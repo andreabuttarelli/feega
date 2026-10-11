@@ -67,3 +67,48 @@ export function motionJolts(diffs: readonly number[], limits: JoltLimits = {}): 
   const cut = (i: number) => cuts.has(i);
   return [...pops(diffs, at, cut), ...stops(diffs, at, cut), ...flickers(diffs.map((v, i) => (cut(i) ? (diffs[i - 1] ?? 0) : v)), at)].sort((a, b) => a.frame - b.frame);
 }
+
+const LUMA = { r: 0.299, g: 0.587, b: 0.114 };
+const RGBA = 4;
+
+export function lumaOf(rgba: ArrayLike<number>): Uint8Array {
+  const out = new Uint8Array(rgba.length / RGBA);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = Math.round(LUMA.r * rgba[i * RGBA] + LUMA.g * rgba[i * RGBA + 1] + LUMA.b * rgba[i * RGBA + 2]);
+  }
+  return out;
+}
+
+export type JoltMeter = { add: (frame: ArrayLike<number>) => void; jolts: (limits: JoltLimits) => JoltAt[] };
+
+export function joltMeter(): JoltMeter {
+  const diffs: number[] = [];
+  let last: ArrayLike<number> | null = null;
+  return {
+    add: (frame) => {
+      if (last) {
+        diffs.push(...frameDiffs([last, frame]));
+      }
+      last = frame;
+    },
+    jolts: (limits) => motionJolts(diffs, limits)
+  };
+}
+
+type Edged = { from: number; durationInFrames: number; junction?: unknown };
+
+export function docCuts(doc: { tracks: readonly { clips: readonly Edged[] }[] }): number[] {
+  const clips = doc.tracks.flatMap((t) => t.clips);
+  const joined = new Set(clips.filter((c) => c.junction).map((c) => c.from));
+  const edges = clips.flatMap((c) => [c.from, c.from + c.durationInFrames]).filter((f) => !joined.has(f));
+  return [...new Set(edges.flatMap((f) => [f - 1, f]))].sort((a, b) => a - b);
+}
+
+export function joltNote(jolts: readonly JoltAt[], fps: number): string {
+  if (!jolts.length) {
+    return 'Smooth: no frame jumps.';
+  }
+  const at = jolts.map((j) => `${((j.frame + 1) / fps).toFixed(1)} s (${j.kind})`);
+  const listed = at.length > 1 ? `${at.slice(0, -1).join(', ')} and ${at.at(-1)}` : at[0];
+  return `${jolts.length} frame jump${jolts.length > 1 ? 's' : ''}, at ${listed}: ask the agent to smooth them.`;
+}

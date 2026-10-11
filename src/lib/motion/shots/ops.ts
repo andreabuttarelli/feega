@@ -4,7 +4,7 @@ import { addClip, type OpResult } from '../timeline';
 import { writeComponent } from '../custom/ops';
 import { VECTOR_TOKEN } from '../vector-ui/piece';
 import type { VectorNode, VectorUi } from '../vector-ui/model';
-import { SHOTS, ShotUi, shotSource, type ShotId } from './library';
+import { SHOTS, ShotUi, overLimits, shotSource, type ShotId } from './library';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -70,6 +70,10 @@ export function addShot(doc: MotionDoc, plan: ShotPlan, id: string): OpResult & 
   const seconds = plan.seconds ?? spec.seconds.best;
   if (seconds < spec.seconds.min || seconds > spec.seconds.max) {
     return { ok: false, error: `${plan.shot} lasts ${spec.seconds.min}–${spec.seconds.max} s: never stretch a shot to fit words, cut the words` };
+  }
+  const crowded = overLimits(plan.shot, parsed.data);
+  if (crowded) {
+    return { ok: false, error: crowded };
   }
   const vector = plan.ui ? vectorOf(doc, plan.ui) : null;
   if (spec.ui === ShotUi.Required && !vector) {

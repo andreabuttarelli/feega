@@ -256,6 +256,17 @@ Chromium tiene 16 contesti WebGL per pagina: lane × canvas 3D (+ compositor) > 
 vecchia li perde, senza errore. Mossa: controllare l'mp4 completo frame per frame (PSNR per frame
 contro WebKit 1 lane), non 3 frame a campione.
 
+### Un componente 3D fallisce il seek check senza stato che perde
+Signal: "the frame at Xs differs between visits", nessuna variabile tenuta tra i seek, i due
+frame identici a occhio (feature-grid, run v4). Le trasformazioni 3D (`translate3d`, `rotateX`,
+`preserve-3d`, `perspective`) promuovono layer che Chrome rasterizza secondo la storia dei seek.
+Move: profondità simulata in 2D (`translate` + `scale`), `transform: none` a riposo; riprodurre
+con `seekPlan` + hash dei jpeg prima di toccare il codice.
+
+### `app_browse` non entra in una pagina di login SvelteKit
+Signal: login failed, nello screenshot email vuota e password piena. L'idratazione azzera il
+campo con `value={...}` scritto prima. Move: attendere che la pagina si assesti prima di scrivere.
+
 ## Ambiente e worktree
 
 ### Verde in locale, rosso in CI: una chiave del `.env` sceglie il ramo

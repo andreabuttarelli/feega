@@ -1,3 +1,4 @@
+import { VECTOR_TOKEN } from '$lib/motion/vector-ui/piece';
 export const EMPTY_EDGE_DENSITY = 0.02;
 export const BEAT_TOLERANCE_S = 0.1;
 
@@ -32,7 +33,7 @@ export type Taste = Record<TasteAxis, { score: number; reason: string }>;
 export type CaseResult = { name: string; prompt: string; unrun: string | null; facts: Facts | null; taste: Taste | null };
 
 type Clip = { component: string; props?: Record<string, unknown> };
-type Doc = { tracks: Array<{ clips: Clip[] }> };
+type Doc = { tracks: Array<{ clips: Clip[] }>; components?: Record<string, { source: { js: string } }> };
 type ToolCall = { toolName: string; output: unknown; status?: string };
 type Message = { tool_calls?: ToolCall[] | null };
 
@@ -94,7 +95,8 @@ export function textMinShare(doc: Doc): number | null {
 export function uiLayers(doc: Doc, kitNames: ReadonlySet<string>) {
   const ui = clipsOf(doc).filter((c) => c.component === 'Custom' && typeof c.props?.name === 'string');
   const kit = ui.filter((c) => kitNames.has(String(c.props?.name))).length;
-  return { recreated: ui.length - kit, kit };
+  const recreated = ui.filter((c) => VECTOR_TOKEN.test(doc.components?.[String(c.props?.name)]?.source.js ?? '')).length;
+  return { recreated, kit };
 }
 
 const callsOf = (messages: readonly Message[]) => messages.flatMap((m) => m.tool_calls ?? []);

@@ -1,5 +1,6 @@
 import type { HTTPRequest, Page } from 'puppeteer-core';
 import { assertPublicUrl } from '$lib/server/tool-guard';
+import { devSelfOrigin } from './self-origin';
 
 export enum ShotView {
   Desktop = 'desktop',
@@ -25,10 +26,13 @@ const JPEG_QUALITY = 70;
 const INERT_SCHEMES = ['data:', 'blob:', 'about:'];
 const WEB_SCHEMES = ['http:', 'https:'];
 
-export async function requestVerdict(url: string): Promise<RequestVerdict> {
+export async function requestVerdict(url: string, self: string | null = devSelfOrigin()): Promise<RequestVerdict> {
   const parsed = URL.canParse(url) ? new URL(url) : null;
   if (!parsed) {
     return RequestVerdict.Abort;
+  }
+  if (self !== null && parsed.origin === self) {
+    return RequestVerdict.Continue;
   }
   if (INERT_SCHEMES.includes(parsed.protocol)) {
     return RequestVerdict.Continue;

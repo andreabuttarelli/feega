@@ -23,3 +23,16 @@ describe('screenshot request guard', () => {
     expect(await requestVerdict(url)).toBe(verdict);
   });
 });
+
+describe('the dev server reading itself', () => {
+  const SELF = 'http://localhost:5301';
+
+  it('lets the browser open the dev server it runs in, so app_browse signs in to the local app', async () => {
+    expect(await requestVerdict(`${SELF}/login`, SELF)).toBe(RequestVerdict.Continue);
+  });
+
+  it('keeps every other private address closed', async () => {
+    expect(await requestVerdict('http://localhost:5173/', SELF)).toBe(RequestVerdict.Abort);
+    expect(await requestVerdict('http://127.0.0.1:5301/', SELF)).toBe(RequestVerdict.Abort);
+  });
+});

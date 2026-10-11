@@ -12,6 +12,7 @@
   import { BrowserStage, renderInBrowser } from '$lib/motion/export/browser-render';
   import { RenderPlace, renderPlace, thisDevice, type Device } from '$lib/motion/render-place';
   import { saveExport } from '$lib/motion/export/save';
+  import { joltNote } from '$lib/motion/smoothness';
   import type { FrameSize } from './MotionPreview.svelte';
   import { liveComponents, liveNote, unverified } from '$lib/motion/custom/determinism';
   import { CheckState } from '$lib/motion/custom/component';
@@ -141,6 +142,7 @@
   let error = $state('');
   let downloadUrl = $state('');
   let savedNote = $state('');
+  let smoothNote = $state('');
   let controller: AbortController | null = null;
 
   const total = $derived(target.durationInFrames);
@@ -262,7 +264,8 @@
           done = n;
           now = performance.now();
         },
-        onPause: (p) => (paused = p)
+        onPause: (p) => (paused = p),
+        onJolts: (jolts) => (smoothNote = joltNote(jolts, target.fps))
       });
       downloadUrl = URL.createObjectURL(blob);
 
@@ -410,6 +413,7 @@
 
       {#if phase === Phase.Done}
         <p class="hint" data-testid="export-saved">{savedNote}</p>
+        {#if smoothNote}<p class="hint" data-testid="export-smooth">{smoothNote}</p>{/if}
         <a class="primary" href={downloadUrl} download={`${fileName}.mp4`} data-testid="export-download"><Download size={16} /> Download MP4</a>
       {:else if busy}
         <button type="button" class="secondary" disabled={phase === Phase.Saving} onclick={cancel}>Cancel</button>

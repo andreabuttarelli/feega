@@ -94,6 +94,14 @@ export function blockedPlatform(url: string): string | null {
 
 export const sameApp = (url: string, app: string) => hostOf(url) !== null && hostOf(url) === hostOf(app);
 
+export function signInPath(url: string): boolean {
+  if (!URL.canParse(url)) {
+    return false;
+  }
+  const path = new URL(url).pathname.replace(/\/+$/, '').toLowerCase();
+  return /(^|\/)(log-?in|sign-?in|sign-?up)(\/|$)/.test(path);
+}
+
 export function onLoginPage(pageUrl: string, loginUrl: string): boolean {
   if (!URL.canParse(pageUrl)) {
     return false;
@@ -102,8 +110,19 @@ export function onLoginPage(pageUrl: string, loginUrl: string): boolean {
     const p = new URL(u);
     return `${p.origin}${p.pathname.replace(/\/+$/, '')}`.toLowerCase();
   };
-  const path = new URL(pageUrl).pathname.replace(/\/+$/, '').toLowerCase();
-  return /(^|\/)(log-?in|sign-?in|sign-?up)(\/|$)/.test(path) || bare(pageUrl) === bare(loginUrl);
+  return signInPath(pageUrl) || bare(pageUrl) === bare(loginUrl);
+}
+
+export type KeptSession = { session: AppSession; origin: string };
+
+export function savedSession(accounts: AppAccountStore, now: () => number = Date.now): (url: string) => Promise<KeptSession | null> {
+  return async (url) => {
+    const account = await accounts.read();
+    if (!account || !account.sessionUntil || account.sessionUntil <= now() || !sameApp(url, account.loginUrl)) {
+      return null;
+    }
+    return { session: account.session, origin: new URL(account.loginUrl).origin };
+  };
 }
 
 function pageUrl(page: string, loginUrl: string): string {
@@ -152,6 +171,7 @@ function fenced(tab: AppTab, app: string, confirm: Confirm): AppTab {
 async function signIn(tab: AppTab, account: AppAccount, sleep: (ms: number) => Promise<unknown>): Promise<boolean> {
   await tab.goto(account.loginUrl);
   await tab.waitFor(DEFAULT_EMAIL_SELECTOR, LOGIN_FIELD_WAIT_MS).catch(() => undefined);
+  await sleep(PAGE_SETTLE_MS);
   await tab.type(DEFAULT_EMAIL_SELECTOR, account.email);
   await tab.type(DEFAULT_PASSWORD_SELECTOR, account.password);
   await tab.click({ selector: DEFAULT_SUBMIT_SELECTOR });

@@ -261,7 +261,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
     storyboard,
-    captureUi: uiCapture({ orgId, userId, projectId: project.id, brandId: project.brandId }),
+    captureUi: uiCapture(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
       BROWSER_DRAWS[browser]();
