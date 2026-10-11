@@ -84,3 +84,27 @@ describe('the shot library', () => {
     expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available })).toMatch(/add_shot/);
   });
 });
+
+describe('on-screen titles come only from the script', () => {
+  const source = { url: 'https://supasito.com/', quote: 'Every site you run.' };
+  const act = (name: string, on_screen: string[]) => ({ act: name, start: 0, end: 1, scene: 'scene', on_screen, ui: '', sources: [] });
+  const script = { brand: 'real', research: { audience: 'site owners', problem: 'edits scatter', struggle: 'three sites', flow: ['pick', 'say'], benefits: [{ claim: 'one place', source }], numbers: [], tone: 'calm', promise: { text: 'Every site you run.', source } }, acts: [act('problem', ['Three sites. One new price.']), act('solution', ['Pick the site.']), act('proof', ['One place.']), act('claim', ['Every site you run.', 'supasito.com'])] } as never;
+
+  it('refuses a title that is not a line of the script and lists the lines to use (v5: "the texts make no sense")', async () => {
+    const { session, run } = setup();
+    session.doc = { ...session.doc, script };
+
+    const made = await run('add_shot', { shot: ShotId.KineticTitle, slots: { text: 'Unlock your synergy' }, at: 0 });
+
+    expect(made.ok).toBe(false);
+    expect(String(made.error)).toContain('"Three sites. One new price." / "Pick the site." / "One place." / "Every site you run." / "supasito.com"');
+  });
+
+  it('takes a script line as a title, whatever its case or punctuation', async () => {
+    const { session, run } = setup();
+    session.doc = { ...session.doc, script };
+
+    expect(await run('add_shot', { shot: ShotId.KineticTitle, slots: { text: 'three sites, one new price' }, at: 0 })).toMatchObject({ ok: true });
+  });
+});
+

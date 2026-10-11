@@ -11,6 +11,7 @@ import {
   logAiCall,
   noteLlmCost,
   takeLlmCost,
+  billingScope,
   withBrandContext,
   withOrgContext
 } from './ai-log';
@@ -474,3 +475,21 @@ describe('la fattura che è finita nella riga si rilegge nello scope', () => {
     });
   });
 });
+
+describe('a billing scope read from outside it', () => {
+  it('tells a running turn what the gateway billed so far, even after the calls returned (v6: the fixer spent $3.4 on a $0.75 share)', async () => {
+    const billing = billingScope('org-1');
+    await billing.run(async () => {
+      noteLlmCost(0.4);
+      await new Promise((r) => setTimeout(r, 1));
+      noteLlmCost(0.5);
+    });
+
+    expect(billing.gatewayUsd()).toBeCloseTo(0.9, 10);
+  });
+
+  it('a billing scope keeps its org for the calls inside it', () => {
+    expect(billingScope('org-2').run(() => getOrgContext())).toBe('org-2');
+  });
+});
+

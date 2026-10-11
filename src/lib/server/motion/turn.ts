@@ -9,7 +9,7 @@ import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions, toolForcing } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
 import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
-import { billedUsdInScope, extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
+import { billedUsdInScope, billingScope, extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
 import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
 import { referencedAssets } from '$lib/motion/doc-assets';
@@ -30,8 +30,9 @@ import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/serv
 import { CutGate, REVIEW_CUT, cutGate, type CutReview } from '$lib/motion/cut-review';
 import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
+import { COPY_SCHEMA, copywrite } from '$lib/server/motion/copywriter';
 import { projectMemory } from '$lib/server/motion/studio-memory';
-import { STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleTools, turnRole } from '$lib/server/motion/studio-roster';
+import { REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
 import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
@@ -274,6 +275,12 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
     storyboard,
+    copywrite: async (script) => {
+      const ask = async (prompt: string) => ({ answer: await llmStructured({ prompt, schema: COPY_SCHEMA, model: roleModel(StudioRole.Copywriter, model), temperature: 0.4, label: STUDIO_ROSTER[StudioRole.Copywriter].label }), usd: billedUsdInScope() ?? 0 });
+      const out = await withOrgContext(orgId, () => copywrite({ ask }, script));
+      spent += out.usd;
+      return out.script;
+    },
     captureUi: uiCapture(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
@@ -314,7 +321,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     }
   });
 
-  const codeModel = llmCodeModel();
+  const codeModel = roleModel(role, llmCodeModel());
   const opening = openingTier({ message, doc: head.doc, selection });
   await ensureGatewayModels();
   const visionModel = gatewayModel(model)?.usable ? model : llmVisionModel();
@@ -328,11 +335,14 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const stepTiers: Tier[] = [];
   const framesShown = new Set<string>();
   let spent = 0;
-  const overBudget: Stop = () => spent > roleBudgetUsd(role, AGENT_TURN_CAP_USD);
+  let roundsUsd = 0;
+  const billing = billingScope(orgId);
+  const charged = () => spent - roundsUsd + Math.max(roundsUsd, billing.gatewayUsd());
+  const overBudget: Stop = () => charged() > roleBudgetUsd(role, AGENT_TURN_CAP_USD);
   const TIER_MODEL: Record<Tier, string> = { [Tier.Edit]: model, [Tier.Code]: codeModel };
 
   const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void) =>
-    streamText({
+    billing.run(() => streamText({
       model: llmLanguageModel(model, PromptCache.On),
       system,
       messages,
@@ -346,7 +356,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         }
       },
       onStepFinish: (step) => {
-        spent += spentUsd([extractSdkUsage(step.usage)], [stepModels.at(-1) ?? model], gatewayRate);
+        const estimate = spentUsd([extractSdkUsage(step.usage)], [stepModels.at(-1) ?? model], gatewayRate);
+        spent += estimate;
+        roundsUsd += estimate;
         onStep(step);
       },
       prepareStep: ({ steps, messages: current, stepNumber }) => {
@@ -364,7 +376,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const forced = ROUND_CHOICE[kind]({ tier, reasoning: stepModel === model ? reasoning : null, forcing: toolForcing(stepModel), stepNumber });
         return { model: llmLanguageModel(stepModel, PromptCache.On), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
       }
-    });
+        }));
 
   const lastLook = async (messages: ModelMessage[]): Promise<ModelMessage[]> => {
     const view = tools[VIEW_FRAMES];
@@ -397,7 +409,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       tile: tileSheet,
       density: frameDensities,
       ask: async (q: { prompt: string; images: LlmMediaPart[] }) => {
-        const answer = await llmStructured({ ...q, schema: CRITIC_SCHEMA, model: visionModel ?? model, temperature: 0, label: STUDIO_ROSTER[StudioRole.Critic].label });
+        const answer = await llmStructured({ ...q, schema: CRITIC_SCHEMA, model: roleModel(StudioRole.Critic, visionModel ?? model), temperature: 0, label: STUDIO_ROSTER[StudioRole.Critic].label });
         return { answer, usd: billedUsdInScope() ?? 0 };
       }
     };
@@ -481,7 +493,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const times = keyFrameTimes(session.doc);
         await play([...conversation, checkMessage(errors, times)], Round.SelfCheck);
       }
-      const critiqued = steps.length > 0 && !awaitsGo && role === StudioRole.Builder && vision === Vision.Available && session.edits.length > 0 ? await reviewCut() : null;
+      const critiqued = steps.length > 0 && !awaitsGo && REVIEWED.has(role) && vision === Vision.Available && session.edits.length > 0 ? await reviewCut() : null;
       const fix = critiqued?.review ? criticMessage(critiqued.review) : null;
       if (fix && gate === CutGate.Auto) {
         await play([...conversation, fix], Round.SelfCheck);
@@ -576,7 +588,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
 
     const written = write?.outcome === RevisionOutcome.Written ? write.head : null;
     const asked = finished.tools.map(savedPick).findLast((p) => p !== null) ?? null;
-    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: spent, pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null };
+    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null };
   }
 
   const reader = stream.getReader();

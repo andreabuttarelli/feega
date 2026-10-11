@@ -9,7 +9,7 @@ const doc = { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 30 * 12
 
 const jpeg = (shade: number) => sharp({ create: { width: 64, height: 36, channels: 3, background: { r: shade, g: shade, b: shade } } }).jpeg().toBuffer();
 
-const ports = (answer: unknown, seen: { times?: number[]; images?: number } = {}): CriticPorts => ({
+const ports = (answer: unknown, seen: { times?: number[]; images?: number; prompt?: string } = {}): CriticPorts => ({
   frames: async (times) => {
     seen.times = [...(seen.times ?? []), ...times];
     return Promise.all(times.map(async (time) => ({ time, bytes: await jpeg(time * 10) })));
@@ -17,6 +17,7 @@ const ports = (answer: unknown, seen: { times?: number[]; images?: number } = {}
   tile: async (frames) => Buffer.from(`sheet of ${frames.length}`),
   ask: async (input) => {
     seen.images = input.images.length;
+    seen.prompt = input.prompt;
     return { answer, usd: 0.05 };
   }
 });
@@ -104,3 +105,15 @@ describe('the critic measures empty frames on its own sheet', () => {
     expect(out.review).toEqual({ score: 9, fixes: [] });
   });
 });
+
+describe('the critic reads the script as text', () => {
+  it('gets the on-screen lines numbered in order and is asked whether they make sense (v5: "the texts make no sense")', async () => {
+    const seen: { prompt?: string } = {};
+    const script = { research: { audience: 'site owners' }, acts: [{ on_screen: ['Three sites.'] }, { on_screen: ['Pick one.', 'Say the change.'] }] } as never;
+    await critique(ports({ score: 9, fixes: [] }, seen), { doc: { ...doc, script }, request: 'x', references: [] });
+
+    expect(seen.prompt).toContain('1. Three sites. 2. Pick one. 3. Say the change.');
+    expect(seen.prompt).toContain('make sense in that order');
+  });
+});
+

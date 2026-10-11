@@ -2791,3 +2791,9 @@ log Vercel: `[video] submit openrouter rifiutato: ...`. Mossa: `get_runtime_logs
 `video` sulla finestra del run; poi confronta il payload con
 `curl https://openrouter.ai/api/v1/videos/models` (`supported_frame_images`): un modello senza
 riferimenti rifiuta `input_references`.
+
+### Un turno motion supera il suo tetto di 4 volte
+Segnale: `motion-fixer-code` $3.03 in `ai_calls` con una quota di $0.75. Il tetto contava
+`spentUsd` dal listino (`gatewayRate`), non la fattura del gateway. Mossa: il turno gira in
+`billingScope` e il tetto legge `max(stima, gatewayUsd())`. `pgrep -f run.ts` in un ciclo
+`until` trova anche il ciclo stesso: aspetta il PID (`kill -0`).

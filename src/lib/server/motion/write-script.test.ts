@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { createMotionTools, type MotionSession } from './motion-tools';
+import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
 import { pageOf } from './site-copy';
 
 const SITE = 'https://supasito.com/';
 const HOME = '<h1>Every site you run. Up to date. In one place.</h1><p>Say what should change. See it before it goes live.</p><h2>The deal is simple.</h2><p>Free for personal use.</p>';
 
-function setup() {
+function setup(copywrite?: MotionToolDeps['copywrite']) {
   let n = 0;
   const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
   const site = vi.fn(async () => ({ ok: true as const, site: { url: SITE, logos: [], pages: [pageOf(SITE, HOME)] } }));
-  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), site });
+  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), site, copywrite });
   const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: (i: unknown, o: { toolCallId: string }) => Promise<Record<string, unknown>> }).execute(input, { toolCallId: 'c' });
   return { session, run };
 }
@@ -33,7 +33,7 @@ const script = (proof: string) => ({
     { act: 'problem', start: 0, end: 3, scene: 'Scattered folders', on_screen: ['The price changed.'], ui: 'Finder: marta-bakery, cardstack-launch, supasito.com, each "edited 9 days ago" with 3 open chats' },
     { act: 'solution', start: 3, end: 7, scene: 'One prompt', on_screen: ['Say what should change.'], ui: 'Sidebar Supasito, Cardstack, Marta’s Bakery; prompt "Set the price to €12"; preview; Publish' },
     { act: 'proof', start: 7, end: 11, scene: 'Preview', on_screen: ['See it before it goes live.'], sources: [source(proof)] },
-    { act: 'claim', start: 11, end: 14, scene: 'Logo', on_screen: ['Every site you run. Up to date. In one place.'] }
+    { act: 'claim', start: 11, end: 14, scene: 'Logo', on_screen: ['Every site you run.', 'Up to date.', 'In one place.'] }
   ]
 });
 
@@ -99,4 +99,18 @@ describe('figures in shot text come from the site, like the script', () => {
 
     expect(await run('add_shot', { shot: 'stat-count', slots: { value: '12', label: 'sites' }, at: 0 })).toMatchObject({ ok: true });
   });
+
+  it('hands the facts to the copywriter and saves its lines, so the titles read as one story', async () => {
+    const lines = ['Three sites. One new price.', 'Pick the site.', 'See it first.', 'Every site you run.', 'Up to date.', 'In one place.'];
+    const copywrite = vi.fn(async (s: { acts: { on_screen: string[] }[] }) => ({ ...s, acts: s.acts.map((a, i) => ({ ...a, on_screen: [[lines[0]], [lines[1]], [lines[2]], lines.slice(3)][i] })) }));
+    const { session, run } = setup(copywrite as never);
+    await run('analyze_site', { url: SITE });
+
+    const saved = await run('write_script', script('See it before it goes live'));
+
+    expect(copywrite).toHaveBeenCalledTimes(1);
+    expect(saved).toMatchObject({ ok: true, lines });
+    expect(session.doc.script?.acts[0].on_screen).toEqual(['Three sites. One new price.']);
+  });
 });
+

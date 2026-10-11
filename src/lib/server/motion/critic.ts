@@ -3,6 +3,7 @@ import type { ModelMessage } from 'ai';
 import type { MotionDoc } from '$lib/motion/doc';
 import type { LlmMediaPart } from '$lib/server/llm';
 import { MAX_FRAMES_PER_VIEW, VIEW_FRAMES, type Frame, type Reference } from './frames';
+import { scriptLines } from '$lib/motion/script';
 import { EMPTY_EDGE_DENSITY } from '$lib/motion/emptiness';
 
 export const SHEET_MAX_FRAMES = 24;
@@ -43,7 +44,8 @@ const prompt = (input: CriticInput, times: number[]) =>
     `The first image is the contact sheet of the WHOLE video: ${times.length} stills, left to right then top to bottom, at ${times.join(', ')} s.`,
     input.references.length ? `The next ${input.references.length} images are the references the video should follow.` : '',
     `The request was: "${input.request}".`,
-    input.doc.script ? `The approved brief and script: ${JSON.stringify(input.doc.script)}` : '',
+    input.doc.script ? `The on-screen lines, read in order: ${scriptLines(input.doc.script).map((l, i) => `${i + 1}. ${l}`).join(' ')}. Judge them first as text: do they make sense in that order, say something true and specific about the product, and lead to the promise? A line that does not is your first fix, with the replacement line.` : '',
+    input.doc.script ? `The research behind them: ${JSON.stringify(input.doc.script.research)}` : '',
     'Score it 1-10 (premium, dense, dynamic, true to the real brand and product, readable hierarchy, follows the brief and the references).',
     `Then list at most ${MAX_FIXES} concrete fixes, worst first, each naming the time in seconds and the exact change (e.g. "2.5s: the frame is mostly empty: put the real dashboard UI behind the title"). No praise, no vague advice. An empty list if nothing must change.`
   ]
