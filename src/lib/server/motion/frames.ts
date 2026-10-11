@@ -7,6 +7,7 @@ import { blocking, type QualityProblem } from '$lib/motion/direction';
 import { REFERENCE_TOOLS } from '$lib/server/web/web-tools';
 
 export const VIEW_FRAMES = 'view_frames';
+export const DESCRIBE_FRAMES = 'describe_frames';
 export const MAX_FRAMES_PER_VIEW = 6;
 export const MAX_VIEWS_PER_TURN = 3;
 export const MAX_FRAME_BYTES = 200_000;
@@ -60,13 +61,15 @@ function framesOutput(output: unknown, frames: readonly Frame[] = [], refs: read
   }
   const picture = (mediaType: string, data: string) => ({ type: 'file' as const, mediaType, data: { type: 'data' as const, data } });
   const compared = refs.length ? [{ type: 'text' as const, text: REFERENCE_ASK }, ...refs.map((r) => picture(r.mediaType, r.data))] : [];
+  const { quality: _quality, blocking: _blocking, gate, ...seen } = output as { quality?: unknown; blocking?: unknown; gate?: string };
   return {
     type: 'content' as const,
     value: [
-      { type: 'text' as const, text: JSON.stringify(output) },
+      { type: 'text' as const, text: JSON.stringify(seen) },
       { type: 'text' as const, text: `Frames, in order, at ${frames.map((f) => `${f.time}s`).join(', ')}. ${FRAMES_ASK}` },
       ...frames.map((f) => picture('image/jpeg', f.bytes.toString('base64'))),
-      ...compared
+      ...compared,
+      ...(gate ? [{ type: 'text' as const, text: gate }] : [])
     ]
   };
 }
@@ -201,7 +204,7 @@ export function checkMessage(errors: readonly QualityProblem[], times: number[])
 }
 
 export function fixPrompt(errors: readonly QualityProblem[], times: number[]): string {
-  return `Not deliverable yet: the quality gate still finds these errors in the video:\n${errors.map((e) => `- ${e.detail}`).join('\n')}\nFix each one with the editing tools, then call ${VIEW_FRAMES} with times [${times.join(', ')}] to check again. Then, as your last message, ${SUMMARY_ASK}`;
+  return `Not deliverable yet: the quality gate still finds these errors in the video:\n${errors.map((e) => `- ${e.detail}`).join('\n')}\nIf the last frames you viewed are not described yet, call ${DESCRIBE_FRAMES} first. Then fix each one with the editing tools, then call ${VIEW_FRAMES} with times [${times.join(', ')}] to check again. Then, as your last message, ${SUMMARY_ASK}`;
 }
 
 export function stillOpenNote(errors: readonly QualityProblem[]): string {

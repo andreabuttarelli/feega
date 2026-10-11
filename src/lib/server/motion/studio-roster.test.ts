@@ -37,8 +37,12 @@ describe('the studio roster', () => {
     expect(roleBudgetUsd(StudioRole.Fixer, 1.5)).toBeLessThan(roleBudgetUsd(StudioRole.Builder, 1.5));
   });
 
-  it('the builder and its critic share one turn cap without exceeding it', () => {
-    expect(STUDIO_ROSTER[StudioRole.Builder].budgetShare + STUDIO_ROSTER[StudioRole.Critic].budgetShare).toBeCloseTo(1);
+  it('the viewer only looks: it gets no tool', () => {
+    expect(roleTools(StudioRole.Viewer, names)).toEqual([]);
+  });
+
+  it('the builder, its critic and the viewer share one turn cap without exceeding it', () => {
+    expect(STUDIO_ROSTER[StudioRole.Builder].budgetShare + STUDIO_ROSTER[StudioRole.Critic].budgetShare + STUDIO_ROSTER[StudioRole.Viewer].budgetShare).toBeCloseTo(1);
     Object.values(STUDIO_ROSTER).forEach((r) => expect(r.budgetShare).toBeLessThanOrEqual(1));
   });
 

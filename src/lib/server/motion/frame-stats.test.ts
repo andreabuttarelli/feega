@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { frameDensities, frameStats } from './frame-stats';
+import { frameDensities, frameStats, seamLuma } from './frame-stats';
 import { EMPTY_EDGE_DENSITY } from '$lib/motion/emptiness';
 
 const W = 160;
@@ -44,5 +44,16 @@ describe('how much is drawn on a frame', () => {
 
     expect(flat).toBeLessThan(EMPTY_EDGE_DENSITY);
     expect(stripes).toBeGreaterThan(EMPTY_EDGE_DENSITY);
+  });
+});
+
+describe('the loop seam between the last frame and the first', () => {
+  it('is near zero when the video ends where it began, large when it cuts to something else', async () => {
+    const dark = await jpeg(pixels(() => 20));
+    const light = await jpeg(pixels(() => 220));
+
+    expect(await seamLuma([{ time: 0, bytes: dark }, { time: 9.9, bytes: dark }])).toBeLessThan(2);
+    expect(await seamLuma([{ time: 0, bytes: dark }, { time: 9.9, bytes: light }])).toBeGreaterThan(150);
+    expect(await seamLuma([{ time: 0, bytes: dark }])).toBeNull();
   });
 });

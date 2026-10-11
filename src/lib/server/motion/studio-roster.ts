@@ -8,7 +8,8 @@ export enum StudioRole {
   Builder = 'builder',
   Fixer = 'fixer',
   Critic = 'critic',
-  Copywriter = 'copywriter'
+  Copywriter = 'copywriter',
+  Viewer = 'viewer'
 }
 
 enum ToolScope {
@@ -37,8 +38,9 @@ export const STUDIO_ROSTER: Record<StudioRole, RoleSpec> = {
   [StudioRole.ShotBuilder]: { label: 'motion-shots', budgetShare: 0.88, tools: ToolScope.Shots, model: RoleModel.Opus, code: WritesCode.No },
   [StudioRole.Builder]: { label: 'motion-agent', budgetShare: 0.88, tools: ToolScope.All, model: RoleModel.Opus, code: WritesCode.Yes },
   [StudioRole.Fixer]: { label: 'motion-fixer', budgetShare: 0.5, tools: ToolScope.All, model: RoleModel.Opus, code: WritesCode.Yes },
-  [StudioRole.Critic]: { label: 'motion-critic', budgetShare: 0.12, tools: ToolScope.None, model: RoleModel.Vision, code: WritesCode.No },
-  [StudioRole.Copywriter]: { label: 'motion-copywriter', budgetShare: 0.05, tools: ToolScope.None, model: RoleModel.Opus, code: WritesCode.No }
+  [StudioRole.Critic]: { label: 'motion-critic', budgetShare: 0.08, tools: ToolScope.None, model: RoleModel.Vision, code: WritesCode.No },
+  [StudioRole.Copywriter]: { label: 'motion-copywriter', budgetShare: 0.05, tools: ToolScope.None, model: RoleModel.Opus, code: WritesCode.No },
+  [StudioRole.Viewer]: { label: 'motion-viewer', budgetShare: 0.04, tools: ToolScope.None, model: RoleModel.Vision, code: WritesCode.No }
 };
 
 const STORY_TOOLS: ReadonlySet<string> = new Set([

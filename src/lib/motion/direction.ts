@@ -47,7 +47,8 @@ export enum Quality {
   OffLook = 'off-look',
   NoProductUi = 'no-product-ui',
   KitUi = 'kit-ui',
-  DeadJunction = 'dead-junction'
+  DeadJunction = 'dead-junction',
+  LoopJump = 'loop-jump'
 }
 
 export enum Severity {
@@ -85,6 +86,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.NoProductUi]: Severity.Blocking,
   [Quality.KitUi]: Severity.Blocking,
   [Quality.DeadJunction]: Severity.Blocking,
+  [Quality.LoopJump]: Severity.Warning,
   [LookMiss.Unrecorded]: Severity.Blocking,
   [LookMiss.TypeScale]: Severity.Warning,
   [LookMiss.TypeScaleGross]: Severity.Blocking,

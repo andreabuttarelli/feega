@@ -49,6 +49,15 @@ describe('the critic', () => {
     expect(out.usd).toBe(0.05);
   });
 
+  it('hands the critic what an independent viewer saw in each frame, before it judges', async () => {
+    let prompt = '';
+    const view = async (frames: readonly { time: number }[]) => ({ lines: frames.map((f) => ({ time: f.time, visible: `still at ${f.time}`, wrong: 'nothing' })), usd: 0.02 });
+    const out = await critique({ ...ports({ score: 9, fixes: [] }), view, ask: async (q) => ((prompt = q.prompt), { answer: { score: 9, fixes: [] }, usd: 0.05 }) }, { doc, request: 'x', references: [] });
+
+    expect(prompt).toContain('0.5s: still at 0.5');
+    expect(out.usd).toBeCloseTo(0.07);
+  });
+
   it('draws the sheet in batches the editor accepts, so no frame request is refused', async () => {
     const batches: number[][] = [];
     const out = await critique({ ...ports({ score: 9, fixes: [] }), frames: async (times) => (batches.push(times), times.map((time) => ({ time, bytes: Buffer.from('x') }))) }, { doc, request: 'x', references: [] });

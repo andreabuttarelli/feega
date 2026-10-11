@@ -95,6 +95,8 @@ export function joltMeter(): JoltMeter {
   };
 }
 
+export const seamDiff = (first: ArrayLike<number>, last: ArrayLike<number>): number => frameDiffs([last, first])[0];
+
 type Edged = { from: number; durationInFrames: number; junction?: unknown };
 
 export function docCuts(doc: { tracks: readonly { clips: readonly Edged[] }[] }): number[] {

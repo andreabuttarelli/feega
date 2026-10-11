@@ -33,7 +33,7 @@ vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
   }
 }));
 vi.mock('$lib/server/motion/frame-stats', () => ({
-  frameDensities: async (frames: unknown[]) => frames.map(() => 0.5), frameStats: async (frames: { time: number }[]) => frames.map((f) => ({ time: f.time, luma: 100, lumaStd: 30, whiteShare: 0 })) }));
+  frameDensities: async (frames: unknown[]) => frames.map(() => 0.5), seamLuma: async () => 0, frameStats: async (frames: { time: number }[]) => frames.map((f) => ({ time: f.time, luma: 100, lumaStd: 30, whiteShare: 0 })) }));
 vi.mock('$lib/server/motion/chromium-frames', () => ({
   serverFramesOpen: () => store.open,
   chromiumFrames: {
