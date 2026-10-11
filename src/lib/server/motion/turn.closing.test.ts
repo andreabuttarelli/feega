@@ -515,6 +515,16 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(outcome.reply).toMatch(/flat colour/);
   });
 
+  it('a turn over its budget gets one more look at most, never every fix round (v6: the fixer spent twice its share in self-checks)', async () => {
+    world.blankViews = 1_000;
+    world.billed = 50;
+
+    const outcome = await turn();
+
+    expect(world.toolCalls.filter((t) => t === 'view_frames').length).toBeLessThanOrEqual(1);
+    expect(outcome.reply).toMatch(/still open/i);
+  });
+
   it('stops after the script is saved: the user reads the brief before anything is built', async () => {
     world.scripting = true;
 

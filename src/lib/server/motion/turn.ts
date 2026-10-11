@@ -127,7 +127,7 @@ const userAsked: Stop = ({ steps }) => awaitsUser(steps as TurnStep[]);
 
 const ROUND_STOPS: Record<Round, (t0: number, overBudget: Stop) => Stop[]> = {
   [Round.Edit]: (t0, overBudget) => [agentStopWhen(t0 - CLOSING_RESERVE_MS), overBudget, userAsked],
-  [Round.SelfCheck]: (t0) => [agentStopWhen(t0), selfCheckSpent],
+  [Round.SelfCheck]: (t0, overBudget) => [agentStopWhen(t0), selfCheckSpent, overBudget],
   [Round.Summary]: () => [oneStep]
 };
 
@@ -501,7 +501,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
 
       await play(openingMessages, Round.Edit);
       const awaitsGo = awaitsUser(steps);
-      for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS && !awaitsGo && steps.length && deliveryBlocked(session, vision); attempt++) {
+      for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS && !(attempt > 0 && overBudget({ steps: [] })) && !awaitsGo && steps.length && deliveryBlocked(session, vision); attempt++) {
         const errors = openErrors(session);
         const times = keyFrameTimes(session.doc);
         await play([...conversation, checkMessage(errors, times)], Round.SelfCheck);
