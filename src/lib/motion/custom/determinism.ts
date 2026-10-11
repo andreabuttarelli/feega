@@ -8,8 +8,9 @@ export const CHECK_POINTS = 5;
 const SPREAD = [0.1, 0.3, 0.5, 0.7, 0.92];
 const SCRAMBLE = [2, 4, 0, 3, 1];
 const MAX_PROBLEMS = 6;
+const ANTIALIAS_NOISE = 12;
 
-export type Shot = { time: number; image: string; layout: string; errors: ClipError[] };
+export type Shot = { time: number; image: string; luma: Uint8Array; layout: string; errors: ClipError[] };
 export type Verdict = { ok: boolean; problems: string[]; offending: Shot[] };
 
 export function seekPlan(seconds: number, fps: number): number[] {
@@ -19,6 +20,16 @@ export function seekPlan(seconds: number, fps: number): number[] {
 }
 
 const seconds = (t: number) => `${Math.round(t * 100) / 100}s`;
+
+function samePicture(a: Shot, b: Shot): boolean {
+  if (a.image === b.image) {
+    return true;
+  }
+  if (a.luma.length !== b.luma.length) {
+    return false;
+  }
+  return a.luma.every((v, p) => Math.abs(v - b.luma[p]) <= ANTIALIAS_NOISE);
+}
 
 export function verdictOf(shots: Shot[]): Verdict {
   const problems: string[] = [];
@@ -34,7 +45,7 @@ export function verdictOf(shots: Shot[]): Verdict {
       first.set(shot.time, shot);
       continue;
     }
-    if (seen.image !== shot.image) {
+    if (!samePicture(seen, shot)) {
       problems.push(`the frame at ${seconds(shot.time)} differs between visits (visit ${order + 1} after seeking from ${seconds(shots[order - 1].time)}): state leaks between seeks`);
       offending.push(seen, shot);
       continue;

@@ -14,7 +14,11 @@ function must(r: OpResult): MotionDoc {
   return r.doc;
 }
 
-const shot = (time: number, image = `img@${time}`, layout = `box@${time}`): Shot => ({ time, image, layout, errors: [] });
+const PIXELS = 64;
+const FRAME = new Uint8Array(PIXELS).fill(40);
+const DRIFTED = new Uint8Array(PIXELS).fill(200);
+
+const shot = (time: number, image = `img@${time}`, layout = `box@${time}`, luma = FRAME): Shot => ({ time, image, luma, layout, errors: [] });
 
 describe('the seek-determinism check', () => {
   it('visits every check point forward, backward and in a scrambled order', () => {
@@ -37,13 +41,21 @@ describe('the seek-determinism check', () => {
 
   it('fails on a frame that depends on where the playhead came from, with both frames', () => {
     const plan = seekPlan(4, 30);
-    const shots = plan.map((t, i) => (i === 12 ? shot(t, 'drifted') : shot(t)));
+    const shots = plan.map((t, i) => (i === 12 ? shot(t, 'drifted', `box@${t}`, DRIFTED) : shot(t)));
 
     const verdict = verdictOf(shots);
 
     expect(verdict.ok).toBe(false);
     expect(verdict.problems[0]).toMatch(/differs/);
     expect(verdict.offending.map((s) => s.image)).toEqual([`img@${plan[12]}`, 'drifted']);
+  });
+
+  it('passes a frame whose revisit differs only by antialiasing noise, as real Chrome draws large glyphs', () => {
+    const plan = seekPlan(4, 30);
+    const grain = FRAME.map((v, p) => (p % 9 === 0 ? v + 3 : v));
+    const shots = plan.map((t, i) => (i === 19 ? shot(t, 'reencoded', `box@${t}`, grain) : shot(t)));
+
+    expect(verdictOf(shots)).toEqual({ ok: true, problems: [], offending: [] });
   });
 
   it('fails on boxes that move between visits even when pixels match', () => {
