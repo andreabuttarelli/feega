@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { vectorJson, vectorRuntime, VECTOR_CSS } from '../vector-ui/piece';
 import { withinBudget, type VectorUi } from '../vector-ui/model';
 import { MAX_JS } from '../custom/component';
+import { CURSOR_SLOT, NODE_ID, cursorSource } from './cursor';
 
 export enum ShotId {
   KineticTitle = 'kinetic-title',
@@ -23,6 +24,11 @@ export enum ShotUi {
   Required = 'required'
 }
 
+export enum ShotCursor {
+  None = 'none',
+  Scripted = 'scripted'
+}
+
 export type SlotLimit = { words: number; chars: number };
 
 export type ShotSpec = {
@@ -30,6 +36,7 @@ export type ShotSpec = {
   about: string;
   seconds: { min: number; best: number; max: number };
   ui: ShotUi;
+  cursor: ShotCursor;
   peak: boolean;
   slots: z.ZodObject<z.ZodRawShape>;
   limits: Record<string, SlotLimit>;
@@ -39,7 +46,7 @@ export type ShotSpec = {
 
 const text = z.string().trim().min(1);
 const limit = (words: number, chars: number): SlotLimit => ({ words, chars });
-const nodeId = z.string().regex(/^[a-z]+-\d+$/, 'an element id of the recreated UI, e.g. button-0, input-0, text-3');
+const nodeId = NODE_ID;
 
 const PRELUDE = `
 const W = root.clientWidth || 1920;
@@ -140,6 +147,81 @@ const dimAround = (drawn, b, level) => {
 const WHOLE = { k: Math.min((W * 0.86) / U.width, (H * 0.8) / U.height), cx: U.width / 2, cy: U.height / 2 };
 `;
 
+const CURSOR_LAYER = `
+const CURSOR = CURSOR_MATH;
+const cursorUi = { width: U.width, height: U.height, box: (id) => {
+  const n = nodeById(U, id);
+  return n ? { x: n.x, y: n.y, w: Math.max(1, n.w), h: Math.max(1, n.h), role: n.role || 'box' } : null;
+} };
+const scriptOf = (raw, fallback) => {
+  let script = raw;
+  if (typeof script === 'string') {
+    try {
+      script = script.trim() ? JSON.parse(script) : null;
+    } catch (e) {
+      script = null;
+    }
+  }
+  return Array.isArray(script) && script.length ? script : fallback;
+};
+const CURSOR_SVG = {
+  arrow: { tip: [4, 2.5], svg: '<path d="M4 2.5v17.2l4.6-4.4 2.9 6.6 2.9-1.3-2.9-6.5h6.3z" fill="#000" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>' },
+  hand: { tip: [9, 3], svg: '<path d="M9 2.8c-1 0-1.7.8-1.7 1.7v8.6l-1.4-1.5c-.7-.7-1.8-.7-2.4 0-.6.6-.6 1.5-.1 2.2l4.1 5.6c.9 1.3 2.4 2.1 4 2.1h3.6c2.6 0 4.7-2.1 4.7-4.7v-4.6c0-.9-.7-1.6-1.6-1.6-.4 0-.8.2-1.1.4v-.2c0-.9-.7-1.6-1.6-1.6-.5 0-.9.2-1.2.5-.2-.7-.8-1.2-1.6-1.2-.4 0-.8.2-1.1.4V4.5c0-.9-.8-1.7-1.6-1.7z" fill="#fff" stroke="#000" stroke-width="1.2" stroke-linejoin="round"/>' },
+  beam: { tip: [12, 12], svg: '<path d="M8.5 3.5h7M8.5 20.5h7M12 3.5v17" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><path d="M8.5 3.5h7M8.5 20.5h7M12 3.5v17" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>' }
+};
+const CURSOR_SIZE = UNIT * (WIDE ? 0.036 : 0.05);
+const FOLLOW = 0.12;
+const HOVER = 0.07;
+const cursorLayer = (drawn, script) => {
+  const plan = CURSOR.plan(script, cursorUi, duration);
+  const ripple = el('div', 'position:absolute;left:0;top:0;border-radius:50%;border:' + Math.max(2, UNIT * 0.003) + 'px solid ' + accent + ';');
+  const pointer = el('div', 'position:absolute;left:0;top:0;width:' + CURSOR_SIZE + 'px;height:' + CURSOR_SIZE + 'px;transform-origin:0 0;filter:drop-shadow(0 ' + (CURSOR_SIZE * 0.06).toFixed(1) + 'px ' + (CURSOR_SIZE * 0.1).toFixed(1) + 'px rgba(0,0,0,0.35));');
+  pointer.setAttribute('data-cursor', 'pointer');
+  ripple.setAttribute('data-cursor', 'ripple');
+  const shapes = Object.fromEntries(Object.entries(CURSOR_SVG).map(([k, v]) => {
+    const holder = el('div', 'position:absolute;inset:0;', pointer);
+    holder.innerHTML = '<svg viewBox="0 0 24 24" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">' + v.svg + '</svg>';
+    return [k, holder];
+  }));
+  const ink = (U.nodes.find((n) => n.role === 'heading' && n.color) || {}).color || '#111111';
+  const typing = plan.steps.filter((s) => s.action === 'type').map((s) => ({ target: s.target, text: s.text, into: textInside(s.target) })).filter((s) => s.into);
+  typing.forEach((s) => {
+    drawn.els[s.into].style.color = ink;
+  });
+  const pressing = plan.steps.filter((s) => s.action === 'click' || s.action === 'type');
+  const touched = [...new Set(plan.steps.map((s) => s.target))].filter((id) => drawn.els[id]);
+  const pose = (t) => CURSOR.pose(plan, t);
+  const follow = (view, p) => ({ k: view.k, cx: mix(view.cx, p.x, FOLLOW * p.opacity), cy: mix(view.cy, p.y, FOLLOW * p.opacity) + p.scroll });
+  const toScreen = (view, x, y) => [W / 2 + (x - view.cx) * view.k, H / 2 + (y - view.cy) * view.k];
+  const draw = (p, view, t) => {
+    touched.forEach((id) => {
+      drawn.els[id].style.filter = id === p.hover && p.lit > 0 ? 'brightness(' + (1 - HOVER * p.lit).toFixed(4) + ')' : '';
+    });
+    pressing.forEach((s) => pressOn(drawn.els, s.target, t, s.at));
+    typing.forEach((s) => {
+      const typed = p.typed.find((k) => k.target === s.target && k.text === s.text);
+      typeInto(U, drawn.els, s.into, s.text, typed ? typed.p : 0, t);
+    });
+    const [x, y] = toScreen(view, p.x, p.y);
+    const tip = CURSOR_SVG[p.shape].tip;
+    const k = 1 - 0.18 * p.press;
+    Object.entries(shapes).forEach(([name, holder]) => {
+      holder.style.display = name === p.shape ? 'block' : 'none';
+    });
+    pointer.style.opacity = String(p.opacity);
+    pointer.style.transform = 'translate(' + (x - (tip[0] / 24) * CURSOR_SIZE * k).toFixed(2) + 'px,' + (y - (tip[1] / 24) * CURSOR_SIZE * k).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
+    const [rx, ry] = p.ripple ? toScreen(view, p.ripple.x, p.ripple.y) : [0, 0];
+    const r = p.ripple ? UNIT * 0.045 * out(p.ripple.p) : 0;
+    ripple.style.display = p.ripple ? 'block' : 'none';
+    ripple.style.opacity = p.ripple ? String(0.6 * (1 - p.ripple.p)) : '0';
+    ripple.style.width = (2 * r).toFixed(1) + 'px';
+    ripple.style.height = (2 * r).toFixed(1) + 'px';
+    ripple.style.transform = 'translate(' + (rx - r).toFixed(2) + 'px,' + (ry - r).toFixed(2) + 'px)';
+  };
+  return { plan, pose, follow, draw };
+};
+`;
+
 const UI_HOST_CSS = `${VECTOR_CSS}
 .cam { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
 `;
@@ -211,6 +293,7 @@ const fieldId = param('field_id', 'input-0', { type: 'text', group: 'Content', l
 const typed = param('type_text', '', { type: 'text', group: 'Content', label: 'Typed text' });
 const buttonId = param('button_id', 'button-0', { type: 'text', group: 'Content', label: 'Button (element id)' });
 const resultId = param('result_id', '', { type: 'text', group: 'Content', label: 'Result (element id, empty = whole UI)' });
+const script = param('cursor', '', { type: 'textarea', group: 'Content', label: 'Cursor script (JSON)' });
 const cam = el('div', '', root);
 cam.className = 'cam';
 const sheet = el('div', 'position:absolute;left:0;top:0;width:' + U.width + 'px;height:' + U.height + 'px;background:' + U.background + ';', cam);
@@ -219,32 +302,33 @@ drawn.frame.style.background = 'transparent';
 drawn.frame.style.position = 'absolute';
 drawn.frame.style.left = '0px';
 drawn.frame.style.top = '0px';
-const field = boxOf(fieldId);
-const button = boxOf(buttonId);
-const result = resultId ? boxOf(resultId) : null;
-const typeTarget = textInside(fieldId);
-const INK_OF_UI = (U.nodes.find((n) => n.role === 'heading' && n.color) || {}).color || '#111111';
-if (typeTarget && typed) {
-  drawn.els[typeTarget].style.color = INK_OF_UI;
-}
-const onField = frameOn(field, 0.72, 0.42);
-const onButton = frameOn({ x: button.x - button.w * 2, y: button.y - button.h * 1.5, w: button.w * 5, h: button.h * 4 }, 0.5, 0.5);
-const onResult = result ? frameOn(result, 0.7, 0.6) : WHOLE;
-const T = { type: 0.35, typeFor: Math.min(1.4, duration * 0.3), toButton: duration * 0.42, press: duration * 0.42 + 0.75, toResult: duration * 0.42 + 1.05 };
+const pointer = cursorLayer(drawn, scriptOf(script, CURSOR.auto([{ id: fieldId, text: typed }, { id: buttonId }].concat(resultId ? [{ id: resultId }] : []), cursorUi)));
+const steps = pointer.plan.steps;
+const around = (b) => {
+  const mx = b.w > 300 ? b.w * 0.12 : Math.max(b.w * 0.5, 120);
+  const my = Math.max(b.h, 80);
+  return frameOn({ x: b.x - mx, y: b.y - my, w: b.w + 2 * mx, h: b.h + 2 * my }, 0.8, 0.6);
+};
+const beats = steps.map((s) => ({ view: around(boxOf(s.target)), from: Math.max(0, s.travel - 0.15), len: Math.max(0.75, s.at - s.travel + 0.15) }));
+const first = beats.length ? beats[0].view : WHOLE;
+const last = steps.length ? Math.max(steps[steps.length - 1].end, steps[steps.length - 1].at + 0.5) + 0.3 : 0;
 const DIM = { depth: 0.55, at: 0.3, len: 0.3, release: 0.4 };
+const released = steps.length > 1 ? steps[1].travel - 0.2 : duration;
 drive((t) => {
   const arrive = out(span(t, 0, 0.7));
-  let view = { k: onField.k * mix(0.82, 1, arrive), cx: onField.cx, cy: onField.cy };
-  view = lerpCam(view, onButton, move(span(t, T.toButton, 0.7)));
-  view = lerpCam(view, onResult, move(span(t, T.toResult, 0.8)));
-  place(view, cam);
-  const focus = t < T.toButton + 0.35 ? field : button;
-  const dim = out(span(t, DIM.at, DIM.len)) * (1 - move(span(t, T.toButton - 0.2, DIM.release)));
-  dimAround(drawn, focus, 1 - DIM.depth * dim);
-  if (typeTarget) {
-    typeInto(U, drawn.els, typeTarget, typed, span(t, T.type, T.typeFor), t);
+  let view = { k: first.k * mix(0.82, 1, arrive), cx: first.cx, cy: first.cy };
+  beats.slice(1).forEach((b) => {
+    view = lerpCam(view, b.view, move(span(t, b.from, b.len)));
+  });
+  if (!resultId) {
+    view = lerpCam(view, WHOLE, move(span(t, last, Math.max(0.4, duration - last))));
   }
-  pressOn(drawn.els, buttonId, t, T.press);
+  const p = pointer.pose(t);
+  view = pointer.follow(view, p);
+  place(view, cam);
+  const dim = out(span(t, DIM.at, DIM.len)) * (1 - move(span(t, released, DIM.release)));
+  dimAround(drawn, boxOf(steps.length ? steps[0].target : fieldId), 1 - DIM.depth * dim);
+  pointer.draw(p, view, t);
 });
 `;
 
@@ -395,6 +479,7 @@ const UI_MORPH = `
 const fromId = param('from_id', 'button-0', { type: 'text', group: 'Content', label: 'From (element id)' });
 const toId = param('to_id', 'button-1', { type: 'text', group: 'Content', label: 'To (element id)' });
 const toText = param('to_text', '', { type: 'text', group: 'Content', label: 'New text on the target' });
+const script = param('cursor', '', { type: 'textarea', group: 'Content', label: 'Cursor script (JSON)' });
 const cam = el('div', '', root);
 cam.className = 'cam';
 const drawn = drawVector(U, cam);
@@ -405,11 +490,15 @@ const target = textInside(toId);
 const camA = frameOn({ x: a.x - a.w * 0.6, y: a.y - a.h * 1.2, w: a.w * 2.2, h: a.h * 3.4 }, 0.8, 0.7);
 const camB = frameOn({ x: b.x - b.w * 0.6, y: b.y - b.h * 1.2, w: b.w * 2.2, h: b.h * 3.4 }, 0.8, 0.7);
 const full = target ? nodeById(U, target).text : '';
-const M = { move: 0.9, len: 0.9, swap: 1.95 };
+const pointer = cursorLayer(drawn, scriptOf(script, [{ target: fromId, action: 'hover' }].concat(CURSOR.auto([{ id: toId }], cursorUi))));
+const onTo = pointer.plan.steps.find((s) => s.target === toId);
+const M = onTo ? { move: onTo.travel, len: Math.max(0.3, onTo.at - onTo.travel), swap: onTo.at + 0.05 } : { move: 0.9, len: 0.9, swap: 1.95 };
 drive((t) => {
   const e = out(span(t, 0, 0.7));
   const p = move(span(t, M.move, M.len));
-  place(lerpCam({ k: camA.k * mix(0.85, 1, e), cx: camA.cx, cy: camA.cy }, camB, p), cam);
+  const c = pointer.pose(t);
+  const view = pointer.follow(lerpCam({ k: camA.k * mix(0.85, 1, e), cx: camA.cx, cy: camA.cy }, camB, p), c);
+  place(view, cam);
   const PAD = 8;
   ring.style.left = (mix(a.x, b.x, p) - PAD).toFixed(1) + 'px';
   ring.style.top = (mix(a.y, b.y, p) - PAD).toFixed(1) + 'px';
@@ -423,7 +512,7 @@ drive((t) => {
     node.textContent = s < 0.5 ? full : toText;
     node.style.filter = s > 0 && s < 1 ? 'blur(' + (8 * (1 - Math.abs(s * 2 - 1))).toFixed(2) + 'px)' : '';
   }
-  pressOn(drawn.els, toId, t, M.swap - 0.1);
+  pointer.draw(c, view, t);
 });
 `;
 
@@ -468,16 +557,16 @@ drive((t) => {
 `;
 
 export const SHOTS: Record<ShotId, ShotSpec> = {
-  [ShotId.KineticTitle]: { name: 'ShotKineticTitle', about: 'a full-frame title: words punch in one by one from 134% and an 18 px blur, then hold on a slow push-in', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ text, accent_word: z.union([z.number().int().min(-1).max(12), text.max(24)]).optional() }), limits: { text: limit(6, 36) }, css: '', js: KINETIC_TITLE },
-  [ShotId.DeviceFlyIn]: { name: 'ShotDeviceFlyIn', about: 'the recreated product UI on a screen flies in from deep space turning 104°, lands and drifts: the establishing shot of the product', seconds: { min: 2.5, best: 3.5, max: 4 }, ui: ShotUi.Required, peak: true, slots: z.object({}), limits: {}, css: UI_HOST_CSS, js: DEVICE_FLY_IN },
-  [ShotId.UiFocus]: { name: 'ShotUiFocus', about: 'one flow of the recreated UI, one part at a time: zoom on the field while the text types, move to the button and press it, pull back to the result', seconds: { min: 3, best: 4, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ field_id: nodeId, button_id: nodeId, type_text: text.optional(), result_id: nodeId.optional() }), limits: { type_text: limit(8, 48) }, css: UI_HOST_CSS, js: UI_FOCUS },
-  [ShotId.FeatureGrid]: { name: 'ShotFeatureGrid', about: 'up to six feature tiles fly in exploded in depth and assemble into a grid', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: true, slots: z.object({ items: text }), limits: { items: limit(12, 96) }, css: '', js: FEATURE_GRID },
-  [ShotId.StatCount]: { name: 'ShotStatCount', about: 'one number counts up huge, an accent rule draws under it, the label rises', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ value: text, label: text }), limits: { value: limit(1, 12), label: limit(5, 32) }, css: '', js: STAT_COUNT },
-  [ShotId.BeforeAfter]: { name: 'ShotBeforeAfter', about: 'the pain line is struck through, then an accent divider wipes the recreated UI in beside it (under it in vertical)', seconds: { min: 3, best: 3.5, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ before_text: text, before_label: text.optional(), after_label: text.optional() }), limits: { before_text: limit(6, 36), before_label: limit(2, 16), after_label: limit(2, 16) }, css: UI_HOST_CSS, js: BEFORE_AFTER },
-  [ShotId.LogoResolve]: { name: 'ShotLogoResolve', about: 'the original logo, flat and untouched, resolves with a fade and a small scale; the address follows', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ logo: z.string().min(1).optional(), wordmark: text.optional(), url: text.optional() }), limits: { wordmark: limit(2, 24), url: limit(1, 40) }, css: '', js: LOGO_RESOLVE },
-  [ShotId.UiMorph]: { name: 'ShotUiMorph', about: 'a highlight travels from one element of the recreated UI to another as the camera follows, then the target changes state', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ from_id: nodeId, to_id: nodeId, to_text: text.optional() }), limits: { to_text: limit(3, 24) }, css: UI_HOST_CSS, js: UI_MORPH },
-  [ShotId.TaglineCard]: { name: 'ShotTaglineCard', about: 'the end card: the promise rises line by line out of a mask, the address fades in under it', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ lines: text, url: text.optional(), accent_line: z.number().int().min(-1).max(2).optional() }), limits: { lines: limit(6, 40), url: limit(1, 40) }, css: '', js: TAGLINE_CARD },
-  [ShotId.WhipZoom]: { name: 'ShotWhipZoom', about: 'a transition: the camera dives into one element of the recreated UI, blurring with speed, and lands on its colour for the next shot', seconds: { min: 1, best: 1.4, max: 2 }, ui: ShotUi.Required, peak: true, slots: z.object({ target_id: nodeId, end_colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }), limits: {}, css: UI_HOST_CSS, js: WHIP_ZOOM }
+  [ShotId.KineticTitle]: { name: 'ShotKineticTitle', about: 'a full-frame title: words punch in one by one from 134% and an 18 px blur, then hold on a slow push-in', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ text, accent_word: z.union([z.number().int().min(-1).max(12), text.max(24)]).optional() }), limits: { text: limit(6, 36) }, css: '', js: KINETIC_TITLE },
+  [ShotId.DeviceFlyIn]: { name: 'ShotDeviceFlyIn', about: 'the recreated product UI on a screen flies in from deep space turning 104°, lands and drifts: the establishing shot of the product', seconds: { min: 2.5, best: 3.5, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.None, peak: true, slots: z.object({}), limits: {}, css: UI_HOST_CSS, js: DEVICE_FLY_IN },
+  [ShotId.UiFocus]: { name: 'ShotUiFocus', about: 'one flow of the recreated UI, one part at a time, driven by a cursor: it clicks the field and types, moves to the button and presses it while the camera follows, then pulls back to the result', seconds: { min: 3, best: 4, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.Scripted, peak: false, slots: z.object({ field_id: nodeId, button_id: nodeId, type_text: text.optional(), result_id: nodeId.optional(), cursor: CURSOR_SLOT.optional() }), limits: { type_text: limit(8, 48) }, css: UI_HOST_CSS, js: UI_FOCUS },
+  [ShotId.FeatureGrid]: { name: 'ShotFeatureGrid', about: 'up to six feature tiles fly in exploded in depth and assemble into a grid', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: true, slots: z.object({ items: text }), limits: { items: limit(12, 96) }, css: '', js: FEATURE_GRID },
+  [ShotId.StatCount]: { name: 'ShotStatCount', about: 'one number counts up huge, an accent rule draws under it, the label rises', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ value: text, label: text }), limits: { value: limit(1, 12), label: limit(5, 32) }, css: '', js: STAT_COUNT },
+  [ShotId.BeforeAfter]: { name: 'ShotBeforeAfter', about: 'the pain line is struck through, then an accent divider wipes the recreated UI in beside it (under it in vertical)', seconds: { min: 3, best: 3.5, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.None, peak: false, slots: z.object({ before_text: text, before_label: text.optional(), after_label: text.optional() }), limits: { before_text: limit(6, 36), before_label: limit(2, 16), after_label: limit(2, 16) }, css: UI_HOST_CSS, js: BEFORE_AFTER },
+  [ShotId.LogoResolve]: { name: 'ShotLogoResolve', about: 'the original logo, flat and untouched, resolves with a fade and a small scale; the address follows', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ logo: z.string().min(1).optional(), wordmark: text.optional(), url: text.optional() }), limits: { wordmark: limit(2, 24), url: limit(1, 40) }, css: '', js: LOGO_RESOLVE },
+  [ShotId.UiMorph]: { name: 'ShotUiMorph', about: 'the cursor rests on one element of the recreated UI, travels to another with a highlight as the camera follows, clicks it and the target changes state', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.Scripted, peak: false, slots: z.object({ from_id: nodeId, to_id: nodeId, to_text: text.optional(), cursor: CURSOR_SLOT.optional() }), limits: { to_text: limit(3, 24) }, css: UI_HOST_CSS, js: UI_MORPH },
+  [ShotId.TaglineCard]: { name: 'ShotTaglineCard', about: 'the end card: the promise rises line by line out of a mask, the address fades in under it', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ lines: text, url: text.optional(), accent_line: z.number().int().min(-1).max(2).optional() }), limits: { lines: limit(6, 40), url: limit(1, 40) }, css: '', js: TAGLINE_CARD },
+  [ShotId.WhipZoom]: { name: 'ShotWhipZoom', about: 'a transition: the camera dives into one element of the recreated UI, blurring with speed, and lands on its colour for the next shot', seconds: { min: 1, best: 1.4, max: 2 }, ui: ShotUi.Required, cursor: ShotCursor.None, peak: true, slots: z.object({ target_id: nodeId, end_colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }), limits: {}, css: UI_HOST_CSS, js: WHIP_ZOOM }
 };
 
 export const PEAK_SHOTS: ReadonlySet<string> = new Set(Object.values(SHOTS).filter((s) => s.peak).map((s) => s.name));
@@ -493,9 +582,10 @@ export function shotSource(id: ShotId, ui: VectorUi | null): ShotSource {
   if (spec.ui !== ShotUi.Required || !ui) {
     return { html: '', css: spec.css, js: `${PRELUDE}\n${spec.js}` };
   }
-  const fixed = PRELUDE.length + vectorRuntime().length + UI_PRELUDE.length + spec.js.length + JS_MARGIN;
+  const cursor = spec.cursor === ShotCursor.Scripted ? CURSOR_LAYER.replace('CURSOR_MATH', () => cursorSource()) : '';
+  const fixed = PRELUDE.length + vectorRuntime().length + UI_PRELUDE.length + cursor.length + spec.js.length + JS_MARGIN;
   const fitted = withinBudget(ui, MAX_JS - fixed, (u) => vectorJson(u).length);
-  return { html: '', css: spec.css, js: `${PRELUDE}\n${vectorRuntime()}\n${UI_PRELUDE.replace('VECTOR_UI', () => vectorJson(fitted))}\n${spec.js}` };
+  return { html: '', css: spec.css, js: `${PRELUDE}\n${vectorRuntime()}\n${UI_PRELUDE.replace('VECTOR_UI', () => vectorJson(fitted))}\n${cursor}\n${spec.js}` };
 }
 
 export const SHOT_PREVIEWS = '/motion/shots';

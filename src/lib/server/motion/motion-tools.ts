@@ -48,7 +48,8 @@ import { patchComponent, recordCheck, removeComponent, writeComponent } from '$l
 import type { UiCapture } from '$lib/server/web/vector-capture';
 import { vectorPiece, withFonts } from '$lib/motion/vector-ui/piece';
 import { VectorRole } from '$lib/motion/vector-ui/model';
-import { SHOTS, SHOT_IDS, ShotUi, shotPreview } from '$lib/motion/shots/library';
+import { SHOTS, SHOT_IDS, ShotCursor, ShotUi, shotPreview } from '$lib/motion/shots/library';
+import { CURSOR_GUIDE, CURSOR_SLOT } from '$lib/motion/shots/cursor';
 import { addShot } from '$lib/motion/shots/ops';
 import { RECREATE_STATES, UI_KINDS, UI_KIT, recreatedStyle, recreatedUi, type UiStructure } from '$lib/motion/ui-kit/kit';
 import { MORPH_KINDS, DEFAULT_REEL } from '$lib/motion/ui-morph/reel';
@@ -1900,12 +1901,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     list_shots: tool({
       description: 'The library of premium shots: handcrafted, deterministic scenes with their own camera move, secondary motion, house easing and holds. For a trailer or product film, direct with shots (add_shot) instead of laying out primitives.',
       inputSchema: z.object({}),
-      execute: async () => ({ ok: true, shots: SHOT_IDS.map((id) => ({ id, about: SHOTS[id].about, slots: Object.keys(SHOTS[id].slots.shape), text_limits: SHOTS[id].limits, seconds: SHOTS[id].seconds, needs_ui: SHOTS[id].ui === ShotUi.Required, preview: shotPreview(id) })) })
+      execute: async () => ({ ok: true, shots: SHOT_IDS.map((id) => ({ id, about: SHOTS[id].about, slots: Object.keys(SHOTS[id].slots.shape), text_limits: SHOTS[id].limits, seconds: SHOTS[id].seconds, needs_ui: SHOTS[id].ui === ShotUi.Required, cursor: SHOTS[id].cursor === ShotCursor.Scripted ? CURSOR_GUIDE : null, preview: shotPreview(id) })) })
     }),
 
     add_shot: tool({
-      description: `Place a premium shot from the library (list_shots): ${SHOT_IDS.map((id) => `${id} (${SHOTS[id].about})`).join('; ')}. slots are its data only: texts, element ids of the recreated UI, and font ink paper muted accent. Every text slot holds a few words at most (text_limits in list_shots: a title is a claim of up to 6 words, never a sentence); a longer text is refused with a cut to use. ui is the name of a UI rebuilt with recreate_ui from a url; the shots that show the product need it. at and seconds place it (2–4 s, transitions shorter); with beats marked (mark_beats) start and end snap to the beat grid. The shot is an ordinary clip: its slots stay editable as props.`,
-      inputSchema: z.object({ shot: z.enum(SHOT_IDS), slots: z.record(z.string(), z.union([z.string(), z.number()])).default({}), ui: z.string().optional(), at: z.number().min(0), seconds: z.number().positive().optional(), track_id: z.string().optional() }),
+      description: `Place a premium shot from the library (list_shots): ${SHOT_IDS.map((id) => `${id} (${SHOTS[id].about})`).join('; ')}. slots are its data only: texts, element ids of the recreated UI, and font ink paper muted accent. Every text slot holds a few words at most (text_limits in list_shots: a title is a claim of up to 6 words, never a sentence); a longer text is refused with a cut to use. ui is the name of a UI rebuilt with recreate_ui from a url; the shots that show the product need it. at and seconds place it (2–4 s, transitions shorter); with beats marked (mark_beats) start and end snap to the beat grid. The shot is an ordinary clip: its slots stay editable as props. ui-focus and ui-morph are driven by a cursor: without a cursor slot they write a script from the element roles (a field is typed into, a button or link clicked, the rest hovered); with one, ${CURSOR_GUIDE}`,
+      inputSchema: z.object({ shot: z.enum(SHOT_IDS), slots: z.record(z.string(), z.union([z.string(), z.number(), CURSOR_SLOT])).default({}), ui: z.string().optional(), at: z.number().min(0), seconds: z.number().positive().optional(), track_id: z.string().optional() }),
       execute: async (input) => {
         const offSite = offSiteFigures(input.shot, input.slots);
         if (offSite) {

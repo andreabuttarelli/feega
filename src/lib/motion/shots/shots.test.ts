@@ -252,7 +252,7 @@ describe('UI shots in vertical', () => {
   it('ui-focus dims the page briefly and keeps it visible (v3: the page sat grey for most of the shot)', () => {
     const draw = drawPiece(shotSource(ShotId.UiFocus, UI).js, SLOTS[ShotId.UiFocus], DURATION, VERTICAL);
     const times = Array.from({ length: 36 }, (_, i) => (i * DURATION) / 35);
-    const lowest = times.map((t) => Math.min(...all(draw(t)).filter((n) => n.className !== 'vcaret').map((n) => Number(n.style.opacity ?? 1))));
+    const lowest = times.map((t) => Math.min(...all(draw(t)).filter((n) => n.className !== 'vcaret' && !n.attrs['data-cursor']).map((n) => Number(n.style.opacity ?? 1))));
 
     expect(Math.min(...lowest)).toBeGreaterThanOrEqual(0.3);
     expect(lowest.filter((o) => o < 0.95).length / times.length).toBeLessThanOrEqual(0.5);
@@ -278,5 +278,48 @@ describe('the stat count', () => {
   it('a large number still counts up', () => {
     expect(shown('12,400', 0.8)).not.toContain('12,400');
     expect(shown('12,400', DURATION)).toContain('12,400');
+  });
+});
+
+describe('the cursor in UI shots', () => {
+  const SQUARE = { width: 1080, height: 1080 };
+  const CURSOR_SHOTS = [ShotId.UiFocus, ShotId.UiMorph];
+  const pointer = (tree: Drawn) => all(tree).find((n) => n.attrs['data-cursor'] === 'pointer');
+  const drawnWith = (id: ShotId, slots: Record<string, unknown>, frame = LANDSCAPE) => drawPiece(shotSource(id, UI).js, slots, DURATION, frame);
+
+  it.each(CURSOR_SHOTS.flatMap((s) => [VERTICAL, LANDSCAPE, SQUARE].map((f) => [s, f] as const)))('%s draws a cursor on screen by default (%o)', (id, frame) => {
+    const shown = pointer(drawnWith(id, SLOTS[id], frame)(2));
+    const x = Number(/translate\(([-\d.]+)px/.exec(String(shown?.style.transform))?.[1]);
+
+    expect(Number(shown?.style.opacity)).toBeGreaterThan(0.9);
+    expect(x).toBeGreaterThan(0);
+    expect(x).toBeLessThan(frame.width);
+  });
+
+  it('follows the script it is given: it types into the field and presses the button when the script says', () => {
+    const draw = drawnWith(ShotId.UiFocus, { ...SLOTS[ShotId.UiFocus], cursor: [{ target: 'input-0', action: 'type', text: 'hello', at: 0.6 }, { target: 'button-0', action: 'click', at: 2.4 }] });
+    const button = (t: number) => all(draw(t)).find((n) => n.attrs['data-anchor'] === 'button-0');
+
+    expect(wordsUnder(draw(1.6))).toContain('hello');
+    expect(String(button(2.3)?.style.transform)).toBe('scale(1)');
+    expect(String(button(2.45)?.style.transform)).not.toBe('scale(1)');
+  });
+
+  it('draws the same frame for a time whatever time came before, with a script', () => {
+    const draw = drawnWith(ShotId.UiMorph, { ...SLOTS[ShotId.UiMorph], cursor: JSON.stringify([{ target: 'button-1', action: 'hover' }, { target: 'button-0', action: 'click' }]) });
+    const seek = (t: number) => json(draw(t));
+    const first = TIMES.map(seek);
+
+    expect([...TIMES].reverse().map(seek).reverse()).toEqual(first);
+  });
+
+  it('add_shot keeps the script as an editable prop and refuses an element the UI does not have', () => {
+    const cursor = [{ target: 'button-0', action: 'click' }];
+    const made = addShot(withUi(), { shot: ShotId.UiFocus, slots: { ...SLOTS[ShotId.UiFocus], cursor }, ui: 'UiFeega', at: 0 }, 'c1');
+    const clip = made.ok ? made.doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'c1') : null;
+    const wrong = addShot(withUi(), { shot: ShotId.UiFocus, slots: { ...SLOTS[ShotId.UiFocus], cursor: [{ target: 'button-7', action: 'click' }] }, ui: 'UiFeega', at: 0 }, 'c1');
+
+    expect(JSON.parse(String(clip?.props.cursor))).toEqual(cursor);
+    expect(wrong.ok ? '' : wrong.error).toMatch(/cursor button-7.*button-0/);
   });
 });
