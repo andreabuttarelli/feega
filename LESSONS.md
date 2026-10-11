@@ -264,8 +264,11 @@ Move: profondità simulata in 2D (`translate` + `scale`), `transform: none` a ri
 con `seekPlan` + hash dei jpeg prima di toccare il codice.
 
 ### `app_browse` non entra in una pagina di login SvelteKit
-Signal: login failed, nello screenshot email vuota e password piena. L'idratazione azzera il
-campo con `value={...}` scritto prima. Move: attendere che la pagina si assesti prima di scrivere.
+Signal: login failed, nello screenshot email vuota e password piena, nessun messaggio d'errore;
+la POST dell'azione risponde 403. Non è l'idratazione: Chromium lanciato con gli argomenti di
+`@sparticuz/chromium` (`--disable-web-security`) non manda `Origin`, e il controllo CSRF rifiuta.
+Move: `originHeaders` rimette l'origine della pagina sulle richieste che cambiano stato; prima di
+diagnosticare un login, guarda lo status della POST.
 
 ## Ambiente e worktree
 

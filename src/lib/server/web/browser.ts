@@ -70,9 +70,23 @@ export function browserlessEndpoint(config: BrowserlessConfig): string {
 
 export const unitsOf = (ms: number) => Math.max(1, Math.ceil(ms / BROWSERLESS_UNIT_MS));
 
+const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
+
+export function originHeaders(method: string, headers: Record<string, string>, pageUrl: string): Record<string, string> | null {
+  if (SAFE_METHODS.includes(method) || headers.origin || !URL.canParse(pageUrl)) {
+    return null;
+  }
+  return { ...headers, origin: new URL(pageUrl).origin };
+}
+
 async function gate(request: HTTPRequest): Promise<void> {
   const verdict = await requestVerdict(request.url());
-  await (verdict === RequestVerdict.Continue ? request.continue() : request.abort('blockedbyclient')).catch(() => undefined);
+  if (verdict !== RequestVerdict.Continue) {
+    await request.abort('blockedbyclient').catch(() => undefined);
+    return;
+  }
+  const headers = originHeaders(request.method(), request.headers(), request.frame()?.url() ?? '');
+  await request.continue(headers ? { headers } : undefined).catch(() => undefined);
 }
 
 async function fenced(page: Page): Promise<void> {

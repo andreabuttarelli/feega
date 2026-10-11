@@ -4,7 +4,7 @@ vi.mock('$env/static/public', () => ({ PUBLIC_SUPABASE_URL: 'https://example.sup
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
 
 import type { Browser } from 'puppeteer-core';
-import { BROWSERLESS_UNIT_USD, browserless, browserlessEndpoint } from './browser';
+import { BROWSERLESS_UNIT_USD, browserless, browserlessEndpoint, originHeaders } from './browser';
 
 const KEY = 'secret-key';
 
@@ -82,5 +82,16 @@ describe('browserless: a hosted browser behind the same tab', () => {
 
     expect(page.setRequestInterception).toHaveBeenCalledWith(true);
     expect(page.on).toHaveBeenCalledWith('request', expect.any(Function));
+  });
+});
+
+describe('the Origin a form post carries', () => {
+  it('puts back the page origin the server-side Chromium drops, so a SvelteKit login is not refused as cross-site (v4 run: 403 on feega login)', () => {
+    expect(originHeaders('POST', { 'content-type': 'application/x-www-form-urlencoded' }, 'http://localhost:5299/login')).toEqual({ 'content-type': 'application/x-www-form-urlencoded', origin: 'http://localhost:5299' });
+  });
+
+  it('leaves a GET, or a post that already has one, alone', () => {
+    expect(originHeaders('GET', { a: '1' }, 'https://app.example/x')).toBeNull();
+    expect(originHeaders('POST', { origin: 'https://app.example' }, 'https://app.example/x')).toBeNull();
   });
 });
