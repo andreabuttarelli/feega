@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, motionDocSchema, newMotionDoc, type MotionDoc } from '../doc';
 import { addClip } from '../timeline';
-import { VAR_RULES, VarKind, bindVar, boundDoc, coerceVars, declareVar, defaultsOf, numericVars, removeVar, varSchemaOf, withVars, type VarDecl } from './vars';
+import { VAR_RULES, VarKind, bindTargets, starterVar, bindVar, boundDoc, coerceVars, declareVar, defaultsOf, numericVars, removeVar, varSchemaOf, withVars, type VarDecl } from './vars';
 import { Outside, interactiveOf } from './settings';
 import { bakeExpressions, expressionValue } from '../expression/bake';
 import { liveScene } from './live';
@@ -101,6 +101,15 @@ describe('runtime variables', () => {
     ]);
     expect(bindVar(base, { var: 'tint', clip: id, prop: 'text' }).ok).toBe(false);
     expect(bindVar(base, { var: 'ghost', clip: id, prop: 'text' }).ok).toBe(false);
+  });
+
+  it('every kind starts from a valid declaration, and lists what it can bind on a layer', () => {
+    for (const kind of Object.values(VarKind)) {
+      expect(declareVar(newMotionDoc(MotionFormat.Landscape), starterVar(kind, 'v')).ok).toBe(true);
+    }
+    expect(bindTargets('Caption', VarKind.Color)).toEqual(['color', 'background']);
+    expect(bindTargets('Shape', VarKind.String)).toEqual([]);
+    expect(bindTargets('Shape', VarKind.Number)).toContain('rotateZ');
   });
 
   it('removing a variable removes its bindings', () => {

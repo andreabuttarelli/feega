@@ -56,8 +56,25 @@ function bindableOf(doc: MotionDoc, binding: VarBinding): Bindable | undefined {
   return clip ? BINDABLE[clip.component]?.[binding.prop] : undefined;
 }
 
-export function bindablePropsOf(component: ComponentId): string[] {
-  return Object.keys(BINDABLE[component] ?? {});
+const STARTER: Record<VarKind, (name: string) => VarDecl> = {
+  [VarKind.Number]: (name) => ({ name, kind: VarKind.Number, default: 1, min: 0, max: 2 }),
+  [VarKind.Boolean]: (name) => ({ name, kind: VarKind.Boolean, default: false }),
+  [VarKind.Enum]: (name) => ({ name, kind: VarKind.Enum, default: 'a', options: ['a', 'b'] }),
+  [VarKind.Color]: (name) => ({ name, kind: VarKind.Color, default: '#ffffff' }),
+  [VarKind.String]: (name) => ({ name, kind: VarKind.String, default: 'Text' })
+};
+
+export function starterVar(kind: VarKind, name: string): VarDecl {
+  return STARTER[kind](name);
+}
+
+const NUMBER_PROPS = ['x', 'y', 'scale', 'rotateZ', 'opacity'];
+
+export function bindTargets(component: ComponentId, kind: VarKind): string[] {
+  if (NUMERIC_KINDS.has(kind)) {
+    return NUMBER_PROPS;
+  }
+  return Object.entries(BINDABLE[component] ?? {}).filter(([, b]) => b.kind === kind).map(([prop]) => prop);
 }
 
 export function bindVar(doc: MotionDoc, binding: VarBinding): OpResult {

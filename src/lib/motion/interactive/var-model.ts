@@ -6,6 +6,7 @@ export enum VarKind {
   String = 'string'
 }
 
+export const VAR_KINDS = Object.values(VarKind) as [VarKind, ...VarKind[]];
 export const VAR_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,31}$/;
 export const MAX_VARS = 32;
 export const MAX_VAR_TEXT = 500;

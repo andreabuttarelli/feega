@@ -42,8 +42,28 @@ describe('motion agent interactive tools', () => {
 
     await run('set_interactive', { playback: PlayMode.Scrub, loop: false, outside: Outside.Hold, scroll_length: 5 });
 
-    expect(session.doc.interactive).toEqual({ playback: PlayMode.Scrub, loop: false, outside: Outside.Hold, scrollLength: 5 });
+    expect(session.doc.interactive).toEqual({ playback: PlayMode.Scrub, loop: false, outside: Outside.Hold, scrollLength: 5, vars: [], bindings: [] });
     expect((await run('get_motion_doc', {})).interactive).toEqual(session.doc.interactive);
+  });
+
+  it('declare_var, bind_var, unbind_var and remove_var drive runtime variables', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Text', start: 0, duration: 4 });
+
+    expect((await run('declare_var', { name: 'speed', kind: 'number', default: 1, min: 0, max: 4 })).ok).toBe(true);
+    expect((await run('declare_var', { name: 'label', kind: 'string', default: 'Hi' })).ok).toBe(true);
+    expect((await run('declare_var', { name: 'speed', kind: 'number', default: 9, min: 0, max: 4 })).ok).toBe(false);
+    expect((await run('bind_var', { name: 'speed', clip_id: 'id1', prop: 'rotateZ' })).ok).toBe(true);
+    expect((await run('bind_var', { name: 'label', clip_id: 'id1', prop: 'text' })).ok).toBe(true);
+
+    expect(findClip(session.doc, 'id1')!.clip.expressions.rotateZ).toBe('vars.speed');
+    expect(session.doc.interactive?.bindings).toEqual([{ var: 'label', clip: 'id1', prop: 'text' }]);
+    expect((await run('export_interactive', {})).vars).toEqual(session.doc.interactive?.vars);
+
+    await run('unbind_var', { clip_id: 'id1', prop: 'text' });
+    await run('remove_var', { name: 'speed' });
+    expect(session.doc.interactive?.bindings).toEqual([]);
+    expect(session.doc.interactive?.vars.map((v) => v.name)).toEqual(['label']);
   });
 
   it('export_interactive reports what reacts live and the embed snippet', async () => {
@@ -79,5 +99,6 @@ describe('motion agent interactive tools', () => {
 
     expect(prompt).toContain('input.pointer.x');
     expect(prompt).toContain('export_interactive');
+    expect(prompt).toContain('declare_var');
   });
 });

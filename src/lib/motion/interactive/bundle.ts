@@ -307,7 +307,7 @@ export async function embedSource(input: InteractiveInput): Promise<string> {
 const STORED_SETTINGS: ((page: string) => EmbedSettings | null)[] = [
   (page) => {
     const source = storedSource(page);
-    return source ? { width: source.doc.width, height: source.doc.height, playback: source.settings.playback, scrollLength: source.settings.scrollLength } : null;
+    return source ? { width: source.doc.width, height: source.doc.height, playback: source.settings.playback, scrollLength: source.settings.scrollLength, vars: interactiveOf(source.doc).vars } : null;
   },
   (page) => playerSettings(page)
 ];
@@ -318,7 +318,7 @@ export function embedSettings(page: string): EmbedSettings | null {
 
 function playerSettings(page: string): EmbedSettings | null {
   const source = storedPlayer(page)?.source;
-  return source ? { width: source.width, height: source.height, playback: source.playback, scrollLength: source.scrollLength ?? SCROLL_LENGTH.default } : null;
+  return source ? { width: source.width, height: source.height, playback: source.playback, scrollLength: source.scrollLength ?? SCROLL_LENGTH.default, vars: source.vars ?? [] } : null;
 }
 
 export function playerPage(html: string, doc: MotionDoc, settings: Interactive, title: string, player: string): string {
