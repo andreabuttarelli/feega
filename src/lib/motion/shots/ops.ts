@@ -3,7 +3,7 @@ import type { MotionDoc } from '../doc';
 import { addClip, type OpResult } from '../timeline';
 import { writeComponent } from '../custom/ops';
 import { VECTOR_TOKEN } from '../vector-ui/piece';
-import type { VectorNode, VectorUi } from '../vector-ui/model';
+import { VectorRole, type VectorNode, type VectorUi } from '../vector-ui/model';
 import { SHOTS, ShotUi, overLimits, shotSource, type ShotId } from './library';
 import type { CursorStep } from './cursor';
 
@@ -59,6 +59,26 @@ function missingIds(slots: Record<string, unknown>, nodes: readonly VectorNode[]
   return `${missing.map(([k, v]) => `${k} ${String(v)}`).join(', ')} not in the UI; its elements: ${offer.join(', ')}`;
 }
 
+const SLOT_ROLES: Record<string, readonly VectorRole[]> = {
+  field_id: [VectorRole.Input],
+  button_id: [VectorRole.Button, VectorRole.Link, VectorRole.Icon]
+};
+
+function wrongRoles(slots: Record<string, unknown>, ui: string, nodes: readonly VectorNode[]): string | null {
+  for (const [slot, roles] of Object.entries(SLOT_ROLES)) {
+    const node = nodes.find((n) => n.id === slots[slot]);
+    if (!node || roles.includes(node.role)) {
+      continue;
+    }
+    const fitting = nodes.filter((n) => roles.includes(n.role)).slice(0, 20).map((n) => `${n.id}${n.text ? ` "${n.text.slice(0, 24)}"` : ''}`);
+    if (!fitting.length) {
+      return `${ui} has no ${roles.join(' or ')} for ${slot}: recreate_ui the app screen where the work happens (its prompt, form or editor), signed in with app_browse, and use that UI`;
+    }
+    return `${slot} ${node.id} is a ${node.role}, not a ${roles.join(' or ')}: pick one of ${fitting.join(', ')}`;
+  }
+  return null;
+}
+
 export const shotComponent = (shot: ShotId, ui?: string) => `${SHOTS[shot].name}${ui ?? ''}`;
 
 function asProps(doc: MotionDoc, name: string, slots: Record<string, unknown>): Record<string, unknown> {
@@ -85,7 +105,7 @@ export function addShot(doc: MotionDoc, plan: ShotPlan, id: string): OpResult & 
   if (spec.ui === ShotUi.Required && !vector) {
     return { ok: false, error: `${plan.shot} shows the real product UI: pass ui, the name of a UI rebuilt with recreate_ui from a url${plan.ui ? ` (${plan.ui} is not one)` : ''}` };
   }
-  const wrong = vector ? missingIds(parsed.data, vector.nodes) : null;
+  const wrong = vector ? (missingIds(parsed.data, vector.nodes) ?? wrongRoles(parsed.data, plan.ui ?? '', vector.nodes)) : null;
   if (wrong) {
     return { ok: false, error: wrong };
   }
