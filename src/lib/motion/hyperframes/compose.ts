@@ -37,6 +37,7 @@ import { shapeScript, shapeStudy, type ShapeBake } from './shapes';
 import type { Extent } from '../shape/render';
 import { TEXT_PATH_CSS, textPathBake, textPathScript, textPathTemplate, type TextPathBake } from './text-path';
 import { particleBake, particleScript } from './particles';
+import { shaderEffectBake, shaderEffectScript, type ShaderEffectBake } from './shader-effects';
 import { remappedSegments } from '../time-remap';
 import type { ParticleBake } from '../particles/simulate';
 import { bakeExpressions } from '../expression/bake';
@@ -472,6 +473,7 @@ const LIBRARY_SOURCE: Record<Library, Script[] | Chunk> = {
   [Library.P5]: [Script.P5],
   [Library.Pixi]: [Script.Pixi, Script.PixiEval],
   [Library.Matter]: [Script.Matter],
+  [Library.Shaders]: [Script.Shaders],
   [Library.Generative]: Chunk.Generative,
   [Library.Twgl]: Chunk.Twgl,
   [Library.Fx]: Chunk.Fx,
@@ -606,6 +608,7 @@ export function composeHtml(raw: ComposeInput): string {
   const textPaths: TextPathBake[] = [];
   const particles: ParticleBake[] = [];
   const blobs: BlobBake[] = [];
+  const shaderEffects: ShaderEffectBake[] = [];
   const cardBakes = new Map<CardLayout, unknown[]>(Object.values(CARD_LAYOUTS).map((l) => [l, []]));
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
@@ -656,6 +659,9 @@ export function composeHtml(raw: ComposeInput): string {
       if (clip.component === 'Particles') {
         particles.push(particleBake(clip, ctx));
       }
+      if (clip.component === 'ShaderEffect') {
+        shaderEffects.push(shaderEffectBake(clip, ctx, raw.liveness === Liveness.Live));
+      }
       if (clip.component === 'LiquidBlob') {
         blobs.push(blobBake(clip, ctx));
       }
@@ -681,7 +687,7 @@ export function composeHtml(raw: ComposeInput): string {
   const boot = gated(bootScript(runs, env, `window.__timelines[${js(COMPOSITION_ID)}]`));
   const definitions = [...used].map((name) => hotScript(definitionScript(name, doc.components[name].source.js))).join('');
   const customBoot = boot ? `<script>${boot}</script>` : '';
-  const hosted = [Script.Runtime, ...[...libraries].flatMap(scriptsOf)].filter((script) => delivery.inlined[script] === undefined).map((script) => scriptUrl(delivery.origin, script));
+  const hosted = [Script.Runtime, ...[...libraries].flatMap(scriptsOf), ...(shaderEffects.length && !libraries.has(Library.Shaders) ? [Script.Shaders] : [])].filter((script) => delivery.inlined[script] === undefined).map((script) => scriptUrl(delivery.origin, script));
   const screenshotInlined = delivery.inlined[Script.Screenshot] !== undefined;
   const moduleSources = modules.map((module) => (delivery.modules[module] === undefined ? moduleUrl(delivery.origin, module) : 'data:'));
   const screenshotSrc = screenshotInlined ? '' : scriptUrl(delivery.origin, Script.Screenshot);
@@ -700,6 +706,7 @@ export function composeHtml(raw: ComposeInput): string {
     ...[...libraries].map((lib) => libraryTag(lib, delivery)),
     screenshotInlined ? scriptTag(Script.Screenshot, delivery) : '',
     shaderClips.length ? chunkTag(Chunk.Shader, delivery) : '',
+    shaderEffects.length && !libraries.has(Library.Shaders) ? scriptTag(Script.Shaders, delivery) : '',
     threeImportMap(delivery.origin, modules, delivery.modules),
     three.length || compositions.length || libraries.has(Library.Three) ? `<script>${gpuScript(GPU[raw.target ?? Target.Video])}</script>` : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
@@ -727,6 +734,7 @@ export function composeHtml(raw: ComposeInput): string {
     particles.length && delivery.runtime === RuntimeDelivery.Hosted ? chunkTag(Chunk.Particles, delivery) : '',
     hotScript(particleScript(particles, doc.fps, Number(duration), delivery.runtime)),
     hotScript(blobScript(blobs, Number(duration))),
+    hotScript(shaderEffectScript(shaderEffects, doc.fps, Number(duration))),
     hotScript(shaderScript(shaderClips, Number(duration))),
     ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');

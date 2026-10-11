@@ -105,6 +105,7 @@ import { SHAPE_KINDS, StrokeKind, modifierKey } from '$lib/motion/shape/schema';
 import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset } from '$lib/motion/shape/presets';
 import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
 import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
+import { SHADER_EFFECTS, SHADER_EFFECT_IDS } from '$lib/motion/shader-effects/catalogue';
 import { Lens, addLens } from '$lib/motion/glass/ops';
 import { SPRINGS } from '$lib/motion/spring';
 import { BLOB_INPUT } from '$lib/motion/blob/inputs';
@@ -352,6 +353,8 @@ type KeyInput = { time: number; value: Keyframe['value']; ease: Keyframe['ease']
 const MODIFIER_CATALOGUE = MODIFIER_KINDS.map((k) => `${k} (${MODIFIERS[k].params.map((p) => `${p.key} ${p.options ? p.options.map((o, i) => `${i}=${o}`).join('/') : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
 const PATH_GUIDE = 'SVG path data (M L H V C S Q T Z, absolute or relative) in the shape box: 0,0 is its top-left and 1,1 its bottom-right';
 const EFFECT_CATALOGUE = EFFECT_KINDS.map((k) => `${k} (${EFFECTS[k].about}; ${EFFECTS[k].params.map((p) => `${p.key} ${p.kind === ValueKind.Color ? 'colour' : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
+
+const SHADER_EFFECT_CATALOGUE = SHADER_EFFECT_IDS.map((id) => `${id} (${SHADER_EFFECTS[id].category}, ${SHADER_EFFECTS[id].source}: ${SHADER_EFFECTS[id].about}; ${[...Object.entries(SHADER_EFFECTS[id].numbers).map(([k, n]) => `${k} ${n.min}..${n.max}`), ...Object.keys(SHADER_EFFECTS[id].colours)].join(', ')})`).join('; ');
 
 const effectSpec = z.object({ kind: z.enum(EFFECT_KINDS), params: z.record(z.string(), z.union([z.number(), z.string()])).optional() });
 
@@ -1064,6 +1067,20 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const props = { ...PARTICLE_PRESET[input.preset].props, ...propsIn('Particles', input.props) };
         const result = addClip(session.doc, { component: 'Particles', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
         return created(apply(withEffects(registered(result, input.props?.sprite), [id], input.effects), `added ${input.preset} particles`), id);
+      }
+    }),
+
+    add_shader_effect: tool({
+      description: `Add a ShaderEffect clip: a GPU effect from the open-source shaders library, seeked frame by frame so preview and export agree. Effects: ${SHADER_EFFECT_CATALOGUE}. Filters apply to image (a picture asset id), or to a mesh gradient without one. props set the knobs listed per effect (colours take #rrggbb or brand.*); every knob but speed takes set_keyframes afterwards, e.g. a wipe's progress 1→0 to reveal. Cursor effects move only in interactive embeds. Never over a brand logo: logos stay untouched. ${PLACEMENT_HELP} Returns the clip id.`,
+      inputSchema: z.object({ effect: z.enum(SHADER_EFFECT_IDS), start: z.number().min(0), duration: z.number().positive().optional(), image: z.string().optional(), props: z.record(z.string(), z.union([z.number(), z.string()])).optional(), ...PLACED_PICTURE }),
+      execute: async (input) => {
+        if (!assetKnown(input.image)) {
+          return { ok: false, error: 'unknown asset id: call list_assets' };
+        }
+        const id = deps.newId();
+        const props = propsIn('ShaderEffect', { ...input.props, effect: input.effect, image: input.image ?? null });
+        const result = addClip(session.doc, { component: 'ShaderEffect', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
+        return created(apply(withEffects(registered(result, input.image), [id], input.effects), `added ${input.effect}`), id);
       }
     }),
 

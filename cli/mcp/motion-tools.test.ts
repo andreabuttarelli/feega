@@ -51,6 +51,10 @@ const fake: Server = createServer((req, res) => {
       send(200, { run_id: 'render-1', mode: 'browser', status: 'done', asset_id: 'a1', file_url: 'https://files/a1.mp4' });
       return;
     }
+    if (route === '/api/v1/motion/shader-effects') {
+      send(200, { effects: [{ id: 'iris-wipe', category: 'transition', source: 'filter', live: false }] });
+      return;
+    }
     if (route === '/api/v1/motion') {
       send(200, { videos: [{ node_id: NODE, name: 'Launch', version: 3 }] });
       return;
@@ -147,6 +151,13 @@ describe('the motion agent over MCP', () => {
 
     expect(result?.structuredContent).toEqual({ run_id: RUN, status: 'running' });
     expect(calls).toHaveLength(1);
+  });
+
+  test('list_shader_effects reads the catalogue', async () => {
+    const result = await callTool('list_shader_effects', {});
+
+    expect(calls[0].path).toBe('/api/v1/motion/shader-effects');
+    expect(result?.structuredContent).toMatchObject({ effects: [{ id: 'iris-wipe' }] });
   });
 
   test('get_motion_run reads a run', async () => {

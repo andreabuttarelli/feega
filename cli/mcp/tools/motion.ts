@@ -50,6 +50,20 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'list_shader_effects',
+    {
+      title: 'List shader effects',
+      description:
+        'The GPU shader effects (open-source shaders library, WebGPU) the motion agent adds with `add_shader_effect`: gradients, noise, glass, metal, light, distortions, wipes, blurs. ' +
+        'Each with category, `source` (generator, or filter over a picture), `live` (cursor effects: interactive embeds only), its knobs with ranges and whether they take keyframes, and colours. ' +
+        'Name one in `ask_motion_agent`, e.g. "add an iris-wipe reveal on the product shot". Reads only.',
+      inputSchema: z.object({ org }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org }) => withAuth((token) => motionApi.shaderEffects(token, org))
+  );
+
+  server.registerTool(
     'get_motion_run',
     {
       title: 'Read a motion agent run',

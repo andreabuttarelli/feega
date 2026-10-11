@@ -31,6 +31,12 @@ describe('guides attached to code writes', () => {
     expect(String(second.warnings)).toContain('WebGLRenderer');
   });
 
+  it('a component using shaders gets the shader effects guide', async () => {
+    const result = await setup()({ name: 'Glow', html: '<canvas></canvas>', css: '', js: 'shaders.layer(root.querySelector("canvas"), "plasma", { colorA: brand.colors.primary });' });
+
+    expect(result.guide).toBe(GUIDES[GuideTopic.ShaderEffects].text);
+  });
+
   it('a component without WebGL gets neither', async () => {
     const result = await setup()(CARD);
 

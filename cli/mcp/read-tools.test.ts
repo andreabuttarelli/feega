@@ -81,6 +81,7 @@ const RESTANO = [
   'write_storyboard',
   'edit_storyboard_card',
   'list_motion_videos',
+  'list_shader_effects',
   'publish_motion_embed',
   'get_motion_embed',
   'view_motion_frames',

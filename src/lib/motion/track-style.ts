@@ -62,6 +62,7 @@ const COMPONENT_FAMILY: Record<ComponentId, ClipFamily> = {
   Composition: ClipFamily.ThreeD,
   Null: ClipFamily.Null,
   Particles: ClipFamily.Shape,
+  ShaderEffect: ClipFamily.Shape,
   Precomp: ClipFamily.Precomp,
   LiquidGlass: ClipFamily.Adjustment,
   LiquidBlob: ClipFamily.Adjustment,

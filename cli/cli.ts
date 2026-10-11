@@ -145,6 +145,15 @@ motion
   });
 
 motion
+  .command('shaders')
+  .description('List the shader effects the motion agent can add, with their knobs')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdMotionShaders } = await import('./commands/motion.ts');
+    await cmdMotionShaders(opts);
+  });
+
+motion
   .command('list')
   .description('List motion videos, to find a node id')
   .option('--project <id>', 'Only the videos of one project')

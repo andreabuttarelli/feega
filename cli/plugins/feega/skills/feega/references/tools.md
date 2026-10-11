@@ -210,6 +210,7 @@ list. Returns how many combinations it actually stopped.
 | `list_motion_videos` | `feega motion list [--project <id>]` |
 | `ask_motion_agent` | `feega motion ask <nodeId> "<prompt>" [--no-wait]` |
 | `get_motion_run` | `feega motion run <runId>` |
+| `list_shader_effects` | `feega motion shaders` |
 | `get_motion_summary` | (MCP only) |
 | `render_video` | `feega motion render <nodeId> [--resolution 720p] [--quality q] [--fps n]` |
 | `get_render` | `feega motion render-status <runId>` |
