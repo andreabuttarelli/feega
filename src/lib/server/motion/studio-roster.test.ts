@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { CutAnswer, cutAnswer } from '$lib/motion/cut-review';
-import { OPUS, STUDIO_ROSTER, StudioRole, WritesCode, roleBudgetUsd, roleModel, roleTools, turnRole } from './studio-roster';
+import { OPUS, REVIEWED, STUDIO_ROSTER, StudioRole, WritesCode, roleBudgetUsd, roleModel, roleTools, turnRole } from './studio-roster';
 
 const empty = newMotionDoc(MotionFormat.Landscape);
 const scripted = { ...empty, script: { research: {}, acts: [] } } as never;
@@ -15,8 +15,18 @@ describe('the studio roster', () => {
     expect(roleTools(StudioRole.Director, names)).toEqual(['analyze_site', 'write_script', 'web_search', 'recreate_ui']);
   });
 
-  it('once there is a script or a cut, the builder takes every tool', () => {
-    expect(turnRole('go', scripted)).toBe(StudioRole.Builder);
+  it('a scripted video with nothing built yet goes to the shot builder: library shots only, no free code', () => {
+    const shotNames = [...names, 'add_shot', 'list_shots', 'write_component', 'patch_component'];
+
+    expect(turnRole('go', scripted)).toBe(StudioRole.ShotBuilder);
+    expect(roleTools(StudioRole.ShotBuilder, shotNames)).toEqual(expect.arrayContaining(['add_shot', 'list_shots', 'recreate_ui', 'add_music', 'view_frames']));
+    expect(roleTools(StudioRole.ShotBuilder, shotNames)).not.toEqual(expect.arrayContaining(['write_component']));
+    expect(roleTools(StudioRole.ShotBuilder, shotNames)).not.toContain('add_clip');
+    expect(REVIEWED.has(StudioRole.ShotBuilder)).toBe(true);
+    expect(REVIEWED.has(StudioRole.Fixer)).toBe(false);
+  });
+
+  it('once there is a cut, the builder takes every tool', () => {
     expect(turnRole('make it pop', built)).toBe(StudioRole.Builder);
     expect(roleTools(StudioRole.Builder, names)).toEqual(names);
   });

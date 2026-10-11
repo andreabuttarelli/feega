@@ -32,7 +32,7 @@ import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
 import { COPY_SCHEMA, copywrite } from '$lib/server/motion/copywriter';
 import { projectMemory } from '$lib/server/motion/studio-memory';
-import { STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
+import { REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
 import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
@@ -493,7 +493,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const times = keyFrameTimes(session.doc);
         await play([...conversation, checkMessage(errors, times)], Round.SelfCheck);
       }
-      const critiqued = steps.length > 0 && !awaitsGo && role === StudioRole.Builder && vision === Vision.Available && session.edits.length > 0 ? await reviewCut() : null;
+      const critiqued = steps.length > 0 && !awaitsGo && REVIEWED.has(role) && vision === Vision.Available && session.edits.length > 0 ? await reviewCut() : null;
       const fix = critiqued?.review ? criticMessage(critiqued.review) : null;
       if (fix && gate === CutGate.Auto) {
         await play([...conversation, fix], Round.SelfCheck);
