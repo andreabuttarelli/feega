@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { chromium, type Page } from 'playwright';
 import { createClient } from '@supabase/supabase-js';
 import { env } from '../../_shims/env-private';
@@ -9,6 +10,7 @@ import { analyzeAudio } from '$lib/motion/audio-analysis';
 import { UI_KIT } from '$lib/motion/ui-kit/kit';
 import { billedUsdInScope, withOrgContext } from '$lib/server/ai-log';
 import { judge } from './judge';
+import { claimPort, turnSettled, type AgentState } from './drive';
 import { contactSheet, cuts, duration, grayFrames, judgeFrames, monoSamples, PROBE_SIZE } from './media';
 import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, uiLayers, TASTE_AXES, type CaseResult, type Facts } from './score';
 
@@ -75,16 +77,20 @@ async function answerCard(page: Page): Promise<string | null> {
 async function drive(page: Page, agentUrl: string): Promise<void> {
   const start = Date.now();
   let replies = 0;
+  let before: AgentState | null = null;
   while (Date.now() - start < TURN_CAP_MS) {
     await page.waitForTimeout(POLL_MS);
     const answered = await answerCard(page);
     if (answered) {
       say(`  answered ${answered}`);
+      before = null;
       continue;
     }
     const r = await page.request.get(agentUrl);
-    const running = r.ok() ? Boolean((await r.json()).running) : true;
-    if (running) {
+    const now: AgentState = r.ok() ? await r.json() : { running: true, messages: [] };
+    const settled = turnSettled(before, now);
+    before = now;
+    if (!settled) {
       continue;
     }
     const last = (await page.locator('[role="log"] .prose').allInnerTexts()).at(-1)?.trim() ?? '';
@@ -97,6 +103,7 @@ async function drive(page: Page, agentUrl: string): Promise<void> {
     await input.fill(reply);
     await input.press('Enter');
     replies++;
+    before = null;
   }
   throw new Error('turn cap reached');
 }
@@ -269,6 +276,7 @@ async function main() {
   const out = join(OUT_ROOT, stamp);
   mkdirSync(out, { recursive: true });
 
+  const release = claimPort(port, tmpdir());
   const server = await startServer();
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   const results: CaseResult[] = [];
@@ -297,6 +305,7 @@ async function main() {
     if (server?.pid) {
       process.kill(-server.pid);
     }
+    release();
   }
   writeFileSync(join(out, 'report.md'), report(stamp, results, previous, total));
   console.log(readFileSync(join(out, 'report.md'), 'utf8'));
