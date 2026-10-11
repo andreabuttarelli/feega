@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Component, Snippet } from 'svelte';
   import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
+  import { NodeFlow } from '$lib/onboarding/stage';
 
   let {
     label,
@@ -8,6 +9,7 @@
     inputs = [],
     output = null,
     selected = false,
+    flow = NodeFlow.Across,
     children
   }: {
     label: string;
@@ -15,11 +17,12 @@
     inputs?: ConnectorType[];
     output?: ConnectorType | null;
     selected?: boolean;
+    flow?: NodeFlow;
     children: Snippet;
   } = $props();
 </script>
 
-<div class="node" class:selected>
+<div class="node {flow}" class:selected>
   <div class="label">
     <Icon size={14} strokeWidth={1.8} />
     <span>{label}</span>
@@ -28,7 +31,7 @@
   <div class="body">{@render children()}</div>
 
   {#each inputs as port, i (port)}
-    <span class="port in" title={CONNECTOR_STYLE[port].label} style:top="{((i + 1) / (inputs.length + 1)) * 100}%" style:--port={CONNECTOR_STYLE[port].color}>
+    <span class="port in" title={CONNECTOR_STYLE[port].label} style:--along="{((i + 1) / (inputs.length + 1)) * 100}%" style:--port={CONNECTOR_STYLE[port].color}>
 
     </span>
   {/each}
@@ -90,15 +93,32 @@
     background: var(--port);
   }
 
-  .in {
+  .across .in {
+    top: var(--along);
     left: 0;
     flex-direction: row-reverse;
     transform: translate(calc(-100% + 6px), -50%);
   }
 
-  .out {
+  .across .out {
     top: 50%;
     right: 0;
     transform: translate(calc(100% - 6px), -50%);
+  }
+
+  .down .port {
+    height: 12px;
+  }
+
+  .down .in {
+    top: 0;
+    left: var(--along);
+    transform: translate(-50%, -50%);
+  }
+
+  .down .out {
+    bottom: 0;
+    left: 50%;
+    transform: translate(-50%, 50%);
   }
 </style>

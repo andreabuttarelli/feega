@@ -286,6 +286,12 @@
     54%, 100% { opacity: 1; transform: none; }
   }
 
+  @media (prefers-reduced-motion: no-preference) {
+    .scene {
+      animation: tour-seam var(--loop) linear infinite;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .scene * {
       animation: none !important;

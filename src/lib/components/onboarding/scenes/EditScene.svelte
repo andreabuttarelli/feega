@@ -380,6 +380,12 @@
     50% { transform: scale(0.6); opacity: 0.5; }
   }
 
+  @media (prefers-reduced-motion: no-preference) {
+    .scene {
+      animation: tour-seam var(--loop) linear infinite;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .scene * {
       animation: none !important;
