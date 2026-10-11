@@ -122,11 +122,13 @@ import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS } from '
 import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
 import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '$lib/motion/style-model';
+import { SPAWN_AGENT, type ModelOffer, type SpawnInput, type SpawnResult } from '$lib/server/agents/spawn';
+import { spawnAgentTool } from '$lib/server/agents/spawn-agent';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
 const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
 
-const copyTexts = (slots: Record<string, string | number>) => Object.entries(slots).flatMap(([k, v]) => (COPY_SLOTS.has(k) && typeof v === 'string' ? v.split('|').map((s) => s.trim()).filter(Boolean) : []));
+const copyTexts = (slots: Record<string, unknown>) => Object.entries(slots).flatMap(([k, v]) => (COPY_SLOTS.has(k) && typeof v === 'string' ? v.split('|').map((s) => s.trim()).filter(Boolean) : []));
 
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[]; look?: Viewing };
 
@@ -150,6 +152,7 @@ export type MotionToolDeps = {
   seam?: () => Promise<number | null>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
+  spawn?: { offers: readonly ModelOffer[]; run: (input: SpawnInput) => Promise<SpawnResult> };
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
   renderLink?: () => Promise<Record<string, unknown>>;
   embed?: (action: EmbedAction) => Promise<Record<string, unknown>>;
@@ -1525,6 +1528,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         return deps.batch({ doc: session.doc, rows });
       }
     }),
+
+    [SPAWN_AGENT]: spawnAgentTool(deps.spawn?.offers ?? [], async (input) => (deps.spawn ? deps.spawn.run(input) : { ok: false, error: 'sub-agents are not available here' })),
 
     render_video: tool({
       description:

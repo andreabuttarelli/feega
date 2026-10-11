@@ -2,6 +2,9 @@ import { styleOf } from '$lib/motion/style';
 import { briefAwaits, promptTexts } from '$lib/motion/script-brief';
 import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, rejectedRounds, shownRefs, savedPick, type PickAnswer, type PickAsk } from '$lib/reference-pick';
 import { createUIMessageStream, streamText, type ModelMessage, type UIMessageChunk } from 'ai';
+import type { SpawnInput } from '$lib/server/agents/spawn';
+import { spawnAgents, spawnOffers } from '$lib/server/agents/spawn-agent';
+import { toolsWritingCode } from '$lib/server/motion/model-route';
 import type { Db } from '$lib/server/db/client';
 import { llmCodeModel, llmLanguageModel, llmStructured, llmVisionModel, type LlmMediaPart } from '$lib/server/llm';
 import { fetchImageBytes, uiReader } from '$lib/server/motion/ui-read';
@@ -268,7 +271,10 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     return firstFrames([editor, server]);
   };
 
+  let spawnRun: (input: SpawnInput) => Promise<Record<string, unknown>> = async () => ({ ok: false, error: 'sub-agents start once the turn is running' });
+  const offers = spawnOffers();
   const tools = createMotionTools({
+    spawn: { offers, run: (input) => spawnRun(input) as never },
     session,
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
@@ -374,6 +380,24 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const charged = () => spent - roundsUsd + Math.max(roundsUsd, billing.gatewayUsd());
   const overBudget: Stop = () => charged() > roleBudgetUsd(role, AGENT_TURN_CAP_USD);
   const TIER_MODEL: Record<Tier, string> = { [Tier.Edit]: model, [Tier.Code]: codeModel };
+
+  spawnRun = spawnAgents(
+    {
+      orgId,
+      tools: () => Object.fromEntries(toolNames.map((n) => [n, tools[n]])),
+      codeTools: toolsWritingCode,
+      visionTools: new Set([VIEW_FRAMES]),
+      remainingUsd: () => roleBudgetUsd(role, AGENT_TURN_CAP_USD) - charged(),
+      onSpent: (usd) => {
+        spent += usd;
+      },
+      changes: () => session.edits.length,
+      changedSince: (mark) => session.edits.slice(mark),
+      log: (e) => withOrgContext(orgId, () => logAiCall({ label: `motion-spawned-${e.label}`, provider: 'llm', model: e.model, ms: 0, ok: true, orgId, userId, threadId, projectId: project.id, actorKind: 'agent', actorId: userId, agentKey: e.agentKey, ...e.usage })),
+      abort: cut.signal
+    },
+    offers
+  );
 
   const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void) =>
     billing.run(() => streamText({
