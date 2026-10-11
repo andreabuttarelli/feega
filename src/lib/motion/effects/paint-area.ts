@@ -32,6 +32,16 @@ const AREA: Partial<Record<ComponentId, (p: Placement, frame: Frame, extent: Ext
   Shape: (p, frame, extent) => (extent ? placedExtent(extent, boxOf(p, frame), p) : null)
 };
 
+const placed = (p: Partial<Placement>): p is Placement => [p.x, p.y, p.width, p.height].every((n) => typeof n === 'number' && Number.isFinite(n));
+
+export function placedBox(p: Partial<Placement>, frame: Frame): Box | null {
+  if (!placed(p)) {
+    return null;
+  }
+  const box = boxOf(p, frame);
+  return placedExtent({ left: 0, top: 0, right: box.width, bottom: box.height } as Extent, box, p);
+}
+
 export function paintArea(component: ComponentId, p: Placement, frame: Frame, extent: Extent | null): Box | null {
   return AREA[component]?.(p, frame, extent) ?? null;
 }

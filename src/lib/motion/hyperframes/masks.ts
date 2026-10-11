@@ -4,6 +4,18 @@ import { esc } from './html';
 import { SANS } from './templates';
 
 type Frame = { width: number; height: number };
+type Box = { left: number; top: number; width: number; height: number };
+
+export function maskArea(frame: Frame, content: Box | null): Box {
+  if (!content) {
+    return { left: 0, top: 0, ...frame };
+  }
+  const left = Math.floor(Math.min(0, content.left));
+  const top = Math.floor(Math.min(0, content.top));
+  const right = Math.ceil(Math.max(frame.width, content.left + content.width));
+  const bottom = Math.ceil(Math.max(frame.height, content.top + content.height));
+  return { left, top, width: right - left, height: bottom - top };
+}
 
 export enum MaskScope {
   Own = 'm',
@@ -25,16 +37,7 @@ enum Part {
 }
 
 const UNIT = 100;
-const OVERSCAN = 0.25;
-
-const margin = (frame: Frame) => ({ x: frame.width * OVERSCAN, y: frame.height * OVERSCAN });
-
-function spanned(frame: Frame): Frame {
-  const m = margin(frame);
-  return { width: frame.width + 2 * m.x, height: frame.height + 2 * m.y };
-}
 const HALF = UNIT / 2;
-
 export type MaskAttr = { part: Part; attr: string; out: (value: number, frame: Frame) => number | string };
 
 function round(n: number): number {
@@ -134,11 +137,11 @@ export function stackLayers(modes: MaskMode[]): StackLayer[] {
 
 export type MaskShape = { mask: Mask; values: MaskValues; url: string | null };
 
-export type MaskLayer = { scope: MaskScope; clipId: string; masks: MaskShape[]; frame: Frame };
+export type MaskLayer = { scope: MaskScope; clipId: string; masks: MaskShape[]; frame: Frame; area: Box };
 
 const stackScope = (scope: MaskScope, index: number) => (index === 0 ? scope : `${scope}${index}`);
 
-function maskDefs(scope: string, clipId: string, shape: MaskShape, flip: boolean, frame: Frame): string {
+function maskDefs(scope: string, clipId: string, shape: MaskShape, flip: boolean, frame: Frame, area: Box): string {
   const { mask, values } = shape;
   const id = (part: string) => maskTarget(scope, part, clipId);
   const value = (part: Part) => {
@@ -153,27 +156,23 @@ function maskDefs(scope: string, clipId: string, shape: MaskShape, flip: boolean
   const kind = KIND[mask.kind];
   const nested = NESTING.reduceRight((body, part) => `<g ${set(part)}>${body}</g>`, kind.shape(paint));
   const filter = `<filter id="${id('f')}" filterUnits="userSpaceOnUse" ${region}><feMorphology id="${id(Part.Dilate)}" operator="dilate" ${value(Part.Dilate)}/><feMorphology id="${id(Part.Erode)}" operator="erode" ${value(Part.Erode)}/><feGaussianBlur ${set(Part.Blur)}/></filter>`;
-  const span = spanned(frame);
-  const shift = margin(frame);
-  const wrapperRegion = `x="0" y="0" width="${span.width}" height="${span.height}"`;
+  const wrapperRegion = `x="0" y="0" width="${area.width}" height="${area.height}"`;
   const backdrop = inverted ? `<rect ${wrapperRegion} fill="#fff"/>` : '';
-  return `${filter}${kind.defs(paint)}<mask id="${id('k')}" maskUnits="userSpaceOnUse" ${wrapperRegion}>${backdrop}<g transform="translate(${shift.x} ${shift.y})"><g filter="url(#${id('f')})"><g ${set(Part.Opacity)}>${nested}</g></g></g></mask>`;
+  return `${filter}${kind.defs(paint)}<mask id="${id('k')}" maskUnits="userSpaceOnUse" ${wrapperRegion}>${backdrop}<g transform="translate(${-area.left} ${-area.top})"><g filter="url(#${id('f')})"><g ${set(Part.Opacity)}>${nested}</g></g></g></mask>`;
 }
 
 export function maskLayer(layer: MaskLayer, inner: string): string {
-  const { scope, clipId, masks, frame } = layer;
+  const { scope, clipId, masks, frame, area } = layer;
   const layers = stackLayers(masks.map((m) => m.mask.mode));
   const topFirst = masks.map((shape, i) => ({ shape, scope: stackScope(scope, i), layer: layers[i] })).reverse();
 
-  const defs = topFirst.map((m) => maskDefs(m.scope, clipId, m.shape, m.layer.flip, frame)).join('');
+  const defs = topFirst.map((m) => maskDefs(m.scope, clipId, m.shape, m.layer.flip, frame, area)).join('');
   const url = topFirst.map((m) => `url(#${maskTarget(m.scope, 'k', clipId)})`).join(',');
   const composite = masks.length > 1 ? `;mask-composite:${topFirst.map((m) => m.layer.composite).join(',')}` : '';
   const wrapper = WRAPPER[scope];
 
-  const span = spanned(frame);
-  const shift = margin(frame);
-  const spansRegion = `left:${-shift.x}px;top:${-shift.y}px;width:${span.width}px;height:${span.height}px`;
-  const framed = `left:${shift.x}px;top:${shift.y}px;width:${frame.width}px;height:${frame.height}px`;
+  const spansRegion = `left:${area.left}px;top:${area.top}px;width:${area.width}px;height:${area.height}px`;
+  const framed = `left:${-area.left}px;top:${-area.top}px;width:${frame.width}px;height:${frame.height}px`;
 
   return `<svg class="kd" aria-hidden="true"><defs>${defs}</defs></svg><div class="${wrapper}" id="${wrapper}-${clipId}" style="${spansRegion};mask:${url};-webkit-mask:${url}${composite}"><div class="kb" style="${framed}">${inner}</div></div>`;
 }

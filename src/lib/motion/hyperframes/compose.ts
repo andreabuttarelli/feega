@@ -21,7 +21,8 @@ import { BENTO_LAYOUT, cellFrames } from '../bento/model';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
 import { ANIMATE_CSS, ENGINE, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
 import { ancestorsOf, parentsWithChildren } from '../parent';
-import { MASK_CSS, MaskScope, maskLayer, startValues } from './masks';
+import { threeGrains, withoutGrain } from './three-grain';
+import { MASK_CSS, MaskScope, maskArea, maskLayer, startValues } from './masks';
 import { captureScript, contentStamp } from './capture';
 import { cspMeta } from './csp';
 import { measureScript } from './measure';
@@ -49,7 +50,7 @@ import { bakePaths } from '../path';
 import { bakePhysics } from '../physics/simulate';
 import { withoutHidden } from '../organize';
 import { JUNCTION, Span, junctionHalves, junctionPairs, withJunctions, type JunctionPair, type Move } from '../junctions';
-import { paintArea } from '../effects/paint-area';
+import { paintArea, placedBox } from '../effects/paint-area';
 import { EFFECT_CSS, adjustmentLayer, adjustmentTimeline, effectLayer, effectScript, effectTimeline, type EffectSet } from '../effects/render';
 import { flattenComps, type GroupProps } from '../precomp';
 import { blendStyle } from '../blend';
@@ -219,7 +220,7 @@ function ownMask(clip: MotionClip, ctx: TemplateCtx<ComponentId>, inner: string)
   }
   const primary = { mask: clip.mask, values: startValues(clip.mask, clip.keyframes), url: ctx.asset(clip.mask.assetId) };
   const stacked = clip.maskStack.map((mask) => ({ mask, values: startValues(mask, {}), url: ctx.asset(mask.assetId) }));
-  return maskLayer({ scope: MaskScope.Own, clipId: clip.id, masks: [primary, ...stacked], frame: ctx }, inner);
+  return maskLayer({ scope: MaskScope.Own, clipId: clip.id, masks: [primary, ...stacked], frame: ctx, area: maskArea(ctx, placedBox(ctx.p as Record<string, number>, ctx)) }, inner);
 }
 
 function matted(matte: MattePair | null, inner: string): string {
@@ -393,7 +394,8 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: bo
     screenFit: p.screenFit ?? ScreenFit.Cover,
     screen: screenOf(clip, ctx),
     video: Boolean(ctx.asset(p.screenVideo ?? null)),
-    overscan: clip.component === 'Device3D' ? DEVICE_OVERSCAN : 0
+    overscan: clip.component === 'Device3D' ? DEVICE_OVERSCAN : 0,
+    grains: threeGrains(clip)
   };
 }
 
@@ -630,9 +632,10 @@ export function composeHtml(raw: ComposeInput): string {
       layer += 1;
       const study = clip.component === 'Shape' ? shapeStudy({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
       const placed: Placed = { layer, trackIndex: index, matte: matteOf.get(clip.id) ?? null, visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id), extent: study?.extent ?? null };
-      const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(clip, ctx, placed, template.html(ctx as never));
+      const filtered = THREE_D_COMPONENTS.includes(clip.component) ? withoutGrain(clip) : clip;
+      const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(filtered, ctx, placed, template.html(ctx as never));
       (onStage.has(clip.id) && !group && !hidden.has(clip.id) ? world : layers).push(html);
-      effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(clip, ctx, ctx.color, paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null))));
+      effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(filtered, ctx, ctx.color, paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null))));
       const own = untrimmed(template.tweens?.(ctx as never) ?? [], ctx.start, ctx.mediaStart);
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));

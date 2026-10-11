@@ -100,6 +100,24 @@ describe('the hosted embed loader', () => {
     expect(document.querySelectorAll('feega-motion iframe')).toHaveLength(1);
   });
 
+  it('warns once when the same video is embedded twice, and still shows both', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await load(`<feega-motion src="${ID}"></feega-motion><feega-motion src="${ID}"></feega-motion>`);
+
+    expect(document.querySelectorAll('feega-motion iframe')).toHaveLength(2);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toContain(ID);
+    warn.mockRestore();
+  });
+
+  it('does not warn for two different videos', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await load(`<feega-motion src="${ID}"></feega-motion><feega-motion src="other"></feega-motion>`);
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
   it('leaves an old iframe snippet alone', async () => {
     const frame = await load(`<iframe src="${ORIGIN}/e/${ID}" style="width:100%;aspect-ratio:16/9"></iframe>`);
 

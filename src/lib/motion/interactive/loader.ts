@@ -132,12 +132,27 @@ export function loaderMain(win: Window, cfg: LoaderConfig, host: typeof hostMain
     }
   };
 
+  const mountedIds = new Set<string>();
+  const warnedIds = new Set<string>();
+  const noteRepeat = (id: string) => {
+    if (!mountedIds.has(id)) {
+      mountedIds.add(id);
+      return;
+    }
+    if (warnedIds.has(id)) {
+      return;
+    }
+    warnedIds.add(id);
+    win.console.warn(`feega: video ${id} is embedded more than once on this page. Paste its snippet once.`);
+  };
+
   const mount = async (el: HTMLElement) => {
     const id = el.getAttribute('src') ?? el.getAttribute(cfg.attr);
     if (!id || el.hasAttribute(cfg.mounted)) {
       return;
     }
     el.setAttribute(cfg.mounted, '');
+    noteRepeat(id);
 
     if (soleContent(el)) {
       takeDocument();
