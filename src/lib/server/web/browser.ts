@@ -36,6 +36,7 @@ export type AppTab = Tab & {
   vector: () => Promise<unknown>;
   overlay: () => Promise<Overlay | null>;
   press: (key: string) => Promise<void>;
+  paint: (html: string, size: { width: number; height: number }) => Promise<Buffer>;
 };
 
 export type OpenBrowser = () => Promise<Tab>;
@@ -234,7 +235,12 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
     ui: () => page.evaluate(uiOf, { max: UI_MAX_ELEMENTS, text: UI_MAX_TEXT }),
     vector: () => vectorOfPage(page),
     overlay: () => page.evaluate(overlayOf, OVERLAY_SELECTOR),
-    press: (key) => page.keyboard.press(key as Parameters<Page['keyboard']['press']>[0])
+    press: (key) => page.keyboard.press(key as Parameters<Page['keyboard']['press']>[0]),
+    paint: async (html, size) => {
+      await page.setContent(html, { waitUntil: 'load', timeout: NAV_TIMEOUT_MS });
+      await page.evaluate(() => document.fonts.ready);
+      return Buffer.from(await page.screenshot({ type: 'jpeg', quality: JPEG_QUALITY, clip: { x: 0, y: 0, ...size } }));
+    }
   };
 }
 
