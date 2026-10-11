@@ -104,6 +104,13 @@ export function withOrgContext<T>(orgId: string, fn: () => T): T {
   return brandStorage.run({ brandId: null, orgId }, fn);
 }
 
+export type BillingScope = { run: <T>(fn: () => T) => T; gatewayUsd: () => number };
+
+export function billingScope(orgId: string): BillingScope {
+  const ctx: BrandLogContext = { brandId: null, orgId };
+  return { run: (fn) => brandStorage.run(ctx, fn), gatewayUsd: () => ctx.llmCostUsd ?? 0 };
+}
+
 
 /**
  * Il costo che il gateway ci ha fatturato in questo scope. Un turno di chat è N chiamate (una per

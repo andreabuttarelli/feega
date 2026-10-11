@@ -9,7 +9,7 @@ import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions, toolForcing } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
 import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
-import { billedUsdInScope, extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
+import { billedUsdInScope, billingScope, extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
 import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
 import { referencedAssets } from '$lib/motion/doc-assets';
@@ -335,11 +335,14 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const stepTiers: Tier[] = [];
   const framesShown = new Set<string>();
   let spent = 0;
-  const overBudget: Stop = () => spent > roleBudgetUsd(role, AGENT_TURN_CAP_USD);
+  let roundsUsd = 0;
+  const billing = billingScope(orgId);
+  const charged = () => spent - roundsUsd + Math.max(roundsUsd, billing.gatewayUsd());
+  const overBudget: Stop = () => charged() > roleBudgetUsd(role, AGENT_TURN_CAP_USD);
   const TIER_MODEL: Record<Tier, string> = { [Tier.Edit]: model, [Tier.Code]: codeModel };
 
   const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void) =>
-    streamText({
+    billing.run(() => streamText({
       model: llmLanguageModel(model, PromptCache.On),
       system,
       messages,
@@ -353,7 +356,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         }
       },
       onStepFinish: (step) => {
-        spent += spentUsd([extractSdkUsage(step.usage)], [stepModels.at(-1) ?? model], gatewayRate);
+        const estimate = spentUsd([extractSdkUsage(step.usage)], [stepModels.at(-1) ?? model], gatewayRate);
+        spent += estimate;
+        roundsUsd += estimate;
         onStep(step);
       },
       prepareStep: ({ steps, messages: current, stepNumber }) => {
@@ -371,7 +376,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const forced = ROUND_CHOICE[kind]({ tier, reasoning: stepModel === model ? reasoning : null, forcing: toolForcing(stepModel), stepNumber });
         return { model: llmLanguageModel(stepModel, PromptCache.On), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
       }
-    });
+        }));
 
   const lastLook = async (messages: ModelMessage[]): Promise<ModelMessage[]> => {
     const view = tools[VIEW_FRAMES];
@@ -583,7 +588,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
 
     const written = write?.outcome === RevisionOutcome.Written ? write.head : null;
     const asked = finished.tools.map(savedPick).findLast((p) => p !== null) ?? null;
-    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: spent, pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null };
+    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null };
   }
 
   const reader = stream.getReader();

@@ -38,6 +38,7 @@ const world = vi.hoisted(() => ({
   tools: [] as string[][],
   imported: [] as string[],
   critic: null as unknown,
+  billed: 0,
   critiques: [] as { prompt: string; images: unknown[] }[]
 }));
 
@@ -189,7 +190,7 @@ vi.mock('$lib/server/openrouter-models', () => ({
   gatewayRate: () => ({ input: world.rate, cachedInput: world.rate, output: world.rate }),
   gatewayModel: () => (world.seesImages ? { usable: true } : null)
 }));
-vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: vi.fn(), billedUsdInScope: () => 0.04, withOrgContext: (_id: string, fn: () => unknown) => fn() }));
+vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: vi.fn(), billedUsdInScope: () => 0.04, billingScope: () => ({ run: (fn: () => unknown) => fn(), gatewayUsd: () => world.billed }), withOrgContext: (_id: string, fn: () => unknown) => fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/repos/chat', () => ({
   openNodeThread: async () => 'thread-1',
@@ -315,6 +316,7 @@ describe('a motion turn closes on a look and a summary', () => {
     world.tools = [];
     world.imported = [];
     world.critic = null;
+    world.billed = 0;
     world.critiques = [];
   });
 
@@ -371,6 +373,15 @@ describe('a motion turn closes on a look and a summary', () => {
     await turn();
 
     expect(world.tools[0]).toContain('add_clip');
+  });
+
+  it('the turn stops on what the gateway billed, not only on the rate card (v6: a $0.75 fixer share spent $3.4)', async () => {
+    world.billed = 50;
+
+    const outcome = await turn();
+
+    expect(outcome.costUsd).toBeGreaterThanOrEqual(50);
+    expect(world.calls.filter((c) => lastMessage(c.prompt).role === 'tool' && JSON.stringify(lastMessage(c.prompt).content).includes('add_clip'))).toHaveLength(0);
   });
 
   it('a cut the critic passes is delivered without another round', async () => {
