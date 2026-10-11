@@ -298,8 +298,10 @@ const show = (n) => {
 const ghost = el('span', 'visibility:hidden;', num);
 const digitsShown = el('span', '', num);
 const FINAL = show(Number(raw));
+const COUNT_MIN_STEPS = 20;
+const counts = Number(raw) * Math.pow(10, digits) >= COUNT_MIN_STEPS;
 drive((t) => {
-  const p = 1 - Math.pow(1 - span(t, 0.2, 1.7), 3);
+  const p = counts ? 1 - Math.pow(1 - span(t, 0.2, 1.7), 3) : 1;
   const shown = show(Number(raw) * p);
   ghost.textContent = FINAL.slice(0, Math.max(0, FINAL.length - shown.length));
   digitsShown.textContent = shown;

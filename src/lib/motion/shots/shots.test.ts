@@ -258,3 +258,16 @@ describe('UI shots in vertical', () => {
     expect(lowest.filter((o) => o < 0.95).length / times.length).toBeLessThanOrEqual(0.5);
   });
 });
+
+describe('the stat count', () => {
+  const shown = (value: string, t: number) => wordsUnder(drawPiece(shotSource(ShotId.StatCount, UI).js, { value, label: 'sites' }, DURATION, LANDSCAPE)(t)).join(' ');
+
+  it('a number too small to count shows itself from the start: no 0 to 1 pop (v4 jumped at 21.5 s)', () => {
+    expect([0.3, 0.8, 1.2].map((t) => shown('3', t))).toEqual(['3 sites', '3 sites', '3 sites']);
+  });
+
+  it('a large number still counts up', () => {
+    expect(shown('12,400', 0.8)).not.toContain('12,400');
+    expect(shown('12,400', DURATION)).toContain('12,400');
+  });
+});

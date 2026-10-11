@@ -3,6 +3,8 @@ import { MotionFormat, newMotionDoc } from './doc';
 import { Resolution } from './render-quote';
 import { AudioMode, BROWSER_RESOLUTIONS, Support, eta, exportSize, exportSupport, frameTimes, outputSize, samplesPerFrame } from './export-plan';
 import { BROWSER_SAMPLES } from './motion-blur';
+import { addClip } from './timeline';
+import type { MotionDoc } from './doc';
 
 describe('export plan', () => {
   it('1080p keeps the doc size, 720p scales it to an even size', () => {
@@ -28,6 +30,24 @@ describe('export plan', () => {
     expect(times).toHaveLength(2 * BROWSER_SAMPLES);
     expect(times[2] * 30).toBeGreaterThan(0.75);
     expect(times[3] * 30).toBeLessThan(1.25);
+  });
+
+  it('a blurred frame never mixes the two sides of a cut (v4: half of the outgoing shot over the next one, a jump at every cut)', () => {
+    const blurred = { ...newMotionDoc(MotionFormat.Square), durationInFrames: 20, motionBlur: { enabled: true, shutterAngle: 180, shutterPhase: -90, samples: 8 } };
+    const placed = (doc: MotionDoc, from: number, durationInFrames: number, id: string) => {
+      const r = addClip(doc, { component: 'Title', from, durationInFrames, props: { text: id } }, id);
+      if (!r.ok) {
+        throw new Error(r.error);
+      }
+      return r.doc;
+    };
+    const doc = placed(placed(blurred, 0, 10, 'a'), 12, 8, 'b');
+    const frame = (i: number) => frameTimes(doc).slice(i * BROWSER_SAMPLES, (i + 1) * BROWSER_SAMPLES).map((t) => t * 30);
+
+    expect(Math.min(...frame(10))).toBeGreaterThanOrEqual(10);
+    expect(Math.min(...frame(12))).toBeGreaterThanOrEqual(12);
+    expect(Math.max(...frame(9))).toBeLessThan(10);
+    expect(Math.max(...frame(5)) - Math.min(...frame(5))).toBeGreaterThan(0);
   });
 
   it('a server render scales the doc up to the asked short side, 4K included', () => {
