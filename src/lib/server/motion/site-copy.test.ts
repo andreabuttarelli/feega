@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SectionKind, linksWorthReading, pageOf, quoted, sectionsOf } from './site-copy';
+import { SectionKind, linksWorthReading, pageOf, quoted, sectionsOf, unsourcedFigures } from './site-copy';
 
 const HOME = `<html><head><title>Supasito</title><script>var x = '<p>no</p>'</script></head><body>
 <nav><a href="/pricing">Pricing</a><a href="/login">Log in</a></nav>
@@ -38,5 +38,25 @@ describe('reading a site for its story', () => {
     expect(quoted(pages, { url: 'https://www.supasito.com', quote: 'See it before it goes live' })).toBe(true);
     expect(quoted(pages, { url: 'https://supasito.com/', quote: 'Ships 10x faster' })).toBe(false);
     expect(quoted(pages, { url: 'https://supasito.com/pricing', quote: 'Free.' })).toBe(false);
+  });
+});
+
+describe('figures shown on screen come from the site', () => {
+  const site = [{ url: 'https://feega.app/', title: 'feega', sections: [{ kind: SectionKind.Pricing, heading: 'Pricing', lines: ['Pro is $29 per month', 'Render 4K in 2 minutes', '10,000 creators'] }] }];
+
+  it('refuses a figure the site never states (v4 showed "1 credit = $1")', () => {
+    expect(unsourcedFigures(['1', 'credit = $1'], site, [])).toEqual(['1', '$1']);
+  });
+
+  it('accepts figures the site states, however they are spaced', () => {
+    expect(unsourcedFigures(['$29', '4K', '10,000 creators', '2 minutes'], site, [])).toEqual([]);
+  });
+
+  it('accepts a figure quoted in the saved script', () => {
+    expect(unsourcedFigures(['3x faster'], site, ['Teams ship 3x faster'])).toEqual([]);
+  });
+
+  it('a text without digits is not a figure', () => {
+    expect(unsourcedFigures(['One idea. Ten tools.'], site, [])).toEqual([]);
   });
 });

@@ -75,3 +75,28 @@ describe('write_script', () => {
     expect(session.doc.script?.acts).toHaveLength(4);
   });
 });
+
+describe('figures in shot text come from the site, like the script', () => {
+  it('refuses a stat the site never states (v4: "1 credit = $1")', async () => {
+    const { run } = setup();
+    await run('analyze_site', { url: 'supasito.com' });
+
+    const out = await run('add_shot', { shot: 'stat-count', slots: { value: '1', label: 'credit = $1' }, at: 0 });
+
+    expect(out.ok).toBe(false);
+    expect(String(out.error)).toContain('$1');
+  });
+
+  it('places a shot whose words carry no figure', async () => {
+    const { run } = setup();
+    await run('analyze_site', { url: 'supasito.com' });
+
+    expect(await run('add_shot', { shot: 'kinetic-title', slots: { text: 'Up to date.' }, at: 0 })).toMatchObject({ ok: true });
+  });
+
+  it('has nothing to check against before a site was read', async () => {
+    const { run } = setup();
+
+    expect(await run('add_shot', { shot: 'stat-count', slots: { value: '12', label: 'sites' }, at: 0 })).toMatchObject({ ok: true });
+  });
+});
