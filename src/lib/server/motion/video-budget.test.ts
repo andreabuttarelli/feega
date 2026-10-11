@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AGENT_TURN_CAP_USD, VIDEO_CAP_USD, VIDEO_RAISE_USD } from '$lib/server/brand-agent/limits';
+import { AGENT_TURN_CAP_USD, FIX_RESERVE_SHARE, VIDEO_CAP_USD, VIDEO_RAISE_USD } from '$lib/server/brand-agent/limits';
 
 const nodes = vi.hoisted(() => ({ data: {} as Record<string, unknown>, patches: [] as { patch: Record<string, unknown>; base?: Record<string, unknown> }[] }));
 
@@ -13,7 +13,7 @@ vi.mock('$lib/server/repos/canvas', () => ({
   }
 }));
 
-const { budgetCard, budgetSpent, raiseVideoBudget, readVideoBudget, turnBudgetUsd, videoBudget } = await import('./video-budget');
+const { Reserve, budgetCard, budgetSpent, raiseVideoBudget, readVideoBudget, turnBudgetUsd, videoBudget } = await import('./video-budget');
 
 function rowsDb(rows: { cost_usd: number | null }[], seen: string[][] = []) {
   const chain = {
@@ -41,6 +41,26 @@ describe('a motion video has one budget across all its turns', () => {
   it('is spent when what is left would not pay for a step', () => {
     expect(budgetSpent(videoBudget(VIDEO_CAP_USD - 0.01, 0))).toBe(true);
     expect(budgetSpent(videoBudget(1, 0))).toBe(false);
+  });
+
+  it('a video costs $3 by default', () => {
+    expect(VIDEO_CAP_USD).toBe(3);
+  });
+
+  it('builders cannot spend the fix reserve, the fix round can', () => {
+    const reserve = VIDEO_CAP_USD * FIX_RESERVE_SHARE;
+    const built = videoBudget(VIDEO_CAP_USD - reserve, 0);
+
+    expect(budgetSpent(built, Reserve.Kept)).toBe(true);
+    expect(turnBudgetUsd(built, Reserve.Kept)).toBe(0);
+    expect(budgetSpent(built, Reserve.Drawn)).toBe(false);
+    expect(turnBudgetUsd(built, Reserve.Drawn)).toBeCloseTo(reserve);
+  });
+
+  it('a raise goes to the builders whole, the reserve stays', () => {
+    const reserve = VIDEO_CAP_USD * FIX_RESERVE_SHARE;
+
+    expect(turnBudgetUsd(videoBudget(VIDEO_CAP_USD - reserve, VIDEO_RAISE_USD), Reserve.Kept)).toBeCloseTo(Math.min(AGENT_TURN_CAP_USD, VIDEO_RAISE_USD));
   });
 
   it('the card tells the cost so far and what continuing adds', () => {

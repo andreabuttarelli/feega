@@ -30,11 +30,11 @@ export function accountAfter(question: string, reply: string, account: TestAccou
 
 export const serverEnv = (baseUrl: string, chromiumPath: string) => ({ PUBLIC_APP_URL: baseUrl, BROWSERLESS_API_KEY: '', CHROMIUM_PATH: chromiumPath });
 
-export function replyTo(question: string, account: TestAccount | null, given = AccountGiven.No): string {
+export function replyTo(question: string, account: TestAccount | null): string {
   if (!ACCOUNT_ASK.test(question)) {
     return 'Sì, vai pure. Decidi tu il resto.';
   }
-  if (!account || given !== AccountGiven.No) {
+  if (!account) {
     return 'Salta: non ho un account di prova, usa il sito pubblico.';
   }
   return `Account di test usa-e-getta: login ${account.loginUrl}, email ${account.email}, password ${account.password}. Usalo per vedere l'app (editor, canvas, chat).`;

@@ -3,7 +3,7 @@ import type { Actor } from '$lib/server/repos/actor';
 import { DataCheck, findNode, patchNodeData } from '$lib/server/repos/canvas';
 import { motionOf } from '$lib/canvas/motion-node';
 import { videoSpentUsd } from '$lib/server/repos/video-spend';
-import { AGENT_TURN_CAP_USD, VIDEO_CAP_USD, VIDEO_RAISE_USD } from '$lib/server/project-agent/limits';
+import { AGENT_TURN_CAP_USD, FIX_RESERVE_SHARE, VIDEO_CAP_USD, VIDEO_RAISE_USD } from '$lib/server/project-agent/limits';
 import type { BudgetCard } from '$lib/motion/budget-card';
 
 export { VIDEO_BUDGET, type BudgetCard } from '$lib/motion/budget-card';
@@ -17,11 +17,18 @@ type NodeScope = { orgId: string; nodeId: string };
 
 export const videoBudget = (spentUsd: number, raisedUsd: number): VideoBudget => ({ spentUsd, capUsd: VIDEO_CAP_USD + raisedUsd });
 
-const leftUsd = (budget: VideoBudget) => Math.max(0, budget.capUsd - budget.spentUsd);
+export enum Reserve {
+  Kept = 'kept',
+  Drawn = 'drawn'
+}
 
-export const turnBudgetUsd = (budget: VideoBudget) => Math.min(AGENT_TURN_CAP_USD, leftUsd(budget));
+const RESERVED_USD: Record<Reserve, number> = { [Reserve.Kept]: VIDEO_CAP_USD * FIX_RESERVE_SHARE, [Reserve.Drawn]: 0 };
 
-export const budgetSpent = (budget: VideoBudget) => leftUsd(budget) < MIN_STEP_USD;
+const leftUsd = (budget: VideoBudget, reserve: Reserve) => Math.max(0, budget.capUsd - RESERVED_USD[reserve] - budget.spentUsd);
+
+export const turnBudgetUsd = (budget: VideoBudget, reserve = Reserve.Drawn) => Math.min(AGENT_TURN_CAP_USD, leftUsd(budget, reserve));
+
+export const budgetSpent = (budget: VideoBudget, reserve = Reserve.Drawn) => leftUsd(budget, reserve) < MIN_STEP_USD;
 
 const cents = (usd: number) => Math.round(usd * 100) / 100;
 

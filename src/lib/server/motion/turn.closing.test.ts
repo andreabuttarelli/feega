@@ -498,6 +498,19 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(outcome.budget).toMatchObject({ spent_usd: 2.5 });
   });
 
+  it('builders that spent their part still leave the fix round its reserve, so the video reaches export', async () => {
+    const { CutAnswer, cutAnswer } = await import('$lib/motion/cut-review');
+    const { FIX_RESERVE_SHARE, VIDEO_CAP_USD } = await import('$lib/server/brand-agent/limits');
+    world.videoSpent = VIDEO_CAP_USD * (1 - FIX_RESERVE_SHARE);
+
+    await turn();
+    expect(world.calls).toHaveLength(0);
+
+    world.message = cutAnswer(CutAnswer.Apply, ['1.5s: the frame is empty']);
+    await turn();
+    expect(world.calls.length).toBeGreaterThan(0);
+  });
+
   it('a video whose user raised the budget gets another round of it', async () => {
     world.videoSpent = 2.5;
     world.raised = 1;

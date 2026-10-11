@@ -29,7 +29,7 @@ import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { AGENT_SELF_SAVE_MS } from '$lib/server/project-agent/limits';
-import { VIDEO_BUDGET, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
+import { Reserve, VIDEO_BUDGET, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
 import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/server/motion/critic';
 import { VIEWER_MODEL, VIEWER_SCHEMA, viewFrames } from '$lib/server/motion/viewer';
 import { CutGate, KEPT_CUT, REVIEW_CUT, cutGate, keepsCut, reviewedBefore, type CutReview } from '$lib/motion/cut-review';
@@ -38,7 +38,7 @@ import { tileSheet } from '$lib/server/motion/contact-sheet';
 import { COPY_SCHEMA, copywrite } from '$lib/server/motion/copywriter';
 import { projectMemory } from '$lib/server/motion/studio-memory';
 import type { LaunchScript } from '$lib/motion/script';
-import { REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleLooks, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
+import { DRAWS_FIX_RESERVE, REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleLooks, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { Looks, ownLook } from '$lib/server/motion/look';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { appAccountKept, liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
@@ -283,11 +283,13 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const reply = await openReply(db, { orgId, threadId, actor });
   const raisedUsd = motion.node.budgetRaisedUsd ?? 0;
   const budget = await readVideoBudget(db, nodeScope, raisedUsd).catch(() => videoBudget(0, raisedUsd));
-  if (budgetSpent(budget)) {
+  const role = turnRole(message, head.doc);
+  const reserve = DRAWS_FIX_RESERVE.has(role) ? Reserve.Drawn : Reserve.Kept;
+  if (budgetSpent(budget, reserve)) {
     const card = budgetCard(budget);
     return cannedTurn(budgetNote(card), reply, card);
   }
-  const turnCapUsd = turnBudgetUsd(budget);
+  const turnCapUsd = turnBudgetUsd(budget, reserve);
   if (keepsCut(message)) {
     return cannedTurn(KEPT_CUT, reply);
   }
@@ -310,7 +312,6 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   });
   const picked = await importFollowed(readAnswer(message), sources.importAsset, assets);
   session.pickAssets = picked.ids;
-  const role = turnRole(message, head.doc);
   const openingRound = role === StudioRole.Director ? Round.Research : Round.Edit;
   const memory = role === StudioRole.Director ? await projectMemory(db, { orgId, projectId: project.id, nodeId: motion.record.id }).catch(() => '') : '';
   const openingText = [message, note, picked.note, memory].filter(Boolean).join('\n\n');
@@ -666,7 +667,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
         await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);
       }
       const left = videoBudget(budget.spentUsd + charged(), raisedUsd);
-      if (budgetSpent(left)) {
+      if (budgetSpent(left, reserve)) {
         budgetTools.push(budgetTool(budgetCard(left)));
         writeText(writer, BUDGET_ID, budgetNote(budgetCard(left)));
         writeCard(writer, budgetCard(left));

@@ -106,7 +106,7 @@ async function drive(page: Page, agentUrl: string, account: TestAccount | null):
     if (!asksUser(last, given) || replies >= MAX_REPLIES) {
       return;
     }
-    const reply = replyTo(last, account, given);
+    const reply = replyTo(last, account);
     given = accountAfter(last, reply, account, given);
     say(`  agent asked, replying: ${reply}`);
     const input = page.locator('#chat-composer-input');
