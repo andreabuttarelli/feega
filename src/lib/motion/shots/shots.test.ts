@@ -266,6 +266,15 @@ describe('the stat count', () => {
     expect([0.3, 0.8, 1.2].map((t) => shown('3', t))).toEqual(['3 sites', '3 sites', '3 sites']);
   });
 
+  it.each(['125+', '2x', '1'])('%s draws the same frame whatever time came before (v5 eval: the seek check failed)', (value) => {
+    const draw = drawPiece(shotSource(ShotId.StatCount, UI).js, { value, label: 'methods' }, DURATION, LANDSCAPE);
+    const seek = (t: number) => json(draw(t));
+    const order = [1.43, 2, 1.43, 0.87, 0.3, 1.43, 0.87];
+    const first = order.map(seek);
+
+    expect([...order].reverse().map(seek).reverse()).toEqual(first);
+  });
+
   it('a large number still counts up', () => {
     expect(shown('12,400', 0.8)).not.toContain('12,400');
     expect(shown('12,400', DURATION)).toContain('12,400');
