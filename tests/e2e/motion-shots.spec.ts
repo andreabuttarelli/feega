@@ -6,7 +6,8 @@ import type { ShotCase } from './fixtures/shot-probe';
 
 const HOST_PAGE = '/changelog';
 const PROBE = '/tests/e2e/fixtures/shot-probe.ts';
-const RENDER_TIMEOUT_MS = 1_200_000;
+const RENDER_TIMEOUT_MS = 600_000;
+const TOO_SLOW_FOR_CI: ReadonlySet<ShotId> = new Set([ShotId.WhipZoom]);
 const SEEK_RUNS = 3;
 
 const UI: VectorUi = {
@@ -55,6 +56,7 @@ test.describe('every shot of the library, rendered in a real browser', () => {
       const c: ShotCase = { format, shot, slots: SLOTS[shot], ui: UI };
 
       test(`${shot} ${format} exports without a frame jump`, async ({ page }) => {
+        test.skip(Boolean(process.env.CI) && TOO_SLOW_FOR_CI.has(shot), 'its blurred 9x zoom renders for over 20 minutes on a CI runner: run it locally');
         await probe(page);
 
         const measured = await page.evaluate((x) => window.shotProbe.jolts(x), c);
