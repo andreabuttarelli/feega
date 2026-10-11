@@ -47,7 +47,7 @@ import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { Quality, blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
-import type { UiCapture } from '$lib/server/web/vector-capture';
+import { CaptureSession, offersSignIn, type UiCapture } from '$lib/server/web/vector-capture';
 import { vectorPiece, withFonts } from '$lib/motion/vector-ui/piece';
 import { VectorRole } from '$lib/motion/vector-ui/model';
 import { SHOTS, SHOT_IDS, ShotCursor, ShotUi, shotPreview } from '$lib/motion/shots/library';
@@ -202,6 +202,8 @@ export enum EmbedAction {
 }
 
 const SHOWN_ELEMENTS = 60;
+
+const PUBLIC_SITE_NEXT = 'this is the public site of an app, read signed out: if the product is that app, the trailer shows its real screens, not this page. Before any shot, ask the user in chat for a TEST account (login url, email, password; say you will see it) and end the turn on that question; then sign in with app_browse and recreate_ui 2–3 signed-in work screens (the editor, the canvas, the result)';
 
 const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
 
@@ -614,7 +616,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       return written;
     }
     const elements = ui.nodes.filter((n) => n.role !== VectorRole.Box).slice(0, SHOWN_ELEMENTS).map((n) => ({ id: n.id, role: n.role, ...(n.text ? { text: n.text.slice(0, 40) } : {}) }));
-    const made = { ok: true, name: piece.name, size: piece.size, elements, raster: ui.raster, ...(read.dismissed ? { dismissed: read.dismissed } : {}), ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}) };
+    const made = { ok: true, name: piece.name, size: piece.size, elements, raster: ui.raster, ...(read.dismissed ? { dismissed: read.dismissed } : {}), ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}), ...(read.session === CaptureSession.None && offersSignIn(ui) ? { next: PUBLIC_SITE_NEXT } : {}) };
     if (input.start === undefined) {
       return made;
     }

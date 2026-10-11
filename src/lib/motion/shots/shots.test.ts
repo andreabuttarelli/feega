@@ -127,6 +127,26 @@ describe('add_shot', () => {
     expect(made.ok ? '' : made.error).toMatch(/button-9.*button-0/);
   });
 
+  it('types only into a field: the feega eval typed into a heading of the marketing page and the zoom landed on empty space', () => {
+    const made = addShot(withUi(), { shot: ShotId.UiFocus, slots: { field_id: 'heading-0', button_id: 'button-0', type_text: 'a launch film' }, ui: 'UiFeega', at: 0 }, 'c1');
+
+    expect(made.ok ? '' : made.error).toMatch(/heading-0 is a heading.*input-0/);
+  });
+
+  it('presses only a button, a link or an icon', () => {
+    const made = addShot(withUi(), { shot: ShotId.UiFocus, slots: { field_id: 'input-0', button_id: 'stat-0' }, ui: 'UiFeega', at: 0 }, 'c1');
+
+    expect(made.ok ? '' : made.error).toMatch(/stat-0 is a stat.*button-0/);
+  });
+
+  it('says so when the UI has no field at all, so the agent recreates the app screen that has one', () => {
+    const piece = vectorPiece('UiSite', { ...UI, nodes: UI.nodes.filter((n) => n.role !== VectorRole.Input) });
+    const doc = writeComponent(newMotionDoc(MotionFormat.Landscape), piece.name, { source: { html: '', css: piece.css, js: piece.js }, propsSchema: { type: 'object', properties: {} } });
+    const made = doc.ok ? addShot(doc.doc, { shot: ShotId.UiFocus, slots: { field_id: 'heading-0', button_id: 'button-0' }, ui: 'UiSite', at: 0 }, 'c1') : doc;
+
+    expect(made.ok ? '' : made.error).toMatch(/UiSite has no input.*recreate_ui/);
+  });
+
   it('never stretches a shot past 4 s to make room for words', () => {
     const made = addShot(withUi(), { shot: ShotId.KineticTitle, slots: { text: 'a very long line of words to read' }, at: 0, seconds: 6 }, 'c1');
 

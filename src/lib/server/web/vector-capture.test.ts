@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AppTab } from './browser';
-import { vectorCapture } from './vector-capture';
+import { CaptureSession, vectorCapture } from './vector-capture';
 
 const PAGE = { url: 'https://feega.test/', title: 'feega', width: 1280, height: 800, background: 'rgb(0, 0, 0)', nodes: [{ kind: 'text', hint: 'none', x: 10, y: 10, w: 80, h: 20, text: 'make your brand move', size: 16 }] };
 
@@ -37,6 +37,7 @@ describe('reading a logged-in app screen', () => {
     const read = await vectorCapture(async () => page, 0)('https://feega.test/app');
 
     expect(read.ok && read.ui.nodes).toHaveLength(1);
+    expect(read.ok && read.session).toBe(CaptureSession.None);
   });
 
   it('opens the page with the session app_browse saved, so recreate_ui rebuilds the app, not the marketing site (v3)', async () => {
@@ -47,6 +48,7 @@ describe('reading a logged-in app screen', () => {
 
     expect(read.ok).toBe(true);
     expect(page.restore).toHaveBeenCalledWith(SESSION, 'https://feega.test');
+    expect(read.ok && read.session).toBe(CaptureSession.Kept);
   });
 
   it('says to sign in with app_browse when the page bounces to the login', async () => {

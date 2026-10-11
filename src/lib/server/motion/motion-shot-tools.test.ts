@@ -6,6 +6,7 @@ import { VectorKind, VectorRole, type VectorUi } from '$lib/motion/vector-ui/mod
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
+import { CaptureSession } from '$lib/server/web/vector-capture';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
@@ -35,7 +36,7 @@ function setup(captureUi?: MotionToolDeps['captureUi']) {
 
 describe('recreate_ui from a url', () => {
   it('reads the live page into a vector UI component whose elements are addressable, and flags what stayed a picture', async () => {
-    const captureUi = vi.fn(async () => ({ ok: true as const, ui: UI }));
+    const captureUi = vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None }));
     const { session, run } = setup(captureUi);
 
     const made = await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega', start: 0, duration: 3 });
@@ -48,9 +49,33 @@ describe('recreate_ui from a url', () => {
   });
 
   it('says which blocking overlay it dismissed before reading the page', async () => {
-    const { run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, dismissed: ['skip'] })));
+    const { run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None, dismissed: ['skip'] })));
 
     expect(await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' })).toMatchObject({ ok: true, dismissed: ['skip'] });
+  });
+
+  describe('the public site of an app', () => {
+    const site: VectorUi = { ...UI, url: 'https://feega.test/', nodes: [...UI.nodes, { id: 'link-0', role: VectorRole.Link, kind: VectorKind.Text, x: 1100, y: 20, w: 60, h: 20, text: 'Log in' }] };
+
+    it('asks for a test account before any shot: the feega eval built its trailer on the marketing page', async () => {
+      const { run } = setup(vi.fn(async () => ({ ok: true as const, ui: site, session: CaptureSession.None })));
+
+      const made = await run('recreate_ui', { url: 'https://feega.test/', name: 'UiSite' });
+
+      expect(String(made.next)).toMatch(/TEST account.*app_browse/);
+    });
+
+    it('says nothing once the page was read signed in', async () => {
+      const { run } = setup(vi.fn(async () => ({ ok: true as const, ui: site, session: CaptureSession.Kept })));
+
+      expect((await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiApp' })).next).toBeUndefined();
+    });
+
+    it('says nothing on a page with no way to sign in', async () => {
+      const { run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None })));
+
+      expect((await run('recreate_ui', { url: 'https://feega.test/', name: 'UiSite' })).next).toBeUndefined();
+    });
   });
 
   it('says so when no browser is there to read the page', async () => {
@@ -71,7 +96,7 @@ describe('the shot library', () => {
   });
 
   it('add_shot places a premium shot built on the recreated UI', async () => {
-    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI })));
+    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None })));
     await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
 
     const made = await run('add_shot', { shot: ShotId.UiFocus, ui: 'UiFeega', slots: { field_id: 'input-0', button_id: 'button-0', type_text: 'a launch film' }, at: 2 });
@@ -81,7 +106,7 @@ describe('the shot library', () => {
   });
 
   it('add_shot takes a cursor script that clicks, types and hovers elements of the recreated UI', async () => {
-    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI })));
+    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None })));
     await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
     const cursor = [{ target: 'input-0', action: 'type', text: 'a launch film' }, { target: 'button-0', action: 'click', at: 2.6 }];
 
