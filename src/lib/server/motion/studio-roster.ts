@@ -1,6 +1,8 @@
 import type { MotionDoc } from '$lib/motion/doc';
 import { answersCut } from '$lib/motion/cut-review';
 import { WEB_TOOLS } from '$lib/server/web/web-tools';
+import { DESCRIBE_FRAMES } from './frames';
+import { Looks } from './look';
 
 export enum StudioRole {
   Director = 'director',
@@ -37,18 +39,18 @@ export enum WritesCode {
   No = 'no'
 }
 
-export type RoleSpec = { label: string; budgetShare: number; tools: ToolScope; model: RoleModel; code: WritesCode };
+export type RoleSpec = { label: string; budgetShare: number; tools: ToolScope; model: RoleModel; code: WritesCode; looks: Looks };
 
 export const STUDIO_ROSTER: Record<StudioRole, RoleSpec> = {
-  [StudioRole.Director]: { label: 'motion-director', budgetShare: 0.6, tools: ToolScope.Story, model: RoleModel.Opus, code: WritesCode.No },
-  [StudioRole.ShotBuilder]: { label: 'motion-shots', budgetShare: 0.88, tools: ToolScope.Shots, model: RoleModel.Opus, code: WritesCode.No },
-  [StudioRole.Builder]: { label: 'motion-agent', budgetShare: 0.88, tools: ToolScope.All, model: RoleModel.Opus, code: WritesCode.Yes },
-  [StudioRole.Fixer]: { label: 'motion-fixer', budgetShare: 0.5, tools: ToolScope.All, model: RoleModel.Opus, code: WritesCode.Yes },
-  [StudioRole.Critic]: { label: 'motion-critic', budgetShare: 0.08, tools: ToolScope.None, model: RoleModel.Vision, code: WritesCode.No },
-  [StudioRole.Copywriter]: { label: 'motion-copywriter', budgetShare: 0.05, tools: ToolScope.None, model: RoleModel.Opus, code: WritesCode.No },
-  [StudioRole.Viewer]: { label: 'motion-viewer', budgetShare: 0.04, tools: ToolScope.None, model: RoleModel.Vision, code: WritesCode.No },
-  [StudioRole.Researcher]: { label: 'motion-researcher', budgetShare: 0.35, tools: ToolScope.Research, model: RoleModel.Sonnet, code: WritesCode.No },
-  [StudioRole.Sound]: { label: 'motion-sound', budgetShare: 0.1, tools: ToolScope.Sound, model: RoleModel.Sonnet, code: WritesCode.No }
+  [StudioRole.Director]: { label: 'motion-director', budgetShare: 0.6, tools: ToolScope.Story, model: RoleModel.Opus, code: WritesCode.No, looks: Looks.Blind },
+  [StudioRole.ShotBuilder]: { label: 'motion-shots', budgetShare: 0.88, tools: ToolScope.Shots, model: RoleModel.Opus, code: WritesCode.No, looks: Looks.Describes },
+  [StudioRole.Builder]: { label: 'motion-agent', budgetShare: 0.88, tools: ToolScope.All, model: RoleModel.Opus, code: WritesCode.Yes, looks: Looks.Describes },
+  [StudioRole.Fixer]: { label: 'motion-fixer', budgetShare: 0.5, tools: ToolScope.All, model: RoleModel.Opus, code: WritesCode.Yes, looks: Looks.Describes },
+  [StudioRole.Critic]: { label: 'motion-critic', budgetShare: 0.08, tools: ToolScope.None, model: RoleModel.Vision, code: WritesCode.No, looks: Looks.Blind },
+  [StudioRole.Copywriter]: { label: 'motion-copywriter', budgetShare: 0.05, tools: ToolScope.None, model: RoleModel.Opus, code: WritesCode.No, looks: Looks.Blind },
+  [StudioRole.Viewer]: { label: 'motion-viewer', budgetShare: 0.04, tools: ToolScope.None, model: RoleModel.Vision, code: WritesCode.No, looks: Looks.Blind },
+  [StudioRole.Researcher]: { label: 'motion-researcher', budgetShare: 0.35, tools: ToolScope.Research, model: RoleModel.Sonnet, code: WritesCode.No, looks: Looks.Blind },
+  [StudioRole.Sound]: { label: 'motion-sound', budgetShare: 0.1, tools: ToolScope.Sound, model: RoleModel.Sonnet, code: WritesCode.No, looks: Looks.Blind }
 };
 
 const STORY_TOOLS: ReadonlySet<string> = new Set([
@@ -94,7 +96,8 @@ const SHOT_TOOLS: ReadonlySet<string> = new Set([
   'cut_to_beat',
   'link_storyboard_beat',
   'mark_story',
-  'view_frames'
+  'view_frames',
+  DESCRIBE_FRAMES
 ]);
 
 const SCOPES: Record<ToolScope, (name: string) => boolean> = {
@@ -113,6 +116,8 @@ export const roleModel = (role: StudioRole, vision: string): string => MODELS[ST
 export const REVIEWED: ReadonlySet<StudioRole> = new Set([StudioRole.Builder, StudioRole.ShotBuilder]);
 
 export const roleBudgetUsd = (role: StudioRole, capUsd: number) => capUsd * STUDIO_ROSTER[role].budgetShare;
+
+export const roleLooks = (role: StudioRole) => STUDIO_ROSTER[role].looks;
 
 export const roleTools = (role: StudioRole, names: readonly string[]) => names.filter(SCOPES[STUDIO_ROSTER[role].tools]);
 

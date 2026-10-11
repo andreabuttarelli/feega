@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { CutAnswer, cutAnswer } from '$lib/motion/cut-review';
 import { OPUS, REVIEWED, STUDIO_ROSTER, StudioRole, WritesCode, roleBudgetUsd, roleModel, roleTools, turnRole } from './studio-roster';
+import { DESCRIBE_FRAMES, VIEW_FRAMES } from './frames';
+import { Looks } from './look';
 
 const empty = newMotionDoc(MotionFormat.Landscape);
 const scripted = { ...empty, script: { research: {}, acts: [] } } as never;
@@ -35,6 +37,12 @@ describe('the studio roster', () => {
   it('a turn applying the critic notes is a fixer, on a smaller budget', () => {
     expect(turnRole(cutAnswer(CutAnswer.Apply, ['2s: empty']), built)).toBe(StudioRole.Fixer);
     expect(roleBudgetUsd(StudioRole.Fixer, 1.5)).toBeLessThan(roleBudgetUsd(StudioRole.Builder, 1.5));
+  });
+
+  it.each(Object.values(StudioRole))('%s declares whether it looks, and a role that views frames can also describe them (v7: shots viewed, could not describe, every edit refused)', (role) => {
+    const eyes = roleTools(role, [VIEW_FRAMES, DESCRIBE_FRAMES]);
+
+    expect(eyes).toEqual(STUDIO_ROSTER[role].looks === Looks.Describes ? [VIEW_FRAMES, DESCRIBE_FRAMES] : []);
   });
 
   it('the viewer only looks: it gets no tool', () => {

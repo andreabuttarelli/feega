@@ -64,6 +64,14 @@ describe('the video keeps to its script', () => {
     expect(drift(film(FAITHFUL.filter((c) => c.id !== 'logo'))).map((p) => p.detail).join(' ')).toContain('logo');
   });
 
+  it('feega v7: a fixer that stretched a 14 s script to 52 s is blocked until it cuts back', () => {
+    const long = { ...film(FAITHFUL), durationInFrames: 52 * FPS };
+    const problems = drift(long);
+
+    expect(problems.map((p) => p.detail).join(' ')).toMatch(/runs 52 s, the script 14 s/);
+    expect(blocking(problems)).toHaveLength(problems.length);
+  });
+
   it('a key line missing from its act is named with the act', () => {
     const problems = drift(film(FAITHFUL.filter((c) => c.id !== 's')));
 

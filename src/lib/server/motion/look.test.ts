@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { Quality } from '$lib/motion/direction';
 import { Forbidden } from '$lib/motion/style';
 import { DESCRIBE_FRAMES } from './frames';
-import { GATE_SHOWN, describeFramesTool, gateBlock, lookFirst, type LookSession } from './look';
+import { GATE_SHOWN, Looks, describeFramesTool, gateBlock, lookFirst, type LookSession } from './look';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
@@ -34,6 +34,17 @@ describe('looking is split from checking', () => {
     expect(refused.ok).toBe(false);
     expect(String(refused.error)).toContain(DESCRIBE_FRAMES);
     expect(edit).not.toHaveBeenCalled();
+  });
+
+  it('a role that cannot describe frames (sound, v7: add_music refused) is never held by a look it did not take', async () => {
+    const { run, edit, session } = setup();
+    await run('view_frames', { times: [1, 2] });
+    session.looks = Looks.Blind;
+
+    const done = await run('add_clip', {});
+
+    expect(done.ok).toBe(true);
+    expect(edit).toHaveBeenCalled();
   });
 
   it('a description that skips a frame is refused and names the missing time', async () => {

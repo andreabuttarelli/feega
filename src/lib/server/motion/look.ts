@@ -35,11 +35,16 @@ export type FrameLine = z.infer<typeof FrameLine>;
 
 export type Viewing = { times: number[]; described: boolean; lines?: FrameLine[] };
 
-export type LookSession = { look?: Viewing };
+export enum Looks {
+  Describes = 'describes',
+  Blind = 'blind'
+}
+
+export type LookSession = { look?: Viewing; looks?: Looks };
 
 export const DESCRIBE_ASK = `Before anything else, call ${DESCRIBE_FRAMES} with one line per frame: what is visible (elements, words, colours, where they sit) and what is wrong, judged from the pictures alone. Edits are refused until you do.`;
 
-const pending = (session: LookSession) => session.look && !session.look.described;
+const pending = (session: LookSession) => session.looks !== Looks.Blind && session.look && !session.look.described;
 
 const refusal = (session: LookSession) => ({ ok: false, error: `describe the frames you last viewed (${session.look?.times.map((t) => `${t}s`).join(', ')}) with ${DESCRIBE_FRAMES} first: one line per frame, what is visible and what is wrong` });
 

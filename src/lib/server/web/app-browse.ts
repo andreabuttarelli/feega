@@ -9,7 +9,8 @@ export const APP_MAX_SHOTS = 6;
 export const APP_DEADLINE_MS = 60_000;
 export const APP_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const LOGIN_FIELD_WAIT_MS = 10_000;
-const LOGIN_SETTLE_MS = 2_500;
+const LOGIN_WAIT_MS = 15_000;
+const LOGIN_POLL_MS = 250;
 const PAGE_SETTLE_MS = 1_500;
 
 export const DEFAULT_EMAIL_SELECTOR = 'input[type="email"], input[name="email"], input[name="username"], input[autocomplete="username"], input[autocomplete="email"]';
@@ -187,14 +188,35 @@ function fenced(tab: AppTab, app: string, confirm: Confirm): AppTab {
   };
 }
 
-async function signIn(tab: AppTab, account: AppAccount, sleep: (ms: number) => Promise<unknown>): Promise<boolean> {
+async function leftLogin(tab: AppTab, loginUrl: string, sleep: (ms: number) => Promise<unknown>): Promise<boolean> {
+  for (let waited = 0; onLoginPage(tab.url(), loginUrl); waited += LOGIN_POLL_MS) {
+    if (waited >= LOGIN_WAIT_MS) {
+      return false;
+    }
+    await sleep(LOGIN_POLL_MS);
+  }
+  return true;
+}
+
+async function signIn(tab: AppTab, account: AppAccount, sleep: (ms: number) => Promise<unknown>): Promise<string | null> {
   await tab.goto(account.loginUrl);
-  await tab.waitFor(DEFAULT_EMAIL_SELECTOR, LOGIN_FIELD_WAIT_MS).catch(() => undefined);
+  if (!onLoginPage(tab.url(), account.loginUrl)) {
+    return null;
+  }
+  const form = await tab.waitFor(DEFAULT_EMAIL_SELECTOR, LOGIN_FIELD_WAIT_MS).then(
+    () => true,
+    () => false
+  );
+  if (!form) {
+    return `login failed: no email field on the sign-in page (${tab.url()}) after ${LOGIN_FIELD_WAIT_MS / 1000} s. Look at the picture: the login url may be wrong, or the form behind a button`;
+  }
   await tab.type(DEFAULT_EMAIL_SELECTOR, account.email);
   await tab.type(DEFAULT_PASSWORD_SELECTOR, account.password);
   await tab.click({ selector: DEFAULT_SUBMIT_SELECTOR });
-  await sleep(LOGIN_SETTLE_MS);
-  return !onLoginPage(tab.url(), account.loginUrl);
+  if (await leftLogin(tab, account.loginUrl, sleep)) {
+    return null;
+  }
+  return `login failed: still on the sign-in page after ${LOGIN_WAIT_MS / 1000} s (${tab.url()}). Look at the picture: a wrong test account, a captcha or a two-step login`;
 }
 
 async function resumed(tab: AppTab, account: AppAccount, first: string, now: number): Promise<boolean> {
@@ -248,10 +270,11 @@ export async function appBrowse(input: AppBrowseInput, ports: AppBrowsePorts): P
 
   try {
     const session = (await resumed(opened, account, landing, now())) ? SessionUse.Reused : SessionUse.Fresh;
-    if (session === SessionUse.Fresh && !(await signIn(opened, account, sleep))) {
+    const refused = session === SessionUse.Fresh ? await signIn(opened, account, sleep) : null;
+    if (refused) {
       shots.push(await opened.shot());
       await ports.accounts.save({ ...account, session: NO_SESSION, sessionUntil: null });
-      return { ok: false, error: `login failed: still on the sign-in page (${opened.url()}). Look at the picture: a wrong test account, a captcha or a two-step login`, shots, costUsd: await close() };
+      return { ok: false, error: refused, shots, costUsd: await close() };
     }
     await ports.accounts.save({ ...account, session: await opened.session(), sessionUntil: now() + APP_SESSION_TTL_MS });
 
