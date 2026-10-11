@@ -12,7 +12,7 @@ import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions, toolForcing } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
 import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
-import { billedUsdInScope, billingScope, extractSdkUsage, logAiCall, withVideoContext } from '$lib/server/ai-log';
+import { billedUsdInScope, billingScope, extractSdkUsage, logAiCall, withNodeContext, withOrgContext } from '$lib/server/ai-log';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
 import { openReply, ReplyStatus, type Reply } from '$lib/server/repos/chat-reply';
 import { referencedAssets } from '$lib/motion/doc-assets';
@@ -28,8 +28,8 @@ import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { fitNewVideo } from '$lib/motion/fit-duration';
-import { AGENT_SELF_SAVE_MS, AGENT_TURN_CAP_USD, budgetSpentNote, videoBudgetLeft } from '$lib/server/project-agent/limits';
-import { videoSpentUsd } from '$lib/server/repos/video-spend';
+import { AGENT_SELF_SAVE_MS } from '$lib/server/project-agent/limits';
+import { VIDEO_BUDGET, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
 import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/server/motion/critic';
 import { VIEWER_MODEL, VIEWER_SCHEMA, viewFrames } from '$lib/server/motion/viewer';
 import { CutGate, KEPT_CUT, REVIEW_CUT, cutGate, keepsCut, reviewedBefore, type CutReview } from '$lib/motion/cut-review';
@@ -219,27 +219,44 @@ async function importFollowed(answer: PickAnswer | null, importAsset: MotionTool
   return { ids: ok.map((o) => o.asset.id), note: lines.length ? `The references the user follows are now project assets: hang each under the storyboard beat it inspires (write_storyboard media) and take the look from them:\n${lines.join('\n')}` : '' };
 }
 
-export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number; pick: PickAsk | null; cut: CutReview | null };
+export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number; pick: PickAsk | null; cut: CutReview | null; budget: BudgetCard | null };
 
 export type MotionTurn = { stream: ReadableStream<UIMessageChunk>; done: Promise<TurnOutcome> };
 
 const CANNED_ID = 'canned';
+const BUDGET_ID = 'video-budget';
 
-function cannedTurn(content: string, reply: Pick<Reply, 'finish'>): MotionTurn {
-  const done = reply.finish({ content, tools: [] }, ReplyStatus.Done).then((): TurnOutcome => ({ reply: content, summary: null, version: null, revision: null, costUsd: 0, pick: null, cut: null }));
+const budgetTool = (card: BudgetCard): SavedTool => ({ toolCallId: BUDGET_ID, toolName: VIDEO_BUDGET, status: 'done', input: {}, output: card });
+
+function writeCard(writer: { write: (chunk: UIMessageChunk) => void }, card: BudgetCard): void {
+  writer.write({ type: 'tool-input-available', toolCallId: BUDGET_ID, toolName: VIDEO_BUDGET, input: {} });
+  writer.write({ type: 'tool-output-available', toolCallId: BUDGET_ID, output: card });
+}
+
+function writeText(writer: { write: (chunk: UIMessageChunk) => void }, id: string, text: string): void {
+  writer.write({ type: 'text-start', id });
+  writer.write({ type: 'text-delta', id, delta: text });
+  writer.write({ type: 'text-end', id });
+}
+
+function cannedTurn(content: string, reply: Pick<Reply, 'finish'>, card: BudgetCard | null = null): MotionTurn {
+  const done = reply.finish({ content, tools: card ? [budgetTool(card)] : [] }, ReplyStatus.Done).then((): TurnOutcome => ({ reply: content, summary: null, version: null, revision: null, costUsd: 0, pick: null, cut: null, budget: card }));
   const stream = createUIMessageStream({
     execute: ({ writer }) => {
       writer.write({ type: 'start' });
-      writer.write({ type: 'text-start', id: CANNED_ID });
-      writer.write({ type: 'text-delta', id: CANNED_ID, delta: content });
-      writer.write({ type: 'text-end', id: CANNED_ID });
+      writeText(writer, CANNED_ID, content);
+      if (card) {
+        writeCard(writer, card);
+      }
       writer.write({ type: 'finish' });
     }
   });
   return { stream, done };
 }
 
-export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Response> {
+export const startMotionTurn = (input: MotionTurnInput): Promise<MotionTurn | Response> => withNodeContext(input.motion.record.id, () => openMotionTurn(input));
+
+async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Response> {
   const startedAt = Date.now();
   const { db, userId, orgId, project, motion, message, attachments = [], selection, model, reasoning, requester, browser, timing = PLATFORM_TIMING } = input;
   const actor = agentActor(userId, MOTION_AGENT_KEY);
@@ -263,11 +280,15 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const storyboard = storyboardStore(db, { orgId, projectId: project.id, motionNodeId: motion.record.id, title: motion.record.displayName ?? 'Video', actor });
   const note = motion.node.storyboard ? boardNote(await storyboard.read()) : null;
   const reply = await openReply(db, { orgId, threadId, actor });
-  const videoSpent = await videoSpentUsd(db, nodeScope).catch(() => 0);
-  const videoLeft = videoBudgetLeft(videoSpent, [...turns, { role: 'user', content: message }]);
-  const canned = videoLeft <= 0 ? budgetSpentNote(videoSpent) : keepsCut(message) ? KEPT_CUT : null;
-  if (canned) {
-    return cannedTurn(canned, reply);
+  const raisedUsd = motion.node.budgetRaisedUsd ?? 0;
+  const budget = await readVideoBudget(db, nodeScope, raisedUsd).catch(() => videoBudget(0, raisedUsd));
+  if (budgetSpent(budget)) {
+    const card = budgetCard(budget);
+    return cannedTurn(budgetNote(card), reply, card);
+  }
+  const turnCapUsd = turnBudgetUsd(budget);
+  if (keepsCut(message)) {
+    return cannedTurn(KEPT_CUT, reply);
   }
 
   const knownAssets = assets.length;
@@ -321,9 +342,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     revisions: { list: () => listRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null },
     ...sources,
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
-    voiceover: (voice) => withVideoContext(orgId, motion.record.id, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
-    music: (ask) => withVideoContext(orgId, motion.record.id, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
-    sfx: (sound) => withVideoContext(orgId, motion.record.id, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
+    voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
+    music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
+    sfx: (sound) => withOrgContext(orgId, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
     frames: drawTurnFrames,
     inspect: frameStats,
     seam: async () => {
@@ -357,13 +378,13 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     storyboard,
     copywrite: async (script) => {
       const ask = async (prompt: string) => ({ answer: await llmStructured({ prompt, schema: COPY_SCHEMA, model: roleModel(StudioRole.Copywriter, model), temperature: 0.4, label: STUDIO_ROSTER[StudioRole.Copywriter].label }), usd: billedUsdInScope() ?? 0 });
-      const out = await withVideoContext(orgId, motion.record.id, () => copywrite({ ask }, script));
+      const out = await withOrgContext(orgId, () => copywrite({ ask }, script));
       spent += out.usd;
       return out.script;
     },
     captureUi: uiCapture(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
     appAccountKept: appAccountKept(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
-    readUi: uiReader({ ask: (q) => withVideoContext(orgId, motion.record.id, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
+    readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
       BROWSER_DRAWS[browser]();
       const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(doc), scope: moderationScope });
@@ -417,25 +438,24 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const framesShown = new Set<string>();
   let spent = 0;
   let roundsUsd = 0;
-  const billing = billingScope(orgId, motion.record.id);
+  const billing = billingScope(orgId);
   const charged = () => spent - roundsUsd + Math.max(roundsUsd, billing.gatewayUsd());
-  const overBudget: Stop = () => charged() > Math.min(roleBudgetUsd(role, AGENT_TURN_CAP_USD), videoLeft);
+  const overBudget: Stop = () => charged() > roleBudgetUsd(role, turnCapUsd);
   const TIER_MODEL: Record<Tier, string> = { [Tier.Edit]: model, [Tier.Code]: codeModel };
 
   spawnRun = spawnAgents(
     {
       orgId,
-      nodeId: motion.record.id,
       tools: () => Object.fromEntries(toolNames.map((n) => [n, tools[n]])),
       codeTools: toolsWritingCode,
       visionTools: new Set([VIEW_FRAMES]),
-      remainingUsd: () => roleBudgetUsd(role, AGENT_TURN_CAP_USD) - charged(),
+      remainingUsd: () => roleBudgetUsd(role, turnCapUsd) - charged(),
       onSpent: (usd) => {
         spent += usd;
       },
       changes: () => session.edits.length,
       changedSince: (mark) => session.edits.slice(mark),
-      log: (e) => withVideoContext(orgId, motion.record.id, () => logAiCall({ label: `motion-spawned-${e.label}`, provider: 'llm', model: e.model, ms: 0, ok: true, orgId, userId, threadId, projectId: project.id, actorKind: 'agent', actorId: userId, agentKey: e.agentKey, ...e.usage })),
+      log: (e) => withOrgContext(orgId, () => logAiCall({ label: `motion-spawned-${e.label}`, provider: 'llm', model: e.model, ms: 0, ok: true, orgId, userId, threadId, projectId: project.id, actorKind: 'agent', actorId: userId, agentKey: e.agentKey, ...e.usage })),
       abort: cut.signal
     },
     offers
@@ -508,6 +528,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
 
   const gate = cutGate(message, turns);
   const gateTools: SavedTool[] = [];
+  const budgetTools: SavedTool[] = [];
   const viewerAsk = async (q: { prompt: string; images: LlmMediaPart[] }) => {
     const answer = await llmStructured({ ...q, schema: VIEWER_SCHEMA, model: gatewayModel(VIEWER_MODEL)?.usable ? VIEWER_MODEL : (visionModel ?? model), temperature: 0, label: STUDIO_ROSTER[StudioRole.Viewer].label });
     return { answer, usd: billedUsdInScope() ?? 0 };
@@ -521,9 +542,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const answer = await llmStructured({ ...q, schema: CRITIC_SCHEMA, model: roleModel(StudioRole.Critic, visionModel ?? model), temperature: 0, label: STUDIO_ROSTER[StudioRole.Critic].label });
         return { answer, usd: billedUsdInScope() ?? 0 };
       },
-      view: (frames: readonly Frame[]) => withVideoContext(orgId, motion.record.id, () => viewFrames({ ask: viewerAsk }, frames))
+      view: (frames: readonly Frame[]) => withOrgContext(orgId, () => viewFrames({ ask: viewerAsk }, frames))
     };
-    const out = await withVideoContext(orgId, motion.record.id, () => critique(ports, { doc: session.doc, request: message, references: session.references ?? [] })).catch((e: unknown) => {
+    const out = await withOrgContext(orgId, () => critique(ports, { doc: session.doc, request: message, references: session.references ?? [] })).catch((e: unknown) => {
       console.warn('[motion-agent] critic failed, delivering without its review', e);
       return { review: null, usd: 0, sheet: null };
     });
@@ -643,6 +664,12 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       if (steps.length && !held && (unlooked || !closedByModel(steps.at(-1)))) {
         await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);
       }
+      const left = videoBudget(budget.spentUsd + charged(), raisedUsd);
+      if (budgetSpent(left)) {
+        budgetTools.push(budgetTool(budgetCard(left)));
+        writeText(writer, BUDGET_ID, budgetNote(budgetCard(left)));
+        writeCard(writer, budgetCard(left));
+      }
       const open = awaitsGo ? '' : stillOpenNote(openErrors(session));
       if (open) {
         writer.write({ type: 'text-start', id: STILL_OPEN_ID });
@@ -695,11 +722,13 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     }
 
     const finished = finishedTurn(steps);
-    const turn = { tools: [...finished.tools, ...gateTools], content: finalReply(steps.map((s) => s.text), awaitsUser(steps) ? [] : openErrors(session)) };
+    const card = (budgetTools[0]?.output as BudgetCard | undefined) ?? null;
+    const content = finalReply(steps.map((s) => s.text), awaitsUser(steps) ? [] : openErrors(session));
+    const turn = { tools: [...finished.tools, ...gateTools, ...budgetTools], content: card ? `${content}\n\n${budgetNote(card)}` : content };
     await reply.finish(turn, ReplyStatus.Done);
 
     for (const [modelId, usage] of usageByModel(steps.map((s) => extractSdkUsage(s.usage)), stepModels)) {
-      withVideoContext(orgId, motion.record.id, () =>
+      withOrgContext(orgId, () =>
         logAiCall({
           label: labelOf(modelId),
           provider: 'llm',
@@ -720,7 +749,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
 
     const written = write?.outcome === RevisionOutcome.Written ? write.head : null;
     const asked = finished.tools.map(savedPick).findLast((p) => p !== null) ?? null;
-    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null };
+    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null, budget: card };
   }
 
   const reader = stream.getReader();

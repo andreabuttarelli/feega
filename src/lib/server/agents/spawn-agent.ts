@@ -11,7 +11,6 @@ const CHILD_SYSTEM = 'You are a sub-agent with one job. Do the job with the tool
 
 export type SpawnHost = {
   orgId: string;
-  nodeId?: string;
   tools: () => Record<string, Tool>;
   codeTools: ReadonlySet<string>;
   visionTools: ReadonlySet<string>;
@@ -33,7 +32,7 @@ export function spawnAgents(host: SpawnHost, offers: readonly ModelOffer[]) {
     {
       run: async (plan) => {
         const mark = host.changes();
-        const billing = billingScope(host.orgId, host.nodeId);
+        const billing = billingScope(host.orgId);
         let estimate = 0;
         const all = host.tools();
         const ran = billing.run(() =>

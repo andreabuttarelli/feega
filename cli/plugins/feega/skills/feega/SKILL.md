@@ -191,7 +191,7 @@ the video's scroll length. Live components (games, generative pieces) run live t
 shows a still of them. Publishing again updates it in place, `action: "unpublish"` takes it
 down. Uncensored projects are refused. It also returns `react` and `flutter` snippets: the
 same player inside a React (`@feega/motion-react`) or Flutter (`feega_motion`) app.
-`get_motion_embed` reads the state. The self-contained HTML (no hosting):
+`motion_budget` reads what a video spent across its turns; `action: "raise"` lets it spend more, only when the user asks to continue. `get_motion_embed` reads the state. The self-contained HTML (no hosting):
 `feega motion embed <nodeId> --download page.html`.
 
 See a video with `view_motion_frames` (up to 6 times in seconds): the frames come back as

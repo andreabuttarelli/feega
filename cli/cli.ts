@@ -176,6 +176,16 @@ motion
   });
 
 motion
+  .command('budget <nodeId>')
+  .description('Show what the video spent on AI across all its turns, and its cap')
+  .option('--raise', 'Let the agent spend more on this video, then ask it to continue')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionBudget } = await import('./commands/motion.ts');
+    await cmdMotionBudget(nodeId, opts);
+  });
+
+motion
   .command('frames <nodeId>')
   .description('Save frames of the saved video as JPEGs and print the quality notes (free)')
   .requiredOption('--at <seconds>', 'Comma-separated times in seconds, up to 6 (e.g. 1,2.5,4)')

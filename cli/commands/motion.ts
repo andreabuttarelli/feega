@@ -50,6 +50,10 @@ function printRun(run: MotionRun) {
     run.reference_pick.candidates.forEach((c) => console.log(`  ${c.id}  ${c.image}${c.why ? `  ${c.why}` : ''}`));
     console.log(`Answer: feega motion ask ${run.node_id ?? '<nodeId>'} "" --follow <ids...> --avoid <ids...>`);
   }
+  if (run.video_budget) {
+    console.log(`  budget used: $${run.video_budget.spent_usd.toFixed(2)} spent`);
+    console.log(`Continue: feega motion budget ${run.node_id ?? '<nodeId>'} --raise (+$${run.video_budget.raise_usd.toFixed(2)})`);
+  }
   if (run.cut_review) {
     console.log(`  critic ${run.cut_review.score}/10`);
     run.cut_review.fixes.forEach((f) => console.log(`  - ${f}`));
@@ -203,4 +207,10 @@ export async function cmdMotionStoryboard(nodeId: string, opts: { org?: string; 
   for (const c of board.cards) {
     console.log(`\n[${c.node_id}]${c.clip_ids.length ? ` clips ${c.clip_ids.join(',')}` : ''}\n${c.text}`);
   }
+}
+
+export async function cmdMotionBudget(nodeId: string, opts: { org?: string; raise?: boolean }) {
+  const bearer = await token();
+  const budget = opts.raise ? await motionApi.raiseBudget(bearer, nodeId, opts.org) : await motionApi.budget(bearer, nodeId, opts.org);
+  console.log(`spent $${budget.spent_usd.toFixed(2)} of $${budget.cap_usd.toFixed(2)}`);
 }

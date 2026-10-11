@@ -637,6 +637,11 @@
         "always": "Apply, and stop asking",
         "ship": "Keep it as is"
       },
+      "budget": {
+        "title": "Video budget used: ${spent} spent",
+        "body": "The work is saved. Continue to let the agent spend up to ${raise} more on this video.",
+        "continue": "Continue (+${raise})"
+      },
       "pick": {
         "label": "Pick references",
         "hint": "Tap once to follow, twice to avoid",

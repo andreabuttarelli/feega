@@ -14,6 +14,7 @@ export type MotionRun = {
   cost_usd?: number | null;
   error?: string | null;
   editor_url?: string;
+  video_budget?: VideoBudget | null;
   cut_review?: { score: number; fixes: string[]; sheet: string | null; answers: Record<'apply' | 'apply-always' | 'ship', string> } | null;
   reference_pick?: { question: string; candidates: { id: string; image: string; title?: string; why?: string }[]; min: number; max: number } | null;
 };
@@ -31,6 +32,8 @@ export type MotionVideo = { node_id: string; name: string | null; project_id: st
 export type MotionFrames = { revision: number; frames: { time: number; mime: string; data: string }[]; quality: string[]; blocking: string[] };
 
 export type MotionRevision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
+
+export type VideoBudget = { ok: true; spent_usd: number; cap_usd: number; raise_usd: number };
 
 export type EmbedState = { published: boolean; url?: string; snippet?: string; react?: string; flutter?: string; revision?: number };
 
@@ -72,6 +75,8 @@ export const motionApi = {
   embed: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token, { method: 'POST' }),
   unembed: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token, { method: 'DELETE' }),
   embedState: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token),
+  budget: (token: string, nodeId: string, org?: string) => request<VideoBudget>(withOrg(`/api/v1/motion/${id(nodeId)}/budget`, org), token),
+  raiseBudget: (token: string, nodeId: string, org?: string) => request<VideoBudget>(withOrg(`/api/v1/motion/${id(nodeId)}/budget`, org), token, { method: 'POST' }),
   frames: (token: string, nodeId: string, ask: { times: number[]; width?: number }, org?: string) =>
     request<MotionFrames>(withOrg(`/api/v1/motion/${id(nodeId)}/frames`, org), token, { method: 'POST', body: JSON.stringify(ask) }),
   revisions: (token: string, nodeId: string, org?: string) => request<{ revisions: MotionRevision[] }>(withOrg(`/api/v1/motion/${id(nodeId)}/revisions`, org), token),

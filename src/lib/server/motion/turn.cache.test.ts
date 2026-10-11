@@ -35,7 +35,7 @@ vi.mock('$lib/server/llm', () => ({
   llmVisionModel: () => null
 }));
 vi.mock('$lib/server/openrouter-models', () => ({ gatewayModels: () => [], ensureGatewayModels: async () => undefined, gatewayRate: () => ({ input: 1, cachedInput: 0.1, output: 1 }), gatewayModel: () => null }));
-vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: vi.fn(), billingScope: () => ({ run: (fn: () => unknown) => fn(), gatewayUsd: () => 0 }), withOrgContext: (_id: string, fn: () => unknown) => fn(), withVideoContext: (_o: string, _n: string, fn: () => unknown) => fn() }));
+vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: vi.fn(), billingScope: () => ({ run: (fn: () => unknown) => fn(), gatewayUsd: () => 0 }), withOrgContext: (_id: string, fn: () => unknown) => fn(), withNodeContext: (_n: string, fn: () => unknown) => fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/repos/chat', () => ({ openNodeThread: async () => 'thread-1', loadTurns: async () => [], promptHistory: () => [], saveTurn: async () => undefined }));
 vi.mock('$lib/server/motion/editor', () => ({
