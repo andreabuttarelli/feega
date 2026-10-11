@@ -232,12 +232,12 @@ describe('every text slot declares how much it holds', () => {
   });
 });
 
-describe('feature-grid survives the export seek check', () => {
-  it('flies its tiles in 2D: 3D layers rasterized by seek history and failed the check in the v4 run', () => {
-    const draw = drawPiece(shotSource(ShotId.FeatureGrid, UI).js, SLOTS[ShotId.FeatureGrid], DURATION);
+describe('every shot survives the export seek check', () => {
+  it.each(SHOT_IDS.map((s) => [s]))('%s moves in 2D: 3D layers rasterize by seek history and failed the check in the v4 runs (feature-grid, device-fly-in)', (id) => {
+    const draw = drawPiece(shotSource(id, UI).js, SLOTS[id], DURATION);
     const transforms = [0.2, 0.8, 1.4, 3].flatMap((t) => all(draw(t)).map((n) => `${String(n.style.transform ?? '')} ${cssOf(n)}`));
 
-    expect(transforms.filter((t) => /3d|rotate[XY]|perspective|preserve-3d/.test(t))).toEqual([]);
+    expect(transforms.filter((t) => /translate3d|matrix3d|rotate[XY]|perspective|preserve-3d/.test(t))).toEqual([]);
   });
 });
 

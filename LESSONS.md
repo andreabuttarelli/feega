@@ -258,7 +258,7 @@ contro WebKit 1 lane), non 3 frame a campione.
 
 ### Un componente 3D fallisce il seek check senza stato che perde
 Signal: "the frame at Xs differs between visits", nessuna variabile tenuta tra i seek, i due
-frame identici a occhio (feature-grid, run v4). Le trasformazioni 3D (`translate3d`, `rotateX`,
+frame identici a occhio (feature-grid e device-fly-in, run v4). Le trasformazioni 3D (`translate3d`, `rotateX`,
 `preserve-3d`, `perspective`) promuovono layer che Chrome rasterizza secondo la storia dei seek.
 Move: profondità simulata in 2D (`translate` + `scale`), `transform: none` a riposo; riprodurre
 con `seekPlan` + hash dei jpeg prima di toccare il codice.
