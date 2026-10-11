@@ -60,6 +60,47 @@ void main() {
     });
   });
 
+  group('runtime variables', () {
+    test('ready carries the schema and the values', () {
+      final m = PlayerMessage.parse(player({
+        'event': 'ready',
+        'width': 16,
+        'height': 9,
+        'duration': 4,
+        'playback': 'autoplay',
+        'loop': true,
+        'vars': [
+          {'name': 'speed', 'kind': 'number', 'default': 1, 'min': 0, 'max': 4},
+          {'name': 'mood', 'kind': 'enum', 'default': 'calm', 'options': ['calm', 'loud']},
+          {'name': 'odd', 'kind': 'dance', 'default': 1}
+        ],
+        'values': {'speed': 1, 'mood': 'calm'}
+      })) as ReadyMessage;
+
+      expect(m.info.vars.map((v) => v.name), ['speed', 'mood']);
+      expect(m.info.vars.first.kind, VarKind.number);
+      expect(m.info.vars.first.max, 4);
+      expect(m.info.vars.last.options, ['calm', 'loud']);
+      expect(m.info.values, {'speed': 1, 'mood': 'calm'});
+    });
+
+    test('parses the values the player kept', () {
+      expect((PlayerMessage.parse(player({'event': 'vars', 'values': {'speed': 4}})) as VarsMessage).values, {'speed': 4});
+    });
+
+    test('sends a partial update', () {
+      expect(HostMessage.vars({'speed': 2}).toJson(), {
+        'type': hostMessage,
+        'vars': {'speed': 2}
+      });
+    });
+
+    test('keeps only what changed', () {
+      expect(changedVars({'speed': 1, 'label': 'Hi'}, {'speed': 2, 'label': 'Hi'}), {'speed': 2});
+      expect(changedVars({'speed': 1}, {'speed': 1}), isNull);
+    });
+  });
+
   test('embed url carries the fit', () {
     expect(embedUri('https://feega.app', 'abc', Fit.cover).toString(), 'https://feega.app/e/abc?fit=cover');
   });

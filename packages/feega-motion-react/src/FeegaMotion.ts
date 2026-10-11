@@ -1,6 +1,6 @@
 'use client';
 import { createElement, forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState, type CSSProperties, type RefObject } from 'react';
-import { DEFAULT_ORIGIN, Fit, HOST_MESSAGE, HostCommand, PlayerEvent, SCRUB_PLAYBACK, embedSrc, readPlayer, settingsUrl, type EmbedSettings, type HostMessage, type PlayerMessage, type ReadyInfo } from './protocol.js';
+import { DEFAULT_ORIGIN, Fit, HOST_MESSAGE, HostCommand, PlayerEvent, SCRUB_PLAYBACK, changedVars, embedSrc, readPlayer, settingsUrl, type EmbedSettings, type HostMessage, type PlayerMessage, type ReadyInfo, type VarValues } from './protocol.js';
 import { isVisible, storyProgress, travelProgress, type Span } from './progress.js';
 
 export type FeegaMotionProps = {
@@ -12,27 +12,30 @@ export type FeegaMotionProps = {
   title?: string;
   className?: string;
   style?: CSSProperties;
+  vars?: VarValues;
   onReady?: (info: ReadyInfo) => void;
   onTimeUpdate?: (time: number, duration: number) => void;
   onEnded?: () => void;
   onLinkClick?: (url: string) => void;
   onError?: (message: string) => void;
+  onVarsChange?: (values: VarValues) => void;
 };
 
-export type FeegaMotionHandle = { play: () => void; pause: () => void; seek: (seconds: number) => void };
+export type FeegaMotionHandle = { play: () => void; pause: () => void; seek: (seconds: number) => void; setVars: (vars: VarValues) => void };
 
-type Callbacks = Pick<FeegaMotionProps, 'onReady' | 'onTimeUpdate' | 'onEnded' | 'onLinkClick' | 'onError'>;
+type Callbacks = Pick<FeegaMotionProps, 'onReady' | 'onTimeUpdate' | 'onEnded' | 'onLinkClick' | 'onError' | 'onVarsChange'>;
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 const FILL: CSSProperties = { position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0, display: 'block' };
 
 const HANDLERS: { [E in PlayerEvent]: (m: Extract<PlayerMessage, { event: E }>, cb: Callbacks) => void } = {
   [PlayerEvent.Size]: () => undefined,
-  [PlayerEvent.Ready]: ({ width, height, duration, playback, loop }, cb) => cb.onReady?.({ width, height, duration, playback, loop }),
+  [PlayerEvent.Ready]: ({ width, height, duration, playback, loop, vars = [], values = {} }, cb) => cb.onReady?.({ width, height, duration, playback, loop, vars, values }),
   [PlayerEvent.TimeUpdate]: (m, cb) => cb.onTimeUpdate?.(m.time, m.duration),
   [PlayerEvent.Ended]: (_m, cb) => cb.onEnded?.(),
   [PlayerEvent.Link]: (m, cb) => cb.onLinkClick?.(m.url),
-  [PlayerEvent.Error]: (m, cb) => cb.onError?.(m.message)
+  [PlayerEvent.Error]: (m, cb) => cb.onError?.(m.message),
+  [PlayerEvent.Vars]: (m, cb) => cb.onVarsChange?.(m.values)
 };
 
 const spanOf = (el: Element): Span => {
@@ -41,13 +44,16 @@ const spanOf = (el: Element): Span => {
 };
 
 export const FeegaMotion = forwardRef<FeegaMotionHandle, FeegaMotionProps>(function FeegaMotion(props, ref) {
-  const { id, fit = Fit.Cover, scrollLength, scrollContainer, origin = DEFAULT_ORIGIN, title = 'Interactive video', className, style } = props;
+  const { id, fit = Fit.Cover, scrollLength, scrollContainer, origin = DEFAULT_ORIGIN, title = 'Interactive video', className, style, vars } = props;
   const box = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLIFrameElement>(null);
   const callbacks = useRef<Callbacks>(props);
+  const wanted = useRef<VarValues | undefined>(vars);
+  const sent = useRef<VarValues | null>(null);
   const [settings, setSettings] = useState<EmbedSettings | null>(null);
   const [viewportHeight, setViewportHeight] = useState(0);
   callbacks.current = props;
+  wanted.current = vars;
 
   const story = scrollLength ?? (settings?.playback === SCRUB_PLAYBACK ? settings.scrollLength : 0);
 
@@ -56,8 +62,25 @@ export const FeegaMotion = forwardRef<FeegaMotionHandle, FeegaMotionProps>(funct
   useImperativeHandle(ref, () => ({
     play: () => post({ command: HostCommand.Play }),
     pause: () => post({ command: HostCommand.Pause }),
-    seek: (seconds) => post({ command: HostCommand.Seek, time: seconds })
+    seek: (seconds) => post({ command: HostCommand.Seek, time: seconds }),
+    setVars: (next) => {
+      sent.current = { ...sent.current, ...next };
+      post({ vars: next });
+    }
   }), [post]);
+
+  const sendVars = useCallback(() => {
+    const next = wanted.current;
+    const changed = next && sent.current ? changedVars(sent.current, next) : null;
+    if (!changed) {
+      return;
+    }
+    sent.current = { ...sent.current, ...changed };
+    post({ vars: changed });
+  }, [post]);
+
+  const varsKey = JSON.stringify(vars ?? {});
+  useEffect(sendVars, [varsKey, sendVars]);
 
   useEffect(() => {
     if (scrollLength !== undefined) {
@@ -105,7 +128,9 @@ export const FeegaMotion = forwardRef<FeegaMotionHandle, FeegaMotionProps>(funct
         return;
       }
       if (m.event === PlayerEvent.Size) {
+        sent.current = {};
         greet();
+        sendVars();
       }
       (HANDLERS[m.event] as (m: PlayerMessage, cb: Callbacks) => void)(m, callbacks.current);
     };
@@ -121,7 +146,7 @@ export const FeegaMotion = forwardRef<FeegaMotionHandle, FeegaMotionProps>(funct
       window.removeEventListener('message', hear);
       frame.current?.removeEventListener('load', greet);
     };
-  }, [scrollContainer, story, post]);
+  }, [scrollContainer, story, post, sendVars]);
 
   const storyHeight = story > 0 && viewportHeight > 0 ? `${story * viewportHeight}px` : '100%';
   const stageStyle: CSSProperties = story > 0 ? { position: 'sticky', top: 0, width: '100%', height: viewportHeight || '100vh', overflow: 'hidden' } : { position: 'absolute', inset: 0 };

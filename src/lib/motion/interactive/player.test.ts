@@ -5,6 +5,12 @@ import { gestureScrub, readHost, selfScroll, HOST_MESSAGE } from './host';
 import { fitBox, FIT_SCALE } from './fit';
 import { LINK_MESSAGE, NATIVE_BRIDGE, PLAYER_MESSAGE, PROTOCOL_VERSION, PlayerEvent } from './protocol';
 import { PlayMode } from './settings';
+import { VAR_RULES, VarKind, coerceVars, type VarDecl } from './var-model';
+
+const VARS: VarDecl[] = [
+  { name: 'speed', kind: VarKind.Number, default: 1, min: 0, max: 4 },
+  { name: 'label', kind: VarKind.String, default: 'Hi' }
+];
 
 type Spy = ReturnType<typeof vi.fn>;
 type Fake = HTMLElement & { seek: Spy; play: Spy; pause: Spy; iframeElement: { contentWindow: { postMessage: Spy }; focus: () => void } };
@@ -29,6 +35,8 @@ const config = (playback: string): PlayerConfig => ({
   standaloneMs: 500,
   fitScale: FIT_SCALE,
   scrollLength: 3,
+  vars: VARS,
+  varRules: VAR_RULES,
   keys: { x: 'pointer.x', y: 'pointer.y', down: 'pointer.down', hover: 'hover', tiltX: 'tilt.x', tiltY: 'tilt.y', scroll: 'scroll', time: 'time' }
 });
 
@@ -41,7 +49,7 @@ function mount(playback: string = PlayMode.Paused): void {
   el = document.getElementById('player') as Fake;
   child = { postMessage: vi.fn() };
   Object.assign(el, { seek: vi.fn(), play: vi.fn(), pause: vi.fn(), iframeElement: { contentWindow: child, focus: () => undefined } });
-  playerMain(config(playback), readHost, selfScroll, fitBox, gestureScrub);
+  playerMain(config(playback), readHost, selfScroll, fitBox, gestureScrub, coerceVars);
 }
 
 const host = (m: Record<string, unknown>) => window.dispatchEvent(new MessageEvent('message', { data: { type: HOST_MESSAGE, ...m } }));
@@ -155,5 +163,49 @@ describe('a link the video opens', () => {
     window.dispatchEvent(new MessageEvent('message', { data: { type: LINK_MESSAGE, url: 'https://evil.example/' } }));
 
     expect(open).not.toHaveBeenCalled();
+  });
+});
+
+describe('runtime variables from the host', () => {
+  let tick: FrameRequestCallback = () => undefined;
+  const lastVars = () => (child.postMessage.mock.lastCall?.[0] as { vars?: unknown }).vars;
+
+  beforeEach(() => {
+    vi.mocked(window.requestAnimationFrame).mockImplementation((fn) => ((tick = fn), 0));
+  });
+
+  it('tells the host the schema and the values when ready', () => {
+    mount();
+    ready();
+
+    expect(events(PlayerEvent.Ready)[0]).toMatchObject({ vars: VARS, values: { speed: 1, label: 'Hi' } });
+  });
+
+  it('starts the video on the defaults', () => {
+    mount();
+    tick(0);
+
+    expect(lastVars()).toEqual({ speed: 1, label: 'Hi' });
+  });
+
+  it('applies a partial update on the next frame, clamped, and echoes what it kept', () => {
+    mount();
+    host({ vars: { speed: 9 } });
+    tick(0);
+
+    expect(lastVars()).toEqual({ speed: 4, label: 'Hi' });
+    expect(events(PlayerEvent.Vars).at(-1)).toMatchObject({ values: { speed: 4, label: 'Hi' } });
+
+    host({ vars: { label: 'Ciao', ghost: 1, speed: 'fast' } });
+    tick(16);
+
+    expect(lastVars()).toEqual({ speed: 4, label: 'Ciao' });
+  });
+
+  it('ignores an update with nothing it knows', () => {
+    mount();
+    host({ vars: { ghost: 1 } });
+
+    expect(events(PlayerEvent.Vars)).toHaveLength(0);
   });
 });

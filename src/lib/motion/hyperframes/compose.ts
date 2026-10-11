@@ -60,6 +60,7 @@ import { RuntimeDelivery } from './runtime-delivery';
 import { shaderBakes, shaderScript, type ShaderBake } from '../shaders/compose';
 import { liveSpec, type SpecInput } from '../interactive/spec';
 import { LIVE_GLOBAL } from '../interactive/runtime';
+import { boundDoc, defaultsOf, withVars, type VarValues } from '../interactive/vars';
 import { Liveness, interactiveOf } from '../interactive/settings';
 import integrity from 'virtual:motion-libs';
 import { HOSTED, Module, Script, defaultOrigin, moduleUrl, notice, scriptUrl } from '../libs/catalog';
@@ -101,7 +102,7 @@ export enum Target {
 
 export type Inlined = Partial<Record<Script, string>>;
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery };
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery; vars?: VarValues };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -587,7 +588,7 @@ function zoomed(doc: MotionDoc, scale: number): string {
 }
 
 export function composeHtml(raw: ComposeInput): string {
-  const shown = withoutHidden(raw.doc);
+  const shown = withoutHidden(boundDoc(withVars(raw.doc, raw.vars)));
   const junctions = junctionTweens(shown, junctionPairs(shown));
   const prepared = bakePaths(withoutBackdrop(flattenComps(withJunctions(shown))));
   const input = { ...raw, doc: bakePhysics(bakeExpressions(prepared, raw.analyses)) };
@@ -676,7 +677,7 @@ export function composeHtml(raw: ComposeInput): string {
   const animation = animationScript(clips, doc, (v) => resolveColor(v, tokens), parentsWithChildren(doc));
   const used = new Set(runs.map((r) => r.name));
   const libraries = librariesOf(doc.components, used);
-  const env = { assets: input.assets, brand: brandEnv(tokens) };
+  const env = { assets: input.assets, brand: brandEnv(tokens), vars: defaultsOf(interactiveOf(doc).vars) };
   const boot = gated(bootScript(runs, env, `window.__timelines[${js(COMPOSITION_ID)}]`));
   const definitions = [...used].map((name) => hotScript(definitionScript(name, doc.components[name].source.js))).join('');
   const customBoot = boot ? `<script>${boot}</script>` : '';
@@ -736,7 +737,7 @@ const LIVE_SCRIPT: Record<Liveness, (input: SpecInput, delivery: Delivery) => st
   [Liveness.Baked]: () => '',
   [Liveness.Live]: (input, delivery) => {
     const spec = liveSpec(input);
-    return spec.live.length ? `${chunkTag(Chunk.Live, delivery)}<script>window.${LIVE_GLOBAL}(${scriptJson(spec)});</script>` : '';
+    return spec.live.length || spec.bindings.length ? `${chunkTag(Chunk.Live, delivery)}<script>window.${LIVE_GLOBAL}(${scriptJson(spec)});</script>` : '';
   }
 };
 

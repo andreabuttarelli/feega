@@ -138,6 +138,38 @@ describe('<FeegaMotion>', () => {
     expect(f.posted).toContainEqual(expect.objectContaining({ reducedMotion: true }));
   });
 
+  it('sends its vars once the player listens, then only what changed, in the same iframe', () => {
+    const { container, rerender } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN, vars: { speed: 1, label: 'Hi' } }));
+    const f = frameOf(container);
+    const varsSent = () => f.posted.filter((m) => 'vars' in m).map((m) => m.vars);
+
+    fromPlayer(f.child, PlayerEvent.Size, { width: 16, height: 9, aspect: 16 / 9 });
+    expect(varsSent()).toEqual([{ speed: 1, label: 'Hi' }]);
+
+    rerender(createElement(FeegaMotion, { id: ID, origin: ORIGIN, vars: { speed: 2, label: 'Hi' } }));
+    rerender(createElement(FeegaMotion, { id: ID, origin: ORIGIN, vars: { speed: 2, label: 'Hi' } }));
+
+    expect(varsSent()).toEqual([{ speed: 1, label: 'Hi' }, { speed: 2 }]);
+    expect(container.querySelector('iframe')).toBe(f.frame);
+  });
+
+  it('sets vars through its ref and reports the schema and the values the player kept', () => {
+    const ref = createRef<FeegaMotionHandle>();
+    const onReady = vi.fn();
+    const onVarsChange = vi.fn();
+    const { container } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN, ref, onReady, onVarsChange }));
+    const f = frameOf(container);
+    const schema = [{ name: 'speed', kind: 'number', default: 1, min: 0, max: 4 }];
+
+    fromPlayer(f.child, PlayerEvent.Ready, { width: 1, height: 1, duration: 9, playback: 'autoplay', loop: true, vars: schema, values: { speed: 1 } });
+    ref.current!.setVars({ speed: 9 });
+    fromPlayer(f.child, PlayerEvent.Vars, { values: { speed: 4 } });
+
+    expect(onReady).toHaveBeenCalledWith(expect.objectContaining({ vars: schema, values: { speed: 1 } }));
+    expect(f.posted.at(-1)).toEqual({ type: HOST_MESSAGE, vars: { speed: 9 } });
+    expect(onVarsChange).toHaveBeenCalledWith({ speed: 4 });
+  });
+
   it('plays, pauses and seeks through its ref', () => {
     const ref = createRef<FeegaMotionHandle>();
     const { container } = render(createElement(FeegaMotion, { id: ID, origin: ORIGIN, ref }));

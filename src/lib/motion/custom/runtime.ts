@@ -123,7 +123,7 @@ export function librariesOf(components: CustomComponents, used: Iterable<string>
 export type ParamKey = { at: number; value: number | string; ease: string };
 export type CustomRun = { id: string; name: string; start: number; length: number; fps: number; values: Record<string, unknown>; seed: number; keys?: Record<string, ParamKey[]>; trim?: number; play?: Play };
 
-export type CustomEnv = { assets: Record<string, string>; brand: { name: string; colors: Record<string, string>; logoUrl: string | null } };
+export type CustomEnv = { assets: Record<string, string>; brand: { name: string; colors: Record<string, string>; logoUrl: string | null }; vars?: Record<string, number | boolean | string> };
 
 export function seedOf(clipId: string): number {
   return parseInt(contentStamp(clipId).split('-')[0], 36) >>> 0;
@@ -151,9 +151,9 @@ type Split = { target?: string | object; by?: string };
 type ClipScope = { root: HTMLElement; tl: Timeline; run: CustomRun; hooks: Hooks };
 type Little = { vec2: (x: number, y: number) => object; setCanvasFixedSize: (size: object) => void; setEngineManualStep: (on: boolean) => void; engineStep: (frames: number) => void; engineObjectsDestroy: () => void; engineInit: (...args: unknown[]) => Promise<unknown> };
 type Game = { debug: { paused: boolean }; quit: () => void; randSeed: (seed: number) => void; onDraw: (draw: () => void) => void };
-type Input = { x: number; y: number; down: boolean; hover: boolean; tiltX: number; tiltY: number; keys: Set<string> };
+type Input = { x: number; y: number; down: boolean; hover: boolean; tiltX: number; tiltY: number; keys: Set<string>; vars: Record<string, number | boolean | string> };
 type Hooks = { pause: (() => void)[]; resume: (() => void)[]; destroy: (() => void)[] };
-type Forwarded = { type?: string; kind?: string; x?: number; y?: number; key?: string; code?: string; values?: Record<string, number> };
+type Forwarded = { type?: string; kind?: string; x?: number; y?: number; key?: string; code?: string; values?: Record<string, number>; vars?: Record<string, number | boolean | string> };
 type BootConfig = { registry: string; errors: string; listener: string; libraries: Record<string, string>; engine: string; shadowed: string[]; clock: string[]; liveRuns: string; eventMessage: string; inputMessage: string; tilt: { x: string; y: string }; gpu: { global: string; three: string } };
 
 function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: Timeline, format: ReturnType<typeof fixedFormat>) {
@@ -195,7 +195,7 @@ function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: 
   const liveRuns: (() => void)[] = [];
   w[cfg.liveRuns] = liveRuns;
 
-  const input: Input = { x: 0, y: 0, down: false, hover: false, tiltX: 0, tiltY: 0, keys: new Set() };
+  const input: Input = { x: 0, y: 0, down: false, hover: false, tiltX: 0, tiltY: 0, keys: new Set(), vars: { ...env.vars } };
   const POINTER_TO_MOUSE: Record<string, string> = { pointerdown: 'mousedown', pointerup: 'mouseup', pointermove: 'mousemove' };
   const forward = (m: Forwarded, area: HTMLElement) => {
     if (m.key !== undefined) {
@@ -261,6 +261,7 @@ function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: 
           if (m?.type === cfg.inputMessage && m.values) {
             input.tiltX = m.values[cfg.tilt.x] ?? input.tiltX;
             input.tiltY = m.values[cfg.tilt.y] ?? input.tiltY;
+            input.vars = m.vars ?? input.vars;
           }
         }
       ]

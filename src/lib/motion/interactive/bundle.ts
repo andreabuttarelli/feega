@@ -18,6 +18,7 @@ import { Liveness, PlayMode, SCROLL_LENGTH, interactiveOf, type Interactive } fr
 import { FIT_SCALE, fitBox } from './fit';
 import { LINK_MESSAGE, NATIVE_BRIDGE, PLAYER_MESSAGE, PROTOCOL_VERSION, PlayerEvent } from './protocol';
 import type { EmbedSettings } from './loader';
+import { VAR_RULES, coerceVars, type VarDecl } from './var-model';
 
 export const BUNDLE_FILE = 'feega-interactive.html';
 export const SELF_SCROLL = 'self-scroll';
@@ -60,7 +61,7 @@ function scriptJson(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
-type PlayerSource = Pick<PlayerConfig, 'html' | 'width' | 'height' | 'duration' | 'playback' | 'loop'> & { scrollLength?: number };
+type PlayerSource = Pick<PlayerConfig, 'html' | 'width' | 'height' | 'duration' | 'playback' | 'loop'> & { scrollLength?: number; vars?: VarDecl[] };
 
 const PLAYER_CALL = '})({"html":';
 const TITLE = /<title>([^<]*)<\/title>/;
@@ -81,6 +82,8 @@ function playerConfig(source: PlayerSource): PlayerConfig {
     selfScroll: SELF_SCROLL,
     standaloneMs: STANDALONE_MS,
     fitScale: FIT_SCALE,
+    vars: source.vars ?? [],
+    varRules: VAR_RULES,
     keys: { x: InputKey.PointerX, y: InputKey.PointerY, down: InputKey.PointerDown, hover: InputKey.Hover, tiltX: InputKey.TiltX, tiltY: InputKey.TiltY, scroll: InputKey.Scroll, time: InputKey.Time }
   };
 }
@@ -138,7 +141,7 @@ const PAD_TOUCH: Record<PlayMode, string> = {
 };
 
 function sourceOf(html: string, doc: MotionDoc, settings: Interactive): PlayerSource {
-  return { html, width: doc.width, height: doc.height, duration: doc.durationInFrames / doc.fps, playback: settings.playback, loop: settings.loop, scrollLength: settings.scrollLength };
+  return { html, width: doc.width, height: doc.height, duration: doc.durationInFrames / doc.fps, playback: settings.playback, loop: settings.loop, scrollLength: settings.scrollLength, vars: interactiveOf(doc).vars };
 }
 
 function jsonEnd(text: string, start: number): number {
@@ -179,8 +182,8 @@ function storedPlayer(page: string): Stored | null {
   if (end < 0) {
     return null;
   }
-  const { html, width, height, duration, playback, loop, scrollLength } = JSON.parse(page.slice(start, end)) as PlayerSource;
-  return { source: { html, width, height, duration, playback, loop, scrollLength }, title: TITLE.exec(page)?.[1] ?? '' };
+  const { html, width, height, duration, playback, loop, scrollLength, vars } = JSON.parse(page.slice(start, end)) as PlayerSource;
+  return { source: { html, width, height, duration, playback, loop, scrollLength, vars }, title: TITLE.exec(page)?.[1] ?? '' };
 }
 
 const INLINED_SCRIPT = /<script>\/\*! (.+?) \*\/\n[\s\S]*?<\/script>/g;
@@ -332,7 +335,7 @@ function pageOf(source: PlayerSource, title: string, player: string): string {
     '</head><body><div id="stage">',
     '<hyperframes-player id="player" sandbox-origin="opaque" assets-loading-ui="none" disable-click-to-play></hyperframes-player>',
     '<div id="pad"></div></div>',
-    `<script>(${playerMain.toString()})(${scriptJson(playerConfig(source))},${readHost.toString()},${selfScroll.toString()},${fitBox.toString()},${gestureScrub.toString()});</script>`,
+    `<script>(${playerMain.toString()})(${scriptJson(playerConfig(source))},${readHost.toString()},${selfScroll.toString()},${fitBox.toString()},${gestureScrub.toString()},${coerceVars.toString()});</script>`,
     '</body></html>'
   ].join('');
 }
