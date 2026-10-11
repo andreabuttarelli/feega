@@ -12,7 +12,7 @@ const LIMITS: Required<Omit<JoltLimits, 'cuts'>> = { popRatio: 3, popFloor: 1, s
 const NEIGHBOURS = 3;
 const FLICKER_WINDOW = 8;
 const FLICKER_FLIPS = 3;
-const FLICKER_SHARE = 0.12;
+const FLICKER_SHARE = 0.25;
 
 const median = (values: number[]) => {
   const sorted = [...values].sort((a, b) => a - b);
