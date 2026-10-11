@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
 import { addClip, setProps, type OpResult } from '../timeline';
 import { CheckState, ComponentMode, sourceHash } from './component';
-import { patchComponent, recordCheck, removeComponent, writeComponent } from './ops';
+import { Occurrence, recordCheck, removeComponent, updateComponent, writeComponent } from './ops';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -52,15 +52,31 @@ describe('custom component ops', () => {
     expect(rewritten.components.NodeGraph.check).toBeNull();
   });
 
-  it('patches one file by replacing text that occurs exactly once', () => {
-    const doc = must(patchComponent(withNodes(), 'NodeGraph', [{ file: 'css', find: 'width:10px', replace: 'width:12px' }]));
+  it('updates one file by replacing text that occurs exactly once', () => {
+    const out = updateComponent(withNodes(), 'NodeGraph', [{ file: 'css', find: 'width:10px', replace: 'width:12px' }]);
 
-    expect(doc.components.NodeGraph.source.css).toBe('.n{width:12px}');
+    expect(must(out).components.NodeGraph.source.css).toBe('.n{width:12px}');
+    expect(out.ok && out.diff).toEqual([{ file: 'css', replaced: 1, before: '.n{width:10px}', after: '.n{width:12px}' }]);
   });
 
-  it('refuses a patch whose text is missing or ambiguous', () => {
-    expect(patchComponent(withNodes(), 'NodeGraph', [{ file: 'css', find: 'height', replace: '' }]).ok).toBe(false);
-    expect(patchComponent(withNodes(), 'NodeGraph', [{ file: 'html', find: 'div', replace: 'span' }]).ok).toBe(false);
+  it('refuses an update whose text is missing, or ambiguous when no occurrence is named', () => {
+    expect(updateComponent(withNodes(), 'NodeGraph', [{ file: 'css', find: 'height', replace: '' }]).ok).toBe(false);
+    expect(updateComponent(withNodes(), 'NodeGraph', [{ file: 'html', find: 'div', replace: 'span' }]).ok).toBe(false);
+    expect(updateComponent(withNodes(), 'NodeGraph', [{ file: 'css', find: 'height', replace: '', occurrence: Occurrence.All }]).ok).toBe(false);
+  });
+
+  it('replaces the first, the last or every occurrence when asked', () => {
+    const html = (occurrence: Occurrence) => must(updateComponent(withNodes(), 'NodeGraph', [{ file: 'html', find: 'div', replace: 'span', occurrence }])).components.NodeGraph.source.html;
+
+    expect(html(Occurrence.First)).toBe('<span class="n"></div>');
+    expect(html(Occurrence.Last)).toBe('<div class="n"></span>');
+    expect(html(Occurrence.All)).toBe('<span class="n"></span>');
+  });
+
+  it('runs the authoring lint on the updated code', () => {
+    const out = updateComponent(withNodes(), 'NodeGraph', [{ file: 'js', find: 'tl.from', replace: 'setInterval(tick,16);tl.from' }]);
+
+    expect(!out.ok && out.error).toContain('setInterval');
   });
 
   it('keeps clip values valid when a rewrite narrows the props schema', () => {
@@ -87,10 +103,10 @@ describe('a live component', () => {
     expect(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Game', { ...loop, mode: ComponentMode.Live })).components.Game.mode).toBe(ComponentMode.Live);
   });
 
-  it('stays live through a patch', () => {
+  it('stays live through an update', () => {
     const doc = must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Game', { ...loop, mode: ComponentMode.Live }));
 
-    expect(must(patchComponent(doc, 'Game', [{ file: 'js', find: 'f()', replace: 'g()' }])).components.Game.mode).toBe(ComponentMode.Live);
+    expect(must(updateComponent(doc, 'Game', [{ file: 'js', find: 'f()', replace: 'g()', occurrence: Occurrence.All }])).components.Game.mode).toBe(ComponentMode.Live);
   });
 });
 

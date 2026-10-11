@@ -16,7 +16,7 @@ describe('the studio roster', () => {
   });
 
   it('a scripted video with nothing built yet goes to the shot builder: library shots only, no free code', () => {
-    const shotNames = [...names, 'add_shot', 'list_shots', 'write_component', 'patch_component'];
+    const shotNames = [...names, 'add_shot', 'list_shots', 'write_component', 'update_components'];
 
     expect(turnRole('go', scripted)).toBe(StudioRole.ShotBuilder);
     expect(roleTools(StudioRole.ShotBuilder, shotNames)).toEqual(expect.arrayContaining(['add_shot', 'list_shots', 'recreate_ui', 'add_music', 'view_frames']));

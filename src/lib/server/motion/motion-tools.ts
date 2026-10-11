@@ -46,7 +46,7 @@ import { DESCRIBE_ASK, describeFramesTool, gateBlock, lookFirst, type Viewing } 
 import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { Quality, blocking, docProblems, frameProblems, softPictures, uiRecolour, uiShrink, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '$lib/motion/custom/component';
-import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
+import { Occurrence, recordCheck, removeComponent, updateComponent, writeComponent } from '$lib/motion/custom/ops';
 import { CaptureSession, FIDELITY_MIN, offersSignIn, type UiCapture } from '$lib/server/web/vector-capture';
 import { StoreKind } from '$lib/server/web/store';
 import { vectorPiece, withFonts } from '$lib/motion/vector-ui/piece';
@@ -65,7 +65,7 @@ import { Isolate, focusUi } from '$lib/motion/ui-focus';
 import { ACTS, BrandKind, briefOf, offScript, scriptLines, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
 import { quoted, unsourcedFigures, type SitePage } from './site-copy';
 import { MediaKind, boardMedia, outlineOf, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
-import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
+import { UPDATE_COMPONENTS, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
 import { removeLight, removeLook, setLight, setLightKeyframes, setLook } from '$lib/motion/look-ops';
@@ -593,7 +593,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }
     session.frames.set(callId, check.frames);
     const shown = check.frames.length ? ' The two frames that should be identical are attached as images.' : '';
-    return { ok: false, error: `${name} v${version} is saved but failed the seek-determinism check, so it cannot be exported:\n- ${check.problems.join('\n- ')}\nFix it with patch_component: build every change on tl from props and time only.${shown}`, ...advice };
+    return { ok: false, error: `${name} v${version} is saved but failed the seek-determinism check, so it cannot be exported:\n- ${check.problems.join('\n- ')}\nFix it with update_components: build every change on tl from props and time only.${shown}`, ...advice };
   }
 
   function adviceFor(source: CustomSource) {
@@ -2072,13 +2072,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
-    [PATCH_COMPONENT]: tool({
-      description: 'Change a custom component by replacing text in one of its files; each find must occur exactly once. Cheaper than rewriting it. The determinism check runs again.',
+    [UPDATE_COMPONENTS]: tool({
+      description: 'Change a custom component by replacing text in its html, css or js. Each find must occur exactly once unless occurrence names first, last or all. Cheaper than rewriting it. Lint and the determinism check run again; returns a small diff.',
       inputSchema: z.object({
-        name: z.string(),
-        edits: z.array(z.object({ file: z.enum(SOURCE_FILES), find: z.string().min(1), replace: z.string() })).min(1).max(20)
+        component: z.string(),
+        edits: z.array(z.object({ file: z.enum(SOURCE_FILES), find: z.string().min(1), replace: z.string(), occurrence: z.enum(Occurrence).optional() })).min(1).max(20)
       }),
-      execute: async (input, { toolCallId }) => codeWrite(patchComponent(session.doc, input.name, input.edits), input.name, `patched ${input.name}`, toolCallId)
+      execute: async (input, { toolCallId }) => {
+        const result = updateComponent(session.doc, input.component, input.edits);
+        const out = await codeWrite(result, input.component, `updated ${input.component}`, toolCallId);
+        return result.ok ? { ...out, diff: result.diff } : out;
+      }
     }),
 
     remove_component: tool({
