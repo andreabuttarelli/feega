@@ -36,7 +36,9 @@ const world = vi.hoisted(() => ({
   message: 'make it pop',
   history: [] as { role: string; content: string }[],
   tools: [] as string[][],
-  imported: [] as string[]
+  imported: [] as string[],
+  critic: null as unknown,
+  critiques: [] as { prompt: string; images: unknown[] }[]
 }));
 
 const draftBucket = {
@@ -174,14 +176,19 @@ vi.mock('$lib/server/llm', () => ({
     return id === 'vision/model' && world.visionFails ? failing() : scripted();
   },
   llmCodeModel: () => 'code/model',
-  llmVisionModel: () => 'vision/model'
+  llmVisionModel: () => 'vision/model',
+  llmStructured: async (q: { prompt: string; images: unknown[] }) => {
+    world.critiques.push(q);
+    return world.critic;
+  }
 }));
+vi.mock('$lib/server/motion/contact-sheet', () => ({ tileSheet: async () => Buffer.from('sheet') }));
 vi.mock('$lib/server/openrouter-models', () => ({
   ensureGatewayModels: async () => undefined,
   gatewayRate: () => ({ input: world.rate, cachedInput: world.rate, output: world.rate }),
   gatewayModel: () => (world.seesImages ? { usable: true } : null)
 }));
-vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: vi.fn(), withOrgContext: (_id: string, fn: () => unknown) => fn() }));
+vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: vi.fn(), billedUsdInScope: () => 0.04, withOrgContext: (_id: string, fn: () => unknown) => fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/repos/chat', () => ({
   openNodeThread: async () => 'thread-1',
@@ -304,6 +311,26 @@ describe('a motion turn closes on a look and a summary', () => {
     world.history = [];
     world.tools = [];
     world.imported = [];
+    world.critic = null;
+    world.critiques = [];
+  });
+
+  it('an independent critic reviews the whole contact sheet and its fixes run one more round', async () => {
+    world.critic = { score: 4, fixes: ['1.5s: the frame is empty, put the product UI behind the title'] };
+    await turn();
+
+    expect(world.critiques).toHaveLength(1);
+    expect(world.critiques[0].images).toHaveLength(1);
+    expect(world.critiques[0].prompt).toContain('contact sheet of the WHOLE video');
+    expect(world.calls.some((c) => textOf(lastMessage(c.prompt)).includes('the frame is empty, put the product UI'))).toBe(true);
+  });
+
+  it('a cut the critic passes is delivered without another round', async () => {
+    world.critic = { score: 9, fixes: [] };
+    await turn();
+
+    expect(world.critiques).toHaveLength(1);
+    expect(world.calls.some((c) => textOf(lastMessage(c.prompt)).includes('independent critic'))).toBe(false);
   });
 
   it('looks at its frames after the last edit even when the edits spent the whole budget', async () => {
