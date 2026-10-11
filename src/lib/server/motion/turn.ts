@@ -33,6 +33,7 @@ import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
 import { COPY_SCHEMA, copywrite } from '$lib/server/motion/copywriter';
 import { projectMemory } from '$lib/server/motion/studio-memory';
+import type { LaunchScript } from '$lib/motion/script';
 import { REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
@@ -128,6 +129,19 @@ const awaitsUser = (steps: readonly TurnStep[]) => briefAwaits(steps) || pickAwa
 const userAsked: Stop = ({ steps }) => awaitsUser(steps as TurnStep[]);
 
 const ROUND_ROLE: Record<Round, StudioRole | null> = { [Round.Research]: StudioRole.Researcher, [Round.Sound]: StudioRole.Sound, [Round.Edit]: null, [Round.SelfCheck]: null, [Round.Summary]: null };
+
+const CREWS = 2;
+
+type Crew = { acts: string[]; from: number; to: number };
+
+function shotCrews(script: LaunchScript): Crew[] {
+  const size = Math.ceil(script.acts.length / CREWS);
+  return Array.from({ length: CREWS }, (_, i) => script.acts.slice(i * size, (i + 1) * size))
+    .filter((acts) => acts.length)
+    .map((acts) => ({ acts: acts.map((a) => a.act), from: acts[0].start, to: acts.at(-1)!.end }));
+}
+
+const crewBrief = (crew: Crew) => `Shot crew: build only the ${crew.acts.join(', ')} acts of the script, from ${crew.from} s to ${crew.to} s, with library shots placed inside that range. Another crew builds the rest at the same time: never place, move or remove anything outside your range, and leave music to the sound pass.`;
 
 const RESEARCH_DONE = 'Research is done: the facts, captures and references are in the conversation above. Now write the script and the storyboard from them.';
 const SOUND_PASS = 'Sound pass: lay the music under the whole video if there is none, mark its beats and cut the shots onto them. Change nothing else.';
@@ -502,21 +516,35 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       };
       let conversation = openingMessages;
 
+      let started = false;
       const play = async (messages: ModelMessage[], kind: Round) => {
+        const first = !started;
+        started = true;
         const answered: ModelMessage[] = [];
         const played = round(messages, kind, (step) => {
           steps.push(step);
           answered.push(...(step.response.messages as ModelMessage[]));
           void reply.progress(finishedTurn(steps));
         });
-        writer.merge(played.toUIMessageStream({ sendStart: kind === openingRound, sendFinish: false, sendReasoning: true }));
+        writer.merge(played.toUIMessageStream({ sendStart: first, sendFinish: false, sendReasoning: true }));
         await Promise.resolve(played.steps).catch((e: unknown) => {
           console.error(`[motion-agent] ${kind} round failed, keeping the steps it finished`, e);
         });
         conversation = [...messages, ...answered];
+        return answered;
       };
 
-      await play(openingMessages, openingRound);
+      const crewsFor = role === StudioRole.ShotBuilder && head.doc.script ? shotCrews(head.doc.script) : [];
+      if (crewsFor.length > 1) {
+        const base = openingMessages;
+        const crewed = await Promise.all(crewsFor.map(async (crew) => {
+          const asked: ModelMessage[] = [...base, { role: 'user', content: crewBrief(crew) }];
+          return [asked.at(-1)!, ...(await play(asked, openingRound))];
+        }));
+        conversation = [...base, ...crewed.flat()];
+      } else {
+        await play(openingMessages, openingRound);
+      }
       if (openingRound === Round.Research && !awaitsUser(steps)) {
         await play([...conversation, { role: 'user', content: RESEARCH_DONE }], Round.Edit);
       }

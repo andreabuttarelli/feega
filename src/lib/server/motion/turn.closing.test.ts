@@ -131,7 +131,7 @@ function reply(call: Call): unknown[] {
   if (world.picking && last.role === 'user') {
     return tool('ask_reference_pick', PICK);
   }
-  if (world.headScript && last.role === 'user' && textOf(last).startsWith('Go')) {
+  if (world.headScript && last.role === 'user' && textOf(last).startsWith('Shot crew')) {
     return tool('add_shot', { shot: 'kinetic-title', slots: { text: 'The price changed.' }, at: 0 });
   }
   if (world.looking && last.role === 'user') {
@@ -424,6 +424,17 @@ describe('a motion turn closes on a look and a summary', () => {
     const sound = world.tools.findIndex((t) => t.includes('add_music') && !t.includes('add_shot'));
     expect(sound).toBeGreaterThan(0);
     expect(world.tools[sound]).not.toContain('add_shot');
+  });
+
+  it('the first cut is built by two shot crews in parallel, each on its own acts and time range', async () => {
+    world.headScript = SCRIPT;
+    world.message = 'Go: build the video from this script.';
+    await turn();
+
+    const briefs = world.calls.map((c) => textOf(lastMessage(c.prompt))).filter((t) => t.startsWith('Shot crew'));
+    expect(briefs.some((t) => t.includes('problem, solution') && t.includes('0 s to 7 s'))).toBe(true);
+    expect(briefs.some((t) => t.includes('proof, claim') && t.includes('7 s to 14 s'))).toBe(true);
+    expect(world.chunks.filter((c) => c.type === 'start')).toHaveLength(1);
   });
 
   it('a cut the critic passes is delivered without another round', async () => {
