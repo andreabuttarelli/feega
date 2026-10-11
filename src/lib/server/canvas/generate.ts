@@ -700,7 +700,22 @@ type VideoRenderLookup = {
   cover_url: string | null;
   persist_opts: unknown;
   submitted_at: string;
+  status: string;
+  media_url: string | null;
+  error: string | null;
 };
+
+type SettledRender = { status: 'done'; url: string; durationSeconds: number | null } | { status: 'failed'; error: string };
+
+const SETTLED_RENDER: Record<string, (row: VideoRenderLookup) => SettledRender | null> = {
+  done: (row) => (row.media_url ? { status: 'done', url: row.media_url, durationSeconds: row.duration_seconds } : null),
+  failed: (row) => ({ status: 'failed', error: row.error ?? 'render_failed' }),
+  expired: (row) => ({ status: 'failed', error: row.error ?? 'render_expired' })
+};
+
+function settledRender(row: VideoRenderLookup): SettledRender | null {
+  return SETTLED_RENDER[row.status]?.(row) ?? null;
+}
 
 /**
  * `video_renders` non è nello schema tipizzato di `Db` — vive nella parte del database che
@@ -710,7 +725,7 @@ type VideoRenderLookup = {
 async function findVideoRenderRow(db: Db, renderId: string): Promise<VideoRenderLookup | null> {
   const { data, error } = await (db as unknown as { from(table: string): any })
     .from('video_renders')
-    .select('id, task_id, model, prompt, duration_seconds, resolution, cover_url, persist_opts, submitted_at')
+    .select('id, task_id, model, prompt, duration_seconds, resolution, cover_url, persist_opts, submitted_at, status, media_url, error')
     .eq('id', renderId)
     .maybeSingle();
 
@@ -807,6 +822,24 @@ export async function reconcileVideoNodeRuns(db: Db): Promise<VideoReconcileOutc
       if (!row) {
         await giveUp(db, startRunShape, { ...run, status: 'finishing' }, 'video_render_row_missing');
         failed += 1;
+        continue;
+      }
+
+      const settled = settledRender(row);
+      if (settled?.status === 'failed') {
+        await giveUp(db, startRunShape, { ...run, status: 'finishing' }, settled.error);
+        failed += 1;
+        continue;
+      }
+      if (settled?.status === 'done') {
+        const asset = await depositVideo(
+          db,
+          { orgId: run.orgId, projectId: node.projectId, nodeId: run.nodeId },
+          { url: settled.url, durationSeconds: settled.durationSeconds }
+        );
+        await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: asset.id, costUsd: null });
+        await showRunState(db, startRunShape, { running: false, runId: run.id, refId: asset.id, error: null, outputUncensored: false });
+        done += 1;
         continue;
       }
 

@@ -1249,6 +1249,8 @@ function videoReconcileDb(initial: {
   node: { id: string; orgId: string; data: Record<string, unknown>; version: number };
   run: { id: string; taskId: string; attempts?: number };
   renderStatus?: string;
+  renderMediaUrl?: string;
+  renderError?: string;
 }) {
   const nodeState = { data: { ...initial.node.data }, version: initial.node.version };
   const runState = {
@@ -1377,7 +1379,9 @@ function videoReconcileDb(initial: {
                   cover_url: null,
                   persist_opts: { captions: false, tighten: false },
                   submitted_at: new Date().toISOString(),
-                  status: renderState.status
+                  status: renderState.status,
+                  media_url: initial.renderMediaUrl ?? null,
+                  error: initial.renderError ?? null
                 },
                 error: null
               })
@@ -1604,6 +1608,45 @@ describe('reconcileVideoNodeRuns chiude un video in coda quando il fornitore ha 
     expect(finishVideoRender).not.toHaveBeenCalled();
     expect(result).toMatchObject({ checked: 1, done: 0, failed: 0, pending: 1 });
     expect(currentRun().status).toBe('running');
+  });
+});
+
+describe('a clip the other reconciler already finished still lands on the node', () => {
+  beforeEach(() => {
+    finishVideoRender.mockReset();
+  });
+
+  it('a done render hands its clip to the node instead of expiring the run', async () => {
+    const { db, currentNode, currentRun, insertedAssets } = videoReconcileDb({
+      node: { id: NODE, orgId: ORG, data: { prompt: 'a dancing cat', running: true }, version: 3 },
+      run: { id: RUN, taskId: 'openrouter:job-7' },
+      renderStatus: 'done',
+      renderMediaUrl: 'https://storage.example/media/user-1/generated/landed.mp4'
+    });
+
+    const result = await reconcileVideoNodeRuns(db);
+
+    expect(finishVideoRender).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ checked: 1, done: 1, pending: 0 });
+    expect(insertedAssets[0]).toMatchObject({ type: 'video', url: 'https://storage.example/media/user-1/generated/landed.mp4' });
+    expect(currentRun().status).toBe('done');
+    expect((currentNode().data as { running?: boolean; refId?: string })).toMatchObject({ running: false, refId: 'asset-video-1' });
+  });
+
+  it('a failed render closes the run with its reason', async () => {
+    const { db, currentNode, currentRun } = videoReconcileDb({
+      node: { id: NODE, orgId: ORG, data: { prompt: 'a dancing cat', running: true }, version: 3 },
+      run: { id: RUN, taskId: 'openrouter:job-8' },
+      renderStatus: 'failed',
+      renderError: 'clip rendered but could not be stored'
+    });
+
+    const result = await reconcileVideoNodeRuns(db);
+
+    expect(finishVideoRender).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ checked: 1, failed: 1, pending: 0 });
+    expect(currentRun()).toMatchObject({ status: 'failed', error: expect.stringContaining('could not be stored') });
+    expect((currentNode().data as { running?: boolean }).running).toBe(false);
   });
 });
 
