@@ -2,6 +2,7 @@ import type { Browser, HTTPRequest, Page } from 'puppeteer-core';
 import { RequestVerdict, requestVerdict } from './screenshot';
 import { CAPTURE_LIMITS, captureOf, framedNodes } from './vector-capture';
 import type { RawCapture } from '$lib/motion/vector-ui/model';
+import { OVERLAY_SELECTOR, type Overlay } from './overlays';
 
 export type Target = { selector?: string; text?: string };
 export type ScrollTo = { px?: number; to?: 'top' | 'bottom' };
@@ -33,6 +34,8 @@ export type AppTab = Tab & {
   label: (target: Target) => Promise<string>;
   ui: () => Promise<UiDigest>;
   vector: () => Promise<unknown>;
+  overlay: () => Promise<Overlay | null>;
+  press: (key: string) => Promise<void>;
 };
 
 export type OpenBrowser = () => Promise<Tab>;
@@ -172,6 +175,20 @@ export async function vectorOfPage(page: Page): Promise<RawCapture> {
   return { ...main, nodes: [...main.nodes, ...inner.flat().flat()] };
 }
 
+function overlayOf(selector: string): Overlay | null {
+  const visible = (el: Element) => {
+    const r = el.getBoundingClientRect();
+    const css = getComputedStyle(el);
+    return r.width * r.height > 0.05 * innerWidth * innerHeight && css.visibility !== 'hidden' && css.display !== 'none' && Number(css.opacity) > 0;
+  };
+  const open = [...document.querySelectorAll(selector)].filter(visible).pop();
+  if (!open) {
+    return null;
+  }
+  const name = (b: Element) => (b.getAttribute('aria-label') || (b as HTMLElement).innerText || b.getAttribute('title') || '').replace(/\s+/g, ' ').trim();
+  return { buttons: [...open.querySelectorAll('button, [role="button"], a')].map(name).filter(Boolean) };
+}
+
 function labelOf(el: Element): string {
   return `${(el as HTMLElement).innerText ?? ''} ${el.getAttribute('aria-label') ?? ''} ${el.getAttribute('title') ?? ''} ${(el as HTMLInputElement).value ?? ''}`.replace(/\s+/g, ' ').trim();
 }
@@ -215,7 +232,9 @@ function tabOf(page: Page, close: () => Promise<number>): AppTab {
       return handle ? handle.evaluate(labelOf).finally(() => handle.dispose()) : '';
     },
     ui: () => page.evaluate(uiOf, { max: UI_MAX_ELEMENTS, text: UI_MAX_TEXT }),
-    vector: () => vectorOfPage(page)
+    vector: () => vectorOfPage(page),
+    overlay: () => page.evaluate(overlayOf, OVERLAY_SELECTOR),
+    press: (key) => page.keyboard.press(key as Parameters<Page['keyboard']['press']>[0])
   };
 }
 

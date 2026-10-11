@@ -18,8 +18,9 @@ const UI = { title: 'Dashboard', elements: [{ tag: 'h1', text: 'Overview', x: 0,
 
 type Fake = AppTab & { typed: [string, string][] };
 
-function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: Record<string, string> } = {}): Fake {
+function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: Record<string, string>; tour?: boolean } = {}): Fake {
   const { loginWorks = true, sessionAlive = true, labels = {} } = opts;
+  let tour = opts.tour ?? false;
   let at = 'about:blank';
   let cookies: SessionCookie[] = [];
   const kept = (): AppSession => ({ cookies, storage: cookies.length ? { jwt: 'tok' } : {} });
@@ -35,6 +36,9 @@ function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: 
     html: vi.fn(async () => '<html><body><h1>Overview</h1></body></html>'),
     look: vi.fn(async () => ({ background: null, text: null, button: null, body: null, heading: null })),
     click: vi.fn(async (target) => {
+      if (target.selector?.includes('Skip')) {
+        tour = false;
+      }
       if (target.selector === DEFAULT_SUBMIT_SELECTOR && loginWorks) {
         cookies = [COOKIE];
         at = `${APP}/dashboard`;
@@ -54,7 +58,9 @@ function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: 
     }),
     label: vi.fn(async (target) => labels[target.selector ?? target.text ?? ''] ?? ''),
     ui: vi.fn(async () => UI),
-    vector: vi.fn(async () => ({}))
+    vector: vi.fn(async () => ({})),
+    overlay: vi.fn(async () => (tour && cookies.length ? { buttons: ['Skip', 'Next'] } : null)),
+    press: vi.fn(async () => undefined)
   };
   return tab;
 }
@@ -202,6 +208,21 @@ describe('app_browse: a test account the user handed over in chat', () => {
     const out = await appBrowse({ ...CREDS, steps: [{ do: StepKind.Type, selector: '#card', text: '4242' }] }, ports(tab, memoryStore()));
 
     expect(out.ok && out.steps[0]).toMatchObject({ ok: false, error: expect.stringContaining('payment') });
+  });
+
+  it('skips a welcome tour before photographing, and says so (the v4 feega trailer saw only the tour)', async () => {
+    const tab = fakeTab({ tour: true });
+
+    const out = await appBrowse({ ...CREDS, pages: ['/dashboard'] }, ports(tab, memoryStore()));
+
+    expect(out).toMatchObject({ ok: true, dismissed: ['skip'] });
+    expect(await tab.overlay()).toBeNull();
+  });
+
+  it('reports nothing dismissed when no overlay blocks the page', async () => {
+    const out = await appBrowse({ ...CREDS, pages: ['/dashboard'] }, ports(fakeTab(), memoryStore()));
+
+    expect(out).toMatchObject({ ok: true, dismissed: [] });
   });
 
   it(`takes at most ${APP_MAX_SHOTS} pictures in one call`, async () => {

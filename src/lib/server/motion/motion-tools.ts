@@ -595,7 +595,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       return written;
     }
     const elements = ui.nodes.filter((n) => n.role !== VectorRole.Box).slice(0, SHOWN_ELEMENTS).map((n) => ({ id: n.id, role: n.role, ...(n.text ? { text: n.text.slice(0, 40) } : {}) }));
-    const made = { ok: true, name: piece.name, size: piece.size, elements, raster: ui.raster, ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}) };
+    const made = { ok: true, name: piece.name, size: piece.size, elements, raster: ui.raster, ...(read.dismissed ? { dismissed: read.dismissed } : {}), ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}) };
     if (input.start === undefined) {
       return made;
     }
