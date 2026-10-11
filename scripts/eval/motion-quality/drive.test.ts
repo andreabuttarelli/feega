@@ -2,7 +2,7 @@ import { mkdtempSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CutAnswer, Teardowns, asksUser, claimPort, cutAnswerFor, replyTo, turnSettled } from './drive';
+import { AccountGiven, CutAnswer, Teardowns, asksUser, claimPort, cutAnswerFor, replyTo, serverEnv, turnSettled } from './drive';
 
 const user = { role: 'user' };
 const assistant = { role: 'assistant' };
@@ -71,6 +71,10 @@ describe('what the driver answers, as a real user would', () => {
     expect(replyTo('Hai un account di test?', null)).toMatch(/non ho un account/);
   });
 
+  it('gives the account once: after that the agent hears it has nothing more', () => {
+    expect(replyTo('Il login non va, hai un altro account?', account, AccountGiven.Yes)).toMatch(/non ho un account/);
+  });
+
   it('says yes to anything else', () => {
     expect(replyTo('Procedo con 20 s?', account)).toMatch(/vai pure/);
   });
@@ -79,6 +83,14 @@ describe('what the driver answers, as a real user would', () => {
     expect(asksUser("Posso aprirla con lo stesso account di test e ricostruirla, se mi dai l'ok.")).toBe(true);
     expect(asksUser('Fatto: il trailer è pronto.')).toBe(false);
     expect(asksUser('Va bene così?')).toBe(true);
+  });
+});
+
+describe('the dev server the driver starts', () => {
+  it('lets the app browser reach the local app: the cloud browser answered "localhost is not a public web page" three times', () => {
+    const env = serverEnv('http://localhost:5411', '/bin/chrome');
+
+    expect(env).toEqual({ PUBLIC_APP_URL: 'http://localhost:5411', BROWSERLESS_API_KEY: '', CHROMIUM_PATH: '/bin/chrome' });
   });
 });
 

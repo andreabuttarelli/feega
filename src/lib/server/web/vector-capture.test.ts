@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { AppTab } from './browser';
-import { CaptureSession, vectorCapture } from './vector-capture';
+import { VectorKind, VectorRole, type VectorUi } from '$lib/motion/vector-ui/model';
+import { CaptureSession, offersSignIn, vectorCapture } from './vector-capture';
 
 const PAGE = { url: 'https://feega.test/', title: 'feega', width: 1280, height: 800, background: 'rgb(0, 0, 0)', nodes: [{ kind: 'text', hint: 'none', x: 10, y: 10, w: 80, h: 20, text: 'make your brand move', size: 16 }] };
 
@@ -57,5 +58,19 @@ describe('reading a logged-in app screen', () => {
     const read = await capture('https://feega.test/app');
 
     expect(read.ok ? '' : read.error).toMatch(/app_browse/);
+  });
+});
+
+describe('a public page that leads into an app', () => {
+  const page = (text: string, role = VectorRole.Link): VectorUi => ({ url: 'https://x.test/', title: '', width: 1280, height: 800, background: '#fff', fonts: [], raster: [], nodes: [{ id: `${role}-0`, role, kind: VectorKind.Text, x: 0, y: 0, w: 80, h: 20, text }] });
+
+  it.each(['Log in', 'Sign in', 'Accedi', 'Start for free', 'Let’s start', "Let's start", 'Get started', 'Sign up'])('reads "%s" as the way into the app (feega.app offers only "Start for free" and "Let’s start")', (text) => {
+    expect(offersSignIn(page(text))).toBe(true);
+    expect(offersSignIn(page(text, VectorRole.Button))).toBe(true);
+  });
+
+  it('not a link that only names a section', () => {
+    expect(offersSignIn(page('Pricing'))).toBe(false);
+    expect(offersSignIn(page('Start for free', VectorRole.Text))).toBe(false);
   });
 });

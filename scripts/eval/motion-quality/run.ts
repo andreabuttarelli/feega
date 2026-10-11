@@ -10,7 +10,7 @@ import { analyzeAudio } from '$lib/motion/audio-analysis';
 import { UI_KIT } from '$lib/motion/ui-kit/kit';
 import { billedUsdInScope, withOrgContext } from '$lib/server/ai-log';
 import { judge } from './judge';
-import { Teardowns, asksUser, claimPort, cutAnswerFor, replyTo, turnSettled, type AgentState, type TestAccount } from './drive';
+import { AccountGiven, Teardowns, asksUser, serverEnv, claimPort, cutAnswerFor, replyTo, turnSettled, type AgentState, type TestAccount } from './drive';
 import { contactSheet, cuts, duration, grayFrames, judgeFrames, monoSamples, PROBE_SIZE } from './media';
 import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, uiLayers, TASTE_AXES, type CaseResult, type Facts } from './score';
 
@@ -84,6 +84,7 @@ async function drive(page: Page, agentUrl: string, account: TestAccount | null):
   const start = Date.now();
   let replies = 0;
   let cutsAnswered = 0;
+  let given = AccountGiven.No;
   let before: AgentState | null = null;
   while (Date.now() - start < TURN_CAP_MS) {
     await page.waitForTimeout(POLL_MS);
@@ -105,7 +106,8 @@ async function drive(page: Page, agentUrl: string, account: TestAccount | null):
     if (!asksUser(last) || replies >= MAX_REPLIES) {
       return;
     }
-    const reply = replyTo(last, account);
+    const reply = replyTo(last, account, given);
+    given = reply.includes(account?.password ?? '\0') ? AccountGiven.Yes : given;
     say(`  agent asked, replying: ${reply}`);
     const input = page.locator('#chat-composer-input');
     await input.fill(reply);
@@ -260,7 +262,8 @@ async function startServer(): Promise<ChildProcess | null> {
   if (await serverUp()) {
     return null;
   }
-  const child = spawn('npx', ['vite', 'dev', '--port', String(port), '--strictPort'], { stdio: 'ignore', detached: true });
+  const env = { ...process.env, ...serverEnv(BASE_URL, chromium.executablePath()) };
+  const child = spawn('npx', ['vite', 'dev', '--port', String(port), '--strictPort'], { stdio: 'ignore', detached: true, env });
   for (let i = 0; i < 90 && !(await serverUp()); i++) {
     await new Promise((r) => setTimeout(r, 1000));
   }
