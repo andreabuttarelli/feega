@@ -67,6 +67,7 @@ const EXPO = 1 - Math.pow(2, -10);
 const out = (p) => (p >= 1 ? 1 : (1 - Math.pow(2, -10 * p)) / EXPO);
 const into = (p) => (p <= 0 ? 0 : Math.pow(2, 10 * p - 10));
 const move = (p) => (p <= 0 ? 0 : p >= 1 ? 1 : p < 0.5 ? Math.pow(2, 20 * p - 10) / 2 : (2 - Math.pow(2, -20 * p + 10)) / 2);
+const soft = (p) => (p <= 0 ? 0 : p >= 1 ? 1 : p < 0.5 ? 16 * Math.pow(p, 5) : 1 - Math.pow(2 - 2 * p, 5) / 2);
 const mix = (a, b, p) => a + (b - a) * p;
 const el = (tag, css, host, content) => {
   const n = document.createElement(tag);
@@ -283,13 +284,13 @@ const spans = fitted.rows.flatMap((row) => {
     return el('span', 'display:inline-block;white-space:pre;transform-origin:50% 60%;' + (i === keyWord ? 'color:' + accent + ';' : ''), line, w + (j < inRow.length - 1 ? ' ' : ''));
   });
 });
-const STAGGER = 0.09;
+const STAGGER = 0.06;
 drive((t) => {
   const push = 1 + 0.05 * span(t, 0, duration);
   box.style.transform = 'translate(-50%,-50%) scale(' + push.toFixed(4) + ')';
   spans.forEach((s, i) => {
-    const p = out(span(t, 0.12 + i * STAGGER, 0.6));
-    s.style.opacity = String(clamp(p * 2.5, 0, 1));
+    const p = move(span(t, 0.12 + i * STAGGER, 0.9));
+    s.style.opacity = String(clamp(p * 2, 0, 1));
     s.style.transform = 'scale(' + mix(1.34, 1, p).toFixed(4) + ')';
     s.style.filter = p < 1 ? 'blur(' + (18 * (1 - p)).toFixed(2) + 'px)' : '';
   });
@@ -413,7 +414,7 @@ const raw = m[2].replace(/,/g, '');
 const digits = (raw.split('.')[1] || '').length;
 const grouped = m[2].includes(',');
 const size = titleSize(value, 0.42);
-const num = el('div', 'position:absolute;left:0;right:0;top:' + (H * 0.5 - size * 0.62) + 'px;text-align:center;color:' + ink + ';font-size:' + size + 'px;font-variant-numeric:tabular-nums;' + TITLE);
+const num = el('div', 'position:absolute;left:0;right:0;top:' + (H * 0.5 - size * 0.62) + 'px;height:' + size * 1.1 + 'px;overflow:hidden;color:' + ink + ';font-size:' + size + 'px;font-variant-numeric:tabular-nums;' + TITLE);
 const rule = el('div', 'position:absolute;left:50%;top:' + (H * 0.5 + size * 0.42) + 'px;height:' + Math.max(2, UNIT * 0.004) + 'px;background:' + accent + ';');
 const cap = el('div', 'position:absolute;left:0;right:0;top:' + (H * 0.5 + size * 0.42 + UNIT * 0.04) + 'px;text-align:center;color:' + muted + ';font-size:' + CAPTION + 'px;font-weight:500;letter-spacing:-0.02em;', root, label);
 const ruleW = Math.min(W * 0.5, size * 2.2);
@@ -421,16 +422,21 @@ const show = (n) => {
   const v = n.toFixed(digits);
   return m[1] + (grouped ? v.replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',') : v) + m[3];
 };
-const ghost = el('span', 'visibility:hidden;', num);
-const digitsShown = el('span', '', num);
-const FINAL = show(Number(raw));
+const line = () => el('div', 'position:absolute;left:0;right:0;top:0;text-align:center;line-height:1.1;', num);
+const shownNow = line();
+const shownNext = line();
+const ROLLS = 6;
 const COUNT_MIN_STEPS = 20;
 const counts = Number(raw) * Math.pow(10, digits) >= COUNT_MIN_STEPS;
+const valueAt = (step) => show((Number(raw) * Math.min(step, ROLLS)) / ROLLS);
 drive((t) => {
-  const p = counts ? 1 - Math.pow(1 - span(t, 0.2, 1.7), 3) : 1;
-  const shown = show(Number(raw) * p);
-  ghost.textContent = FINAL.slice(0, Math.max(0, FINAL.length - shown.length));
-  digitsShown.textContent = shown;
+  const u = counts ? ROLLS * (1 - Math.pow(1 - span(t, 0.2, 1.7), 3)) : ROLLS;
+  const step = Math.min(ROLLS, Math.floor(u));
+  const f = step >= ROLLS ? 0 : u - step;
+  shownNow.textContent = valueAt(step);
+  shownNext.textContent = f > 0 ? valueAt(step + 1) : '';
+  shownNow.style.transform = 'translateY(' + (-100 * f).toFixed(3) + '%)';
+  shownNext.style.transform = 'translateY(' + (100 * (1 - f)).toFixed(3) + '%)';
   const enter = out(span(t, 0.05, 0.7));
   num.style.opacity = String(enter);
   num.style.transform = 'scale(' + (mix(1.18, 1, enter) + 0.03 * span(t, 1.8, duration)).toFixed(4) + ')';
@@ -522,6 +528,7 @@ const fromId = param('from_id', 'button-0', { type: 'text', group: 'Content', la
 const toId = param('to_id', 'button-1', { type: 'text', group: 'Content', label: 'To (element id)' });
 const toText = param('to_text', '', { type: 'text', group: 'Content', label: 'New text on the target' });
 const script = param('cursor', '', { type: 'textarea', group: 'Content', label: 'Cursor script (JSON)' });
+root.style.background = U.background;
 const cam = el('div', '', root);
 cam.className = 'cam';
 const drawn = drawVector(U, cam);
@@ -564,16 +571,15 @@ const url = param('url', 'feega.app', { type: 'text', group: 'Content' });
 const keyLine = param('accent_line', -1, { type: 'number', min: -1, max: 2, group: 'Content' });
 const fitted = lines.map((l) => fitRows([l], 0.5 / lines.length, Math.max(1, Math.floor(MAX_ROWS * 1.5 / lines.length))));
 const size = Math.min(...fitted.map((f) => f.size));
-const block = el('div', 'position:absolute;left:0;right:0;top:50%;text-align:center;color:' + ink + ';font-size:' + size + 'px;' + TITLE);
+const block = el('div', 'position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;color:' + ink + ';font-size:' + size + 'px;' + TITLE);
 const rows = fitted.flatMap((f, i) => f.rows.map((l) => {
   const mask = el('div', 'overflow:hidden;padding-bottom:0.08em;white-space:nowrap;', block);
   return el('div', i === keyLine ? 'color:' + accent + ';' : '', mask, l);
 }));
 const address = el('div', 'position:absolute;left:0;right:0;bottom:' + H * 0.1 + 'px;text-align:center;color:' + muted + ';font-size:' + CAPTION + 'px;font-weight:500;letter-spacing:-0.02em;', root, url);
 drive((t) => {
-  block.style.transform = 'translateY(-50%) scale(' + (1 + 0.04 * span(t, 0, duration)).toFixed(4) + ')';
   rows.forEach((r, i) => {
-    const p = out(span(t, 0.1 + i * 0.14, 0.85));
+    const p = soft(span(t, 0.1 + i * 0.08, 1));
     r.style.transform = 'translateY(' + (110 * (1 - p)).toFixed(2) + '%)';
   });
   const a = out(span(t, 0.9, 0.7));
@@ -591,10 +597,10 @@ const b = boxOf(targetId);
 const flood = el('div', 'position:absolute;inset:0;background:' + (into_ || accent) + ';');
 const deep = { k: frameOn(b, 1, 1).k * 9, cx: b.x + b.w / 2, cy: b.y + b.h / 2 };
 drive((t) => {
-  const p = into(span(t, 0.15, duration * 0.8));
+  const p = into(span(t, 0, duration * 0.85));
   place(lerpCam(WHOLE, deep, p), cam);
-  cam.style.filter = p > 0.05 ? 'blur(' + (26 * p * p).toFixed(2) + 'px)' : '';
-  flood.style.opacity = String(move(span(t, duration * 0.45, duration * 0.5)));
+  cam.style.filter = 'blur(' + (26 * p * p).toFixed(3) + 'px)';
+  flood.style.opacity = String(soft(span(t, duration * 0.45, duration * 0.5)));
 });
 `;
 

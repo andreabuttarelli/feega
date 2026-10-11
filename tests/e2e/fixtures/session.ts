@@ -157,9 +157,17 @@ export async function gotoHydrated(page: Page, path: string): Promise<import('@p
  * morto, non un errore di credenziali). `waitForResponse` aspetta il segnale vero — il POST che
  * `use:enhance` intercetta — non un'approssimazione temporale.
  */
+export async function skipTour(page: Page): Promise<void> {
+  await page.addInitScript((key) => {
+    if (window.self === window.top) {
+      localStorage.setItem(key, '1');
+    }
+  }, TOUR_SEEN_KEY);
+}
+
 export async function signInE2e(page: Page, session: Pick<E2eSession, 'email' | 'password'>, tour: E2eTour = E2eTour.Seen): Promise<void> {
   if (tour === E2eTour.Seen) {
-    await page.addInitScript((key) => localStorage.setItem(key, '1'), TOUR_SEEN_KEY);
+    await skipTour(page);
   }
   await gotoHydrated(page, '/login');
   await page.getByPlaceholder('you@yourbrand.com').fill(session.email);

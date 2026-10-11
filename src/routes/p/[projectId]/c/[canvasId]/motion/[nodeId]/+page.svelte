@@ -39,6 +39,7 @@
   import { CHECK_REQUEST, FRAMES_REQUEST, Head, Landing, adoptAgentAssets, agentDraft, landTurn, type AgentDraft, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
   import { Agent, showsStart } from '$lib/motion/start-prompt';
   import { runCheck, type CheckPorts } from '$lib/motion/custom/run-check';
+  import { decodeLuma } from '$lib/motion/custom/luma-decode';
   import { recordCheck } from '$lib/motion/custom/ops';
   import { unverified } from '$lib/motion/custom/determinism';
   import { CheckState, sourceHash } from '$lib/motion/custom/component';
@@ -530,7 +531,8 @@
 
   const checkPorts: CheckPorts = {
     compose: (d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses }),
-    capture: (times, source) => (preview ? preview.capture(times, source, CHECK_WIDTH) : Promise.reject(new Error('the preview is still loading')))
+    capture: (times, source) => (preview ? preview.capture(times, source, CHECK_WIDTH) : Promise.reject(new Error('the preview is still loading'))),
+    luma: decodeLuma
   };
 
   async function answerCheck(request: CheckRequest) {
