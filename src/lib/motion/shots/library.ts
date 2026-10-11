@@ -571,14 +571,13 @@ const url = param('url', 'feega.app', { type: 'text', group: 'Content' });
 const keyLine = param('accent_line', -1, { type: 'number', min: -1, max: 2, group: 'Content' });
 const fitted = lines.map((l) => fitRows([l], 0.5 / lines.length, Math.max(1, Math.floor(MAX_ROWS * 1.5 / lines.length))));
 const size = Math.min(...fitted.map((f) => f.size));
-const block = el('div', 'position:absolute;left:0;right:0;top:50%;text-align:center;color:' + ink + ';font-size:' + size + 'px;' + TITLE);
+const block = el('div', 'position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;color:' + ink + ';font-size:' + size + 'px;' + TITLE);
 const rows = fitted.flatMap((f, i) => f.rows.map((l) => {
   const mask = el('div', 'overflow:hidden;padding-bottom:0.08em;white-space:nowrap;', block);
   return el('div', i === keyLine ? 'color:' + accent + ';' : '', mask, l);
 }));
 const address = el('div', 'position:absolute;left:0;right:0;bottom:' + H * 0.1 + 'px;text-align:center;color:' + muted + ';font-size:' + CAPTION + 'px;font-weight:500;letter-spacing:-0.02em;', root, url);
 drive((t) => {
-  block.style.transform = 'translateY(-50%) scale(' + (1 + 0.04 * span(t, 0, duration)).toFixed(4) + ')';
   rows.forEach((r, i) => {
     const p = soft(span(t, 0.1 + i * 0.08, 1));
     r.style.transform = 'translateY(' + (110 * (1 - p)).toFixed(2) + '%)';

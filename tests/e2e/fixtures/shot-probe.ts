@@ -65,10 +65,11 @@ async function seekCheck(c: ShotCase): Promise<string[]> {
 
 async function jolts(c: ShotCase): Promise<{ jolts: JoltAt[]; diffs: number[] }> {
   const doc = shotDoc(c);
+  const size = { width: doc.width, height: doc.height };
   const player = await mountCapturePlayer(host(doc), compose(doc));
-  const request = { format: FrameFormat.Bitmap, settle: Settle.Seek, layering: exportLayering(), width: doc.width, height: doc.height };
+  const request = { format: FrameFormat.Bitmap, settle: Settle.Seek, layering: exportLayering(), ...size };
   const frames: Uint8Array[] = [];
-  const look = probeOf({ width: doc.width, height: doc.height }, { add: (frame) => frames.push(Uint8Array.from(frame)), jolts: () => [] })!;
+  const look = probeOf(size, { add: (frame) => frames.push(Uint8Array.from(frame)), jolts: () => [] })!;
   for (let f = 0; f < lastFrame(doc); f++) {
     const bitmap = frameOf(await player.shoot(f / doc.fps, request));
     look(bitmap);

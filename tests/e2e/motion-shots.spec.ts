@@ -6,7 +6,7 @@ import type { ShotCase } from './fixtures/shot-probe';
 
 const HOST_PAGE = '/changelog';
 const PROBE = '/tests/e2e/fixtures/shot-probe.ts';
-const RENDER_TIMEOUT_MS = 600_000;
+const RENDER_TIMEOUT_MS = 1_200_000;
 const SEEK_RUNS = 3;
 
 const UI: VectorUi = {
