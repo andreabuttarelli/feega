@@ -40,7 +40,8 @@ import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, e
 import type { MotionAsset } from './editor';
 import { referenceLookSchema, type ReferenceLook } from '$lib/motion/reference-look-model';
 import type { PickAnswer } from '$lib/reference-pick';
-import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, withFrames, type Frame, type Reference } from './frames';
+import { DESCRIBE_FRAMES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, withFrames, type Frame, type Reference } from './frames';
+import { DESCRIBE_ASK, describeFramesTool, gateBlock, lookFirst, type Viewing } from './look';
 import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
 import { blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '$lib/motion/custom/component';
@@ -126,7 +127,7 @@ const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']
 
 const copyTexts = (slots: Record<string, string | number>) => Object.entries(slots).flatMap(([k, v]) => (COPY_SLOTS.has(k) && typeof v === 'string' ? v.split('|').map((s) => s.trim()).filter(Boolean) : []));
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[] };
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[]; look?: Viewing };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
@@ -2019,11 +2020,14 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const audioAssets = deps.assets.filter((a) => a.kind === AssetKind.Audio).length;
         const pixels = assetPixels();
         session.gate = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos], referencesSeen: Boolean(session.references?.length) }), ...frameProblems(stats)];
+        session.look = { times: frames.map((f) => f.time), described: false };
         const quality = session.gate.map((p) => p.detail);
         const open = blocking(session.gate).map((p) => p.detail);
-        return { ok: true, times: frames.map((f) => f.time), quality, blocking: open, note: open.length ? 'blocking lists what must be fixed before the video can be delivered: fix each one, then look again. The frames are attached as images.' : quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames are attached as images.' : 'The frames are attached as images.' };
+        return { ok: true, times: session.look.times, quality, blocking: open, gate: gateBlock(session.gate), note: `The frames are attached as images. ${DESCRIBE_ASK}` };
       }
     }),
+
+    [DESCRIBE_FRAMES]: describeFramesTool(session),
 
     add_music: tool({
       description: 'Music under the whole video: a generated track when the workspace has a music generator, otherwise a CC0 track from the built-in library, chosen by mood and bpm. It lands on an Audio clip from 0 to the end and its beats are marked ("beat N"), ready for cut_to_beat. A launch film always has music.',
@@ -2215,7 +2219,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return ((await nested.execute(parsed.data, options)) ?? {}) as { ok?: boolean; error?: unknown };
   }
 
-  return { ...withFrames(oneAtATime(tools), session), ...(deps.web ? createWebTools(deps.web) : {}) };
+  return { ...withFrames(oneAtATime(lookFirst(tools, session)), session), ...(deps.web ? createWebTools(deps.web) : {}) };
 }
 
 type Execute = (input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown>;

@@ -23,7 +23,7 @@ function setup(overrides: Partial<MotionToolDeps> = {}) {
   let call = 0;
   const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: `call-${++call}` });
   const schema = (name: string) => (tools[name] as Tool & { inputSchema: { safeParse: (x: unknown) => { success: boolean } } }).inputSchema;
-  return { session, deps, run, schema };
+  return { session, deps, run, schema, tools };
 }
 
 describe('motion agent tools at another frame rate', () => {
@@ -217,6 +217,32 @@ describe('motion agent tools', () => {
     expect(session.frames.get('call-1')).toHaveLength(2);
   });
 
+  it('after view_frames the next edit is refused until each frame is described', async () => {
+    const { run, session } = setup();
+    await run('view_frames', { times: [0.5, 2] });
+
+    expect((await run('add_clip', { component: 'Title', start: 0 })).ok).toBe(false);
+    const described = await run('describe_frames', { frames: [0.5, 2].map((time) => ({ time, visible: 'cream background, nothing else', wrong: 'the frame is empty' })) });
+
+    expect(described.ok).toBe(true);
+    expect((await run('add_clip', { component: 'Title', start: 0 })).ok).toBe(true);
+    expect(session.edits).toHaveLength(1);
+  });
+
+  it('the model sees the frames first and the gate apart, compact, after them', async () => {
+    const { run, tools } = setup({ inspect: async (frames) => frames.map((f) => ({ time: f.time, luma: 0, lumaStd: 0, whiteShare: 0 })) });
+    const input = { times: [1] };
+    const output = await run('view_frames', input);
+    const toModel = (tools.view_frames as unknown as { toModelOutput: (o: unknown) => Promise<{ value: { type: string; text?: string }[] }> }).toModelOutput;
+    const shown = (await toModel({ toolCallId: 'call-1', input, output })).value;
+
+    const first = shown[0].text ?? '';
+    expect(first).not.toContain('flat colour');
+    expect(first).toContain('describe_frames');
+    expect(shown.findIndex((p) => p.type === 'file')).toBeLessThan(shown.findIndex((p) => p.text?.includes('flat colour')));
+    expect(shown.at(-1)?.text).toContain('Quality gate');
+  });
+
   it('view_frames takes at most six times', () => {
     const { schema } = setup();
 
@@ -289,6 +315,7 @@ describe('motion agent tools', () => {
     for (let i = 0; i < MAX_VIEWS_PER_TURN; i++) {
       await run('view_frames', { times: [1] });
     }
+    await run('describe_frames', { frames: [{ time: 1, visible: 'an empty cream frame', wrong: 'nothing on screen' }] });
     await run('add_clip', { component: 'Title', start: 0, duration: 1, props: { text: 'Late' } });
 
     expect((await run('view_frames', { times: [1] })).ok).toBe(true);

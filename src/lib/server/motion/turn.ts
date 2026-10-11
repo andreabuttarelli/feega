@@ -27,6 +27,7 @@ import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from 
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { AGENT_SELF_SAVE_MS, AGENT_TURN_CAP_USD } from '$lib/server/project-agent/limits';
 import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/server/motion/critic';
+import { VIEWER_MODEL, VIEWER_SCHEMA, viewFrames } from '$lib/server/motion/viewer';
 import { CutGate, REVIEW_CUT, cutGate, type CutReview } from '$lib/motion/cut-review';
 import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
@@ -50,7 +51,7 @@ import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
-import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep } from '$lib/server/motion/frames';
+import { DESCRIBE_FRAMES, SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep, type Frame } from '$lib/server/motion/frames';
 import { frameDensities, frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, storeAssetFile } from '$lib/server/repos/asset-storage';
@@ -327,7 +328,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const visionModel = gatewayModel(model)?.usable ? model : llmVisionModel();
   const vision = BROWSER_VISION[browser](visionModel);
   const asksPick = !choosesForUser(message);
-  const toolNames = roleTools(role, Object.keys(tools)).filter((name) => (vision === Vision.Available || name !== VIEW_FRAMES) && (asksPick || name !== ASK_REFERENCE_PICK));
+  const toolNames = roleTools(role, Object.keys(tools)).filter((name) => (vision === Vision.Available || (name !== VIEW_FRAMES && name !== DESCRIBE_FRAMES)) && (asksPick || name !== ASK_REFERENCE_PICK));
   const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
   const t0 = Date.now();
   const stepModels: string[] = [];
@@ -403,6 +404,10 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
 
   const gate = cutGate(message, turns);
   const gateTools: SavedTool[] = [];
+  const viewerAsk = async (q: { prompt: string; images: LlmMediaPart[] }) => {
+    const answer = await llmStructured({ ...q, schema: VIEWER_SCHEMA, model: gatewayModel(VIEWER_MODEL)?.usable ? VIEWER_MODEL : (visionModel ?? model), temperature: 0, label: STUDIO_ROSTER[StudioRole.Viewer].label });
+    return { answer, usd: billedUsdInScope() ?? 0 };
+  };
   const reviewCut = async (): Promise<Critique> => {
     const ports = {
       frames: (times: number[]) => drawTurnFrames(`${CRITIC_ID}-${sheetBatch++}`, times),
@@ -411,7 +416,8 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       ask: async (q: { prompt: string; images: LlmMediaPart[] }) => {
         const answer = await llmStructured({ ...q, schema: CRITIC_SCHEMA, model: roleModel(StudioRole.Critic, visionModel ?? model), temperature: 0, label: STUDIO_ROSTER[StudioRole.Critic].label });
         return { answer, usd: billedUsdInScope() ?? 0 };
-      }
+      },
+      view: (frames: readonly Frame[]) => withOrgContext(orgId, () => viewFrames({ ask: viewerAsk }, frames))
     };
     const out = await withOrgContext(orgId, () => critique(ports, { doc: session.doc, request: message, references: session.references ?? [] })).catch((e: unknown) => {
       console.warn('[motion-agent] critic failed, delivering without its review', e);

@@ -39,7 +39,8 @@ const world = vi.hoisted(() => ({
   imported: [] as string[],
   critic: null as unknown,
   billed: 0,
-  critiques: [] as { prompt: string; images: unknown[] }[]
+  critiques: [] as { prompt: string; images: unknown[] }[],
+  viewed: [] as { prompt: string; images: unknown[] }[]
 }));
 
 const draftBucket = {
@@ -105,6 +106,14 @@ function reply(call: Call): unknown[] {
     return text(SUMMARY);
   }
   if (hasImage(last)) {
+    return text('Frames look clean.');
+  }
+  const seen = last.role === 'tool' ? JSON.stringify(last.content) : '';
+  if (seen.includes('"toolName":"view_frames"') && seen.includes('"type":"file"')) {
+    const times = JSON.parse(/\\"times\\":(\[[^\]]*\])/.exec(seen)?.[1] ?? '[]') as number[];
+    return tool('describe_frames', { frames: times.map((time) => ({ time, visible: 'a title on a dark background', wrong: 'nothing' })) });
+  }
+  if (seen.includes('"toolName":"describe_frames"')) {
     return text('Frames look clean.');
   }
   if (nudged && world.nudgesToIgnore > 0) {
@@ -178,7 +187,11 @@ vi.mock('$lib/server/llm', () => ({
   },
   llmCodeModel: () => 'code/model',
   llmVisionModel: () => 'vision/model',
-  llmStructured: async (q: { prompt: string; images: unknown[] }) => {
+  llmStructured: async (q: { prompt: string; images: unknown[]; label?: string }) => {
+    if (q.label === 'motion-viewer') {
+      world.viewed.push(q);
+      return { frames: [{ time: 0.5, visible: 'a title card', wrong: 'nothing' }] };
+    }
     world.critiques.push(q);
     return world.critic;
   }
@@ -318,6 +331,7 @@ describe('a motion turn closes on a look and a summary', () => {
     world.critic = null;
     world.billed = 0;
     world.critiques = [];
+    world.viewed = [];
   });
 
   it('an independent critic reviews the whole contact sheet, and the user sees it before any fix is spent', async () => {
@@ -327,6 +341,8 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.critiques).toHaveLength(1);
     expect(world.critiques[0].images).toHaveLength(1);
     expect(world.critiques[0].prompt).toContain('contact sheet of the WHOLE video');
+    expect(world.viewed).toHaveLength(1);
+    expect(world.critiques[0].prompt).toContain('0.5s: a title card');
     const asked = world.chunks.filter((c) => c.type === FRAMES_REQUEST).map((c) => (c.data as { callId: string }).callId);
     expect(asked.every((id) => FrameUpload.shape.callId.safeParse(id).success)).toBe(true);
     expect(world.calls.some((c) => textOf(lastMessage(c.prompt)).includes('the frame is empty, put the product UI'))).toBe(false);
@@ -484,6 +500,7 @@ describe('a motion turn closes on a look and a summary', () => {
     const asked = world.calls.flatMap((c) => c.prompt).filter((m) => m.role === 'user').map(textOf);
 
     expect(world.toolCalls.filter((t) => t === 'view_frames')).toHaveLength(2);
+    expect(world.toolCalls).toContain('describe_frames');
     expect(asked.some((t) => /flat colour/.test(t))).toBe(true);
   });
 
