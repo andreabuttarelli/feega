@@ -1,8 +1,7 @@
 import { VECTOR_TOKEN } from '$lib/motion/vector-ui/piece';
-export const EMPTY_EDGE_DENSITY = 0.02;
+import { EMPTY_EDGE_DENSITY } from '$lib/motion/emptiness';
+export { EMPTY_EDGE_DENSITY, edgeDensity } from '$lib/motion/emptiness';
 export const BEAT_TOLERANCE_S = 0.1;
-
-const EDGE_STEP = 48;
 
 const TEXT_DEFAULT_SIZE: Record<string, number> = { Title: 0.11, Text: 0.04, Kicker: 0.025, Caption: 0.035 };
 
@@ -36,19 +35,6 @@ type Clip = { component: string; props?: Record<string, unknown> };
 type Doc = { tracks: Array<{ clips: Clip[] }>; components?: Record<string, { source: { js: string } }> };
 type ToolCall = { toolName: string; output: unknown; status?: string };
 type Message = { tool_calls?: ToolCall[] | null };
-
-export function edgeDensity(gray: Uint8Array, width: number, height: number): number {
-  let edges = 0;
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = y * width + x;
-      const dx = x + 1 < width ? Math.abs(gray[i + 1] - gray[i]) : 0;
-      const dy = y + 1 < height ? Math.abs(gray[i + width] - gray[i]) : 0;
-      edges += dx + dy > EDGE_STEP ? 1 : 0;
-    }
-  }
-  return edges / (width * height);
-}
 
 export function emptyShare(densities: readonly number[], threshold = EMPTY_EDGE_DENSITY): number | null {
   if (!densities.length) {
