@@ -1,3 +1,3 @@
-import { AGENT_MAX_DURATION_S, AGENT_SELF_SAVE_MS, AGENT_TURN_CAP_USD, VIDEO_CAP_USD, VIDEO_RAISE_USD, agentStopWhen, overTurnCap } from '$lib/server/brand-agent/limits';
+import { AGENT_MAX_DURATION_S, AGENT_SELF_SAVE_MS, AGENT_TURN_CAP_USD, FIX_RESERVE_SHARE, VIDEO_CAP_USD, VIDEO_RAISE_USD, agentStopWhen, overTurnCap } from '$lib/server/brand-agent/limits';
 
-export { AGENT_MAX_DURATION_S, AGENT_SELF_SAVE_MS, AGENT_TURN_CAP_USD, VIDEO_CAP_USD, VIDEO_RAISE_USD, agentStopWhen, overTurnCap };
+export { AGENT_MAX_DURATION_S, AGENT_SELF_SAVE_MS, AGENT_TURN_CAP_USD, FIX_RESERVE_SHARE, VIDEO_CAP_USD, VIDEO_RAISE_USD, agentStopWhen, overTurnCap };

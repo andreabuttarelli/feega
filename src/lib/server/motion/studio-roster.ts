@@ -113,6 +113,8 @@ const MODELS: Record<RoleModel, (vision: string) => string> = { [RoleModel.Opus]
 
 export const roleModel = (role: StudioRole, vision: string): string => MODELS[STUDIO_ROSTER[role].model](vision);
 
+export const DRAWS_FIX_RESERVE: ReadonlySet<StudioRole> = new Set([StudioRole.Fixer]);
+
 export const REVIEWED: ReadonlySet<StudioRole> = new Set([StudioRole.Builder, StudioRole.ShotBuilder]);
 
 export const roleBudgetUsd = (role: StudioRole, capUsd: number) => capUsd * STUDIO_ROSTER[role].budgetShare;
