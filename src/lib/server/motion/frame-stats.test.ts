@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { frameStats } from './frame-stats';
+import { frameDensities, frameStats } from './frame-stats';
+import { EMPTY_EDGE_DENSITY } from '$lib/motion/emptiness';
 
 const W = 160;
 const H = 90;
@@ -31,5 +32,17 @@ describe('what a frame looks like, in numbers', () => {
     expect(black.lumaStd).toBeLessThan(2);
     expect(half.whiteShare).toBeGreaterThan(0.4);
     expect(half.lumaStd).toBeGreaterThan(20);
+  });
+});
+
+describe('how much is drawn on a frame', () => {
+  it('a flat frame is empty, a frame of stripes is full, on the same measure as the eval', async () => {
+    const [flat, stripes] = await frameDensities([
+      { time: 0, bytes: await jpeg(pixels(() => 10)) },
+      { time: 1, bytes: await jpeg(pixels((x) => (x % 4 < 2 ? 0 : 255))) }
+    ]);
+
+    expect(flat).toBeLessThan(EMPTY_EDGE_DENSITY);
+    expect(stripes).toBeGreaterThan(EMPTY_EDGE_DENSITY);
   });
 });

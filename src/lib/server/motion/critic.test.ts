@@ -97,3 +97,21 @@ describe('the studio roster', () => {
     expect(roleBudgetUsd(StudioRole.Critic, 1.5)).toBeCloseTo(1.5 * STUDIO_ROSTER[StudioRole.Critic].budgetShare);
   });
 });
+
+describe('the critic measures empty frames on its own sheet', () => {
+  const measured = (densities: number[]) => ({ density: async (frames: readonly { time: number }[]) => frames.map((_, i) => densities[i] ?? 0.5) });
+
+  it('turns a passing review into fixes when frames are mostly empty (v4: the score passed with half-empty shots)', async () => {
+    const out = await critique({ ...ports({ score: 9, fixes: [] }), ...measured([0.001, 0.5, 0.004]) }, { doc, request: 'x', references: [] });
+
+    expect(out.review?.score).toBeLessThan(CRITIC_PASS_SCORE);
+    expect(out.review?.fixes).toEqual([expect.stringMatching(/^0\.5s: .*empty/), expect.stringMatching(/^2\.5s: .*empty/)]);
+    expect(out.review && criticMessage(out.review)).not.toBeNull();
+  });
+
+  it('leaves a full video to the critic alone', async () => {
+    const out = await critique({ ...ports({ score: 9, fixes: [] }), ...measured([]) }, { doc, request: 'x', references: [] });
+
+    expect(out.review).toEqual({ score: 9, fixes: [] });
+  });
+});

@@ -49,7 +49,7 @@ import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
 import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep } from '$lib/server/motion/frames';
-import { frameStats } from '$lib/server/motion/frame-stats';
+import { frameDensities, frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, storeAssetFile } from '$lib/server/repos/asset-storage';
 import { ASSETS_ADDED, CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
@@ -392,6 +392,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     const ports = {
       frames: (times: number[]) => drawTurnFrames(`${CRITIC_ID}-${sheetBatch++}`, times),
       tile: tileSheet,
+      density: frameDensities,
       ask: async (q: { prompt: string; images: LlmMediaPart[] }) => {
         const answer = await llmStructured({ ...q, schema: CRITIC_SCHEMA, model: visionModel ?? model, temperature: 0, label: STUDIO_ROSTER[StudioRole.Critic].label });
         return { answer, usd: billedUsdInScope() ?? 0 };
