@@ -1,9 +1,10 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { EMPTY_PROBE_PX } from '$lib/motion/emptiness';
 
 const SCENE_THRESHOLD = 0.3;
-const PROBE = 160;
+const PROBE = EMPTY_PROBE_PX;
 const SHEET_COLUMNS = 8;
 const JUDGE_FRAMES = 8;
 const AUDIO_RATE = 22050;

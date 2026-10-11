@@ -4,7 +4,7 @@ import { vectorCapture } from './vector-capture';
 
 const PAGE = { url: 'https://feega.test/', title: 'feega', width: 1280, height: 800, background: 'rgb(0, 0, 0)', nodes: [{ kind: 'text', hint: 'none', x: 10, y: 10, w: 80, h: 20, text: 'make your brand move', size: 16 }] };
 
-const tab = (goto: AppTab['goto'], at = 'https://feega.test/') => ({ goto, url: () => at, restore: vi.fn(async () => undefined), vector: vi.fn(async () => PAGE), close: vi.fn(async () => 0) }) as unknown as AppTab;
+const tab = (goto: AppTab['goto'], at = 'https://feega.test/') => ({ goto, url: () => at, restore: vi.fn(async () => undefined), vector: vi.fn(async () => PAGE), close: vi.fn(async () => 0), overlay: vi.fn(async () => null), click: vi.fn(async () => undefined), press: vi.fn(async () => undefined) }) as unknown as AppTab;
 
 const SESSION = { cookies: [{ name: 'sb', value: 'tok', domain: 'feega.test', path: '/', expires: -1, httpOnly: true, secure: true }], storage: {} };
 
@@ -25,6 +25,20 @@ describe('reading a live page as vector UI', () => {
 });
 
 describe('reading a logged-in app screen', () => {
+  it('skips a welcome tour before reading the screen, so the UI rebuilt is the app and not the tour (v4)', async () => {
+    const page = tab(async () => 200, 'https://feega.test/app');
+    let tour = true;
+    vi.mocked(page.overlay).mockImplementation(async () => (tour ? { buttons: ['Skip'] } : null));
+    vi.mocked(page.click).mockImplementation(async () => {
+      tour = false;
+    });
+    vi.mocked(page.vector).mockImplementation(async () => (tour ? { ...PAGE, nodes: [] } : PAGE));
+
+    const read = await vectorCapture(async () => page, 0)('https://feega.test/app');
+
+    expect(read.ok && read.ui.nodes).toHaveLength(1);
+  });
+
   it('opens the page with the session app_browse saved, so recreate_ui rebuilds the app, not the marketing site (v3)', async () => {
     const page = tab(async () => 200, 'https://feega.test/p/1/c/2');
     const capture = vectorCapture(async () => page, 0, async (url) => (url.startsWith('https://feega.test') ? { session: SESSION, origin: 'https://feega.test' } : null));

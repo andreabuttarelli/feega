@@ -1,6 +1,7 @@
 import { RAW_CAPTURE, VectorHint, VectorKind, vectorUi, type RawCapture, type VectorUi } from '$lib/motion/vector-ui/model';
 import type { OpenAppBrowser } from './browser';
 import { signInPath, type KeptSession } from './app-browse';
+import { dismissOverlays } from './overlays';
 
 export type CaptureLimits = { max: number; text: number; svg: number };
 
@@ -217,7 +218,7 @@ export function framedNodes(inner: RawCapture, box: FrameBox): RawCapture['nodes
   return [backdrop, ...inner.nodes.map((n) => ({ ...n, x: n.x + box.x, y: n.y + box.y }))];
 }
 
-export type UiCapture = (url: string) => Promise<{ ok: true; ui: VectorUi } | { ok: false; error: string }>;
+export type UiCapture = (url: string) => Promise<{ ok: true; ui: VectorUi; dismissed?: string[] } | { ok: false; error: string }>;
 
 export type SignedIn = (url: string) => Promise<KeptSession | null>;
 
@@ -241,11 +242,12 @@ export function vectorCapture(open: OpenAppBrowser, settleMs = SETTLE_MS, signed
         return { ok: false, error: `${url} sent the browser to its sign-in page: it is an app screen behind a login. Ask the user in chat for a TEST account, sign in with app_browse, then call recreate_ui on the same url (the session is reused)` };
       }
       await pause(settleMs);
+      const dismissed = await dismissOverlays(tab);
       const parsed = RAW_CAPTURE.safeParse(await tab.vector());
       if (!parsed.success) {
         return { ok: false, error: `the page could not be read as vector UI: ${parsed.error.issues[0]?.message ?? 'unknown shape'}` };
       }
-      return { ok: true, ui: vectorUi(parsed.data) };
+      return { ok: true, ui: vectorUi(parsed.data), ...(dismissed.length ? { dismissed } : {}) };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     } finally {

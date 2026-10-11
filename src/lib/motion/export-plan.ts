@@ -1,6 +1,8 @@
 import type { MotionDoc } from './doc';
 import { Resolution } from './render-quote';
 import { BROWSER_SAMPLES, sampleTimes } from './motion-blur';
+import { TrackKind } from './components';
+import { withJunctions } from './junctions';
 
 export enum Support {
   Full = 'full',
@@ -43,8 +45,19 @@ export function outputSize(doc: Pick<MotionDoc, 'width' | 'height'>, resolution:
   return { width: even(doc.width * scale), height: even(doc.height * scale), scale };
 }
 
-export function frameTimes(doc: Timed): number[] {
-  return Array.from({ length: doc.durationInFrames }, (_, i) => sampleTimes(i, doc.fps, doc.motionBlur, BROWSER_SAMPLES)).flat();
+function cutFrames(doc: Timed & Partial<Pick<MotionDoc, 'tracks' | 'comps'>>): number[] {
+  if (!doc.tracks) {
+    return [];
+  }
+  const joined = withJunctions(doc as MotionDoc);
+  return [...new Set(joined.tracks.filter((t) => t.kind === TrackKind.Visual).flatMap((t) => t.clips.flatMap((c) => [c.from, c.from + c.durationInFrames])))];
+}
+
+const acrossCut = (cuts: readonly number[], sample: number, frame: number) => cuts.some((c) => (sample < frame ? sample < c && c <= frame : frame < c && c <= sample));
+
+export function frameTimes(doc: Timed & Partial<Pick<MotionDoc, 'tracks' | 'comps'>>): number[] {
+  const cuts = doc.motionBlur.enabled ? cutFrames(doc) : [];
+  return Array.from({ length: doc.durationInFrames }, (_, i) => sampleTimes(i, doc.fps, doc.motionBlur, BROWSER_SAMPLES).map((t) => (acrossCut(cuts, t * doc.fps, i) ? i / doc.fps : t))).flat();
 }
 
 export function eta(progress: { done: number; total: number; elapsedMs: number }): number | null {

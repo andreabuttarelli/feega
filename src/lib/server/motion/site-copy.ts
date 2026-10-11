@@ -126,6 +126,18 @@ export function quoted(pages: readonly SitePage[], source: { url: string; quote:
   return Boolean(page && page.sections.some((s) => [s.heading, ...s.lines].some((line) => normal(line).includes(quote))));
 }
 
+const FIGURE = /[$€£]?\d(?:[\d.,]*\d)?(?:%|x\b|k\b|\+)?/gi;
+
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const stated = (figure: string, corpus: string) => new RegExp(`(?<![\\d.,])${escaped(figure)}(?![\\d]|[.,]\\d)`).test(corpus);
+
+export function unsourcedFigures(texts: readonly string[], pages: readonly SitePage[], quotes: readonly string[]): string[] {
+  const corpus = [...pages.flatMap((p) => p.sections.flatMap((s) => [s.heading, ...s.lines])), ...quotes].map(normal).join('\n');
+  const figures = new Set(texts.flatMap((t) => normal(t).match(FIGURE) ?? []));
+  return [...figures].filter((f) => !stated(f, corpus));
+}
+
 function sameUrl(a: string, b: string): boolean {
   try {
     const x = new URL(a);

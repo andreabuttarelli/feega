@@ -47,6 +47,12 @@ describe('recreate_ui from a url', () => {
     expect(findClip(session.doc, String(made.clip_id))?.clip.props.name).toBe('UiFeega');
   });
 
+  it('says which blocking overlay it dismissed before reading the page', async () => {
+    const { run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, dismissed: ['skip'] })));
+
+    expect(await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' })).toMatchObject({ ok: true, dismissed: ['skip'] });
+  });
+
   it('says so when no browser is there to read the page', async () => {
     const { run } = setup();
 

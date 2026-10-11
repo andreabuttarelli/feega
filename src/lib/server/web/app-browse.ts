@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { RequestVerdict, requestVerdict } from './screenshot';
 import { BROWSE_MAX_STEPS, browseStepSchema, walkSteps, type BrowseStep, type StepReport } from './browse';
 import type { AppSession, AppTab, Target, UiDigest } from './browser';
+import { dismissOverlays } from './overlays';
 
 export const APP_MAX_PAGES = 6;
 export const APP_MAX_SHOTS = 6;
@@ -70,7 +71,7 @@ export type AppBrowseInput = z.infer<typeof appBrowseInputSchema>;
 export type AppPage = { url: string; ok: true; shot: number; ui: UiDigest } | { url: string; ok: false; error: string };
 
 export type AppBrowseOutcome =
-  | { ok: true; url: string; session: SessionUse; pages: AppPage[]; steps: StepReport[]; shots: Buffer[]; ui?: UiDigest; costUsd: number; stopped?: string }
+  | { ok: true; url: string; session: SessionUse; pages: AppPage[]; dismissed: string[]; links: AppLink[]; steps: StepReport[]; shots: Buffer[]; ui?: UiDigest; costUsd: number; stopped?: string }
   | { ok: false; error: string; shots: Buffer[]; costUsd: number };
 
 export const NO_ACCOUNT = 'no app account for this project yet: ask the user for a TEST account (login url, email, password) of the app, saying the AI will see these credentials, so they must be test credentials, never a real account';
@@ -100,6 +101,24 @@ export function signInPath(url: string): boolean {
   }
   const path = new URL(url).pathname.replace(/\/+$/, '').toLowerCase();
   return /(^|\/)(log-?in|sign-?in|sign-?up)(\/|$)/.test(path);
+}
+
+const SESSION_PATH = /(^|\/)(log-?in|sign-?in|sign-?up|log-?out|sign-?out)(\/|$)/;
+const APP_LINKS_MAX = 24;
+
+export type AppLink = { text: string; url: string };
+
+export function appLinks(uis: UiDigest[], app: string): AppLink[] {
+  const seen = new Set<string>();
+  const links: AppLink[] = [];
+  for (const el of uis.flatMap((u) => u.elements)) {
+    if (!el.href || !el.text || !sameApp(el.href, app) || SESSION_PATH.test(new URL(el.href).pathname.toLowerCase()) || seen.has(el.href)) {
+      continue;
+    }
+    seen.add(el.href);
+    links.push({ text: el.text, url: el.href });
+  }
+  return links.slice(0, APP_LINKS_MAX);
 }
 
 export function onLoginPage(pageUrl: string, loginUrl: string): boolean {
@@ -190,10 +209,11 @@ async function resumed(tab: AppTab, account: AppAccount, first: string, now: num
 
 const hidden = (message: string, account: AppAccount) => message.split(account.password).join('[password]');
 
-async function visit(tab: AppTab, url: string, shots: Buffer[], sleep: (ms: number) => Promise<unknown>): Promise<AppPage> {
+async function visit(tab: AppTab, url: string, shots: Buffer[], dismissed: string[], sleep: (ms: number) => Promise<unknown>): Promise<AppPage> {
   try {
     await tab.goto(url);
     await sleep(PAGE_SETTLE_MS);
+    dismissed.push(...(await dismissOverlays(tab)));
     shots.push(await tab.shot());
     return { url: tab.url(), ok: true, shot: shots.length - 1, ui: await tab.ui() };
   } catch (e) {
@@ -236,7 +256,9 @@ export async function appBrowse(input: AppBrowseInput, ports: AppBrowsePorts): P
     await ports.accounts.save({ ...account, session: await opened.session(), sessionUntil: now() + APP_SESSION_TTL_MS });
 
     const pages: AppPage[] = [];
-    for (const page of wanted) {
+    const dismissed = await dismissOverlays(opened);
+    const visits = wanted.length || input.steps?.length ? wanted : [opened.url()];
+    for (const page of visits) {
       if (now() > deadline) {
         break;
       }
@@ -247,16 +269,17 @@ export async function appBrowse(input: AppBrowseInput, ports: AppBrowsePorts): P
           return e as Error;
         }
       })();
-      pages.push(url instanceof Error ? { url: page, ok: false, error: url.message } : await visit(tab, url, shots, sleep));
+      pages.push(url instanceof Error ? { url: page, ok: false, error: url.message } : await visit(tab, url, shots, dismissed, sleep));
     }
 
     const steps: BrowseStep[] = input.steps ?? [];
     const walked = await walkSteps(tab, steps, deadline, APP_MAX_SHOTS - shots.length);
     shots.push(...walked.shots);
     const ui = walked.shots.length ? await opened.ui().catch(() => undefined) : undefined;
+    const links = appLinks([...pages.flatMap((p) => (p.ok ? [p.ui] : [])), ...(ui ? [ui] : [])], account.loginUrl);
     await ports.accounts.save({ ...account, session: await opened.session(), sessionUntil: now() + APP_SESSION_TTL_MS });
 
-    return { ok: true, url: opened.url(), session, pages, steps: walked.steps, shots, ...(ui ? { ui } : {}), costUsd: await close(), ...(walked.stopped ? { stopped: walked.stopped } : {}) };
+    return { ok: true, url: opened.url(), session, pages, dismissed, links, steps: walked.steps, shots, ...(ui ? { ui } : {}), costUsd: await close(), ...(walked.stopped ? { stopped: walked.stopped } : {}) };
   } catch (e) {
     return { ok: false, error: hidden(errorOf(e), account), shots, costUsd: await close() };
   }

@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import type { FrameStat } from '$lib/motion/direction';
 import type { Frame } from './frames';
+import { EMPTY_PROBE_PX, edgeDensity } from '$lib/motion/emptiness';
 
 const WHITE_LUMA = 245;
 
@@ -20,4 +21,13 @@ async function statOf(frame: Frame): Promise<FrameStat> {
 
 export function frameStats(frames: readonly Frame[]): Promise<FrameStat[]> {
   return Promise.all(frames.map(statOf));
+}
+
+async function densityOf(frame: Frame): Promise<number> {
+  const data = await sharp(frame.bytes).resize(EMPTY_PROBE_PX, EMPTY_PROBE_PX, { fit: 'fill' }).greyscale().raw().toBuffer();
+  return edgeDensity(new Uint8Array(data), EMPTY_PROBE_PX, EMPTY_PROBE_PX);
+}
+
+export function frameDensities(frames: readonly Frame[]): Promise<number[]> {
+  return Promise.all(frames.map(densityOf));
 }

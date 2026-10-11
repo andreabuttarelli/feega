@@ -3,6 +3,7 @@ import type { ModelMessage } from 'ai';
 import type { MotionDoc } from '$lib/motion/doc';
 import type { LlmMediaPart } from '$lib/server/llm';
 import { MAX_FRAMES_PER_VIEW, VIEW_FRAMES, type Frame, type Reference } from './frames';
+import { EMPTY_EDGE_DENSITY } from '$lib/motion/emptiness';
 
 export const SHEET_MAX_FRAMES = 24;
 export const CRITIC_PASS_SCORE = 8;
@@ -20,6 +21,7 @@ export type CriticPorts = {
   frames: (times: number[]) => Promise<Frame[] | null>;
   tile: (frames: readonly Frame[]) => Promise<Buffer>;
   ask: (input: CriticAsk) => Promise<{ answer: unknown; usd: number }>;
+  density?: (frames: readonly Frame[]) => Promise<number[]>;
 };
 
 export type CriticInput = { doc: MotionDoc; request: string; references: readonly Reference[] };
@@ -48,6 +50,15 @@ const prompt = (input: CriticInput, times: number[]) =>
     .filter(Boolean)
     .join('\n');
 
+const emptyFix = (time: number) => `${time}s: the frame is mostly empty: fill it with the recreated product UI (a ui-focus or whip-zoom on its elements) or make the one element on it large enough to hold the frame`;
+
+export function withEmptyFrames(review: CriticReview, empty: readonly number[]): CriticReview {
+  if (!empty.length) {
+    return review;
+  }
+  return { score: Math.min(review.score, CRITIC_PASS_SCORE - 1), fixes: [...empty.map(emptyFix), ...review.fixes].slice(0, MAX_FIXES) };
+}
+
 export async function critique(ports: CriticPorts, input: CriticInput): Promise<Critique> {
   const times = sheetTimes(input.doc);
   const batches = Array.from({ length: Math.ceil(times.length / MAX_FRAMES_PER_VIEW) }, (_, i) => times.slice(i * MAX_FRAMES_PER_VIEW, (i + 1) * MAX_FRAMES_PER_VIEW));
@@ -65,7 +76,12 @@ export async function critique(ports: CriticPorts, input: CriticInput): Promise<
   const { answer, usd } = await ports.ask({ prompt: prompt(input, times), images });
 
   const parsed = REVIEW.safeParse(answer);
-  return { review: parsed.success ? parsed.data : null, usd, sheet };
+  if (!parsed.success) {
+    return { review: null, usd, sheet };
+  }
+  const densities = ports.density ? await ports.density(frames) : [];
+  const empty = frames.filter((_, i) => densities[i] !== undefined && densities[i] < EMPTY_EDGE_DENSITY).map((f) => f.time);
+  return { review: withEmptyFrames(parsed.data, empty), usd, sheet };
 }
 
 export function criticMessage(review: CriticReview): ModelMessage | null {

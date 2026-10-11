@@ -58,7 +58,7 @@ import { anchorsOf } from '$lib/motion/clicks';
 import { clickUi } from '$lib/motion/cursor-ops';
 import { Isolate, focusUi } from '$lib/motion/ui-focus';
 import { ACTS, BrandKind, briefOf, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
-import { quoted, type SitePage } from './site-copy';
+import { quoted, unsourcedFigures, type SitePage } from './site-copy';
 import { MediaKind, boardMedia, outlineOf, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
@@ -476,6 +476,16 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     [BrandKind.Fictional]: () => ({ unread: false, problems: [] })
   };
 
+  const offSiteFigures = (shot: keyof typeof SHOTS, slots: Record<string, unknown>): string | null => {
+    const script = session.doc.script as LaunchScript | undefined;
+    if (!sitePages.length || script?.brand === BrandKind.Fictional) {
+      return null;
+    }
+    const texts = Object.keys(SHOTS[shot].limits).flatMap((k) => (typeof slots[k] === 'string' || typeof slots[k] === 'number' ? [String(slots[k])] : []));
+    const missing = unsourcedFigures(texts, sitePages, script ? sourcesOf(script).map((s) => s.quote) : []);
+    return missing.length ? `${missing.join(', ')} is not stated on the site analyze_site read: a figure on screen must be one the site states, word for word; use one from the site or drop it` : null;
+  };
+
   const readLogos = (read: SourceRead) => {
     const found = read as { site?: { logos?: { url?: string }[] }; brand?: { logoUrl?: string | null } };
     for (const url of [...(found.site?.logos ?? []).map((l) => l.url), found.brand?.logoUrl]) {
@@ -595,7 +605,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       return written;
     }
     const elements = ui.nodes.filter((n) => n.role !== VectorRole.Box).slice(0, SHOWN_ELEMENTS).map((n) => ({ id: n.id, role: n.role, ...(n.text ? { text: n.text.slice(0, 40) } : {}) }));
-    const made = { ok: true, name: piece.name, size: piece.size, elements, raster: ui.raster, ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}) };
+    const made = { ok: true, name: piece.name, size: piece.size, elements, raster: ui.raster, ...(read.dismissed ? { dismissed: read.dismissed } : {}), ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}) };
     if (input.start === undefined) {
       return made;
     }
@@ -1897,6 +1907,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Place a premium shot from the library (list_shots): ${SHOT_IDS.map((id) => `${id} (${SHOTS[id].about})`).join('; ')}. slots are its data only: texts, element ids of the recreated UI, and font ink paper muted accent. Every text slot holds a few words at most (text_limits in list_shots: a title is a claim of up to 6 words, never a sentence); a longer text is refused with a cut to use. ui is the name of a UI rebuilt with recreate_ui from a url; the shots that show the product need it. at and seconds place it (2–4 s, transitions shorter); with beats marked (mark_beats) start and end snap to the beat grid. The shot is an ordinary clip: its slots stay editable as props.`,
       inputSchema: z.object({ shot: z.enum(SHOT_IDS), slots: z.record(z.string(), z.union([z.string(), z.number()])).default({}), ui: z.string().optional(), at: z.number().min(0), seconds: z.number().positive().optional(), track_id: z.string().optional() }),
       execute: async (input) => {
+        const offSite = offSiteFigures(input.shot, input.slots);
+        if (offSite) {
+          return { ok: false, error: offSite };
+        }
         const fonts = registeredFont(session.doc, input.slots.font);
         if (!fonts.ok) {
           return fonts;

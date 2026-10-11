@@ -254,6 +254,8 @@ describe('web tools', () => {
       url: 'https://app.example/dashboard',
       session: SessionUse.Fresh,
       pages: [{ url: 'https://app.example/dashboard', ok: true as const, shot: 0, ui: { title: 'D', elements: [] } }],
+      dismissed: [],
+      links: [],
       steps: [],
       shots: [{ jpeg: Buffer.from('jpg'), assetId: 'a1' }],
       costUsd: 0.004
