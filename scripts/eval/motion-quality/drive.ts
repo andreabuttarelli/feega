@@ -15,11 +15,18 @@ const ACCOUNT_ASK = /account|login|log in|credenzial|password|accesso/i;
 
 export const asksUser = (text: string) => text.trim().endsWith('?') || ACCOUNT_ASK.test(text);
 
-export function replyTo(question: string, account: TestAccount | null): string {
+export enum AccountGiven {
+  No = 'no',
+  Yes = 'yes'
+}
+
+export const serverEnv = (baseUrl: string, chromiumPath: string) => ({ PUBLIC_APP_URL: baseUrl, BROWSERLESS_API_KEY: '', CHROMIUM_PATH: chromiumPath });
+
+export function replyTo(question: string, account: TestAccount | null, given = AccountGiven.No): string {
   if (!ACCOUNT_ASK.test(question)) {
     return 'Sì, vai pure. Decidi tu il resto.';
   }
-  if (!account) {
+  if (!account || given === AccountGiven.Yes) {
     return 'Salta: non ho un account di prova, usa il sito pubblico.';
   }
   return `Account di test usa-e-getta: login ${account.loginUrl}, email ${account.email}, password ${account.password}. Usalo per vedere l'app (editor, canvas, chat).`;

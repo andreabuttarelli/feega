@@ -16,8 +16,12 @@ canvas only after building on the marketing page, pressed `icon-21`, and tinted 
   `field_id` must be an input, `button_id` a button, link or icon. A UI with no input
   sends the agent to recreate the signed-in work screen.
 - `vectorCapture` reports whether the page was read with a kept session
-  (`CaptureSession`). recreate_ui of a signed-out page offering "Log in"/"Sign in"
-  returns `next`: ask for a TEST account and end the turn before any shot.
+  (`CaptureSession`). recreate_ui of a signed-out page offering a way into the app
+  ("Log in", "Sign up", "Start for free", "Let’s start"; feega.app has only the last
+  two) returns `next`: ask for a TEST account and end the turn before any shot.
+- The driver's dev server runs with the local browser and `PUBLIC_APP_URL` (as the v5
+  harness did): with Browserless the cloud browser refused `localhost` as "not a
+  public web page" and the given account was useless. The account is given once.
 - Motion eval driver: the feega case answers with its own throwaway account, as a real
   user would; account requests are heard without a `?`; the cut review is applied
   once, then shipped (no loop); teardowns run on crash and signals; the report is
