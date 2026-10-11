@@ -5,11 +5,11 @@ export enum TourState {
 }
 
 export enum TourScene {
-  Intro = 'intro',
-  Motion = 'motion',
+  Make = 'make',
+  Edit = 'edit',
   Canvas = 'canvas',
-  Link = 'link',
-  Flow = 'flow',
+  Connect = 'connect',
+  Share = 'share',
   Start = 'start'
 }
 
@@ -29,16 +29,36 @@ export type TourSeen = { seenAt: string | null } | null;
 export type TourSlide = { id: TourScene; title: string; body: string };
 
 export const TOUR_SLIDES: readonly TourSlide[] = [
-  { id: TourScene.Intro, title: 'this is feega', body: 'Motion videos from a prompt or a URL. Share them as a file or as an interactive embed.' },
-  { id: TourScene.Motion, title: 'motion', body: 'The video editor. Tell the AI chat what you want: it builds the scenes, you tweak them on the timeline.' },
-  { id: TourScene.Canvas, title: 'canvas', body: 'An infinite board of nodes: images, videos, text, products, social feeds. You and the AI work on it together.' },
   {
-    id: TourScene.Link,
-    title: 'one video, one node',
-    body: 'Every motion video is a node on a canvas. That is why a new motion also creates a canvas project: the video can connect to everything else.'
+    id: TourScene.Make,
+    title: 'paste a link. get a launch video.',
+    body: 'Give feega your website or a one-line idea. It writes the script, builds every scene and sets it to music.'
   },
-  { id: TourScene.Flow, title: 'wire it up', body: 'Connect references, a storyboard or images into the video. Then feed the video into other nodes.' },
-  { id: TourScene.Start, title: 'start here', body: 'Make a video now, or open a canvas and collect material first.' }
+  {
+    id: TourScene.Edit,
+    title: 'change it by asking.',
+    body: 'Tell the chat what to fix: a shorter intro, your colours, a new last line. It edits the timeline while you watch.'
+  },
+  {
+    id: TourScene.Canvas,
+    title: 'every video lives on a canvas.',
+    body: 'Each video is a node on its project’s canvas, next to the images and notes behind it. Open it from there any time.'
+  },
+  {
+    id: TourScene.Connect,
+    title: 'connect anything into it.',
+    body: 'Wire your logo, product shots or a storyboard into the video and the next edit uses them. Wire the video out to make a cut-down.'
+  },
+  {
+    id: TourScene.Share,
+    title: 'download it, or embed it live.',
+    body: 'Export an mp4 for any feed, or paste one line of code to play it on your site, sharp at any size.'
+  },
+  {
+    id: TourScene.Start,
+    title: 'start with your link.',
+    body: 'Paste your website and get a first cut in minutes. Or open a canvas and gather material first.'
+  }
 ];
 
 const TOUR_PATH_PREFIXES = ['/app/', '/p/'];
