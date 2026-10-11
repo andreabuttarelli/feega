@@ -7,10 +7,11 @@ import './twgl-entry';
 import './fx-entry';
 import './splitting-entry';
 import './open-props-entry';
+import { INPUT_MESSAGE } from '../interactive/runtime';
 import { installEngine, testTimeline, type TestTimeline } from '../engine/testing';
 import { ERRORS, EVENT_MESSAGE, LIVE_RUNS, Play, REGISTRY, bootScript, definitionScript, librariesOf, Library, seedOf, type CustomRun } from './runtime';
 
-const ENV = { assets: {}, brand: { name: 'feega', colors: { accent: '#0099ff' }, logoUrl: null } };
+const ENV = { assets: {}, brand: { name: 'feega', colors: { accent: '#0099ff' }, logoUrl: null }, vars: { speed: 1 } };
 
 function run(name: string, js: string, at = 1, length = 2, play = Play.Seeked): { master: TestTimeline; errors: { message: string }[]; root: HTMLElement } {
   document.body.innerHTML = `<div id="cc-c1"><div class="dot"></div></div>`;
@@ -476,6 +477,17 @@ describe('a live component', () => {
     root.dispatchEvent(new Event('probe'));
 
     expect(root.dataset.input).toBe('40,30,true,ArrowLeft');
+  });
+
+  it('reads the runtime variables, from their defaults to what the host sent', () => {
+    const { root } = live('root.addEventListener("probe", () => { root.dataset.vars = JSON.stringify(input.vars); });');
+    root.dispatchEvent(new Event('probe'));
+    expect(JSON.parse(root.dataset.vars!)).toEqual({ speed: 1 });
+
+    window.dispatchEvent(new MessageEvent('message', { data: { type: INPUT_MESSAGE, values: {}, vars: { speed: 3 } } }));
+    root.dispatchEvent(new Event('probe'));
+
+    expect(JSON.parse(root.dataset.vars!)).toEqual({ speed: 3 });
   });
 
   it('gets the input the embed forwards as real events, which game engines read', () => {

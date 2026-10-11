@@ -20,12 +20,19 @@ describe('/e/[id].json', () => {
     const res = await open(page({ html: '<p/>', width: 1920, height: 1080, duration: 24, playback: 'scrub', loop: false, scrollLength: 6 }));
 
     expect(res.headers.get('access-control-allow-origin')).toBe('*');
-    expect(await res.json()).toEqual({ width: 1920, height: 1080, playback: 'scrub', scrollLength: 6 });
+    expect(await res.json()).toEqual({ width: 1920, height: 1080, playback: 'scrub', scrollLength: 6, vars: [] });
   });
 
   it('gives an embed published before scroll length the default', async () => {
     const res = await open(page({ html: '<p/>', width: 1080, height: 1080, duration: 4, playback: 'autoplay', loop: true }));
     expect((await res.json()).scrollLength).toBe(3);
+  });
+
+  it('lists the runtime variables a host can set, so it can build controls', async () => {
+    const vars = [{ name: 'speed', kind: 'number', default: 1, min: 0, max: 4 }];
+    const res = await open(page({ html: '<p/>', width: 1080, height: 1080, duration: 4, playback: 'autoplay', loop: true, vars }));
+
+    expect((await res.json()).vars).toEqual(vars);
   });
 
   it('an unpublished embed is a 404', async () => {

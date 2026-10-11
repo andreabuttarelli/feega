@@ -499,6 +499,7 @@ function globals(scope: Scope): Map<string, Value> {
     ['Math', MATH],
     ['audio', audioNamespace(scope.audio)],
     ['input', inputNamespace(scope.input)],
+    ['vars', new Namespace(new Map(Object.entries(scope.input.vars)))],
     fn('layer', (ref) => {
       if (typeof ref !== 'string' && typeof ref !== 'number') {
         throw new ExpressionError('layer() takes a layer name, id or index');

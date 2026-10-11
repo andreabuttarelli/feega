@@ -185,7 +185,7 @@ describe('a page published from the minified editor', () => {
     const page = minified((await interactiveBundle({ doc, tokens: FEEGA_TOKENS, assetUrls: {}, title: 'Clip', fetchBlob, origin: ORIGIN })).html);
 
     expect(page).not.toContain('function playerMain(');
-    expect(embedSettings(page)).toEqual({ width: doc.width, height: doc.height, playback: PlayMode.Autoplay, scrollLength: expect.any(Number) });
+    expect(embedSettings(page)).toEqual({ width: doc.width, height: doc.height, playback: PlayMode.Autoplay, scrollLength: expect.any(Number), vars: [] });
     expect(upgradePlayer(page, ORIGIN)).toContain('(function playerMain(');
   });
 });

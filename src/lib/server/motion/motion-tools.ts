@@ -81,6 +81,7 @@ import { OUTSIDES, PLAY_MODES, SCROLL_LENGTH, interactiveOf } from '$lib/motion/
 import { interactiveSchema } from '$lib/motion/interactive/schema';
 import { liveLanes } from '$lib/motion/interactive/spec';
 import { fileSnippet } from '$lib/motion/interactive/bundle';
+import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, removeVar, unbindVar, type VarDecl } from '$lib/motion/interactive/vars';
 import { flattenComps } from '$lib/motion/precomp';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
@@ -1347,12 +1348,36 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async ({ scroll_length, ...input }) => apply(setInteractive(session.doc, Object.fromEntries(Object.entries({ ...input, scrollLength: scroll_length }).filter(([, v]) => v !== undefined))), 'changed interactive playback')
     }),
 
+    declare_var: tool({
+      description: `Declare or replace a runtime variable: a value the site that embeds the video sets live from its own code (web element, React, Flutter), without reloading. ${VARS_GUIDE} kind number needs min and max; enum needs options and a default among them; color is #rrggbb; string up to ${MAX_VAR_TEXT} characters.`,
+      inputSchema: z.object({ name: z.string().regex(VAR_NAME), kind: z.enum(VAR_KINDS), default: z.union([z.number(), z.boolean(), z.string()]), min: z.number().optional(), max: z.number().optional(), options: z.array(z.string()).optional() }),
+      execute: async ({ name, kind, min, max, options, ...rest }) => apply(declareVar(session.doc, { name, kind, default: rest.default, ...(min === undefined ? {} : { min }), ...(max === undefined ? {} : { max }), ...(options ? { options } : {}) } as VarDecl), `declared variable ${name}`)
+    }),
+
+    remove_var: tool({
+      description: 'Remove a runtime variable and its text/colour bindings. Expressions that still read vars.<name> must be changed with set_expression.',
+      inputSchema: z.object({ name: z.string() }),
+      execute: async ({ name }) => apply(removeVar(session.doc, name), `removed variable ${name}`)
+    }),
+
+    bind_var: tool({
+      description: 'Drive a clip property with a runtime variable. number, boolean (1/0) and enum (option index) write the expression vars.<name> on any live property (transforms, number props, liquid glass/blob; edit it with set_expression to scale it, e.g. value * vars.size); string binds to the text and color to the color (or a Caption background) of a Title, Text, Kicker or Caption.',
+      inputSchema: z.object({ name: z.string(), clip_id: z.string(), prop: z.string() }),
+      execute: async ({ name, clip_id, prop }) => apply(bindVar(session.doc, { var: name, clip: clip_id, prop }), `bound ${name} to ${prop}`)
+    }),
+
+    unbind_var: tool({
+      description: 'Stop a runtime variable driving a clip property: removes its text/colour binding, or the expression on a number property.',
+      inputSchema: z.object({ clip_id: z.string(), prop: z.string() }),
+      execute: async ({ clip_id, prop }) => apply(unbindVar(session.doc, clip_id, prop), `unbound ${prop}`)
+    }),
+
     export_interactive: tool({
       description: 'Check the interactive web export: lists the clip properties that react to live input, the playback settings and the embed snippet. The self-contained HTML file is downloaded by the user from Export → Interactive (web); publish_embed hosts it instead.',
       inputSchema: z.object({}),
       execute: async () => {
         const live = liveLanes(flattenComps(session.doc)).map((l) => ({ clip_id: l.id, prop: l.key }));
-        return { ok: true, live, settings: interactiveOf(session.doc), snippet: fileSnippet(session.doc), note: live.length ? 'Ready: Export → Interactive (web) downloads the file.' : 'Nothing reads input yet: apply_interactive_preset or set_expression with input.*.' };
+        return { ok: true, live, settings: interactiveOf(session.doc), vars: interactiveOf(session.doc).vars, snippet: fileSnippet(session.doc), note: live.length ? 'Ready: Export → Interactive (web) downloads the file.' : 'Nothing reads input yet: apply_interactive_preset or set_expression with input.*.' };
       }
     }),
 
@@ -2055,7 +2080,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     [WRITE_COMPONENT]: tool({
       description: `Create or replace a custom component written in code. The editor runs it in a sandbox and checks that seeking gives the same frame from any direction (a live component: its video still); a failing check comes back as an error with the offending frames. Use it in clips with add_clip component "Custom", props { name, ...props }.`,
       inputSchema: z.object({
-        mode: z.enum(ComponentMode).optional().describe('deterministic (default): every frame from tl, seekable, exact in the video. live: for games, generative pieces that differ on every view and interactive heroes meant for the website embed; runs its own loop (requestAnimationFrame, timers, Math.random) and reads input.x, input.y, input.down, input.keys, input.tiltX/Y, with onPause, onResume, onDestroy; gets the game engines LittleJS (LittleJS.engineInit(init, update, updatePost, render, renderPost)) and kaplay (const k = kaplay({ background: [0, 0, 0] })), and p5 loops on its own. The video shows a still of a live component: its first frame, seeded, or what it returns as { still(t) {} }'),
+        mode: z.enum(ComponentMode).optional().describe('deterministic (default): every frame from tl, seekable, exact in the video. live: for games, generative pieces that differ on every view and interactive heroes meant for the website embed; runs its own loop (requestAnimationFrame, timers, Math.random) and reads input.x, input.y, input.down, input.keys, input.tiltX/Y, input.vars (the runtime variables by name, as the embedding site sets them), with onPause, onResume, onDestroy; gets the game engines LittleJS (LittleJS.engineInit(init, update, updatePost, render, renderPost)) and kaplay (const k = kaplay({ background: [0, 0, 0] })), and p5 loops on its own. The video shows a still of a live component: its first frame, seeded, or what it returns as { still(t) {} }'),
         name: z.string().describe('PascalCase, e.g. NodeGraph'),
         html: z.string().max(MAX_HTML).describe('markup inside the component root; no script, style, iframe, media or external urls'),
         css: z.string().max(MAX_CSS).describe('scoped to the component root (:scope is the root); no animation, transition, @keyframes, @import or external url()'),

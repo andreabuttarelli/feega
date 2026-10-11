@@ -12,6 +12,7 @@
   import { MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
   import { INPUT_MESSAGE } from '$lib/motion/interactive/runtime';
+  import type { VarValues } from '$lib/motion/interactive/var-model';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
 
@@ -32,13 +33,14 @@
     muted = false,
     loop = false,
     live = null,
+    vars = null,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; children?: Snippet } = $props();
 
   let pointer = $state<InputValues>({});
 
   function sendInputs(values: InputValues) {
-    player?.iframeElement?.contentWindow?.postMessage({ type: INPUT_MESSAGE, values }, '*');
+    player?.iframeElement?.contentWindow?.postMessage({ type: INPUT_MESSAGE, values, ...(vars ? { vars } : {}) }, '*');
   }
 
   function track(e: PointerEvent) {

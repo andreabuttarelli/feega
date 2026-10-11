@@ -4,6 +4,7 @@ import * as react from '../../../../packages/feega-motion-react/src/protocol';
 import { EMBED_ROUTE, HOST_MESSAGE } from './host';
 import { Fit } from './fit';
 import { PlayMode } from './settings';
+import { VarKind } from './var-model';
 import { HostCommand, NATIVE_BRIDGE, PLAYER_MESSAGE, PROTOCOL_VERSION, PlayerEvent } from './protocol';
 
 const dart = readFileSync(new URL('../../../../packages/feega_motion_flutter/lib/src/protocol.dart', import.meta.url), 'utf8');
@@ -15,6 +16,7 @@ describe('the SDKs speak the player protocol', () => {
     expect({ ...react.PlayerEvent }).toEqual({ ...PlayerEvent });
     expect({ ...react.HostCommand }).toEqual({ ...HostCommand });
     expect({ ...react.Fit }).toEqual({ ...Fit });
+    expect({ ...react.VarKind }).toEqual({ ...VarKind });
   });
 
   it('Flutter uses the same names, version, bridge and playback names', () => {
@@ -24,6 +26,9 @@ describe('the SDKs speak the player protocol', () => {
     }
     for (const event of Object.values(PlayerEvent)) {
       expect(dart).toContain(`'${event}': `);
+    }
+    for (const kind of Object.values(VarKind)) {
+      expect(dart).toContain(`('${kind}')`);
     }
   });
 });

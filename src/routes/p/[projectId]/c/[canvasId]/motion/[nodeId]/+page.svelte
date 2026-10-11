@@ -59,7 +59,9 @@
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
-  import { Liveness } from '$lib/motion/interactive/settings';
+  import { Liveness, interactiveOf } from '$lib/motion/interactive/settings';
+  import { defaultsOf, type VarValues } from '$lib/motion/interactive/var-model';
+  import VarsPanel from '$lib/components/motion/VarsPanel.svelte';
   import { applyInteractivePreset } from '$lib/motion/interactive/presets';
   import { InputKey } from '$lib/motion/expression/inputs';
   import TemplateDialog from '$lib/components/motion/TemplateDialog.svelte';
@@ -240,6 +242,7 @@
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
   let interactive = $state(false);
   let tiltX = $state(0);
+  let previewVars = $state<VarValues>({});
   let tiltY = $state(0);
   const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
   const liveScene = $derived(liveComponents(doc));
@@ -1257,7 +1260,7 @@
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed}>
     <section class="stage" aria-label="Preview" bind:this={stageEl}>
       <ZoomStage bind:this={zoomStage} frame={{ width: doc.width, height: doc.height }} onspace={COMMANDS[Command.TogglePlay]}>
-      <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null}>
+      <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -1269,6 +1272,7 @@
       {#if liveScene.length}<span class="live-badge" data-testid="live-badge" title={`${liveScene.join(', ')} ${liveScene.length === 1 ? 'runs' : 'run'} live: different on every view, a still in the video`}>live</span>{/if}
       <div class="live-bar">
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
+        {#if interactive}<VarsPanel {doc} bind:values={previewVars} clip={selected ?? null} onchange={edit} />{/if}
       </div>
       {#if blank}
         <div class="empty-state" data-testid="empty-state">

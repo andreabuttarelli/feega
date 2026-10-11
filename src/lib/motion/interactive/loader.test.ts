@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { hostMain } from './host';
+import { PLAYER_MESSAGE, PROTOCOL_VERSION, PlayerEvent } from './protocol';
 import { HostKind, ScrubSource, embedSnippet, loaderConfig, loaderMain } from './loader';
 
 const ORIGIN = 'https://oh.feega.app';
@@ -221,6 +222,63 @@ describe('the scroll source of a scrub embed', () => {
 
     expect(posted).toEqual([{ type: 'feega:host', gesture: true }]);
     expect(child.document.querySelector('[data-scroll]')).toBeNull();
+  });
+});
+
+describe('runtime variables on the element', () => {
+  beforeEach(() => serve({ width: 1920, height: 1080, playback: 'autoplay', scrollLength: 3 }));
+
+  async function mounted(attr = '') {
+    const frame = await load(`<feega-motion src="${ID}"${attr}></feega-motion>`);
+    const posted: Record<string, unknown>[] = [];
+    vi.spyOn(frame.contentWindow as Window, 'postMessage').mockImplementation((m: unknown) => void posted.push(m as Record<string, unknown>));
+    const el = document.querySelector('feega-motion') as HTMLElement & { setVars: (v: Record<string, unknown>) => void };
+    const player = (event: string, data: Record<string, unknown> = {}) => window.dispatchEvent(new MessageEvent('message', { data: { type: PLAYER_MESSAGE, v: PROTOCOL_VERSION, event, ...data }, source: frame.contentWindow }));
+    const sentVars = () => posted.filter((m) => 'vars' in m).map((m) => m.vars);
+    return { el, player, sentVars };
+  }
+
+  it('sends the vars attribute once the player listens, and again when it changes', async () => {
+    const { el, player, sentVars } = await mounted(` vars='{"speed":2}'`);
+    expect(sentVars()).toEqual([]);
+
+    player(PlayerEvent.Size);
+    el.setAttribute('vars', '{"speed":3,"label":"Hi"}');
+    await settle();
+
+    expect(sentVars()).toEqual([{ speed: 2 }, { speed: 3, label: 'Hi' }]);
+  });
+
+  it('holds setVars until the player listens, then sends it', async () => {
+    const { el, player, sentVars } = await mounted();
+    el.setVars({ speed: 1 });
+    expect(sentVars()).toEqual([]);
+
+    player(PlayerEvent.Size);
+    el.setVars({ label: 'Yo' });
+
+    expect(sentVars()).toEqual([{ speed: 1 }, { label: 'Yo' }]);
+  });
+
+  it('fires vars-changed with what the player kept, and ready with the schema', async () => {
+    const { el, player } = await mounted();
+    const changed: unknown[] = [];
+    const ready: unknown[] = [];
+    el.addEventListener('vars-changed', (e) => changed.push((e as CustomEvent).detail));
+    el.addEventListener('ready', (e) => ready.push((e as CustomEvent).detail));
+
+    player(PlayerEvent.Ready, { vars: [{ name: 'speed', kind: 'number', default: 1, min: 0, max: 4 }], values: { speed: 1 } });
+    player(PlayerEvent.Vars, { values: { speed: 4 } });
+
+    expect(ready).toEqual([expect.objectContaining({ values: { speed: 1 } })]);
+    expect(changed).toEqual([{ speed: 4 }]);
+  });
+
+  it('ignores a bad vars attribute', async () => {
+    const { player, sentVars } = await mounted(` vars='not json'`);
+    player(PlayerEvent.Size);
+
+    expect(sentVars()).toEqual([]);
   });
 });
 
