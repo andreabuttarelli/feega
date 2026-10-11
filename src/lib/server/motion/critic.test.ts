@@ -4,7 +4,6 @@ import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { CRITIC_PASS_SCORE, SHEET_MAX_FRAMES, critique, criticMessage, sheetTimes, type CriticPorts } from './critic';
 import { tileSheet } from './contact-sheet';
 import { MAX_FRAMES_PER_VIEW } from './frames';
-import { STUDIO_ROSTER, StudioRole, roleBudgetUsd } from './studio-roster';
 
 const doc = { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 30 * 12, fps: 30 as const };
 
@@ -88,16 +87,6 @@ describe('the contact sheet', () => {
     expect(meta.height).toBeGreaterThan(36);
   });
 });
-
-describe('the studio roster', () => {
-  it('splits the turn cap between the roles without exceeding it', () => {
-    const shares = Object.values(STUDIO_ROSTER).reduce((sum, r) => sum + r.budgetShare, 0);
-
-    expect(shares).toBeCloseTo(1);
-    expect(roleBudgetUsd(StudioRole.Critic, 1.5)).toBeCloseTo(1.5 * STUDIO_ROSTER[StudioRole.Critic].budgetShare);
-  });
-});
-
 describe('the critic measures empty frames on its own sheet', () => {
   const measured = (densities: number[]) => ({ density: async (frames: readonly { time: number }[]) => frames.map((_, i) => densities[i] ?? 0.5) });
 

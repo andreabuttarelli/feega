@@ -27,10 +27,11 @@ import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from 
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { AGENT_SELF_SAVE_MS, AGENT_TURN_CAP_USD } from '$lib/server/project-agent/limits';
 import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/server/motion/critic';
-import { CutGate, REVIEW_CUT, answersCut, cutGate, type CutReview } from '$lib/motion/cut-review';
+import { CutGate, REVIEW_CUT, cutGate, type CutReview } from '$lib/motion/cut-review';
 import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
-import { STUDIO_ROSTER, StudioRole, roleBudgetUsd } from '$lib/server/motion/studio-roster';
+import { projectMemory } from '$lib/server/motion/studio-memory';
+import { STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
 import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
@@ -217,7 +218,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   });
   const picked = await importFollowed(readAnswer(message), sources.importAsset, assets);
   session.pickAssets = picked.ids;
-  const openingText = [message, note, picked.note].filter(Boolean).join('\n\n');
+  const role = turnRole(message, head.doc);
+  const memory = role === StudioRole.Director ? await projectMemory(db, { orgId, projectId: project.id, nodeId: motion.record.id }).catch(() => '') : '';
+  const openingText = [message, note, picked.note, memory].filter(Boolean).join('\n\n');
   const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint });
   const drawTurnFrames = async (callId: string, times: number[]) => {
     const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
@@ -317,7 +320,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const visionModel = gatewayModel(model)?.usable ? model : llmVisionModel();
   const vision = BROWSER_VISION[browser](visionModel);
   const asksPick = !choosesForUser(message);
-  const toolNames = Object.keys(tools).filter((name) => (vision === Vision.Available || name !== VIEW_FRAMES) && (asksPick || name !== ASK_REFERENCE_PICK));
+  const toolNames = roleTools(role, Object.keys(tools)).filter((name) => (vision === Vision.Available || name !== VIEW_FRAMES) && (asksPick || name !== ASK_REFERENCE_PICK));
   const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
   const t0 = Date.now();
   const stepModels: string[] = [];
@@ -325,7 +328,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const stepTiers: Tier[] = [];
   const framesShown = new Set<string>();
   let spent = 0;
-  const overBudget: Stop = () => spent > roleBudgetUsd(StudioRole.Builder, AGENT_TURN_CAP_USD);
+  const overBudget: Stop = () => spent > roleBudgetUsd(role, AGENT_TURN_CAP_USD);
   const TIER_MODEL: Record<Tier, string> = { [Tier.Edit]: model, [Tier.Code]: codeModel };
 
   const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void) =>
@@ -478,7 +481,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const times = keyFrameTimes(session.doc);
         await play([...conversation, checkMessage(errors, times)], Round.SelfCheck);
       }
-      const critiqued = steps.length > 0 && !awaitsGo && !answersCut(message) && vision === Vision.Available && session.edits.length > 0 ? await reviewCut() : null;
+      const critiqued = steps.length > 0 && !awaitsGo && role === StudioRole.Builder && vision === Vision.Available && session.edits.length > 0 ? await reviewCut() : null;
       const fix = critiqued?.review ? criticMessage(critiqued.review) : null;
       if (fix && gate === CutGate.Auto) {
         await play([...conversation, fix], Round.SelfCheck);
@@ -530,7 +533,8 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     return write;
   }
 
-  const labelOf = (modelId: string) => (modelId === model ? 'motion-agent' : modelId === codeModel ? 'motion-agent-code' : 'motion-agent-vision');
+  const roleLabel = STUDIO_ROSTER[role].label;
+  const labelOf = (modelId: string) => (modelId === model ? roleLabel : modelId === codeModel ? `${roleLabel}-code` : `${roleLabel}-vision`);
 
   async function finishTurn(steps: TurnStep[]): Promise<TurnOutcome> {
     clearTimeout(wall);
