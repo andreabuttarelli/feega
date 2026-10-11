@@ -41,6 +41,28 @@ describe('a product film must show the real product', () => {
   });
 });
 
+describe('a product film with the real UI keeps the generic kit off screen', () => {
+  const kitBeside = (doc: MotionDoc) => docProblems(doc, { audioAssets: 1 }).filter((p) => p.kind === Quality.KitUi);
+
+  it('blocks each kit card placed once the real product was rebuilt (v4: UiCardGrid and UiToggle beside FeegaApp)', () => {
+    const doc = withPiece(withPiece(withPiece(productFilm(), VECTOR), UI_KIT[UiKind.CardGrid]), UI_KIT[UiKind.Toggle]);
+
+    expect(kitBeside(doc).map((p) => p.detail)).toEqual([expect.stringContaining(UI_KIT[UiKind.CardGrid].name), expect.stringContaining(UI_KIT[UiKind.Toggle].name)]);
+    expect(SEVERITY[Quality.KitUi]).toBe(Severity.Blocking);
+  });
+
+  it('counts a rebuilt UI that is written but not placed', () => {
+    const rebuilt = must(writeComponent(productFilm(), VECTOR.name, { source: { html: VECTOR.html, css: VECTOR.css, js: VECTOR.js }, propsSchema: { type: 'object', properties: {} } }));
+
+    expect(kitBeside(withPiece(rebuilt, UI_KIT[UiKind.CardGrid]))).toHaveLength(1);
+  });
+
+  it('leaves the kit alone when nothing real was rebuilt, or the video tells no product story', () => {
+    expect(kitBeside(withPiece(productFilm(), UI_KIT[UiKind.CardGrid]))).toEqual([]);
+    expect(kitBeside(withPiece(withPiece(newMotionDoc(MotionFormat.Landscape), VECTOR), UI_KIT[UiKind.CardGrid]))).toEqual([]);
+  });
+});
+
 describe('reading time never stretches a shot', () => {
   const titled = (text: string, seconds: number) => must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: seconds * 30, props: { text } }, 't1'));
 
