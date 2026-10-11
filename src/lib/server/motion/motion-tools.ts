@@ -48,6 +48,7 @@ import { Quality, blocking, docProblems, frameProblems, softPictures, type Frame
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '$lib/motion/custom/component';
 import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
 import { CaptureSession, offersSignIn, type UiCapture } from '$lib/server/web/vector-capture';
+import { StoreKind } from '$lib/server/web/store';
 import { vectorPiece, withFonts } from '$lib/motion/vector-ui/piece';
 import { VectorRole } from '$lib/motion/vector-ui/model';
 import { SHOTS, SHOT_IDS, ShotCursor, ShotUi, shotPreview } from '$lib/motion/shots/library';
@@ -168,6 +169,7 @@ export type MotionToolDeps = {
   capture?: (url: string, view: CaptureView) => Promise<SiteCapture>;
   readUi?: (asset: MotionAsset, region?: UiRegion) => Promise<UiRead>;
   captureUi?: UiCapture;
+  appAccountKept?: () => Promise<boolean>;
   effects?: EffectStore;
   layouts?: LayoutStore;
   web?: WebToolDeps;
@@ -209,6 +211,12 @@ export enum EmbedAction {
 }
 
 const SHOWN_ELEMENTS = 60;
+
+export enum AppAccount {
+  Declined = 'declined'
+}
+
+const SCRIPT_INPUT = scriptSchema.extend({ app_account: z.enum(AppAccount).optional().describe('declined: the user said they have no test account of the app') });
 
 const PUBLIC_SITE_NEXT = 'this is the public site of an app, read signed out: if the product is that app, the trailer shows its real screens, not this page. Before any shot, ask the user in chat for a TEST account (login url, email, password; say you will see it) and end the turn on that question; then sign in with app_browse and recreate_ui 2–3 signed-in work screens (the editor, the canvas, the result)';
 
@@ -478,10 +486,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   const logoUrls = new Set<string>();
   const brandLogos = new Set<string>();
   const sitePages: SitePage[] = [];
+  let appEntry: string | null = null;
   const readPages = (read: SourceRead) => {
-    const pages = (read as { site?: { pages?: SitePage[] } }).site?.pages ?? [];
-    sitePages.push(...pages);
+    const site = (read as { site?: { pages?: SitePage[]; appEntry?: string | null; store?: StoreKind } }).site;
+    sitePages.push(...(site?.pages ?? []));
+    appEntry = site?.appEntry && site.store === StoreKind.None ? site.appEntry : appEntry;
     return read;
+  };
+
+  const accountMissing = async (script: LaunchScript, answer?: AppAccount): Promise<string | null> => {
+    if (script.brand === BrandKind.Fictional || !appEntry || answer === AppAccount.Declined || (await deps.appAccountKept?.())) {
+      return null;
+    }
+    return `before the script, ask the user in chat for a TEST account of the app behind ${appEntry} (login url, email, password; say you will see them, so never a real one) and end the turn on that question: a trailer shows the real signed-in screens, not the marketing site. Then app_browse signs in and photographs the key screens, recreate_ui rebuilds them, and the script describes them. If the user has no account, write_script with app_account: declined`;
   };
 
   const SOURCING: Record<BrandKind, (script: LaunchScript) => { unread: boolean; problems: string[] }> = {
@@ -1736,16 +1753,20 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     write_script: tool({
       description: `Save the research and the four-act script of a launch film before building it; the video is not built until this passes. Research: who it serves, the concrete problem, the struggle as an everyday scene, how the product works step by step (input → what happens → result), 1–3 benefits and up to 4 numbers or results, the tone, the promise. Every benefit, number, promise and proof cites its source: the url of a page analyze_site read and a quote copied from that page; a claim without a source on the site is refused, so never invent one. Acts ${ACTS.join(', ')} in order: problem shows the "before" UI, cluttered or slow, with realistic data; solution shows the product's real flow with specific content, written as a sequence of UI beats, one element per beat (the field and its typed text, the button pressed, the progress, the result); proof shows a number or result from the site; claim puts the site's own promise on screen. Keep on_screen lines few and short: each becomes its own full-frame title card, shown before the scene it announces, never over it. For an invented demo brand (no real site), set brand: fictional: no site is read and sources are the brand's own copy; the brief says it is fictional. Never use it for a real brand. The turn ends there: the user reads the brief in the chat, then says go or corrects it.`,
-      inputSchema: scriptSchema,
+      inputSchema: SCRIPT_INPUT,
       execute: async (raw) => {
-        const parsed = scriptSchema.safeParse(raw);
+        const parsed = SCRIPT_INPUT.safeParse(raw);
         if (!parsed.success) {
           return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };
         }
-        const input = parsed.data;
+        const { app_account: answer, ...input } = parsed.data;
         const sourcing = SOURCING[input.brand](input);
         if (sourcing.unread) {
           return { ok: false, error: 'read the site first: analyze_site gives the pages and quotes every claim must come from' };
+        }
+        const ask = await accountMissing(input, answer);
+        if (ask) {
+          return { ok: false, error: ask };
         }
         const written = deps.copywrite ? await deps.copywrite(input) : input;
         const problems = [...scriptProblems(written), ...sourcing.problems];

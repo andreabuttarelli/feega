@@ -1,3 +1,5 @@
+import { leadsIntoApp } from '$lib/server/web/app-entry';
+
 export enum SectionKind {
   Hero = 'hero',
   Feature = 'feature',
@@ -86,6 +88,15 @@ const WORTH: [RegExp, number][] = [
   [/docs?|guide|changelog/i, 1]
 ];
 const SKIP = /login|log-in|signin|sign-in|signup|sign-up|register|cart|checkout|privacy|terms|legal|cookie|\.(png|jpe?g|svg|pdf|zip|dmg)(\?|$)|mailto:|tel:/i;
+
+export function appEntryOf(html: string, base: string): string | null {
+  for (const m of html.matchAll(LINK)) {
+    if (leadsIntoApp(plain(m[2])) && URL.canParse(decode(m[1]), base)) {
+      return new URL(decode(m[1]), base).href;
+    }
+  }
+  return null;
+}
 
 export function linksWorthReading(html: string, base: string): string[] {
   const origin = new URL(base);

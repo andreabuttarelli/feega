@@ -39,7 +39,7 @@ import { projectMemory } from '$lib/server/motion/studio-memory';
 import type { LaunchScript } from '$lib/motion/script';
 import { REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
-import { liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
+import { appAccountKept, liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
 import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
 import { ATTACHMENT_PORTS } from '$lib/server/chat-attachments/register';
 import { EmbedAction, createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from '$lib/server/motion/motion-tools';
@@ -324,6 +324,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       return out.script;
     },
     captureUi: uiCapture(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
+    appAccountKept: appAccountKept(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
       BROWSER_DRAWS[browser]();
