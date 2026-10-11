@@ -34,7 +34,8 @@
  * video, audio: «cosa guida questa generazione», mai «con cosa comincia». Un fotogramma è
  * un'eccezione esplicita, e vive SOLO su una delle due maniglie — `FIRST_FRAME_HANDLE` /
  * `LAST_FRAME_HANDLE`, gli stessi nomi di `frame_type` e non un vocabolario nostro — senza quella
- * maniglia l'immagine collegata resta un riferimento, anche se è l'unica collegata.
+ * maniglia l'immagine collegata resta un riferimento — salvo su un modello che di riferimenti non
+ * ne prende (`videoRefCapacity(...).images === 0`, es. Grok): lì diventa il primo fotogramma.
  *
  * I DUE SLOT SONO OPZIONALI E INDIPENDENTI. Né l'uno né l'altro è testo-a-video; solo il primo è
  * immagine-a-video; entrambi è interpolazione. Nessuna regola locale lega un frame finale a uno
@@ -284,7 +285,7 @@ function listCapacity(connector: ConnectorType, kind: GenerativeNodeKind, model:
   if (connector === 'images' && kind === 'image') return imageModelSpec(model)?.maxRefs ?? 1;
   if (kind === 'video') {
     const caps = videoRefCapacity(model);
-    if (connector === 'images') return Math.max(caps.images, 1);
+    if (connector === 'images') return caps.images;
     if (connector === 'videos') return caps.videos;
     if (connector === 'audios') return caps.audios;
   }
@@ -351,6 +352,7 @@ export function resolveUpstreamInputs(
   const referenceVideoUrls: string[] = [];
   const referenceAudioUrls: string[] = [];
   const used: Partial<Record<ConnectorType, number>> = {};
+  const frameCandidates: { nodeId: string; url: string }[] = [];
 
   for (const edge of ordered) {
     const wired = at.get(edge.sourceNodeId);
@@ -423,6 +425,10 @@ export function resolveUpstreamInputs(
     }
 
     const room = listCapacity(connector, targetKind, target.model ?? null);
+    if (connector === 'images' && targetKind === 'video' && room === 0) {
+      frameCandidates.push(...sourceUrls.map((url) => ({ nodeId: source.id, url })));
+      continue;
+    }
     const bucket = connector === 'images' ? referenceImageUrls : connector === 'videos' ? referenceVideoUrls : referenceAudioUrls;
 
     // OGNI VISTA CONTA COME UN RIFERIMENTO SEPARATO contro il tetto del modello — un nodo che ne
@@ -441,6 +447,14 @@ export function resolveUpstreamInputs(
       used[connector] = count + 1;
       bucket.push(url);
     }
+  }
+
+  for (const candidate of frameCandidates) {
+    if (!startFrameUrl) {
+      startFrameUrl = candidate.url;
+      continue;
+    }
+    rejected.push({ nodeId: candidate.nodeId, why: `this model takes no reference ${CONNECTOR_LABEL.images}` });
   }
 
   const picked = pickedWithin(target, targetKind, connectors, referenceImageUrls.length);

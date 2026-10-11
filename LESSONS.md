@@ -2784,3 +2784,10 @@ doc (`docCuts`: inizi dei clip visivi di primo livello); ffmpeg solo se il doc m
 ### Un export dal browser di un video di 51 s non sta in 20 minuti
 Headless, 1080×1920 High: ~1 frame/s. Segnale: `export failed: TimeoutError` con la barra
 all'80%. Mossa: tetto a 45 min in `eval:motion`; la durata è un fatto, non un errore del driver.
+
+## Un nodo video fallisce con `render_failed` nudo
+Segnale: `node_runs.error = 'render_failed'`, `external_job_id` null. Il motivo vero sta solo nei
+log Vercel: `[video] submit openrouter rifiutato: ...`. Mossa: `get_runtime_logs` con query
+`video` sulla finestra del run; poi confronta il payload con
+`curl https://openrouter.ai/api/v1/videos/models` (`supported_frame_images`): un modello senza
+riferimenti rifiuta `input_references`.
