@@ -2802,3 +2802,13 @@ Segnale: `motion-fixer-code` $3.03 in `ai_calls` con una quota di $0.75. Il tett
 Segnale: in `ai_calls` per ora, dopo `motion-fixer` altre righe `motion-agent` da $1.2 + $0.4 e un nuovo `motion-critic` a ogni risposta dell'utente ("Salta…", "Ship the cut"). Il tetto era per turno: ogni risposta apriva un turno pieno e una nuova revisione.
 Mossa: budget per video (`VIDEO_CAP_USD`, somma di `ai_calls.node_id`), critic una volta per video, "tieni il taglio" senza modello.
 
+### WebGPU manca nel WebKit di Playwright 1.60
+Segnale: `navigator.gpu` undefined in WebKit, uno ShaderEffect dipinge il gradiente di ripiego,
+mentre lo stesso codice gira col Playwright del checkout principale (1.63). Mossa: per provare
+WebGPU su WebKit usa Playwright ≥1.63; il ripiego non è un difetto dell'effetto.
+
+### Una tela WebGPU letta nel task sbagliato è vuota o vecchia
+Segnale: `drawImage` di una tela WebGPU dà zero pixel (Chromium) o il primo frame (WebKit) dopo
+un `await`. Mossa: render con `waitForGpu: false` e copia nello stesso task; su WebKit ricopia al
+frame successivo.
+

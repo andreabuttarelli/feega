@@ -57,6 +57,8 @@ async function download(path: string, token: string): Promise<string> {
 }
 const id = encodeURIComponent;
 
+export type ShaderEffect = { id: string; category: string; source: string; live: boolean; about: string; knobs: Record<string, { label: string; min: number; max: number; default: number; keyframes: boolean }>; colours: Record<string, string> };
+
 export const motionApi = {
   ask: (token: string, nodeId: string, prompt: string, org?: string, attachments: AttachmentSource[] = [], pick?: ReferencePickReply) =>
     request<MotionRun>(withOrg(`/api/v1/motion/${id(nodeId)}/ask`, org), token, { method: 'POST', body: JSON.stringify({ prompt, ...(attachments.length ? { attachments } : {}), ...(pick ? { reference_pick: pick } : {}) }) }),
@@ -65,6 +67,7 @@ export const motionApi = {
     request<RenderStart>(withOrg(`/api/v1/motion/${id(nodeId)}/render`, org), token, { method: 'POST', body: JSON.stringify(renderBody(opts)) }),
   renderState: (token: string, runId: string, org?: string) => request<RenderState>(withOrg(`/api/v1/motion/renders/${id(runId)}`, org), token),
   summary: (token: string, nodeId: string, org?: string) => request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}`, org), token),
+  shaderEffects: (token: string, org?: string) => request<{ effects: ShaderEffect[] }>(withOrg('/api/v1/motion/shader-effects', org), token),
   list: (token: string, projectId?: string, org?: string) => request<{ videos: MotionVideo[] }>(withQuery('/api/v1/motion', { project: projectId, org }), token),
   embed: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token, { method: 'POST' }),
   unembed: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token, { method: 'DELETE' }),

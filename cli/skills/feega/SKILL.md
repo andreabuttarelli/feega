@@ -173,6 +173,8 @@ running `run_id`: poll `get_motion_run` every few seconds until `done` (reply, s
 (e.g. a logo) and PDF/DOCX/PPTX/XLSX/CSV/TXT/MD/HTML it reads as text — each a public `url`, a
 project `asset_id`, or base64 `data` + `name` + `mime_type`. CLI: `feega motion ask <nodeId> "<prompt>"
 --attach ./brief.pdf https://…/logo.png asset:<id>`.
+`list_shader_effects` (CLI `feega motion shaders`) lists the GPU shader effects the agent adds —
+gradients, noise, glass, metal, light, distortions, wipes, blurs — with their knobs: name one in the prompt.
 
 Render one with `render_video`: by default it is FREE and returns a `render_url`,
 a one-time link (30 minutes, bound to the saved revision) the user opens on any device — the video

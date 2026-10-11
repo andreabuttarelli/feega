@@ -11,6 +11,7 @@ import type { CustomComponents } from '../custom/component';
 import { compositionVideoId, resolvedMedia } from './composition';
 import { shapeHtml } from './shapes';
 import { particleHtml } from './particles';
+import { shaderEffectHtml } from './shader-effects';
 import { ParticleShape } from '../particles/model';
 import type { MediaSegment } from '../time-remap';
 import { ShapeKind } from '../shape/schema';
@@ -418,6 +419,11 @@ const Particles: Template<'Particles'> = {
   html: (ctx) => particleHtml(ctx.id, ctx.width, ctx.height, ctx.p.shape === ParticleShape.Sprite ? ctx.asset(ctx.p.sprite) : null)
 };
 
+const ShaderEffect: Template<'ShaderEffect'> = {
+  timing: Timing.Wrapper,
+  html: (ctx) => shaderEffectHtml(ctx.id, ctx.width, ctx.height)
+};
+
 export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   Title,
   Text,
@@ -442,6 +448,7 @@ export const TEMPLATES: { [K in ComponentId]: Template<K> } = {
   Particles,
   LiquidGlass,
   LiquidBlob,
+  ShaderEffect,
   Precomp,
   Adjustment,
   Custom

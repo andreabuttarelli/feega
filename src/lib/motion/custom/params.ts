@@ -10,6 +10,7 @@ import { PropFormat, type PropSpec } from './component';
 import { effectProps, type Effect } from '../effects/model';
 import { animatorProps, type TextAnimator } from '../text-animators/model';
 import { textPathProps, type TextPath } from '../text-path/model';
+import { shaderEffectProps } from '../shader-effects/params';
 
 export const PARAM_CALL = 'param';
 export const PARAM_CSS_PREFIX = '--param-';
@@ -108,5 +109,5 @@ function shapeModifierProps(clip: Pick<MotionClip, 'component' | 'props'>): Anim
 }
 
 export function withParams<C extends Pick<MotionClip, 'component' | 'props'> & { effects?: Effect[]; shaders?: ClipShader[]; animators?: TextAnimator[]; textPath?: TextPath | null }>(doc: Pick<MotionDoc, 'components'> & { shaders?: ShaderDefs }, clip: C): C & { params: AnimProp[] } {
-  return { ...clip, params: [...paramProps(doc, clip), ...effectProps(clip.effects ?? []), ...shaderProps(clip.shaders ?? [], doc.shaders ?? {}), ...animatorProps(clip.animators ?? []), ...shapeModifierProps(clip), ...textPathProps(clip.textPath ?? null)] };
+  return { ...clip, params: [...paramProps(doc, clip), ...effectProps(clip.effects ?? []), ...shaderProps(clip.shaders ?? [], doc.shaders ?? {}), ...animatorProps(clip.animators ?? []), ...shapeModifierProps(clip), ...textPathProps(clip.textPath ?? null), ...shaderEffectProps(clip)] };
 }

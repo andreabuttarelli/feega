@@ -24,7 +24,7 @@ const LAUNCH: Record<string, Parameters<BrowserType['launch']>[0]> = {
 const OUT = resolve(process.env.BENCH_OUT ?? join(homedir(), 'Documents/feega-videos/bench'));
 const FRAME_TIMEOUT_MS = 3_600_000;
 
-type Args = { range: [number, number] | null; doc: string; engines: string[]; lanes: number[]; frames: number; keep: boolean; parity: boolean; live: boolean; strip: Set<string>; layering: Layering };
+type Args = { range: [number, number] | null; doc: string; engines: string[]; lanes: number[]; frames: number; keep: boolean; parity: boolean; live: boolean; strip: Set<string>; layering: Layering; headed: boolean };
 
 function args(): Args {
   const flags = new Map(process.argv.slice(2).map((a) => a.replace(/^--/, '').split('=') as [string, string]));
@@ -38,7 +38,8 @@ function args(): Args {
     parity: flags.has('parity'),
     live: flags.has('live'),
     layering: (flags.get('layering') ?? Layering.Split) as Layering,
-    strip: new Set((flags.get('strip') ?? '').split(',').filter(Boolean))
+    strip: new Set((flags.get('strip') ?? '').split(',').filter(Boolean)),
+    headed: flags.has('headed')
   };
 }
 
@@ -108,7 +109,8 @@ function stripped<T extends Tracked>(doc: T, kinds: Set<string>): T {
   return { ...clean(doc), comps: Object.fromEntries(Object.entries(comps).map(([k, v]) => [k, clean(v)])) } as unknown as T;
 }
 
-const { range, doc: docPath, engines, lanes, frames, keep, parity, live, strip, layering } = args();
+const { range, doc: docPath, engines, lanes, frames, keep, parity, live, strip, layering, headed } = args();
+const launch = (engine: string) => ENGINES[engine].launch({ ...LAUNCH[engine], headless: !headed });
 const loaded = JSON.parse(readFileSync(docPath, 'utf8')) as { doc: MotionDoc; assets: Record<string, string> };
 const doc = stripped(loaded.doc as unknown as Tracked, strip) as unknown as MotionDoc;
 const assets = loaded.assets;
@@ -122,7 +124,7 @@ mkdirSync(OUT, { recursive: true });
 if (parity) {
   mkdirSync(OUT, { recursive: true });
   for (const engine of engines) {
-    const browser = await ENGINES[engine].launch(LAUNCH[engine]);
+    const browser = await launch(engine);
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     page.setDefaultTimeout(FRAME_TIMEOUT_MS);
     await page.goto(server.url);
@@ -148,7 +150,7 @@ if (parity) {
 console.log('| doc | engine | lanes | frames | wall ms/frame | seek+settle | serialize | paint | readback | encode | total 465f (s) |');
 console.log('|---|---|---|---|---|---|---|---|---|---|---|');
 for (const engine of engines) {
-  const browser = await ENGINES[engine].launch(LAUNCH[engine]);
+  const browser = await launch(engine);
   for (const laneCount of lanes.map((l) => lanesWithin(l, webglPerLane(html)))) {
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     page.setDefaultTimeout(FRAME_TIMEOUT_MS);

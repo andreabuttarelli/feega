@@ -109,6 +109,15 @@ export async function cmdMotionRevisions(nodeId: string, opts: { org?: string; r
   }
 }
 
+export async function cmdMotionShaders(opts: { org?: string }) {
+  const { effects } = await motionApi.shaderEffects(await token(), opts.org);
+  for (const e of effects) {
+    const knobs = Object.entries(e.knobs).map(([key, k]) => `${key} ${k.min}..${k.max}${k.keyframes ? '' : ' (fixed)'}`);
+    console.log(`${e.id}  ${e.category}  ${e.source}${e.live ? '  live only' : ''}  ${e.about}`);
+    console.log(`  ${[...knobs, ...Object.keys(e.colours)].join(', ')}`);
+  }
+}
+
 export async function cmdMotionList(opts: { org?: string; project?: string }) {
   const { videos } = await motionApi.list(await token(), opts.project, opts.org);
   if (!videos.length) {

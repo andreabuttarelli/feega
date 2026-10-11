@@ -30,8 +30,8 @@ function put(file: string, bytes: string | Buffer) {
   writeFileSync(file, bytes);
 }
 
-async function packed(dir: string, lib: Hosted): Promise<Buffer> {
-  const entry = join(dir, lib.source);
+async function packed(root: string, dir: string, lib: Hosted): Promise<Buffer> {
+  const entry = lib.entry ? join(root, lib.entry) : join(dir, lib.source);
   if (lib.packing === Packing.Copy) {
     return readFileSync(entry);
   }
@@ -56,7 +56,7 @@ export async function writeMotionLibs(root: string): Promise<Integrity> {
 
   for (const [script, lib] of Object.entries(HOSTED) as [Script, Hosted][]) {
     const dir = pinned(root, lib);
-    const bytes = await packed(dir, lib);
+    const bytes = await packed(root, dir, lib);
     put(join(out, folderOf(lib), lib.file), bytes);
     put(join(out, folderOf(lib), lib.licenceFile), readFileSync(join(dir, lib.licenceFile)));
     integrity[script] = sri(bytes);

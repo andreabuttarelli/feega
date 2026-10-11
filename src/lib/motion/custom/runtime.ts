@@ -11,7 +11,7 @@ import { FX_GLOBAL } from './fx';
 import { SPLITTING_GLOBAL } from './splitting';
 import { OPEN_PROPS_GLOBAL } from './open-props';
 import { GPU_GLOBAL } from '../hyperframes/gpu';
-import { LITTLEJS_GLOBAL, THREE_GLOBAL } from '../libs/catalog';
+import { LITTLEJS_GLOBAL, SHADERS_GLOBAL, THREE_GLOBAL } from '../libs/catalog';
 
 export const REGISTRY = '__feegaComponents';
 export const ERRORS = '__feegaErrors';
@@ -75,7 +75,8 @@ export enum Library {
   Twgl = 'twgl',
   Fx = 'fx',
   Splitting = 'Splitting',
-  OpenProps = 'OpenProps'
+  OpenProps = 'OpenProps',
+  Shaders = 'shaders'
 }
 
 const USES: Record<Library, RegExp> = {
@@ -91,7 +92,8 @@ const USES: Record<Library, RegExp> = {
   [Library.Twgl]: /\btwgl\b/,
   [Library.Fx]: /\bfx\./,
   [Library.Splitting]: /\bSplitting\b/,
-  [Library.OpenProps]: /\bOpenProps\b|['"]ease-[a-z0-9-]+['"]/
+  [Library.OpenProps]: /\bOpenProps\b|['"]ease-[a-z0-9-]+['"]/,
+  [Library.Shaders]: /\bshaders\./
 };
 
 const STYLE_USES: Partial<Record<Library, RegExp>> = {
@@ -111,7 +113,8 @@ const GLOBALS: Record<Library, string> = {
   [Library.Twgl]: TWGL_GLOBAL,
   [Library.Fx]: FX_GLOBAL,
   [Library.Splitting]: SPLITTING_GLOBAL,
-  [Library.OpenProps]: OPEN_PROPS_GLOBAL
+  [Library.OpenProps]: OPEN_PROPS_GLOBAL,
+  [Library.Shaders]: SHADERS_GLOBAL
 };
 
 export function librariesOf(components: CustomComponents, used: Iterable<string>): Set<Library> {
@@ -149,6 +152,8 @@ type Random = () => number;
 type Generative = { createNoise2D: (r: Random) => unknown; createNoise3D: (r: Random) => unknown; createNoise4D: (r: Random) => unknown; PoissonDiskSampling: new (options: object, r: Random) => unknown };
 type Split = { target?: string | object; by?: string };
 type ClipScope = { root: HTMLElement; tl: Timeline; run: CustomRun; hooks: Hooks };
+type GpuEffect = { seek: (time: number, props: Record<string, unknown>) => void; play: () => void; destroy: () => void };
+type GpuEffects = { supported: () => Promise<boolean>; effects: Record<string, unknown>; props: (spec: unknown, values: Record<string, number | string>) => Record<string, unknown>; tree: (effect: string, values: Record<string, number | string>, image: string | null) => unknown; mount: (canvas: HTMLCanvasElement, tree: unknown, size: { width: number; height: number }) => Promise<GpuEffect> };
 type Little = { vec2: (x: number, y: number) => object; setCanvasFixedSize: (size: object) => void; setEngineManualStep: (on: boolean) => void; engineStep: (frames: number) => void; engineObjectsDestroy: () => void; engineInit: (...args: unknown[]) => Promise<unknown> };
 type Game = { debug: { paused: boolean }; quit: () => void; randSeed: (seed: number) => void; onDraw: (draw: () => void) => void };
 type Input = { x: number; y: number; down: boolean; hover: boolean; tiltX: number; tiltY: number; keys: Set<string>; vars: Record<string, number | boolean | string> };
@@ -503,7 +508,49 @@ function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: 
     };
     return Object.assign(scoped, { drive });
   };
-  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds, gen: utilities, twgl: shaders, fx: effects, Splitting: splits, OpenProps: tokens };
+  const gpuEffects = (lib: GpuEffects, { tl, run, hooks }: ClipScope) => {
+    let made = 0;
+    const layer = (canvas: HTMLCanvasElement, effect: string, values: Record<string, number | string> = {}, image: string | null = null) => {
+      const live = run.play === 'live';
+      const size = { width: canvas.width, height: canvas.height };
+      const gpu = live ? canvas : Object.assign(document.createElement('canvas'), size);
+      const paint = live ? null : canvas.getContext('2d');
+      const state: { values: Record<string, number | string>; shader: GpuEffect | null; time: number } = { values: { ...values }, shader: null, time: 0 };
+      const draw = () => {
+        if (!state.shader || !paint) {
+          return;
+        }
+        state.shader.seek(state.time, lib.props(lib.effects[effect], state.values));
+        paint.clearRect(0, 0, size.width, size.height);
+        paint.drawImage(gpu, 0, 0, size.width, size.height);
+      };
+      const ready = lib
+        .supported()
+        .then((ok) => (ok ? lib.mount(gpu, lib.tree(effect, values, image), size) : null))
+        .then((shader) => {
+          state.shader = shader;
+          if (shader && live) {
+            shader.play();
+          }
+          draw();
+        });
+      const hf = ((w.__hf as Record<string, unknown>) ??= {}) as { buildReady?: Record<string, Promise<unknown>> };
+      (hf.buildReady ??= {})[`shaders-${run.id}-${(made += 1)}`] = ready;
+      tl.to({}, { duration: run.length + (run.trim ?? 0), ease: 'none', onUpdate: () => {
+        state.time = tl.time();
+        draw();
+      } }, 0);
+      hooks.destroy.push(() => state.shader?.destroy());
+      return {
+        set: (next: Record<string, number | string>) => {
+          Object.assign(state.values, next);
+          draw();
+        }
+      };
+    };
+    return { ...lib, layer };
+  };
+  const wraps: Record<string, (lib: never, scope: ClipScope) => unknown> = { p5: sketches, PIXI: stages, Matter: worlds, gen: utilities, twgl: shaders, fx: effects, Splitting: splits, OpenProps: tokens, shaders: gpuEffects };
   const libraries = Object.entries(cfg.libraries).map(([name, global]) => [name, w[global] ?? null] as const);
   const three = { renderer: (canvas: unknown, extra?: object) => (w[cfg.gpu.global] as { renderer: (lib: unknown, canvas: unknown, extra?: object) => unknown }).renderer(w[cfg.gpu.three], canvas, extra) };
   const clipLibraries = (scope: ClipScope) => {
