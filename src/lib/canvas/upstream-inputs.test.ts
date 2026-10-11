@@ -294,6 +294,37 @@ describe('resolveUpstreamInputs — video: fotogrammi e riferimenti', () => {
     expect(out.rejected).toHaveLength(1);
   });
 
+  it('a model that takes no reference images films the wired image as its first frame', () => {
+    const nodes = [
+      node({ id: 'v1', type: 'video', model: 'x-ai/grok-imagine-video-1.5-lite' }),
+      node({ id: 'cat', type: 'image', mediaUrl: 'https://cdn/cat.png' })
+    ];
+    const edges = [edge({ id: 'e1', sourceNodeId: 'cat', targetNodeId: 'v1', targetHandle: 'images' })];
+
+    const out = resolveUpstreamInputs(nodes, edges, 'v1', TEXT_IMAGE);
+
+    expect(out.startFrameUrl).toBe('https://cdn/cat.png');
+    expect(out.referenceImageUrls).toEqual([]);
+  });
+
+  it('a model that takes no reference images keeps a wired first frame and refuses the extra image', () => {
+    const nodes = [
+      node({ id: 'v1', type: 'video', model: 'x-ai/grok-imagine-video-1.5-lite' }),
+      node({ id: 'cover', type: 'image', mediaUrl: 'https://cdn/cover.png' }),
+      node({ id: 'mood', type: 'image', mediaUrl: 'https://cdn/mood.png' })
+    ];
+    const edges = [
+      edge({ id: 'e1', sourceNodeId: 'mood', targetNodeId: 'v1' }),
+      edge({ id: 'e2', sourceNodeId: 'cover', targetNodeId: 'v1', targetHandle: FIRST_FRAME_HANDLE })
+    ];
+
+    const out = resolveUpstreamInputs(nodes, edges, 'v1', TEXT_IMAGE);
+
+    expect(out.startFrameUrl).toBe('https://cdn/cover.png');
+    expect(out.referenceImageUrls).toEqual([]);
+    expect(out.rejected).toEqual([{ nodeId: 'mood', why: expect.stringContaining('no reference') }]);
+  });
+
   it('un modello che non regge riferimenti multimodali (Grok) rifiuta le immagini oltre la prima', () => {
     const nodes = [
       node({ id: 'v1', type: 'video', model: 'grok-imagine-video-1-5-preview' }),
@@ -307,10 +338,8 @@ describe('resolveUpstreamInputs — video: fotogrammi e riferimenti', () => {
 
     const out = resolveUpstreamInputs(nodes, edges, 'v1', TEXT_IMAGE);
 
-    // Grok tiene un'immagine (`Math.max(caps.images, 1)`, in `upstream-inputs.ts::listCapacity`)
-    // — senza maniglia resta un riferimento, non un fotogramma implicito.
-    expect(out.startFrameUrl).toBeNull();
-    expect(out.referenceImageUrls).toEqual(['https://cdn/a.png']);
+    expect(out.startFrameUrl).toBe('https://cdn/a.png');
+    expect(out.referenceImageUrls).toEqual([]);
     expect(out.rejected).toEqual([{ nodeId: 'b', why: expect.any(String) }]);
   });
 
@@ -472,7 +501,7 @@ describe('resolveUpstreamInputs — un\'immagine caricata, non generata', () => 
   it('alimenta il connettore immagini come un\'immagine generata', () => {
     const nodes = [
       node({ id: 'u1', type: 'image', mediaUrl: 'https://cdn/upload.png' }),
-      node({ id: 'v1', type: 'video' })
+      node({ id: 'v1', type: 'video', model: 'bytedance/seedance-2-5' })
     ];
     const edges = [edge({ id: 'e1', sourceNodeId: 'u1', targetNodeId: 'v1' })];
 

@@ -405,6 +405,36 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
     );
   }
 
+  it("a video the provider refuses carries the provider's reason onto the node", async () => {
+    generateVideoWithoutBrand.mockReset();
+    generateVideoWithoutBrand.mockResolvedValue({
+      ok: false,
+      error: 'render_failed',
+      reason: '`input_references` is not supported for this model.'
+    });
+
+    const videoNodeRow = { ...freshNodeRow, type: 'video' };
+    const { db } = fakeDb(
+      { nodes: [videoNodeRow], assets: [] },
+      { updateRows: { nodes: [{ ...videoNodeRow, version: 2 }] } }
+    );
+
+    const result = await runGenNode(db, {
+      orgId: ORG,
+      projectId: PROJECT,
+      canvasId: CANVAS,
+      nodeId: NODE,
+      userId: USER,
+      medium: 'video',
+      prompt: 'a dancing cat',
+      model: 'bytedance/seedance-2-5',
+      params: {},
+      expectedVersion: 1
+    });
+
+    expect(result).toMatchObject({ kind: 'refused', error: expect.stringContaining('input_references') });
+  });
+
   it('params.resolution scelto nella barra raggiunge generateVideoWithoutBrand', async () => {
     generateVideoWithoutBrand.mockReset();
     generateVideoWithoutBrand.mockResolvedValue({ ok: true, jobId: 'job-1' });
