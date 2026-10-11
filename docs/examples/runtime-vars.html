@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>feega motion · runtime variables</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; background: #0b0b0c; color: #f4f4f5; display: grid; grid-template-columns: 1fr 280px; min-height: 100vh; }
+      feega-motion { height: 100vh; }
+      form { padding: 24px; display: grid; gap: 16px; align-content: start; border-left: 1px solid #27272a; }
+      label { display: grid; gap: 6px; font-size: 13px; }
+      input { border-radius: 0; }
+      pre { font: 11px ui-monospace, monospace; color: #a1a1aa; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <feega-motion id="video" vars='{"speed":1}'></feega-motion>
+    <form id="controls">
+      <label>speed <input name="speed" type="range" min="0" max="5" step="0.1" value="1" /></label>
+      <label><span><input name="spin" type="checkbox" checked /> spin</span></label>
+      <label>label <input name="label" type="text" value="Hello" /></label>
+      <label>tint <input name="tint" type="color" value="#ffffff" /></label>
+      <pre id="echo">waiting for the player…</pre>
+    </form>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const origin = params.get('origin') ?? 'https://oh.feega.app';
+      const video = document.getElementById('video');
+      video.setAttribute('src', params.get('id') ?? 'your-embed-id');
+
+      const loader = document.createElement('script');
+      loader.src = `${origin}/embed.js`;
+      document.head.append(loader);
+
+      const read = { range: (el) => Number(el.value), checkbox: (el) => el.checked, text: (el) => el.value, color: (el) => el.value };
+      document.getElementById('controls').addEventListener('input', (e) => {
+        const el = e.target;
+        video.setVars?.({ [el.name]: read[el.type](el) });
+      });
+      video.addEventListener('ready', (e) => (document.getElementById('echo').textContent = `schema ${JSON.stringify(e.detail.vars, null, 1)}`));
+      video.addEventListener('vars-changed', (e) => (document.getElementById('echo').textContent = `player kept ${JSON.stringify(e.detail)}`));
+    </script>
+  </body>
+</html>
