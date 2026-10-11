@@ -250,8 +250,9 @@ const rows = Math.ceil(items.length / cols);
 const GAP = UNIT * 0.018;
 const tw = Math.min((W * 0.84 - GAP * (cols - 1)) / cols, UNIT * 0.62);
 const th = tw * 0.62;
-const persp = el('div', 'position:absolute;inset:0;perspective:' + W * 1.2 + 'px;');
-const grid = el('div', 'position:absolute;left:50%;top:50%;width:' + (cols * tw + (cols - 1) * GAP) + 'px;height:' + (rows * th + (rows - 1) * GAP) + 'px;transform-style:preserve-3d;', persp);
+const DEPTH = W * 1.2;
+const stage = el('div', 'position:absolute;inset:0;');
+const grid = el('div', 'position:absolute;left:50%;top:50%;width:' + (cols * tw + (cols - 1) * GAP) + 'px;height:' + (rows * th + (rows - 1) * GAP) + 'px;', stage);
 const SCATTER = [[-1.3, -0.9, -900, 55, -35], [0.2, -1.4, -1300, -40, 25], [1.4, -0.6, -700, 30, 50], [-1.5, 0.9, -1100, -50, -30], [0.1, 1.5, -800, 45, 40], [1.3, 1.0, -1200, -35, -45]];
 const tiles = items.map((label, i) => {
   const c = i % cols;
@@ -263,11 +264,11 @@ const tiles = items.map((label, i) => {
 });
 drive((t) => {
   const settleAll = span(t, 1.6, Math.max(0.1, duration - 1.6));
-  grid.style.transform = 'translate(-50%,-50%) rotateX(' + mix(8, 0, out(span(t, 0, 1.8))).toFixed(3) + 'deg) scale(' + (1 + 0.04 * settleAll).toFixed(4) + ')';
+  grid.style.transform = 'translate(-50%,-50%) scale(' + (1 + 0.04 * settleAll).toFixed(4) + ')';
   tiles.forEach((tile, i) => {
     const [sx, sy, sz, rx, ry] = SCATTER[i % SCATTER.length];
     const p = out(span(t, 0.1 + i * 0.08, 1.15));
-    tile.style.transform = 'translate3d(' + (sx * tw * (1 - p)).toFixed(1) + 'px,' + (sy * th * (1 - p)).toFixed(1) + 'px,' + (sz * (1 - p)).toFixed(1) + 'px) rotateX(' + (rx * (1 - p)).toFixed(2) + 'deg) rotateY(' + (ry * (1 - p)).toFixed(2) + 'deg)';
+    tile.style.transform = p >= 1 ? 'none' : 'translate(' + (sx * tw * (1 - p)).toFixed(1) + 'px,' + (sy * th * (1 - p)).toFixed(1) + 'px) scale(' + (DEPTH / (DEPTH - sz * (1 - p))).toFixed(4) + ') rotate(' + ((rx + ry) * 0.2 * (1 - p)).toFixed(2) + 'deg)';
     tile.style.opacity = String(clamp(p * 2, 0, 1));
   });
 });

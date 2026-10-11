@@ -232,6 +232,15 @@ describe('every text slot declares how much it holds', () => {
   });
 });
 
+describe('feature-grid survives the export seek check', () => {
+  it('flies its tiles in 2D: 3D layers rasterized by seek history and failed the check in the v4 run', () => {
+    const draw = drawPiece(shotSource(ShotId.FeatureGrid, UI).js, SLOTS[ShotId.FeatureGrid], DURATION);
+    const transforms = [0.2, 0.8, 1.4, 3].flatMap((t) => all(draw(t)).map((n) => `${String(n.style.transform ?? '')} ${cssOf(n)}`));
+
+    expect(transforms.filter((t) => /3d|rotate[XY]|perspective|preserve-3d/.test(t))).toEqual([]);
+  });
+});
+
 describe('UI shots in vertical', () => {
   it('before-after stacks in 9:16: the UI wipes in under the pain line, not beside it', () => {
     const clipped = (frame: { width: number; height: number }) => all(drawnAt(ShotId.BeforeAfter, frame)).map((n) => String(n.style.clipPath ?? '')).find((c) => c.startsWith('inset('));
