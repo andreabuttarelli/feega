@@ -371,9 +371,10 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     ];
   };
 
+  let sheetBatch = 0;
   const reviewCut = async (): Promise<ModelMessage | null> => {
     const ports = {
-      frames: (times: number[]) => drawTurnFrames(`${CRITIC_ID}-${times[0]}`, times),
+      frames: (times: number[]) => drawTurnFrames(`${CRITIC_ID}-${sheetBatch++}`, times),
       tile: tileSheet,
       ask: async (q: { prompt: string; images: LlmMediaPart[] }) => {
         const answer = await llmStructured({ ...q, schema: CRITIC_SCHEMA, model: visionModel ?? model, temperature: 0, label: STUDIO_ROSTER[StudioRole.Critic].label });

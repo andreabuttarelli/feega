@@ -246,7 +246,8 @@ vi.mock('$lib/server/motion/brand-sources', async () => {
 });
 
 const { startMotionTurn, Browser, MAX_DELIVERY_ATTEMPTS } = await import('./turn');
-const { DOC_EDITED } = await import('$lib/motion/frames-request');
+const { DOC_EDITED, FRAMES_REQUEST } = await import('$lib/motion/frames-request');
+const { FrameUpload } = await import('./frames');
 type DocEdited = import('$lib/motion/frames-request').DocEdited;
 
 async function turn(reasoning: string | null = 'low', browser = Browser.Attached, landingMs?: number, stopPollMs = 3000) {
@@ -322,6 +323,8 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.critiques).toHaveLength(1);
     expect(world.critiques[0].images).toHaveLength(1);
     expect(world.critiques[0].prompt).toContain('contact sheet of the WHOLE video');
+    const asked = world.chunks.filter((c) => c.type === FRAMES_REQUEST).map((c) => (c.data as { callId: string }).callId);
+    expect(asked.every((id) => FrameUpload.shape.callId.safeParse(id).success)).toBe(true);
     expect(world.calls.some((c) => textOf(lastMessage(c.prompt)).includes('the frame is empty, put the product UI'))).toBe(true);
   });
 
