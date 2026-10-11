@@ -35,7 +35,7 @@ elements in DOM order: sidebar first.
   re-hinting as flicker. ui-focus now glides between views clamped once
   (no per-frame clamp, no cursor follow), `.cam` keeps its raster
   (`will-change: transform`), and the flicker detector counts a delta only
-  above 12% of the local level.
+  above 25% of the local level.
 - **v8 follow-ups.** Each parallel shot crew has its own look
   (`ownLook`): crew B is no longer held by crew A's frames. `recreate_ui`
   refuses a url already rebuilt under another name (v8: /app twice).
