@@ -166,3 +166,14 @@ describe('finalReply', () => {
     expect(reply).not.toContain('Draft.');
   });
 });
+
+describe('the closing summary does not reopen what the user settled', () => {
+  it('states what stays open instead of asking, and never re-asks an answered question (eval: linear re-asked for a test account twice after no)', async () => {
+    const { SUMMARY_PROMPT, selfCheckPrompt } = await import('./frames');
+
+    for (const prompt of [SUMMARY_PROMPT, selfCheckPrompt([1])]) {
+      expect(prompt).not.toContain('anything left to decide');
+      expect(prompt).toContain('never ask again what the user already answered');
+    }
+  });
+});

@@ -10,7 +10,7 @@ import { analyzeAudio } from '$lib/motion/audio-analysis';
 import { UI_KIT } from '$lib/motion/ui-kit/kit';
 import { billedUsdInScope, withOrgContext } from '$lib/server/ai-log';
 import { judge } from './judge';
-import { AccountGiven, Teardowns, asksUser, serverEnv, claimPort, cutAnswerFor, replyTo, turnSettled, type AgentState, type TestAccount } from './drive';
+import { AccountGiven, Teardowns, accountAfter, asksUser, serverEnv, claimPort, cutAnswerFor, replyTo, turnSettled, type AgentState, type TestAccount } from './drive';
 import { contactSheet, cuts, duration, grayFrames, judgeFrames, monoSamples, PROBE_SIZE } from './media';
 import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, uiLayers, TASTE_AXES, type CaseResult, type Facts } from './score';
 
@@ -103,11 +103,11 @@ async function drive(page: Page, agentUrl: string, account: TestAccount | null):
       continue;
     }
     const last = (await page.locator('[role="log"] .prose').allInnerTexts()).at(-1)?.trim() ?? '';
-    if (!asksUser(last) || replies >= MAX_REPLIES) {
+    if (!asksUser(last, given) || replies >= MAX_REPLIES) {
       return;
     }
     const reply = replyTo(last, account, given);
-    given = reply.includes(account?.password ?? '\0') ? AccountGiven.Yes : given;
+    given = accountAfter(last, reply, account, given);
     say(`  agent asked, replying: ${reply}`);
     const input = page.locator('#chat-composer-input');
     await input.fill(reply);
