@@ -71,7 +71,7 @@ export type AppBrowseInput = z.infer<typeof appBrowseInputSchema>;
 export type AppPage = { url: string; ok: true; shot: number; ui: UiDigest } | { url: string; ok: false; error: string };
 
 export type AppBrowseOutcome =
-  | { ok: true; url: string; session: SessionUse; pages: AppPage[]; dismissed: string[]; steps: StepReport[]; shots: Buffer[]; ui?: UiDigest; costUsd: number; stopped?: string }
+  | { ok: true; url: string; session: SessionUse; pages: AppPage[]; dismissed: string[]; links: AppLink[]; steps: StepReport[]; shots: Buffer[]; ui?: UiDigest; costUsd: number; stopped?: string }
   | { ok: false; error: string; shots: Buffer[]; costUsd: number };
 
 export const NO_ACCOUNT = 'no app account for this project yet: ask the user for a TEST account (login url, email, password) of the app, saying the AI will see these credentials, so they must be test credentials, never a real account';
@@ -101,6 +101,24 @@ export function signInPath(url: string): boolean {
   }
   const path = new URL(url).pathname.replace(/\/+$/, '').toLowerCase();
   return /(^|\/)(log-?in|sign-?in|sign-?up)(\/|$)/.test(path);
+}
+
+const SESSION_PATH = /(^|\/)(log-?in|sign-?in|sign-?up|log-?out|sign-?out)(\/|$)/;
+const APP_LINKS_MAX = 24;
+
+export type AppLink = { text: string; url: string };
+
+export function appLinks(uis: UiDigest[], app: string): AppLink[] {
+  const seen = new Set<string>();
+  const links: AppLink[] = [];
+  for (const el of uis.flatMap((u) => u.elements)) {
+    if (!el.href || !el.text || !sameApp(el.href, app) || SESSION_PATH.test(new URL(el.href).pathname.toLowerCase()) || seen.has(el.href)) {
+      continue;
+    }
+    seen.add(el.href);
+    links.push({ text: el.text, url: el.href });
+  }
+  return links.slice(0, APP_LINKS_MAX);
 }
 
 export function onLoginPage(pageUrl: string, loginUrl: string): boolean {
@@ -239,7 +257,8 @@ export async function appBrowse(input: AppBrowseInput, ports: AppBrowsePorts): P
 
     const pages: AppPage[] = [];
     const dismissed = await dismissOverlays(opened);
-    for (const page of wanted) {
+    const visits = wanted.length || input.steps?.length ? wanted : [opened.url()];
+    for (const page of visits) {
       if (now() > deadline) {
         break;
       }
@@ -257,9 +276,10 @@ export async function appBrowse(input: AppBrowseInput, ports: AppBrowsePorts): P
     const walked = await walkSteps(tab, steps, deadline, APP_MAX_SHOTS - shots.length);
     shots.push(...walked.shots);
     const ui = walked.shots.length ? await opened.ui().catch(() => undefined) : undefined;
+    const links = appLinks([...pages.flatMap((p) => (p.ok ? [p.ui] : [])), ...(ui ? [ui] : [])], account.loginUrl);
     await ports.accounts.save({ ...account, session: await opened.session(), sessionUntil: now() + APP_SESSION_TTL_MS });
 
-    return { ok: true, url: opened.url(), session, pages, dismissed, steps: walked.steps, shots, ...(ui ? { ui } : {}), costUsd: await close(), ...(walked.stopped ? { stopped: walked.stopped } : {}) };
+    return { ok: true, url: opened.url(), session, pages, dismissed, links, steps: walked.steps, shots, ...(ui ? { ui } : {}), costUsd: await close(), ...(walked.stopped ? { stopped: walked.stopped } : {}) };
   } catch (e) {
     return { ok: false, error: hidden(errorOf(e), account), shots, costUsd: await close() };
   }

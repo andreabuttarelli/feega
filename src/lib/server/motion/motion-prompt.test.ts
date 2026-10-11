@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { motionAgentPrompt } from './motion-prompt';
+import { PRODUCT_SCREENS_RULE, motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { HOUSE_DEFAULTS, STYLES, TITLE_CARD_RULE, TITLE_TYPE_RULE, UI_FOCUS_RULE } from '$lib/motion/style';
 import { MotionStyle } from '$lib/motion/style-model';
@@ -96,5 +96,14 @@ describe('references become measurable targets before the build', () => {
     for (const move of ['cropped by the frame', 'columns', 'rule']) {
       expect(text).toContain(move);
     }
+  });
+});
+
+describe('a product trailer films the screens where the work happens', () => {
+  it.each([MotionStyle.LaunchFilm, MotionStyle.AppleMinimal])('%s sends the agent past the page after login (v4 stopped at the welcome tour)', (style) => {
+    expect(prompt(style)).toContain(PRODUCT_SCREENS_RULE);
+    expect(PRODUCT_SCREENS_RULE).toMatch(/links/);
+    expect(PRODUCT_SCREENS_RULE).toMatch(/editor/);
+    expect(PRODUCT_SCREENS_RULE).toMatch(/at least two/);
   });
 });

@@ -23,7 +23,7 @@ export type Tab = {
 };
 
 export type SessionCookie = { name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean; secure: boolean };
-export type UiElement = { tag: string; text: string; x: number; y: number; w: number; h: number; color?: string; background?: string; font?: string; size?: number; weight?: number; radius?: string };
+export type UiElement = { tag: string; text: string; x: number; y: number; w: number; h: number; color?: string; background?: string; font?: string; size?: number; weight?: number; radius?: string; href?: string };
 export type UiDigest = { title: string; elements: UiElement[] };
 
 export type AppSession = { cookies: SessionCookie[]; storage: Record<string, string> };
@@ -153,7 +153,7 @@ function uiOf(limits: { max: number; text: number }): UiDigest {
       continue;
     }
     const css = getComputedStyle(el);
-    elements.push({ tag: el.tagName.toLowerCase(), text, x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height), color: css.color, background: css.backgroundColor, font: css.fontFamily.split(',')[0], size: parseFloat(css.fontSize), weight: Number(css.fontWeight), radius: css.borderRadius });
+    elements.push({ tag: el.tagName.toLowerCase(), text, x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height), color: css.color, background: css.backgroundColor, font: css.fontFamily.split(',')[0], size: parseFloat(css.fontSize), weight: Number(css.fontWeight), radius: css.borderRadius, ...(el instanceof HTMLAnchorElement && el.href ? { href: el.href } : {}) });
   }
   return { title: document.title, elements };
 }
