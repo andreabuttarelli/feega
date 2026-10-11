@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { CutAnswer, cutAnswer } from '$lib/motion/cut-review';
-import { STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleTools, turnRole } from './studio-roster';
+import { OPUS, STUDIO_ROSTER, StudioRole, WritesCode, roleBudgetUsd, roleModel, roleTools, turnRole } from './studio-roster';
 
 const empty = newMotionDoc(MotionFormat.Landscape);
 const scripted = { ...empty, script: { research: {}, acts: [] } } as never;
@@ -29,5 +29,17 @@ describe('the studio roster', () => {
   it('the builder and its critic share one turn cap without exceeding it', () => {
     expect(STUDIO_ROSTER[StudioRole.Builder].budgetShare + STUDIO_ROSTER[StudioRole.Critic].budgetShare).toBeCloseTo(1);
     Object.values(STUDIO_ROSTER).forEach((r) => expect(r.budgetShare).toBeLessThanOrEqual(1));
+  });
+
+  it('every role that writes code runs on Opus, never a smaller model', () => {
+    const coders = Object.values(StudioRole).filter((r) => STUDIO_ROSTER[r].code === WritesCode.Yes);
+
+    expect(coders).toEqual([StudioRole.Builder, StudioRole.Fixer]);
+    coders.forEach((r) => expect(roleModel(r, 'some/vision-model')).toBe(OPUS));
+  });
+
+  it('the copywriter writes on Opus; the critic may look with another model', () => {
+    expect(roleModel(StudioRole.Copywriter, 'v/m')).toBe(OPUS);
+    expect(roleModel(StudioRole.Critic, 'v/m')).toBe('v/m');
   });
 });

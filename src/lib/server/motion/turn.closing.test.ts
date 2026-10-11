@@ -64,7 +64,7 @@ const SCRIPT = {
     { act: 'problem', start: 0, end: 3, scene: 'Scattered folders', on_screen: ['The price changed.'], ui: 'Finder: marta-bakery, cardstack-launch, supasito.com, each edited 9 days ago' },
     { act: 'solution', start: 3, end: 7, scene: 'One prompt', on_screen: ['Say what should change.'], ui: 'Sidebar Supasito, Cardstack, Marta Bakery; prompt Set the price to 12; preview' },
     { act: 'proof', start: 7, end: 11, scene: 'Preview', on_screen: ['In one place.'], sources: [source] },
-    { act: 'claim', start: 11, end: 14, scene: 'Logo', on_screen: [PROMISE] }
+    { act: 'claim', start: 11, end: 14, scene: 'Logo', on_screen: ['Every site you run.', 'Up to date.', 'In one place.'] }
   ]
 };
 

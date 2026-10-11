@@ -57,7 +57,7 @@ import { STORY_BEATS, STORY_SHARE, markStory } from '$lib/motion/story';
 import { anchorsOf } from '$lib/motion/clicks';
 import { clickUi } from '$lib/motion/cursor-ops';
 import { Isolate, focusUi } from '$lib/motion/ui-focus';
-import { ACTS, BrandKind, briefOf, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
+import { ACTS, BrandKind, briefOf, offScript, scriptLines, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
 import { quoted, unsourcedFigures, type SitePage } from './site-copy';
 import { MediaKind, boardMedia, outlineOf, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
 import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
@@ -121,6 +121,10 @@ import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '$lib/motion/style-model';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
+const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
+
+const copyTexts = (slots: Record<string, string | number>) => Object.entries(slots).flatMap(([k, v]) => (COPY_SLOTS.has(k) && typeof v === 'string' ? v.split('|').map((s) => s.trim()).filter(Boolean) : []));
+
 export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[] };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
@@ -157,6 +161,7 @@ export type MotionToolDeps = {
   layouts?: LayoutStore;
   web?: WebToolDeps;
   storyboard?: StoryboardPort;
+  copywrite?: (script: LaunchScript) => Promise<LaunchScript>;
 };
 
 export type StoryboardPort = {
@@ -1700,12 +1705,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (sourcing.unread) {
           return { ok: false, error: 'read the site first: analyze_site gives the pages and quotes every claim must come from' };
         }
-        const problems = [...scriptProblems(input), ...sourcing.problems];
+        const written = deps.copywrite ? await deps.copywrite(input) : input;
+        const problems = [...scriptProblems(written), ...sourcing.problems];
         if (problems.length) {
           return { ok: false, error: problems.join('; ') };
         }
-        const saved = apply({ ok: true, doc: { ...session.doc, script: input } }, 'saved the research and the script');
-        return saved.ok ? { ok: true, brief: briefOf(input) } : saved;
+        const saved = apply({ ok: true, doc: { ...session.doc, script: written } }, 'saved the research and the script');
+        return saved.ok ? { ok: true, brief: briefOf(written), lines: scriptLines(written) } : saved;
       }
     }),
 
@@ -1914,6 +1920,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const fonts = registeredFont(session.doc, input.slots.font);
         if (!fonts.ok) {
           return fonts;
+        }
+        const script = session.doc.script;
+        const off = script ? offScript(copyTexts(input.slots), script) : [];
+        if (script && off.length) {
+          return { ok: false, error: `${off.map((t) => `"${t}"`).join(', ')} is not a line of the script: on-screen titles come only from its lines, in their order: ${scriptLines(script).map((l) => `"${l}"`).join(' / ')}` };
         }
         const id = deps.newId();
         const made = addShot(fonts.doc, { shot: input.shot, slots: input.slots, ui: input.ui, at: input.at, seconds: input.seconds, trackId: input.track_id }, id);

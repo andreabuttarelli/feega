@@ -30,8 +30,9 @@ import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/serv
 import { CutGate, REVIEW_CUT, cutGate, type CutReview } from '$lib/motion/cut-review';
 import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
+import { COPY_SCHEMA, copywrite } from '$lib/server/motion/copywriter';
 import { projectMemory } from '$lib/server/motion/studio-memory';
-import { STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleTools, turnRole } from '$lib/server/motion/studio-roster';
+import { STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
 import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
@@ -274,6 +275,12 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
     storyboard,
+    copywrite: async (script) => {
+      const ask = async (prompt: string) => ({ answer: await llmStructured({ prompt, schema: COPY_SCHEMA, model: roleModel(StudioRole.Copywriter, model), temperature: 0.4, label: STUDIO_ROSTER[StudioRole.Copywriter].label }), usd: billedUsdInScope() ?? 0 });
+      const out = await withOrgContext(orgId, () => copywrite({ ask }, script));
+      spent += out.usd;
+      return out.script;
+    },
     captureUi: uiCapture(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
@@ -314,7 +321,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     }
   });
 
-  const codeModel = llmCodeModel();
+  const codeModel = roleModel(role, llmCodeModel());
   const opening = openingTier({ message, doc: head.doc, selection });
   await ensureGatewayModels();
   const visionModel = gatewayModel(model)?.usable ? model : llmVisionModel();
@@ -397,7 +404,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       tile: tileSheet,
       density: frameDensities,
       ask: async (q: { prompt: string; images: LlmMediaPart[] }) => {
-        const answer = await llmStructured({ ...q, schema: CRITIC_SCHEMA, model: visionModel ?? model, temperature: 0, label: STUDIO_ROSTER[StudioRole.Critic].label });
+        const answer = await llmStructured({ ...q, schema: CRITIC_SCHEMA, model: roleModel(StudioRole.Critic, visionModel ?? model), temperature: 0, label: STUDIO_ROSTER[StudioRole.Critic].label });
         return { answer, usd: billedUsdInScope() ?? 0 };
       }
     };
