@@ -48,6 +48,17 @@ describe('the copywriter', () => {
     expect(applyCopy(SCRIPT, { acts: [] })).toBe(SCRIPT);
   });
 
+  it('a one-sentence tagline split across cards, as "Make / your brand / move." came back, is put back on one card', () => {
+    const promise = { text: 'Make your brand move.', source: { ...source, quote: 'Make your brand move.' } };
+    const moving = { ...SCRIPT, research: { ...SCRIPT.research, promise } };
+    const split = { acts: LINES.acts.map((a) => (a.act === 'claim' ? { ...a, on_screen: ['Make', 'your brand', 'move.', 'supasito.com'] } : a)) };
+
+    const claim = applyCopy(moving, split).acts.find((a) => a.act === 'claim');
+
+    expect(claim?.on_screen).toEqual(['Make your brand move.', 'supasito.com']);
+    expect(copyPrompt(SCRIPT)).toContain('never split a sentence');
+  });
+
   it('a failing copywriter costs nothing more than its call and keeps the script', async () => {
     const out = await copywrite({ ask: async () => { throw new Error('down'); } }, SCRIPT);
 

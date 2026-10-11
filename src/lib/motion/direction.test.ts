@@ -476,6 +476,12 @@ describe('the script gate', () => {
     }
   });
 
+  it('a trailer built without its script cannot be delivered, as when write_script waited on a test account and the next turn built without it', () => {
+    const problems = docProblems(titled(MotionStyle.LaunchFilm), { audioAssets: 0 }).filter((p) => p.kind === Quality.NoScript);
+
+    expect(blocking(problems)).toHaveLength(1);
+  });
+
   it('un esercizio di stile grafico non resta bloccato su uno script che non può avere', () => {
     expect(asksScript(MotionStyle.Graphic)).toBe(false);
     expect(asksScript(MotionStyle.LaunchFilm)).toBe(true);

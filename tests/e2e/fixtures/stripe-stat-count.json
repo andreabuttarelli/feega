@@ -1,0 +1,180 @@
+{
+ "fps": 30,
+ "look": null,
+ "comps": {},
+ "fonts": [
+  {
+   "axes": [
+    [
+     "opsz",
+     14,
+     32
+    ],
+    [
+     "wght",
+     100,
+     900
+    ]
+   ],
+   "family": "Inter",
+   "italic": true,
+   "source": "google",
+   "weights": [
+    100,
+    200,
+    300,
+    400,
+    500,
+    600,
+    700,
+    800,
+    900
+   ],
+   "category": "sans"
+  }
+ ],
+ "width": 1080,
+ "assets": [
+  {
+   "id": "f4e7e31f-d6b8-4633-b176-7439608bb757",
+   "kind": "image",
+   "name": "image \u00b7 2026-10-11 \u00b7 f4e7e3"
+  },
+  {
+   "id": "99769d4a-c01c-4371-bf12-4339651ebd7f",
+   "kind": "audio",
+   "name": "music drive-128"
+  }
+ ],
+ "camera": null,
+ "fields": [],
+ "height": 1920,
+ "script": null,
+ "tracks": [
+  {
+   "id": "v",
+   "kind": "visual",
+   "name": "Video",
+   "clips": [
+    {
+     "id": "00da098c",
+     "from": 0,
+     "mask": null,
+     "path": null,
+     "blend": "normal",
+     "depth": 0,
+     "matte": "none",
+     "props": {
+      "ink": "#ffffff",
+      "font": "sans",
+      "name": "ShotStatCount",
+      "label": "payment methods",
+      "muted": "#8b8b8b",
+      "paper": "#000000",
+      "value": "125+",
+      "accent": "#635bff"
+     },
+     "space": "world",
+     "parent": null,
+     "effects": [],
+     "shaders": [],
+     "textPath": null,
+     "animators": [],
+     "component": "Custom",
+     "keyframes": {},
+     "maskStack": [],
+     "transform": {},
+     "trimStart": 0,
+     "motionBlur": true,
+     "expressions": {},
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "parentOpacity": "inherit",
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "durationInFrames": 75
+    }
+   ]
+  }
+ ],
+ "markers": [],
+ "shaders": {},
+ "version": 5,
+ "background": "brand",
+ "components": {
+  "ShotStatCount": {
+   "check": {
+    "hash": "tjrd6w-4p6",
+    "state": "failed",
+    "problems": [
+     "the frame at 0.77s differs between visits (visit 20 after seeking from 1.77s): state leaks between seeks"
+    ]
+   },
+   "source": {
+    "js": "\nconst W = root.clientWidth || 1920;\nconst H = root.clientHeight || 1080;\nconst UNIT = Math.min(W, H);\nconst WIDE = W >= H;\nconst font = param('font', 'sans', { type: 'font', group: 'Style' });\nconst ink = param('ink', '#ffffff', { type: 'color', group: 'Style', label: 'Text' });\nconst paper = param('paper', '#000000', { type: 'color', group: 'Style', label: 'Background' });\nconst muted = param('muted', '#8b8b8b', { type: 'color', group: 'Style', label: 'Muted text' });\nconst accent = param('accent', '#0099ff', { type: 'color', group: 'Style' });\nroot.style.background = paper;\nroot.style.overflow = 'hidden';\nroot.style.fontFamily = font;\nconst clamp = (v, a, b) => Math.min(b, Math.max(a, v));\nconst span = (t, at, len) => clamp((t - at) / Math.max(0.001, len), 0, 1);\nconst EXPO = 1 - Math.pow(2, -10);\nconst out = (p) => (p >= 1 ? 1 : (1 - Math.pow(2, -10 * p)) / EXPO);\nconst into = (p) => (p <= 0 ? 0 : Math.pow(2, 10 * p - 10));\nconst move = (p) => (p <= 0 ? 0 : p >= 1 ? 1 : p < 0.5 ? Math.pow(2, 20 * p - 10) / 2 : (2 - Math.pow(2, -20 * p + 10)) / 2);\nconst soft = (p) => (p <= 0 ? 0 : p >= 1 ? 1 : p < 0.5 ? 16 * Math.pow(p, 5) : 1 - Math.pow(2 - 2 * p, 5) / 2);\nconst mix = (a, b, p) => a + (b - a) * p;\nconst el = (tag, css, host, content) => {\n  const n = document.createElement(tag);\n  n.style.cssText = css || '';\n  if (content !== undefined) {\n    n.textContent = content;\n  }\n  (host || root).appendChild(n);\n  return n;\n};\nconst TITLE = 'font-weight:600;letter-spacing:-0.05em;line-height:0.95;';\nconst GLYPH = 0.52;\nconst MAX_ROWS = WIDE ? 2 : 4;\nconst CAPTION = UNIT * (WIDE ? 0.04 : 0.056);\nconst wrapRows = (line, cap) => line.split(/\\s+/).filter(Boolean).reduce((rows, w) => {\n  const last = rows[rows.length - 1];\n  if (last !== undefined && (last + ' ' + w).length <= cap) {\n    rows[rows.length - 1] = last + ' ' + w;\n    return rows;\n  }\n  rows.push(w);\n  return rows;\n}, []);\nconst fitRows = (lines, share, most) => {\n  const longest = Math.max(1, ...lines.map((l) => l.length));\n  const word = Math.max(1, ...lines.flatMap((l) => l.split(/\\s+/)).map((w) => w.length));\n  let best = { size: 0, rows: lines };\n  for (let cap = longest; cap >= word; cap--) {\n    const rows = lines.flatMap((l) => wrapRows(l, cap));\n    if (rows.length > Math.max(most, lines.length)) {\n      continue;\n    }\n    const wide = Math.max(...rows.map((r) => r.length));\n    const size = Math.min((H * share) / rows.length, (W * 0.86) / (wide * GLYPH));\n    if (size > best.size) {\n      best = { size, rows };\n    }\n  }\n  return best;\n};\nconst titleSize = (copy, share) => fitRows([String(copy)], share, MAX_ROWS).size;\nconst drive = (render) => {\n  render(0);\n  tl.to({}, { duration, ease: 'none', onUpdate() { render(this.time()); } }, 0);\n};\n\n\nconst value = String(param('value', '12,400', { type: 'text', group: 'Content' }));\nconst label = param('label', 'videos made this month', { type: 'text', group: 'Content' });\nconst m = /^([^0-9]*)([0-9][0-9.,]*)(.*)$/.exec(value) || ['', '', '0', value];\nconst raw = m[2].replace(/,/g, '');\nconst digits = (raw.split('.')[1] || '').length;\nconst grouped = m[2].includes(',');\nconst size = titleSize(value, 0.42);\nconst num = el('div', 'position:absolute;left:0;right:0;top:' + (H * 0.5 - size * 0.62) + 'px;height:' + size * 1.1 + 'px;overflow:hidden;color:' + ink + ';font-size:' + size + 'px;font-variant-numeric:tabular-nums;' + TITLE);\nconst rule = el('div', 'position:absolute;left:50%;top:' + (H * 0.5 + size * 0.42) + 'px;height:' + Math.max(2, UNIT * 0.004) + 'px;background:' + accent + ';');\nconst cap = el('div', 'position:absolute;left:0;right:0;top:' + (H * 0.5 + size * 0.42 + UNIT * 0.04) + 'px;text-align:center;color:' + muted + ';font-size:' + CAPTION + 'px;font-weight:500;letter-spacing:-0.02em;', root, label);\nconst ruleW = Math.min(W * 0.5, size * 2.2);\nconst show = (n) => {\n  const v = n.toFixed(digits);\n  return m[1] + (grouped ? v.replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',') : v) + m[3];\n};\nconst line = () => el('div', 'position:absolute;left:0;right:0;top:0;text-align:center;line-height:1.1;', num);\nconst shownNow = line();\nconst shownNext = line();\nconst ROLLS = 6;\nconst COUNT_MIN_STEPS = 20;\nconst counts = Number(raw) * Math.pow(10, digits) >= COUNT_MIN_STEPS;\nconst valueAt = (step) => show((Number(raw) * Math.min(step, ROLLS)) / ROLLS);\ndrive((t) => {\n  const u = counts ? ROLLS * (1 - Math.pow(1 - span(t, 0.2, 1.7), 3)) : ROLLS;\n  const step = Math.min(ROLLS, Math.floor(u));\n  const f = step >= ROLLS ? 0 : u - step;\n  shownNow.textContent = valueAt(step);\n  shownNext.textContent = f > 0 ? valueAt(step + 1) : '';\n  shownNow.style.transform = 'translateY(' + (-100 * f).toFixed(3) + '%)';\n  shownNext.style.transform = 'translateY(' + (100 * (1 - f)).toFixed(3) + '%)';\n  const enter = out(span(t, 0.05, 0.7));\n  num.style.opacity = String(enter);\n  num.style.transform = 'scale(' + (mix(1.18, 1, enter) + 0.03 * span(t, 1.8, duration)).toFixed(4) + ')';\n  num.style.filter = enter < 1 ? 'blur(' + (14 * (1 - enter)).toFixed(2) + 'px)' : '';\n  const r = out(span(t, 0.5, 1.1));\n  rule.style.width = (ruleW * r).toFixed(1) + 'px';\n  rule.style.marginLeft = (-ruleW * r / 2).toFixed(1) + 'px';\n  const c = out(span(t, 0.8, 0.7));\n  cap.style.opacity = String(c);\n  cap.style.transform = 'translateY(' + (UNIT * 0.02 * (1 - c)).toFixed(1) + 'px)';\n});\n",
+    "css": "",
+    "html": ""
+   },
+   "version": 1,
+   "propsSchema": {
+    "type": "object",
+    "properties": {
+     "ink": {
+      "type": "string",
+      "group": "Style",
+      "title": "Text",
+      "format": "color",
+      "default": "#ffffff"
+     },
+     "font": {
+      "type": "string",
+      "group": "Style",
+      "format": "font",
+      "default": "sans"
+     },
+     "label": {
+      "type": "string",
+      "group": "Content",
+      "default": "videos made this month"
+     },
+     "muted": {
+      "type": "string",
+      "group": "Style",
+      "title": "Muted text",
+      "format": "color",
+      "default": "#8b8b8b"
+     },
+     "paper": {
+      "type": "string",
+      "group": "Style",
+      "title": "Background",
+      "format": "color",
+      "default": "#000000"
+     },
+     "value": {
+      "type": "string",
+      "group": "Content",
+      "default": "12,400"
+     },
+     "accent": {
+      "type": "string",
+      "group": "Style",
+      "format": "color",
+      "default": "#0099ff"
+     }
+    }
+   }
+  }
+ },
+ "motionBlur": {
+  "enabled": true,
+  "samples": 6,
+  "shutterAngle": 180,
+  "shutterPhase": -90
+ },
+ "durationInFrames": 75
+}

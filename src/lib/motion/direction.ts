@@ -81,7 +81,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.ClickMiss]: Severity.Blocking,
   [Quality.EmptyUi]: Severity.Blocking,
   [Quality.NoMicroMotion]: Severity.Warning,
-  [Quality.NoScript]: Severity.Warning,
+  [Quality.NoScript]: Severity.Blocking,
   [Quality.CutMidAnimation]: Severity.Blocking,
   [Quality.NoHold]: Severity.Blocking,
   [Quality.ScriptDrift]: Severity.Blocking,

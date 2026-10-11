@@ -14,9 +14,11 @@ function must(r: OpResult): MotionDoc {
   return r.doc;
 }
 
-const PIXELS = 64;
-const FRAME = new Uint8Array(PIXELS).fill(40);
-const DRIFTED = new Uint8Array(PIXELS).fill(200);
+const SIDE = 16;
+const picture = (values: Uint8Array) => ({ width: SIDE, values });
+const FRAME = picture(new Uint8Array(SIDE * SIDE).fill(40));
+const DRIFTED = picture(new Uint8Array(SIDE * SIDE).fill(200));
+const edge = (at: number) => picture(new Uint8Array(SIDE * SIDE).map((_, p) => (p % SIDE < at ? 0 : 255)));
 
 const shot = (time: number, image = `img@${time}`, layout = `box@${time}`, luma = FRAME): Shot => ({ time, image, luma, layout, errors: [] });
 
@@ -52,10 +54,25 @@ describe('the seek-determinism check', () => {
 
   it('passes a frame whose revisit differs only by antialiasing noise, as real Chrome draws large glyphs', () => {
     const plan = seekPlan(4, 30);
-    const grain = FRAME.map((v, p) => (p % 9 === 0 ? v + 3 : v));
+    const grain = picture(FRAME.values.map((v, p) => (p % 9 === 0 ? v + 3 : v)));
     const shots = plan.map((t, i) => (i === 19 ? shot(t, 'reencoded', `box@${t}`, grain) : shot(t)));
 
     expect(verdictOf(shots)).toEqual({ ok: true, problems: [], offending: [] });
+  });
+
+  it('passes a revisit where JPEG re-quantised one 8x8 block of a mid-roll digit by 13 levels, as the stripe stat-count measured', () => {
+    const plan = seekPlan(4, 30);
+    const requantised = picture(FRAME.values.map((v, p) => (p % SIDE < 8 && p < 8 * SIDE ? v + (p % 2 ? 13 : -13) : v)));
+    const shots = plan.map((t, i) => (i === 19 ? shot(t, 'requantised', `box@${t}`, requantised) : shot(t)));
+
+    expect(verdictOf(shots)).toEqual({ ok: true, problems: [], offending: [] });
+  });
+
+  it('fails on an edge drawn one pixel off on a revisit', () => {
+    const plan = seekPlan(4, 30);
+    const shots = plan.map((t, i) => (i === 19 ? shot(t, 'shifted', `box@${t}`, edge(5)) : shot(t, `img@${t}`, `box@${t}`, edge(4))));
+
+    expect(verdictOf(shots).ok).toBe(false);
   });
 
   it('fails on boxes that move between visits even when pixels match', () => {

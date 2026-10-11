@@ -46,8 +46,9 @@ function host(doc: MotionDoc): HTMLElement {
   return el;
 }
 
-async function seekCheck(c: ShotCase): Promise<string[]> {
-  const doc = shotDoc(c);
+const seekCheck = (c: ShotCase) => seekCheckDoc(shotDoc(c), shotComponent(c.shot, uiOf(c.shot)));
+
+async function seekCheckDoc(doc: MotionDoc, name: string): Promise<string[]> {
   const request = { format: FrameFormat.Jpeg, width: CHECK_WIDTH, height: Math.round((CHECK_WIDTH * doc.height) / doc.width), quality: CHECK_QUALITY };
   const capture = async (times: number[], html: string) => {
     const player = await mountCapturePlayer(host(doc), html);
@@ -59,7 +60,7 @@ async function seekCheck(c: ShotCase): Promise<string[]> {
     player.dispose();
     return shots;
   };
-  const run = await runCheck(doc, shotComponent(c.shot, uiOf(c.shot)), { compose, capture, luma: decodeLuma });
+  const run = await runCheck(doc, name, { compose, capture, luma: decodeLuma });
   return run.check.problems;
 }
 
@@ -82,8 +83,8 @@ async function jolts(c: ShotCase): Promise<{ jolts: JoltAt[]; diffs: number[] }>
 
 declare global {
   interface Window {
-    shotProbe: { seekCheck: typeof seekCheck; jolts: typeof jolts };
+    shotProbe: { seekCheck: typeof seekCheck; seekCheckDoc: typeof seekCheckDoc; jolts: typeof jolts };
   }
 }
 
-window.shotProbe = { seekCheck, jolts };
+window.shotProbe = { seekCheck, seekCheckDoc, jolts };

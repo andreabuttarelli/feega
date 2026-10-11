@@ -8,9 +8,11 @@ export const CHECK_POINTS = 5;
 const SPREAD = [0.1, 0.3, 0.5, 0.7, 0.92];
 const SCRAMBLE = [2, 4, 0, 3, 1];
 const MAX_PROBLEMS = 6;
-const ANTIALIAS_NOISE = 12;
+const JPEG_BLOCK = 8;
+const BLOCK_NOISE = 2;
 
-export type Shot = { time: number; image: string; luma: Uint8Array; layout: string; errors: ClipError[] };
+export type Luma = { width: number; values: Uint8Array };
+export type Shot = { time: number; image: string; luma: Luma; layout: string; errors: ClipError[] };
 export type Verdict = { ok: boolean; problems: string[]; offending: Shot[] };
 
 export function seekPlan(seconds: number, fps: number): number[] {
@@ -21,14 +23,28 @@ export function seekPlan(seconds: number, fps: number): number[] {
 
 const seconds = (t: number) => `${Math.round(t * 100) / 100}s`;
 
+function blockMeans({ width, values }: Luma): Float64Array {
+  const across = Math.ceil(width / JPEG_BLOCK);
+  const rows = Math.ceil(values.length / width / JPEG_BLOCK);
+  const sums = new Float64Array(across * rows);
+  const counts = new Float64Array(across * rows);
+  values.forEach((v, p) => {
+    const block = Math.floor(p / width / JPEG_BLOCK) * across + Math.floor((p % width) / JPEG_BLOCK);
+    sums[block] += v;
+    counts[block]++;
+  });
+  return sums.map((sum, b) => sum / counts[b]);
+}
+
 function samePicture(a: Shot, b: Shot): boolean {
   if (a.image === b.image) {
     return true;
   }
-  if (a.luma.length !== b.luma.length) {
+  if (a.luma.width !== b.luma.width || a.luma.values.length !== b.luma.values.length) {
     return false;
   }
-  return a.luma.every((v, p) => Math.abs(v - b.luma[p]) <= ANTIALIAS_NOISE);
+  const before = blockMeans(a.luma);
+  return blockMeans(b.luma).every((v, block) => Math.abs(v - before[block]) <= BLOCK_NOISE);
 }
 
 export function verdictOf(shots: Shot[]): Verdict {

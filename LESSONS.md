@@ -263,6 +263,17 @@ frame identici a occhio (feature-grid e device-fly-in, run v4). Le trasformazion
 Move: profondità simulata in 2D (`translate` + `scale`), `transform: none` a riposo; riprodurre
 con `seekPlan` + hash dei jpeg prima di toccare il codice.
 
+### Il seek check fallisce un componente puro dopo la tolleranza di luma
+Signal: "differs between visits" su un frame a metà animazione, 4–5 pixel oltre la soglia, tutti
+dentro un blocco 8x8; nessuna variabile tenuta, `reply.time` uguale al tempo chiesto. È la JPEG
+dei frame di controllo: un rumore sotto soglia sposta un coefficiente quantizzato e tutto il
+blocco cambia. Move: confrontare medie di blocco 8x8, non pixel; riprodurre con il doc dell'eval
+in `seekCheckDoc` (20 giri, Chromium basta), non con lo shot rifatto da `addShot`, che non falliva.
+
+### Un dev server con `NO_HMR=1` serve i moduli vecchi dopo un edit
+Signal: un giro Playwright dopo una modifica si comporta come prima, o `window.x is not a function`
+su una funzione appena aggiunta. Move: riavviare il dev server dopo ogni edit prima di misurare.
+
 ### `app_browse` non entra in una pagina di login SvelteKit
 Signal: login failed, nello screenshot email vuota e password piena, nessun messaggio d'errore;
 la POST dell'azione risponde 403. Non è l'idratazione: Chromium lanciato con gli argomenti di

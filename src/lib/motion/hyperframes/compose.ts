@@ -23,7 +23,7 @@ import { ANIMATE_CSS, ENGINE, animationScript, keyedOverrides, sceneKeys, wrapAn
 import { ancestorsOf, parentsWithChildren } from '../parent';
 import { threeGrains, withoutGrain } from './three-grain';
 import { MASK_CSS, MaskScope, maskArea, maskLayer, startValues } from './masks';
-import { captureScript, contentStamp } from './capture';
+import { COMPOSITION_ID, captureScript, contentStamp } from './capture';
 import { cspMeta } from './csp';
 import { measureScript } from './measure';
 import { Library, Play, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
@@ -69,7 +69,7 @@ import { HOSTED, Module, Script, defaultOrigin, moduleUrl, notice, scriptUrl } f
 export { CAPTURE_REPLY, CAPTURE_REQUEST } from './capture';
 
 export { HYPERFRAMES_VERSION } from '../libs/catalog';
-export const COMPOSITION_ID = 'main';
+export { COMPOSITION_ID };
 
 const FONTS_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fragment+Mono&display=block';
 

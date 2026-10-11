@@ -24,8 +24,21 @@ export function copyPrompt(script: LaunchScript): string {
     `- Promise (the site's own words): ${r.promise.text}`,
     `- Address: ${site}`,
     `Acts: ${script.acts.map((a) => `${a.act} (${a.scene})`).join('; ')}.`,
-    `Rules: each line is said once (never repeat the tagline in two acts), every line at most ${MAX_LINE_WORDS} words, plain words a customer would say, no buzzwords, no hype, no questions without answers. problem: name the pain concretely for that audience. solution: what you do with the product, as actions. proof: one number or result from the facts. claim: the promise split into lines, then the address ${site} as the last line. Write one language for every line: the language of the site's own copy (the promise above), never mixed; the promise stays verbatim in the site's words only when that is the same language, otherwise translate it. Read all the lines in order: they must make sense as one sentence of thought, each following from the one before.`
+    `Rules: each line is said once (never repeat the tagline in two acts), every line at most ${MAX_LINE_WORDS} words, plain words a customer would say, no buzzwords, no hype, no questions without answers. problem: name the pain concretely for that audience. solution: what you do with the product, as actions. proof: one number or result from the facts. claim: the promise one sentence per line (never split a sentence across lines), then the address ${site} as the last line. Write one language for every line: the language of the site's own copy (the promise above), never mixed; the promise stays verbatim in the site's words only when that is the same language, otherwise translate it. Read all the lines in order: they must make sense as one sentence of thought, each following from the one before.`
   ].join('\n');
+}
+
+const SENTENCE_END = /[.!?…]$/;
+const CONTINUES = /^\p{Ll}/u;
+
+function wholeSentences(lines: string[]): string[] {
+  return lines.reduce<string[]>((cards, line) => {
+    const last = cards.at(-1);
+    if (last === undefined || SENTENCE_END.test(last) || !CONTINUES.test(line)) {
+      return [...cards, line];
+    }
+    return [...cards.slice(0, -1), `${last} ${line}`];
+  }, []);
 }
 
 export function applyCopy(script: LaunchScript, answer: unknown): LaunchScript {
@@ -33,7 +46,7 @@ export function applyCopy(script: LaunchScript, answer: unknown): LaunchScript {
   if (!parsed.success) {
     return script;
   }
-  const byAct = new Map(parsed.data.acts.map((a) => [a.act, a.on_screen]));
+  const byAct = new Map(parsed.data.acts.map((a) => [a.act, wholeSentences(a.on_screen)]));
   const copied = { ...script, acts: script.acts.map((a) => ({ ...a, on_screen: byAct.get(a.act) ?? a.on_screen })) };
   return scriptProblems(copied).length ? script : copied;
 }

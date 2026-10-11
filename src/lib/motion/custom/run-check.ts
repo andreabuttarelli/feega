@@ -1,14 +1,14 @@
 import type { MotionDoc } from '../doc';
 import type { ClipError } from '../hyperframes/capture';
 import { CheckState, sourceHash, type ComponentCheck } from './component';
-import { checkDoc, seekPlan, verdictOf, type Shot } from './determinism';
+import { checkDoc, seekPlan, verdictOf, type Luma, type Shot } from './determinism';
 
 export type CheckShot = { time: number; data: string; layout: string; errors: ClipError[] };
 
 export type CheckPorts = {
   compose: (doc: MotionDoc) => string;
   capture: (times: number[], html: string) => Promise<CheckShot[]>;
-  luma: (data: string) => Promise<Uint8Array>;
+  luma: (data: string) => Promise<Luma>;
 };
 
 export type CheckRun = { check: ComponentCheck; offending: { time: number; data: string }[] };

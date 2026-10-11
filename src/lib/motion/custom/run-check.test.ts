@@ -20,7 +20,7 @@ describe('running the determinism check in the editor', () => {
     const capture = vi.fn(async (times: number[]) => times.map((time) => ({ time, data: `f${time}`, layout: 'l', errors: [] })));
     const compose = vi.fn(() => '<html>check</html>');
 
-    const result = await runCheck(doc, 'Cursor', { compose, capture, luma: async () => new Uint8Array(4) });
+    const result = await runCheck(doc, 'Cursor', { compose, capture, luma: async () => ({ width: 2, values: new Uint8Array(4) }) });
 
     expect(compose).toHaveBeenCalledWith(expect.objectContaining({ components: { Cursor: doc.components.Cursor } }));
     expect(capture).toHaveBeenCalledWith(seekPlan(4, 30), '<html>check</html>');
@@ -30,7 +30,7 @@ describe('running the determinism check in the editor', () => {
 
   it('compares revisits by their decoded pixels, so a re-encoded but identical frame passes', async () => {
     const capture = vi.fn(async (times: number[]) => times.map((time, i) => ({ time, data: `f${time}${i === 19 ? '-reencoded' : ''}`, layout: 'l', errors: [] })));
-    const luma = vi.fn(async (data: string) => new Uint8Array(4).fill(data.endsWith('-reencoded') ? 41 : 40));
+    const luma = vi.fn(async (data: string) => ({ width: 2, values: new Uint8Array(4).fill(data.endsWith('-reencoded') ? 41 : 40) }));
 
     const result = await runCheck(doc, 'Cursor', { compose: () => '', capture, luma });
 
@@ -43,7 +43,7 @@ describe('running the determinism check in the editor', () => {
       throw new Error('capture timed out');
     });
 
-    const result = await runCheck(doc, 'Cursor', { compose: () => '', capture, luma: async () => new Uint8Array(4) });
+    const result = await runCheck(doc, 'Cursor', { compose: () => '', capture, luma: async () => ({ width: 2, values: new Uint8Array(4) }) });
 
     expect(result.check.state).toBe(CheckState.Failed);
     expect(result.check.problems).toEqual(['the preview could not render it: capture timed out']);

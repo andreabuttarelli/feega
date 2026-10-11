@@ -3,12 +3,14 @@ import { MotionFormat } from '../../src/lib/motion/doc';
 import { ShotId } from '../../src/lib/motion/shots/library';
 import { VectorKind, VectorRole, type VectorUi } from '../../src/lib/motion/vector-ui/model';
 import type { ShotCase } from './fixtures/shot-probe';
+import STRIPE_STAT_COUNT from './fixtures/stripe-stat-count.json' with { type: 'json' };
 
 const HOST_PAGE = '/changelog';
 const PROBE = '/tests/e2e/fixtures/shot-probe.ts';
 const RENDER_TIMEOUT_MS = 600_000;
 const TOO_SLOW_FOR_CI: ReadonlySet<ShotId> = new Set([ShotId.WhipZoom]);
 const SEEK_RUNS = 3;
+const STRIPE_SEEK_RUNS = 20;
 
 const UI: VectorUi = {
   url: 'https://feega.test/app',
@@ -73,5 +75,16 @@ test.describe('every shot of the library, rendered in a real browser', () => {
       const problems = await page.evaluate((x) => window.shotProbe.seekCheck(x), { format: MotionFormat.Vertical, shot: ShotId.StatCount, slots: SLOTS[ShotId.StatCount], ui: UI });
       expect(problems).toEqual([]);
     }
+  });
+
+  test('the stripe stat-count passes the seek check on every run, though JPEG re-quantises a block of its rolling digit', async ({ page }) => {
+    await probe(page);
+
+    const runs: string[][] = [];
+    for (let run = 0; run < STRIPE_SEEK_RUNS; run++) {
+      runs.push(await page.evaluate((doc) => window.shotProbe.seekCheckDoc(doc as never, 'ShotStatCount'), STRIPE_STAT_COUNT));
+    }
+
+    expect(runs.flat()).toEqual([]);
   });
 });
