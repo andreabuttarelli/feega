@@ -79,6 +79,7 @@ const SHOT_TOOLS: ReadonlySet<string> = new Set([
   'mark_beats',
   'cut_to_beat',
   'link_storyboard_beat',
+  'mark_story',
   'view_frames'
 ]);
 

@@ -22,6 +22,7 @@ describe('the studio roster', () => {
     expect(roleTools(StudioRole.ShotBuilder, shotNames)).toEqual(expect.arrayContaining(['add_shot', 'list_shots', 'recreate_ui', 'add_music', 'view_frames']));
     expect(roleTools(StudioRole.ShotBuilder, shotNames)).not.toEqual(expect.arrayContaining(['write_component']));
     expect(roleTools(StudioRole.ShotBuilder, shotNames)).not.toContain('add_clip');
+    expect(roleTools(StudioRole.ShotBuilder, ['mark_story'])).toEqual(['mark_story']);
     expect(REVIEWED.has(StudioRole.ShotBuilder)).toBe(true);
     expect(REVIEWED.has(StudioRole.Fixer)).toBe(false);
   });
