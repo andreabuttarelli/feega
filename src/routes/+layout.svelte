@@ -9,6 +9,8 @@
   import { TourState, tourShowsOn } from '$lib/onboarding/tour';
   import AppEntryShimmer from '$lib/components/AppEntryShimmer.svelte';
   import CanvasEntryShimmer from '$lib/components/CanvasEntryShimmer.svelte';
+  import MotionEntryShimmer from '$lib/components/MotionEntryShimmer.svelte';
+  import { EntryShell, entryShell } from '$lib/entry-shell';
   import {
     identifyUser,
     setAnalyticsOptOut,
@@ -45,24 +47,12 @@
     return m ? `project:${m[1]}` : null;
   }
 
-  // Optimistic entry into the app: show the destination shell immediately while loads /
-  // redirect chains (/app → /p/<projectId>) finish. Same-project navigations skip it.
-  const showAppEntry = $derived.by(() => {
-    const to = navigating.to?.url.pathname;
-    if (!to) return false;
-    const from = navigating.from?.url.pathname ?? $page.url.pathname;
-    if (to.startsWith('/p/') || to === '/app' || to.startsWith('/app/')) {
-      const fromScope = appNavScope(from);
-      const toScope = appNavScope(to);
-      if (fromScope && toScope && fromScope === toScope) return false;
-      return true;
-    }
-    // Logged-in Start → /login always bounces to the home project; cover that hop too.
-    if ((to === '/login' || to.startsWith('/login/')) && data?.session) return true;
-    return false;
-  });
-
-  const showCanvasEntry = $derived(showAppEntry && (navigating.to?.url.pathname ?? '').startsWith('/p/'));
+  const entry = $derived(
+    navigating.to
+      ? entryShell({ from: navigating.from?.url.pathname ?? $page.url.pathname, to: navigating.to.url.pathname, signedIn: !!data?.session })
+      : EntryShell.None
+  );
+  const showAppEntry = $derived(entry !== EntryShell.None);
 
   // Global navigation feedback: without it, any server-load wait reads as "the click did
   // nothing". Shown only when a navigation outlives 150ms so instant navs never flash a bar.
@@ -165,9 +155,11 @@
   <div class="nav-progress" aria-hidden="true"></div>
 {/if}
 
-{#if showCanvasEntry}
+{#if entry === EntryShell.Motion}
+  <MotionEntryShimmer />
+{:else if entry === EntryShell.Canvas}
   <CanvasEntryShimmer />
-{:else if showAppEntry}
+{:else if entry === EntryShell.App}
   <AppEntryShimmer />
 {/if}
 
