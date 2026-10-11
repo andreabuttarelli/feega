@@ -52,7 +52,8 @@ import { vectorPiece, withFonts } from '$lib/motion/vector-ui/piece';
 import { VectorRole } from '$lib/motion/vector-ui/model';
 import { SHOTS, SHOT_IDS, ShotCursor, ShotUi, shotPreview } from '$lib/motion/shots/library';
 import { CURSOR_GUIDE, CURSOR_SLOT } from '$lib/motion/shots/cursor';
-import { addShot } from '$lib/motion/shots/ops';
+import { ShotSound, sfxLabel, type Sfx, type SfxCue } from '$lib/motion/sfx';
+import { addShot, placeSfx } from '$lib/motion/shots/ops';
 import { RECREATE_STATES, UI_KINDS, UI_KIT, recreatedStyle, recreatedUi, type UiStructure } from '$lib/motion/ui-kit/kit';
 import { MORPH_KINDS, DEFAULT_REEL } from '$lib/motion/ui-morph/reel';
 import { addMorphReel } from '$lib/motion/ui-morph/ops';
@@ -139,12 +140,15 @@ export type Voiceover = { ok: true; assetId: string; seconds: number; url: strin
 
 export type Music = { ok: true; assetId: string; seconds: number; url: string | null; source: string; track: string } | { ok: false; error: string };
 
+export type SfxAsset = { ok: true; assetId: string; url: string | null; seconds: number } | { ok: false; error: string };
+
 export type MotionToolDeps = {
   session: MotionSession;
   assets: MotionAsset[];
   newId: () => string;
   voiceover: (input: { text: string; voiceId?: string }) => Promise<Voiceover>;
   music?: (input: { mood: Mood; bpm?: number; seconds: number }) => Promise<Music>;
+  sfx?: (sfx: Sfx) => Promise<SfxAsset>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   inspect?: (frames: Frame[]) => Promise<FrameStat[]>;
   seam?: () => Promise<number | null>;
@@ -626,6 +630,33 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   }
 
   const registeredFont = (doc: MotionDoc, font: unknown): OpResult => (typeof font !== 'string' || doc.fonts.some((f) => f.family === font) || !GOOGLE_FONTS.some((f) => f.f === font) ? { ok: true, doc } : registerFont(doc, font, GOOGLE_FONTS));
+
+  const sfxAsset = async (sfx: Sfx): Promise<string | null> => {
+    const known = deps.assets.find((a) => a.label === sfxLabel(sfx));
+    if (known) {
+      return known.id;
+    }
+    const made = deps.sfx ? await deps.sfx(sfx) : null;
+    if (!made?.ok) {
+      return null;
+    }
+    deps.assets.push({ id: made.assetId, kind: AssetKind.Audio, label: sfxLabel(sfx), previewUrl: '', url: made.url });
+    return made.assetId;
+  };
+
+  const soundCues = async (cues: readonly SfxCue[]): Promise<string | null> => {
+    if (!cues.length) {
+      return null;
+    }
+    const kinds = [...new Set(cues.map((c) => c.sfx))];
+    const ids = Object.fromEntries((await Promise.all(kinds.map(async (k) => [k, await sfxAsset(k)] as const))).filter(([, v]) => v));
+    if (Object.keys(ids).length < kinds.length) {
+      return 'sound effects unavailable in this workspace';
+    }
+    const withAssets = Object.values(ids).reduce<OpResult>((r, assetId) => registered(r, assetId), { ok: true, doc: session.doc });
+    const laid = apply(withAssets.ok ? placeSfx(withAssets.doc, cues, ids, deps.newId) : withAssets, `laid ${cues.length} sound effects`);
+    return laid.ok ? `${cues.length} sound effects on the SFX track` : laid.error;
+  };
 
   const tools: Record<string, Tool> = {
     get_motion_doc: tool({
@@ -1917,7 +1948,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     add_shot: tool({
       description: `Place a premium shot from the library (list_shots): ${SHOT_IDS.map((id) => `${id} (${SHOTS[id].about})`).join('; ')}. slots are its data only: texts, element ids of the recreated UI, and font ink paper muted accent. Every text slot holds a few words at most (text_limits in list_shots: a title is a claim of up to 6 words, never a sentence); a longer text is refused with a cut to use. ui is the name of a UI rebuilt with recreate_ui from a url; the shots that show the product need it. at and seconds place it (2–4 s, transitions shorter); with beats marked (mark_beats) start and end snap to the beat grid. The shot is an ordinary clip: its slots stay editable as props. ui-focus and ui-morph are driven by a cursor: without a cursor slot they write a script from the element roles (a field is typed into, a button or link clicked, the rest hovered); with one, ${CURSOR_GUIDE}`,
-      inputSchema: z.object({ shot: z.enum(SHOT_IDS), slots: z.record(z.string(), z.union([z.string(), z.number(), CURSOR_SLOT])).default({}), ui: z.string().optional(), at: z.number().min(0), seconds: z.number().positive().optional(), track_id: z.string().optional() }),
+      inputSchema: z.object({ shot: z.enum(SHOT_IDS), slots: z.record(z.string(), z.union([z.string(), z.number(), CURSOR_SLOT])).default({}), ui: z.string().optional(), at: z.number().min(0), seconds: z.number().positive().optional(), track_id: z.string().optional(), sound: z.enum(ShotSound).default(ShotSound.Off).describe('on: a click on every cursor click and a key tap per typed character, on an SFX audio track') }),
       execute: async (input) => {
         const offSite = offSiteFigures(input.shot, input.slots);
         if (offSite) {
@@ -1933,9 +1964,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: `${off.map((t) => `"${t}"`).join(', ')} is not a line of the script: on-screen titles come only from its lines, in their order: ${scriptLines(script).map((l) => `"${l}"`).join(' / ')}` };
         }
         const id = deps.newId();
-        const made = addShot(fonts.doc, { shot: input.shot, slots: input.slots, ui: input.ui, at: input.at, seconds: input.seconds, trackId: input.track_id }, id);
+        const made = addShot(fonts.doc, { shot: input.shot, slots: input.slots, ui: input.ui, at: input.at, seconds: input.seconds, trackId: input.track_id, sound: input.sound ?? ShotSound.Off }, id);
         const shown = created(apply(made, `added shot ${input.shot}`), id);
-        return shown.ok && made.ok && made.placed ? { ...shown, from: made.placed.from / session.doc.fps, seconds: made.placed.frames / session.doc.fps, on_beat: made.placed.snapped } : shown;
+        if (!shown.ok || !made.ok || !made.placed) {
+          return shown;
+        }
+        const sounded = await soundCues(made.cues ?? []);
+        return { ...shown, from: made.placed.from / session.doc.fps, seconds: made.placed.frames / session.doc.fps, on_beat: made.placed.snapped, ...(sounded ? { sound: sounded } : {}) };
       }
     }),
 

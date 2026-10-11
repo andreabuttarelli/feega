@@ -26,10 +26,10 @@ const UI: VectorUi = {
   ]
 };
 
-function setup(captureUi?: MotionToolDeps['captureUi']) {
+function setup(captureUi?: MotionToolDeps['captureUi'], extra: Partial<MotionToolDeps> = {}) {
   let n = 0;
   const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
-  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(async () => null), captureUi });
+  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(async () => null), captureUi, ...extra });
   const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' });
   return { session, run };
 }
@@ -114,6 +114,34 @@ describe('the shot library', () => {
 
     expect(made).toMatchObject({ ok: true });
     expect(JSON.parse(String(findClip(session.doc, String(made.clip_id))?.clip.props.cursor))).toEqual(cursor);
+  });
+
+  it('add_shot with sound on lays a click and key taps on an SFX track, under the cursor, uploading each sound once', async () => {
+    const sfx = vi.fn(async (kind: string) => ({ ok: true as const, assetId: `asset-${kind}`, url: null, seconds: 0.08 }));
+    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI })), { sfx });
+    await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
+
+    const made = await run('add_shot', { shot: ShotId.UiFocus, ui: 'UiFeega', slots: { field_id: 'input-0', button_id: 'button-0', type_text: 'abc' }, at: 1, sound: 'on' });
+
+    const track = session.doc.tracks.find((t) => t.name === 'SFX');
+    const sounds = (track?.clips ?? []).map((c) => String(c.props.assetId));
+    expect(made).toMatchObject({ ok: true });
+    expect(sounds.filter((s) => s === 'asset-click')).toHaveLength(2);
+    expect(sounds.filter((s) => s === 'asset-key')).toHaveLength(3);
+    expect(Math.min(...(track?.clips ?? []).map((c) => c.from))).toBeGreaterThanOrEqual(session.doc.fps);
+    expect(sfx).toHaveBeenCalledTimes(2);
+    expect(session.doc.assets.map((a) => a.id)).toEqual(expect.arrayContaining(['asset-click', 'asset-key']));
+  });
+
+  it('add_shot lays no sound by default', async () => {
+    const sfx = vi.fn();
+    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI })), { sfx });
+    await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
+
+    await run('add_shot', { shot: ShotId.UiFocus, ui: 'UiFeega', slots: { field_id: 'input-0', button_id: 'button-0' }, at: 0 });
+
+    expect(sfx).not.toHaveBeenCalled();
+    expect(session.doc.tracks.some((t) => t.name === 'SFX')).toBe(false);
   });
 
   it('list_shots says which shots take a cursor script and how it is written', async () => {

@@ -35,20 +35,20 @@ export type CursorBox = { x: number; y: number; w: number; h: number; role: stri
 export type CursorUi = { width: number; height: number; box: (id: string) => CursorBox | null };
 
 export function cursorMath() {
-  const START = 0.2;
+  const START = 0.5;
+  const ENTRY = { x: 70, y: 90 };
   const TRAVEL = 0.6;
   const GAP = 0.12;
   const TAIL = 0.6;
   const CPS = 14;
   const TYPE_LEAD = 0.18;
-  const PRESS = 0.2;
+  const MAX_KEYS = 16;
+  const PRESS = 0.26;
   const RIPPLE = 0.5;
-  const SETTLE = 0.22;
-  const OVERSHOOT = 0.04;
+  const OVERSHOOT = 0.2;
   const BEND = 0.2;
-  const FADE = 0.25;
   const SHAPE_LEAD = 0.08;
-  const LIT = 0.2;
+  const LIT = 0.45;
   const EXPO = 6;
   const SCROLL_SHARE = 0.25;
 
@@ -106,7 +106,7 @@ export function cursorMath() {
       const box = ui.box(s.target) as CursorBox;
       const to = { x: box.x + box.w / 2, y: box.y + box.h / 2 };
       const prev = steps[steps.length - 1];
-      const from = prev ? { x: prev.to.x, y: prev.to.y + prev.scroll } : { x: to.x + ui.width * 0.22, y: to.y + ui.height * 0.3 };
+      const from = prev ? { x: prev.to.x, y: prev.to.y + prev.scroll } : { x: to.x + ENTRY.x, y: to.y + ENTRY.y };
       const a = squeeze(at);
       const floor = prev ? prev.end : 0;
       const travel = Math.max(floor, a - TRAVEL * k, 0);
@@ -124,19 +124,26 @@ export function cursorMath() {
     return { x: q * q * a.x + 2 * q * p * c.x + p * p * b.x, y: q * q * a.y + 2 * q * p * c.y + p * p * b.y };
   }
 
+  const arrive = (p: number) => glide(p) + OVERSHOOT * Math.pow(Math.sin(Math.PI * clamp(p, 0, 1)), 2) * Math.pow(clamp(p, 0, 1), 3);
+
   function placeAt(step: Resolved, t: number): Point {
-    const dist = Math.hypot(step.to.x - step.from.x, step.to.y - step.from.y) || 1;
-    const past = { x: step.to.x + ((step.to.x - step.from.x) / dist) * OVERSHOOT * dist, y: step.to.y + ((step.to.y - step.from.y) / dist) * OVERSHOOT * dist };
-    const settle = Math.min(SETTLE, (step.at - step.travel) / 3);
-    const turn = step.at - settle;
-    if (t < turn) {
-      return curve(step.from, past, glide((t - step.travel) / Math.max(0.001, turn - step.travel)));
-    }
     if (t < step.at) {
-      const p = glide((t - turn) / Math.max(0.001, settle));
-      return { x: past.x + (step.to.x - past.x) * p, y: past.y + (step.to.y - past.y) * p };
+      return curve(step.from, step.to, arrive((t - step.travel) / Math.max(0.001, step.at - step.travel)));
     }
     return { x: step.to.x, y: step.to.y + step.scroll * glide((t - step.at) / Math.max(0.001, step.end - step.at)) };
+  }
+
+  function keyTimes(s: { action: string; at: number; end: number; text: string }) {
+    if (s.action !== 'type' || !s.text) {
+      return [];
+    }
+    const n = Math.min(s.text.length, MAX_KEYS);
+    const span = s.end - s.at - TYPE_LEAD;
+    return Array.from({ length: n }, (_, i) => s.at + TYPE_LEAD + (span * (i + 0.5)) / n);
+  }
+
+  function pressOf(s: { action: string; at: number }, t: number) {
+    return PRESSES[s.action] && t >= s.at && t <= s.at + PRESS ? Math.sin((Math.PI * (t - s.at)) / PRESS) : 0;
   }
 
   function pose(p: Plan, t: number) {
@@ -153,7 +160,7 @@ export function cursorMath() {
     const step = steps[Math.max(0, i)];
     const point = i < 0 ? step.from : placeAt(step, t);
     const arrived = i >= 0 && t >= step.at - SHAPE_LEAD;
-    const press = Math.max(0, ...steps.filter((s) => PRESSES[s.action] && t >= s.at && t <= s.at + PRESS).map((s) => Math.sin((Math.PI * (t - s.at)) / PRESS)));
+    const press = Math.max(0, ...steps.map((s) => pressOf(s, t)));
     const clicked = steps.filter((s) => PRESSES[s.action] && t >= s.at && t < s.at + RIPPLE).pop();
     const typed = steps.filter((s) => s.action === 'type' && t >= s.at + TYPE_LEAD).map((s) => ({ target: s.target, text: s.text, p: clamp((t - s.at - TYPE_LEAD) / Math.max(0.001, s.end - s.at - TYPE_LEAD), 0, 1) }));
     const rested = steps.filter((s) => s.action !== 'scroll' && t >= s.at - SHAPE_LEAD).pop();
@@ -161,18 +168,18 @@ export function cursorMath() {
     return {
       x: point.x,
       y: point.y,
-      opacity: out((t - (steps[0].travel - FADE)) / FADE),
+      opacity: 1,
       shape: arrived ? (ROLE_SHAPE[step.role] ?? 'arrow') : 'arrow',
       press,
       ripple: clicked ? { x: clicked.to.x, y: clicked.to.y, p: (t - clicked.at) / RIPPLE } : null,
       hover: rested ? rested.target : null,
-      lit: rested ? clamp((t - rested.at + SHAPE_LEAD) / LIT, 0, 1) * (1 - clamp((t - (steps[steps.indexOf(rested) + 1]?.travel ?? Infinity)) / LIT, 0, 1)) : 0,
+      lit: rested ? glide((t - rested.at + SHAPE_LEAD) / LIT) * (1 - glide((t - (steps[steps.indexOf(rested) + 1]?.travel ?? Infinity)) / LIT)) : 0,
       typed,
       scroll
     };
   }
 
-  return { auto, plan, pose };
+  return { auto, plan, pose, glide, pressOf, keyTimes };
 }
 
 export type CursorPose = ReturnType<ReturnType<typeof cursorMath>['pose']>;

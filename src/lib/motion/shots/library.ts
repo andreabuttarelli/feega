@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { vectorJson, vectorRuntime, VECTOR_CSS } from '../vector-ui/piece';
 import { withinBudget, type VectorUi } from '../vector-ui/model';
 import { MAX_JS } from '../custom/component';
-import { CURSOR_SLOT, NODE_ID, cursorSource } from './cursor';
+import { CURSOR_SLOT, CursorAction, NODE_ID, cursorSource, type CursorStep } from './cursor';
 
 export enum ShotId {
   KineticTitle = 'kinetic-title',
@@ -149,11 +149,12 @@ const WHOLE = { k: Math.min((W * 0.86) / U.width, (H * 0.8) / U.height), cx: U.w
 
 const CURSOR_LAYER = `
 const CURSOR = CURSOR_MATH;
+const glide = CURSOR.glide;
 const cursorUi = { width: U.width, height: U.height, box: (id) => {
   const n = nodeById(U, id);
   return n ? { x: n.x, y: n.y, w: Math.max(1, n.w), h: Math.max(1, n.h), role: n.role || 'box' } : null;
 } };
-const scriptOf = (raw, fallback) => {
+const scriptOf = (raw) => {
   let script = raw;
   if (typeof script === 'string') {
     try {
@@ -162,20 +163,53 @@ const scriptOf = (raw, fallback) => {
       script = null;
     }
   }
-  return Array.isArray(script) && script.length ? script : fallback;
+  return Array.isArray(script) ? script : [];
 };
 const CURSOR_SVG = {
   arrow: { tip: [4, 2.5], svg: '<path d="M4 2.5v17.2l4.6-4.4 2.9 6.6 2.9-1.3-2.9-6.5h6.3z" fill="#000" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>' },
   hand: { tip: [9, 3], svg: '<path d="M9 2.8c-1 0-1.7.8-1.7 1.7v8.6l-1.4-1.5c-.7-.7-1.8-.7-2.4 0-.6.6-.6 1.5-.1 2.2l4.1 5.6c.9 1.3 2.4 2.1 4 2.1h3.6c2.6 0 4.7-2.1 4.7-4.7v-4.6c0-.9-.7-1.6-1.6-1.6-.4 0-.8.2-1.1.4v-.2c0-.9-.7-1.6-1.6-1.6-.5 0-.9.2-1.2.5-.2-.7-.8-1.2-1.6-1.2-.4 0-.8.2-1.1.4V4.5c0-.9-.8-1.7-1.6-1.7z" fill="#fff" stroke="#000" stroke-width="1.2" stroke-linejoin="round"/>' },
   beam: { tip: [12, 12], svg: '<path d="M8.5 3.5h7M8.5 20.5h7M12 3.5v17" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><path d="M8.5 3.5h7M8.5 20.5h7M12 3.5v17" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>' }
 };
-const CURSOR_SIZE = UNIT * (WIDE ? 0.036 : 0.05);
+const CURSOR_BASE = 100;
+const CURSOR_UI = 22;
+const CURSOR_FIT = { min: UNIT * 0.03, max: UNIT * 0.11 };
+const BLUR = { per: 0.12, max: 6 };
 const FOLLOW = 0.12;
+const PRESSED = 0.05;
 const HOVER = 0.07;
+const CARET_HZ = 1.2;
+const CARET_FADE = 6;
 const cursorLayer = (drawn, script) => {
+  const typedEls = {};
+  const typeFade = (id, text, p, t) => {
+    const host = drawn.els[id];
+    if (!typedEls[id]) {
+      host.textContent = '';
+      const chars = [...text].map((c) => {
+        const glyph = document.createElement('span');
+        glyph.className = 'vtyped';
+        glyph.textContent = c;
+        host.appendChild(glyph);
+        return glyph;
+      });
+      const caret = document.createElement('span');
+      caret.className = 'vcaret';
+      caret.style.background = (nodeById(U, id) || {}).color || '#000';
+      host.appendChild(caret);
+      typedEls[id] = { chars, caret };
+    }
+    const parts = typedEls[id];
+    const exact = parts.chars.length * p;
+    parts.chars.forEach((glyph, i) => {
+      glyph.style.opacity = clamp(exact - i, 0, 1).toFixed(3);
+    });
+    const away = glide(Math.min(1, p * CARET_FADE)) * glide(Math.min(1, (1 - p) * CARET_FADE));
+    parts.caret.style.opacity = (p <= 0 ? 0 : p < 1 ? 1 - away : 0.5 + 0.5 * Math.cos(2 * Math.PI * CARET_HZ * t)).toFixed(3);
+  };
   const plan = CURSOR.plan(script, cursorUi, duration);
   const ripple = el('div', 'position:absolute;left:0;top:0;border-radius:50%;border:' + Math.max(2, UNIT * 0.003) + 'px solid ' + accent + ';');
-  const pointer = el('div', 'position:absolute;left:0;top:0;width:' + CURSOR_SIZE + 'px;height:' + CURSOR_SIZE + 'px;transform-origin:0 0;filter:drop-shadow(0 ' + (CURSOR_SIZE * 0.06).toFixed(1) + 'px ' + (CURSOR_SIZE * 0.1).toFixed(1) + 'px rgba(0,0,0,0.35));');
+  const pointer = el('div', 'position:absolute;left:0;top:0;width:' + CURSOR_BASE + 'px;height:' + CURSOR_BASE + 'px;transform-origin:0 0;');
+  const SHADOW = 'drop-shadow(0 ' + CURSOR_BASE * 0.06 + 'px ' + CURSOR_BASE * 0.1 + 'px rgba(0,0,0,0.35))';
   pointer.setAttribute('data-cursor', 'pointer');
   ripple.setAttribute('data-cursor', 'ripple');
   const shapes = Object.fromEntries(Object.entries(CURSOR_SVG).map(([k, v]) => {
@@ -188,32 +222,39 @@ const cursorLayer = (drawn, script) => {
   typing.forEach((s) => {
     drawn.els[s.into].style.color = ink;
   });
-  const pressing = plan.steps.filter((s) => s.action === 'click' || s.action === 'type');
+  const pressing = plan.steps.filter((s) => CURSOR.pressOf(s, s.at + 0.1) > 0 && drawn.els[s.target]);
   const touched = [...new Set(plan.steps.map((s) => s.target))].filter((id) => drawn.els[id]);
   const pose = (t) => CURSOR.pose(plan, t);
-  const follow = (view, p) => ({ k: view.k, cx: mix(view.cx, p.x, FOLLOW * p.opacity), cy: mix(view.cy, p.y, FOLLOW * p.opacity) + p.scroll });
+  const follow = (view, p) => ({ k: view.k, cx: mix(view.cx, p.x, FOLLOW), cy: mix(view.cy, p.y, FOLLOW) + p.scroll });
   const toScreen = (view, x, y) => [W / 2 + (x - view.cx) * view.k, H / 2 + (y - view.cy) * view.k];
   const draw = (p, view, t) => {
     touched.forEach((id) => {
       drawn.els[id].style.filter = id === p.hover && p.lit > 0 ? 'brightness(' + (1 - HOVER * p.lit).toFixed(4) + ')' : '';
     });
-    pressing.forEach((s) => pressOn(drawn.els, s.target, t, s.at));
+    pressing.forEach((s) => {
+      drawn.els[s.target].style.transform = 'scale(' + (1 - PRESSED * CURSOR.pressOf(s, t)).toFixed(4) + ')';
+    });
     typing.forEach((s) => {
       const typed = p.typed.find((k) => k.target === s.target && k.text === s.text);
-      typeInto(U, drawn.els, s.into, s.text, typed ? typed.p : 0, t);
+      typeFade(s.into, s.text, typed ? typed.p : 0, t);
     });
     const [x, y] = toScreen(view, p.x, p.y);
+    const before = pose(t - 1 / 60);
+    const [bx, by] = toScreen(view, before.x, before.y);
     const tip = CURSOR_SVG[p.shape].tip;
-    const k = 1 - 0.18 * p.press;
+    const size = clamp(CURSOR_UI * view.k, CURSOR_FIT.min, CURSOR_FIT.max);
+    const k = (size / CURSOR_BASE) * (1 - 0.18 * p.press);
+    const blur = Math.min(BLUR.max, Math.hypot(x - bx, y - by) * BLUR.per) / k;
     Object.entries(shapes).forEach(([name, holder]) => {
       holder.style.display = name === p.shape ? 'block' : 'none';
     });
     pointer.style.opacity = String(p.opacity);
-    pointer.style.transform = 'translate(' + (x - (tip[0] / 24) * CURSOR_SIZE * k).toFixed(2) + 'px,' + (y - (tip[1] / 24) * CURSOR_SIZE * k).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
+    pointer.style.filter = SHADOW + (blur > 0.05 ? ' blur(' + blur.toFixed(2) + 'px)' : '');
+    pointer.style.transform = 'translate(' + (x - (tip[0] / 24) * CURSOR_BASE * k).toFixed(2) + 'px,' + (y - (tip[1] / 24) * CURSOR_BASE * k).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
     const [rx, ry] = p.ripple ? toScreen(view, p.ripple.x, p.ripple.y) : [0, 0];
-    const r = p.ripple ? UNIT * 0.045 * out(p.ripple.p) : 0;
+    const r = p.ripple ? size * 1.2 * out(p.ripple.p) : 0;
     ripple.style.display = p.ripple ? 'block' : 'none';
-    ripple.style.opacity = p.ripple ? String(0.6 * (1 - p.ripple.p)) : '0';
+    ripple.style.opacity = p.ripple ? String(0.5 * Math.sin(Math.PI * p.ripple.p)) : '0';
     ripple.style.width = (2 * r).toFixed(1) + 'px';
     ripple.style.height = (2 * r).toFixed(1) + 'px';
     ripple.style.transform = 'translate(' + (rx - r).toFixed(2) + 'px,' + (ry - r).toFixed(2) + 'px)';
@@ -302,32 +343,33 @@ drawn.frame.style.background = 'transparent';
 drawn.frame.style.position = 'absolute';
 drawn.frame.style.left = '0px';
 drawn.frame.style.top = '0px';
-const pointer = cursorLayer(drawn, scriptOf(script, CURSOR.auto([{ id: fieldId, text: typed }, { id: buttonId }].concat(resultId ? [{ id: resultId }] : []), cursorUi)));
+const pointer = cursorLayer(drawn, scriptOf(script));
 const steps = pointer.plan.steps;
 const around = (b) => {
-  const mx = b.w > 300 ? b.w * 0.12 : Math.max(b.w * 0.5, 120);
-  const my = Math.max(b.h, 80);
+  const mx = b.w > 300 ? b.w * 0.12 : Math.max(b.w * 0.5, 260);
+  const my = Math.max(b.h, 180);
   return frameOn({ x: b.x - mx, y: b.y - my, w: b.w + 2 * mx, h: b.h + 2 * my }, 0.8, 0.6);
 };
-const beats = steps.map((s) => ({ view: around(boxOf(s.target)), from: Math.max(0, s.travel - 0.15), len: Math.max(0.75, s.at - s.travel + 0.15) }));
+const CAM_BEAT = 0.9;
+const beats = steps.map((s, i) => {
+  const from = Math.max(i ? steps[i - 1].at : 0, s.at - CAM_BEAT);
+  return { view: around(boxOf(s.target)), from, len: Math.max(0.3, s.at - from) };
+});
 const first = beats.length ? beats[0].view : WHOLE;
 const last = steps.length ? Math.max(steps[steps.length - 1].end, steps[steps.length - 1].at + 0.5) + 0.3 : 0;
-const DIM = { depth: 0.55, at: 0.3, len: 0.3, release: 0.4 };
-const released = steps.length > 1 ? steps[1].travel - 0.2 : duration;
+const PULL_BACK = 0.8;
 drive((t) => {
-  const arrive = out(span(t, 0, 0.7));
+  const arrive = glide(span(t, 0, 0.9));
   let view = { k: first.k * mix(0.82, 1, arrive), cx: first.cx, cy: first.cy };
   beats.slice(1).forEach((b) => {
-    view = lerpCam(view, b.view, move(span(t, b.from, b.len)));
+    view = lerpCam(view, b.view, glide(span(t, b.from, b.len)));
   });
-  if (!resultId) {
-    view = lerpCam(view, WHOLE, move(span(t, last, Math.max(0.4, duration - last))));
+  if (!resultId && duration - last >= PULL_BACK) {
+    view = lerpCam(view, WHOLE, glide(span(t, last, duration - last)));
   }
   const p = pointer.pose(t);
   view = pointer.follow(view, p);
   place(view, cam);
-  const dim = out(span(t, DIM.at, DIM.len)) * (1 - move(span(t, released, DIM.release)));
-  dimAround(drawn, boxOf(steps.length ? steps[0].target : fieldId), 1 - DIM.depth * dim);
   pointer.draw(p, view, t);
 });
 `;
@@ -490,12 +532,12 @@ const target = textInside(toId);
 const camA = frameOn({ x: a.x - a.w * 0.6, y: a.y - a.h * 1.2, w: a.w * 2.2, h: a.h * 3.4 }, 0.8, 0.7);
 const camB = frameOn({ x: b.x - b.w * 0.6, y: b.y - b.h * 1.2, w: b.w * 2.2, h: b.h * 3.4 }, 0.8, 0.7);
 const full = target ? nodeById(U, target).text : '';
-const pointer = cursorLayer(drawn, scriptOf(script, [{ target: fromId, action: 'hover' }].concat(CURSOR.auto([{ id: toId }], cursorUi))));
+const pointer = cursorLayer(drawn, scriptOf(script));
 const onTo = pointer.plan.steps.find((s) => s.target === toId);
 const M = onTo ? { move: onTo.travel, len: Math.max(0.3, onTo.at - onTo.travel), swap: onTo.at + 0.05 } : { move: 0.9, len: 0.9, swap: 1.95 };
 drive((t) => {
-  const e = out(span(t, 0, 0.7));
-  const p = move(span(t, M.move, M.len));
+  const e = glide(span(t, 0, 0.9));
+  const p = glide(span(t, M.move, M.len));
   const c = pointer.pose(t);
   const view = pointer.follow(lerpCam({ k: camA.k * mix(0.85, 1, e), cx: camA.cx, cy: camA.cy }, camB, p), c);
   place(view, cam);
@@ -504,7 +546,7 @@ drive((t) => {
   ring.style.top = (mix(a.y, b.y, p) - PAD).toFixed(1) + 'px';
   ring.style.width = (mix(a.w, b.w, p) + 2 * PAD).toFixed(1) + 'px';
   ring.style.height = (mix(a.h, b.h, p) + 2 * PAD).toFixed(1) + 'px';
-  ring.style.opacity = String(out(span(t, 0.25, 0.4)));
+  ring.style.opacity = String(glide(span(t, 0, 0.9)));
   dimAround(drawn, { x: Math.min(a.x, b.x) - 40, y: Math.min(a.y, b.y) - 40, w: Math.abs(b.x - a.x) + Math.max(a.w, b.w) + 80, h: Math.abs(b.y - a.y) + Math.max(a.h, b.h) + 80 }, 0.22);
   if (target && toText) {
     const s = span(t, M.swap, 0.45);
@@ -567,6 +609,15 @@ export const SHOTS: Record<ShotId, ShotSpec> = {
   [ShotId.UiMorph]: { name: 'ShotUiMorph', about: 'the cursor rests on one element of the recreated UI, travels to another with a highlight as the camera follows, clicks it and the target changes state', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.Scripted, peak: false, slots: z.object({ from_id: nodeId, to_id: nodeId, to_text: text.optional(), cursor: CURSOR_SLOT.optional() }), limits: { to_text: limit(3, 24) }, css: UI_HOST_CSS, js: UI_MORPH },
   [ShotId.TaglineCard]: { name: 'ShotTaglineCard', about: 'the end card: the promise rises line by line out of a mask, the address fades in under it', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ lines: text, url: text.optional(), accent_line: z.number().int().min(-1).max(2).optional() }), limits: { lines: limit(6, 40), url: limit(1, 40) }, css: '', js: TAGLINE_CARD },
   [ShotId.WhipZoom]: { name: 'ShotWhipZoom', about: 'a transition: the camera dives into one element of the recreated UI, blurring with speed, and lands on its colour for the next shot', seconds: { min: 1, best: 1.4, max: 2 }, ui: ShotUi.Required, cursor: ShotCursor.None, peak: true, slots: z.object({ target_id: nodeId, end_colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }), limits: {}, css: UI_HOST_CSS, js: WHIP_ZOOM }
+};
+
+type AutoCursor = (entries: { id: string; text?: string }[]) => CursorStep[];
+
+const idOf = (v: unknown) => String(v ?? '');
+
+export const AUTO_CURSOR: Partial<Record<ShotId, (slots: Record<string, unknown>, auto: AutoCursor) => CursorStep[]>> = {
+  [ShotId.UiFocus]: (s, auto) => auto([{ id: idOf(s.field_id), text: typeof s.type_text === 'string' ? s.type_text : undefined }, { id: idOf(s.button_id) }, ...(s.result_id ? [{ id: idOf(s.result_id) }] : [])]),
+  [ShotId.UiMorph]: (s, auto) => [{ target: idOf(s.from_id), action: CursorAction.Hover }, ...auto([{ id: idOf(s.to_id) }])]
 };
 
 export const PEAK_SHOTS: ReadonlySet<string> = new Set(Object.values(SHOTS).filter((s) => s.peak).map((s) => s.name));

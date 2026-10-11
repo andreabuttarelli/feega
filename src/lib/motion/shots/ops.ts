@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import type { MotionDoc } from '../doc';
-import { addClip, type OpResult } from '../timeline';
+import { addClip, addTrack, type OpResult } from '../timeline';
+import { TrackKind } from '../components';
+import { SFX_LIBRARY, ShotSound, cursorCues, type Sfx, type SfxCue } from '../sfx';
 import { writeComponent } from '../custom/ops';
 import { VECTOR_TOKEN } from '../vector-ui/piece';
 import { VectorRole, type VectorNode, type VectorUi } from '../vector-ui/model';
-import { SHOTS, ShotUi, overLimits, shotSource, type ShotId } from './library';
-import type { CursorStep } from './cursor';
+import { AUTO_CURSOR, SHOTS, ShotUi, overLimits, shotSource, type ShotId } from './library';
+import { cursorMath, type CursorStep, type CursorUi } from './cursor';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 
@@ -14,7 +16,7 @@ export const STYLE_SLOTS = z.object({ font: z.string().max(64).optional(), ink: 
 const BEAT = /^beat \d+$/;
 const SNAP_S = 0.3;
 
-export type ShotPlan = { shot: ShotId; slots: Record<string, unknown>; ui?: string; at: number; seconds?: number; trackId?: string };
+export type ShotPlan = { shot: ShotId; slots: Record<string, unknown>; ui?: string; at: number; seconds?: number; trackId?: string; sound?: ShotSound };
 
 export type Placed = { from: number; frames: number; snapped: boolean };
 
@@ -79,6 +81,23 @@ function wrongRoles(slots: Record<string, unknown>, ui: string, nodes: readonly 
   return null;
 }
 
+export const cursorUiOf = (ui: VectorUi): CursorUi => {
+  const byId = new Map(ui.nodes.map((n) => [n.id, n]));
+  return { width: ui.width, height: ui.height, box: (id) => {
+    const n = byId.get(id);
+    return n ? { x: n.x, y: n.y, w: Math.max(1, n.w), h: Math.max(1, n.h), role: n.role } : null;
+  } };
+};
+
+export function shotCursor(shot: ShotId, slots: Record<string, unknown>, ui: VectorUi): CursorStep[] | null {
+  const given = slots.cursor as CursorStep[] | undefined;
+  if (given?.length) {
+    return given;
+  }
+  const make = AUTO_CURSOR[shot];
+  return make ? make(slots, (entries) => cursorMath().auto(entries, cursorUiOf(ui)) as CursorStep[]) : null;
+}
+
 export const shotComponent = (shot: ShotId, ui?: string) => `${SHOTS[shot].name}${ui ?? ''}`;
 
 function asProps(doc: MotionDoc, name: string, slots: Record<string, unknown>): Record<string, unknown> {
@@ -86,7 +105,30 @@ function asProps(doc: MotionDoc, name: string, slots: Record<string, unknown>): 
   return Object.fromEntries(Object.entries(slots).map(([k, v]) => [k, schema[k]?.type === 'string' && typeof v !== 'string' ? (typeof v === 'object' ? JSON.stringify(v) : String(v)) : v]));
 }
 
-export function addShot(doc: MotionDoc, plan: ShotPlan, id: string): OpResult & { placed?: Placed } {
+const SFX_TRACK = 'SFX';
+const SFX_VOLUME = 0.6;
+
+export function placeSfx(doc: MotionDoc, cues: readonly SfxCue[], assets: Partial<Record<Sfx, string>>, newId: () => string): OpResult {
+  const existing = doc.tracks.find((t) => t.kind === TrackKind.Audio && t.name === SFX_TRACK);
+  const trackId = existing?.id ?? newId();
+  let result: OpResult = existing ? { ok: true, doc } : addTrack(doc, TrackKind.Audio, trackId, SFX_TRACK);
+  for (const cue of cues) {
+    const assetId = assets[cue.sfx];
+    if (!result.ok || !assetId) {
+      continue;
+    }
+    const frames = Math.max(1, Math.round(SFX_LIBRARY[cue.sfx].seconds * result.doc.fps));
+    result = addClip(result.doc, { component: 'Audio', from: Math.round(cue.at * result.doc.fps), durationInFrames: frames, trackId, props: { assetId, volume: SFX_VOLUME } }, newId());
+  }
+  return result;
+}
+
+const SOUNDS: Record<ShotSound, (steps: Parameters<typeof cursorCues>[0]) => SfxCue[]> = {
+  [ShotSound.Off]: () => [],
+  [ShotSound.On]: cursorCues
+};
+
+export function addShot(doc: MotionDoc, plan: ShotPlan, id: string): OpResult & { placed?: Placed; cues?: SfxCue[] } {
   const spec = SHOTS[plan.shot];
   const parsed = spec.slots.extend(STYLE_SLOTS.shape).strict().safeParse(plan.slots);
   if (!parsed.success) {
@@ -114,7 +156,14 @@ export function addShot(doc: MotionDoc, plan: ShotPlan, id: string): OpResult & 
   if (!written.ok) {
     return written;
   }
+  const script = vector ? shotCursor(plan.shot, parsed.data, vector) : null;
+  const slots = script ? { ...parsed.data, cursor: script } : parsed.data;
   const placed = onBeat(written.doc, Math.round(plan.at * doc.fps), Math.round(seconds * doc.fps), spec.seconds);
-  const made = addClip(written.doc, { component: 'Custom', from: placed.from, durationInFrames: placed.frames, trackId: plan.trackId, props: { name, ...asProps(written.doc, name, parsed.data) } }, id);
-  return made.ok ? { ...made, placed } : made;
+  const made = addClip(written.doc, { component: 'Custom', from: placed.from, durationInFrames: placed.frames, trackId: plan.trackId, props: { name, ...asProps(written.doc, name, slots) } }, id);
+  if (!made.ok) {
+    return made;
+  }
+  const steps = script && vector ? cursorMath().plan(script, cursorUiOf(vector), placed.frames / doc.fps).steps : [];
+  const cues = SOUNDS[plan.sound ?? ShotSound.Off](steps).map((c) => ({ ...c, at: c.at + placed.from / doc.fps }));
+  return { ...made, placed, cues };
 }
