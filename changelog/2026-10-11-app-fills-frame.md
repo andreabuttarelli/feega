@@ -31,4 +31,14 @@ elements in DOM order: sidebar first.
   `recreate_ui` output, so a truncated saved output still shows it.
   `ui-fidelity.browser.test.ts` runs the SSIM path in a real browser.
 
-Discarded: a soft (smooth-max) clamp per frame — still wobbled.
+- **Smoothness.** Filling the frame made CI read camera kinks and text
+  re-hinting as flicker. ui-focus now glides between views clamped once
+  (no per-frame clamp, no cursor follow), `.cam` keeps its raster
+  (`will-change: transform`), and the flicker detector counts a delta only
+  above 12% of the local level.
+- **v8 follow-ups.** Each parallel shot crew has its own look
+  (`ownLook`): crew B is no longer held by crew A's frames. `recreate_ui`
+  refuses a url already rebuilt under another name (v8: /app twice).
+
+Discarded: a soft (smooth-max) clamp per frame and a temporal average of
+the camera — both still wobbled.
