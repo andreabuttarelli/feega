@@ -9,7 +9,7 @@ import { pieceAnchors } from '../ui-kit/anchors';
 import { vectorPiece } from '../vector-ui/piece';
 import { VectorKind, VectorRole, type VectorNode, type VectorUi } from '../vector-ui/model';
 import { SHOTS, SHOT_IDS, ShotId, ShotUi, shotSource } from './library';
-import { addShot, shotComponent } from './ops';
+import { addShot, shotComponent, shotCursor } from './ops';
 
 const node = (id: string, role: VectorRole, kind: VectorKind, x: number, y: number, w: number, h: number, extra: Partial<VectorNode> = {}): VectorNode => ({ id, role, kind, x, y, w, h, ...extra });
 
@@ -270,9 +270,9 @@ describe('UI shots in vertical', () => {
   });
 
   it('ui-focus dims the page briefly and keeps it visible (v3: the page sat grey for most of the shot)', () => {
-    const draw = drawPiece(shotSource(ShotId.UiFocus, UI).js, SLOTS[ShotId.UiFocus], DURATION, VERTICAL);
+    const draw = drawPiece(shotSource(ShotId.UiFocus, UI).js, { ...SLOTS[ShotId.UiFocus], cursor: shotCursor(ShotId.UiFocus, SLOTS[ShotId.UiFocus], UI) }, DURATION, VERTICAL);
     const times = Array.from({ length: 36 }, (_, i) => (i * DURATION) / 35);
-    const lowest = times.map((t) => Math.min(...all(draw(t)).filter((n) => n.className !== 'vcaret' && !n.attrs['data-cursor']).map((n) => Number(n.style.opacity ?? 1))));
+    const lowest = times.map((t) => Math.min(...all(draw(t)).filter((n) => !['vcaret', 'vtyped'].includes(n.className) && !n.attrs['data-cursor']).map((n) => Number(n.style.opacity ?? 1))));
 
     expect(Math.min(...lowest)).toBeGreaterThanOrEqual(0.3);
     expect(lowest.filter((o) => o < 0.95).length / times.length).toBeLessThanOrEqual(0.5);
@@ -308,7 +308,7 @@ describe('the cursor in UI shots', () => {
   const drawnWith = (id: ShotId, slots: Record<string, unknown>, frame = LANDSCAPE) => drawPiece(shotSource(id, UI).js, slots, DURATION, frame);
 
   it.each(CURSOR_SHOTS.flatMap((s) => [VERTICAL, LANDSCAPE, SQUARE].map((f) => [s, f] as const)))('%s draws a cursor on screen by default (%o)', (id, frame) => {
-    const shown = pointer(drawnWith(id, SLOTS[id], frame)(2));
+    const shown = pointer(drawnWith(id, { ...SLOTS[id], cursor: shotCursor(id, SLOTS[id], UI) }, frame)(2));
     const x = Number(/translate\(([-\d.]+)px/.exec(String(shown?.style.transform))?.[1]);
 
     expect(Number(shown?.style.opacity)).toBeGreaterThan(0.9);
@@ -316,13 +316,33 @@ describe('the cursor in UI shots', () => {
     expect(x).toBeLessThan(frame.width);
   });
 
+  it('sizes the cursor to the UI at its zoom, within a readable range of the frame', () => {
+    const slots = { ...SLOTS[ShotId.UiMorph], cursor: shotCursor(ShotId.UiMorph, SLOTS[ShotId.UiMorph], UI) };
+    const draw = drawnWith(ShotId.UiMorph, slots, LANDSCAPE);
+    const scaleIn = (n: Drawn | undefined) => Number(/scale\(([\d.]+)\)/.exec(String(n?.style.transform))?.[1]);
+    const sizes = [0.2, 1.5, 3].map((t) => {
+      const tree = draw(t);
+      const cam = all(tree).find((n) => n.className === 'cam');
+      return { zoom: scaleIn(cam), cursor: scaleIn(pointer(tree)) * 100 };
+    });
+
+    for (const s of sizes) {
+      expect(s.cursor).toBeCloseTo(Math.min(Math.max(22 * s.zoom, 1080 * 0.03), 1080 * 0.11), 0);
+    }
+  });
+
   it('follows the script it is given: it types into the field and presses the button when the script says', () => {
     const draw = drawnWith(ShotId.UiFocus, { ...SLOTS[ShotId.UiFocus], cursor: [{ target: 'input-0', action: 'type', text: 'hello', at: 0.6 }, { target: 'button-0', action: 'click', at: 2.4 }] });
     const button = (t: number) => all(draw(t)).find((n) => n.attrs['data-anchor'] === 'button-0');
 
-    expect(wordsUnder(draw(1.6))).toContain('hello');
-    expect(String(button(2.3)?.style.transform)).toBe('scale(1)');
-    expect(String(button(2.45)?.style.transform)).not.toBe('scale(1)');
+    const typed = (t: number) => all(draw(t)).filter((n) => n.className === 'vtyped' && Number(n.style.opacity) === 1).map((n) => n.textContent).join('');
+
+    expect(typed(0.5)).toBe('');
+    expect(typed(1.6)).toBe('hello');
+    const scale = (t: number) => Number(/scale\(([\d.]+)\)/.exec(String(button(t)?.style.transform))?.[1]);
+
+    expect(scale(2.3)).toBe(1);
+    expect(scale(2.45)).toBeLessThan(1);
   });
 
   it('draws the same frame for a time whatever time came before, with a script', () => {
