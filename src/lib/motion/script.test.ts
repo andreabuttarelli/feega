@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Act, briefOf, scriptProblems, scriptSchema, type LaunchScript } from './script';
+import { Act, briefOf, durationProblem, scriptProblems, scriptSchema, type LaunchScript } from './script';
 
 const SITE = 'https://supasito.com/';
 
@@ -49,11 +49,31 @@ describe('the launch script', () => {
     expect(scriptProblems(s).join(' ')).toContain('own promise');
   });
 
+  it('feega v7: refuses more on-screen lines than its length can show (14 lines in 15 s grew the cut to 52 s)', () => {
+    const s = good();
+    s.acts[1].on_screen = ['Say what should change.', 'Pick the site.', 'Type the price.', 'See the preview.', 'Press publish.', 'Done.'];
+    s.acts[2].on_screen = ['See it before it goes live.', 'Every change.', 'Every site.', 'One place.'];
+
+    expect(scriptProblems(s).join(' ')).toMatch(/15 on-screen lines.*14 s/);
+  });
+
   it('refuses acts out of order', () => {
     const s = good();
     s.acts = [s.acts[1], s.acts[0], s.acts[2], s.acts[3]];
 
     expect(scriptProblems(s)[0]).toContain('in this order');
+  });
+
+  it.each([
+    [14, null],
+    [11.3, null],
+    [16.7, null],
+    [52.6, 'the video runs 52.6 s, the script 14 s'],
+    [10, 'the video runs 10 s, the script 14 s']
+  ])('a %s s video against a 14 s script: %s', (seconds, problem) => {
+    const found = durationProblem(seconds, good());
+
+    expect(problem === null ? found : found?.startsWith(problem)).toBe(problem === null ? null : true);
   });
 
   it('writes a brief that cites every claim', () => {

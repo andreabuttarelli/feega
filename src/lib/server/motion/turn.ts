@@ -37,7 +37,7 @@ import { tileSheet } from '$lib/server/motion/contact-sheet';
 import { COPY_SCHEMA, copywrite } from '$lib/server/motion/copywriter';
 import { projectMemory } from '$lib/server/motion/studio-memory';
 import type { LaunchScript } from '$lib/motion/script';
-import { REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
+import { REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleLooks, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { appAccountKept, liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
 import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
@@ -547,6 +547,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       const play = async (messages: ModelMessage[], kind: Round) => {
         const first = !started;
         started = true;
+        session.looks = roleLooks(ROUND_ROLE[kind] ?? role);
         const answered: ModelMessage[] = [];
         const played = round(messages, kind, (step) => {
           steps.push(step);

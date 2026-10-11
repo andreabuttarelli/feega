@@ -1,5 +1,5 @@
 import type { MotionDoc } from './doc';
-import { Act, type LaunchScript } from './script';
+import { Act, durationProblem, type LaunchScript } from './script';
 import { storyLabel, StoryBeat } from './story';
 import { UI_KIT } from './ui-kit/kit';
 import { contentParams, kitKind } from './ui-kit/content';
@@ -117,7 +117,9 @@ export function scriptDrift(doc: MotionDoc): DriftProblem[] {
     return [];
   }
   const clips = shown(doc, doc.tracks, 0, Number.POSITIVE_INFINITY, new Set());
-  return windows(doc, script).flatMap((window) => {
+  const length = durationProblem(doc.durationInFrames / doc.fps, script);
+  const stretched = length ? [{ frame: 0, detail: length }] : [];
+  return [...stretched, ...windows(doc, script).flatMap((window) => {
     const act = script.acts.find((a) => a.act === window.act)!;
     const inside = clips.filter((c) => c.from < window.to && c.to > window.from).sort((a, b) => a.from - b.from);
     const hay = inside.flatMap((c) => wordsOf(c.text));
@@ -125,5 +127,5 @@ export function scriptDrift(doc: MotionDoc): DriftProblem[] {
     const lines = window.act === Act.Claim ? [...new Set([...act.on_screen, script.research.promise.text])] : act.on_screen;
     const logo = window.act === Act.Claim && !inside.some((c) => c.logo) ? [{ frame: window.from, detail: 'the claim has no logo: close on the original logo, flat and intact, with the promise and the address' }] : [];
     return [...unmarked, ...lines.flatMap((line) => lineProblem(line, window, hay, doc)), ...logo];
-  });
+  })];
 }
