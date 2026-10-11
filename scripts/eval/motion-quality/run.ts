@@ -289,7 +289,7 @@ async function main() {
   if (port === FORBIDDEN_PORT) {
     throw new Error(`port ${FORBIDDEN_PORT} is the shared dev server: pass --port=<other>`);
   }
-  const chosen = CASES.filter((c) => !only || c.name === only);
+  const chosen = CASES.filter((c) => !only || only.split(',').includes(c.name));
   if (!chosen.length) {
     throw new Error(`no case ${only}: ${CASES.map((c) => c.name).join(', ')}`);
   }
