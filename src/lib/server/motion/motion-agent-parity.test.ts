@@ -24,7 +24,7 @@ const DOC: Record<string, Access> = {
   camera: { write: ['set_camera'], read: 'camera' },
   look: { write: ['set_look', 'set_light', 'remove_light', 'set_light_keyframes'], read: 'look' },
   fonts: { write: ['set_font', 'register_font', 'remove_font'], read: 'fonts' },
-  components: { write: ['write_component', 'patch_component', 'remove_component'], read: 'components' },
+  components: { write: ['write_component', 'update_components', 'remove_component'], read: 'components' },
   shaders: { write: ['add_custom_effect'], read: 'shaders' },
   markers: { write: ['set_marker', 'remove_marker', 'mark_beats'], read: 'markers' },
   workArea: { write: ['set_work_area'], read: 'workArea' },

@@ -8,10 +8,10 @@ export enum Tier {
 }
 
 export const WRITE_COMPONENT = 'write_component';
-export const PATCH_COMPONENT = 'patch_component';
+export const UPDATE_COMPONENTS = 'update_components';
 export const READ_COMPONENT = 'read_component';
 
-export const toolsWritingCode: ReadonlySet<string> = new Set([WRITE_COMPONENT, PATCH_COMPONENT]);
+export const toolsWritingCode: ReadonlySet<string> = new Set([WRITE_COMPONENT, UPDATE_COMPONENTS]);
 
 const FORCES_VIEW: Record<Tier, boolean> = { [Tier.Edit]: true, [Tier.Code]: false };
 
