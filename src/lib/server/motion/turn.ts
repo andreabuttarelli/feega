@@ -30,6 +30,7 @@ import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/serv
 import { CutGate, REVIEW_CUT, cutGate, type CutReview } from '$lib/motion/cut-review';
 import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
+import { projectMemory } from '$lib/server/motion/studio-memory';
 import { STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
@@ -217,7 +218,9 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   });
   const picked = await importFollowed(readAnswer(message), sources.importAsset, assets);
   session.pickAssets = picked.ids;
-  const openingText = [message, note, picked.note].filter(Boolean).join('\n\n');
+  const role = turnRole(message, head.doc);
+  const memory = role === StudioRole.Director ? await projectMemory(db, { orgId, projectId: project.id, nodeId: motion.record.id }).catch(() => '') : '';
+  const openingText = [message, note, picked.note, memory].filter(Boolean).join('\n\n');
   const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint });
   const drawTurnFrames = async (callId: string, times: number[]) => {
     const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
@@ -317,7 +320,6 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const visionModel = gatewayModel(model)?.usable ? model : llmVisionModel();
   const vision = BROWSER_VISION[browser](visionModel);
   const asksPick = !choosesForUser(message);
-  const role = turnRole(message, head.doc);
   const toolNames = roleTools(role, Object.keys(tools)).filter((name) => (vision === Vision.Available || name !== VIEW_FRAMES) && (asksPick || name !== ASK_REFERENCE_PICK));
   const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
   const t0 = Date.now();

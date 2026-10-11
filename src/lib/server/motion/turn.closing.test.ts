@@ -182,6 +182,7 @@ vi.mock('$lib/server/llm', () => ({
     return world.critic;
   }
 }));
+vi.mock('$lib/server/motion/studio-memory', () => ({ projectMemory: async () => 'Studio memory, from the last video made in this project: shots ShotKineticTitle.' }));
 vi.mock('$lib/server/motion/contact-sheet', () => ({ tileSheet: async () => Buffer.from('sheet') }));
 vi.mock('$lib/server/openrouter-models', () => ({
   ensureGatewayModels: async () => undefined,
@@ -357,6 +358,13 @@ describe('a motion turn closes on a look and a summary', () => {
 
     expect(world.tools[0]).toContain('write_script');
     expect(world.tools[0]).not.toContain('add_clip');
+    expect(JSON.stringify(world.calls[0].prompt)).toContain('Studio memory');
+  });
+
+  it('a builder turn is not told the last video memory: it already has its own doc', async () => {
+    await turn();
+
+    expect(world.calls.some((c) => JSON.stringify(c.prompt).includes('Studio memory'))).toBe(false);
   });
 
   it('a small edit on a blank doc goes straight to the builder', async () => {
