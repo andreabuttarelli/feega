@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { CRITIC_PASS_SCORE, SHEET_MAX_FRAMES, critique, criticMessage, sheetTimes, type CriticPorts } from './critic';
 import { tileSheet } from './contact-sheet';
+import { MAX_FRAMES_PER_VIEW } from './frames';
 import { STUDIO_ROSTER, StudioRole, roleBudgetUsd } from './studio-roster';
 
 const doc = { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 30 * 12, fps: 30 as const };
@@ -11,7 +12,7 @@ const jpeg = (shade: number) => sharp({ create: { width: 64, height: 36, channel
 
 const ports = (answer: unknown, seen: { times?: number[]; images?: number } = {}): CriticPorts => ({
   frames: async (times) => {
-    seen.times = times;
+    seen.times = [...(seen.times ?? []), ...times];
     return Promise.all(times.map(async (time) => ({ time, bytes: await jpeg(time * 10) })));
   },
   tile: async (frames) => Buffer.from(`sheet of ${frames.length}`),
@@ -46,6 +47,15 @@ describe('the critic', () => {
     expect(seen.images).toBe(2);
     expect(out.review).toEqual({ score: 5, fixes: ['scene at 3s is empty: fill it with the product UI'] });
     expect(out.usd).toBe(0.05);
+  });
+
+  it('draws the sheet in batches the editor accepts, so no frame request is refused', async () => {
+    const batches: number[][] = [];
+    const out = await critique({ ...ports({ score: 9, fixes: [] }), frames: async (times) => (batches.push(times), times.map((time) => ({ time, bytes: Buffer.from('x') }))) }, { doc, request: 'x', references: [] });
+
+    expect(batches.every((b) => b.length <= MAX_FRAMES_PER_VIEW)).toBe(true);
+    expect(batches.flat()).toEqual(sheetTimes(doc));
+    expect(out.review?.score).toBe(9);
   });
 
   it('gives up quietly when no frames can be drawn', async () => {

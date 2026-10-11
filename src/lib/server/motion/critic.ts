@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { ModelMessage } from 'ai';
 import type { MotionDoc } from '$lib/motion/doc';
 import type { LlmMediaPart } from '$lib/server/llm';
-import { VIEW_FRAMES, type Frame, type Reference } from './frames';
+import { MAX_FRAMES_PER_VIEW, VIEW_FRAMES, type Frame, type Reference } from './frames';
 
 export const SHEET_MAX_FRAMES = 24;
 export const CRITIC_PASS_SCORE = 8;
@@ -50,7 +50,12 @@ const prompt = (input: CriticInput, times: number[]) =>
 
 export async function critique(ports: CriticPorts, input: CriticInput): Promise<Critique> {
   const times = sheetTimes(input.doc);
-  const frames = await ports.frames(times);
+  const batches = Array.from({ length: Math.ceil(times.length / MAX_FRAMES_PER_VIEW) }, (_, i) => times.slice(i * MAX_FRAMES_PER_VIEW, (i + 1) * MAX_FRAMES_PER_VIEW));
+  const drawn = [];
+  for (const batch of batches) {
+    drawn.push(await ports.frames(batch));
+  }
+  const frames = drawn.every(Boolean) ? drawn.flatMap((d) => d ?? []) : null;
   if (!frames?.length) {
     return { review: null, usd: 0 };
   }
