@@ -36,6 +36,7 @@ const world = vi.hoisted(() => ({
   message: 'make it pop',
   history: [] as { role: string; content: string; tools?: unknown[] }[],
   videoSpent: 0,
+  raised: 0,
   tools: [] as string[][],
   imported: [] as string[],
   critic: null as unknown,
@@ -216,7 +217,7 @@ vi.mock('$lib/server/openrouter-models', () => ({
   gatewayModel: () => (world.seesImages ? { usable: true } : null),
   gatewayModels: () => ['anthropic/claude-opus-5.5', 'anthropic/claude-sonnet-5.5', 'anthropic/claude-haiku-4.5'].map((id) => ({ id, label: id, tools: true, usable: !id.includes('haiku'), rate: { input: 1, cachedInput: 1, output: 1 }, reasoning: false, efforts: [], defaultEffort: null }))
 }));
-vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: (e: { agentKey?: string; model?: string; label?: string }) => void world.logged.push(e), billedUsdInScope: () => 0.04, billingScope: () => ({ run: (fn: () => unknown) => fn(), gatewayUsd: () => world.billed }), withOrgContext: (_id: string, fn: () => unknown) => fn(), withVideoContext: (_o: string, _n: string, fn: () => unknown) => fn() }));
+vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: (e: { agentKey?: string; model?: string; label?: string }) => void world.logged.push(e), billedUsdInScope: () => 0.04, billingScope: () => ({ run: (fn: () => unknown) => fn(), gatewayUsd: () => world.billed }), withOrgContext: (_id: string, fn: () => unknown) => fn(), withNodeContext: (_n: string, fn: () => unknown) => fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/repos/chat', () => ({
   openNodeThread: async () => 'thread-1',
@@ -276,14 +277,13 @@ vi.mock('$lib/server/motion/brand-sources', async () => {
 });
 
 const { startMotionTurn, Browser, MAX_DELIVERY_ATTEMPTS } = await import('./turn');
-const { VIDEO_BUDGET_RAISE } = await import('$lib/server/brand-agent/limits');
 const { DOC_EDITED, FRAMES_REQUEST } = await import('$lib/motion/frames-request');
 const { FrameUpload } = await import('./frames');
 type DocEdited = import('$lib/motion/frames-request').DocEdited;
 
 async function turn(reasoning: string | null = 'low', browser = Browser.Attached, landingMs?: number, stopPollMs = 3000) {
   const db = { storage: { from: () => draftBucket } } as never;
-  const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
+  const motion = { record: { id: 'n-1', canvasId: 'c-1' }, node: { id: 'n-1', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null, budgetRaisedUsd: world.raised } } as never;
   const started = await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null }, motion, message: world.message, selection: [], model: 'anthropic/claude-opus-5.5', reasoning, requester: { kind: 'user', id: 'u-1' }, browser, ...(landingMs === undefined ? {} : { timing: { landingMs, stopPollMs } }) });
   if (started instanceof Response) {
     throw new Error('turn refused');
@@ -342,6 +342,7 @@ describe('a motion turn closes on a look and a summary', () => {
     world.message = 'make it pop';
     world.history = [];
     world.videoSpent = 0;
+    world.raised = 0;
     world.tools = [];
     world.imported = [];
     world.critic = null;
@@ -492,12 +493,14 @@ describe('a motion turn closes on a look and a summary', () => {
 
     expect(world.calls).toHaveLength(0);
     expect(outcome.reply).toContain('$2.50');
-    expect(outcome.reply).toContain(VIDEO_BUDGET_RAISE);
+    const saved = world.saved.findLast((t) => t.role === 'assistant') as { tools?: { toolName: string; output: { spent_usd: number; raise_usd: number } }[] };
+    expect(saved.tools?.find((t) => t.toolName === 'video_budget')?.output).toMatchObject({ spent_usd: 2.5, raise_usd: 1 });
+    expect(outcome.budget).toMatchObject({ spent_usd: 2.5 });
   });
 
-  it('a user who raises the budget gets another round of it', async () => {
+  it('a video whose user raised the budget gets another round of it', async () => {
     world.videoSpent = 2.5;
-    world.message = VIDEO_BUDGET_RAISE;
+    world.raised = 1;
 
     await turn();
 
@@ -505,12 +508,18 @@ describe('a motion turn closes on a look and a summary', () => {
   });
 
   it('a turn stops when the video budget runs out, even with turn budget left', async () => {
-    world.videoSpent = 1.99;
+    world.videoSpent = 1.8;
     world.billed = 0.5;
 
-    await turn();
+    const outcome = await turn();
 
     expect(world.calls.filter((c) => lastMessage(c.prompt).role === 'tool' && JSON.stringify(lastMessage(c.prompt).content).includes('add_clip'))).toHaveLength(0);
+    expect(world.writes.length).toBeGreaterThan(0);
+    expect(outcome.budget).toMatchObject({ raise_usd: 1 });
+  });
+
+  it('a turn well inside the video budget offers no card', async () => {
+    expect((await turn()).budget).toBeNull();
   });
 
   it('keeping the cut costs no model call (v7: each "keep it" answer spent $0.40)', async () => {
@@ -605,9 +614,13 @@ describe('a motion turn closes on a look and a summary', () => {
     const outcome = await turn('low', Browser.Absent);
     const saved = world.saved.find((t) => t.role === 'assistant')!.content!;
 
-    expect(outcome.reply.trim().endsWith(SUMMARY)).toBe(true);
-    expect(saved.trim().endsWith(SUMMARY)).toBe(true);
-    expect(saved).not.toMatch(/\.[A-Z]/);
+    const cut = saved.lastIndexOf('\n\n');
+    const [said, note] = [saved.slice(0, cut), saved.slice(cut + 2)];
+
+    expect(outcome.reply).toBe(saved);
+    expect(said.trim().endsWith(SUMMARY)).toBe(true);
+    expect(note).toMatch(/^This video has used its budget/);
+    expect(said).not.toMatch(/\.[A-Z]/);
   });
 
   it('each finished step is written as progress before the answer is closed done', async () => {

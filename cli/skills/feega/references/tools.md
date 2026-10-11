@@ -216,6 +216,7 @@ list. Returns how many combinations it actually stopped.
 | `get_render` | `feega motion render-status <runId>` |
 | `publish_motion_embed` | `feega motion embed <nodeId> [--unpublish]` |
 | `get_motion_embed` | `feega motion embed <nodeId> --status` |
+| `motion_budget` | `feega motion budget <nodeId> [--raise]` |
 | `view_motion_frames` | `feega motion frames <nodeId> --at 1,2.5,4 [--width 640] [--out dir]` |
 | `list_motion_revisions` | `feega motion revisions <nodeId>` |
 | `restore_motion_revision` | `feega motion revisions <nodeId> --restore <version>` |

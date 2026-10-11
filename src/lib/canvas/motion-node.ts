@@ -8,6 +8,7 @@ export type MotionNode = {
   posterAssetId: string | null;
   lastRenderAssetId: string | null;
   storyboard?: StoryboardLink;
+  budgetRaisedUsd?: number;
 };
 
 const FORMAT_NAMES: Record<string, MotionFormat> = {
@@ -28,7 +29,8 @@ export const motionNodeSchema = z.object({
   docHeadRevision: z.number().int().min(0),
   posterAssetId: z.string().nullable(),
   lastRenderAssetId: z.string().nullable(),
-  storyboard: linkSchema.optional()
+  storyboard: linkSchema.optional(),
+  budgetRaisedUsd: z.number().min(0).optional()
 });
 
 export function storyboardOf(data: Record<string, unknown>): StoryboardLink | null {

@@ -2,7 +2,7 @@ import { mkdtempSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { AccountGiven, CutAnswer, Teardowns, asksUser, claimPort, cutAnswerFor, replyTo, serverEnv, turnSettled } from './drive';
+import { AccountGiven, CutAnswer, Teardowns, accountAfter, asksUser, claimPort, cutAnswerFor, replyTo, serverEnv, turnSettled } from './drive';
 
 const user = { role: 'user' };
 const assistant = { role: 'assistant' };
@@ -83,6 +83,22 @@ describe('what the driver answers, as a real user would', () => {
     expect(asksUser("Posso aprirla con lo stesso account di test e ricostruirla, se mi dai l'ok.")).toBe(true);
     expect(asksUser('Fatto: il trailer è pronto.')).toBe(false);
     expect(asksUser('Va bene così?')).toBe(true);
+  });
+
+  it('once the account is answered, a report that only mentions it is not a question (eval: linear paid two $1.2 turns for "Salta" sent to status reports)', () => {
+    const report = 'The cut passes the check. All of Linear in this cut is the rebuilt public homepage, because without a test account there are no signed-in screens.';
+
+    expect(asksUser(report, AccountGiven.Declined)).toBe(false);
+    expect(asksUser(report, AccountGiven.Yes)).toBe(false);
+    expect(asksUser('Should I go ahead with the public page?', AccountGiven.Declined)).toBe(true);
+  });
+
+  it('remembers the answer it gave: an account, or that there is none', () => {
+    const ask = 'I need a test account: login url, email and password.';
+
+    expect(accountAfter(ask, replyTo(ask, account), account, AccountGiven.No)).toBe(AccountGiven.Yes);
+    expect(accountAfter(ask, replyTo(ask, null), null, AccountGiven.No)).toBe(AccountGiven.Declined);
+    expect(accountAfter('Procedo con 20 s?', 'Sì, vai pure.', null, AccountGiven.No)).toBe(AccountGiven.No);
   });
 });
 

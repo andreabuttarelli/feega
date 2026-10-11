@@ -84,6 +84,7 @@ const RESTANO = [
   'list_shader_effects',
   'publish_motion_embed',
   'get_motion_embed',
+  'motion_budget',
   'view_motion_frames',
   'search_gallery',
   'remix_gallery_item',

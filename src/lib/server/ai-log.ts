@@ -31,7 +31,6 @@ type BrandLogContext = {
   orgId?: string;
   /** Set when the caller already knows the plan. `undefined` = not resolved yet (look up). */
   plan?: string | null;
-  nodeId?: string;
   /** Costo fatturato dal gateway in questo scope, sommato: la fattura vera del turno. */
   llmCostUsd?: number;
   /** Le fatture gia` ritirate e scritte in `ai_calls`, per chi deve DIRE quanto e` costato. */
@@ -105,14 +104,16 @@ export function withOrgContext<T>(orgId: string, fn: () => T): T {
   return brandStorage.run({ brandId: null, orgId }, fn);
 }
 
-export function withVideoContext<T>(orgId: string, nodeId: string, fn: () => T): T {
-  return brandStorage.run({ brandId: null, orgId, nodeId }, fn);
+const nodeStorage = new AsyncLocalStorage<string>();
+
+export function withNodeContext<T>(nodeId: string, fn: () => T): T {
+  return nodeStorage.run(nodeId, fn);
 }
 
 export type BillingScope = { run: <T>(fn: () => T) => T; gatewayUsd: () => number };
 
-export function billingScope(orgId: string, nodeId?: string): BillingScope {
-  const ctx: BrandLogContext = { brandId: null, orgId, nodeId };
+export function billingScope(orgId: string): BillingScope {
+  const ctx: BrandLogContext = { brandId: null, orgId };
   return { run: (fn) => brandStorage.run(ctx, fn), gatewayUsd: () => ctx.llmCostUsd ?? 0 };
 }
 
@@ -482,7 +483,7 @@ export function logAiCall(entry: AiCallLog): void {
 
     const admin = createAdminClient();
     const brandId = entry.brandId ?? getBrandContext();
-    const nodeId = brandStorage.getStore()?.nodeId ?? null;
+    const nodeId = nodeStorage.getStore() ?? null;
     const planFromAls = getBrandPlanContext();
     // Letti QUI, sincroni, come il brand: dopo il primo await lo scope è di chi ha aspettato.
     const operation = operationTag(entry);

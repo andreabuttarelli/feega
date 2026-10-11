@@ -69,6 +69,10 @@ const fake: Server = createServer((req, res) => {
       send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, react: `<FeegaMotion id="${NODE}" />`, flutter: `FeegaMotion(id: '${NODE}')`, revision: 3 } : { published });
       return;
     }
+    if (route === `/api/v1/motion/${NODE}/budget`) {
+      send(200, { ok: true, spent_usd: 2.04, cap_usd: req.method === 'POST' ? 3 : 2, raise_usd: 1 });
+      return;
+    }
     if (route === `/api/v1/motion/${NODE}/revisions`) {
       send(200, req.method === 'POST' ? { version: 21, restored: 17 } : { revisions: [{ version: 20, summary: 'Undo', actorKind: 'user', createdAt: '', clips: 0 }] });
       return;
@@ -210,6 +214,18 @@ describe('the motion agent over MCP', () => {
     expect(result?.structuredContent).toMatchObject({ published: false });
   });
 
+  test('motion_budget reads what a video spent across all its turns', async () => {
+    const result = await callTool('motion_budget', { node_id: NODE });
+    expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/budget` });
+    expect(result?.structuredContent).toMatchObject({ spent_usd: 2.04, cap_usd: 2 });
+  });
+
+  test('motion_budget with raise lets the video spend more, as the continue card does', async () => {
+    const result = await callTool('motion_budget', { node_id: NODE, action: 'raise' });
+    expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/budget` });
+    expect(result?.structuredContent).toMatchObject({ cap_usd: 3 });
+  });
+
   test('get_motion_embed reads the embed state', async () => {
     await callTool('get_motion_embed', { node_id: NODE });
     expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/embed` });
@@ -246,7 +262,7 @@ describe('the motion agent over MCP', () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
     const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
 
-    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_videos', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
+    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_videos', 'motion_budget', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
     expect(names).toContain('render_video');
     expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');

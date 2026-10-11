@@ -218,6 +218,20 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'motion_budget',
+    {
+      title: 'Read or raise the budget of a motion video',
+      description:
+        'What a motion video has spent on AI across all its agent turns (`spent_usd`) and what it may spend (`cap_usd`). ' +
+        'When an ask returns `video_budget`, the agent stopped because the video used its budget: its work is saved. ' +
+        '`action: "raise"` adds `raise_usd` to the cap (only when the user asked to continue), then `ask_motion_agent` continues.',
+      inputSchema: z.object({ org, node_id: z.string(), action: z.enum(['read', 'raise']).optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
+    },
+    async ({ org, node_id, action }) => withAuth((token) => (action === 'raise' ? motionApi.raiseBudget(token, node_id, org) : motionApi.budget(token, node_id, org)))
+  );
+
+  server.registerTool(
     'view_motion_frames',
     {
       title: 'See frames of a motion video',

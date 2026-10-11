@@ -172,7 +172,7 @@ function libraryTexts(doc: MotionDoc): string[] {
   );
 }
 
-const SUMMARY_ASK = 'write the user a short summary of the video as it now stands: what you made or changed, what you checked in the frames, and anything left to decide. Plain sentences, no tool names, no working notes.';
+const SUMMARY_ASK = 'write the user a short summary of the video as it now stands: what you made or changed, what you checked in the frames, and what stays open, as statements. End on a question only when you cannot go on without the answer, and never ask again what the user already answered in this conversation (a test account they said they do not have: work from the public site). Plain sentences, no tool names, no working notes.';
 
 export function selfCheckPrompt(times: number[]): string {
   return `Self-check: call ${VIEW_FRAMES} with times [${times.join(', ')}] and look at the result. If text is clipped or overflows, overlaps another element, has poor contrast or leaves the safe area, or the result lists quality problems, fix them with the editing tools; otherwise change nothing. Then, as your last message, ${SUMMARY_ASK}`;

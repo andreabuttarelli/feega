@@ -36,11 +36,4 @@ export function overTurnCap(spentUsd: () => number): (input: StepsSoFar) => bool
 
 export const VIDEO_CAP_USD = 2;
 
-export const VIDEO_BUDGET_RAISE = 'Raise the video budget and continue.';
-
-export function videoBudgetLeft(spentUsd: number, turns: readonly { role: string; content: string }[]): number {
-  const raises = turns.filter((t) => t.role === 'user' && t.content.trim() === VIDEO_BUDGET_RAISE).length;
-  return VIDEO_CAP_USD * (1 + raises) - spentUsd;
-}
-
-export const budgetSpentNote = (spentUsd: number) => `This video has used its budget: $${spentUsd.toFixed(2)} so far. Nothing more was spent. To keep working on it, answer: "${VIDEO_BUDGET_RAISE}"`;
+export const VIDEO_RAISE_USD = 1;
