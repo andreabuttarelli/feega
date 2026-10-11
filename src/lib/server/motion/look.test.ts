@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { Quality } from '$lib/motion/direction';
 import { Forbidden } from '$lib/motion/style';
 import { DESCRIBE_FRAMES } from './frames';
-import { GATE_SHOWN, Looks, describeFramesTool, gateBlock, lookFirst, type LookSession } from './look';
+import { GATE_SHOWN, Looks, describeFramesTool, gateBlock, lookFirst, ownLook, type LookSession } from './look';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
@@ -112,5 +112,36 @@ describe('the gate block', () => {
 
     expect(block.match(/plain white/g)).toHaveLength(1);
     expect(block).toContain('3×');
+  });
+});
+
+describe('parallel crews look on their own', () => {
+  function crews() {
+    const edit = vi.fn(async () => ({ ok: true }));
+    const raw: Record<string, Tool> = {
+      view_frames: tool({ inputSchema: z.object({ times: z.array(z.number()) }), execute: async (input) => ({ ok: true, times: input.times }) }),
+      add_clip: tool({ inputSchema: z.object({}), execute: edit }),
+      get_motion_doc: tool({ inputSchema: z.object({}), execute: async () => ({ ok: true }) })
+    };
+    const runner = (tools: Record<string, Tool>) => (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' });
+    return { a: runner(ownLook(raw, Looks.Describes)), b: runner(ownLook(raw, Looks.Describes)) };
+  }
+
+  it("one crew's look never blocks the other crew's edits: v8 crew B was held by crew A's frames", async () => {
+    const { a, b } = crews();
+    await a('view_frames', { times: [1] });
+
+    expect((await b('add_clip', {})).ok).toBe(true);
+    expect((await a('add_clip', {})).ok).toBe(false);
+  });
+
+  it('each crew describes its own frames', async () => {
+    const { a, b } = crews();
+    await a('view_frames', { times: [1] });
+    await b('view_frames', { times: [5] });
+
+    expect((await a(DESCRIBE_FRAMES, { frames: [line(1)] })).ok).toBe(true);
+    expect((await a('add_clip', {})).ok).toBe(true);
+    expect((await b('add_clip', {})).ok).toBe(false);
   });
 });
