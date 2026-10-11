@@ -65,12 +65,23 @@ export function resolveChoice(options: readonly ChatModelOption[], asked: AskedC
   return { ok: false, error: ChoiceError.UnknownModel };
 }
 
-export const MOTION_CAPABLE_MODELS: ReadonlySet<string> = new Set([
-  'anthropic/claude-opus-5.5',
-  'anthropic/claude-opus-5',
-  'anthropic/claude-sonnet-5.5',
-  'openai/gpt-5.6-sol'
-]);
+export enum ToolForcing {
+  Allowed = 'allowed',
+  Refused = 'refused'
+}
+
+const MOTION_MODELS: Record<string, { forcing: ToolForcing }> = {
+  'anthropic/claude-opus-5.5': { forcing: ToolForcing.Refused },
+  'anthropic/claude-opus-5': { forcing: ToolForcing.Allowed },
+  'anthropic/claude-sonnet-5.5': { forcing: ToolForcing.Refused },
+  'openai/gpt-5.6-sol': { forcing: ToolForcing.Allowed }
+};
+
+export const MOTION_CAPABLE_MODELS: ReadonlySet<string> = new Set(Object.keys(MOTION_MODELS));
+
+export function toolForcing(model: string): ToolForcing {
+  return MOTION_MODELS[model]?.forcing ?? ToolForcing.Refused;
+}
 
 export type MotionAsk = { asked: AskedChoice; refused: string | null };
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { Tier, activeTools, openingTier, spentUsd, stepTier, toolsWritingCode } from './model-route';
+import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, toolsWritingCode } from './model-route';
+import { ToolForcing, toolForcing } from '$lib/server/chat-model/catalogue';
 
 const doc = newMotionDoc(MotionFormat.Landscape);
 
@@ -39,5 +40,16 @@ describe('which model a motion step runs on', () => {
     );
 
     expect(usd).toBeCloseTo(1 + 0.1 + 1 + 0.1, 5);
+  });
+});
+
+describe('the self-check look', () => {
+  it('forces view_frames only on a model that accepts a forced tool', () => {
+    expect(selfCheckChoice({ tier: Tier.Edit, reasoning: null, forcing: toolForcing('openai/gpt-5.6-sol') }).toolChoice?.toolName).toBe('view_frames');
+    expect(selfCheckChoice({ tier: Tier.Edit, reasoning: null, forcing: toolForcing('anthropic/claude-opus-5.5') })).toEqual({});
+  });
+
+  it('treats an unknown model as one that refuses forcing', () => {
+    expect(toolForcing('someone/new-model')).toBe(ToolForcing.Refused);
   });
 });

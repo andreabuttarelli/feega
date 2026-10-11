@@ -1,5 +1,6 @@
 import { findClip, type MotionDoc } from '$lib/motion/doc';
 import type { TokenUsage } from './frames';
+import { ToolForcing } from '$lib/server/chat-model/catalogue';
 
 export enum Tier {
   Edit = 'edit',
@@ -16,8 +17,9 @@ const FORCES_VIEW: Record<Tier, boolean> = { [Tier.Edit]: true, [Tier.Code]: fal
 
 export type ForcedTool = { toolChoice?: { type: 'tool'; toolName: string } };
 
-export function selfCheckChoice(input: { tier: Tier; reasoning: string | null }): ForcedTool {
-  return FORCES_VIEW[input.tier] && !input.reasoning ? { toolChoice: { type: 'tool', toolName: 'view_frames' } } : {};
+export function selfCheckChoice(input: { tier: Tier; reasoning: string | null; forcing: ToolForcing }): ForcedTool {
+  const forces = FORCES_VIEW[input.tier] && !input.reasoning && input.forcing === ToolForcing.Allowed;
+  return forces ? { toolChoice: { type: 'tool', toolName: 'view_frames' } } : {};
 }
 const CODE_TOOLS: ReadonlySet<string> = new Set([...toolsWritingCode, READ_COMPONENT]);
 
