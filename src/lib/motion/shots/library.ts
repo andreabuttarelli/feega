@@ -142,6 +142,11 @@ const lerpCam = (a, b, p) => ({ k: Math.exp(mix(Math.log(a.k), Math.log(b.k), p)
 const place = (cam, host) => {
   host.style.transform = 'translate(' + (W / 2 - cam.cx * cam.k).toFixed(2) + 'px,' + (H / 2 - cam.cy * cam.k).toFixed(2) + 'px) scale(' + cam.k.toFixed(4) + ')';
 };
+const placed = (cam, host) => {
+  const view = filled(cam);
+  place(view, host);
+  return view;
+};
 const dimAround = (drawn, b, level) => {
   U.nodes.forEach((n) => {
     const inside = n.x >= b.x - 6 && n.y >= b.y - 6 && n.x + n.w <= b.x + b.w + 6 && n.y + n.h <= b.y + b.h + 6;
@@ -157,11 +162,6 @@ const filled = (cam) => {
   return { k, cx: clamp(cam.cx, hw, U.width - hw), cy: clamp(cam.cy, hh, U.height - hh) };
 };
 const WHOLE = filled({ k: COVER, cx: U.width / 2, cy: U.height / 2 });
-const frameCam = (cam, host) => {
-  const view = filled(cam);
-  place(view, host);
-  return view;
-};
 `;
 
 const CURSOR_LAYER = `
@@ -389,7 +389,7 @@ drive((t) => {
     view = lerpCam(view, WHOLE, glide(span(t, last, duration - last)));
   }
   const p = pointer.pose(t);
-  view = frameCam(pointer.follow(view, p), cam);
+  view = placed(pointer.follow(view, p), cam);
   pointer.draw(p, view, t);
 });
 `;
@@ -565,7 +565,7 @@ drive((t) => {
   const e = glide(span(t, 0, 0.9));
   const p = glide(span(t, M.move, M.len));
   const c = pointer.pose(t);
-  const view = frameCam(pointer.follow(lerpCam(lerpCam(opening, camA, e), camB, p), c), cam);
+  const view = placed(pointer.follow(lerpCam(lerpCam(opening, camA, e), camB, p), c), cam);
   const PAD = 8;
   ring.style.left = (mix(a.x, b.x, p) - PAD).toFixed(1) + 'px';
   ring.style.top = (mix(a.y, b.y, p) - PAD).toFixed(1) + 'px';
@@ -616,7 +616,7 @@ const flood = el('div', 'position:absolute;inset:0;background:' + (into_ || acce
 const deep = { k: frameOn(b, 1, 1).k * 9, cx: b.x + b.w / 2, cy: b.y + b.h / 2 };
 drive((t) => {
   const p = into(span(t, 0, duration * 0.85));
-  frameCam(lerpCam(WHOLE, deep, p), cam);
+  placed(lerpCam(WHOLE, deep, p), cam);
   cam.style.filter = 'blur(' + (26 * p * p).toFixed(3) + 'px)';
   flood.style.opacity = String(soft(span(t, duration * 0.45, duration * 0.5)));
 });

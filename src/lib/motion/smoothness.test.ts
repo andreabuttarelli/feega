@@ -23,6 +23,10 @@ describe('motionJolts', () => {
     expect(motionJolts([1.5, 0, 1.5, 0, 1.5, 0, 1.5, 0]).map((j) => j.kind)).toContain(Jolt.Flicker);
   });
 
+  it('a fast move over a full-frame UI that wobbles a few percent at its peak is not a flicker: text antialiasing', () => {
+    expect(motionJolts([2.0, 1.6, 1.3, 0.7, 1.7, 2.4, 3.1, 3.3, 4.3, 5.3, 6.3, 6.5, 5.5, 4.9, 5.2, 3.8, 2.0, 1.2, 0.6]).map((j) => j.kind)).not.toContain(Jolt.Flicker);
+  });
+
   it('a hard cut the edit asked for is not a jolt', () => {
     expect(motionJolts([0.2, 0.2, 0.2, 60, 0.2, 0.2, 0.2], { cuts: [3] })).toEqual([]);
   });
