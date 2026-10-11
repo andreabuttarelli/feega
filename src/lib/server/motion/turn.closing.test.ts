@@ -34,7 +34,8 @@ const world = vi.hoisted(() => ({
   picking: false,
   looking: false,
   message: 'make it pop',
-  history: [] as { role: string; content: string }[],
+  history: [] as { role: string; content: string; tools?: unknown[] }[],
+  videoSpent: 0,
   tools: [] as string[][],
   imported: [] as string[],
   critic: null as unknown,
@@ -69,7 +70,7 @@ const SCRIPT = {
   acts: [
     { act: 'problem', start: 0, end: 3, scene: 'Scattered folders', on_screen: ['The price changed.'], ui: 'Finder: marta-bakery, cardstack-launch, supasito.com, each edited 9 days ago' },
     { act: 'solution', start: 3, end: 7, scene: 'One prompt', on_screen: ['Say what should change.'], ui: 'Sidebar Supasito, Cardstack, Marta Bakery; prompt Set the price to 12; preview' },
-    { act: 'proof', start: 7, end: 11, scene: 'Preview', on_screen: ['In one place.'], sources: [source] },
+    { act: 'proof', start: 7, end: 11, scene: 'Preview', on_screen: ['See it before it goes live.'], sources: [source] },
     { act: 'claim', start: 11, end: 14, scene: 'Logo', on_screen: ['Every site you run.', 'Up to date.', 'In one place.'] }
   ]
 };
@@ -207,6 +208,7 @@ vi.mock('$lib/server/llm', () => ({
   }
 }));
 vi.mock('$lib/server/motion/studio-memory', () => ({ projectMemory: async () => 'Studio memory, from the last video made in this project: shots ShotKineticTitle.' }));
+vi.mock('$lib/server/repos/video-spend', () => ({ videoSpentUsd: async () => world.videoSpent }));
 vi.mock('$lib/server/motion/contact-sheet', () => ({ tileSheet: async () => Buffer.from('sheet') }));
 vi.mock('$lib/server/openrouter-models', () => ({
   ensureGatewayModels: async () => undefined,
@@ -214,7 +216,7 @@ vi.mock('$lib/server/openrouter-models', () => ({
   gatewayModel: () => (world.seesImages ? { usable: true } : null),
   gatewayModels: () => ['anthropic/claude-opus-5.5', 'anthropic/claude-sonnet-5.5', 'anthropic/claude-haiku-4.5'].map((id) => ({ id, label: id, tools: true, usable: !id.includes('haiku'), rate: { input: 1, cachedInput: 1, output: 1 }, reasoning: false, efforts: [], defaultEffort: null }))
 }));
-vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: (e: { agentKey?: string; model?: string; label?: string }) => void world.logged.push(e), billedUsdInScope: () => 0.04, billingScope: () => ({ run: (fn: () => unknown) => fn(), gatewayUsd: () => world.billed }), withOrgContext: (_id: string, fn: () => unknown) => fn() }));
+vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: (e: { agentKey?: string; model?: string; label?: string }) => void world.logged.push(e), billedUsdInScope: () => 0.04, billingScope: () => ({ run: (fn: () => unknown) => fn(), gatewayUsd: () => world.billed }), withOrgContext: (_id: string, fn: () => unknown) => fn(), withVideoContext: (_o: string, _n: string, fn: () => unknown) => fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/repos/chat', () => ({
   openNodeThread: async () => 'thread-1',
@@ -274,6 +276,7 @@ vi.mock('$lib/server/motion/brand-sources', async () => {
 });
 
 const { startMotionTurn, Browser, MAX_DELIVERY_ATTEMPTS } = await import('./turn');
+const { VIDEO_BUDGET_RAISE } = await import('$lib/server/brand-agent/limits');
 const { DOC_EDITED, FRAMES_REQUEST } = await import('$lib/motion/frames-request');
 const { FrameUpload } = await import('./frames');
 type DocEdited = import('$lib/motion/frames-request').DocEdited;
@@ -338,6 +341,7 @@ describe('a motion turn closes on a look and a summary', () => {
     world.looking = false;
     world.message = 'make it pop';
     world.history = [];
+    world.videoSpent = 0;
     world.tools = [];
     world.imported = [];
     world.critic = null;
@@ -447,6 +451,15 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.chunks.filter((c) => c.type === 'start')).toHaveLength(1);
   });
 
+  it('a shot crew cannot place a shot outside its own time range', async () => {
+    world.headScript = SCRIPT;
+    world.message = 'Go: build the video from this script.';
+    await turn();
+
+    const results = world.calls.map((c) => lastMessage(c.prompt)).filter((m) => m.role === 'tool' && JSON.stringify(m.content).includes('add_shot'));
+    expect(results.some((m) => JSON.stringify(m.content).includes('outside your range 7 s to 14 s'))).toBe(true);
+  });
+
   it('the agent can spawn a sub-agent with its own prompt, tools and model, and gets its text, cost and changes back', async () => {
     world.spawning = true;
     world.message = 'add a hello';
@@ -470,6 +483,53 @@ describe('a motion turn closes on a look and a summary', () => {
 
     const result = world.calls.map((c) => lastMessage(c.prompt)).find((m) => m.role === 'tool' && JSON.stringify(m.content).includes('spawn_agent'));
     expect(JSON.stringify(result?.content)).toContain('not tools you can hand over');
+  });
+
+  it('a video whose budget is spent stops before any model call and says what it cost and how to go on (v7: $6.33 for one trailer)', async () => {
+    world.videoSpent = 2.5;
+
+    const outcome = await turn();
+
+    expect(world.calls).toHaveLength(0);
+    expect(outcome.reply).toContain('$2.50');
+    expect(outcome.reply).toContain(VIDEO_BUDGET_RAISE);
+  });
+
+  it('a user who raises the budget gets another round of it', async () => {
+    world.videoSpent = 2.5;
+    world.message = VIDEO_BUDGET_RAISE;
+
+    await turn();
+
+    expect(world.calls.length).toBeGreaterThan(0);
+  });
+
+  it('a turn stops when the video budget runs out, even with turn budget left', async () => {
+    world.videoSpent = 1.99;
+    world.billed = 0.5;
+
+    await turn();
+
+    expect(world.calls.filter((c) => lastMessage(c.prompt).role === 'tool' && JSON.stringify(lastMessage(c.prompt).content).includes('add_clip'))).toHaveLength(0);
+  });
+
+  it('keeping the cut costs no model call (v7: each "keep it" answer spent $0.40)', async () => {
+    const { CutAnswer, cutAnswer } = await import('$lib/motion/cut-review');
+    world.message = cutAnswer(CutAnswer.Ship, []);
+
+    const outcome = await turn();
+
+    expect(world.calls).toHaveLength(0);
+    expect(outcome.reply).toMatch(/as it is/i);
+  });
+
+  it('the critic reviews a video once: a later turn is not reviewed again (v7: three reviews and three fix asks on linear)', async () => {
+    world.history = [{ role: 'assistant', content: '', tools: [{ toolName: 'review_cut', status: 'done', output: { ok: true, score: 5, fixes: ['x'] } }] }];
+    world.critic = { score: 4, fixes: ['1.5s: empty'] };
+
+    await turn();
+
+    expect(world.critiques).toHaveLength(0);
   });
 
   it('a cut the critic passes is delivered without another round', async () => {

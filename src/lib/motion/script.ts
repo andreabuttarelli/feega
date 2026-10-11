@@ -61,8 +61,19 @@ export function offScript(texts: readonly string[], script: Pick<LaunchScript, '
   return texts.filter((t) => !lines.has(plain(t)));
 }
 
+function repeated(script: LaunchScript): string[] {
+  const seen = new Map<string, string>();
+  const twice = scriptLines(script).filter((line) => {
+    const key = plain(line);
+    const again = seen.has(key);
+    seen.set(key, line);
+    return again;
+  });
+  return [...new Set(twice)].map((line) => `"${line}" appears twice: each line is said once, in one act`);
+}
+
 function lineProblems(script: LaunchScript): string[] {
-  return scriptLines(script).flatMap((line) => (words(line).length > MAX_LINE_WORDS ? [`"${line}" is ${words(line).length} words: an on-screen line holds at most ${MAX_LINE_WORDS}; cut it to "${words(line).slice(0, MAX_LINE_WORDS).join(' ')}" or split it into two lines`] : []));
+  return [...repeated(script), ...scriptLines(script).flatMap((line) => (words(line).length > MAX_LINE_WORDS ? [`"${line}" is ${words(line).length} words: an on-screen line holds at most ${MAX_LINE_WORDS}; cut it to "${words(line).slice(0, MAX_LINE_WORDS).join(' ')}" or split it into two lines`] : []))];
 }
 
 const NEEDS: Record<Act, (act: ScriptAct, research: Research) => string | null> = {

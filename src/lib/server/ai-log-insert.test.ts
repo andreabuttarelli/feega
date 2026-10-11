@@ -65,7 +65,7 @@ vi.mock('./supabase-admin', () => ({
   })
 }));
 
-import { logAiCall, withBrandContext } from './ai-log';
+import { logAiCall, withBrandContext, withVideoContext } from './ai-log';
 
 async function settled(): Promise<void> {
   await vi.waitFor(() => expect(rows.length + Number(lastError !== null)).toBeGreaterThan(0));
@@ -122,3 +122,16 @@ describe('logAiCall scrive le colonne reali di ai_calls', () => {
     expect(rows[0].error).toBe('boom');
   });
 });
+
+describe('a call made for a motion video carries the video', () => {
+  it('every call inside the video scope writes node_id, so the video budget can sum them (v7: $6 per trailer, no cap across turns)', async () => {
+    withVideoContext('org-1', 'node-1', () => {
+      logAiCall({ label: 'motion-critic', provider: 'llm', model: 'x', ms: 1, ok: true, inputTokens: 1, outputTokens: 1 });
+    });
+
+    await settled();
+
+    expect(rows[0]).toMatchObject({ org_id: 'org-1', node_id: 'node-1', thread_id: null });
+  });
+});
+
