@@ -20,6 +20,9 @@ import { VECTOR_TOKEN } from './vector-ui/piece';
 import { structureOf } from './ui-kit/anchors';
 import { junctionProblem } from './junctions';
 import { EffectKind } from './effects/registry';
+import { SHOTS, SHOT_IDS, ShotId } from './shots/library';
+import { vectorOf } from './shots/ops';
+import { FILL_MIN, showsUi, uiCoverage } from './shots/coverage';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -53,7 +56,8 @@ export enum Quality {
   LittleUi = 'little-ui',
   OneScreen = 'one-screen',
   RecolouredUi = 'recoloured-ui',
-  ShrunkUi = 'shrunk-ui'
+  ShrunkUi = 'shrunk-ui',
+  SmallUi = 'small-ui'
 }
 
 export enum Severity {
@@ -96,6 +100,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.OneScreen]: Severity.Blocking,
   [Quality.RecolouredUi]: Severity.Blocking,
   [Quality.ShrunkUi]: Severity.Blocking,
+  [Quality.SmallUi]: Severity.Blocking,
   [LookMiss.Unrecorded]: Severity.Blocking,
   [LookMiss.TypeScale]: Severity.Warning,
   [LookMiss.TypeScaleGross]: Severity.Blocking,
@@ -611,6 +616,39 @@ function alteredUi(doc: MotionDoc): QualityProblem[] {
   });
 }
 
+const FILL_SAMPLES = 12;
+const FILLED_MOST = 0.5;
+const FRAMED_MOMENTS = 1;
+const FRAMED: ReadonlySet<ShotId> = new Set([ShotId.DeviceFlyIn, ShotId.BeforeAfter]);
+
+const shotOf = (clip: Clip) => SHOT_IDS.find((id) => clip.component === 'Custom' && String(clip.props.name).startsWith(SHOTS[id].name) && showsUi(id));
+
+function filledShare(doc: MotionDoc, clip: Clip, shot: ShotId): number | null {
+  const ui = vectorOf(doc, String(clip.props.name));
+  if (!ui) {
+    return null;
+  }
+  const scale = clip.transform.scale ?? 1;
+  const seconds = clip.durationInFrames / doc.fps;
+  const filled = Array.from({ length: FILL_SAMPLES }, (_, i) => uiCoverage(shot, ui, doc, ((i + 0.5) / FILL_SAMPLES) * seconds, seconds) * scale * scale).filter((c) => c >= FILL_MIN);
+  return filled.length / FILL_SAMPLES;
+}
+
+function smallUi(doc: MotionDoc): QualityProblem[] {
+  if (!storyFilm(doc)) {
+    return [];
+  }
+  const small = doc.tracks.flatMap((t) => t.clips as Clip[]).flatMap((clip) => {
+    const shot = shotOf(clip);
+    const share = shot ? filledShare(doc, clip, shot) : null;
+    return shot && share !== null && share < FILLED_MOST ? [{ clip, shot, share }] : [];
+  });
+  const allowed = small.filter((s) => FRAMED.has(s.shot)).slice(0, FRAMED_MOMENTS);
+  return small
+    .filter((s) => !allowed.includes(s))
+    .map((s) => ({ kind: Quality.SmallUi, at: seconds(doc, s.clip.from), detail: `${s.clip.id} (${s.shot}) shows the app over ${FILL_MIN * 100}% of the frame for ${Math.round(s.share * 100)}% of its time: the app fills the frame like a screen recording (ui-focus, ui-morph on the input, the send, the result); one device or split moment per film at most` }));
+}
+
 const KIT_NAMES = new Set(Object.values(UI_KIT).map((p) => p.name));
 
 const rebuiltUi = (js: string) => VECTOR_TOKEN.test(js) || Boolean(structureOf(js));
@@ -629,7 +667,7 @@ function kitBesideRealUi(doc: MotionDoc): QualityProblem[] {
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...unscripted(doc), ...productUiMissing(doc), ...uiShare(doc), ...alteredUi(doc), ...kitBesideRealUi(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...deadJunctions(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail })), ...lookProblems(doc, placedClips(doc), input.referencesSeen ?? false).map((p) => ({ kind: Quality.OffLook, effect: p.miss, detail: p.detail }))];
+  return [...unscripted(doc), ...productUiMissing(doc), ...uiShare(doc), ...smallUi(doc), ...alteredUi(doc), ...kitBesideRealUi(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...deadJunctions(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail })), ...lookProblems(doc, placedClips(doc), input.referencesSeen ?? false).map((p) => ({ kind: Quality.OffLook, effect: p.miss, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {

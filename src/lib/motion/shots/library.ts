@@ -115,8 +115,12 @@ const drive = (render) => {
 };
 `;
 
+export const DEVICE = { land: 1.7, hold: 0.35, zoom: 0.9, wide: 0.66, tall: 0.88 };
+
 const UI_PRELUDE = `
 const U = VECTOR_UI;
+const CLEAR = /transparent|rgba\\([^)]*,\\s*0\\)/;
+root.style.background = CLEAR.test(U.background) ? paper : U.background;
 const boxOf = (id) => {
   const n = nodeById(U, id);
   return n ? { x: n.x, y: n.y, w: Math.max(1, n.w), h: Math.max(1, n.h) } : { x: 0, y: 0, w: U.width, h: U.height };
@@ -145,7 +149,19 @@ const dimAround = (drawn, b, level) => {
     drawn.els[n.id].style.opacity = String((n.o ?? 1) * (inside || holder ? 1 : level));
   });
 };
-const WHOLE = { k: Math.min((W * 0.86) / U.width, (H * 0.8) / U.height), cx: U.width / 2, cy: U.height / 2 };
+const COVER = Math.max(W / U.width, H / U.height);
+const filled = (cam) => {
+  const k = Math.max(cam.k, COVER);
+  const hw = W / (2 * k);
+  const hh = H / (2 * k);
+  return { k, cx: clamp(cam.cx, hw, U.width - hw), cy: clamp(cam.cy, hh, U.height - hh) };
+};
+const WHOLE = filled({ k: COVER, cx: U.width / 2, cy: U.height / 2 });
+const frameCam = (cam, host) => {
+  const view = filled(cam);
+  place(view, host);
+  return view;
+};
 `;
 
 const CURSOR_LAYER = `
@@ -299,7 +315,7 @@ drive((t) => {
 
 const DEVICE_FLY_IN = `
 const BEZEL = Math.round(UNIT * 0.012);
-const sw = W * (WIDE ? 0.66 : 0.88);
+const sw = W * (WIDE ? ${DEVICE.wide} : ${DEVICE.tall});
 const s = sw / U.width;
 const sh = U.height * s;
 const DEPTH = W * 1.3;
@@ -311,19 +327,22 @@ const glass = el('div', 'position:absolute;left:' + BEZEL + 'px;top:' + BEZEL + 
 const inner = el('div', 'position:absolute;left:0;top:0;transform-origin:0 0;transform:scale(' + s + ');', glass);
 const drawn = drawVector(U, inner);
 const sheen = el('div', 'position:absolute;inset:0;background:linear-gradient(115deg, rgba(255,255,255,0.10), rgba(255,255,255,0) 38%);', glass);
-const LAND = 1.7;
+const LAND = ${DEVICE.land};
+const ZOOM_IN = WIDE ? 1 : Math.max(W / sw, H / sh);
 drive((t) => {
   const p = out(span(t, 0.05, LAND));
   const after = span(t, LAND, Math.max(0.1, duration - LAND));
-  const ry = mix(-104, 0, p) + 3 * after;
-  const rx = mix(30, 7, p) - 4 * after;
+  const inside = move(span(t, LAND + ${DEVICE.hold}, ${DEVICE.zoom}));
+  const ry = (mix(-104, 0, p) + 3 * after) * (1 - inside);
+  const rx = (mix(30, 7, p) - 4 * after) * (1 - inside);
   const z = mix(-W * 0.9, 0, p);
   const y = mix(H * 0.22, 0, p);
-  const k = 1 + 0.035 * after;
+  const k = (1 + 0.035 * after) * mix(1, ZOOM_IN, inside);
   const near = DEPTH / (DEPTH - z);
   const turn = Math.max(0.04, Math.abs(Math.cos(ry * RAD)));
   const tilt = Math.cos(rx * RAD);
   device.style.transform = 'translate(0,' + y.toFixed(1) + 'px) scale(' + (near * k * turn).toFixed(4) + ',' + (near * k * tilt).toFixed(4) + ') skewY(' + (-Math.sin(ry * RAD) * 10).toFixed(3) + 'deg) skewX(' + (-rx * 0.3).toFixed(3) + 'deg)';
+  sheen.style.display = inside > 0 ? 'none' : 'block';
   device.style.opacity = String(clamp(p * 3, 0, 1));
   floor.style.opacity = String(0.9 * p);
   sheen.style.opacity = String(mix(1, 0.35, p));
@@ -349,28 +368,28 @@ const steps = pointer.plan.steps;
 const around = (b) => {
   const mx = b.w > 300 ? b.w * 0.12 : Math.max(b.w * 0.5, 260);
   const my = Math.max(b.h, 180);
-  return frameOn({ x: b.x - mx, y: b.y - my, w: b.w + 2 * mx, h: b.h + 2 * my }, 0.8, 0.6);
+  return filled(frameOn({ x: b.x - mx, y: b.y - my, w: b.w + 2 * mx, h: b.h + 2 * my }, 0.8, 0.6));
 };
 const CAM_BEAT = 0.9;
 const beats = steps.map((s, i) => {
   const from = Math.max(i ? steps[i - 1].at : 0, s.at - CAM_BEAT);
   return { view: around(boxOf(s.target)), from, len: Math.max(0.3, s.at - from) };
 });
-const first = beats.length ? beats[0].view : WHOLE;
+const first = beats.length ? beats[0].view : filled({ ...WHOLE, k: COVER * 1.12 });
 const last = steps.length ? Math.max(steps[steps.length - 1].end, steps[steps.length - 1].at + 0.5) + 0.3 : 0;
 const PULL_BACK = 0.8;
+const opening = filled({ k: first.k * 0.82, cx: first.cx, cy: first.cy });
 drive((t) => {
   const arrive = glide(span(t, 0, 0.9));
-  let view = { k: first.k * mix(0.82, 1, arrive), cx: first.cx, cy: first.cy };
+  let view = lerpCam(opening, first, arrive);
   beats.slice(1).forEach((b) => {
     view = lerpCam(view, b.view, glide(span(t, b.from, b.len)));
   });
-  if (!resultId && duration - last >= PULL_BACK) {
+  if (!resultId && steps.length && duration - last >= PULL_BACK) {
     view = lerpCam(view, WHOLE, glide(span(t, last, duration - last)));
   }
   const p = pointer.pose(t);
-  view = pointer.follow(view, p);
-  place(view, cam);
+  view = frameCam(pointer.follow(view, p), cam);
   pointer.draw(p, view, t);
 });
 `;
@@ -528,7 +547,6 @@ const fromId = param('from_id', 'button-0', { type: 'text', group: 'Content', la
 const toId = param('to_id', 'button-1', { type: 'text', group: 'Content', label: 'To (element id)' });
 const toText = param('to_text', '', { type: 'text', group: 'Content', label: 'New text on the target' });
 const script = param('cursor', '', { type: 'textarea', group: 'Content', label: 'Cursor script (JSON)' });
-root.style.background = U.background;
 const cam = el('div', '', root);
 cam.className = 'cam';
 const drawn = drawVector(U, cam);
@@ -536,8 +554,9 @@ const a = boxOf(fromId);
 const b = boxOf(toId);
 const ring = el('div', 'position:absolute;left:0;top:0;transform-origin:0 0;box-shadow:0 0 0 2px ' + accent + ', 0 0 0 10px rgba(0,153,255,0.14);', cam);
 const target = textInside(toId);
-const camA = frameOn({ x: a.x - a.w * 0.6, y: a.y - a.h * 1.2, w: a.w * 2.2, h: a.h * 3.4 }, 0.8, 0.7);
-const camB = frameOn({ x: b.x - b.w * 0.6, y: b.y - b.h * 1.2, w: b.w * 2.2, h: b.h * 3.4 }, 0.8, 0.7);
+const camA = filled(frameOn({ x: a.x - a.w * 0.6, y: a.y - a.h * 1.2, w: a.w * 2.2, h: a.h * 3.4 }, 0.8, 0.7));
+const camB = filled(frameOn({ x: b.x - b.w * 0.6, y: b.y - b.h * 1.2, w: b.w * 2.2, h: b.h * 3.4 }, 0.8, 0.7));
+const opening = filled({ k: camA.k * 0.85, cx: camA.cx, cy: camA.cy });
 const full = target ? nodeById(U, target).text : '';
 const pointer = cursorLayer(drawn, scriptOf(script));
 const onTo = pointer.plan.steps.find((s) => s.target === toId);
@@ -546,8 +565,7 @@ drive((t) => {
   const e = glide(span(t, 0, 0.9));
   const p = glide(span(t, M.move, M.len));
   const c = pointer.pose(t);
-  const view = pointer.follow(lerpCam({ k: camA.k * mix(0.85, 1, e), cx: camA.cx, cy: camA.cy }, camB, p), c);
-  place(view, cam);
+  const view = frameCam(pointer.follow(lerpCam(lerpCam(opening, camA, e), camB, p), c), cam);
   const PAD = 8;
   ring.style.left = (mix(a.x, b.x, p) - PAD).toFixed(1) + 'px';
   ring.style.top = (mix(a.y, b.y, p) - PAD).toFixed(1) + 'px';
@@ -598,7 +616,7 @@ const flood = el('div', 'position:absolute;inset:0;background:' + (into_ || acce
 const deep = { k: frameOn(b, 1, 1).k * 9, cx: b.x + b.w / 2, cy: b.y + b.h / 2 };
 drive((t) => {
   const p = into(span(t, 0, duration * 0.85));
-  place(lerpCam(WHOLE, deep, p), cam);
+  frameCam(lerpCam(WHOLE, deep, p), cam);
   cam.style.filter = 'blur(' + (26 * p * p).toFixed(3) + 'px)';
   flood.style.opacity = String(soft(span(t, duration * 0.45, duration * 0.5)));
 });
