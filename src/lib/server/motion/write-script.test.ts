@@ -7,11 +7,11 @@ import { pageOf } from './site-copy';
 const SITE = 'https://supasito.com/';
 const HOME = '<h1>Every site you run. Up to date. In one place.</h1><p>Say what should change. See it before it goes live.</p><h2>The deal is simple.</h2><p>Free for personal use.</p>';
 
-function setup(copywrite?: MotionToolDeps['copywrite']) {
+function setup(copywrite?: MotionToolDeps['copywrite'], app: { entry?: string; store?: string; kept?: boolean } = {}) {
   let n = 0;
   const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
-  const site = vi.fn(async () => ({ ok: true as const, site: { url: SITE, logos: [], pages: [pageOf(SITE, HOME)] } }));
-  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), site, copywrite });
+  const site = vi.fn(async () => ({ ok: true as const, site: { url: SITE, logos: [], pages: [pageOf(SITE, HOME)], appEntry: app.entry ?? null, store: app.store ?? 'none' } }));
+  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), site, copywrite, appAccountKept: async () => app.kept ?? false });
   const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: (i: unknown, o: { toolCallId: string }) => Promise<Record<string, unknown>> }).execute(input, { toolCallId: 'c' });
   return { session, run };
 }
@@ -73,6 +73,41 @@ describe('write_script', () => {
     expect(out).toMatchObject({ ok: true });
     expect(String(out.brief)).toContain('See the preview');
     expect(session.doc.script?.acts).toHaveLength(4);
+  });
+});
+
+describe('a product that lives behind a login', () => {
+  const entry = 'https://supasito.com/login';
+
+  it('asks for a test account before the script, unprompted: "Fammi un trailer motion di feega.app" filmed the marketing page', async () => {
+    const { run } = setup(undefined, { entry });
+    await run('analyze_site', { url: 'supasito.com' });
+
+    const out = await run('write_script', script('See it before it goes live'));
+
+    expect(out.ok).toBe(false);
+    expect(String(out.error)).toMatch(/TEST account.*supasito\.com\/login.*app_browse/);
+  });
+
+  it('writes the script once app_browse has signed in', async () => {
+    const { run } = setup(undefined, { entry, kept: true });
+    await run('analyze_site', { url: 'supasito.com' });
+
+    expect(await run('write_script', script('See it before it goes live'))).toMatchObject({ ok: true });
+  });
+
+  it('writes it when the user said they have no account', async () => {
+    const { run } = setup(undefined, { entry });
+    await run('analyze_site', { url: 'supasito.com' });
+
+    expect(await run('write_script', { ...script('See it before it goes live'), app_account: 'declined' })).toMatchObject({ ok: true });
+  });
+
+  it('never asks a shop: its products are the product', async () => {
+    const { run } = setup(undefined, { entry, store: 'shopify' });
+    await run('analyze_site', { url: 'supasito.com' });
+
+    expect(await run('write_script', script('See it before it goes live'))).toMatchObject({ ok: true });
   });
 });
 

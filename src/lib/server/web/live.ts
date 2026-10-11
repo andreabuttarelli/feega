@@ -173,6 +173,11 @@ export function uiCapture(db: Db, scope: Metered): UiCapture | undefined {
   return open ? vectorCapture(open, undefined, savedSession(accounts)) : undefined;
 }
 
+export function appAccountKept(db: Db, scope: Metered): () => Promise<boolean> {
+  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: { kind: 'agent', id: scope.userId } });
+  return async () => (await accounts.read()) !== null;
+}
+
 function meteredExa(scope: Metered, key: string): SiteStrategy {
   const strategy = exaContents(key);
   return {

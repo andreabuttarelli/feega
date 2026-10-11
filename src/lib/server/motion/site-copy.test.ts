@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SectionKind, linksWorthReading, pageOf, quoted, sectionsOf, unsourcedFigures } from './site-copy';
+import { SectionKind, appEntryOf, linksWorthReading, pageOf, quoted, sectionsOf, unsourcedFigures } from './site-copy';
 
 const HOME = `<html><head><title>Supasito</title><script>var x = '<p>no</p>'</script></head><body>
 <nav><a href="/pricing">Pricing</a><a href="/login">Log in</a></nav>
@@ -30,6 +30,15 @@ describe('reading a site for its story', () => {
 
   it('follows only same-site pages worth reading, best first', () => {
     expect(linksWorthReading(HOME, 'https://supasito.com/')).toEqual(['https://supasito.com/pricing', 'https://supasito.com/features']);
+  });
+
+  it('finds the way into the app behind the site, where a test account signs in', () => {
+    expect(appEntryOf(HOME, 'https://supasito.com/')).toBe('https://supasito.com/login');
+    expect(appEntryOf('<a href="/showcase">Showcase</a><a href="https://app.feega.app/">Start for free</a>', 'https://www.feega.app/')).toBe('https://app.feega.app/');
+  });
+
+  it('finds none on a site with no sign-in', () => {
+    expect(appEntryOf('<a href="/pricing">Pricing</a><a href="/blog">Blog</a>', 'https://x.com/')).toBeNull();
   });
 
   it('accepts a claim only when its quote is on the page it names', () => {

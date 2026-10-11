@@ -9,7 +9,7 @@ import { safeFetchBytes, safeFetchUrl } from '$lib/server/tool-guard';
 import { probeImageDimensions } from '$lib/server/brand-media';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { AccentSource, pickAccent, type Accent } from '$lib/motion/accent';
-import { PageRole, linksWorthReading, pageOf, type SitePage } from './site-copy';
+import { PageRole, appEntryOf, linksWorthReading, pageOf, type SitePage } from './site-copy';
 import { StoreKind, readStore, type StoreProduct } from '$lib/server/web/store';
 import { SITE_PAGE_MAX_BYTES, SiteSource, fetchSite, type SiteStrategy, type SiteTry } from '$lib/server/web/site-fetch';
 
@@ -60,6 +60,7 @@ export type SiteBrief = {
   products: SiteProduct[];
   socials: { platform: string; url: string }[];
   pages: SitePage[];
+  appEntry: string | null;
   source: SiteSource;
   note: string | null;
   tried: SiteTry[];
@@ -276,6 +277,7 @@ async function read(input: string, chain: SiteStrategy[]): Promise<SiteRead> {
       products: products.map((p) => ({ name: p.title, price: priceOf(p), url: p.url, image: p.images[0] ?? null })),
       socials: extractSocialHandles(html).map((s) => ({ platform: s.platform, url: s.url })),
       pages: [...home, ...pages, ...others],
+      appEntry: appEntryOf(html, base),
       source: got.source,
       note: SOURCE_NOTES[got.source],
       tried: got.tried

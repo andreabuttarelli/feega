@@ -2,6 +2,7 @@ import { RAW_CAPTURE, VectorHint, VectorKind, VectorRole, vectorUi, type RawCapt
 import type { OpenAppBrowser } from './browser';
 import { signInPath, type KeptSession } from './app-browse';
 import { dismissOverlays } from './overlays';
+import { leadsIntoApp } from './app-entry';
 
 export type CaptureLimits = { max: number; text: number; svg: number };
 
@@ -223,10 +224,9 @@ export enum CaptureSession {
   None = 'none'
 }
 
-const SIGN_IN_TEXT = /^\s*(log ?in|sign ?in|sign ?up|accedi|entra|registrati|anmelden|connexion|se connecter|iniciar sesión|get started|start for free|try (it )?(for )?free|let[’']s start|start free trial)\s*$/i;
 const SIGN_IN_ROLES: readonly VectorRole[] = [VectorRole.Link, VectorRole.Button];
 
-export const offersSignIn = (ui: VectorUi) => ui.nodes.some((n) => SIGN_IN_ROLES.includes(n.role) && SIGN_IN_TEXT.test(n.text ?? ''));
+export const offersSignIn = (ui: VectorUi) => ui.nodes.some((n) => SIGN_IN_ROLES.includes(n.role) && leadsIntoApp(n.text ?? ''));
 
 export type UiCapture = (url: string) => Promise<{ ok: true; ui: VectorUi; session: CaptureSession; dismissed?: string[] } | { ok: false; error: string }>;
 
