@@ -7,12 +7,13 @@
   import BeforeAfter from '$lib/components/upscale/BeforeAfter.svelte';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
-  import { planUpscale, quoteUpscale, UPSCALE_MODES, UPSCALE_REFUSAL_TEXT, UPSCALE_TARGETS, UpscaleMode, UpscaleTarget } from '$lib/upscale';
+  import { planUpscale, quoteUpscale, upscaleSteps, UPSCALE_MODES, UPSCALE_REFUSAL_TEXT, UPSCALE_TARGETS, UpscaleJobStatus, UpscaleMode, UpscaleStep, UpscaleTarget } from '$lib/upscale';
 
   type Probe = { width: number; height: number; seconds: number; bytes: number; mimeType: string };
   type Picked = { kind: 'upload'; file: File; previewUrl: string } | { kind: 'asset'; id: string; previewUrl: string };
 
   const POLL_MS = 5000;
+  const BYTES_PER_MB = 1024 * 1024;
   const SAMPLE = { before: '/upscaler/sample-before.mp4', after: '/upscaler/sample-after.mp4', poster: '/upscaler/sample-poster.webp' };
 
   let { data } = $props();
@@ -25,11 +26,16 @@
   let busy = $state(false);
   let failure = $state<string | null>(null);
   let fileInput = $state<HTMLInputElement | null>(null);
+  let step = $state<UpscaleStep | null>(null);
+  let dragging = $state(false);
 
   const plan = $derived(probe ? planUpscale(probe, target, data.limits) : null);
   const quote = $derived(plan?.ok && probe ? quoteUpscale(plan, probe.seconds, data.pricing, mode) : null);
   const refusal = $derived(plan && !plan.ok ? UPSCALE_REFUSAL_TEXT[plan.error] : null);
   const job = $derived(data.job);
+  const shownStep = $derived(step ?? (job?.status === UpscaleJobStatus.Running ? UpscaleStep.Upscaling : job?.status === UpscaleJobStatus.Done ? UpscaleStep.Done : null));
+  const steps = $derived(shownStep ? upscaleSteps(shownStep) : []);
+  const megabytes = (bytes: number) => `${(bytes / BYTES_PER_MB).toFixed(1)} MB`;
 
   const poll = setInterval(() => {
     if (job?.status === 'running') {
@@ -52,7 +58,28 @@
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
-    if (!file) {
+    await useFile(file);
+  }
+
+  async function dropFile(e: DragEvent) {
+    e.preventDefault();
+    dragging = false;
+    await useFile(e.dataTransfer?.files?.[0]);
+  }
+
+  function dragOver(e: DragEvent) {
+    e.preventDefault();
+    dragging = true;
+  }
+
+  function clearPick() {
+    picked = null;
+    probe = null;
+    failure = null;
+  }
+
+  async function useFile(file: File | undefined) {
+    if (!file || busy) {
       return;
     }
     failure = null;
@@ -86,11 +113,13 @@
     }
     busy = true;
     failure = null;
+    step = picked.kind === 'upload' ? UpscaleStep.Uploading : UpscaleStep.Starting;
     try {
       const sourceFields = picked.kind === 'upload' ? await uploadFields(picked.file) : { source: 'asset', asset_id: picked.id };
       if (!sourceFields) {
         return;
       }
+      step = UpscaleStep.Starting;
 
       const body = new FormData();
       const fields = { ...sourceFields, project: data.projectId, width: String(probe.width), height: String(probe.height), seconds: String(probe.seconds), target, mode };
@@ -108,105 +137,212 @@
       failure = result.type === 'failure' ? String(result.data?.error ?? 'Something went wrong.') : 'Something went wrong.';
     } finally {
       busy = false;
+      step = null;
     }
   }
 </script>
 
+<PageHead title="AI Video Upscaler" subtitle="Upscale a clip to 2× or 4K with FLUX Video Upscale. MP4 up to 20 s, 1440p and 50 MB." />
+
 <div class="upscale">
-  <PageHead title="AI Video Upscaler" subtitle="Upscale a clip to 2× or 4K with FLUX Video Upscale. MP4 up to 20 s, 1440p and 50 MB." />
-  <PageTitle text="AI Video Upscaler" />
+  <header class="head">
+    <PageTitle text="upscale a video" />
+    <p class="lede">Sharper frames, same motion. MP4 up to {data.limits.maxInputSeconds} s and 1440p.</p>
+  </header>
 
-  {#if job}
-    <section class="result" data-testid="upscale-job" data-status={job.status}>
-      {#if job.status === 'running'}
-        <p class="muted">Upscaling{job.factor ? ` ${job.factor}×` : ''}… this takes a few minutes. You can leave the page: the result lands on the <a href={job.canvasHref}>Upscale canvas</a>.</p>
-      {:else if job.status === 'failed'}
-        <p class="error">The upscale failed: {job.error ?? 'no result'}.</p>
-      {:else if job.beforeUrl && job.afterUrl}
-        <BeforeAfter before={job.beforeUrl} after={job.afterUrl} />
-        <div class="actions">
-          <a class="primary" href={job.afterUrl} download>Download</a>
-          <a href={job.canvasHref}>Open on the canvas</a>
-          <span class="muted">Saved to this project's assets, marked as AI-generated.</span>
-        </div>
+  <div class="layout">
+    <main class="stage">
+      {#if job && job.status !== UpscaleJobStatus.Running}
+        <section class="result" data-testid="upscale-job" data-status={job.status}>
+          {#if job.status === UpscaleJobStatus.Failed}
+            <p class="error">The upscale failed: {job.error ?? 'no result'}. Pick the clip again to retry.</p>
+          {:else if job.beforeUrl && job.afterUrl}
+            <BeforeAfter before={job.beforeUrl} after={job.afterUrl} />
+            <div class="row">
+              <a class="primary" href={job.afterUrl} download>Download</a>
+              <a class="ghost" href={job.canvasHref}>Open on the canvas</a>
+              <a class="ghost" href={`/app/upscale?project=${data.projectId}`}>Upscale another</a>
+            </div>
+            <p class="muted">Saved to this project's assets, marked as AI-generated.</p>
+          {/if}
+        </section>
+      {:else if picked}
+        <section class="source" data-testid="upscale-source">
+          <video src={picked.previewUrl} controls muted playsinline preload="metadata"></video>
+          <div class="row meta">
+            <span class="mono">{probe ? `${probe.width}×${probe.height} · ${probe.seconds.toFixed(1)} s${probe.bytes ? ` · ${megabytes(probe.bytes)}` : ''}` : 'Reading…'}</span>
+            <button type="button" class="ghost" onclick={clearPick} disabled={busy}>Change clip</button>
+          </div>
+        </section>
+      {:else if job}
+        <section class="running" data-testid="upscale-job" data-status={job.status}>
+          <div class="shimmer"></div>
+        </section>
+      {:else}
+        <button
+          type="button"
+          class="drop"
+          class:dragging
+          data-testid="upscale-drop"
+          onclick={() => fileInput?.click()}
+          ondragover={dragOver}
+          ondragleave={() => (dragging = false)}
+          ondrop={dropFile}
+        >
+          <span class="drop-title">drop an mp4 here</span>
+          <span class="muted">or click to choose a file · up to {data.limits.maxInputSeconds} s, {megabytes(data.limits.maxInputBytes)}</span>
+        </button>
       {/if}
-    </section>
-  {:else}
-    <section>
-      <h3>Example <span class="muted">real FLUX Video Upscale output, 854×480 → 1708×960 · Big Buck Bunny © Blender Foundation, CC BY 3.0</span></h3>
-      <BeforeAfter before={SAMPLE.before} after={SAMPLE.after} poster={SAMPLE.poster} label="Example: a 480p clip and its 2× upscale" />
-    </section>
-  {/if}
-
-  <section>
-    <h3>1 · Clip</h3>
-    <div class="actions">
-      <button type="button" onclick={() => fileInput?.click()} disabled={busy}>Upload MP4</button>
       <input bind:this={fileInput} type="file" accept="video/mp4" hidden onchange={pickFile} />
-      {#if picked}<span class="muted">{probe ? `${probe.width}×${probe.height} · ${probe.seconds.toFixed(1)} s` : 'Reading…'}</span>{/if}
-    </div>
-    {#if data.library.length}
-      <p class="muted">Or pick a video from this project:</p>
+
+      {#if steps.length}
+        <ol class="steps" data-testid="upscale-steps">
+          {#each steps as s (s.id)}
+            <li class={s.state}><span class="dot"></span>{s.label}</li>
+          {/each}
+        </ol>
+        {#if job?.status === UpscaleJobStatus.Running}
+          <p class="muted">This takes a few minutes. You can leave: the result lands on the <a href={job.canvasHref}>Upscale canvas</a> and in the list below.</p>
+        {/if}
+      {/if}
+
+      {#if !picked && !job && data.library.length}
+        <section>
+          <h2>from this project</h2>
+          <div class="tiles">
+            {#each data.library as asset (asset.id)}
+              <button type="button" class="tile" onclick={() => pickAsset(asset)} aria-label="Use this video">
+                {#if asset.url}<video src={asset.url} muted preload="metadata"></video>{/if}
+              </button>
+            {/each}
+          </div>
+        </section>
+      {/if}
+
+      {#if !picked && !job}
+        <section>
+          <h2>example <span class="muted">854×480 → 1708×960 · Big Buck Bunny © Blender Foundation, CC BY 3.0</span></h2>
+          <BeforeAfter before={SAMPLE.before} after={SAMPLE.after} poster={SAMPLE.poster} label="Example: a 480p clip and its 2× upscale" />
+        </section>
+      {/if}
+    </main>
+
+    <aside class="panel">
+      <section>
+        <h2>size</h2>
+        <div class="seg">
+          {#each UPSCALE_TARGETS as t (t.id)}
+            <button type="button" class:on={target === t.id} aria-pressed={target === t.id} onclick={() => (target = t.id)}>{t.label}</button>
+          {/each}
+        </div>
+      </section>
+
+      <section>
+        <h2>mode</h2>
+        <div class="seg">
+          {#each UPSCALE_MODES as m (m.id)}
+            <button type="button" class:on={mode === m.id} aria-pressed={mode === m.id} onclick={() => (mode = m.id)}>{m.label}</button>
+          {/each}
+        </div>
+        <p class="muted hint">{UPSCALE_MODES.find((m) => m.id === mode)?.hint}</p>
+      </section>
+
+      <section class="quote" data-testid="upscale-quote">
+        {#if refusal}
+          <p class="error">{refusal}</p>
+        {:else if plan?.ok && probe}
+          <p class="mono">{probe.width}×{probe.height} → <strong>{plan.width}×{plan.height}</strong> · {plan.factor}×</p>
+          <p class="cost">{quote?.credits != null ? `${quote.credits} credits` : 'Price shown after the run'}</p>
+          <p class="muted">Balance {data.balance} credits</p>
+        {:else}
+          <p class="muted">Pick a clip to see the output size and the cost.</p>
+        {/if}
+      </section>
+
+      {#if failure}<p class="error">{failure}</p>{/if}
+
+      <button type="button" class="primary wide" data-testid="upscale-start" disabled={busy || !plan?.ok} onclick={start}>
+        {busy ? (step === UpscaleStep.Uploading ? 'Uploading…' : 'Starting…') : 'Upscale'}
+      </button>
+    </aside>
+  </div>
+
+  {#if data.history.length}
+    <section data-testid="upscale-history">
+      <h2>recent upscales</h2>
       <div class="tiles">
-        {#each data.library as asset (asset.id)}
-          <button type="button" class="tile" class:on={picked?.kind === 'asset' && picked.id === asset.id} onclick={() => pickAsset(asset)}>
-            {#if asset.url}<video src={asset.url} muted preload="metadata"></video>{/if}
-          </button>
+        {#each data.history as h (h.nodeId)}
+          <a class="item" class:current={job?.nodeId === h.nodeId} href={`/app/upscale?project=${data.projectId}&job=${h.nodeId}`}>
+            <span class="thumb">{#if h.afterUrl ?? h.beforeUrl}<video src={h.afterUrl ?? h.beforeUrl} muted preload="metadata"></video>{/if}</span>
+            <span class="caption"><span class="dot {h.status}"></span>{h.factor ? `${h.factor}× · ` : ''}{h.status}</span>
+          </a>
         {/each}
       </div>
-    {/if}
-  </section>
-
-  <section>
-    <h3>2 · Size and mode</h3>
-    <div class="chips">
-      {#each UPSCALE_TARGETS as t (t.id)}
-        <button type="button" class="chip" class:on={target === t.id} onclick={() => (target = t.id)}>{t.label}</button>
-      {/each}
-    </div>
-    <div class="chips">
-      {#each UPSCALE_MODES as m (m.id)}
-        <button type="button" class="chip" class:on={mode === m.id} title={m.hint} onclick={() => (mode = m.id)}>{m.label}</button>
-      {/each}
-    </div>
-    <p class="muted">{UPSCALE_MODES.find((m) => m.id === mode)?.hint}</p>
-  </section>
-
-  <section class="quote" data-testid="upscale-quote">
-    {#if refusal}
-      <p class="error">{refusal}</p>
-    {:else if plan?.ok && probe}
-      <p>{probe.width}×{probe.height} → <strong>{plan.width}×{plan.height}</strong> ({plan.factor}×)</p>
-      <p>{quote?.credits != null ? `${quote.credits} credits` : 'Price shown after the run'} <span class="muted">· balance {data.balance}</span></p>
-    {:else}
-      <p class="muted">Pick a clip to see the output size and the price.</p>
-    {/if}
-  </section>
-
-  {#if failure}<p class="error">{failure}</p>{/if}
-
-  <div class="actions">
-    <button type="button" class="primary" disabled={busy || !plan?.ok} onclick={start}>{busy ? 'Starting…' : 'Upscale'}</button>
-  </div>
+    </section>
+  {/if}
 </div>
 
 <style>
-  .upscale { max-width: var(--content-max, 1100px); margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-  h3 { font-size: 13px; font-weight: 600; margin: 0 0 8px; }
-  .muted { color: var(--ink-3, #6e6e73); font-size: 12px; font-weight: 400; }
-  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin-top: 6px; }
-  .tile { padding: 0; border: 1px solid var(--ui-line-strong); background: #000; cursor: pointer; }
-  .tile video { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
-  .on { outline: 2px solid var(--ui-ink); outline-offset: -2px; }
-  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
-  .chip { padding: 6px 10px; font-size: 12.5px; border: 1px solid var(--ui-line-strong); background: var(--ui-bg); cursor: pointer; }
-  .chip:hover { border-color: var(--ui-ink-3); }
-  .chip.on { background: var(--ui-accent-wash); color: var(--ui-accent); border-color: var(--ui-accent); }
-  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
-  .actions button, .actions a { padding: 8px 14px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--ui-line-strong); background: var(--ui-bg); color: inherit; cursor: pointer; text-decoration: none; }
-  .actions .primary { background: var(--ui-accent); color: var(--ui-accent-ink); border-color: var(--ui-accent); }
-  .actions button:disabled { opacity: 0.5; cursor: not-allowed; }
-  .quote { border: 1px solid var(--ui-line-strong); padding: 12px; font-size: 13px; }
-  .quote p { margin: 2px 0; }
-  .error { color: var(--danger, #c0392b); font-size: 12.5px; }
+  .upscale { max-width: var(--content-max, 1100px); margin: 0 auto; padding: 0 16px 48px; display: flex; flex-direction: column; gap: 32px; }
+  .head { display: flex; flex-direction: column; gap: 8px; padding-top: 24px; }
+  .lede { margin: 0; color: var(--ui-ink-3); font-size: var(--ui-text-md); }
+  h2 { font-size: var(--ui-text-sm); font-weight: 600; margin: 0 0 8px; color: var(--ui-ink-2); }
+  .muted { color: var(--ui-ink-3); font-size: var(--ui-text-sm); font-weight: 400; margin: 0; }
+  .hint { margin-top: 8px; }
+  .mono { font-family: var(--ui-mono); font-size: var(--ui-text-sm); }
+  .error { color: var(--ui-danger); font-size: var(--ui-text-sm); margin: 0; }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; align-items: start; }
+  .stage { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+  .panel { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 20px; padding: 20px; background: var(--ui-surface); }
+
+  .drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; aspect-ratio: 16 / 9; width: 100%; background: var(--ui-surface); border: 1px dashed var(--ui-line-strong); color: var(--ui-ink); cursor: pointer; padding: 16px; text-align: center; }
+  .drop:hover, .drop.dragging { background: var(--ui-accent-wash); border-color: var(--ui-accent); }
+  .drop-title { font-size: clamp(28px, 4vw, 44px); font-weight: 600; letter-spacing: -0.04em; line-height: 0.95; }
+
+  .source video { width: 100%; aspect-ratio: 16 / 9; background: #000; display: block; object-fit: contain; }
+  .meta { justify-content: space-between; margin-top: 8px; }
+  .shimmer { aspect-ratio: 16 / 9; background: linear-gradient(90deg, var(--ui-surface) 0%, var(--ui-hover) 50%, var(--ui-surface) 100%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+  .steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: var(--ui-text-md); }
+  .steps li { display: flex; align-items: center; gap: 10px; color: var(--ui-ink-3); }
+  .steps li.active { color: var(--ui-ink); font-weight: 600; }
+  .steps li.done { color: var(--ui-ink-2); }
+  .dot { width: 8px; height: 8px; border-radius: 9999px; background: var(--ui-line-strong); flex: none; }
+  .steps .active .dot, .dot.running { background: var(--ui-accent); }
+  .steps .active .dot { animation: pulse 0.9s ease-in-out infinite alternate; }
+  .steps .done .dot, .dot.done { background: var(--ui-ok); }
+  .dot.failed { background: var(--ui-danger); }
+  @keyframes pulse { to { opacity: 0.3; } }
+
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .result { display: flex; flex-direction: column; gap: 12px; }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: var(--ui-bg); }
+  .seg button { min-height: 44px; border: 0; background: transparent; color: var(--ui-ink-2); font-size: var(--ui-text-md); cursor: pointer; }
+  .seg button:hover { background: var(--ui-hover); }
+  .seg button.on { background: var(--ui-accent-wash); color: var(--ui-accent); font-weight: 600; }
+  .quote { display: flex; flex-direction: column; gap: 4px; }
+  .quote p { margin: 0; }
+  .cost { font-size: var(--ui-text-xl); font-weight: 600; letter-spacing: -0.02em; }
+
+  .primary, .ghost { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; font-size: var(--ui-text-md); font-weight: 600; border: 0; border-radius: 9999px; cursor: pointer; text-decoration: none; }
+  .primary { background: var(--ui-accent); color: var(--ui-accent-ink); }
+  .ghost { background: var(--ui-surface); color: var(--ui-ink); }
+  .ghost:hover { background: var(--ui-hover); }
+  .primary:disabled, .ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+  .wide { width: 100%; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .tile, .thumb { padding: 0; border: 0; background: #000; cursor: pointer; display: block; }
+  .tile video, .thumb video { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+  .tile:hover video, .item:hover video { opacity: 0.85; }
+  .item { color: inherit; text-decoration: none; min-height: 44px; }
+  .item.current .thumb { outline: 2px solid var(--ui-accent); outline-offset: -2px; }
+  .caption { display: flex; align-items: center; gap: 6px; padding-top: 6px; font-size: var(--ui-text-sm); color: var(--ui-ink-2); }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .panel { position: static; }
+  }
 </style>

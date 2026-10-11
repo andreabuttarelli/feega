@@ -24,6 +24,8 @@ export type UpscalePlan = { ok: true; factor: number; width: number; height: num
 
 export type UpscaleQuote = { usd: number | null; credits: number | null };
 
+export const UPSCALE_CANVAS_NAME = 'Upscale';
+
 const FOUR_K_LONG_EDGE = 3840;
 const PIXELS_PER_MEGAPIXEL = 1_000_000;
 const CENTS_PER_USD = 100;
@@ -105,6 +107,36 @@ export function quoteUpscale(
 
   const usd = ((plan.width * plan.height) / PIXELS_PER_MEGAPIXEL) * seconds * (cents / CENTS_PER_USD);
   return { usd, credits: billedCreditsFor(usd) };
+}
+
+export enum UpscaleJobStatus {
+  Running = 'running',
+  Done = 'done',
+  Failed = 'failed'
+}
+
+export enum UpscaleStep {
+  Uploading = 'uploading',
+  Starting = 'starting',
+  Upscaling = 'upscaling',
+  Done = 'done'
+}
+
+export enum StepState {
+  Done = 'done',
+  Active = 'active',
+  Todo = 'todo'
+}
+
+const STEP_LABELS: readonly { id: UpscaleStep; label: string }[] = [
+  { id: UpscaleStep.Uploading, label: 'Uploading the clip' },
+  { id: UpscaleStep.Starting, label: 'Starting the upscale' },
+  { id: UpscaleStep.Upscaling, label: 'Upscaling and saving to your assets' }
+];
+
+export function upscaleSteps(current: UpscaleStep): { id: UpscaleStep; label: string; state: StepState }[] {
+  const at = current === UpscaleStep.Done ? STEP_LABELS.length : STEP_LABELS.findIndex((s) => s.id === current);
+  return STEP_LABELS.map((s, i) => ({ ...s, state: i < at ? StepState.Done : i === at ? StepState.Active : StepState.Todo }));
 }
 
 export function upscaleParams(factor: number, mode: UpscaleMode): { upscale_factor: number; creativity: number } {
