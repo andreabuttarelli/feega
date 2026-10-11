@@ -71,8 +71,8 @@ describe('what the driver answers, as a real user would', () => {
     expect(replyTo('Hai un account di test?', null)).toMatch(/non ho un account/);
   });
 
-  it('gives the account once: after that the agent hears it has nothing more', () => {
-    expect(replyTo('Il login non va, hai un altro account?', account, AccountGiven.Yes)).toMatch(/non ho un account/);
+  it('asked again, gives the same account again, never "skip" (a feega run was told to skip it mid-run and fell back to the marketing page)', () => {
+    expect(replyTo('Il login non va, hai un altro account?', account)).toContain('pw-1');
   });
 
   it('says yes to anything else', () => {
