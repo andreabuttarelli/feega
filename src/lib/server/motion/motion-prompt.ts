@@ -7,6 +7,7 @@ import { UNITS_GUIDE } from '$lib/motion/units';
 import { HOUSE_DEFAULTS_RULE, STYLES } from '$lib/motion/style';
 import { DEFAULT_STYLE, type MotionStyle } from '$lib/motion/style-model';
 import { WEB_GUIDANCE } from '$lib/server/web/web-tools';
+import { LOOP_RULE } from '$lib/motion/loop';
 
 export const PRODUCT_SCREENS_RULE =
   '2a. Product screens: the page after login is a hub, not the product. app_browse returns the links of the app: open the screens where the work happens (the editor with its timeline and chat, the canvas with its nodes, the export or result), photograph them with app_browse pages, then recreate_ui each url. A product trailer shows at least two distinct work screens, filled edge to edge; never only the landing, the dashboard or a welcome dialog.';
@@ -42,6 +43,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     `Read the doc (get_motion_doc) before changing it. Times are in seconds. Every tool reads and writes the units the editor shows: ${UNITS_GUIDE} Keyframes on x and y are offsets in px from the clip's own place, not positions. Expressions still see the stored values (x/y as fractions of the frame, scale and opacity as 1 = 100%).`,
     [`Direction, style ${style.label} (set_style changes it only when the user explicitly asks for another style; apple-minimal is the calm one; graphic is a poster, type or look exercise with no product to sell, and needs no script). Rules, each one checked by the quality gate in view_frames where it can be:`, ...style.rules.map((rule, i) => `${i + 1}. ${rule}`)].join('\n'),
     HOUSE_DEFAULTS_RULE,
+    LOOP_RULE,
     'Your edits of this turn are saved together as one revision the user can undo.',
     SEEING[input.vision],
     'Motion: set_transform for a static 3D pose (rotateX/Y/Z, perspective, anchor), set_keyframes to animate a prop over time (seconds from the clip start), remove_keyframes to undo it. Keyframes and transitions combine: a fade-in plus a keyframed rotation is fine. Check a 3D move with view_frames at its start, middle and end.',

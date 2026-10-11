@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Jolt, docCuts, frameDiffs, joltMeter, joltNote, lumaOf, motionJolts } from './smoothness';
+import { Jolt, docCuts, frameDiffs, joltMeter, joltNote, lumaOf, motionJolts, seamDiff } from './smoothness';
 
 const ramp = (n: number, peak: number) => Array.from({ length: n }, (_, i) => peak * Math.sin((Math.PI * i) / (n - 1)));
 
@@ -71,5 +71,12 @@ describe('what the export tells the user', () => {
 
   it('says so when the motion is smooth', () => {
     expect(joltNote([], 30)).toBe('Smooth: no frame jumps.');
+  });
+});
+
+describe('the loop seam', () => {
+  it('measures how far the last frame is from the first, as one more frame step', () => {
+    expect(seamDiff(new Uint8Array([10, 20]), new Uint8Array([30, 20]))).toBe(10);
+    expect(seamDiff(new Uint8Array([10, 20]), new Uint8Array([10, 20]))).toBe(0);
   });
 });

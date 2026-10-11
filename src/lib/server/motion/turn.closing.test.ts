@@ -245,6 +245,7 @@ vi.mock('$lib/server/motion/frame-store', async (importOriginal) => ({
 }));
 vi.mock('$lib/server/motion/frame-stats', () => ({
   frameDensities: async (frames: unknown[]) => frames.map(() => 0.5),
+  seamLuma: async () => 0,
   frameStats: async (frames: { time: number }[]) => {
     world.views++;
     const blank = world.views <= world.blankViews;

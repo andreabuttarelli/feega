@@ -10,6 +10,7 @@ export enum MotionStyle {
 
 export const MOTION_STYLES = Object.values(MotionStyle) as [MotionStyle, ...MotionStyle[]];
 export const DEFAULT_STYLE = MotionStyle.LaunchFilm;
+export const HOUSE_LOOP = true;
 
 export type StyleEases = { enter: EaseSpec; move: EaseSpec };
 

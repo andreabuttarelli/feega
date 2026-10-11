@@ -243,6 +243,14 @@ describe('motion agent tools', () => {
     expect(shown.at(-1)?.text).toContain('Quality gate');
   });
 
+  it('a last frame that jumps to the first is named as a warning, never blocking', async () => {
+    const { run } = setup({ seam: async () => 60 });
+    const out = (await run('view_frames', { times: [1] })) as { quality: string[]; blocking: string[] };
+
+    expect(out.quality.some((q) => q.includes('jumps to the first'))).toBe(true);
+    expect(out.blocking.some((q) => q.includes('jumps to the first'))).toBe(false);
+  });
+
   it('view_frames takes at most six times', () => {
     const { schema } = setup();
 

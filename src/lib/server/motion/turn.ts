@@ -52,7 +52,7 @@ import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
 import { DESCRIBE_FRAMES, SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep, type Frame } from '$lib/server/motion/frames';
-import { frameDensities, frameStats } from '$lib/server/motion/frame-stats';
+import { frameDensities, frameStats, seamLuma } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, storeAssetFile } from '$lib/server/repos/asset-storage';
 import { ASSETS_ADDED, CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
@@ -113,6 +113,7 @@ export const MAX_DELIVERY_ATTEMPTS = 3;
 const STILL_OPEN_ID = 'still-open';
 const LAST_LOOK_ID = 'last-look';
 const CRITIC_ID = 'critic-sheet';
+const LOOP_SEAM_ID = 'loop-seam';
 const CUT_REVIEW_ID = 'cut-review';
 const SHEET_FILE = 'sheet.jpg';
 
@@ -224,6 +225,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const memory = role === StudioRole.Director ? await projectMemory(db, { orgId, projectId: project.id, nodeId: motion.record.id }).catch(() => '') : '';
   const openingText = [message, note, picked.note, memory].filter(Boolean).join('\n\n');
   const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint });
+  let seamDraws = 0;
   const drawTurnFrames = async (callId: string, times: number[]) => {
     const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
     if (!review.ok) {
@@ -252,6 +254,11 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
     frames: drawTurnFrames,
     inspect: frameStats,
+    seam: async () => {
+      const end = session.doc.durationInFrames / session.doc.fps;
+      const frames = await drawTurnFrames(`${LOOP_SEAM_ID}-${seamDraws++}`, [0, Math.max(0, end - 1 / session.doc.fps)]);
+      return seamLuma(frames?.filter((f) => f.bytes.length > 0) ?? []);
+    },
     web: {
       ...liveWebDeps(
         db,
