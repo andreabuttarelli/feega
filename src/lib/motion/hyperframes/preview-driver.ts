@@ -4,6 +4,7 @@ import { CAPTURE_REQUEST, stampOf, type CaptureReply, type CaptureRequest } from
 export const CAPTURE_TIMEOUT_MS = 15_000;
 export const STALE_RETRY_MS = 50;
 export const RELOAD_DEBOUNCE_MS = 250;
+const SEEK_TOLERANCE_S = 1 / 240;
 
 export enum Playback {
   Playing = 'playing',
@@ -39,20 +40,25 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
   let live = false;
   let current = '';
 
+  let reload: ReturnType<typeof setTimeout> | null = null;
+
+  function cancelReload() {
+    if (reload) {
+      clearTimeout(reload);
+      reload = null;
+    }
+  }
+
   function load(html: string) {
+    cancelReload();
     expected = stampOf(html);
     live = false;
     current = html;
     port.load(html);
   }
 
-  let reload: ReturnType<typeof setTimeout> | null = null;
-
   function update(html: string) {
-    if (reload) {
-      clearTimeout(reload);
-      reload = null;
-    }
+    cancelReload();
     if (html === current) {
       return;
     }
@@ -130,6 +136,10 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
         }
         if (expected && m.stamp !== expected) {
           retry = setTimeout(send, STALE_RETRY_MS);
+          return;
+        }
+        if (m.time !== undefined && Math.abs(m.time - time) > SEEK_TOLERANCE_S) {
+          send();
           return;
         }
         done(() => (m.error ? reject(new Error(m.error)) : resolve(m)));

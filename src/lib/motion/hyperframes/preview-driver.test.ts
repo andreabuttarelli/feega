@@ -85,6 +85,51 @@ describe('the preview driver', () => {
 
     expect(order).toEqual(['start export', 'export:export', 'start agent', 'agent:agent']);
   });
+
+  it('an editor reload queued before a borrowed capture never lands in the middle of it', async () => {
+    const driver = previewDriver(slowPlayer(page('editor')));
+    await driver.loaded(page('editor'));
+    driver.ready();
+
+    driver.update(page('edited'));
+    const urls = await driver.exclusive(async () => {
+      await driver.loaded(page('check'));
+      const shots: string[] = [];
+      for (let i = 0; i < 6; i++) {
+        await new Promise((r) => setTimeout(r, RELOAD_DEBOUNCE_MS / 2));
+        shots.push((await driver.shoot(0, REQUEST)).url ?? '');
+      }
+      return shots;
+    });
+
+    expect(urls).toEqual(Array(6).fill('check'));
+  });
+
+  it('a shot drawn at another time than asked, because something else moved the player, is taken again', async () => {
+    let at = 0;
+    let stray = true;
+    const replies = new Set<(r: CaptureReply) => void>();
+    const port: PlayerPort = {
+      ...slowPlayer(page('a')),
+      seek: (t) => (at = t),
+      post: (m) => {
+        const id = (m as CaptureRequest).id;
+        if (stray) {
+          stray = false;
+          at = 0;
+        }
+        const drawn = at;
+        queueMicrotask(() => replies.forEach((l) => l({ type: CAPTURE_REPLY, id, url: `frame@${drawn}`, time: drawn })));
+        return true;
+      },
+      onReply: (l) => (replies.add(l), () => replies.delete(l))
+    };
+    const driver = previewDriver(port);
+
+    const reply = await driver.shoot(0.77, REQUEST);
+
+    expect(reply.url).toBe('frame@0.77');
+  });
 });
 
 describe('agent looks during one turn', () => {
