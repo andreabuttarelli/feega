@@ -98,6 +98,34 @@ describe('the recreated app on screen', () => {
     expect((await placed(0.96)).made.low_fidelity).toBeUndefined();
   });
 
+  it('refuses the same screen under a second name: v8 rebuilt /app twice and called it two screens', async () => {
+    const ctx = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.Kept })));
+    await ctx.run('recreate_ui', { url: 'https://feega.test/app', name: 'FeegaApp' });
+
+    const again = await ctx.run('recreate_ui', { url: 'https://feega.test/app/', name: 'FeegaEditor' });
+
+    expect(again.ok).toBe(false);
+    expect(String(again.error)).toMatch(/FeegaApp.*another work screen/);
+    expect((await ctx.run('recreate_ui', { url: 'https://feega.test/app', name: 'FeegaApp' })).ok).toBe(true);
+    expect((await ctx.run('recreate_ui', { url: 'https://feega.test/app/videos/1', name: 'FeegaEditor' })).ok).toBe(true);
+  });
+
+  it('puts fidelity first, so a saved output cut short still shows it', async () => {
+    expect(Object.keys((await placed(0.96)).made).slice(0, 2)).toEqual(['ok', 'fidelity']);
+  });
+
+  it('lists the elements that matter first, with the sidebar marked as navigation', async () => {
+    const ctx = setup(vi.fn(async () => ({ ok: true as const, ui: { ...UI, nodes: [{ id: 'link-0', role: VectorRole.Link, kind: VectorKind.Text, x: 20, y: 100, w: 80, h: 17, text: 'Motion editor' }, ...UI.nodes] }, session: CaptureSession.Kept })));
+
+    const made = await ctx.run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
+    const elements = made.elements as { id: string; zone: string }[];
+
+    expect(made.focus).toEqual(expect.arrayContaining(['input-0', 'button-0']));
+    expect(made.focus).not.toContain('link-0');
+    expect(elements[0].id).toBe('input-0');
+    expect(elements.find((e) => e.id === 'link-0')?.zone).toBe('nav');
+  });
+
   it('refuses a tint on it: v5 turned the editor into a negative', async () => {
     const { run, clip } = await placed();
 

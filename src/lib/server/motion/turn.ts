@@ -39,6 +39,7 @@ import { COPY_SCHEMA, copywrite } from '$lib/server/motion/copywriter';
 import { projectMemory } from '$lib/server/motion/studio-memory';
 import type { LaunchScript } from '$lib/motion/script';
 import { REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleLooks, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
+import { Looks, ownLook } from '$lib/server/motion/look';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { appAccountKept, liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
 import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
@@ -604,10 +605,10 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       let conversation = openingMessages;
 
       let started = false;
-      const play = async (messages: ModelMessage[], kind: Round, toolSet: typeof tools = tools) => {
+      const play = async (messages: ModelMessage[], kind: Round, toolSet: typeof tools = tools, looks: Looks = roleLooks(ROUND_ROLE[kind] ?? role)) => {
         const first = !started;
         started = true;
-        session.looks = roleLooks(ROUND_ROLE[kind] ?? role);
+        session.looks = looks;
         const answered: ModelMessage[] = [];
         const played = round(messages, kind, (step) => {
           steps.push(step);
@@ -627,7 +628,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
         const base = openingMessages;
         const crewed = await Promise.all(crewsFor.map(async (crew) => {
           const asked: ModelMessage[] = [...base, { role: 'user', content: crewBrief(crew) }];
-          return [asked.at(-1)!, ...(await play(asked, openingRound, crewTools(tools, crew)))];
+          return [asked.at(-1)!, ...(await play(asked, openingRound, ownLook(crewTools(tools, crew), roleLooks(role)) as typeof tools, Looks.Blind))];
         }));
         conversation = [...base, ...crewed.flat()];
       } else {

@@ -63,7 +63,9 @@ describe('the cursor shots render without a jump', () => {
       const props = { ...plan.slots, cursor: shotCursor(plan.shot, plan.slots, UI) };
       const diffs = await diffsOf(shotSource(plan.shot, UI), props, plan.seconds, size);
 
-      expect(motionJolts(diffs).map((j) => `${((j.frame + 1) / FPS).toFixed(2)}s ${j.kind}`)).toEqual([]);
+      const jolts = motionJolts(diffs);
+
+      expect(jolts.map((j) => `${((j.frame + 1) / FPS).toFixed(2)}s ${j.kind}`), jolts.map((j) => diffs.slice(Math.max(0, j.frame - 2), j.frame + 10).map((d) => d.toFixed(2)).join(' ')).join(' | ')).toEqual([]);
     },
     120_000
   );

@@ -6,6 +6,7 @@ import { SFX_LIBRARY, ShotSound, cursorCues, type Sfx, type SfxCue } from '../sf
 import { writeComponent } from '../custom/ops';
 import { VECTOR_TOKEN } from '../vector-ui/piece';
 import { VectorRole, type VectorNode, type VectorUi } from '../vector-ui/model';
+import { Zone, ranked, zoneOf } from '../vector-ui/importance';
 import { AUTO_CURSOR, SHOTS, ShotUi, overLimits, shotSource, type ShotId } from './library';
 import { cursorMath, type CursorStep, type CursorUi } from './cursor';
 
@@ -16,7 +17,12 @@ export const STYLE_SLOTS = z.object({ font: z.string().max(64).optional(), ink: 
 const BEAT = /^beat \d+$/;
 const SNAP_S = 0.3;
 
-export type ShotPlan = { shot: ShotId; slots: Record<string, unknown>; ui?: string; at: number; seconds?: number; trackId?: string; sound?: ShotSound };
+export enum ShotFocus {
+  Action = 'action',
+  Navigation = 'navigation'
+}
+
+export type ShotPlan = { shot: ShotId; slots: Record<string, unknown>; ui?: string; at: number; seconds?: number; trackId?: string; sound?: ShotSound; focus?: ShotFocus };
 
 export type Placed = { from: number; frames: number; snapped: boolean };
 
@@ -59,6 +65,20 @@ function missingIds(slots: Record<string, unknown>, nodes: readonly VectorNode[]
   }
   const offer = nodes.filter((n) => n.role !== 'box').slice(0, 40).map((n) => `${n.id}${n.text ? ` "${n.text.slice(0, 24)}"` : ''}`);
   return `${missing.map(([k, v]) => `${k} ${String(v)}`).join(', ')} not in the UI; its elements: ${offer.join(', ')}`;
+}
+
+const TOP_OFFERED = 8;
+
+function onNavigation(slots: Record<string, unknown>, ui: VectorUi, focus: ShotFocus): string | null {
+  if (focus === ShotFocus.Navigation) {
+    return null;
+  }
+  const nav = idsIn(slots).flatMap(([, v]) => ui.nodes.filter((n) => n.id === v && zoneOf(ui, n) === Zone.Nav)).map((n) => `${n.id}${n.text ? ` "${n.text.slice(0, 24)}"` : ''}`);
+  if (!nav.length) {
+    return null;
+  }
+  const top = ranked(ui).filter((e) => e.zone === Zone.Main).slice(0, TOP_OFFERED).map((e) => `${e.id}${e.text ? ` "${e.text.slice(0, 24)}"` : ''}`);
+  return `${[...new Set(nav)].join(', ')} ${nav.length > 1 ? 'are' : 'is'} navigation (sidebar, top bar): a shot frames the action, not the menu. Use the top elements: ${top.join(', ')}. Only when the script line is about navigating pass focus "navigation"`;
 }
 
 const SLOT_ROLES: Record<string, readonly VectorRole[]> = {
@@ -147,7 +167,7 @@ export function addShot(doc: MotionDoc, plan: ShotPlan, id: string): OpResult & 
   if (spec.ui === ShotUi.Required && !vector) {
     return { ok: false, error: `${plan.shot} shows the real product UI: pass ui, the name of a UI rebuilt with recreate_ui from a url${plan.ui ? ` (${plan.ui} is not one)` : ''}` };
   }
-  const wrong = vector ? (missingIds(parsed.data, vector.nodes) ?? wrongRoles(parsed.data, plan.ui ?? '', vector.nodes)) : null;
+  const wrong = vector ? (missingIds(parsed.data, vector.nodes) ?? wrongRoles(parsed.data, plan.ui ?? '', vector.nodes) ?? onNavigation(parsed.data, vector, plan.focus ?? ShotFocus.Action)) : null;
   if (wrong) {
     return { ok: false, error: wrong };
   }

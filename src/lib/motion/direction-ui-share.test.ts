@@ -8,6 +8,12 @@ import { StoryBeat, markStory } from './story';
 import { vectorPiece } from './vector-ui/piece';
 import { VectorKind, VectorRole } from './vector-ui/model';
 import { Quality, SEVERITY, Severity, docProblems, uiRecolour, uiShrink } from './direction';
+import { ShotId } from './shots/library';
+import { addShot, type ShotPlan } from './shots/ops';
+import FEEGA_APP from './shots/fixtures/feega-app-vector.json';
+import type { VectorUi } from './vector-ui/model';
+
+const APP = vectorPiece('UiApp', FEEGA_APP as unknown as VectorUi);
 
 const must = (r: { ok: true; doc: MotionDoc } | { ok: false; error: string }) => {
   if (!r.ok) {
@@ -92,5 +98,37 @@ describe('the real app keeps its own colours and fills the frame', () => {
 
     expect(uiRecolour(doc, 't', EffectKind.Tint)).toBeNull();
     expect(uiShrink(doc, 't', 50)).toBeNull();
+  });
+});
+
+describe('the real app fills the frame where it is drawn', () => {
+  const vertical = (seconds: number) => markStory(must(setCanvas(newMotionDoc(MotionFormat.Vertical), { durationInFrames: seconds * FPS })), StoryBeat.Solution, 0);
+  const shot = (doc: MotionDoc, plan: ShotPlan, id: string) => {
+    const made = addShot(doc, plan, id);
+    if (!made.ok) {
+      throw new Error(made.error);
+    }
+    return made.doc;
+  };
+  const withApp = (doc: MotionDoc) => must(writeComponent(doc, APP.name, { source: { html: APP.html, css: APP.css, js: APP.js }, propsSchema: { type: 'object', properties: {} } }));
+  const focus = (doc: MotionDoc, at: number, id: string) => shot(doc, { shot: ShotId.UiFocus, ui: APP.name, at, seconds: 4, slots: { field_id: 'input-0', button_id: 'button-5' } }, id);
+  const device = (doc: MotionDoc, at: number, id: string) => shot(doc, { shot: ShotId.DeviceFlyIn, ui: APP.name, at, seconds: 2.5, slots: {} }, id);
+
+  it('passes ui-focus shots, which keep the app over the whole frame', () => {
+    expect(kinds(focus(focus(withApp(vertical(12)), 0, 'a'), 5, 'b'))).not.toContain(Quality.SmallUi);
+  });
+
+  it('allows one device moment and blocks a second: v2 showed the app small on black', () => {
+    const one = device(withApp(vertical(12)), 0, 'a');
+
+    expect(kinds(one)).not.toContain(Quality.SmallUi);
+    expect(kinds(device(one, 4, 'b'))).toContain(Quality.SmallUi);
+    expect(SEVERITY[Quality.SmallUi]).toBe(Severity.Blocking);
+  });
+
+  it('blocks an app shot shrunk by its clip scale', () => {
+    const doc = must(setTransform(focus(withApp(vertical(12)), 0, 'a'), 'a', { scale: 0.5 }));
+
+    expect(kinds(doc)).toContain(Quality.SmallUi);
   });
 });

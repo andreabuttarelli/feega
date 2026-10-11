@@ -50,11 +50,11 @@ import { Occurrence, recordCheck, removeComponent, updateComponent, writeCompone
 import { CaptureSession, FIDELITY_MIN, offersSignIn, type UiCapture } from '$lib/server/web/vector-capture';
 import { StoreKind } from '$lib/server/web/store';
 import { vectorPiece, withFonts } from '$lib/motion/vector-ui/piece';
-import { VectorRole } from '$lib/motion/vector-ui/model';
+import { Zone, ranked } from '$lib/motion/vector-ui/importance';
 import { SHOTS, SHOT_IDS, ShotCursor, ShotUi, shotPreview } from '$lib/motion/shots/library';
 import { CURSOR_GUIDE, CURSOR_SLOT } from '$lib/motion/shots/cursor';
 import { ShotSound, sfxLabel, type Sfx, type SfxCue } from '$lib/motion/sfx';
-import { addShot, placeSfx } from '$lib/motion/shots/ops';
+import { ShotFocus, addShot, placeSfx } from '$lib/motion/shots/ops';
 import { RECREATE_STATES, UI_KINDS, UI_KIT, recreatedStyle, recreatedUi, type UiStructure } from '$lib/motion/ui-kit/kit';
 import { MORPH_KINDS, DEFAULT_REEL } from '$lib/motion/ui-morph/reel';
 import { addMorphReel } from '$lib/motion/ui-morph/ops';
@@ -213,6 +213,7 @@ export enum EmbedAction {
 }
 
 const SHOWN_ELEMENTS = 60;
+const FOCUS_ELEMENTS = 8;
 
 export enum AppAccount {
   Declined = 'declined'
@@ -221,6 +222,11 @@ export enum AppAccount {
 const SCRIPT_INPUT = scriptSchema.extend({ app_account: z.enum(AppAccount).optional().describe('declined: the user said they have no test account of the app') });
 
 const PUBLIC_SITE_NEXT = 'this is the public site of an app, read signed out: if the product is that app, the trailer shows its real screens, not this page. Before any shot, ask the user in chat for a TEST account (login url, email, password; say you will see it) and end the turn on that question; then sign in with app_browse and recreate_ui 2–3 signed-in work screens (the editor, the canvas, the result)';
+
+const screenKey = (url: string) => {
+  const u = new URL(url);
+  return `${u.host}${u.pathname.replace(/\/+$/, '')}${u.search}`;
+};
 
 const fidelityOf = (fidelity: number | undefined) => {
   if (fidelity === undefined) {
@@ -636,10 +642,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
   const created = (out: ReturnType<typeof apply>, clipId: string) => (out.ok ? { ...out, clip_id: clipId } : out);
 
+  const screens = new Map<string, string>();
+
   async function recreateFromUrl(url: string, input: { name: string; start?: number; duration: number; track_id?: string }) {
     if (!deps.captureUi) {
       return UNREADABLE('a browser to read the page');
     }
+    const screen = screenKey(url);
+    const taken = screens.get(screen);
+    if (taken && taken !== input.name) {
+      return { ok: false, error: `${url} is the screen already rebuilt as ${taken}: open another work screen (the editor of a video, the canvas, the export) from the app links app_browse returned, and recreate_ui that url` };
+    }
+    screens.set(screen, input.name);
     const read = await deps.captureUi(url);
     if (!read.ok) {
       return read;
@@ -651,8 +665,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     if (!written.ok) {
       return written;
     }
-    const elements = ui.nodes.filter((n) => n.role !== VectorRole.Box).slice(0, SHOWN_ELEMENTS).map((n) => ({ id: n.id, role: n.role, ...(n.text ? { text: n.text.slice(0, 40) } : {}) }));
-    const made = { ok: true, name: piece.name, size: piece.size, elements, raster: ui.raster, ...(read.dismissed ? { dismissed: read.dismissed } : {}), ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}), ...(read.session === CaptureSession.None && offersSignIn(ui) ? { next: PUBLIC_SITE_NEXT } : {}), ...fidelityOf(read.fidelity) };
+    const order = ranked(ui);
+    const elements = order.slice(0, SHOWN_ELEMENTS).map((e) => ({ id: e.id, role: e.role, zone: e.zone, ...(e.text ? { text: e.text.slice(0, 40) } : {}) }));
+    const focus = order.filter((e) => e.zone === Zone.Main).slice(0, FOCUS_ELEMENTS).map((e) => e.id);
+    const made = { ok: true, ...fidelityOf(read.fidelity), name: piece.name, focus, size: piece.size, elements, raster: ui.raster, ...(read.dismissed ? { dismissed: read.dismissed } : {}), ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}), ...(read.session === CaptureSession.None && offersSignIn(ui) ? { next: PUBLIC_SITE_NEXT } : {}) };
     if (input.start === undefined) {
       return made;
     }
@@ -1991,7 +2007,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     recreate_ui: tool({
-      description: `Rebuild a real product UI as a sharp, vector, animatable component. With url (best: the product's own page or app screen) the live page is read element by element (boxes, real texts, fonts, colours, corners, icons as SVG) into a faithful vector UI; every element gets an id (input-0, button-2, heading-0, stat-1, text-4…) that focus_ui, click_ui and add_shot animate; pictures that are photos stay flagged in raster. With asset_id instead, a vision model reads a capture into a simpler layout: ${RECREATE_STATES.join('; ')}. With start and duration it also places the clip. An app screen behind a login: sign in with app_browse first (a TEST account the user gave in chat), then pass its url here; the saved session opens it.`,
+      description: `Rebuild a real product UI as a sharp, vector, animatable component. With url (best: the product's own page or app screen) the live page is read element by element (boxes, real texts, fonts, colours, corners, icons as SVG) into a faithful vector UI; every element gets an id (input-0, button-2, heading-0, stat-1, text-4…) that focus_ui, click_ui and add_shot animate; elements come ranked by importance and focus lists the top ones (the input, the primary buttons, the result): frame those, never the sidebar or nav (zone nav); pictures that are photos stay flagged in raster. With asset_id instead, a vision model reads a capture into a simpler layout: ${RECREATE_STATES.join('; ')}. With start and duration it also places the clip. An app screen behind a login: sign in with app_browse first (a TEST account the user gave in chat), then pass its url here; the saved session opens it.`,
       inputSchema: z
         .object({
           url: z.string().url().optional(),
@@ -2042,7 +2058,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     add_shot: tool({
       description: `Place a premium shot from the library (list_shots): ${SHOT_IDS.map((id) => `${id} (${SHOTS[id].about})`).join('; ')}. slots are its data only: texts, element ids of the recreated UI, and font ink paper muted accent. Every text slot holds a few words at most (text_limits in list_shots: a title is a claim of up to 6 words, never a sentence); a longer text is refused with a cut to use. ui is the name of a UI rebuilt with recreate_ui from a url; the shots that show the product need it. at and seconds place it (2–4 s, transitions shorter); with beats marked (mark_beats) start and end snap to the beat grid. The shot is an ordinary clip: its slots stay editable as props. ui-focus and ui-morph are driven by a cursor: without a cursor slot they write a script from the element roles (a field is typed into, a button or link clicked, the rest hovered); with one, ${CURSOR_GUIDE}`,
-      inputSchema: z.object({ shot: z.enum(SHOT_IDS), slots: z.record(z.string(), z.union([z.string(), z.number(), CURSOR_SLOT])).default({}), ui: z.string().optional(), at: z.number().min(0), seconds: z.number().positive().optional(), track_id: z.string().optional(), sound: z.enum(ShotSound).default(ShotSound.Off).describe('on: a click on every cursor click and a key tap per typed character, on an SFX audio track') }),
+      inputSchema: z.object({ shot: z.enum(SHOT_IDS), slots: z.record(z.string(), z.union([z.string(), z.number(), CURSOR_SLOT])).default({}), ui: z.string().optional(), at: z.number().min(0), seconds: z.number().positive().optional(), track_id: z.string().optional(), sound: z.enum(ShotSound).default(ShotSound.Off).describe('on: a click on every cursor click and a key tap per typed character, on an SFX audio track'), focus: z.enum(ShotFocus).default(ShotFocus.Action).describe('navigation only when the script line is about moving through the app: then sidebar and top-bar elements may be framed') }),
       execute: async (input) => {
         const offSite = offSiteFigures(input.shot, input.slots);
         if (offSite) {
@@ -2058,7 +2074,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: `${off.map((t) => `"${t}"`).join(', ')} is not a line of the script: on-screen titles come only from its lines, in their order: ${scriptLines(script).map((l) => `"${l}"`).join(' / ')}` };
         }
         const id = deps.newId();
-        const made = addShot(fonts.doc, { shot: input.shot, slots: input.slots, ui: input.ui, at: input.at, seconds: input.seconds, trackId: input.track_id, sound: input.sound ?? ShotSound.Off }, id);
+        const made = addShot(fonts.doc, { shot: input.shot, slots: input.slots, ui: input.ui, at: input.at, seconds: input.seconds, trackId: input.track_id, sound: input.sound ?? ShotSound.Off, focus: input.focus }, id);
         const shown = created(apply(made, `added shot ${input.shot}`), id);
         if (!shown.ok || !made.ok || !made.placed) {
           return shown;

@@ -81,6 +81,20 @@ export function describeFramesTool(session: LookSession): Tool {
   });
 }
 
+export function ownLook(tools: Record<string, Tool>, looks: Looks): Record<string, Tool> {
+  const session: LookSession = { looks };
+  const view = tools[VIEW_FRAMES];
+  const viewed: Execute = async (input, options) => {
+    const out = (await (view.execute as Execute)(input, options)) as { times?: number[] };
+    if (out?.times) {
+      session.look = { times: out.times, described: false };
+    }
+    return out;
+  };
+  const own = { ...tools, ...(view?.execute ? { [VIEW_FRAMES]: { ...view, execute: viewed } as Tool } : {}), [DESCRIBE_FRAMES]: describeFramesTool(session) };
+  return lookFirst(own, session);
+}
+
 const RANK: Record<Severity, number> = { [Severity.Blocking]: 0, [Severity.Warning]: 1 };
 
 export function gateBlock(problems: readonly QualityProblem[]): string {
