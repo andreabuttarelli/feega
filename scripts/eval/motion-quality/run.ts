@@ -59,6 +59,11 @@ async function answerCard(page: Page): Promise<string | null> {
     await pick.last().locator('[data-testid="pick-go"]').click();
     return `reference pick: first ${n}`;
   }
+  const cut = page.locator('[data-testid="cut-apply"]');
+  if ((await cut.count()) && (await cut.last().isVisible())) {
+    await cut.last().click();
+    return 'cut review: Apply fixes';
+  }
   const brief = page.locator('[data-testid="brief-go"]');
   if ((await brief.count()) && (await brief.last().isVisible())) {
     await brief.last().click();

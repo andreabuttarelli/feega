@@ -316,7 +316,7 @@ describe('a motion turn closes on a look and a summary', () => {
     world.critiques = [];
   });
 
-  it('an independent critic reviews the whole contact sheet and its fixes run one more round', async () => {
+  it('an independent critic reviews the whole contact sheet, and the user sees it before any fix is spent', async () => {
     world.critic = { score: 4, fixes: ['1.5s: the frame is empty, put the product UI behind the title'] };
     await turn();
 
@@ -325,6 +325,19 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.critiques[0].prompt).toContain('contact sheet of the WHOLE video');
     const asked = world.chunks.filter((c) => c.type === FRAMES_REQUEST).map((c) => (c.data as { callId: string }).callId);
     expect(asked.every((id) => FrameUpload.shape.callId.safeParse(id).success)).toBe(true);
+    expect(world.calls.some((c) => textOf(lastMessage(c.prompt)).includes('the frame is empty, put the product UI'))).toBe(false);
+    const saved = world.saved.findLast((t) => t.role === 'assistant') as { tools?: { toolName: string; output: { fixes: string[]; sheet: string } }[] };
+    const card = saved.tools?.find((t) => t.toolName === 'review_cut');
+    expect(card?.output.fixes).toEqual(['1.5s: the frame is empty, put the product UI behind the title']);
+    expect(card?.output.sheet).toMatch(/\/web-views\/critic-sheet-[\w-]+\/sheet\.jpg$/);
+    expect([...world.stored.keys()].some((k) => k.endsWith('/sheet.jpg'))).toBe(true);
+  });
+
+  it('a user who said to go ahead without asking gets the critic fixes applied in the same turn', async () => {
+    world.message = 'make it pop, scegli tu';
+    world.critic = { score: 4, fixes: ['1.5s: the frame is empty, put the product UI behind the title'] };
+    await turn();
+
     expect(world.calls.some((c) => textOf(lastMessage(c.prompt)).includes('the frame is empty, put the product UI'))).toBe(true);
   });
 

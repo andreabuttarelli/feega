@@ -14,6 +14,7 @@ export type MotionRun = {
   cost_usd?: number | null;
   error?: string | null;
   editor_url?: string;
+  cut_review?: { score: number; fixes: string[]; sheet: string | null; answers: Record<'apply' | 'apply-always' | 'ship', string> } | null;
   reference_pick?: { question: string; candidates: { id: string; image: string; title?: string; why?: string }[]; min: number; max: number } | null;
 };
 

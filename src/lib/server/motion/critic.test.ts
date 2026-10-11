@@ -61,7 +61,7 @@ describe('the critic', () => {
   it('gives up quietly when no frames can be drawn', async () => {
     const out = await critique({ ...ports({}), frames: async () => null }, { doc, request: 'x', references: [] });
 
-    expect(out).toEqual({ review: null, usd: 0 });
+    expect(out).toEqual({ review: null, usd: 0, sheet: null });
   });
 
   it('drops an answer that does not fit the review shape', async () => {
