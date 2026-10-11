@@ -650,8 +650,9 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
       referenceAudioUrls
     });
     if (!out.ok) {
-      await giveUp(db, input, run, out.error);
-      return { kind: 'refused', error: out.error };
+      const message = 'reason' in out && out.reason ? `${out.error}: ${out.reason}` : out.error;
+      await giveUp(db, input, run, message);
+      return { kind: 'refused', error: message };
     }
 
     await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: out.jobId });
