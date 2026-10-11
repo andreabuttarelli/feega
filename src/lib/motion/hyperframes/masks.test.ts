@@ -30,11 +30,11 @@ describe('mask markup', () => {
     expect(compose(base)).not.toContain('id="km-img"');
   });
 
-  it('a masked clip is wrapped in one element that points at its SVG mask', () => {
+  it('a masked clip spans the whole mask region, so content past the frame edge is not cut square', () => {
     const html = masked({ kind: MaskKind.Ellipse });
 
-    expect(html).toContain('<div class="km" id="km-img" style="mask:url(#mk-img);-webkit-mask:url(#mk-img)">');
-    expect(html).toMatch(/<mask id="mk-img" maskUnits="userSpaceOnUse" x="-1920" y="-1080" width="5760" height="3240">/);
+    expect(html).toContain('<div class="km" id="km-img" style="left:-480px;top:-270px;width:2880px;height:1620px;mask:url(#mk-img);-webkit-mask:url(#mk-img)"><div class="kb" style="left:480px;top:270px;width:1920px;height:1080px">');
+    expect(html).toMatch(/<mask id="mk-img" maskUnits="userSpaceOnUse" x="0" y="0" width="2880" height="1620"><g transform="translate\(480 270\)"><g filter="url\(#mf-img\)">/);
   });
 
   it('position, rotation and size are one transform per prop, in frame pixels, around a 100-unit shape', () => {
@@ -79,7 +79,7 @@ describe('mask markup', () => {
   it('invert paints the frame and cuts the shape out of it', () => {
     const html = masked({ kind: MaskKind.Ellipse, invert: true });
 
-    expect(html).toContain('<rect x="-1920" y="-1080" width="5760" height="3240" fill="#fff"/>');
+    expect(html).toContain('<rect x="0" y="0" width="2880" height="1620" fill="#fff"/>');
     expect(html).toContain('<ellipse rx="50" ry="50" fill="#000"/>');
   });
 
@@ -273,6 +273,6 @@ describe('several masks on one clip', () => {
 
     expect(html).toContain('<mask id="mk-img"');
     expect(html).toContain('<mask id="m1k-img"');
-    expect(html).toContain('style="mask:url(#m1k-img),url(#mk-img);-webkit-mask:url(#m1k-img),url(#mk-img);mask-composite:intersect,add"');
+    expect(html).toContain('height:1620px;mask:url(#m1k-img),url(#mk-img);-webkit-mask:url(#m1k-img),url(#mk-img);mask-composite:intersect,add"');
   });
 });
