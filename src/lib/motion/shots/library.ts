@@ -281,7 +281,7 @@ const cursorLayer = (drawn, script) => {
 `;
 
 const UI_HOST_CSS = `${VECTOR_CSS}
-.cam { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.cam { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 `;
 
 const KINETIC_TITLE = `
@@ -389,7 +389,8 @@ drive((t) => {
     view = lerpCam(view, WHOLE, glide(span(t, last, duration - last)));
   }
   const p = pointer.pose(t);
-  view = placed(pointer.follow(view, p), cam);
+  view = { ...view, cy: view.cy + p.scroll };
+  place(view, cam);
   pointer.draw(p, view, t);
 });
 `;
