@@ -39,6 +39,9 @@ const world = vi.hoisted(() => ({
   imported: [] as string[],
   critic: null as unknown,
   billed: 0,
+  spawning: false,
+  spawnTools: ['analyze_site'],
+  logged: [] as { agentKey?: string; model?: string; label?: string }[],
   headScript: null as unknown,
   critiques: [] as { prompt: string; images: unknown[] }[],
   viewed: [] as { prompt: string; images: unknown[] }[]
@@ -134,6 +137,9 @@ function reply(call: Call): unknown[] {
   if (world.headScript && last.role === 'user' && textOf(last).startsWith('Shot crew')) {
     return tool('add_shot', { shot: 'kinetic-title', slots: { text: 'The price changed.' }, at: 0 });
   }
+  if (world.spawning && last.role === 'user' && textOf(last) === world.message) {
+    return tool('spawn_agent', { prompt: 'Read supasito.com and list three facts with quotes.', label: 'facts', kind: 'reading', tools: world.spawnTools, budget_usd: 0.2 });
+  }
   if (world.looking && last.role === 'user') {
     return tool('set_reference_look', LOOK);
   }
@@ -205,9 +211,10 @@ vi.mock('$lib/server/motion/contact-sheet', () => ({ tileSheet: async () => Buff
 vi.mock('$lib/server/openrouter-models', () => ({
   ensureGatewayModels: async () => undefined,
   gatewayRate: () => ({ input: world.rate, cachedInput: world.rate, output: world.rate }),
-  gatewayModel: () => (world.seesImages ? { usable: true } : null)
+  gatewayModel: () => (world.seesImages ? { usable: true } : null),
+  gatewayModels: () => ['anthropic/claude-opus-5.5', 'anthropic/claude-sonnet-5.5', 'anthropic/claude-haiku-4.5'].map((id) => ({ id, label: id, tools: true, usable: !id.includes('haiku'), rate: { input: 1, cachedInput: 1, output: 1 }, reasoning: false, efforts: [], defaultEffort: null }))
 }));
-vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: vi.fn(), billedUsdInScope: () => 0.04, billingScope: () => ({ run: (fn: () => unknown) => fn(), gatewayUsd: () => world.billed }), withOrgContext: (_id: string, fn: () => unknown) => fn() }));
+vi.mock('$lib/server/ai-log', () => ({ extractSdkUsage: () => ({ inputTokens: 10, outputTokens: 5 }), logAiCall: (e: { agentKey?: string; model?: string; label?: string }) => void world.logged.push(e), billedUsdInScope: () => 0.04, billingScope: () => ({ run: (fn: () => unknown) => fn(), gatewayUsd: () => world.billed }), withOrgContext: (_id: string, fn: () => unknown) => fn() }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 vi.mock('$lib/server/repos/chat', () => ({
   openNodeThread: async () => 'thread-1',
@@ -335,6 +342,9 @@ describe('a motion turn closes on a look and a summary', () => {
     world.imported = [];
     world.critic = null;
     world.billed = 0;
+    world.spawning = false;
+    world.spawnTools = ['analyze_site'];
+    world.logged = [];
     world.headScript = null;
     world.critiques = [];
     world.viewed = [];
@@ -435,6 +445,31 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(briefs.some((t) => t.includes('problem, solution') && t.includes('0 s to 7 s'))).toBe(true);
     expect(briefs.some((t) => t.includes('proof, claim') && t.includes('7 s to 14 s'))).toBe(true);
     expect(world.chunks.filter((c) => c.type === 'start')).toHaveLength(1);
+  });
+
+  it('the agent can spawn a sub-agent with its own prompt, tools and model, and gets its text, cost and changes back', async () => {
+    world.spawning = true;
+    world.message = 'add a hello';
+    await turn();
+
+    expect(world.models).toContain('anthropic/claude-sonnet-5.5');
+    expect(world.tools).toContainEqual(['analyze_site']);
+    expect(world.logged.some((e) => e.agentKey === 'spawned:facts' && e.model === 'anthropic/claude-sonnet-5.5')).toBe(true);
+    const result = world.calls.map((c) => lastMessage(c.prompt)).find((m) => m.role === 'tool' && JSON.stringify(m.content).includes('cost_usd'));
+    expect(JSON.stringify(result?.content)).toContain('Read supasito.com');
+  });
+
+  it('a sub-agent is never offered the power to spawn', async () => {
+    world.spawning = true;
+    world.message = 'add a hello';
+    await turn();
+
+    world.spawnTools = ['spawn_agent'];
+    world.calls = [];
+    await turn();
+
+    const result = world.calls.map((c) => lastMessage(c.prompt)).find((m) => m.role === 'tool' && JSON.stringify(m.content).includes('spawn_agent'));
+    expect(JSON.stringify(result?.content)).toContain('not tools you can hand over');
   });
 
   it('a cut the critic passes is delivered without another round', async () => {

@@ -1,3 +1,5 @@
+import { SPAWN_AGENT } from '$lib/server/agents/spawn';
+import { spawnAgentTool, spawnAgents, spawnOffers } from '$lib/server/agents/spawn-agent';
 import { json } from '@sveltejs/kit';
 import { streamText, type ModelMessage } from 'ai';
 import type { Db } from '$lib/server/db/client';
@@ -18,7 +20,7 @@ import { openAgentTools } from '$lib/server/project-agent/tool-surface';
 import { createWebTools } from '$lib/server/web/web-tools';
 import { liveWebDeps, productImport, productsNodePlacer, webImageImport } from '$lib/server/web/live';
 import { projectAgentPrompt } from '$lib/server/project-agent/system-prompt';
-import { AGENT_MAX_DURATION_S, agentStopWhen, overTurnCap } from '$lib/server/project-agent/limits';
+import { AGENT_MAX_DURATION_S, AGENT_TURN_CAP_USD, agentStopWhen, overTurnCap } from '$lib/server/project-agent/limits';
 import { spentUsd } from '$lib/server/motion/model-route';
 import { ensureGatewayModels, gatewayRate } from '$lib/server/openrouter-models';
 import { screenModelInput } from '$lib/server/moderation/model-input';
@@ -146,6 +148,27 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     ...createMotionDelegation({ db, orgId, projectId: project.id, userId: user.id, origin: url.origin, model, canvasId }),
     ...webTools
   };
+  Object.assign(projectTools, {
+    [SPAWN_AGENT]: spawnAgentTool(
+      spawnOffers(),
+      spawnAgents(
+        {
+          orgId,
+          tools: () => projectTools,
+          codeTools: new Set<string>(),
+          visionTools: new Set(['view_images']),
+          remainingUsd: () => AGENT_TURN_CAP_USD - spent,
+          onSpent: (usd) => {
+            spent += usd;
+          },
+          changes: () => 0,
+          changedSince: () => [],
+          log: (e) => logAiCall({ label: `project-spawned-${e.label}`, provider: 'llm', model: e.model, ms: 0, ok: true, brandId: brand?.id, orgId, userId: user.id, threadId, projectId: project.id, actorKind: 'agent', actorId: user.id, agentKey: e.agentKey, ...e.usage })
+        },
+        spawnOffers()
+      )
+    )
+  });
   const agent = await openAgentTools({
     projectTools,
     brand,

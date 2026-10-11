@@ -234,3 +234,11 @@ describe('reply e ask_user sono IL messaggio, non un attrezzo', () => {
 		expect(chips.map((c) => c.toolName)).toEqual(['motion_render']);
 	});
 });
+
+describe('a spawned sub-agent in the chat', () => {
+  it('reads as a sub-agent, not a tool name', async () => {
+    const { toolLabel } = await import('./chat-parts');
+
+    expect(toolLabel('spawn_agent')).toBe('Sub-agent');
+  });
+});
