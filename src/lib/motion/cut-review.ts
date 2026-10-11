@@ -15,17 +15,21 @@ export enum CutAnswer {
   Ship = 'ship'
 }
 
+const APPLY_HEAD = "Apply the critic's fixes";
 const GO_AHEAD = 'Go ahead without asking from now on.';
 
 const fixList = (fixes: readonly string[]) => fixes.map((f) => `- ${f}`).join('\n');
 
 const ANSWERS: Record<CutAnswer, (fixes: readonly string[]) => string> = {
-  [CutAnswer.Apply]: (fixes) => `Apply the critic's fixes, worst first:\n${fixList(fixes)}`,
-  [CutAnswer.ApplyAlways]: (fixes) => `Apply the critic's fixes, worst first:\n${fixList(fixes)}\n${GO_AHEAD}`,
+  [CutAnswer.Apply]: (fixes) => `${APPLY_HEAD}, worst first:\n${fixList(fixes)}`,
+  [CutAnswer.ApplyAlways]: (fixes) => `${APPLY_HEAD}, worst first:\n${fixList(fixes)}\n${GO_AHEAD}`,
   [CutAnswer.Ship]: () => 'Ship the cut as it is: no more changes.'
 };
 
 export const cutAnswer = (answer: CutAnswer, fixes: readonly string[]) => ANSWERS[answer](fixes);
+
+
+export const answersCut = (message: string): boolean => message.startsWith(APPLY_HEAD);
 
 export const cutAnswers = (fixes: readonly string[]): Record<CutAnswer, string> => ({ [CutAnswer.Apply]: cutAnswer(CutAnswer.Apply, fixes), [CutAnswer.ApplyAlways]: cutAnswer(CutAnswer.ApplyAlways, fixes), [CutAnswer.Ship]: cutAnswer(CutAnswer.Ship, fixes) });
 

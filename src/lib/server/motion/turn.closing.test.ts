@@ -341,6 +341,15 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.calls.some((c) => textOf(lastMessage(c.prompt)).includes('the frame is empty, put the product UI'))).toBe(true);
   });
 
+  it('a turn that applies the critic fixes is not reviewed again: one review per cut, never a loop', async () => {
+    const { CutAnswer, cutAnswer } = await import('$lib/motion/cut-review');
+    world.message = cutAnswer(CutAnswer.Apply, ['1.5s: the frame is empty']);
+    world.critic = { score: 4, fixes: ['3s: still empty'] };
+    await turn();
+
+    expect(world.critiques).toHaveLength(0);
+  });
+
   it('a cut the critic passes is delivered without another round', async () => {
     world.critic = { score: 9, fixes: [] };
     await turn();

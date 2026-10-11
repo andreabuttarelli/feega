@@ -27,7 +27,7 @@ import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from 
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { AGENT_SELF_SAVE_MS, AGENT_TURN_CAP_USD } from '$lib/server/project-agent/limits';
 import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/server/motion/critic';
-import { CutGate, REVIEW_CUT, cutGate, type CutReview } from '$lib/motion/cut-review';
+import { CutGate, REVIEW_CUT, answersCut, cutGate, type CutReview } from '$lib/motion/cut-review';
 import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
 import { STUDIO_ROSTER, StudioRole, roleBudgetUsd } from '$lib/server/motion/studio-roster';
@@ -477,7 +477,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const times = keyFrameTimes(session.doc);
         await play([...conversation, checkMessage(errors, times)], Round.SelfCheck);
       }
-      const critiqued = steps.length > 0 && !awaitsGo && vision === Vision.Available && session.edits.length > 0 ? await reviewCut() : null;
+      const critiqued = steps.length > 0 && !awaitsGo && !answersCut(message) && vision === Vision.Available && session.edits.length > 0 ? await reviewCut() : null;
       const fix = critiqued?.review ? criticMessage(critiqued.review) : null;
       if (fix && gate === CutGate.Auto) {
         await play([...conversation, fix], Round.SelfCheck);
