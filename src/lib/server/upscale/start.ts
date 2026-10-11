@@ -6,7 +6,8 @@ import { runGenNode } from '$lib/server/canvas/generate';
 import { OPENROUTER_UPSCALE_MODEL, upscaleLimitsOf } from '$lib/video-models';
 import { planUpscale, upscaleParams, type UpscaleMode, type UpscaleRefusal, type UpscaleTarget } from '$lib/upscale';
 
-export const UPSCALE_CANVAS_NAME = 'Upscale';
+export { UPSCALE_CANVAS_NAME } from '$lib/upscale';
+import { UPSCALE_CANVAS_NAME } from '$lib/upscale';
 
 const SOURCE_HANDLE = 'videos';
 const COLUMN_GAP = 480;

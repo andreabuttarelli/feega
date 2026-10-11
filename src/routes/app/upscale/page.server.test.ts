@@ -27,8 +27,9 @@ vi.mock('$lib/server/repos/assets', () => ({ listProjectAssets: vi.fn(async () =
 
 vi.mock('$lib/server/studio/studio-media', () => ({ signedAssets: vi.fn(async () => ({ assets: new Map(), urls: { v1: 'https://signed/v1' } })) }));
 
-const upscaleNode = { id: 'n-up', canvasId: 'c-up', projectId: 'p1', type: 'video', data: { model: OPENROUTER_UPSCALE_MODEL, running: false, refId: 'out-1', error: null, params: { upscale_factor: 2 } }, version: 3 };
+const upscaleNode = { id: 'n-up', canvasId: 'c-up', projectId: 'p1', type: 'video', position: { x: 0, y: 0, z: 0 }, data: { model: OPENROUTER_UPSCALE_MODEL, running: false, refId: 'out-1', error: null, params: { upscale_factor: 2 } }, version: 3 };
 vi.mock('$lib/server/repos/canvas', () => ({
+  listCanvases: vi.fn(async () => [{ id: 'c-up', projectId: 'p1', name: 'Upscale', viewport: null }]),
   findNode: vi.fn(async () => upscaleNode),
   listConnections: vi.fn(async () => [{ id: 'e1', canvasId: 'c-up', sourceNodeId: 'n-src', targetNodeId: 'n-up' }]),
   listNodes: vi.fn(async () => [{ id: 'n-src', type: 'video', data: { assetId: 'v1' } }, upscaleNode])
@@ -68,6 +69,12 @@ describe('/app/upscale', () => {
     expect(data.limits.maxInputSeconds).toBe(20);
     expect(data.library.map((v: { id: string }) => v.id)).toEqual(['v1']);
     expect(data.job).toBeNull();
+  });
+
+  it('lists the recent upscales of the project', async () => {
+    const data = (await load({ url: new URL('http://x/app/upscale') } as never)) as Record<string, any>;
+
+    expect(data.history).toEqual([expect.objectContaining({ nodeId: 'n-up', status: 'done', afterUrl: '/p/p1/c/c-up/assets/out-1' })]);
   });
 
   it('a job shows the source and the result as canvas asset links', async () => {
