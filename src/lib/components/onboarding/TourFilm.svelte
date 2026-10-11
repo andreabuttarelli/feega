@@ -174,7 +174,8 @@
   }
 
   @keyframes beat-title {
-    0%, 36% { opacity: 1; }
+    0% { opacity: 0; }
+    3%, 36% { opacity: 1; }
     38%, 100% { opacity: 0; }
   }
 
@@ -186,7 +187,8 @@
 
   @keyframes beat-mark {
     0%, 70% { opacity: 0; }
-    72%, 100% { opacity: 1; }
+    72%, 96% { opacity: 1; }
+    100% { opacity: 0; }
   }
 
   @keyframes rise {
