@@ -33,6 +33,7 @@ import type { SavedTool } from '$lib/server/repos/chat';
 import { tileSheet } from '$lib/server/motion/contact-sheet';
 import { COPY_SCHEMA, copywrite } from '$lib/server/motion/copywriter';
 import { projectMemory } from '$lib/server/motion/studio-memory';
+import type { LaunchScript } from '$lib/motion/script';
 import { REVIEWED, STUDIO_ROSTER, StudioRole, roleBudgetUsd, roleModel, roleTools, turnRole } from '$lib/server/motion/studio-roster';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
 import { liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
@@ -96,6 +97,8 @@ enum Client {
 }
 
 enum Round {
+  Research = 'research',
+  Sound = 'sound',
   Edit = 'edit',
   SelfCheck = 'self-check',
   Summary = 'summary'
@@ -125,9 +128,29 @@ const awaitsUser = (steps: readonly TurnStep[]) => briefAwaits(steps) || pickAwa
 
 const userAsked: Stop = ({ steps }) => awaitsUser(steps as TurnStep[]);
 
+const ROUND_ROLE: Record<Round, StudioRole | null> = { [Round.Research]: StudioRole.Researcher, [Round.Sound]: StudioRole.Sound, [Round.Edit]: null, [Round.SelfCheck]: null, [Round.Summary]: null };
+
+const CREWS = 2;
+
+type Crew = { acts: string[]; from: number; to: number };
+
+function shotCrews(script: LaunchScript): Crew[] {
+  const size = Math.ceil(script.acts.length / CREWS);
+  return Array.from({ length: CREWS }, (_, i) => script.acts.slice(i * size, (i + 1) * size))
+    .filter((acts) => acts.length)
+    .map((acts) => ({ acts: acts.map((a) => a.act), from: acts[0].start, to: acts.at(-1)!.end }));
+}
+
+const crewBrief = (crew: Crew) => `Shot crew: build only the ${crew.acts.join(', ')} acts of the script, from ${crew.from} s to ${crew.to} s, with library shots placed inside that range. Another crew builds the rest at the same time: never place, move or remove anything outside your range, and leave music to the sound pass.`;
+
+const RESEARCH_DONE = 'Research is done: the facts, captures and references are in the conversation above. Now write the script and the storyboard from them.';
+const SOUND_PASS = 'Sound pass: lay the music under the whole video if there is none, mark its beats and cut the shots onto them. Change nothing else.';
+
 const ROUND_STOPS: Record<Round, (t0: number, overBudget: Stop) => Stop[]> = {
+  [Round.Research]: (t0, overBudget) => [agentStopWhen(t0 - CLOSING_RESERVE_MS), overBudget, userAsked],
+  [Round.Sound]: (t0, overBudget) => [agentStopWhen(t0), overBudget, selfCheckSpent],
   [Round.Edit]: (t0, overBudget) => [agentStopWhen(t0 - CLOSING_RESERVE_MS), overBudget, userAsked],
-  [Round.SelfCheck]: (t0) => [agentStopWhen(t0), selfCheckSpent],
+  [Round.SelfCheck]: (t0, overBudget) => [agentStopWhen(t0), selfCheckSpent, overBudget],
   [Round.Summary]: () => [oneStep]
 };
 
@@ -136,6 +159,8 @@ type Choice = ForcedTool | { toolChoice: 'none' };
 type ChoiceInput = Parameters<typeof selfCheckChoice>[0] & { stepNumber: number };
 
 const ROUND_CHOICE: Record<Round, (input: ChoiceInput) => Choice> = {
+  [Round.Research]: () => ({}),
+  [Round.Sound]: () => ({}),
   [Round.Edit]: () => ({}),
   [Round.SelfCheck]: (input) => (input.stepNumber === 0 ? selfCheckChoice(input) : {}),
   [Round.Summary]: () => ({ toolChoice: 'none' })
@@ -222,6 +247,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const picked = await importFollowed(readAnswer(message), sources.importAsset, assets);
   session.pickAssets = picked.ids;
   const role = turnRole(message, head.doc);
+  const openingRound = role === StudioRole.Director ? Round.Research : Round.Edit;
   const memory = role === StudioRole.Director ? await projectMemory(db, { orgId, projectId: project.id, nodeId: motion.record.id }).catch(() => '') : '';
   const openingText = [message, note, picked.note, memory].filter(Boolean).join('\n\n');
   const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint });
@@ -351,7 +377,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
 
   const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void) =>
     billing.run(() => streamText({
-      model: llmLanguageModel(model, PromptCache.On),
+      model: llmLanguageModel(ROUND_ROLE[kind] ? roleModel(ROUND_ROLE[kind], model) : model, PromptCache.On),
       system,
       messages,
       tools,
@@ -382,6 +408,11 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         const stepModel = routed?.model ?? tierModel;
         stepModels.push(stepModel);
         const forced = ROUND_CHOICE[kind]({ tier, reasoning: stepModel === model ? reasoning : null, forcing: toolForcing(stepModel), stepNumber });
+        const roundRole = ROUND_ROLE[kind];
+        if (roundRole) {
+          stepModels[stepModels.length - 1] = roleModel(roundRole, stepModel);
+          return { model: llmLanguageModel(stepModels.at(-1)!, PromptCache.On), activeTools: roleTools(roundRole, toolNames) };
+        }
         return { model: llmLanguageModel(stepModel, PromptCache.On), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
       }
         }));
@@ -485,23 +516,43 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       };
       let conversation = openingMessages;
 
+      let started = false;
       const play = async (messages: ModelMessage[], kind: Round) => {
+        const first = !started;
+        started = true;
         const answered: ModelMessage[] = [];
         const played = round(messages, kind, (step) => {
           steps.push(step);
           answered.push(...(step.response.messages as ModelMessage[]));
           void reply.progress(finishedTurn(steps));
         });
-        writer.merge(played.toUIMessageStream({ sendStart: kind === Round.Edit, sendFinish: false, sendReasoning: true }));
+        writer.merge(played.toUIMessageStream({ sendStart: first, sendFinish: false, sendReasoning: true }));
         await Promise.resolve(played.steps).catch((e: unknown) => {
           console.error(`[motion-agent] ${kind} round failed, keeping the steps it finished`, e);
         });
         conversation = [...messages, ...answered];
+        return answered;
       };
 
-      await play(openingMessages, Round.Edit);
+      const crewsFor = role === StudioRole.ShotBuilder && head.doc.script ? shotCrews(head.doc.script) : [];
+      if (crewsFor.length > 1) {
+        const base = openingMessages;
+        const crewed = await Promise.all(crewsFor.map(async (crew) => {
+          const asked: ModelMessage[] = [...base, { role: 'user', content: crewBrief(crew) }];
+          return [asked.at(-1)!, ...(await play(asked, openingRound))];
+        }));
+        conversation = [...base, ...crewed.flat()];
+      } else {
+        await play(openingMessages, openingRound);
+      }
+      if (openingRound === Round.Research && !awaitsUser(steps)) {
+        await play([...conversation, { role: 'user', content: RESEARCH_DONE }], Round.Edit);
+      }
+      if (role === StudioRole.ShotBuilder && !awaitsUser(steps) && session.edits.length) {
+        await play([...conversation, { role: 'user', content: SOUND_PASS }], Round.Sound);
+      }
       const awaitsGo = awaitsUser(steps);
-      for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS && !awaitsGo && steps.length && deliveryBlocked(session, vision); attempt++) {
+      for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS && !(attempt > 0 && overBudget({ steps: [] })) && !awaitsGo && steps.length && deliveryBlocked(session, vision); attempt++) {
         const errors = openErrors(session);
         const times = keyFrameTimes(session.doc);
         await play([...conversation, checkMessage(errors, times)], Round.SelfCheck);
@@ -559,7 +610,8 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   }
 
   const roleLabel = STUDIO_ROSTER[role].label;
-  const labelOf = (modelId: string) => (modelId === model ? roleLabel : modelId === codeModel ? `${roleLabel}-code` : `${roleLabel}-vision`);
+  const sideRole = openingRound === Round.Research ? StudioRole.Researcher : StudioRole.Sound;
+  const labelOf = (modelId: string) => (modelId === roleModel(sideRole, model) && modelId !== model ? STUDIO_ROSTER[sideRole].label : modelId === model ? roleLabel : modelId === codeModel ? `${roleLabel}-code` : `${roleLabel}-vision`);
 
   async function finishTurn(steps: TurnStep[]): Promise<TurnOutcome> {
     clearTimeout(wall);

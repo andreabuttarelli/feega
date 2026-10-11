@@ -24,7 +24,7 @@ export function copyPrompt(script: LaunchScript): string {
     `- Promise (the site's own words): ${r.promise.text}`,
     `- Address: ${site}`,
     `Acts: ${script.acts.map((a) => `${a.act} (${a.scene})`).join('; ')}.`,
-    `Rules: every line at most ${MAX_LINE_WORDS} words, plain words a customer would say, no buzzwords, no hype, no questions without answers. problem: name the pain concretely for that audience. solution: what you do with the product, as actions. proof: one number or result from the facts. claim: the promise split into lines, then the address ${site} as the last line. Read all the lines in order: they must make sense as one sentence of thought, each following from the one before.`
+    `Rules: every line at most ${MAX_LINE_WORDS} words, plain words a customer would say, no buzzwords, no hype, no questions without answers. problem: name the pain concretely for that audience. solution: what you do with the product, as actions. proof: one number or result from the facts. claim: the promise split into lines, then the address ${site} as the last line. Write one language for every line: the language of the site's own copy (the promise above), never mixed; the promise stays verbatim in the site's words only when that is the same language, otherwise translate it. Read all the lines in order: they must make sense as one sentence of thought, each following from the one before.`
   ].join('\n');
 }
 

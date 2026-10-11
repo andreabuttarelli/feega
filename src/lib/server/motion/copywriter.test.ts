@@ -27,6 +27,8 @@ describe('the copywriter', () => {
   it('is briefed with the real facts: who, the problem, how it works, the proof, the promise, and the url to close on', () => {
     const prompt = copyPrompt(SCRIPT);
 
+    expect(prompt).toContain('one language for every line: the language of the site');
+    expect(prompt).toContain('verbatim');
     for (const fact of ['People who run several websites', 'Changes scatter across chats', 'Pick the site', '3x faster', 'Every site you run', 'supasito.com', 'at most 6 words']) {
       expect(prompt).toContain(fact);
     }

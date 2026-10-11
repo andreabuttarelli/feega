@@ -9,10 +9,14 @@ export enum StudioRole {
   Fixer = 'fixer',
   Critic = 'critic',
   Copywriter = 'copywriter',
-  Viewer = 'viewer'
+  Viewer = 'viewer',
+  Researcher = 'researcher',
+  Sound = 'sound'
 }
 
 enum ToolScope {
+  Research = 'research',
+  Sound = 'sound',
   Story = 'story',
   Shots = 'shots',
   All = 'all',
@@ -20,9 +24,11 @@ enum ToolScope {
 }
 
 export const OPUS = 'anthropic/claude-opus-5.5';
+export const SONNET = 'anthropic/claude-sonnet-5.5';
 
 export enum RoleModel {
   Opus = 'opus',
+  Sonnet = 'sonnet',
   Vision = 'vision'
 }
 
@@ -40,7 +46,9 @@ export const STUDIO_ROSTER: Record<StudioRole, RoleSpec> = {
   [StudioRole.Fixer]: { label: 'motion-fixer', budgetShare: 0.5, tools: ToolScope.All, model: RoleModel.Opus, code: WritesCode.Yes },
   [StudioRole.Critic]: { label: 'motion-critic', budgetShare: 0.08, tools: ToolScope.None, model: RoleModel.Vision, code: WritesCode.No },
   [StudioRole.Copywriter]: { label: 'motion-copywriter', budgetShare: 0.05, tools: ToolScope.None, model: RoleModel.Opus, code: WritesCode.No },
-  [StudioRole.Viewer]: { label: 'motion-viewer', budgetShare: 0.04, tools: ToolScope.None, model: RoleModel.Vision, code: WritesCode.No }
+  [StudioRole.Viewer]: { label: 'motion-viewer', budgetShare: 0.04, tools: ToolScope.None, model: RoleModel.Vision, code: WritesCode.No },
+  [StudioRole.Researcher]: { label: 'motion-researcher', budgetShare: 0.35, tools: ToolScope.Research, model: RoleModel.Sonnet, code: WritesCode.No },
+  [StudioRole.Sound]: { label: 'motion-sound', budgetShare: 0.1, tools: ToolScope.Sound, model: RoleModel.Sonnet, code: WritesCode.No }
 };
 
 const STORY_TOOLS: ReadonlySet<string> = new Set([
@@ -58,6 +66,10 @@ const STORY_TOOLS: ReadonlySet<string> = new Set([
   'read_storyboard',
   'update_storyboard_card'
 ]);
+
+const WRITES_STORY: ReadonlySet<string> = new Set(['write_script', 'write_storyboard', 'update_storyboard_card']);
+
+const SOUND_TOOLS: ReadonlySet<string> = new Set(['get_motion_doc', 'add_music', 'analyze_audio', 'beat_times', 'mark_beats', 'cut_to_beat', 'duck_audio', 'pulse_with_music']);
 
 const SHOT_TOOLS: ReadonlySet<string> = new Set([
   ...STORY_TOOLS,
@@ -87,12 +99,16 @@ const SHOT_TOOLS: ReadonlySet<string> = new Set([
 
 const SCOPES: Record<ToolScope, (name: string) => boolean> = {
   [ToolScope.Shots]: (name) => SHOT_TOOLS.has(name),
+  [ToolScope.Research]: (name) => STORY_TOOLS.has(name) && !WRITES_STORY.has(name),
+  [ToolScope.Sound]: (name) => SOUND_TOOLS.has(name),
   [ToolScope.Story]: (name) => STORY_TOOLS.has(name),
   [ToolScope.All]: () => true,
   [ToolScope.None]: () => false
 };
 
-export const roleModel = (role: StudioRole, vision: string): string => (STUDIO_ROSTER[role].model === RoleModel.Opus ? OPUS : vision);
+const MODELS: Record<RoleModel, (vision: string) => string> = { [RoleModel.Opus]: () => OPUS, [RoleModel.Sonnet]: () => SONNET, [RoleModel.Vision]: (vision) => vision };
+
+export const roleModel = (role: StudioRole, vision: string): string => MODELS[STUDIO_ROSTER[role].model](vision);
 
 export const REVIEWED: ReadonlySet<StudioRole> = new Set([StudioRole.Builder, StudioRole.ShotBuilder]);
 

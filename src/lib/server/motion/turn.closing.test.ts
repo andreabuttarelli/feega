@@ -39,6 +39,7 @@ const world = vi.hoisted(() => ({
   imported: [] as string[],
   critic: null as unknown,
   billed: 0,
+  headScript: null as unknown,
   critiques: [] as { prompt: string; images: unknown[] }[],
   viewed: [] as { prompt: string; images: unknown[] }[]
 }));
@@ -129,6 +130,9 @@ function reply(call: Call): unknown[] {
   const answered = JSON.stringify(last.content);
   if (world.picking && last.role === 'user') {
     return tool('ask_reference_pick', PICK);
+  }
+  if (world.headScript && last.role === 'user' && textOf(last).startsWith('Shot crew')) {
+    return tool('add_shot', { shot: 'kinetic-title', slots: { text: 'The price changed.' }, at: 0 });
   }
   if (world.looking && last.role === 'user') {
     return tool('set_reference_look', LOOK);
@@ -226,7 +230,7 @@ vi.mock('$lib/server/repos/chat-reply', async (importOriginal) => ({
   })
 }));
 vi.mock('$lib/server/motion/editor', () => ({
-  headOrNew: async () => ({ version: 0, doc: { ...newMotionDoc(MotionFormat.Landscape), style: MotionStyle.AppleMinimal }, summary: null, actorKind: 'system' }),
+  headOrNew: async () => ({ version: 0, doc: { ...newMotionDoc(MotionFormat.Landscape), style: MotionStyle.AppleMinimal, ...(world.headScript ? { script: world.headScript } : {}) }, summary: null, actorKind: 'system' }),
   motionTokens: async () => ({ name: 'Brand' }),
   motionAssets: async () => [],
   assetUrls: () => ({}),
@@ -331,6 +335,7 @@ describe('a motion turn closes on a look and a summary', () => {
     world.imported = [];
     world.critic = null;
     world.billed = 0;
+    world.headScript = null;
     world.critiques = [];
     world.viewed = [];
   });
@@ -375,8 +380,8 @@ describe('a motion turn closes on a look and a summary', () => {
     world.message = 'a launch trailer for supasito.com';
     await turn();
 
-    expect(world.tools[0]).toContain('write_script');
-    expect(world.tools[0]).not.toContain('add_clip');
+    expect(world.tools.some((t) => t.includes('write_script'))).toBe(true);
+    expect(world.tools.some((t) => t.includes('add_clip'))).toBe(false);
     expect(JSON.stringify(world.calls[0].prompt)).toContain('Studio memory');
   });
 
@@ -399,6 +404,37 @@ describe('a motion turn closes on a look and a summary', () => {
 
     expect(outcome.costUsd).toBeGreaterThanOrEqual(50);
     expect(world.calls.filter((c) => lastMessage(c.prompt).role === 'tool' && JSON.stringify(lastMessage(c.prompt).content).includes('add_clip'))).toHaveLength(0);
+  });
+
+  it('a new video first sends a researcher on Sonnet with the research tools only, then the director writes', async () => {
+    world.message = 'a launch trailer for supasito.com';
+    await turn();
+
+    expect(world.models[0]).toBe('anthropic/claude-sonnet-5.5');
+    expect(world.tools[0]).toContain('analyze_site');
+    expect(world.tools[0]).not.toContain('write_script');
+    expect(world.tools.some((t) => t.includes('write_script'))).toBe(true);
+  });
+
+  it('after the shot builder, a sound pass on Sonnet lays music and cuts on the beat with the sound tools only', async () => {
+    world.headScript = SCRIPT;
+    world.message = 'Go: build the video from this script.';
+    await turn();
+
+    const sound = world.tools.findIndex((t) => t.includes('add_music') && !t.includes('add_shot'));
+    expect(sound).toBeGreaterThan(0);
+    expect(world.tools[sound]).not.toContain('add_shot');
+  });
+
+  it('the first cut is built by two shot crews in parallel, each on its own acts and time range', async () => {
+    world.headScript = SCRIPT;
+    world.message = 'Go: build the video from this script.';
+    await turn();
+
+    const briefs = world.calls.map((c) => textOf(lastMessage(c.prompt))).filter((t) => t.startsWith('Shot crew'));
+    expect(briefs.some((t) => t.includes('problem, solution') && t.includes('0 s to 7 s'))).toBe(true);
+    expect(briefs.some((t) => t.includes('proof, claim') && t.includes('7 s to 14 s'))).toBe(true);
+    expect(world.chunks.filter((c) => c.type === 'start')).toHaveLength(1);
   });
 
   it('a cut the critic passes is delivered without another round', async () => {
@@ -513,6 +549,16 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.toolCalls.filter((t) => t === 'view_frames')).toHaveLength(MAX_DELIVERY_ATTEMPTS);
     expect(outcome.reply).toMatch(/still open/i);
     expect(outcome.reply).toMatch(/flat colour/);
+  });
+
+  it('a turn over its budget gets one more look at most, never every fix round (v6: the fixer spent twice its share in self-checks)', async () => {
+    world.blankViews = 1_000;
+    world.billed = 50;
+
+    const outcome = await turn();
+
+    expect(world.toolCalls.filter((t) => t === 'view_frames').length).toBeLessThanOrEqual(1);
+    expect(outcome.reply).toMatch(/still open/i);
   });
 
   it('stops after the script is saved: the user reads the brief before anything is built', async () => {
