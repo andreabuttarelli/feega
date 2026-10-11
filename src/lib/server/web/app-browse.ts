@@ -171,7 +171,6 @@ function fenced(tab: AppTab, app: string, confirm: Confirm): AppTab {
 async function signIn(tab: AppTab, account: AppAccount, sleep: (ms: number) => Promise<unknown>): Promise<boolean> {
   await tab.goto(account.loginUrl);
   await tab.waitFor(DEFAULT_EMAIL_SELECTOR, LOGIN_FIELD_WAIT_MS).catch(() => undefined);
-  await sleep(PAGE_SETTLE_MS);
   await tab.type(DEFAULT_EMAIL_SELECTOR, account.email);
   await tab.type(DEFAULT_PASSWORD_SELECTOR, account.password);
   await tab.click({ selector: DEFAULT_SUBMIT_SELECTOR });
