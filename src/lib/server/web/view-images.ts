@@ -46,6 +46,17 @@ async function fetchPicture(url: string, ports: ViewPorts): Promise<SafeFetchByt
 
 const errorOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+export async function viewBytes(url: string, bytes: Buffer, path: string, edge: number, ports: Pick<ViewPorts, 'store' | 'screen' | 'remove'>): Promise<{ image: ViewedImage; part: ImagePart }> {
+  const { data, info } = await sharp(bytes).rotate().resize({ width: edge, height: edge, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: JPEG_QUALITY }).toBuffer({ resolveWithObject: true });
+  await ports.store(path, data);
+  const review = await ports.screen(path);
+  if (!review.ok) {
+    await ports.remove(path).catch(() => undefined);
+    throw new Refused(review.error);
+  }
+  return { image: { url, path, width: info.width, height: info.height }, part: { mediaType: JPEG, data: data.toString('base64') } };
+}
+
 async function viewOne(url: string, path: string, edge: number, ports: ViewPorts): Promise<{ image: ViewedImage; part?: ImagePart }> {
   try {
     const fetched = await fetchPicture(url, ports);
@@ -55,14 +66,7 @@ async function viewOne(url: string, path: string, edge: number, ports: ViewPorts
     if (!fetched.mime.startsWith('image/')) {
       throw new Refused(`not a picture (${fetched.mime || 'unknown type'})`);
     }
-    const { data, info } = await sharp(fetched.bytes).rotate().resize({ width: edge, height: edge, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: JPEG_QUALITY }).toBuffer({ resolveWithObject: true });
-    await ports.store(path, data);
-    const review = await ports.screen(path);
-    if (!review.ok) {
-      await ports.remove(path).catch(() => undefined);
-      throw new Refused(review.error);
-    }
-    return { image: { url, path, width: info.width, height: info.height }, part: { mediaType: JPEG, data: data.toString('base64') } };
+    return await viewBytes(url, fetched.bytes, path, edge, ports);
   } catch (e) {
     return { image: { url, error: errorOf(e) } };
   }

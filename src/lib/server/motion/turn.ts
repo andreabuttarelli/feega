@@ -1,16 +1,18 @@
 import { styleOf } from '$lib/motion/style';
 import { briefAwaits, promptTexts } from '$lib/motion/script-brief';
+import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, rejectedRounds, shownRefs, savedPick, type PickAnswer, type PickAsk } from '$lib/reference-pick';
 import { createUIMessageStream, streamText, type ModelMessage, type UIMessageChunk } from 'ai';
 import type { Db } from '$lib/server/db/client';
-import { llmCodeModel, llmLanguageModel, llmStructured, llmVisionModel } from '$lib/server/llm';
+import { llmCodeModel, llmLanguageModel, llmStructured, llmVisionModel, type LlmMediaPart } from '$lib/server/llm';
 import { fetchImageBytes, uiReader } from '$lib/server/motion/ui-read';
 import { PromptCache } from '$lib/server/prompt-cache';
 import { reasoningProviderOptions, toolForcing } from '$lib/server/chat-model/catalogue';
 import { ensureGatewayModels, gatewayModel, gatewayRate } from '$lib/server/openrouter-models';
 import { Tier, activeTools, openingTier, selfCheckChoice, spentUsd, stepTier, type ForcedTool } from '$lib/server/motion/model-route';
-import { extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
+import { billedUsdInScope, extractSdkUsage, logAiCall, withOrgContext } from '$lib/server/ai-log';
 import { loadTurns, openNodeThread, promptHistory, saveTurn } from '$lib/server/repos/chat';
 import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
+import { referencedAssets } from '$lib/motion/doc-assets';
 import { finishedTurn } from '$lib/server/project-agent/finished-turn';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { agentStopWhen } from '$lib/server/project-agent/limits';
@@ -23,11 +25,18 @@ import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { fitNewVideo } from '$lib/motion/fit-duration';
-import { AGENT_SELF_SAVE_MS, overTurnCap } from '$lib/server/project-agent/limits';
+import { AGENT_SELF_SAVE_MS, AGENT_TURN_CAP_USD } from '$lib/server/project-agent/limits';
+import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/server/motion/critic';
+import { CutGate, REVIEW_CUT, answersCut, cutGate, type CutReview } from '$lib/motion/cut-review';
+import type { SavedTool } from '$lib/server/repos/chat';
+import { tileSheet } from '$lib/server/motion/contact-sheet';
+import { STUDIO_ROSTER, StudioRole, roleBudgetUsd } from '$lib/server/motion/studio-roster';
 import { dropWorkingDoc, keepWorkingDoc } from '$lib/server/motion/working-doc';
-import { liveWebDeps, productImport, screenedImport } from '$lib/server/web/live';
+import { liveWebDeps, productImport, screenedImport, uiCapture, webViewPrefix } from '$lib/server/web/live';
+import { CAPTURE_MAX_EDGE, storeImage } from './asset-import';
 import { ATTACHMENT_PORTS } from '$lib/server/chat-attachments/register';
-import { EmbedAction, createMotionTools, selectionNote, type MotionSession } from '$lib/server/motion/motion-tools';
+import { EmbedAction, createMotionTools, selectionNote, type MotionSession, type MotionToolDeps } from '$lib/server/motion/motion-tools';
+import type { MotionAsset } from '$lib/server/motion/editor';
 import { publishEmbed, removeEmbed } from '$lib/server/motion/embed';
 import type { ProjectMode } from '$lib/project-mode';
 import { templateLibrary } from '$lib/server/motion/templates';
@@ -39,10 +48,10 @@ import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
-import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, fixPrompt, keyFrameTimes, openErrors, selfCheckPrompt, stillOpenNote, usageByModel, visionStep } from '$lib/server/motion/frames';
+import { SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep } from '$lib/server/motion/frames';
 import { frameStats } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
-import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
+import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, storeAssetFile } from '$lib/server/repos/asset-storage';
 import { ASSETS_ADDED, CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
 import { rowRequests } from '$lib/server/motion/batch-input';
 import { startFarmBatch } from '$lib/server/motion/render-start';
@@ -99,15 +108,21 @@ export type TurnTiming = { landingMs: number; stopPollMs: number };
 const PLATFORM_TIMING: TurnTiming = { landingMs: AGENT_SELF_SAVE_MS, stopPollMs: 3000 };
 export const MAX_DELIVERY_ATTEMPTS = 3;
 const STILL_OPEN_ID = 'still-open';
+const LAST_LOOK_ID = 'last-look';
+const CRITIC_ID = 'critic-sheet';
+const CUT_REVIEW_ID = 'cut-review';
+const SHEET_FILE = 'sheet.jpg';
 
 const oneStep: Stop = ({ steps }) => steps.length >= 1;
 
 const selfCheckSpent: Stop = ({ steps }) => steps.length >= SELF_CHECK_MAX_STEPS;
 
-const briefShown: Stop = ({ steps }) => briefAwaits(steps as TurnStep[]);
+const awaitsUser = (steps: readonly TurnStep[]) => briefAwaits(steps) || pickAwaits(steps);
+
+const userAsked: Stop = ({ steps }) => awaitsUser(steps as TurnStep[]);
 
 const ROUND_STOPS: Record<Round, (t0: number, overBudget: Stop) => Stop[]> = {
-  [Round.Edit]: (t0, overBudget) => [agentStopWhen(t0 - CLOSING_RESERVE_MS), overBudget, briefShown],
+  [Round.Edit]: (t0, overBudget) => [agentStopWhen(t0 - CLOSING_RESERVE_MS), overBudget, userAsked],
   [Round.SelfCheck]: (t0) => [agentStopWhen(t0), selfCheckSpent],
   [Round.Summary]: () => [oneStep]
 };
@@ -142,7 +157,20 @@ export type MotionTurnInput = {
   timing?: TurnTiming;
 };
 
-export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number };
+type Followed = { ids: string[]; note: string };
+
+async function importFollowed(answer: PickAnswer | null, importAsset: MotionToolDeps['importAsset'], assets: MotionAsset[]): Promise<Followed> {
+  if (!answer?.follow.length || !importAsset) {
+    return { ids: [], note: '' };
+  }
+  const landed = await Promise.all(answer.follow.map(async (c) => ({ c, out: await importAsset(c.image, c.title) })));
+  const ok = landed.flatMap(({ c, out }) => (out.ok ? [{ c, asset: out.asset }] : []));
+  assets.push(...ok.map((o) => o.asset));
+  const lines = ok.map(({ c, asset }) => `- ${c.title || c.id}: asset ${asset.id}`);
+  return { ids: ok.map((o) => o.asset.id), note: lines.length ? `The references the user follows are now project assets: hang each under the storyboard beat it inspires (write_storyboard media) and take the look from them:\n${lines.join('\n')}` : '' };
+}
+
+export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number; pick: PickAsk | null; cut: CutReview | null };
 
 export type MotionTurn = { stream: ReadableStream<UIMessageChunk>; done: Promise<TurnOutcome> };
 
@@ -163,15 +191,16 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   }
 
   const assets = await motionAssets({ db, orgId, projectId: project.id, canvasId: motion.record.canvasId, nodeId: motion.record.id });
-  const history = promptHistory(await loadTurns(db, { orgId, threadId }));
+  const turns = await loadTurns(db, { orgId, threadId });
+  const history = promptHistory(turns);
+  const pick = readAnswer(message) ?? latestAnswer(turns);
   await saveTurn(db, { orgId, threadId, role: 'user', content: message, attachments, actor: requester });
   const storyboard = storyboardStore(db, { orgId, projectId: project.id, motionNodeId: motion.record.id, title: motion.record.displayName ?? 'Video', actor });
   const note = motion.node.storyboard ? boardNote(await storyboard.read()) : null;
-  const openingContent = await userContent(db, { orgId, text: note ? `${message}\n\n${note}` : message, attachments, hint: motionPlaceHint });
   const reply = await openReply(db, { orgId, threadId, actor });
 
   const knownAssets = assets.length;
-  const session: MotionSession = { doc: head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
+  const session: MotionSession = { doc: head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick };
   const moderationScope = { orgId, userId, projectId: project.id, nodeId: motion.record.id, actor };
   const bucket = db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket;
   const frameScope = { orgId, projectId: project.id, nodeId: motion.record.id };
@@ -186,6 +215,26 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const sources = brandSources(db, { orgId, userId, projectId: project.id, canvasId: motion.record.canvasId, brandId: project.brandId, screen: screenPicture }, (usd) => {
     spent += usd;
   });
+  const picked = await importFollowed(readAnswer(message), sources.importAsset, assets);
+  session.pickAssets = picked.ids;
+  const openingText = [message, note, picked.note].filter(Boolean).join('\n\n');
+  const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint });
+  const drawTurnFrames = async (callId: string, times: number[]) => {
+    const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
+    if (!review.ok) {
+      throw new Error(`frames withheld by the safety review: ${review.error}`);
+    }
+    const editor = async () => {
+      if (!EDITOR_DRAWS[browser] || client === Client.Gone) {
+        return null;
+      }
+      askPreview({ callId, times, doc: session.doc, assets: assets.slice(knownAssets) });
+      return awaitFrames(bucket, framesPrefix(frameScope, callId), times.length);
+    };
+    const server = async () => (serverFramesOpen() ? drawFrames(chromiumFrames, { compose: { doc: session.doc, tokens, assets: assetUrls(assets) }, times }) : null);
+    return firstFrames([editor, server]);
+  };
+
   const tools = createMotionTools({
     session,
     assets,
@@ -196,31 +245,33 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
     music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
-    frames: async (callId, times) => {
-      const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
-      if (!review.ok) {
-        throw new Error(`frames withheld by the safety review: ${review.error}`);
-      }
-      const editor = async () => {
-        if (!EDITOR_DRAWS[browser] || client === Client.Gone) {
-          return null;
-        }
-        askPreview({ callId, times, doc: session.doc, assets: assets.slice(knownAssets) });
-        return awaitFrames(bucket, framesPrefix(frameScope, callId), times.length);
-      };
-      const server = async () => (serverFramesOpen() ? drawFrames(chromiumFrames, { compose: { doc: session.doc, tokens, assets: assetUrls(assets) }, times }) : null);
-      return firstFrames([editor, server]);
-    },
+    frames: drawTurnFrames,
     inspect: frameStats,
     web: {
-      ...liveWebDeps(db, { orgId, userId, projectId: project.id, brandId: project.brandId, mode: project.mode }, (usd) => {
-        spent += usd;
-      }),
-      importProducts: productImport(screenedImport(sources.importAsset, screenPicture, assets))
+      ...liveWebDeps(
+        db,
+        { orgId, userId, projectId: project.id, brandId: project.brandId, mode: project.mode },
+        (usd) => {
+          spent += usd;
+        },
+        async (jpeg, name) => {
+          const stored = await storeImage(db, { orgId, projectId: project.id, canvasId: motion.record.canvasId, screen: screenPicture }, { bytes: jpeg, url: name }, name, CAPTURE_MAX_EDGE);
+          if (!stored.ok) {
+            return null;
+          }
+          assets.push(stored.asset);
+          return stored.asset.id;
+        }
+      ),
+      importProducts: productImport(screenedImport(sources.importAsset, screenPicture, assets)),
+      avoid: avoidedImages(pick),
+      shown: shownRefs(turns),
+      rejections: rejectedRounds([...turns, { role: 'user', content: message }])
     },
     layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
     storyboard,
+    captureUi: uiCapture(db, { orgId, userId, projectId: project.id, brandId: project.brandId }),
     readUi: uiReader({ ask: (q) => withOrgContext(orgId, () => llmStructured({ ...q, model: llmVisionModel() ?? model, label: 'motion-recreate-ui' })), fetchBytes: fetchImageBytes }),
     check: async (callId, doc, name) => {
       BROWSER_DRAWS[browser]();
@@ -265,7 +316,8 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   await ensureGatewayModels();
   const visionModel = gatewayModel(model)?.usable ? model : llmVisionModel();
   const vision = BROWSER_VISION[browser](visionModel);
-  const toolNames = Object.keys(tools).filter((name) => vision === Vision.Available || name !== VIEW_FRAMES);
+  const asksPick = !choosesForUser(message);
+  const toolNames = Object.keys(tools).filter((name) => (vision === Vision.Available || name !== VIEW_FRAMES) && (asksPick || name !== ASK_REFERENCE_PICK));
   const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
   const t0 = Date.now();
   const stepModels: string[] = [];
@@ -273,7 +325,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
   const stepTiers: Tier[] = [];
   const framesShown = new Set<string>();
   let spent = 0;
-  const overBudget: Stop = overTurnCap(() => spent);
+  const overBudget: Stop = () => spent > roleBudgetUsd(StudioRole.Builder, AGENT_TURN_CAP_USD);
   const TIER_MODEL: Record<Tier, string> = { [Tier.Edit]: model, [Tier.Code]: codeModel };
 
   const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void) =>
@@ -295,6 +347,10 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         onStep(step);
       },
       prepareStep: ({ steps, messages: current, stepNumber }) => {
+        const seen = viewedReferences(current);
+        if (seen.length) {
+          session.references = seen;
+        }
         const tier = stepTier(stepTiers.at(-1) ?? opening, steps.map((s) => s.toolCalls));
         stepTiers.push(tier);
         const tierModel = TIER_MODEL[tier];
@@ -306,6 +362,48 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
         return { model: llmLanguageModel(stepModel, PromptCache.On), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
       }
     });
+
+  const lastLook = async (messages: ModelMessage[]): Promise<ModelMessage[]> => {
+    const view = tools[VIEW_FRAMES];
+    const scenes = keyFrameTimes(session.doc);
+    const input = { times: scenes.length ? scenes : [session.doc.durationInFrames / session.doc.fps / 2] };
+    const output = await view.execute!(input, { toolCallId: LAST_LOOK_ID, messages, context: {} });
+    const result = await view.toModelOutput!({ toolCallId: LAST_LOOK_ID, input, output });
+    return [
+      { role: 'assistant', content: [{ type: 'tool-call', toolCallId: LAST_LOOK_ID, toolName: VIEW_FRAMES, input }] },
+      { role: 'tool', content: [{ type: 'tool-result', toolCallId: LAST_LOOK_ID, toolName: VIEW_FRAMES, output: result }] }
+    ];
+  };
+
+  let sheetBatch = 0;
+  const storeSheet = async (bytes: Buffer | null): Promise<string | null> => {
+    if (!bytes) {
+      return null;
+    }
+    const path = `${webViewPrefix({ orgId, projectId: project.id }, `${CRITIC_ID}-${crypto.randomUUID().slice(0, 8)}`)}/${SHEET_FILE}`;
+    return storeAssetFile(db, path, new File([new Uint8Array(bytes)], SHEET_FILE, { type: 'image/jpeg' }))
+      .then(() => path)
+      .catch(() => null);
+  };
+
+  const gate = cutGate(message, turns);
+  const gateTools: SavedTool[] = [];
+  const reviewCut = async (): Promise<Critique> => {
+    const ports = {
+      frames: (times: number[]) => drawTurnFrames(`${CRITIC_ID}-${sheetBatch++}`, times),
+      tile: tileSheet,
+      ask: async (q: { prompt: string; images: LlmMediaPart[] }) => {
+        const answer = await llmStructured({ ...q, schema: CRITIC_SCHEMA, model: visionModel ?? model, temperature: 0, label: STUDIO_ROSTER[StudioRole.Critic].label });
+        return { answer, usd: billedUsdInScope() ?? 0 };
+      }
+    };
+    const out = await withOrgContext(orgId, () => critique(ports, { doc: session.doc, request: message, references: session.references ?? [] })).catch((e: unknown) => {
+      console.warn('[motion-agent] critic failed, delivering without its review', e);
+      return { review: null, usd: 0, sheet: null };
+    });
+    spent += out.usd;
+    return out;
+  };
 
   let settle: (outcome: TurnOutcome) => void = () => {};
   let abandon: (e: unknown) => void = () => {};
@@ -373,13 +471,29 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
       };
 
       await play(openingMessages, Round.Edit);
-      const awaitsGo = briefAwaits(steps);
+      const awaitsGo = awaitsUser(steps);
       for (let attempt = 0; attempt < MAX_DELIVERY_ATTEMPTS && !awaitsGo && steps.length && deliveryBlocked(session, vision); attempt++) {
         const errors = openErrors(session);
         const times = keyFrameTimes(session.doc);
-        await play([...conversation, { role: 'user', content: errors.length ? fixPrompt(errors, times) : selfCheckPrompt(times) }], Round.SelfCheck);
+        await play([...conversation, checkMessage(errors, times)], Round.SelfCheck);
       }
-      if (steps.length && !awaitsGo && !closedByModel(steps.at(-1))) {
+      const critiqued = steps.length > 0 && !awaitsGo && !answersCut(message) && vision === Vision.Available && session.edits.length > 0 ? await reviewCut() : null;
+      const fix = critiqued?.review ? criticMessage(critiqued.review) : null;
+      if (fix && gate === CutGate.Auto) {
+        await play([...conversation, fix], Round.SelfCheck);
+      }
+      if (fix && gate === CutGate.Ask && critiqued?.review) {
+        const output = { ok: true, ...critiqued.review, sheet: await storeSheet(critiqued.sheet) };
+        gateTools.push({ toolCallId: CUT_REVIEW_ID, toolName: REVIEW_CUT, status: 'done', input: {}, output });
+        writer.write({ type: 'tool-input-available', toolCallId: CUT_REVIEW_ID, toolName: REVIEW_CUT, input: {} });
+        writer.write({ type: 'tool-output-available', toolCallId: CUT_REVIEW_ID, output });
+      }
+      const held = awaitsGo || gateTools.length > 0;
+      const unlooked = steps.length > 0 && !held && selfCheckDue(session, vision);
+      if (unlooked) {
+        conversation = [...conversation, ...(await lastLook(conversation))];
+      }
+      if (steps.length && !held && (unlooked || !closedByModel(steps.at(-1)))) {
         await play([...conversation, { role: 'user', content: SUMMARY_PROMPT }], Round.Summary);
       }
       const open = awaitsGo ? '' : stillOpenNote(openErrors(session));
@@ -421,6 +535,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     clearTimeout(wall);
     clearInterval(watch);
     session.doc = fitNewVideo(head.doc, session.doc);
+    session.doc = { ...session.doc, assets: referencedAssets(session.doc, assets.map((a) => ({ id: a.id, kind: a.kind, name: a.label }))) };
     const write = session.edits.length ? await saveAgentDoc() : null;
     if (write && write.outcome !== RevisionOutcome.Written) {
       console.warn('[motion-agent] revision not saved', { nodeId: motion.record.id, outcome: write.outcome });
@@ -431,7 +546,7 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     }
 
     const finished = finishedTurn(steps);
-    const turn = { ...finished, content: finished.content + (briefAwaits(steps) ? '' : stillOpenNote(openErrors(session))) };
+    const turn = { tools: [...finished.tools, ...gateTools], content: finalReply(steps.map((s) => s.text), awaitsUser(steps) ? [] : openErrors(session)) };
     await reply.finish(turn, ReplyStatus.Done);
 
     for (const [modelId, usage] of usageByModel(steps.map((s) => extractSdkUsage(s.usage)), stepModels)) {
@@ -455,7 +570,8 @@ export async function startMotionTurn(input: MotionTurnInput): Promise<MotionTur
     }
 
     const written = write?.outcome === RevisionOutcome.Written ? write.head : null;
-    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: spent };
+    const asked = finished.tools.map(savedPick).findLast((p) => p !== null) ?? null;
+    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: spent, pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null };
   }
 
   const reader = stream.getReader();

@@ -6,6 +6,9 @@ import { isInternalEmail } from '$lib/server/internal-users';
 import { trackingAllowed } from '$lib/analytics';
 import { outdatedTermsVersion } from '$lib/terms-notice';
 import { socialPublishing } from '$lib/server/social-publishing';
+import type { User } from '@supabase/supabase-js';
+import { readTourSeen } from '$lib/server/repos/profiles';
+import { TourState, tourStateOf } from '$lib/onboarding/tour';
 
 export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession, db } }) => {
   const { session, user } = await safeGetSession();
@@ -49,9 +52,18 @@ export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession, db
     internalViewer,
     planGo: isPlanGoEnabled(),
     socialPublishing: await socialPublishing(),
-    termsNoticeVersion
+    termsNoticeVersion,
+    tour: await tourFor(db, user)
   };
 };
+
+async function tourFor(db: () => Promise<Db | null>, user: User | null): Promise<TourState> {
+  const client = user ? await db() : null;
+  if (!user || !client) {
+    return TourState.Seen;
+  }
+  return tourStateOf({ createdAt: user.created_at, seen: await readTourSeen(client, user.id) });
+}
 
 async function outdatedTermsNoticeFor(db: () => Promise<Db | null>, userId: string | null): Promise<string | null> {
   if (!userId) return null;

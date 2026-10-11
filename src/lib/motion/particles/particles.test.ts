@@ -132,7 +132,7 @@ describe('particles in the composition', () => {
     const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Particles', from: 15, durationInFrames: 60 }, 'p'));
     const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} });
     expect(html).toContain('<canvas id="pt-p" width="1920" height="1080"');
-    expect(html).toContain('const PT_AT=(');
+    expect(html).toContain('const PT_AT=PT.at');
     expect(html).toContain('"id":"p","from":15');
   });
 
@@ -146,7 +146,7 @@ describe('particles in the composition', () => {
   it('each frame leaves its particles on the canvas for the export to draw, not just their pixels', () => {
     const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Particles', from: 0, durationInFrames: 30 }, 'p'));
     const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {} });
-    expect(html).toContain('const PT_QUADS=(');
+    expect(html).toContain('const PT_QUADS=PT.quads');
     expect(html).toContain(`[${JSON.stringify(PARTICLE_STATE)}]=`);
   });
 });

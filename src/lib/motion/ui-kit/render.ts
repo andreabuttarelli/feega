@@ -4,17 +4,19 @@ const FRAME = { width: 1920, height: 1080 };
 const SEED = 42;
 const LCG = { multiplier: 16807, modulus: 2147483647 };
 
-function node(tag: string): DrawnNode {
+type Frame = { width: number; height: number };
+
+function node(tag: string, frame: Frame = FRAME): DrawnNode {
   const style: Record<string, unknown> = {};
   style.setProperty = (k: string, v: string) => (style[k] = v);
-  const n = { tag, className: '', textContent: '', innerHTML: '', style, attrs: {} as Record<string, string>, children: [] as DrawnNode[], clientWidth: FRAME.width, clientHeight: FRAME.height };
+  const n = { tag, className: '', textContent: '', innerHTML: '', style, attrs: {} as Record<string, string>, children: [] as DrawnNode[], clientWidth: frame.width, clientHeight: frame.height };
   return Object.assign(n, { appendChild: (c: DrawnNode) => n.children.push(c), setAttribute: (k: string, v: string) => (n.attrs[k] = v) });
 }
 
-const fakeDocument = { createElement: node, createElementNS: (_: string, tag: string) => node(tag) };
+const fakeDocument = { createElement: (tag: string) => node(tag), createElementNS: (_: string, tag: string) => node(tag) };
 
-export function drawPiece(js: string, props: Record<string, unknown>, duration: number): (t: number) => DrawnNode {
-  const root = node('root');
+export function drawPiece(js: string, props: Record<string, unknown>, duration: number, frame: Frame = FRAME): (t: number) => DrawnNode {
+  const root = node('root', frame);
   const updates: (() => void)[] = [];
   let now = 0;
   let seed = SEED;

@@ -126,7 +126,8 @@ export function textPathTemplate(component: ComponentId): Template<'Title'> {
     html: (ctx) => {
       const size = Math.round(ctx.p.size * ctx.unit * SIZE_DIGITS) / SIZE_DIGITS;
       const box = boxOf(ctx.p, ctx);
-      const style = css({ ...typeStyle(ctx, ctx.p, size), color: ctx.color(ctx.p.color), position: 'relative', width: px(box.width), height: px(box.height), textTransform: CASE[component], ...ctx.text.vars });
+      const type = typeStyle(ctx, ctx.p, size);
+      const style = css({ ...type, color: ctx.color(ctx.p.color), position: 'relative', width: px(box.width), height: px(box.height), textTransform: CASE[component] ?? type.textTransform, ...ctx.text.vars });
       const host = ctx.text.id ? ` id="${ctx.text.id}"` : '';
       return placed(ctx, ctx.p, `<div${host} style="${style}">${ctx.text.style}<div id="${glyphsId(ctx.id)}">${glyphHtml(ctx.p.text, ctx.text.seed)}</div></div>`);
     }

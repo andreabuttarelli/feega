@@ -30,7 +30,8 @@ const DOC: Record<string, Access> = {
   workArea: { write: ['set_work_area'], read: 'workArea' },
   interactive: { write: ['set_interactive', 'apply_interactive_preset'], read: 'interactive' },
   style: { write: ['set_style'], read: 'style' },
-  script: { write: ['write_script'], read: 'script' }
+  script: { write: ['write_script'], read: 'script' },
+  referenceLook: { write: ['set_reference_look'], read: 'referenceLook' }
 };
 
 const TRACK: Record<string, Access> = {
@@ -72,6 +73,7 @@ const CLIP: Record<string, Access> = {
   physics: { write: ['set_physics', 'apply_physics_preset'], read: 'physics' },
   hidden: { write: ['set_visibility'], read: 'hidden' },
   locked: { write: ['set_visibility'], read: 'locked' },
+  bleed: { write: ['set_visibility'], read: 'bleed' },
   markers: { write: ['set_marker', 'remove_marker'], read: 'markers' }
 };
 

@@ -11,14 +11,14 @@ import { FX_GLOBAL } from './fx';
 import { SPLITTING_GLOBAL } from './splitting';
 import { OPEN_PROPS_GLOBAL } from './open-props';
 import { GPU_GLOBAL } from '../hyperframes/gpu';
+import { LITTLEJS_GLOBAL, THREE_GLOBAL } from '../libs/catalog';
 
 export const REGISTRY = '__feegaComponents';
 export const ERRORS = '__feegaErrors';
 const ERROR_LISTENER = '__feegaErrorListener';
-export const THREE_GLOBAL = '__feegaThree';
+export { LITTLEJS_GLOBAL, THREE_GLOBAL };
 export const LIVE_RUNS = '__feegaLiveRuns';
 export const EVENT_MESSAGE = 'feega:event';
-export const LITTLEJS_GLOBAL = '__feegaLittleJS';
 
 export enum Play {
   Seeked = 'seeked',

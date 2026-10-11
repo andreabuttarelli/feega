@@ -89,6 +89,13 @@ describe('the video keeps to its script', () => {
     expect(drift(doc)).toEqual([]);
   });
 
+  it('a line set in a shot counts for its act: shots were thrown away for titles because the gate could not read them', () => {
+    const shot = (id: string, from: number, seconds: number, props: Record<string, unknown>): MotionClip => newClip({ id, from: from * FPS, durationInFrames: seconds * FPS, component: 'Custom', props: { name: 'ShotKineticTitle', ...props } });
+    const clips = [shot('p', 0, 3, { text: 'The price changed.' }), ...FAITHFUL.filter((c) => c.id !== 'p' && c.id !== 'c1' && c.id !== 'c2'), shot('c', 10, 4, { name: 'ShotTaglineCard', lines: 'Every site you run.|Up to date. In one place.' })];
+
+    expect(drift(film(clips))).toEqual([]);
+  });
+
   it('a film without a saved script is not checked against one', () => {
     expect(drift({ ...film([]), script: undefined })).toEqual([]);
   });

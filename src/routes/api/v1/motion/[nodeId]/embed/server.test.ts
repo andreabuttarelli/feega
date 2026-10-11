@@ -57,6 +57,7 @@ const call = (handler: Handler, method: string, path = 'embed') => {
 };
 
 beforeEach(() => {
+  vi.stubGlobal('fetch', async () => new Response('window.lib=1;', { headers: { 'content-type': 'text/javascript' } }));
   store.caller = { db: { storage: { from: () => bucket } }, orgId: ORG, userId: 'u-1', apiKeyId: 'key-1', writeAllowed: true };
   store.head = 2;
   store.mode = ProjectMode.Standard;
@@ -73,7 +74,17 @@ describe('/api/v1/motion/[nodeId]/embed', () => {
     expect(body.url).toBe(`https://feega.app/e/${NODE}`);
     expect(body.snippet).toBe(`<script src="https://feega.app/embed.js" async></script>\n<feega-motion src="${NODE}"></feega-motion>`);
     expect(body.revision).toBe(2);
-    expect(store.files.get(`${NODE}.html`)).toContain('<html');
+    expect(store.files.get(`${NODE}.html`)).toContain('application/feega-embed+json');
+  });
+
+  it('hands the React and Flutter snippets for the same video', async () => {
+    const body = await (await call(route.POST as Handler, 'POST')).json();
+    const read = await (await call(route.GET as Handler, 'GET')).json();
+
+    expect(body.react).toContain(`<FeegaMotion id="${NODE}" origin="https://feega.app" />`);
+    expect(body.flutter).toContain(`FeegaMotion(id: '${NODE}', origin: 'https://feega.app')`);
+    expect(read.react).toBe(body.react);
+    expect(read.flutter).toBe(body.flutter);
   });
 
   it('reports whether it is published, with the snippet', async () => {

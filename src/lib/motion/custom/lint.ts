@@ -79,6 +79,7 @@ const FORBIDDEN_MEMBERS: Record<string, Record<string, Rule>> = {
   Matter: { Runner: MATTER_CLOCK, Render: MATTER_CLOCK },
   d3: { timer: D3_CLOCK, interval: D3_CLOCK, timeout: D3_CLOCK, now: D3_CLOCK },
   Date: { now: WALL_CLOCK },
+  THREE: { Clock: clock('THREE.Clock reads the wall clock: take the time from this.time() in onUpdate') },
   Math: { random: { reason: 'use rand(), seeded per clip', concern: Concern.Chance } },
   document: { cookie: sandbox('no cookies'), domain: sandbox('no access'), write: sandbox('build DOM inside root'), defaultView: sandbox('use root, not window') }
 };
@@ -270,6 +271,74 @@ export function lintSource(source: CustomSource, mode = ComponentMode.Determinis
     ...textProblems(source.css, CSS_RULES, allowed).map((message) => ({ file: 'css' as const, message })),
     ...lintJs(source.js, allowed).map((message) => ({ file: 'js' as const, message }))
   ];
+}
+
+type GpuFacts = { webgl: boolean; renderers: number; rawRenderers: number; pixelRatio: boolean; disposes: boolean; shadows: boolean; castingLights: number };
+
+const MAX_SHADOW_LIGHTS = 1;
+
+const NON_CASTING_LIGHTS = new Set(['AmbientLight', 'HemisphereLight', 'RectAreaLight', 'LightProbe']);
+
+const GPU_LIBRARIES = new Set(['THREE', 'twgl', 'PIXI']);
+
+const RENDERER_CALLS: Record<string, string> = { three: 'renderer', twgl: 'webgl' };
+
+const ADVICE: { when: (f: GpuFacts) => boolean; message: string }[] = [
+  { when: (f) => f.rawRenderers > 0, message: 'new THREE.WebGLRenderer: use three.renderer(canvas), tuned for preview, phones and export' },
+  { when: (f) => f.renderers > 1, message: 'one renderer per component: every WebGL canvas is a context the export reads back on each frame' },
+  { when: (f) => f.pixelRatio, message: 'setPixelRatio/devicePixelRatio: the host sets the pixel ratio' },
+  { when: (f) => !f.disposes, message: 'no dispose: free geometries, materials, textures and the renderer in onDestroy' },
+  { when: (f) => f.shadows && f.castingLights > MAX_SHADOW_LIGHTS, message: 'shadow map with several lights: cast shadows from one light only' }
+];
+
+const memberOf = (node: AnyNode, object: string, property: string) => node.type === 'MemberExpression' && name(node.object) === object && propertyName(node) === property;
+
+function gpuFacts(program: Node): GpuFacts {
+  const facts: GpuFacts = { webgl: false, renderers: 0, rawRenderers: 0, pixelRatio: false, disposes: false, shadows: false, castingLights: 0 };
+  full(program, (n) => {
+    const node = n as AnyNode;
+    if (node.type === 'Identifier' && (GPU_LIBRARIES.has(String(node.name)) || node.name === 'devicePixelRatio')) {
+      facts.webgl ||= node.name !== 'devicePixelRatio';
+      facts.pixelRatio ||= node.name === 'devicePixelRatio';
+    }
+    if (node.type === 'MemberExpression') {
+      const property = propertyName(node);
+      facts.pixelRatio ||= property === 'setPixelRatio';
+      facts.disposes ||= property === 'dispose';
+      facts.shadows ||= property === 'shadowMap';
+    }
+    if (node.type === 'CallExpression' && Object.entries(RENDERER_CALLS).some(([object, property]) => memberOf(node.callee as AnyNode, object, property))) {
+      facts.webgl = true;
+      facts.renderers += 1;
+    }
+    if (node.type !== 'NewExpression') {
+      return;
+    }
+    const callee = node.callee as AnyNode;
+    const made = callee.type === 'MemberExpression' && name(callee.object) === 'THREE' ? propertyName(callee) : null;
+    if (made === 'WebGLRenderer' || memberOf(callee, 'PIXI', 'Application')) {
+      facts.renderers += 1;
+      facts.rawRenderers += made === 'WebGLRenderer' ? 1 : 0;
+    }
+    if (made?.endsWith('Light') && !NON_CASTING_LIGHTS.has(made)) {
+      facts.castingLights += 1;
+    }
+  });
+  return facts;
+}
+
+export function lintAdvice(source: CustomSource): string[] {
+  let program: Node;
+  try {
+    program = parse(source.js, { ecmaVersion: ECMA_VERSION, sourceType: 'script', allowReturnOutsideFunction: true });
+  } catch {
+    return [];
+  }
+  const facts = gpuFacts(program);
+  if (!facts.webgl) {
+    return [];
+  }
+  return ADVICE.filter((a) => a.when(facts)).map((a) => a.message);
 }
 
 export function lintReport(problems: LintProblem[]): string {

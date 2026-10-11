@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { addClip } from './timeline';
 import { parseProps } from './components';
-import { Forbidden, STYLES, TITLE_TYPE_RULE, styleProblems } from './style';
+import { Forbidden, HOUSE_DEFAULTS, HOUSE_DEFAULTS_RULE, STYLES, TITLE_TYPE_RULE, styleProblems } from './style';
+import { FontClass, Imagery, SmallText } from './reference-look-model';
 import { SEVERITY, Severity } from './direction';
 import { MotionStyle } from './style-model';
 import { BUILTIN_TEMPLATES } from './template/builtins';
@@ -66,5 +67,20 @@ describe('titles are semibold or medium with very tight tracking', () => {
       throw new Error(r.error);
     }
     expect(named(r.doc)).toEqual([]);
+  });
+});
+
+describe('the house title type yields to the references', () => {
+  it('a heavy title raises no title-type problem once the references set the type', () => {
+    const doc = titled(MotionStyle.LaunchFilm, { weight: 900, tracking: 0 });
+    const look = { typeScale: 0.6, bleed: false, columns: 1, smallText: SmallText.None, palette: ['#000000'], font: FontClass.Grotesk, imagery: Imagery.None };
+
+    expect(named(doc)).toHaveLength(1);
+    expect(named({ ...doc, referenceLook: look })).toEqual([]);
+  });
+
+  it('every house default is named in the rule that lets it yield', () => {
+    expect(HOUSE_DEFAULTS).toContain(Forbidden.TitleType);
+    expect(HOUSE_DEFAULTS_RULE).toContain(Forbidden.TitleType);
   });
 });

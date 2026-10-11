@@ -5,6 +5,8 @@
   import { navigating } from '$app/state';
   import CookieBanner from '$lib/components/CookieBanner.svelte';
   import TermsUpdateNotice from '$lib/components/TermsUpdateNotice.svelte';
+  import HowFeegaWorks from '$lib/components/onboarding/HowFeegaWorks.svelte';
+  import { TourState, tourShowsOn } from '$lib/onboarding/tour';
   import AppEntryShimmer from '$lib/components/AppEntryShimmer.svelte';
   import CanvasEntryShimmer from '$lib/components/CanvasEntryShimmer.svelte';
   import {
@@ -172,6 +174,7 @@
 {@render children()}
 {#if !isBlog}<CookieBanner />{/if}
 {#if !isBlog && data?.session}<TermsUpdateNotice version={data.termsNoticeVersion ?? null} />{/if}
+{#if data?.session && tourShowsOn($page.url.pathname)}<HowFeegaWorks tour={data.tour ?? TourState.Seen} />{/if}
 
 <style>
   /* Indeterminate top progress bar: sprints to ~80% then crawls, so long loads still feel alive.

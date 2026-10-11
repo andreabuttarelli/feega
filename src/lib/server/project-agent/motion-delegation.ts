@@ -8,7 +8,7 @@ import { motionEditorPath } from '$lib/canvas/motion-node';
 import { Preset, settingsOf } from '$lib/motion/export-formats';
 import { findMotionNode } from '$lib/server/motion/editor';
 import { listMotionVideos } from '$lib/server/motion/agent-videos';
-import { askMotion, askStatus } from '$lib/server/motion/ask';
+import { askMotion, askStatus, type PickReply } from '$lib/server/motion/ask';
 import { MOTION_START_DEPS, startMotion } from '$lib/server/motion/start';
 import { RenderMode, renderState, requestRender } from '$lib/server/motion/agent-render';
 import { motionFrames } from '$lib/server/motion/agent-frames';
@@ -16,6 +16,22 @@ import { MAX_FRAMES_PER_VIEW } from '$lib/server/motion/frames';
 import { framePaths, framesPrefix, putFrames, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { motionEmbedState, publishMotionEmbed, type EmbedAnswer } from '$lib/server/motion/agent-embed';
+
+const PICK_RELAY = 'The motion agent asks the user which references to follow: call ask_reference_pick with this question and these candidates (same ids) so the user picks here, then pass their answer to ask_motion_agent as reference_pick (follow and avoid ids, note; or rejected true with their query and avoid_all when they turned them all down).';
+
+const CUT_RELAY = 'The motion agent finished a first cut and its critic scored it: show the user cut_review (score, fixes, sheet) and ask whether to apply the fixes, apply them and stop asking, or keep the cut as is; then call ask_motion_agent with the matching cut_review.answers text as the request, unchanged.';
+
+const RELAYS: readonly { field: string; next: string }[] = [
+  { field: 'reference_pick', next: PICK_RELAY },
+  { field: 'cut_review', next: CUT_RELAY }
+];
+
+export function relayed(state: Record<string, unknown>): Record<string, unknown> {
+  const relay = RELAYS.find((r) => state[r.field]);
+  return relay ? { ...state, next: relay.next } : state;
+}
+
+const pickReplySchema = z.object({ follow: z.array(z.string()).max(12), avoid: z.array(z.string()).max(12), note: z.string().max(1000).optional(), rejected: z.boolean().optional(), query: z.string().max(300).optional(), avoid_all: z.boolean().optional() });
 
 export const MOTION_DELEGATION_TOOLS = [
   'list_motion_videos',
@@ -90,7 +106,7 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
 
   const inProject = (nodeId: string) => findMotionNode(db, { orgId, nodeId, place: { projectId } });
 
-  async function ask(nodeId: string, request: string, refs: string[] = []): Promise<Record<string, unknown>> {
+  async function ask(nodeId: string, request: string, refs: string[] = [], pick?: PickReply): Promise<Record<string, unknown>> {
     const motion = await inProject(nodeId);
     if (!motion) {
       return NOT_FOUND;
@@ -104,7 +120,7 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
     }
 
     const prompt = media.length ? `${request}\n\n${mediaLine(media as Asset[])}` : request;
-    const asked = await askMotion(db, { orgId, userId, nodeId, prompt, agentKey: SIDEBAR_AGENT_KEY, choice: { model: deps.model } });
+    const asked = await askMotion(db, { orgId, userId, nodeId, prompt, agentKey: SIDEBAR_AGENT_KEY, choice: { model: deps.model }, pick });
     if (asked instanceof Response) {
       return asked.json();
     }
@@ -119,7 +135,7 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
       await pause(pollMs);
       state = await bodyOf(await askStatus(db, { orgId, runId }));
     }
-    return state;
+    return relayed(state);
   }
 
   return {
@@ -160,8 +176,8 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
         'Hand a request to the motion editor agent for one motion video of THIS project: it writes the video itself, in the editor thread, and costs credits like the editor — only when the user asked.',
         'Runs in the background: poll get_motion_run with the returned run_id. media: node or asset ids of the canvas whose image, video or audio it should use.'
       ].join(' '),
-      inputSchema: z.object({ nodeId: z.string(), request: z.string().min(1).max(8000), media: z.array(z.string()).optional() }).strict(),
-      execute: async (input: { nodeId: string; request: string; media?: string[] }) => ask(input.nodeId, input.request, input.media)
+      inputSchema: z.object({ nodeId: z.string(), request: z.string().min(1).max(8000), media: z.array(z.string()).optional(), reference_pick: pickReplySchema.optional() }).strict(),
+      execute: async (input: { nodeId: string; request: string; media?: string[]; reference_pick?: PickReply }) => ask(input.nodeId, input.request, input.media, input.reference_pick)
     }),
 
     get_motion_run: tool({

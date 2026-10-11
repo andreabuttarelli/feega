@@ -22,6 +22,7 @@ const LINEAR = EASE_BEZIER[Ease.Linear];
 const BEAT = 0.5;
 const HIT = 0.25;
 const PUNCH = 1.35;
+const DISPLAY_LEADING = 0.95;
 const BLUR = FILM.movement.blur;
 const RISE = FILM.movement.rise;
 
@@ -43,7 +44,7 @@ const word = (size: number, color = PAPER) => ({
   size,
   color,
   tracking: -0.05,
-  leading: 1
+  leading: DISPLAY_LEADING
 });
 const label = (color = MUTED) => ({
   font: FAMILY,
@@ -112,6 +113,7 @@ const HOLD = 4 * BEAT;
 const CLAIM_HOLD = 5 * BEAT;
 const CLAIM_SECONDS = (CLAIMS.length - 1) * HOLD + CLAIM_HOLD;
 const BURST_SECONDS = BEAT * 4 + 1.5;
+const BURST_PITCH = LINE * 1.5 * DISPLAY_LEADING;
 
 const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
   {
@@ -130,9 +132,9 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
         props: {
           text: w,
           ...word(LINE * 1.5, i === BURST.length - 1 ? ACCENT : PAPER),
-          y: 0.5 + (i - (BURST.length - 1) / 2) * 0.2,
+          y: 0.5 + (i - (BURST.length - 1) / 2) * BURST_PITCH,
           width: 0.92,
-          height: 0.2
+          height: BURST_PITCH
         },
         keys: punch(i === BURST.length - 1 ? 0.6 : PUNCH)
       }))
@@ -407,8 +409,8 @@ const LAUNCH_DESIGNS: Omit<Design, 'fonts'>[] = [
           ],
           opacity: [
             [0, 1, LINEAR],
-            [BEAT, 1, SNAP],
-            [BEAT * 1.6, 0.45, LINEAR]
+            [BEAT, 1, EASE_BEZIER[Ease.Standard]],
+            [BEAT * 2, 0.45, LINEAR]
           ]
         }
       },

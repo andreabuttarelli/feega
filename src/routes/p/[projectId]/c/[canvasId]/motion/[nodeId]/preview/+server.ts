@@ -5,7 +5,7 @@ import { composeHtml } from '$lib/motion/hyperframes/compose';
 import type { MotionPreview } from '$lib/canvas/motion-preview';
 import type { RequestHandler } from './$types';
 
-export const GET: RequestHandler = async ({ locals, params }) => {
+export const GET: RequestHandler = async ({ locals, params, url }) => {
   const scope = await motionScope(locals, params);
   const nodeId = scope.motion.record.id;
   const [head, tokens, assets] = await Promise.all([
@@ -17,7 +17,7 @@ export const GET: RequestHandler = async ({ locals, params }) => {
   const { doc } = head;
   const preview: MotionPreview = {
     version: head.version,
-    html: composeHtml({ doc, tokens, assets: assetUrls(assets) }),
+    html: composeHtml({ doc, tokens, assets: assetUrls(assets), origin: url.origin }),
     width: doc.width,
     height: doc.height,
     fps: doc.fps,

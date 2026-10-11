@@ -65,6 +65,8 @@ const RESTANO = [
   'list_layouts',
   'write_layout',
   'patch_layout',
+  'get_app_account',
+  'forget_app_account',
   'enhance_prompt',
   'run_node_loop',
   'preview_node_loop',

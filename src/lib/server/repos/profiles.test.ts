@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ensureProfile, profileFromAuthUser, recordTermsAcceptance } from '$lib/server/repos/profiles';
+import { TourWrite, ensureProfile, markTourSeen, profileFromAuthUser, readTourSeen, recordTermsAcceptance } from '$lib/server/repos/profiles';
 import { fakeDb } from '$lib/server/db/fake-db';
 import type { User } from '@supabase/supabase-js';
 
@@ -80,5 +80,50 @@ describe('l’accettazione dei termini si registra una volta', () => {
     const update = calls.find((c) => c.op === 'update')!;
     expect(update.payload).toMatchObject({ terms_version: '2026-09-30' });
     expect(update.filters).toEqual([['id', USER]]);
+  });
+});
+
+const MISSING_COLUMN = { code: '42703', message: 'column profiles.onboarding_seen_at does not exist' };
+const NOT_IN_CACHE = { code: 'PGRST204', message: "Could not find the 'onboarding_seen_at' column of 'profiles' in the schema cache" };
+
+function answering(result: { data?: unknown; error?: unknown }) {
+  const writes: unknown[] = [];
+  const outcome = { data: result.data ?? null, error: result.error ?? null };
+  const chain = {
+    select: () => chain,
+    update: (payload: unknown) => {
+      writes.push(payload);
+      return chain;
+    },
+    eq: () => chain,
+    maybeSingle: async () => outcome,
+    then: (resolve: (v: unknown) => unknown) => resolve(outcome)
+  };
+  return { db: { from: () => chain } as never, writes };
+}
+
+describe('il tour si ricorda per persona', () => {
+  it('legge quando è stato visto', async () => {
+    const { db } = answering({ data: { onboarding_seen_at: '2026-10-12T10:00:00Z' } });
+    expect(await readTourSeen(db, USER)).toEqual({ seenAt: '2026-10-12T10:00:00Z' });
+  });
+
+  it('senza colonna risponde null invece di fingere un mai visto', async () => {
+    expect(await readTourSeen(answering({ error: MISSING_COLUMN }).db, USER)).toBeNull();
+    expect(await readTourSeen(answering({ error: NOT_IN_CACHE }).db, USER)).toBeNull();
+  });
+
+  it('un altro errore non si nasconde', async () => {
+    await expect(readTourSeen(answering({ error: { code: '500', message: 'boom' } }).db, USER)).rejects.toBeTruthy();
+  });
+
+  it('segnarlo visto scrive la data', async () => {
+    const { db, writes } = answering({});
+    expect(await markTourSeen(db, USER)).toBe(TourWrite.Saved);
+    expect(writes[0]).toHaveProperty('onboarding_seen_at');
+  });
+
+  it('senza colonna segnarlo dice che non è stato salvato', async () => {
+    expect(await markTourSeen(answering({ error: NOT_IN_CACHE }).db, USER)).toBe(TourWrite.NoColumn);
   });
 });

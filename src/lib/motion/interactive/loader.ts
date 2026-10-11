@@ -41,9 +41,18 @@ export type LoaderConfig = {
 
 export const embedSnippet = (origin: string, id: string) => `<script src="${origin}/${LOADER_FILE}" async></script>\n<${EMBED_TAG} src="${id}"></${EMBED_TAG}>`;
 
-export function snippetOf(embedUrl: string): string {
+export const REACT_PACKAGE = '@feega/motion-react';
+export const FLUTTER_PACKAGE = 'feega_motion';
+
+export const reactSnippet = (origin: string, id: string) => `import { FeegaMotion } from '${REACT_PACKAGE}';\n\n<FeegaMotion id="${id}" origin="${origin}" />`;
+
+export const flutterSnippet = (origin: string, id: string) => `import 'package:${FLUTTER_PACKAGE}/${FLUTTER_PACKAGE}.dart';\n\nFeegaMotion(id: '${id}', origin: '${origin}')`;
+
+export const embedSnippets = (origin: string, id: string) => ({ snippet: embedSnippet(origin, id), react: reactSnippet(origin, id), flutter: flutterSnippet(origin, id) });
+
+export function snippetsOf(embedUrl: string): ReturnType<typeof embedSnippets> {
   const url = new URL(embedUrl);
-  return embedSnippet(url.origin, url.pathname.slice(url.pathname.lastIndexOf('/') + 1));
+  return embedSnippets(url.origin, url.pathname.slice(url.pathname.lastIndexOf('/') + 1));
 }
 
 export function loaderConfig(origin: string): LoaderConfig {
@@ -116,7 +125,11 @@ export function loaderMain(win: Window, cfg: LoaderConfig, host: typeof hostMain
       watchSelf(frame);
     },
     [cfg.sourceNames.ParentScroll]: (_el, frame) => host(frame, cfg.hostMessage, win.parent, win.frameElement as Element),
-    [cfg.sourceNames.Gesture]: (_el, frame) => frame.addEventListener('load', () => frame.contentWindow?.postMessage({ type: cfg.hostMessage, gesture: true }, '*'))
+    [cfg.sourceNames.Gesture]: (_el, frame) => {
+      const grant = () => frame.contentWindow?.postMessage({ type: cfg.hostMessage, gesture: true }, '*');
+      frame.addEventListener('load', grant);
+      grant();
+    }
   };
 
   const mount = async (el: HTMLElement) => {
@@ -133,10 +146,10 @@ export function loaderMain(win: Window, cfg: LoaderConfig, host: typeof hostMain
       el.style.position = 'relative';
     }
 
-    const settings = await settingsOf(id);
-    const source = settings.playback === cfg.scrub ? cfg.sources[kind] : null;
     const frame = frameOf(id, el.getAttribute('fit'));
     el.appendChild(frame);
+    const settings = await settingsOf(id);
+    const source = settings.playback === cfg.scrub ? cfg.sources[kind] : null;
 
     if (el.clientHeight === 0 && !el.style.height) {
       if (source === cfg.sourceNames.Story) {

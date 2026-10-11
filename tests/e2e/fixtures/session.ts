@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { test as base, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { purgeStorage, type StoragePort } from './storage-purge';
 
 /**
  * LA SESSIONE USA-E-GETTA CHE OGNI SPEC `@real` COSTRUISCE SOPRA. Stesso pattern di
@@ -22,8 +23,6 @@ export type E2eSession = {
   canvasId: string;
   canvasName: string;
 };
-
-const UPLOAD_BUCKET = 'canvas-assets';
 
 /** Abbondante per qualunque scenario reale della suite: una generazione di testo costa ~14 crediti. */
 export const E2E_ORG_CREDITS = 5000;
@@ -49,7 +48,14 @@ async function checked<T>(result: PromiseLike<{ data: T; error: { message: strin
  * `withCredits: false` è per l'unica spec che prova il rifiuto del cancello — il saldo zero è il
  * caso da provare in QUELLO scenario, non un default che ogni altra spec deve aggirare.
  */
-export async function createE2eSession(opts: { withCredits?: boolean } = {}): Promise<E2eSession> {
+export enum E2eTour {
+  Seen = 'seen',
+  Due = 'due'
+}
+
+export const TOUR_SEEN_KEY = 'feega:tour-seen';
+
+export async function createE2eSession(opts: { withCredits?: boolean; tour?: E2eTour } = {}): Promise<E2eSession> {
   const db = adminClient();
   const email = `e2e-shell-${randomUUID()}@feega.app`;
   const password = randomUUID();
@@ -66,6 +72,9 @@ export async function createE2eSession(opts: { withCredits?: boolean } = {}): Pr
   const canvasName = 'Prima tela';
 
   await checked(db.from('profiles').upsert({ id: userId, email, name: 'E2E shell' }));
+  if ((opts.tour ?? E2eTour.Seen) === E2eTour.Seen) {
+    await db.from('profiles').update({ onboarding_seen_at: new Date().toISOString() }).eq('id', userId);
+  }
   await checked(db.from('orgs').insert({ id: orgId, name: 'E2E shell', slug: `e2e-shell-${orgId}` }));
   await checked(db.from('orgs_members').insert({ org_id: orgId, user_id: userId, role: 'owner' }));
   await checked(db.from('projects').insert({ id: projectId, org_id: orgId, name: 'E2E project', slug: `e2e-project-${projectId}` }));
@@ -88,17 +97,22 @@ export async function createE2eSession(opts: { withCredits?: boolean } = {}): Pr
   return { userId, email, password, orgId, projectId, canvasId, canvasName };
 }
 
-/** Cancella nell'ordine giusto: la org porta via progetto e tela per cascata, lo Storage no —
- *  vive fuori da Postgres e va ripulito a parte, sul prefisso `${orgId}/${projectId}/`. L'utente
- *  resta per ultimo perché `auth.users` non è nello schema pubblico. */
+const LIST_PAGE = 1000;
+
+function storageOf(db: SupabaseClient): StoragePort {
+  return {
+    buckets: async () => ((await checked(db.storage.listBuckets())) ?? []).map((b) => b.name),
+    list: async (bucket, prefix) => ((await checked(db.storage.from(bucket).list(prefix, { limit: LIST_PAGE }))) ?? []).map((e) => ({ name: e.name, folder: e.id === null })),
+    remove: async (bucket, paths) => {
+      await checked(db.storage.from(bucket).remove(paths));
+    }
+  };
+}
+
 export async function teardownE2eSession(session: E2eSession): Promise<void> {
   const db = adminClient();
 
-  const { data: files } = await db.storage.from(UPLOAD_BUCKET).list(`${session.orgId}/${session.projectId}`);
-  if (files?.length) {
-    const paths = files.map((f) => `${session.orgId}/${session.projectId}/${f.name}`);
-    await db.storage.from(UPLOAD_BUCKET).remove(paths);
-  }
+  await purgeStorage(storageOf(db), [session.orgId, session.userId, `colours/${session.orgId}`]);
 
   await db.from('orgs').delete().eq('id', session.orgId);
   await db.auth.admin.deleteUser(session.userId);
@@ -143,7 +157,10 @@ export async function gotoHydrated(page: Page, path: string): Promise<import('@p
  * morto, non un errore di credenziali). `waitForResponse` aspetta il segnale vero — il POST che
  * `use:enhance` intercetta — non un'approssimazione temporale.
  */
-export async function signInE2e(page: Page, session: Pick<E2eSession, 'email' | 'password'>): Promise<void> {
+export async function signInE2e(page: Page, session: Pick<E2eSession, 'email' | 'password'>, tour: E2eTour = E2eTour.Seen): Promise<void> {
+  if (tour === E2eTour.Seen) {
+    await page.addInitScript((key) => localStorage.setItem(key, '1'), TOUR_SEEN_KEY);
+  }
   await gotoHydrated(page, '/login');
   await page.getByPlaceholder('you@yourbrand.com').fill(session.email);
   await page.locator('input[type="password"]').fill(session.password);

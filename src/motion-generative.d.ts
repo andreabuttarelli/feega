@@ -59,3 +59,8 @@ declare module 'clipper-lib' {
 	const ClipperLib: Record<string, unknown>;
 	export default ClipperLib;
 }
+
+declare module 'virtual:motion-libs' {
+	const integrity: Record<import('$lib/motion/libs/catalog').Script, string>;
+	export default integrity;
+}

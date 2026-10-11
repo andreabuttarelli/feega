@@ -8,6 +8,7 @@ import { EASE_BEZIER, easeCurve, type Bezier, type Keyframe } from './keyframes'
 import { motionEngine } from './engine/engine';
 import { loopSeam, tooDense } from './ui-morph/ops';
 import { uiOverload } from './ui-focus';
+import { PEAK_SHOTS } from './shots/library';
 import { DEFAULT_STYLE, MotionStyle, STYLE_EASES, type StyleEases } from './style-model';
 
 export enum Forbidden {
@@ -35,8 +36,14 @@ export enum Forbidden {
   TitleType = 'title-type'
 }
 
+export enum Script {
+  Required = 'required',
+  Free = 'free'
+}
+
 export type StyleSpec = {
   label: string;
+  script: Script;
   eases: StyleEases;
   seconds: { enter: [min: number, max: number]; stagger: number; exit: number; still: number; scene: [min: number, max: number] };
   movement: { rise: number; settle: number; blur: number; pushIn: number; turn: number };
@@ -79,6 +86,9 @@ const SCENES = new Set(['Custom', 'Device3D', 'Video', 'Model3D']);
 const SHARED_SECONDS = 0.5;
 const MAX_WORDS_PER_SECOND = 1;
 const TITLE_CARDS: readonly Forbidden[] = [Forbidden.TextOverScene, Forbidden.TooMuchText, Forbidden.TitleType];
+export const HOUSE_DEFAULTS: readonly Forbidden[] = [...TITLE_CARDS, Forbidden.Crowded];
+
+export const HOUSE_DEFAULTS_RULE = `House defaults yield to a look the user asks for or to the references they give or you viewed: the gates ${HOUSE_DEFAULTS.join(', ')}, the house type family and weight, little text and the minimal look. Then set_style graphic (or the closest style) and follow the references. Hard rules always hold: text on screen long enough to read, nothing clipped by accident (a deliberate bleed off the edge is declared with set_visibility bleed true), the brand logo intact.`;
 const CALM: readonly Forbidden[] = [Forbidden.WeakEase, Forbidden.Particles, Forbidden.Glow, Forbidden.Rotation, Forbidden.Bounce, Forbidden.FlyingText, Forbidden.Crowded, Forbidden.Transition, Forbidden.Still];
 
 export const TITLE_CARD_RULE =
@@ -90,12 +100,19 @@ export const TITLE_TYPE_RULE =
 export const UI_FOCUS_RULE =
   'One part of the UI at a time, as with words: a product act is a sequence of UI beats, each showing one element (or two that belong together) large in the frame, faithful to the real product UI, then moving on to the next. Example, a prompt being typed: zoom on the text field and the typed text → the button being pressed → the progress bar alone → the result. Build each beat with focus_ui on the anchors add_ui and recreate_ui return (isolate on: the part alone, masked, its box framed on the house ease); pass from beat to beat with a zoom or a shared-element morph (the same element changing size and place), never a cut to a new full screen. The whole screen appears at most briefly, as an establishing shot or at the end; never a busy dashboard held on screen. The ui-overload gate names a whole UI held more than 1.5 s and more than two UI pieces on screen at once.';
 
+export const GRAPHIC_REFERENCE_RULE =
+  'References lead: when the user gives or you viewed reference images, copy their composition and type scale, not only their colours: how big the largest type is relative to the frame and whether it bleeds off the edge, the grid and its rules, the columns of small text, where the blocks of colour sit, the ratio of big to small. In view_frames put each frame next to the reference it follows and fix the biggest difference first. Poster moves: one word or number cropped by the frame (size 0.8–1.2, a third of it outside, bleed true); 3–5 columns of small text (dates, places, numbers, 0.015–0.025) hung on the grid; hairline rules on the column lines; a flat block of the accent covering a third of the frame with type overprinting it; a word turned 90° along one edge.';
+
+export const SHOTS_RULE =
+  'Direct, do not lay out pixels: a trailer or product film is a sequence of premium shots from the library (list_shots, add_shot), each with its own camera move, secondary motion and holds, cut on the beat. First rebuild the real product UI with recreate_ui from the product url (its app screens, the page that shows the product). For a SaaS the product is the app behind its login, never the marketing site: ask the user in chat for a TEST account of the app, sign in with app_browse, then recreate_ui with the url of the logged-in screens (editor, dashboard, chat): it reuses that session. That vector UI, never a generic kit card, is what the device, focus, morph, before-after and whip shots show. A product film without the real UI is blocked by the gate. Each shot lasts 2–4 s; when words need longer, cut words, never stretch the shot. Raw primitives only for what no shot covers.';
+
 export const EASING_RULE =
   'Easing is strongly accentuated, with a soft settle: every entrance on enter (feega.out), every exit on exit (feega.in), every move on standard (feega.inOut, the default), an expo-like curve that lands with an almost imperceptible resistance (at most 1–2% past the mark, never a visible bounce). In code, tween with ease: \'feega.out\' / \'feega.inOut\' / \'feega.in\'; springs stay near critical damping. Linear only for a continuous drift, a loop or a driver tween; never sine, power1 or a plain ease; never bouncy or elastic (back, elastic, bounce, overshoot). The weak-ease gate names the rest.';
 
 export const STYLES: Record<MotionStyle, StyleSpec> = {
   [MotionStyle.LaunchFilm]: {
     label: 'Launch film',
+    script: Script.Required,
     eases: STYLE_EASES[MotionStyle.LaunchFilm],
     seconds: { enter: [0.2, 0.35], stagger: 0.06, exit: 0.2, still: 0.5, scene: [2, 5] },
     movement: { rise: 0.12, settle: 0.7, blur: 18, pushIn: 1.25, turn: 100 },
@@ -109,6 +126,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
     maxMoving: 4,
     rules: [
       'Launch film is the house style: the LOOK of an Apple keynote film, Linear, Vercel Ship or Stripe Sessions (few elements, very large type, the real product, a sober palette) with HIGH ENERGY. Minimal never means slow: the bar is "would a client pay for this?". Never a slideshow, a still picture, a slow fade, the same layout twice or a PowerPoint effect.',
+      SHOTS_RULE,
       TITLE_CARD_RULE,
       TITLE_TYPE_RULE,
       UI_FOCUS_RULE,
@@ -133,6 +151,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
   },
   [MotionStyle.AppleMinimal]: {
     label: 'Apple minimal',
+    script: Script.Free,
     eases: STYLE_EASES[MotionStyle.AppleMinimal],
     seconds: { enter: [0.3, 0.5], stagger: 0.1, exit: 0.4, still: 1, scene: [2, 4] },
     movement: { rise: 0.02, settle: 0.97, blur: 6, pushIn: 1.05, turn: 14 },
@@ -170,6 +189,7 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
   },
   [MotionStyle.UiMorph]: {
     label: 'UI morph reel',
+    script: Script.Free,
     eases: STYLE_EASES[MotionStyle.UiMorph],
     seconds: { enter: [0.2, 0.35], stagger: 0.05, exit: 0.15, still: 0.5, scene: [0.5, 2] },
     movement: { rise: 0, settle: 1, blur: 12, pushIn: 1, turn: 0 },
@@ -190,6 +210,29 @@ export const STYLES: Record<MotionStyle, StyleSpec> = {
       'Calm, never dense: one change every two beats or every bar from a downbeat, then a hold (at least 0.6 s) in which the state reads; energy comes from the quality of the movement, not from the number of events. 8 states over a longer loop beat 11 rushed ones. The cursor moves slowly on curves. The too-dense gate names events closer than 0.9 s.',
       'Analyze the music with mark_beats and set the reel offset to the first beat.',
       'The last frame flows into the first, cursor included: the reel spans the whole video and the loop-seam gate names anything that breaks the loop.'
+    ]
+  },
+  [MotionStyle.Graphic]: {
+    label: 'Graphic poster',
+    script: Script.Free,
+    eases: STYLE_EASES[MotionStyle.Graphic],
+    seconds: { enter: [0.2, 0.4], stagger: 0.06, exit: 0.2, still: 1, scene: [2, 4] },
+    movement: { rise: 0.08, settle: 0.8, blur: 8, pushIn: 1.1, turn: 90 },
+    type: { family: 'Inter Tight', weights: { display: 700, text: 500 }, sizes: { hero: 0.5, line: 0.12, small: 0.018 } },
+    palette: { ink: '#0a0a0a', paper: '#f2f0eb', muted: '#8b8b8b', accents: 1 },
+    junctions: [JunctionKind.Crossfade, JunctionKind.Wipe, JunctionKind.PushLeft, JunctionKind.PushRight],
+    entrances: [TransitionKind.None, TransitionKind.Fade, TransitionKind.SlideLeft, TransitionKind.SlideRight, TransitionKind.SlideUp],
+    reading: READING,
+    forbidden: [Forbidden.Particles, Forbidden.Glow, Forbidden.Bounce, Forbidden.WeakEase, Forbidden.ReadingTime],
+    pace: { minGap: 0.5, hold: 0.6 },
+    maxMoving: 3,
+    rules: [
+      'Graphic poster is for a look, poster or type exercise with no product to sell (Swiss, brutalist, editorial, a moodboard): every frame is a printed poster that moves. No script and no story acts: the references and the brief are the whole direction.',
+      GRAPHIC_REFERENCE_RULE,
+      'Type is the image: one word or number so large it bleeds off one or two edges (Title or Text 0.4–1.2 of the frame, x or y partly outside), set against small text (0.015–0.025) in narrow columns, captions and numbers on the grid. Declare every deliberate bleed with set_visibility bleed true, or the safe-area gate pushes it back in. Mix weights and widths as the references do; never everything in one size. Pick the face the references show with set_font, any Google family: a condensed or heavy grotesk (Archivo Narrow, Archivo Black, Anton, Oswald, Bebas Neue) for the giant word, a neo-grotesk (Inter Tight, Space Grotesk) for the small text.',
+      'A visible grid: thin rules (add_shape lines 2–6 px) on a column grid, blocks of flat colour aligned to it, text hung on its lines, generous margins only where the references keep them.',
+      EASING_RULE,
+      'Movement is graphic: blocks wipe in along the grid, giant type slides across the frame or is revealed by a mask, rules draw on; cut on the beat when there is music. Each layout holds long enough to read as a poster (1 s at least).'
     ]
   }
 };
@@ -356,7 +399,9 @@ const PEAK_SPANS: readonly { from: string; to: string; size: number }[] = [{ fro
 
 const spanned = (clip: Clip) => PEAK_SPANS.some(({ from, to, size }) => Math.abs(Number(clip.props[to] ?? 0) - Number(clip.props[from] ?? 0)) >= size);
 
-const peakOf = (clip: Clip) => spanned(clip) || Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);
+const peakShot = (clip: Clip) => clip.component === 'Custom' && [...PEAK_SHOTS].some((n) => String(clip.props.name ?? '').startsWith(n));
+
+const peakOf = (clip: Clip) => peakShot(clip) || spanned(clip) || Object.entries(PEAK_TRAVEL).some(([prop, size]) => travel(clip.keyframes[prop] ?? []) >= size);
 
 function noPeak(doc: MotionDoc): Found[] {
   const clips = timelines(doc).flat();
@@ -391,10 +436,23 @@ const words = (clip: Clip) => String(clip.props.text ?? '').split(/\s+/).filter(
 
 const readingTime = (n: number, spec: StyleSpec) => Math.max(spec.reading.perWord * n + spec.reading.base, n > 1 ? spec.reading.phrase : 0) + spec.reading.pause;
 
+const LONGEST_HOLD_S = 4;
+
+const wordsFor = (seconds: number, spec: StyleSpec) => Math.max(1, Math.floor((seconds - spec.reading.base - spec.reading.pause) / spec.reading.perWord + 1e-9));
+
+function readingAdvice(clip: Clip, spec: StyleSpec, fps: number): string {
+  const shown = Math.round((clip.durationInFrames / fps) * 10) / 10;
+  const need = readingTime(words(clip), spec);
+  if (need > LONGEST_HOLD_S) {
+    return `${clip.id} is on screen ${shown} s for ${words(clip)} words: no shot holds more than ${LONGEST_HOLD_S} s, so cut it to ${wordsFor(LONGEST_HOLD_S, spec)} words or fewer (or split it into two title cards), never stretch it`;
+  }
+  return `${clip.id} is on screen ${shown} s for ${words(clip)} words: it needs ${Math.round(need * 10) / 10} s to be read. Keep the words on screen (let them build the line and stay) and move the camera instead`;
+}
+
 function unreadable(clips: readonly Clip[], spec: StyleSpec, fps: number): Found[] {
   return clips
     .filter((c) => TEXT.has(c.component) && words(c) > 0 && c.durationInFrames / fps < readingTime(words(c), spec) - 1 / fps)
-    .map((clip) => ({ clip, at: clip.from, detail: `${clip.id} is on screen ${Math.round((clip.durationInFrames / fps) * 10) / 10} s for ${words(clip)} words: it needs ${Math.round(readingTime(words(clip), spec) * 10) / 10} s to be read. Keep the words on screen (let them build the line and stay) and move the camera instead` }));
+    .map((clip) => ({ clip, at: clip.from, detail: readingAdvice(clip, spec, fps) }));
 }
 
 const area = (clip: Clip) => Number(clip.props.width ?? 1) * Number(clip.props.height ?? 1);
@@ -503,5 +561,6 @@ export type StyleProblem = { effect: Forbidden; at: number; detail: string };
 
 export function styleProblems(doc: MotionDoc): StyleProblem[] {
   const spec = STYLES[styleOf(doc)];
-  return spec.forbidden.flatMap((effect) => CHECKS[effect](doc, spec).map((f) => ({ effect, at: Math.round((f.at / doc.fps) * 100) / 100, detail: f.detail })));
+  const yielded: ReadonlySet<Forbidden> = new Set(doc.referenceLook ? HOUSE_DEFAULTS : []);
+  return spec.forbidden.filter((effect) => !yielded.has(effect)).flatMap((effect) => CHECKS[effect](doc, spec).map((f) => ({ effect, at: Math.round((f.at / doc.fps) * 100) / 100, detail: f.detail })));
 }

@@ -303,6 +303,14 @@ on the cheapest model in the catalog, then the object is actually downloaded and
 counted. A bucket that exists and a policy that compiles are not the same claim as a file landing
 in it — `store_failed` can still come back for reasons neither of those catches.
 
+`npm run eval:motion -- --port=5199 [--only=<case>] [--compare=<run dir>] [--cap=20]` is the
+motion agent's quality eval: five fixed briefs (feega, linear, stripe, a Shopify demo store, a
+mobile app), each on a throwaway account, driven through the editor chat by Playwright, exported
+in the browser. Facts first (duration, holds, empty frames, text size, recreated vs kit UI, beat
+alignment, gate left, errors, cost from `ai_calls`), then a vision judge calibrated on anchor
+stills in `scripts/eval/motion-quality/anchors/`. Output in `~/Documents/feega-videos/evals/<ts>/`.
+Never on port 5173; ~$2.5 per case.
+
 **What does NOT exist, so nobody writes it in a report as if it had run:** `npm run eval`,
 `npm run eval:ux`, `npm run eval:durability`, `npm run eval:creative`, `npm run eval:clip` — the
 rubric/plan/post pipeline and the UGC clip renderer they walked are gone with the rest of the old

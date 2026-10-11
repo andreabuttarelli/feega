@@ -8,10 +8,14 @@
   import { keepDraft, keptDraft } from './chat-draft';
   import { chatSession, type ChatSession, type StreamData } from './chat-session.svelte';
   import { nextFollow, type Follow, type FollowEvent } from './chat-follow';
-  import { FAILURES, keyboardInset, speakerStarts } from './chat-view';
+  import { FAILURES, keyboardInset, speakerStarts, viewedHref } from './chat-view';
   import ChatComposer from './ChatComposer.svelte';
   import ChatMessage from './ChatMessage.svelte';
   import ScriptBrief from './ScriptBrief.svelte';
+  import ReferencePick from './ReferencePick.svelte';
+  import CutReview from './CutReview.svelte';
+  import { cutAnswer, pendingReview } from '$lib/motion/cut-review';
+  import { PickState, answerLabel, answerText, pickCards, rejectText, type Mark, type PickAsk } from '$lib/reference-pick';
   import { BRIEF_AUTO_GO_S, GO_MESSAGE, pendingBoard, pendingBrief } from '$lib/motion/script-brief';
   import ChatModelPicker from './ChatModelPicker.svelte';
   import { chatModelPrefs } from './chat-model-prefs.svelte';
@@ -86,8 +90,10 @@
   const suggestions = $derived(($json(`${copyKey}.suggestions`) as string[] | undefined) ?? []);
   const brief = $derived(motionNodeId && !busy ? pendingBrief(messages) : null);
   const pendingOutline = $derived(brief ? pendingBoard(messages) : null);
+  const review = $derived(motionNodeId && !busy ? pendingReview(messages) : null);
   const board = $derived(pendingOutline ? { href: `/p/${scopeProjectId}/c/${pendingOutline.canvasId}`, outline: pendingOutline.outline } : null);
   let editingBrief = $state(false);
+  const picks = $derived(pickCards(messages));
   const showEmpty = $derived(!loading && failed !== 'load' && !messages.length);
 
   $effect(() => {
@@ -200,6 +206,10 @@
     void session.send(text, 'append-user', attachments);
   }
 
+  function pick(ask: PickAsk, marks: Record<string, Mark>, note: string) {
+    send(answerText(ask, marks, note));
+  }
+
   function editBrief() {
     editingBrief = true;
     root?.querySelector('textarea')?.focus();
@@ -262,7 +272,7 @@
         {#each messages as message, i (i)}
           <ChatMessage
             role={message.role}
-            content={message.content}
+            content={message.role === 'user' ? answerLabel(message.content) : message.content}
             projectId={scopeProjectId}
             pending={message.pending}
             at={message.at}
@@ -273,12 +283,19 @@
             live={message.live}
             first={starts[i]}
           />
+          {@const card = picks.get(i)}
+          {#if card && !message.live && !message.pending}
+            <ReferencePick stored={(path) => viewedHref(path, scopeProjectId, canvasId)} card={busy && card.state === PickState.Waiting ? { ...card, state: PickState.Passed } : card} onpick={(marks, note) => pick(card.ask, marks, note)} onreject={(query, avoidAll) => send(rejectText(card.ask, query, avoidAll))} />
+          {/if}
         {/each}
 
         {#if brief}
           {#key brief}
             <ScriptBrief {brief} {board} seconds={BRIEF_AUTO_GO_S} held={editingBrief || !!draft.trim()} ongo={() => send(GO_MESSAGE)} onedit={editBrief} />
           {/key}
+        {/if}
+        {#if review}
+          <CutReview {review} sheetHref={review.sheet ? viewedHref(review.sheet, scopeProjectId, canvasId) : null} onanswer={(answer) => send(cutAnswer(answer, review.fixes))} />
         {/if}
       </div>
     </div>

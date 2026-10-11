@@ -50,6 +50,15 @@ const projectUpdate = (calls: ReturnType<typeof fakeDb>['calls']) =>
   calls.find((c) => c.table === 'projects' && c.op === 'update');
 
 describe('settings/project actions', () => {
+  it('forgetAppAccount cancella l\'account di test del progetto, solo della sua org', async () => {
+    const { db, calls } = fakeDb({ ...seed(), app_accounts: [{ project_id: PROJECT, org_id: ORG }] }, { filter: true });
+
+    const result = (await run('forgetAppAccount', {}, db)) as { forgotten: boolean };
+
+    expect(result.forgotten).toBe(true);
+    expect(calls.find((c) => c.table === 'app_accounts' && c.op === 'delete')?.filters).toEqual(expect.arrayContaining([['project_id', PROJECT], ['org_id', ORG]]));
+  });
+
   it('rename scrive il nome nuovo sul progetto della sua org', async () => {
     const { db, calls } = fakeDb(seed(), { filter: true });
 

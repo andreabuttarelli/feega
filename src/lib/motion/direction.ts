@@ -1,7 +1,7 @@
 import { COMPONENTS, TrackKind, type ComponentId } from './components';
 import { clipsOf, type MotionDoc } from './doc';
 import { DEVICE, Device } from './devices';
-import { Forbidden, styleOf, styleProblems } from './style';
+import { Forbidden, STYLES, Script, styleOf, styleProblems } from './style';
 import { MotionStyle } from './style-model';
 import { UI_KIT, UI_SAFE, uiScale } from './ui-kit/kit';
 import { sampleTrack } from './sample-track';
@@ -15,6 +15,10 @@ import { liveComponents, liveNote } from './custom/determinism';
 import { maskAt } from './ui-focus';
 import { MaskKind } from './mask';
 import { pivotBox } from './parent';
+import { LookMiss, lookProblems } from './reference-look';
+import { VECTOR_TOKEN } from './vector-ui/piece';
+import { structureOf } from './ui-kit/anchors';
+import { junctionProblem } from './junctions';
 
 export enum Quality {
   RepeatedLayout = 'repeated-layout',
@@ -39,7 +43,10 @@ export enum Quality {
   NoHold = 'no-hold',
   ScriptDrift = 'script-drift',
   BackgroundSeam = 'background-seam',
-  LiveScene = 'live-scene'
+  LiveScene = 'live-scene',
+  OffLook = 'off-look',
+  NoProductUi = 'no-product-ui',
+  DeadJunction = 'dead-junction'
 }
 
 export enum Severity {
@@ -47,7 +54,7 @@ export enum Severity {
   Blocking = 'blocking'
 }
 
-export type Check = Quality | Forbidden;
+export type Check = Quality | Forbidden | LookMiss;
 
 export const SEVERITY: Record<Check, Severity> = {
   [Quality.RepeatedLayout]: Severity.Warning,
@@ -59,7 +66,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.SoftPicture]: Severity.Blocking,
   [Quality.CroppedScreen]: Severity.Warning,
   [Quality.BrandLogoAltered]: Severity.Blocking,
-  [Quality.OutOfFrame]: Severity.Blocking,
+  [Quality.OutOfFrame]: Severity.Warning,
   [Quality.TiltedText]: Severity.Warning,
   [Quality.EmptyFrames]: Severity.Blocking,
   [Quality.TrailingEmpty]: Severity.Blocking,
@@ -73,6 +80,24 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.ScriptDrift]: Severity.Blocking,
   [Quality.BackgroundSeam]: Severity.Warning,
   [Quality.LiveScene]: Severity.Warning,
+  [Quality.OffLook]: Severity.Warning,
+  [Quality.NoProductUi]: Severity.Blocking,
+  [Quality.DeadJunction]: Severity.Blocking,
+  [LookMiss.Unrecorded]: Severity.Blocking,
+  [LookMiss.TypeScale]: Severity.Warning,
+  [LookMiss.TypeScaleGross]: Severity.Blocking,
+  [LookMiss.Bleed]: Severity.Blocking,
+  [LookMiss.Columns]: Severity.Warning,
+  [LookMiss.NoSmallText]: Severity.Blocking,
+  [LookMiss.TypeFamily]: Severity.Blocking,
+  [LookMiss.TypeFamilySmall]: Severity.Warning,
+  [LookMiss.TypeWeight]: Severity.Warning,
+  [LookMiss.TypeWeightGross]: Severity.Blocking,
+  [LookMiss.TypeTracking]: Severity.Warning,
+  [LookMiss.TypeLeading]: Severity.Warning,
+  [LookMiss.TypeCase]: Severity.Warning,
+  [LookMiss.TypeRoleMissing]: Severity.Warning,
+  [LookMiss.Rules]: Severity.Warning,
   [Forbidden.Particles]: Severity.Warning,
   [Forbidden.Glow]: Severity.Warning,
   [Forbidden.Rotation]: Severity.Warning,
@@ -99,7 +124,7 @@ export const SEVERITY: Record<Check, Severity> = {
 
 export type Pixels = Record<string, { width: number; height: number }>;
 
-export type QualityProblem = { kind: Quality; effect?: Forbidden; at?: number; detail: string };
+export type QualityProblem = { kind: Quality; effect?: Forbidden | LookMiss; at?: number; detail: string };
 
 export const severityOf = (p: QualityProblem) => SEVERITY[p.effect ?? p.kind];
 
@@ -175,7 +200,7 @@ function smallTitles(doc: MotionDoc): QualityProblem[] {
     .map((c) => ({ kind: Quality.SmallTitle, at: seconds(doc, c.from), detail: `title ${c.id} at ${seconds(doc, c.from)}s sits in a small box (${Math.round(num(c, 'width', 0.8) * 100)}% × ${Math.round(num(c, 'height', 0.4) * 100)}% of the frame): it reads small` }));
 }
 
-const SCORED: Record<MotionStyle, boolean> = { [MotionStyle.LaunchFilm]: true, [MotionStyle.AppleMinimal]: false, [MotionStyle.UiMorph]: true };
+const SCORED: Record<MotionStyle, boolean> = { [MotionStyle.LaunchFilm]: true, [MotionStyle.AppleMinimal]: false, [MotionStyle.UiMorph]: true, [MotionStyle.Graphic]: false };
 
 function silent(doc: MotionDoc, audioAssets: number): QualityProblem[] {
   const plays = doc.tracks.some((t) => t.kind === TrackKind.Audio && t.clips.length > 0);
@@ -311,7 +336,7 @@ function placedClips(doc: MotionDoc): Clip[] {
   const nested = top.flatMap((scene) => {
     const comp = scene.component === 'Precomp' ? doc.comps[String(scene.props.comp)] : undefined;
     const shift = scene.from - scene.trimStart;
-    return comp ? comp.tracks.flatMap((t) => (t.clips as Clip[]).map((c) => ({ ...c, from: c.from + shift }))) : [];
+    return comp ? comp.tracks.flatMap((t) => (t.clips as Clip[]).map((c) => ({ ...c, from: c.from + shift, bleed: c.bleed || scene.bleed }))) : [];
   });
   return [...top, ...nested];
 }
@@ -342,19 +367,19 @@ function outOfFrame(doc: MotionDoc): QualityProblem[] {
   const edge = Math.round(EDGE_SECONDS * doc.fps);
   return placedClips(doc).flatMap((clip) => {
     const size = contentSize(clip, frame);
-    if (!size) {
+    if (!size || clip.bleed) {
       return [];
     }
     const out = heldFrames(clip, edge).filter((f) => outside(clip, size, frame, f));
     if (out.length <= OUT_FRAMES_ALLOWED) {
       return [];
     }
-    return [{ kind: Quality.OutOfFrame, at: seconds(doc, clip.from + out[0]), detail: `${clip.id} leaves the safe area (5% from each edge) for ${out.length} frames from ${seconds(doc, clip.from + out[0])}s: keep scale moves small and slow, move the camera or the position instead, or shrink it (zoom, width)` }];
+    return [{ kind: Quality.OutOfFrame, at: seconds(doc, clip.from + out[0]), detail: `${clip.id} leaves the safe area (5% from each edge) for ${out.length} frames from ${seconds(doc, clip.from + out[0])}s: keep scale moves small and slow, move the camera or the position instead, or shrink it (zoom, width). If it runs off the edge on purpose (poster type, a full-bleed block), declare it: set_visibility bleed true` }];
   });
 }
 
 const EMPTY_SECONDS = 0.3;
-const TRAILING_SECONDS = 0.5;
+const TRAILING_SECONDS = 0.2;
 const FLASH_LUMA_JUMP = 200;
 
 function holes(shown: readonly boolean[]): Span[] {
@@ -382,6 +407,15 @@ function emptyFrames(doc: MotionDoc): QualityProblem[] {
   return holes(shown)
     .filter((h) => h.to < doc.durationInFrames && h.to - h.from > EMPTY_SECONDS * doc.fps)
     .map((h) => ({ kind: Quality.EmptyFrames, at: seconds(doc, h.from), detail: `from ${seconds(doc, h.from)}s to ${seconds(doc, h.to)}s only the background is on screen: an empty hole the viewer reads as a mistake. Close the gap (start the next scene or its content sooner) or fill it` }));
+}
+
+function deadJunctions(doc: MotionDoc): QualityProblem[] {
+  return doc.tracks
+    .flatMap((t) => (t.kind === TrackKind.Visual ? (t.clips as Clip[]) : []))
+    .flatMap((clip) => {
+      const problem = clip.junction ? junctionProblem(doc, clip.id) : null;
+      return problem ? [{ kind: Quality.DeadJunction, at: seconds(doc, clip.from), detail: `the ${clip.junction!.kind} transition into ${clip.id} at ${seconds(doc, clip.from)}s never plays, it is a hard cut: ${problem}` }] : [];
+    });
 }
 
 function trailingEmpty(doc: MotionDoc): QualityProblem[] {
@@ -455,7 +489,7 @@ function stillUis(doc: MotionDoc): QualityProblem[] {
 }
 
 function unscripted(doc: MotionDoc): QualityProblem[] {
-  return SCORED[styleOf(doc)] && !doc.script && everyClip(doc).length ? [{ kind: Quality.NoScript, detail: 'no research and script saved: for a launch film or trailer, write_script first (problem, struggle, flow, sourced proof, promise) and build that' }] : [];
+  return STYLES[styleOf(doc)].script === Script.Required && !doc.script && everyClip(doc).length ? [{ kind: Quality.NoScript, detail: 'no research and script saved: for a launch film or trailer, write_script first (problem, struggle, flow, sourced proof, promise) and build that' }] : [];
 }
 
 const CUT_QUALITY: Record<CutFault, Quality> = {
@@ -509,10 +543,25 @@ function liveScenes(doc: MotionDoc): QualityProblem[] {
   });
 }
 
-export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[] }): QualityProblem[] {
+const STORY_MARK = /^story: /;
+
+const realUi = (doc: MotionDoc, clip: Clip) => {
+  const js = clip.component === 'Custom' ? doc.components[String(clip.props.name)]?.source.js : undefined;
+  return Boolean(js && (VECTOR_TOKEN.test(js) || structureOf(js)));
+};
+
+function productUiMissing(doc: MotionDoc): QualityProblem[] {
+  const story = Boolean(doc.script) || (doc.markers ?? []).some((m) => STORY_MARK.test(m.label));
+  if (!story || everyClip(doc).some((c) => realUi(doc, c))) {
+    return [];
+  }
+  return [{ kind: Quality.NoProductUi, detail: 'this product film never shows the real product: rebuild its UI with recreate_ui from the product url (its app screens) and show it with add_shot (device-fly-in, ui-focus, ui-morph, before-after, whip-zoom); generic kit cards do not count' }];
+}
+
+export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
-  return [...unscripted(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail }))];
+  return [...unscripted(doc), ...productUiMissing(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...deadJunctions(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail })), ...lookProblems(doc, placedClips(doc), input.referencesSeen ?? false).map((p) => ({ kind: Quality.OffLook, effect: p.miss, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {

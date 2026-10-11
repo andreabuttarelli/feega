@@ -1,5 +1,5 @@
-import { createServer } from 'node:http';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createServer, type ServerResponse } from 'node:http';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { build } from 'vite';
@@ -12,6 +12,9 @@ import { CAPTURE_REQUEST, Layering } from '$lib/motion/hyperframes/capture';
 import type { MotionDoc } from '$lib/motion/doc';
 import { STATS_REPLY, STATS_REQUEST, withProbe, type BenchInput, type BenchResult, type ParityFrame, type ParityInput } from './probe';
 import base from '../vite-node.config';
+import { libraryPath } from '../motion-libs';
+import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
+import { MOTION_LIBS_ROUTE } from '$lib/motion/libs/catalog';
 
 const ENGINES: Record<string, BrowserType> = { chromium, webkit };
 const LAUNCH: Record<string, Parameters<BrowserType['launch']>[0]> = {
@@ -21,11 +24,12 @@ const LAUNCH: Record<string, Parameters<BrowserType['launch']>[0]> = {
 const OUT = resolve(process.env.BENCH_OUT ?? join(homedir(), 'Documents/feega-videos/bench'));
 const FRAME_TIMEOUT_MS = 3_600_000;
 
-type Args = { doc: string; engines: string[]; lanes: number[]; frames: number; keep: boolean; parity: boolean; live: boolean; strip: Set<string>; layering: Layering };
+type Args = { range: [number, number] | null; doc: string; engines: string[]; lanes: number[]; frames: number; keep: boolean; parity: boolean; live: boolean; strip: Set<string>; layering: Layering };
 
 function args(): Args {
   const flags = new Map(process.argv.slice(2).map((a) => a.replace(/^--/, '').split('=') as [string, string]));
   return {
+    range: flags.has('range') ? (String(flags.get('range')).split(',').map(Number) as [number, number]) : null,
     doc: flags.get('doc') ?? '',
     engines: (flags.get('engines') ?? 'chromium,webkit').split(','),
     lanes: (flags.get('lanes') ?? '4,1').split(',').map(Number),
@@ -49,13 +53,47 @@ async function hostBundle(): Promise<string> {
   return chunks.output[0].code ?? '';
 }
 
-function serve(script: string): Promise<{ url: string; close: () => void }> {
-  const page = `<!doctype html><html><body><div id="host" style="position:relative;width:1920px;height:1080px"></div><script src="/host.js"></script></body></html>`;
-  const server = createServer((req, res) => (req.url === '/host.js' ? res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8' }).end(script) : res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }).end(page)));
-  return new Promise((ok) => server.listen(0, '127.0.0.1', () => ok({ url: `http://127.0.0.1:${(server.address() as { port: number }).port}/`, close: () => server.close() })));
+const ROOT = resolve(import.meta.dirname, '../..');
+const HTTP_OK = 200;
+const HTTP_NOT_FOUND = 404;
+const TYPES: Record<string, string> = { js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json' };
+
+function library(pathname: string, res: ServerResponse) {
+  const file = libraryPath(ROOT, pathname);
+  if (!existsSync(file)) {
+    res.writeHead(HTTP_NOT_FOUND).end();
+    return;
+  }
+  const type = TYPES[file.split('.').pop() ?? ''] ?? 'text/plain; charset=utf-8';
+  res.writeHead(HTTP_OK, { 'content-type': type, 'access-control-allow-origin': '*' }).end(readFileSync(file));
 }
 
-function spread(total: number, count: number, fps: number): number[] {
+function serve(script: string): Promise<{ url: string; origin: string; close: () => void }> {
+  const page = `<!doctype html><html><body><div id="host" style="position:relative;width:1920px;height:1080px"></div><script src="/host.js"></script></body></html>`;
+  const server = createServer((req, res) => {
+    const pathname = new URL(req.url ?? '/', 'http://bench').pathname;
+    if (pathname.startsWith(MOTION_LIBS_ROUTE)) {
+      library(pathname, res);
+      return;
+    }
+    if (pathname === '/host.js') {
+      res.writeHead(HTTP_OK, { 'content-type': TYPES.js }).end(script);
+      return;
+    }
+    res.writeHead(HTTP_OK, { 'content-type': 'text/html; charset=utf-8' }).end(page);
+  });
+  return new Promise((ok) =>
+    server.listen(0, '127.0.0.1', () => {
+      const origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
+      ok({ url: `${origin}/`, origin, close: () => server.close() });
+    })
+  );
+}
+
+function spread(total: number, count: number, fps: number, range: [number, number] | null): number[] {
+  if (range) {
+    return Array.from({ length: range[1] - range[0] }, (_, i) => (range[0] + i) / fps);
+  }
   const n = count > 0 ? Math.min(count, total) : total;
   return Array.from({ length: n }, (_, i) => Math.floor((i * total) / n) / fps);
 }
@@ -70,15 +108,15 @@ function stripped<T extends Tracked>(doc: T, kinds: Set<string>): T {
   return { ...clean(doc), comps: Object.fromEntries(Object.entries(comps).map(([k, v]) => [k, clean(v)])) } as unknown as T;
 }
 
-const { doc: docPath, engines, lanes, frames, keep, parity, live, strip, layering } = args();
+const { range, doc: docPath, engines, lanes, frames, keep, parity, live, strip, layering } = args();
 const loaded = JSON.parse(readFileSync(docPath, 'utf8')) as { doc: MotionDoc; assets: Record<string, string> };
 const doc = stripped(loaded.doc as unknown as Tracked, strip) as unknown as MotionDoc;
 const assets = loaded.assets;
 const name = docPath.split('/').pop()?.replace('.json', '') ?? 'doc';
-const html = withProbe(composeHtml({ doc, tokens: FEEGA_TOKENS, assets }), CAPTURE_REQUEST, STATS_REQUEST, STATS_REPLY);
-const size = exportSize(doc, Resolution.P1080);
-const times = spread(doc.durationInFrames, frames, doc.fps);
 const server = await serve(await hostBundle());
+const html = withProbe(composeHtml({ doc, tokens: FEEGA_TOKENS, assets, origin: server.origin }), CAPTURE_REQUEST, STATS_REQUEST, STATS_REPLY);
+const size = exportSize(doc, Resolution.P1080);
+const times = spread(doc.durationInFrames, frames, doc.fps, range);
 mkdirSync(OUT, { recursive: true });
 
 if (parity) {
@@ -111,7 +149,7 @@ console.log('| doc | engine | lanes | frames | wall ms/frame | seek+settle | ser
 console.log('|---|---|---|---|---|---|---|---|---|---|---|');
 for (const engine of engines) {
   const browser = await ENGINES[engine].launch(LAUNCH[engine]);
-  for (const laneCount of lanes) {
+  for (const laneCount of lanes.map((l) => lanesWithin(l, webglPerLane(html)))) {
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     page.setDefaultTimeout(FRAME_TIMEOUT_MS);
     page.on('pageerror', (e) => console.error(engine, e.message));

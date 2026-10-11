@@ -1,3 +1,6 @@
+import { VECTOR_TOKEN } from '../vector-ui/piece';
+import type { VectorUi } from '../vector-ui/model';
+import { SHOT_NAMES } from '../shots/library';
 import { UI_KIT, UI_SAFE, UiKind, UI_STRUCTURE, type UiPiece, type UiSize, type UiStructure } from './kit';
 
 export type Rect = { x: number; y: number; w: number; h: number };
@@ -200,8 +203,22 @@ export function pieceAnchors(name: string, props: Props, js?: string): Placed | 
     const piece = UI_KIT[kind];
     return { size: piece.size, anchors: LAYOUTS[kind]({ ...defaultsOf(piece), ...props }) };
   }
+  const vector = js && !SHOT_NAMES.has(name) ? vectorAnchors(js) : null;
+  if (vector) {
+    return vector;
+  }
   const structure = js ? structureOf(js) : null;
   return structure ? { size: RECREATED_FRAME, anchors: recreatedAnchors(structure) } : null;
+}
+
+function vectorAnchors(js: string): Placed | null {
+  const found = VECTOR_TOKEN.exec(js);
+  if (!found) {
+    return null;
+  }
+  const ui = JSON.parse(found[1]) as Pick<VectorUi, 'width' | 'height' | 'nodes'>;
+  const anchors = Object.fromEntries(ui.nodes.map((n) => [n.id, { x: n.x - ui.width / 2, y: n.y - ui.height / 2, w: n.w, h: n.h }]));
+  return { size: { width: ui.width, height: ui.height }, anchors };
 }
 
 const RECREATED_FRAME: UiSize = { width: 1400, height: 860 };

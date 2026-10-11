@@ -43,15 +43,6 @@ async function seedAssets(session: E2eSession): Promise<void> {
   }
 }
 
-async function removeExports(session: E2eSession): Promise<void> {
-  const root = `${session.orgId}/${session.projectId}/motion`;
-  const { data: nodes } = await admin.storage.from(BUCKET).list(root);
-  for (const node of nodes ?? []) {
-    const { data: files } = await admin.storage.from(BUCKET).list(`${root}/${node.name}`);
-    await admin.storage.from(BUCKET).remove((files ?? []).map((f) => `${root}/${node.name}/${f.name}`));
-  }
-}
-
 async function newVideo(page: Page, name: string): Promise<void> {
   await page.goto(`${BASE_URL}/app/motion`);
   await page.waitForLoadState('networkidle');
@@ -64,6 +55,7 @@ async function newVideo(page: Page, name: string): Promise<void> {
 
 async function exportMp4(page: Page, scenario: Scenario): Promise<string> {
   await page.getByTestId('export-open').click();
+  await page.getByTestId('export-mode-video').click();
   await page.getByTestId('export-start').click();
   const download = page.getByTestId('export-download');
   await download.waitFor({ timeout: EXPORT_TIMEOUT_MS });
@@ -105,7 +97,7 @@ async function run(scenario: Scenario, page: Page): Promise<void> {
   if (scenario.chat) {
     await chat(page, scenario.chat);
   }
-  await page.getByTestId('save-state').filter({ hasText: 'Saved' }).waitFor();
+  await page.getByRole('status', { name: /^Saved/ }).waitFor();
   await page.screenshot({ path: join(OUT, `${scenario.name}-editor.png`) });
   const file = await exportMp4(page, scenario);
   console.log(`[${scenario.name}] exported ${basename(file)}`);
@@ -137,7 +129,6 @@ async function main() {
   } finally {
     writeFileSync(join(OUT, 'console-errors.txt'), errors.join('\n'));
     await browser.close();
-    await removeExports(session);
     await teardownE2eSession(session);
   }
 }

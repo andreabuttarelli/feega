@@ -18,6 +18,17 @@ export function laneCount(info: DeviceInfo, engine: Engine): number {
   return engine === Engine.WebKit ? 1 : LANES_OF[deviceOf(info)](info.cores);
 }
 
+export type LaneVisibility = 'hidden' | 'visible';
+
+const VISIBILITY_OF: Record<Engine, LaneVisibility> = {
+  [Engine.WebKit]: 'hidden',
+  [Engine.Other]: 'visible'
+};
+
+export function laneVisibility(engine: Engine): LaneVisibility {
+  return VISIBILITY_OF[engine];
+}
+
 export async function shootInLanes<F>(times: number[], lanes: Shooter<F>[], onFrame: (frame: F, index: number) => Promise<void>, signal: AbortSignal): Promise<void> {
   const ready = new Map<number, F>();
   const window = lanes.length * AHEAD_PER_LANE;

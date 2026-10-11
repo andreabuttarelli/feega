@@ -1,0 +1,38 @@
+{
+ "success": true,
+ "credits_charged": 1,
+ "videos": [
+  {
+   "type": "video",
+   "id": "OIAWkkSO4WY",
+   "url": "https://www.youtube.com/watch?v=OIAWkkSO4WY",
+   "title": "Claude Opus 5.5 Is INSANE at Motion Graphics",
+   "thumbnail": "https://i.ytimg.com/vi/OIAWkkSO4WY/hq720.jpg?sqp=-oaymwEnCNAFEJQDSFryq4qpAxkIARUAAIhCGAHYAQHiAQoIGBACGAY4AUAB&rs=AOn4CLB9jn8CHYUuW3BGx3bIhJCV7V14JA",
+   "channel": {
+    "id": "UCuyTqd701wPfaLRJY2C_4_A",
+    "title": "RandomAI",
+    "handle": "RandomAI_ss",
+    "thumbnail": "https://yt3.ggpht.com/7XqvJe6KRh81mxw1HD_I2DVxJTPyt3yYm0CQB4dsS8rpVZNCNVaixsN7rdqf_tdGK-7y2mQ1=s68-c-k-c0x00ffffff-no-rj"
+   },
+   "viewCountInt": 181925,
+   "publishedTime": "2026-10-03T10:32:58.936Z",
+   "lengthSeconds": 710
+  },
+  {
+   "type": "video",
+   "id": "ldlBhg1c1Gw",
+   "url": "https://www.youtube.com/watch?v=ldlBhg1c1Gw",
+   "title": "Le Motion Design, c'est quoi ?",
+   "thumbnail": "https://i.ytimg.com/vi/ldlBhg1c1Gw/hq720.jpg?sqp=-oaymwEnCNAFEJQDSFryq4qpAxkIARUAAIhCGAHYAQHiAQoIGBACGAY4AUAB&rs=AOn4CLBjhgrI-mKQOlTqN7y24ZqV90mmrA",
+   "channel": {
+    "id": "UCigyM5eUGUg6_P7ach_oLJg",
+    "title": "REDFOX",
+    "handle": "redfox-channel",
+    "thumbnail": "https://yt3.ggpht.com/DViVwph_uBjCTF5sbWgQnRlGLErpvEwBmY5wLTGqqlgBplW4yaPcaHdKrcm6z6wuR4I0VLJk=s68-c-k-c0x00ffffff-no-rj"
+   },
+   "viewCountInt": 36088,
+   "publishedTime": "2018-10-10T10:32:58.936Z",
+   "lengthSeconds": 107
+  }
+ ]
+}

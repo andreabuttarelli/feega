@@ -4,6 +4,7 @@ import { COMPONENTS, Control, TrackKind } from '$lib/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
 import type { MotionDoc } from '$lib/motion/doc';
 import { blocking, type QualityProblem } from '$lib/motion/direction';
+import { REFERENCE_TOOLS } from '$lib/server/web/web-tools';
 
 export const VIEW_FRAMES = 'view_frames';
 export const MAX_FRAMES_PER_VIEW = 6;
@@ -53,23 +54,28 @@ export function keyFrameTimes(doc: MotionDoc, max = SELF_CHECK_FRAMES): number[]
 
 const FRAMES_ASK = 'Look for clipped or overflowing text, overlaps, poor contrast and anything outside the safe area.';
 
-function framesOutput(output: unknown, frames: readonly Frame[] = []) {
+function framesOutput(output: unknown, frames: readonly Frame[] = [], refs: readonly Reference[] = []) {
   if (!frames.length) {
     return { type: 'json' as const, value: output as never };
   }
+  const picture = (mediaType: string, data: string) => ({ type: 'file' as const, mediaType, data: { type: 'data' as const, data } });
+  const compared = refs.length ? [{ type: 'text' as const, text: REFERENCE_ASK }, ...refs.map((r) => picture(r.mediaType, r.data))] : [];
   return {
     type: 'content' as const,
     value: [
       { type: 'text' as const, text: JSON.stringify(output) },
       { type: 'text' as const, text: `Frames, in order, at ${frames.map((f) => `${f.time}s`).join(', ')}. ${FRAMES_ASK}` },
-      ...frames.map((f) => ({ type: 'file' as const, mediaType: 'image/jpeg', data: { type: 'data' as const, data: f.bytes.toString('base64') } }))
+      ...frames.map((f) => picture('image/jpeg', f.bytes.toString('base64'))),
+      ...compared
     ]
   };
 }
 
-export function withFrames(tools: Record<string, Tool>, frames: ReadonlyMap<string, Frame[]>): Record<string, Tool> {
+export type FramedSession = { frames: ReadonlyMap<string, Frame[]>; references?: readonly Reference[] };
+
+export function withFrames(tools: Record<string, Tool>, session: FramedSession): Record<string, Tool> {
   return Object.fromEntries(
-    Object.entries(tools).map(([name, t]) => [name, t.toModelOutput ? t : { ...t, toModelOutput: ({ toolCallId, output }: { toolCallId: string; output: unknown }) => framesOutput(output, frames.get(toolCallId)) }])
+    Object.entries(tools).map(([name, t]) => [name, t.toModelOutput ? t : { ...t, toModelOutput: ({ toolCallId, output }: { toolCallId: string; output: unknown }) => framesOutput(output, session.frames.get(toolCallId), session.references) }])
   );
 }
 
@@ -169,12 +175,51 @@ export function selfCheckPrompt(times: number[]): string {
   return `Self-check: call ${VIEW_FRAMES} with times [${times.join(', ')}] and look at the result. If text is clipped or overflows, overlaps another element, has poor contrast or leaves the safe area, or the result lists quality problems, fix them with the editing tools; otherwise change nothing. Then, as your last message, ${SUMMARY_ASK}`;
 }
 
+export const MAX_SELF_CHECK_REFS = 3;
+
+const REFERENCE_ASK =
+  'The pictures after the frames are the references you looked at this turn. Set each frame next to the reference it follows and write the difference in one line per frame: type scale (the largest type as a share of the frame height, here and there), edge bleed (does the big type run off the edge?), grid and rules, columns of small text, where the blocks of colour sit. Then the typographic diff per role (display title, headline, body, labels, numbers), here and there: family (class and face), weight, tracking, leading (line gap against the cap height), case, alignment. Colour alone is not a match. Fix the biggest differences first, with the editing tools; a deliberate bleed off the edge is declared with set_visibility bleed true.';
+
+export type Reference = { mediaType: string; data: string };
+
+export function viewedReferences(messages: readonly ModelMessage[], max = MAX_SELF_CHECK_REFS): Reference[] {
+  const seen = messages.flatMap((m) =>
+    m.role !== 'tool'
+      ? []
+      : m.content.flatMap((part) => {
+          if (part.type !== 'tool-result' || !REFERENCE_TOOLS.has(part.toolName) || part.output.type !== 'content') {
+            return [];
+          }
+          return part.output.value.flatMap((v) => (v.type === 'file' && v.data.type === 'data' && typeof v.data.data === 'string' ? [{ mediaType: v.mediaType, data: v.data.data }] : []));
+        })
+  );
+  return seen.slice(-max);
+}
+
+export function checkMessage(errors: readonly QualityProblem[], times: number[]): ModelMessage {
+  return { role: 'user', content: errors.length ? fixPrompt(errors, times) : selfCheckPrompt(times) };
+}
+
 export function fixPrompt(errors: readonly QualityProblem[], times: number[]): string {
   return `Not deliverable yet: the quality gate still finds these errors in the video:\n${errors.map((e) => `- ${e.detail}`).join('\n')}\nFix each one with the editing tools, then call ${VIEW_FRAMES} with times [${times.join(', ')}] to check again. Then, as your last message, ${SUMMARY_ASK}`;
 }
 
 export function stillOpenNote(errors: readonly QualityProblem[]): string {
   return errors.length ? `\n\nStill open after the last check, not fixed:\n${errors.map((e) => `- ${e.detail}`).join('\n')}` : '';
+}
+
+const PARAGRAPH = /\n\s*\n/;
+const QUESTION = /\?\s*$/;
+
+export function finalReply(texts: readonly string[], errors: readonly QualityProblem[]): string {
+  const last = [...texts].reverse().find((t) => t.trim())?.trim() ?? '';
+  const note = stillOpenNote(errors).trim();
+  if (!note) {
+    return last;
+  }
+  const paragraphs = last.split(PARAGRAPH);
+  const ask = paragraphs.length > 1 && QUESTION.test(last) ? paragraphs.pop()! : '';
+  return [paragraphs.join('\n\n'), note, ask].filter(Boolean).join('\n\n');
 }
 
 export const SUMMARY_PROMPT = `The turn is over: ${SUMMARY_ASK}`;

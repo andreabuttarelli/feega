@@ -10,6 +10,7 @@ import { unverified } from '$lib/motion/custom/determinism';
 import { exportFolder, exportPath, outputSize } from '$lib/motion/export-plan';
 import { composeHtml, HYPERFRAMES_VERSION, type ComposeInput } from '$lib/motion/hyperframes/compose';
 import { assetOrigins } from '$lib/motion/hyperframes/csp';
+import { libsOrigin } from './libs-origin';
 import { audioPlan } from '$lib/motion/audio-plan';
 import { holdCredits, releaseCredits, splitPortions, type Portion } from '$lib/server/credit-hold';
 import { checkTask, FarmTask, farmChunks, farmProblem, firstSlices, framesOf, halves, launchAssembly, launchPiece, MAX_ATTEMPTS, pieceFile, stopWorker, TaskState, WORKER_GONE, type FarmJob, type Slice, type TaskCheck } from './farm-render';
@@ -65,10 +66,11 @@ const ORPHAN_GRACE_MS = 3 * 60_000;
 
 export function farmJob(input: ComposeInput, settings: RenderSettings): FarmJob {
   const { doc, tokens, assets } = input;
-  const reachable = assetOrigins([...Object.values(assets), tokens.logoUrl ?? '']);
+  const origin = input.origin ?? libsOrigin();
+  const reachable = assetOrigins([origin, ...Object.values(assets), tokens.logoUrl ?? '']);
   const out = outputSize(doc, settings.resolution);
   return {
-    html: composeHtml({ ...input, scale: out.scale }),
+    html: composeHtml({ ...input, origin, scale: out.scale }),
     width: out.width,
     height: out.height,
     fps: doc.fps,

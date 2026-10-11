@@ -4,7 +4,8 @@ import type { EaseSpec } from './keyframes';
 export enum MotionStyle {
   LaunchFilm = 'launch-film',
   AppleMinimal = 'apple-minimal',
-  UiMorph = 'ui-morph'
+  UiMorph = 'ui-morph',
+  Graphic = 'graphic'
 }
 
 export const MOTION_STYLES = Object.values(MotionStyle) as [MotionStyle, ...MotionStyle[]];
@@ -17,5 +18,6 @@ const HOUSE_EASES: StyleEases = { enter: Ease.Enter, move: Ease.Standard };
 export const STYLE_EASES: Record<MotionStyle, StyleEases> = {
   [MotionStyle.LaunchFilm]: HOUSE_EASES,
   [MotionStyle.AppleMinimal]: HOUSE_EASES,
-  [MotionStyle.UiMorph]: HOUSE_EASES
+  [MotionStyle.UiMorph]: HOUSE_EASES,
+  [MotionStyle.Graphic]: HOUSE_EASES
 };

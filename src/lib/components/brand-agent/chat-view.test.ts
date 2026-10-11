@@ -86,6 +86,12 @@ describe('pictures the agent looked at', () => {
     expect(out).toEqual([{ href: '/p/p1/c/c1/web-views/v1/0.jpg', source: 'https://a.example/x.png' }]);
   });
 
+  it('shows the cover and frames of a video the agent watched', () => {
+    const watched = { toolName: 'view_video_frames', status: 'done' as const, output: { ok: true, images: [{ url: 'https://v.example/c.jpg', path: 'o/p1/web-views/f1/cover.jpg' }, { url: 'https://v.example/v.mp4', path: 'o/p1/web-views/f1/50.jpg' }] } };
+
+    expect(viewedPicturesOf(watched, 'p1', 'c1').map((p) => p.href)).toEqual(['/p/p1/c/c1/web-views/f1/cover.jpg', '/p/p1/c/c1/web-views/f1/50.jpg']);
+  });
+
   it('shows nothing without a canvas or for other tools', () => {
     expect(viewedPicturesOf(call([{ url: 'u', path: 'o/p/web-views/v/0.jpg' }]), 'p1', '')).toEqual([]);
     expect(viewedPicturesOf({ toolName: 'read_page', output: { images: [{ path: 'o/p/web-views/v/0.jpg' }] } }, 'p1', 'c1')).toEqual([]);

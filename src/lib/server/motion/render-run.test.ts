@@ -505,11 +505,12 @@ describe('cancelRender', () => {
 });
 
 describe('farmJob', () => {
-  it('the sandbox may reach the hosts of the signed assets and of the brand logo, nothing else', () => {
+  it('the sandbox may reach our origin for the libraries and the hosts of the signed assets and of the brand logo, nothing else', () => {
     const tokens = { ...FEEGA_TOKENS, logoUrl: 'https://media.example.com/logo.png' };
     const job = farmJob({ doc: trailer(), tokens, assets: { a: 'https://x.supabase.co/storage/v1/object/sign/a?token=t', b: 'https://x.supabase.co/b' } }, settingsOf(Preset.Social));
 
-    expect(job.allowHosts).toEqual(['media.example.com', 'x.supabase.co']);
+    expect(job.allowHosts).toEqual(['feega.app', 'media.example.com', 'x.supabase.co']);
+    expect(job.html).not.toContain('jsdelivr.net/npm');
     expect([job.width, job.height, job.fps, job.totalFrames]).toEqual([1920, 1080, 30, 840]);
     expect(job.html).toContain('<html');
   });

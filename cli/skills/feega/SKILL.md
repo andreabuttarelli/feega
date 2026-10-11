@@ -146,6 +146,8 @@ Custom composition layouts: `write_layout` writes a spec layout (placement, slot
 workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists them; ask
 `ask_motion_agent` to arrange a composition on one.
 
+Test app account: the project chat logs in to the user's own app with a TEST account the user gives it in chat, and photographs its screens. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
+
 ## Loop a node over many combinations
 
 `run_node_loop` queues every combination from a node's `iterate` wires (or a plain "repeat N")
@@ -185,7 +187,8 @@ It fills 100% of the box the site gives it (`fit="contain"` to show it all); wit
 it takes the video ratio, or a viewport for scrub. Scrub builds its own sticky scroll story of
 the video's scroll length. Live components (games, generative pieces) run live there; a video
 shows a still of them. Publishing again updates it in place, `action: "unpublish"` takes it
-down. Uncensored projects are refused.
+down. Uncensored projects are refused. It also returns `react` and `flutter` snippets: the
+same player inside a React (`@feega/motion-react`) or Flutter (`feega_motion`) app.
 `get_motion_embed` reads the state. The self-contained HTML (no hosting):
 `feega motion embed <nodeId> --download page.html`.
 

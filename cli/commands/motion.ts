@@ -4,7 +4,7 @@ import { loadSession } from '../lib/auth.ts';
 import { awaitRun, motionApi, type MotionRun, type RenderStart } from '../lib/motion.ts';
 import { attachmentSource } from '../lib/attachments.ts';
 
-type AskOpts = { org?: string; wait?: boolean; attach?: string[] };
+type AskOpts = { org?: string; wait?: boolean; attach?: string[]; follow?: string[]; avoid?: string[]; note?: string; reject?: string | boolean; avoidAll?: boolean };
 
 async function token(): Promise<string> {
   const session = await loadSession();
@@ -21,7 +21,12 @@ export async function cmdMotionAsk(nodeId: string, prompt: string, opts: AskOpts
 
 export async function askAndReport(bearer: string, nodeId: string, prompt: string, opts: AskOpts) {
   const attachments = await Promise.all((opts.attach ?? []).map(attachmentSource));
-  const started = await motionApi.ask(bearer, nodeId, prompt, opts.org, attachments);
+  const rejected = opts.reject !== undefined && opts.reject !== false;
+  const picked = rejected || opts.follow?.length || opts.avoid?.length;
+  const marks = { follow: opts.follow ?? [], avoid: opts.avoid ?? [], ...(opts.note ? { note: opts.note } : {}) };
+  const rejection = rejected ? { rejected: true, query: typeof opts.reject === 'string' ? opts.reject : '', avoid_all: opts.avoidAll === true } : {};
+  const pick = picked ? { ...marks, ...rejection } : undefined;
+  const started = await motionApi.ask(bearer, nodeId, prompt, opts.org, attachments, pick);
   printRun(opts.wait === false ? started : await awaitRun(bearer, started, { org: opts.org }));
 }
 
@@ -39,6 +44,16 @@ function printRun(run: MotionRun) {
   }
   if (run.cost_usd !== undefined && run.cost_usd !== null) {
     console.log(`  cost     $${run.cost_usd.toFixed(4)}`);
+  }
+  if (run.reference_pick) {
+    console.log(`  ${run.reference_pick.question}`);
+    run.reference_pick.candidates.forEach((c) => console.log(`  ${c.id}  ${c.image}${c.why ? `  ${c.why}` : ''}`));
+    console.log(`Answer: feega motion ask ${run.node_id ?? '<nodeId>'} "" --follow <ids...> --avoid <ids...>`);
+  }
+  if (run.cut_review) {
+    console.log(`  critic ${run.cut_review.score}/10`);
+    run.cut_review.fixes.forEach((f) => console.log(`  - ${f}`));
+    console.log(`Apply: feega motion ask ${run.node_id ?? '<nodeId>'} ${JSON.stringify(run.cut_review.answers.apply)}`);
   }
   if (run.error) {
     console.error(run.error);
@@ -126,6 +141,12 @@ export async function embedAndReport(bearer: string, nodeId: string, opts: Embed
   console.log(state.published ? `Published: ${state.url}` : `Not published. It would live at ${state.url}`);
   if (state.snippet) {
     console.log(state.snippet);
+  }
+  if (state.react) {
+    console.log(`\nReact:\n${state.react}`);
+  }
+  if (state.flutter) {
+    console.log(`\nFlutter:\n${state.flutter}`);
   }
 }
 

@@ -2,7 +2,7 @@ import { env as publicEnv } from '$env/dynamic/public';
 import type { Db } from '$lib/server/db/client';
 import { embedRefusal, type PublishRefusal } from '$lib/gallery/refusals';
 import type { ProjectMode } from '$lib/project-mode';
-import { embedSettings, embedUrl, interactiveBundle, upgradePlayer, type InteractiveInput } from '$lib/motion/interactive/bundle';
+import { embedSettings, embedSource, embedUrl, hostedPage, upgradePlayer, type InteractiveInput } from '$lib/motion/interactive/bundle';
 import { embedSnippet, type EmbedSettings } from '$lib/motion/interactive/loader';
 import { assetOf, hostAssets, type HostedAsset } from './embed-assets';
 
@@ -41,8 +41,7 @@ export async function publishEmbed(db: Db, input: EmbedPublish, origin = embedOr
     return refusal;
   }
 
-  const bundle = await interactiveBundle(input);
-  const stored = await storeEmbed(db, input.nodeId, bundle.html);
+  const stored = await storeEmbed(db, input.nodeId, await embedSource(input));
   if (!stored.ok) {
     return stored;
   }
@@ -84,9 +83,19 @@ async function storedEmbed(fetchFn: typeof fetch, id: string): Promise<string | 
 
 export const assetBase = (origin: string, id: string) => `${embedUrl(origin, id)}/a`;
 
-export async function readEmbed(fetchFn: typeof fetch, id: string, origin: string): Promise<string | null> {
+export type HostedEmbed = { html: string; legacy: boolean };
+
+export async function readHostedEmbed(fetchFn: typeof fetch, id: string, origin: string): Promise<HostedEmbed | null> {
   const page = await storedEmbed(fetchFn, id);
-  return page === null ? null : hostAssets(upgradePlayer(page) ?? page, assetBase(origin, id));
+  if (page === null) {
+    return null;
+  }
+  const hosted = hostedPage(page, origin);
+  return { html: hostAssets(hosted ?? upgradePlayer(page, origin) ?? page, assetBase(origin, id)), legacy: hosted === null };
+}
+
+export async function readEmbed(fetchFn: typeof fetch, id: string, origin: string): Promise<string | null> {
+  return (await readHostedEmbed(fetchFn, id, origin))?.html ?? null;
 }
 
 export async function readEmbedAsset(fetchFn: typeof fetch, id: string, hash: string): Promise<HostedAsset | null> {

@@ -42,6 +42,14 @@ describe('the hosted embed loader', () => {
     expect(frame.getAttribute('loading')).toBe('lazy');
   });
 
+  it('starts the video before its settings arrive', () => {
+    window.fetch = vi.fn(() => new Promise<Response>(() => {})) as never;
+    document.body.innerHTML = `<feega-motion src="${ID}"></feega-motion>`;
+    loaderMain(window, loaderConfig(ORIGIN), hostMain);
+
+    expect(document.querySelector('feega-motion iframe')).not.toBeNull();
+  });
+
   it('opens the connection to feega before the iframe asks for it', async () => {
     await load(`<feega-motion src="${ID}"></feega-motion>`);
     const hint = document.head.querySelector('link[rel="preconnect"]') as HTMLLinkElement;

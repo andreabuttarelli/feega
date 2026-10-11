@@ -9,6 +9,7 @@ import Scale from '@lucide/svelte/icons/scale';
 import SunMoon from '@lucide/svelte/icons/sun-moon';
 import LogOut from '@lucide/svelte/icons/log-out';
 import Shuffle from '@lucide/svelte/icons/shuffle';
+import CircleHelp from '@lucide/svelte/icons/circle-help';
 import { GALLERY_PATH } from '$lib/gallery/paths';
 import { TOOLS, TOOL_STATUS_LABEL, ToolRole, toolHref } from '$lib/tools';
 import { TOOL_ICONS } from '$lib/components/app/tool-icons';
@@ -25,6 +26,7 @@ export enum NavKind {
   Link = 'link',
   Legal = 'legal',
   Theme = 'theme',
+  Tour = 'tour',
   Logout = 'logout'
 }
 
@@ -102,6 +104,7 @@ export const APP_NAV: readonly NavItem[] = [
   row({ id: 'billing', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.billing' }, icon: CreditCard, meta: NavMeta.Credits, href: () => BILLING_PATH }),
   row({ id: 'changelog', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.changelog' }, icon: Sparkles, load: NavLoad.Document, href: () => '/changelog' }),
   row({ id: 'report', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.report' }, icon: Flag, href: () => REPORT_PATH }),
+  row({ id: 'tour', section: NavSection.Account, kind: NavKind.Tour, label: { text: 'How feega works' }, icon: CircleHelp }),
   row({ id: 'legal', section: NavSection.Account, kind: NavKind.Legal, label: { key: 'legal.menuLabel' }, icon: Scale }),
   row({ id: 'theme', section: NavSection.Account, kind: NavKind.Theme, label: { text: 'Theme' }, icon: SunMoon }),
   row({ id: 'logout', section: NavSection.Account, kind: NavKind.Logout, label: { key: 'app.shell.menu.logout' }, icon: LogOut })

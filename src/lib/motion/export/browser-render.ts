@@ -2,6 +2,7 @@ import type { MotionDoc } from '../doc';
 import { audioPlan } from '../audio-plan';
 import { frameTimes, samplesPerFrame, type Size } from '../export-plan';
 import { encodeMp4, mixAudio } from './encode';
+import { docCuts, joltMeter, type JoltAt } from '../smoothness';
 import { keepAwake, visibleGate, type Page, type WakeLockHost } from './stay-awake';
 
 export type FrameSource = (times: number[], size: Size, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal) => Promise<void>;
@@ -21,6 +22,7 @@ export type BrowserJob = {
   onStage: (stage: BrowserStage) => void;
   onFrame: (done: number) => void;
   onPause: (paused: boolean) => void;
+  onJolts?: (jolts: JoltAt[]) => void;
   host?: { nav: WakeLockHost; page: Page };
 };
 
@@ -34,7 +36,8 @@ export async function renderInBrowser(job: BrowserJob): Promise<Blob> {
 
     job.onStage(BrowserStage.Rendering);
     const times = frameTimes(job.doc);
-    return await encodeMp4({
+    const meter = job.onJolts ? joltMeter() : undefined;
+    const blob = await encodeMp4({
       size: job.size,
       fps: job.doc.fps,
       frames: job.doc.durationInFrames,
@@ -43,8 +46,11 @@ export async function renderInBrowser(job: BrowserJob): Promise<Blob> {
       signal: job.signal,
       gate: visibleGate(host.page, job.onPause),
       render: (onFrame) => job.frames(times, job.size, onFrame, job.signal),
-      onFrame: job.onFrame
+      onFrame: job.onFrame,
+      meter
     });
+    job.onJolts?.(meter ? meter.jolts({ cuts: docCuts(job.doc) }) : []);
+    return blob;
   } finally {
     release();
   }

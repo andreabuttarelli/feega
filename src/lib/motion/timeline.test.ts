@@ -135,6 +135,22 @@ describe('timeline operations', () => {
   it('refuses a duration that cuts a clip', () => {
     expect(setCanvas(withTitle(), { durationInFrames: 60 }).ok).toBe(false);
   });
+
+  it('accorcia il video anche sotto la musica: la traccia si taglia alla nuova fine e sfuma', () => {
+    const scored = must(addClip(withTitle(), { component: 'Audio', from: 0, durationInFrames: 450, props: { assetId: 'music' } }, 'm'));
+    const doc = must(setCanvas(scored, { durationInFrames: 120 }));
+    const music = findClip(doc, 'm')!.clip;
+
+    expect(doc.durationInFrames).toBe(120);
+    expect(music.from + music.durationInFrames).toBe(120);
+    expect(Number(music.props.fadeOut)).toBeGreaterThan(0);
+  });
+
+  it('a sound that starts after the new end still refuses the cut', () => {
+    const late = must(addClip(withTitle(), { component: 'Audio', from: 200, durationInFrames: 100, props: { assetId: 'sfx' } }, 's'));
+
+    expect(setCanvas(late, { durationInFrames: 120 }).ok).toBe(false);
+  });
 });
 
 describe('snap', () => {

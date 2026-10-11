@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
-import { TITLE_CARD_RULE, TITLE_TYPE_RULE, UI_FOCUS_RULE } from '$lib/motion/style';
+import { HOUSE_DEFAULTS, STYLES, TITLE_CARD_RULE, TITLE_TYPE_RULE, UI_FOCUS_RULE } from '$lib/motion/style';
 import { MotionStyle } from '$lib/motion/style-model';
 
 const prompt = (style: MotionStyle) =>
@@ -61,3 +61,40 @@ describe('live components', () => {
   });
 });
 
+
+describe('a style the user asks for beats the house defaults', () => {
+  it('the graphic poster style forbids none of the house defaults', () => {
+    expect(STYLES[MotionStyle.Graphic].forbidden.filter((f) => HOUSE_DEFAULTS.includes(f))).toEqual([]);
+  });
+
+  it('every prompt says the house defaults yield to an asked style or references, and the hard rules do not', () => {
+    for (const style of Object.values(MotionStyle)) {
+      expect(prompt(style)).toContain('House defaults yield');
+      expect(prompt(style)).toContain(HOUSE_DEFAULTS[0]);
+    }
+  });
+});
+
+describe('references become measurable targets before the build', () => {
+  it('every prompt asks to record the reference look before building', () => {
+    for (const style of Object.values(MotionStyle)) {
+      expect(prompt(style)).toContain('set_reference_look');
+    }
+  });
+
+  it('every prompt asks to measure the typography of each role from the picture', () => {
+    for (const style of Object.values(MotionStyle)) {
+      for (const detail of ['per role', 'weight', 'tracking', 'line height', 'case', 'cap height']) {
+        expect(prompt(style)).toContain(detail);
+      }
+    }
+  });
+
+  it('the graphic poster prompt names concrete poster moves', () => {
+    const text = prompt(MotionStyle.Graphic);
+
+    for (const move of ['cropped by the frame', 'columns', 'rule']) {
+      expect(text).toContain(move);
+    }
+  });
+});

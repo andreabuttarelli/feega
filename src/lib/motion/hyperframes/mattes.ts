@@ -1,6 +1,5 @@
 import { MATTE_READ, matteAlpha, type MattePair } from '../matte';
 import { css, js } from './html';
-import { SCREENSHOT_URL } from './capture';
 import { MaskScope } from './masks';
 
 export const MATTE_RUNTIME = '__feegaMattes';
@@ -155,10 +154,10 @@ function matteRuntime(cfg: RuntimeConfig, tl: { to: (target: object, vars: Recor
   void refresh(cfg.exact);
 }
 
-export function matteScript(pairs: MattePair[], duration: number): string {
+export function matteScript(pairs: MattePair[], duration: number, lib: string): string {
   if (!pairs.length) {
     return '';
   }
-  const cfg: RuntimeConfig = { pairs, reads: MATTE_READ, whole: WHOLE, lib: SCREENSHOT_URL, wrapper: WRAPPER, global: MATTE_RUNTIME, scales: PASS_SCALE, settleMs: MATTE_SETTLE_MS, exact: Pass.Exact, draft: Pass.Draft };
+  const cfg: RuntimeConfig = { pairs, reads: MATTE_READ, whole: WHOLE, lib, wrapper: WRAPPER, global: MATTE_RUNTIME, scales: PASS_SCALE, settleMs: MATTE_SETTLE_MS, exact: Pass.Exact, draft: Pass.Draft };
   return `<script>(${matteRuntime.toString()})(${js(cfg)},window.__timelines&&window.__timelines.main,${duration});</script>`;
 }

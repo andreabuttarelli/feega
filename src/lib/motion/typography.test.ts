@@ -39,6 +39,13 @@ describe('rich typography', () => {
     expect(html).toMatch(/data-fit="\d+(\.\d+)?"/);
   });
 
+  it('a text case sets the letters upper or lower without retyping them', () => {
+    expect(findClip(doc(), 'title')!.clip.props).toMatchObject({ textCase: 'as-typed' });
+    expect(compose(doc())).not.toContain('text-transform');
+    expect(compose(ok(setProps(doc(), 'title', { textCase: 'upper' })))).toContain('text-transform:uppercase');
+    expect(compose(ok(setProps(doc(), 'title', { textCase: 'lower' })))).toContain('text-transform:lowercase');
+  });
+
   it('refuses a malformed axes string', () => {
     expect(setProps(doc(), 'title', { axes: "'GRAD' 50; color: red" })).toMatchObject({ ok: false });
   });

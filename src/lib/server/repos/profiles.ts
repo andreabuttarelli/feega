@@ -132,6 +132,41 @@ export async function readFirstRun(db: Db, userId: string): Promise<FirstRun> {
   return { signupCampaign: data?.signup_campaign ?? null, onboardingStatus: data?.onboarding_status ?? null };
 }
 
+export enum TourWrite {
+  Saved = 'saved',
+  NoColumn = 'no_column'
+}
+
+const MISSING_COLUMN_CODES = new Set(['42703', 'PGRST204']);
+
+const isMissingColumn = (error: { code?: string } | null) => MISSING_COLUMN_CODES.has(error?.code ?? '');
+
+export async function readTourSeen(db: Db, userId: string): Promise<{ seenAt: string | null } | null> {
+  const { data, error } = await db.from('profiles').select('onboarding_seen_at').eq('id', userId).maybeSingle();
+
+  if (isMissingColumn(error)) {
+    console.warn('[tour] profiles.onboarding_seen_at missing: apply 20261010180000_onboarding_seen.sql');
+    return null;
+  }
+  if (error) {
+    throw error;
+  }
+  return { seenAt: data?.onboarding_seen_at ?? null };
+}
+
+export async function markTourSeen(db: Db, userId: string): Promise<TourWrite> {
+  const { error } = await db.from('profiles').update({ onboarding_seen_at: new Date().toISOString() }).eq('id', userId);
+
+  if (isMissingColumn(error)) {
+    console.warn('[tour] profiles.onboarding_seen_at missing: seen kept in the browser only');
+    return TourWrite.NoColumn;
+  }
+  if (error) {
+    throw error;
+  }
+  return TourWrite.Saved;
+}
+
 export async function moveOnboarding(db: Db, userId: string, input: { from: string | null; to: string }): Promise<boolean> {
   const update = db.from('profiles').update({ onboarding_status: input.to }).eq('id', userId);
   const guarded = input.from === null ? update.is('onboarding_status', null) : update.eq('onboarding_status', input.from);

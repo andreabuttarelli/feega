@@ -5,7 +5,7 @@ import { Playback, RELOAD_DEBOUNCE_MS, previewDriver, type PlayerPort } from './
 const REQUEST = { format: FrameFormat.Jpeg, width: 64, height: 36 };
 const COMMIT_MS = 30;
 
-const page = (name: string) => `<html><body data-name="${name}">${name}</body>${captureScript({ width: 64, height: 36 }, name)}</html>`;
+const page = (name: string) => `<html><body data-name="${name}">${name}</body>${captureScript({ width: 64, height: 36 }, name, "lib.js")}</html>`;
 const nameOf = (html: string) => /data-name="([^"]+)"/.exec(html)?.[1] ?? '';
 
 function slowPlayer(first: string, stuck = '') {

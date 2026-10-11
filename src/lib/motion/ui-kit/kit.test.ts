@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { UI_KINDS, UI_KIT, UiBlock, recreatedUi, type UiPiece } from './kit';
+import { UI_KINDS, UI_KIT, UiBlock, UiKind, recreatedUi, uiScale, type UiPiece } from './kit';
 import { drawPiece, placeholders } from './render';
 import { skeletons } from './content';
 
@@ -38,6 +38,45 @@ describe('every UI kit piece', () => {
 
   it.each(UI_KINDS.map((k) => [k]))('%s never leaves grey placeholder rows or shape-only cards on screen once it has loaded', (kind) => {
     expect(skeletons(UI_KIT[kind].name, {}, DURATION)).toEqual([]);
+  });
+});
+
+type Box = { clientWidth: number; clientHeight: number; style: Record<string, unknown>; children: Box[]; className: string };
+
+function laidOutLate(piece: UiPiece, frame: { width: number; height: number }) {
+  const node = (): Box => {
+    const n = { clientWidth: 0, clientHeight: 0, style: { setProperty: () => {} } as Record<string, unknown>, children: [] as Box[], className: '', offsetWidth: 0, offsetHeight: 0, offsetLeft: 0, offsetTop: 0, offsetParent: null, textContent: '', innerHTML: '' };
+    return Object.assign(n, { appendChild: (c: Box) => n.children.push(c), setAttribute: () => {} });
+  };
+  const root = node();
+  const updates: (() => void)[] = [];
+  let now = 0;
+  const tl = { to: (_: unknown, o: { onUpdate: (this: { time: () => number }) => void }) => updates.push(() => o.onUpdate.call({ time: () => now })) };
+  const doc = { createElement: node, createElementNS: () => node() };
+  new Function('root', 'param', 'tl', 'duration', 'rand', 'document', piece.js)(root, (_: string, v: unknown) => v, tl, DURATION, Math.random, doc);
+  Object.assign(root, { clientWidth: frame.width, clientHeight: frame.height });
+  return (t: number) => {
+    now = t;
+    updates.forEach((u) => u());
+    return root;
+  };
+}
+
+describe('frame fit', () => {
+  const VERTICAL = { width: 1080, height: 1920 };
+
+  it.each(UI_KINDS.filter((k) => k !== UiKind.Cursor).map((k) => [k]))('%s fits the frame it is drawn in, even when its clip had no layout yet at mount', (kind) => {
+    const piece = UI_KIT[kind];
+    const stage = laidOutLate(piece, VERTICAL)(1).children.find((c) => c.className === 'stage');
+
+    expect(stage?.style.transform).toBe(`translate(-50%, -50%) scale(${uiScale(piece, VERTICAL, 1)})`);
+  });
+
+  it('the cursor walks the frame it is drawn in, even when its clip had no layout yet at mount', () => {
+    const layer = laidOutLate(UI_KIT[UiKind.Cursor], VERTICAL)(DURATION).children.find((c) => c.className === 'layer');
+    const left = parseFloat(String(layer?.children.find((c) => c.className === 'pointer')?.style.left));
+
+    expect(left).toBeLessThan(VERTICAL.width);
   });
 });
 

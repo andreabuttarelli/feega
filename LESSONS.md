@@ -229,6 +229,47 @@ vero (`hyperframes-player` + `feega:capture`), bisezione togliendo componenti, e
 l'immagine catturata: un filtro `userSpaceOnUse` su un layer HTML in WebKit si risolve sul
 contenuto dipinto, non sul box — un frame "più veloce" può essere un frame vuoto.
 
+### Un raster dell'export rifatto a ogni frame anche se non cambia nulla
+Segnale: `rasterOf` va in miss al secondo frame su ogni layer, e la chiave differisce solo per gli
+spazi dello `style` (`left:0px` → `left: 0px;`). `setProperty` riscrive l'attributo nella
+serializzazione del browser. Mossa: chiavi dagli stili parsati (`el.style.cssText`), mai da
+`getAttribute('style')`.
+
+### Il costo di export si sposta, non sparisce: misura a A/B, non per stadio
+Segnale: tolto un lavoro (es. un raster), le colonne del bench cambiano ma il ms/frame no. In WebKit
+un `ImageBitmap` di un canvas WebGL è pigro: la lettura dal GPU (e l'attesa del render three.js)
+si paga al `texImage2D` nell'host, quindi si sposta fra "output" e "composite". Mossa: A/B
+interlacciato (prima/dopo alternati, 3 giri, carico macchina alto) sul ms/frame totale.
+
+### Uno stallo WebKit che cade sul primo `await` GPU di ogni scatto, qualunque esso sia
+Segnale: ~450 ms che si spostano fra `createImageBitmap`, `texImage2D` nell'host e un rAF
+aggiunto; il lavoro misurato dello scatto (raster, three.js) è di pochi ms. È WebKit che dipinge
+la pagina viva della lane, che nessuno guarda. Mossa: un'attesa di 600 ms fra gli scatti — se lo
+stallo sparisce è lavoro in background, non dello scatto; la lane in WebKit va
+`visibility: hidden` (`laneVisibility`). In Chromium no: ferma il rAF di un iframe cross-origin
+nascosto e `Settle.Paint` resta appeso.
+
+### Chromium a 4 lane perde i layer 3D di una lane
+Segnale: nell'mp4 Chromium 4 lane un frame su 4 è senza sfere/oggetti 3D (PSNR 19 dB contro
+WebKit, periodico); console `Too many active WebGL contexts. Oldest context will be lost.`
+Chromium tiene 16 contesti WebGL per pagina: lane × canvas 3D (+ compositor) > 16 e la lane più
+vecchia li perde, senza errore. Mossa: controllare l'mp4 completo frame per frame (PSNR per frame
+contro WebKit 1 lane), non 3 frame a campione.
+
+### Un componente 3D fallisce il seek check senza stato che perde
+Signal: "the frame at Xs differs between visits", nessuna variabile tenuta tra i seek, i due
+frame identici a occhio (feature-grid e device-fly-in, run v4). Le trasformazioni 3D (`translate3d`, `rotateX`,
+`preserve-3d`, `perspective`) promuovono layer che Chrome rasterizza secondo la storia dei seek.
+Move: profondità simulata in 2D (`translate` + `scale`), `transform: none` a riposo; riprodurre
+con `seekPlan` + hash dei jpeg prima di toccare il codice.
+
+### `app_browse` non entra in una pagina di login SvelteKit
+Signal: login failed, nello screenshot email vuota e password piena, nessun messaggio d'errore;
+la POST dell'azione risponde 403. Non è l'idratazione: Chromium lanciato con gli argomenti di
+`@sparticuz/chromium` (`--disable-web-security`) non manda `Origin`, e il controllo CSRF rifiuta.
+Move: `originHeaders` rimette l'origine della pagina sulle richieste che cambiano stato; prima di
+diagnosticare un login, guarda lo status della POST.
+
 ## Ambiente e worktree
 
 ### Verde in locale, rosso in CI: una chiave del `.env` sceglie il ramo
@@ -2695,3 +2736,51 @@ Segnale: `bench:export --parity` in WebKit dà una differenza a forma del layer 
 ### Una sonda `position:absolute` dentro un elemento statico misura un altro elemento
 Segnale: un layer del compositore finisce fuori posto o tagliato (il titolo sparito dietro una clip spostata). Le sonde assolute si posizionano rispetto all'antenato posizionato più vicino, non al genitore statico. Mossa: affine da `offsetLeft/Top` + matrice propria quando l'`offsetParent` è il genitore; altrimenti `position: relative` temporaneo sull'elemento durante la sonda (`pointsIn`, `capture.ts`).
 
+
+## An embed published from the editor stays on the old player
+
+Signal: `/e/<id>.json` answers 404 while `/e/<id>` serves a page; the page still loads libs from
+jsDelivr and letterboxes. Cause: code that finds its own output by a function name
+(`playerMain.toString()`) breaks on output built in the browser, where the bundle is minified
+(`function vi`). Move: anchor on data the minifier cannot rename (the config JSON), and test with
+the name replaced.
+
+## A `/motion-runtime/<chunk>.<hash>.js` 404s from a script or another build
+
+Signal: a page composed by `vite-node` (or by an older deploy) loads a runtime chunk that the
+server answers 404. The hash covers code built from `fn.toString()`, which differs between the
+minified server build and unminified `vite-node`. Move: compose hosted pages and serve chunks from
+the same build (`/e/[id]` does); in local harnesses serve the chunks the harness itself wrote.
+
+## Reference pictures from Instagram or TikTok show as broken images in the chat
+
+Signal: `ask_reference_pick` returns ok, the grid has titles and empty frames; the same urls work
+for the server (`view_images` stored them). Cause: social CDNs (`cdninstagram`, `fbcdn`,
+`tiktokcdn`) refuse to be embedded on another site, and their urls are signed and expire. Move:
+show the stored, screened copy (`candidate.preview` → `/web-views/...`), never the CDN url; a
+check that only reads tool results misses it, the screenshot of the grid catches it.
+
+## A real check against `vite dev` shows no change after an edit
+
+Signal: a server-side edit (a tool, a port) has no effect in agent turns, and nothing new lands in
+storage, while unit tests pass. The dev server kept the old module for turns running in the
+background. Move: restart `vite dev` after server edits before trusting a real-check run.
+
+## An export flickers every other frame but a 1-lane render is smooth
+
+Signal: consecutive exported frames alternate between two states (`bench:export --lanes=4` vs
+`--lanes=1` differ; `scripts/motion-smoothness.ts` reports `flicker`). Cause: something reads
+layout once at mount (`clientWidth`) and a lane's iframe had no size yet. Move: render the window
+with `bench:export --range=a,b --lanes=4,1 --keep` and diff; make the read happen per frame or give
+the stage a fixed px size.
+
+## Eval
+
+### `eval:motion` conta una scena sola in un video di 34 s
+`ffmpeg select='gt(scene,0.3)'` non vede i cambi fatti di dissolvenze e sfondo nero: il punteggio
+più alto era 0.13. Segnale: `scenes 1`, `maxHold` uguale alla durata. Mossa: i tagli vengono dal
+doc (`docCuts`: inizi dei clip visivi di primo livello); ffmpeg solo se il doc manca.
+
+### Un export dal browser di un video di 51 s non sta in 20 minuti
+Headless, 1080×1920 High: ~1 frame/s. Segnale: `export failed: TimeoutError` con la barra
+all'80%. Mossa: tetto a 45 min in `eval:motion`; la durata è un fatto, non un errore del driver.

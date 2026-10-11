@@ -5,6 +5,7 @@ import { UI_KIT } from './ui-kit/kit';
 import { contentParams, kitKind } from './ui-kit/content';
 import { defaultsOf } from './ui-kit/anchors';
 import { nestedComp } from './nested';
+import { shotWords } from './shots/library';
 
 export type DriftProblem = { frame: number; detail: string };
 
@@ -34,6 +35,10 @@ const normal = (text: string) =>
 const wordsOf = (text: string) => normal(text).split(' ').filter(Boolean);
 
 function kitText(clip: Clip): string {
+  const shot = shotWords(String(clip.props.name ?? ''), clip.props);
+  if (shot !== null) {
+    return shot;
+  }
   const kind = kitKind(String(clip.props.name ?? ''));
   if (!kind) {
     return '';

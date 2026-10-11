@@ -1,7 +1,9 @@
 import { env } from '$env/dynamic/private';
 import type { Db } from '$lib/server/db/client';
 import { logAiCall, withBrandContext, withOrgContext } from '$lib/server/ai-log';
-import { SCRAPECREATORS_COST_USD, scrapeCreatorsGet } from '$lib/server/scrapecreators';
+import { SCRAPECREATORS_COST_USD, fetchProfileHistory, fetchSinglePost, scrapeCreatorsGet } from '$lib/server/scrapecreators';
+import { ensureFfmpegPath } from '$lib/server/ffmpeg-bin';
+import { classifySocialInput } from '$lib/canvas/social-url-classifier';
 import { llmApiKey, llmBaseUrl, llmDefaultModel } from '$lib/server/llm';
 import { safeFetchBytes } from '$lib/server/tool-guard';
 import { chromiumPage, serverFramesOpen } from '$lib/server/motion/chromium-frames';
@@ -10,12 +12,19 @@ import { CHAT_ATTACHMENT_MAX_BYTES } from '$lib/chat-attachments';
 import type { ProjectMode } from '$lib/project-mode';
 import { SearchEngine, exaSearch, openRouterSearch, searchEngineOf, type SearchPort } from './search';
 import { readPage } from './read-page';
-import { browserless, localBrowser, type BrowserlessUse, type OpenBrowser } from './browser';
+import { vectorCapture, type UiCapture } from './vector-capture';
+import { browserless, localBrowser, type BrowserlessUse, type OpenAppBrowser } from './browser';
+import { appBrowse, savedSession } from './app-browse';
+import { appAccountStore } from '$lib/server/repos/app-accounts';
 import { browse } from './browse';
 import { directFetch, exaContents, renderedSite, secondarySources, type SiteStrategy } from './site-fetch';
 import { screenshotPage } from './screenshot';
 import { readStore, storeProducts } from './store';
 import { viewImages, type ViewPorts } from './view-images';
+import { socialSearch, type ClipsFound, type SocialGet } from './social-search';
+import { profileAccount, socialItem } from './social-posts';
+import { viewVideoFrames, type FramePorts } from './video-frames';
+import { videoStills } from './video-stills';
 import { pinterestBoard, pinterestPin, pinterestSearch, type PinterestGet, type PinsFound } from './pinterest';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { removeAssetFile, signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
@@ -26,13 +35,16 @@ import type { Actor } from '$lib/server/repos/actor';
 import type { ScreenOutcome } from '$lib/server/moderation/screen';
 import type { AssetImport } from '$lib/server/motion/motion-tools';
 import type { MotionAsset } from '$lib/server/motion/editor';
-import type { ImageImport, PinterestPort, PinterestRead, ProductsImport, WebToolDeps } from './web-tools';
+import type { AppPort, ImageImport, ItemsRead, PinterestPort, ProductsImport, SocialPort, WebToolDeps } from './web-tools';
 
 export type WebScope = { orgId: string; userId: string; projectId: string; brandId?: string | null; mode: ProjectMode };
 
 export const WEB_VIEWS_DIR = 'web-views';
 
 const IMAGE_TIMEOUT_MS = 20_000;
+const VIDEO_TIMEOUT_MS = 60_000;
+const VIDEO_MAX_BYTES = 80_000_000;
+const PROFILE_PAGES = 1;
 const SEARCH_LABEL = 'web-search';
 const PICTURES_PER_PRODUCT = 2;
 const VIEW_MAX_BYTES = 15_000_000;
@@ -92,14 +104,33 @@ export function webViewPrefix(scope: { orgId: string; projectId: string }, callI
   return `${canvasUploadPrefix(scope.orgId, scope.projectId)}${WEB_VIEWS_DIR}/${callId}`;
 }
 
-function viewer(db: Db, scope: WebScope): NonNullable<WebToolDeps['view']> {
-  const ports: ViewPorts = {
+function viewPorts(db: Db, scope: WebScope): ViewPorts {
+  return {
     fetchImage: (url) => safeFetchBytes(url, { maxBytes: VIEW_MAX_BYTES, timeoutMs: IMAGE_TIMEOUT_MS }),
     store: (path, bytes) => storeAssetFile(db, path, new File([new Uint8Array(bytes)], path.split('/').at(-1) as string, { type: 'image/jpeg' })),
     screen: async (path) => ATTACHMENT_PORTS.screenImage({ orgId: scope.orgId, mode: scope.mode, url: await signAssetFile(db, path) }),
     remove: (path) => removeAssetFile(db, path)
   };
+}
+
+function viewer(db: Db, scope: WebScope): NonNullable<WebToolDeps['view']> {
+  const ports = viewPorts(db, scope);
   return (urls, detail, callId) => viewImages(urls, detail, webViewPrefix(scope, callId), ports);
+}
+
+function framesViewer(db: Db, scope: WebScope): NonNullable<WebToolDeps['frames']> {
+  const ports: FramePorts = {
+    ...viewPorts(db, scope),
+    fetchVideo: (url) => safeFetchBytes(url, { maxBytes: VIDEO_MAX_BYTES, timeoutMs: VIDEO_TIMEOUT_MS, scheme: 'https-only' }),
+    stills: async (video, points) => {
+      const bin = await ensureFfmpegPath();
+      if (!bin) {
+        throw new Error('video frames are unavailable right now (no ffmpeg)');
+      }
+      return videoStills(video, points, bin);
+    }
+  };
+  return (source, callId) => viewVideoFrames(source, webViewPrefix(scope, callId), ports);
 }
 
 type Metered = Omit<WebScope, 'mode'>;
@@ -127,13 +158,19 @@ async function connectBrowserless(endpoint: string) {
   return puppeteer.connect({ browserWSEndpoint: endpoint });
 }
 
-export function liveBrowser(scope: Metered): OpenBrowser | null {
+export function liveBrowser(scope: Metered): OpenAppBrowser | null {
   const key = env.BROWSERLESS_API_KEY?.trim();
   if (key) {
     const meter = (use: BrowserlessUse) => logged(scope, { label: BROWSERLESS_LABEL, provider: 'browserless', model: BROWSERLESS_MODEL, ms: use.ms, usd: use.usd, units: use.units });
     return browserless({ key, base: env.BROWSERLESS_BASE_URL?.trim() || undefined }, { connect: connectBrowserless, meter });
   }
   return serverFramesOpen() ? localBrowser(() => chromiumPage()) : null;
+}
+
+export function uiCapture(db: Db, scope: Metered): UiCapture | undefined {
+  const open = liveBrowser(scope);
+  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: { kind: 'agent', id: scope.userId } });
+  return open ? vectorCapture(open, undefined, savedSession(accounts)) : undefined;
 }
 
 function meteredExa(scope: Metered, key: string): SiteStrategy {
@@ -161,7 +198,7 @@ export function liveSiteChain(scope: Metered): SiteStrategy[] {
   ];
 }
 
-function browser(db: Db, scope: WebScope, open: OpenBrowser): NonNullable<WebToolDeps['browse']> {
+function browser(db: Db, scope: WebScope, open: OpenAppBrowser): NonNullable<WebToolDeps['browse']> {
   return async (url, steps, callId) => {
     const seen = await browse(url, steps, open);
     if (!seen.ok) {
@@ -182,7 +219,29 @@ function browser(db: Db, scope: WebScope, open: OpenBrowser): NonNullable<WebToo
   };
 }
 
-const priced = (found: PinsFound): PinterestRead => ({ ...found, costUsd: found.requests * SCRAPECREATORS_COST_USD });
+export type KeepShot = (jpeg: Buffer, name: string) => Promise<string | null>;
+
+export function attachedShot(db: Db, scope: WebScope): KeepShot {
+  return (jpeg, name) => inlineAttachment(db, scope, { data: jpeg.toString('base64'), name, mimeType: 'image/jpeg' }, ATTACHMENT_PORTS).then(
+    (saved) => saved.assetId,
+    () => null
+  );
+}
+
+export function appPort(db: Db, scope: WebScope, open: OpenAppBrowser, keep: KeepShot): AppPort {
+  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: { kind: 'agent', id: scope.userId } });
+  return {
+    browse: async (input) => {
+      const seen = await appBrowse(input, { open, accounts });
+      const host = URL.canParse(seen.ok ? seen.url : '') ? new URL(seen.ok ? seen.url : '').hostname : 'app';
+      const shots = await Promise.all(seen.shots.map(async (jpeg, i) => ({ jpeg, assetId: await keep(jpeg, `${host}-${i + 1}.jpg`) })));
+      return { ...seen, shots };
+    },
+    forget: () => accounts.forget()
+  };
+}
+
+const priced = <T extends PinsFound | ClipsFound>(found: T): T & { costUsd: number } => ({ ...found, costUsd: found.requests * SCRAPECREATORS_COST_USD });
 
 export function pinterestPort(get: PinterestGet): PinterestPort {
   return {
@@ -192,16 +251,59 @@ export function pinterestPort(get: PinterestGet): PinterestPort {
   };
 }
 
-function livePinterest(scope: Metered): PinterestPort | undefined {
+export type SocialFetchers = { history: typeof fetchProfileHistory; single: typeof fetchSinglePost };
+
+const SOCIAL_REQUEST_USD = SCRAPECREATORS_COST_USD;
+const failed = (what: string, e: unknown, costUsd: number): ItemsRead => ({ ok: false, error: `${what} failed: ${e instanceof Error ? e.message : String(e)}`, costUsd });
+
+export function socialPort(get: SocialGet, fetchers: SocialFetchers): SocialPort {
+  return {
+    search: async (platform, query, limit) => priced(await socialSearch(get, platform, query, limit)),
+    profile: async (platform, handle, limit) => {
+      const target = profileAccount(platform, handle);
+      if (!target.ok) {
+        return { ...target, costUsd: 0 };
+      }
+      try {
+        const posts = await fetchers.history(target.platform, target.account, { maxPages: PROFILE_PAGES, maxPosts: limit });
+        return { ok: true, items: posts.map((p) => socialItem(target.platform, p)), costUsd: SOCIAL_REQUEST_USD };
+      } catch (e) {
+        return failed('social profile', e, SOCIAL_REQUEST_USD);
+      }
+    },
+    post: async (url) => {
+      const classified = classifySocialInput(url);
+      if (!classified.ok || classified.entry.kind !== 'post') {
+        return { ok: false, error: `not a post url: ${url}`, costUsd: 0 };
+      }
+      try {
+        return { ok: true, items: [socialItem(classified.entry.platform, await fetchers.single(classified.entry.platform, url))], costUsd: SOCIAL_REQUEST_USD };
+      } catch (e) {
+        return failed('social post', e, SOCIAL_REQUEST_USD);
+      }
+    }
+  };
+}
+
+type Billed = <T>(fn: () => T) => T;
+
+function scrapeBilling(scope: Metered): Billed | undefined {
   if (!env.SCRAPECREATORS_API_KEY?.trim()) {
     return undefined;
   }
-  const billed = <T>(fn: () => T): T => (scope.brandId ? withBrandContext(scope.brandId, fn) : withOrgContext(scope.orgId, fn));
-  return pinterestPort((path) => billed(() => scrapeCreatorsGet(path)));
+  return (fn) => (scope.brandId ? withBrandContext(scope.brandId, fn) : withOrgContext(scope.orgId, fn));
 }
 
-export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => void): WebToolDeps {
+function liveSocial(billed: Billed): SocialPort {
+  return socialPort((path) => billed(() => scrapeCreatorsGet(path)), {
+    history: (...args) => billed(() => fetchProfileHistory(...args)),
+    single: (...args) => billed(() => fetchSinglePost(...args))
+  });
+}
+
+export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => void, keep: KeepShot = attachedShot(db, scope)): WebToolDeps {
   const open = liveBrowser(scope);
+  const billed = scrapeBilling(scope);
   return {
     view: viewer(db, scope),
     search: loggedSearch(scope),
@@ -209,7 +311,10 @@ export function liveWebDeps(db: Db, scope: WebScope, spend: (usd: number) => voi
     store: (url, opts) => readStore(url, opts),
     shoot: serverFramesOpen() ? (url, view) => screenshotPage(url, view, chromiumPage) : undefined,
     browse: open ? browser(db, scope, open) : undefined,
-    pinterest: livePinterest(scope),
+    pinterest: billed ? pinterestPort((path) => billed(() => scrapeCreatorsGet(path))) : undefined,
+    social: billed ? liveSocial(billed) : undefined,
+    frames: framesViewer(db, scope),
+    app: open ? appPort(db, scope, open, keep) : undefined,
     spend
   };
 }

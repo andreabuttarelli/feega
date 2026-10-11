@@ -58,3 +58,33 @@ describe('the motion style', () => {
     expect(text).toContain('builtin:scene-');
   });
 });
+
+describe('the look measured from the references', () => {
+  const SWISS = { typeScale: 0.8, bleed: true, columns: 3, smallText: 'dense', palette: ['#e30613', '#0a0a0a'], font: 'condensed', imagery: 'shapes' };
+
+  it('set_reference_look stores the targets on the doc and get_motion_doc shows them', async () => {
+    const { session, run } = setup();
+
+    expect((await run('set_reference_look', SWISS)).ok).toBe(true);
+    expect(session.doc.referenceLook?.typeScale).toBe(0.8);
+    expect((await run('get_motion_doc', {})).referenceLook).toEqual(SWISS);
+  });
+
+  it('view_frames blocks a video that looked at references and never recorded their look', async () => {
+    const { session, run } = setup();
+    session.references = [{ mediaType: 'image/jpeg', data: 'cGlu' }];
+    await run('add_clip', { component: 'Title', start: 0, duration: 2, props: { text: 'FORM' } });
+
+    expect(JSON.stringify((await run('view_frames', { times: [1] })).blocking)).toContain('set_reference_look');
+  });
+
+  it('view_frames names the gross misses against the recorded look', async () => {
+    const { run } = setup();
+    await run('set_reference_look', SWISS);
+    await run('add_clip', { component: 'Title', start: 0, duration: 2, props: { text: 'FORM' } });
+    const out = await run('view_frames', { times: [1] });
+
+    expect(JSON.stringify(out.blocking)).toContain('0.8 of the frame height');
+    expect(JSON.stringify(out.blocking)).toContain('off the frame edge');
+  });
+});

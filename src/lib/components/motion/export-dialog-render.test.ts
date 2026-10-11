@@ -100,6 +100,17 @@ describe('the embed path discloses step by step', () => {
     expect(body).not.toContain('data-testid="interactive-publish"');
   });
 
+  it('once published: the same video in a React or Flutter app', () => {
+    const appSnippets = { react: '<FeegaMotion id="n" origin="https://feega.app" />', flutter: "FeegaMotion(id: 'n', origin: 'https://feega.app')" };
+    const body = embed({ hosted: { published: true, url: 'https://feega.app/e/n' }, hostedSnippet: '<feega-motion src="n"></feega-motion>', appSnippets });
+
+    expect(body).toContain('Embed in your app');
+    expect(body).toContain('data-testid="interactive-react-snippet"');
+    expect(body).toContain('&lt;FeegaMotion id="n"');
+    expect(body).toContain('data-testid="interactive-flutter-snippet"');
+    expect(body).toContain("FeegaMotion(id: 'n'");
+  });
+
   it('a scene with no input says it plays as a video and points to the agent', () => {
     const body = embed();
 

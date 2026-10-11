@@ -4,7 +4,9 @@
   import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
   import { CAPTURE_TIMEOUT_MS, Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
-  import { shootInLanes } from '$lib/motion/export/lanes';
+  import { laneVisibility, shootInLanes } from '$lib/motion/export/lanes';
+  import { engineOf } from '$lib/motion/engine';
+  import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
   import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
   import { CAPTURE_PROFILES, CaptureProfile } from '$lib/motion/export/capture-profile';
   import { MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
@@ -148,11 +150,17 @@
     playing = false;
     const back = frame;
     capturing = true;
+    if (player) {
+      player.style.visibility = laneVisibility(engineOf(navigator.userAgent));
+    }
     try {
       await loaded(source);
       return await work();
     } finally {
       capturing = false;
+      if (player) {
+        player.style.visibility = 'visible';
+      }
       await loaded(html);
       player?.seek(back / fps);
     }
@@ -204,7 +212,7 @@
     const { settle, lanes } = CAPTURE_PROFILES[profile];
     const request = { format: FrameFormat.Bitmap, settle, layering: exportLayering(), ...size };
     return borrowed(source, async () => {
-      const extra = host ? await Promise.all(Array.from({ length: lanes() - 1 }, () => mountCapturePlayer(host!, source))) : [];
+      const extra = host ? await Promise.all(Array.from({ length: lanesWithin(lanes(), webglPerLane(source)) - 1 }, () => mountCapturePlayer(host!, source))) : [];
       const sharedWait = CAPTURE_TIMEOUT_MS * (extra.length + 1);
       try {
         const shooters = [(time: number) => shoot(time, request, sharedWait).then(frameOf), ...extra.map((p) => (time: number) => p.shoot(time, request, sharedWait).then(frameOf))];

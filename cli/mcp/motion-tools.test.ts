@@ -62,7 +62,7 @@ const fake: Server = createServer((req, res) => {
     }
     if (route === `/api/v1/motion/${NODE}/embed`) {
       const published = req.method !== 'DELETE';
-      send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, revision: 3 } : { published });
+      send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, react: `<FeegaMotion id="${NODE}" />`, flutter: `FeegaMotion(id: '${NODE}')`, revision: 3 } : { published });
       return;
     }
     if (route === `/api/v1/motion/${NODE}/revisions`) {
@@ -135,6 +135,13 @@ describe('the motion agent over MCP', () => {
     expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/ask`, body: { prompt: 'use these', attachments } });
   });
 
+  test('ask_motion_agent answers a reference pick by id, with no prompt needed', async () => {
+    const reference_pick = { follow: ['pin0', 'pin1', 'pin2'], avoid: ['pin3'], note: 'darker' };
+    await callTool('ask_motion_agent', { node_id: NODE, reference_pick });
+
+    expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/ask`, body: { prompt: '', reference_pick } });
+  });
+
   test('ask_motion_agent returns the run at once by default', async () => {
     const result = await callTool('ask_motion_agent', { node_id: NODE, prompt: 'add a bounce' });
 
@@ -183,6 +190,7 @@ describe('the motion agent over MCP', () => {
     expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/embed` });
     expect(result?.structuredContent).toMatchObject({ published: true, url: `https://feega.app/e/${NODE}` });
     expect(JSON.stringify(result)).toContain('iframe');
+    expect(result?.structuredContent).toMatchObject({ react: `<FeegaMotion id="${NODE}" />`, flutter: `FeegaMotion(id: '${NODE}')` });
   });
 
   test('publish_motion_embed with unpublish takes it down', async () => {
@@ -273,6 +281,32 @@ describe('feega motion ask --attach', () => {
   });
 });
 
+describe('feega motion ask --follow --avoid', () => {
+  test('answers the reference pick the agent asked for', async () => {
+    const log = console.log;
+    console.log = () => {};
+    const { askAndReport } = await import('../commands/motion.ts');
+
+    await askAndReport('token', NODE, '', { wait: false, follow: ['pin0'], avoid: ['pin3'], note: 'darker' }).finally(() => {
+      console.log = log;
+    });
+
+    expect(calls[0].body).toEqual({ prompt: '', reference_pick: { follow: ['pin0'], avoid: ['pin3'], note: 'darker' } });
+  });
+
+  test('--reject asks for another search, --avoid-all avoids the shown ones too', async () => {
+    const log = console.log;
+    console.log = () => {};
+    const { askAndReport } = await import('../commands/motion.ts');
+
+    await askAndReport('token', NODE, '', { wait: false, reject: 'warmer light', avoidAll: true }).finally(() => {
+      console.log = log;
+    });
+
+    expect(calls[0].body).toEqual({ prompt: '', reference_pick: { follow: [], avoid: [], rejected: true, query: 'warmer light', avoid_all: true } });
+  });
+});
+
 describe('feega motion render', () => {
   async function printed(work: () => Promise<void>): Promise<string> {
     const lines: string[] = [];
@@ -317,6 +351,8 @@ describe('feega motion embed', () => {
 
     expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/embed` });
     expect(lines.join('\n')).toContain('<iframe');
+    expect(lines.join('\n')).toContain(`React:\n<FeegaMotion id="${NODE}" />`);
+    expect(lines.join('\n')).toContain(`Flutter:\nFeegaMotion(id: '${NODE}')`);
   });
 
   test('--download saves the self-contained html', async () => {

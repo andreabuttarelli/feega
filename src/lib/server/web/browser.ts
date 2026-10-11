@@ -1,5 +1,7 @@
 import type { Browser, HTTPRequest, Page } from 'puppeteer-core';
 import { RequestVerdict, requestVerdict } from './screenshot';
+import { CAPTURE_LIMITS, captureOf, framedNodes } from './vector-capture';
+import type { RawCapture } from '$lib/motion/vector-ui/model';
 
 export type Target = { selector?: string; text?: string };
 export type ScrollTo = { px?: number; to?: 'top' | 'bottom' };
@@ -19,7 +21,22 @@ export type Tab = {
   close: () => Promise<number>;
 };
 
+export type SessionCookie = { name: string; value: string; domain: string; path: string; expires: number; httpOnly: boolean; secure: boolean };
+export type UiElement = { tag: string; text: string; x: number; y: number; w: number; h: number; color?: string; background?: string; font?: string; size?: number; weight?: number; radius?: string };
+export type UiDigest = { title: string; elements: UiElement[] };
+
+export type AppSession = { cookies: SessionCookie[]; storage: Record<string, string> };
+
+export type AppTab = Tab & {
+  session: () => Promise<AppSession>;
+  restore: (session: AppSession, origin: string) => Promise<void>;
+  label: (target: Target) => Promise<string>;
+  ui: () => Promise<UiDigest>;
+  vector: () => Promise<unknown>;
+};
+
 export type OpenBrowser = () => Promise<Tab>;
+export type OpenAppBrowser = () => Promise<AppTab>;
 
 export type BrowserlessConfig = { key: string; base?: string };
 export type BrowserlessUse = { ms: number; units: number; usd: number };
@@ -53,9 +70,23 @@ export function browserlessEndpoint(config: BrowserlessConfig): string {
 
 export const unitsOf = (ms: number) => Math.max(1, Math.ceil(ms / BROWSERLESS_UNIT_MS));
 
+const SAFE_METHODS = ['GET', 'HEAD', 'OPTIONS'];
+
+export function originHeaders(method: string, headers: Record<string, string>, pageUrl: string): Record<string, string> | null {
+  if (SAFE_METHODS.includes(method) || headers.origin || !URL.canParse(pageUrl)) {
+    return null;
+  }
+  return { ...headers, origin: new URL(pageUrl).origin };
+}
+
 async function gate(request: HTTPRequest): Promise<void> {
   const verdict = await requestVerdict(request.url());
-  await (verdict === RequestVerdict.Continue ? request.continue() : request.abort('blockedbyclient')).catch(() => undefined);
+  if (verdict !== RequestVerdict.Continue) {
+    await request.abort('blockedbyclient').catch(() => undefined);
+    return;
+  }
+  const headers = originHeaders(request.method(), request.headers(), request.frame()?.url() ?? '');
+  await request.continue(headers ? { headers } : undefined).catch(() => undefined);
 }
 
 async function fenced(page: Page): Promise<void> {
@@ -98,7 +129,54 @@ function sensitiveField(el: Element): boolean {
   return risky(el) || (form ? [...form.querySelectorAll('input')].some(risky) : false);
 }
 
-function tabOf(page: Page, close: () => Promise<number>): Tab {
+const UI_MAX_ELEMENTS = 160;
+const UI_MAX_TEXT = 120;
+
+function uiOf(limits: { max: number; text: number }): UiDigest {
+  const PICKED = 'h1, h2, h3, h4, nav a, aside a, button, [role=button], [role=tab], a, label, input, select, textarea, th, td, li, p, span, img, svg';
+  const elements: UiElement[] = [];
+  for (const el of document.querySelectorAll(PICKED)) {
+    if (elements.length >= limits.max) {
+      break;
+    }
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 4 || rect.height < 4 || rect.bottom < 0 || rect.top > window.innerHeight) {
+      continue;
+    }
+    const field = el as HTMLInputElement;
+    const own = [...el.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent ?? '').join(' ').trim();
+    const text = (el.matches('input, textarea, select') ? field.placeholder || field.getAttribute('aria-label') || '' : el.matches('img, svg') ? el.getAttribute('alt') || el.getAttribute('aria-label') || '' : own || (el.matches('button, a, [role=button], [role=tab], label, th, td') ? (el as HTMLElement).innerText : '')).replace(/\s+/g, ' ').trim().slice(0, limits.text);
+    if (!text && !el.matches('input, img, svg, button')) {
+      continue;
+    }
+    const css = getComputedStyle(el);
+    elements.push({ tag: el.tagName.toLowerCase(), text, x: Math.round(rect.x), y: Math.round(rect.y), w: Math.round(rect.width), h: Math.round(rect.height), color: css.color, background: css.backgroundColor, font: css.fontFamily.split(',')[0], size: parseFloat(css.fontSize), weight: Number(css.fontWeight), radius: css.borderRadius });
+  }
+  return { title: document.title, elements };
+}
+
+export async function vectorOfPage(page: Page): Promise<RawCapture> {
+  const main = await page.evaluate(captureOf, CAPTURE_LIMITS);
+  const inner = await Promise.all(
+    page.mainFrame().childFrames().map(async (frame) => {
+      const host = await frame.frameElement();
+      const box = await host?.boundingBox();
+      await host?.dispose();
+      if (!box || box.width < 1 || box.height < 1) {
+        return [];
+      }
+      const raw = await frame.evaluate(captureOf, CAPTURE_LIMITS).catch(() => null);
+      return raw ? [framedNodes(raw, box)] : [];
+    })
+  );
+  return { ...main, nodes: [...main.nodes, ...inner.flat().flat()] };
+}
+
+function labelOf(el: Element): string {
+  return `${(el as HTMLElement).innerText ?? ''} ${el.getAttribute('aria-label') ?? ''} ${el.getAttribute('title') ?? ''} ${(el as HTMLInputElement).value ?? ''}`.replace(/\s+/g, ' ').trim();
+}
+
+function tabOf(page: Page, close: () => Promise<number>): AppTab {
   return {
     goto: async (url) => (await page.goto(url, { waitUntil: 'networkidle2', timeout: NAV_TIMEOUT_MS }))?.status() ?? null,
     url: () => page.url(),
@@ -115,11 +193,33 @@ function tabOf(page: Page, close: () => Promise<number>): Tab {
       return handle ? handle.evaluate(sensitiveField).finally(() => handle.dispose()) : false;
     },
     shot: async () => Buffer.from(await page.screenshot({ type: 'jpeg', quality: JPEG_QUALITY })),
-    close
+    close,
+    session: async () => ({
+      cookies: (await page.browser().cookies()).map(({ name, value, domain, path, expires, httpOnly, secure }) => ({ name, value, domain, path, expires, httpOnly: httpOnly ?? false, secure })),
+      storage: await page.evaluate(() => Object.fromEntries(Object.entries(localStorage))).catch(() => ({}))
+    }),
+    restore: async (session, origin) => {
+      await page.browser().setCookie(...session.cookies);
+      await page.evaluateOnNewDocument(
+        (at: string, items: Record<string, string>) => {
+          if (location.origin === at) {
+            Object.entries(items).forEach(([k, v]) => localStorage.setItem(k, v));
+          }
+        },
+        origin,
+        session.storage
+      );
+    },
+    label: async (target) => {
+      const handle = await page.$(locator(target));
+      return handle ? handle.evaluate(labelOf).finally(() => handle.dispose()) : '';
+    },
+    ui: () => page.evaluate(uiOf, { max: UI_MAX_ELEMENTS, text: UI_MAX_TEXT }),
+    vector: () => vectorOfPage(page)
   };
 }
 
-export function localBrowser(newPage: () => Promise<Page>): OpenBrowser {
+export function localBrowser(newPage: () => Promise<Page>): OpenAppBrowser {
   return async () => {
     const page = await newPage();
     await fenced(page);
@@ -149,7 +249,7 @@ async function connected(config: BrowserlessConfig, ports: BrowserlessPorts): Pr
   }
 }
 
-export function browserless(config: BrowserlessConfig, ports: BrowserlessPorts): OpenBrowser {
+export function browserless(config: BrowserlessConfig, ports: BrowserlessPorts): OpenAppBrowser {
   const now = ports.now ?? Date.now;
   return async () => {
     const started = now();

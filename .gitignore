@@ -101,3 +101,5 @@ vite.config.ts.timestamp-*.mjs
 # versioni che nessuno ha scelto.
 bun.lock
 .playwright-mcp/
+
+/static/motion-libs/

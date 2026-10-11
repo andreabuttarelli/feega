@@ -48,6 +48,17 @@ describe('motion agent brand tools', () => {
     expect(session.doc.assets.map((a) => a.id)).toContain('logo1');
   });
 
+  it('import_asset refuses a reference the user marked avoid: it never reaches the storyboard', async () => {
+    const importAsset = vi.fn(async () => ({ ok: true as const, asset: LOGO, width: 200, height: 100 }));
+    const { session, run } = setup({ importAsset });
+    const pin = (id: string) => ({ id, image: `https://i.pinimg.com/${id}.jpg` });
+    session.pick = { follow: [pin('a')], avoid: [pin('b')], note: '' };
+
+    expect(await run('import_asset', { url: 'https://i.pinimg.com/b.jpg' })).toMatchObject({ ok: false });
+    expect(await run('import_asset', { url: 'https://i.pinimg.com/a.jpg' })).toMatchObject({ ok: true });
+    expect(importAsset).toHaveBeenCalledTimes(1);
+  });
+
   it('import_asset with capture photographs the page at 2x and registers every shot', async () => {
     const shot = (id: string): MotionAsset => ({ id, kind: AssetKind.Image, label: id, previewUrl: '', url: `https://signed/${id}.png`, width: 780, height: 1688 });
     const capture = vi.fn(async () => ({ ok: true as const, shots: [{ part: 'top', asset: shot('top'), width: 780, height: 1688 }, { part: 'section 2', asset: shot('s2'), width: 780, height: 1688 }] }));

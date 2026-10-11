@@ -2850,6 +2850,7 @@ export type Database = {
           email: string
           id: string
           name: string | null
+          onboarding_seen_at: string | null
           onboarding_status: string | null
           signup_campaign: string | null
           terms_accepted_at: string | null
@@ -2863,6 +2864,7 @@ export type Database = {
           email: string
           id: string
           name?: string | null
+          onboarding_seen_at?: string | null
           onboarding_status?: string | null
           signup_campaign?: string | null
           terms_accepted_at?: string | null
@@ -2876,6 +2878,7 @@ export type Database = {
           email?: string
           id?: string
           name?: string | null
+          onboarding_seen_at?: string | null
           onboarding_status?: string | null
           signup_campaign?: string | null
           terms_accepted_at?: string | null

@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import { resolve } from 'node:path';
 import { motionBundles } from './motion-bundles';
+import { motionLibs } from './motion-libs';
 const r = (p: string) => resolve(import.meta.dirname, p);
 export default defineConfig({
-  plugins: [motionBundles()],
+  plugins: [motionBundles(), motionLibs()],
   resolve: {
     alias: {
       '$app/environment': r('_shims/app-environment.ts'),

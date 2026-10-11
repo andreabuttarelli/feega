@@ -92,8 +92,11 @@ const stage = document.createElement('div');
 stage.className = 'stage';
 stage.style.fontFamily = family;
 root.appendChild(stage);
-const fit = Math.min(1, ((root.clientWidth || DESIGN_W) * SAFE) / DESIGN_W, ((root.clientHeight || DESIGN_H) * SAFE) / DESIGN_H);
-stage.style.transform = 'translate(-50%, -50%) scale(' + zoom * fit + ')';
+const fitStage = () => {
+  const fit = Math.min(1, ((root.clientWidth || DESIGN_W) * SAFE) / DESIGN_W, ((root.clientHeight || DESIGN_H) * SAFE) / DESIGN_H);
+  stage.style.transform = 'translate(-50%, -50%) scale(' + zoom * fit + ')';
+};
+fitStage();
 const SPRING = SPRING_MATH;
 const PRESS = { stiffness: 1400, damping: 75 };
 const UI = { stiffness: 320, damping: 30 };
@@ -115,7 +118,7 @@ const anchor = (el, name) => {
 };
 const drive = (render) => {
   render(0);
-  tl.to({}, { duration, ease: 'none', onUpdate() { render(this.time()); } }, 0);
+  tl.to({}, { duration, ease: 'none', onUpdate() { fitStage(); render(this.time()); } }, 0);
 };
 `;
 
@@ -988,9 +991,9 @@ layer.className = 'layer';
 root.appendChild(layer);
 const ripple = make('div', 'ripple', layer);
 const cursor = pointer(layer);
-const W = root.clientWidth || 1920;
-const H = root.clientHeight || 1080;
 drive((t) => {
+  const W = root.clientWidth || 1920;
+  const H = root.clientHeight || 1080;
   const pose = plan.at(t);
   cursor.style.left = (pose.x * W - TIP[0]) + 'px';
   cursor.style.top = (pose.y * H - TIP[1]) + 'px';

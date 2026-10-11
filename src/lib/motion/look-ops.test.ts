@@ -42,7 +42,7 @@ describe('look', () => {
   it('environment patches merge, and only file presets have a url', () => {
     const doc = must(setLook(newMotionDoc(MotionFormat.Square), { environment: { preset: EnvPreset.Sunset } }));
     expect(must(setLook(doc, { environment: { intensity: 2 } })).look?.environment).toEqual({ preset: EnvPreset.Sunset, intensity: 2, rotation: 0 });
-    expect(hdriUrl(EnvPreset.Room)).toBeNull();
-    expect(hdriUrl(EnvPreset.Sunset)).toMatch(/^https:\/\/cdn\.jsdelivr\.net\/.+venice_sunset_1k\.hdr$/);
+    expect(hdriUrl(EnvPreset.Room, 'https://oh.feega.app')).toBeNull();
+    expect(hdriUrl(EnvPreset.Sunset, 'https://oh.feega.app')).toBe('https://oh.feega.app/motion-env/r181/venice_sunset_256.hdr');
   });
 });
