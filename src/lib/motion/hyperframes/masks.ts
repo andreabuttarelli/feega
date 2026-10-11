@@ -25,6 +25,14 @@ enum Part {
 }
 
 const UNIT = 100;
+const OVERSCAN = 0.25;
+
+const margin = (frame: Frame) => ({ x: frame.width * OVERSCAN, y: frame.height * OVERSCAN });
+
+function spanned(frame: Frame): Frame {
+  const m = margin(frame);
+  return { width: frame.width + 2 * m.x, height: frame.height + 2 * m.y };
+}
 const HALF = UNIT / 2;
 
 export type MaskAttr = { part: Part; attr: string; out: (value: number, frame: Frame) => number | string };
@@ -145,8 +153,11 @@ function maskDefs(scope: string, clipId: string, shape: MaskShape, flip: boolean
   const kind = KIND[mask.kind];
   const nested = NESTING.reduceRight((body, part) => `<g ${set(part)}>${body}</g>`, kind.shape(paint));
   const filter = `<filter id="${id('f')}" filterUnits="userSpaceOnUse" ${region}><feMorphology id="${id(Part.Dilate)}" operator="dilate" ${value(Part.Dilate)}/><feMorphology id="${id(Part.Erode)}" operator="erode" ${value(Part.Erode)}/><feGaussianBlur ${set(Part.Blur)}/></filter>`;
-  const backdrop = inverted ? `<rect ${region} fill="#fff"/>` : '';
-  return `${filter}${kind.defs(paint)}<mask id="${id('k')}" maskUnits="userSpaceOnUse" ${region}>${backdrop}<g filter="url(#${id('f')})"><g ${set(Part.Opacity)}>${nested}</g></g></mask>`;
+  const span = spanned(frame);
+  const shift = margin(frame);
+  const wrapperRegion = `x="0" y="0" width="${span.width}" height="${span.height}"`;
+  const backdrop = inverted ? `<rect ${wrapperRegion} fill="#fff"/>` : '';
+  return `${filter}${kind.defs(paint)}<mask id="${id('k')}" maskUnits="userSpaceOnUse" ${wrapperRegion}>${backdrop}<g transform="translate(${shift.x} ${shift.y})"><g filter="url(#${id('f')})"><g ${set(Part.Opacity)}>${nested}</g></g></g></mask>`;
 }
 
 export function maskLayer(layer: MaskLayer, inner: string): string {
@@ -159,10 +170,15 @@ export function maskLayer(layer: MaskLayer, inner: string): string {
   const composite = masks.length > 1 ? `;mask-composite:${topFirst.map((m) => m.layer.composite).join(',')}` : '';
   const wrapper = WRAPPER[scope];
 
-  return `<svg class="kd" aria-hidden="true"><defs>${defs}</defs></svg><div class="${wrapper}" id="${wrapper}-${clipId}" style="mask:${url};-webkit-mask:${url}${composite}">${inner}</div>`;
+  const span = spanned(frame);
+  const shift = margin(frame);
+  const spansRegion = `left:${-shift.x}px;top:${-shift.y}px;width:${span.width}px;height:${span.height}px`;
+  const framed = `left:${shift.x}px;top:${shift.y}px;width:${frame.width}px;height:${frame.height}px`;
+
+  return `<svg class="kd" aria-hidden="true"><defs>${defs}</defs></svg><div class="${wrapper}" id="${wrapper}-${clipId}" style="${spansRegion};mask:${url};-webkit-mask:${url}${composite}"><div class="kb" style="${framed}">${inner}</div></div>`;
 }
 
-export const MASK_CSS = '.km,.kt{position:absolute;inset:0}.kd{position:absolute;width:0;height:0;overflow:hidden}';
+export const MASK_CSS = '.km,.kt,.kb{position:absolute}.kd{position:absolute;width:0;height:0;overflow:hidden}';
 
 export async function freezeMasks(): Promise<() => void> {
   const SVG_NS = 'http://www.w3.org/2000/svg';
