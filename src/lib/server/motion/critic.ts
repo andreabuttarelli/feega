@@ -24,7 +24,7 @@ export type CriticPorts = {
 
 export type CriticInput = { doc: MotionDoc; request: string; references: readonly Reference[] };
 
-export type Critique = { review: CriticReview | null; usd: number };
+export type Critique = { review: CriticReview | null; usd: number; sheet: Buffer | null };
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
@@ -57,7 +57,7 @@ export async function critique(ports: CriticPorts, input: CriticInput): Promise<
   }
   const frames = drawn.every(Boolean) ? drawn.flatMap((d) => d ?? []) : null;
   if (!frames?.length) {
-    return { review: null, usd: 0 };
+    return { review: null, usd: 0, sheet: null };
   }
 
   const sheet = await ports.tile(frames);
@@ -65,7 +65,7 @@ export async function critique(ports: CriticPorts, input: CriticInput): Promise<
   const { answer, usd } = await ports.ask({ prompt: prompt(input, times), images });
 
   const parsed = REVIEW.safeParse(answer);
-  return { review: parsed.success ? parsed.data : null, usd };
+  return { review: parsed.success ? parsed.data : null, usd, sheet };
 }
 
 export function criticMessage(review: CriticReview): ModelMessage | null {

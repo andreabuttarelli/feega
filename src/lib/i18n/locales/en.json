@@ -630,6 +630,13 @@
         "held": "Waiting for your changes",
         "storyboard": "Open storyboard"
       },
+      "cut": {
+        "title": "First cut: critic {score}/10",
+        "sheet": "Contact sheet of the whole video",
+        "apply": "Apply fixes",
+        "always": "Apply, and stop asking",
+        "ship": "Keep it as is"
+      },
       "pick": {
         "label": "Pick references",
         "hint": "Tap once to follow, twice to avoid",

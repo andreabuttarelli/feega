@@ -19,6 +19,18 @@ import { motionEmbedState, publishMotionEmbed, type EmbedAnswer } from '$lib/ser
 
 const PICK_RELAY = 'The motion agent asks the user which references to follow: call ask_reference_pick with this question and these candidates (same ids) so the user picks here, then pass their answer to ask_motion_agent as reference_pick (follow and avoid ids, note; or rejected true with their query and avoid_all when they turned them all down).';
 
+const CUT_RELAY = 'The motion agent finished a first cut and its critic scored it: show the user cut_review (score, fixes, sheet) and ask whether to apply the fixes, apply them and stop asking, or keep the cut as is; then call ask_motion_agent with the matching cut_review.answers text as the request, unchanged.';
+
+const RELAYS: readonly { field: string; next: string }[] = [
+  { field: 'reference_pick', next: PICK_RELAY },
+  { field: 'cut_review', next: CUT_RELAY }
+];
+
+export function relayed(state: Record<string, unknown>): Record<string, unknown> {
+  const relay = RELAYS.find((r) => state[r.field]);
+  return relay ? { ...state, next: relay.next } : state;
+}
+
 const pickReplySchema = z.object({ follow: z.array(z.string()).max(12), avoid: z.array(z.string()).max(12), note: z.string().max(1000).optional(), rejected: z.boolean().optional(), query: z.string().max(300).optional(), avoid_all: z.boolean().optional() });
 
 export const MOTION_DELEGATION_TOOLS = [
@@ -123,7 +135,7 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
       await pause(pollMs);
       state = await bodyOf(await askStatus(db, { orgId, runId }));
     }
-    return state.reference_pick ? { ...state, next: PICK_RELAY } : state;
+    return relayed(state);
   }
 
   return {

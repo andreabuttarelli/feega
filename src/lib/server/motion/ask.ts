@@ -1,3 +1,4 @@
+import { cutAnswers } from '$lib/motion/cut-review';
 import { json } from '@sveltejs/kit';
 import type { Db } from '$lib/server/db/client';
 import { findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
@@ -145,6 +146,7 @@ export async function askStatus(db: Db, input: { orgId: string; runId: string })
     version: outcome.version ?? null,
     revision: outcome.revision ?? null,
     reference_pick: outcome.pick ?? null,
+    cut_review: outcome.cut ? { ...outcome.cut, answers: cutAnswers(outcome.cut.fixes) } : null,
     cost_usd: run.costUsd,
     error: run.error,
     editor_url: editorUrl(motion.record),

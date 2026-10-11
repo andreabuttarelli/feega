@@ -326,3 +326,13 @@ describe('the canvas agent delegates motion videos', () => {
     expect(await call(tools().view_motion_frames, { nodeId: NODE, times: [0] })).toMatchObject({ error: 'motion_node_not_found' });
   });
 });
+
+describe('what the canvas chat is told to do with a finished motion run', () => {
+  it('relays a first cut the critic reviewed, with the exact answers to send back', async () => {
+    const { relayed } = await import('./motion-delegation');
+    const state = relayed({ status: 'done', cut_review: { score: 5, fixes: ['2s: empty'], answers: { apply: 'Apply…' } } });
+
+    expect(state.next).toMatch(/cut_review\.answers/);
+    expect(relayed({ status: 'done' }).next).toBeUndefined();
+  });
+});

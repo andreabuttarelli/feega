@@ -50,6 +50,11 @@ function printRun(run: MotionRun) {
     run.reference_pick.candidates.forEach((c) => console.log(`  ${c.id}  ${c.image}${c.why ? `  ${c.why}` : ''}`));
     console.log(`Answer: feega motion ask ${run.node_id ?? '<nodeId>'} "" --follow <ids...> --avoid <ids...>`);
   }
+  if (run.cut_review) {
+    console.log(`  critic ${run.cut_review.score}/10`);
+    run.cut_review.fixes.forEach((f) => console.log(`  - ${f}`));
+    console.log(`Apply: feega motion ask ${run.node_id ?? '<nodeId>'} ${JSON.stringify(run.cut_review.answers.apply)}`);
+  }
   if (run.error) {
     console.error(run.error);
   }
