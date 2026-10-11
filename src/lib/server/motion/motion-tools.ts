@@ -223,6 +223,11 @@ const SCRIPT_INPUT = scriptSchema.extend({ app_account: z.enum(AppAccount).optio
 
 const PUBLIC_SITE_NEXT = 'this is the public site of an app, read signed out: if the product is that app, the trailer shows its real screens, not this page. Before any shot, ask the user in chat for a TEST account (login url, email, password; say you will see it) and end the turn on that question; then sign in with app_browse and recreate_ui 2–3 signed-in work screens (the editor, the canvas, the result)';
 
+const screenKey = (url: string) => {
+  const u = new URL(url);
+  return `${u.host}${u.pathname.replace(/\/+$/, '')}${u.search}`;
+};
+
 const fidelityOf = (fidelity: number | undefined) => {
   if (fidelity === undefined) {
     return {};
@@ -637,10 +642,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
   const created = (out: ReturnType<typeof apply>, clipId: string) => (out.ok ? { ...out, clip_id: clipId } : out);
 
+  const screens = new Map<string, string>();
+
   async function recreateFromUrl(url: string, input: { name: string; start?: number; duration: number; track_id?: string }) {
     if (!deps.captureUi) {
       return UNREADABLE('a browser to read the page');
     }
+    const screen = screenKey(url);
+    const taken = screens.get(screen);
+    if (taken && taken !== input.name) {
+      return { ok: false, error: `${url} is the screen already rebuilt as ${taken}: open another work screen (the editor of a video, the canvas, the export) from the app links app_browse returned, and recreate_ui that url` };
+    }
+    screens.set(screen, input.name);
     const read = await deps.captureUi(url);
     if (!read.ok) {
       return read;

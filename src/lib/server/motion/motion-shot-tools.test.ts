@@ -98,6 +98,18 @@ describe('the recreated app on screen', () => {
     expect((await placed(0.96)).made.low_fidelity).toBeUndefined();
   });
 
+  it('refuses the same screen under a second name: v8 rebuilt /app twice and called it two screens', async () => {
+    const ctx = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.Kept })));
+    await ctx.run('recreate_ui', { url: 'https://feega.test/app', name: 'FeegaApp' });
+
+    const again = await ctx.run('recreate_ui', { url: 'https://feega.test/app/', name: 'FeegaEditor' });
+
+    expect(again.ok).toBe(false);
+    expect(String(again.error)).toMatch(/FeegaApp.*another work screen/);
+    expect((await ctx.run('recreate_ui', { url: 'https://feega.test/app', name: 'FeegaApp' })).ok).toBe(true);
+    expect((await ctx.run('recreate_ui', { url: 'https://feega.test/app/videos/1', name: 'FeegaEditor' })).ok).toBe(true);
+  });
+
   it('puts fidelity first, so a saved output cut short still shows it', async () => {
     expect(Object.keys((await placed(0.96)).made).slice(0, 2)).toEqual(['ok', 'fidelity']);
   });
