@@ -351,6 +351,20 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.critiques).toHaveLength(0);
   });
 
+  it('a new video on a blank doc opens with the director: story and research tools only, no building yet', async () => {
+    world.message = 'a launch trailer for supasito.com';
+    await turn();
+
+    expect(world.tools[0]).toContain('write_script');
+    expect(world.tools[0]).not.toContain('add_clip');
+  });
+
+  it('a small edit on a blank doc goes straight to the builder', async () => {
+    await turn();
+
+    expect(world.tools[0]).toContain('add_clip');
+  });
+
   it('a cut the critic passes is delivered without another round', async () => {
     world.critic = { score: 9, fixes: [] };
     await turn();
