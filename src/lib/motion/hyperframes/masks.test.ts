@@ -30,11 +30,19 @@ describe('mask markup', () => {
     expect(compose(base)).not.toContain('id="km-img"');
   });
 
-  it('a masked clip spans the whole mask region, so content past the frame edge is not cut square', () => {
+  it('a masked clip inside the frame keeps a frame-sized wrapper, since a bigger one costs every frame it animates', () => {
     const html = masked({ kind: MaskKind.Ellipse });
 
-    expect(html).toContain('<div class="km" id="km-img" style="left:-480px;top:-270px;width:2880px;height:1620px;mask:url(#mk-img);-webkit-mask:url(#mk-img)"><div class="kb" style="left:480px;top:270px;width:1920px;height:1080px">');
-    expect(html).toMatch(/<mask id="mk-img" maskUnits="userSpaceOnUse" x="0" y="0" width="2880" height="1620"><g transform="translate\(480 270\)"><g filter="url\(#mf-img\)">/);
+    expect(html).toContain('<div class="km" id="km-img" style="left:0px;top:0px;width:1920px;height:1080px;mask:url(#mk-img);-webkit-mask:url(#mk-img)"><div class="kb" style="left:0px;top:0px;width:1920px;height:1080px">');
+    expect(html).toMatch(/<mask id="mk-img" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080"><g transform="translate\(0 0\)"><g filter="url\(#mf-img\)">/);
+  });
+
+  it('a masked clip reaching past the frame edge spans its own box, so its content is not cut square', () => {
+    const past = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Image', from: 0, durationInFrames: 60, props: { assetId: 'pic', x: 0.9, y: 0.2, width: 0.5, height: 0.5 } }, 'img'));
+    const html = compose(must(setMask(past, 'img', { kind: MaskKind.Ellipse })));
+
+    expect(html).toContain('<div class="km" id="km-img" style="left:0px;top:-54px;width:2208px;height:1134px;mask:url(#mk-img);-webkit-mask:url(#mk-img)"><div class="kb" style="left:0px;top:54px;width:1920px;height:1080px">');
+    expect(html).toMatch(/<mask id="mk-img" maskUnits="userSpaceOnUse" x="0" y="0" width="2208" height="1134"><g transform="translate\(0 54\)">/);
   });
 
   it('position, rotation and size are one transform per prop, in frame pixels, around a 100-unit shape', () => {
@@ -79,7 +87,7 @@ describe('mask markup', () => {
   it('invert paints the frame and cuts the shape out of it', () => {
     const html = masked({ kind: MaskKind.Ellipse, invert: true });
 
-    expect(html).toContain('<rect x="0" y="0" width="2880" height="1620" fill="#fff"/>');
+    expect(html).toContain('<rect x="0" y="0" width="1920" height="1080" fill="#fff"/>');
     expect(html).toContain('<ellipse rx="50" ry="50" fill="#000"/>');
   });
 
@@ -273,6 +281,6 @@ describe('several masks on one clip', () => {
 
     expect(html).toContain('<mask id="mk-img"');
     expect(html).toContain('<mask id="m1k-img"');
-    expect(html).toContain('height:1620px;mask:url(#m1k-img),url(#mk-img);-webkit-mask:url(#m1k-img),url(#mk-img);mask-composite:intersect,add"');
+    expect(html).toContain('height:1080px;mask:url(#m1k-img),url(#mk-img);-webkit-mask:url(#m1k-img),url(#mk-img);mask-composite:intersect,add"');
   });
 });
