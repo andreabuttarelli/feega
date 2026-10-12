@@ -3,7 +3,8 @@ import { TrackKind } from '$lib/motion/components';
 import { motionDocSchema, parseMotionDoc, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { MAX_FIELDS, type ExposedField } from './field-model';
-import { applyValues, fieldValues, locateClip, type FieldValue } from './fields';
+import { applyValues, fieldValues, locateClip, setField, type FieldValue } from './fields';
+import { keyFieldsSchema, type KeyFields } from './key-fields';
 import { VAR_PREFIX, paramVar } from '$lib/motion/custom/component';
 import { interactiveOf } from '$lib/motion/interactive/settings';
 import { MAX_VARS, coerceVars, type VarDecl } from '$lib/motion/interactive/var-model';
@@ -11,6 +12,7 @@ import { MAX_VARS, coerceVars, type VarDecl } from '$lib/motion/interactive/var-
 export const motionTemplateSchema = z.object({
   name: z.string().trim().min(1).max(60),
   description: z.string().max(200).default(''),
+  keyFields: keyFieldsSchema,
   doc: motionDocSchema
 });
 
@@ -183,7 +185,7 @@ export function insertTemplate(doc: MotionDoc, entry: TemplateEntry, at: Placeme
 
   const compId = at.newId();
   const nested = Object.fromEntries(Object.entries(source.comps).map(([id, c]) => [rename(id), { ...unmarked(c), tracks: tracks(c.tracks) }]));
-  const comp: MotionComp = { template: { id: entry.id, name: entry.template.name, keys }, name: entry.template.name, durationInFrames: source.durationInFrames, tracks: tracks(source.tracks.filter((t) => t.kind === TrackKind.Visual)) };
+  const comp: MotionComp = { template: { id: entry.id, name: entry.template.name, keys, ...(entry.template.keyFields ? { keyFields: entry.template.keyFields } : {}) }, name: entry.template.name, durationInFrames: source.durationInFrames, tracks: tracks(source.tracks.filter((t) => t.kind === TrackKind.Visual)) };
   const next: MotionDoc = {
     ...adoptVars(doc, movedVars(interactiveOf(source).vars, moves)),
     comps: { ...doc.comps, ...nested, [compId]: comp },
@@ -217,6 +219,22 @@ export function templateFields(doc: MotionDoc, clipId: string): TemplateFieldVal
     const value = values.get(docKey);
     return value ? [{ ...value, key: local, docKey }] : [];
   });
+}
+
+export const keyFieldsOf = (doc: MotionDoc, clipId: string): KeyFields => instanceComp(doc, clipId)?.comp.template?.keyFields;
+
+export type Instance = { doc: MotionDoc; clipId: string };
+
+const edited = (f: TemplateFieldValue) => JSON.stringify(f.value) !== JSON.stringify(f.default ?? null);
+
+export function carryEdits(from: Instance, to: Instance): Changed {
+  const targets = new Map(templateFields(to.doc, to.clipId).map((f) => [f.key, f]));
+  return templateFields(from.doc, from.clipId)
+    .filter(edited)
+    .reduce<Changed>((current, f) => {
+      const target = targets.get(f.key);
+      return current.ok && target ? setField(current.doc, target, f.value) : current;
+    }, { ok: true, doc: to.doc });
 }
 
 export function setTemplateValues(doc: MotionDoc, clipId: string, values: Record<string, string>): Changed {
