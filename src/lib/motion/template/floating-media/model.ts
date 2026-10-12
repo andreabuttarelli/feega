@@ -1,12 +1,13 @@
+import { WORD_ENTRANCE } from '../word-entrance';
+
 export const FLOAT_MODEL = String.raw`
+${WORD_ENTRANCE}
 const PERSPECTIVE = 1.8;
 const MAX_CARDS = 12;
 const CARD_RATIO = 1.25;
 const SETTLE = 0.012;
 const ENTER = 1.6;
 const EXIT = 1.1;
-const WORD_IN = 1.1;
-const WORD_GAP = 0.08;
 const NATURAL = 2 * Math.PI * 0.12;
 const PUSH_OUT = 1.06;
 const PUSH_STEPS = 80;
@@ -15,11 +16,7 @@ const RELAX_ROUNDS = 40;
 const GOLDEN_ANGLE = 2.39996;
 const ARRIVE_DEPTH = 0.5;
 
-const clamp01 = (x) => Math.min(1, Math.max(0, x));
-const span = (t, at, length) => clamp01((t - at) / Math.max(length, 1e-6));
-const expoInOut = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x < 0.5 ? Math.pow(2, 20 * x - 10) / 2 : (2 - Math.pow(2, -20 * x + 10)) / 2);
 const settle = (x) => expoInOut(x) + SETTLE * Math.sin(Math.PI * clamp01((x - 0.5) / 0.5));
-const smooth = (x) => x * x * x * (x * (x * 6 - 15) + 10);
 
 const hash01 = (i, salt) => {
   let h = Math.imul(i + 1, 374761393) ^ Math.imul(salt + 7, 668265263);
@@ -248,10 +245,9 @@ function cardFrame(card, n, p, t, length, start, push) {
 function wordFrames(words, p, t, length) {
   return words.map((_, i) => {
     const at = p.titleAt + i * WORD_GAP;
-    const e = expoInOut(span(t, at, WORD_IN));
+    const e = wordIn(t, at);
     const out = p.leave ? expoInOut(span(t, length - EXIT - 0.2 + i * 0.04, EXIT * 0.8)) : 0;
-    const shown = smooth(span(t, at, WORD_IN * 0.35)) * (1 - smooth(out));
-    return { y: 0.2 * (1 - e) - 0.1 * out, blur: p.titleBlur * (1 - e + out), opacity: shown };
+    return { y: e.rise - 0.1 * out, blur: p.titleBlur * (1 - e.progress + out), opacity: e.opacity * (1 - smooth(out)) };
   });
 }
 
