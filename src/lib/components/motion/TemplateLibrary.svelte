@@ -38,10 +38,18 @@
   let picked = $state<string | null>(null);
   let sounds = $state(true);
   const chosen = $derived(picked ?? initial);
+  let list = $state<HTMLUListElement | null>(null);
+
+  $effect(() => {
+    if (initial && list) {
+      list.querySelector('.on')?.scrollIntoView({ block: 'nearest' });
+    }
+  });
   let name = $state('');
   let description = $state('');
   let error = $state('');
   let previewFrame = $state(0);
+  let previewPlaying = $state(true);
 
   const entry = $derived(templates.find((t) => t.id === chosen) ?? templates[0] ?? null);
   const sample = $derived.by(() => {
@@ -87,7 +95,7 @@
   <header><span>Templates</span><IconButton action={Action.Close} onclick={onclose} /></header>
 
   <div class="split">
-    <ul class="list">
+    <ul class="list" bind:this={list}>
       {#each templates as t (t.id)}
         <li>
           <button type="button" class:on={entry?.id === t.id} onclick={() => (picked = t.id)}>{t.template.name}</button>
@@ -99,7 +107,7 @@
     {#if entry}
       <div class="detail">
         {#if sample}
-          <div class="preview"><MotionPreview html={compose(sample)} width={sample.width} height={sample.height} fps={sample.fps} bind:frame={previewFrame} /></div>
+          <div class="preview" style={`aspect-ratio: ${sample.width} / ${sample.height};`}><MotionPreview html={compose(sample)} width={sample.width} height={sample.height} fps={sample.fps} bind:frame={previewFrame} bind:playing={previewPlaying} /></div>
         {/if}
         <p>{entry.template.description}</p>
         <p class="fields">{entry.template.doc.fields.map((f) => `${f.label} · ${FIELD_TYPE_LABEL[f.type]}`).join(' — ')}</p>
@@ -184,7 +192,17 @@
     flex: 0;
   }
 
+  .preview {
+    width: 100%;
+    max-height: 360px;
+    container-type: size;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+  }
+
   .detail {
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 8px;

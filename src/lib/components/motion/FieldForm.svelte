@@ -24,6 +24,7 @@
   let error = $state('');
 
   const UNGROUPED = '';
+  const HEX_VALUE = /^#[0-9a-f]{6}/i;
   const groups = $derived([...new Set(fields.map((f) => f.group ?? UNGROUPED))].map((name) => ({ name, fields: fields.filter((f) => (f.group ?? UNGROUPED) === name) })));
   const ranged = (f: TemplateFieldValue) => f.min !== undefined && f.max !== undefined;
   const stepOf = (f: TemplateFieldValue) => ((f.max ?? 1) - (f.min ?? 0)) / 100;
@@ -56,7 +57,10 @@
     {#if f.type === FieldType.Text}
       <textarea rows="2" value={String(f.value ?? '')} onchange={(e) => set(f, e.currentTarget.value)}></textarea>
     {:else if f.type === FieldType.Color}
-      <input type="color" value={String(f.value ?? '#000000').slice(0, 7)} onchange={(e) => set(f, e.currentTarget.value)} />
+      <span class="colour">
+        <input type="color" value={HEX_VALUE.test(String(f.value)) ? String(f.value).slice(0, 7) : '#000000'} onchange={(e) => set(f, e.currentTarget.value)} />
+        <output>{HEX_VALUE.test(String(f.value)) ? f.value : 'none'}</output>
+      </span>
     {:else if f.type === FieldType.Number && ranged(f)}
       <span class="slider">
         <input type="range" min={f.min} max={f.max} step={stepOf(f)} value={Number(f.value ?? 0)} oninput={(e) => set(f, e.currentTarget.value)} />
@@ -122,6 +126,13 @@
     align-items: center;
   }
 
+  .colour {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .colour output,
   .slider output {
     font-family: var(--ui-mono);
     font-size: 11px;

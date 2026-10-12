@@ -17,7 +17,6 @@ export const PROMPT_CSS = String.raw`
   color: var(--pi-ink);
   -webkit-font-smoothing: antialiased;
   transform-origin: 50% 50%;
-  will-change: transform;
 }
 
 .pi-box {

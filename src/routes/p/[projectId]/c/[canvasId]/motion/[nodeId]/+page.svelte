@@ -652,6 +652,7 @@
       return;
     }
     selection = [placed.clipId];
+    showProperties();
     if (sounds) {
       await addTemplateSounds(placed.doc, placed.clipId, history.present);
     }

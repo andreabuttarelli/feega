@@ -202,6 +202,12 @@ Every save is a revision. `list_motion_revisions` lists them (who saved, clip co
 `restore_motion_revision` puts one back as a new revision, history kept. Free. CLI:
 `feega motion revisions <nodeId> [--restore <version>]`.
 
+Ready-made pieces: `list_motion_templates` lists them with their typed fields (e.g.
+`builtin:prompt-input`, a prompt box that types, presses send and thinks);
+`add_motion_template` inserts an editable copy at `at` seconds with `vars` as field values and
+its key/click sounds. Free, no AI. CLI: `feega motion templates`,
+`feega motion add-template <nodeId> builtin:prompt-input --var text="..."`.
+
 A launch film's script is also laid out as a storyboard canvas linked to the video: one card per
 beat, story order left to right, stronger emotion higher. `get_storyboard` reads it (the user's
 edits included, and the clips each card plays), `write_storyboard` writes it from beats,
