@@ -21,7 +21,7 @@ export const WIRE_PROPS: Record<string, PropSpec> = {
   lineOpacity: number('Wire strength', 0.55, 0, 1, 'Layout', 0.05),
   backLines: number('Wire behind the globe', 0.3, 0, 1, 'Layout', 0.05),
   gridStep: number('Wire spacing (degrees)', 15, 6, 45, 'Layout', 1),
-  pages: number('Pages', 26, 6, 40, 'Layout', 1),
+  pages: number('Pages', 32, 6, 40, 'Layout', 1),
   pageSize: number('Page size', 1, 0.5, 1.6, 'Layout', 0.05),
   pageAspect: number('Page aspect (width / height)', 0.75, 0.4, 2, 'Layout', 0.05),
   radius: number('Globe radius (share of the short side)', 0.47, 0.2, 0.6, 'Layout', 0.01),

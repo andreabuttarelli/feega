@@ -19,21 +19,32 @@ const times = Array.from({ length: LENGTH * FPS + 1 }, (_, i) => i / FPS);
 const GRID = [0, 0.5, 1];
 
 describe('the wire globe pages model', () => {
-  it('bends every page onto the sphere, just inside the wire', () => {
+  it('bends every page onto its own shell, all inside the wire', () => {
     const pages = model.pageLayout(PARAMS);
 
     expect(pages).toHaveLength(22);
     pages.forEach((page) => {
       GRID.forEach((u) => GRID.forEach((v) => expect(Math.hypot(...model.pagePoint(page, u, v))).toBeCloseTo(page.r, 9)));
       expect(page.r).toBeLessThan(1);
-      expect(page.r).toBeGreaterThan(0.9);
     });
   });
 
-  it('gives each page its own layer, so overlaps never flicker', () => {
+  it('stacks the pages on levels from the core to the wire, so some pass in front of others', () => {
     const radii = model.pageLayout(PARAMS).map((p) => p.r);
 
-    expect(new Set(radii).size).toBe(radii.length);
+    expect(Math.min(...radii)).toBeLessThan(0.5);
+    expect(Math.max(...radii)).toBeGreaterThan(0.85);
+    expect(radii.filter((r) => r < 0.7).length).toBeGreaterThan(radii.length / 4);
+    expect(radii.filter((r) => r > 0.7).length).toBeGreaterThan(radii.length / 4);
+  });
+
+  it('keeps inner pages readable: a deeper page spans a wider angle', () => {
+    const pages = model.pageLayout(PARAMS);
+    const inner = pages.filter((p) => p.r < 0.6);
+    const outer = pages.filter((p) => p.r > 0.8);
+    const mean = (list: Page[]) => list.reduce((s, p) => s + p.w * p.h, 0) / list.length;
+
+    expect(mean(inner)).toBeGreaterThan(mean(outer));
   });
 
   it('keeps the page shape: width over height is the asked aspect', () => {
@@ -54,7 +65,7 @@ describe('the wire globe pages model', () => {
 
     expect(Math.max(...lats)).toBeGreaterThan(0.7);
     expect(Math.min(...lats)).toBeLessThan(-0.7);
-    expect(area).toBeGreaterThan(4 * Math.PI * 0.9);
+    expect(area).toBeGreaterThan(4 * Math.PI * 0.6);
   });
 
   it('is the same layout every time', () => {

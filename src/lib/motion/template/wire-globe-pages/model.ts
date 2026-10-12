@@ -7,9 +7,11 @@ const LAT_JITTER = 0.3;
 const LON_JITTER = 0.5;
 const SIZE_JITTER = 0.45;
 const ASPECT_JITTER = 0.16;
-const ROLL_JITTER = 0.9;
-const OUTER_PAGE = 0.975;
-const LAYER_DEPTH = 0.045;
+const ROLL_JITTER = 1.3;
+const OUTER_PAGE = 0.95;
+const INNER_PAGE = 0.38;
+const LEVEL_STRIDE = 0.38;
+const MAX_SPAN = 1.7;
 const POLE = Math.PI / 2 - 0.05;
 const DEG = Math.PI / 180;
 
@@ -18,11 +20,23 @@ const hash = (i, k) => {
   return x - Math.floor(x);
 };
 
+const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+
+function levelOf(i, n) {
+  let stride = Math.max(1, Math.round(n * LEVEL_STRIDE));
+  while (gcd(stride, n) !== 1) {
+    stride++;
+  }
+  const level = ((i * stride) % n + 0.5) / n;
+  return INNER_PAGE + (OUTER_PAGE - INNER_PAGE) * level;
+}
+
 function pageLayout(p) {
   const n = Math.max(MIN_PAGES, Math.min(MAX_PAGES, Math.round(p.pages)));
   const side = Math.sqrt((4 * Math.PI) / n) * COVERAGE * p.pageSize;
   return Array.from({ length: n }, (_, i) => {
-    const size = side * (1 + (hash(i, 1) - 0.5) * SIZE_JITTER);
+    const r = levelOf(i, n);
+    const size = Math.min(MAX_SPAN, (side / Math.sqrt(r)) * (1 + (hash(i, 1) - 0.5) * SIZE_JITTER));
     const aspect = p.pageAspect * (1 + (hash(i, 2) - 0.5) * ASPECT_JITTER);
     const lat = Math.asin(1 - (2 * (i + 0.5)) / n) + (hash(i, 3) - 0.5) * LAT_JITTER;
     return {
@@ -31,7 +45,7 @@ function pageLayout(p) {
       roll: (hash(i, 5) - 0.5) * ROLL_JITTER,
       w: size * Math.sqrt(aspect),
       h: size / Math.sqrt(aspect),
-      r: OUTER_PAGE - (LAYER_DEPTH * i) / n,
+      r,
       slot: i
     };
   });

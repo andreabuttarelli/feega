@@ -6,9 +6,10 @@ const FOV = 30;
 const PAGE_SEGMENTS = 20;
 const CIRCLE_SEGMENTS = 192;
 const WIRE_RADIUS = 1;
+const DEPTH_FOG = 0.5;
 
-const PAGE_VERTEX = 'varying vec2 vUv; varying float vFacing; void main() { vUv = uv; vec4 view = modelViewMatrix * vec4(position, 1.0); vFacing = dot(normalize(normalMatrix * normal), normalize(-view.xyz)); gl_Position = projectionMatrix * view; }';
-const PAGE_FRAGMENT = 'uniform sampler2D uMap; uniform float uHas; uniform vec4 uCrop; uniform float uMono; uniform float uBack; uniform float uContrast; uniform float uBright; uniform vec3 uEmpty; uniform vec3 uBg; varying vec2 vUv; varying float vFacing; void main() { vec3 c = mix(uEmpty, texture2D(uMap, uCrop.xy * vUv + uCrop.zw).rgb, uHas); c = mix(c, vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), uMono); c = clamp((c - 0.5) * uContrast + 0.5, 0.0, 1.0) * uBright; vec2 e = min(vUv, 1.0 - vUv); c = mix(c, vec3(0.85), 0.35 * (1.0 - smoothstep(0.0, 0.006, min(e.x, e.y)))); c = mix(c, uBg, uBack * smoothstep(0.2, -0.4, vFacing)); gl_FragColor = vec4(c, 1.0); }';
+const PAGE_VERTEX = 'varying vec2 vUv; varying float vFacing; varying float vDepth; void main() { vUv = uv; vec4 view = modelViewMatrix * vec4(position, 1.0); vDepth = view.z - (modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0)).z; vFacing = dot(normalize(normalMatrix * normal), normalize(-view.xyz)); gl_Position = projectionMatrix * view; }';
+const PAGE_FRAGMENT = 'uniform sampler2D uMap; uniform float uHas; uniform vec4 uCrop; uniform float uMono; uniform float uBack; uniform float uContrast; uniform float uBright; uniform vec3 uEmpty; uniform vec3 uBg; uniform float uFog; varying vec2 vUv; varying float vFacing; varying float vDepth; void main() { vec3 c = mix(uEmpty, texture2D(uMap, uCrop.xy * vUv + uCrop.zw).rgb, uHas); c = mix(c, vec3(dot(c, vec3(0.2126, 0.7152, 0.0722))), uMono); c = clamp((c - 0.5) * uContrast + 0.5, 0.0, 1.0) * uBright; vec2 e = min(vUv, 1.0 - vUv); c = mix(c, vec3(0.85), 0.35 * (1.0 - smoothstep(0.0, 0.006, min(e.x, e.y)))); c = mix(c, uBg, uBack * smoothstep(0.2, -0.4, vFacing)); c = mix(c, uBg, uFog * smoothstep(0.4, -1.0, vDepth)); gl_FragColor = vec4(c, 1.0); }';
 const LINE_VERTEX = 'varying float vFacing; void main() { vec4 view = modelViewMatrix * vec4(position, 1.0); vec4 centre = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0); vFacing = dot(normalize(view.xyz - centre.xyz), normalize(-view.xyz)); gl_Position = projectionMatrix * view; }';
 const LINE_FRAGMENT = 'uniform vec3 uColor; uniform float uOpacity; uniform float uBackLines; varying float vFacing; void main() { gl_FragColor = vec4(uColor, uOpacity * mix(uBackLines, 1.0, smoothstep(-0.15, 0.15, vFacing))); }';
 
@@ -129,7 +130,7 @@ const buildPages = (p) => {
       vertexShader: PAGE_VERTEX,
       fragmentShader: PAGE_FRAGMENT,
       side: THREE.DoubleSide,
-      uniforms: { uMap: { value: world.blank }, uHas: { value: 0 }, uCrop: { value: new THREE.Vector4(1, 1, 0, 0) }, uMono: { value: 1 }, uBack: { value: 0.7 }, uContrast: { value: 1 }, uBright: { value: 1 }, uEmpty: { value: rgb('#2b2b2b') }, uBg: { value: rgb('#0d0d0d') } }
+      uniforms: { uMap: { value: world.blank }, uHas: { value: 0 }, uCrop: { value: new THREE.Vector4(1, 1, 0, 0) }, uMono: { value: 1 }, uBack: { value: 0.7 }, uContrast: { value: 1 }, uBright: { value: 1 }, uEmpty: { value: rgb('#2b2b2b') }, uBg: { value: rgb('#0d0d0d') }, uFog: { value: DEPTH_FOG } }
     });
     const mesh = new THREE.Mesh(pageGeometry(page), material);
     mesh.matrixAutoUpdate = false;
