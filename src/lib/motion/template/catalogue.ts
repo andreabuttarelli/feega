@@ -15,6 +15,16 @@ export const KIND_LABEL: Record<ComponentKind, string> = {
   [ComponentKind.Scene]: 'Scenes'
 };
 
+export enum AddTarget {
+  Video = 'video',
+  Composition = 'composition'
+}
+
+export const ADD_TARGET: Record<AddTarget, { label: string; sounds: boolean }> = {
+  [AddTarget.Video]: { label: 'Add to video', sounds: true },
+  [AddTarget.Composition]: { label: 'Use in composition', sounds: false }
+};
+
 export const STARTER_FORMATS = [MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Square] as const;
 export type StarterFormat = (typeof STARTER_FORMATS)[number];
 

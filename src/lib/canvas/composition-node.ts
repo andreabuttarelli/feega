@@ -1,8 +1,20 @@
 import type { LayoutId } from './composition/types';
 import type { CameraPresetId } from './composition/camera';
 import type { CellSpec } from '$lib/motion/components';
+import { z } from 'zod';
+import { FIELD_KEY } from '$lib/motion/template/field-model';
 
 export type CompositionAspect = '9:16' | '1:1' | '16:9';
+
+const TEMPLATE_ID_MAX = 120;
+const TEMPLATE_VALUE_MAX = 2000;
+
+export const compositionTemplateSchema = z.object({
+  id: z.string().min(1).max(TEMPLATE_ID_MAX),
+  values: z.record(z.string().regex(FIELD_KEY), z.string().max(TEMPLATE_VALUE_MAX)).default({})
+});
+
+export type CompositionTemplate = z.infer<typeof compositionTemplateSchema>;
 
 export type CompositionNode = {
   id: string;
@@ -14,6 +26,7 @@ export type CompositionNode = {
   aspect: CompositionAspect;
   refId: string | null;
   cells: Record<string, CellSpec>;
+  template?: CompositionTemplate | null;
 };
 
 const COMPOSITION_NODE_SIZE = { w: 320, h: 240 };
