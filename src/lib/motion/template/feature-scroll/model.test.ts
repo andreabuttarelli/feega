@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { SCROLL_MODEL } from './model';
 
 type Layout = { pitch: number; closeY: number; lineSize: number; box: { ax: number; ay: number }; lines: { y: number; text: string }[] };
-type Look = { opacity: number; y: number; blur: number };
-type Frame = { camera: number; speed: number; shift: number; streak: number; list: number; open: Look; close: Look; land: number };
+type Word = { progress: number; rise: number; opacity: number };
+type Frame = { camera: number; speed: number; shift: number; streak: number; open: Word[]; lines: Word[]; close: Word[]; closeOut: { opacity: number; y: number }; land: number };
 type Model = {
   scrollLayout: (p: object, width: number, height: number) => Layout;
   scrollFrame: (layout: Layout, p: object, t: number, length: number, fps: number) => Frame;
@@ -12,21 +12,21 @@ type Model = {
 const model = new Function(`${SCROLL_MODEL}; return { scrollLayout, scrollFrame };`)() as Model;
 
 const PARAMS = {
+  openTitle: 'everything you need',
+  closeTitle: 'in one place.',
   lines: 'One canvas for every idea\nVideos made from a prompt\nYour brand, on every frame\nMotion templates you can remix\nExport in every format',
   repeat: 4,
-  fontSize: 12,
-  lineScale: 0.5,
+  fontSize: 9,
   lineSpacing: 1.2,
   gap: 0.4,
   titleAt: 0,
-  holdSeconds: 1,
-  readSpeed: 1.1,
-  readSeconds: 3.2,
+  holdSeconds: 0.8,
+  readSpeed: 2.6,
+  readSeconds: 1.8,
   accelSeconds: 2.4,
   accelCurve: 2.5,
   brakeSeconds: 1.6,
   motionBlur: 0.6,
-  titleBlur: 0.12,
   leave: true
 };
 const LENGTH = 12;
@@ -61,7 +61,7 @@ describe('the feature scroll model', () => {
     const peak = Math.max(...frames.map((f) => f.speed));
 
     expect(reading.length / FPS).toBeGreaterThan(PARAMS.readSeconds * 0.9);
-    expect(peak).toBeGreaterThan(PARAMS.readSpeed * 8);
+    expect(peak).toBeGreaterThan(PARAMS.readSpeed * 5);
   });
 
   it('changes speed smoothly: no per-frame displacement jumps', () => {
@@ -81,7 +81,8 @@ describe('the feature scroll model', () => {
       landed.forEach((f) => {
         expect(f.camera).toBeCloseTo(layout.closeY, 9);
         expect(f.speed).toBe(0);
-        expect(f.close.opacity).toBe(1);
+        f.close.forEach((w) => expect(w.opacity).toBe(1));
+        expect(f.closeOut.opacity).toBe(1);
       });
     });
 
@@ -104,15 +105,15 @@ describe('the feature scroll model', () => {
     const { frames } = run();
     const [first, last] = [frames[0], frames[frames.length - 1]];
 
-    expect(first.open.opacity).toBe(0);
-    expect(first.list).toBe(0);
-    expect(last.close.opacity).toBeCloseTo(0, 6);
+    expect(first.open.every((w) => w.opacity === 0)).toBe(true);
+    expect(first.lines[0].opacity).toBe(0);
+    expect(last.closeOut.opacity).toBeCloseTo(0, 6);
   });
 
   it('without loop, the closing title stays on the last frame', () => {
     const { frames } = run({ ...PARAMS, leave: false });
 
-    expect(frames[frames.length - 1].close.opacity).toBe(1);
+    expect(frames[frames.length - 1].closeOut.opacity).toBe(1);
   });
 
   it('streaks only while moving, in proportion to the blur amount', () => {
@@ -127,6 +128,32 @@ describe('the feature scroll model', () => {
   it('shows the opening title within the first frames', () => {
     const { frames } = run();
 
-    expect(frames[Math.round(0.3 * FPS)].open.opacity).toBeGreaterThan(0.5);
+    expect(frames[Math.round(0.3 * FPS)].open[0].opacity).toBeGreaterThan(0.5);
+  });
+
+  it('enters every title word and the first lines with a plain rise, never past rest', () => {
+    const { frames } = run();
+    const tracks = [(f: Frame) => f.open[1], (f: Frame) => f.lines[0], (f: Frame) => f.close[0]];
+
+    for (const track of tracks) {
+      const words = frames.map(track);
+      words.forEach((w) => expect(w.rise).toBeGreaterThanOrEqual(0));
+      words.slice(1).forEach((w, i) => expect(w.opacity).toBeGreaterThanOrEqual(words[i].opacity));
+      expect(words[words.length - 1].opacity).toBe(1);
+    }
+  });
+
+  it('lets later lines arrive by scrolling, already visible', () => {
+    const { layout, frames } = run();
+    const below = layout.lines.findIndex((l) => l.y - layout.lineSize / 2 > layout.box.ay + layout.pitch);
+
+    expect(below).toBeGreaterThan(0);
+    expect(frames[0].lines[below].opacity).toBe(1);
+  });
+
+  it('starts brisk: the list moves within two seconds of the title', () => {
+    const { frames } = run();
+
+    expect(frames[2 * FPS].speed).toBeGreaterThan(0);
   });
 });

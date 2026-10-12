@@ -5,7 +5,7 @@ import { SCROLL_COMPONENT, SCROLL_FONTS, SCROLL_PROPS, SCROLL_VAR_PREFIX, scroll
 
 export const SCROLL_TEMPLATE_ID = `${BUILTIN_PREFIX}feature-scroll`;
 export const SCROLL_CLIP = 'scroll';
-export const SCROLL_VARS = ['openTitle', 'closeTitle', 'lines', 'repeat', 'titleColor', 'lineColor', 'background', 'align', 'readSpeed', 'readSeconds', 'accelSeconds', 'motionBlur'];
+export const SCROLL_VARS = ['openTitle', 'closeTitle', 'lines', 'repeat', 'textColor', 'background', 'align', 'readSpeed', 'readSeconds', 'accelSeconds', 'motionBlur'];
 
 export const FEATURE_SCROLL_TEMPLATE: TemplateEntry = {
   id: SCROLL_TEMPLATE_ID,

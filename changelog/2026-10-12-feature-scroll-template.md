@@ -12,3 +12,7 @@ centred closing title. Lines are out of frame on landing, in every aspect.
 - Closing gap is frame-aware (`ay + pitch`), so 9:16 also clears the lines.
 - `leave` (not `loop`: lint reserves it for p5) fades the closing title so frame L = frame 0.
 - Based on #425's `custom-template.ts`.
+- Review 1: one text style for titles and lines (single font/size/weight/tracking/colour/case
+  fields). Entrances reuse floating-media's word entrance via `word-entrance.ts` (fade + 0.2em
+  rise, expo, no overshoot, no blur): opening title per word, lines already in frame staggered,
+  closing title per word as it brakes. Brisker start: 2.6 lines/s for 1.8 s (`readSpeed` field).
