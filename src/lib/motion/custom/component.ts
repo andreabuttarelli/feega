@@ -9,6 +9,9 @@ export const MAX_CSS = 20_000;
 export const MAX_JS = 40_000;
 export const MAX_PROPS = 30;
 export const MAX_COMPONENTS = 24;
+export const VAR_PREFIX = 'varPrefix';
+export const snakeKey = (key: string) => key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+export const paramVar = (prefix: string, key: string) => `${prefix}_${snakeKey(key)}`;
 const PROP_KEY = /^[a-zA-Z][a-zA-Z0-9_]{0,39}$/;
 
 export enum PropFormat {

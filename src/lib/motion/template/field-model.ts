@@ -22,7 +22,7 @@ export const FIELD_TYPE_LABEL: Record<FieldType, string> = {
   [FieldType.MediaList]: 'Media list'
 };
 export const FIELD_KEY = /^[a-z][a-z0-9_]{0,39}$/;
-export const MAX_FIELDS = 50;
+export const MAX_FIELDS = 120;
 export const MAX_OPTIONS = 20;
 
 export const MAX_LINKED = 12;
