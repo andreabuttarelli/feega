@@ -463,6 +463,13 @@ describe('a live scene in a video', () => {
     expect(live).toEqual([expect.objectContaining({ at: 1, detail: expect.stringContaining('export it as Embed') })]);
     expect(blocking(live)).toEqual([]);
   });
+
+  it('stays quiet when the component draws the video itself with still(t)', () => {
+    const drawn = { ...game, source: { ...game.source, js: 'requestAnimationFrame(() => {});\nreturn { still: (t) => {} };' } };
+    const doc = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Game', drawn)), { component: 'Custom', from: 30, durationInFrames: 60, props: { name: 'Game' } }, 'g1'));
+
+    expect(docProblems(doc, { audioAssets: 1 }).filter((p) => p.kind === Quality.LiveScene)).toEqual([]);
+  });
 });
 
 
