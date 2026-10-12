@@ -5,7 +5,7 @@ import { STRIP_COMPONENT, STRIP_FONTS, STRIP_PROPS, STRIP_VAR_PREFIX, stripCompo
 
 export const STRIP_TEMPLATE_ID = `${BUILTIN_PREFIX}photo-strip`;
 export const STRIP_CLIP = 'strip';
-export const STRIP_VARS = ['media', 'captions', 'background', 'captionColor', 'magnify', 'falloff', 'step', 'gesture', 'pause', 'direction', 'cursor'];
+export const STRIP_VARS = ['captions', 'background', 'captionColor', 'magnify', 'falloff', 'step', 'gesture', 'pause', 'direction', 'cursor'];
 
 const IN_GROUP: Record<string, readonly string[]> = {
   Photos: ['media', 'captions', 'lowercase', 'count'],
@@ -20,6 +20,7 @@ export const PHOTO_STRIP_TEMPLATE: TemplateEntry = {
   template: {
     name: 'Photo strip',
     description: 'A strip of photos slides sideways in hand-like flicks; the one passing the middle grows large, as under a magnifier, then shrinks as it moves on.',
+    keyFields: ['media', 'captions', 'background', 'caption_color', 'magnify'],
     doc: customTemplateDoc({ name: 'photo-strip', component: STRIP_COMPONENT, code: stripComponent(), props: STRIP_PROPS, fonts: STRIP_FONTS, varPrefix: STRIP_VAR_PREFIX, vars: STRIP_VARS, clip: STRIP_CLIP, seconds: 12, fps: 30, groups: STRIP_GROUPS })
   }
 };
