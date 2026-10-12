@@ -69,7 +69,8 @@
   import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
   import { insertTemplate, isLockedComp, type TemplateEntry } from '$lib/motion/template/library';
-  import { PROMPT_TEMPLATE_ID } from '$lib/motion/template/prompt-input/template';
+  import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
+  import { catalogue } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
@@ -149,6 +150,8 @@
   let browsing = $state(false);
   let templates = $state<TemplateEntry[]>(data.templates);
   let browseFirst = $state<string | null>(null);
+  let componentsOpen = $state(false);
+  const components = $derived(catalogue(templates));
   let previewDoc = $state<MotionDoc | null>(null);
   let draft = $state<AgentDraft>(null);
   let sounding = $state<SoundKind | null>(null);
@@ -642,6 +645,14 @@
     const count = Object.keys(history.present.comps).length + 1;
     apply(precompose(doc, selection, { comp: newId(), clip: id }, `Comp ${count}`), 'Precomposed');
     selection = [id];
+  }
+
+  function insertComponent(id: string, sounds: boolean) {
+    componentsOpen = false;
+    const entry = templates.find((t) => t.id === id);
+    if (entry) {
+      void insertEntry(entry, sounds);
+    }
   }
 
   async function insertEntry(entry: TemplateEntry, sounds: boolean) {
@@ -1264,6 +1275,10 @@
     />
   {/if}
 
+  {#if componentsOpen}
+    <ComponentLibrary items={components} onpick={insertComponent} onclose={() => (componentsOpen = false)} />
+  {/if}
+
   {#if templating}
     <TemplateDialog
       {doc}
@@ -1368,7 +1383,7 @@
                 {/each}
                 <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
                 <span class="menu-head">Components</span>
-                <button type="button" role="menuitem" data-testid="add-prompt-input" onclick={() => ((adding = false), (browseFirst = PROMPT_TEMPLATE_ID), (browsing = true))}>Prompt input…</button>
+                <button type="button" role="menuitem" data-testid="open-components" onclick={() => ((adding = false), (componentsOpen = true))}>Browse components…</button>
                 <span class="menu-head">Templates</span>
                 <button type="button" role="menuitem" data-testid="open-templates" onclick={() => ((adding = false), (browseFirst = null), (browsing = true))}>Browse templates…</button>
                 <span class="menu-head">Audio</span>

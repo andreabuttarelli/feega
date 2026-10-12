@@ -2832,3 +2832,9 @@ composto viene arrotondato al pixel, quindi la salita procede a scatti. Mossa:
 
 ### A custom component that throws renders a still, not an error
 Signal: a template render shows static text, 0 jolts, reseek diff 0. The runtime caught the throw into `window.__feegaErrors` (and `data-error` on the root). Move: read `__feegaErrors` after load before trusting a render.
+
+### `chromiumFrames` in locale: Chrome desktop muore, le librerie motion mancano
+Segnale: `TargetCloseError … setTouchEmulationEnabled` con `CHROMIUM_PATH` su Google Chrome, poi
+`Waiting failed: 20000ms` su `__playerReady` (`/motion-libs/...` dà 404 su feega.app e dazero.co).
+Mossa: `CHROMIUM_PATH` = `chrome-headless-shell` di Playwright (`~/Library/Caches/ms-playwright/
+chromium_headless_shell-*/…`) e `PUBLIC_APP_URL` su un `vite dev` locale (porta libera).
