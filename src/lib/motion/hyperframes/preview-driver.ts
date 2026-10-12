@@ -1,5 +1,6 @@
 import { hotPatch, type HotPatch } from './hot';
 import { CAPTURE_REQUEST, stampOf, type CaptureReply, type CaptureRequest } from './capture';
+import { exactSeek, type ExactSeek } from './exact-seek';
 
 export const CAPTURE_TIMEOUT_MS = 15_000;
 export const STALE_RETRY_MS = 50;
@@ -16,7 +17,7 @@ export type PlayerPort = {
   seek: (seconds: number) => void;
   play: () => void;
   pause: () => void;
-  post: (message: CaptureRequest | HotPatch) => boolean;
+  post: (message: CaptureRequest | HotPatch | ExactSeek) => boolean;
   onReady: (listener: () => void) => () => void;
   onReply: (listener: (reply: CaptureReply) => void) => () => void;
 };
@@ -27,6 +28,7 @@ export type PreviewDriver = {
   load: (html: string) => void;
   update: (html: string) => void;
   loaded: (html: string) => Promise<void>;
+  seek: (seconds: number) => void;
   shoot: (time: number, request: ShotRequest, waitMs?: number) => Promise<CaptureReply>;
   exclusive: <T>(work: () => Promise<T>) => Promise<T>;
   ready: () => void;
@@ -109,6 +111,11 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
     });
   }
 
+  function seek(seconds: number) {
+    port.seek(seconds);
+    port.post(exactSeek(seconds));
+  }
+
   function shoot(time: number, request: ShotRequest, waitMs = timeoutMs): Promise<CaptureReply> {
     const id = newId();
     const message = { type: CAPTURE_REQUEST, id, ...request } as const;
@@ -124,7 +131,7 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
         settle();
       };
       const send = () => {
-        port.seek(time);
+        seek(time);
         if (!port.post(message)) {
           done(() => reject(new Error('preview not ready')));
         }
@@ -154,5 +161,5 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
     return run;
   }
 
-  return { load, update, loaded, shoot, exclusive, ready, playback };
+  return { load, update, loaded, seek, shoot, exclusive, ready, playback };
 }
