@@ -16,7 +16,7 @@ type Model = {
 
 const model = new Function(`${STRIP_MODEL}; return { stripPlan, stripPos, magnifyAt, stripFrame, releaseTarget, restAfter };`)() as Model;
 
-const PARAMS = { count: 10, cardSize: 0.24, aspect: 0.8, gap: 0.035, magnify: 1.75, falloff: 1.2, step: 1.5, gesture: 1.2, pause: 0.45, direction: 'left', lift: 0.04, cursor: false };
+const PARAMS = { count: 10, cardSize: 0.24, aspect: 0.8, gap: 0.035, magnify: 1.75, falloff: 1.2, step: 1.5, gesture: 1.2, pause: 0.45, direction: 'left', lift: 0.04, cursor: false, captionLead: 0.4 };
 const LENGTH = 12;
 const FPS = 30;
 const ASPECTS = { landscape: [1920, 1080], vertical: [1080, 1920], square: [1080, 1080] } as const;
@@ -153,6 +153,17 @@ describe('the photo strip model', () => {
     expect(resting.caption.opacity).toBeGreaterThan(0.95);
     expect(resting.caption.photo).toBe(centred(resting).photo);
     expect(moving.caption.opacity).toBeLessThan(0.05);
+  });
+
+  it('brings the caption in during the deceleration, settled by the end', () => {
+    const plan = model.stripPlan(PARAMS, LENGTH);
+    const g = plan.gestures[1];
+    const at = (x: number, p = PARAMS) => model.stripFrame(p, g.at + x * (g.end - g.at), LENGTH, 1920, 1080).caption.opacity;
+
+    expect(at(0.5)).toBeLessThan(0.05);
+    expect(at(0.75)).toBeGreaterThan(0.2);
+    expect(at(0.96)).toBeGreaterThan(0.95);
+    expect(at(0.75, { ...PARAMS, captionLead: 0.15 })).toBeLessThan(0.05);
   });
 
   it('moves the other way when asked', () => {

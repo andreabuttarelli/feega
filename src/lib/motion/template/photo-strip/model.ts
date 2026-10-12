@@ -5,8 +5,8 @@ const SETTLE = 0.015;
 const SETTLE_FROM = 0.7;
 const MAX_PHOTOS = 12;
 const WRAP_MARGIN = 2;
-const CAPTION_OUT = 0.15;
-const CAPTION_IN = 0.8;
+const CAPTION_OUT = 0.12;
+const CAPTION_SETTLED = 0.95;
 const CAPTION_GAP = 0.035;
 const CURSOR_REACH = 0.6;
 const FLING = 0.18;
@@ -86,12 +86,12 @@ function slotCount(p, half) {
 
 const wrapped = (x, size) => x - size * Math.floor(x / size + 0.5);
 
-function captionWeight(plan, t) {
+function captionWeight(plan, t, lead) {
   const at = gestureAt(plan, t);
   if (!at) {
     return 1;
   }
-  return Math.max(1 - smooth(clamp01(at.x / CAPTION_OUT)), smooth(clamp01((at.x - CAPTION_IN) / (1 - CAPTION_IN))));
+  return Math.max(1 - smooth(clamp01(at.x / CAPTION_OUT)), smooth(clamp01((at.x - (CAPTION_SETTLED - lead)) / Math.max(1e-3, lead))));
 }
 
 function cursorFrame(p, plan, t) {
@@ -120,7 +120,7 @@ function stripFrame(p, t, length, width, height, pos, calm) {
   });
   const nearest = Math.round(s);
   const photo = ((nearest % n) + n) % n;
-  const weight = calm === undefined ? captionWeight(plan, t) : calm;
+  const weight = calm === undefined ? captionWeight(plan, t, p.captionLead ?? 0.4) : calm;
   const near = 1 - smooth(clamp01(Math.abs(s - nearest) / 0.4));
   return {
     cards,

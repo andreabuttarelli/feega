@@ -42,6 +42,7 @@ export const STRIP_PROPS: Record<string, PropSpec> = {
   gesture: number('Gesture length (seconds)', 1.2, 0.5, 3, 'Motion', 0.05),
   pause: number('Pause on a card (seconds)', 0.45, 0.1, 2, 'Motion', 0.05),
   direction: { type: 'string', title: 'Direction', enum: Object.values(StripDirection), default: StripDirection.Left, group: 'Motion' },
+  captionLead: number('Caption lead (share of the gesture)', 0.4, 0.05, 0.9, 'Motion', 0.05),
   cursor: flag('Show the dragging cursor', false, 'Motion'),
   cursorColor: colour('Cursor colour', '#ffffff'),
   drag: flag('Viewers can drag the strip (embeds)', true, 'Motion'),
