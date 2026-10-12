@@ -26,6 +26,7 @@ import { MASK_CSS, MaskScope, maskArea, maskLayer, startValues } from './masks';
 import { COMPOSITION_ID, captureScript, contentStamp } from './capture';
 import { cspMeta } from './csp';
 import { measureScript } from './measure';
+import { exactSeekScript } from './exact-seek';
 import { Library, Play, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
 import { ComponentMode, PropFormat, modeOf, type CustomComponents } from '../custom/component';
 import { mattePairs, type MattePair } from '../matte';
@@ -739,7 +740,7 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(shaderScript(shaderClips, Number(duration))),
     ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');
-  return `${page}${live}${captureScript(frame, contentStamp(page), screenshotSrc)}${measureScript()}</body></html>`;
+  return `${page}${live}${captureScript(frame, contentStamp(page), screenshotSrc)}${measureScript()}${exactSeekScript()}</body></html>`;
 }
 
 const LIVE_SCRIPT: Record<Liveness, (input: SpecInput, delivery: Delivery) => string> = {
