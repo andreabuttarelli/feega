@@ -8,8 +8,8 @@ card passing the centre is magnified, then shrinks as it moves on.
 - **Gestures fit the loop.** Gesture count = round(length / (gesture + pause)); cards moved are
   split into whole numbers summing to a multiple of the photo count, so the strip wraps and
   frame L = frame 0. Rests ≈0.45 s, always on a centred card.
-- **Flick curve.** Softened expo in-out (k=5), front-loaded time warp, sin² settle 1.5% past the
-  target: no velocity jump, no bounce.
+- **Flick curve.** Each gesture is a beta-shaped velocity pulse (u²(1−u)⁴, closed-form CDF): fast
+  rise, long soft tail, no overshoot. Pulses overlap the next one, so the strip never freezes.
 - **Wrap out of sight.** Slots repeat the photos until the wrap seam is beyond the frame edge.
 - **Live drag in embeds** (deterministic component, pointer and wheel): grab freezes auto time,
   release flings to a whole card, then hands back at the plan's next rest. A video render gets no

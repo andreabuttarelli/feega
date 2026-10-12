@@ -1,8 +1,5 @@
 export const STRIP_MODEL = String.raw`
-const SHARPNESS = 5;
-const FRONT_LOAD = 1.5;
-const SETTLE = 0.015;
-const SETTLE_FROM = 0.7;
+const TAIL_SHARE = 1.25;
 const MAX_PHOTOS = 12;
 const WRAP_MARGIN = 2;
 const CAPTION_OUT = 0.12;
@@ -14,10 +11,10 @@ const STRIP_Y = -0.03;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const smooth = (x) => x * x * x * (x * (x * 6 - 15) + 10);
-const expoHalf = (y) => (Math.pow(2, SHARPNESS * (2 * y - 1)) - Math.pow(2, -SHARPNESS)) / (2 * (1 - Math.pow(2, -SHARPNESS)));
-const expoInOut = (y) => (y <= 0 ? 0 : y >= 1 ? 1 : y < 0.5 ? expoHalf(y) : 1 - expoHalf(1 - y));
-const hump = (x) => Math.pow(Math.sin(Math.PI * clamp01((x - SETTLE_FROM) / (1 - SETTLE_FROM))), 2);
-const flick = (x) => expoInOut(1 - Math.pow(1 - clamp01(x), FRONT_LOAD)) + SETTLE * hump(x);
+const flick = (x) => {
+  const u = clamp01(x);
+  return u * u * u * (35 + u * (-105 + u * (126 + u * (-70 + u * 15))));
+};
 
 const photoCount = (p) => Math.max(1, Math.min(MAX_PHOTOS, Math.round(p.count)));
 const heading = (p) => (p.direction === 'right' ? -1 : 1);
@@ -30,37 +27,36 @@ function stripPlan(p, length) {
   const k = Math.max(1, Math.round(length / beat));
   const period = length / k;
   const move = (period * Math.max(0.2, p.gesture)) / beat;
+  const window = Math.min(length, move + TAIL_SHARE * (period - move));
   const laps = Math.max(Math.ceil(k / n), Math.round((k * Math.max(1, p.step)) / n));
   const total = n * laps;
   const sign = heading(p);
-  const lead = (period - move) / 2;
   const gestures = Array.from({ length: k }, (_, i) => ({
-    at: i * period + lead,
-    end: i * period + lead + move,
+    at: i * period,
+    end: (i + 1) * period,
+    window,
     from: sign * Math.floor((i * total) / k),
     to: sign * Math.floor(((i + 1) * total) / k)
   }));
-  return { gestures, length, count: n };
+  return { gestures, length, count: n, total: sign * total };
 }
 
 function stripPos(plan, t) {
   const laps = Math.floor(t / plan.length);
   const local = t - laps * plan.length;
-  const lap = plan.gestures[plan.gestures.length - 1].to * laps;
-  let pos = 0;
-  for (const g of plan.gestures) {
-    if (local < g.at) {
-      break;
+  let pos = (laps - 1) * plan.total;
+  for (const lap of [-1, 0]) {
+    for (const g of plan.gestures) {
+      pos += (g.to - g.from) * flick((local - lap * plan.length - g.at) / g.window);
     }
-    pos = g.from + (g.to - g.from) * flick((local - g.at) / (g.end - g.at));
   }
-  return lap + pos;
+  return pos;
 }
 
 function gestureAt(plan, t) {
   const local = t - Math.floor(t / plan.length) * plan.length;
-  const g = plan.gestures.find((g) => local >= g.at && local <= g.end);
-  return g ? { g, x: (local - g.at) / (g.end - g.at) } : null;
+  const g = plan.gestures.find((g) => local >= g.at && local < g.end) ?? plan.gestures[plan.gestures.length - 1];
+  return { g, x: (local - g.at) / (g.end - g.at) };
 }
 
 function magnifyAt(d, p) {
@@ -96,12 +92,13 @@ function captionWeight(plan, t, lead) {
 
 function cursorFrame(p, plan, t) {
   const at = p.cursor ? gestureAt(plan, t) : null;
+  const reach = at ? flick((at.x * (at.g.end - at.g.at)) / at.g.window) : 0;
   if (!at) {
     return { x: 0, y: 0, opacity: 0, press: 0 };
   }
   const sign = Math.sign(at.g.to - at.g.from);
   const shown = smooth(clamp01(at.x / 0.12)) * (1 - smooth(clamp01((at.x - 0.7) / 0.3)));
-  return { x: sign * CURSOR_REACH * (0.5 - flick(at.x)) * pitchOf(p) * 2, y: STRIP_Y + heightOf(p) * 0.15, opacity: shown, press: shown };
+  return { x: sign * CURSOR_REACH * (0.5 - reach) * pitchOf(p) * 2, y: STRIP_Y + heightOf(p) * 0.15, opacity: shown, press: shown };
 }
 
 function stripFrame(p, t, length, width, height, pos, calm) {
@@ -133,10 +130,7 @@ const releaseTarget = (pos, velocity) => Math.round(pos + velocity * FLING);
 
 function restAfter(plan, t) {
   const at = gestureAt(plan, t);
-  if (!at) {
-    return { at: t, pos: stripPos(plan, t) };
-  }
-  const end = t + (1 - at.x) * (at.g.end - at.g.at);
-  return { at: end, pos: stripPos(plan, end) };
+  const next = t + (1 - at.x) * (at.g.end - at.g.at);
+  return { at: next, pos: stripPos(plan, next) };
 }
 `;

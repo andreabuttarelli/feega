@@ -61,54 +61,50 @@ describe('the photo strip model', () => {
     }
   });
 
-  it('rests on a centred card for short pauses only', () => {
+  it('slows to near rest on a centred card between gestures', () => {
     const plan = model.stripPlan(PARAMS, LENGTH);
-    const rests = plan.gestures.map((g, i) => (plan.gestures[i + 1]?.at ?? plan.gestures[0].at + LENGTH) - g.end);
 
-    for (const rest of rests) {
-      expect(rest).toBeGreaterThanOrEqual(0.3);
-      expect(rest).toBeLessThanOrEqual(0.6);
-    }
     for (const g of plan.gestures) {
       expect(Number.isInteger(g.to)).toBe(true);
-      expect(model.stripPos(plan, (g.end + (plan.gestures.find((n) => n.at > g.end)?.at ?? g.end + 0.3)) / 2)).toBeCloseTo(g.to, 9);
+      expect(Math.abs(model.stripPos(plan, g.at) - g.from)).toBeLessThan(0.01);
     }
   });
 
-  it('never stands still longer than a short pause', () => {
-    const plan = model.stripPlan(PARAMS, LENGTH);
-    const pos = times().map((t) => model.stripPos(plan, t));
-    let still = 0;
-    let longest = 0;
-    pos.slice(1).forEach((s, i) => {
-      still = Math.abs(s - pos[i]) < 0.002 ? still + 1 : 0;
-      longest = Math.max(longest, still);
-    });
-
-    expect(longest / FPS).toBeLessThanOrEqual(0.8);
-  });
-
-  it('moves like a hand flick: no jumps, no sudden change of speed', () => {
+  const curve = () => {
     const plan = model.stripPlan(PARAMS, LENGTH);
     const pos = times().map((t) => model.stripPos(plan, t));
     const speed = pos.slice(1).map((s, i) => s - pos[i]);
-    const kick = speed.slice(1).map((v, i) => Math.abs(v - speed[i]));
-    const g = plan.gestures[0];
-    const at = (x: number) => (model.stripPos(plan, g.at + x * (g.end - g.at)) - g.from) / (g.to - g.from);
+    const accel = speed.slice(1).map((v, i) => v - speed[i]);
+    const jerk = accel.slice(1).map((a, i) => Math.abs(a - accel[i]));
+    return { plan, speed, accel, jerk };
+  };
 
-    expect(Math.max(...speed.map(Math.abs))).toBeLessThan(0.35);
-    expect(Math.max(...kick)).toBeLessThan(0.04);
-    expect(at(0.4)).toBeGreaterThan(0.5);
+  it('never freezes: the strip keeps a residual drift, only briefly near still', () => {
+    const { speed } = curve();
+    let still = 0;
+    let longest = 0;
+    for (const v of speed) {
+      still = Math.abs(v) < 0.002 ? still + 1 : 0;
+      longest = Math.max(longest, still);
+    }
+
+    expect(Math.min(...speed.map(Math.abs))).toBeGreaterThan(0);
+    expect(longest / FPS).toBeLessThanOrEqual(0.6);
   });
 
-  it('settles softly past the target, never a bounce', () => {
-    const plan = model.stripPlan(PARAMS, LENGTH);
-    const g = plan.gestures[0];
-    const xs = times().filter((t) => t >= g.at && t <= g.end).map((t) => (model.stripPos(plan, t) - g.from) / (g.to - g.from));
+  it('moves like a hand flick: no jumps, no jerk spikes', () => {
+    const { speed, accel, jerk } = curve();
+    const typical = jerk.reduce((a, b) => a + b, 0) / jerk.length;
 
-    expect(Math.max(...xs)).toBeGreaterThan(1);
-    expect(Math.max(...xs)).toBeLessThan(1.03);
-    expect(Math.min(...xs)).toBeGreaterThanOrEqual(-1e-9);
+    expect(Math.max(...speed.map(Math.abs))).toBeLessThan(0.2);
+    expect(Math.max(...accel.map(Math.abs))).toBeLessThan(0.02);
+    expect(Math.max(...jerk)).toBeLessThan(typical * 8);
+  });
+
+  it('decelerates on a long soft tail, never overshooting or reversing', () => {
+    const { speed } = curve();
+
+    expect(speed.every((v) => v >= 0)).toBe(true);
   });
 
   it('wraps cards only out of sight in every aspect', () => {
@@ -193,6 +189,6 @@ describe('the photo strip model', () => {
 
     expect(rest.at).toBeGreaterThanOrEqual(2);
     expect(model.stripPos(plan, rest.at)).toBeCloseTo(rest.pos, 9);
-    expect(model.stripPos(plan, rest.at + 0.05)).toBeCloseTo(rest.pos, 9);
+    expect(Math.abs(model.stripPos(plan, rest.at + 0.05) - rest.pos)).toBeLessThan(0.01);
   });
 });
