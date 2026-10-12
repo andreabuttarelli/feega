@@ -39,7 +39,6 @@ export const MELT_PROPS: Record<string, PropSpec> = {
   meltAt: number('Sand starts (seconds)', 0.6, 0, 4, 'Motion', 0.1),
   spread: number('Top-to-bottom sweep (seconds)', 4.2, 0.2, 6, 'Motion', 0.1),
   gravity: number('Gravity (page heights per s²)', 1.6, 0.4, 6, 'Motion', 0.1),
-  wind: number('Wind drift', 0.08, -0.4, 0.4, 'Motion', 0.01),
   [VAR_PREFIX]: text('Runtime variable prefix', MELT_VAR_PREFIX, 20)
 };
 

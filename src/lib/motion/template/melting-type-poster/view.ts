@@ -108,7 +108,7 @@ const paintSource = (size, words) => {
 
 const buildSand = (p, size) => {
   const words = measureWords();
-  const key = JSON.stringify([size, words, document.fonts ? document.fonts.status : '', p.strength, p.meltAt, p.spread, p.gravity, p.wind, duration]);
+  const key = JSON.stringify([size, words, document.fonts ? document.fonts.status : '', p.strength, p.meltAt, p.spread, p.gravity, duration]);
   if (key === cache.sandKey) {
     return;
   }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MELT_MODEL } from './model';
 
 type Page = { x: number; y: number; w: number; h: number };
-type Grains = { count: number; x0: Float32Array; y0: Float32Array; a: Uint8Array; release: Float32Array; xr: Float32Array; yr: Float32Array };
+type Grains = { count: number; x0: Float32Array; y0: Float32Array; a: Uint8Array; release: Float32Array; yr: Float32Array };
 type Model = {
   pageBox: (width: number, height: number, margin: number) => Page;
   sandGrains: (alpha: Uint8Array, w: number, h: number, p: object, length: number) => Grains;
@@ -11,7 +11,7 @@ type Model = {
 
 const model = new Function(`${MELT_MODEL}; return { pageBox, sandGrains, grainAt };`)() as Model;
 
-const PARAMS = { strength: 1, meltAt: 0.6, spread: 3, gravity: 1.6, wind: 0.08 };
+const PARAMS = { strength: 1, meltAt: 0.6, spread: 3, gravity: 1.6 };
 const LENGTH = 10;
 const FPS = 60;
 const W = 120;
@@ -68,21 +68,17 @@ describe('the sand type model', () => {
     });
   });
 
-  it('turns the whole page to sand: mid-loop every grain lies in a heap at the bottom', () => {
+  it('turns the whole page to sand: mid-loop every grain has fallen out of the page, no heap', () => {
     const g = grains();
-    const lowest = Math.min(...all(g).map((i) => model.grainAt(g, i, settled)[1]));
 
-    expect(lowest).toBeGreaterThan(H * 0.55);
-    all(g).forEach((i) => expect(model.grainAt(g, i, settled)).toEqual([g.xr[i], g.yr[i]]));
+    all(g).forEach((i) => expect(model.grainAt(g, i, settled)[1]).toBeGreaterThanOrEqual(H));
   });
 
-  it('piles the heap: one grain per resting pixel, slopes never steeper than one step per column', () => {
+  it('falls straight down: a grain never leaves its column', () => {
     const g = grains();
-    const spots = new Set(all(g).map((i) => `${g.xr[i]},${g.yr[i]}`));
-    const height = Array.from({ length: W }, (_, x) => all(g).filter((i) => g.xr[i] === x).length);
+    const times = Array.from({ length: LENGTH * 20 }, (_, k) => k / 20);
 
-    expect(spots.size).toBe(g.count);
-    height.slice(1).forEach((h, x) => expect(Math.abs(h - height[x])).toBeLessThanOrEqual(1));
+    all(g).filter((i) => i % 13 === 0).forEach((i) => times.forEach((t) => expect(model.grainAt(g, i, t)[0]).toBe(g.x0[i])));
   });
 
   it('disintegrates from the top down: the title goes before the footer', () => {
