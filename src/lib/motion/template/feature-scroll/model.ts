@@ -1,18 +1,17 @@
+import { WORD_ENTRANCE } from '../word-entrance';
+
 export const SCROLL_MODEL = String.raw`
-const TITLE_IN = 1.1;
+${WORD_ENTRANCE}
 const RAMP = 0.8;
 const EXIT = 0.7;
 const MIN_LAND_HOLD = 0.6;
 const BRAKE_SHARPNESS = 10;
-const SETTLE = 0.012;
 const MAX_LINES = 240;
 const LINE_HEIGHT = 1.15;
+const LINE_LAG = 0.25;
+const LINE_GAP = 0.12;
+const LAND_LEAD = 0.75;
 
-const clamp01 = (x) => Math.min(1, Math.max(0, x));
-const span = (t, at, length) => clamp01((t - at) / Math.max(length, 1e-6));
-const expoInOut = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x < 0.5 ? Math.pow(2, 20 * x - 10) / 2 : (2 - Math.pow(2, -20 * x + 10)) / 2);
-const settle = (x) => expoInOut(x) + SETTLE * Math.sin(Math.PI * clamp01((x - 0.5) / 0.5));
-const smooth = (x) => x * x * x * (x * (x * 6 - 15) + 10);
 const smoothArea = (x) => x * x * x * x * (x * (x - 3) + 2.5);
 
 const BRAKE_FLOOR = Math.pow(2, -BRAKE_SHARPNESS);
@@ -31,18 +30,19 @@ function scrollLayout(p, width, height) {
   const texts = lineList(p.lines);
   const base = texts.length ? texts : [' '];
   const count = Math.min(MAX_LINES, base.length * Math.max(1, Math.round(p.repeat)));
-  const lineSize = (p.fontSize * p.lineScale) / 100;
+  const lineSize = p.fontSize / 100;
   const pitch = lineSize * LINE_HEIGHT * p.lineSpacing;
-  const titleHalf = p.fontSize / 200;
+  const titleHalf = lineSize / 2;
   const first = titleHalf + p.gap;
   const last = first + (count - 1) * pitch;
   const clear = Math.max(p.gap + titleHalf, box.ay + titleHalf + pitch);
   const lines = Array.from({ length: count }, (_, k) => ({ y: first + k * pitch, text: base[k % base.length] }));
-  return { box, pitch, lines, lineSize, closeY: last + clear };
+  const words = (raw) => Math.max(1, String(raw || '').trim().split(/\s+/).filter(Boolean).length);
+  return { box, pitch, lines, lineSize, closeY: last + clear, openWords: words(p.openTitle), closeWords: words(p.closeTitle) };
 }
 
 function phases(p, length) {
-  const start = p.titleAt + TITLE_IN + p.holdSeconds;
+  const start = p.titleAt + WORD_IN + p.holdSeconds;
   const exit = p.leave ? EXIT : 0;
   const parts = [RAMP, p.readSeconds, p.accelSeconds, p.brakeSeconds];
   const room = Math.max(0.5, length - exit - MIN_LAND_HOLD - start);
@@ -90,10 +90,17 @@ function travel(plan, t) {
   return { s: plan.total, v: 0 };
 }
 
+const wordsFrom = (n, at, t) => Array.from({ length: n }, (_, i) => wordIn(t, at + i * WORD_GAP));
+
+function lineLooks(layout, p, t) {
+  const at = p.titleAt + (layout.openWords - 1) * WORD_GAP + LINE_LAG;
+  const seen = layout.box.ay + layout.pitch;
+  return layout.lines.map((line, k) => (line.y - layout.lineSize / 2 < seen ? wordIn(t, at + k * LINE_GAP) : { progress: 1, rise: 0, opacity: 1 }));
+}
+
 function scrollFrame(layout, p, t, length, fps) {
   const plan = speedPlan(layout, p, length);
   const move = travel(plan, t);
-  const enter = settle(span(t, p.titleAt, TITLE_IN));
   const out = p.leave ? expoInOut(span(t, plan.leave, plan.exit)) : 0;
   const shift = move.v / fps;
   return {
@@ -101,9 +108,10 @@ function scrollFrame(layout, p, t, length, fps) {
     speed: move.v,
     shift,
     streak: p.motionBlur * shift,
-    list: smooth(span(t, p.titleAt + TITLE_IN * 0.5, TITLE_IN)),
-    open: { opacity: smooth(span(t, p.titleAt, TITLE_IN * 0.4)), y: 0.3 * (1 - enter), blur: p.titleBlur * (1 - enter) },
-    close: { opacity: 1 - smooth(out), y: -0.2 * out, blur: p.titleBlur * out },
+    open: wordsFrom(layout.openWords, p.titleAt, t),
+    lines: lineLooks(layout, p, t),
+    close: wordsFrom(layout.closeWords, plan.land - LAND_LEAD, t),
+    closeOut: { opacity: 1 - smooth(out), y: -0.1 * out },
     land: plan.land
   };
 }

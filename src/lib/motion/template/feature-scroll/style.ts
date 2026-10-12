@@ -31,27 +31,27 @@ export const SCROLL_CSS = String.raw`
   will-change: transform, filter;
 }
 
-.fs-title,
-.fs-line {
+.fs-text {
   position: absolute;
   left: 50%;
   margin: 0;
   white-space: nowrap;
   line-height: 1;
-}
-
-.fs-title {
   font-size: calc(var(--fs-size) * 1cqmin);
   font-weight: var(--fs-weight);
   letter-spacing: var(--fs-tracking);
   color: var(--fs-ink);
-  text-align: center;
   transform: translate(-50%, -50%);
-  will-change: transform, filter, opacity;
+  will-change: transform, opacity;
 }
 
-.fs-title > span {
+.fs-title {
+  text-align: center;
+}
+
+.fs-word {
   display: inline-block;
+  white-space: pre;
 }
 
 .fs-line {
@@ -59,12 +59,6 @@ export const SCROLL_CSS = String.raw`
   align-items: center;
   gap: 0.45em;
   width: var(--fs-width);
-  font-size: calc(var(--fs-size) * var(--fs-line-scale) * 1cqmin);
-  font-weight: var(--fs-line-weight);
-  letter-spacing: var(--fs-line-tracking);
-  color: var(--fs-line);
-  opacity: var(--fs-list);
-  transform: translate(-50%, -50%);
 }
 
 .fs[data-align='center'] .fs-line {

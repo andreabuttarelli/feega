@@ -24,26 +24,33 @@ filter.appendChild(gauss);
 svg.appendChild(filter);
 scene.appendChild(svg);
 
-let cache = { key: '', layout: null, open: null, close: null, lookKey: '' };
+let cache = { key: '', layout: null, open: [], close: null, closeWords: [], lines: [], lookKey: '' };
 
 const sizeOf = () => ({ width: scene.clientWidth || 1920, height: scene.clientHeight || 1080 });
 
-const titleNode = (text, lowercase) => {
-  const node = document.createElement('h1');
-  node.className = 'fs-title';
-  const inner = document.createElement('span');
-  inner.textContent = lowercase ? String(text).toLowerCase() : String(text);
-  node.appendChild(inner);
-  return node;
+const cased = (text, p) => (p.lowercase ? String(text).toLowerCase() : String(text));
+
+const titleNode = (text, p) => {
+  const node = document.createElement('div');
+  node.className = 'fs-text fs-title';
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  const spans = (words.length ? words : [' ']).map((word, i) => {
+    const span = document.createElement('span');
+    span.className = 'fs-word';
+    span.textContent = cased(word, p) + (i < words.length - 1 ? ' ' : '');
+    node.appendChild(span);
+    return span;
+  });
+  return { node, spans };
 };
 
-const lineNode = (text) => {
+const lineNode = (text, p) => {
   const node = document.createElement('div');
-  node.className = 'fs-line';
+  node.className = 'fs-text fs-line';
   const dot = document.createElement('i');
   dot.className = 'fs-dot';
   const label = document.createElement('span');
-  label.textContent = text;
+  label.textContent = cased(text, p);
   node.appendChild(dot);
   node.appendChild(label);
   return node;
@@ -51,7 +58,7 @@ const lineNode = (text) => {
 
 const build = (p) => {
   const { width, height } = sizeOf();
-  const key = JSON.stringify([width, height, p.lines, p.repeat, p.fontSize, p.lineScale, p.lineSpacing, p.gap, p.openTitle, p.closeTitle, p.lowercase]);
+  const key = JSON.stringify([width, height, p.lines, p.repeat, p.fontSize, p.lineSpacing, p.gap, p.openTitle, p.closeTitle, p.lowercase]);
   if (key === cache.key) {
     return cache;
   }
@@ -63,16 +70,18 @@ const build = (p) => {
     column.appendChild(node);
     return node;
   };
-  const open = place(titleNode(p.openTitle, p.lowercase), 0);
-  layout.lines.forEach((line) => place(lineNode(line.text), line.y));
-  const close = place(titleNode(p.closeTitle, p.lowercase), layout.closeY);
-  cache = { ...cache, key, layout, open, close, lookKey: '' };
+  const open = titleNode(p.openTitle, p);
+  place(open.node, 0);
+  const lines = layout.lines.map((line) => place(lineNode(line.text, p), line.y));
+  const close = titleNode(p.closeTitle, p);
+  place(close.node, layout.closeY);
+  cache = { ...cache, key, layout, open: open.spans, close: close.node, closeWords: close.spans, lines, lookKey: '' };
   return cache;
 };
 
 const paintLook = (p, layout) => {
   const { width, height } = sizeOf();
-  const key = JSON.stringify([width, height, p.background, p.titleColor, p.lineColor, p.markerColor, p.font, p.fontSize, p.fontWeight, p.tracking, p.lineScale, p.lineWeight, p.lineTracking, p.align, p.marker, p.edgeFade, layout.pitch]);
+  const key = JSON.stringify([width, height, p.background, p.textColor, p.markerColor, p.font, p.fontSize, p.fontWeight, p.tracking, p.align, p.marker, p.edgeFade, layout.pitch]);
   if (key === cache.lookKey) {
     return;
   }
@@ -82,27 +91,22 @@ const paintLook = (p, layout) => {
   scene.dataset.align = p.align;
   scene.dataset.marker = p.marker;
   s.setProperty('--fs-bg', p.background);
-  s.setProperty('--fs-ink', p.titleColor);
-  s.setProperty('--fs-line', p.lineColor);
+  s.setProperty('--fs-ink', p.textColor);
   s.setProperty('--fs-mark', p.markerColor);
   s.setProperty('--fs-font', String(p.font).includes(',') ? p.font : '"' + p.font + '", system-ui, sans-serif');
   s.setProperty('--fs-size', String(p.fontSize));
   s.setProperty('--fs-weight', String(p.fontWeight));
   s.setProperty('--fs-tracking', p.tracking + 'em');
-  s.setProperty('--fs-line-scale', String(p.lineScale));
-  s.setProperty('--fs-line-weight', String(p.lineWeight));
-  s.setProperty('--fs-line-tracking', p.lineTracking + 'em');
   s.setProperty('--fs-width', COLUMN_WIDTH * width + 'px');
   s.setProperty('--fs-fade', p.edgeFade * 100 + '%');
   s.setProperty('--fs-rule-drop', ((layout.pitch - layout.lineSize) / 2) * unit + 'px');
 };
 
-const paintTitle = (node, look) => {
-  const s = node.style;
-  s.opacity = String(look.opacity);
-  s.visibility = look.opacity > 0.002 ? 'visible' : 'hidden';
-  s.transform = 'translate(-50%, -50%) translateY(' + look.y + 'em)';
-  s.filter = look.blur > 0.002 ? 'blur(' + look.blur + 'em)' : 'none';
+const CENTRED = 'translate(-50%, -50%) ';
+
+const paintWord = (node, look, base = '') => {
+  node.style.opacity = String(look.opacity);
+  node.style.transform = base + 'translateY(' + look.rise + 'em)';
 };
 
 const draw = () => {
@@ -118,9 +122,12 @@ const draw = () => {
   const streak = Math.min(STREAK_CAP, f.streak) * built.layout.pitch * unit * 0.5;
   gauss.setAttribute('stdDeviation', '0 ' + streak.toFixed(2));
   column.style.filter = streak > STREAK_FLOOR * built.layout.pitch * unit ? 'url(#' + filterId + ')' : 'none';
-  scene.style.setProperty('--fs-list', String(f.list));
-  paintTitle(built.open, f.open);
-  paintTitle(built.close, f.close);
+
+  f.open.forEach((look, i) => paintWord(built.open[i], look));
+  f.lines.forEach((look, i) => paintWord(built.lines[i], look, CENTRED));
+  f.close.forEach((look, i) => paintWord(built.closeWords[i], look));
+  built.close.style.opacity = String(f.closeOut.opacity);
+  built.close.style.marginTop = f.closeOut.y + 'em';
 };
 
 draw();
