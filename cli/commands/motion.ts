@@ -126,6 +126,12 @@ const parsedVar = (raw: string): [string, string] => {
   return [raw.slice(0, at), raw.slice(at + 1)];
 };
 
+export async function cmdMotionNew(opts: { template: string; format?: '16:9' | '9:16' | '1:1'; project?: string; org?: string }) {
+  const made = await motionApi.fromTemplate(await token(), { template: opts.template, format: opts.format, project: opts.project }, opts.org);
+  console.log(`Created video ${made.node_id} from ${opts.template}, revision ${made.version}.`);
+  console.log(`Edit it: ${made.editor_url}`);
+}
+
 export async function cmdMotionAddTemplate(nodeId: string, templateId: string, opts: { org?: string; at?: string; var?: string[]; sound?: boolean }) {
   const vars = Object.fromEntries((opts.var ?? []).filter((v) => v.includes('=')).map(parsedVar));
   const added = await motionApi.addTemplate(await token(), nodeId, { id: templateId, at: Number(opts.at ?? 0), vars, sound: opts.sound !== false }, opts.org);

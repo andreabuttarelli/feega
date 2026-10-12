@@ -195,6 +195,18 @@ motion
   });
 
 motion
+  .command('new')
+  .description('Start a new video from a template, e.g. --template builtin:prompt-input (free)')
+  .requiredOption('--template <id>', 'Template id, from `feega motion templates`')
+  .option('--format <ratio>', '16:9 (default), 9:16 or 1:1')
+  .option('--project <id>', 'Project to create it in (default: the most recent)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdMotionNew } = await import('./commands/motion.ts');
+    await cmdMotionNew(opts);
+  });
+
+motion
   .command('add-template <nodeId> <templateId>')
   .description('Insert an editable copy of a template into a video, e.g. builtin:prompt-input (free)')
   .option('--at <seconds>', 'Where it starts, in seconds')
