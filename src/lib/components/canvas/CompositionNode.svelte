@@ -10,6 +10,9 @@
   import { LAYOUTS } from '$lib/canvas/composition/index';
   import { nodeDoc } from '$lib/motion/composition-draft';
   import type { MotionDoc } from '$lib/motion/doc';
+  import type { TemplateEntry } from '$lib/motion/template/library';
+  import { FORMAT_OF_ASPECT, composedTemplate, sequentialIds } from '$lib/canvas/composition-template';
+  import TemplateTextFields from './TemplateTextFields.svelte';
 
   let {
     node,
@@ -17,17 +20,24 @@
     cards = [],
     assets = {},
     previewActive = true,
+    templates = [],
     composeIn,
-    onpatch
+    onpatch,
+    onpickcomponent
   }: {
     node: CompositionNode;
     posterUrl?: string | null;
     cards?: UpstreamCard[];
     assets?: Record<string, string>;
     previewActive?: boolean;
+    templates?: TemplateEntry[];
     composeIn: { project: string; canvas: string };
     onpatch?: (patch: Partial<CompositionNode>) => void;
+    onpickcomponent?: () => void;
   } = $props();
+
+  const entry = $derived(node.template ? (templates.find((t) => t.id === node.template?.id) ?? null) : null);
+  const picked = $derived(entry && node.template ? composedTemplate(entry, { format: FORMAT_OF_ASPECT[node.aspect], values: node.template.values }, cards, sequentialIds()) : null);
 
   const ASPECT_RATIO = { '9:16': 9 / 16, '1:1': 1, '16:9': 16 / 9 } as const;
 
@@ -75,7 +85,17 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="composition" ondblclick={openInCompositions}>
-  {#if cards.length > 0}
+  {#if picked?.ok}
+    <div
+      class="composition-preview"
+      data-testid="composition-template"
+      style={`--preview-ratio: ${ASPECT_RATIO[node.aspect]}; aspect-ratio: ${ASPECT_RATIO[node.aspect]}`}
+    >
+      <CompositionPlayer doc={picked.doc} assets={allAssets} active={previewActive} />
+    </div>
+  {:else if picked}
+    <div class="composition-empty"><p>{picked.error}</p></div>
+  {:else if cards.length > 0}
     <div
       class="composition-preview"
       style={`--preview-ratio: ${ASPECT_RATIO[node.aspect]}; aspect-ratio: ${ASPECT_RATIO[node.aspect]}`}
@@ -91,7 +111,9 @@
     </div>
   {/if}
 
-  {#if node.layout === 'bento' && onpatch}
+  {#if picked?.ok && node.template && onpatch}
+    <TemplateTextFields instance={picked} template={node.template} keyFields={entry?.template.keyFields} {onpatch} />
+  {:else if node.layout === 'bento' && onpatch}
     <BentoPanel {node} {cards} {onpatch} />
   {:else if LAYOUTS[node.layout].cards && onpatch}
     <CardsPanel {node} {cards} {onpatch} />
@@ -100,6 +122,12 @@
   <div class="composition-actions">
     {#if node.refId && posterUrl}
       <NodeDownload kind="video" sourceUrl={posterUrl} nodeId={node.id} nodeType="composizione" />
+    {/if}
+    {#if onpickcomponent}
+      <button type="button" class="composition-action nodrag" data-testid="pick-component" onclick={onpickcomponent}>Component</button>
+    {/if}
+    {#if node.template && onpatch}
+      <button type="button" class="composition-action nodrag" data-testid="clear-component" title="Back to the media layout" onclick={() => onpatch({ template: null })}>Layout</button>
     {/if}
     <form bind:this={form} method="POST" action="/app/compose?/fromNode" class="nodrag">
       <input type="hidden" name="project" value={composeIn.project} />

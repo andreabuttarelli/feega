@@ -2,7 +2,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { toolScope } from '$lib/server/dashboard/tool-scope';
 import { COMPOSE_DEPS, openCanvasComposition, recentCompositions, startComposition, type ComposeStart } from '$lib/server/motion/compose';
-import { composeEditorPath, newDraft } from '$lib/motion/composition-draft';
+import { newDraft } from '$lib/motion/composition-draft';
 import { COMPOSITION_LAYOUTS } from '$lib/motion/components';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import type { LayoutId } from '$lib/canvas/composition/types';
@@ -32,7 +32,7 @@ function opened(started: ComposeStart) {
   if (!started.ok) {
     return fail(HTTP_NOT_FOUND, { error: started.error });
   }
-  throw redirect(HTTP_SEE_OTHER, composeEditorPath(started.start));
+  throw redirect(HTTP_SEE_OTHER, started.editor);
 }
 
 export const actions: Actions = {

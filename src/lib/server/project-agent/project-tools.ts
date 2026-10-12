@@ -31,6 +31,10 @@ import { listGallery } from '$lib/server/repos/gallery';
 import { cardView, publishNode, remixInto } from '$lib/server/gallery/service';
 import { DurationBand, GalleryKind, gallerySearchSchema, itemPath } from '$lib/gallery/model';
 import { MOTION_FORMATS } from '$lib/motion/doc';
+import { templateLibrary } from '$lib/server/motion/templates';
+import { componentKind } from '$lib/motion/template/catalogue';
+import { compositionOf } from '$lib/canvas-node-data';
+import { FORMAT_OF_ASPECT, composedTemplate, sequentialIds } from '$lib/canvas/composition-template';
 
 /**
  * I TOOL DI PROGETTO E TELA. Sempre presenti, anche senza brand.
@@ -60,6 +64,8 @@ const AGENT_PATCH_ANSWERS: Record<PatchWrite['outcome'], (written: PatchWrite) =
   gone: () => NODE_NOT_FOUND
 };
 
+const NOT_A_COMPOSITION = { outcome: 'invalid', message: 'That node is not a composition.' };
+
 const BAD_MEDIUM = { error: 'bad_medium', message: `medium must be one of: ${GEN_MEDIUMS.join(', ')}.` };
 
 function outcomeOf(out: RunOutcome): Record<string, unknown> {
@@ -80,6 +86,8 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
   const effects = effectStore({ db: deps.db, orgId: deps.orgId, actor: { kind: 'agent', id: deps.userId, agentKey: SIDEBAR_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null });
 
   /** La generazione spende: il costo deve atterrare sul brand, o sull'org se non ce n'è uno. */
+  const components = () => templateLibrary(deps.db, { orgId: deps.orgId, actor }).list();
+
   const billed = <T>(fn: () => Promise<T>): Promise<T> =>
     deps.brandId ? withBrandContext(deps.brandId, fn) : withOrgContext(deps.orgId, fn);
 
@@ -316,6 +324,59 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
         );
 
         return outcomeOf(out);
+      }
+    }),
+
+    list_components: tool({
+      description: 'The motion component library a composition node can play (set_composition_component): id, name, kind, seconds and fields (key, type, label). Free, reads only.',
+      inputSchema: z.object({}).strict(),
+      execute: async () => ({
+        components: (await components()).map((e) => ({
+          id: e.id,
+          name: e.template.name,
+          description: e.template.description,
+          kind: componentKind(e),
+          seconds: e.template.doc.durationInFrames / e.template.doc.fps,
+          fields: e.template.doc.fields.map((f) => ({ key: f.key, type: f.type, label: f.label }))
+        }))
+      })
+    }),
+
+    set_composition_component: tool({
+      description: [
+        'Put a composition node of THIS project on a library component (id from list_components), with its field values by key; component null puts it back on its own media layout.',
+        'Images, videos and motions wired into the node fill the component media fields by themselves, in order: do not pass media values.',
+        'Free. Returns { outcome: "invalid" } for an unknown component or field.'
+      ].join(' '),
+      inputSchema: z.object({ nodeId: z.string(), component: z.string().nullable(), values: z.record(z.string(), z.string()).default({}) }).strict(),
+      execute: async (input: { nodeId: string; component: string | null; values?: Record<string, string> }) => {
+        const current = await findNode(deps.db, { orgId: deps.orgId, nodeId: input.nodeId });
+        if (!current) {
+          return NODE_NOT_FOUND;
+        }
+        const node = compositionOf(current);
+        if (!node) {
+          return NOT_A_COMPOSITION;
+        }
+
+        const values = input.values ?? {};
+        const entry = input.component ? (await components()).find((e) => e.id === input.component) : null;
+        if (input.component && !entry) {
+          return { outcome: 'invalid', message: `No component ${input.component}: call list_components.` };
+        }
+        const made = entry ? composedTemplate(entry, { format: FORMAT_OF_ASPECT[node.aspect], values }, [], sequentialIds()) : null;
+        if (made && !made.ok) {
+          return { outcome: 'invalid', message: made.error };
+        }
+
+        const written = await patchNodeData(deps.db, {
+          orgId: deps.orgId,
+          nodeId: input.nodeId,
+          patch: { template: entry ? { id: entry.id, values } : null },
+          check: DataCheck.Schema,
+          actor
+        });
+        return AGENT_PATCH_ANSWERS[written.outcome](written);
       }
     }),
 

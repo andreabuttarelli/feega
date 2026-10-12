@@ -4,7 +4,7 @@ import ComponentLibrary from './ComponentLibrary.svelte';
 import ComponentDetail from './ComponentDetail.svelte';
 import { MotionFormat } from '$lib/motion/doc';
 import { BUILTIN_TEMPLATES, builtinTemplate } from '$lib/motion/template/builtins';
-import { catalogue, starterDoc, type StarterFormat } from '$lib/motion/template/catalogue';
+import { AddTarget, catalogue, starterDoc, type StarterFormat } from '$lib/motion/template/catalogue';
 import { PROMPT_TEMPLATE_ID } from '$lib/motion/template/prompt-input/template';
 import { PROMPT_VAR_PREFIX } from '$lib/motion/template/prompt-input/component';
 import { paramVar } from '$lib/motion/custom/component';
@@ -42,6 +42,15 @@ describe('the component library', () => {
 });
 
 describe('a component opened in the library', () => {
+  it('picked for a canvas composition, it offers to use it there, without the video sounds', () => {
+    const body = render(ComponentDetail, {
+      props: { item: items.find((i) => i.id === PROMPT_TEMPLATE_ID)!, format: MotionFormat.Landscape, draftOf, compose: null, assets: [], target: AddTarget.Composition, onadd: () => {}, onclose: () => {} }
+    }).body;
+
+    expect(body).toContain('Use in composition');
+    expect(body).not.toContain('data-testid="add-sounds"');
+  });
+
   it('shows its key fields with human labels and one primary action', () => {
     const body = detail();
     const key = body.slice(body.indexOf('data-testid="key-fields"'), body.indexOf('data-testid="advanced-fields"'));

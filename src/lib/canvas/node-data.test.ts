@@ -562,6 +562,13 @@ describe('validateNodeData — composition', () => {
     expect(validateNodeData('composition', validComposition).ok).toBe(true);
     expect(validateNodeData('composition', { ...validComposition, refId: 'asset-1' }).ok).toBe(true);
   });
+
+  it('accepts a library component with its field values, and refuses one without an id or with a bad key', () => {
+    expect(validateNodeData('composition', { ...validComposition, template: { id: 'builtin:photo-strip', values: { captions: 'Rome' } } }).ok).toBe(true);
+    expect(validateNodeData('composition', { ...validComposition, template: null }).ok).toBe(true);
+    expect(validateNodeData('composition', { ...validComposition, template: { id: '', values: {} } }).ok).toBe(false);
+    expect(validateNodeData('composition', { ...validComposition, template: { id: 'x', values: { 'Bad Key': 'a' } } }).ok).toBe(false);
+  });
 });
 
 describe('validateNodeData — un tipo sconosciuto è rifiutato, non passa silenziosamente', () => {
