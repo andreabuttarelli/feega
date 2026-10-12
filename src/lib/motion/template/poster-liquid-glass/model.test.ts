@@ -4,19 +4,27 @@ import { POSTER_GLASS_MODEL } from './model';
 type Box = { x: number; y: number; w: number; h: number };
 type Node = [number, number, number];
 type Line = { text: string; muted: boolean };
+type Block = { role: string; text: string; x: number; y: number; size: number; align: 'left' | 'right'; muted: boolean };
 type Model = {
   posterBox: (width: number, height: number) => Box;
   columnLines: (text: string) => Line[];
-  typeSize: (rows: number, widestEm: number, poster: Box) => number;
+  posterBlocks: (p: object, poster: Box, widthEm: (text: string) => number) => Block[];
   blobNodes: (p: object, t: number, length: number) => Node[];
   BLOB_EDGES: [number, number][];
+  BODY_COUNT: number;
+  DROPS: number[][];
+  MELT: number;
   POSTER_ASPECT: number;
-  TYPE_LEADING: number;
+  TYPE_ASCENT: number;
+  TYPE_DESCENT: number;
 };
 
-const model = new Function(`${POSTER_GLASS_MODEL}; return { posterBox, columnLines, typeSize, blobNodes, BLOB_EDGES, POSTER_ASPECT, TYPE_LEADING };`)() as Model;
+const model = new Function(`${POSTER_GLASS_MODEL}; return { posterBox, columnLines, posterBlocks, blobNodes, BLOB_EDGES, BODY_COUNT, DROPS, MELT, POSTER_ASPECT, TYPE_ASCENT, TYPE_DESCENT };`)() as Model;
 
-const PARAMS = { glassSize: 1, flow: 1, wander: 1 };
+const PARAMS = { glassSize: 1, flow: 1, wander: 1, seed: 3 };
+const COPY = { intro: 'Spring sessions\n~on sound', details: '~Talks and walks\nFree entry', headline: 'Murmur', dates: '07.—\n19.\n~Apr', venue: 'Halde Pavilion\n~Mirrow Quay', footer: '~No. 04' };
+const POSTER = { x: 0, y: 0, w: 700, h: 1000 };
+const widthEm = (text: string) => text.length * 0.55;
 const LENGTH = 10;
 const FPS = 60;
 const ASPECTS = { landscape: [1920, 1080], vertical: [1080, 1920], square: [1080, 1080], portrait: [1080, 1350] } as const;
@@ -68,8 +76,8 @@ describe('the poster liquid glass model', () => {
     }
   });
 
-  it('joins every edge between real nodes, as one stream', () => {
-    const count = model.blobNodes(PARAMS, 0, LENGTH).length;
+  it('joins every body node into one stream, the drops apart', () => {
+    const count = model.BODY_COUNT;
     const reached = new Set([0]);
     for (let round = 0; round < count; round++) {
       model.BLOB_EDGES.filter(([a, b]) => reached.has(a) || reached.has(b)).forEach(([a, b]) => reached.add(a).add(b));
@@ -86,25 +94,95 @@ describe('the poster liquid glass model', () => {
   });
 
   it('marks muted lines with a leading tilde and keeps the rest ink', () => {
-    expect(model.columnLines('Lectures\n~24.–\n\n  ~Sep ')).toEqual([
-      { text: 'Lectures', muted: false },
-      { text: '24.–', muted: true },
+    expect(model.columnLines('Murmur\n~07.—\n\n  ~Apr ')).toEqual([
+      { text: 'Murmur', muted: false },
+      { text: '07.—', muted: true },
       { text: '', muted: false },
-      { text: 'Sep', muted: true }
+      { text: 'Apr', muted: true }
     ]);
   });
 
-  it('sizes the type to the taller column, or to the widest row when that is tighter', () => {
-    const poster = { x: 0, y: 0, w: 720, h: 1000 };
-    const tall = model.typeSize(13, 3, poster);
-    const wide = model.typeSize(13, 9, poster);
+  const boxOf = (b: Block) => {
+    const w = widthEm(b.text) * b.size;
+    const left = b.align === 'left' ? b.x : b.x - w;
+    return { left, right: left + w, top: b.y - b.size * model.TYPE_ASCENT, bottom: b.y + b.size * model.TYPE_DESCENT };
+  };
 
-    const block = (size: number) => size * 13 * model.TYPE_LEADING;
+  it('sets every line inside the poster margins', () => {
+    for (const b of model.posterBlocks(COPY, POSTER, widthEm)) {
+      const box = boxOf(b);
 
-    expect(block(tall)).toBeLessThan(poster.h);
-    expect(block(tall)).toBeGreaterThan(poster.h * 0.8);
-    expect(wide).toBeLessThan(tall);
-    expect(wide * 9).toBeLessThan(poster.w);
+      expect(box.left).toBeGreaterThanOrEqual(POSTER.x);
+      expect(box.right).toBeLessThanOrEqual(POSTER.x + POSTER.w + 1e-6);
+      expect(box.top).toBeGreaterThan(POSTER.y);
+      expect(box.bottom).toBeLessThan(POSTER.y + POSTER.h);
+    }
+  });
+
+  it('never lets two lines collide', () => {
+    const boxes = model.posterBlocks(COPY, POSTER, widthEm).filter((b) => b.text).map(boxOf);
+    boxes.forEach((a, i) => boxes.slice(i + 1).forEach((b) => {
+      const apart = a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+
+      expect(apart).toBe(true);
+    }));
+  });
+
+  it('makes one huge word the poster, with type in at least three sizes around it', () => {
+    const blocks = model.posterBlocks(COPY, POSTER, widthEm);
+    const headline = blocks.find((b) => b.role === 'headline')!;
+    const sizes = new Set(blocks.map((b) => Math.round(b.size)));
+
+    expect(headline.text).toBe('Murmur');
+    expect(Math.max(...blocks.map((b) => b.size))).toBe(headline.size);
+    expect(widthEm(headline.text) * headline.size).toBeGreaterThan(POSTER.w * 0.8);
+    expect(sizes.size).toBeGreaterThanOrEqual(3);
+  });
+
+  it('marks grey lines with a tilde in every block', () => {
+    const dates = model.posterBlocks(COPY, POSTER, widthEm).filter((b) => b.role === 'dates');
+
+    expect(dates.map((b) => [b.text, b.muted])).toEqual([['07.—', false], ['19.', false], ['Apr', true]]);
+  });
+
+  it('shrinks a block whose line is too long, instead of running off the poster', () => {
+    const long = model.posterBlocks({ ...COPY, dates: 'a very long line of dates' }, POSTER, widthEm).find((b) => b.role === 'dates')!;
+
+    expect(boxOf(long).right).toBeLessThanOrEqual(POSTER.w + 1e-6);
+  });
+
+  const gaps = (t: number) => {
+    const nodes = model.blobNodes(PARAMS, t, LENGTH);
+    return model.DROPS.map(([anchor], k) => {
+      const [x, y, r] = nodes[model.BODY_COUNT + k];
+      const [ax, ay, ar] = nodes[anchor];
+      return Math.hypot(x - ax, y - ay) - r - ar;
+    });
+  };
+
+  it('lets drops break away from the body and melt back in', () => {
+    const all = times().map(gaps);
+    model.DROPS.forEach((_, k) => {
+      const path = all.map((g) => g[k]);
+
+      expect(Math.max(...path)).toBeGreaterThan(model.MELT);
+      expect(Math.min(...path)).toBeLessThan(0);
+    });
+  });
+
+  it('breaks the drops away at different moments, set by the seed', () => {
+    const widest = (seed: number) => model.DROPS.map((_, k) => {
+      const path = times().map((t) => {
+        const nodes = model.blobNodes({ ...PARAMS, seed }, t, LENGTH);
+        const [x, y, r] = nodes[model.BODY_COUNT + k];
+        const [ax, ay, ar] = nodes[model.DROPS[k][0]];
+        return Math.hypot(x - ax, y - ay) - r - ar;
+      });
+      return path.indexOf(Math.max(...path));
+    });
+
+    expect(new Set(widest(3)).size).toBeGreaterThan(model.DROPS.length / 2);
+    expect(widest(4)).not.toEqual(widest(3));
   });
 
   for (const [name, [width, height]] of Object.entries(ASPECTS)) {

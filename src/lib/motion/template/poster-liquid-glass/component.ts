@@ -8,8 +8,11 @@ export const POSTER_GLASS_VAR_PREFIX = 'poster';
 
 export const POSTER_GLASS_FONTS = ['Inter', 'Inter Tight', 'Geist', 'Instrument Sans', 'Manrope', 'DM Sans', 'Space Grotesk'];
 
-const LEFT_COLUMN = ['Lectures', '~24.–', '~26.', '~Sep', '~Us', '~BY', '~NiGht', '~Ostend', '18.', 'Oct', 'FoRm', 'DaYs', 'Verona'].join('\n');
-const RIGHT_COLUMN = ['~1. Dec', '~Nicer', '~TuesdaYs', '~Leeds', '12.', 'Nov', 'Swiss', 'Modern', 'Archive', 'Lucerne', '~7. Oct', '~VKS', '~Bern'].join('\n');
+const INTRO = ['Spring sessions', '~on sound, form', '~and slow light'].join('\n');
+const DETAILS = ['~Talks, walks', '~and late screenings', 'Free entry'].join('\n');
+const DATES = ['07.—', '19.', '~Apr'].join('\n');
+const VENUE = ['Halde Pavilion', '~Mirrow Quay', '~Room 3'].join('\n');
+const FOOTER = ['~No. 04', '~2027'].join('\n');
 
 const lines = (title: string, value: string): PropSpec => ({ type: 'string', title, default: value, format: PropFormat.Textarea, maxLength: 400, group: 'Content' });
 const number = (title: string, value: number, minimum: number, maximum: number, group: PropSpec['group'], step: number): PropSpec => ({ type: 'number', title, default: value, minimum, maximum, group, step });
@@ -17,8 +20,12 @@ const flag = (title: string, value: boolean, group: PropSpec['group']): PropSpec
 const colour = (title: string, value: string): PropSpec => ({ type: 'string', title, format: PropFormat.Color, default: value, group: 'Style' });
 
 export const POSTER_GLASS_PROPS: Record<string, PropSpec> = {
-  leftColumn: lines('Left column (one line each, ~ for grey)', LEFT_COLUMN),
-  rightColumn: lines('Right column (one line each, ~ for grey)', RIGHT_COLUMN),
+  headline: { type: 'string', title: 'Big word', default: 'Murmur', maxLength: 24, group: 'Content' },
+  intro: lines('Top left (one line each, ~ for grey)', INTRO),
+  details: lines('Top right (one line each, ~ for grey)', DETAILS),
+  dates: lines('Dates (one line each, ~ for grey)', DATES),
+  venue: lines('Place, bottom left (one line each, ~ for grey)', VENUE),
+  footer: lines('Corner note (one line each, ~ for grey)', FOOTER),
   font: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter', group: 'Style' },
   fontWeight: number('Type weight', 500, 300, 800, 'Style', 100),
   tracking: number('Type tracking (em)', -0.045, -0.1, 0.05, 'Style', 0.005),
@@ -32,6 +39,7 @@ export const POSTER_GLASS_PROPS: Record<string, PropSpec> = {
   shine: number('Highlights', 1, 0, 2, 'Layout', 0.05),
   flow: number('Flow cycles per loop', 1, 1, 3, 'Motion', 1),
   wander: number('How far the glass wanders', 1, 0, 1.6, 'Motion', 0.05),
+  seed: number('Drop timing seed', 3, 0, 99, 'Motion', 1),
   [VAR_PREFIX]: { type: 'string', title: 'Runtime variable prefix', default: POSTER_GLASS_VAR_PREFIX, maxLength: 20, group: 'Layout' }
 };
 

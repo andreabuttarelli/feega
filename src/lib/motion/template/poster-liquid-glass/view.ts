@@ -1,9 +1,8 @@
 export const POSTER_GLASS_VIEW = String.raw`
-const COLUMN_GAP_EM = 0.3;
 const MEASURE_PX = 100;
 const RIM = 0.028;
-const STEEPEST = 2.5;
-const MELT = 0.05;
+const STEEPEST = 1.6;
+const EDGE_CALM = 0.35;
 const BEND = 0.04;
 const SPREAD = [1, 1.025, 1.05];
 const SHADOW_SHIFT = [0.006, 0.014];
@@ -18,9 +17,10 @@ const canvas = root.querySelector('.plg-canvas');
 const paper = document.createElement('canvas');
 const ink = paper.getContext('2d');
 
-const nodeCount = blobNodes({ glassSize: 1, flow: 1, wander: 0 }, 0, 1).length;
+const nodeCount = blobNodes({ glassSize: 1, flow: 1, wander: 0, seed: 0 }, 0, 1).length;
 
 const capsules = BLOB_EDGES.map(([a, b]) => 'd = smin(d, capsule(p, uNodes[' + a + '], uNodes[' + b + ']), MELT);').join('\n  ');
+const droplets = DROPS.map((_, i) => 'd = smin(d, length(p - uNodes[' + (BODY_COUNT + i) + '].xy) - uNodes[' + (BODY_COUNT + i) + '].z, MELT);').join('\n  ');
 
 const FRAGMENT = [
   'precision highp float;',
@@ -38,9 +38,10 @@ const FRAGMENT = [
   'float field(vec2 p) {',
   '  float d = 1e3;',
   '  ' + capsules,
+  '  ' + droplets,
   '  return d;',
   '}',
-  'float lift(float d) { float x = clamp(-d / RIM, 0.0, 1.0); return sqrt(1.0 - (1.0 - x) * (1.0 - x)); }',
+  'float lift(float d) { float x = clamp(-d / RIM, 0.0, 1.0); return 1.0 - (1.0 - x) * (1.0 - x); }',
   'vec2 capped(vec2 s) { float m = length(s); return m > ' + STEEPEST.toFixed(2) + ' ? s * (' + STEEPEST.toFixed(2) + ' / m) : s; }',
   'vec3 paperAt(vec2 px) { return texture2D(uPaper, vec2(px.x / uRes.x, 1.0 - px.y / uRes.y)).rgb; }',
   'void main() {',
@@ -54,7 +55,7 @@ const FRAGMENT = [
   '  float e = pixel * 1.5;',
   '  float h = lift(d);',
   '  vec2 slope = vec2(lift(field(p + vec2(e, 0.0))) - h, lift(field(p + vec2(0.0, e))) - h) / e * RIM;',
-  '  vec2 bend = capped(slope);',
+  '  vec2 bend = capped(slope) * smoothstep(0.0, ' + EDGE_CALM.toFixed(3) + ', h);',
   '  vec2 inward = bend * uBend * ' + BEND.toFixed(4) + ' * uPoster.z;',
   '  vec3 bent = vec3(paperAt(px + inward * ' + SPREAD[0].toFixed(3) + ').r, paperAt(px + inward * ' + SPREAD[1].toFixed(3) + ').g, paperAt(px + inward * ' + SPREAD[2].toFixed(3) + ').b);',
   '  vec3 n = normalize(vec3(-bend * 0.6, 1.0));',
@@ -126,11 +127,6 @@ const measure = (p, text) => {
   return ink.measureText(text).width / MEASURE_PX;
 };
 
-const widestRow = (p, left, right) => {
-  const rows = Math.max(left.length, right.length);
-  return Array.from({ length: rows }, (_, i) => measure(p, (left[i] || {}).text || '') + measure(p, (right[i] || {}).text || '') + COLUMN_GAP_EM).reduce((a, b) => Math.max(a, b), 0);
-};
-
 const paintClip = (x, y, size) => {
   ink.fillStyle = '#9a9a9c';
   ink.fillRect(x - size * 0.32, y - size * 0.62, size * 0.08, size * 0.5);
@@ -140,7 +136,7 @@ const paintClip = (x, y, size) => {
 };
 
 const paintPaper = (p, width, height) => {
-  const key = JSON.stringify([width, height, p.leftColumn, p.rightColumn, p.font, p.fontWeight, p.tracking, p.ink, p.muted, p.paper, p.wall, p.clips]);
+  const key = JSON.stringify([width, height, p.headline, p.intro, p.details, p.dates, p.venue, p.footer, p.font, p.fontWeight, p.tracking, p.ink, p.muted, p.paper, p.wall, p.clips]);
   if (key === cache.paperKey) {
     return cache.poster;
   }
@@ -157,23 +153,14 @@ const paintPaper = (p, width, height) => {
   ink.fillRect(poster.x, poster.y, poster.w, poster.h);
   ink.restore();
 
-  const left = columnLines(p.leftColumn);
-  const right = columnLines(p.rightColumn);
-  const size = typeSize(Math.max(left.length, right.length), widestRow(p, left, right), poster);
-  const line = size * TYPE_LEADING;
-  const top = poster.y + poster.h * TYPE_PAD_Y + line * 0.82;
-  ink.font = typeFace(p, size);
-  ink.letterSpacing = p.tracking * size + 'px';
   ink.textBaseline = 'alphabetic';
-  const column = (rows, align, x) => {
-    ink.textAlign = align;
-    rows.forEach((row, i) => {
-      ink.fillStyle = row.muted ? p.muted : p.ink;
-      ink.fillText(row.text, x, top + i * line);
-    });
-  };
-  column(left, 'left', poster.x + poster.w * TYPE_PAD_X);
-  column(right, 'right', poster.x + poster.w * (1 - TYPE_PAD_X) + p.tracking * size);
+  posterBlocks(p, poster, (text) => measure(p, text)).forEach((b) => {
+    ink.font = typeFace(p, b.size);
+    ink.letterSpacing = p.tracking * b.size + 'px';
+    ink.textAlign = b.align;
+    ink.fillStyle = b.muted ? p.muted : p.ink;
+    ink.fillText(b.text, b.align === 'right' ? b.x + p.tracking * b.size : b.x, b.y);
+  });
 
   if (p.clips) {
     CLIP_SPOTS.forEach((at) => paintClip(poster.x + poster.w * at, poster.y, poster.w * 0.04));

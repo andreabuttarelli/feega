@@ -42,11 +42,12 @@ describe('the poster liquid glass template', () => {
     expect(component().source.css).not.toMatch(/radius|rotate/);
   });
 
-  it('exposes both columns as text fields, at most five of them key', () => {
+  it('exposes every text block as a text field, at most five of them key', () => {
     const fields = POSTER_LIQUID_GLASS_TEMPLATE.template.doc.fields;
 
-    expect(fields.find((f) => f.prop === 'leftColumn')?.type).toBe(FieldType.Text);
-    expect(fields.find((f) => f.prop === 'rightColumn')?.type).toBe(FieldType.Text);
+    for (const prop of ['headline', 'intro', 'details', 'dates', 'venue', 'footer']) {
+      expect(fields.find((f) => f.prop === prop)?.type).toBe(FieldType.Text);
+    }
     expect(POSTER_GLASS_KEY_FIELDS.length).toBeLessThanOrEqual(5);
     expect(fields.map((f) => f.key)).toEqual(expect.arrayContaining(POSTER_GLASS_KEY_FIELDS));
   });
@@ -57,25 +58,25 @@ describe('the poster liquid glass template', () => {
     expect(groups).toEqual(['Text', 'Style', 'Glass', 'Motion']);
   });
 
-  it('declares the columns and colours as runtime variables', () => {
+  it('declares the words and colours as runtime variables', () => {
     const names = interactiveOf(POSTER_LIQUID_GLASS_TEMPLATE.template.doc).vars.map((v) => v.name);
 
-    expect(names).toEqual(expect.arrayContaining(['poster_left_column', 'poster_right_column', 'poster_ink']));
+    expect(names).toEqual(expect.arrayContaining(['poster_headline', 'poster_dates', 'poster_ink']));
   });
 
-  it('takes edited columns through the fields', () => {
+  it('takes an edited headline through the fields', () => {
     const placed = inserted();
-    const set = setTemplateValues(placed.doc, placed.clipId, { left_column: 'zqx\n~grey' });
+    const set = setTemplateValues(placed.doc, placed.clipId, { headline: 'zqx' });
     if (!set.ok) {
       throw new Error(set.error);
     }
 
     expect(parseMotionDoc(set.doc).ok).toBe(true);
-    expect(templateFields(set.doc, placed.clipId).find((f) => f.key === 'left_column')?.value).toBe('zqx\n~grey');
+    expect(templateFields(set.doc, placed.clipId).find((f) => f.key === 'headline')?.value).toBe('zqx');
   });
 
   it.each([MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Square, MotionFormat.Portrait])('composes in %s with the variables reaching the component', (format) => {
-    const html = composeHtml({ doc: inserted(format).doc, tokens: FEEGA_TOKENS, assets: {}, vars: { poster_left_column: 'zqx from the host' } });
+    const html = composeHtml({ doc: inserted(format).doc, tokens: FEEGA_TOKENS, assets: {}, vars: { poster_headline: 'zqx from the host' } });
 
     expect(html).toContain('zqx from the host');
     expect(html).toContain('plg-canvas');
