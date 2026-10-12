@@ -21,6 +21,6 @@ export const COMMENT_GRID_TEMPLATE: TemplateEntry = {
     name: 'Comment grid',
     description: 'A drifting grid of comment cards enters from the centre out, then a title lands over it. Every part is a field or a runtime variable.',
     keyFields: COMMENTS_KEY_FIELDS,
-    doc: customTemplateDoc({ name: 'comment-grid', component: COMMENTS_COMPONENT, code: commentsComponent(), props: COMMENTS_PROPS, fonts: COMMENTS_FONTS, varPrefix: COMMENTS_VAR_PREFIX, vars: COMMENTS_VARS, clip: COMMENTS_CLIP, seconds: 10, fps: 30, groups: COMMENTS_GROUPS })
+    doc: customTemplateDoc({ name: 'comment-grid', component: COMMENTS_COMPONENT, code: commentsComponent(), props: COMMENTS_PROPS, fonts: COMMENTS_FONTS, varPrefix: COMMENTS_VAR_PREFIX, vars: COMMENTS_VARS, clip: COMMENTS_CLIP, seconds: 12, fps: 30, groups: COMMENTS_GROUPS })
   }
 };
