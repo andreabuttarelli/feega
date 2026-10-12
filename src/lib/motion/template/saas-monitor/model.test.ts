@@ -114,13 +114,14 @@ describe('the saas monitor model', () => {
     expect(frames({ ...PARAMS, scroll: false }).every((f) => f.scroll === 0)).toBe(true);
   });
 
-  it('places the watermark behind the monitor, partly hidden and wider than the frame', () => {
-    const layout = model.mockupLayout(PARAMS, 1920, 1080, TEXT_EM);
+  it.each([[1920, 1080], [1080, 1920], [1080, 1080]])('places the watermark behind the monitor, partly hidden and wider than the frame at %ix%i', (w, h) => {
+    const layout = model.mockupLayout(PARAMS, w, h, TEXT_EM);
     const share = model.covered(layout);
 
     expect(share).toBeGreaterThan(0.15);
     expect(share).toBeLessThan(0.85);
     expect(layout.watermark.x1 - layout.watermark.x0).toBeGreaterThan(2 * layout.box.ax);
+    expect(layout.watermark.x1 - layout.watermark.x0).toBeLessThan(4 * layout.box.ax);
   });
 
   it('keeps the monitor inside the frame at rest', () => {

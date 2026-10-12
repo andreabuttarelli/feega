@@ -36,6 +36,7 @@
   "builtin:product-reveal",
   "builtin:prompt-input",
   "builtin:quote",
+  "builtin:saas-monitor",
   "builtin:scene-big-number",
   "builtin:scene-device-hero",
   "builtin:scene-device-split",

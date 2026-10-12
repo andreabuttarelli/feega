@@ -294,6 +294,9 @@ const measureEm = (p) => {
 };
 
 const mediaOf = (raw) => {
+  if (Array.isArray(raw)) {
+    return raw[0] && raw[0].src ? { src: raw[0].src, video: raw[0].kind === 'video' } : null;
+  }
   const item = String(raw || '').trim();
   const video = item.startsWith(VIDEO_MARK);
   const id = video ? item.slice(VIDEO_MARK.length).trim() : item;

@@ -35,7 +35,7 @@ export const MOCKUP_PROPS: Record<string, PropSpec> = {
   secondaryCta: text('Second button', 'Book a demo', { maxLength: 30 }),
   productName: text('Product section title', 'Kairo Studio', { maxLength: 40 }),
   screenSource: choice('Screen shows', Object.values(ScreenSource), ScreenSource.Site, 'Content'),
-  screenAsset: text('Screen asset (id or link; video:id for a video)', '', { maxLength: 400 }),
+  screenAsset: text('Screen picture or video', '', { format: PropFormat.Media, maxLength: 2000 }),
   font: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter Tight', group: 'Style' },
   accent: colour('Accent (product section, glow)', '#7c5cff'),
   backgroundFrom: colour('Background, light end', '#f3efff'),

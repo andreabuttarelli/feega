@@ -35,7 +35,7 @@ function mockupLayout(p, width, height, textEm) {
   const screenW = p.monitorSize * 2 * Math.min(box.ax, box.ay * 1.6);
   const bodyW = screenW * (1 + 2 * BEZEL);
   const bodyH = screenW * SCREEN_ASPECT + screenW * 2 * BEZEL;
-  const em = (p.watermarkSize / 100) * 2 * box.ay;
+  const em = (p.watermarkSize / 100) * 2 * Math.min(box.ay, box.ax * SCREEN_ASPECT);
   return {
     box,
     screenW,
