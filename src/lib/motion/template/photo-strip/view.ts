@@ -2,7 +2,7 @@ export const STRIP_VIEW = String.raw`
 const LINK = /^(https?:|data:|blob:|\/)/;
 
 const listOf = (raw) => String(raw || '').split(',').map((s) => s.trim());
-const mediaList = (raw) => listOf(raw).filter(Boolean).map((id) => (LINK.test(id) ? id : assets[id])).filter(Boolean);
+const mediaList = (raw) => (Array.isArray(raw) ? raw.filter((m) => m.kind !== 'video').map((m) => m.src) : listOf(raw).filter(Boolean).map((id) => (LINK.test(id) ? id : assets[id]))).filter(Boolean);
 
 root.insertAdjacentHTML('beforeend', '<div class="ps"><div class="ps-row"></div><div class="ps-row ps-over"><div class="ps-caption"></div><div class="ps-cursor"></div></div></div>');
 
@@ -21,7 +21,7 @@ const withMedia = (p) => {
 };
 
 const buildCards = (p, slots) => {
-  const key = JSON.stringify([p.media, p.count, slots]);
+  const key = JSON.stringify([p.items, p.count, slots]);
   if (key === cache.cardsKey) {
     return cache.cards;
   }

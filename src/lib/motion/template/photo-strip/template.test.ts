@@ -41,7 +41,7 @@ describe('the photo strip template', () => {
     expect(fields.find((f) => f.prop === 'pause')?.type).toBe(FieldType.Number);
     expect(fields.find((f) => f.prop === 'background')?.type).toBe(FieldType.Color);
     expect(fields.find((f) => f.prop === 'cursor')?.type).toBe(FieldType.Boolean);
-    expect(fields.find((f) => f.prop === 'media')?.type).toBe(FieldType.Text);
+    expect(fields.find((f) => f.prop === 'media')?.type).toBe(FieldType.MediaList);
   });
 
   it('groups the Properties panel into photos, style, motion and interaction', () => {

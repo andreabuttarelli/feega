@@ -14,6 +14,6 @@ card passing the centre is magnified, then shrinks as it moves on.
 - **No drag in embeds (for now).** Built, then dropped: the embed only forwards pointer input to
   live components, and a deterministic one never receives it. The strip stays automatic.
 - **Properties** grouped Photos / Style / Motion / Interaction via an optional group map in the
-  shared builder. Photos stay a comma-separated field: the media-list picker writes an array,
-  which custom component props cannot hold.
-- Stacked on #425 (shared `custom-template.ts`).
+  shared builder. Photos use the media picker (`PropFormat.Media`, landed with #425);
+  comma-separated ids still work.
+- Library preview generated with `scripts/component-previews.ts`.

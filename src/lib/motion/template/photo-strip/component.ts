@@ -19,7 +19,7 @@ const flag = (title: string, value: boolean, group: PropSpec['group']): PropSpec
 const colour = (title: string, value: string): PropSpec => ({ type: 'string', title, format: PropFormat.Color, default: value, group: 'Style' });
 
 export const STRIP_PROPS: Record<string, PropSpec> = {
-  media: text('Photos (ids or links, comma separated)', '', { format: PropFormat.Textarea, maxLength: 2000 }),
+  media: text('Photos', '', { format: PropFormat.Media, maxLength: 2000 }),
   captions: text('Captions (comma separated, one per photo)', '', { format: PropFormat.Textarea, maxLength: 1000 }),
   lowercase: flag('Lowercase captions', true, 'Content'),
   font: { type: 'string', title: 'Caption font', format: PropFormat.Font, default: 'Inter Tight', group: 'Style' },
