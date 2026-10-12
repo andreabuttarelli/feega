@@ -157,7 +157,7 @@ function imageFrames(p, t, length, position, width, height) {
     const r = rest(p, chapter, grid, head, gap, i, Math.min(width, height));
     const away = (i - position) * Math.max(1, chapter.speed);
     const idle = p.idleDrift * IDLE * height * Math.sin((2 * Math.PI * t) / Math.max(length, 1e-6) + i);
-    const travel = EXIT * Math.max(r.y + r.h - grid.ys[1], grid.ys[grid.ys.length - 2] - r.y);
+    const travel = EXIT * (away < 0 ? r.y + r.h - grid.ys[1] : grid.ys[grid.ys.length - 2] - r.y);
     return { x: r.x, y: r.y + away * travel + idle, w: r.w, h: r.h, shift: away * p.parallax };
   });
 }

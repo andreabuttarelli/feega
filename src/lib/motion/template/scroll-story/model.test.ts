@@ -180,6 +180,13 @@ describe('the scroll story model', () => {
     });
   });
 
+  it.each(Object.entries(ASPECTS))('always keeps an image in the picture window in %s', (_, size) => {
+    const grid = model.storyGrid(PARAMS, size[0], size[1]);
+    const inside = (img: Picture) => img.y + img.h > grid.ys[1] && img.y < grid.ys[grid.ys.length - 2];
+
+    times().forEach((t) => expect(frame(t, PARAMS, size).images.some(inside)).toBe(true));
+  });
+
   it('rolls the chapter number and label over without an empty moment', () => {
     const [swap] = model.swapPlan(PARAMS, LENGTH);
     const f = frame(swap.outAt[0] + PARAMS.swapDuration / 2);
