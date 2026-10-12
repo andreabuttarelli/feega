@@ -32,10 +32,45 @@ describe('the wire globe pages model', () => {
   it('stacks the pages on levels from the core to the wire, so some pass in front of others', () => {
     const radii = model.pageLayout(PARAMS).map((p) => p.r);
 
-    expect(Math.min(...radii)).toBeLessThan(0.5);
+    expect(Math.min(...radii)).toBeLessThan(0.6);
     expect(Math.max(...radii)).toBeGreaterThan(0.85);
     expect(radii.filter((r) => r < 0.7).length).toBeGreaterThan(radii.length / 4);
     expect(radii.filter((r) => r > 0.7).length).toBeGreaterThan(radii.length / 4);
+  });
+
+  it('never lets two pages on the same level touch, at any page count', () => {
+    const angle = (a: number[], b: number[]) => Math.acos(Math.min(1, (a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) / (Math.hypot(...a) * Math.hypot(...b))));
+    const reach = (page: Page) => Math.max(...[[0, 0], [1, 0], [0, 1], [1, 1]].map(([u, v]) => angle(model.pagePoint(page, 0.5, 0.5), model.pagePoint(page, u, v))));
+
+    [6, 13, 22, 32, 40].forEach((count) => {
+      [0.5, 1, 1.6].forEach((pageSize) => {
+        const pages = model.pageLayout({ ...PARAMS, pages: count, pageSize });
+        pages.forEach((a, i) => pages.slice(i + 1).filter((b) => b.r === a.r).forEach((b) => {
+          const gap = angle(model.pagePoint(a, 0.5, 0.5), model.pagePoint(b, 0.5, 0.5)) - reach(a) - reach(b);
+          expect(gap).toBeGreaterThan(0.06);
+        }));
+      });
+    });
+  });
+
+  it('spreads the pages evenly over a few levels, with no dense inner ball', () => {
+    [6, 22, 32, 40].forEach((count) => {
+      const radii = model.pageLayout({ ...PARAMS, pages: count }).map((p) => p.r);
+      const levels = [...new Set(radii)];
+      const counts = levels.map((r) => radii.filter((x) => x === r).length);
+
+      expect(levels.length).toBe(3);
+      expect(Math.max(...counts) - Math.min(...counts)).toBeLessThanOrEqual(1);
+      expect(Math.min(...radii)).toBeGreaterThan(0.45);
+    });
+  });
+
+  it('offsets the levels, so no page sits right behind another', () => {
+    const pages = model.pageLayout({ ...PARAMS, pages: 32 });
+    const dir = (p: Page) => model.pagePoint(p, 0.5, 0.5).map((x) => x / p.r);
+    const angle = (a: number[], b: number[]) => Math.acos(Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
+
+    pages.forEach((a, i) => pages.slice(i + 1).filter((b) => b.r !== a.r).forEach((b) => expect(angle(dir(a), dir(b))).toBeGreaterThan(0.2)));
   });
 
   it('keeps inner pages readable: a deeper page spans a wider angle', () => {
@@ -58,14 +93,12 @@ describe('the wire globe pages model', () => {
     expect(page.w / page.h).toBeLessThan(0.9);
   });
 
-  it('covers the globe from pole to pole, overlapping', () => {
+  it('covers the globe from pole to pole', () => {
     const pages = model.pageLayout(PARAMS);
     const lats = pages.map((p) => p.lat);
-    const area = pages.reduce((sum, p) => sum + p.w * p.h, 0);
 
     expect(Math.max(...lats)).toBeGreaterThan(0.7);
     expect(Math.min(...lats)).toBeLessThan(-0.7);
-    expect(area).toBeGreaterThan(4 * Math.PI * 0.6);
   });
 
   it('is the same layout every time', () => {

@@ -2,17 +2,12 @@ export const WIRE_MODEL = String.raw`
 const MIN_PAGES = 6;
 const MAX_PAGES = 40;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const COVERAGE = 1.05;
-const LAT_JITTER = 0.3;
-const LON_JITTER = 0.5;
-const SIZE_JITTER = 0.45;
-const ASPECT_JITTER = 0.16;
-const ROLL_JITTER = 1.3;
-const OUTER_PAGE = 0.95;
-const INNER_PAGE = 0.38;
-const LEVEL_STRIDE = 0.38;
-const MAX_SPAN = 1.7;
-const POLE = Math.PI / 2 - 0.05;
+const LEVELS = [0.95, 0.76, 0.57];
+const FILL = 0.66;
+const MAX_FILL = 0.86;
+const SIZE_JITTER = 0.18;
+const ASPECT_JITTER = 0.12;
+const ROLL_JITTER = 0.9;
 const DEG = Math.PI / 180;
 
 const hash = (i, k) => {
@@ -20,35 +15,34 @@ const hash = (i, k) => {
   return x - Math.floor(x);
 };
 
-const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+function shellDirections(m, level) {
+  const shift = (level / LEVELS.length) * GOLDEN_ANGLE;
+  const lift = (level / LEVELS.length - 0.5) / m;
+  return Array.from({ length: m }, (_, j) => ({ lat: Math.asin(1 - (2 * (j + 0.5 + lift)) / m), lon: j * GOLDEN_ANGLE + shift }));
+}
 
-function levelOf(i, n) {
-  let stride = Math.max(1, Math.round(n * LEVEL_STRIDE));
-  while (gcd(stride, n) !== 1) {
-    stride++;
-  }
-  const level = ((i * stride) % n + 0.5) / n;
-  return INNER_PAGE + (OUTER_PAGE - INNER_PAGE) * level;
+const arc = (a, b) => Math.acos(Math.max(-1, Math.min(1, Math.sin(a.lat) * Math.sin(b.lat) + Math.cos(a.lat) * Math.cos(b.lat) * Math.cos(a.lon - b.lon))));
+
+function nearest(points) {
+  return points.map((a, i) => Math.min(Math.PI, ...points.filter((_, j) => j !== i).map((b) => arc(a, b))));
 }
 
 function pageLayout(p) {
   const n = Math.max(MIN_PAGES, Math.min(MAX_PAGES, Math.round(p.pages)));
-  const side = Math.sqrt((4 * Math.PI) / n) * COVERAGE * p.pageSize;
-  return Array.from({ length: n }, (_, i) => {
-    const r = levelOf(i, n);
-    const size = Math.min(MAX_SPAN, (side / Math.sqrt(r)) * (1 + (hash(i, 1) - 0.5) * SIZE_JITTER));
-    const aspect = p.pageAspect * (1 + (hash(i, 2) - 0.5) * ASPECT_JITTER);
-    const lat = Math.asin(1 - (2 * (i + 0.5)) / n) + (hash(i, 3) - 0.5) * LAT_JITTER;
-    return {
-      lat: Math.max(-POLE, Math.min(POLE, lat)),
-      lon: i * GOLDEN_ANGLE + (hash(i, 4) - 0.5) * LON_JITTER,
-      roll: (hash(i, 5) - 0.5) * ROLL_JITTER,
-      w: size * Math.sqrt(aspect),
-      h: size / Math.sqrt(aspect),
-      r,
-      slot: i
-    };
-  });
+  const fill = Math.min(MAX_FILL, FILL * p.pageSize);
+  return LEVELS.flatMap((r, level) => {
+    const slots = Array.from({ length: n }, (_, i) => i).filter((i) => i % LEVELS.length === level);
+    const points = shellDirections(slots.length, level);
+    const spacing = Math.min(...nearest(points));
+    return slots.map((slot, j) => {
+      const aspect = p.pageAspect * (1 + (hash(slot, 2) - 0.5) * ASPECT_JITTER);
+      const reach = (spacing / 2) * fill * (1 - hash(slot, 1) * SIZE_JITTER);
+      const diag = Math.tan(reach);
+      const tw = (diag * Math.sqrt(aspect)) / Math.sqrt(aspect + 1 / aspect);
+      const th = (diag / Math.sqrt(aspect)) / Math.sqrt(aspect + 1 / aspect);
+      return { ...points[j], roll: (hash(slot, 5) - 0.5) * ROLL_JITTER, w: 2 * Math.atan(tw), h: 2 * Math.atan(th), r, slot };
+    });
+  }).sort((a, b) => a.slot - b.slot);
 }
 
 function pagePoint(page, u, v) {

@@ -16,3 +16,7 @@ seen dimmed through the wire.
   First draft put all pages on one shell just under the wire: read as a flat skin, not a volume.
 - Deeper pages span a wider angle (1/sqrt(r)) so they stay legible; a depth fog darkens the far
   half so the levels read.
+- Second draft (one level per page, overlapping, 1/sqrt(r) sizing) piled pages into touching
+  clusters with a dense core. Now three shells (0.95, 0.76, 0.57), pages dealt round-robin,
+  Fibonacci per shell, each shell offset. Size comes from the shell's nearest-neighbour arc, so
+  pages on one shell never touch at any count or page size.
