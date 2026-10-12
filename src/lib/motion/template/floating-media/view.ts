@@ -4,7 +4,9 @@ const LINK = /^(https?:|data:|blob:|\/)/;
 const BLUR_UNIT = 0.0012;
 const BORDER_BASE = 1080;
 
-const mediaList = (raw) => String(raw || '').split(',').map((s) => s.trim()).filter(Boolean).map((item) => {
+const picked = (item) => ({ src: item.src, video: item.kind === 'video' });
+
+const mediaList = (raw) => Array.isArray(raw) ? raw.map(picked).filter((m) => m.src) : String(raw || '').split(',').map((s) => s.trim()).filter(Boolean).map((item) => {
   const video = item.startsWith(VIDEO_MARK);
   const id = video ? item.slice(VIDEO_MARK.length).trim() : item;
   const src = LINK.test(id) ? id : assets[id];
@@ -50,7 +52,11 @@ const buildCards = (p, n) => {
     node.className = 'fm-card';
     node.innerHTML = cardHtml(items.length ? items[i % items.length] : null) + '<i class="fm-shade"></i>';
     world.appendChild(node);
-    return { node, shade: node.querySelector('.fm-shade'), video: node.querySelector('video') };
+    const video = node.querySelector('video');
+    if (video) {
+      video.addEventListener('loadedmetadata', () => seekVideo(video, tl.time()));
+    }
+    return { node, shade: node.querySelector('.fm-shade'), video };
   });
   cache = { ...cache, cardsKey: key, cards };
   return cards;

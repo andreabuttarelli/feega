@@ -18,7 +18,8 @@ export enum PropFormat {
   Color = 'color',
   Textarea = 'textarea',
   Asset = 'asset',
-  Font = 'font'
+  Font = 'font',
+  Media = 'media'
 }
 
 export enum ComponentMode {
@@ -42,7 +43,7 @@ const propSpecSchema = z
     maximum: z.number().optional(),
     step: z.number().positive().optional(),
     enum: z.array(z.string().max(60)).min(1).max(20).optional(),
-    format: z.enum([PropFormat.Color, PropFormat.Textarea, PropFormat.Asset, PropFormat.Font]).optional(),
+    format: z.enum([PropFormat.Color, PropFormat.Textarea, PropFormat.Asset, PropFormat.Font, PropFormat.Media]).optional(),
     assetKind: z.enum(['image', 'video', 'model3d']).optional(),
     group: z.enum(['Content', 'Style', 'Layout', 'Motion', 'Camera']).optional(),
     maxLength: z.number().int().positive().max(2000).optional()
@@ -94,12 +95,17 @@ export enum Strictness {
   Lenient = 'lenient'
 }
 
+const isMediaItem = (item: unknown) => typeof (item as { assetId?: unknown })?.assetId === 'string';
+
 type ValueRule = (spec: PropSpec, value: unknown) => string | null;
 
 const TYPE_RULES: Record<PropSpec['type'], ValueRule> = {
   string: (spec, value) => {
     if (value === null && spec.format === PropFormat.Asset) {
       return null;
+    }
+    if (spec.format === PropFormat.Media && Array.isArray(value)) {
+      return value.every(isMediaItem) ? null : 'expected media items with an assetId';
     }
     if (typeof value !== 'string') {
       return 'expected text';
