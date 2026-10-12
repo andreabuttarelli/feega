@@ -5,7 +5,7 @@ import { STRIP_COMPONENT, STRIP_FONTS, STRIP_PROPS, STRIP_VAR_PREFIX, stripCompo
 
 export const STRIP_TEMPLATE_ID = `${BUILTIN_PREFIX}photo-strip`;
 export const STRIP_CLIP = 'strip';
-export const STRIP_VARS = ['media', 'captions', 'background', 'captionColor', 'magnify', 'falloff', 'step', 'gesture', 'pause', 'direction', 'cursor'];
+export const STRIP_VARS = ['captions', 'background', 'captionColor', 'magnify', 'falloff', 'step', 'gesture', 'pause', 'direction', 'cursor'];
 
 const IN_GROUP: Record<string, readonly string[]> = {
   Photos: ['media', 'captions', 'lowercase', 'count'],

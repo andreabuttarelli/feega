@@ -22,8 +22,10 @@ const LAYOUT_PREFIX = 'builtin:composition-';
 
 const SAMPLES = join(OUT, 'samples');
 const SAMPLE_PHOTOS = ['p1015', 'p1016', 'p1018', 'p1039', 'p1043'];
-const SAMPLE_MEDIA: Record<string, { field: string; photos: string[] }> = {
-  'builtin:floating-media': { field: 'media', photos: SAMPLE_PHOTOS }
+const STRIP_PHOTOS = [...SAMPLE_PHOTOS, 'p1050', 'p1069', 'p1074', 'p1080'];
+const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: Record<string, string> }> = {
+  'builtin:floating-media': { field: 'media', photos: SAMPLE_PHOTOS },
+  'builtin:photo-strip': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } }
 };
 
 const sampleAssets = (photos: string[]) => Object.fromEntries(photos.map((id) => [id, `data:image/jpeg;base64,${readFileSync(join(SAMPLES, `${id}.jpg`)).toString('base64')}`]));
@@ -51,7 +53,7 @@ for (const entry of BUILTIN_TEMPLATES.filter((e) => !only.length || only.include
   }
 
   const media = SAMPLE_MEDIA[entry.id];
-  const filled = media ? setTemplateValues(placed.doc, placed.clipId, { [media.field]: media.photos.join(', ') }) : placed;
+  const filled = media ? setTemplateValues(placed.doc, placed.clipId, { [media.field]: media.photos.join(', '), ...media.values }) : placed;
   if (!filled.ok) {
     console.warn(entry.id, filled.error);
     continue;

@@ -57,7 +57,8 @@ describe('the photo strip template', () => {
   it('declares runtime variables an embedding site can set', () => {
     const names = interactiveOf(PHOTO_STRIP_TEMPLATE.template.doc).vars.map((v) => v.name);
 
-    expect(names).toEqual(expect.arrayContaining(['strip_media', 'strip_captions', 'strip_magnify', 'strip_cursor']));
+    expect(names).toEqual(expect.arrayContaining(['strip_captions', 'strip_magnify', 'strip_cursor']));
+    expect(names, 'a text variable would shadow the picked photos').not.toContain('strip_media');
   });
 
   it('setting a field moves its variable too', () => {
