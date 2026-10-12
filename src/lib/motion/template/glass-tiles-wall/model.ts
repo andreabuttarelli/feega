@@ -12,6 +12,9 @@ const LIFT_DEPTH = 0.12;
 const CAMERA_DISTANCE = 1.7;
 const DEG = Math.PI / 180;
 const SWAY = 0.06;
+const STAGGER_DEPTH = 0.16;
+const GOLDEN = 0.6180339887;
+const PITCH_SHARE = 0.4;
 
 const glide = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : (expoInOut(x) - EXPO_EDGE) / (1 - 2 * EXPO_EDGE));
 const wrap = (x, period) => x - period * Math.floor(x / period);
@@ -68,14 +71,16 @@ function placeTile(layout, p, row, slot, q, tilt) {
   const y0 = R * sb;
   const z0 = R * cb * ca;
   const facing = sb * st + cb * ca * ct;
+  const item = itemOf(layout, row, slot);
+  const stagger = p.stagger * STAGGER_DEPTH * layout.tileW * (2 * wrap(item * GOLDEN, 1) - 1);
   const lift = p.lift * LIFT_DEPTH * layout.tileW * Math.pow(Math.max(0, facing), LIFT_SHARPNESS);
   return {
     row: row.r,
     slot,
-    item: itemOf(layout, row, slot),
+    item,
     x: R * cb * Math.sin(a),
     y: y0 * ct - z0 * st,
-    z: y0 * st + z0 * ct - R + lift,
+    z: y0 * st + z0 * ct - R + lift + stagger,
     a,
     b: row.b,
     facing,
@@ -90,5 +95,11 @@ function wallFrame(layout, p, t, length) {
   const tilt = p.tilt * DEG * Math.cos(breath);
   const tiles = layout.rows.flatMap((row) => Array.from({ length: row.slots }, (_, slot) => placeTile(layout, p, row, slot, q, tilt)));
   return { tilt, tiles };
+}
+
+function orbitAt(p, t, length) {
+  const turn = (2 * Math.PI * t) / length;
+  const reach = p.orbit * DEG;
+  return { yaw: reach * Math.sin(turn), pitch: reach * PITCH_SHARE * Math.sin(2 * turn) };
 }
 `;

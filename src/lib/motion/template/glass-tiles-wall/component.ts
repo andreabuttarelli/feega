@@ -8,8 +8,8 @@ export const GTW_VAR_PREFIX = 'gtw';
 
 export const GTW_FONTS = ['Inter Tight', 'Inter', 'Geist', 'Instrument Sans', 'Manrope', 'Space Grotesk', 'DM Sans', 'Instrument Serif'];
 
-const TITLES = 'Night Index, Soft Power, Useful Noise, Tender Machines, Unfinished, Outer Office, Afterimage, New Rituals, Deep Surface, Free State, Near Future, Other Nature';
-const CAPTIONS = 'An atlas for life after dark | A gentler language for bold ideas | Signals worth keeping | Tools that learned to listen | A story without an ending | Work designed around being human | What stays when the light goes | Small gestures for a changing world | Depth under every plane | Room to move | Tomorrow, slightly early | New ecologies for synthetic worlds';
+const TITLES = 'Low Tide, Quiet Engine, Field Notes, Slow Weather, Paper Moon, Second Light, Open Hours, Still Water, Hand Made, North Window, Long Table, Common Ground';
+const CAPTIONS = 'What the sea leaves behind | Things that work without asking | Small findings, written down | Seasons at their own pace | A night shoot in three acts | The hour after sunset | A studio with the door open | Calm, measured in frames | Objects that remember hands | Light from one side only | Dinners worth the wait | Places we all share';
 
 const text = (title: string, value: string, extra: Partial<PropSpec> = {}): PropSpec => ({ type: 'string', title, default: value, group: 'Content', ...extra });
 const number = (title: string, value: number, minimum: number, maximum: number, group: PropSpec['group'], step: number): PropSpec => ({ type: 'number', title, default: value, minimum, maximum, group, step });
@@ -19,7 +19,7 @@ export const GTW_PROPS: Record<string, PropSpec> = {
   media: text('Pictures and videos', '', { format: PropFormat.Media, maxLength: 2000 }),
   titles: text('Tile titles (comma separated)', TITLES, { maxLength: 600 }),
   captions: text('Tile captions (separated by |)', CAPTIONS, { maxLength: 1200 }),
-  label: text('Small label on every tile', 'selected work', { maxLength: 40 }),
+  label: text('Small label on every tile', 'archive', { maxLength: 40 }),
   font: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter Tight', group: 'Style' },
   fontWeight: number('Title weight', 500, 300, 800, 'Style', 100),
   tracking: number('Title tracking (em)', -0.045, -0.08, 0.05, 'Style', 0.005),
@@ -36,6 +36,9 @@ export const GTW_PROPS: Record<string, PropSpec> = {
   step: number('Tiles crossed per move', 2, 1, 4, 'Camera', 1),
   tilt: number('Camera tilt (degrees)', 4, 0, 15, 'Camera', 0.5),
   lift: number('Front tiles lift toward the camera', 1, 0, 3, 'Camera', 0.1),
+  thickness: number('Glass thickness', 1, 0.2, 3, 'Style', 0.1),
+  stagger: number('Depth difference between tiles', 1, 0, 3, 'Camera', 0.1),
+  orbit: number('Camera orbit (degrees)', 7, 0, 20, 'Camera', 0.5),
   [VAR_PREFIX]: text('Runtime variable prefix', GTW_VAR_PREFIX, { group: 'Layout', maxLength: 20 })
 };
 
@@ -44,7 +47,7 @@ export function gtwComponent(): CustomComponent {
     source: { html: '', css: GTW_CSS.trim(), js: `${GTW_MODEL.trim()}\n\n${GTW_VIEW.trim()}` },
     propsSchema: { type: 'object', properties: GTW_PROPS },
     mode: ComponentMode.Deterministic,
-    version: 1,
+    version: 2,
     check: null
   };
 }

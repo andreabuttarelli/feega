@@ -8,11 +8,12 @@ type Model = {
   wallLayout: (p: object, width: number, height: number) => Layout;
   wallFrame: (layout: Layout, p: object, t: number, length: number) => Frame;
   panAt: (p: object, t: number, length: number) => number;
+  orbitAt: (p: object, t: number, length: number) => { yaw: number; pitch: number };
 };
 
-const model = new Function(`${GTW_MODEL}; return { wallLayout, wallFrame, panAt };`)() as Model;
+const model = new Function(`${GTW_MODEL}; return { wallLayout, wallFrame, panAt, orbitAt };`)() as Model;
 
-const PARAMS = { tileSize: 0.34, tileAspect: 1.42, gap: 0.06, curve: 0.9, moves: 3, step: 2, tilt: 4, lift: 1 };
+const PARAMS = { tileSize: 0.34, tileAspect: 1.42, gap: 0.06, curve: 0.9, moves: 3, step: 2, tilt: 4, lift: 1, stagger: 1, orbit: 6 };
 const SIZES = { landscape: [1920, 1080], vertical: [1080, 1920], square: [1080, 1080] } as const;
 const LENGTH = 12;
 const FPS = 60;
@@ -73,5 +74,25 @@ describe('the glass tiles wall model', () => {
 
   it('hides tiles turned away from the camera', () => {
     frameOf(3).tiles.filter((x) => x.shown).forEach((x) => expect(x.facing).toBeGreaterThan(0));
+  });
+
+  it('sets tiles at different depths, the same depth for the same picture', () => {
+    const layout = model.wallLayout(PARAMS, 1920, 1080);
+    const flat = model.wallFrame(layout, { ...PARAMS, stagger: 0, lift: 0 }, 0, LENGTH).tiles;
+    const staggered = model.wallFrame(layout, { ...PARAMS, lift: 0 }, 0, LENGTH).tiles;
+    const offsets = staggered.map((t, i) => t.z - flat[i].z);
+    expect(new Set(offsets.map((d) => d.toFixed(2))).size).toBeGreaterThan(3);
+    offsets.forEach((d) => expect(Math.abs(d)).toBeLessThanOrEqual(layout.tileW * 0.2));
+  });
+
+  it('orbits the camera in a closed, gentle loop', () => {
+    const at = times().map((t) => model.orbitAt(PARAMS, t, LENGTH));
+    expect(at[at.length - 1].yaw).toBeCloseTo(at[0].yaw, 9);
+    expect(at[at.length - 1].pitch).toBeCloseTo(at[0].pitch, 9);
+    const span = Math.max(...at.map((o) => o.yaw)) - Math.min(...at.map((o) => o.yaw));
+    expect(span).toBeGreaterThan(0.1);
+    at.slice(1).forEach((o, i) => expect(Math.abs(o.yaw - at[i].yaw)).toBeLessThan(0.01));
+    const still = model.orbitAt({ ...PARAMS, orbit: 0 }, 4, LENGTH);
+    expect(Math.abs(still.yaw) + Math.abs(still.pitch)).toBe(0);
   });
 });

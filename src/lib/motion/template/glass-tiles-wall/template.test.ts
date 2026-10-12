@@ -59,6 +59,6 @@ describe('the glass tiles wall template', () => {
     const html = composeHtml({ doc: inserted(format).doc, tokens: FEEGA_TOKENS, assets: {}, vars: { gtw_titles: 'zqx from the host' } });
 
     expect(html).toContain('zqx from the host');
-    expect(html).toContain('gt-wall');
+    expect(html).toContain('gt-canvas');
   });
 });
