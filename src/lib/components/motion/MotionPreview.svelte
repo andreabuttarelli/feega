@@ -85,7 +85,7 @@
       el.loop = loop;
       el.addEventListener('ready', () => {
         ready = true;
-        el.seek(frame / fps);
+        driver.seek(frame / fps);
         driver.ready();
       });
       el.addEventListener('timeupdate', (e) => {
@@ -164,7 +164,7 @@
         player.style.visibility = 'visible';
       }
       await loaded(html);
-      player?.seek(back / fps);
+      driver.seek(back / fps);
     }
   }
 
@@ -243,7 +243,7 @@
       return;
     }
     reported = target;
-    player.seek(target / fps);
+    driver.seek(target / fps);
   });
 
   $effect(() => {
