@@ -19,6 +19,7 @@
   "builtin:composition-staggered-grid",
   "builtin:composition-tilted-grid",
   "builtin:composition-vertical-flow",
+  "builtin:editorial-words-media",
   "builtin:end-card",
   "builtin:feature-scroll",
   "builtin:floating-media",
