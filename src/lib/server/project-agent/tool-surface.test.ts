@@ -58,10 +58,12 @@ describe('la superficie del modello mostra solo ciò che può usare', () => {
         'make_effects_pair',
         'search_gallery',
         'remix_gallery_item',
-        'publish_to_gallery'
+        'publish_to_gallery',
+        'list_components',
+        'set_composition_component'
       ])
     );
-    expect(names).toHaveLength(18);
+    expect(names).toHaveLength(20);
   });
 
   it('col brand i tool di brand ci sono, accanto a quelli di progetto', () => {

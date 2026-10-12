@@ -6,7 +6,7 @@
   import ComponentDetail from './ComponentDetail.svelte';
   import { Action } from '$lib/motion/actions';
   import { Dismiss, dismissFrom, gridStep } from '$lib/motion/template/browser';
-  import { ComponentKind, KIND_LABEL, matching, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
+  import { AddTarget, ComponentKind, KIND_LABEL, matching, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
   import type { Instance } from '$lib/motion/template/library';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
@@ -17,6 +17,7 @@
     draftOf,
     compose = null,
     assets = [],
+    target = AddTarget.Video,
     onpick,
     onclose
   }: {
@@ -25,6 +26,7 @@
     draftOf: (id: string, format: StarterFormat) => Instance | null;
     compose?: ((doc: Instance['doc']) => string) | null;
     assets?: Asset[];
+    target?: AddTarget;
     onpick: (id: string, sounds: boolean, draft: Instance | null) => void;
     onclose: () => void;
   } = $props();
@@ -116,7 +118,7 @@
   {#if open}
     <div class="sheet-scrim" role="presentation" onclick={closeDetail}></div>
     {#key open.id}
-      <ComponentDetail item={open} {format} {draftOf} {compose} {assets} onadd={(sounds, draft) => onpick(open.id, sounds, draft)} onclose={closeDetail} />
+      <ComponentDetail item={open} {format} {draftOf} {compose} {assets} {target} onadd={(sounds, draft) => onpick(open.id, sounds, draft)} onclose={closeDetail} />
     {/key}
   {/if}
 </div>

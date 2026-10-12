@@ -4,6 +4,7 @@ import { writeComponent } from '$lib/motion/custom/ops';
 import { registerFont } from '$lib/motion/fonts/ops';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { declareVar, VarKind, type VarDecl } from '$lib/motion/interactive/vars';
+import { interactiveOf, type Interactive } from '$lib/motion/interactive/settings';
 import { addClip, setCanvas, type OpResult } from '$lib/motion/timeline';
 import { exposeField, FieldType, type FieldInput } from './fields';
 
@@ -18,6 +19,7 @@ export type CustomTemplateSpec = {
   clip: string;
   seconds: number;
   fps: MotionDoc['fps'];
+  playback?: Pick<Interactive, 'playback' | 'scrollLength'>;
   groups?: Readonly<Record<string, string>>;
 };
 
@@ -88,5 +90,5 @@ export function customTemplateDoc(spec: CustomTemplateSpec): MotionDoc {
   for (const key of spec.vars) {
     doc = must(declareVar(doc, varOf(spec.varPrefix, key, spec.props[key])));
   }
-  return doc;
+  return spec.playback ? { ...doc, interactive: { ...interactiveOf(doc), ...spec.playback } } : doc;
 }

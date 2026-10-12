@@ -5,6 +5,9 @@ import { COMPOSITION_CLIP, applyDraft, newDraft } from '$lib/motion/composition-
 import { findClip, newMotionDoc, MotionFormat, type MotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { motionCompId } from '$lib/motion/embed';
+import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
+import { STRIP_TEMPLATE_ID } from '$lib/motion/template/photo-strip/template';
+import { fieldValues } from '$lib/motion/template/fields';
 import { COMPOSE_DEPS, mediaOfRefs, openCanvasComposition, recentCompositions, startComposition, type ComposeDeps } from './compose';
 
 const db = {} as Db;
@@ -41,7 +44,7 @@ describe('startComposition', () => {
     const d = deps();
     const started = await startComposition(db, d, { orgId: 'org', projectId: 'p1', canvasId: null, userId: 'u1', name: 'Spring', draft: newDraft('coverflow') });
 
-    expect(started).toEqual({ ok: true, start: { projectId: 'p1', canvasId: 'c-motion', nodeId: 'm-new' } });
+    expect(started).toEqual({ ok: true, start: { projectId: 'p1', canvasId: 'c-motion', nodeId: 'm-new' }, editor: '/app/compose/m-new?project=p1' });
     const saved = vi.mocked(d.saveMotionDoc).mock.calls[0][1];
     expect(saved).toMatchObject({ orgId: 'org', nodeId: 'm-new', expectedVersion: 0, actor: { kind: 'user', id: 'u1' } });
     expect(findClip(saved.doc as MotionDoc, COMPOSITION_CLIP)?.clip.props).toMatchObject({ layout: 'coverflow' });
@@ -108,7 +111,7 @@ describe('openCanvasComposition: an existing canvas composition node becomes the
     const d = migrating();
     const opened = await openCanvasComposition(db, d, { orgId: 'org', projectId: 'p1', canvasId: 'c1', nodeId: 'comp-node', userId: 'u1' });
 
-    expect(opened).toEqual({ ok: true, start: { projectId: 'p1', canvasId: 'c1', nodeId: 'm-new' } });
+    expect(opened).toEqual({ ok: true, start: { projectId: 'p1', canvasId: 'c1', nodeId: 'm-new' }, editor: '/app/compose/m-new?project=p1' });
     const doc = vi.mocked(d.saveMotionDoc).mock.calls[0][1].doc as MotionDoc;
     expect({ width: doc.width, height: doc.height, durationInFrames: doc.durationInFrames }).toEqual({ width: 1080, height: 1080, durationInFrames: 270 });
     expect(findClip(doc, COMPOSITION_CLIP)?.clip.props).toMatchObject({
@@ -156,6 +159,22 @@ describe('openCanvasComposition: an existing canvas composition node becomes the
     await openCanvasComposition(db, d, { orgId: 'org', projectId: 'p1', canvasId: 'c1', nodeId: 'comp-node', userId: 'u1' });
 
     expect(legacy.data).toMatchObject({ layout: 'helix', duration: 9 });
+  });
+
+  it('a node on a library component opens as that component in the motion editor, the wired media in its media field', async () => {
+    const picked = record('comp-node', 'composition', { ...legacy.data, aspect: '9:16', template: { id: STRIP_TEMPLATE_ID, values: { captions: 'Rome' } } });
+    const d = migrating({ findNode: vi.fn(async () => picked), templates: vi.fn(async () => BUILTIN_TEMPLATES) });
+
+    const opened = await openCanvasComposition(db, d, { orgId: 'org', projectId: 'p1', canvasId: 'c1', nodeId: 'comp-node', userId: 'u1' });
+
+    expect(opened).toEqual({ ok: true, start: { projectId: 'p1', canvasId: 'c1', nodeId: 'm-new' }, editor: '/p/p1/c/c1/motion/m-new' });
+    const doc = vi.mocked(d.saveMotionDoc).mock.calls[0][1].doc as MotionDoc;
+    const comp = Object.values(doc.comps).find((c) => c.template?.id === STRIP_TEMPLATE_ID);
+    expect(doc.height).toBeGreaterThan(doc.width);
+    const values = Object.fromEntries(fieldValues(doc).map((f) => [f.key, f.value]));
+    expect(String(values[comp!.template!.keys.captions])).toBe('Rome');
+    expect(JSON.stringify(values[comp!.template!.keys.media])).toContain('a1');
+    expect(JSON.stringify(values[comp!.template!.keys.media])).toContain('v1');
   });
 
   it('refuses a node that is not a composition on that canvas', async () => {

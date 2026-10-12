@@ -467,8 +467,18 @@ describe('un nodo composition, letto dalla riga', () => {
       duration: 6,
       aspect: '9:16',
       refId: null,
-      cells: {}
+      cells: {},
+      template: null
     });
+  });
+
+  it('a library component picked on the node is read back with its values; a malformed one is dropped', () => {
+    const picked = compositionOf({ id: 'n1', type: 'composition', data: { template: { id: 'builtin:photo-strip', values: { captions: 'Rome', n: 3 } } } });
+    const broken = compositionOf({ id: 'n1', type: 'composition', data: { template: { values: {} } } });
+
+    expect(picked?.template).toEqual({ id: 'builtin:photo-strip', values: { captions: 'Rome' } });
+    expect(broken?.template).toBeNull();
+    expect(compositionData(picked!).template).toEqual(picked?.template);
   });
 
   it('le impostazioni di cella valide restano, quelle sbagliate cadono', () => {

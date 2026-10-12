@@ -19,7 +19,7 @@ import { EFFECTS, type EffectStep } from '$lib/canvas/effects';
 import type { EffectsNode } from '$lib/canvas/effects-node';
 import { LAYOUTS } from '$lib/canvas/composition/index';
 import { CAMERA_PRESETS } from '$lib/canvas/composition/camera';
-import type { CompositionNode } from '$lib/canvas/composition-node';
+import { compositionTemplateSchema, type CompositionNode } from '$lib/canvas/composition-node';
 import { cellSchema, type CellSpec } from '$lib/motion/components';
 import { newCalendarData } from '$lib/canvas/calendar-node';
 import { newMotionData } from '$lib/canvas/motion-node';
@@ -287,6 +287,13 @@ function cellsOf(raw: unknown): Record<string, CellSpec> {
   );
 }
 
+function templateOf(raw: unknown): CompositionNode['template'] {
+  const picked = record(raw);
+  const values = Object.fromEntries(Object.entries(record(picked.values)).filter(([, v]) => typeof v === 'string'));
+  const parsed = compositionTemplateSchema.safeParse({ ...picked, values });
+  return parsed.success ? parsed.data : null;
+}
+
 export function compositionOf(row: NodeRow): CompositionNode | null {
   if (row.type !== 'composition') {
     return null;
@@ -314,7 +321,8 @@ export function compositionOf(row: NodeRow): CompositionNode | null {
       ? (row.data.aspect as CompositionNode['aspect'])
       : DEFAULT_COMPOSITION_ASPECT,
     refId: nullableStr(row.data.refId),
-    cells: cellsOf(row.data.cells)
+    cells: cellsOf(row.data.cells),
+    template: templateOf(row.data.template)
   };
 }
 
@@ -327,7 +335,8 @@ export function compositionData(node: CompositionNode): Record<string, unknown> 
     duration: node.duration,
     aspect: node.aspect,
     refId: node.refId,
-    cells: node.cells
+    cells: node.cells,
+    template: node.template
   };
 }
 
