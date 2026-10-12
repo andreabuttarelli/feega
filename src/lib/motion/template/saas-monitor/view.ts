@@ -1,22 +1,36 @@
 export const MOCKUP_VIEW = String.raw`
 const VIDEO_MARK = 'video:';
 const LINK = /^(https?:|data:|blob:|\/)/;
-const DEPTH = 0.016;
-const PERSPECTIVE = 3.2;
-const CORNER = 0.016;
-const RIM = 0.005;
 const SCREEN_SCALE = 2;
-const ARM_W = 0.2;
+const FOV = 22;
+const CORNER = 0.02;
+const DEPTH = 0.014;
+const BEVEL = 0.003;
+const RIM = 0.006;
+const ARM_W = 0.19;
 const ARM_D = 0.012;
-const ARM_TILT = 14;
-const STAND_H = 0.3;
-const FOOT_W = 0.3;
-const FOOT_D = 0.24;
-const FOOT_H = 0.008;
-const FLOOR_W = 1.25;
-const FLOOR_D = 0.7;
+const ARM_TILT = 0.27;
+const ARM_TOP = 0.08;
+const STAND_H = 0.34;
+const FOOT_W = 0.27;
+const FOOT_D = 0.22;
+const FOOT_H = 0.007;
+const FOOT_LEAD = 0.3;
+const SHADOW_MAP = 1024;
+const AO_TEXTURE = 256;
+const FINISHES = {
+  silver: { color: 0xc9ccd1, roughness: 0.32 },
+  black: { color: 0x2b2c30, roughness: 0.42 }
+};
+const STUDIO_PANELS = [
+  [-2.6, 2.2, 1.8, 3.2, 2.2, 0.1, 9],
+  [2.8, 1.4, 2.2, 1.6, 3.2, 0.1, 5],
+  [0, 3.4, 0, 4, 0.1, 3, 6],
+  [0, 0.6, -4.8, 6, 2.4, 0.1, 2.4]
+];
 const BLUR_UNIT = 0.0025;
 const SHEEN_PER_DEGREE = 1.6;
+const DEG = Math.PI / 180;
 const CURSOR_TRAVEL = { x: 16, y: 12 };
 const BAR_HEIGHTS = [0.42, 0.55, 0.48, 0.66, 0.6, 0.74, 0.7, 0.83, 0.78, 0.9, 0.86, 0.97];
 const SIDE_ROWS = ['Overview', 'Roadmap', 'Research', 'Feedback', 'Agents', 'Settings'];
@@ -24,16 +38,19 @@ const STATS = [['Shipped', '48'], ['In review', '12'], ['Insights', '1,284']];
 const GRAIN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="180"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" stitchTiles="stitch"/><feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.55 0"/></filter><rect width="180" height="180" filter="url(#n)"/></svg>';
 const CURSOR_SVG = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 2.5 L5 19.5 L9.4 15.4 L12.3 21.6 L15.2 20.3 L12.4 14.2 L18.4 14.2 Z" fill="#0b0b10" stroke="#ffffff" stroke-width="1.4" stroke-linejoin="round"/></svg>';
 
-root.insertAdjacentHTML('beforeend', '<div class="sm"><div class="sm-light"></div><h2 class="sm-mark"></h2><div class="sm-stage"><div class="sm-rig"></div></div><div class="sm-grain"></div></div>');
+root.insertAdjacentHTML('beforeend', '<div class="sm"><div class="sm-light"></div><h2 class="sm-mark"></h2><div class="sm-stage"><canvas class="sm-canvas"></canvas><div class="sm-screen"><div class="sm-content"></div><div class="sm-glass"></div></div></div><div class="sm-grain"></div></div>');
 
 const scene = root.querySelector('.sm');
 const mark = root.querySelector('.sm-mark');
 const stage = root.querySelector('.sm-stage');
-const rig = root.querySelector('.sm-rig');
+const canvas = root.querySelector('.sm-canvas');
+const overlay = root.querySelector('.sm-screen');
+const content = root.querySelector('.sm-content');
+const glass = root.querySelector('.sm-glass');
 const grain = root.querySelector('.sm-grain');
 grain.style.backgroundImage = 'url("data:image/svg+xml;utf8,' + encodeURIComponent(GRAIN_SVG) + '")';
 
-let cache = { rigKey: '', siteKey: '', lookKey: '', textEm: 0, parts: null, site: null };
+let cache = { sizeKey: '', siteKey: '', lookKey: '', textEm: 0, site: null, monitor: null };
 
 const sizeOf = () => ({ width: scene.clientWidth || 1920, height: scene.clientHeight || 1080 });
 const fontOf = (p) => (String(p.font).includes(',') ? p.font : '"' + p.font + '", system-ui, sans-serif');
@@ -49,42 +66,217 @@ const el = (tag, className, text) => {
   return node;
 };
 
-const FACES = [
-  ['front', (w, h, d) => [w, h, 'translateZ(' + d / 2 + 'px)']],
-  ['back', (w, h, d) => [w, h, 'rotateY(180deg) translateZ(' + d / 2 + 'px)']],
-  ['right', (w, h, d) => [d, h, 'rotateY(90deg) translateZ(' + w / 2 + 'px)']],
-  ['left', (w, h, d) => [d, h, 'rotateY(-90deg) translateZ(' + w / 2 + 'px)']],
-  ['top', (w, h, d) => [w, d, 'rotateX(90deg) translateZ(' + h / 2 + 'px)']],
-  ['bottom', (w, h, d) => [w, d, 'rotateX(-90deg) translateZ(' + h / 2 + 'px)']]
-];
-
-const solid = (part, w, h, d, x, y, z, tilt = 0) => {
-  const box = el('div', 'sm-box ' + part);
-  box.style.transform = 'translate3d(' + x + 'px,' + y + 'px,' + z + 'px) rotateX(' + tilt + 'deg)';
-  const faces = {};
-  for (const [name, shape] of FACES) {
-    const [fw, fh, turn] = shape(w, h, d);
-    const face = el('div', 'sm-face sm-' + name);
-    face.style.width = fw + 'px';
-    face.style.height = fh + 'px';
-    face.style.left = -fw / 2 + 'px';
-    face.style.top = -fh / 2 + 'px';
-    face.style.transform = turn;
-    box.appendChild(face);
-    faces[name] = face;
-  }
-  rig.appendChild(box);
-  return faces;
+const rounded = (w, h, r) => {
+  const x = -w / 2;
+  const y = -h / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(x + r, y);
+  shape.lineTo(x + w - r, y);
+  shape.quadraticCurveTo(x + w, y, x + w, y + r);
+  shape.lineTo(x + w, y + h - r);
+  shape.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  shape.lineTo(x + r, y + h);
+  shape.quadraticCurveTo(x, y + h, x, y + h - r);
+  shape.lineTo(x, y + r);
+  shape.quadraticCurveTo(x, y, x + r, y);
+  return shape;
 };
 
-const plane = (className, w, d, y, z) => {
-  const node = el('div', className);
-  node.style.width = w + 'px';
-  node.style.height = d + 'px';
-  node.style.left = -w / 2 + 'px';
-  node.style.top = -d / 2 + 'px';
-  node.style.transform = 'translate3d(0,' + y + 'px,' + z + 'px) rotateX(90deg)';
-  rig.appendChild(node);
+const slab = (w, h, r, depth, bevel) => {
+  const geometry = new THREE.ExtrudeGeometry(rounded(w, h, r), { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 10 });
+  geometry.translate(0, 0, -depth / 2);
+  return geometry;
+};
+
+const studioRoom = () => {
+  const room = new THREE.Scene();
+  const cube = new THREE.BoxGeometry(1, 1, 1);
+  const wall = new THREE.MeshBasicMaterial({ color: 0x8a86a0, side: THREE.BackSide });
+  const shell = new THREE.Mesh(cube, wall);
+  shell.scale.set(12, 8, 12);
+  room.add(shell);
+  const glows = STUDIO_PANELS.map(([x, y, z, sx, sy, sz, k]) => {
+    const glow = new THREE.MeshBasicMaterial({ color: new THREE.Color(k, k, k) });
+    const panel = new THREE.Mesh(cube, glow);
+    panel.position.set(x, y, z);
+    panel.scale.set(sx, sy, sz);
+    room.add(panel);
+    return glow;
+  });
+  return { room, dispose: () => [cube, wall, ...glows].forEach((d) => d.dispose()) };
+};
+
+const aoTexture = () => {
+  const c = document.createElement('canvas');
+  c.width = AO_TEXTURE;
+  c.height = AO_TEXTURE;
+  const g = c.getContext('2d');
+  const half = AO_TEXTURE / 2;
+  const fade = g.createRadialGradient(half, half, 0, half, half, half);
+  fade.addColorStop(0, 'rgba(24,10,60,0.85)');
+  fade.addColorStop(0.45, 'rgba(24,10,60,0.35)');
+  fade.addColorStop(1, 'rgba(24,10,60,0)');
+  g.fillStyle = fade;
+  g.fillRect(0, 0, AO_TEXTURE, AO_TEXTURE);
+  const texture = new THREE.CanvasTexture(c);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+};
+
+const world = (() => {
+  const renderer = three.renderer(canvas);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const scene3 = new THREE.Scene();
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const studio = studioRoom();
+  const env = pmrem.fromScene(studio.room, 0.04).texture;
+  studio.dispose();
+  pmrem.dispose();
+  scene3.environment = env;
+  const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.1, 60);
+  const rig = new THREE.Group();
+  scene3.add(rig);
+
+  const metal = new THREE.MeshPhysicalMaterial({ color: FINISHES.silver.color, metalness: 1, roughness: FINISHES.silver.roughness, clearcoat: 0.3, clearcoatRoughness: 0.4 });
+  const glassBlack = new THREE.MeshPhysicalMaterial({ color: 0x050506, metalness: 0, roughness: 0.08, clearcoat: 1 });
+  const dark = new THREE.MeshBasicMaterial({ color: 0x050506 });
+  const shadowCatcher = new THREE.ShadowMaterial({ color: 0x1c0b4a, opacity: 0.2 });
+  const ao = aoTexture();
+  const aoMaterial = new THREE.MeshBasicMaterial({ map: ao, transparent: true, depthWrite: false });
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x7c5cff, 0.35);
+  const key = new THREE.DirectionalLight(0xffffff, 1.4);
+  key.position.set(-0.7, 4, 1.8);
+  key.castShadow = true;
+  key.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
+  key.shadow.radius = 14;
+  Object.assign(key.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2, near: 0.5, far: 8 });
+  key.shadow.camera.updateProjectionMatrix();
+  scene3.add(hemi, key, key.target);
+
+  const geometries = [];
+  const add = (geometry, material, at, shadow) => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(at[0], at[1], at[2]);
+    mesh.castShadow = shadow;
+    rig.add(mesh);
+    geometries.push(geometry);
+    return mesh;
+  };
+  return { renderer, scene: scene3, camera, rig, metal, glassBlack, dark, shadowCatcher, aoMaterial, hemi, key, add, geometries, env, ao };
+})();
+
+const buildMonitor = (layout) => {
+  const W = 1;
+  const H = layout.bodyH / layout.bodyW;
+  const sw = layout.screenW / layout.bodyW;
+  const sh = sw * (9 / 16);
+  const front = DEPTH / 2 + BEVEL;
+  world.add(slab(W, H, CORNER, DEPTH, BEVEL), world.metal, [0, 0, 0], true);
+  world.add(new THREE.ShapeGeometry(rounded(W - 2 * RIM, H - 2 * RIM, CORNER - RIM), 10), world.glassBlack, [0, 0, front + 0.0004], false);
+  world.add(new THREE.PlaneGeometry(sw, sh), world.dark, [0, 0, front + 0.0008], false);
+
+  const top = ARM_TOP * H;
+  const bottom = -(H / 2 + STAND_H * H);
+  const drop = top - bottom;
+  const back = -(DEPTH / 2 + BEVEL + ARM_D / 2);
+  const lean = drop * Math.tan(ARM_TILT);
+  const arm = world.add(new THREE.BoxGeometry(ARM_W, drop / Math.cos(ARM_TILT), ARM_D), world.metal, [0, (top + bottom) / 2, back - lean / 2], true);
+  arm.rotation.x = ARM_TILT;
+
+  const foot = world.add(slab(FOOT_W, FOOT_D, 0.02, FOOT_H, 0.002), world.metal, [0, bottom + FOOT_H / 2 + 0.002, back - lean + FOOT_D * FOOT_LEAD], true);
+  foot.rotation.x = -Math.PI / 2;
+
+  const floor = world.add(new THREE.PlaneGeometry(5, 5), world.shadowCatcher, [0, bottom - 0.0005, 0], false);
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  const blob = world.add(new THREE.PlaneGeometry(1.3, 0.75), world.aoMaterial, [0, bottom + 0.0005, back - lean * 0.6], false);
+  blob.rotation.x = -Math.PI / 2;
+  const contact = world.add(new THREE.PlaneGeometry(FOOT_W * 1.5, FOOT_D * 1.5), world.aoMaterial, [0, bottom + 0.0008, foot.position.z], false);
+  contact.rotation.x = -Math.PI / 2;
+
+  world.key.target.position.set(0, bottom, 0);
+  world.key.target.updateMatrixWorld();
+  world.renderer.compile(world.scene, world.camera);
+  return { sw, sh, front };
+};
+
+onDestroy(() => {
+  world.geometries.forEach((g) => g.dispose());
+  [world.metal, world.glassBlack, world.dark, world.shadowCatcher, world.aoMaterial].forEach((m) => m.dispose());
+  world.ao.dispose();
+  world.env.dispose();
+  world.renderer.dispose();
+});
+
+const corner = new THREE.Vector3();
+
+const project = (x, y, z, width, height) => {
+  corner.set(x, y, z).applyMatrix4(world.rig.matrixWorld).project(world.camera);
+  return [((corner.x + 1) / 2) * width, ((1 - corner.y) / 2) * height];
+};
+
+const solve = (rows, values) => {
+  const n = values.length;
+  const m = rows.map((row, i) => [...row, values[i]]);
+  for (let c = 0; c < n; c++) {
+    let pivot = c;
+    for (let r = c + 1; r < n; r++) {
+      if (Math.abs(m[r][c]) > Math.abs(m[pivot][c])) {
+        pivot = r;
+      }
+    }
+    [m[c], m[pivot]] = [m[pivot], m[c]];
+    for (let r = 0; r < n; r++) {
+      if (r === c) {
+        continue;
+      }
+      const k = m[r][c] / m[c][c];
+      for (let j = c; j <= n; j++) {
+        m[r][j] -= k * m[c][j];
+      }
+    }
+  }
+  return m.map((row, i) => row[n] / row[i]);
+};
+
+const homography = (from, to) => {
+  const rows = [];
+  const values = [];
+  from.forEach(([x, y], i) => {
+    const [u, v] = to[i];
+    rows.push([x, y, 1, 0, 0, 0, -u * x, -u * y]);
+    values.push(u);
+    rows.push([0, 0, 0, x, y, 1, -v * x, -v * y]);
+    values.push(v);
+  });
+  const h = solve(rows, values);
+  return 'matrix3d(' + [h[0], h[3], 0, h[6], h[1], h[4], 0, h[7], 0, 0, 1, 0, h[2], h[5], 0, 1].join(',') + ')';
+};
+
+const fitWorld = (layout, width, height, unit) => {
+  const key = JSON.stringify([width, height, layout.bodyW, layout.bodyH, layout.screenW]);
+  if (key === cache.sizeKey) {
+    return cache.monitor;
+  }
+  world.rig.clear();
+  world.geometries.forEach((g) => g.dispose());
+  world.geometries.length = 0;
+  world.renderer.setSize(width, height, false);
+  const perShort = 1 / layout.bodyW;
+  const visible = 2 * layout.box.ay * perShort;
+  world.camera.aspect = width / height;
+  world.camera.position.set(0, 0, visible / (2 * Math.tan((FOV * DEG) / 2)));
+  world.camera.updateProjectionMatrix();
+  world.camera.updateMatrixWorld();
+  const monitor = { ...buildMonitor(layout), perShort, dw: layout.screenW * unit * SCREEN_SCALE };
+  monitor.dh = monitor.dw * (9 / 16);
+  overlay.style.width = monitor.dw + 'px';
+  overlay.style.height = monitor.dh + 'px';
+  cache = { ...cache, sizeKey: key, monitor };
+  return monitor;
 };
 
 const measureEm = (p) => {
@@ -96,48 +288,6 @@ const measureEm = (p) => {
   const em = probe.getBoundingClientRect().width / 100;
   probe.remove();
   return em;
-};
-
-const buildRig = (p, layout, unit) => {
-  const key = JSON.stringify([unit, layout.bodyW, layout.bodyH]);
-  if (key === cache.rigKey) {
-    return cache.parts;
-  }
-  rig.innerHTML = '';
-  const w = layout.bodyW * unit;
-  const h = layout.bodyH * unit;
-  const d = DEPTH * w;
-  const standBottom = h / 2 + STAND_H * h;
-  const armTop = h * 0.08;
-  const armH = (standBottom - armTop) / Math.cos((ARM_TILT * Math.PI) / 180);
-  const armZ = -(d / 2 + ARM_D * w);
-  const lean = Math.tan((ARM_TILT * Math.PI) / 180) * (standBottom - armTop);
-  const footZ = armZ - lean / 2 + FOOT_D * w * 0.1;
-  plane('sm-floor', FLOOR_W * w, FLOOR_D * w, standBottom + 1, footZ);
-  plane('sm-contact', FOOT_W * w * 1.15, FOOT_D * w * 1.1, standBottom + 0.5, footZ);
-  solid('sm-foot', FOOT_W * w, FOOT_H * w, FOOT_D * w, 0, standBottom - (FOOT_H * w) / 2, footZ);
-  solid('sm-arm', ARM_W * w, armH, ARM_D * w, 0, (armTop + standBottom) / 2, armZ - lean / 2, ARM_TILT);
-  const body = solid('sm-body', w, h, d, 0, 0, 0);
-  const radius = CORNER * w + 'px';
-  body.front.style.borderRadius = radius;
-  body.back.style.borderRadius = radius;
-  const black = el('div', 'sm-bezel');
-  black.style.inset = RIM * w + 'px';
-  black.style.borderRadius = CORNER * w - RIM * w + 'px';
-  const sw = layout.screenW * unit;
-  const sh = sw * (9 / 16);
-  const screen = el('div', 'sm-screen');
-  screen.style.left = (w - sw) / 2 + 'px';
-  screen.style.top = (h - sh) / 2 + 'px';
-  screen.style.width = sw * SCREEN_SCALE + 'px';
-  screen.style.height = sh * SCREEN_SCALE + 'px';
-  screen.style.transform = 'scale(' + 1 / SCREEN_SCALE + ')';
-  const glass = el('div', 'sm-glass');
-  body.front.append(black, screen, glass);
-  scene.style.setProperty('--sm-bw', w + 'px');
-  stage.style.perspective = PERSPECTIVE * unit + 'px';
-  cache = { ...cache, rigKey: key, siteKey: '', parts: { screen, glass } };
-  return cache.parts;
 };
 
 const mediaOf = (raw) => {
@@ -306,8 +456,8 @@ const draw = () => {
   const unit = Math.min(width, height);
   paintLook(p);
   const layout = mockupLayout(p, width, height, cache.textEm);
-  const parts = buildRig(p, layout, unit);
-  const site = buildScreen(p, parts.screen);
+  const monitor = fitWorld(layout, width, height, unit);
+  const site = buildScreen(p, content);
   const f = mockupFrame(p, t, duration);
 
   mark.style.fontSize = layout.em * unit + 'px';
@@ -316,11 +466,22 @@ const draw = () => {
 
   const pose = f.pose;
   stage.style.opacity = String(pose.opacity);
-  rig.style.transform = 'translate3d(0,' + (p.monitorY + pose.lift + f.float) * unit + 'px,0) rotateX(' + pose.pitch + 'deg) rotateY(' + pose.yaw + 'deg) scale(' + pose.scale + ')';
+  const finish = FINISHES[p.finish] || FINISHES.silver;
+  world.metal.color.setHex(finish.color);
+  world.metal.roughness = finish.roughness;
+  world.hemi.groundColor.set(p.accent);
+  world.rig.position.y = -(p.monitorY + pose.lift + f.float) * monitor.perShort;
+  world.rig.rotation.set(-pose.pitch * DEG, pose.yaw * DEG, 0);
+  world.rig.scale.setScalar(pose.scale);
+  world.rig.updateMatrixWorld(true);
+  world.renderer.render(world.scene, world.camera);
+  const z = monitor.front + 0.001;
+  const to = [project(-monitor.sw / 2, monitor.sh / 2, z, width, height), project(monitor.sw / 2, monitor.sh / 2, z, width, height), project(monitor.sw / 2, -monitor.sh / 2, z, width, height), project(-monitor.sw / 2, -monitor.sh / 2, z, width, height)];
+  overlay.style.transform = homography([[0, 0], [monitor.dw, 0], [monitor.dw, monitor.dh], [0, monitor.dh]], to);
   const sheen = 46 + pose.yaw * SHEEN_PER_DEGREE * -1;
-  parts.glass.style.setProperty('--sm-sheen-a', sheen - 14 + '%');
-  parts.glass.style.setProperty('--sm-sheen-b', sheen + '%');
-  parts.glass.style.setProperty('--sm-sheen-c', sheen + 12 + '%');
+  glass.style.setProperty('--sm-sheen-a', sheen - 14 + '%');
+  glass.style.setProperty('--sm-sheen-b', sheen + '%');
+  glass.style.setProperty('--sm-sheen-c', sheen + 12 + '%');
 
   if (site.page) {
     paintSite(site, f);

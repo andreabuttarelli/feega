@@ -71,6 +71,6 @@ describe('the saas monitor template', () => {
     const html = composeHtml({ doc: inserted(format).doc, tokens: FEEGA_TOKENS, assets: {}, vars: { mockup_headline: 'zqx from the host' } });
 
     expect(html).toContain('zqx from the host');
-    expect(html).toContain('sm-rig');
+    expect(html).toContain('sm-canvas');
   });
 });

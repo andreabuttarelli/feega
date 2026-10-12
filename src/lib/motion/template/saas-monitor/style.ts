@@ -39,75 +39,31 @@ export const MOCKUP_CSS = String.raw`
   perspective-origin: 50% 42%;
 }
 
-.sm-rig,
-.sm-box {
+.sm-canvas {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 0;
-  height: 0;
-  transform-style: preserve-3d;
-}
-
-.sm-box {
-  left: 0;
-  top: 0;
-}
-
-.sm-face {
-  position: absolute;
-  backface-visibility: hidden;
-}
-
-.sm-body .sm-front {
-  box-sizing: border-box;
-  background: linear-gradient(135deg, var(--sm-bezel-hi) 0%, var(--sm-bezel) 45%, var(--sm-bezel-hi) 70%, var(--sm-bezel) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 0 0 1px var(--sm-rim), 0 0 calc(var(--sm-bw) * 0.09) color-mix(in srgb, var(--sm-accent) 38%, transparent);
-}
-
-.sm-bezel {
-  position: absolute;
-  background: #050506;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-}
-
-.sm-body .sm-back { background: var(--sm-shell); }
-.sm-body .sm-left,
-.sm-body .sm-right { background: linear-gradient(180deg, var(--sm-edge-hi), var(--sm-edge)); }
-.sm-body .sm-top { background: linear-gradient(90deg, var(--sm-edge), #ffffff 50%, var(--sm-edge)); }
-.sm-body .sm-bottom { background: var(--sm-edge); }
-
-.sm-arm .sm-face,
-.sm-foot .sm-face { background: var(--silver); }
-.sm-arm .sm-left,
-.sm-arm .sm-right { background: linear-gradient(180deg, #c9ccd2, #8f9299); }
-.sm-foot .sm-top { background: linear-gradient(180deg, #b4b7bd 0%, #f1f2f4 55%, #d6d8dc 100%); }
-.sm-foot .sm-front { background: linear-gradient(90deg, #8a8d94, #d2d4d9 40%, #f0f1f3 60%, #8e9198); }
-.sm-foot .sm-bottom,
-.sm-foot .sm-back { background: #6f727a; }
-
-.sm-floor {
-  position: absolute;
-  background: radial-gradient(50% 50% at 50% 50%, rgba(36, 18, 84, 0.42) 0%, rgba(36, 18, 84, 0.18) 45%, transparent 100%);
-}
-
-.sm-contact {
-  position: absolute;
-  background: radial-gradient(50% 50% at 50% 50%, rgba(20, 10, 50, 0.55) 0%, rgba(20, 10, 50, 0.25) 60%, transparent 100%);
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .sm-screen {
   position: absolute;
-  transform-origin: 0 0;
+  left: 0;
+  top: 0;
   overflow: hidden;
   background: #ffffff;
+  transform-origin: 0 0;
+}
+
+.sm-content {
+  position: absolute;
+  inset: 0;
   container-type: size;
 }
 
 .sm-glass {
   position: absolute;
   inset: 0;
-  border-radius: inherit;
   pointer-events: none;
   background: linear-gradient(112deg, transparent 0%, transparent var(--sm-sheen-a), rgba(255, 255, 255, 0.16) var(--sm-sheen-b), transparent var(--sm-sheen-c), transparent 100%);
 }
