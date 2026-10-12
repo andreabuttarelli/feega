@@ -18,6 +18,8 @@ const SECONDS = 9;
 const FPS = 30;
 const UNEXPOSED = new Set([VAR_PREFIX]);
 
+const GROUP: Record<NonNullable<PropSpec['group']>, string> = { Content: 'Text', Style: 'Style', Layout: 'Style', Motion: 'Motion', Camera: 'Motion' };
+
 type FieldShape = Pick<FieldInput, 'type' | 'min' | 'max' | 'options'>;
 
 function fieldShape(spec: PropSpec): FieldShape {
@@ -69,7 +71,7 @@ function promptDoc(): MotionDoc {
   doc = must(writeComponent(doc, PROMPT_COMPONENT, promptComponent()));
   doc = must(addClip(doc, { component: 'Custom', from: 0, durationInFrames: SECONDS * FPS, props: { name: PROMPT_COMPONENT, ...promptDefaults() } }, PROMPT_CLIP));
   for (const [key, spec] of Object.entries(PROMPT_PROPS).filter(([key]) => !UNEXPOSED.has(key))) {
-    doc = must(exposeField(doc, { key: snakeKey(key), label: spec.title ?? key, clipId: PROMPT_CLIP, prop: key, ...fieldShape(spec) }));
+    doc = must(exposeField(doc, { key: snakeKey(key), label: spec.title ?? key, clipId: PROMPT_CLIP, prop: key, group: GROUP[spec.group ?? 'Style'], ...fieldShape(spec) }));
   }
   for (const key of PROMPT_VARS) {
     doc = must(declareVar(doc, varOf(key, PROMPT_PROPS[key])));

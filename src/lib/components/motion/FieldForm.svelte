@@ -23,6 +23,11 @@
 
   let error = $state('');
 
+  const UNGROUPED = '';
+  const groups = $derived([...new Set(fields.map((f) => f.group ?? UNGROUPED))].map((name) => ({ name, fields: fields.filter((f) => (f.group ?? UNGROUPED) === name) })));
+  const ranged = (f: TemplateFieldValue) => f.min !== undefined && f.max !== undefined;
+  const stepOf = (f: TemplateFieldValue) => ((f.max ?? 1) - (f.min ?? 0)) / 100;
+
   const target = (f: TemplateFieldValue) => locateClip(doc, f.clipId)?.clip ?? null;
   const preview = (id: unknown) => assets.find((a) => a.id === id)?.previewUrl ?? '';
 
@@ -43,13 +48,20 @@
   }
 </script>
 
-{#each fields as f (f.docKey)}
+{#each groups as group (group.name)}
+{#if group.name}<h4 class="group" data-testid="field-group">{group.name}</h4>{/if}
+{#each group.fields as f (f.docKey)}
   <label class="field">
     <span>{f.label}{f.unit ? ` (${f.unit})` : ''}</span>
     {#if f.type === FieldType.Text}
       <textarea rows="2" value={String(f.value ?? '')} onchange={(e) => set(f, e.currentTarget.value)}></textarea>
     {:else if f.type === FieldType.Color}
       <input type="color" value={String(f.value ?? '#000000').slice(0, 7)} onchange={(e) => set(f, e.currentTarget.value)} />
+    {:else if f.type === FieldType.Number && ranged(f)}
+      <span class="slider">
+        <input type="range" min={f.min} max={f.max} step={stepOf(f)} value={Number(f.value ?? 0)} oninput={(e) => set(f, e.currentTarget.value)} />
+        <output>{Number(f.value ?? 0)}</output>
+      </span>
     {:else if f.type === FieldType.Number}
       <input type="number" min={f.min} max={f.max} step="any" value={Number(f.value ?? 0)} onchange={(e) => set(f, e.currentTarget.value)} />
     {:else if f.type === FieldType.Select}
@@ -90,10 +102,32 @@
     {/if}
   </label>
 {/each}
+{/each}
 
 {#if error}<p class="error">{error}</p>{/if}
 
 <style>
+  .group {
+    margin: 8px 0 0;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ui-ink-2);
+    text-transform: lowercase;
+  }
+
+  .slider {
+    display: grid;
+    grid-template-columns: 1fr 44px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .slider output {
+    font-family: var(--ui-mono);
+    font-size: 11px;
+    text-align: right;
+  }
+
   .field {
     display: flex;
     flex-direction: column;

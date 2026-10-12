@@ -186,6 +186,27 @@ motion
   });
 
 motion
+  .command('templates')
+  .description('List the motion templates with their fields (free)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdMotionTemplates } = await import('./commands/motion.ts');
+    await cmdMotionTemplates(opts);
+  });
+
+motion
+  .command('add-template <nodeId> <templateId>')
+  .description('Insert an editable copy of a template into a video, e.g. builtin:prompt-input (free)')
+  .option('--at <seconds>', 'Where it starts, in seconds')
+  .option('--var <key=value...>', 'A field value, repeatable (e.g. --var text="Hello" --var accent=#ff5a1f)')
+  .option('--no-sound', 'Do not lay its key taps and clicks')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, templateId: string, opts) => {
+    const { cmdMotionAddTemplate } = await import('./commands/motion.ts');
+    await cmdMotionAddTemplate(nodeId, templateId, opts);
+  });
+
+motion
   .command('frames <nodeId>')
   .description('Save frames of the saved video as JPEGs and print the quality notes (free)')
   .requiredOption('--at <seconds>', 'Comma-separated times in seconds, up to 6 (e.g. 1,2.5,4)')

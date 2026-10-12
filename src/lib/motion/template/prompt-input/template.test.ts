@@ -50,6 +50,13 @@ describe('the prompt input template', () => {
     expect(fields.find((f) => f.prop === 'typo')?.type).toBe(FieldType.Boolean);
   });
 
+  it('groups its fields into text, style and motion, in that order', () => {
+    const groups = [...new Set(PROMPT_INPUT_TEMPLATE.template.doc.fields.map((f) => f.group))];
+
+    expect(groups).toEqual(['Text', 'Style', 'Motion']);
+    expect(PROMPT_INPUT_TEMPLATE.template.doc.fields.find((f) => f.prop === 'cameraZoom')?.group).toBe('Motion');
+  });
+
   it('declares runtime variables an embedding site can set', () => {
     const names = interactiveOf(PROMPT_INPUT_TEMPLATE.template.doc).vars.map((v) => v.name);
 

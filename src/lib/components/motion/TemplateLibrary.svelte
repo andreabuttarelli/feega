@@ -16,6 +16,7 @@
     frame,
     editorUrl,
     compose,
+    initial = null,
     oninsert,
     onsaved,
     onremoved,
@@ -27,13 +28,16 @@
     frame: number;
     editorUrl: string;
     compose: (doc: MotionDoc) => string;
-    oninsert: (entry: TemplateEntry) => void;
+    initial?: string | null;
+    oninsert: (entry: TemplateEntry, sounds: boolean) => void;
     onsaved: (entry: TemplateEntry) => void;
     onremoved: (id: string) => void;
     onclose: () => void;
   } = $props();
 
-  let chosen = $state<string | null>(null);
+  let picked = $state<string | null>(null);
+  let sounds = $state(true);
+  const chosen = $derived(picked ?? initial);
   let name = $state('');
   let description = $state('');
   let error = $state('');
@@ -86,7 +90,7 @@
     <ul class="list">
       {#each templates as t (t.id)}
         <li>
-          <button type="button" class:on={entry?.id === t.id} onclick={() => (chosen = t.id)}>{t.template.name}</button>
+          <button type="button" class:on={entry?.id === t.id} onclick={() => (picked = t.id)}>{t.template.name}</button>
           {#if !t.id.startsWith(BUILTIN_PREFIX)}<button type="button" class="remove" aria-label="Delete template" onclick={() => remove(t.id)}><X size={12} /></button>{/if}
         </li>
       {/each}
@@ -99,7 +103,8 @@
         {/if}
         <p>{entry.template.description}</p>
         <p class="fields">{entry.template.doc.fields.map((f) => `${f.label} · ${FIELD_TYPE_LABEL[f.type]}`).join(' — ')}</p>
-        <button type="button" class="primary" data-testid="insert-template" onclick={() => oninsert(entry)}>Insert at playhead</button>
+        <label class="sounds"><input type="checkbox" bind:checked={sounds} data-testid="template-sounds" /> Add its sounds (key taps, clicks)</label>
+        <button type="button" class="primary" data-testid="insert-template" onclick={() => oninsert(entry, sounds)}>Insert at playhead</button>
       </div>
     {/if}
   </div>

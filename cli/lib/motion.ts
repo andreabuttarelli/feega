@@ -62,6 +62,10 @@ const id = encodeURIComponent;
 
 export type ShaderEffect = { id: string; category: string; source: string; live: boolean; about: string; knobs: Record<string, { label: string; min: number; max: number; default: number; keyframes: boolean }>; colours: Record<string, string> };
 
+export type MotionTemplateField = { key: string; label: string; type: string; group?: string; min?: number; max?: number; options?: string[]; default?: unknown };
+export type MotionTemplate = { id: string; name: string; description: string; seconds: number; fields: MotionTemplateField[] };
+export type AddTemplate = { id: string; at?: number; vars?: Record<string, string | number | boolean>; sound?: boolean };
+
 export const motionApi = {
   ask: (token: string, nodeId: string, prompt: string, org?: string, attachments: AttachmentSource[] = [], pick?: ReferencePickReply) =>
     request<MotionRun>(withOrg(`/api/v1/motion/${id(nodeId)}/ask`, org), token, { method: 'POST', body: JSON.stringify({ prompt, ...(attachments.length ? { attachments } : {}), ...(pick ? { reference_pick: pick } : {}) }) }),
@@ -80,6 +84,9 @@ export const motionApi = {
   frames: (token: string, nodeId: string, ask: { times: number[]; width?: number }, org?: string) =>
     request<MotionFrames>(withOrg(`/api/v1/motion/${id(nodeId)}/frames`, org), token, { method: 'POST', body: JSON.stringify(ask) }),
   revisions: (token: string, nodeId: string, org?: string) => request<{ revisions: MotionRevision[] }>(withOrg(`/api/v1/motion/${id(nodeId)}/revisions`, org), token),
+  templates: (token: string, org?: string) => request<{ templates: MotionTemplate[] }>(withOrg('/api/v1/motion/templates', org), token),
+  addTemplate: (token: string, nodeId: string, body: AddTemplate, org?: string) =>
+    request<{ version: number; clip_id: string; sounds: string | null; fields: { key: string; value: unknown }[] }>(withOrg(`/api/v1/motion/${id(nodeId)}/templates`, org), token, { method: 'POST', body: JSON.stringify(body) }),
   restore: (token: string, nodeId: string, version: number, org?: string) =>
     request<{ version: number; restored: number }>(withOrg(`/api/v1/motion/${id(nodeId)}/revisions`, org), token, { method: 'POST', body: JSON.stringify({ version }) }),
   storyboard: (token: string, nodeId: string, org?: string) => request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}/storyboard`, org), token),

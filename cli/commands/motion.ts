@@ -113,6 +113,25 @@ export async function cmdMotionRevisions(nodeId: string, opts: { org?: string; r
   }
 }
 
+export async function cmdMotionTemplates(opts: { org?: string }) {
+  const { templates } = await motionApi.templates(await token(), opts.org);
+  for (const t of templates) {
+    console.log(`${t.id}  ${t.name}  ${t.seconds}s  ${t.description}`);
+    console.log(`  ${t.fields.map((f) => `${f.key}:${f.type}`).join(', ')}`);
+  }
+}
+
+const parsedVar = (raw: string): [string, string] => {
+  const at = raw.indexOf('=');
+  return [raw.slice(0, at), raw.slice(at + 1)];
+};
+
+export async function cmdMotionAddTemplate(nodeId: string, templateId: string, opts: { org?: string; at?: string; var?: string[]; sound?: boolean }) {
+  const vars = Object.fromEntries((opts.var ?? []).filter((v) => v.includes('=')).map(parsedVar));
+  const added = await motionApi.addTemplate(await token(), nodeId, { id: templateId, at: Number(opts.at ?? 0), vars, sound: opts.sound !== false }, opts.org);
+  console.log(`Added ${templateId} as clip ${added.clip_id}, revision ${added.version}.${added.sounds ? ` Sounds: ${added.sounds}` : ''}`);
+}
+
 export async function cmdMotionShaders(opts: { org?: string }) {
   const { effects } = await motionApi.shaderEffects(await token(), opts.org);
   for (const e of effects) {
