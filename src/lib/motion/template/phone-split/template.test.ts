@@ -53,7 +53,7 @@ describe('the phone split template', () => {
   it('declares runtime variables an embedding site can set', () => {
     const names = interactiveOf(PHONE_SPLIT_TEMPLATE.template.doc).vars.map((v) => v.name);
 
-    expect(names).toEqual(expect.arrayContaining(['phone_headline', 'phone_split_at', 'phone_media', 'phone_rise_seconds']));
+    expect(names).toEqual(expect.arrayContaining(['phone_headline', 'phone_split_at', 'phone_rise_seconds']));
   });
 
   it('setting a field moves its variable too', () => {
@@ -81,5 +81,25 @@ describe('the phone split device', () => {
     const code = JSON.stringify(PHONE_SPLIT_TEMPLATE.template.doc);
 
     expect(code).not.toMatch(/iphone|apple|samsung|galaxy|pixel/i);
+  });
+});
+
+describe('the phone split screen and properties', () => {
+  it('puts the picked picture on the screen: no runtime variable overrides the media list', () => {
+    const placed = inserted();
+    const set = setTemplateValues(placed.doc, placed.clipId, { media: 'zqxphoto' });
+    if (!set.ok) {
+      throw new Error(set.error);
+    }
+    const html = composeHtml({ doc: set.doc, tokens: FEEGA_TOKENS, assets: { zqxphoto: 'data:image/png;base64,zqxbytes' }, vars: {} });
+
+    expect(html).toContain('zqxbytes');
+    expect(interactiveOf(set.doc).vars.map((v) => v.name)).not.toContain('phone_media');
+  });
+
+  it('groups the device controls together in the properties', () => {
+    const fields = PHONE_SPLIT_TEMPLATE.template.doc.fields;
+
+    ['finish', 'phoneHeight', 'shadow', 'tilt', 'tiltDegrees', 'screenAccent'].forEach((prop) => expect(fields.find((f) => f.prop === prop)?.group).toBe('Device'));
   });
 });
