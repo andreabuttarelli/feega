@@ -29,7 +29,8 @@ const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: R
   'builtin:split-headline': { field: 'media', photos: ['p1043'] },
   'builtin:phone-split': { field: 'media', photos: ['p1039'] },
   'builtin:image-globe': { field: 'media', photos: STRIP_PHOTOS },
-  'builtin:photo-strip': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } }
+  'builtin:photo-strip': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } },
+  'builtin:circular-carousel': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } }
 };
 
 const sampleAssets = (photos: string[]) => Object.fromEntries(photos.map((id) => [id, `data:image/jpeg;base64,${readFileSync(join(SAMPLES, `${id}.jpg`)).toString('base64')}`]));
