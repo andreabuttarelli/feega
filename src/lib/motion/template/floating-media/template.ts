@@ -5,7 +5,7 @@ import { FLOAT_COMPONENT, FLOAT_FONTS, FLOAT_PROPS, FLOAT_VAR_PREFIX, floatCompo
 
 export const FLOAT_TEMPLATE_ID = `${BUILTIN_PREFIX}floating-media`;
 export const FLOAT_CLIP = 'float';
-export const FLOAT_VARS = ['title', 'subtitle', 'media', 'titleColor', 'background', 'layout', 'count', 'depth', 'drift', 'speed', 'resistance', 'push'];
+export const FLOAT_VARS = ['title', 'subtitle', 'titleColor', 'background', 'layout', 'count', 'depth', 'drift', 'speed', 'resistance', 'push'];
 
 export const FLOATING_MEDIA_TEMPLATE: TemplateEntry = {
   id: FLOAT_TEMPLATE_ID,

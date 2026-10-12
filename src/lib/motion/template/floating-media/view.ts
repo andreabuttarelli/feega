@@ -140,11 +140,11 @@ const draw = () => {
   f.words.forEach((w, i) => {
     const s = words[i].style;
     s.opacity = String(w.opacity);
-    s.transform = 'translateY(' + w.y + 'em)';
+    s.transform = 'translate3d(0, ' + w.y + 'em, 0)';
     s.filter = w.blur > 0.002 ? 'blur(' + w.blur + 'em)' : 'none';
   });
   sub.style.opacity = String(f.subtitle);
-  sub.style.transform = 'translateY(' + 0.4 * (1 - f.subtitle) + 'em)';
+  sub.style.transform = 'translate3d(0, ' + 0.4 * (1 - f.subtitle) + 'em, 0)';
 };
 
 draw();

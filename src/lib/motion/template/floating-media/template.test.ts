@@ -51,7 +51,8 @@ describe('the floating media template', () => {
   it('declares runtime variables an embedding site can set', () => {
     const names = interactiveOf(FLOATING_MEDIA_TEMPLATE.template.doc).vars.map((v) => v.name);
 
-    expect(names).toEqual(expect.arrayContaining(['float_title', 'float_media', 'float_drift', 'float_resistance']));
+    expect(names).toEqual(expect.arrayContaining(['float_title', 'float_drift', 'float_resistance']));
+    expect(names, 'a text variable would shadow the picked media at runtime').not.toContain('float_media');
   });
 
   it('setting a field moves its variable too', () => {

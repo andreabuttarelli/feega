@@ -11,6 +11,8 @@ const NATURAL = 2 * Math.PI * 0.12;
 const PUSH_OUT = 1.06;
 const PUSH_STEPS = 80;
 const SHRINK = 0.95;
+const RELAX_ROUNDS = 40;
+const GOLDEN_ANGLE = 2.39996;
 const ARRIVE_DEPTH = 0.5;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
@@ -62,7 +64,9 @@ function seeds(layout, n, box, depth) {
   }
   for (let i = 0; i < n; i++) {
     if (layout === 'cloud') {
-      cards.push({ x: signed(i, 11) * box.ax * 0.9, y: signed(i, 12) * box.ay * 0.9, z: -depth * hash01(i, 13) + 0.12 * depth * signed(i, 14) });
+      const angle = i * GOLDEN_ANGLE + 0.6 * signed(i, 11);
+      const ring = 0.62 + 0.3 * hash01(i, 12);
+      cards.push({ x: Math.cos(angle) * box.ax * ring, y: Math.sin(angle) * box.ay * ring, z: -depth * (hash01(i, 13) < 0.5 ? 0.1 + 0.2 * hash01(i, 14) : 0.7 + 0.3 * hash01(i, 14)) });
       continue;
     }
     const angle = (2 * Math.PI * i) / n + 0.35 * signed(i, 21) / n + Math.PI / 2;
@@ -93,14 +97,45 @@ function placed(p, box, safe, size) {
   });
 }
 
+function separate(a, b, p, push) {
+  const fa = footprint(a, p.drift, push);
+  const fb = footprint(b, p.drift, push);
+  const overX = fa.hw + fb.hw - Math.abs(fa.x - fb.x);
+  const overY = fa.hh + fb.hh - Math.abs(fa.y - fb.y);
+  if (overX <= 0 || overY <= 0) {
+    return;
+  }
+  const alongX = overX * fb.hh < overY * fb.hw;
+  const sign = (alongX ? fa.x - fb.x : fa.y - fb.y) >= 0 ? 1 : -1;
+  const step = (alongX ? overX : overY) / 2 + 1e-3;
+  const axis = alongX ? 'x' : 'y';
+  a[axis] += (sign * step) / scaleAt(a.z + push);
+  b[axis] -= (sign * step) / scaleAt(b.z + push);
+}
+
+function relax(cards, p, safe, box) {
+  for (let round = 0; round < RELAX_ROUNDS && crowded(cards, p); round++) {
+    for (const push of [0, p.push]) {
+      cards.forEach((a, i) => cards.slice(i + 1).forEach((b) => separate(a, b, p, push)));
+    }
+    for (const card of cards) {
+      clearOf(card, p, safe);
+      if (p.contain) {
+        fitInside(card, p, safe, box);
+      }
+    }
+  }
+  return cards;
+}
+
 function floatLayout(p, width, height) {
   const box = frameBox(width, height);
   const safe = safeBox(p, box);
   let size = p.cardSize;
-  let cards = placed(p, box, safe, size);
+  let cards = relax(placed(p, box, safe, size), p, safe, box);
   for (let step = 0; step < PUSH_STEPS && crowded(cards, p); step++) {
     size *= SHRINK;
-    cards = placed(p, box, safe, size);
+    cards = relax(placed(p, box, safe, size), p, safe, box);
   }
   return cards;
 }
@@ -110,6 +145,19 @@ function clearOf(card, p, safe) {
     const away = card.x === 0 && card.y === 0 ? { x: 0, y: 1e-3 } : card;
     card.x = away.x * PUSH_OUT;
     card.y = away.y * PUSH_OUT;
+  }
+}
+
+function sidestep(card, p, safe, box) {
+  const near = footprint(card, p.drift, 0);
+  if (!overlaps(near, safe)) {
+    return;
+  }
+  const far = footprint(card, p.drift, p.push);
+  const side = card.x < 0 ? -1 : 1;
+  const x = side * (safe.hw + near.hw + 1e-3) / scaleAt(card.z);
+  if (Math.abs(x) * scaleAt(card.z + p.push) + far.hw <= box.ax) {
+    card.x = x;
   }
 }
 
@@ -124,6 +172,7 @@ function fitInside(card, p, safe, box) {
     }
     card.x -= overX > 0 ? Math.sign(card.x) * overX / s : 0;
     card.y -= overY > 0 ? Math.sign(card.y) * overY / s : 0;
+    sidestep(card, p, safe, box);
     if (overlaps(footprint(card, p.drift, 0), safe) || overX > f.hw || overY > f.hh) {
       card.w *= SHRINK;
       card.h *= SHRINK;
