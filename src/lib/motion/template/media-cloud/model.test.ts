@@ -22,6 +22,7 @@ const ASPECTS = { landscape: [1920, 1080], vertical: [1080, 1920], square: [1080
 const times = () => Array.from({ length: LENGTH * FPS + 1 }, (_, i) => i / FPS);
 const frameAt = (t: number, p = PARAMS, size: readonly number[] = ASPECTS.landscape) => model.cloudFrame(model.cloudLayout(p, size[0], size[1]), p, t, LENGTH, TITLE);
 
+const GHOST_MAX = 0.12;
 const BOX = model.frameBox(1920, 1080);
 const onScreen = (tile: Tile, box: { ax: number; ay: number }) => tile.opacity > 1e-3 && Math.abs(tile.x) - (tile.w * tile.scale) / 2 < box.ax && Math.abs(tile.y) - (tile.h * tile.scale) / 2 < box.ay;
 
@@ -85,13 +86,26 @@ describe('the media cloud model', () => {
     });
   }
 
-  it('keeps every tile small enough to read as a cloud, never a wall', () => {
+  it('keeps every tile centred in the frame small enough to read as a cloud, never a wall', () => {
+    const centred = (tile: Tile) => tile.opacity > 0.05 && Math.abs(tile.x) < BOX.ax && Math.abs(tile.y) < BOX.ay;
     for (const t of times().filter((_, i) => i % 3 === 0)) {
-      for (const tile of frameAt(t).tiles.filter((tile) => tile.opacity > 0.05)) {
-        expect(Math.max(tile.w, tile.h) * tile.scale).toBeLessThan(0.32);
+      for (const tile of frameAt(t).tiles.filter(centred)) {
+        expect(Math.max(tile.w, tile.h) * tile.scale).toBeLessThan(0.4);
       }
     }
   });
+
+  for (const [name, size] of Object.entries(ASPECTS)) {
+    it(`never shows a large see-through tile in the ${name} frame: near tiles leave it instead`, () => {
+      const p = { ...PARAMS, clearing: 0 };
+      const box = model.frameBox(size[0], size[1]);
+      for (const t of times()) {
+        for (const tile of frameAt(t, p, size).tiles.filter((tile) => onScreen(tile, box) && tile.opacity < 0.98)) {
+          expect(Math.max(tile.w, tile.h) * tile.scale, `${name} t=${t}`).toBeLessThan(GHOST_MAX);
+        }
+      }
+    });
+  }
 
   it('makes tiles near the centre bigger than tiles at the edge', () => {
     const tiles = model.cloudLayout(PARAMS, 1920, 1080) as unknown as { w: number; x: number; y: number }[];

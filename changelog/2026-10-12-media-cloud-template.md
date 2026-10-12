@@ -10,3 +10,8 @@ picture/video tiles in 3D, camera flying forward through them; optional title at
   WebGL: 150 plain elements are cheap.
 - Title clears tiles behind it with a soft 0.2 mask; camera drift is a periodic sway.
 - Step 1 preview only (16:9); 9:16/1:1 covered by model tests, not rendered yet.
+
+Near tiles no longer fade while large ("ghost tiles"): each tile is placed
+far enough off the camera axis to leave the frame before it gets close, so
+the near fade only ever hits tiles already out of view. The size-based fade
+is gone.
