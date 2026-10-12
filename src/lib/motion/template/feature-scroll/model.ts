@@ -8,8 +8,8 @@ const MIN_LAND_HOLD = 0.6;
 const BRAKE_SHARPNESS = 10;
 const MAX_LINES = 240;
 const LINE_HEIGHT = 1.15;
-const LINE_LAG = 0.25;
-const LINE_GAP = 0.12;
+const LINE_LAG = 0.5;
+const LINE_GAP = 0.04;
 const LAND_LEAD = 0.75;
 
 const smoothArea = (x) => x * x * x * x * (x * (x - 3) + 2.5);
