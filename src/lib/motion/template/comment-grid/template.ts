@@ -10,7 +10,7 @@ export const COMMENTS_KEY_FIELDS = ['title', 'comments', 'theme', 'avatars'];
 
 const IN_GROUP: Record<string, readonly string[]> = {
   Cards: ['cardWidth', 'gap', 'radius', 'shadow', 'cardFont', 'accent', 'cardColor', 'textColor'],
-  Camera: ['gridDim', 'gridBlur']
+  Focus: ['gridDim', 'gridBlur']
 };
 
 const COMMENTS_GROUPS = Object.fromEntries(Object.entries(IN_GROUP).flatMap(([group, keys]) => keys.map((key) => [key, group])));

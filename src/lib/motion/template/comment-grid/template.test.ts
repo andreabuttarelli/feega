@@ -59,6 +59,12 @@ describe('the comment grid template', () => {
     expect(COMMENT_GRID_TEMPLATE.template.keyFields).toEqual(COMMENTS_KEY_FIELDS);
   });
 
+  it('groups its fields into text, media, style, cards, focus and motion, each group in one run', () => {
+    const groups = COMMENT_GRID_TEMPLATE.template.doc.fields.map((f) => f.group).filter((g, i, all) => g !== all[i - 1]);
+
+    expect(groups).toEqual(['Text', 'Media', 'Style', 'Cards', 'Focus', 'Motion']);
+  });
+
   it('declares runtime variables an embedding site can set', () => {
     const names = interactiveOf(COMMENT_GRID_TEMPLATE.template.doc).vars.map((v) => v.name);
 
