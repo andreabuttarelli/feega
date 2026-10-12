@@ -34,6 +34,7 @@
   "builtin:launch-word-burst",
   "builtin:lower-third",
   "builtin:phone-split",
+  "builtin:marquee",
   "builtin:photo-strip",
   "builtin:product-reveal",
   "builtin:prompt-input",
