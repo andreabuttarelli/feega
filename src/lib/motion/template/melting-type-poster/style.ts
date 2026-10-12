@@ -11,90 +11,88 @@ export const MELT_CSS = String.raw`
   overflow: hidden;
   container-type: size;
   background: var(--mt-page);
-  color: var(--mt-ink);
   font-family: var(--mt-font);
   font-weight: 500;
   -webkit-font-smoothing: antialiased;
 }
 
-.mt-page p,
-.mt-page h1,
-.mt-page h2 {
+.mt-text {
   position: absolute;
   margin: 0;
-  white-space: pre-line;
-}
-
-.mt-melts {
   color: transparent;
-  white-space: pre;
 }
 
-.mt-line {
-  display: block;
+.mt-kicker,
+.mt-credit {
+  top: 4.4cqh;
+  font-size: 1.35cqw;
+  letter-spacing: -0.01em;
 }
 
 .mt-kicker {
-  left: 21.5cqw;
-  top: 5.2cqh;
-  font-size: 1.5cqw;
-  line-height: 1.25;
-  letter-spacing: -0.02em;
-}
-
-.mt-index,
-.mt-title,
-.mt-sub {
-  font-size: 6.6cqw;
-  font-weight: 500;
-  line-height: 1.08;
-  letter-spacing: -0.035em;
-}
-
-.mt-index {
-  left: 6.4cqw;
-  top: 19.4cqh;
-}
-
-.mt-title {
-  left: 21.5cqw;
-  top: 19.4cqh;
-}
-
-.mt-sub {
-  left: 21.5cqw;
-  top: 34.6cqh;
-}
-
-.mt-col {
-  top: 50.6cqh;
-  width: 27.6cqw;
-  font-size: 1.62cqw;
-  line-height: 1.17;
-  letter-spacing: -0.025em;
-}
-
-.mt-left {
-  left: 21.5cqw;
-}
-
-.mt-right {
-  left: 51.4cqw;
-}
-
-.mt-foot {
-  left: 6.4cqw;
-  bottom: 4.6cqh;
-  font-size: 1.15cqw;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  left: 6cqw;
 }
 
 .mt-credit {
-  right: 2.6cqw;
-  top: 20cqh;
-  font-size: 1.1cqw;
-  writing-mode: vertical-rl;
+  right: 6cqw;
+  text-align: right;
+}
+
+.mt-title {
+  left: 5.4cqw;
+  top: 9.5cqh;
+  width: 70cqw;
+  font-size: 12.4cqw;
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: -0.055em;
+}
+
+.mt-index {
+  right: 6cqw;
+  top: 9.5cqh;
+  font-size: 12.4cqw;
+  font-weight: 300;
+  line-height: 0.9;
+  letter-spacing: -0.05em;
+}
+
+.mt-sub {
+  left: 36cqw;
+  top: 47cqh;
+  width: 58cqw;
+  font-size: 2.7cqw;
+  line-height: 1.14;
+  letter-spacing: -0.03em;
+}
+
+.mt-left,
+.mt-mid,
+.mt-right {
+  top: 63cqh;
+  width: 26cqw;
+  font-size: 1.42cqw;
+  line-height: 1.24;
+  letter-spacing: -0.015em;
+}
+
+.mt-left {
+  left: 6cqw;
+}
+
+.mt-mid {
+  left: 37cqw;
+}
+
+.mt-right {
+  left: 68cqw;
+}
+
+.mt-foot {
+  left: 6cqw;
+  top: 47.4cqh;
+  width: 24cqw;
+  font-size: 1.2cqw;
   letter-spacing: -0.01em;
 }
 

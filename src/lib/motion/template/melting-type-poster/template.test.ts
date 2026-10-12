@@ -41,7 +41,7 @@ describe('the melting type poster template', () => {
   it('exposes the editable text as typed fields, at most five of them key', () => {
     const fields = MELTING_TYPE_POSTER_TEMPLATE.template.doc.fields;
 
-    ['title', 'subtitle', 'index', 'kicker', 'body_left', 'body_right', 'footer', 'credit'].forEach((key) => expect(fields.find((f) => f.key === key)?.type).toBe(FieldType.Text));
+    ['title', 'subtitle', 'index', 'kicker', 'body_left', 'body_mid', 'body_right', 'footer', 'credit'].forEach((key) => expect(fields.find((f) => f.key === key)?.type).toBe(FieldType.Text));
     expect(MELT_KEY_FIELDS.length).toBeLessThanOrEqual(5);
     expect(fields.map((f) => f.key)).toEqual(expect.arrayContaining(MELT_KEY_FIELDS));
   });
