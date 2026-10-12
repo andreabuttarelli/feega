@@ -14,7 +14,7 @@
   import { saveExport } from '$lib/motion/export/save';
   import { joltNote } from '$lib/motion/smoothness';
   import type { FrameSize } from './MotionPreview.svelte';
-  import { liveComponents, liveNote, unverified } from '$lib/motion/custom/determinism';
+  import { liveNote, stillStandIns, unverified } from '$lib/motion/custom/determinism';
   import { CheckState } from '$lib/motion/custom/component';
   import { deserialize } from '$app/forms';
   import { HOLD_BUFFER, renderQuote } from '$lib/motion/render-quote';
@@ -151,7 +151,7 @@
   const remaining = $derived(eta({ done, total, elapsedMs: now - startedAt }));
   const busy = $derived(phase === Phase.Mixing || phase === Phase.Rendering || phase === Phase.Saving);
   const blockers = $derived(unverified(doc));
-  const live = $derived(liveComponents(doc));
+  const live = $derived(stillStandIns(doc));
   const BLOCKER_LABEL: Record<CheckState, string> = { [CheckState.Unchecked]: 'is still being checked', [CheckState.Failed]: 'failed the seek check', [CheckState.Passed]: '' };
   const hasAudio = $derived(withAudio && sounds.length > 0);
   const place = $derived(caps && device ? renderPlace({ doc: target, settings, capabilities: caps, device, background, hasAudio }) : null);
