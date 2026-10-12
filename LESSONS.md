@@ -2844,3 +2844,6 @@ Segnale: `flicker` nei primi frame di un ingresso parola per parola, diff che al
 giù, più evidente su sfondo chiaro. Causa: `translateY` su uno `span` inline-block non
 composto viene arrotondato al pixel, quindi la salita procede a scatti. Mossa:
 `will-change: transform, opacity` sulla parola; la salita torna sub-pixel e il flicker sparisce.
+
+### A test file that fails to parse is not in the `Tests` count
+Signal: `Tests N passed` locally, CI red with `Transform failed … Unexpected end of file`. A conflict resolved by keeping both sides dropped a closing `});`; vitest counts the file under `Test Files … failed`, not `Tests`. Move: read the `Test Files` line too.
