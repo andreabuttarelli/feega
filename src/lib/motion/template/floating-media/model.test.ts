@@ -13,7 +13,7 @@ type Model = {
 
 const model = new Function(`${FLOAT_MODEL}; return { floatLayout, floatFrame, scaleAt, safeBox, frameBox };`)() as Model;
 
-const PARAMS = { title: 'made to move', count: 10, layout: 'orbit', depth: 1.2, drift: 0.035, speed: 1, resistance: 0.8, cardSize: 0.26, safeWidth: 0.5, safeHeight: 0.34, tilt: 1, focusBlur: 6, dim: 0.35, entrance: true, leave: true, enterAt: 0.2, stagger: 0.12, titleAt: 0.5, titleBlur: 0.25, push: 0.25 };
+const PARAMS = { title: 'made to move', count: 5, layout: 'orbit', depth: 2, drift: 0.035, speed: 1, resistance: 0.8, cardSize: 0.26, safeWidth: 0.5, safeHeight: 0.34, tilt: 1, focusBlur: 6, dim: 0.35, entrance: true, leave: true, enterAt: 0, stagger: 0.12, titleAt: 0, titleBlur: 0.25, push: 0.25 };
 const LENGTH = 10;
 const FPS = 30;
 const ASPECTS = { landscape: [1920, 1080], vertical: [1080, 1920], square: [1080, 1080] } as const;
@@ -99,5 +99,43 @@ describe('the floating media model', () => {
 
     expect(firstIn).toBeLessThan(lastIn);
     expect(Math.min(...words.slice(0, LENGTH * FPS / 2).map((w) => w[0].y))).toBeGreaterThan(-0.42 * 0.03);
+  });
+
+  it('starts the cards only once the title has landed', () => {
+    const layout = model.floatLayout(PARAMS, 1920, 1080);
+    const frames = times().map((t) => model.floatFrame(layout, PARAMS, t, LENGTH));
+    const titleDone = frames.findIndex((f) => f.words.every((w) => w.opacity >= 0.999));
+    const firstCard = frames.findIndex((f) => f.cards.some((c) => c.opacity > 0.001));
+
+    expect(titleDone).toBeGreaterThan(0);
+    expect(firstCard).toBeGreaterThanOrEqual(titleDone);
+  });
+
+  it('shows the title within the first frames, not a blank screen', () => {
+    const layout = model.floatLayout(PARAMS, 1920, 1080);
+
+    expect(model.floatFrame(layout, PARAMS, 0.2, LENGTH).words[0].opacity).toBeGreaterThan(0.3);
+  });
+
+  for (const [name, [width, height]] of Object.entries(ASPECTS)) {
+    it(`never overlaps two of the five orbit cards in ${name}`, () => {
+      const p = { ...PARAMS, entrance: false };
+      const placed = model.floatLayout(p, width, height);
+
+      for (const t of times().filter((_, i) => i % 10 === 0)) {
+        const boxes = model.floatFrame(placed, p, t, LENGTH).cards.map(screen);
+        boxes.forEach((a, i) => boxes.slice(i + 1).forEach((b) => {
+          expect(Math.abs(a.x - b.x) < a.hw + b.hw && Math.abs(a.y - b.y) < a.hh + b.hh, `${name} t=${t}`).toBe(false);
+        }));
+      }
+    });
+  }
+
+  it('puts some cards clearly far back, where they blur', () => {
+    const p = { ...PARAMS, entrance: false };
+    const cards = model.floatFrame(model.floatLayout(p, 1920, 1080), p, 5, LENGTH).cards;
+
+    expect(Math.min(...cards.map((c) => c.z))).toBeLessThan(-1.2);
+    expect(Math.max(...cards.map((c) => c.blur))).toBeGreaterThan(3);
   });
 });

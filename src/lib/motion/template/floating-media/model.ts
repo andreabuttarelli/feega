@@ -65,7 +65,7 @@ function seeds(layout, n, box, depth) {
     }
     const angle = (2 * Math.PI * i) / n + 0.35 * signed(i, 21) / n + Math.PI / 2;
     const ring = 0.78 + 0.16 * signed(i, 22);
-    cards.push({ x: Math.cos(angle) * box.ax * ring, y: Math.sin(angle) * box.ay * ring, z: -depth * (i % 2 ? 0.75 : 0.15) + 0.1 * depth * signed(i, 23) });
+    cards.push({ x: Math.cos(angle) * box.ax * ring, y: Math.sin(angle) * box.ay * ring, z: -depth * (i % 2 ? 0.95 : 0.1) + 0.05 * depth * signed(i, 23) });
   }
   return cards;
 }
@@ -115,25 +115,27 @@ function drift(card, p, t, length) {
   };
 }
 
-function entranceAt(card, n, p, t, length) {
+const titleEnd = (words, p) => p.titleAt + Math.max(0, words - 1) * WORD_GAP + WORD_IN;
+
+function entranceAt(card, n, p, t, length, start) {
   if (!p.entrance) {
     return { in: 1, out: 0 };
   }
-  const at = p.enterAt + card.i * p.stagger;
+  const at = start + p.enterAt + card.i * p.stagger;
   const leave = p.leave ? length - EXIT - (n - 1 - card.i) * p.stagger * 0.4 : Infinity;
   return { in: span(t, at, ENTER), out: span(t, leave - 0.05, EXIT) };
 }
 
-function cardFrame(card, n, p, t, length) {
+function cardFrame(card, n, p, t, length, start) {
   const d = drift(card, p, t, length);
-  const e = entranceAt(card, n, p, t, length);
+  const e = entranceAt(card, n, p, t, length, start);
   const arrive = settle(e.in);
   const leave = expoInOut(e.out);
   const away = (1 - arrive) + leave;
   const z = card.z + d.z - away * (1.2 + p.depth);
   const sight = scaleAt(card.z + d.z) / scaleAt(z);
   const visible = smooth(clamp01(e.in * 1.6)) * (1 - smooth(e.out));
-  const depthShare = p.depth > 0 ? clamp01(-z / (p.depth + 1.2)) : 0;
+  const depthShare = p.depth > 0 ? clamp01(-z / (p.depth + 0.4)) : 0;
   return {
     x: (card.x + d.x) * sight,
     y: (card.y + d.y) * sight,
@@ -154,7 +156,7 @@ function wordFrames(words, p, t, length) {
     const at = p.titleAt + i * WORD_GAP;
     const e = settle(span(t, at, WORD_IN));
     const out = p.leave ? expoInOut(span(t, length - EXIT - 0.2 + i * 0.04, EXIT * 0.8)) : 0;
-    const shown = smooth(span(t, at, WORD_IN * 0.7)) * (1 - smooth(out));
+    const shown = smooth(span(t, at, WORD_IN * 0.35)) * (1 - smooth(out));
     return { y: 0.42 * (1 - e) - 0.2 * out, blur: p.titleBlur * (1 - e + out), opacity: shown };
   });
 }
@@ -164,7 +166,7 @@ function floatFrame(layout, p, t, length) {
   const push = p.push * Math.pow(Math.sin((Math.PI * clamp01(t / length))), 2);
   const sub = p.leave ? 1 - smooth(span(t, length - EXIT - 0.2, EXIT * 0.8)) : 1;
   return {
-    cards: layout.map((card) => cardFrame(card, layout.length, p, t, length)),
+    cards: layout.map((card) => cardFrame(card, layout.length, p, t, length, titleEnd(words.length, p))),
     words: wordFrames(words, p, t, length),
     subtitle: smooth(span(t, p.titleAt + 0.35 + words.length * WORD_GAP, 0.8)) * sub,
     camera: push
