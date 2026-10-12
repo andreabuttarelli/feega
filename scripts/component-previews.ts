@@ -28,6 +28,7 @@ const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: R
   'builtin:floating-media': { field: 'media', photos: SAMPLE_PHOTOS },
   'builtin:split-headline': { field: 'media', photos: ['p1043'] },
   'builtin:image-globe': { field: 'media', photos: STRIP_PHOTOS },
+  'builtin:editorial-words-media': { field: 'media', photos: STRIP_PHOTOS },
   'builtin:photo-strip': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } }
 };
 
