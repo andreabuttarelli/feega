@@ -18,6 +18,7 @@ export type CustomTemplateSpec = {
   clip: string;
   seconds: number;
   fps: MotionDoc['fps'];
+  groups?: Readonly<Record<string, string>>;
 };
 
 const GROUP: Record<NonNullable<PropSpec['group']>, string> = { Content: 'Text', Style: 'Style', Layout: 'Style', Motion: 'Motion', Camera: 'Motion' };
@@ -82,7 +83,7 @@ export function customTemplateDoc(spec: CustomTemplateSpec): MotionDoc {
   doc = must(writeComponent(doc, spec.component, spec.code));
   doc = must(addClip(doc, { component: 'Custom', from: 0, durationInFrames: frames, props: { name: spec.component, ...defaultsOf(spec.props) } }, spec.clip));
   for (const [key, prop] of Object.entries(spec.props).filter(([key]) => key !== VAR_PREFIX)) {
-    doc = must(exposeField(doc, { key: snakeKey(key), label: prop.title ?? key, clipId: spec.clip, prop: key, group: groupOf(prop), ...fieldShape(prop, spec.fonts) }));
+    doc = must(exposeField(doc, { key: snakeKey(key), label: prop.title ?? key, clipId: spec.clip, prop: key, group: spec.groups?.[key] ?? groupOf(prop), ...fieldShape(prop, spec.fonts) }));
   }
   for (const key of spec.vars) {
     doc = must(declareVar(doc, varOf(spec.varPrefix, key, spec.props[key])));

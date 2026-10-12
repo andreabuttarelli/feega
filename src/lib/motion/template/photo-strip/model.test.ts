@@ -125,6 +125,17 @@ describe('the photo strip model', () => {
     }
   });
 
+  it('keeps big cards with no gap clear of each other, whatever the magnifier', () => {
+    for (const p of [{ ...PARAMS, cardSize: 0.36, gap: 0 }, { ...PARAMS, cardSize: 0.4, gap: 0.01, magnify: 2.5, falloff: 0.4 }, { ...PARAMS, gap: 0, falloff: 3 }]) {
+      for (const t of times().filter((_, i) => i % 2 === 0)) {
+        const cards = model.stripFrame(p, t, LENGTH, 1080, 1920).cards.sort((a, b) => a.x - b.x);
+        cards.slice(1).forEach((c, i) => {
+          expect(c.x - cards[i].x - (c.w * c.scale + cards[i].w * cards[i].scale) / 2, `t=${t}`).toBeGreaterThanOrEqual(-1e-9);
+        });
+      }
+    }
+  });
+
   it('keeps the magnified card in frame and clear of its neighbours', () => {
     for (const [name, [width, height]] of Object.entries(ASPECTS)) {
       const ay = height / Math.min(width, height) / 2;

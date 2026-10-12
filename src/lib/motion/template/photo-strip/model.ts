@@ -8,6 +8,7 @@ const CAPTION_GAP = 0.035;
 const CURSOR_REACH = 0.6;
 const FLING = 0.18;
 const STRIP_Y = -0.03;
+const MAGNIFIER_CORE = 0.5;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const smooth = (x) => x * x * x * (x * (x * 6 - 15) + 10);
@@ -65,11 +66,12 @@ function magnifyAt(d, p) {
 
 function grownBy(d, p) {
   const w = Math.max(0.05, p.falloff);
-  const v = clamp01(Math.abs(d) / w);
-  return Math.sign(d) * w * (v - (Math.pow(v, 6) - 3 * Math.pow(v, 5) + 2.5 * Math.pow(v, 4)));
+  const core = Math.min(Math.abs(d), MAGNIFIER_CORE);
+  const v = clamp01((Math.abs(d) - core) / w);
+  return Math.sign(d) * (core + w * (v - (Math.pow(v, 6) - 3 * Math.pow(v, 5) + 2.5 * Math.pow(v, 4))));
 }
 
-const offsetAt = (d, p) => pitchOf(p) * (d + (p.magnify - 1) * grownBy(d, p));
+const offsetAt = (d, p) => pitchOf(p) * d + p.cardSize * (p.magnify - 1) * grownBy(d, p);
 
 function slotCount(p, half) {
   const n = photoCount(p);

@@ -44,6 +44,15 @@ describe('the photo strip template', () => {
     expect(fields.find((f) => f.prop === 'media')?.type).toBe(FieldType.Text);
   });
 
+  it('groups the Properties panel into photos, style, motion and interaction', () => {
+    const group = (prop: string) => PHOTO_STRIP_TEMPLATE.template.doc.fields.find((f) => f.prop === prop)?.group;
+
+    expect([group('media'), group('captions')]).toEqual(['Photos', 'Photos']);
+    expect([group('background'), group('cardSize'), group('font')]).toEqual(['Style', 'Style', 'Style']);
+    expect([group('magnify'), group('pause'), group('direction')]).toEqual(['Motion', 'Motion', 'Motion']);
+    expect([group('drag'), group('cursor')]).toEqual(['Interaction', 'Interaction']);
+  });
+
   it('declares runtime variables an embedding site can set', () => {
     const names = interactiveOf(PHOTO_STRIP_TEMPLATE.template.doc).vars.map((v) => v.name);
 
