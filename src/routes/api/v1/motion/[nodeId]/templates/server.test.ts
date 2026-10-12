@@ -77,6 +77,8 @@ describe('/api/v1/motion templates', () => {
     expect(split.fields).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'headline', group: 'Text' }), expect.objectContaining({ key: 'radius', group: 'Style' }), expect.objectContaining({ key: 'open_seconds', group: 'Motion' })]));
     expect(res.status).toBe(200);
     expect(JSON.stringify((head?.doc as MotionDoc).comps)).toContain('Zqx split here');
+  });
+
   it('lists and inserts the image globe', async () => {
     const url = new URL('https://feega.test/api/v1/motion/templates');
     const body = await (await GET({ request: new Request(url, { headers: { authorization: 'Bearer t' } }), url } as never)).json();
