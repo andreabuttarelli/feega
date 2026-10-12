@@ -4,7 +4,7 @@ Fourth hand-built premium template: three chapters on a visible grid,
 phased (hold, eased move, hold, eased move, hold; fields for hold,
 move and easing; scrub maps scroll to the same phases). The
 headline is pinned in the centre and swaps line by line (masked, staggered,
-expo in-out with a soft settle, no blur) at each chapter boundary; each
+pure in-out expo, no overshoot: nothing ever moves back) at each chapter boundary; each
 chapter image drifts upward on its own grid column at its own speed, with a
 light inner parallax. Labels, chapter index and a progress hairline sit on
 the grid.

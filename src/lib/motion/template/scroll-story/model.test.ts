@@ -48,6 +48,7 @@ const PARAMS = {
   swapOverlap: 0.35
 };
 const LENGTH = 12;
+const MASK_HALF = 0.55;
 const FPS = 30;
 const ASPECTS = { landscape: [1920, 1080], vertical: [1080, 1920], square: [1080, 1080] } as const;
 const times = () => Array.from({ length: LENGTH * FPS + 1 }, (_, i) => i / FPS);
@@ -164,6 +165,27 @@ describe('the scroll story model', () => {
       f.images.forEach((img, k) => expect(Math.abs(img.y - prev.images[k].y)).toBeLessThan(height * 0.12));
       f.marks.forEach((m, k) => expect(Math.abs(m - prev.marks[k])).toBeLessThan(0.2));
     });
+  });
+
+  it.each(Object.entries(ASPECTS))('never moves anything back within a move in %s', (_, size) => {
+    const { moves } = model.storyPhases(PARAMS, LENGTH);
+    const values = (f: Frame) => [f.position, ...f.images.map((i) => i.y), ...f.heads.flatMap((h) => [h.kicker, h.index, ...h.lines].map((s) => s.y))];
+
+    moves.forEach(([a, b]) => {
+      const steps = Array.from({ length: 241 }, (_, i) => values(frame(a + ((b - a) * i) / 240, PARAMS, size)));
+      steps[0].forEach((_, k) => {
+        const deltas = steps.slice(1).map((s, i) => s[k] - steps[i][k]);
+        expect(deltas.every((d) => d >= -1e-9) || deltas.every((d) => d <= 1e-9)).toBe(true);
+      });
+    });
+  });
+
+  it('rolls the chapter number over without an empty moment', () => {
+    const [swap] = model.swapPlan(PARAMS, LENGTH);
+    const f = frame(swap.outAt[0] + PARAMS.swapDuration / 2);
+
+    expect(f.heads[0].index.on || f.heads[1].index.on).toBe(true);
+    expect(f.heads[1].index.y).toBeLessThan(MASK_HALF);
   });
 
   it('drifts a hold only when idle drift is on, and only a little', () => {

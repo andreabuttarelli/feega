@@ -1,6 +1,5 @@
 export const STORY_MODEL = String.raw`
 const CHAPTERS = 3;
-const SETTLE = 0.012;
 const MASK_TRAVEL = 1.1;
 const LABEL_SLOTS = 1;
 const LINE_HEIGHT = 0.98;
@@ -23,8 +22,6 @@ const span = (t, at, length) => clamp01((t - at) / Math.max(length, 1e-6));
 const expoInOut = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x < 0.5 ? Math.pow(2, 20 * x - 10) / 2 : (2 - Math.pow(2, -20 * x + 10)) / 2);
 const powInOut = (n) => (x) => (x < 0.5 ? Math.pow(2 * x, n) / 2 : 1 - Math.pow(2 - 2 * x, n) / 2);
 const EASE = { expo: expoInOut, quint: powInOut(5), cubic: powInOut(3) };
-const settleWith = (ease) => (x) => ease(x) + SETTLE * Math.sin(Math.PI * clamp01((x - 0.5) / 0.5));
-const settle = settleWith(expoInOut);
 const smooth = (x) => x * x * x * (x * (x * 6 - 15) + 10);
 
 const linesOf = (text) => String(text || '').split('\n').map((s) => s.trim()).filter(Boolean);
@@ -48,7 +45,7 @@ function storyPhases(p, length) {
 }
 
 function storyPosition(p, t, length) {
-  const ease = settleWith(EASE[p.easing] || expoInOut);
+  const ease = EASE[p.easing] || expoInOut;
   const { moves } = storyPhases(p, length);
   const k = moves.findIndex(([a, b]) => t > a && t < b);
   if (k < 0) {
@@ -74,7 +71,7 @@ function slotFrame(p, t, inAt, outAt) {
   const style = SWAP_STYLE[p.swapStyle] || SWAP_STYLE['mask-up'];
   const inRaw = inAt === null ? 1 : span(t, inAt, p.swapDuration);
   const outRaw = outAt === null ? 0 : span(t, outAt, p.swapDuration);
-  const enter = inAt === null ? 1 : settle(inRaw);
+  const enter = inAt === null ? 1 : expoInOut(inRaw);
   const leave = expoInOut(outRaw);
   const y = -style.dir * style.travel * (1 - enter) + style.dir * style.travel * leave;
   const opacity = style.fade ? smooth(inRaw) * (1 - smooth(outRaw)) : 1;
@@ -89,7 +86,8 @@ function headFrames(p, t, length) {
     const inAt = (j) => (i === 0 ? null : plan[i - 1].inAt[j]);
     const outAt = (j) => (i === chapters.length - 1 ? null : plan[i].outAt[j]);
     const slot = (j) => slotFrame(p, t, inAt(j), outAt(j));
-    return { kicker: slot(0), index: slot(0), lines: chapter.lines.map((_, j) => slot(j + LABEL_SLOTS)) };
+    const index = slotFrame(p, t, i === 0 ? null : plan[i - 1].outAt[0], outAt(0));
+    return { kicker: slot(0), index, lines: chapter.lines.map((_, j) => slot(j + LABEL_SLOTS)) };
   });
 }
 
