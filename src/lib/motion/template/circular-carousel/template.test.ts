@@ -4,6 +4,7 @@ import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { composeHtml, Target } from '$lib/motion/hyperframes/compose';
 import { ComponentMode, customValues, Strictness } from '$lib/motion/custom/component';
 import { lintSource } from '$lib/motion/custom/lint';
+import { stillStandIns } from '$lib/motion/custom/determinism';
 import { interactiveOf } from '$lib/motion/interactive/settings';
 import { builtinTemplate } from '../builtins';
 import { insertTemplate, setTemplateValues, templateFields } from '../library';
@@ -39,7 +40,7 @@ describe('the circular carousel template', () => {
   });
 
   it('draws the video from t alone: it hands the runtime a still(t)', () => {
-    expect(component().source.js).toMatch(/return \{ still/);
+    expect(stillStandIns(inserted().doc)).toEqual([]);
   });
 
   it('exposes media, captions, autoplay and the background as typed fields', () => {

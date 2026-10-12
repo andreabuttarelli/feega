@@ -112,18 +112,18 @@ const render = (pos, t) => {
 };
 
 const now = () => performance.now() / 1000;
-const state = { from: 0, to: 0, start: now(), seconds: 0, ease: 'inout', drag: null, press: null, lastInput: -Infinity, frames: 0 };
+const state = { from: 0, to: 0, start: now(), seconds: 0, ease: 'inout', auto: false, drag: null, press: null, lastInput: -Infinity, frames: 0 };
 
 const posAt = (t) => (state.drag ? state.drag.pos : glide(state.from, state.to, t - state.start, state.seconds, state.ease));
 const moving = (t) => t - state.start < state.seconds;
 const spacing = () => props.itemSize * props.aspect * (1 + props.gap) * Math.min(sizeOf().width, sizeOf().height);
 
-const goTo = (target, ease) => {
+const goTo = (target, ease, auto = false) => {
   const t = now();
-  Object.assign(state, { from: posAt(t), to: target, start: t, seconds: props.moveSeconds, ease, drag: null });
+  Object.assign(state, { from: posAt(t), to: target, start: t, seconds: props.moveSeconds, ease, auto, drag: null });
 };
 
-const step = (dir) => goTo(state.to + dir, moving(now()) ? 'out' : 'inout');
+const step = (dir) => goTo(stepTarget({ ...state, moving: moving(now()) }, dir), moving(now()) ? 'out' : 'inout');
 
 const nearestCopy = (i) => state.to + Math.round(wrapOffset(i, state.to, cache.items.length));
 
@@ -195,7 +195,7 @@ const autoplay = (t) => {
   const hold = Math.max(0.2, props.interval - props.moveSeconds);
   const idleSince = Math.max(state.lastInput + RESUME_AFTER, state.start + state.seconds);
   if (props.autoplay && !state.press && t - idleSince >= hold) {
-    step(SIGN[props.direction] ?? 1);
+    goTo(state.to + (SIGN[props.direction] ?? 1), 'inout', true);
   }
 };
 

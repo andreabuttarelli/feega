@@ -62,5 +62,7 @@ function glide(from, to, elapsed, seconds, ease) {
   return x >= 1 ? to : from + (to - from) * (EASES[ease] ?? expoInOut)(x);
 }
 
+const stepTarget = (step, dir) => (step.auto && step.moving ? Math.round(step.from) : step.to) + dir;
+
 const dragPos = (start, dx, spacing) => start - dx / Math.max(spacing, 1);
 `;

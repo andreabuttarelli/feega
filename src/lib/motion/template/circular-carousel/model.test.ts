@@ -11,9 +11,10 @@ type Model = {
   snapTarget: (pos: number, velocity: number) => number;
   glide: (from: number, to: number, elapsed: number, seconds: number, ease: string) => number;
   dragPos: (start: number, dx: number, spacing: number) => number;
+  stepTarget: (step: { from: number; to: number; auto: boolean; moving: boolean }, dir: number) => number;
 };
 
-const model = new Function(`${CAROUSEL_MODEL}; return { wrapOffset, ringStep, ringSlot, sequencePos, captionAt, snapTarget, glide, dragPos };`)() as Model;
+const model = new Function(`${CAROUSEL_MODEL}; return { wrapOffset, ringStep, ringSlot, sequencePos, captionAt, snapTarget, glide, dragPos, stepTarget };`)() as Model;
 
 const PARAMS = { itemSize: 0.56, aspect: 0.75, gap: 0.14, ringRadius: 0.8, visible: 7, dim: 0.7, lift: 0.06, interval: 2.4, moveSeconds: 1.1, direction: 'next' };
 const FPS = 30;
@@ -144,5 +145,12 @@ describe('the interaction', () => {
     const two = model.glide(one, one + 1, 1.1, 1.1, 'out');
 
     expect(two).toBe(2);
+  });
+
+  it('a click during an autoplay step replaces it instead of adding to it', () => {
+    expect(model.stepTarget({ from: 3, to: 4, auto: true, moving: true }, 1)).toBe(4);
+    expect(model.stepTarget({ from: 3, to: 4, auto: true, moving: true }, -1)).toBe(2);
+    expect(model.stepTarget({ from: 3, to: 4, auto: true, moving: false }, 1)).toBe(5);
+    expect(model.stepTarget({ from: 3, to: 4, auto: false, moving: true }, 1)).toBe(5);
   });
 });

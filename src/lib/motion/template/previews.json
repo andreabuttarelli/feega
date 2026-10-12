@@ -1,4 +1,5 @@
 [
+  "builtin:circular-carousel",
   "builtin:composition-bento",
   "builtin:composition-carousel-3d",
   "builtin:composition-coverflow",

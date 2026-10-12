@@ -10,8 +10,8 @@ pieno e nitido, gli altri arretrano e si scuriscono.
 - **Video**: il corpo restituisce `still(t)`, che disegna `sequencePos(t)` — un passo ogni
   `interval` secondi, funzione pura di t. L'autoplay governa solo lo schermo: il video avanza
   sempre.
-- **Avviso noto**: l'export video mostra ancora "will look different" (`liveNote`), perché
-  `liveComponents` segnala ogni componente live. Qui è falso: il video è la sequenza
-  automatica. Toglierlo richiede che un componente dichiari di avere uno still fedele —
-  rinviato, da decidere.
-- Ancora assente: anteprima in `previews.json`.
+- **Nessun avviso "will look different"**: il corpo restituisce `still(t)`, che #442 riconosce
+  come still fedele.
+- **Click durante un passo dell'autoplay**: lo sostituisce invece di sommarsi
+  (`stepTarget`); prima un › appena dopo l'autoplay avanzava di due.
+- Anteprima in libreria e render 16:9, 9:16, 1:1 controllati (errori pagina/componente, frame fermi).
