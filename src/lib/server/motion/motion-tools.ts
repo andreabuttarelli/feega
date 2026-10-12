@@ -119,6 +119,7 @@ import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/
 import { FIELD_TYPES, MAX_LINKED, type ExposedField } from '$lib/motion/template/field-model';
 import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields } from '$lib/motion/template/library';
 import type { TemplateLibrary } from './templates';
+import { templateCues } from './template-sounds';
 import { createWebTools, type WebToolDeps } from '$lib/server/web/web-tools';
 import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
 import { renderQuote } from '$lib/motion/render-quote';
@@ -2278,20 +2279,26 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
-    insert_template: tool({
-      description: 'Insert a template (id from list_templates) as one locked Precomp clip on a new top track at start seconds. Fill it with set_template_fields; its structure stays fixed unless detach_template.',
-      inputSchema: z.object({ template_id: z.string(), start: z.number().min(0).default(0) }),
+    add_template: tool({
+      description: 'Insert a template (id from list_templates) as one locked Precomp clip on a new top track at `at` seconds, with its fields filled from vars (keys as in list_templates, checked like set_template_fields). sound (default true) lays its key taps and clicks on the SFX track. Its structure stays fixed unless detach_template.',
+      inputSchema: z.object({ id: z.string(), at: z.number().min(0).default(0), vars: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}), sound: z.boolean().default(true) }),
       execute: async (input) => {
-        const entry = ((await deps.templates?.list()) ?? []).find((e) => e.id === input.template_id);
+        const entry = ((await deps.templates?.list()) ?? []).find((e) => e.id === input.id);
         if (!entry) {
-          return { ok: false, error: `no template ${input.template_id}: call list_templates` };
+          return { ok: false, error: `no template ${input.id}: call list_templates` };
         }
-        const placed = insertTemplate(session.doc, entry, { from: frames(input.start), newId: deps.newId });
+        const placed = insertTemplate(session.doc, entry, { from: frames(input.at ?? 0), newId: deps.newId });
         if (!placed.ok) {
           return placed;
         }
-        const out = apply(placed, `inserted template ${entry.template.name}`);
-        return out.ok ? { ...out, clip_id: placed.clipId, fields: templateFields(session.doc, placed.clipId).map((f) => ({ ...fieldSpec(f), value: f.value })) } : out;
+        const values = Object.fromEntries(Object.entries(input.vars ?? {}).map(([k, v]) => [k, String(v)]));
+        const filled = Object.keys(values).length ? setTemplateValues(placed.doc, placed.clipId, values) : placed;
+        const out = apply(filled, `inserted template ${entry.template.name}`);
+        if (!out.ok) {
+          return out;
+        }
+        const sounds = input.sound !== false ? await soundCues(templateCues(session.doc, placed.clipId)) : null;
+        return { ...out, clip_id: placed.clipId, ...(sounds ? { sounds } : {}), fields: templateFields(session.doc, placed.clipId).map((f) => ({ ...fieldSpec(f), value: f.value })) };
       }
     }),
 

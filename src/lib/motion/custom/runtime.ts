@@ -2,7 +2,7 @@ import { InputKey } from '../expression/inputs';
 import { INPUT_MESSAGE } from '../interactive/runtime';
 import { contentStamp } from '../stamp';
 import { js } from '../hyperframes/html';
-import type { CustomComponents } from './component';
+import { VAR_PREFIX, type CustomComponents } from './component';
 import { ENGINE_GLOBAL } from '../engine/engine';
 import { fixedFormat } from './format';
 import { GENERATIVE_GLOBAL } from './generative';
@@ -159,7 +159,7 @@ type Game = { debug: { paused: boolean }; quit: () => void; randSeed: (seed: num
 type Input = { x: number; y: number; down: boolean; hover: boolean; tiltX: number; tiltY: number; keys: Set<string>; vars: Record<string, number | boolean | string> };
 type Hooks = { pause: (() => void)[]; resume: (() => void)[]; destroy: (() => void)[] };
 type Forwarded = { type?: string; kind?: string; x?: number; y?: number; key?: string; code?: string; values?: Record<string, number>; vars?: Record<string, number | boolean | string> };
-type BootConfig = { registry: string; errors: string; listener: string; libraries: Record<string, string>; engine: string; shadowed: string[]; clock: string[]; liveRuns: string; eventMessage: string; inputMessage: string; tilt: { x: string; y: string }; gpu: { global: string; three: string } };
+type BootConfig = { registry: string; errors: string; listener: string; libraries: Record<string, string>; engine: string; shadowed: string[]; clock: string[]; liveRuns: string; eventMessage: string; inputMessage: string; varPrefix: string; tilt: { x: string; y: string }; gpu: { global: string; three: string } };
 
 function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: Timeline, format: ReturnType<typeof fixedFormat>) {
   const w = window as unknown as BootWindow;
@@ -557,9 +557,31 @@ function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: 
     const wrapped = played(scope.run.play ?? 'seeked');
     return Object.fromEntries(libraries.map(([name, lib]) => [name, lib && wrapped[name] ? wrapped[name](lib as never, scope) : lib]));
   };
+  const followVars = (e: MessageEvent) => {
+    const m = e.data as Forwarded;
+    if (m?.type === cfg.inputMessage && m.vars) {
+      input.vars = m.vars;
+    }
+  };
   if (runs.some((r) => r.play === 'live')) {
     listenInput(document.getElementById('root') ?? document.body);
+  } else if (Object.keys(input.vars).length) {
+    addEventListener('message', followVars);
+    liveRuns.push(() => removeEventListener('message', followVars));
   }
+  const snake = (key: string) => key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+  const varDriven = (values: Record<string, unknown>) => {
+    const prefix = values[cfg.varPrefix];
+    if (typeof prefix !== 'string' || !prefix) {
+      return;
+    }
+    for (const key of Object.keys(values)) {
+      const given = Object.getOwnPropertyDescriptor(values, key)!;
+      const fallback = () => (given.get ? given.get() : given.value);
+      const name = `${prefix}_${snake(key)}`;
+      Object.defineProperty(values, key, { get: () => (name in input.vars ? input.vars[name] : fallback()), enumerable: true });
+    }
+  };
 
   for (const run of runs) {
     const root = document.getElementById(`cc-${run.id}`);
@@ -597,6 +619,7 @@ function bootCustom(cfg: BootConfig, runs: CustomRun[], env: CustomEnv, master: 
         child.fromTo(root, { [cssVar(key)]: a.value }, { [cssVar(key)]: b.value, duration: Math.max(0.0001, b.at - a.at), ease: a.ease, immediateRender: false, lazy: false }, a.at + trim);
       }
     }
+    varDriven(values);
     const param = (name: string, fallback: unknown) => (name in values ? values[name] : fallback);
     const hooks: Hooks = { pause: [], resume: [], destroy: [] };
     const live = run.play === 'live' ? liveClock(root, hooks) : null;
@@ -633,6 +656,6 @@ export function bootScript(runs: CustomRun[], env: CustomEnv, master: string): s
   if (!runs.length) {
     return '';
   }
-  const cfg: BootConfig = { registry: REGISTRY, errors: ERRORS, listener: ERROR_LISTENER, libraries: GLOBALS, engine: ENGINE_GLOBAL, shadowed: [...SHADOWED], clock: CLOCK_SHADOWS, liveRuns: LIVE_RUNS, eventMessage: EVENT_MESSAGE, inputMessage: INPUT_MESSAGE, tilt: { x: InputKey.TiltX, y: InputKey.TiltY }, gpu: { global: GPU_GLOBAL, three: THREE_GLOBAL } };
+  const cfg: BootConfig = { registry: REGISTRY, errors: ERRORS, listener: ERROR_LISTENER, libraries: GLOBALS, engine: ENGINE_GLOBAL, shadowed: [...SHADOWED], clock: CLOCK_SHADOWS, liveRuns: LIVE_RUNS, eventMessage: EVENT_MESSAGE, inputMessage: INPUT_MESSAGE, varPrefix: VAR_PREFIX, tilt: { x: InputKey.TiltX, y: InputKey.TiltY }, gpu: { global: GPU_GLOBAL, three: THREE_GLOBAL } };
   return `(${bootCustom.toString()})(${js(cfg)},${js(runs)},${js(env)},${master},(${fixedFormat.toString()})());`;
 }

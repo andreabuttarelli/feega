@@ -69,6 +69,7 @@
   import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
   import { insertTemplate, isLockedComp, type TemplateEntry } from '$lib/motion/template/library';
+  import { PROMPT_TEMPLATE_ID } from '$lib/motion/template/prompt-input/template';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
@@ -147,6 +148,7 @@
   let brandAsk = $state<ChatPrefill | null>(null);
   let browsing = $state(false);
   let templates = $state<TemplateEntry[]>(data.templates);
+  let browseFirst = $state<string | null>(null);
   let previewDoc = $state<MotionDoc | null>(null);
   let draft = $state<AgentDraft>(null);
   let sounding = $state<SoundKind | null>(null);
@@ -642,13 +644,35 @@
     selection = [id];
   }
 
-  function insertEntry(entry: TemplateEntry) {
+  async function insertEntry(entry: TemplateEntry, sounds: boolean) {
     browsing = false;
     const placed = insertTemplate(doc, entry, { from: frame, newId });
     apply(placed, `Inserted ${entry.template.name}`);
-    if (placed.ok) {
-      selection = [placed.clipId];
+    if (!placed.ok) {
+      return;
     }
+    selection = [placed.clipId];
+    showProperties();
+    if (sounds) {
+      await addTemplateSounds(placed.doc, placed.clipId, history.present);
+    }
+  }
+
+  async function addTemplateSounds(withTemplate: MotionDoc, clipId: string, at: MotionDoc) {
+    const form = new FormData();
+    form.set('doc', JSON.stringify(withTemplate));
+    form.set('clipId', clipId);
+    const res = await fetch(`${editorUrl}?/templateSounds`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+    const result = deserialize(await res.text());
+    if (result.type !== 'success') {
+      notice = 'The template is in; its sounds could not be added.';
+      return;
+    }
+    if (history.present !== at) {
+      notice = 'The video changed while its sounds were made: insert the template again to add them.';
+      return;
+    }
+    apply({ ok: true, doc: (result.data as { doc: MotionDoc }).doc }, 'Added template sounds');
   }
 
   function enterComp(comp: string) {
@@ -1232,6 +1256,7 @@
       {frame}
       {editorUrl}
       compose={(d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses })}
+      initial={browseFirst}
       oninsert={insertEntry}
       onsaved={(entry) => ((templates = [...templates, entry]), (notice = `Saved ${entry.template.name} to the templates.`))}
       onremoved={(id) => (templates = templates.filter((t) => t.id !== id))}
@@ -1342,8 +1367,10 @@
                   <button type="button" role="menuitem" onclick={() => startTemplate(id)}>{AD_TEMPLATES[id].label}</button>
                 {/each}
                 <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
+                <span class="menu-head">Components</span>
+                <button type="button" role="menuitem" data-testid="add-prompt-input" onclick={() => ((adding = false), (browseFirst = PROMPT_TEMPLATE_ID), (browsing = true))}>Prompt input…</button>
                 <span class="menu-head">Templates</span>
-                <button type="button" role="menuitem" data-testid="open-templates" onclick={() => ((adding = false), (browsing = true))}>Browse templates…</button>
+                <button type="button" role="menuitem" data-testid="open-templates" onclick={() => ((adding = false), (browseFirst = null), (browsing = true))}>Browse templates…</button>
                 <span class="menu-head">Audio</span>
                 <button type="button" role="menuitem" onclick={() => ((adding = false), (sounding = 'voice'))}>Generate voice-over…</button>
                 <button type="button" role="menuitem" onclick={() => ((adding = false), (sounding = 'music'))}>Generate music…</button>

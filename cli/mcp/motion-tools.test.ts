@@ -246,6 +246,13 @@ describe('the motion agent over MCP', () => {
     expect(JSON.stringify(result)).toContain('21');
   });
 
+  test('list_motion_templates reads the templates; add_motion_template posts the copy with its vars', async () => {
+    await callTool('list_motion_templates', {});
+    await callTool('add_motion_template', { node_id: NODE, id: 'builtin:prompt-input', at: 2, vars: { text: 'Hi', shape: 'pill' } });
+    expect(calls[0]).toMatchObject({ method: 'GET', path: '/api/v1/motion/templates' });
+    expect(calls[1]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/templates`, body: { id: 'builtin:prompt-input', at: 2, vars: { text: 'Hi', shape: 'pill' } } });
+  });
+
   test('list_motion_revisions reads the versions with their clip counts', async () => {
     const result = await callTool('list_motion_revisions', { node_id: NODE });
     expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/revisions` });
@@ -262,7 +269,7 @@ describe('the motion agent over MCP', () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
     const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
 
-    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_videos', 'motion_budget', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
+    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['add_motion_template', 'ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_templates', 'list_motion_videos', 'motion_budget', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
     expect(names).toContain('render_video');
     expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');

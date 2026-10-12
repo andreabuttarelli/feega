@@ -22,7 +22,7 @@ export const FIELD_TYPE_LABEL: Record<FieldType, string> = {
   [FieldType.MediaList]: 'Media list'
 };
 export const FIELD_KEY = /^[a-z][a-z0-9_]{0,39}$/;
-export const MAX_FIELDS = 50;
+export const MAX_FIELDS = 120;
 export const MAX_OPTIONS = 20;
 
 export const MAX_LINKED = 12;
@@ -41,6 +41,7 @@ export const fieldSchema = z.object({
   unit: z.string().max(12).optional(),
   options: z.array(z.string().min(1).max(60)).min(1).max(MAX_OPTIONS).optional(),
   aspect: z.number().positive().max(10).optional(),
+  group: z.string().min(1).max(30).optional(),
   also: z.array(targetSchema).max(MAX_LINKED).optional()
 });
 

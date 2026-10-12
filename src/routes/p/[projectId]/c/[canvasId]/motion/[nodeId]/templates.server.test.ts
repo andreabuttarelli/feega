@@ -4,10 +4,14 @@ import { addClip } from '$lib/motion/timeline';
 import { precompose } from '$lib/motion/precomp';
 import { exposeField, FieldType } from '$lib/motion/template/fields';
 import { templatesDb } from '$lib/server/motion/templates-testing';
+import { TrackKind } from '$lib/motion/components';
+import { insertTemplate } from '$lib/motion/template/library';
+import { PROMPT_INPUT_TEMPLATE } from '$lib/motion/template/prompt-input/template';
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
 vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => ({ orgId: 'org-a', canvas: { id: 'c1', projectId: 'p1', name: 'C' }, projectBrandId: null }) }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: async () => true }));
+vi.mock('$lib/server/motion/sfx', () => ({ laySfx: async (_db: unknown, _scope: unknown, sfx: string) => ({ ok: true, assetId: `sfx-${sfx}`, url: null, seconds: 0.1 }) }));
 vi.mock('$lib/server/motion/editor', () => ({ findMotionNode: async () => ({ record: { id: 'n1' }, node: {} }), assetUrls: vi.fn(), headOrNew: vi.fn(), motionAssets: vi.fn(), motionTokens: vi.fn(), saveMotionDoc: vi.fn() }));
 
 const { actions } = await import('./+page.server');
@@ -50,5 +54,21 @@ describe('saving a motion template from the editor', () => {
 
     expect(out).toMatchObject({ status: 400 });
     expect(rows).toEqual([]);
+  });
+});
+
+describe('sounds for an inserted template', () => {
+  it('lays the key taps and the send click of a prompt input on the SFX track', async () => {
+    let n = 0;
+    const placed = insertTemplate(newMotionDoc(MotionFormat.Landscape), PROMPT_INPUT_TEMPLATE, { from: 0, newId: () => `x${++n}` });
+    if (!placed.ok) {
+      throw new Error(placed.error);
+    }
+
+    const out = (await actions.templateSounds(event({}, { doc: JSON.stringify(placed.doc), clipId: placed.clipId }))) as { doc: ReturnType<typeof newMotionDoc> };
+    const clips = out.doc.tracks.filter((t) => t.kind === TrackKind.Audio).flatMap((t) => t.clips);
+
+    expect(clips.length).toBeGreaterThan(40);
+    expect(out.doc.assets.map((a) => a.name)).toEqual(expect.arrayContaining(['sfx key', 'sfx click']));
   });
 });

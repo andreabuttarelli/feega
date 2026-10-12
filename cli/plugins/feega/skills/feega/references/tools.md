@@ -220,6 +220,8 @@ list. Returns how many combinations it actually stopped.
 | `view_motion_frames` | `feega motion frames <nodeId> --at 1,2.5,4 [--width 640] [--out dir]` |
 | `list_motion_revisions` | `feega motion revisions <nodeId>` |
 | `restore_motion_revision` | `feega motion revisions <nodeId> --restore <version>` |
+| `list_motion_templates` | `feega motion templates` |
+| `add_motion_template` | `feega motion add-template <nodeId> <templateId> [--at s] [--var k=v] [--no-sound]` |
 | `get_storyboard` | `feega motion storyboard <nodeId>` |
 | `write_storyboard` | `feega motion storyboard <nodeId> --write beats.json` |
 | `edit_storyboard_card` | `feega motion storyboard <nodeId> --card <id> --text "..."` |

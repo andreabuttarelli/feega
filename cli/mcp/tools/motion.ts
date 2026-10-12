@@ -190,6 +190,32 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'list_motion_templates',
+    {
+      title: 'List motion templates',
+      description:
+        'Ready-made pieces to drop into a motion video (built-in and saved by the org), e.g. builtin:prompt-input, a prompt field that types, presses send and thinks. ' +
+        'Each with `id`, `seconds` and its `fields`: key, type (text, number min..max, color #rrggbb, boolean, select options), group and default. Reads only, free.',
+      inputSchema: z.object({ org }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org }) => withAuth((token) => motionApi.templates(token, org))
+  );
+
+  server.registerTool(
+    'add_motion_template',
+    {
+      title: 'Add a template to a motion video',
+      description:
+        'Insert an editable copy of a template (id from `list_motion_templates`) at `at` seconds, its fields set from `vars` (keys and types as listed). ' +
+        '`sound` (default true) lays its key taps and clicks on the SFX track. Saved as a new revision; no AI, free.',
+      inputSchema: z.object({ org, node_id: z.string(), id: z.string(), at: z.number().min(0).optional(), vars: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(), sound: z.boolean().optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, node_id, ...body }) => withAuth((token) => motionApi.addTemplate(token, node_id, body, org))
+  );
+
+  server.registerTool(
     'list_motion_videos',
     {
       title: 'List motion videos',
