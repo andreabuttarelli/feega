@@ -27,6 +27,7 @@ const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: R
   'builtin:scroll-story': { field: 'image1', photos: ['p1015'], values: { image2: 'p1039', image3: 'p1043' }, more: ['p1039', 'p1043'] },
   'builtin:floating-media': { field: 'media', photos: SAMPLE_PHOTOS },
   'builtin:split-headline': { field: 'media', photos: ['p1043'] },
+  'builtin:phone-split': { field: 'media', photos: ['p1039'] },
   'builtin:image-globe': { field: 'media', photos: STRIP_PHOTOS },
   'builtin:photo-strip': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } }
 };
