@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CAPTURE_REPLY, FrameFormat, captureScript, type CaptureReply, type CaptureRequest } from './capture';
+import { CAPTURE_REPLY, CAPTURE_REQUEST, FrameFormat, captureScript, type CaptureReply, type CaptureRequest } from './capture';
+import { EXACT_SEEK } from './exact-seek';
 import { Playback, RELOAD_DEBOUNCE_MS, previewDriver, type PlayerPort } from './preview-driver';
 
 const REQUEST = { format: FrameFormat.Jpeg, width: 64, height: 36 };
@@ -246,5 +247,38 @@ describe('the preview transport', () => {
     driver.ready();
 
     expect(calls).toEqual(['pause', 'play', 'load', 'play']);
+  });
+});
+
+describe('seeking the preview', () => {
+  it('a seek moves the player, then asks the page for the exact time the player rounds away', () => {
+    const { port, calls } = transport();
+    const posted: unknown[] = [];
+    const driver = previewDriver({ ...port, seek: (t) => calls.push(`seek:${t}`), post: (m) => (calls.push('post'), posted.push(m), true) });
+
+    driver.seek(1 / 60);
+
+    expect(calls).toEqual([`seek:${1 / 60}`, 'post']);
+    expect(posted).toEqual([{ type: EXACT_SEEK, time: 1 / 60 }]);
+  });
+
+  it('a shot asks for the exact time before it is taken', async () => {
+    const posted: string[] = [];
+    const replies = new Set<(r: CaptureReply) => void>();
+    const port: PlayerPort = {
+      ...slowPlayer(page('a')),
+      post: (m) => {
+        posted.push(m.type);
+        if (m.type === CAPTURE_REQUEST) {
+          queueMicrotask(() => replies.forEach((l) => l({ type: CAPTURE_REPLY, id: (m as CaptureRequest).id, url: 'x' })));
+        }
+        return true;
+      },
+      onReply: (l) => (replies.add(l), () => replies.delete(l))
+    };
+
+    await previewDriver(port).shoot(1 / 60, REQUEST);
+
+    expect(posted).toEqual([EXACT_SEEK, CAPTURE_REQUEST]);
   });
 });
