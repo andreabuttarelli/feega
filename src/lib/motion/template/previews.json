@@ -37,6 +37,7 @@
   "builtin:product-reveal",
   "builtin:prompt-input",
   "builtin:quote",
+  "builtin:rows-spaced-title",
   "builtin:scene-big-number",
   "builtin:scene-device-hero",
   "builtin:scene-device-split",
