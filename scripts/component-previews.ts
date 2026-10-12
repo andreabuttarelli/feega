@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { formatOf } from '$lib/motion/doc';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
+import { PGRID_TEMPLATES } from '$lib/motion/template/parallax-grid/template';
 import { setTemplateValues } from '$lib/motion/template/library';
 import { PREVIEW_DIR, previewSlug, starterDoc, type StarterFormat } from '$lib/motion/template/catalogue';
 import { drawFrames } from '$lib/server/motion/server-frames';
@@ -26,7 +27,7 @@ const STRIP_PHOTOS = [...SAMPLE_PHOTOS, 'p1050', 'p1069', 'p1074', 'p1080'];
 const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: Record<string, string> }> = {
   'builtin:floating-media': { field: 'media', photos: SAMPLE_PHOTOS },
   'builtin:image-globe': { field: 'media', photos: STRIP_PHOTOS },
-  'builtin:parallax-grid': { field: 'media', photos: STRIP_PHOTOS },
+  ...Object.fromEntries(PGRID_TEMPLATES.map((e) => [e.id, { field: 'media', photos: STRIP_PHOTOS }])),
   'builtin:photo-strip': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } }
 };
 

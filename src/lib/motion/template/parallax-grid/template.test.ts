@@ -9,7 +9,7 @@ import { builtinTemplate } from '../builtins';
 import { insertTemplate, setTemplateValues, templateFields } from '../library';
 import { FieldType } from '../field-model';
 import { PGRID_COMPONENT } from './component';
-import { PARALLAX_GRID_TEMPLATE, PGRID_KEY_FIELDS, PGRID_TEMPLATE_ID } from './template';
+import { PARALLAX_GRID_TEMPLATE, PGRID_KEY_FIELDS, PGRID_TEMPLATE_ID, PGRID_TEMPLATES } from './template';
 
 const inserted = (format = MotionFormat.Landscape) => {
   let n = 0;
@@ -23,6 +23,15 @@ const inserted = (format = MotionFormat.Landscape) => {
 describe('the parallax grid template', () => {
   it('is a built-in template', () => {
     expect(builtinTemplate(PGRID_TEMPLATE_ID)).toBe(PARALLAX_GRID_TEMPLATE);
+  });
+
+  it('ships one library entry per motion, differing only in the default motion', () => {
+    const motionOf = (e: typeof PARALLAX_GRID_TEMPLATE) => JSON.stringify(e.template.doc).match(/"motion":"(\w+)"/)?.[1];
+
+    expect(PGRID_TEMPLATES.map((e) => e.template.name)).toEqual(['Parallax columns', 'Alternating columns', 'Staggered columns', 'Depth columns', 'Drifting columns']);
+    expect(PGRID_TEMPLATES.map(motionOf)).toEqual(['parallax', 'alternate', 'stagger', 'zoom', 'drift']);
+    PGRID_TEMPLATES.forEach((e) => expect(builtinTemplate(e.id)).toBe(e));
+    expect(new Set(PGRID_TEMPLATES.map((e) => e.id)).size).toBe(5);
   });
 
   it('ships clean, deterministic component code whose defaults pass its own schema', () => {

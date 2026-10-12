@@ -1,7 +1,7 @@
 import { BUILTIN_PREFIX } from '../design-kit';
 import { customTemplateDoc } from '../custom-template';
 import type { TemplateEntry } from '../library';
-import { PGRID_COMPONENT, PGRID_FONTS, PGRID_PROPS, PGRID_VAR_PREFIX, pgridComponent } from './component';
+import { GridMotion, PGRID_COMPONENT, PGRID_FONTS, PGRID_PROPS, PGRID_VAR_PREFIX, pgridComponent } from './component';
 
 export const PGRID_TEMPLATE_ID = `${BUILTIN_PREFIX}parallax-grid`;
 export const PGRID_CLIP = 'grid';
@@ -15,12 +15,28 @@ const IN_GROUP: Record<string, readonly string[]> = {
 
 const PGRID_GROUPS = Object.fromEntries(Object.entries(IN_GROUP).flatMap(([group, keys]) => keys.map((key) => [key, group])));
 
-export const PARALLAX_GRID_TEMPLATE: TemplateEntry = {
-  id: PGRID_TEMPLATE_ID,
-  template: {
-    name: 'Parallax grid',
-    description: 'Columns of pictures and videos scroll past at different speeds, as on a smoothly scrolled page. Pick a motion: parallax, alternate, stagger, zoom or drift.',
-    keyFields: PGRID_KEY_FIELDS,
-    doc: customTemplateDoc({ name: 'parallax-grid', component: PGRID_COMPONENT, code: pgridComponent(), props: PGRID_PROPS, fonts: PGRID_FONTS, varPrefix: PGRID_VAR_PREFIX, vars: PGRID_VARS, clip: PGRID_CLIP, seconds: 10, fps: 30, groups: PGRID_GROUPS })
-  }
+const VARIANTS: { motion: GridMotion; name: string; description: string }[] = [
+  { motion: GridMotion.Parallax, name: 'Parallax columns', description: 'Columns of pictures and videos scroll the same way at different speeds, as on a smoothly scrolled page.' },
+  { motion: GridMotion.Alternate, name: 'Alternating columns', description: 'Columns of pictures and videos scroll in opposite directions, one up, the next down.' },
+  { motion: GridMotion.Stagger, name: 'Staggered columns', description: 'Columns of pictures and videos start scrolling one after another, in a wave.' },
+  { motion: GridMotion.Zoom, name: 'Depth columns', description: 'Columns of pictures and videos at different depths: wider ones scroll faster, under a slow push-in.' },
+  { motion: GridMotion.Drift, name: 'Drifting columns', description: 'Columns of pictures and videos drift slowly and steadily, without stopping.' }
+];
+
+const variantId = (motion: GridMotion) => (motion === GridMotion.Parallax ? PGRID_TEMPLATE_ID : `${PGRID_TEMPLATE_ID}-${motion}`);
+
+const variant = (v: (typeof VARIANTS)[number]): TemplateEntry => {
+  const props = { ...PGRID_PROPS, motion: { ...PGRID_PROPS.motion, default: v.motion } };
+  return {
+    id: variantId(v.motion),
+    template: {
+      name: v.name,
+      description: `${v.description} Every part is a field or a runtime variable.`,
+      keyFields: PGRID_KEY_FIELDS,
+      doc: customTemplateDoc({ name: `parallax-grid-${v.motion}`, component: PGRID_COMPONENT, code: pgridComponent(), props, fonts: PGRID_FONTS, varPrefix: PGRID_VAR_PREFIX, vars: PGRID_VARS, clip: PGRID_CLIP, seconds: 10, fps: 30, groups: PGRID_GROUPS })
+    }
+  };
 };
+
+export const PGRID_TEMPLATES: TemplateEntry[] = VARIANTS.map(variant);
+export const PARALLAX_GRID_TEMPLATE = PGRID_TEMPLATES[0];
