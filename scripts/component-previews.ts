@@ -25,8 +25,10 @@ const SAMPLE_PHOTOS = ['p1015', 'p1016', 'p1018', 'p1039', 'p1043'];
 const STRIP_PHOTOS = [...SAMPLE_PHOTOS, 'p1050', 'p1069', 'p1074', 'p1080'];
 const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: Record<string, string> }> = {
   'builtin:floating-media': { field: 'media', photos: SAMPLE_PHOTOS },
+  'builtin:split-headline': { field: 'media', photos: ['p1043'] },
   'builtin:image-globe': { field: 'media', photos: STRIP_PHOTOS },
-  'builtin:photo-strip': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } }
+  'builtin:photo-strip': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } },
+  'builtin:circular-carousel': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } }
 };
 
 const sampleAssets = (photos: string[]) => Object.fromEntries(photos.map((id) => [id, `data:image/jpeg;base64,${readFileSync(join(SAMPLES, `${id}.jpg`)).toString('base64')}`]));

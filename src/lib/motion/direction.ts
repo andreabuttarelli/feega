@@ -11,7 +11,7 @@ import { FillKind, ShapeKind } from './shape/schema';
 import { CutFault, cutProblems } from './cuts';
 import { scriptDrift } from './script-drift';
 import { contentEnd, shownSpans, type Span } from './fit-duration';
-import { liveComponents, liveNote } from './custom/determinism';
+import { liveNote, stillStandIns } from './custom/determinism';
 import { maskAt } from './ui-focus';
 import { MaskKind } from './mask';
 import { pivotBox } from './parent';
@@ -555,7 +555,7 @@ function backgroundSeams(doc: MotionDoc): QualityProblem[] {
 }
 
 function liveScenes(doc: MotionDoc): QualityProblem[] {
-  return liveComponents(doc).map((name) => {
+  return stillStandIns(doc).map((name) => {
     const first = clipsOf(doc).find((c) => c.component === 'Custom' && c.props.name === name);
     return { kind: Quality.LiveScene, at: seconds(doc, first?.from ?? 0), detail: liveNote([name]) };
   });
