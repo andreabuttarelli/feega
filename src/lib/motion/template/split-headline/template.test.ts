@@ -36,7 +36,7 @@ describe('the split headline template', () => {
   it('exposes the headline, the split, the image and the timing as typed fields', () => {
     const fields = SPLIT_HEADLINE_TEMPLATE.template.doc.fields;
 
-    expect(fields.find((f) => f.prop === 'mask')).toMatchObject({ type: FieldType.Select, options: ['rect', 'pill'] });
+    expect(fields.find((f) => f.prop === 'radius')?.type).toBe(FieldType.Number);
     expect(fields.find((f) => f.prop === 'splitAt')?.type).toBe(FieldType.Number);
     expect(fields.find((f) => f.prop === 'background')?.type).toBe(FieldType.Color);
     expect(fields.find((f) => f.prop === 'headline')?.type).toBe(FieldType.Text);
@@ -51,14 +51,14 @@ describe('the split headline template', () => {
 
   it('setting a field moves its variable too', () => {
     const placed = inserted();
-    const set = setTemplateValues(placed.doc, placed.clipId, { headline: 'zqx wide open', mask: 'pill' });
+    const set = setTemplateValues(placed.doc, placed.clipId, { headline: 'zqx wide open', radius: '50' });
     if (!set.ok) {
       throw new Error(set.error);
     }
 
     expect(parseMotionDoc(set.doc).ok).toBe(true);
     expect(templateFields(set.doc, placed.clipId).find((f) => f.key === 'headline')?.value).toBe('zqx wide open');
-    expect(interactiveOf(set.doc).vars.find((v) => v.name === 'split_mask')?.default).toBe('pill');
+    expect(interactiveOf(set.doc).vars.find((v) => v.name === 'split_radius')?.default).toBe(50);
   });
 
   it.each([MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Square])('composes in %s with the variables reaching the component', (format) => {

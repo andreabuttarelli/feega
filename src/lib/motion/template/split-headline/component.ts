@@ -11,21 +11,10 @@ export enum SplitGrow {
   Size = 'size'
 }
 
-export enum SplitMask {
-  Rect = 'rect',
-  Pill = 'pill'
-}
-
 export enum SplitStack {
   Auto = 'auto',
   Row = 'row',
   Column = 'column'
-}
-
-export enum SplitEase {
-  Expo = 'expo',
-  Quint = 'quint',
-  Smooth = 'smooth'
 }
 
 export const SPLIT_FONTS = ['Inter Tight', 'Inter', 'Geist', 'Instrument Sans', 'Manrope', 'Space Grotesk', 'DM Sans', 'Instrument Serif'];
@@ -42,22 +31,21 @@ export const SPLIT_PROPS: Record<string, PropSpec> = {
   media: text('Image or video (id or link; video:id)', '', { maxLength: 2000 }),
   lowercase: flag('Lowercase headline', true, 'Content'),
   font: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter Tight', group: 'Style' },
-  fontSize: number('Headline size (% of the short side)', 20, 4, 30, 'Style', 0.5),
+  fontSize: number('Headline size (% of the short side)', 13.5, 4, 30, 'Style', 0.5),
   fontWeight: number('Headline weight', 600, 300, 800, 'Style', 100),
   tracking: number('Headline tracking (em)', -0.05, -0.08, 0.05, 'Style', 0.005),
   background: colour('Background', '#000000'),
   textColor: colour('Headline colour', '#ffffff'),
   placeholderColor: colour('Empty image colour', '#1a1a1a'),
-  mask: choice('Image shape', Object.values(SplitMask), SplitMask.Rect, 'Style'),
-  imageHeight: number('Image height (em of the headline)', 1, 0.3, 4, 'Layout', 0.05),
-  aspect: number('Image aspect (width / height)', 1.6, 0.3, 4, 'Layout', 0.05),
+  radius: number('Image corner radius (% of its height, 50 is a pill)', 7, 0, 50, 'Style', 1),
+  imageHeight: number('Image height (em of the headline)', 1.7, 0.3, 4, 'Layout', 0.05),
+  aspect: number('Image aspect (width / height)', 1.8, 0.3, 4, 'Layout', 0.05),
   gap: number('Gap between image and words (em)', 0.22, 0, 1, 'Layout', 0.01),
   grow: choice('Grow from', Object.values(SplitGrow), SplitGrow.Width, 'Layout'),
   stack: choice('Halves side by side or stacked', Object.values(SplitStack), SplitStack.Auto, 'Layout'),
   titleAt: number('Headline starts (seconds)', 0.2, 0, 4, 'Motion', 0.1),
-  openDelay: number('Image opens after the headline (seconds)', 0.3, 0, 4, 'Motion', 0.1),
+  openDelay: number('Extra wait before the image opens (seconds)', 0, 0, 4, 'Motion', 0.1),
   openSeconds: number('Opening duration (seconds)', 1.4, 0.3, 4, 'Motion', 0.1),
-  easing: choice('Opening curve', Object.values(SplitEase), SplitEase.Expo, 'Motion'),
   innerZoom: flag('Zoom the picture as it opens', true, 'Motion'),
   zoomAmount: number('Inner zoom amount', 0.25, 0, 1, 'Motion', 0.01),
   holdSeconds: number('Hold open (seconds)', 2.5, 0, 10, 'Motion', 0.1),

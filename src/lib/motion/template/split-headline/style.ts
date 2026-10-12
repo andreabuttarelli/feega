@@ -42,9 +42,6 @@ export const SPLIT_CSS = String.raw`
   background: var(--sh-empty);
 }
 
-.sh[data-mask='pill'] .sh-media {
-  border-radius: 9999px;
-}
 
 .sh-media img,
 .sh-media video {

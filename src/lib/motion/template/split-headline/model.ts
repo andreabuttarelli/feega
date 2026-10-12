@@ -8,11 +8,8 @@ const LINE_GAP = 0.12;
 const WORDS_OUT = 0.6;
 const WORDS_OUT_LIFT = 0.2;
 
-const EASES = {
-  expo: expoInOut,
-  quint: (x) => (x < 0.5 ? 16 * Math.pow(x, 5) : 1 - Math.pow(-2 * x + 2, 5) / 2),
-  smooth
-};
+const SETTLE_OVERLAP = 0.35;
+const FADE_UNTIL = 0.06;
 
 function splitWords(text, at) {
   const words = String(text || '').trim().split(/\s+/).filter(Boolean);
@@ -43,16 +40,15 @@ function splitLayout(p, m) {
 
 function openTimes(p, words, length) {
   const titleDone = p.titleAt + Math.max(0, words - 1) * WORD_GAP + WORD_IN;
-  const openAt = titleDone + p.openDelay;
+  const openAt = Math.max(p.titleAt, titleDone - SETTLE_OVERLAP + p.openDelay);
   const closeLatest = length - WORDS_OUT - p.closeSeconds;
   const closeAt = Math.max(openAt + p.openSeconds, Math.min(closeLatest, openAt + p.openSeconds + p.holdSeconds));
   return { openAt, closeAt, outAt: length - WORDS_OUT };
 }
 
 function openness(p, times, t) {
-  const ease = EASES[p.easing] || expoInOut;
-  const opened = ease(span(t, times.openAt, p.openSeconds));
-  const closed = p.leave ? ease(span(t, times.closeAt, p.closeSeconds)) : 0;
+  const opened = expoInOut(span(t, times.openAt, p.openSeconds));
+  const closed = p.leave ? expoInOut(span(t, times.closeAt, p.closeSeconds)) : 0;
   return Math.max(0, opened - closed);
 }
 
@@ -86,7 +82,7 @@ function splitFrame(layout, p, t, length, words) {
   const out = p.leave ? smooth(span(t, times.outAt, WORDS_OUT * 0.85)) : 0;
   return {
     open: e,
-    image: { ...place.image, w: size.w, h: size.h, zoom: p.innerZoom ? 1 + p.zoomAmount * (1 - e) : 1 },
+    image: { ...place.image, w: size.w, h: size.h, opacity: smooth(clamp01(e / FADE_UNTIL)), zoom: p.innerZoom ? 1 + p.zoomAmount * (1 - e) : 1 },
     left: place.left,
     right: place.right,
     words: wordLooks(words, p, t, out),

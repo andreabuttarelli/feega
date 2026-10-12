@@ -2829,3 +2829,6 @@ Segnale: `flicker` nei primi frame di un ingresso parola per parola, diff che al
 giù, più evidente su sfondo chiaro. Causa: `translateY` su uno `span` inline-block non
 composto viene arrotondato al pixel, quindi la salita procede a scatti. Mossa:
 `will-change: transform, opacity` sulla parola; la salita torna sub-pixel e il flicker sparisce.
+
+### A custom component that throws renders a still, not an error
+Signal: a template render shows static text, 0 jolts, reseek diff 0. The runtime caught the throw into `window.__feegaErrors` (and `data-error` on the root). Move: read `__feegaErrors` after load before trusting a render.

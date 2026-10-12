@@ -22,9 +22,8 @@ const PARAMS = {
   grow: 'width',
   stack: 'auto',
   titleAt: 0.2,
-  openDelay: 0.3,
+  openDelay: 0,
   openSeconds: 1.4,
-  easing: 'expo',
   innerZoom: true,
   zoomAmount: 0.25,
   holdSeconds: 2.5,
@@ -133,6 +132,23 @@ describe('the split headline model', () => {
     const before = frames[Math.floor(openAt * FPS)];
 
     before.words.forEach((w) => expect(w.opacity).toBe(1));
+  });
+
+  it('hides the image until it is visibly wide: no sliver, then a one-way fade in', () => {
+    const { frames } = run();
+    const opening = frames.filter((f) => f.times.openAt <= 0 || f.open < 1).filter((f, i) => i < frames.findIndex((g) => g.open === 1));
+    const sliver = frames.filter((f) => f.open > 0 && f.open < 0.01);
+
+    sliver.forEach((f) => expect(f.image.opacity).toBeLessThan(0.05));
+    opening.slice(1).forEach((f, i) => expect(f.image.opacity).toBeGreaterThanOrEqual(opening[i].image.opacity));
+    expect(frames.find((f) => f.open > 0.06)?.image.opacity).toBe(1);
+  });
+
+  it('starts opening as the headline settles, not after a pause', () => {
+    const { frames } = run();
+    const lastWordDone = PARAMS.titleAt + (WORDS - 1) * 0.08 + 1.1;
+
+    expect(frames[0].times.openAt).toBeLessThan(lastWordDone);
   });
 
   it('zooms the picture inside the mask from the zoom amount down to rest, only when asked', () => {

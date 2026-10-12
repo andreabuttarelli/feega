@@ -57,13 +57,12 @@ const buildMedia = (p) => {
 };
 
 const paintLook = (p) => {
-  const key = JSON.stringify([p.background, p.textColor, p.placeholderColor, p.font, p.fontWeight, p.tracking, p.mask]);
+  const key = JSON.stringify([p.background, p.textColor, p.placeholderColor, p.font, p.fontWeight, p.tracking]);
   if (key === cache.lookKey) {
     return;
   }
   cache = { ...cache, lookKey: key, measureKey: '' };
   const s = scene.style;
-  scene.dataset.mask = p.mask;
   s.setProperty('--sh-bg', p.background);
   s.setProperty('--sh-ink', p.textColor);
   s.setProperty('--sh-empty', p.placeholderColor);
@@ -107,12 +106,14 @@ const placeHalves = (layout, f) => {
   halves.right.style.transform = 'translate(-50%, calc(-50% + ' + f.right.y + 'em))';
 };
 
-const placeImage = (layout, f) => {
+const placeImage = (layout, f, p) => {
   const s = frame.style;
   s.width = f.image.w + 'em';
   s.height = f.image.h + 'em';
   s.transform = 'translate(-50%, -50%) translate(' + f.image.x + 'em, ' + f.image.y + 'em)';
   s.visibility = f.image.w > HIDDEN_BELOW && f.image.h > HIDDEN_BELOW ? 'visible' : 'hidden';
+  s.opacity = String(f.image.opacity);
+  s.borderRadius = (p.radius / 100) * layout.imgH + 'em';
   if (!cache.picture) {
     return;
   }
@@ -132,7 +133,7 @@ const draw = () => {
   const f = splitFrame(layout, p, t, duration, words.length);
 
   placeHalves(layout, f);
-  placeImage(layout, f);
+  placeImage(layout, f, p);
   seekVideo(cache.video, t);
   f.words.forEach((w, i) => {
     words[i].style.opacity = String(w.opacity);
