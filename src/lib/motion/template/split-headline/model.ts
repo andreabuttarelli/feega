@@ -1,32 +1,14 @@
 import { WORD_ENTRANCE } from '../word-entrance';
+import { SPLIT_LINE } from '../split-line';
 
 export const SPLIT_MODEL = String.raw`
 ${WORD_ENTRANCE}
-const SAFE = 0.88;
-const AUTO_ROW_MIN = 0.7;
-const LINE_GAP = 0.12;
+${SPLIT_LINE}
 const WORDS_OUT = 0.6;
 const WORDS_OUT_LIFT = 0.2;
 
 const SETTLE_OVERLAP = 0.35;
 const FADE_UNTIL = 0.1;
-
-function splitWords(text, at) {
-  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
-  if (words.length < 2) {
-    return { left: words, right: [] };
-  }
-  const auto = Math.round(words.length / 2);
-  const cut = Math.min(words.length - 1, Math.max(1, Math.round(at) || auto));
-  return { left: words.slice(0, cut), right: words.slice(cut) };
-}
-
-function chooseAxis(p, rowFit, m) {
-  if (p.stack === 'row' || p.stack === 'column') {
-    return p.stack;
-  }
-  return rowFit >= AUTO_ROW_MIN && m.frameW >= m.frameH ? 'row' : 'column';
-}
 
 function splitLayout(p, m) {
   const imgH = p.imageHeight;

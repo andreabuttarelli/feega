@@ -153,6 +153,16 @@ describe('motion agent template library tools', () => {
     expect(await run('add_template', { id: 'builtin:image-globe', at: 0, vars: { turns: 'fast' } })).toMatchObject({ ok: false });
   });
 
+  it('add_template places the parallax grid with its motion and columns', async () => {
+    const { run, session } = withLibrary(vi.fn() as never);
+
+    const placed = await run('add_template', { id: 'builtin:parallax-grid', at: 0, vars: { title: 'Zqx scrolling', motion: 'alternate', columns: 5 } });
+
+    expect(placed).toMatchObject({ ok: true, fields: expect.arrayContaining([expect.objectContaining({ key: 'motion' })]) });
+    expect(JSON.stringify(session.doc)).toContain('Zqx scrolling');
+    expect(await run('add_template', { id: 'builtin:parallax-grid', at: 0, vars: { motion: 'bounce' } })).toMatchObject({ ok: false });
+  });
+
   it('add_template with sound off lays no sound', async () => {
     const sfx = vi.fn();
     const { run, session } = withLibrary(sfx as never);
