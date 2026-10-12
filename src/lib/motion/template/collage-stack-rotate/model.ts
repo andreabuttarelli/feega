@@ -32,6 +32,10 @@ const LINE_IN = 1.2;
 const LINE_GAP = 0.06;
 const END_HOLD = 0.05;
 const DEFAULT_LABELS = 'Unknown, @fennel';
+const LETTER_ADVANCE = 0.6;
+const LETTER_LEADING = 0.86;
+const LETTER_REACH = 1.6;
+const LETTER_MAX_LINES = 8;
 
 const hash01 = (i, salt) => {
   let h = Math.imul(i + 1, 374761393) ^ Math.imul(salt + 7, 668265263);
@@ -49,6 +53,45 @@ function labelRows(raw, count) {
     const [creator, saver] = list[i % list.length];
     return ['ID ' + fakeId(i), 'CREATED BY ' + creator.toUpperCase(), 'SAVED BY ' + String(saver || '@anon').toUpperCase()];
   });
+}
+
+function wrapWords(words, width) {
+  return words.reduce((lines, word) => {
+    const last = lines[lines.length - 1];
+    if (last && last.length + 1 + word.length <= width) {
+      lines[lines.length - 1] = last + ' ' + word;
+      return lines;
+    }
+    return [...lines, word];
+  }, []);
+}
+
+function linesFor(words, count) {
+  const total = words.join(' ').length;
+  let width = Math.max(...words.map((w) => w.length), Math.ceil(total / count));
+  let lines = wrapWords(words, width);
+  while (lines.length > count) {
+    width += 1;
+    lines = wrapWords(words, width);
+  }
+  return lines;
+}
+
+function fitLetters(text, width, height, cap) {
+  const long = Math.max(width, height);
+  const short = Math.min(width, height);
+  const turn = height > width ? -90 : 0;
+  const words = String(text || '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) {
+    return { lines: [' '], size: (short * cap) / 100, turn };
+  }
+  const tries = Array.from({ length: Math.min(words.length, LETTER_MAX_LINES) }, (_, i) => linesFor(words, i + 1));
+  const sized = tries.map((lines) => {
+    const longest = Math.max(...lines.map((l) => l.length));
+    const size = Math.min((short * cap) / 100, short / (lines.length * LETTER_LEADING), (long * LETTER_REACH) / (longest * LETTER_ADVANCE));
+    return { lines, size, turn };
+  });
+  return sized.reduce((best, next) => (next.size > best.size ? next : best));
 }
 
 function offDistance(card, dir, halfW, halfH) {

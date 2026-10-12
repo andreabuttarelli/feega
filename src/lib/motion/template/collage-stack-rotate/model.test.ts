@@ -9,9 +9,14 @@ type Model = {
   collageLayout: (p: object, width: number, height: number) => Layout;
   collageFrame: (layout: Layout, p: object, t: number, length: number) => Frame;
   labelRows: (raw: string, count: number) => string[][];
+  fitLetters: (text: string, width: number, height: number, cap: number) => Letters;
+  LETTER_ADVANCE: number;
+  LETTER_LEADING: number;
+  LETTER_REACH: number;
 };
+type Letters = { lines: string[]; size: number; turn: number };
 
-const model = new Function(`${COLLAGE_MODEL}; return { collageLayout, collageFrame, labelRows };`)() as Model;
+const model = new Function(`${COLLAGE_MODEL}; return { collageLayout, collageFrame, labelRows, fitLetters, LETTER_ADVANCE, LETTER_LEADING, LETTER_REACH };`)() as Model;
 
 const PARAMS = { count: 8, cardScale: 1, cardsAt: 0.3, gap: 0.85, labelsAt: 0.6, settle: 1.5, leave: true };
 const LENGTH = 10;
@@ -114,6 +119,49 @@ describe('the collage stack model', () => {
         expect(c.x).toBeLessThan(1);
         expect(c.y).toBeLessThan(1);
       });
+    });
+  });
+
+  describe('the background lettering', () => {
+    const SHORT = 'keep';
+    const MEDIUM = 'new season drop';
+    const LONG = 'everything we saved this year, from the first sketch to the last print, in one long archive of found pictures';
+    const CAP = 92;
+
+    const lineWidth = (line: string, size: number) => line.length * model.LETTER_ADVANCE * size;
+
+    it.each(Object.entries(ASPECTS).flatMap(([aspect, size]) => [SHORT, MEDIUM, LONG].map((text) => [aspect, text, size] as const)))('fits the frame in %s for "%s"', (_, text, [width, height]) => {
+      const fit = model.fitLetters(text, width, height, CAP);
+      const long = Math.max(width, height);
+      const short = Math.min(width, height);
+
+      expect(fit.size).toBeGreaterThan(0);
+      expect(fit.size).toBeLessThanOrEqual((short * CAP) / 100);
+      expect(fit.lines.length * fit.size * model.LETTER_LEADING).toBeLessThanOrEqual(short + 1e-6);
+      fit.lines.forEach((line) => expect(lineWidth(line, fit.size)).toBeLessThanOrEqual(long * model.LETTER_REACH + 1e-6));
+      expect(fit.lines.join(' ')).toBe(text);
+    });
+
+    it('fills the frame: a long text never leaves the short side mostly empty', () => {
+      const fit = model.fitLetters(LONG, 1080, 1920, CAP);
+
+      expect(fit.lines.length).toBeGreaterThan(1);
+      expect(fit.lines.length * fit.size * model.LETTER_LEADING).toBeGreaterThan(1080 * 0.5);
+    });
+
+    it('sets a short word bigger than a long sentence', () => {
+      expect(model.fitLetters(SHORT, 1080, 1920, CAP).size).toBeGreaterThan(model.fitLetters(LONG, 1080, 1920, CAP).size);
+    });
+
+    it('runs along the long side: turned in portrait, flat otherwise', () => {
+      expect(model.fitLetters(SHORT, 1080, 1920, CAP).turn).toBe(-90);
+      expect(model.fitLetters(SHORT, 1920, 1080, CAP).turn).toBe(0);
+      expect(model.fitLetters(SHORT, 1080, 1080, CAP).turn).toBe(0);
+    });
+
+    it('collapses spaces and survives an empty text', () => {
+      expect(model.fitLetters('  a   b  ', 1080, 1920, CAP).lines.join(' ')).toBe('a b');
+      expect(model.fitLetters('', 1080, 1920, CAP).lines).toEqual([' ']);
     });
   });
 });

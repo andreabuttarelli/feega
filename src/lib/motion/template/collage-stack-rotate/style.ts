@@ -15,18 +15,22 @@ export const COLLAGE_CSS = String.raw`
   height: 0;
 }
 
-.cs-strip {
+.cs-lines {
   position: absolute;
   left: 0;
   top: 0;
+  transform-origin: 0 0;
+}
+
+.cs-strip {
   display: flex;
+  width: max-content;
   white-space: pre;
   font-family: var(--cs-font);
-  font-size: calc(var(--cs-size) * 1cqmin);
-  font-weight: 900;
-  font-style: italic;
+  font-size: var(--cs-size);
+  font-weight: var(--cs-weight);
   letter-spacing: -0.04em;
-  line-height: 0.8;
+  line-height: var(--cs-leading);
   color: var(--cs-fill);
   -webkit-text-stroke: var(--cs-stroke) var(--cs-letter);
   will-change: transform;

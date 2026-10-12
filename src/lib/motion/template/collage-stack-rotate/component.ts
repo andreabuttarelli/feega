@@ -7,7 +7,7 @@ export const COLLAGE_COMPONENT = 'CollageStack';
 export const COLLAGE_VAR_PREFIX = 'collage';
 export const COLLAGE_MAX_CARDS = 10;
 
-export const COLLAGE_FONTS = ['Inter Tight', 'Inter', 'Archivo', 'Space Grotesk', 'Manrope', 'Geist', 'Instrument Serif'];
+export const COLLAGE_FONTS = ['Inter Tight', 'Inter', 'Archivo', 'Space Grotesk', 'Manrope', 'Geist'];
 
 const LABELS = ['Unknown, @fennel', 'Mara Velt, @oreo_lab', 'Studio Halde, @kiln', 'Jun Arata, @pallid', 'Unknown, @mossgrey', 'Teo Ranke, @ruse_02', 'Ivy Calder, @kiln', 'Late Hours, @owl_ink', 'Leni Strom, @borel', 'Otto Weir, @kiln'].join('\n');
 
@@ -17,12 +17,13 @@ const flag = (title: string, value: boolean, group: PropSpec['group']): PropSpec
 const colour = (title: string, value: string): PropSpec => ({ type: 'string', title, format: PropFormat.Color, default: value, group: 'Style' });
 
 export const COLLAGE_PROPS: Record<string, PropSpec> = {
-  word: text('Background word', 'keep', { maxLength: 24 }),
+  text: text('Background text', 'keep', { maxLength: 300 }),
   labels: text('Labels (one "creator, @saver" per line)', LABELS, { maxLength: 1200 }),
   media: text('Pictures and videos', '', { format: PropFormat.Media, maxLength: 2000 }),
   font: { type: 'string', title: 'Letters font', format: PropFormat.Font, default: 'Inter Tight', group: 'Style' },
-  letterSize: number('Letters size (% of the short side)', 92, 20, 120, 'Style', 1),
-  outline: flag('Outline letters', true, 'Style'),
+  weight: number('Letters weight', 700, 100, 900, 'Style', 100),
+  letterSize: number('Largest letters (% of the short side)', 92, 20, 120, 'Style', 1),
+  outline: flag('Outline letters', false, 'Style'),
   background: colour('Background', '#d93b1e'),
   letterColor: colour('Letters colour', '#0b0b0b'),
   labelColor: colour('Labels colour', '#ffffff'),

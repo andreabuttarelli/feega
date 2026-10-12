@@ -2,15 +2,15 @@ import { MEDIA_LIST } from '../media-list';
 
 export const COLLAGE_VIEW = String.raw`
 ${MEDIA_LIST}
-root.insertAdjacentHTML('beforeend', '<div class="cs"><div class="cs-letters"><div class="cs-strip"></div></div><div class="cs-world"></div><div class="cs-grid"></div></div>');
+root.insertAdjacentHTML('beforeend', '<div class="cs"><div class="cs-letters"><div class="cs-lines"></div></div><div class="cs-world"></div><div class="cs-grid"></div></div>');
 
 const scene = root.querySelector('.cs');
-const strip = root.querySelector('.cs-strip');
+const block = root.querySelector('.cs-lines');
 const world = root.querySelector('.cs-world');
 const grid = root.querySelector('.cs-grid');
 const STRIP_SPARE = 2;
 
-let cache = { layoutKey: '', layout: null, cardsKey: '', cards: [], gridKey: '', lines: [], cells: [], lookKey: '', wordKey: '' };
+let cache = { layoutKey: '', layout: null, cardsKey: '', cards: [], gridKey: '', lines: [], cells: [], lookKey: '', textKey: '', strips: [], fit: null };
 
 const sizeOf = () => ({ width: scene.clientWidth || 1080, height: scene.clientHeight || 1920 });
 
@@ -79,7 +79,7 @@ const buildGrid = (p, layout) => {
 };
 
 const paintLook = (p) => {
-  const key = JSON.stringify([p.background, p.letterColor, p.paper, p.labelColor, p.placeholderColor, p.font, p.letterSize, p.outline]);
+  const key = JSON.stringify([p.background, p.letterColor, p.paper, p.labelColor, p.placeholderColor, p.font, p.weight, p.outline]);
   if (key === cache.lookKey) {
     return;
   }
@@ -93,21 +93,47 @@ const paintLook = (p) => {
   s.setProperty('--cs-label', p.labelColor);
   s.setProperty('--cs-empty', p.placeholderColor);
   s.setProperty('--cs-font', String(p.font).includes(',') ? p.font : '"' + p.font + '", "Helvetica Neue", Helvetica, Arial, sans-serif');
-  s.setProperty('--cs-size', String(p.letterSize));
+  s.setProperty('--cs-weight', String(p.weight));
+  s.setProperty('--cs-leading', String(LETTER_LEADING));
 };
 
-const paintWord = (p, longSide) => {
-  const word = String(p.word || '').trim() || ' ';
-  const first = strip.firstElementChild;
+const buildText = (p, width, height) => {
+  const fit = fitLetters(p.text, width, height, p.letterSize);
+  const key = JSON.stringify([fit.lines, fit.size]);
+  if (key !== cache.textKey) {
+    block.innerHTML = '';
+    block.style.setProperty('--cs-size', fit.size + 'px');
+    const strips = fit.lines.map((line) => {
+      const node = document.createElement('div');
+      node.className = 'cs-strip';
+      block.appendChild(node);
+      return { node, line, copies: 0 };
+    });
+    cache = { ...cache, textKey: key, strips, fit };
+  }
+  return cache.fit;
+};
+
+const fillStrip = (strip, longSide) => {
+  const first = strip.node.firstElementChild;
   const tile = first ? first.offsetWidth : 0;
   const copies = tile > 0 ? Math.ceil(longSide / tile) + STRIP_SPARE : 1;
-  const key = JSON.stringify([word, copies]);
-  if (key !== cache.wordKey) {
-    cache = { ...cache, wordKey: key };
-    strip.innerHTML = Array.from({ length: copies }, () => '<span></span>').join('');
-    strip.querySelectorAll('span').forEach((s) => (s.textContent = word + ' '));
+  if (copies > strip.copies) {
+    strip.node.innerHTML = Array.from({ length: copies }, () => '<span></span>').join('');
+    strip.node.querySelectorAll('span').forEach((s) => (s.textContent = strip.line + ' '));
+    strip.copies = copies;
   }
-  return { tile: strip.firstElementChild.offsetWidth, copies, height: strip.offsetHeight };
+  return { tile: strip.node.firstElementChild.offsetWidth, copies: strip.copies };
+};
+
+const placeText = (fit, drift, longSide) => {
+  block.style.transform = 'rotate(' + fit.turn + 'deg) translate3d(0, ' + -block.offsetHeight / 2 + 'px, 0)';
+  cache.strips.forEach((strip, r) => {
+    const { tile, copies } = fillStrip(strip, longSide);
+    const way = r % 2 ? 1 : -1;
+    const shift = -(tile * copies) / 2 + tile / 2 + way * drift * tile;
+    strip.node.style.transform = 'translate3d(' + shift + 'px, 0, 0)';
+  });
 };
 
 const draw = () => {
@@ -118,14 +144,11 @@ const draw = () => {
   const layout = layoutFor(p);
   const cards = buildCards(p, layout);
   buildGrid(p, layout);
-  const letters = paintWord(p, Math.max(width, height));
+  const fit = buildText(p, width, height);
   const f = collageFrame(layout, p, t, duration);
   const u = layout.unit;
 
-  const turn = height > width ? -90 : 0;
-  const shift = -(letters.tile * letters.copies) / 2 + letters.tile / 2 - f.drift * letters.tile;
-  strip.style.transform = 'rotate(' + turn + 'deg) translate3d(' + shift + 'px, ' + -letters.height / 2 + 'px, 0)';
-  strip.style.transformOrigin = '0 0';
+  placeText(fit, f.drift, Math.max(width, height));
 
   f.cards.forEach((c, i) => {
     const card = layout.cards[i];
