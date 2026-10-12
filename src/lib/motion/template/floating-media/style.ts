@@ -72,6 +72,7 @@ export const FLOAT_CSS = String.raw`
 .fm-word {
   display: inline-block;
   white-space: pre;
+  will-change: transform, opacity;
 }
 
 .fm-sub {

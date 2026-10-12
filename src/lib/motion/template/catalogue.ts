@@ -1,4 +1,4 @@
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { FIELD_TYPE_LABEL } from './field-model';
 import { insertTemplate, type Inserted, type TemplateEntry } from './library';
 import PREVIEWED from './previews.json';
@@ -18,12 +18,20 @@ export const KIND_LABEL: Record<ComponentKind, string> = {
 export const STARTER_FORMATS = [MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Square] as const;
 export type StarterFormat = (typeof STARTER_FORMATS)[number];
 
+const isStarter = (f: MotionFormat): f is StarterFormat => (STARTER_FORMATS as readonly MotionFormat[]).includes(f);
+
+export function starterFormatOf(frame: Pick<MotionDoc, 'width' | 'height'>): StarterFormat {
+  const format = formatOf(frame);
+  return isStarter(format) ? format : STARTER_FORMATS[0];
+}
+
 export type CatalogueItem = {
   id: string;
   name: string;
   description: string;
   seconds: number;
   kind: ComponentKind;
+  format: StarterFormat;
   fields: { label: string; type: string }[];
   preview: Preview | null;
 };
@@ -64,6 +72,7 @@ export function catalogue(entries: readonly TemplateEntry[]): CatalogueItem[] {
     description: e.template.description,
     seconds: e.template.doc.durationInFrames / e.template.doc.fps,
     kind: componentKind(e),
+    format: starterFormatOf(e.template.doc),
     fields: e.template.doc.fields.map((f) => ({ label: f.label, type: FIELD_TYPE_LABEL[f.type] })),
     preview: previewOf(e.id)
   }));

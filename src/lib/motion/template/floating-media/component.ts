@@ -22,7 +22,7 @@ const colour = (title: string, value: string): PropSpec => ({ type: 'string', ti
 export const FLOAT_PROPS: Record<string, PropSpec> = {
   title: text('Title', 'made to move', { maxLength: 80 }),
   subtitle: text('Subtitle', '', { maxLength: 120 }),
-  media: text('Media (ids or links, comma separated; video:id)', '', { format: PropFormat.Textarea, maxLength: 2000 }),
+  media: text('Pictures and videos', '', { format: PropFormat.Media, maxLength: 2000 }),
   lowercase: flag('Lowercase title', true, 'Content'),
   font: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter Tight', group: 'Style' },
   fontSize: number('Title size (% of the short side)', 13, 4, 24, 'Style', 0.5),

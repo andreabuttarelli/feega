@@ -31,5 +31,5 @@ function reelDoc(): MotionDoc {
 
 export const UI_MORPH_TEMPLATE: TemplateEntry = {
   id: `${BUILTIN_PREFIX}ui-morph-reel`,
-  template: { name: 'UI morph reel', description: 'One shape morphing through eleven UI states on the beat, cursor-driven, looping.', doc: reelDoc() }
+  template: { name: 'UI morph reel', description: 'One shape morphing through eleven UI states on the beat, cursor-driven, looping.', keyFields: ['button', 'toast', 'accent'], doc: reelDoc() }
 };

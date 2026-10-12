@@ -2838,3 +2838,9 @@ Segnale: `TargetCloseError … setTouchEmulationEnabled` con `CHROMIUM_PATH` su 
 `Waiting failed: 20000ms` su `__playerReady` (`/motion-libs/...` dà 404 su feega.app e dazero.co).
 Mossa: `CHROMIUM_PATH` = `chrome-headless-shell` di Playwright (`~/Library/Caches/ms-playwright/
 chromium_headless_shell-*/…`) e `PUBLIC_APP_URL` su un `vite dev` locale (porta libera).
+
+### `motion-smoothness` segnala un flicker su parole che salgono di 0.2em
+Segnale: `flicker` nei primi frame di un ingresso parola per parola, diff che alternano su e
+giù, più evidente su sfondo chiaro. Causa: `translateY` su uno `span` inline-block non
+composto viene arrotondato al pixel, quindi la salita procede a scatti. Mossa:
+`will-change: transform, opacity` sulla parola; la salita torna sub-pixel e il flicker sparisce.

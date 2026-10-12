@@ -114,6 +114,15 @@ describe('motion agent template library tools', () => {
     expect(await run('add_template', { id: 'builtin:prompt-input', at: 0, vars: { speed: '999' } })).toMatchObject({ ok: false });
   });
 
+  it('list_templates offers floating media and add_template fills its title and media', async () => {
+    const { run, session } = withLibrary();
+
+    expect(JSON.stringify(await run('list_templates', {}))).toContain('builtin:floating-media');
+    expect(await run('add_template', { id: 'builtin:floating-media', at: 0, vars: { title: 'zqx slow water', media: 'pic1, video:clip1', layout: 'cloud' } })).toMatchObject({ ok: true });
+    expect(JSON.stringify(session.doc)).toContain('zqx slow water');
+    expect(JSON.stringify(session.doc)).toContain('"assetId":"clip1"');
+  });
+
   it('add_template places the feature scroll with its titles and list', async () => {
     const { run, session } = withLibrary(vi.fn() as never);
 
