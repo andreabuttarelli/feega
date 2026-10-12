@@ -11,6 +11,7 @@ export const FEATURE_SCROLL_TEMPLATE: TemplateEntry = {
   id: SCROLL_TEMPLATE_ID,
   template: {
     name: 'Feature scroll',
+    keyFields: ['open_title', 'close_title', 'lines', 'background', 'text_color'],
     description: 'A title enters, then a list of features scrolls past, readable first, then faster until it blurs, and brakes into a closing title. Every part is a field or a runtime variable.',
     doc: customTemplateDoc({ name: 'feature-scroll', component: SCROLL_COMPONENT, code: scrollComponent(), props: SCROLL_PROPS, fonts: SCROLL_FONTS, varPrefix: SCROLL_VAR_PREFIX, vars: SCROLL_VARS, clip: SCROLL_CLIP, seconds: 12, fps: 30 })
   }
