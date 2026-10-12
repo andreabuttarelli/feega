@@ -41,7 +41,7 @@ describe('the editorial words and media template', () => {
     expect(field('quote')?.type).toBe(FieldType.Boolean);
     expect(field('beat')?.type).toBe(FieldType.Number);
     expect([field('phrases')?.group, field('quote')?.group, field('beat')?.group]).toEqual(['Text', 'Text', 'Motion']);
-    expect(EDITORIAL_WORDS_MEDIA_TEMPLATE.template.keyFields.length).toBeLessThanOrEqual(5);
+    expect(EDITORIAL_WORDS_MEDIA_TEMPLATE.template.keyFields?.length ?? 0).toBeLessThanOrEqual(5);
   });
 
   it('setting a field moves its variable too', () => {
