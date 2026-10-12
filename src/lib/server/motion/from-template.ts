@@ -7,7 +7,9 @@ import { motionEditorPath } from '$lib/canvas/motion-node';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { MotionFormat } from '$lib/motion/doc';
 import type { TemplateEntry } from '$lib/motion/template/library';
-import { STARTER_FORMATS, starterDoc, type StarterFormat } from '$lib/motion/template/catalogue';
+import { STARTER_FORMATS, type StarterFormat } from '$lib/motion/template/catalogue';
+import { composedTemplate } from '$lib/canvas/composition-template';
+import type { UpstreamCard } from '$lib/canvas/composition-node';
 import { MOTION_START_DEPS, startMotion, type MotionStart, type MotionStartDeps } from './start';
 import { saveMotionDoc } from './editor';
 import { templateLibrary } from './templates';
@@ -47,7 +49,7 @@ export const fromTemplateBody = z.object({
   project: z.string().optional()
 });
 
-type Input = { orgId: string; projectId: string; userId: string; templateId: string; format: StarterFormat; actor?: Actor };
+type Input = { orgId: string; projectId: string; canvasId?: string | null; userId: string; templateId: string; format: StarterFormat; values?: Record<string, string>; wired?: UpstreamCard[]; actor?: Actor };
 
 const newId = () => crypto.randomUUID().slice(0, ID_LENGTH);
 
@@ -58,12 +60,12 @@ export async function startFromTemplate(db: Db, deps: FromTemplateDeps, input: I
     return { outcome: FromTemplate.Unknown };
   }
 
-  const placed = starterDoc(entry, input.format, newId);
+  const placed = composedTemplate(entry, { format: input.format, values: input.values ?? {} }, input.wired ?? [], newId);
   if (!placed.ok) {
     return { outcome: FromTemplate.Invalid, error: placed.error };
   }
 
-  const start = await startMotion(db, deps, { orgId: input.orgId, projectId: input.projectId, canvasId: null, userId: input.userId, name: entry.template.name, format: input.format, actor });
+  const start = await startMotion(db, deps, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId ?? null, userId: input.userId, name: entry.template.name, format: input.format, actor });
   if (!start) {
     return { outcome: FromTemplate.NoCanvas };
   }

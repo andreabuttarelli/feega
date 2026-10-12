@@ -51,6 +51,7 @@ import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, estimateWorkflowCr
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { insertTemplate } from '$lib/server/canvas/templates';
+import { templateLibrary } from '$lib/server/motion/templates';
 import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
 import { undoGesture } from '$lib/server/canvas/undo';
@@ -275,11 +276,12 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   ]);
   const catalogue = catalogueIn(mode, visibleCatalogue(fullCatalogue, uncensored));
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
-    firstRunFor(db, { userId, orgId, nodeCount: nodes.length })
+    firstRunFor(db, { userId, orgId, nodeCount: nodes.length }),
+    templateLibrary(db, { orgId, actor: userActor({ userId }) }).list()
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
@@ -301,7 +303,8 @@ export const load: PageServerLoad = async ({ params, locals }) => {
     references,
     mode,
     projectBrandId,
-    onboarding
+    onboarding,
+    componentTemplates
   };
 };
 
