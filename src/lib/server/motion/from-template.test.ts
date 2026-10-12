@@ -1,0 +1,48 @@
+import { describe, expect, it, vi } from 'vitest';
+import type { Db } from '$lib/server/db/client';
+import { MotionFormat, parseMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
+import { PROMPT_TEMPLATE_ID } from '$lib/motion/template/prompt-input/template';
+import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
+import { newMotionData } from '$lib/canvas/motion-node';
+import { FromTemplate, startFromTemplate, type FromTemplateDeps } from './from-template';
+
+const db = {} as Db;
+const canvas = { id: 'c-motion', projectId: 'p1', name: 'Motion', viewport: null };
+
+function deps(overrides: Partial<FromTemplateDeps> = {}): FromTemplateDeps {
+  return {
+    listCanvases: vi.fn(async () => [canvas]),
+    createCanvas: vi.fn(async () => canvas),
+    listNodes: vi.fn(async () => []),
+    createNode: vi.fn(async () => ({ id: 'n1', canvasId: 'c-motion', projectId: 'p1', type: 'motion', displayName: null, position: { x: 0, y: 0, z: 0 }, size: { width: null, height: null }, data: {}, version: 1 })),
+    templates: vi.fn(async () => BUILTIN_TEMPLATES),
+    save: vi.fn(async (_db: Db, input: { doc: unknown }) => ({ outcome: RevisionOutcome.Written as const, head: { version: 1, doc: input.doc as MotionDoc, summary: null, actorKind: 'user' } })),
+    ...overrides
+  };
+}
+
+const input = { orgId: 'org', projectId: 'p1', userId: 'u1', templateId: PROMPT_TEMPLATE_ID, format: MotionFormat.Vertical as const };
+
+describe('a video started from a component', () => {
+  it('is a new motion node whose first revision already holds the component', async () => {
+    const d = deps();
+    const started = await startFromTemplate(db, d, input);
+
+    expect(started).toEqual({ outcome: FromTemplate.Started, start: { projectId: 'p1', canvasId: 'c-motion', nodeId: 'n1' }, version: 1 });
+    expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ displayName: 'Prompt input', data: newMotionData(MotionFormat.Vertical) }));
+
+    const saved = vi.mocked(d.save).mock.calls[0][1];
+    expect(saved).toMatchObject({ orgId: 'org', nodeId: 'n1', expectedVersion: 0 });
+    const doc = saved.doc as MotionDoc;
+    expect(parseMotionDoc(doc).ok).toBe(true);
+    expect(Object.values(doc.comps).some((c) => c.template?.id === PROMPT_TEMPLATE_ID)).toBe(true);
+    expect(doc.height).toBeGreaterThan(doc.width);
+  });
+
+  it('creates nothing for a component that does not exist', async () => {
+    const d = deps();
+    expect(await startFromTemplate(db, d, { ...input, templateId: 'builtin:nope' })).toEqual({ outcome: FromTemplate.Unknown });
+    expect(d.createNode).not.toHaveBeenCalled();
+  });
+});
