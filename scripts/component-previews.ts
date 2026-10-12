@@ -37,7 +37,8 @@ const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: R
   'builtin:scatter-title': { field: 'media', photos: STRIP_PHOTOS },
   'builtin:ring-through-title': { field: 'media', photos: STRIP_PHOTOS },
   'builtin:editorial-words-media': { field: 'media', photos: STRIP_PHOTOS },
-  'builtin:media-cloud-white': { field: 'media', photos: STRIP_PHOTOS }
+  'builtin:media-cloud-white': { field: 'media', photos: STRIP_PHOTOS },
+  'builtin:glass-tiles-wall': { field: 'media', photos: STRIP_PHOTOS }
 };
 
 const sampleAssets = (photos: string[]) => Object.fromEntries(photos.map((id) => [id, `data:image/jpeg;base64,${readFileSync(join(SAMPLES, `${id}.jpg`)).toString('base64')}`]));
