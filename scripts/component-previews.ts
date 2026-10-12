@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { formatOf } from '$lib/motion/doc';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
+import { PGRID_TEMPLATES } from '$lib/motion/template/parallax-grid/template';
 import { setTemplateValues } from '$lib/motion/template/library';
 import { PREVIEW_DIR, previewSlug, starterDoc, type StarterFormat } from '$lib/motion/template/catalogue';
 import { drawFrames } from '$lib/server/motion/server-frames';
@@ -29,6 +30,7 @@ const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: R
   'builtin:split-headline': { field: 'media', photos: ['p1043'] },
   'builtin:phone-split': { field: 'media', photos: ['p1039'] },
   'builtin:image-globe': { field: 'media', photos: STRIP_PHOTOS },
+  ...Object.fromEntries(PGRID_TEMPLATES.map((e) => [e.id, { field: 'media', photos: STRIP_PHOTOS }])),
   'builtin:photo-strip': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } },
   'builtin:circular-carousel': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } }
 };

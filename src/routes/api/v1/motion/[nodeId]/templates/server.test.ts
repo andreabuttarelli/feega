@@ -103,6 +103,18 @@ describe('/api/v1/motion templates', () => {
     expect(JSON.stringify((head?.doc as MotionDoc).comps)).toContain('Zqx said so');
   });
 
+  it('lists and inserts the parallax grid', async () => {
+    const url = new URL('https://feega.test/api/v1/motion/templates');
+    const body = await (await GET({ request: new Request(url, { headers: { authorization: 'Bearer t' } }), url } as never)).json();
+    const grid = body.templates.find((t: { id: string }) => t.id === 'builtin:parallax-grid');
+    const res = await post(NODE, { id: 'builtin:parallax-grid', vars: { title: 'Zqx over the grid', motion: 'zoom' } });
+    const head = await readHead(state.db as never, { orgId: ORG, nodeId: NODE });
+
+    expect(grid.fields).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'media', group: 'Media' }), expect.objectContaining({ key: 'motion', group: 'Motion' }), expect.objectContaining({ key: 'columns', group: 'Grid' })]));
+    expect(res.status).toBe(200);
+    expect(JSON.stringify((head?.doc as MotionDoc).comps)).toContain('Zqx over the grid');
+  });
+
   it('POST refuses an unknown template, a bad value and a read-only key', async () => {
     expect((await post(NODE, { id: 'builtin:nope' })).status).toBe(404);
     expect((await post(NODE, { id: 'builtin:prompt-input', vars: { theme: 'sepia' } })).status).toBe(400);
