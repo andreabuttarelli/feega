@@ -141,7 +141,7 @@ describe('the split headline model', () => {
 
     sliver.forEach((f) => expect(f.image.opacity).toBeLessThan(0.05));
     opening.slice(1).forEach((f, i) => expect(f.image.opacity).toBeGreaterThanOrEqual(opening[i].image.opacity));
-    expect(frames.find((f) => f.open > 0.06)?.image.opacity).toBe(1);
+    expect(frames.find((f) => f.open > 0.1)?.image.opacity).toBe(1);
   });
 
   it('starts opening as the headline settles, not after a pause', () => {

@@ -7,6 +7,8 @@ export const SPLIT_TEMPLATE_ID = `${BUILTIN_PREFIX}split-headline`;
 export const SPLIT_CLIP = 'split';
 export const SPLIT_VARS = ['headline', 'splitAt', 'media', 'textColor', 'background', 'radius', 'imageHeight', 'aspect', 'gap', 'openSeconds', 'holdSeconds', 'innerZoom', 'leave'];
 
+export const SPLIT_KEY_FIELDS = ['headline', 'media', 'text_color', 'background', 'radius'];
+
 export const SPLIT_HEADLINE_TEMPLATE: TemplateEntry = {
   id: SPLIT_TEMPLATE_ID,
   template: {

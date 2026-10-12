@@ -9,7 +9,7 @@ const WORDS_OUT = 0.6;
 const WORDS_OUT_LIFT = 0.2;
 
 const SETTLE_OVERLAP = 0.35;
-const FADE_UNTIL = 0.06;
+const FADE_UNTIL = 0.1;
 
 function splitWords(text, at) {
   const words = String(text || '').trim().split(/\s+/).filter(Boolean);

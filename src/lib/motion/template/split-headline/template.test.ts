@@ -9,7 +9,7 @@ import { builtinTemplate } from '../builtins';
 import { insertTemplate, setTemplateValues, templateFields } from '../library';
 import { FieldType } from '../field-model';
 import { SPLIT_COMPONENT } from './component';
-import { SPLIT_HEADLINE_TEMPLATE, SPLIT_TEMPLATE_ID } from './template';
+import { SPLIT_HEADLINE_TEMPLATE, SPLIT_KEY_FIELDS, SPLIT_TEMPLATE_ID } from './template';
 
 const inserted = (format = MotionFormat.Landscape) => {
   let n = 0;
@@ -41,6 +41,12 @@ describe('the split headline template', () => {
     expect(fields.find((f) => f.prop === 'background')?.type).toBe(FieldType.Color);
     expect(fields.find((f) => f.prop === 'headline')?.type).toBe(FieldType.Text);
     expect(fields.find((f) => f.prop === 'innerZoom')?.type).toBe(FieldType.Boolean);
+  });
+
+  it('names its key fields among the fields it exposes', () => {
+    const keys = SPLIT_HEADLINE_TEMPLATE.template.doc.fields.map((f) => f.key);
+
+    expect(keys).toEqual(expect.arrayContaining(SPLIT_KEY_FIELDS));
   });
 
   it('declares runtime variables an embedding site can set', () => {

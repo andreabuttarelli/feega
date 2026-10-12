@@ -67,6 +67,18 @@ describe('/api/v1/motion templates', () => {
     expect(JSON.stringify((head?.doc as MotionDoc).comps)).toContain('Zqx the end');
   });
 
+  it('lists and inserts the split headline', async () => {
+    const url = new URL('https://feega.test/api/v1/motion/templates');
+    const body = await (await GET({ request: new Request(url, { headers: { authorization: 'Bearer t' } }), url } as never)).json();
+    const split = body.templates.find((t: { id: string }) => t.id === 'builtin:split-headline');
+    const res = await post(NODE, { id: 'builtin:split-headline', vars: { headline: 'Zqx split here' } });
+    const head = await readHead(state.db as never, { orgId: ORG, nodeId: NODE });
+
+    expect(split.fields).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'headline', group: 'Text' }), expect.objectContaining({ key: 'radius', group: 'Style' }), expect.objectContaining({ key: 'open_seconds', group: 'Motion' })]));
+    expect(res.status).toBe(200);
+    expect(JSON.stringify((head?.doc as MotionDoc).comps)).toContain('Zqx split here');
+  });
+
   it('POST refuses an unknown template, a bad value and a read-only key', async () => {
     expect((await post(NODE, { id: 'builtin:nope' })).status).toBe(404);
     expect((await post(NODE, { id: 'builtin:prompt-input', vars: { theme: 'sepia' } })).status).toBe(400);
