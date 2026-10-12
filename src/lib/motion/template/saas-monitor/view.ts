@@ -1,14 +1,18 @@
 export const MOCKUP_VIEW = String.raw`
 const VIDEO_MARK = 'video:';
 const LINK = /^(https?:|data:|blob:|\/)/;
-const DEPTH = 0.024;
+const DEPTH = 0.016;
 const PERSPECTIVE = 3.2;
-const NECK_W = 0.13;
-const NECK_D = 0.05;
-const STAND_H = 0.26;
-const FOOT_W = 0.38;
-const FOOT_D = 0.26;
-const FOOT_H = 0.014;
+const CORNER = 0.016;
+const RIM = 0.005;
+const SCREEN_SCALE = 2;
+const ARM_W = 0.2;
+const ARM_D = 0.012;
+const ARM_TILT = 14;
+const STAND_H = 0.3;
+const FOOT_W = 0.3;
+const FOOT_D = 0.24;
+const FOOT_H = 0.008;
 const FLOOR_W = 1.25;
 const FLOOR_D = 0.7;
 const BLUR_UNIT = 0.0025;
@@ -54,9 +58,9 @@ const FACES = [
   ['bottom', (w, h, d) => [w, d, 'rotateX(-90deg) translateZ(' + h / 2 + 'px)']]
 ];
 
-const solid = (part, w, h, d, x, y, z) => {
+const solid = (part, w, h, d, x, y, z, tilt = 0) => {
   const box = el('div', 'sm-box ' + part);
-  box.style.transform = 'translate3d(' + x + 'px,' + y + 'px,' + z + 'px)';
+  box.style.transform = 'translate3d(' + x + 'px,' + y + 'px,' + z + 'px) rotateX(' + tilt + 'deg)';
   const faces = {};
   for (const [name, shape] of FACES) {
     const [fw, fh, turn] = shape(w, h, d);
@@ -104,20 +108,32 @@ const buildRig = (p, layout, unit) => {
   const h = layout.bodyH * unit;
   const d = DEPTH * w;
   const standBottom = h / 2 + STAND_H * h;
-  const neckTop = h * 0.05;
-  const neckH = standBottom - neckTop;
-  const neckZ = -(d / 2 + (NECK_D * w) / 2);
-  const footZ = neckZ + FOOT_D * w * 0.28;
+  const armTop = h * 0.08;
+  const armH = (standBottom - armTop) / Math.cos((ARM_TILT * Math.PI) / 180);
+  const armZ = -(d / 2 + ARM_D * w);
+  const lean = Math.tan((ARM_TILT * Math.PI) / 180) * (standBottom - armTop);
+  const footZ = armZ - lean / 2 + FOOT_D * w * 0.1;
   plane('sm-floor', FLOOR_W * w, FLOOR_D * w, standBottom + 1, footZ);
+  plane('sm-contact', FOOT_W * w * 1.15, FOOT_D * w * 1.1, standBottom + 0.5, footZ);
   solid('sm-foot', FOOT_W * w, FOOT_H * w, FOOT_D * w, 0, standBottom - (FOOT_H * w) / 2, footZ);
-  solid('sm-neck', NECK_W * w, neckH, NECK_D * w, 0, neckTop + neckH / 2, neckZ);
+  solid('sm-arm', ARM_W * w, armH, ARM_D * w, 0, (armTop + standBottom) / 2, armZ - lean / 2, ARM_TILT);
   const body = solid('sm-body', w, h, d, 0, 0, 0);
-  const bezel = (h - layout.screenW * unit * (9 / 16)) / 2;
+  const radius = CORNER * w + 'px';
+  body.front.style.borderRadius = radius;
+  body.back.style.borderRadius = radius;
+  const black = el('div', 'sm-bezel');
+  black.style.inset = RIM * w + 'px';
+  black.style.borderRadius = CORNER * w - RIM * w + 'px';
+  const sw = layout.screenW * unit;
+  const sh = sw * (9 / 16);
   const screen = el('div', 'sm-screen');
-  screen.style.inset = bezel + 'px';
+  screen.style.left = (w - sw) / 2 + 'px';
+  screen.style.top = (h - sh) / 2 + 'px';
+  screen.style.width = sw * SCREEN_SCALE + 'px';
+  screen.style.height = sh * SCREEN_SCALE + 'px';
+  screen.style.transform = 'scale(' + 1 / SCREEN_SCALE + ')';
   const glass = el('div', 'sm-glass');
-  body.front.appendChild(screen);
-  body.front.appendChild(glass);
+  body.front.append(black, screen, glass);
   scene.style.setProperty('--sm-bw', w + 'px');
   stage.style.perspective = PERSPECTIVE * unit + 'px';
   cache = { ...cache, rigKey: key, siteKey: '', parts: { screen, glass } };

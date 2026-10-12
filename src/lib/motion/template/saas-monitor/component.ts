@@ -43,7 +43,7 @@ export const MOCKUP_PROPS: Record<string, PropSpec> = {
   watermarkColor: colour('Background word colour', '#ffffff'),
   watermarkOpacity: number('Background word opacity', 0.78, 0, 1, 'Style', 0.01),
   grain: number('Grain', 0.35, 0, 1, 'Style', 0.01),
-  finish: choice('Monitor finish', Object.values(MonitorFinish), MonitorFinish.Black, 'Style'),
+  finish: choice('Monitor finish', Object.values(MonitorFinish), MonitorFinish.Silver, 'Style'),
   depthBlur: number('Depth of field on the background word', 0.35, 0, 2, 'Style', 0.05),
   monitorSize: number('Monitor size (share of frame width)', 0.5, 0.3, 0.8, 'Layout', 0.01),
   monitorY: number('Monitor height (+ is lower)', -0.03, -0.2, 0.3, 'Layout', 0.01),
