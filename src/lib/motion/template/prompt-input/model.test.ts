@@ -21,7 +21,8 @@ function pixels(frame: Frame, [width, height]: readonly [number, number]): numbe
   const n = (key: string) => Number(frame[key]);
   const typed = frame.shown.length / PARAMS.text.length;
   return [
-    n('zoom') * 0.04 * box,
+    n('closeUp') * 1.5 * box,
+    n('toButton') * n('closeUp') * 0.8 * box,
     typed * n('textOpacity') * n('textLift') * 0.7 * em,
     typed * n('textOpacity') * 40,
     n('placeholder') * 40,

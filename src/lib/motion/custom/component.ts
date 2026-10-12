@@ -7,7 +7,7 @@ export { CUSTOM_NAME };
 export const MAX_HTML = 20_000;
 export const MAX_CSS = 20_000;
 export const MAX_JS = 40_000;
-export const MAX_PROPS = 30;
+export const MAX_PROPS = 40;
 export const MAX_COMPONENTS = 24;
 export const VAR_PREFIX = 'varPrefix';
 export const snakeKey = (key: string) => key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);

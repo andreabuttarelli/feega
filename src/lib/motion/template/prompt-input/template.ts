@@ -12,7 +12,7 @@ import { PROMPT_COMPONENT, PROMPT_FONTS, PROMPT_PROPS, PROMPT_VAR_PREFIX, prompt
 
 export const PROMPT_TEMPLATE_ID = `${BUILTIN_PREFIX}prompt-input`;
 export const PROMPT_CLIP = 'prompt';
-export const PROMPT_VARS = ['text', 'placeholder', 'chips', 'buttonLabel', 'accent', 'theme', 'speed', 'typo'];
+export const PROMPT_VARS = ['text', 'placeholder', 'chips', 'buttonLabel', 'accent', 'theme', 'speed', 'typo', 'camera', 'cameraZoom'];
 
 const SECONDS = 9;
 const FPS = 30;

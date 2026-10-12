@@ -4,7 +4,7 @@ const WRONG_KEYS = 'qwertyuiopasdfghjklzxcvbnm';
 const TYPO_PAUSE = 0.34;
 const BACKSPACE = 0.075;
 const RESUME = 0.16;
-const HOLD_BEFORE_PRESS = 0.95;
+const HOLD_BEFORE_PRESS = 1.15;
 const PRESS_TO_SUBMIT = 0.16;
 const THINKING = 2.3;
 const CLEAR = 0.45;
@@ -119,6 +119,14 @@ function blinkAt(plan, t) {
   return steady + (1 - steady) * wave;
 }
 
+const FOLLOW_SAMPLES = 48;
+
+function followTimes(t, window) {
+  const weights = Array.from({ length: FOLLOW_SAMPLES }, (_, i) => 1 - i / FOLLOW_SAMPLES);
+  const total = weights.reduce((a, b) => a + b, 0);
+  return weights.map((w, i) => ({ at: t - (window * i) / FOLLOW_SAMPLES, weight: w / total }));
+}
+
 function promptFrame(plan, t) {
   const k = plan.k;
   const fade = (at, length) => smooth(span(t, at, length * k));
@@ -135,12 +143,12 @@ function promptFrame(plan, t) {
   const pressUp = plan.press ? settle(span(t, plan.pressAt + 0.04 * k, 0.5 * k)) : 0;
   const armed = fade(firstKey, 0.3) * (1 - (thinkingStyle || !plan.press ? fade(plan.returnAt, 0.4) : fade(plan.submitAt, 0.4)));
 
-  const travel = move(plan.typeEnd + 0.05 * k, (plan.pressAt - plan.typeEnd) / k - 0.15);
-  const leave = move(plan.submitAt + 0.35 * k, 0.8);
-  const reach = travel * (1 - leave);
+  const travel = move(plan.typeEnd + 0.3 * k, (plan.pressAt - plan.typeEnd) / k - 0.4);
+  const reach = travel;
+  const aimIn = move(0.25 * plan.typeStart, Math.max(0.4, (0.75 * plan.typeStart) / k + 0.15));
+  const toButton = move(plan.typeEnd + 0.12 * k, (plan.pressAt - plan.typeEnd) / k - 0.5);
+  const pullOut = plan.press ? move(plan.submitAt + 0.55 * k, 1.2) : move(plan.returnAt, 1.2);
 
-  const zoomIn = smooth(span(t, plan.typeStart - 0.3 * k, plan.pressAt - plan.typeStart + 0.3 * k));
-  const zoomOut = smooth(span(t, plan.returnAt - 0.2 * k, 1.2 * k));
   const shown = gone >= 1 ? '' : shownAt(plan, t);
 
   return {
@@ -155,8 +163,9 @@ function promptFrame(plan, t) {
     armed,
     press: Math.max(-0.2, pressDown - pressUp),
     focus: fade(plan.typeStart - 0.45 * k, 0.45) * (1 - fade(plan.returnAt, 0.7)),
-    zoom: zoomIn * (1 - zoomOut),
-    cursor: plan.press ? fade(plan.typeEnd - 0.15 * k, 0.4) * (1 - fade(plan.submitAt + 0.5 * k, 0.6)) : 0,
+    closeUp: aimIn * (1 - pullOut),
+    toButton,
+    cursor: plan.press ? fade(plan.typeEnd + 0.15 * k, 0.4) * (1 - fade(plan.submitAt + 0.5 * k, 0.6)) : 0,
     cursorX: 2.2 - 2.05 * reach + 0.35 * Math.sin(Math.PI * reach),
     cursorY: 2.4 - 2.15 * reach
   };

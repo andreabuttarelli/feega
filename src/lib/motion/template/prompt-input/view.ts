@@ -97,7 +97,7 @@ const paintFrame = (p, f) => {
   nodes.thinking.style.opacity = String(f.thinking);
   nodes.thinking.style.backgroundPosition = (-200 * f.shimmer) + '% 0';
   nodes.box.style.setProperty('--pi-focus', String(f.focus));
-  nodes.stage.style.transform = 'scale(' + (1 + p.zoom * f.zoom) + ')';
+  nodes.stage.style.transform = cameraAt(p, f);
   nodes.send.style.setProperty('--pi-armed', String(f.armed));
   nodes.face.style.transform = 'scale(' + (1 - 0.09 * f.press) + ')';
   nodes.icon.style.opacity = String(1 - f.stop);
@@ -110,6 +110,72 @@ const paintFrame = (p, f) => {
   nodes.cursor.style.setProperty('--pi-cx', String(f.cursorX));
   nodes.cursor.style.setProperty('--pi-cy', String(f.cursorY));
   nodes.cursor.style.setProperty('--pi-cpress', String(Math.max(0, f.press)));
+};
+
+const prefixOf = (shown, text) => {
+  let n = 0;
+  while (n < shown.length && shown[n] === text[n]) {
+    n++;
+  }
+  return n;
+};
+
+const indexAt = (plan, text, at) => {
+  const keys = plan.keys;
+  const next = keys.findIndex((k) => k.at > at);
+  if (next <= 0) {
+    return next === 0 ? 0 : prefixOf(keys.length ? keys[keys.length - 1].shown : '', text);
+  }
+  const a = keys[next - 1];
+  const b = keys[next];
+  const from = prefixOf(a.shown, text);
+  return from + (prefixOf(b.shown, text) - from) * smooth(span(at, a.at, b.at - a.at));
+};
+
+const local = (rect, frame, ratio) => ({ x: (rect.left + rect.width / 2 - frame.left) / ratio, y: (rect.top + rect.height / 2 - frame.top) / ratio });
+
+const caretPoint = (n, frame, ratio) => {
+  const glyphs = nodes.ghost.firstChild;
+  if (!glyphs || !glyphs.length) {
+    return { x: 0, y: 0 };
+  }
+  const range = document.createRange();
+  const end = Math.min(Math.max(n, 1), glyphs.length);
+  range.setStart(glyphs, end - 1);
+  range.setEnd(glyphs, end);
+  const rect = range.getBoundingClientRect();
+  const edge = n === 0 ? rect.left : rect.right;
+  return { x: (edge - frame.left) / ratio, y: (rect.top + rect.height / 2 - frame.top) / ratio };
+};
+
+const cameraAt = (p, f) => {
+  if (!p.camera || f.closeUp <= 0) {
+    return 'none';
+  }
+  const plan = planFor(p);
+  const frame = nodes.box.getBoundingClientRect();
+  const ratio = frame.width / nodes.box.offsetWidth;
+  const em = parseFloat(getComputedStyle(nodes.stage).fontSize);
+  const measured = new Map();
+  const pointOf = (n) => {
+    if (!measured.has(n)) {
+      measured.set(n, caretPoint(n, frame, ratio));
+    }
+    return measured.get(n);
+  };
+  const caret = followTimes(tl.time(), p.follow).reduce((sum, s) => {
+    const index = indexAt(plan, p.text, s.at);
+    const a = pointOf(Math.floor(index));
+    const b = pointOf(Math.ceil(index));
+    const u = index - Math.floor(index);
+    return { x: sum.x + s.weight * (a.x + (b.x - a.x) * u), y: sum.y + s.weight * (a.y + (b.y - a.y) * u) };
+  }, { x: 0, y: 0 });
+  const button = local(nodes.face.getBoundingClientRect(), frame, ratio);
+  const centre = { x: nodes.box.offsetWidth / 2, y: nodes.box.offsetHeight / 2 };
+  const aim = { x: caret.x + p.lead * em + (button.x - caret.x - p.lead * em) * f.toButton, y: caret.y + (button.y - caret.y) * f.toButton };
+  const target = { x: centre.x + (aim.x - centre.x) * f.closeUp, y: centre.y + (aim.y - centre.y) * f.closeUp };
+  const zoom = 1 + (p.cameraZoom + (p.buttonZoom - p.cameraZoom) * f.toButton - 1) * f.closeUp;
+  return 'translate(' + (centre.x - target.x) * zoom + 'px, ' + (centre.y - target.y) * zoom + 'px) scale(' + zoom + ')';
 };
 
 const draw = () => {
