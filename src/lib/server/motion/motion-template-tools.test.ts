@@ -133,6 +133,16 @@ describe('motion agent template library tools', () => {
     expect(await run('add_template', { id: 'builtin:feature-scroll', at: 0, vars: { align: 'right' } })).toMatchObject({ ok: false });
   });
 
+  it('add_template places the image globe with its title and turn', async () => {
+    const { run, session } = withLibrary(vi.fn() as never);
+
+    const placed = await run('add_template', { id: 'builtin:image-globe', at: 0, vars: { title: 'Zqx round world', turns: 2 } });
+
+    expect(placed).toMatchObject({ ok: true, fields: expect.arrayContaining([expect.objectContaining({ key: 'turns' })]) });
+    expect(JSON.stringify(session.doc)).toContain('Zqx round world');
+    expect(await run('add_template', { id: 'builtin:image-globe', at: 0, vars: { turns: 'fast' } })).toMatchObject({ ok: false });
+  });
+
   it('add_template with sound off lays no sound', async () => {
     const sfx = vi.fn();
     const { run, session } = withLibrary(sfx as never);

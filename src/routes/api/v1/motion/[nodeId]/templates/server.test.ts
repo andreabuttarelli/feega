@@ -67,6 +67,18 @@ describe('/api/v1/motion templates', () => {
     expect(JSON.stringify((head?.doc as MotionDoc).comps)).toContain('Zqx the end');
   });
 
+  it('lists and inserts the image globe', async () => {
+    const url = new URL('https://feega.test/api/v1/motion/templates');
+    const body = await (await GET({ request: new Request(url, { headers: { authorization: 'Bearer t' } }), url } as never)).json();
+    const globe = body.templates.find((t: { id: string }) => t.id === 'builtin:image-globe');
+    const res = await post(NODE, { id: 'builtin:image-globe', vars: { title: 'Zqx in front' } });
+    const head = await readHead(state.db as never, { orgId: ORG, nodeId: NODE });
+
+    expect(globe.fields).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'media', group: 'Media' }), expect.objectContaining({ key: 'turns', group: 'Motion' })]));
+    expect(res.status).toBe(200);
+    expect(JSON.stringify((head?.doc as MotionDoc).comps)).toContain('Zqx in front');
+  });
+
   it('POST refuses an unknown template, a bad value and a read-only key', async () => {
     expect((await post(NODE, { id: 'builtin:nope' })).status).toBe(404);
     expect((await post(NODE, { id: 'builtin:prompt-input', vars: { theme: 'sepia' } })).status).toBe(400);
