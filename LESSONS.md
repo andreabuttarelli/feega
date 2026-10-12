@@ -2847,3 +2847,10 @@ composto viene arrotondato al pixel, quindi la salita procede a scatti. Mossa:
 
 ### A test file that fails to parse is not in the `Tests` count
 Signal: `Tests N passed` locally, CI red with `Transform failed … Unexpected end of file`. A conflict resolved by keeping both sides dropped a closing `});`; vitest counts the file under `Test Files … failed`, not `Tests`. Move: read the `Test Files` line too.
+
+### A word that "steps at the end" is fading in before it moves
+Signal: a title entrance reads as a final hop, yet frames show no pixel snap. Cause: opacity
+finishes before an in-out position curve starts moving, so the visible motion is only its fast
+middle. Move: measure the word's sub-pixel centroid per frame against its opacity; the position
+curve must be out-shaped, moving during the fade and reaching zero speed at rest
+(`word-entrance.test.ts`).
