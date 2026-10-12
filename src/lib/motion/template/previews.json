@@ -45,6 +45,7 @@
   "builtin:product-reveal",
   "builtin:prompt-input",
   "builtin:quote",
+  "builtin:ring-through-title",
   "builtin:rows-spaced-title",
   "builtin:saas-monitor",
   "builtin:scatter-title",
