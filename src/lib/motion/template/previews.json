@@ -47,6 +47,7 @@
   "builtin:quote",
   "builtin:rows-spaced-title",
   "builtin:saas-monitor",
+  "builtin:scatter-title",
   "builtin:scene-big-number",
   "builtin:scene-device-hero",
   "builtin:scene-device-split",

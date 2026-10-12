@@ -33,7 +33,8 @@ const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: R
   ...Object.fromEntries(PGRID_TEMPLATES.map((e) => [e.id, { field: 'media', photos: STRIP_PHOTOS }])),
   'builtin:photo-strip': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } },
   'builtin:circular-carousel': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } },
-  'builtin:rows-spaced-title': { field: 'media', photos: STRIP_PHOTOS }
+  'builtin:rows-spaced-title': { field: 'media', photos: STRIP_PHOTOS },
+  'builtin:scatter-title': { field: 'media', photos: STRIP_PHOTOS }
 };
 
 const sampleAssets = (photos: string[]) => Object.fromEntries(photos.map((id) => [id, `data:image/jpeg;base64,${readFileSync(join(SAMPLES, `${id}.jpg`)).toString('base64')}`]));
