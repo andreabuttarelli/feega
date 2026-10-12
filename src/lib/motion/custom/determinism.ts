@@ -101,6 +101,12 @@ export function liveComponents(doc: MotionDoc): string[] {
   return [...usedComponents(doc)].filter((name) => doc.components[name]?.mode === ComponentMode.Live);
 }
 
+const RETURNS_STILL = /\breturn\s*\{[^}]*\bstill\b/;
+
+export function stillStandIns(doc: MotionDoc): string[] {
+  return liveComponents(doc).filter((name) => !RETURNS_STILL.test(doc.components[name].source.js));
+}
+
 export function unverified(doc: MotionDoc): Unverified[] {
   const used = usedComponents(doc);
   return [...used]

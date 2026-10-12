@@ -169,5 +169,12 @@ describe('a live scene in the video export', () => {
     expect(body).toContain('export it as Embed');
     expect(dialog(ExportMode.Video)).not.toContain('data-testid="export-live"');
   });
+
+  it('has no note when the component draws the video itself with still(t)', () => {
+    const drawn = { ...game, source: { ...game.source, js: 'return { still(t) {} };' } };
+    const doc = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Game', drawn)), { component: 'Custom', from: 0, durationInFrames: 60, props: { name: 'Game' } }, 'g1'));
+
+    expect(dialog(ExportMode.Video, doc)).not.toContain('data-testid="export-live"');
+  });
 });
 

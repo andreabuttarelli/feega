@@ -3,7 +3,7 @@
   import { FORMATS } from '$lib/motion/doc';
   import { Action } from '$lib/motion/actions';
   import { interactiveOf } from '$lib/motion/interactive/settings';
-  import { STARTER_FORMATS, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
+  import { ADD_TARGET, AddTarget, STARTER_FORMATS, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
   import { carryEdits, keyFieldsOf, setTemplateValues, templateFields, type Instance, type TemplateFieldValue } from '$lib/motion/template/library';
   import { FieldLayout, splitFields } from '$lib/motion/template/key-fields';
   import ComponentPreview from './ComponentPreview.svelte';
@@ -19,6 +19,7 @@
     draftOf,
     compose,
     assets,
+    target = AddTarget.Video,
     onadd,
     onclose
   }: {
@@ -27,6 +28,7 @@
     draftOf: (id: string, format: StarterFormat) => Instance | null;
     compose: ((doc: Instance['doc']) => string) | null;
     assets: Asset[];
+    target?: AddTarget;
     onadd: (sounds: boolean, draft: Instance | null) => void;
     onclose: () => void;
   } = $props();
@@ -110,8 +112,10 @@
   {/if}
 
   <footer class="add">
-    <label class="sounds"><input type="checkbox" bind:checked={sounds} data-testid="add-sounds" /> Add sounds</label>
-    <button type="button" class="primary" data-testid="insert-component" onclick={() => onadd(sounds, touched ? draft : null)}>Add to video</button>
+    {#if ADD_TARGET[target].sounds}
+      <label class="sounds"><input type="checkbox" bind:checked={sounds} data-testid="add-sounds" /> Add sounds</label>
+    {/if}
+    <button type="button" class="primary" data-testid="insert-component" onclick={() => onadd(sounds, touched ? draft : null)}>{ADD_TARGET[target].label}</button>
   </footer>
 </aside>
 

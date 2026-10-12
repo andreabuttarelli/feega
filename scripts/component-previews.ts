@@ -23,8 +23,10 @@ const LAYOUT_PREFIX = 'builtin:composition-';
 const SAMPLES = join(OUT, 'samples');
 const SAMPLE_PHOTOS = ['p1015', 'p1016', 'p1018', 'p1039', 'p1043'];
 const STRIP_PHOTOS = [...SAMPLE_PHOTOS, 'p1050', 'p1069', 'p1074', 'p1080'];
-const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: Record<string, string> }> = {
+const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: Record<string, string>; more?: string[] }> = {
+  'builtin:scroll-story': { field: 'image1', photos: ['p1015'], values: { image2: 'p1039', image3: 'p1043' }, more: ['p1039', 'p1043'] },
   'builtin:floating-media': { field: 'media', photos: SAMPLE_PHOTOS },
+  'builtin:split-headline': { field: 'media', photos: ['p1043'] },
   'builtin:image-globe': { field: 'media', photos: STRIP_PHOTOS },
   'builtin:photo-strip': { field: 'media', photos: STRIP_PHOTOS, values: { captions: 'fjord, red rock, quiraing, falls, yosemite, coast, jellyfish, lioness, strawberries' } }
 };
@@ -59,7 +61,7 @@ for (const entry of BUILTIN_TEMPLATES.filter((e) => !only.length || only.include
     console.warn(entry.id, filled.error);
     continue;
   }
-  const assets = media ? sampleAssets(media.photos) : {};
+  const assets = media ? sampleAssets([...media.photos, ...(media.more ?? [])]) : {};
 
   const seconds = Math.min(source.durationInFrames / source.fps, MAX_WINDOW_S);
   const times = Array.from({ length: PREVIEW_FRAMES }, (_, i) => (i * seconds) / PREVIEW_FRAMES);
