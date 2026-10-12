@@ -119,7 +119,6 @@ const draw = () => {
   const f = floatFrame(layout, p, t, duration);
 
   scene.style.perspective = PERSPECTIVE * unit + 'px';
-  world.style.transform = 'translateZ(' + f.camera * unit + 'px)';
   f.cards.forEach((c, i) => {
     const card = cards[i];
     const s = card.node.style;
