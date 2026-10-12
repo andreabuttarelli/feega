@@ -86,8 +86,8 @@ function headFrames(p, t, length) {
     const inAt = (j) => (i === 0 ? null : plan[i - 1].inAt[j]);
     const outAt = (j) => (i === chapters.length - 1 ? null : plan[i].outAt[j]);
     const slot = (j) => slotFrame(p, t, inAt(j), outAt(j));
-    const index = slotFrame(p, t, i === 0 ? null : plan[i - 1].outAt[0], outAt(0));
-    return { kicker: slot(0), index, lines: chapter.lines.map((_, j) => slot(j + LABEL_SLOTS)) };
+    const label = slotFrame(p, t, i === 0 ? null : plan[i - 1].outAt[0], outAt(0));
+    return { kicker: label, index: label, lines: chapter.lines.map((_, j) => slot(j + LABEL_SLOTS)) };
   });
 }
 

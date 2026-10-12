@@ -180,12 +180,13 @@ describe('the scroll story model', () => {
     });
   });
 
-  it('rolls the chapter number over without an empty moment', () => {
+  it('rolls the chapter number and label over without an empty moment', () => {
     const [swap] = model.swapPlan(PARAMS, LENGTH);
     const f = frame(swap.outAt[0] + PARAMS.swapDuration / 2);
 
     expect(f.heads[0].index.on || f.heads[1].index.on).toBe(true);
     expect(f.heads[1].index.y).toBeLessThan(MASK_HALF);
+    expect(f.heads[1].kicker.y).toBeLessThan(MASK_HALF);
   });
 
   it('drifts a hold only when idle drift is on, and only a little', () => {
