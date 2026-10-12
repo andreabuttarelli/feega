@@ -26,7 +26,8 @@ const STUDIO_PANELS = [
   [-2.6, 2.2, 1.8, 3.2, 2.2, 0.1, 9],
   [2.8, 1.4, 2.2, 1.6, 3.2, 0.1, 5],
   [0, 3.4, 0, 4, 0.1, 3, 6],
-  [0, 0.6, -4.8, 6, 2.4, 0.1, 2.4]
+  [0, 0.6, -4.8, 6, 2.4, 0.1, 2.4],
+  [0, -0.4, 5.5, 6, 3, 0.1, 4]
 ];
 const BLUR_UNIT = 0.0025;
 const SHEEN_PER_DEGREE = 1.6;
@@ -143,18 +144,20 @@ const world = (() => {
   const metal = new THREE.MeshPhysicalMaterial({ color: FINISHES.silver.color, metalness: 1, roughness: FINISHES.silver.roughness, clearcoat: 0.3, clearcoatRoughness: 0.4 });
   const glassBlack = new THREE.MeshPhysicalMaterial({ color: 0x050506, metalness: 0, roughness: 0.08, clearcoat: 1 });
   const dark = new THREE.MeshBasicMaterial({ color: 0x050506 });
-  const shadowCatcher = new THREE.ShadowMaterial({ color: 0x1c0b4a, opacity: 0.2 });
+  const shadowCatcher = new THREE.ShadowMaterial({ color: 0x1c0b4a, opacity: 0.14 });
   const ao = aoTexture();
   const aoMaterial = new THREE.MeshBasicMaterial({ map: ao, transparent: true, depthWrite: false });
   const hemi = new THREE.HemisphereLight(0xffffff, 0x7c5cff, 0.35);
+  const fill = new THREE.DirectionalLight(0xffffff, 1.1);
+  fill.position.set(0.4, 0.6, 3);
   const key = new THREE.DirectionalLight(0xffffff, 1.4);
-  key.position.set(-0.7, 4, 1.8);
+  key.position.set(-0.25, 5, 0.9);
   key.castShadow = true;
   key.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
-  key.shadow.radius = 14;
+  key.shadow.radius = 24;
   Object.assign(key.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2, near: 0.5, far: 8 });
   key.shadow.camera.updateProjectionMatrix();
-  scene3.add(hemi, key, key.target);
+  scene3.add(hemi, fill, key, key.target);
 
   const geometries = [];
   const add = (geometry, material, at, shadow) => {
