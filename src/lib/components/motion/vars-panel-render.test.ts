@@ -34,6 +34,14 @@ describe('the variables panel', () => {
     expect(body).toContain('value="3"');
   });
 
+  it('sits behind a closed Interactive · Advanced section: runtime names are for developers', () => {
+    const body = html(docWith([starterVar(VarKind.Number, 'speed')]));
+
+    expect(body).toMatch(/<details[^>]*data-testid="vars-panel"/);
+    expect(body).not.toMatch(/<details[^>]*open/);
+    expect(body).toContain('Interactive · Advanced');
+  });
+
   it('offers to declare one when there are none', () => {
     expect(html(newMotionDoc(MotionFormat.Landscape))).toContain('data-testid="var-add"');
   });

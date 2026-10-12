@@ -14,6 +14,8 @@ export const PROMPT_TEMPLATE_ID = `${BUILTIN_PREFIX}prompt-input`;
 export const PROMPT_CLIP = 'prompt';
 export const PROMPT_VARS = ['text', 'placeholder', 'chips', 'buttonLabel', 'accent', 'theme', 'speed', 'typo', 'camera', 'cameraZoom'];
 
+const PROMPT_KEY_FIELDS = ['text', 'buttonLabel', 'theme', 'accent'].map(snakeKey);
+
 const SECONDS = 9;
 const FPS = 30;
 const UNEXPOSED = new Set([VAR_PREFIX]);
@@ -83,7 +85,8 @@ export const PROMPT_INPUT_TEMPLATE: TemplateEntry = {
   id: PROMPT_TEMPLATE_ID,
   template: {
     name: 'Prompt input',
-    description: 'A prompt field types a request at a human pace, presses send and thinks. Every part is a field or a runtime variable.',
+    description: 'A prompt box types a request at a human pace, presses send and thinks.',
+    keyFields: PROMPT_KEY_FIELDS,
     doc: promptDoc()
   }
 };

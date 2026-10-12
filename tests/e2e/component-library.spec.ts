@@ -51,15 +51,41 @@ test.describe('component library @real', () => {
         await page.screenshot({ path: `${SHOTS}/${viewport.name}-3-library.png` });
       }
       await library.locator(`[data-component="${PROMPT}"]`).click();
-      await expect(library.getByTestId('component-detail')).toContainText('Prompt input');
+      const detail = library.getByTestId('component-detail');
+      await expect(detail).toContainText('Prompt input');
+      await expect(library.getByTestId('component-grid')).toBeVisible();
+      await expect(detail.getByTestId('advanced-fields')).not.toHaveAttribute('open');
+      await expect(detail.getByTestId('developer-info')).toBeHidden();
       if (SHOTS) {
         await page.waitForTimeout(1500);
         await page.screenshot({ path: `${SHOTS}/${viewport.name}-4-detail.png` });
       }
+
+      await page.keyboard.press('Escape');
+      await expect(detail).toHaveCount(0);
+      await expect(library).toBeVisible();
+      await expect(library.locator(`[data-component="${PROMPT}"]`)).toBeFocused();
+
+      await page.keyboard.press('Enter');
+      await detail.getByTestId('key-fields').getByRole('textbox').first().fill('Zqx from the library');
+      await detail.getByTestId('key-fields').getByRole('textbox').first().blur();
+      await expect(detail.getByTestId('detail-preview').getByTestId('motion-preview')).toBeVisible();
+      if (SHOTS) {
+        await page.waitForTimeout(2500);
+        await page.screenshot({ path: `${SHOTS}/${viewport.name}-5-detail-edited.png` });
+      }
+      await detail.getByTestId('insert-component').click();
+      await expect(library).toHaveCount(0);
+      const inspector = page.getByTestId('template-inspector');
+      await expect(inspector.getByTestId('key-fields').getByRole('textbox').first()).toHaveValue('Zqx from the library');
+      if (SHOTS) {
+        await page.waitForTimeout(1500);
+        await inspector.screenshot({ path: `${SHOTS}/${viewport.name}-6-inspector.png` });
+      }
     });
   }
 
-  test('mobile: the editor component library is a full-screen sheet', async ({ page, session, seedNode }) => {
+  test('mobile: the editor component library opens a component as a bottom sheet', async ({ page, session, seedNode }) => {
     test.setTimeout(90_000);
     await page.setViewportSize({ width: 390, height: 844 });
     const node = await seedNode({ type: 'motion', data: { format: 'landscape', docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } });
@@ -74,6 +100,8 @@ test.describe('component library @real', () => {
       await page.waitForTimeout(1500);
       await page.screenshot({ path: `${SHOTS}/mobile-3-library-detail.png` });
     }
+    await expect(library.getByTestId('component-detail')).toBeVisible();
+    await expect(library.getByTestId('add-sounds')).toBeChecked();
     await library.getByTestId('insert-component').click();
     await expect(page.getByTestId('component-library')).toHaveCount(0);
   });
