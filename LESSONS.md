@@ -2823,3 +2823,9 @@ Segnale: `drawImage` di una tela WebGPU dà zero pixel (Chromium) o il primo fra
 un `await`. Mossa: render con `waitForGpu: false` e copia nello stesso task; su WebKit ricopia al
 frame successivo.
 
+
+### `motion-smoothness` segnala un flicker su parole che salgono di 0.2em
+Segnale: `flicker` nei primi frame di un ingresso parola per parola, diff che alternano su e
+giù, più evidente su sfondo chiaro. Causa: `translateY` su uno `span` inline-block non
+composto viene arrotondato al pixel, quindi la salita procede a scatti. Mossa:
+`will-change: transform, opacity` sulla parola; la salita torna sub-pixel e il flicker sparisce.
