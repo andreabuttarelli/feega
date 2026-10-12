@@ -21,6 +21,6 @@ export const MARQUEE_TEMPLATE: TemplateEntry = {
     name: 'Marquee',
     description: 'Rows of logos, testimonials or images scroll on their own, sideways or up and down; in an embed, grab a row to scrub it and let go to send it gliding back to speed.',
     keyFields: ['media', 'quotes', 'direction', 'speed', 'background'],
-    doc: customTemplateDoc({ name: 'marquee', component: MARQUEE_COMPONENT, code: marqueeComponent(), props: MARQUEE_PROPS, fonts: MARQUEE_FONTS, varPrefix: MARQUEE_VAR_PREFIX, vars: MARQUEE_VARS, clip: MARQUEE_CLIP, seconds: 12, fps: 30, groups: MARQUEE_GROUPS })
+    doc: customTemplateDoc({ name: 'marquee', component: MARQUEE_COMPONENT, code: marqueeComponent(), props: MARQUEE_PROPS, fonts: MARQUEE_FONTS, varPrefix: MARQUEE_VAR_PREFIX, vars: MARQUEE_VARS, clip: MARQUEE_CLIP, seconds: 24, fps: 30, groups: MARQUEE_GROUPS })
   }
 };

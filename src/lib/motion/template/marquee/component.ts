@@ -23,14 +23,17 @@ export enum MarqueeContent {
 
 export const MARQUEE_FONTS = ['Inter Tight', 'Inter', 'Geist', 'Instrument Sans', 'Manrope', 'Space Grotesk', 'DM Sans', 'Instrument Serif'];
 
-const WORDMARKS = 'Halcyon, orbitly, KESTREL, Paperplane, vesta, Fieldnote, monoline, Northstack';
+const WORDMARKS = 'Halcyon, orbitly, KESTREL, Paperplane, vesta, Fieldnote, monoline, Northstack, quillo, Brightfold, TESSEL, Riverbank, nimbo, Saltworks, Ondine, LATTICE';
 
 const QUOTES = [
-  'We shipped the launch video in an afternoon. — Mara Lindqvist, Halcyon',
-  'Our signups doubled the week it went live. — Tomás Reyes, Orbitly',
-  'Finally, motion that looks like our brand. — Priya Natarajan, Kestrel',
-  'The team stopped waiting on the agency. — Jonah Feld, Paperplane',
-  'It feels made by a studio, not a tool. — Ines Okafor, Vesta'
+  'We shipped the launch video in an afternoon. — Mara, Halcyon',
+  'Our signups doubled the week it went live. — Tomás, Orbitly',
+  'Finally, motion that looks like our brand. — Priya, Kestrel',
+  'The team stopped waiting on the agency. — Jonah, Paperplane',
+  'It feels made by a studio, not a tool. — Ines, Vesta',
+  'Every product page has a video now. — Leo, Fieldnote',
+  'Our ads finally stop the scroll. — Hana, Brightfold',
+  'Briefs in the morning, cuts by lunch. — Sam, Riverbank'
 ].join('\n');
 
 const text = (title: string, value: string, extra: Partial<PropSpec> = {}): PropSpec => ({ type: 'string', title, default: value, group: 'Content', ...extra });
@@ -47,11 +50,11 @@ export const MARQUEE_PROPS: Record<string, PropSpec> = {
   rows: number('Rows', 2, 1, 4, 'Layout', 1),
   direction: choice('Direction', Object.values(MarqueeDirection), MarqueeDirection.Left, 'Motion'),
   alternate: flag('Rows run opposite ways', true, 'Motion'),
-  speed: number('Speed (share of the short side per second)', 0.08, 0.01, 0.6, 'Motion', 0.01),
+  speed: { ...number('Speed (short sides per second)', 0.19, 0.01, 0.6, 'Motion', 0.01), description: 'Rounded to the nearest speed that loops seamlessly; the video shows the rounded speed.' },
   gap: number('Gap (share of the short side)', 0.05, 0, 0.3, 'Layout', 0.005),
   rowGap: number('Row gap (share of the short side)', 0.06, 0, 0.3, 'Layout', 0.005),
-  itemSize: number('Logo height (share of the short side)', 0.09, 0.02, 0.25, 'Layout', 0.005),
-  quoteWidth: number('Testimonial width (share of the short side)', 0.62, 0.2, 1, 'Layout', 0.01),
+  itemSize: number('Logo height (share of the short side)', 0.07, 0.02, 0.25, 'Layout', 0.005),
+  quoteWidth: number('Testimonial width (share of the short side)', 0.5, 0.2, 1, 'Layout', 0.01),
   monochrome: flag('Monochrome logos', false, 'Style'),
   logoOpacity: number('Logo opacity', 0.9, 0.1, 1, 'Style', 0.05),
   fade: number('Edge fade (share of the width)', 0.14, 0, 0.45, 'Style', 0.01),
@@ -59,7 +62,7 @@ export const MARQUEE_PROPS: Record<string, PropSpec> = {
   ink: colour('Text and logo colour', '#f5f5f5'),
   cardColor: colour('Testimonial card colour', '#161616'),
   font: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter Tight', group: 'Style' },
-  quoteSize: number('Testimonial text size (% of the short side)', 3.2, 1, 6, 'Style', 0.1),
+  quoteSize: number('Testimonial text size (% of the short side)', 2.8, 1, 6, 'Style', 0.1),
   weight: number('Text weight', 500, 300, 800, 'Style', 100),
   tracking: number('Tracking (em)', -0.04, -0.08, 0.05, 'Style', 0.005),
   pauseOnHover: flag('Pause on hover', false, 'Motion'),

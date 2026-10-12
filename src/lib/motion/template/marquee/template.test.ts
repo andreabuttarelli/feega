@@ -8,7 +8,9 @@ import { interactiveOf } from '$lib/motion/interactive/settings';
 import { builtinTemplate } from '../builtins';
 import { insertTemplate, setTemplateValues, templateFields } from '../library';
 import { FieldType } from '../field-model';
-import { MARQUEE_COMPONENT } from './component';
+import { MARQUEE_COMPONENT, MARQUEE_PROPS } from './component';
+import { MARQUEE_MODEL } from './model';
+import { defaultsOf } from '../custom-template';
 import { MARQUEE_TEMPLATE, MARQUEE_TEMPLATE_ID } from './template';
 
 const inserted = (format = MotionFormat.Landscape) => {
@@ -87,5 +89,18 @@ describe('the marquee template', () => {
 
     expect(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })).toContain('"play":"live"');
     expect(composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, target: Target.Video })).toContain('"play":"still"');
+  });
+
+  it('shows the speed it really runs at: the default lands on whole wraps, calm, with a dozen names or more', () => {
+    const p = defaultsOf(MARQUEE_PROPS) as Record<string, string | number>;
+    const plan = new Function(`${MARQUEE_MODEL}; return rowPlan;`)() as (p: object, row: number, count: number, length: number) => { cruise: number };
+    const seconds = MARQUEE_TEMPLATE.template.doc.durationInFrames / MARQUEE_TEMPLATE.template.doc.fps;
+    const counts = [String(p.wordmarks).split(',').length, String(p.quotes).split('\n').length];
+
+    expect(counts[0]).toBeGreaterThanOrEqual(12);
+    counts.forEach((count, row) => {
+      expect(Math.abs(Math.abs(plan(p, row, count, seconds).cruise) - Number(p.speed)) / Number(p.speed), `row ${row}`).toBeLessThan(0.1);
+    });
+    expect(Number(p.speed)).toBeLessThanOrEqual(0.2);
   });
 });
