@@ -87,10 +87,24 @@ describe('the poster liquid glass model', () => {
     expect(reached.size).toBe(count);
   });
 
-  it('mixes fat pools and thin tendrils, like poured liquid', () => {
-    const radii = model.blobNodes(PARAMS, 0, LENGTH).map((n) => n[2]);
+  it('pools into round lobes of different sizes, never thin tendrils', () => {
+    const radii = model.blobNodes(PARAMS, 0, LENGTH).slice(0, model.BODY_COUNT).map((n) => n[2]);
 
-    expect(Math.max(...radii) / Math.min(...radii)).toBeGreaterThan(3);
+    expect(model.BODY_COUNT).toBeLessThanOrEqual(8);
+    expect(Math.min(...radii)).toBeGreaterThan(0.06);
+    expect(Math.max(...radii) / Math.min(...radii)).toBeGreaterThan(1.8);
+  });
+
+  it('keeps every arm short: two joined lobes overlap or nearly touch', () => {
+    for (const t of times().filter((_, i) => i % 10 === 0)) {
+      const nodes = model.blobNodes(PARAMS, t, LENGTH);
+      for (const [a, b] of model.BLOB_EDGES) {
+        const [ax, ay, ar] = nodes[a];
+        const [bx, by, br] = nodes[b];
+
+        expect(Math.hypot(ax - bx, ay - by) / (ar + br)).toBeLessThan(1.3);
+      }
+    }
   });
 
   it('marks muted lines with a leading tilde and keeps the rest ink', () => {
