@@ -1,15 +1,9 @@
+import { MEDIA_LIST } from '../media-list';
+
 export const FLOAT_VIEW = String.raw`
-const VIDEO_MARK = 'video:';
-const LINK = /^(https?:|data:|blob:|\/)/;
+${MEDIA_LIST}
 const BLUR_UNIT = 0.0012;
 const BORDER_BASE = 1080;
-
-const mediaList = (raw) => String(raw || '').split(',').map((s) => s.trim()).filter(Boolean).map((item) => {
-  const video = item.startsWith(VIDEO_MARK);
-  const id = video ? item.slice(VIDEO_MARK.length).trim() : item;
-  const src = LINK.test(id) ? id : assets[id];
-  return src ? { src, video } : null;
-}).filter(Boolean);
 
 root.insertAdjacentHTML('beforeend', '<div class="fm"><div class="fm-world"></div><div class="fm-title"><h1 class="fm-headline"></h1><div class="fm-sub"></div></div></div>');
 
@@ -50,7 +44,11 @@ const buildCards = (p, n) => {
     node.className = 'fm-card';
     node.innerHTML = cardHtml(items.length ? items[i % items.length] : null) + '<i class="fm-shade"></i>';
     world.appendChild(node);
-    return { node, shade: node.querySelector('.fm-shade'), video: node.querySelector('video') };
+    const video = node.querySelector('video');
+    if (video) {
+      video.addEventListener('loadedmetadata', () => seekVideo(video, tl.time()));
+    }
+    return { node, shade: node.querySelector('.fm-shade'), video };
   });
   cache = { ...cache, cardsKey: key, cards };
   return cards;
@@ -97,16 +95,6 @@ const paintTitle = (p) => {
   return nodes;
 };
 
-const seekVideo = (video, t) => {
-  if (!video || !(video.duration > 0)) {
-    return;
-  }
-  const at = t % video.duration;
-  if (Math.abs(video.currentTime - at) > 0.5 / fps) {
-    video.currentTime = at;
-  }
-};
-
 const draw = () => {
   const p = { ...props };
   const t = tl.time();
@@ -134,11 +122,11 @@ const draw = () => {
   f.words.forEach((w, i) => {
     const s = words[i].style;
     s.opacity = String(w.opacity);
-    s.transform = 'translateY(' + w.y + 'em)';
+    s.transform = 'translate3d(0, ' + w.y + 'em, 0)';
     s.filter = w.blur > 0.002 ? 'blur(' + w.blur + 'em)' : 'none';
   });
   sub.style.opacity = String(f.subtitle);
-  sub.style.transform = 'translateY(' + 0.4 * (1 - f.subtitle) + 'em)';
+  sub.style.transform = 'translate3d(0, ' + 0.4 * (1 - f.subtitle) + 'em, 0)';
 };
 
 draw();

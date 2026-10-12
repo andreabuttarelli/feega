@@ -114,6 +114,45 @@ describe('motion agent template library tools', () => {
     expect(await run('add_template', { id: 'builtin:prompt-input', at: 0, vars: { speed: '999' } })).toMatchObject({ ok: false });
   });
 
+  it('list_templates offers floating media and add_template fills its title and media', async () => {
+    const { run, session } = withLibrary();
+
+    expect(JSON.stringify(await run('list_templates', {}))).toContain('builtin:floating-media');
+    expect(await run('add_template', { id: 'builtin:floating-media', at: 0, vars: { title: 'zqx slow water', media: 'pic1, video:clip1', layout: 'cloud' } })).toMatchObject({ ok: true });
+    expect(JSON.stringify(session.doc)).toContain('zqx slow water');
+    expect(JSON.stringify(session.doc)).toContain('"assetId":"clip1"');
+  });
+
+  it('add_template places the feature scroll with its titles and list', async () => {
+    const { run, session } = withLibrary(vi.fn() as never);
+
+    const placed = await run('add_template', { id: 'builtin:feature-scroll', at: 0, vars: { open_title: 'Zqx all of it', lines: 'zqx one\nzqx two' } });
+
+    expect(placed).toMatchObject({ ok: true, fields: expect.arrayContaining([expect.objectContaining({ key: 'read_speed' })]) });
+    expect(JSON.stringify(session.doc)).toContain('Zqx all of it');
+    expect(await run('add_template', { id: 'builtin:feature-scroll', at: 0, vars: { align: 'right' } })).toMatchObject({ ok: false });
+  });
+
+  it('add_template places the split headline with its headline and image', async () => {
+    const { run, session } = withLibrary(vi.fn() as never);
+
+    const placed = await run('add_template', { id: 'builtin:split-headline', at: 0, vars: { headline: 'Zqx wide open', radius: '20' } });
+
+    expect(placed).toMatchObject({ ok: true, fields: expect.arrayContaining([expect.objectContaining({ key: 'media' })]) });
+    expect(JSON.stringify(session.doc)).toContain('Zqx wide open');
+    expect(await run('add_template', { id: 'builtin:split-headline', at: 0, vars: { stack: 'diagonal' } })).toMatchObject({ ok: false });
+  });
+
+  it('add_template places the image globe with its title and turn', async () => {
+    const { run, session } = withLibrary(vi.fn() as never);
+
+    const placed = await run('add_template', { id: 'builtin:image-globe', at: 0, vars: { title: 'Zqx round world', turns: 2 } });
+
+    expect(placed).toMatchObject({ ok: true, fields: expect.arrayContaining([expect.objectContaining({ key: 'turns' })]) });
+    expect(JSON.stringify(session.doc)).toContain('Zqx round world');
+    expect(await run('add_template', { id: 'builtin:image-globe', at: 0, vars: { turns: 'fast' } })).toMatchObject({ ok: false });
+  });
+
   it('add_template with sound off lays no sound', async () => {
     const sfx = vi.fn();
     const { run, session } = withLibrary(sfx as never);

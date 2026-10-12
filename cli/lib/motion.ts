@@ -64,6 +64,8 @@ export type ShaderEffect = { id: string; category: string; source: string; live:
 
 export type MotionTemplateField = { key: string; label: string; type: string; group?: string; min?: number; max?: number; options?: string[]; default?: unknown };
 export type MotionTemplate = { id: string; name: string; description: string; seconds: number; fields: MotionTemplateField[] };
+export type FromTemplate = { template: string; format?: '16:9' | '9:16' | '1:1'; project?: string };
+export type FromTemplateMade = { node_id: string; project_id: string; canvas_id: string; version: number; editor_url: string };
 export type AddTemplate = { id: string; at?: number; vars?: Record<string, string | number | boolean>; sound?: boolean };
 
 export const motionApi = {
@@ -85,6 +87,7 @@ export const motionApi = {
     request<MotionFrames>(withOrg(`/api/v1/motion/${id(nodeId)}/frames`, org), token, { method: 'POST', body: JSON.stringify(ask) }),
   revisions: (token: string, nodeId: string, org?: string) => request<{ revisions: MotionRevision[] }>(withOrg(`/api/v1/motion/${id(nodeId)}/revisions`, org), token),
   templates: (token: string, org?: string) => request<{ templates: MotionTemplate[] }>(withOrg('/api/v1/motion/templates', org), token),
+  fromTemplate: (token: string, body: FromTemplate, org?: string) => request<FromTemplateMade>(withOrg('/api/v1/motion/from-template', org), token, { method: 'POST', body: JSON.stringify(body) }),
   addTemplate: (token: string, nodeId: string, body: AddTemplate, org?: string) =>
     request<{ version: number; clip_id: string; sounds: string | null; fields: { key: string; value: unknown }[] }>(withOrg(`/api/v1/motion/${id(nodeId)}/templates`, org), token, { method: 'POST', body: JSON.stringify(body) }),
   restore: (token: string, nodeId: string, version: number, org?: string) =>

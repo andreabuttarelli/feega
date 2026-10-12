@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkDoc, liveComponents, seekPlan, unverified, verdictOf, type Shot } from './determinism';
+import { checkDoc, liveComponents, stillStandIns, seekPlan, unverified, verdictOf, type Shot } from './determinism';
 import { MotionFormat, clipsOf, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
 import { composeHtml } from '../hyperframes/compose';
 import { FEEGA_TOKENS } from '../brand';
@@ -154,6 +154,14 @@ describe('live scenes', () => {
   it('names the live components the video uses, not the ones it only declares', () => {
     expect(liveComponents(written)).toEqual([]);
     expect(liveComponents(must(addClip(written, { component: 'Custom', from: 0, durationInFrames: 30, props: { name: 'Game' } }, 'g1')))).toEqual(['Game']);
+  });
+
+  it('a live component that returns still(t) needs no stand-in in the video', () => {
+    const use = (js: string) => must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Vertical), 'Game', { ...draft, source: { ...draft.source, js } })), { component: 'Custom', from: 0, durationInFrames: 30, props: { name: 'Game' } }, 'g1'));
+
+    expect(stillStandIns(use('requestAnimationFrame(() => {});'))).toEqual(['Game']);
+    expect(stillStandIns(use('return { still: (t) => draw(t) };'))).toEqual([]);
+    expect(stillStandIns(use('return {\n  dispose,\n  still(t) { draw(t); }\n};'))).toEqual([]);
   });
 });
 

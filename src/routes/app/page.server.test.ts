@@ -12,7 +12,12 @@ vi.mock('$lib/server/repos/projects', () => ({ listProjects, createProject }));
 const createCanvas = vi.fn(async (_db: unknown, input: { name: string }) => ({ id: input.name === 'Motion' ? 'c-motion' : 'c-new', projectId: 'p-new', name: input.name, viewport: null }));
 const listCanvases = vi.fn(async () => [{ id: 'c1', projectId: 'p1', name: 'Board', viewport: null }]);
 const createNode = vi.fn(async (_db: unknown, input: { canvasId: string }) => ({ id: 'm-new', canvasId: input.canvasId }));
-vi.mock('$lib/server/repos/canvas', async (original) => ({ ...(await original<object>()), createCanvas, listCanvases, listNodes: vi.fn(async () => []), createNode }));
+const patchNodeData = vi.fn(async () => ({}));
+vi.mock('$lib/server/repos/canvas', async (original) => ({ ...(await original<object>()), createCanvas, listCanvases, listNodes: vi.fn(async () => []), createNode, patchNodeData }));
+
+const appendRevision = vi.fn(async (_db: unknown, input: { doc: unknown }) => ({ outcome: 'written', head: { version: 1, doc: input.doc, summary: null, actorKind: 'user' } }));
+vi.mock('$lib/server/repos/motion-revisions', async (original) => ({ ...(await original<object>()), appendRevision }));
+vi.mock('$lib/server/repos/motion-templates', () => ({ listOrgTemplates: vi.fn(async () => []) }));
 
 vi.mock('$lib/server/projects/lookup', () => ({ findReachableProject: vi.fn(async (_db: unknown, input: { projectId: string }) => ({ orgId: 'org-a', project: { id: input.projectId } })) }));
 
@@ -144,6 +149,30 @@ describe('/app is the dashboard for a returning user', () => {
 
     expect(data.gallery.map((g) => g.id)).toEqual(['g1']);
     expect(data.templates.length).toBeGreaterThan(0);
+  });
+
+  it('the home lists every built-in component, with its kind and preview', async () => {
+    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as { components: { id: string; kind: string }[] };
+
+    expect(data.components.map((c) => c.id)).toContain('builtin:prompt-input');
+    expect(data.components.find((c) => c.id === 'builtin:prompt-input')?.kind).toBe('component');
+  });
+
+  it('use in new video opens the editor on a video that already holds the component', async () => {
+    const redirected = await thrown(() => actions.fromTemplate({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ template: 'builtin:prompt-input', format: '9:16' }) } as never));
+
+    expect(createNode).toHaveBeenCalledWith({}, expect.objectContaining({ canvasId: 'c-motion', type: 'motion', displayName: 'Prompt input' }));
+    const doc = (appendRevision.mock.calls[0][1] as { doc: { comps: Record<string, { template?: { id: string } }>; height: number; width: number } }).doc;
+    expect(Object.values(doc.comps).some((c) => c.template?.id === 'builtin:prompt-input')).toBe(true);
+    expect(doc.height).toBeGreaterThan(doc.width);
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new' });
+  });
+
+  it('an unknown component creates nothing', async () => {
+    const refused = (await actions.fromTemplate({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ template: 'builtin:nope' }) } as never)) as { status: number };
+
+    expect(refused.status).toBe(404);
+    expect(createNode).not.toHaveBeenCalled();
   });
 
   it('switching workspace remembers a membership, never a stranger org', async () => {

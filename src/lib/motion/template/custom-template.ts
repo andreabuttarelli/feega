@@ -20,15 +20,23 @@ export type CustomTemplateSpec = {
   seconds: number;
   fps: MotionDoc['fps'];
   playback?: Pick<Interactive, 'playback' | 'scrollLength'>;
+  groups?: Readonly<Record<string, string>>;
 };
 
 const GROUP: Record<NonNullable<PropSpec['group']>, string> = { Content: 'Text', Style: 'Style', Layout: 'Style', Motion: 'Motion', Camera: 'Motion' };
+
+const MEDIA_GROUP = 'Media';
+
+const groupOf = (spec: PropSpec) => (spec.format === PropFormat.Media ? MEDIA_GROUP : GROUP[spec.group ?? 'Style']);
 
 type FieldShape = Pick<FieldInput, 'type' | 'min' | 'max' | 'options'>;
 
 function fieldShape(spec: PropSpec, fonts: readonly string[]): FieldShape {
   if (spec.format === PropFormat.Font) {
     return { type: FieldType.Select, options: [...fonts] };
+  }
+  if (spec.format === PropFormat.Media) {
+    return { type: FieldType.MediaList };
   }
   if (spec.enum) {
     return { type: FieldType.Select, options: spec.enum };
@@ -77,7 +85,7 @@ export function customTemplateDoc(spec: CustomTemplateSpec): MotionDoc {
   doc = must(writeComponent(doc, spec.component, spec.code));
   doc = must(addClip(doc, { component: 'Custom', from: 0, durationInFrames: frames, props: { name: spec.component, ...defaultsOf(spec.props) } }, spec.clip));
   for (const [key, prop] of Object.entries(spec.props).filter(([key]) => key !== VAR_PREFIX)) {
-    doc = must(exposeField(doc, { key: snakeKey(key), label: prop.title ?? key, clipId: spec.clip, prop: key, group: GROUP[prop.group ?? 'Style'], ...fieldShape(prop, spec.fonts) }));
+    doc = must(exposeField(doc, { key: snakeKey(key), label: prop.title ?? key, clipId: spec.clip, prop: key, group: spec.groups?.[key] ?? groupOf(prop), ...fieldShape(prop, spec.fonts) }));
   }
   for (const key of spec.vars) {
     doc = must(declareVar(doc, varOf(spec.varPrefix, key, spec.props[key])));

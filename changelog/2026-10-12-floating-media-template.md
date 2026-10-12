@@ -1,4 +1,4 @@
-# Floating media template (step 1, draft)
+# Floating media template
 
 Second hand-made premium template: central title with word reveal (expo + soft settle, blur-in)
 and 1–12 image/video cards in real 3D depth, drifting forever.
@@ -15,4 +15,11 @@ and 1–12 image/video cards in real 3D depth, drifting forever.
   drift alone loops.
 - `custom-template.ts` holds the field/var builder; prompt-input keeps its own copy until #424
   lands, then moves onto it.
-- Video cards seek to `t mod duration`; the renderer does not yet wait for the seek.
+- Media is a real media list: new `PropFormat.Media` lets a custom component prop hold the
+  picker's `[{assetId, kind}]`; compose resolves it to `[{src, kind}]`. `media` is not a runtime
+  variable: a string var default shadows the picked list at runtime (test holds it).
+- Video cards seek to `t mod duration` and re-seek on `loadedmetadata`; both renderers already
+  wait for every `<video>` seek. Verified: re-seeking 9 s → 5 s gives the identical frame.
+- Layout: overlapping cards are pushed apart before any shrink; a card blocked vertically
+  sidesteps the title; cloud uses golden-angle seeds. Cards keep ≥75% size in 16:9.
+- Final renders (4 variants, 16:9/9:16/1:1, light and dark): 0 jolts on the smoothness meter.

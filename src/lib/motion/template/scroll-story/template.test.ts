@@ -43,6 +43,15 @@ describe('the scroll story template', () => {
     expect(fields.find((f) => f.prop === 'lineColor')?.type).toBe(FieldType.Color);
   });
 
+  it('puts the chapters first and groups the rest', () => {
+    const fields = SCROLL_STORY_TEMPLATE.template.doc.fields;
+
+    expect(SCROLL_STORY_TEMPLATE.template.keyFields).toEqual(['headline1', 'image1', 'headline2', 'image2', 'headline3']);
+    expect(fields.find((f) => f.prop === 'image3')?.group).toBe('Media');
+    expect(fields.find((f) => f.prop === 'columns')?.group).toBe('Grid');
+    expect(fields.find((f) => f.prop === 'speed2')?.group).toBe('Media');
+  });
+
   it('declares runtime variables an embedding site can set', () => {
     const names = interactiveOf(SCROLL_STORY_TEMPLATE.template.doc).vars.map((v) => v.name);
 
