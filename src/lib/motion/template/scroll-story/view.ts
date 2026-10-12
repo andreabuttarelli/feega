@@ -35,7 +35,7 @@ const maskedLine = (text) => {
 };
 
 const buildGrid = (p, width, height) => {
-  const key = JSON.stringify([width, height, p.columns, p.rows, p.margin]);
+  const key = JSON.stringify([width, height, p.columns, p.rows]);
   if (key === cache.gridKey) {
     return cache.grid;
   }
@@ -60,11 +60,10 @@ const buildGrid = (p, width, height) => {
 
 const buildContent = (p) => {
   const chapters = storyChapters(p);
-  const key = JSON.stringify([chapters, p.lowercase]);
+  const key = JSON.stringify(chapters);
   if (key === cache.contentKey) {
     return cache.content;
   }
-  const cased = (s) => (p.lowercase ? s.toLowerCase() : s);
   imageLayer.innerHTML = '';
   textLayer.innerHTML = '';
   kickerLayer.innerHTML = '';
@@ -79,7 +78,7 @@ const buildContent = (p) => {
     const head = document.createElement('div');
     head.className = 'ss-head';
     const lines = chapter.lines.map((text) => {
-      const l = maskedLine(cased(text));
+      const l = maskedLine(text);
       head.appendChild(l.line);
       return l;
     });
@@ -128,6 +127,7 @@ const paintSlot = (target, slot) => {
 const place = (grid) => {
   const inset = grid.col * 0.12;
   Object.assign(kickerLayer.style, { left: grid.left + inset + 'px', top: grid.top + inset + 'px' });
+  imageLayer.style.clipPath = 'inset(' + grid.ys[1] + 'px 0 ' + (sizeOf().height - grid.ys[grid.ys.length - 2]) + 'px 0)';
   Object.assign(progressLayer.style, { left: grid.left + 'px', top: grid.top + grid.tall + 'px', width: grid.wide + 'px' });
   const index = indexNow.parentElement;
   Object.assign(index.style, { right: grid.left + inset + 'px', top: grid.top + inset + 'px' });
@@ -143,8 +143,6 @@ const draw = () => {
   place(grid);
   const f = storyFrame(p, t, duration, width, height);
 
-  f.grid.v.forEach((k, i) => (grid.v[i].style.transform = 'scaleY(' + k + ')'));
-  f.grid.h.forEach((k, i) => (grid.h[i].style.transform = 'scaleX(' + k + ')'));
 
   content.forEach((c, i) => {
     const img = f.images[i];
@@ -163,7 +161,7 @@ const draw = () => {
     c.mark.style.left = (i / content.length) * 100 + '%';
     c.mark.style.opacity = String(f.marks[i]);
   });
-  bar.style.transform = 'scaleX(' + f.progress + ')';
+  bar.style.transform = 'scaleX(' + f.position / (content.length - 1) + ')';
 };
 
 draw();
