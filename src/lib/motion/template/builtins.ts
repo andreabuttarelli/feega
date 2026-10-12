@@ -13,6 +13,7 @@ import { PROMPT_INPUT_TEMPLATE } from './prompt-input/template';
 import { FLOATING_MEDIA_TEMPLATE } from './floating-media/template';
 import { PHOTO_STRIP_TEMPLATE } from './photo-strip/template';
 import { FEATURE_SCROLL_TEMPLATE } from './feature-scroll/template';
+import { SPLIT_HEADLINE_TEMPLATE } from './split-headline/template';
 import { IMAGE_GLOBE_TEMPLATE } from './image-globe/template';
 import { MARQUEE_TEMPLATE } from './marquee/template';
 
@@ -157,7 +158,7 @@ function compositionDesign(layout: LayoutId): Design {
   };
 }
 
-export const BUILTIN_TEMPLATES: TemplateEntry[] = [...[...LAUNCH_SCENES, ...SCENES, ...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build), UI_MORPH_TEMPLATE, PROMPT_INPUT_TEMPLATE, FLOATING_MEDIA_TEMPLATE, PHOTO_STRIP_TEMPLATE, FEATURE_SCROLL_TEMPLATE, IMAGE_GLOBE_TEMPLATE, MARQUEE_TEMPLATE];
+export const BUILTIN_TEMPLATES: TemplateEntry[] = [...[...LAUNCH_SCENES, ...SCENES, ...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build), UI_MORPH_TEMPLATE, PROMPT_INPUT_TEMPLATE, FLOATING_MEDIA_TEMPLATE, PHOTO_STRIP_TEMPLATE, FEATURE_SCROLL_TEMPLATE, IMAGE_GLOBE_TEMPLATE, SPLIT_HEADLINE_TEMPLATE, MARQUEE_TEMPLATE];
 
 export function builtinTemplate(id: string): TemplateEntry | null {
   return BUILTIN_TEMPLATES.find((e) => e.id === id) ?? null;
