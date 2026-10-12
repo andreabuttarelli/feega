@@ -9,12 +9,10 @@ type Model = {
   stripPlan: (p: object, length: number) => Plan;
   stripPos: (plan: Plan, t: number) => number;
   magnifyAt: (d: number, p: object) => number;
-  stripFrame: (p: object, t: number, length: number, width: number, height: number, pos?: number) => Frame;
-  releaseTarget: (pos: number, velocity: number) => number;
-  restAfter: (plan: Plan, t: number) => { at: number; pos: number };
+  stripFrame: (p: object, t: number, length: number, width: number, height: number) => Frame;
 };
 
-const model = new Function(`${STRIP_MODEL}; return { stripPlan, stripPos, magnifyAt, stripFrame, releaseTarget, restAfter };`)() as Model;
+const model = new Function(`${STRIP_MODEL}; return { stripPlan, stripPos, magnifyAt, stripFrame };`)() as Model;
 
 const PARAMS = { count: 10, cardSize: 0.24, aspect: 0.8, gap: 0.035, magnify: 1.75, falloff: 1.2, step: 1.5, gesture: 1.2, pause: 0.45, direction: 'left', lift: 0.04, cursor: false, captionLead: 0.4 };
 const LENGTH = 12;
@@ -188,18 +186,5 @@ describe('the photo strip model', () => {
     expect(model.stripFrame({ ...PARAMS, cursor: true }, (g.at + g.end) / 2, LENGTH, 1920, 1080).cursor.opacity).toBeGreaterThan(0.5);
   });
 
-  it('a real drag snaps to a whole card, flung further when faster', () => {
-    expect(model.releaseTarget(3.4, 0)).toBe(3);
-    expect(model.releaseTarget(3.4, 6)).toBeGreaterThan(3);
-    expect(Number.isInteger(model.releaseTarget(-1.7, -3))).toBe(true);
-  });
 
-  it('a released drag hands back to the next rest, where the strip stands still', () => {
-    const plan = model.stripPlan(PARAMS, LENGTH);
-    const rest = model.restAfter(plan, 2);
-
-    expect(rest.at).toBeGreaterThanOrEqual(2);
-    expect(model.stripPos(plan, rest.at)).toBeCloseTo(rest.pos, 9);
-    expect(Math.abs(model.stripPos(plan, rest.at + 0.05) - rest.pos)).toBeLessThan(0.01);
-  });
 });

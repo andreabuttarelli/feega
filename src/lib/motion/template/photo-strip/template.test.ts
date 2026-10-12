@@ -50,13 +50,14 @@ describe('the photo strip template', () => {
     expect([group('media'), group('captions')]).toEqual(['Photos', 'Photos']);
     expect([group('background'), group('cardSize'), group('font')]).toEqual(['Style', 'Style', 'Style']);
     expect([group('magnify'), group('pause'), group('direction')]).toEqual(['Motion', 'Motion', 'Motion']);
-    expect([group('drag'), group('cursor')]).toEqual(['Interaction', 'Interaction']);
+    expect([group('cursor'), group('cursorColor')]).toEqual(['Interaction', 'Interaction']);
+    expect(group('drag')).toBeUndefined();
   });
 
   it('declares runtime variables an embedding site can set', () => {
     const names = interactiveOf(PHOTO_STRIP_TEMPLATE.template.doc).vars.map((v) => v.name);
 
-    expect(names).toEqual(expect.arrayContaining(['strip_media', 'strip_captions', 'strip_magnify', 'strip_drag']));
+    expect(names).toEqual(expect.arrayContaining(['strip_media', 'strip_captions', 'strip_magnify', 'strip_cursor']));
   });
 
   it('setting a field moves its variable too', () => {

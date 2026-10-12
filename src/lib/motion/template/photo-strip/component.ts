@@ -45,7 +45,6 @@ export const STRIP_PROPS: Record<string, PropSpec> = {
   captionLead: number('Caption lead (share of the gesture)', 0.4, 0.05, 0.9, 'Motion', 0.05),
   cursor: flag('Show the dragging cursor', false, 'Motion'),
   cursorColor: colour('Cursor colour', '#ffffff'),
-  drag: flag('Viewers can drag the strip (embeds)', true, 'Motion'),
   [VAR_PREFIX]: text('Runtime variable prefix', STRIP_VAR_PREFIX, { group: 'Layout', maxLength: 20 })
 };
 

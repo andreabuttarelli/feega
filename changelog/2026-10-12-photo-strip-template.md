@@ -11,7 +11,9 @@ card passing the centre is magnified, then shrinks as it moves on.
 - **Flick curve.** Each gesture is a beta-shaped velocity pulse (u²(1−u)⁴, closed-form CDF): fast
   rise, long soft tail, no overshoot. Pulses overlap the next one, so the strip never freezes.
 - **Wrap out of sight.** Slots repeat the photos until the wrap seam is beyond the frame edge.
-- **Live drag in embeds** (deterministic component, pointer and wheel): grab freezes auto time,
-  release flings to a whole card, then hands back at the plan's next rest. A video render gets no
-  input, so it stays a pure function of t.
+- **No drag in embeds (for now).** Built, then dropped: the embed only forwards pointer input to
+  live components, and a deterministic one never receives it. The strip stays automatic.
+- **Properties** grouped Photos / Style / Motion / Interaction via an optional group map in the
+  shared builder. Photos stay a comma-separated field: the media-list picker writes an array,
+  which custom component props cannot hold.
 - Stacked on #425 (shared `custom-template.ts`).

@@ -5,16 +5,6 @@ export const STRIP_CSS = String.raw`
   container-type: size;
   overflow: hidden;
   background: var(--ps-bg);
-  touch-action: pan-y;
-  user-select: none;
-}
-
-.ps[data-drag] {
-  cursor: grab;
-}
-
-.ps[data-holding] {
-  cursor: grabbing;
 }
 
 .ps-row {

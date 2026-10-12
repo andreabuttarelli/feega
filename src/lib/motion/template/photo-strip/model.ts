@@ -6,7 +6,6 @@ const CAPTION_OUT = 0.12;
 const CAPTION_SETTLED = 0.95;
 const CAPTION_GAP = 0.035;
 const CURSOR_REACH = 0.6;
-const FLING = 0.18;
 const STRIP_Y = -0.03;
 const MAGNIFIER_CORE = 0.5;
 
@@ -103,9 +102,9 @@ function cursorFrame(p, plan, t) {
   return { x: sign * CURSOR_REACH * (0.5 - reach) * pitchOf(p) * 2, y: STRIP_Y + heightOf(p) * 0.15, opacity: shown, press: shown };
 }
 
-function stripFrame(p, t, length, width, height, pos, calm) {
+function stripFrame(p, t, length, width, height) {
   const plan = stripPlan(p, length);
-  const s = pos === undefined ? stripPos(plan, t) : pos;
+  const s = stripPos(plan, t);
   const short = Math.min(width, height);
   const half = width / short / 2;
   const n = plan.count;
@@ -119,7 +118,7 @@ function stripFrame(p, t, length, width, height, pos, calm) {
   });
   const nearest = Math.round(s);
   const photo = ((nearest % n) + n) % n;
-  const weight = calm === undefined ? captionWeight(plan, t, p.captionLead ?? 0.4) : calm;
+  const weight = captionWeight(plan, t, p.captionLead ?? 0.4);
   const near = 1 - smooth(clamp01(Math.abs(s - nearest) / 0.4));
   return {
     cards,
@@ -128,11 +127,4 @@ function stripFrame(p, t, length, width, height, pos, calm) {
   };
 }
 
-const releaseTarget = (pos, velocity) => Math.round(pos + velocity * FLING);
-
-function restAfter(plan, t) {
-  const at = gestureAt(plan, t);
-  const next = t + (1 - at.x) * (at.g.end - at.g.at);
-  return { at: next, pos: stripPos(plan, next) };
-}
 `;
