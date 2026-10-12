@@ -16,3 +16,8 @@ centred closing title. Lines are out of frame on landing, in every aspect.
   fields). Entrances reuse floating-media's word entrance via `word-entrance.ts` (fade + 0.2em
   rise, expo, no overshoot, no blur): opening title per word, lines already in frame staggered,
   closing title per word as it brakes. Brisker start: 2.6 lines/s for 1.8 s (`readSpeed` field).
+- Ship: text size shrinks to fit the widest line in 84% of the frame width (measured, cached,
+  re-measured when fonts finish loading), so 9:16 never clips. Word spans get `will-change` to
+  stop pixel-snapped rise flicker. Lines already in frame enter together after the title (0.04 s
+  stagger). Variants rendered: dark centred 16:9, light left-aligned with rules 1:1, 9:16;
+  0 jolts each.

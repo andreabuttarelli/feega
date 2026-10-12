@@ -2,6 +2,7 @@ export const SCROLL_VIEW = String.raw`
 const COLUMN_WIDTH = 0.84;
 const STREAK_FLOOR = 0.05;
 const STREAK_CAP = 2;
+const DOT_ROOM = 0.7;
 const SVG = 'http://www.w3.org/2000/svg';
 
 const filterId = 'fs-streak-' + document.querySelectorAll('.fs').length;
@@ -24,6 +25,11 @@ filter.appendChild(gauss);
 svg.appendChild(filter);
 scene.appendChild(svg);
 
+const probe = document.createElement('span');
+probe.className = 'fs-probe';
+scene.appendChild(probe);
+
+let fitted = { key: '', size: 0 };
 let cache = { key: '', layout: null, open: [], close: null, closeWords: [], lines: [], lookKey: '' };
 
 const sizeOf = () => ({ width: scene.clientWidth || 1920, height: scene.clientHeight || 1080 });
@@ -54,6 +60,29 @@ const lineNode = (text, p) => {
   node.appendChild(dot);
   node.appendChild(label);
   return node;
+};
+
+const fontsReady = () => (document.fonts ? document.fonts.status : 'loaded');
+
+const fittedSize = (p) => {
+  const { width, height } = sizeOf();
+  const key = JSON.stringify([width, height, p.lines, p.openTitle, p.closeTitle, p.lowercase, p.font, p.fontSize, p.fontWeight, p.tracking, p.marker, fontsReady()]);
+  if (key === fitted.key) {
+    return fitted.size;
+  }
+  const px = (p.fontSize * Math.min(width, height)) / 100;
+  const ps = probe.style;
+  ps.fontFamily = String(p.font).includes(',') ? p.font : '"' + p.font + '", system-ui, sans-serif';
+  ps.fontSize = px + 'px';
+  ps.fontWeight = String(p.fontWeight);
+  ps.letterSpacing = p.tracking + 'em';
+  const extra = p.marker === 'dot' ? DOT_ROOM * px : 0;
+  const widest = [p.openTitle, p.closeTitle, ...lineList(p.lines)].reduce((most, text) => {
+    probe.textContent = cased(text, p);
+    return Math.max(most, probe.getBoundingClientRect().width + extra);
+  }, 1);
+  fitted = { key, size: p.fontSize * Math.min(1, (COLUMN_WIDTH * width) / widest) };
+  return fitted.size;
 };
 
 const build = (p) => {
@@ -111,6 +140,7 @@ const paintWord = (node, look, base = '') => {
 
 const draw = () => {
   const p = { ...props };
+  p.fontSize = fittedSize(p);
   const t = tl.time();
   const { width, height } = sizeOf();
   const unit = Math.min(width, height);

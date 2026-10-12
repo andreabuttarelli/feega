@@ -9,6 +9,13 @@ export const SCROLL_CSS = String.raw`
   -webkit-font-smoothing: antialiased;
 }
 
+.fs-probe {
+  position: absolute;
+  visibility: hidden;
+  white-space: pre;
+  line-height: 1;
+}
+
 .fs-filter {
   position: absolute;
   width: 0;
@@ -52,6 +59,7 @@ export const SCROLL_CSS = String.raw`
 .fs-word {
   display: inline-block;
   white-space: pre;
+  will-change: transform, opacity;
 }
 
 .fs-line {
