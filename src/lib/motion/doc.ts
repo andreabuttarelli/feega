@@ -22,6 +22,7 @@ import { textPathSchema } from './text-path/model';
 import { DEFAULT_MOTION_BLUR, motionBlurSchema } from './motion-blur';
 import { interactiveSchema } from './interactive/schema';
 import { fieldsSchema } from './template/field-model';
+import { keyFieldsSchema } from './template/key-fields';
 import { scriptSchema } from './script';
 import { physicsSchema } from './physics/model';
 import { MOTION_STYLES } from './style-model';
@@ -117,7 +118,8 @@ export const MAX_TRACKS = 20;
 const templateMarkSchema = z.object({
   id: z.string().min(1).max(80),
   name: z.string().min(1).max(60),
-  keys: z.record(z.string(), z.string()).default({})
+  keys: z.record(z.string(), z.string()).default({}),
+  keyFields: keyFieldsSchema
 });
 
 const compSchema = z.object({

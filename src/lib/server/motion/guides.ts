@@ -1,7 +1,8 @@
 import type { CustomSource } from '$lib/motion/custom/component';
 
 export enum GuideTopic {
-  ThreePerformance = '3d-performance'
+  ThreePerformance = '3d-performance',
+  ShaderEffects = 'shader-effects'
 }
 
 type Guide = { uses: RegExp; text: string };
@@ -42,8 +43,27 @@ const THREE_PERFORMANCE = [
   '- onDestroy(() => { geometry.dispose(); material.dispose(); texture.dispose(); renderer.dispose(); }) for everything you created.'
 ].join('\n');
 
+const SHADER_EFFECTS_GUIDE = [
+  'SHADER EFFECTS GUIDE (read once, apply to every use of shaders.*, the open-source WebGPU shaders library)',
+  'When',
+  '- A backdrop that has to breathe (mesh-gradient, aurora, plasma), a material moment (liquid-metal, chrome), a light accent (godrays, light-leak), a reveal (iris-wipe, noise-dissolve). One per scene, never decoration on every shot.',
+  '- Prefer the ShaderEffect clip (add_shader_effect): it seeks, keyframes and exports for free. Inside a component only when the effect must react to the component own state.',
+  'Time',
+  '- const fx = shaders.layer(canvas, effect, values, imageUrl) once at build, the canvas sized to the layer box. It follows tl by itself: the frame at t comes from t alone, in any order. fx.set({ progress }) inside onUpdate animates a knob.',
+  '- Never mount or drive the library by hand: shaders.layer waits for the GPU before the export captures. cursor-ripples and chroma-flow follow the pointer: live components only.',
+  '- speed is fixed per layer: animate the other knobs, never speed.',
+  'Performance',
+  '- One effect per canvas, the canvas sized to the layer box: the cost grows with pixels, not with knobs.',
+  '- WebGPU is not WebGL: it does not use the 16 WebGL contexts of the export, but every mount holds GPU textures; at most 3 at once on screen.',
+  '- Without WebGPU (Firefox, old Safari) the layer paints a flat gradient of its colours: never put the message only inside the effect.',
+  'Brand',
+  '- Brand logos stay untouched: never under a distortion, glass, wipe, blur or grain. Effects go behind or beside the logo, never on it.',
+  '- Colours from the brand: pass brand colours as the effect colours, not the library defaults.'
+].join('\n');
+
 export const GUIDES: Record<GuideTopic, Guide> = {
-  [GuideTopic.ThreePerformance]: { uses: /\bTHREE\b|\bthree\.renderer\b|\btwgl\b|\bPIXI\b/, text: THREE_PERFORMANCE }
+  [GuideTopic.ThreePerformance]: { uses: /\bTHREE\b|\bthree\.renderer\b|\btwgl\b|\bPIXI\b/, text: THREE_PERFORMANCE },
+  [GuideTopic.ShaderEffects]: { uses: /\bshaders\./, text: SHADER_EFFECTS_GUIDE }
 };
 
 export function guidesFor(source: CustomSource, given: readonly GuideTopic[]): GuideTopic[] {

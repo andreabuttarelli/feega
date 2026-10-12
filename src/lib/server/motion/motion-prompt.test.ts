@@ -3,6 +3,7 @@ import { PRODUCT_SCREENS_RULE, motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { HOUSE_DEFAULTS, STYLES, TITLE_CARD_RULE, TITLE_TYPE_RULE, UI_FOCUS_RULE } from '$lib/motion/style';
 import { MotionStyle } from '$lib/motion/style-model';
+import { LOOP_RULE } from '$lib/motion/loop';
 
 const prompt = (style: MotionStyle) =>
   motionAgentPrompt({
@@ -11,6 +12,12 @@ const prompt = (style: MotionStyle) =>
     vision: Vision.Available,
     style
   });
+
+describe('videos loop', () => {
+  it('every role is told to end where the video began', () => {
+    expect(prompt(MotionStyle.LaunchFilm)).toContain(LOOP_RULE);
+  });
+});
 
 describe('when the agent breaks the video', () => {
   it('restores a saved version itself instead of asking the user to undo', () => {

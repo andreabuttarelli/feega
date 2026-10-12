@@ -271,3 +271,62 @@ describe('the chat agent sets a node model only from the canvas catalogue', () =
     expect(out.message).toMatch(/m1 \(balanced\)/);
   });
 });
+
+describe('set_composition_component — a canvas composition on a library component, as in the node', () => {
+  const STRIP = 'builtin:photo-strip';
+  const compositionRow = () => ({
+    ...nodeRow,
+    type: 'composition',
+    data: { layout: 'tilted-grid', layoutParams: {}, camera: { preset: 'static', params: {} }, background: { color: '#000000' }, duration: 6, aspect: '9:16', refId: null } as Record<string, unknown>
+  });
+
+  it('list_components names every library component with its fields', async () => {
+    const { db } = fakeDb({ motion_templates: [] }, { filter: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    const out = (await run(tools.list_components, {})) as { components: { id: string; fields: { key: string; type: string }[] }[] };
+    const strip = out.components.find((c) => c.id === STRIP);
+
+    expect(strip?.fields).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'media', type: 'media_list' })]));
+  });
+
+  it('writes the component and its text on the node; wired media fill its media field by themselves', async () => {
+    const rows = { nodes: [compositionRow()], canvas_events: [{}], motion_templates: [] };
+    const { db } = fakeDb(rows, { filter: true, mutate: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    const out = await run(tools.set_composition_component, { nodeId: NODE, component: STRIP, values: { captions: 'Rome' } });
+
+    expect(out).toMatchObject({ outcome: 'written' });
+    expect(rows.nodes[0].data).toMatchObject({ layout: 'tilted-grid', template: { id: STRIP, values: { captions: 'Rome' } } });
+  });
+
+  it('refuses an unknown component or field without writing', async () => {
+    const rows = { nodes: [compositionRow()], motion_templates: [] };
+    const { db } = fakeDb(rows, { filter: true, mutate: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    expect(await run(tools.set_composition_component, { nodeId: NODE, component: 'builtin:nope', values: {} })).toMatchObject({ outcome: 'invalid' });
+    expect(await run(tools.set_composition_component, { nodeId: NODE, component: STRIP, values: { nope: 'x' } })).toMatchObject({ outcome: 'invalid' });
+    expect(rows.nodes[0].version).toBe(3);
+  });
+
+  it('component null puts the node back on its media layout', async () => {
+    const row = compositionRow();
+    const rows = { nodes: [{ ...row, data: { ...row.data, template: { id: STRIP, values: {} } } }], canvas_events: [{}], motion_templates: [] };
+    const { db } = fakeDb(rows, { filter: true, mutate: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    await run(tools.set_composition_component, { nodeId: NODE, component: null });
+
+    expect(rows.nodes[0].data.template).toBeUndefined();
+  });
+
+  it('refuses a node that is not a composition', async () => {
+    const rows = { nodes: [{ ...nodeRow }], motion_templates: [] };
+    const { db } = fakeDb(rows, { filter: true, mutate: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    expect(await run(tools.set_composition_component, { nodeId: NODE, component: STRIP })).toMatchObject({ outcome: 'invalid' });
+  });
+});

@@ -34,14 +34,16 @@ export const INPUT_KEYS = Object.values(InputKey);
 
 export type InputValues = Partial<Record<InputKey, number>>;
 
-export type InputPort = { read: (key: InputKey) => number; smooth: (slot: number, target: number, seconds: number) => number };
+export type VarNumbers = Readonly<Record<string, number>>;
 
-export function fallbackPort(seconds: number): InputPort {
-  return { read: (key) => INPUTS[key].fallback(seconds), smooth: (_slot, target) => target };
+export type InputPort = { read: (key: InputKey) => number; smooth: (slot: number, target: number, seconds: number) => number; vars: VarNumbers };
+
+export function fallbackPort(seconds: number, vars: VarNumbers = {}): InputPort {
+  return { read: (key) => INPUTS[key].fallback(seconds), smooth: (_slot, target) => target, vars };
 }
 
-export function valuesPort(values: InputValues, seconds: number, smooth: InputPort['smooth']): InputPort {
-  return { read: (key) => values[key] ?? INPUTS[key].fallback(seconds), smooth };
+export function valuesPort(values: InputValues, seconds: number, smooth: InputPort['smooth'], vars: VarNumbers = {}): InputPort {
+  return { read: (key) => values[key] ?? INPUTS[key].fallback(seconds), smooth, vars };
 }
 
 export type Point = [number, number];
@@ -80,7 +82,7 @@ export function crossLevel(outer: InputValues, level: Level): Crossed {
   return { values, inside: local.inside };
 }
 
-const READS_INPUT = /\binput\s*\./;
+const READS_INPUT = /\b(?:input|vars)\s*\./;
 
 export function readsInput(source: string): boolean {
   return READS_INPUT.test(source);

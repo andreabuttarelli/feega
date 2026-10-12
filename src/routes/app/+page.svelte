@@ -3,8 +3,11 @@
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { enhance } from '$app/forms';
+  import { preloadCode } from '$app/navigation';
+  import { BriefPhase, briefPhaseAfter, briefProgress } from '$lib/motion/brief-progress';
   import VideoCard from '$lib/components/app/VideoCard.svelte';
   import ProjectCard from '$lib/components/app/ProjectCard.svelte';
+  import ComponentShelf from '$lib/components/app/ComponentShelf.svelte';
   import type { VideoPage } from '$lib/server/dashboard/dashboard';
   import { GALLERY_PATH, byline, itemPath } from '$lib/gallery/model';
   import { BRIEF_MAX } from '$lib/motion/video-brief';
@@ -22,8 +25,10 @@
   const EXAMPLES_SHOWN = 3;
   const EXAMPLE_TURN_MS = 6000;
   const SKELETONS = 5;
+  const EDITOR_ROUTE = '/p/_/c/_/motion/_';
 
-  let sending = $state(false);
+  let phase = $state(BriefPhase.Idle);
+  const sending = $derived(phase !== BriefPhase.Idle);
   let brief = $state('');
   let turn = $state(0);
   let dragging = $state(false);
@@ -73,6 +78,10 @@
     } finally {
       loadingMore = false;
     }
+  }
+
+  function preloadEditor() {
+    void preloadCode(EDITOR_ROUTE);
   }
 
   function fill(text: string) {
@@ -127,10 +136,11 @@
       cancel();
       return;
     }
-    sending = true;
-    return async ({ update }: { update: () => Promise<void> }) => {
+    phase = BriefPhase.Creating;
+    return async ({ result, update }: { result: { type: string }; update: () => Promise<void> }) => {
+      phase = briefPhaseAfter(result.type);
       await update();
-      sending = false;
+      phase = BriefPhase.Idle;
     };
   };
 </script>
@@ -147,6 +157,7 @@
         action="?/video"
         class="composer"
         class:dragging
+        aria-busy={sending}
         bind:this={composer}
         use:enhance={submit}
         ondragover={dragged}
@@ -172,6 +183,8 @@
           bind:this={field}
           onkeydown={keyed}
           onpaste={pasted}
+          onfocus={preloadEditor}
+          readonly={sending}
         ></textarea>
         {#if data.attachProjectId}<input type="hidden" name="projectId" value={data.attachProjectId} />{/if}
         {#each ready as attachment (attachment.assetId)}<input type="hidden" name="attachment" value={attachment.assetId} />{/each}
@@ -182,7 +195,8 @@
               <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
             </span>
           {/if}
-          <button type="submit" class="send" data-testid="brief-send" disabled={!canSend} aria-label="Make the video" title="Make the video">
+          {#if sending}<span class="progress" role="status" data-testid="brief-progress">{briefProgress(phase)}</span>{/if}
+          <button type="submit" class="send" class:busy={sending} data-testid="brief-send" disabled={!canSend} aria-label="Make the video" title="Make the video">
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" /></svg>
           </button>
         </div>
@@ -221,6 +235,8 @@
       <p class="empty" data-testid="home-videos-empty">nothing here yet. <a href="#video-brief">describe your first video</a> and it lands here.</p>
     {/if}
   </section>
+
+  <ComponentShelf items={data.components} projectId={data.attachProjectId} />
 
   <section class="shelf" aria-labelledby="projects-heading">
     <div class="head">
@@ -372,6 +388,34 @@
     background: var(--ui-field);
     color: var(--ui-ink-3);
     cursor: default;
+  }
+
+  .progress {
+    margin-left: auto;
+    font-size: var(--ui-text-sm);
+    color: var(--ui-ink-2);
+  }
+
+  .progress + .send {
+    margin-left: 0;
+  }
+
+  .send.busy:disabled {
+    background: var(--ui-accent);
+    color: #fff;
+    animation: send-busy 1s ease-in-out infinite;
+  }
+
+  @keyframes send-busy {
+    50% {
+      opacity: 0.55;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .send.busy:disabled {
+      animation: none;
+    }
   }
 
   .send:focus-visible {

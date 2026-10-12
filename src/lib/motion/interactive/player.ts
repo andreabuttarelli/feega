@@ -1,5 +1,6 @@
 import type { gestureScrub, readHost, selfScroll } from './host';
 import type { fitBox } from './fit';
+import type { VarDecl, VarRules, VarValues, coerceVars } from './var-model';
 
 export type PlayerConfig = {
   html: string;
@@ -16,11 +17,13 @@ export type PlayerConfig = {
   linkMessage: string;
   nativeBridge: string;
   protocol: number;
-  events: Record<'Size' | 'Ready' | 'TimeUpdate' | 'Ended' | 'Link' | 'Error', string>;
+  events: Record<'Size' | 'Ready' | 'TimeUpdate' | 'Ended' | 'Link' | 'Error' | 'Vars', string>;
   selfScroll: string;
   standaloneMs: number;
   fitScale: Record<string, 'max' | 'min'>;
   scrollLength: number;
+  vars: VarDecl[];
+  varRules: VarRules;
   keys: { x: string; y: string; down: string; hover: string; tiltX: string; tiltY: string; scroll: string; time: string };
 };
 
@@ -28,12 +31,13 @@ type PlayerEl = HTMLElement & { seek: (t: number) => void; play: () => void; pau
 type Bridge = { postMessage: (message: string) => void };
 type Orientation = typeof DeviceOrientationEvent & { requestPermission?: () => Promise<string> };
 
-export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof selfScroll, fit: typeof fitBox, swipe: typeof gestureScrub): void {
+export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof selfScroll, fit: typeof fitBox, swipe: typeof gestureScrub, coerce: typeof coerceVars): void {
   const TILT_DEGREES = 45;
   const UPRIGHT_BETA = 45;
   const el = document.getElementById('player') as PlayerEl;
   const pad = document.getElementById('pad') as HTMLElement;
   const values: Record<string, number> = {};
+  let vars: VarValues = Object.fromEntries(cfg.vars.map((d) => [d.name, d.default]));
   const started = performance.now();
   let ready = false;
   let playing = false;
@@ -43,7 +47,7 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
   let pending: (() => void) | null = null;
 
   const clamp = (v: number) => Math.max(-1, Math.min(1, v));
-  const post = () => el.iframeElement?.contentWindow?.postMessage({ type: cfg.inputMessage, values }, '*');
+  const post = () => el.iframeElement?.contentWindow?.postMessage({ type: cfg.inputMessage, values, vars }, '*');
   const send = (event: object) => el.iframeElement?.contentWindow?.postMessage({ type: cfg.eventMessage, ...event }, '*');
   const play = () => {
     if (ready && !playing) {
@@ -185,6 +189,11 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
     if (m.command) {
       obey(m.command, m.time);
     }
+    const changed = m.vars ? coerce(cfg.vars, m.vars, cfg.varRules) : {};
+    if (Object.keys(changed).length) {
+      vars = { ...vars, ...changed };
+      emit(cfg.events.Vars, { values: vars });
+    }
     standalone?.cancel();
     if (m.gesture && cfg.playback === cfg.modes.scrub && !swiping) {
       swiping = true;
@@ -220,7 +229,7 @@ export function playerMain(cfg: PlayerConfig, read: typeof readHost, own: typeof
     }
     pending?.();
     pending = null;
-    emit(cfg.events.Ready, { width: cfg.width, height: cfg.height, duration: cfg.duration, playback: cfg.playback, loop: cfg.loop });
+    emit(cfg.events.Ready, { width: cfg.width, height: cfg.height, duration: cfg.duration, playback: cfg.playback, loop: cfg.loop, vars: cfg.vars, values: vars });
   });
   new IntersectionObserver((entries) => {
     if (cfg.playback === cfg.modes.inView) {

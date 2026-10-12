@@ -23,6 +23,8 @@ class FeegaMotionController {
   void pause() => _state?._send(HostMessage.pause());
 
   void seek(double seconds) => _state?._send(HostMessage.seek(seconds));
+
+  void setVars(Map<String, Object?> vars) => _state?._sendVars(vars);
 }
 
 class FeegaMotion extends StatefulWidget {
@@ -35,11 +37,13 @@ class FeegaMotion extends StatefulWidget {
     this.tilt = false,
     this.origin = defaultOrigin,
     this.controller,
+    this.vars = const {},
     this.onReady,
     this.onTimeUpdate,
     this.onEnded,
     this.onLinkClick,
     this.onError,
+    this.onVarsChange,
   });
 
   final String id;
@@ -49,11 +53,13 @@ class FeegaMotion extends StatefulWidget {
   final bool tilt;
   final String origin;
   final FeegaMotionController? controller;
+  final Map<String, Object?> vars;
   final ValueChanged<ReadyInfo>? onReady;
   final void Function(double time, double duration)? onTimeUpdate;
   final VoidCallback? onEnded;
   final ValueChanged<Uri>? onLinkClick;
   final ValueChanged<String>? onError;
+  final ValueChanged<Map<String, Object?>>? onVarsChange;
 
   @override
   State<FeegaMotion> createState() => _FeegaMotionState();
@@ -62,6 +68,7 @@ class FeegaMotion extends StatefulWidget {
 class _FeegaMotionState extends State<FeegaMotion> with WidgetsBindingObserver {
   late final WebViewController _web;
   final List<HostMessage> _pending = [];
+  final Map<String, Object?> _sentVars = {};
   ScrollPosition? _position;
   StreamSubscription<AccelerometerEvent>? _tilt;
   bool _listening = false;
@@ -82,6 +89,9 @@ class _FeegaMotionState extends State<FeegaMotion> with WidgetsBindingObserver {
     widget.controller?._state = this;
     WidgetsBinding.instance.addObserver(this);
     _story = widget.scrollLength ?? 0;
+    if (widget.vars.isNotEmpty) {
+      _sendVars(widget.vars);
+    }
     widget.scrollController?.addListener(_queueMeasure);
     WidgetsBinding.instance.addPostFrameCallback((_) => mounted ? _measure() : null);
     _web = WebViewController()
@@ -117,6 +127,10 @@ class _FeegaMotionState extends State<FeegaMotion> with WidgetsBindingObserver {
     widget.controller?._state = this;
     if (old.fit != widget.fit) {
       _send(HostMessage.fit(widget.fit));
+    }
+    final changed = changedVars(_sentVars, widget.vars);
+    if (changed != null) {
+      _sendVars(changed);
     }
     if (old.scrollController != widget.scrollController) {
       old.scrollController?.removeListener(_queueMeasure);
@@ -187,6 +201,11 @@ class _FeegaMotionState extends State<FeegaMotion> with WidgetsBindingObserver {
     _web.runJavaScript(message.script);
   }
 
+  void _sendVars(Map<String, Object?> vars) {
+    _sentVars.addAll(vars);
+    _send(HostMessage.vars(vars));
+  }
+
   void _hear(String raw) {
     final message = PlayerMessage.parse(raw);
     switch (message) {
@@ -208,6 +227,8 @@ class _FeegaMotionState extends State<FeegaMotion> with WidgetsBindingObserver {
         _openLink(url);
       case ErrorMessage(message: final text):
         widget.onError?.call(text);
+      case VarsMessage(:final values):
+        widget.onVarsChange?.call(values);
       case null:
         return;
     }

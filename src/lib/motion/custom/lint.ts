@@ -1,6 +1,7 @@
 import { parse, type Node } from 'acorn';
 import { full } from 'acorn-walk';
 import { ComponentMode, type CustomSource, type SourceFile } from './component';
+import { SHADER_EFFECTS, ShaderPlay, type ShaderEffectId } from '../shader-effects/catalogue';
 
 export type LintProblem = { file: SourceFile; message: string };
 
@@ -75,6 +76,10 @@ const MATTER_CLOCK = clock('matter.js loops run on the clock: Matter.seekable(en
 
 const WALL_CLOCK = clock('time comes from tl, not the clock');
 
+const CURSOR_EFFECT = clock('a cursor shader effect follows the pointer: declare the component live');
+
+const isLiveEffect = (value: unknown) => SHADER_EFFECTS[value as ShaderEffectId]?.play === ShaderPlay.Live;
+
 const FORBIDDEN_MEMBERS: Record<string, Record<string, Rule>> = {
   Matter: { Runner: MATTER_CLOCK, Render: MATTER_CLOCK },
   d3: { timer: D3_CLOCK, interval: D3_CLOCK, timeout: D3_CLOCK, now: D3_CLOCK },
@@ -138,6 +143,11 @@ const VISITS: Record<string, Visit> = {
   CallExpression: (node, report) => {
     if (name(node.callee) === 'Date') {
       report(WALL_CLOCK, 'Date()');
+    }
+  },
+  Literal: (node, report) => {
+    if (isLiveEffect(node.value)) {
+      report(CURSOR_EFFECT, String(node.value));
     }
   },
   ImportExpression: (_, report) => {

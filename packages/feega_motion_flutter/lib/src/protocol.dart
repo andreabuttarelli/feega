@@ -38,6 +38,56 @@ HostCommand? visibilityCommand(Playback playback, {required bool visible}) {
   return visible ? shown : hidden;
 }
 
+enum VarKind {
+  number('number'),
+  boolean('boolean'),
+  enumeration('enum'),
+  color('color'),
+  string('string');
+
+  const VarKind(this.wire);
+
+  final String wire;
+
+  static VarKind? of(Object? wire) => values.where((k) => k.wire == wire).firstOrNull;
+}
+
+class VarDecl {
+  const VarDecl({required this.name, required this.kind, required this.defaultValue, this.min, this.max, this.options = const []});
+
+  final String name;
+  final VarKind kind;
+  final Object? defaultValue;
+  final double? min;
+  final double? max;
+  final List<String> options;
+
+  static VarDecl? fromJson(Object? raw) {
+    if (raw is! Map<String, dynamic>) {
+      return null;
+    }
+    final kind = VarKind.of(raw['kind']);
+    final name = raw['name'];
+    if (kind == null || name is! String) {
+      return null;
+    }
+    final options = raw['options'];
+    return VarDecl(
+      name: name,
+      kind: kind,
+      defaultValue: raw['default'],
+      min: (raw['min'] as num?)?.toDouble(),
+      max: (raw['max'] as num?)?.toDouble(),
+      options: options is List ? options.whereType<String>().toList() : const [],
+    );
+  }
+}
+
+Map<String, Object?>? changedVars(Map<String, Object?> sent, Map<String, Object?> next) {
+  final changed = {for (final e in next.entries) if (sent[e.key] != e.value) e.key: e.value};
+  return changed.isEmpty ? null : changed;
+}
+
 Uri embedUri(String origin, String id, Fit fit) => Uri.parse('$origin$embedRoute/${Uri.encodeComponent(id)}?fit=${fit.name}');
 
 class HostMessage {
@@ -52,6 +102,7 @@ class HostMessage {
   HostMessage.fit(Fit fit) : this._({'fit': fit.name});
   HostMessage.greet({required bool reducedMotion}) : this._({'links': 'host', 'reducedMotion': reducedMotion});
   HostMessage.tilt(Tilt tilt) : this._({'tilt': {'x': tilt.x, 'y': tilt.y}});
+  HostMessage.vars(Map<String, Object?> vars) : this._({'vars': vars});
 
   final Map<String, Object?> _fields;
 
@@ -61,13 +112,15 @@ class HostMessage {
 }
 
 class ReadyInfo {
-  const ReadyInfo({required this.width, required this.height, required this.duration, required this.playback, required this.loop});
+  const ReadyInfo({required this.width, required this.height, required this.duration, required this.playback, required this.loop, this.vars = const [], this.values = const {}});
 
   final double width;
   final double height;
   final double duration;
   final Playback playback;
   final bool loop;
+  final List<VarDecl> vars;
+  final Map<String, Object?> values;
 
   double get aspect => width / height;
 }
@@ -114,12 +167,21 @@ class LinkMessage extends PlayerMessage {
   final Uri url;
 }
 
+class VarsMessage extends PlayerMessage {
+  const VarsMessage(this.values);
+  final Map<String, Object?> values;
+}
+
 class ErrorMessage extends PlayerMessage {
   const ErrorMessage(this.message);
   final String message;
 }
 
 double _num(Object? v) => v is num ? v.toDouble() : 0;
+
+Map<String, Object?> _values(Object? v) => v is Map<String, dynamic> ? Map<String, Object?>.from(v) : const {};
+
+List<VarDecl> _decls(Object? v) => v is List ? v.map(VarDecl.fromJson).whereType<VarDecl>().toList() : const [];
 
 PlayerMessage? _link(Map<String, dynamic> m) {
   final url = Uri.tryParse('${m['url']}');
@@ -128,9 +190,10 @@ PlayerMessage? _link(Map<String, dynamic> m) {
 
 final Map<Object?, PlayerMessage? Function(Map<String, dynamic>)> _readers = {
   'size': (m) => SizeMessage(_num(m['aspect'])),
-  'ready': (m) => ReadyMessage(ReadyInfo(width: _num(m['width']), height: _num(m['height']), duration: _num(m['duration']), playback: Playback.of(m['playback']), loop: m['loop'] == true)),
+  'ready': (m) => ReadyMessage(ReadyInfo(width: _num(m['width']), height: _num(m['height']), duration: _num(m['duration']), playback: Playback.of(m['playback']), loop: m['loop'] == true, vars: _decls(m['vars']), values: _values(m['values']))),
   'timeupdate': (m) => TimeMessage(_num(m['time']), _num(m['duration'])),
   'ended': (_) => const EndedMessage(),
   'link': _link,
   'error': (m) => ErrorMessage('${m['message']}'),
+  'vars': (m) => VarsMessage(_values(m['values'])),
 };

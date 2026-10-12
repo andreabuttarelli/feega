@@ -50,7 +50,7 @@ export async function mixAudio(entries: AudioEntry[], seconds: number): Promise<
   return context.startRendering();
 }
 
-function probeOf(size: Size, meter: JoltMeter | undefined): ((source: OffscreenCanvas) => void) | null {
+export function probeOf(size: Size, meter: JoltMeter | undefined): ((source: CanvasImageSource) => void) | null {
   if (!meter) {
     return null;
   }
@@ -60,6 +60,7 @@ function probeOf(size: Size, meter: JoltMeter | undefined): ((source: OffscreenC
   if (!look) {
     return null;
   }
+  look.imageSmoothingQuality = 'high';
   return (source) => {
     look.drawImage(source, 0, 0, probe.width, probe.height);
     meter.add(lumaOf(look.getImageData(0, 0, probe.width, probe.height).data));

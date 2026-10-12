@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkDoc, liveComponents, seekPlan, unverified, verdictOf, type Shot } from './determinism';
+import { checkDoc, liveComponents, stillStandIns, seekPlan, unverified, verdictOf, type Shot } from './determinism';
 import { MotionFormat, clipsOf, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
 import { composeHtml } from '../hyperframes/compose';
 import { FEEGA_TOKENS } from '../brand';
@@ -14,7 +14,13 @@ function must(r: OpResult): MotionDoc {
   return r.doc;
 }
 
-const shot = (time: number, image = `img@${time}`, layout = `box@${time}`): Shot => ({ time, image, layout, errors: [] });
+const SIDE = 16;
+const picture = (values: Uint8Array) => ({ width: SIDE, values });
+const FRAME = picture(new Uint8Array(SIDE * SIDE).fill(40));
+const DRIFTED = picture(new Uint8Array(SIDE * SIDE).fill(200));
+const edge = (at: number) => picture(new Uint8Array(SIDE * SIDE).map((_, p) => (p % SIDE < at ? 0 : 255)));
+
+const shot = (time: number, image = `img@${time}`, layout = `box@${time}`, luma = FRAME): Shot => ({ time, image, luma, layout, errors: [] });
 
 describe('the seek-determinism check', () => {
   it('visits every check point forward, backward and in a scrambled order', () => {
@@ -37,13 +43,36 @@ describe('the seek-determinism check', () => {
 
   it('fails on a frame that depends on where the playhead came from, with both frames', () => {
     const plan = seekPlan(4, 30);
-    const shots = plan.map((t, i) => (i === 12 ? shot(t, 'drifted') : shot(t)));
+    const shots = plan.map((t, i) => (i === 12 ? shot(t, 'drifted', `box@${t}`, DRIFTED) : shot(t)));
 
     const verdict = verdictOf(shots);
 
     expect(verdict.ok).toBe(false);
     expect(verdict.problems[0]).toMatch(/differs/);
     expect(verdict.offending.map((s) => s.image)).toEqual([`img@${plan[12]}`, 'drifted']);
+  });
+
+  it('passes a frame whose revisit differs only by antialiasing noise, as real Chrome draws large glyphs', () => {
+    const plan = seekPlan(4, 30);
+    const grain = picture(FRAME.values.map((v, p) => (p % 9 === 0 ? v + 3 : v)));
+    const shots = plan.map((t, i) => (i === 19 ? shot(t, 'reencoded', `box@${t}`, grain) : shot(t)));
+
+    expect(verdictOf(shots)).toEqual({ ok: true, problems: [], offending: [] });
+  });
+
+  it('passes a revisit where JPEG re-quantised one 8x8 block of a mid-roll digit by 13 levels, as the stripe stat-count measured', () => {
+    const plan = seekPlan(4, 30);
+    const requantised = picture(FRAME.values.map((v, p) => (p % SIDE < 8 && p < 8 * SIDE ? v + (p % 2 ? 13 : -13) : v)));
+    const shots = plan.map((t, i) => (i === 19 ? shot(t, 'requantised', `box@${t}`, requantised) : shot(t)));
+
+    expect(verdictOf(shots)).toEqual({ ok: true, problems: [], offending: [] });
+  });
+
+  it('fails on an edge drawn one pixel off on a revisit', () => {
+    const plan = seekPlan(4, 30);
+    const shots = plan.map((t, i) => (i === 19 ? shot(t, 'shifted', `box@${t}`, edge(5)) : shot(t, `img@${t}`, `box@${t}`, edge(4))));
+
+    expect(verdictOf(shots).ok).toBe(false);
   });
 
   it('fails on boxes that move between visits even when pixels match', () => {
@@ -125,6 +154,14 @@ describe('live scenes', () => {
   it('names the live components the video uses, not the ones it only declares', () => {
     expect(liveComponents(written)).toEqual([]);
     expect(liveComponents(must(addClip(written, { component: 'Custom', from: 0, durationInFrames: 30, props: { name: 'Game' } }, 'g1')))).toEqual(['Game']);
+  });
+
+  it('a live component that returns still(t) needs no stand-in in the video', () => {
+    const use = (js: string) => must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Vertical), 'Game', { ...draft, source: { ...draft.source, js } })), { component: 'Custom', from: 0, durationInFrames: 30, props: { name: 'Game' } }, 'g1'));
+
+    expect(stillStandIns(use('requestAnimationFrame(() => {});'))).toEqual(['Game']);
+    expect(stillStandIns(use('return { still: (t) => draw(t) };'))).toEqual([]);
+    expect(stillStandIns(use('return {\n  dispose,\n  still(t) { draw(t); }\n};'))).toEqual([]);
   });
 });
 

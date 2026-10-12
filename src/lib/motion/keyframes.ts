@@ -229,6 +229,7 @@ export const ANIMATABLE: Record<ComponentId, readonly AnimProp[]> = {
   Particles: visual(PARTICLE_PROPS),
   LiquidGlass: GLASS_PROPS,
   LiquidBlob: BLOB_PROPS,
+  ShaderEffect: visual(),
   Precomp: visual(),
   Adjustment: [],
   Custom: visual()

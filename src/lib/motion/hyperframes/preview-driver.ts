@@ -1,9 +1,11 @@
 import { hotPatch, type HotPatch } from './hot';
 import { CAPTURE_REQUEST, stampOf, type CaptureReply, type CaptureRequest } from './capture';
+import { exactSeek, type ExactSeek } from './exact-seek';
 
 export const CAPTURE_TIMEOUT_MS = 15_000;
 export const STALE_RETRY_MS = 50;
 export const RELOAD_DEBOUNCE_MS = 250;
+const SEEK_TOLERANCE_S = 1 / 240;
 
 export enum Playback {
   Playing = 'playing',
@@ -15,7 +17,7 @@ export type PlayerPort = {
   seek: (seconds: number) => void;
   play: () => void;
   pause: () => void;
-  post: (message: CaptureRequest | HotPatch) => boolean;
+  post: (message: CaptureRequest | HotPatch | ExactSeek) => boolean;
   onReady: (listener: () => void) => () => void;
   onReply: (listener: (reply: CaptureReply) => void) => () => void;
 };
@@ -26,6 +28,7 @@ export type PreviewDriver = {
   load: (html: string) => void;
   update: (html: string) => void;
   loaded: (html: string) => Promise<void>;
+  seek: (seconds: number) => void;
   shoot: (time: number, request: ShotRequest, waitMs?: number) => Promise<CaptureReply>;
   exclusive: <T>(work: () => Promise<T>) => Promise<T>;
   ready: () => void;
@@ -39,20 +42,25 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
   let live = false;
   let current = '';
 
+  let reload: ReturnType<typeof setTimeout> | null = null;
+
+  function cancelReload() {
+    if (reload) {
+      clearTimeout(reload);
+      reload = null;
+    }
+  }
+
   function load(html: string) {
+    cancelReload();
     expected = stampOf(html);
     live = false;
     current = html;
     port.load(html);
   }
 
-  let reload: ReturnType<typeof setTimeout> | null = null;
-
   function update(html: string) {
-    if (reload) {
-      clearTimeout(reload);
-      reload = null;
-    }
+    cancelReload();
     if (html === current) {
       return;
     }
@@ -103,6 +111,11 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
     });
   }
 
+  function seek(seconds: number) {
+    port.seek(seconds);
+    port.post(exactSeek(seconds));
+  }
+
   function shoot(time: number, request: ShotRequest, waitMs = timeoutMs): Promise<CaptureReply> {
     const id = newId();
     const message = { type: CAPTURE_REQUEST, id, ...request } as const;
@@ -118,7 +131,7 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
         settle();
       };
       const send = () => {
-        port.seek(time);
+        seek(time);
         if (!port.post(message)) {
           done(() => reject(new Error('preview not ready')));
         }
@@ -130,6 +143,10 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
         }
         if (expected && m.stamp !== expected) {
           retry = setTimeout(send, STALE_RETRY_MS);
+          return;
+        }
+        if (m.time !== undefined && Math.abs(m.time - time) > SEEK_TOLERANCE_S) {
+          send();
           return;
         }
         done(() => (m.error ? reject(new Error(m.error)) : resolve(m)));
@@ -144,5 +161,5 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
     return run;
   }
 
-  return { load, update, loaded, shoot, exclusive, ready, playback };
+  return { load, update, loaded, seek, shoot, exclusive, ready, playback };
 }

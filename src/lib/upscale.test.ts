@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { OPENROUTER_UPSCALE_MODEL, upscaleLimitsOf, videoRefCapacity } from '$lib/video-models';
-import { planUpscale, quoteUpscale, UpscaleMode, UpscaleTarget, upscaleParams } from './upscale';
+import { planUpscale, quoteUpscale, UpscaleMode, UpscaleStep, UpscaleTarget, upscaleParams, upscaleSteps } from './upscale';
+
+describe('upscaleSteps marks the real steps of a run', () => {
+  it('marks earlier steps done and the current one active', () => {
+    expect(upscaleSteps(UpscaleStep.Starting).map((s) => s.state)).toEqual(['done', 'active', 'todo']);
+  });
+
+  it('marks every step done when finished', () => {
+    expect(upscaleSteps(UpscaleStep.Done).every((s) => s.state === 'done')).toBe(true);
+  });
+});
 
 const LIMITS = upscaleLimitsOf(OPENROUTER_UPSCALE_MODEL)!;
 const PRICING = { cents_per_megapixel_second_precise: '7.5', cents_per_megapixel_second_creative: '10.5' };

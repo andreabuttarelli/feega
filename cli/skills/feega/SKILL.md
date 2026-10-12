@@ -173,6 +173,8 @@ running `run_id`: poll `get_motion_run` every few seconds until `done` (reply, s
 (e.g. a logo) and PDF/DOCX/PPTX/XLSX/CSV/TXT/MD/HTML it reads as text — each a public `url`, a
 project `asset_id`, or base64 `data` + `name` + `mime_type`. CLI: `feega motion ask <nodeId> "<prompt>"
 --attach ./brief.pdf https://…/logo.png asset:<id>`.
+`list_shader_effects` (CLI `feega motion shaders`) lists the GPU shader effects the agent adds —
+gradients, noise, glass, metal, light, distortions, wipes, blurs — with their knobs: name one in the prompt.
 
 Render one with `render_video`: by default it is FREE and returns a `render_url`,
 a one-time link (30 minutes, bound to the saved revision) the user opens on any device — the video
@@ -189,7 +191,7 @@ the video's scroll length. Live components (games, generative pieces) run live t
 shows a still of them. Publishing again updates it in place, `action: "unpublish"` takes it
 down. Uncensored projects are refused. It also returns `react` and `flutter` snippets: the
 same player inside a React (`@feega/motion-react`) or Flutter (`feega_motion`) app.
-`get_motion_embed` reads the state. The self-contained HTML (no hosting):
+`motion_budget` reads what a video spent across its turns; `action: "raise"` lets it spend more, only when the user asks to continue. `get_motion_embed` reads the state. The self-contained HTML (no hosting):
 `feega motion embed <nodeId> --download page.html`.
 
 See a video with `view_motion_frames` (up to 6 times in seconds): the frames come back as
@@ -199,6 +201,14 @@ images with the quality gate's `quality` and `blocking` notes. Free; look before
 Every save is a revision. `list_motion_revisions` lists them (who saved, clip count);
 `restore_motion_revision` puts one back as a new revision, history kept. Free. CLI:
 `feega motion revisions <nodeId> [--restore <version>]`.
+
+Ready-made pieces: `list_motion_templates` lists them with their typed fields (e.g.
+`builtin:prompt-input`, a prompt box that types, presses send and thinks);
+`add_motion_template` inserts an editable copy at `at` seconds with `vars` as field values and
+its key/click sounds. Free, no AI. CLI: `feega motion templates`,
+`feega motion add-template <nodeId> builtin:prompt-input --var text="..."`.
+`new_motion_from_template` starts a new video holding one at 0s (`format` 16:9, 9:16 or 1:1);
+CLI: `feega motion new --template builtin:prompt-input --format 9:16`.
 
 A launch film's script is also laid out as a storyboard canvas linked to the video: one card per
 beat, story order left to right, stronger emotion higher. `get_storyboard` reads it (the user's

@@ -39,15 +39,15 @@ export function mcpInstructions(publishing: SocialPublishing): string {
 }
 
 const MCP_INSTRUCTION_LINES = (promoted: string) => [
-  'feega is an infinite canvas of typed nodes (media, social feeds, products, ads, generations), driven by a person, the in-app chat or an MCP agent.',
-  'Reads cost nothing, change nothing; READING IS ONE TOOL: `query`. Every table, org-scoped. Name `columns` or the answer comes back short; `offset` is the next page; `count: "exact"` when the number IS the answer; `embed` brings a related table along.',
+  'feega is an infinite canvas of typed nodes (media, feeds, products, ads, generations) a person, the chat or an MCP agent drives.',
+  'Reads cost nothing, change nothing; READING IS ONE TOOL: `query`. Every table, org-scoped. Name `columns`; `offset` is the next page; `count: "exact"` when the number IS the answer; `embed` brings a related table along.',
   'Three generic writes reach every table: `insert_row`, `update_row`, `delete_row`. `describe_node_types` gives the JSON Schema `nodes.data` must match per `type` before you insert or update one.',
   '`run_node_generation` is the canvas Generate button: fills an existing node, never creates one; omit `model` for the default; `medium` must match the node\'s type; a video comes back `queued`. `apply_effects`/`make_effects_pair` render effects (`list_effects`; custom: `write_effect`, `patch_effect`), free. `enhance_prompt` improves a prompt. `run_node_loop` queues every combination of a node\'s inputs (`preview_node_loop` free, `cancel_node_loop` stops it); confirm >50, refused >1000.',
   promoted,
   'A project needs no brand (`projects.brand_id` is nullable, and that is the normal case): attach one only to publish.',
-  '`get_media` shows a node, run or asset: fetch `preview_url` to look, give users `full_url`.',
-  '`list_motion_videos`; `ask_motion_agent` edits one (`get_motion_run`, `get_motion_summary`); `render_video`/`get_render`; `publish_motion_embed`/`get_motion_embed`; `view_motion_frames`, `list_motion_revisions`, `restore_motion_revision`; `get_storyboard`/`write_storyboard`/`edit_storyboard_card`; `search_gallery`/`remix_gallery_item`/`publish_to_gallery`; `write_layout`/`patch_layout`/`list_layouts`; `get_app_account`/`forget_app_account`.',
-  'Signing in is not a tool: over HTTP the host sends the Bearer; locally run `feega login` once.'
+  '`get_media`: show `preview_url`, give `full_url`.',
+  '`list_motion_videos`/`list_shader_effects`; `ask_motion_agent`/`get_motion_run`/`get_motion_summary`/`motion_budget`; `render_video`/`get_render`; `publish_motion_embed`/`get_motion_embed`; `view_motion_frames`/`list_motion_revisions`/`restore_motion_revision`; `list_motion_templates`/`add_motion_template`/`new_motion_from_template`; `get_storyboard`/`write_storyboard`/`edit_storyboard_card`; `search_gallery`/`remix_gallery_item`/`publish_to_gallery`; `write_layout`/`patch_layout`/`list_layouts`; `get_app_account`/`forget_app_account`.',
+  'Signing in is not a tool: over HTTP the host sends the Bearer; locally `feega login`.'
 ];
 
 export const MCP_INSTRUCTIONS = mcpInstructions(SocialPublishing.Off);

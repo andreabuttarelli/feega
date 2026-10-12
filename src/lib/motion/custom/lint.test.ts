@@ -166,5 +166,15 @@ describe('3D performance advice', () => {
     expect(problemsOf({ js }).join('\n')).toContain('THREE.Clock');
     expect(lintSource({ ...ok, js }, ComponentMode.Live)).toEqual([]);
   });
-});
 
+  it('keeps cursor shader effects to live components', () => {
+    const js = 'shaders.layer(canvas, "cursor-ripples");';
+
+    expect(problemsOf({ js }).join('\n')).toContain('cursor-ripples');
+    expect(lintSource({ ...ok, js }, ComponentMode.Live)).toEqual([]);
+  });
+
+  it('allows a seekable shader effect in a deterministic component', () => {
+    expect(problemsOf({ js: 'shaders.layer(canvas, "plasma", { speed: 2 });' })).toEqual([]);
+  });
+});

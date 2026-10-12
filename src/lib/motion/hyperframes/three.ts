@@ -1,5 +1,6 @@
 import { GPU_GLOBAL, Scaling } from './gpu';
 import { js } from './html';
+import { GRAIN_TILE, grainTile, type ThreeGrain } from './three-grain';
 import { SCENE, sampleTrack, type Keyframe, type SceneKey } from '../keyframes';
 import type { StageSpec } from '../camera';
 import { hdriUrl, type Look } from '../look';
@@ -56,6 +57,7 @@ export type ThreeClip = {
   screen: ScreenBake | null;
   video: boolean;
   overscan: number;
+  grains: ThreeGrain[];
 };
 
 export const LIGHTING = {
@@ -181,6 +183,82 @@ function bokeh(canvas) {
   const scene = new THREE.Scene();
   scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material));
   return { target, material, scene, camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1) };
+}
+
+const GRAIN_FRAGMENT = [
+  'uniform sampler2D tile;uniform float amount;uniform float tileSize;uniform float pxScale;uniform float sign;',
+  'void main(){',
+  '  float t=texture2D(tile,gl_FragCoord.xy*pxScale/tileSize).r;',
+  '  gl_FragColor=vec4(vec3(max(sign*amount*(t-0.5),0.0)),0.0);',
+  '}'
+].join(String.fromCharCode(10));
+
+function tileTexture(spec, seed) {
+  const gray = grainTile(spec.size, seed);
+  const rgba = new Uint8Array(gray.length * 4);
+  gray.forEach((v, i) => rgba.fill(v, i * 4, i * 4 + 4));
+  const texture = new THREE.DataTexture(rgba, GRAIN_TILE, GRAIN_TILE);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.magFilter = THREE.LinearFilter;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function grainLayer(spec, tile, equation) {
+  return new THREE.ShaderMaterial({
+    uniforms: { tile: { value: tile }, amount: { value: spec.amount }, tileSize: { value: GRAIN_TILE }, pxScale: { value: 1 }, sign: { value: equation === THREE.AddEquation ? 1 : -1 } },
+    vertexShader: BOKEH_VERTEX,
+    fragmentShader: GRAIN_FRAGMENT,
+    depthTest: false,
+    depthWrite: false,
+    transparent: true,
+    blending: THREE.CustomBlending,
+    blendEquation: equation,
+    blendSrc: THREE.DstAlphaFactor,
+    blendDst: THREE.OneFactor,
+    blendEquationAlpha: THREE.AddEquation,
+    blendSrcAlpha: THREE.ZeroFactor,
+    blendDstAlpha: THREE.OneFactor
+  });
+}
+
+function grainPass(grains) {
+  if (!grains.length) return null;
+  const scene = new THREE.Scene();
+  const layers = grains.map((spec) => {
+    const tile = tileTexture(spec, 0);
+    const materials = [THREE.AddEquation, THREE.ReverseSubtractEquation].map((equation) => grainLayer(spec, tile, equation));
+    return { spec, seed: 0, tile, materials };
+  });
+  layers.flatMap((l) => l.materials).forEach((material, i) => {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
+    mesh.renderOrder = i;
+    scene.add(mesh);
+  });
+  return { layers, scene, camera: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1) };
+}
+
+function reseed(layer, frame) {
+  const seed = Math.floor(frame * layer.spec.evolve);
+  if (seed === layer.seed) return;
+  layer.tile.dispose();
+  layer.tile = tileTexture(layer.spec, seed);
+  layer.seed = seed;
+  layer.materials.forEach((m) => (m.uniforms.tile.value = layer.tile));
+}
+
+function paintGrain(s, frame) {
+  const canvas = s.renderer.domElement;
+  const pxScale = canvas.width ? (canvas.clientWidth || canvas.width) / canvas.width : 1;
+  for (const layer of s.grain.layers) {
+    reseed(layer, frame);
+    layer.materials.forEach((m) => (m.uniforms.pxScale.value = pxScale));
+  }
+  const clears = s.renderer.autoClear;
+  s.renderer.autoClear = false;
+  s.renderer.render(s.grain.scene, s.grain.camera);
+  s.renderer.autoClear = clears;
 }
 
 const LIGHT_BUILD = {
@@ -314,7 +392,7 @@ function stage(c) {
   const object = new THREE.Group();
   pivot.add(object);
   scene.add(pivot);
-  return { renderer, scene, camera, pivot, object, lights, bokeh: blurred ? bokeh(canvas) : null };
+  return { renderer, scene, camera, pivot, object, lights, bokeh: blurred ? bokeh(canvas) : null, grain: grainPass(c.grains) };
 }
 
 function dressed(c, base) {
@@ -465,6 +543,10 @@ ${ON_DISPOSE}(() => {
         s.bokeh.target.dispose();
         disposeScene(s.bokeh.scene);
       }
+      if (s.grain) {
+        disposeScene(s.grain.scene);
+        s.grain.layers.forEach((l) => l.tile.dispose());
+      }
     }
   });
 });
@@ -519,16 +601,17 @@ function drawAt(time) {
     }
     s.camera.updateProjectionMatrix();
     placeFaces(c, s);
-    if (!s.bokeh) {
+    if (s.bokeh) {
+      s.renderer.setRenderTarget(s.bokeh.target);
+      s.renderer.clear();
       s.renderer.render(s.scene, s.camera);
-      continue;
+      s.renderer.setRenderTarget(null);
+      s.renderer.clear();
+      s.renderer.render(s.bokeh.scene, s.bokeh.camera);
+    } else {
+      s.renderer.render(s.scene, s.camera);
     }
-    s.renderer.setRenderTarget(s.bokeh.target);
-    s.renderer.clear();
-    s.renderer.render(s.scene, s.camera);
-    s.renderer.setRenderTarget(null);
-    s.renderer.clear();
-    s.renderer.render(s.bokeh.scene, s.bokeh.camera);
+    if (s.grain) paintGrain(s, time * c.fps);
   }
 }
 
@@ -548,5 +631,5 @@ export function threeScript(clips: ThreeClip[], duration: number, stage: StageSp
   if (!clips.length) {
     return '';
   }
-  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const onScreen = (${onScreen.toString()});const drawOnce = (${drawOnce.toString()});const screenKey = (${screenKey.toString()});const screenPlacement = (${screenPlacement.toString()});const quadMatrix = (${quadMatrix.toString()});const faceShown = (${faceShown.toString()});const strokePolygons = (${strokePolygons.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
+  return `<script type="module">const CLIPS = ${js(clips)};const LIGHTING = ${js(LIGHTING)};const LOOK = ${js(look)};const DURATION = ${js(duration)};const FOV = ${SCENE.fov.fallback};const STAGE = ${js(stage)};${cameraRuntime()}const sampleTrack = (${sampleTrack.toString()});const grainTile = (${grainTile.toString()});const GRAIN_TILE = ${GRAIN_TILE};const onScreen = (${onScreen.toString()});const drawOnce = (${drawOnce.toString()});const screenKey = (${screenKey.toString()});const screenPlacement = (${screenPlacement.toString()});const quadMatrix = (${quadMatrix.toString()});const faceShown = (${faceShown.toString()});const strokePolygons = (${strokePolygons.toString()});${SCENE_SCRIPT.replace('DRIVER', seekDriver(THREE_TIMELINE, 'DURATION', 'renderAt'))}</script>`;
 }

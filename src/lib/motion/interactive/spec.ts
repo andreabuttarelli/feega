@@ -10,7 +10,8 @@ import { apply2d, composeLocal, mul2d, type Affine } from '../affine';
 import { BENTO_LAYOUT, bentoCellId, cellFrames, type BentoCard, type CompFrame } from '../bento/model';
 import { bentoSlotAt } from '../hyperframes/bento';
 import type { HostSpec, HostStep, LiveLane, LiveSpec, Rect } from './live';
-import type { Outside } from './settings';
+import { interactiveOf, type Outside } from './settings';
+import { paintBindings } from './vars';
 import { lensSpec } from './live-props';
 import { LivePaint, type LensSpec } from './paint';
 
@@ -157,6 +158,8 @@ export function liveSpec(input: SpecInput): LiveSpec {
     order: clipsOf(baked).map((c) => c.id),
     names: namesOf(baked),
     hosts: Object.fromEntries(hostIds.map((id) => [id, hostOf(byId.get(id)!, cells.get(id), baked)])),
-    chains
+    chains,
+    vars: interactiveOf(live).vars,
+    bindings: paintBindings(live)
   };
 }

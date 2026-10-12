@@ -145,6 +145,15 @@ motion
   });
 
 motion
+  .command('shaders')
+  .description('List the shader effects the motion agent can add, with their knobs')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdMotionShaders } = await import('./commands/motion.ts');
+    await cmdMotionShaders(opts);
+  });
+
+motion
   .command('list')
   .description('List motion videos, to find a node id')
   .option('--project <id>', 'Only the videos of one project')
@@ -164,6 +173,49 @@ motion
   .action(async (nodeId: string, opts) => {
     const { cmdMotionEmbed } = await import('./commands/motion.ts');
     await cmdMotionEmbed(nodeId, opts);
+  });
+
+motion
+  .command('budget <nodeId>')
+  .description('Show what the video spent on AI across all its turns, and its cap')
+  .option('--raise', 'Let the agent spend more on this video, then ask it to continue')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionBudget } = await import('./commands/motion.ts');
+    await cmdMotionBudget(nodeId, opts);
+  });
+
+motion
+  .command('templates')
+  .description('List the motion templates with their fields (free)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdMotionTemplates } = await import('./commands/motion.ts');
+    await cmdMotionTemplates(opts);
+  });
+
+motion
+  .command('new')
+  .description('Start a new video from a template, e.g. --template builtin:prompt-input (free)')
+  .requiredOption('--template <id>', 'Template id, from `feega motion templates`')
+  .option('--format <ratio>', '16:9 (default), 9:16 or 1:1')
+  .option('--project <id>', 'Project to create it in (default: the most recent)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdMotionNew } = await import('./commands/motion.ts');
+    await cmdMotionNew(opts);
+  });
+
+motion
+  .command('add-template <nodeId> <templateId>')
+  .description('Insert an editable copy of a template into a video, e.g. builtin:prompt-input (free)')
+  .option('--at <seconds>', 'Where it starts, in seconds')
+  .option('--var <key=value...>', 'A field value, repeatable (e.g. --var text="Hello" --var accent=#ff5a1f)')
+  .option('--no-sound', 'Do not lay its key taps and clicks')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, templateId: string, opts) => {
+    const { cmdMotionAddTemplate } = await import('./commands/motion.ts');
+    await cmdMotionAddTemplate(nodeId, templateId, opts);
   });
 
 motion

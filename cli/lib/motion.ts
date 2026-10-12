@@ -14,6 +14,7 @@ export type MotionRun = {
   cost_usd?: number | null;
   error?: string | null;
   editor_url?: string;
+  video_budget?: VideoBudget | null;
   cut_review?: { score: number; fixes: string[]; sheet: string | null; answers: Record<'apply' | 'apply-always' | 'ship', string> } | null;
   reference_pick?: { question: string; candidates: { id: string; image: string; title?: string; why?: string }[]; min: number; max: number } | null;
 };
@@ -31,6 +32,8 @@ export type MotionVideo = { node_id: string; name: string | null; project_id: st
 export type MotionFrames = { revision: number; frames: { time: number; mime: string; data: string }[]; quality: string[]; blocking: string[] };
 
 export type MotionRevision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
+
+export type VideoBudget = { ok: true; spent_usd: number; cap_usd: number; raise_usd: number };
 
 export type EmbedState = { published: boolean; url?: string; snippet?: string; react?: string; flutter?: string; revision?: number };
 
@@ -57,6 +60,14 @@ async function download(path: string, token: string): Promise<string> {
 }
 const id = encodeURIComponent;
 
+export type ShaderEffect = { id: string; category: string; source: string; live: boolean; about: string; knobs: Record<string, { label: string; min: number; max: number; default: number; keyframes: boolean }>; colours: Record<string, string> };
+
+export type MotionTemplateField = { key: string; label: string; type: string; group?: string; min?: number; max?: number; options?: string[]; default?: unknown };
+export type MotionTemplate = { id: string; name: string; description: string; seconds: number; fields: MotionTemplateField[] };
+export type FromTemplate = { template: string; format?: '16:9' | '9:16' | '1:1'; project?: string };
+export type FromTemplateMade = { node_id: string; project_id: string; canvas_id: string; version: number; editor_url: string };
+export type AddTemplate = { id: string; at?: number; vars?: Record<string, string | number | boolean>; sound?: boolean };
+
 export const motionApi = {
   ask: (token: string, nodeId: string, prompt: string, org?: string, attachments: AttachmentSource[] = [], pick?: ReferencePickReply) =>
     request<MotionRun>(withOrg(`/api/v1/motion/${id(nodeId)}/ask`, org), token, { method: 'POST', body: JSON.stringify({ prompt, ...(attachments.length ? { attachments } : {}), ...(pick ? { reference_pick: pick } : {}) }) }),
@@ -65,13 +76,20 @@ export const motionApi = {
     request<RenderStart>(withOrg(`/api/v1/motion/${id(nodeId)}/render`, org), token, { method: 'POST', body: JSON.stringify(renderBody(opts)) }),
   renderState: (token: string, runId: string, org?: string) => request<RenderState>(withOrg(`/api/v1/motion/renders/${id(runId)}`, org), token),
   summary: (token: string, nodeId: string, org?: string) => request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}`, org), token),
+  shaderEffects: (token: string, org?: string) => request<{ effects: ShaderEffect[] }>(withOrg('/api/v1/motion/shader-effects', org), token),
   list: (token: string, projectId?: string, org?: string) => request<{ videos: MotionVideo[] }>(withQuery('/api/v1/motion', { project: projectId, org }), token),
   embed: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token, { method: 'POST' }),
   unembed: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token, { method: 'DELETE' }),
   embedState: (token: string, nodeId: string, org?: string) => request<EmbedState>(withOrg(`/api/v1/motion/${id(nodeId)}/embed`, org), token),
+  budget: (token: string, nodeId: string, org?: string) => request<VideoBudget>(withOrg(`/api/v1/motion/${id(nodeId)}/budget`, org), token),
+  raiseBudget: (token: string, nodeId: string, org?: string) => request<VideoBudget>(withOrg(`/api/v1/motion/${id(nodeId)}/budget`, org), token, { method: 'POST' }),
   frames: (token: string, nodeId: string, ask: { times: number[]; width?: number }, org?: string) =>
     request<MotionFrames>(withOrg(`/api/v1/motion/${id(nodeId)}/frames`, org), token, { method: 'POST', body: JSON.stringify(ask) }),
   revisions: (token: string, nodeId: string, org?: string) => request<{ revisions: MotionRevision[] }>(withOrg(`/api/v1/motion/${id(nodeId)}/revisions`, org), token),
+  templates: (token: string, org?: string) => request<{ templates: MotionTemplate[] }>(withOrg('/api/v1/motion/templates', org), token),
+  fromTemplate: (token: string, body: FromTemplate, org?: string) => request<FromTemplateMade>(withOrg('/api/v1/motion/from-template', org), token, { method: 'POST', body: JSON.stringify(body) }),
+  addTemplate: (token: string, nodeId: string, body: AddTemplate, org?: string) =>
+    request<{ version: number; clip_id: string; sounds: string | null; fields: { key: string; value: unknown }[] }>(withOrg(`/api/v1/motion/${id(nodeId)}/templates`, org), token, { method: 'POST', body: JSON.stringify(body) }),
   restore: (token: string, nodeId: string, version: number, org?: string) =>
     request<{ version: number; restored: number }>(withOrg(`/api/v1/motion/${id(nodeId)}/revisions`, org), token, { method: 'POST', body: JSON.stringify({ version }) }),
   storyboard: (token: string, nodeId: string, org?: string) => request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}/storyboard`, org), token),

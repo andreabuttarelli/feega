@@ -13,6 +13,7 @@ export type HostReading = {
   reducedMotion?: boolean;
   pointer?: HostPoint & { down: boolean };
   tilt?: HostPoint;
+  vars?: Record<string, unknown>;
 };
 
 export function hostMain(frame: HTMLIFrameElement, type: string, win: Window, anchor: Element = frame): void {
@@ -89,6 +90,9 @@ export function readHost(data: unknown, type: string): HostReading | null {
   }
   if (tilt) {
     reading.tilt = tilt;
+  }
+  if (m.vars && typeof m.vars === 'object' && !Array.isArray(m.vars)) {
+    reading.vars = m.vars as Record<string, unknown>;
   }
   return reading;
 }

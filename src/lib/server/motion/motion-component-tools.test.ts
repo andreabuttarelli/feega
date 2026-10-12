@@ -108,12 +108,12 @@ describe('component tools', () => {
     expect(deps.check).not.toHaveBeenCalled();
   });
 
-  it('patch_component edits one file and checks again', async () => {
+  it('update_components edits one file, checks again and returns the diff', async () => {
     const { session, run, deps } = setup();
     await run(WRITE_COMPONENT, CHAT);
-    const out = await run('patch_component', { name: 'ChatPanel', edits: [{ file: 'css', find: 'inset:10%', replace: 'inset:8%' }] });
+    const out = await run('update_components', { component: 'ChatPanel', edits: [{ file: 'css', find: 'inset:10%', replace: 'inset:8%' }] });
 
-    expect(out).toMatchObject({ ok: true, version: 2 });
+    expect(out).toMatchObject({ ok: true, version: 2, diff: [{ file: 'css', replaced: 1 }] });
     expect(session.doc.components.ChatPanel.source.css).toContain('inset:8%');
     expect(deps.check).toHaveBeenCalledTimes(2);
   });

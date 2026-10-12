@@ -79,7 +79,7 @@ export function failedCallCount(calls: Array<{ status?: string; output?: unknown
 /** Display name for a tool chip: `list_posts` → "list posts". */
 export function toolLabel(name: string): string {
   // Una delega non è "un tool chiamato": è un altro agente che ha lavorato.
-  if (name === 'delegate_task') return 'Sub-agent';
+  if (name === 'delegate_task' || name === 'spawn_agent') return 'Sub-agent';
   if (name === 'run_task_pipeline') return 'Research → Execute → Verify';
   if (name === 'publish_artifact') return 'Artifact';
   return name.replace(/_/g, ' ');

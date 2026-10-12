@@ -68,6 +68,13 @@
   import EffectsNode from '$lib/components/canvas/EffectsNode.svelte';
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
+  import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
+  import { AddTarget, catalogue as componentCatalogue, type StarterFormat } from '$lib/motion/template/catalogue';
+  import type { Instance } from '$lib/motion/template/library';
+  import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
+  import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
+  import { FEEGA_TOKENS } from '$lib/motion/brand';
+  import { AssetKind } from '$lib/motion/components';
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
@@ -1286,6 +1293,24 @@
     });
     const asset = result?.asset as { id?: string } | undefined;
     return asset?.id ?? null;
+  }
+
+  let componentPickFor = $state<string | null>(null);
+  const componentItems = $derived(componentCatalogue(data.componentTemplates));
+  const componentPicking = $derived.by(() => {
+    const row = componentPickFor ? nodes.find((n) => n.id === componentPickFor) : null;
+    return row ? compositionOf(row) : null;
+  });
+
+  function componentDraft(nodeId: string, templateId: string, format: StarterFormat): Instance | null {
+    const entry = data.componentTemplates.find((t) => t.id === templateId);
+    const made = entry ? composedTemplate(entry, { format, values: {} }, compositionCards(nodeId, edges, nodes), sequentialIds()) : null;
+    return made?.ok ? made : null;
+  }
+
+  function pickComponent(nodeId: string, templateId: string, draft: Instance | null) {
+    componentPickFor = null;
+    write(nodeId, { template: { id: templateId, values: draft ? editedValues(draft) : {} }, ...(draft ? { aspect: aspectOf(draft.doc) } : {}) }, SaveTiming.Now);
   }
 
   let effectsEditorId = $state<string | null>(null);
@@ -2756,7 +2781,9 @@
             {cards}
             assets={cardAssets(cards)}
             composeIn={{ project: data.projectId, canvas: data.canvas.id }}
+            templates={data.componentTemplates}
             onpatch={(patch) => write(id, patch, SaveTiming.Now)}
+            onpickcomponent={() => (componentPickFor = id)}
           />
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
@@ -2789,6 +2816,22 @@
       {/if}
     {/snippet}
   </CanvasFlow>
+
+  {#if componentPicking}
+    {@const pickingId = componentPicking.id}
+    {@const pickingAssets = cardAssets(compositionCards(pickingId, edges, nodes))}
+    {@const wiredAssets = Object.entries(pickingAssets).map(([assetId, previewUrl], i) => ({ id: assetId, kind: AssetKind.Image, label: `Input ${i + 1}`, previewUrl }))}
+    <ComponentLibrary
+      items={componentItems}
+      format={FORMAT_OF_ASPECT[componentPicking.aspect]}
+      draftOf={(templateId, format) => componentDraft(pickingId, templateId, format)}
+      compose={(doc) => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: pickingAssets, target: Target.Screen })}
+      assets={wiredAssets}
+      target={AddTarget.Composition}
+      onpick={(templateId, _sounds, draft) => pickComponent(pickingId, templateId, draft)}
+      onclose={() => (componentPickFor = null)}
+    />
+  {/if}
 
   {#if effectsEditing}
     {@const editingId = effectsEditing.id}

@@ -4,7 +4,7 @@ import { TrackKind } from '$lib/motion/components';
 import { precompose } from '$lib/motion/precomp';
 import { addClip, addTrack, type OpResult } from '$lib/motion/timeline';
 import { exposeField, FieldType } from './fields';
-import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields, templateFromComp, templateFromDoc, type MotionTemplate } from './library';
+import { carryEdits, detachTemplate, insertTemplate, keyFieldsOf, isLockedComp, setTemplateValues, templateFields, templateFromComp, templateFromDoc, type MotionTemplate } from './library';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -128,5 +128,33 @@ describe('detaching', () => {
 
     expect(isLockedComp(detached, comp)).toBe(false);
     expect(detached.comps[comp].tracks).toEqual(doc.comps[comp].tracks);
+  });
+});
+
+describe('key fields travel with the template', () => {
+  it('an inserted instance remembers which fields its template declared key', () => {
+    const made = templateFromComp(card(), 'card', { name: 'Card' });
+    const template = made.ok ? { ...made.template, keyFields: ['photo'] } : (null as unknown as MotionTemplate);
+
+    const out = insertTemplate(newMotionDoc(MotionFormat.Landscape), { id: 'org:card', template }, { from: 0, newId: counter() });
+
+    expect(out.ok && keyFieldsOf(out.doc, out.clipId)).toEqual(['photo']);
+    expect(out.ok && parseMotionDoc(out.doc).ok).toBe(true);
+  });
+});
+
+describe('carrying edits from a library draft into the video', () => {
+  it('copies only the fields the user changed', () => {
+    const draft = inserted(1);
+    const edited = must(setTemplateValues(draft.doc, draft.clips[0], { headline: 'Edited' }));
+    const target = inserted(2);
+
+    const carried = must(carryEdits({ doc: edited, clipId: draft.clips[0] }, { doc: target.doc, clipId: target.clips[1] }));
+
+    expect(templateFields(carried, target.clips[1]).map((f) => [f.key, f.value])).toEqual([
+      ['headline', 'Edited'],
+      ['photo', null]
+    ]);
+    expect(templateFields(carried, target.clips[0])[0].value).toBe('Hello');
   });
 });

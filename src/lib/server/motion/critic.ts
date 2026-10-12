@@ -3,7 +3,9 @@ import type { ModelMessage } from 'ai';
 import type { MotionDoc } from '$lib/motion/doc';
 import type { LlmMediaPart } from '$lib/server/llm';
 import { MAX_FRAMES_PER_VIEW, VIEW_FRAMES, type Frame, type Reference } from './frames';
+import { scriptLines } from '$lib/motion/script';
 import { EMPTY_EDGE_DENSITY } from '$lib/motion/emptiness';
+import { viewNote, type View } from './viewer';
 
 export const SHEET_MAX_FRAMES = 24;
 export const CRITIC_PASS_SCORE = 8;
@@ -22,6 +24,7 @@ export type CriticPorts = {
   tile: (frames: readonly Frame[]) => Promise<Buffer>;
   ask: (input: CriticAsk) => Promise<{ answer: unknown; usd: number }>;
   density?: (frames: readonly Frame[]) => Promise<number[]>;
+  view?: (frames: readonly Frame[]) => Promise<View>;
 };
 
 export type CriticInput = { doc: MotionDoc; request: string; references: readonly Reference[] };
@@ -37,13 +40,15 @@ export function sheetTimes(doc: Pick<MotionDoc, 'durationInFrames' | 'fps'>): nu
   return Array.from({ length: count }, (_, i) => round1(step * i + step / 2));
 }
 
-const prompt = (input: CriticInput, times: number[]) =>
+const prompt = (input: CriticInput, times: number[], seen: View['lines']) =>
   [
     'You are the independent critic of a brand motion video made by another agent. You did not make it; judge it like a creative director before it ships.',
     `The first image is the contact sheet of the WHOLE video: ${times.length} stills, left to right then top to bottom, at ${times.join(', ')} s.`,
     input.references.length ? `The next ${input.references.length} images are the references the video should follow.` : '',
     `The request was: "${input.request}".`,
-    input.doc.script ? `The approved brief and script: ${JSON.stringify(input.doc.script)}` : '',
+    input.doc.script ? `The on-screen lines, read in order: ${scriptLines(input.doc.script).map((l, i) => `${i + 1}. ${l}`).join(' ')}. Judge them first as text: do they make sense in that order, say something true and specific about the product, and lead to the promise? A line that does not is your first fix, with the replacement line.` : '',
+    input.doc.script ? `The research behind them: ${JSON.stringify(input.doc.script.research)}` : '',
+    seen?.length ? `An independent viewer looked at each still alone and wrote what is on it:\n${viewNote(seen)}` : '',
     'Score it 1-10 (premium, dense, dynamic, true to the real brand and product, readable hierarchy, follows the brief and the references).',
     `Then list at most ${MAX_FIXES} concrete fixes, worst first, each naming the time in seconds and the exact change (e.g. "2.5s: the frame is mostly empty: put the real dashboard UI behind the title"). No praise, no vague advice. An empty list if nothing must change.`
   ]
@@ -72,8 +77,11 @@ export async function critique(ports: CriticPorts, input: CriticInput): Promise<
   }
 
   const sheet = await ports.tile(frames);
+  const seen = ports.view ? await ports.view(frames) : { lines: null, usd: 0 };
   const images: LlmMediaPart[] = [{ mediaType: 'image/jpeg', data: sheet.toString('base64') }, ...input.references.map((r) => ({ mediaType: r.mediaType, data: r.data }))];
-  const { answer, usd } = await ports.ask({ prompt: prompt(input, times), images });
+  const asked = await ports.ask({ prompt: prompt(input, times, seen.lines), images });
+  const { answer } = asked;
+  const usd = asked.usd + seen.usd;
 
   const parsed = REVIEW.safeParse(answer);
   if (!parsed.success) {

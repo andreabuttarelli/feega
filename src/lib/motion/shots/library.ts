@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { vectorJson, vectorRuntime, VECTOR_CSS } from '../vector-ui/piece';
 import { withinBudget, type VectorUi } from '../vector-ui/model';
 import { MAX_JS } from '../custom/component';
+import { CURSOR_SLOT, CursorAction, NODE_ID, cursorSource, type CursorStep } from './cursor';
 
 export enum ShotId {
   KineticTitle = 'kinetic-title',
@@ -23,6 +24,11 @@ export enum ShotUi {
   Required = 'required'
 }
 
+export enum ShotCursor {
+  None = 'none',
+  Scripted = 'scripted'
+}
+
 export type SlotLimit = { words: number; chars: number };
 
 export type ShotSpec = {
@@ -30,6 +36,7 @@ export type ShotSpec = {
   about: string;
   seconds: { min: number; best: number; max: number };
   ui: ShotUi;
+  cursor: ShotCursor;
   peak: boolean;
   slots: z.ZodObject<z.ZodRawShape>;
   limits: Record<string, SlotLimit>;
@@ -39,7 +46,7 @@ export type ShotSpec = {
 
 const text = z.string().trim().min(1);
 const limit = (words: number, chars: number): SlotLimit => ({ words, chars });
-const nodeId = z.string().regex(/^[a-z]+-\d+$/, 'an element id of the recreated UI, e.g. button-0, input-0, text-3');
+const nodeId = NODE_ID;
 
 const PRELUDE = `
 const W = root.clientWidth || 1920;
@@ -60,6 +67,7 @@ const EXPO = 1 - Math.pow(2, -10);
 const out = (p) => (p >= 1 ? 1 : (1 - Math.pow(2, -10 * p)) / EXPO);
 const into = (p) => (p <= 0 ? 0 : Math.pow(2, 10 * p - 10));
 const move = (p) => (p <= 0 ? 0 : p >= 1 ? 1 : p < 0.5 ? Math.pow(2, 20 * p - 10) / 2 : (2 - Math.pow(2, -20 * p + 10)) / 2);
+const soft = (p) => (p <= 0 ? 0 : p >= 1 ? 1 : p < 0.5 ? 16 * Math.pow(p, 5) : 1 - Math.pow(2 - 2 * p, 5) / 2);
 const mix = (a, b, p) => a + (b - a) * p;
 const el = (tag, css, host, content) => {
   const n = document.createElement(tag);
@@ -107,8 +115,12 @@ const drive = (render) => {
 };
 `;
 
+export const DEVICE = { land: 1.7, hold: 0.35, zoom: 0.9, wide: 0.66, tall: 0.88 };
+
 const UI_PRELUDE = `
 const U = VECTOR_UI;
+const CLEAR = /transparent|rgba\\([^)]*,\\s*0\\)/;
+root.style.background = CLEAR.test(U.background) ? paper : U.background;
 const boxOf = (id) => {
   const n = nodeById(U, id);
   return n ? { x: n.x, y: n.y, w: Math.max(1, n.w), h: Math.max(1, n.h) } : { x: 0, y: 0, w: U.width, h: U.height };
@@ -130,6 +142,11 @@ const lerpCam = (a, b, p) => ({ k: Math.exp(mix(Math.log(a.k), Math.log(b.k), p)
 const place = (cam, host) => {
   host.style.transform = 'translate(' + (W / 2 - cam.cx * cam.k).toFixed(2) + 'px,' + (H / 2 - cam.cy * cam.k).toFixed(2) + 'px) scale(' + cam.k.toFixed(4) + ')';
 };
+const placed = (cam, host) => {
+  const view = filled(cam);
+  place(view, host);
+  return view;
+};
 const dimAround = (drawn, b, level) => {
   U.nodes.forEach((n) => {
     const inside = n.x >= b.x - 6 && n.y >= b.y - 6 && n.x + n.w <= b.x + b.w + 6 && n.y + n.h <= b.y + b.h + 6;
@@ -137,11 +154,134 @@ const dimAround = (drawn, b, level) => {
     drawn.els[n.id].style.opacity = String((n.o ?? 1) * (inside || holder ? 1 : level));
   });
 };
-const WHOLE = { k: Math.min((W * 0.86) / U.width, (H * 0.8) / U.height), cx: U.width / 2, cy: U.height / 2 };
+const COVER = Math.max(W / U.width, H / U.height);
+const filled = (cam) => {
+  const k = Math.max(cam.k, COVER);
+  const hw = W / (2 * k);
+  const hh = H / (2 * k);
+  return { k, cx: clamp(cam.cx, hw, U.width - hw), cy: clamp(cam.cy, hh, U.height - hh) };
+};
+const WHOLE = filled({ k: COVER, cx: U.width / 2, cy: U.height / 2 });
+`;
+
+const CURSOR_LAYER = `
+const CURSOR = CURSOR_MATH;
+const glide = CURSOR.glide;
+const cursorUi = { width: U.width, height: U.height, box: (id) => {
+  const n = nodeById(U, id);
+  return n ? { x: n.x, y: n.y, w: Math.max(1, n.w), h: Math.max(1, n.h), role: n.role || 'box' } : null;
+} };
+const scriptOf = (raw) => {
+  let script = raw;
+  if (typeof script === 'string') {
+    try {
+      script = script.trim() ? JSON.parse(script) : null;
+    } catch (e) {
+      script = null;
+    }
+  }
+  return Array.isArray(script) ? script : [];
+};
+const CURSOR_SVG = {
+  arrow: { tip: [4, 2.5], svg: '<path d="M4 2.5v17.2l4.6-4.4 2.9 6.6 2.9-1.3-2.9-6.5h6.3z" fill="#000" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>' },
+  hand: { tip: [9, 3], svg: '<path d="M9 2.8c-1 0-1.7.8-1.7 1.7v8.6l-1.4-1.5c-.7-.7-1.8-.7-2.4 0-.6.6-.6 1.5-.1 2.2l4.1 5.6c.9 1.3 2.4 2.1 4 2.1h3.6c2.6 0 4.7-2.1 4.7-4.7v-4.6c0-.9-.7-1.6-1.6-1.6-.4 0-.8.2-1.1.4v-.2c0-.9-.7-1.6-1.6-1.6-.5 0-.9.2-1.2.5-.2-.7-.8-1.2-1.6-1.2-.4 0-.8.2-1.1.4V4.5c0-.9-.8-1.7-1.6-1.7z" fill="#fff" stroke="#000" stroke-width="1.2" stroke-linejoin="round"/>' },
+  beam: { tip: [12, 12], svg: '<path d="M8.5 3.5h7M8.5 20.5h7M12 3.5v17" stroke="#fff" stroke-width="3.6" stroke-linecap="round"/><path d="M8.5 3.5h7M8.5 20.5h7M12 3.5v17" stroke="#000" stroke-width="1.5" stroke-linecap="round"/>' }
+};
+const CURSOR_BASE = 100;
+const CURSOR_UI = 22;
+const CURSOR_FIT = { min: UNIT * 0.03, max: UNIT * 0.11 };
+const BLUR = { per: 0.12, max: 6 };
+const FOLLOW = 0.12;
+const PRESSED = 0.05;
+const HOVER = 0.07;
+const CARET_HZ = 1.2;
+const CARET_FADE = 6;
+const cursorLayer = (drawn, script) => {
+  const typedEls = {};
+  const typeFade = (id, text, p, t) => {
+    const host = drawn.els[id];
+    if (!typedEls[id]) {
+      host.textContent = '';
+      const chars = [...text].map((c) => {
+        const glyph = document.createElement('span');
+        glyph.className = 'vtyped';
+        glyph.textContent = c;
+        host.appendChild(glyph);
+        return glyph;
+      });
+      const caret = document.createElement('span');
+      caret.className = 'vcaret';
+      caret.style.background = (nodeById(U, id) || {}).color || '#000';
+      host.appendChild(caret);
+      typedEls[id] = { chars, caret };
+    }
+    const parts = typedEls[id];
+    const exact = parts.chars.length * p;
+    parts.chars.forEach((glyph, i) => {
+      glyph.style.opacity = clamp(exact - i, 0, 1).toFixed(3);
+    });
+    const away = glide(Math.min(1, p * CARET_FADE)) * glide(Math.min(1, (1 - p) * CARET_FADE));
+    parts.caret.style.opacity = (p <= 0 ? 0 : p < 1 ? 1 - away : 0.5 + 0.5 * Math.cos(2 * Math.PI * CARET_HZ * t)).toFixed(3);
+  };
+  const plan = CURSOR.plan(script, cursorUi, duration);
+  const ripple = el('div', 'position:absolute;left:0;top:0;border-radius:50%;border:' + Math.max(2, UNIT * 0.003) + 'px solid ' + accent + ';');
+  const pointer = el('div', 'position:absolute;left:0;top:0;width:' + CURSOR_BASE + 'px;height:' + CURSOR_BASE + 'px;transform-origin:0 0;');
+  const SHADOW = 'drop-shadow(0 ' + CURSOR_BASE * 0.06 + 'px ' + CURSOR_BASE * 0.1 + 'px rgba(0,0,0,0.35))';
+  pointer.setAttribute('data-cursor', 'pointer');
+  ripple.setAttribute('data-cursor', 'ripple');
+  const shapes = Object.fromEntries(Object.entries(CURSOR_SVG).map(([k, v]) => {
+    const holder = el('div', 'position:absolute;inset:0;', pointer);
+    holder.innerHTML = '<svg viewBox="0 0 24 24" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">' + v.svg + '</svg>';
+    return [k, holder];
+  }));
+  const ink = (U.nodes.find((n) => n.role === 'heading' && n.color) || {}).color || '#111111';
+  const typing = plan.steps.filter((s) => s.action === 'type').map((s) => ({ target: s.target, text: s.text, into: textInside(s.target) })).filter((s) => s.into);
+  typing.forEach((s) => {
+    drawn.els[s.into].style.color = ink;
+  });
+  const pressing = plan.steps.filter((s) => CURSOR.pressOf(s, s.at + 0.1) > 0 && drawn.els[s.target]);
+  const touched = [...new Set(plan.steps.map((s) => s.target))].filter((id) => drawn.els[id]);
+  const pose = (t) => CURSOR.pose(plan, t);
+  const follow = (view, p) => ({ k: view.k, cx: mix(view.cx, p.x, FOLLOW), cy: mix(view.cy, p.y, FOLLOW) + p.scroll });
+  const toScreen = (view, x, y) => [W / 2 + (x - view.cx) * view.k, H / 2 + (y - view.cy) * view.k];
+  const draw = (p, view, t) => {
+    touched.forEach((id) => {
+      drawn.els[id].style.filter = id === p.hover && p.lit > 0 ? 'brightness(' + (1 - HOVER * p.lit).toFixed(4) + ')' : '';
+    });
+    pressing.forEach((s) => {
+      drawn.els[s.target].style.transform = 'scale(' + (1 - PRESSED * CURSOR.pressOf(s, t)).toFixed(4) + ')';
+    });
+    typing.forEach((s) => {
+      const typed = p.typed.find((k) => k.target === s.target && k.text === s.text);
+      typeFade(s.into, s.text, typed ? typed.p : 0, t);
+    });
+    const [x, y] = toScreen(view, p.x, p.y);
+    const before = pose(t - 1 / 60);
+    const [bx, by] = toScreen(view, before.x, before.y);
+    const tip = CURSOR_SVG[p.shape].tip;
+    const size = clamp(CURSOR_UI * view.k, CURSOR_FIT.min, CURSOR_FIT.max);
+    const k = (size / CURSOR_BASE) * (1 - 0.18 * p.press);
+    const blur = Math.min(BLUR.max, Math.hypot(x - bx, y - by) * BLUR.per) / k;
+    Object.entries(shapes).forEach(([name, holder]) => {
+      holder.style.display = name === p.shape ? 'block' : 'none';
+    });
+    pointer.style.opacity = String(p.opacity);
+    pointer.style.filter = SHADOW + (blur > 0.05 ? ' blur(' + blur.toFixed(2) + 'px)' : '');
+    pointer.style.transform = 'translate(' + (x - (tip[0] / 24) * CURSOR_BASE * k).toFixed(2) + 'px,' + (y - (tip[1] / 24) * CURSOR_BASE * k).toFixed(2) + 'px) scale(' + k.toFixed(4) + ')';
+    const [rx, ry] = p.ripple ? toScreen(view, p.ripple.x, p.ripple.y) : [0, 0];
+    const r = p.ripple ? size * 1.2 * out(p.ripple.p) : 0;
+    ripple.style.display = p.ripple ? 'block' : 'none';
+    ripple.style.opacity = p.ripple ? String(0.5 * Math.sin(Math.PI * p.ripple.p)) : '0';
+    ripple.style.width = (2 * r).toFixed(1) + 'px';
+    ripple.style.height = (2 * r).toFixed(1) + 'px';
+    ripple.style.transform = 'translate(' + (rx - r).toFixed(2) + 'px,' + (ry - r).toFixed(2) + 'px)';
+  };
+  return { plan, pose, follow, draw };
+};
 `;
 
 const UI_HOST_CSS = `${VECTOR_CSS}
-.cam { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.cam { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }
 `;
 
 const KINETIC_TITLE = `
@@ -160,13 +300,13 @@ const spans = fitted.rows.flatMap((row) => {
     return el('span', 'display:inline-block;white-space:pre;transform-origin:50% 60%;' + (i === keyWord ? 'color:' + accent + ';' : ''), line, w + (j < inRow.length - 1 ? ' ' : ''));
   });
 });
-const STAGGER = 0.09;
+const STAGGER = 0.06;
 drive((t) => {
   const push = 1 + 0.05 * span(t, 0, duration);
   box.style.transform = 'translate(-50%,-50%) scale(' + push.toFixed(4) + ')';
   spans.forEach((s, i) => {
-    const p = out(span(t, 0.12 + i * STAGGER, 0.6));
-    s.style.opacity = String(clamp(p * 2.5, 0, 1));
+    const p = move(span(t, 0.12 + i * STAGGER, 0.9));
+    s.style.opacity = String(clamp(p * 2, 0, 1));
     s.style.transform = 'scale(' + mix(1.34, 1, p).toFixed(4) + ')';
     s.style.filter = p < 1 ? 'blur(' + (18 * (1 - p)).toFixed(2) + 'px)' : '';
   });
@@ -175,7 +315,7 @@ drive((t) => {
 
 const DEVICE_FLY_IN = `
 const BEZEL = Math.round(UNIT * 0.012);
-const sw = W * (WIDE ? 0.66 : 0.88);
+const sw = W * (WIDE ? ${DEVICE.wide} : ${DEVICE.tall});
 const s = sw / U.width;
 const sh = U.height * s;
 const DEPTH = W * 1.3;
@@ -187,19 +327,22 @@ const glass = el('div', 'position:absolute;left:' + BEZEL + 'px;top:' + BEZEL + 
 const inner = el('div', 'position:absolute;left:0;top:0;transform-origin:0 0;transform:scale(' + s + ');', glass);
 const drawn = drawVector(U, inner);
 const sheen = el('div', 'position:absolute;inset:0;background:linear-gradient(115deg, rgba(255,255,255,0.10), rgba(255,255,255,0) 38%);', glass);
-const LAND = 1.7;
+const LAND = ${DEVICE.land};
+const ZOOM_IN = WIDE ? 1 : Math.max(W / sw, H / sh);
 drive((t) => {
   const p = out(span(t, 0.05, LAND));
   const after = span(t, LAND, Math.max(0.1, duration - LAND));
-  const ry = mix(-104, 0, p) + 3 * after;
-  const rx = mix(30, 7, p) - 4 * after;
+  const inside = move(span(t, LAND + ${DEVICE.hold}, ${DEVICE.zoom}));
+  const ry = (mix(-104, 0, p) + 3 * after) * (1 - inside);
+  const rx = (mix(30, 7, p) - 4 * after) * (1 - inside);
   const z = mix(-W * 0.9, 0, p);
   const y = mix(H * 0.22, 0, p);
-  const k = 1 + 0.035 * after;
+  const k = (1 + 0.035 * after) * mix(1, ZOOM_IN, inside);
   const near = DEPTH / (DEPTH - z);
   const turn = Math.max(0.04, Math.abs(Math.cos(ry * RAD)));
   const tilt = Math.cos(rx * RAD);
   device.style.transform = 'translate(0,' + y.toFixed(1) + 'px) scale(' + (near * k * turn).toFixed(4) + ',' + (near * k * tilt).toFixed(4) + ') skewY(' + (-Math.sin(ry * RAD) * 10).toFixed(3) + 'deg) skewX(' + (-rx * 0.3).toFixed(3) + 'deg)';
+  sheen.style.display = inside > 0 ? 'none' : 'block';
   device.style.opacity = String(clamp(p * 3, 0, 1));
   floor.style.opacity = String(0.9 * p);
   sheen.style.opacity = String(mix(1, 0.35, p));
@@ -211,6 +354,7 @@ const fieldId = param('field_id', 'input-0', { type: 'text', group: 'Content', l
 const typed = param('type_text', '', { type: 'text', group: 'Content', label: 'Typed text' });
 const buttonId = param('button_id', 'button-0', { type: 'text', group: 'Content', label: 'Button (element id)' });
 const resultId = param('result_id', '', { type: 'text', group: 'Content', label: 'Result (element id, empty = whole UI)' });
+const script = param('cursor', '', { type: 'textarea', group: 'Content', label: 'Cursor script (JSON)' });
 const cam = el('div', '', root);
 cam.className = 'cam';
 const sheet = el('div', 'position:absolute;left:0;top:0;width:' + U.width + 'px;height:' + U.height + 'px;background:' + U.background + ';', cam);
@@ -219,32 +363,35 @@ drawn.frame.style.background = 'transparent';
 drawn.frame.style.position = 'absolute';
 drawn.frame.style.left = '0px';
 drawn.frame.style.top = '0px';
-const field = boxOf(fieldId);
-const button = boxOf(buttonId);
-const result = resultId ? boxOf(resultId) : null;
-const typeTarget = textInside(fieldId);
-const INK_OF_UI = (U.nodes.find((n) => n.role === 'heading' && n.color) || {}).color || '#111111';
-if (typeTarget && typed) {
-  drawn.els[typeTarget].style.color = INK_OF_UI;
-}
-const onField = frameOn(field, 0.72, 0.42);
-const onButton = frameOn({ x: button.x - button.w * 2, y: button.y - button.h * 1.5, w: button.w * 5, h: button.h * 4 }, 0.5, 0.5);
-const onResult = result ? frameOn(result, 0.7, 0.6) : WHOLE;
-const T = { type: 0.35, typeFor: Math.min(1.4, duration * 0.3), toButton: duration * 0.42, press: duration * 0.42 + 0.75, toResult: duration * 0.42 + 1.05 };
-const DIM = { depth: 0.55, at: 0.3, len: 0.3, release: 0.4 };
+const pointer = cursorLayer(drawn, scriptOf(script));
+const steps = pointer.plan.steps;
+const around = (b) => {
+  const mx = b.w > 300 ? b.w * 0.12 : Math.max(b.w * 0.5, 260);
+  const my = Math.max(b.h, 180);
+  return filled(frameOn({ x: b.x - mx, y: b.y - my, w: b.w + 2 * mx, h: b.h + 2 * my }, 0.8, 0.6));
+};
+const CAM_BEAT = 0.9;
+const beats = steps.map((s, i) => {
+  const from = Math.max(i ? steps[i - 1].at : 0, s.at - CAM_BEAT);
+  return { view: around(boxOf(s.target)), from, len: Math.max(0.3, s.at - from) };
+});
+const first = beats.length ? beats[0].view : filled({ ...WHOLE, k: COVER * 1.12 });
+const last = steps.length ? Math.max(steps[steps.length - 1].end, steps[steps.length - 1].at + 0.5) + 0.3 : 0;
+const PULL_BACK = 0.8;
+const opening = filled({ k: first.k * 0.82, cx: first.cx, cy: first.cy });
 drive((t) => {
-  const arrive = out(span(t, 0, 0.7));
-  let view = { k: onField.k * mix(0.82, 1, arrive), cx: onField.cx, cy: onField.cy };
-  view = lerpCam(view, onButton, move(span(t, T.toButton, 0.7)));
-  view = lerpCam(view, onResult, move(span(t, T.toResult, 0.8)));
-  place(view, cam);
-  const focus = t < T.toButton + 0.35 ? field : button;
-  const dim = out(span(t, DIM.at, DIM.len)) * (1 - move(span(t, T.toButton - 0.2, DIM.release)));
-  dimAround(drawn, focus, 1 - DIM.depth * dim);
-  if (typeTarget) {
-    typeInto(U, drawn.els, typeTarget, typed, span(t, T.type, T.typeFor), t);
+  const arrive = glide(span(t, 0, 0.9));
+  let view = lerpCam(opening, first, arrive);
+  beats.slice(1).forEach((b) => {
+    view = lerpCam(view, b.view, glide(span(t, b.from, b.len)));
+  });
+  if (!resultId && steps.length && duration - last >= PULL_BACK) {
+    view = lerpCam(view, WHOLE, glide(span(t, last, duration - last)));
   }
-  pressOn(drawn.els, buttonId, t, T.press);
+  const p = pointer.pose(t);
+  view = { ...view, cy: view.cy + p.scroll };
+  place(view, cam);
+  pointer.draw(p, view, t);
 });
 `;
 
@@ -287,7 +434,7 @@ const raw = m[2].replace(/,/g, '');
 const digits = (raw.split('.')[1] || '').length;
 const grouped = m[2].includes(',');
 const size = titleSize(value, 0.42);
-const num = el('div', 'position:absolute;left:0;right:0;top:' + (H * 0.5 - size * 0.62) + 'px;text-align:center;color:' + ink + ';font-size:' + size + 'px;font-variant-numeric:tabular-nums;' + TITLE);
+const num = el('div', 'position:absolute;left:0;right:0;top:' + (H * 0.5 - size * 0.62) + 'px;height:' + size * 1.1 + 'px;overflow:hidden;color:' + ink + ';font-size:' + size + 'px;font-variant-numeric:tabular-nums;' + TITLE);
 const rule = el('div', 'position:absolute;left:50%;top:' + (H * 0.5 + size * 0.42) + 'px;height:' + Math.max(2, UNIT * 0.004) + 'px;background:' + accent + ';');
 const cap = el('div', 'position:absolute;left:0;right:0;top:' + (H * 0.5 + size * 0.42 + UNIT * 0.04) + 'px;text-align:center;color:' + muted + ';font-size:' + CAPTION + 'px;font-weight:500;letter-spacing:-0.02em;', root, label);
 const ruleW = Math.min(W * 0.5, size * 2.2);
@@ -295,16 +442,21 @@ const show = (n) => {
   const v = n.toFixed(digits);
   return m[1] + (grouped ? v.replace(/\\B(?=(\\d{3})+(?!\\d))/g, ',') : v) + m[3];
 };
-const ghost = el('span', 'visibility:hidden;', num);
-const digitsShown = el('span', '', num);
-const FINAL = show(Number(raw));
+const line = () => el('div', 'position:absolute;left:0;right:0;top:0;text-align:center;line-height:1.1;', num);
+const shownNow = line();
+const shownNext = line();
+const ROLLS = 6;
 const COUNT_MIN_STEPS = 20;
 const counts = Number(raw) * Math.pow(10, digits) >= COUNT_MIN_STEPS;
+const valueAt = (step) => show((Number(raw) * Math.min(step, ROLLS)) / ROLLS);
 drive((t) => {
-  const p = counts ? 1 - Math.pow(1 - span(t, 0.2, 1.7), 3) : 1;
-  const shown = show(Number(raw) * p);
-  ghost.textContent = FINAL.slice(0, Math.max(0, FINAL.length - shown.length));
-  digitsShown.textContent = shown;
+  const u = counts ? ROLLS * (1 - Math.pow(1 - span(t, 0.2, 1.7), 3)) : ROLLS;
+  const step = Math.min(ROLLS, Math.floor(u));
+  const f = step >= ROLLS ? 0 : u - step;
+  shownNow.textContent = valueAt(step);
+  shownNext.textContent = f > 0 ? valueAt(step + 1) : '';
+  shownNow.style.transform = 'translateY(' + (-100 * f).toFixed(3) + '%)';
+  shownNext.style.transform = 'translateY(' + (100 * (1 - f)).toFixed(3) + '%)';
   const enter = out(span(t, 0.05, 0.7));
   num.style.opacity = String(enter);
   num.style.transform = 'scale(' + (mix(1.18, 1, enter) + 0.03 * span(t, 1.8, duration)).toFixed(4) + ')';
@@ -395,6 +547,7 @@ const UI_MORPH = `
 const fromId = param('from_id', 'button-0', { type: 'text', group: 'Content', label: 'From (element id)' });
 const toId = param('to_id', 'button-1', { type: 'text', group: 'Content', label: 'To (element id)' });
 const toText = param('to_text', '', { type: 'text', group: 'Content', label: 'New text on the target' });
+const script = param('cursor', '', { type: 'textarea', group: 'Content', label: 'Cursor script (JSON)' });
 const cam = el('div', '', root);
 cam.className = 'cam';
 const drawn = drawVector(U, cam);
@@ -402,20 +555,24 @@ const a = boxOf(fromId);
 const b = boxOf(toId);
 const ring = el('div', 'position:absolute;left:0;top:0;transform-origin:0 0;box-shadow:0 0 0 2px ' + accent + ', 0 0 0 10px rgba(0,153,255,0.14);', cam);
 const target = textInside(toId);
-const camA = frameOn({ x: a.x - a.w * 0.6, y: a.y - a.h * 1.2, w: a.w * 2.2, h: a.h * 3.4 }, 0.8, 0.7);
-const camB = frameOn({ x: b.x - b.w * 0.6, y: b.y - b.h * 1.2, w: b.w * 2.2, h: b.h * 3.4 }, 0.8, 0.7);
+const camA = filled(frameOn({ x: a.x - a.w * 0.6, y: a.y - a.h * 1.2, w: a.w * 2.2, h: a.h * 3.4 }, 0.8, 0.7));
+const camB = filled(frameOn({ x: b.x - b.w * 0.6, y: b.y - b.h * 1.2, w: b.w * 2.2, h: b.h * 3.4 }, 0.8, 0.7));
+const opening = filled({ k: camA.k * 0.85, cx: camA.cx, cy: camA.cy });
 const full = target ? nodeById(U, target).text : '';
-const M = { move: 0.9, len: 0.9, swap: 1.95 };
+const pointer = cursorLayer(drawn, scriptOf(script));
+const onTo = pointer.plan.steps.find((s) => s.target === toId);
+const M = onTo ? { move: onTo.travel, len: Math.max(0.3, onTo.at - onTo.travel), swap: onTo.at + 0.05 } : { move: 0.9, len: 0.9, swap: 1.95 };
 drive((t) => {
-  const e = out(span(t, 0, 0.7));
-  const p = move(span(t, M.move, M.len));
-  place(lerpCam({ k: camA.k * mix(0.85, 1, e), cx: camA.cx, cy: camA.cy }, camB, p), cam);
+  const e = glide(span(t, 0, 0.9));
+  const p = glide(span(t, M.move, M.len));
+  const c = pointer.pose(t);
+  const view = placed(pointer.follow(lerpCam(lerpCam(opening, camA, e), camB, p), c), cam);
   const PAD = 8;
   ring.style.left = (mix(a.x, b.x, p) - PAD).toFixed(1) + 'px';
   ring.style.top = (mix(a.y, b.y, p) - PAD).toFixed(1) + 'px';
   ring.style.width = (mix(a.w, b.w, p) + 2 * PAD).toFixed(1) + 'px';
   ring.style.height = (mix(a.h, b.h, p) + 2 * PAD).toFixed(1) + 'px';
-  ring.style.opacity = String(out(span(t, 0.25, 0.4)));
+  ring.style.opacity = String(glide(span(t, 0, 0.9)));
   dimAround(drawn, { x: Math.min(a.x, b.x) - 40, y: Math.min(a.y, b.y) - 40, w: Math.abs(b.x - a.x) + Math.max(a.w, b.w) + 80, h: Math.abs(b.y - a.y) + Math.max(a.h, b.h) + 80 }, 0.22);
   if (target && toText) {
     const s = span(t, M.swap, 0.45);
@@ -423,7 +580,7 @@ drive((t) => {
     node.textContent = s < 0.5 ? full : toText;
     node.style.filter = s > 0 && s < 1 ? 'blur(' + (8 * (1 - Math.abs(s * 2 - 1))).toFixed(2) + 'px)' : '';
   }
-  pressOn(drawn.els, toId, t, M.swap - 0.1);
+  pointer.draw(c, view, t);
 });
 `;
 
@@ -433,16 +590,15 @@ const url = param('url', 'feega.app', { type: 'text', group: 'Content' });
 const keyLine = param('accent_line', -1, { type: 'number', min: -1, max: 2, group: 'Content' });
 const fitted = lines.map((l) => fitRows([l], 0.5 / lines.length, Math.max(1, Math.floor(MAX_ROWS * 1.5 / lines.length))));
 const size = Math.min(...fitted.map((f) => f.size));
-const block = el('div', 'position:absolute;left:0;right:0;top:50%;text-align:center;color:' + ink + ';font-size:' + size + 'px;' + TITLE);
+const block = el('div', 'position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;color:' + ink + ';font-size:' + size + 'px;' + TITLE);
 const rows = fitted.flatMap((f, i) => f.rows.map((l) => {
   const mask = el('div', 'overflow:hidden;padding-bottom:0.08em;white-space:nowrap;', block);
   return el('div', i === keyLine ? 'color:' + accent + ';' : '', mask, l);
 }));
 const address = el('div', 'position:absolute;left:0;right:0;bottom:' + H * 0.1 + 'px;text-align:center;color:' + muted + ';font-size:' + CAPTION + 'px;font-weight:500;letter-spacing:-0.02em;', root, url);
 drive((t) => {
-  block.style.transform = 'translateY(-50%) scale(' + (1 + 0.04 * span(t, 0, duration)).toFixed(4) + ')';
   rows.forEach((r, i) => {
-    const p = out(span(t, 0.1 + i * 0.14, 0.85));
+    const p = soft(span(t, 0.1 + i * 0.08, 1));
     r.style.transform = 'translateY(' + (110 * (1 - p)).toFixed(2) + '%)';
   });
   const a = out(span(t, 0.9, 0.7));
@@ -460,24 +616,33 @@ const b = boxOf(targetId);
 const flood = el('div', 'position:absolute;inset:0;background:' + (into_ || accent) + ';');
 const deep = { k: frameOn(b, 1, 1).k * 9, cx: b.x + b.w / 2, cy: b.y + b.h / 2 };
 drive((t) => {
-  const p = into(span(t, 0.15, duration * 0.8));
-  place(lerpCam(WHOLE, deep, p), cam);
-  cam.style.filter = p > 0.05 ? 'blur(' + (26 * p * p).toFixed(2) + 'px)' : '';
-  flood.style.opacity = String(move(span(t, duration * 0.45, duration * 0.5)));
+  const p = into(span(t, 0, duration * 0.85));
+  placed(lerpCam(WHOLE, deep, p), cam);
+  cam.style.filter = 'blur(' + (26 * p * p).toFixed(3) + 'px)';
+  flood.style.opacity = String(soft(span(t, duration * 0.45, duration * 0.5)));
 });
 `;
 
 export const SHOTS: Record<ShotId, ShotSpec> = {
-  [ShotId.KineticTitle]: { name: 'ShotKineticTitle', about: 'a full-frame title: words punch in one by one from 134% and an 18 px blur, then hold on a slow push-in', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ text, accent_word: z.union([z.number().int().min(-1).max(12), text.max(24)]).optional() }), limits: { text: limit(6, 36) }, css: '', js: KINETIC_TITLE },
-  [ShotId.DeviceFlyIn]: { name: 'ShotDeviceFlyIn', about: 'the recreated product UI on a screen flies in from deep space turning 104°, lands and drifts: the establishing shot of the product', seconds: { min: 2.5, best: 3.5, max: 4 }, ui: ShotUi.Required, peak: true, slots: z.object({}), limits: {}, css: UI_HOST_CSS, js: DEVICE_FLY_IN },
-  [ShotId.UiFocus]: { name: 'ShotUiFocus', about: 'one flow of the recreated UI, one part at a time: zoom on the field while the text types, move to the button and press it, pull back to the result', seconds: { min: 3, best: 4, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ field_id: nodeId, button_id: nodeId, type_text: text.optional(), result_id: nodeId.optional() }), limits: { type_text: limit(8, 48) }, css: UI_HOST_CSS, js: UI_FOCUS },
-  [ShotId.FeatureGrid]: { name: 'ShotFeatureGrid', about: 'up to six feature tiles fly in exploded in depth and assemble into a grid', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: true, slots: z.object({ items: text }), limits: { items: limit(12, 96) }, css: '', js: FEATURE_GRID },
-  [ShotId.StatCount]: { name: 'ShotStatCount', about: 'one number counts up huge, an accent rule draws under it, the label rises', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ value: text, label: text }), limits: { value: limit(1, 12), label: limit(5, 32) }, css: '', js: STAT_COUNT },
-  [ShotId.BeforeAfter]: { name: 'ShotBeforeAfter', about: 'the pain line is struck through, then an accent divider wipes the recreated UI in beside it (under it in vertical)', seconds: { min: 3, best: 3.5, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ before_text: text, before_label: text.optional(), after_label: text.optional() }), limits: { before_text: limit(6, 36), before_label: limit(2, 16), after_label: limit(2, 16) }, css: UI_HOST_CSS, js: BEFORE_AFTER },
-  [ShotId.LogoResolve]: { name: 'ShotLogoResolve', about: 'the original logo, flat and untouched, resolves with a fade and a small scale; the address follows', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ logo: z.string().min(1).optional(), wordmark: text.optional(), url: text.optional() }), limits: { wordmark: limit(2, 24), url: limit(1, 40) }, css: '', js: LOGO_RESOLVE },
-  [ShotId.UiMorph]: { name: 'ShotUiMorph', about: 'a highlight travels from one element of the recreated UI to another as the camera follows, then the target changes state', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.Required, peak: false, slots: z.object({ from_id: nodeId, to_id: nodeId, to_text: text.optional() }), limits: { to_text: limit(3, 24) }, css: UI_HOST_CSS, js: UI_MORPH },
-  [ShotId.TaglineCard]: { name: 'ShotTaglineCard', about: 'the end card: the promise rises line by line out of a mask, the address fades in under it', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, peak: false, slots: z.object({ lines: text, url: text.optional(), accent_line: z.number().int().min(-1).max(2).optional() }), limits: { lines: limit(6, 40), url: limit(1, 40) }, css: '', js: TAGLINE_CARD },
-  [ShotId.WhipZoom]: { name: 'ShotWhipZoom', about: 'a transition: the camera dives into one element of the recreated UI, blurring with speed, and lands on its colour for the next shot', seconds: { min: 1, best: 1.4, max: 2 }, ui: ShotUi.Required, peak: true, slots: z.object({ target_id: nodeId, end_colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }), limits: {}, css: UI_HOST_CSS, js: WHIP_ZOOM }
+  [ShotId.KineticTitle]: { name: 'ShotKineticTitle', about: 'a full-frame title: words punch in one by one from 134% and an 18 px blur, then hold on a slow push-in', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ text, accent_word: z.union([z.number().int().min(-1).max(12), text.max(24)]).optional() }), limits: { text: limit(6, 36) }, css: '', js: KINETIC_TITLE },
+  [ShotId.DeviceFlyIn]: { name: 'ShotDeviceFlyIn', about: 'the recreated product UI on a screen flies in from deep space turning 104°, lands and drifts: the establishing shot of the product', seconds: { min: 2.5, best: 3.5, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.None, peak: true, slots: z.object({}), limits: {}, css: UI_HOST_CSS, js: DEVICE_FLY_IN },
+  [ShotId.UiFocus]: { name: 'ShotUiFocus', about: 'one flow of the recreated UI, one part at a time, driven by a cursor: it clicks the field and types, moves to the button and presses it while the camera follows, then pulls back to the result', seconds: { min: 3, best: 4, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.Scripted, peak: false, slots: z.object({ field_id: nodeId, button_id: nodeId, type_text: text.optional(), result_id: nodeId.optional(), cursor: CURSOR_SLOT.optional() }), limits: { type_text: limit(8, 48) }, css: UI_HOST_CSS, js: UI_FOCUS },
+  [ShotId.FeatureGrid]: { name: 'ShotFeatureGrid', about: 'up to six feature tiles fly in exploded in depth and assemble into a grid', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: true, slots: z.object({ items: text }), limits: { items: limit(12, 96) }, css: '', js: FEATURE_GRID },
+  [ShotId.StatCount]: { name: 'ShotStatCount', about: 'one number counts up huge, an accent rule draws under it, the label rises', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ value: text, label: text }), limits: { value: limit(1, 12), label: limit(5, 32) }, css: '', js: STAT_COUNT },
+  [ShotId.BeforeAfter]: { name: 'ShotBeforeAfter', about: 'the pain line is struck through, then an accent divider wipes the recreated UI in beside it (under it in vertical)', seconds: { min: 3, best: 3.5, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.None, peak: false, slots: z.object({ before_text: text, before_label: text.optional(), after_label: text.optional() }), limits: { before_text: limit(6, 36), before_label: limit(2, 16), after_label: limit(2, 16) }, css: UI_HOST_CSS, js: BEFORE_AFTER },
+  [ShotId.LogoResolve]: { name: 'ShotLogoResolve', about: 'the original logo, flat and untouched, resolves with a fade and a small scale; the address follows', seconds: { min: 2, best: 2.5, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ logo: z.string().min(1).optional(), wordmark: text.optional(), url: text.optional() }), limits: { wordmark: limit(2, 24), url: limit(1, 40) }, css: '', js: LOGO_RESOLVE },
+  [ShotId.UiMorph]: { name: 'ShotUiMorph', about: 'the cursor rests on one element of the recreated UI, travels to another with a highlight as the camera follows, clicks it and the target changes state', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.Required, cursor: ShotCursor.Scripted, peak: false, slots: z.object({ from_id: nodeId, to_id: nodeId, to_text: text.optional(), cursor: CURSOR_SLOT.optional() }), limits: { to_text: limit(3, 24) }, css: UI_HOST_CSS, js: UI_MORPH },
+  [ShotId.TaglineCard]: { name: 'ShotTaglineCard', about: 'the end card: the promise rises line by line out of a mask, the address fades in under it', seconds: { min: 2.5, best: 3, max: 4 }, ui: ShotUi.None, cursor: ShotCursor.None, peak: false, slots: z.object({ lines: text, url: text.optional(), accent_line: z.number().int().min(-1).max(2).optional() }), limits: { lines: limit(6, 40), url: limit(1, 40) }, css: '', js: TAGLINE_CARD },
+  [ShotId.WhipZoom]: { name: 'ShotWhipZoom', about: 'a transition: the camera dives into one element of the recreated UI, blurring with speed, and lands on its colour for the next shot', seconds: { min: 1, best: 1.4, max: 2 }, ui: ShotUi.Required, cursor: ShotCursor.None, peak: true, slots: z.object({ target_id: nodeId, end_colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }), limits: {}, css: UI_HOST_CSS, js: WHIP_ZOOM }
+};
+
+type AutoCursor = (entries: { id: string; text?: string }[]) => CursorStep[];
+
+const idOf = (v: unknown) => String(v ?? '');
+
+export const AUTO_CURSOR: Partial<Record<ShotId, (slots: Record<string, unknown>, auto: AutoCursor) => CursorStep[]>> = {
+  [ShotId.UiFocus]: (s, auto) => auto([{ id: idOf(s.field_id), text: typeof s.type_text === 'string' ? s.type_text : undefined }, { id: idOf(s.button_id) }, ...(s.result_id ? [{ id: idOf(s.result_id) }] : [])]),
+  [ShotId.UiMorph]: (s, auto) => [{ target: idOf(s.from_id), action: CursorAction.Hover }, ...auto([{ id: idOf(s.to_id) }])]
 };
 
 export const PEAK_SHOTS: ReadonlySet<string> = new Set(Object.values(SHOTS).filter((s) => s.peak).map((s) => s.name));
@@ -493,9 +658,10 @@ export function shotSource(id: ShotId, ui: VectorUi | null): ShotSource {
   if (spec.ui !== ShotUi.Required || !ui) {
     return { html: '', css: spec.css, js: `${PRELUDE}\n${spec.js}` };
   }
-  const fixed = PRELUDE.length + vectorRuntime().length + UI_PRELUDE.length + spec.js.length + JS_MARGIN;
+  const cursor = spec.cursor === ShotCursor.Scripted ? CURSOR_LAYER.replace('CURSOR_MATH', () => cursorSource()) : '';
+  const fixed = PRELUDE.length + vectorRuntime().length + UI_PRELUDE.length + cursor.length + spec.js.length + JS_MARGIN;
   const fitted = withinBudget(ui, MAX_JS - fixed, (u) => vectorJson(u).length);
-  return { html: '', css: spec.css, js: `${PRELUDE}\n${vectorRuntime()}\n${UI_PRELUDE.replace('VECTOR_UI', () => vectorJson(fitted))}\n${spec.js}` };
+  return { html: '', css: spec.css, js: `${PRELUDE}\n${vectorRuntime()}\n${UI_PRELUDE.replace('VECTOR_UI', () => vectorJson(fitted))}\n${cursor}\n${spec.js}` };
 }
 
 export const SHOT_PREVIEWS = '/motion/shots';

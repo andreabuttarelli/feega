@@ -6,6 +6,9 @@ import { ValueKind, animProp, baseValue, type Keyframe } from '../keyframes';
 import { ExpressionError } from './language';
 import type { AudioAnalysis } from '../audio-analysis';
 import { audioPort } from './audio-port';
+import { fallbackPort } from './inputs';
+import { interactiveOf } from '../interactive/settings';
+import { numericVars } from '../interactive/var-model';
 import { Evaluator, type InputSource, type LaneBook, type LaneData } from './evaluator';
 
 export type { InputSource };
@@ -82,7 +85,13 @@ export function docBook(doc: MotionDoc): LaneBook {
   return new DocBook(doc);
 }
 
-const docEvaluator = (doc: MotionDoc, analyses: Record<string, AudioAnalysis>, inputs?: InputSource) => new Evaluator(docBook(doc), doc.fps, (frame) => audioPort(doc, analyses, frame), inputs);
+function defaultInputs(doc: MotionDoc): InputSource {
+  const { vars } = interactiveOf(doc);
+  const numbers = numericVars(vars, {});
+  return (_id, _key, frame) => fallbackPort(frame / doc.fps, numbers);
+}
+
+const docEvaluator = (doc: MotionDoc, analyses: Record<string, AudioAnalysis>, inputs?: InputSource) => new Evaluator(docBook(doc), doc.fps, (frame) => audioPort(doc, analyses, frame), inputs ?? defaultInputs(doc));
 
 function deviates(samples: number[], from: number, to: number, tolerance: number): boolean {
   for (let i = from + 1; i < to; i++) {

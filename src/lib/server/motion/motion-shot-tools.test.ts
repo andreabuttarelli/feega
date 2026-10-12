@@ -6,6 +6,7 @@ import { VectorKind, VectorRole, type VectorUi } from '$lib/motion/vector-ui/mod
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
+import { CaptureSession } from '$lib/server/web/vector-capture';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
@@ -25,17 +26,17 @@ const UI: VectorUi = {
   ]
 };
 
-function setup(captureUi?: MotionToolDeps['captureUi']) {
+function setup(captureUi?: MotionToolDeps['captureUi'], extra: Partial<MotionToolDeps> = {}) {
   let n = 0;
   const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
-  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(async () => null), captureUi });
+  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(async () => null), captureUi, ...extra });
   const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' });
   return { session, run };
 }
 
 describe('recreate_ui from a url', () => {
   it('reads the live page into a vector UI component whose elements are addressable, and flags what stayed a picture', async () => {
-    const captureUi = vi.fn(async () => ({ ok: true as const, ui: UI }));
+    const captureUi = vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None }));
     const { session, run } = setup(captureUi);
 
     const made = await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega', start: 0, duration: 3 });
@@ -48,15 +49,94 @@ describe('recreate_ui from a url', () => {
   });
 
   it('says which blocking overlay it dismissed before reading the page', async () => {
-    const { run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, dismissed: ['skip'] })));
+    const { run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None, dismissed: ['skip'] })));
 
     expect(await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' })).toMatchObject({ ok: true, dismissed: ['skip'] });
+  });
+
+  describe('the public site of an app', () => {
+    const site: VectorUi = { ...UI, url: 'https://feega.test/', nodes: [...UI.nodes, { id: 'link-0', role: VectorRole.Link, kind: VectorKind.Text, x: 1100, y: 20, w: 60, h: 20, text: 'Log in' }] };
+
+    it('asks for a test account before any shot: the feega eval built its trailer on the marketing page', async () => {
+      const { run } = setup(vi.fn(async () => ({ ok: true as const, ui: site, session: CaptureSession.None })));
+
+      const made = await run('recreate_ui', { url: 'https://feega.test/', name: 'UiSite' });
+
+      expect(String(made.next)).toMatch(/TEST account.*app_browse/);
+    });
+
+    it('says nothing once the page was read signed in', async () => {
+      const { run } = setup(vi.fn(async () => ({ ok: true as const, ui: site, session: CaptureSession.Kept })));
+
+      expect((await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiApp' })).next).toBeUndefined();
+    });
+
+    it('says nothing on a page with no way to sign in', async () => {
+      const { run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None })));
+
+      expect((await run('recreate_ui', { url: 'https://feega.test/', name: 'UiSite' })).next).toBeUndefined();
+    });
   });
 
   it('says so when no browser is there to read the page', async () => {
     const { run } = setup();
 
     expect(await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' })).toMatchObject({ ok: false });
+  });
+});
+
+describe('the recreated app on screen', () => {
+  const placed = async (fidelity?: number) => {
+    const ctx = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.Kept, ...(fidelity === undefined ? {} : { fidelity }) })));
+    const made = await ctx.run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega', start: 0, duration: 3 });
+    return { ...ctx, made, clip: String(made.clip_id) };
+  };
+
+  it('says how faithful the rebuild is, and warns when it is far from the page', async () => {
+    expect((await placed(0.96)).made).toMatchObject({ fidelity: 0.96 });
+    expect(String((await placed(0.6)).made.low_fidelity)).toMatch(/60%/);
+    expect((await placed(0.96)).made.low_fidelity).toBeUndefined();
+  });
+
+  it('refuses the same screen under a second name: v8 rebuilt /app twice and called it two screens', async () => {
+    const ctx = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.Kept })));
+    await ctx.run('recreate_ui', { url: 'https://feega.test/app', name: 'FeegaApp' });
+
+    const again = await ctx.run('recreate_ui', { url: 'https://feega.test/app/', name: 'FeegaEditor' });
+
+    expect(again.ok).toBe(false);
+    expect(String(again.error)).toMatch(/FeegaApp.*another work screen/);
+    expect((await ctx.run('recreate_ui', { url: 'https://feega.test/app', name: 'FeegaApp' })).ok).toBe(true);
+    expect((await ctx.run('recreate_ui', { url: 'https://feega.test/app/videos/1', name: 'FeegaEditor' })).ok).toBe(true);
+  });
+
+  it('puts fidelity first, so a saved output cut short still shows it', async () => {
+    expect(Object.keys((await placed(0.96)).made).slice(0, 2)).toEqual(['ok', 'fidelity']);
+  });
+
+  it('lists the elements that matter first, with the sidebar marked as navigation', async () => {
+    const ctx = setup(vi.fn(async () => ({ ok: true as const, ui: { ...UI, nodes: [{ id: 'link-0', role: VectorRole.Link, kind: VectorKind.Text, x: 20, y: 100, w: 80, h: 17, text: 'Motion editor' }, ...UI.nodes] }, session: CaptureSession.Kept })));
+
+    const made = await ctx.run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
+    const elements = made.elements as { id: string; zone: string }[];
+
+    expect(made.focus).toEqual(expect.arrayContaining(['input-0', 'button-0']));
+    expect(made.focus).not.toContain('link-0');
+    expect(elements[0].id).toBe('input-0');
+    expect(elements.find((e) => e.id === 'link-0')?.zone).toBe('nav');
+  });
+
+  it('refuses a tint on it: v5 turned the editor into a negative', async () => {
+    const { run, clip } = await placed();
+
+    expect(await run('add_effect', { clip_id: clip, kind: 'tint' })).toMatchObject({ ok: false, error: expect.stringMatching(/native colours/) });
+  });
+
+  it('refuses shrinking it', async () => {
+    const { run, clip } = await placed();
+
+    expect(await run('set_transform', { clip_id: clip, transform: { scale: 70 } })).toMatchObject({ ok: false, error: expect.stringMatching(/fill the frame/) });
+    expect(await run('set_transform', { clip_id: clip, transform: { scale: 130 } })).toMatchObject({ ok: true });
   });
 });
 
@@ -71,7 +151,7 @@ describe('the shot library', () => {
   });
 
   it('add_shot places a premium shot built on the recreated UI', async () => {
-    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI })));
+    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None })));
     await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
 
     const made = await run('add_shot', { shot: ShotId.UiFocus, ui: 'UiFeega', slots: { field_id: 'input-0', button_id: 'button-0', type_text: 'a launch film' }, at: 2 });
@@ -80,7 +160,79 @@ describe('the shot library', () => {
     expect(findClip(session.doc, String(made.clip_id))?.clip.props).toMatchObject({ field_id: 'input-0' });
   });
 
+  it('add_shot takes a cursor script that clicks, types and hovers elements of the recreated UI', async () => {
+    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI, session: CaptureSession.None })));
+    await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
+    const cursor = [{ target: 'input-0', action: 'type', text: 'a launch film' }, { target: 'button-0', action: 'click', at: 2.6 }];
+
+    const made = await run('add_shot', { shot: ShotId.UiFocus, ui: 'UiFeega', slots: { field_id: 'input-0', button_id: 'button-0', cursor }, at: 0 });
+
+    expect(made).toMatchObject({ ok: true });
+    expect(JSON.parse(String(findClip(session.doc, String(made.clip_id))?.clip.props.cursor))).toEqual(cursor);
+  });
+
+  it('add_shot with sound on lays a click and key taps on an SFX track, under the cursor, uploading each sound once', async () => {
+    const sfx = vi.fn(async (kind: string) => ({ ok: true as const, assetId: `asset-${kind}`, url: null, seconds: 0.08 }));
+    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI })), { sfx });
+    await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
+
+    const made = await run('add_shot', { shot: ShotId.UiFocus, ui: 'UiFeega', slots: { field_id: 'input-0', button_id: 'button-0', type_text: 'abc' }, at: 1, sound: 'on' });
+
+    const track = session.doc.tracks.find((t) => t.name === 'SFX');
+    const sounds = (track?.clips ?? []).map((c) => String(c.props.assetId));
+    expect(made).toMatchObject({ ok: true });
+    expect(sounds.filter((s) => s === 'asset-click')).toHaveLength(2);
+    expect(sounds.filter((s) => s === 'asset-key')).toHaveLength(3);
+    expect(Math.min(...(track?.clips ?? []).map((c) => c.from))).toBeGreaterThanOrEqual(session.doc.fps);
+    expect(sfx).toHaveBeenCalledTimes(2);
+    expect(session.doc.assets.map((a) => a.id)).toEqual(expect.arrayContaining(['asset-click', 'asset-key']));
+  });
+
+  it('add_shot lays no sound by default', async () => {
+    const sfx = vi.fn();
+    const { session, run } = setup(vi.fn(async () => ({ ok: true as const, ui: UI })), { sfx });
+    await run('recreate_ui', { url: 'https://feega.test/app', name: 'UiFeega' });
+
+    await run('add_shot', { shot: ShotId.UiFocus, ui: 'UiFeega', slots: { field_id: 'input-0', button_id: 'button-0' }, at: 0 });
+
+    expect(sfx).not.toHaveBeenCalled();
+    expect(session.doc.tracks.some((t) => t.name === 'SFX')).toBe(false);
+  });
+
+  it('list_shots says which shots take a cursor script and how it is written', async () => {
+    const { run } = setup();
+
+    const listed = (await run('list_shots', {})) as { shots: { id: string; cursor: string | null }[] };
+
+    expect(listed.shots.find((s) => s.id === ShotId.UiFocus)?.cursor).toMatch(/click.*type.*scroll/);
+    expect(listed.shots.find((s) => s.id === ShotId.KineticTitle)?.cursor).toBeNull();
+  });
+
   it('the prompt sends a product trailer to the shots', () => {
     expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available })).toMatch(/add_shot/);
   });
 });
+
+describe('on-screen titles come only from the script', () => {
+  const source = { url: 'https://supasito.com/', quote: 'Every site you run.' };
+  const act = (name: string, on_screen: string[]) => ({ act: name, start: 0, end: 1, scene: 'scene', on_screen, ui: '', sources: [] });
+  const script = { brand: 'real', research: { audience: 'site owners', problem: 'edits scatter', struggle: 'three sites', flow: ['pick', 'say'], benefits: [{ claim: 'one place', source }], numbers: [], tone: 'calm', promise: { text: 'Every site you run.', source } }, acts: [act('problem', ['Three sites. One new price.']), act('solution', ['Pick the site.']), act('proof', ['One place.']), act('claim', ['Every site you run.', 'supasito.com'])] } as never;
+
+  it('refuses a title that is not a line of the script and lists the lines to use (v5: "the texts make no sense")', async () => {
+    const { session, run } = setup();
+    session.doc = { ...session.doc, script };
+
+    const made = await run('add_shot', { shot: ShotId.KineticTitle, slots: { text: 'Unlock your synergy' }, at: 0 });
+
+    expect(made.ok).toBe(false);
+    expect(String(made.error)).toContain('"Three sites. One new price." / "Pick the site." / "One place." / "Every site you run." / "supasito.com"');
+  });
+
+  it('takes a script line as a title, whatever its case or punctuation', async () => {
+    const { session, run } = setup();
+    session.doc = { ...session.doc, script };
+
+    expect(await run('add_shot', { shot: ShotId.KineticTitle, slots: { text: 'three sites, one new price' }, at: 0 })).toMatchObject({ ok: true });
+  });
+});
+

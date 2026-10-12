@@ -34,6 +34,7 @@ const ROLE: Record<ComponentId, Role> = {
   Device3D: Role.Content,
   Composition: Role.Content,
   Particles: Role.Content,
+  ShaderEffect: Role.Content,
   LiquidGlass: Role.Content,
   LiquidBlob: Role.Content,
   Precomp: Role.Content,

@@ -210,14 +210,19 @@ list. Returns how many combinations it actually stopped.
 | `list_motion_videos` | `feega motion list [--project <id>]` |
 | `ask_motion_agent` | `feega motion ask <nodeId> "<prompt>" [--no-wait]` |
 | `get_motion_run` | `feega motion run <runId>` |
+| `list_shader_effects` | `feega motion shaders` |
 | `get_motion_summary` | (MCP only) |
 | `render_video` | `feega motion render <nodeId> [--resolution 720p] [--quality q] [--fps n]` |
 | `get_render` | `feega motion render-status <runId>` |
 | `publish_motion_embed` | `feega motion embed <nodeId> [--unpublish]` |
 | `get_motion_embed` | `feega motion embed <nodeId> --status` |
+| `motion_budget` | `feega motion budget <nodeId> [--raise]` |
 | `view_motion_frames` | `feega motion frames <nodeId> --at 1,2.5,4 [--width 640] [--out dir]` |
 | `list_motion_revisions` | `feega motion revisions <nodeId>` |
 | `restore_motion_revision` | `feega motion revisions <nodeId> --restore <version>` |
+| `list_motion_templates` | `feega motion templates` |
+| `new_motion_from_template` | `feega motion new --template <id> [--format 16:9, 9:16 or 1:1] [--project id]` |
+| `add_motion_template` | `feega motion add-template <nodeId> <templateId> [--at s] [--var k=v] [--no-sound]` |
 | `get_storyboard` | `feega motion storyboard <nodeId>` |
 | `write_storyboard` | `feega motion storyboard <nodeId> --write beats.json` |
 | `edit_storyboard_card` | `feega motion storyboard <nodeId> --card <id> --text "..."` |

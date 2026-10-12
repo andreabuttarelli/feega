@@ -1,9 +1,17 @@
 import { EMBED_ROUTE, HOST_MESSAGE, type hostMain } from './host';
 import { PlayMode, SCROLL_LENGTH } from './settings';
+import { PLAYER_MESSAGE, PlayerEvent } from './protocol';
+import type { VarDecl } from './var-model';
 
 export const EMBED_TAG = 'feega-motion';
 export const EMBED_ATTR = 'data-feega';
 export const LOADER_FILE = 'embed.js';
+export const VARS_ATTR = 'vars';
+
+export enum ElementEvent {
+  Ready = 'ready',
+  VarsChanged = 'vars-changed'
+}
 
 export enum HostKind {
   Page = 'page',
@@ -23,7 +31,7 @@ export const SCRUB_SOURCE: Record<HostKind, ScrubSource> = {
   [HostKind.ForeignFrame]: ScrubSource.Gesture
 };
 
-export type EmbedSettings = { width: number; height: number; playback: string; scrollLength: number };
+export type EmbedSettings = { width: number; height: number; playback: string; scrollLength: number; vars?: VarDecl[] };
 
 export type LoaderConfig = {
   origin: string;
@@ -32,6 +40,10 @@ export type LoaderConfig = {
   attr: string;
   mounted: string;
   hostMessage: string;
+  playerMessage: string;
+  playerEvents: { size: string; ready: string; vars: string };
+  varsAttr: string;
+  elementEvents: { ready: string; varsChanged: string };
   scrub: string;
   fallback: EmbedSettings;
   kinds: Record<keyof typeof HostKind, HostKind>;
@@ -63,6 +75,10 @@ export function loaderConfig(origin: string): LoaderConfig {
     attr: EMBED_ATTR,
     mounted: 'data-feega-mounted',
     hostMessage: HOST_MESSAGE,
+    playerMessage: PLAYER_MESSAGE,
+    playerEvents: { size: PlayerEvent.Size, ready: PlayerEvent.Ready, vars: PlayerEvent.Vars },
+    varsAttr: VARS_ATTR,
+    elementEvents: { ready: ElementEvent.Ready, varsChanged: ElementEvent.VarsChanged },
     scrub: PlayMode.Scrub,
     fallback: { width: 16, height: 9, playback: PlayMode.Autoplay, scrollLength: SCROLL_LENGTH.default },
     kinds: { ...HostKind },
@@ -132,12 +148,69 @@ export function loaderMain(win: Window, cfg: LoaderConfig, host: typeof hostMain
     }
   };
 
+  const parsed = (raw: string | null): Record<string, unknown> => {
+    try {
+      const value = JSON.parse(raw ?? '{}') as unknown;
+      return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const wireVars = (el: HTMLElement, frame: HTMLIFrameElement) => {
+    let listening = false;
+    let held = parsed(el.getAttribute(cfg.varsAttr));
+    const sendVars = (vars: Record<string, unknown>) => {
+      if (!listening) {
+        held = { ...held, ...vars };
+        return;
+      }
+      if (Object.keys(vars).length) {
+        frame.contentWindow?.postMessage({ type: cfg.hostMessage, vars }, '*');
+      }
+    };
+    const relay: Record<string, (data: Record<string, unknown>) => void> = {
+      [cfg.playerEvents.size]: () => {
+        listening = true;
+        sendVars(held);
+        held = {};
+      },
+      [cfg.playerEvents.ready]: (data) => el.dispatchEvent(new CustomEvent(cfg.elementEvents.ready, { detail: data })),
+      [cfg.playerEvents.vars]: (data) => el.dispatchEvent(new CustomEvent(cfg.elementEvents.varsChanged, { detail: data.values }))
+    };
+
+    (el as HTMLElement & { setVars: (vars: Record<string, unknown>) => void }).setVars = sendVars;
+    win.addEventListener('message', (e: MessageEvent) => {
+      const data = e.data as Record<string, unknown> | null;
+      if (e.source !== frame.contentWindow || data?.type !== cfg.playerMessage) {
+        return;
+      }
+      relay[String(data.event)]?.(data);
+    });
+    new (win as unknown as typeof globalThis).MutationObserver(() => sendVars(parsed(el.getAttribute(cfg.varsAttr)))).observe(el, { attributes: true, attributeFilter: [cfg.varsAttr] });
+  };
+
+  const mountedIds = new Set<string>();
+  const warnedIds = new Set<string>();
+  const noteRepeat = (id: string) => {
+    if (!mountedIds.has(id)) {
+      mountedIds.add(id);
+      return;
+    }
+    if (warnedIds.has(id)) {
+      return;
+    }
+    warnedIds.add(id);
+    win.console.warn(`feega: video ${id} is embedded more than once on this page. Paste its snippet once.`);
+  };
+
   const mount = async (el: HTMLElement) => {
     const id = el.getAttribute('src') ?? el.getAttribute(cfg.attr);
     if (!id || el.hasAttribute(cfg.mounted)) {
       return;
     }
     el.setAttribute(cfg.mounted, '');
+    noteRepeat(id);
 
     if (soleContent(el)) {
       takeDocument();
@@ -148,6 +221,7 @@ export function loaderMain(win: Window, cfg: LoaderConfig, host: typeof hostMain
 
     const frame = frameOf(id, el.getAttribute('fit'));
     el.appendChild(frame);
+    wireVars(el, frame);
     const settings = await settingsOf(id);
     const source = settings.playback === cfg.scrub ? cfg.sources[kind] : null;
 

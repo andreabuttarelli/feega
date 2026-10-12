@@ -463,6 +463,13 @@ describe('a live scene in a video', () => {
     expect(live).toEqual([expect.objectContaining({ at: 1, detail: expect.stringContaining('export it as Embed') })]);
     expect(blocking(live)).toEqual([]);
   });
+
+  it('stays quiet when the component draws the video itself with still(t)', () => {
+    const drawn = { ...game, source: { ...game.source, js: 'requestAnimationFrame(() => {});\nreturn { still: (t) => {} };' } };
+    const doc = must(addClip(must(writeComponent(newMotionDoc(MotionFormat.Landscape), 'Game', drawn)), { component: 'Custom', from: 30, durationInFrames: 60, props: { name: 'Game' } }, 'g1'));
+
+    expect(docProblems(doc, { audioAssets: 1 }).filter((p) => p.kind === Quality.LiveScene)).toEqual([]);
+  });
 });
 
 
@@ -474,6 +481,12 @@ describe('the script gate', () => {
     for (const style of MOTION_STYLES) {
       expect(asksScript(style), style).toBe(STYLES[style].script === Script.Required);
     }
+  });
+
+  it('a trailer built without its script cannot be delivered, as when write_script waited on a test account and the next turn built without it', () => {
+    const problems = docProblems(titled(MotionStyle.LaunchFilm), { audioAssets: 0 }).filter((p) => p.kind === Quality.NoScript);
+
+    expect(blocking(problems)).toHaveLength(1);
   });
 
   it('un esercizio di stile grafico non resta bloccato su uno script che non può avere', () => {

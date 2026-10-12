@@ -50,6 +50,20 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'list_shader_effects',
+    {
+      title: 'List shader effects',
+      description:
+        'The GPU shader effects (open-source shaders library, WebGPU) the motion agent adds with `add_shader_effect`: gradients, noise, glass, metal, light, distortions, wipes, blurs. ' +
+        'Each with category, `source` (generator, or filter over a picture), `live` (cursor effects: interactive embeds only), its knobs with ranges and whether they take keyframes, and colours. ' +
+        'Name one in `ask_motion_agent`, e.g. "add an iris-wipe reveal on the product shot". Reads only.',
+      inputSchema: z.object({ org }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org }) => withAuth((token) => motionApi.shaderEffects(token, org))
+  );
+
+  server.registerTool(
     'get_motion_run',
     {
       title: 'Read a motion agent run',
@@ -176,6 +190,45 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'list_motion_templates',
+    {
+      title: 'List motion templates',
+      description:
+        'Ready-made pieces to drop into a motion video (built-in and saved by the org), e.g. builtin:prompt-input, a prompt field that types, presses send and thinks. ' +
+        'Each with `id`, `seconds` and its `fields`: key, type (text, number min..max, color #rrggbb, boolean, select options), group and default. Reads only, free.',
+      inputSchema: z.object({ org }),
+      annotations: { readOnlyHint: true }
+    },
+    async ({ org }) => withAuth((token) => motionApi.templates(token, org))
+  );
+
+  server.registerTool(
+    'new_motion_from_template',
+    {
+      title: 'Start a motion video from a template',
+      description:
+        'Create a new motion video that already holds a template (id from `list_motion_templates`) at 0s, sized to `format` (16:9 default, 9:16, 1:1), ' +
+        'in `project` (default: the most recently active). Returns node_id and editor_url; change its fields with `add_motion_template` vars or `ask_motion_agent`. No AI, free.',
+      inputSchema: z.object({ org, template: z.string(), format: z.enum(['16:9', '9:16', '1:1']).optional(), project: z.string().optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, ...body }) => withAuth((token) => motionApi.fromTemplate(token, body, org))
+  );
+
+  server.registerTool(
+    'add_motion_template',
+    {
+      title: 'Add a template to a motion video',
+      description:
+        'Insert an editable copy of a template (id from `list_motion_templates`) at `at` seconds, its fields set from `vars` (keys and types as listed). ' +
+        '`sound` (default true) lays its key taps and clicks on the SFX track. Saved as a new revision; no AI, free.',
+      inputSchema: z.object({ org, node_id: z.string(), id: z.string(), at: z.number().min(0).optional(), vars: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(), sound: z.boolean().optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, node_id, ...body }) => withAuth((token) => motionApi.addTemplate(token, node_id, body, org))
+  );
+
+  server.registerTool(
     'list_motion_videos',
     {
       title: 'List motion videos',
@@ -201,6 +254,20 @@ export function registerMotionTools(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true }
     },
     async ({ org, node_id, action }) => withAuth((token) => (action === 'unpublish' ? motionApi.unembed(token, node_id, org) : motionApi.embed(token, node_id, org)))
+  );
+
+  server.registerTool(
+    'motion_budget',
+    {
+      title: 'Read or raise the budget of a motion video',
+      description:
+        'What a motion video has spent on AI across all its agent turns (`spent_usd`) and what it may spend (`cap_usd`). ' +
+        'When an ask returns `video_budget`, the agent stopped because the video used its budget: its work is saved. ' +
+        '`action: "raise"` adds `raise_usd` to the cap (only when the user asked to continue), then `ask_motion_agent` continues.',
+      inputSchema: z.object({ org, node_id: z.string(), action: z.enum(['read', 'raise']).optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false }
+    },
+    async ({ org, node_id, action }) => withAuth((token) => (action === 'raise' ? motionApi.raiseBudget(token, node_id, org) : motionApi.budget(token, node_id, org)))
   );
 
   server.registerTool(

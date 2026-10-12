@@ -22,7 +22,10 @@ FeegaMotion(id: '<video id>', origin: 'https://oh.feega.app')
 - **Links** open in the external browser through `url_launcher`, or go to `onLinkClick`.
 - **Pauses** off-screen (`visibility_detector`) and when the app goes to the background.
 - **Reduced motion** follows `MediaQuery.disableAnimations`.
-- `FeegaMotionController` plays, pauses and seeks.
+- **Runtime variables** the video declares: `FeegaMotion(vars: {'speed': 2, 'label': 'Hi'})`
+  sends only what changed on each rebuild, without reloading the WebView; `onReady` gets the
+  schema in `info.vars`, `onVarsChange` the values the player kept.
+- `FeegaMotionController` plays, pauses, seeks and `setVars`.
 
 Protocol: [`docs/embed-protocol.md`](../../docs/embed-protocol.md).
 

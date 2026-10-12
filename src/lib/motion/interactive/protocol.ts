@@ -15,7 +15,8 @@ export enum PlayerEvent {
   TimeUpdate = 'timeupdate',
   Ended = 'ended',
   Link = 'link',
-  Error = 'error'
+  Error = 'error',
+  Vars = 'vars'
 }
 
 export type PlayerMessage = { type: typeof PLAYER_MESSAGE; v: typeof PROTOCOL_VERSION; event: PlayerEvent } & Record<string, unknown>;

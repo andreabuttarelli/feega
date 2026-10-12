@@ -18,21 +18,29 @@ const UI = { title: 'Dashboard', elements: [{ tag: 'h1', text: 'Overview', x: 0,
 
 type Fake = AppTab & { typed: [string, string][] };
 
-function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: Record<string, string>; tour?: boolean } = {}): Fake {
+type Clock = { at: number };
+
+function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: Record<string, string>; tour?: boolean; signedIn?: boolean; noForm?: boolean; redirect?: { clock: Clock; afterMs: number } } = {}): Fake {
   const { loginWorks = true, sessionAlive = true, labels = {} } = opts;
   let tour = opts.tour ?? false;
   let at = 'about:blank';
-  let cookies: SessionCookie[] = [];
+  let cookies: SessionCookie[] = opts.signedIn ? [COOKIE] : [];
+  let landsAt: number | null = null;
   const kept = (): AppSession => ({ cookies, storage: cookies.length ? { jwt: 'tok' } : {} });
   const typed: [string, string][] = [];
   const tab: Fake = {
     typed,
     goto: vi.fn(async (url: string) => {
       const loggedIn = cookies.length > 0;
-      at = !loggedIn && url !== LOGIN ? LOGIN : url;
+      at = loggedIn && url === LOGIN ? `${APP}/dashboard` : !loggedIn && url !== LOGIN ? LOGIN : url;
       return 200;
     }),
-    url: () => at,
+    url: () => {
+      if (landsAt !== null && opts.redirect && opts.redirect.clock.at >= landsAt) {
+        at = `${APP}/dashboard`;
+      }
+      return at;
+    },
     html: vi.fn(async () => '<html><body><h1>Overview</h1></body></html>'),
     look: vi.fn(async () => ({ background: null, text: null, button: null, body: null, heading: null })),
     click: vi.fn(async (target) => {
@@ -41,6 +49,10 @@ function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: 
       }
       if (target.selector === DEFAULT_SUBMIT_SELECTOR && loginWorks) {
         cookies = [COOKIE];
+        if (opts.redirect) {
+          landsAt = opts.redirect.clock.at + opts.redirect.afterMs;
+          return;
+        }
         at = `${APP}/dashboard`;
       }
     }),
@@ -48,7 +60,11 @@ function fakeTab(opts: { loginWorks?: boolean; sessionAlive?: boolean; labels?: 
       typed.push([selector, text]);
     }),
     scroll: vi.fn(async () => undefined),
-    waitFor: vi.fn(async () => undefined),
+    waitFor: vi.fn(async (selector: string) => {
+      if (opts.noForm) {
+        throw new Error(`Waiting for selector \`${selector}\` failed`);
+      }
+    }),
     sensitive: vi.fn(async () => false),
     shot: vi.fn(async () => Buffer.from('jpeg')),
     close: vi.fn(async () => 0.004),
@@ -161,6 +177,48 @@ describe('app_browse: a test account the user handed over in chat', () => {
     expect(!out.ok && out.shots).toHaveLength(1);
     expect(accounts.saved()?.session).toEqual({ cookies: [], storage: {} });
     expect(tab.close).toHaveBeenCalled();
+  });
+
+  it('waits for a slow app to leave the sign-in page (oh.feega.app takes ~5 s, the v7 trailer gave up at 2.5 s)', async () => {
+    const clock: Clock = { at: NOW };
+    const tab = fakeTab({ redirect: { clock, afterMs: 5_000 } });
+    const sleep = async (ms: number) => {
+      clock.at += ms;
+    };
+
+    const out = await appBrowse({ ...CREDS, pages: ['/dashboard'] }, { open: async () => tab, accounts: memoryStore(), now: () => clock.at, sleep });
+
+    expect(out).toMatchObject({ ok: true, session: 'fresh' });
+  });
+
+  it('gives up on a login that never leaves the sign-in page within the wait, and says how long it waited', async () => {
+    const clock: Clock = { at: NOW };
+    const tab = fakeTab({ redirect: { clock, afterMs: 60_000 } });
+    const sleep = async (ms: number) => {
+      clock.at += ms;
+    };
+
+    const out = await appBrowse({ ...CREDS, pages: ['/dashboard'] }, { open: async () => tab, accounts: memoryStore(), now: () => clock.at, sleep });
+
+    expect(out).toMatchObject({ ok: false, error: expect.stringMatching(/still on the sign-in page after 15 s/) });
+  });
+
+  it('a browser that is already signed in skips the form instead of waiting 30 s for a field that is not there (v7)', async () => {
+    const tab = fakeTab({ signedIn: true });
+
+    const out = await appBrowse({ ...CREDS, pages: ['/dashboard'] }, ports(tab, memoryStore()));
+
+    expect(out).toMatchObject({ ok: true });
+    expect(tab.typed).toEqual([]);
+  });
+
+  it('a sign-in page with no email field says so instead of timing out', async () => {
+    const tab = fakeTab({ noForm: true });
+
+    const out = await appBrowse({ ...CREDS, pages: ['/dashboard'] }, ports(tab, memoryStore()));
+
+    expect(out).toMatchObject({ ok: false, error: expect.stringContaining('no email field') });
+    expect(tab.typed).toEqual([]);
   });
 
   it('never signs in to a social platform', async () => {

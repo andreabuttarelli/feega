@@ -50,6 +50,10 @@ function printRun(run: MotionRun) {
     run.reference_pick.candidates.forEach((c) => console.log(`  ${c.id}  ${c.image}${c.why ? `  ${c.why}` : ''}`));
     console.log(`Answer: feega motion ask ${run.node_id ?? '<nodeId>'} "" --follow <ids...> --avoid <ids...>`);
   }
+  if (run.video_budget) {
+    console.log(`  budget used: $${run.video_budget.spent_usd.toFixed(2)} spent`);
+    console.log(`Continue: feega motion budget ${run.node_id ?? '<nodeId>'} --raise (+$${run.video_budget.raise_usd.toFixed(2)})`);
+  }
   if (run.cut_review) {
     console.log(`  critic ${run.cut_review.score}/10`);
     run.cut_review.fixes.forEach((f) => console.log(`  - ${f}`));
@@ -106,6 +110,40 @@ export async function cmdMotionRevisions(nodeId: string, opts: { org?: string; r
   const { revisions } = await motionApi.revisions(bearer, nodeId, opts.org);
   for (const r of revisions) {
     console.log(`v${r.version}  ${r.actorKind}  ${r.clips} clips  ${r.createdAt}  ${r.summary ?? ''}`);
+  }
+}
+
+export async function cmdMotionTemplates(opts: { org?: string }) {
+  const { templates } = await motionApi.templates(await token(), opts.org);
+  for (const t of templates) {
+    console.log(`${t.id}  ${t.name}  ${t.seconds}s  ${t.description}`);
+    console.log(`  ${t.fields.map((f) => `${f.key}:${f.type}`).join(', ')}`);
+  }
+}
+
+const parsedVar = (raw: string): [string, string] => {
+  const at = raw.indexOf('=');
+  return [raw.slice(0, at), raw.slice(at + 1)];
+};
+
+export async function cmdMotionNew(opts: { template: string; format?: '16:9' | '9:16' | '1:1'; project?: string; org?: string }) {
+  const made = await motionApi.fromTemplate(await token(), { template: opts.template, format: opts.format, project: opts.project }, opts.org);
+  console.log(`Created video ${made.node_id} from ${opts.template}, revision ${made.version}.`);
+  console.log(`Edit it: ${made.editor_url}`);
+}
+
+export async function cmdMotionAddTemplate(nodeId: string, templateId: string, opts: { org?: string; at?: string; var?: string[]; sound?: boolean }) {
+  const vars = Object.fromEntries((opts.var ?? []).filter((v) => v.includes('=')).map(parsedVar));
+  const added = await motionApi.addTemplate(await token(), nodeId, { id: templateId, at: Number(opts.at ?? 0), vars, sound: opts.sound !== false }, opts.org);
+  console.log(`Added ${templateId} as clip ${added.clip_id}, revision ${added.version}.${added.sounds ? ` Sounds: ${added.sounds}` : ''}`);
+}
+
+export async function cmdMotionShaders(opts: { org?: string }) {
+  const { effects } = await motionApi.shaderEffects(await token(), opts.org);
+  for (const e of effects) {
+    const knobs = Object.entries(e.knobs).map(([key, k]) => `${key} ${k.min}..${k.max}${k.keyframes ? '' : ' (fixed)'}`);
+    console.log(`${e.id}  ${e.category}  ${e.source}${e.live ? '  live only' : ''}  ${e.about}`);
+    console.log(`  ${[...knobs, ...Object.keys(e.colours)].join(', ')}`);
   }
 }
 
@@ -194,4 +232,10 @@ export async function cmdMotionStoryboard(nodeId: string, opts: { org?: string; 
   for (const c of board.cards) {
     console.log(`\n[${c.node_id}]${c.clip_ids.length ? ` clips ${c.clip_ids.join(',')}` : ''}\n${c.text}`);
   }
+}
+
+export async function cmdMotionBudget(nodeId: string, opts: { org?: string; raise?: boolean }) {
+  const bearer = await token();
+  const budget = opts.raise ? await motionApi.raiseBudget(bearer, nodeId, opts.org) : await motionApi.budget(bearer, nodeId, opts.org);
+  console.log(`spent $${budget.spent_usd.toFixed(2)} of $${budget.cap_usd.toFixed(2)}`);
 }

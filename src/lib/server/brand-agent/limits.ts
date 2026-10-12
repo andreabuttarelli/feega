@@ -33,3 +33,9 @@ export function agentStopWhen(startedAt: number): (input: StepsSoFar) => boolean
 export function overTurnCap(spentUsd: () => number): (input: StepsSoFar) => boolean {
   return () => spentUsd() > AGENT_TURN_CAP_USD;
 }
+
+export const VIDEO_CAP_USD = 3;
+
+export const FIX_RESERVE_SHARE = 0.25;
+
+export const VIDEO_RAISE_USD = 1;

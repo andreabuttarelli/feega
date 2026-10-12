@@ -5,6 +5,7 @@ import type { Out } from '../hyperframes/channel-out';
 import { apply2d, type Affine } from '../affine';
 import { Outside } from './settings';
 import type { LivePaint, LensSpec } from './paint';
+import { numericVars, type PaintBinding, type VarDecl, type VarValues } from './var-model';
 
 export type StyleLane = { id: string; key: string; paint: LivePaint.Style; target: string; prop: string; out: Out };
 export type LensLane = { id: string; key: string; paint: LivePaint.Lens };
@@ -29,9 +30,11 @@ export type LiveSpec = {
   names: Record<string, string>;
   hosts: Record<string, HostSpec>;
   chains: Record<string, string[]>;
+  vars: VarDecl[];
+  bindings: PaintBinding[];
 };
 
-export type LiveScene = { lanes: LiveLane[]; tick: (global: InputValues, frame: number, dtSeconds: number) => Map<string, number> };
+export type LiveScene = { lanes: LiveLane[]; tick: (global: InputValues, frame: number, dtSeconds: number, vars?: VarValues) => Map<string, number> };
 
 
 export function laneName(lane: Pick<LiveLane, 'id' | 'key'>): string {
@@ -88,6 +91,7 @@ export function liveScene(spec: LiveSpec): LiveScene {
   const memory = new Map<string, InputValues>();
   const smoothed = new Map<string, number>();
   let global: InputValues = {};
+  let numbers = numericVars(spec.vars, {});
   let dt = 0;
 
   const levelOf = (host: HostSpec, frame: number): Level => {
@@ -121,12 +125,15 @@ export function liveScene(spec: LiveSpec): LiveScene {
     return next;
   };
 
-  const evaluator = new Evaluator(specBook(spec), spec.fps, () => SILENT_AUDIO, (id, key, frame) => valuesPort(localInputs(id, frame), frame / spec.fps, smoother(`${id}.${key}`)));
+  const evaluator = new Evaluator(specBook(spec), spec.fps, () => SILENT_AUDIO, (id, key, frame) => valuesPort(localInputs(id, frame), frame / spec.fps, smoother(`${id}.${key}`), numbers));
 
   return {
     lanes: spec.live,
-    tick: (next, frame, dtSeconds) => {
+    tick: (next, frame, dtSeconds, vars) => {
       global = next;
+      if (vars) {
+        numbers = numericVars(spec.vars, vars);
+      }
       dt = dtSeconds;
       evaluator.reset();
       const values = new Map<string, number>();

@@ -21,6 +21,9 @@ import { saveFontUpload } from '$lib/server/motion/font-upload';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { clipsOf, parseMotionDoc } from '$lib/motion/doc';
 import { templateLibrary } from '$lib/server/motion/templates';
+import { withTemplateSounds } from '$lib/server/motion/template-sounds';
+import { laySfx } from '$lib/server/motion/sfx';
+import type { Sfx } from '$lib/motion/sfx';
 import type { Db } from '$lib/server/db/client';
 import { loadAttachments } from '$lib/server/chat-attachments/register';
 import { briefAttachmentIds } from '$lib/motion/video-brief';
@@ -245,6 +248,19 @@ export const actions: Actions = {
     const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };
     const started = await startFarmBatch(scope.db, renderScope, rows.rows);
     return started.ok ? started : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
+  },
+
+  templateSounds: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const form = await request.formData();
+    const parsed = parseMotionDoc(parsedJson(String(form.get('doc') ?? '')));
+    if (!parsed.ok) {
+      return fail(HTTP_BAD_REQUEST, { error: parsed.error });
+    }
+    const soundScope = { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } };
+    const make = (sfx: Sfx) => withOrgContext(scope.orgId, () => laySfx(scope.db, soundScope, sfx));
+    const laid = await withTemplateSounds(parsed.doc, String(form.get('clipId') ?? ''), make, () => crypto.randomUUID().slice(0, 8));
+    return laid.ok ? { doc: laid.doc } : fail(HTTP_UNAVAILABLE, { error: laid.error });
   },
 
   saveTemplate: async ({ locals, params, request }) => {

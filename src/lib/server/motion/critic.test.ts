@@ -4,13 +4,12 @@ import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { CRITIC_PASS_SCORE, SHEET_MAX_FRAMES, critique, criticMessage, sheetTimes, type CriticPorts } from './critic';
 import { tileSheet } from './contact-sheet';
 import { MAX_FRAMES_PER_VIEW } from './frames';
-import { STUDIO_ROSTER, StudioRole, roleBudgetUsd } from './studio-roster';
 
 const doc = { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 30 * 12, fps: 30 as const };
 
 const jpeg = (shade: number) => sharp({ create: { width: 64, height: 36, channels: 3, background: { r: shade, g: shade, b: shade } } }).jpeg().toBuffer();
 
-const ports = (answer: unknown, seen: { times?: number[]; images?: number } = {}): CriticPorts => ({
+const ports = (answer: unknown, seen: { times?: number[]; images?: number; prompt?: string } = {}): CriticPorts => ({
   frames: async (times) => {
     seen.times = [...(seen.times ?? []), ...times];
     return Promise.all(times.map(async (time) => ({ time, bytes: await jpeg(time * 10) })));
@@ -18,6 +17,7 @@ const ports = (answer: unknown, seen: { times?: number[]; images?: number } = {}
   tile: async (frames) => Buffer.from(`sheet of ${frames.length}`),
   ask: async (input) => {
     seen.images = input.images.length;
+    seen.prompt = input.prompt;
     return { answer, usd: 0.05 };
   }
 });
@@ -47,6 +47,15 @@ describe('the critic', () => {
     expect(seen.images).toBe(2);
     expect(out.review).toEqual({ score: 5, fixes: ['scene at 3s is empty: fill it with the product UI'] });
     expect(out.usd).toBe(0.05);
+  });
+
+  it('hands the critic what an independent viewer saw in each frame, before it judges', async () => {
+    let prompt = '';
+    const view = async (frames: readonly { time: number }[]) => ({ lines: frames.map((f) => ({ time: f.time, visible: `still at ${f.time}`, wrong: 'nothing' })), usd: 0.02 });
+    const out = await critique({ ...ports({ score: 9, fixes: [] }), view, ask: async (q) => ((prompt = q.prompt), { answer: { score: 9, fixes: [] }, usd: 0.05 }) }, { doc, request: 'x', references: [] });
+
+    expect(prompt).toContain('0.5s: still at 0.5');
+    expect(out.usd).toBeCloseTo(0.07);
   });
 
   it('draws the sheet in batches the editor accepts, so no frame request is refused', async () => {
@@ -88,16 +97,6 @@ describe('the contact sheet', () => {
     expect(meta.height).toBeGreaterThan(36);
   });
 });
-
-describe('the studio roster', () => {
-  it('splits the turn cap between the roles without exceeding it', () => {
-    const shares = Object.values(STUDIO_ROSTER).reduce((sum, r) => sum + r.budgetShare, 0);
-
-    expect(shares).toBeCloseTo(1);
-    expect(roleBudgetUsd(StudioRole.Critic, 1.5)).toBeCloseTo(1.5 * STUDIO_ROSTER[StudioRole.Critic].budgetShare);
-  });
-});
-
 describe('the critic measures empty frames on its own sheet', () => {
   const measured = (densities: number[]) => ({ density: async (frames: readonly { time: number }[]) => frames.map((_, i) => densities[i] ?? 0.5) });
 
@@ -115,3 +114,15 @@ describe('the critic measures empty frames on its own sheet', () => {
     expect(out.review).toEqual({ score: 9, fixes: [] });
   });
 });
+
+describe('the critic reads the script as text', () => {
+  it('gets the on-screen lines numbered in order and is asked whether they make sense (v5: "the texts make no sense")', async () => {
+    const seen: { prompt?: string } = {};
+    const script = { research: { audience: 'site owners' }, acts: [{ on_screen: ['Three sites.'] }, { on_screen: ['Pick one.', 'Say the change.'] }] } as never;
+    await critique(ports({ score: 9, fixes: [] }, seen), { doc: { ...doc, script }, request: 'x', references: [] });
+
+    expect(seen.prompt).toContain('1. Three sites. 2. Pick one. 3. Say the change.');
+    expect(seen.prompt).toContain('make sense in that order');
+  });
+});
+

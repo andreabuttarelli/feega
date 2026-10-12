@@ -2,6 +2,7 @@ export const MOTION_LIBS_ROUTE = '/motion-libs';
 export const APP_ORIGIN = 'https://feega.app';
 export const HYPERFRAMES_VERSION = '0.8.114';
 export const THREE_VERSION = '0.181.2';
+export const SHADERS_VERSION = '4.0.4';
 
 export enum Licence {
   Mit = 'MIT',
@@ -27,13 +28,15 @@ export enum Script {
   Matter = 'matter',
   LittleJS = 'littlejs',
   Kaplay = 'kaplay',
-  Three = 'three'
+  Three = 'three',
+  Shaders = 'shaders'
 }
 
-export type Hosted = { name: string; version: string; pkg: string; source: string; file: string; licence: Licence; licenceFile: string; home: string; packing: Packing; global?: string };
+export type Hosted = { name: string; version: string; pkg: string; source: string; file: string; licence: Licence; licenceFile: string; home: string; packing: Packing; global?: string; entry?: string };
 
 export const THREE_GLOBAL = '__feegaThree';
 export const LITTLEJS_GLOBAL = '__feegaLittleJS';
+export const SHADERS_GLOBAL = '__feegaShaders';
 
 const THREE = { name: 'three', version: THREE_VERSION, pkg: 'motion-three', licence: Licence.Mit, licenceFile: 'LICENSE', home: 'https://github.com/mrdoob/three.js' };
 
@@ -49,7 +52,8 @@ export const HOSTED: Record<Script, Hosted> = {
   [Script.Matter]: { name: 'matter-js', version: '0.20.0', pkg: 'matter-js', source: 'build/matter.min.js', file: 'matter.min.js', licence: Licence.Mit, licenceFile: 'LICENSE', home: 'https://github.com/liabru/matter-js', packing: Packing.Copy },
   [Script.LittleJS]: { name: 'littlejsengine', version: '1.26.1', pkg: 'littlejsengine', source: 'dist/littlejs.esm.min.js', file: 'littlejs.iife.js', licence: Licence.Mit, licenceFile: 'LICENSE', home: 'https://github.com/KilledByAPixel/LittleJS', packing: Packing.Iife, global: LITTLEJS_GLOBAL },
   [Script.Kaplay]: { name: 'kaplay', version: '3001.0.19', pkg: 'kaplay', source: 'dist/kaplay.js', file: 'kaplay.js', licence: Licence.Mit, licenceFile: 'LICENSE.md', home: 'https://github.com/kaplayjs/kaplay', packing: Packing.Copy },
-  [Script.Three]: { ...THREE, source: 'build/three.module.js', file: 'three.iife.js', packing: Packing.Iife, global: THREE_GLOBAL }
+  [Script.Three]: { ...THREE, source: 'build/three.module.js', file: 'three.iife.js', packing: Packing.Iife, global: THREE_GLOBAL },
+  [Script.Shaders]: { name: 'shaders', version: SHADERS_VERSION, pkg: 'shaders', source: 'dist/core/index.js', entry: 'src/lib/motion/shader-effects/library-entry.ts', file: 'shaders.iife.js', licence: Licence.Mit, licenceFile: 'LICENSE', home: 'https://github.com/shader-effects-inc/shaders', packing: Packing.Iife, global: SHADERS_GLOBAL }
 };
 
 export const OPENTYPE: Hosted = { name: 'opentype.js', version: '1.3.4', pkg: 'opentype.js', source: 'dist/opentype.module.js', file: 'opentype.module.js', licence: Licence.Mit, licenceFile: 'LICENSE', home: 'https://github.com/opentypejs/opentype.js', packing: Packing.Copy };

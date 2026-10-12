@@ -21,10 +21,12 @@ import { BENTO_LAYOUT, cellFrames } from '../bento/model';
 import { bakeComposition, compositionScript, type TimedBake } from './composition';
 import { ANIMATE_CSS, ENGINE, animationScript, keyedOverrides, sceneKeys, wrapAnimated, wrapParents } from './animate';
 import { ancestorsOf, parentsWithChildren } from '../parent';
-import { MASK_CSS, MaskScope, maskLayer, startValues } from './masks';
-import { captureScript, contentStamp } from './capture';
+import { threeGrains, withoutGrain } from './three-grain';
+import { MASK_CSS, MaskScope, maskArea, maskLayer, startValues } from './masks';
+import { COMPOSITION_ID, captureScript, contentStamp } from './capture';
 import { cspMeta } from './csp';
 import { measureScript } from './measure';
+import { exactSeekScript } from './exact-seek';
 import { Library, Play, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
 import { ComponentMode, PropFormat, modeOf, type CustomComponents } from '../custom/component';
 import { mattePairs, type MattePair } from '../matte';
@@ -36,6 +38,7 @@ import { shapeScript, shapeStudy, type ShapeBake } from './shapes';
 import type { Extent } from '../shape/render';
 import { TEXT_PATH_CSS, textPathBake, textPathScript, textPathTemplate, type TextPathBake } from './text-path';
 import { particleBake, particleScript } from './particles';
+import { shaderEffectBake, shaderEffectScript, type ShaderEffectBake } from './shader-effects';
 import { remappedSegments } from '../time-remap';
 import type { ParticleBake } from '../particles/simulate';
 import { bakeExpressions } from '../expression/bake';
@@ -49,7 +52,7 @@ import { bakePaths } from '../path';
 import { bakePhysics } from '../physics/simulate';
 import { withoutHidden } from '../organize';
 import { JUNCTION, Span, junctionHalves, junctionPairs, withJunctions, type JunctionPair, type Move } from '../junctions';
-import { paintArea } from '../effects/paint-area';
+import { paintArea, placedBox } from '../effects/paint-area';
 import { EFFECT_CSS, adjustmentLayer, adjustmentTimeline, effectLayer, effectScript, effectTimeline, type EffectSet } from '../effects/render';
 import { flattenComps, type GroupProps } from '../precomp';
 import { blendStyle } from '../blend';
@@ -59,6 +62,7 @@ import { RuntimeDelivery } from './runtime-delivery';
 import { shaderBakes, shaderScript, type ShaderBake } from '../shaders/compose';
 import { liveSpec, type SpecInput } from '../interactive/spec';
 import { LIVE_GLOBAL } from '../interactive/runtime';
+import { boundDoc, defaultsOf, withVars, type VarValues } from '../interactive/vars';
 import { Liveness, interactiveOf } from '../interactive/settings';
 import integrity from 'virtual:motion-libs';
 import { HOSTED, Module, Script, defaultOrigin, moduleUrl, notice, scriptUrl } from '../libs/catalog';
@@ -66,7 +70,7 @@ import { HOSTED, Module, Script, defaultOrigin, moduleUrl, notice, scriptUrl } f
 export { CAPTURE_REPLY, CAPTURE_REQUEST } from './capture';
 
 export { HYPERFRAMES_VERSION } from '../libs/catalog';
-export const COMPOSITION_ID = 'main';
+export { COMPOSITION_ID };
 
 const FONTS_URL = 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Fragment+Mono&display=block';
 
@@ -100,7 +104,7 @@ export enum Target {
 
 export type Inlined = Partial<Record<Script, string>>;
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery };
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery; vars?: VarValues };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -219,7 +223,7 @@ function ownMask(clip: MotionClip, ctx: TemplateCtx<ComponentId>, inner: string)
   }
   const primary = { mask: clip.mask, values: startValues(clip.mask, clip.keyframes), url: ctx.asset(clip.mask.assetId) };
   const stacked = clip.maskStack.map((mask) => ({ mask, values: startValues(mask, {}), url: ctx.asset(mask.assetId) }));
-  return maskLayer({ scope: MaskScope.Own, clipId: clip.id, masks: [primary, ...stacked], frame: ctx }, inner);
+  return maskLayer({ scope: MaskScope.Own, clipId: clip.id, masks: [primary, ...stacked], frame: ctx, area: maskArea(ctx, placedBox(ctx.p as Record<string, number>, ctx)) }, inner);
 }
 
 function matted(matte: MattePair | null, inner: string): string {
@@ -393,7 +397,8 @@ function threeClipOf(clip: MotionClip, ctx: TemplateCtx<ComponentId>, staged: bo
     screenFit: p.screenFit ?? ScreenFit.Cover,
     screen: screenOf(clip, ctx),
     video: Boolean(ctx.asset(p.screenVideo ?? null)),
-    overscan: clip.component === 'Device3D' ? DEVICE_OVERSCAN : 0
+    overscan: clip.component === 'Device3D' ? DEVICE_OVERSCAN : 0,
+    grains: threeGrains(clip)
   };
 }
 
@@ -428,7 +433,8 @@ const RESOLVE: Record<PropFormat, ValueResolver> = {
   [PropFormat.Color]: (v, ctx) => ctx.color(String(v)),
   [PropFormat.Asset]: (v, ctx) => ctx.asset(typeof v === 'string' ? v : null),
   [PropFormat.Textarea]: (v) => v,
-  [PropFormat.Font]: (v, ctx) => ctx.font(String(v))
+  [PropFormat.Font]: (v, ctx) => ctx.font(String(v)),
+  [PropFormat.Media]: (v, ctx) => (Array.isArray(v) ? v.map((m) => ({ src: ctx.asset(m.assetId), kind: m.kind })).filter((m) => m.src) : v)
 };
 
 const ENV_LOAD: Record<Target, EnvLoad> = { [Target.Video]: EnvLoad.Wait, [Target.Screen]: EnvLoad.Swap };
@@ -469,6 +475,7 @@ const LIBRARY_SOURCE: Record<Library, Script[] | Chunk> = {
   [Library.P5]: [Script.P5],
   [Library.Pixi]: [Script.Pixi, Script.PixiEval],
   [Library.Matter]: [Script.Matter],
+  [Library.Shaders]: [Script.Shaders],
   [Library.Generative]: Chunk.Generative,
   [Library.Twgl]: Chunk.Twgl,
   [Library.Fx]: Chunk.Fx,
@@ -585,7 +592,7 @@ function zoomed(doc: MotionDoc, scale: number): string {
 }
 
 export function composeHtml(raw: ComposeInput): string {
-  const shown = withoutHidden(raw.doc);
+  const shown = withoutHidden(boundDoc(withVars(raw.doc, raw.vars)));
   const junctions = junctionTweens(shown, junctionPairs(shown));
   const prepared = bakePaths(withoutBackdrop(flattenComps(withJunctions(shown))));
   const input = { ...raw, doc: bakePhysics(bakeExpressions(prepared, raw.analyses)) };
@@ -603,6 +610,7 @@ export function composeHtml(raw: ComposeInput): string {
   const textPaths: TextPathBake[] = [];
   const particles: ParticleBake[] = [];
   const blobs: BlobBake[] = [];
+  const shaderEffects: ShaderEffectBake[] = [];
   const cardBakes = new Map<CardLayout, unknown[]>(Object.values(CARD_LAYOUTS).map((l) => [l, []]));
   const clips: MotionClip[] = [];
   const runs: CustomRun[] = [];
@@ -630,9 +638,10 @@ export function composeHtml(raw: ComposeInput): string {
       layer += 1;
       const study = clip.component === 'Shape' ? shapeStudy({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
       const placed: Placed = { layer, trackIndex: index, matte: matteOf.get(clip.id) ?? null, visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id), extent: study?.extent ?? null };
-      const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(clip, ctx, placed, template.html(ctx as never));
+      const filtered = THREE_D_COMPONENTS.includes(clip.component) ? withoutGrain(clip) : clip;
+      const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(filtered, ctx, placed, template.html(ctx as never));
       (onStage.has(clip.id) && !group && !hidden.has(clip.id) ? world : layers).push(html);
-      effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(clip, ctx, ctx.color, paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null))));
+      effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(filtered, ctx, ctx.color, paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null))));
       const own = untrimmed(template.tweens?.(ctx as never) ?? [], ctx.start, ctx.mediaStart);
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
@@ -651,6 +660,9 @@ export function composeHtml(raw: ComposeInput): string {
       }
       if (clip.component === 'Particles') {
         particles.push(particleBake(clip, ctx));
+      }
+      if (clip.component === 'ShaderEffect') {
+        shaderEffects.push(shaderEffectBake(clip, ctx, raw.liveness === Liveness.Live));
       }
       if (clip.component === 'LiquidBlob') {
         blobs.push(blobBake(clip, ctx));
@@ -673,11 +685,11 @@ export function composeHtml(raw: ComposeInput): string {
   const animation = animationScript(clips, doc, (v) => resolveColor(v, tokens), parentsWithChildren(doc));
   const used = new Set(runs.map((r) => r.name));
   const libraries = librariesOf(doc.components, used);
-  const env = { assets: input.assets, brand: brandEnv(tokens) };
+  const env = { assets: input.assets, brand: brandEnv(tokens), vars: defaultsOf(interactiveOf(doc).vars) };
   const boot = gated(bootScript(runs, env, `window.__timelines[${js(COMPOSITION_ID)}]`));
   const definitions = [...used].map((name) => hotScript(definitionScript(name, doc.components[name].source.js))).join('');
   const customBoot = boot ? `<script>${boot}</script>` : '';
-  const hosted = [Script.Runtime, ...[...libraries].flatMap(scriptsOf)].filter((script) => delivery.inlined[script] === undefined).map((script) => scriptUrl(delivery.origin, script));
+  const hosted = [Script.Runtime, ...[...libraries].flatMap(scriptsOf), ...(shaderEffects.length && !libraries.has(Library.Shaders) ? [Script.Shaders] : [])].filter((script) => delivery.inlined[script] === undefined).map((script) => scriptUrl(delivery.origin, script));
   const screenshotInlined = delivery.inlined[Script.Screenshot] !== undefined;
   const moduleSources = modules.map((module) => (delivery.modules[module] === undefined ? moduleUrl(delivery.origin, module) : 'data:'));
   const screenshotSrc = screenshotInlined ? '' : scriptUrl(delivery.origin, Script.Screenshot);
@@ -696,6 +708,7 @@ export function composeHtml(raw: ComposeInput): string {
     ...[...libraries].map((lib) => libraryTag(lib, delivery)),
     screenshotInlined ? scriptTag(Script.Screenshot, delivery) : '',
     shaderClips.length ? chunkTag(Chunk.Shader, delivery) : '',
+    shaderEffects.length && !libraries.has(Library.Shaders) ? scriptTag(Script.Shaders, delivery) : '',
     threeImportMap(delivery.origin, modules, delivery.modules),
     three.length || compositions.length || libraries.has(Library.Three) ? `<script>${gpuScript(GPU[raw.target ?? Target.Video])}</script>` : '',
     `<link rel="stylesheet" crossorigin="anonymous" href="${FONTS_URL}" />`,
@@ -723,17 +736,18 @@ export function composeHtml(raw: ComposeInput): string {
     particles.length && delivery.runtime === RuntimeDelivery.Hosted ? chunkTag(Chunk.Particles, delivery) : '',
     hotScript(particleScript(particles, doc.fps, Number(duration), delivery.runtime)),
     hotScript(blobScript(blobs, Number(duration))),
+    hotScript(shaderEffectScript(shaderEffects, doc.fps, Number(duration))),
     hotScript(shaderScript(shaderClips, Number(duration))),
     ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');
-  return `${page}${live}${captureScript(frame, contentStamp(page), screenshotSrc)}${measureScript()}</body></html>`;
+  return `${page}${live}${captureScript(frame, contentStamp(page), screenshotSrc)}${measureScript()}${exactSeekScript()}</body></html>`;
 }
 
 const LIVE_SCRIPT: Record<Liveness, (input: SpecInput, delivery: Delivery) => string> = {
   [Liveness.Baked]: () => '',
   [Liveness.Live]: (input, delivery) => {
     const spec = liveSpec(input);
-    return spec.live.length ? `${chunkTag(Chunk.Live, delivery)}<script>window.${LIVE_GLOBAL}(${scriptJson(spec)});</script>` : '';
+    return spec.live.length || spec.bindings.length ? `${chunkTag(Chunk.Live, delivery)}<script>window.${LIVE_GLOBAL}(${scriptJson(spec)});</script>` : '';
   }
 };
 

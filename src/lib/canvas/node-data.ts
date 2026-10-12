@@ -34,6 +34,7 @@ import type { CameraPresetId } from './composition/camera';
 import { CALENDAR_VIEWS } from '$lib/calendar/period-grid';
 import { CALENDAR_SCOPES } from './calendar-node';
 import { motionNodeSchema } from './motion-node';
+import { compositionTemplateSchema } from './composition-node';
 import { studioBatchNodeSchema } from './studio-batch-node';
 import { AUDIO_OPERATION_IDS, type AudioOperationId } from './audio-operations';
 import { MAX_CUSTOM_OUTPUTS, MAX_OUTPUT_LABEL } from './select-outputs';
@@ -432,7 +433,8 @@ const compositionSchema = z.object({
   duration: z.number().positive(),
   aspect: z.enum(COMPOSITION_ASPECTS),
   refId: z.string().nullish(),
-  cells: z.record(z.string(), cellSchema).optional()
+  cells: z.record(z.string(), cellSchema).optional(),
+  template: compositionTemplateSchema.nullish()
 });
 
 /**

@@ -7,15 +7,19 @@ export { CUSTOM_NAME };
 export const MAX_HTML = 20_000;
 export const MAX_CSS = 20_000;
 export const MAX_JS = 40_000;
-export const MAX_PROPS = 30;
+export const MAX_PROPS = 40;
 export const MAX_COMPONENTS = 24;
+export const VAR_PREFIX = 'varPrefix';
+export const snakeKey = (key: string) => key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+export const paramVar = (prefix: string, key: string) => `${prefix}_${snakeKey(key)}`;
 const PROP_KEY = /^[a-zA-Z][a-zA-Z0-9_]{0,39}$/;
 
 export enum PropFormat {
   Color = 'color',
   Textarea = 'textarea',
   Asset = 'asset',
-  Font = 'font'
+  Font = 'font',
+  Media = 'media'
 }
 
 export enum ComponentMode {
@@ -39,7 +43,7 @@ const propSpecSchema = z
     maximum: z.number().optional(),
     step: z.number().positive().optional(),
     enum: z.array(z.string().max(60)).min(1).max(20).optional(),
-    format: z.enum([PropFormat.Color, PropFormat.Textarea, PropFormat.Asset, PropFormat.Font]).optional(),
+    format: z.enum([PropFormat.Color, PropFormat.Textarea, PropFormat.Asset, PropFormat.Font, PropFormat.Media]).optional(),
     assetKind: z.enum(['image', 'video', 'model3d']).optional(),
     group: z.enum(['Content', 'Style', 'Layout', 'Motion', 'Camera']).optional(),
     maxLength: z.number().int().positive().max(2000).optional()
@@ -91,12 +95,17 @@ export enum Strictness {
   Lenient = 'lenient'
 }
 
+const isMediaItem = (item: unknown) => typeof (item as { assetId?: unknown })?.assetId === 'string';
+
 type ValueRule = (spec: PropSpec, value: unknown) => string | null;
 
 const TYPE_RULES: Record<PropSpec['type'], ValueRule> = {
   string: (spec, value) => {
     if (value === null && spec.format === PropFormat.Asset) {
       return null;
+    }
+    if (spec.format === PropFormat.Media && Array.isArray(value)) {
+      return value.every(isMediaItem) ? null : 'expected media items with an assetId';
     }
     if (typeof value !== 'string') {
       return 'expected text';

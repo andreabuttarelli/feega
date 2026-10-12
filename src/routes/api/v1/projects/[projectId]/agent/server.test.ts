@@ -89,7 +89,7 @@ function slowModel() {
 vi.mock('$lib/server/llm', () => ({
   llmLanguageModel: () => (world.stepped ? steppedModel() : slowModel())
 }));
-vi.mock('$lib/server/openrouter-models', () => ({
+vi.mock('$lib/server/openrouter-models', () => ({ gatewayModels: () => [],
   ensureGatewayModels: async () => {},
   gatewayRate: () => ({ input: world.usdPerToken * 1_000_000, cachedInput: 0, output: world.usdPerToken * 1_000_000 })
 }));
@@ -224,6 +224,12 @@ describe('POST /api/v1/projects/[projectId]/agent', () => {
     await POST(postEvent());
 
     expect(offeredProjectTools.names).toEqual(expect.arrayContaining([...MOTION_DELEGATION_TOOLS]));
+  });
+
+  it('lets the canvas agent spawn sub-agents', async () => {
+    await POST(postEvent());
+
+    expect(offeredProjectTools.names).toContain('spawn_agent');
   });
 
   it('hands the canvas agent the web tools', async () => {

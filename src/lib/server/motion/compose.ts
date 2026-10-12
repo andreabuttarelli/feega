@@ -6,7 +6,11 @@ import { upstreamCards, type UpstreamCard } from '$lib/canvas/composition-node';
 import { listRecentNodes } from '$lib/server/repos/dashboard';
 import { readHead, readHeads } from '$lib/server/repos/motion-revisions';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
-import { MOTION_START_DEPS, startMotion, type MotionStart, type MotionStartDeps } from './start';
+import { startMotion, type MotionStart } from './start';
+import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate, type FromTemplateDeps } from './from-template';
+import { motionEditorPath } from '$lib/canvas/motion-node';
+import { FORMAT_OF_ASPECT } from '$lib/canvas/composition-template';
+import type { CompositionNode } from '$lib/canvas/composition-node';
 import { saveMotionDoc } from './editor';
 import { applyDraft, composeEditorPath, draftFromDoc, draftFromNode, slotsOf, withEmbeds, type ComposeDraft, type ComposeMedia, type MotionSources } from '$lib/motion/composition-draft';
 import type { MotionDoc } from '$lib/motion/doc';
@@ -14,7 +18,7 @@ import { COMPOSITION_MEDIA_KINDS } from '$lib/motion/components';
 import { newMotionDoc } from '$lib/motion/doc';
 import type { CompositionLayout } from '$lib/canvas/composition/index';
 
-export type ComposeDeps = MotionStartDeps & {
+export type ComposeDeps = FromTemplateDeps & {
   saveMotionDoc: typeof saveMotionDoc;
   listRecentNodes: typeof listRecentNodes;
   readHead: typeof readHead;
@@ -24,9 +28,9 @@ export type ComposeDeps = MotionStartDeps & {
   listProjectAssets: typeof listProjectAssets;
 };
 
-export const COMPOSE_DEPS: ComposeDeps = { ...MOTION_START_DEPS, saveMotionDoc, listRecentNodes, readHead, readHeads, findNode, listConnections, listProjectAssets };
+export const COMPOSE_DEPS: ComposeDeps = { ...FROM_TEMPLATE_DEPS, saveMotionDoc, listRecentNodes, readHead, readHeads, findNode, listConnections, listProjectAssets };
 
-export type ComposeStart = { ok: true; start: MotionStart } | { ok: false; error: string };
+export type ComposeStart = { ok: true; start: MotionStart; editor: string } | { ok: false; error: string };
 
 type StartInput = { orgId: string; projectId: string; canvasId: string | null; userId: string; name: string; draft: ComposeDraft; base?: MotionDoc };
 
@@ -43,7 +47,7 @@ export async function startComposition(db: Db, deps: ComposeDeps, input: StartIn
 
   const actor = { kind: 'user' as const, id: input.userId };
   const write = await deps.saveMotionDoc(db, { orgId: input.orgId, nodeId: start.nodeId, expectedVersion: 0, doc: doc.doc, actor, summary: 'Composition' });
-  return write.outcome === RevisionOutcome.Written ? { ok: true, start } : { ok: false, error: 'not_saved' };
+  return write.outcome === RevisionOutcome.Written ? { ok: true, start, editor: composeEditorPath(start) } : { ok: false, error: 'not_saved' };
 }
 
 const MEDIA_KINDS = new Set<string>(COMPOSITION_MEDIA_KINDS);
@@ -105,6 +109,22 @@ type CanvasNodeInput = { orgId: string; projectId: string; canvasId: string; nod
 
 const MIGRATED_NAME = 'Composition';
 
+type Picked = { template: NonNullable<CompositionNode['template']>; aspect: CompositionNode['aspect']; cards: UpstreamCard[] };
+
+async function openTemplate(db: Db, deps: ComposeDeps, input: CanvasNodeInput, picked: Picked): Promise<ComposeStart> {
+  const started = await startFromTemplate(db, { ...deps, save: deps.saveMotionDoc }, {
+    ...input,
+    templateId: picked.template.id,
+    format: FORMAT_OF_ASPECT[picked.aspect],
+    values: picked.template.values,
+    wired: picked.cards
+  });
+  if (started.outcome !== FromTemplate.Started) {
+    return { ok: false, error: started.outcome };
+  }
+  return { ok: true, start: started.start, editor: motionEditorPath(started.start) };
+}
+
 export async function openCanvasComposition(db: Db, deps: ComposeDeps, input: CanvasNodeInput): Promise<ComposeStart> {
   const record = await deps.findNode(db, { orgId: input.orgId, nodeId: input.nodeId });
   const onCanvas = record && record.canvasId === input.canvasId && record.projectId === input.projectId;
@@ -121,6 +141,9 @@ export async function openCanvasComposition(db: Db, deps: ComposeDeps, input: Ca
   ]);
   const edges = connections.map((c) => ({ source: c.sourceNodeId, target: c.targetNodeId }));
   const cards = knownCards(assets, upstreamCards(node.id, edges, nodes));
+  if (node.template) {
+    return openTemplate(db, deps, input, { template: node.template, aspect: node.aspect, cards });
+  }
   const slots = slotsOf(node, cards, await headsOf(db, deps, input.orgId, cards));
   const draft = draftFromNode(node, slots.media);
 

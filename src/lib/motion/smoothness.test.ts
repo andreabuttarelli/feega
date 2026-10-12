@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Jolt, docCuts, frameDiffs, joltMeter, joltNote, lumaOf, motionJolts } from './smoothness';
+import { Jolt, docCuts, frameDiffs, joltMeter, joltNote, lumaOf, motionJolts, seamDiff } from './smoothness';
 
 const ramp = (n: number, peak: number) => Array.from({ length: n }, (_, i) => peak * Math.sin((Math.PI * i) / (n - 1)));
 
@@ -21,6 +21,14 @@ describe('motionJolts', () => {
 
   it('frames that alternate between two states every frame are a flicker', () => {
     expect(motionJolts([1.5, 0, 1.5, 0, 1.5, 0, 1.5, 0]).map((j) => j.kind)).toContain(Jolt.Flicker);
+  });
+
+  it('a fast move over a full-frame UI on CI chromium, wobbling up to a fifth at its peak, is not a flicker', () => {
+    expect(motionJolts([1.94, 2.59, 3.39, 4.37, 5.44, 6.06, 5.75, 4.7, 5.77, 4.33, 4.57, 3.44, 2.5, 1.5]).map((j) => j.kind)).not.toContain(Jolt.Flicker);
+  });
+
+  it('a fast move over a full-frame UI that wobbles a few percent at its peak is not a flicker: text antialiasing', () => {
+    expect(motionJolts([2.0, 1.6, 1.3, 0.7, 1.7, 2.4, 3.1, 3.3, 4.3, 5.3, 6.3, 6.5, 5.5, 4.9, 5.2, 3.8, 2.0, 1.2, 0.6]).map((j) => j.kind)).not.toContain(Jolt.Flicker);
   });
 
   it('a hard cut the edit asked for is not a jolt', () => {
@@ -71,5 +79,12 @@ describe('what the export tells the user', () => {
 
   it('says so when the motion is smooth', () => {
     expect(joltNote([], 30)).toBe('Smooth: no frame jumps.');
+  });
+});
+
+describe('the loop seam', () => {
+  it('measures how far the last frame is from the first, as one more frame step', () => {
+    expect(seamDiff(new Uint8Array([10, 20]), new Uint8Array([30, 20]))).toBe(10);
+    expect(seamDiff(new Uint8Array([10, 20]), new Uint8Array([10, 20]))).toBe(0);
   });
 });

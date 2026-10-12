@@ -104,6 +104,19 @@ export function withOrgContext<T>(orgId: string, fn: () => T): T {
   return brandStorage.run({ brandId: null, orgId }, fn);
 }
 
+const nodeStorage = new AsyncLocalStorage<string>();
+
+export function withNodeContext<T>(nodeId: string, fn: () => T): T {
+  return nodeStorage.run(nodeId, fn);
+}
+
+export type BillingScope = { run: <T>(fn: () => T) => T; gatewayUsd: () => number };
+
+export function billingScope(orgId: string): BillingScope {
+  const ctx: BrandLogContext = { brandId: null, orgId };
+  return { run: (fn) => brandStorage.run(ctx, fn), gatewayUsd: () => ctx.llmCostUsd ?? 0 };
+}
+
 
 /**
  * Il costo che il gateway ci ha fatturato in questo scope. Un turno di chat è N chiamate (una per
@@ -470,6 +483,7 @@ export function logAiCall(entry: AiCallLog): void {
 
     const admin = createAdminClient();
     const brandId = entry.brandId ?? getBrandContext();
+    const nodeId = nodeStorage.getStore() ?? null;
     const planFromAls = getBrandPlanContext();
     // Letti QUI, sincroni, come il brand: dopo il primo await lo scope è di chi ha aspettato.
     const operation = operationTag(entry);
@@ -518,6 +532,7 @@ export function logAiCall(entry: AiCallLog): void {
         actor_id: entry.actorId ?? entry.userId ?? null,
         agent_key: entry.agentKey ?? null,
         thread_id: entry.threadId ?? null,
+        node_id: nodeId,
         uncensored: entry.uncensored ?? false
       };
       // Tipizzata contro AiCallInsert (generato da database.types.ts): una colonna sbagliata qui

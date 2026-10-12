@@ -40,16 +40,21 @@ import { ANIMATABLE, INTERPS, Interp, SPATIAL_KEYS, TRANSFORM_KEYS, ValueKind, e
 import type { MotionAsset } from './editor';
 import { referenceLookSchema, type ReferenceLook } from '$lib/motion/reference-look-model';
 import type { PickAnswer } from '$lib/reference-pick';
-import { MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, withFrames, type Frame, type Reference } from './frames';
+import { DESCRIBE_FRAMES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, withFrames, type Frame, type Reference } from './frames';
+import { loopJump, seamChecked } from '$lib/motion/loop';
+import { DESCRIBE_ASK, describeFramesTool, gateBlock, lookFirst, type Looks, type Viewing } from './look';
 import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
-import { blocking, docProblems, frameProblems, softPictures, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
+import { Quality, blocking, docProblems, frameProblems, softPictures, uiRecolour, uiShrink, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '$lib/motion/custom/component';
-import { patchComponent, recordCheck, removeComponent, writeComponent } from '$lib/motion/custom/ops';
-import type { UiCapture } from '$lib/server/web/vector-capture';
+import { Occurrence, recordCheck, removeComponent, updateComponent, writeComponent } from '$lib/motion/custom/ops';
+import { CaptureSession, FIDELITY_MIN, offersSignIn, type UiCapture } from '$lib/server/web/vector-capture';
+import { StoreKind } from '$lib/server/web/store';
 import { vectorPiece, withFonts } from '$lib/motion/vector-ui/piece';
-import { VectorRole } from '$lib/motion/vector-ui/model';
-import { SHOTS, SHOT_IDS, ShotUi, shotPreview } from '$lib/motion/shots/library';
-import { addShot } from '$lib/motion/shots/ops';
+import { Zone, ranked } from '$lib/motion/vector-ui/importance';
+import { SHOTS, SHOT_IDS, ShotCursor, ShotUi, shotPreview } from '$lib/motion/shots/library';
+import { CURSOR_GUIDE, CURSOR_SLOT } from '$lib/motion/shots/cursor';
+import { ShotSound, sfxLabel, type Sfx, type SfxCue } from '$lib/motion/sfx';
+import { ShotFocus, addShot, placeSfx } from '$lib/motion/shots/ops';
 import { RECREATE_STATES, UI_KINDS, UI_KIT, recreatedStyle, recreatedUi, type UiStructure } from '$lib/motion/ui-kit/kit';
 import { MORPH_KINDS, DEFAULT_REEL } from '$lib/motion/ui-morph/reel';
 import { addMorphReel } from '$lib/motion/ui-morph/ops';
@@ -57,10 +62,10 @@ import { STORY_BEATS, STORY_SHARE, markStory } from '$lib/motion/story';
 import { anchorsOf } from '$lib/motion/clicks';
 import { clickUi } from '$lib/motion/cursor-ops';
 import { Isolate, focusUi } from '$lib/motion/ui-focus';
-import { ACTS, BrandKind, briefOf, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
+import { ACTS, BrandKind, briefOf, durationProblem, offScript, scriptLines, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
 import { quoted, unsourcedFigures, type SitePage } from './site-copy';
 import { MediaKind, boardMedia, outlineOf, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
-import { PATCH_COMPONENT, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
+import { UPDATE_COMPONENTS, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
 import { removeLight, removeLook, setLight, setLightKeyframes, setLook } from '$lib/motion/look-ops';
@@ -76,6 +81,7 @@ import { OUTSIDES, PLAY_MODES, SCROLL_LENGTH, interactiveOf } from '$lib/motion/
 import { interactiveSchema } from '$lib/motion/interactive/schema';
 import { liveLanes } from '$lib/motion/interactive/spec';
 import { fileSnippet } from '$lib/motion/interactive/bundle';
+import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, removeVar, unbindVar, type VarDecl } from '$lib/motion/interactive/vars';
 import { flattenComps } from '$lib/motion/precomp';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
@@ -99,6 +105,7 @@ import { SHAPE_KINDS, StrokeKind, modifierKey } from '$lib/motion/shape/schema';
 import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset } from '$lib/motion/shape/presets';
 import { MAX_RATE, MIN_RATE, REMAP_KEY, clearTimeRemap, freezeFrame } from '$lib/motion/time-remap';
 import { PARTICLE_PRESETS, PRESET_PROPS as PARTICLE_PRESET, applyParticlePreset } from '$lib/motion/particles/presets';
+import { SHADER_EFFECTS, SHADER_EFFECT_IDS } from '$lib/motion/shader-effects/catalogue';
 import { Lens, addLens } from '$lib/motion/glass/ops';
 import { SPRINGS } from '$lib/motion/spring';
 import { BLOB_INPUT } from '$lib/motion/blob/inputs';
@@ -112,6 +119,7 @@ import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/
 import { FIELD_TYPES, MAX_LINKED, type ExposedField } from '$lib/motion/template/field-model';
 import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields } from '$lib/motion/template/library';
 import type { TemplateLibrary } from './templates';
+import { templateCues } from './template-sounds';
 import { createWebTools, type WebToolDeps } from '$lib/server/web/web-tools';
 import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
 import { renderQuote } from '$lib/motion/render-quote';
@@ -119,9 +127,15 @@ import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS } from '
 import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
 import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '$lib/motion/style-model';
+import { SPAWN_AGENT, type ModelOffer, type SpawnInput, type SpawnResult } from '$lib/server/agents/spawn';
+import { spawnAgentTool } from '$lib/server/agents/spawn-agent';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[] };
+const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
+
+const copyTexts = (slots: Record<string, unknown>) => Object.entries(slots).flatMap(([k, v]) => (COPY_SLOTS.has(k) && typeof v === 'string' ? v.split('|').map((s) => s.trim()).filter(Boolean) : []));
+
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[]; look?: Viewing; looks?: Looks };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
@@ -132,16 +146,21 @@ export type Voiceover = { ok: true; assetId: string; seconds: number; url: strin
 
 export type Music = { ok: true; assetId: string; seconds: number; url: string | null; source: string; track: string } | { ok: false; error: string };
 
+export type SfxAsset = { ok: true; assetId: string; url: string | null; seconds: number } | { ok: false; error: string };
+
 export type MotionToolDeps = {
   session: MotionSession;
   assets: MotionAsset[];
   newId: () => string;
   voiceover: (input: { text: string; voiceId?: string }) => Promise<Voiceover>;
   music?: (input: { mood: Mood; bpm?: number; seconds: number }) => Promise<Music>;
+  sfx?: (sfx: Sfx) => Promise<SfxAsset>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
   inspect?: (frames: Frame[]) => Promise<FrameStat[]>;
+  seam?: () => Promise<number | null>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
+  spawn?: { offers: readonly ModelOffer[]; run: (input: SpawnInput) => Promise<SpawnResult> };
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
   renderLink?: () => Promise<Record<string, unknown>>;
   embed?: (action: EmbedAction) => Promise<Record<string, unknown>>;
@@ -153,10 +172,12 @@ export type MotionToolDeps = {
   capture?: (url: string, view: CaptureView) => Promise<SiteCapture>;
   readUi?: (asset: MotionAsset, region?: UiRegion) => Promise<UiRead>;
   captureUi?: UiCapture;
+  appAccountKept?: () => Promise<boolean>;
   effects?: EffectStore;
   layouts?: LayoutStore;
   web?: WebToolDeps;
   storyboard?: StoryboardPort;
+  copywrite?: (script: LaunchScript) => Promise<LaunchScript>;
 };
 
 export type StoryboardPort = {
@@ -193,6 +214,28 @@ export enum EmbedAction {
 }
 
 const SHOWN_ELEMENTS = 60;
+const FOCUS_ELEMENTS = 8;
+
+export enum AppAccount {
+  Declined = 'declined'
+}
+
+const SCRIPT_INPUT = scriptSchema.extend({ app_account: z.enum(AppAccount).optional().describe('declined: the user said they have no test account of the app') });
+
+const PUBLIC_SITE_NEXT = 'this is the public site of an app, read signed out: if the product is that app, the trailer shows its real screens, not this page. Before any shot, ask the user in chat for a TEST account (login url, email, password; say you will see it) and end the turn on that question; then sign in with app_browse and recreate_ui 2–3 signed-in work screens (the editor, the canvas, the result)';
+
+const screenKey = (url: string) => {
+  const u = new URL(url);
+  return `${u.host}${u.pathname.replace(/\/+$/, '')}${u.search}`;
+};
+
+const fidelityOf = (fidelity: number | undefined) => {
+  if (fidelity === undefined) {
+    return {};
+  }
+  const low = fidelity < FIDELITY_MIN ? { low_fidelity: `the rebuild matches the page at ${Math.round(fidelity * 100)}% even after a second read: the page was still loading or is mostly pictures; recreate_ui it again or film another screen` } : {};
+  return { fidelity: Math.round(fidelity * 100) / 100, ...low };
+};
 
 const UNREADABLE = (what: string) => ({ ok: false as const, error: `${what} is not available in this workspace` });
 
@@ -317,6 +360,8 @@ type KeyInput = { time: number; value: Keyframe['value']; ease: Keyframe['ease']
 const MODIFIER_CATALOGUE = MODIFIER_KINDS.map((k) => `${k} (${MODIFIERS[k].params.map((p) => `${p.key} ${p.options ? p.options.map((o, i) => `${i}=${o}`).join('/') : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
 const PATH_GUIDE = 'SVG path data (M L H V C S Q T Z, absolute or relative) in the shape box: 0,0 is its top-left and 1,1 its bottom-right';
 const EFFECT_CATALOGUE = EFFECT_KINDS.map((k) => `${k} (${EFFECTS[k].about}; ${EFFECTS[k].params.map((p) => `${p.key} ${p.kind === ValueKind.Color ? 'colour' : `${p.min}..${p.max}`}`).join(', ')})`).join('; ');
+
+const SHADER_EFFECT_CATALOGUE = SHADER_EFFECT_IDS.map((id) => `${id} (${SHADER_EFFECTS[id].category}, ${SHADER_EFFECTS[id].source}: ${SHADER_EFFECTS[id].about}; ${[...Object.entries(SHADER_EFFECTS[id].numbers).map(([k, n]) => `${k} ${n.min}..${n.max}`), ...Object.keys(SHADER_EFFECTS[id].colours)].join(', ')})`).join('; ');
 
 const effectSpec = z.object({ kind: z.enum(EFFECT_KINDS), params: z.record(z.string(), z.union([z.number(), z.string()])).optional() });
 
@@ -460,10 +505,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   const logoUrls = new Set<string>();
   const brandLogos = new Set<string>();
   const sitePages: SitePage[] = [];
+  let appEntry: string | null = null;
   const readPages = (read: SourceRead) => {
-    const pages = (read as { site?: { pages?: SitePage[] } }).site?.pages ?? [];
-    sitePages.push(...pages);
+    const site = (read as { site?: { pages?: SitePage[]; appEntry?: string | null; store?: StoreKind } }).site;
+    sitePages.push(...(site?.pages ?? []));
+    appEntry = site?.appEntry && site.store === StoreKind.None ? site.appEntry : appEntry;
     return read;
+  };
+
+  const accountMissing = async (script: LaunchScript, answer?: AppAccount): Promise<string | null> => {
+    if (script.brand === BrandKind.Fictional || !appEntry || answer === AppAccount.Declined || (await deps.appAccountKept?.())) {
+      return null;
+    }
+    return `before the script, ask the user in chat for a TEST account of the app behind ${appEntry} (login url, email, password; say you will see them, so never a real one) and end the turn on that question: a trailer shows the real signed-in screens, not the marketing site. Then app_browse signs in and photographs the key screens, recreate_ui rebuilds them, and the script describes them. If the user has no account, write_script with app_account: declined`;
   };
 
   const SOURCING: Record<BrandKind, (script: LaunchScript) => { unread: boolean; problems: string[] }> = {
@@ -550,7 +604,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }
     session.frames.set(callId, check.frames);
     const shown = check.frames.length ? ' The two frames that should be identical are attached as images.' : '';
-    return { ok: false, error: `${name} v${version} is saved but failed the seek-determinism check, so it cannot be exported:\n- ${check.problems.join('\n- ')}\nFix it with patch_component: build every change on tl from props and time only.${shown}`, ...advice };
+    return { ok: false, error: `${name} v${version} is saved but failed the seek-determinism check, so it cannot be exported:\n- ${check.problems.join('\n- ')}\nFix it with update_components: build every change on tl from props and time only.${shown}`, ...advice };
   }
 
   function adviceFor(source: CustomSource) {
@@ -589,10 +643,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
   const created = (out: ReturnType<typeof apply>, clipId: string) => (out.ok ? { ...out, clip_id: clipId } : out);
 
+  const screens = new Map<string, string>();
+
   async function recreateFromUrl(url: string, input: { name: string; start?: number; duration: number; track_id?: string }) {
     if (!deps.captureUi) {
       return UNREADABLE('a browser to read the page');
     }
+    const screen = screenKey(url);
+    const taken = screens.get(screen);
+    if (taken && taken !== input.name) {
+      return { ok: false, error: `${url} is the screen already rebuilt as ${taken}: open another work screen (the editor of a video, the canvas, the export) from the app links app_browse returned, and recreate_ui that url` };
+    }
+    screens.set(screen, input.name);
     const read = await deps.captureUi(url);
     if (!read.ok) {
       return read;
@@ -604,8 +666,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     if (!written.ok) {
       return written;
     }
-    const elements = ui.nodes.filter((n) => n.role !== VectorRole.Box).slice(0, SHOWN_ELEMENTS).map((n) => ({ id: n.id, role: n.role, ...(n.text ? { text: n.text.slice(0, 40) } : {}) }));
-    const made = { ok: true, name: piece.name, size: piece.size, elements, raster: ui.raster, ...(read.dismissed ? { dismissed: read.dismissed } : {}), ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}) };
+    const order = ranked(ui);
+    const elements = order.slice(0, SHOWN_ELEMENTS).map((e) => ({ id: e.id, role: e.role, zone: e.zone, ...(e.text ? { text: e.text.slice(0, 40) } : {}) }));
+    const focus = order.filter((e) => e.zone === Zone.Main).slice(0, FOCUS_ELEMENTS).map((e) => e.id);
+    const made = { ok: true, ...fidelityOf(read.fidelity), name: piece.name, focus, size: piece.size, elements, raster: ui.raster, ...(read.dismissed ? { dismissed: read.dismissed } : {}), ...(ui.raster.length ? { note: `${ui.raster.length} pictures stayed pictures (photos, canvas, video): they show as empty frames` } : {}), ...(read.session === CaptureSession.None && offersSignIn(ui) ? { next: PUBLIC_SITE_NEXT } : {}) };
     if (input.start === undefined) {
       return made;
     }
@@ -615,6 +679,33 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   }
 
   const registeredFont = (doc: MotionDoc, font: unknown): OpResult => (typeof font !== 'string' || doc.fonts.some((f) => f.family === font) || !GOOGLE_FONTS.some((f) => f.f === font) ? { ok: true, doc } : registerFont(doc, font, GOOGLE_FONTS));
+
+  const sfxAsset = async (sfx: Sfx): Promise<string | null> => {
+    const known = deps.assets.find((a) => a.label === sfxLabel(sfx));
+    if (known) {
+      return known.id;
+    }
+    const made = deps.sfx ? await deps.sfx(sfx) : null;
+    if (!made?.ok) {
+      return null;
+    }
+    deps.assets.push({ id: made.assetId, kind: AssetKind.Audio, label: sfxLabel(sfx), previewUrl: '', url: made.url });
+    return made.assetId;
+  };
+
+  const soundCues = async (cues: readonly SfxCue[]): Promise<string | null> => {
+    if (!cues.length) {
+      return null;
+    }
+    const kinds = [...new Set(cues.map((c) => c.sfx))];
+    const ids = Object.fromEntries((await Promise.all(kinds.map(async (k) => [k, await sfxAsset(k)] as const))).filter(([, v]) => v));
+    if (Object.keys(ids).length < kinds.length) {
+      return 'sound effects unavailable in this workspace';
+    }
+    const withAssets = Object.values(ids).reduce<OpResult>((r, assetId) => registered(r, assetId), { ok: true, doc: session.doc });
+    const laid = apply(withAssets.ok ? placeSfx(withAssets.doc, cues, ids, deps.newId) : withAssets, `laid ${cues.length} sound effects`);
+    return laid.ok ? `${cues.length} sound effects on the SFX track` : laid.error;
+  };
 
   const tools: Record<string, Tool> = {
     get_motion_doc: tool({
@@ -768,7 +859,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     set_transform: tool({
       description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot inside the clip box (0..1), blur in px.`,
       inputSchema: z.object({ clip_id: z.string(), transform: transformInput }),
-      execute: async (input) => apply(setTransform(session.doc, input.clip_id, storedRecord(ownerOf(input.clip_id), input.transform, session.doc)), `transformed ${input.clip_id}`)
+      execute: async (input) => {
+        const shrunk = uiShrink(session.doc, input.clip_id, input.transform.scale as number | undefined);
+        if (shrunk) {
+          return { ok: false, error: shrunk };
+        }
+        return apply(setTransform(session.doc, input.clip_id, storedRecord(ownerOf(input.clip_id), input.transform, session.doc)), `transformed ${input.clip_id}`);
+      }
     }),
 
     set_keyframes: tool({
@@ -987,6 +1084,20 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const props = { ...PARTICLE_PRESET[input.preset].props, ...propsIn('Particles', input.props) };
         const result = addClip(session.doc, { component: 'Particles', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
         return created(apply(withEffects(registered(result, input.props?.sprite), [id], input.effects), `added ${input.preset} particles`), id);
+      }
+    }),
+
+    add_shader_effect: tool({
+      description: `Add a ShaderEffect clip: a GPU effect from the open-source shaders library, seeked frame by frame so preview and export agree. Effects: ${SHADER_EFFECT_CATALOGUE}. Filters apply to image (a picture asset id), or to a mesh gradient without one. props set the knobs listed per effect (colours take #rrggbb or brand.*); every knob but speed takes set_keyframes afterwards, e.g. a wipe's progress 1→0 to reveal. Cursor effects move only in interactive embeds. Never over a brand logo: logos stay untouched. ${PLACEMENT_HELP} Returns the clip id.`,
+      inputSchema: z.object({ effect: z.enum(SHADER_EFFECT_IDS), start: z.number().min(0), duration: z.number().positive().optional(), image: z.string().optional(), props: z.record(z.string(), z.union([z.number(), z.string()])).optional(), ...PLACED_PICTURE }),
+      execute: async (input) => {
+        if (!assetKnown(input.image)) {
+          return { ok: false, error: 'unknown asset id: call list_assets' };
+        }
+        const id = deps.newId();
+        const props = propsIn('ShaderEffect', { ...input.props, effect: input.effect, image: input.image ?? null });
+        const result = addClip(session.doc, { component: 'ShaderEffect', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
+        return created(apply(withEffects(registered(result, input.image), [id], input.effects), `added ${input.effect}`), id);
       }
     }),
 
@@ -1271,12 +1382,36 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async ({ scroll_length, ...input }) => apply(setInteractive(session.doc, Object.fromEntries(Object.entries({ ...input, scrollLength: scroll_length }).filter(([, v]) => v !== undefined))), 'changed interactive playback')
     }),
 
+    declare_var: tool({
+      description: `Declare or replace a runtime variable: a value the site that embeds the video sets live from its own code (web element, React, Flutter), without reloading. ${VARS_GUIDE} kind number needs min and max; enum needs options and a default among them; color is #rrggbb; string up to ${MAX_VAR_TEXT} characters.`,
+      inputSchema: z.object({ name: z.string().regex(VAR_NAME), kind: z.enum(VAR_KINDS), default: z.union([z.number(), z.boolean(), z.string()]), min: z.number().optional(), max: z.number().optional(), options: z.array(z.string()).optional() }),
+      execute: async ({ name, kind, min, max, options, ...rest }) => apply(declareVar(session.doc, { name, kind, default: rest.default, ...(min === undefined ? {} : { min }), ...(max === undefined ? {} : { max }), ...(options ? { options } : {}) } as VarDecl), `declared variable ${name}`)
+    }),
+
+    remove_var: tool({
+      description: 'Remove a runtime variable and its text/colour bindings. Expressions that still read vars.<name> must be changed with set_expression.',
+      inputSchema: z.object({ name: z.string() }),
+      execute: async ({ name }) => apply(removeVar(session.doc, name), `removed variable ${name}`)
+    }),
+
+    bind_var: tool({
+      description: 'Drive a clip property with a runtime variable. number, boolean (1/0) and enum (option index) write the expression vars.<name> on any live property (transforms, number props, liquid glass/blob; edit it with set_expression to scale it, e.g. value * vars.size); string binds to the text and color to the color (or a Caption background) of a Title, Text, Kicker or Caption.',
+      inputSchema: z.object({ name: z.string(), clip_id: z.string(), prop: z.string() }),
+      execute: async ({ name, clip_id, prop }) => apply(bindVar(session.doc, { var: name, clip: clip_id, prop }), `bound ${name} to ${prop}`)
+    }),
+
+    unbind_var: tool({
+      description: 'Stop a runtime variable driving a clip property: removes its text/colour binding, or the expression on a number property.',
+      inputSchema: z.object({ clip_id: z.string(), prop: z.string() }),
+      execute: async ({ clip_id, prop }) => apply(unbindVar(session.doc, clip_id, prop), `unbound ${prop}`)
+    }),
+
     export_interactive: tool({
       description: 'Check the interactive web export: lists the clip properties that react to live input, the playback settings and the embed snippet. The self-contained HTML file is downloaded by the user from Export → Interactive (web); publish_embed hosts it instead.',
       inputSchema: z.object({}),
       execute: async () => {
         const live = liveLanes(flattenComps(session.doc)).map((l) => ({ clip_id: l.id, prop: l.key }));
-        return { ok: true, live, settings: interactiveOf(session.doc), snippet: fileSnippet(session.doc), note: live.length ? 'Ready: Export → Interactive (web) downloads the file.' : 'Nothing reads input yet: apply_interactive_preset or set_expression with input.*.' };
+        return { ok: true, live, settings: interactiveOf(session.doc), vars: interactiveOf(session.doc).vars, snippet: fileSnippet(session.doc), note: live.length ? 'Ready: Export → Interactive (web) downloads the file.' : 'Nothing reads input yet: apply_interactive_preset or set_expression with input.*.' };
       }
     }),
 
@@ -1356,6 +1491,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Add an effect at the end of a clip's effect stack (applied top to bottom, inside the clip transform). Kinds and params: ${EFFECT_CATALOGUE}. Params not given take their defaults. Returns effect_id and the keys to animate: set_keyframes / set_expression with prop fx.<effect id>.<param>.`,
       inputSchema: z.object({ clip_id: z.string(), kind: z.enum(EFFECT_KINDS), params: z.record(z.string(), z.union([z.number(), z.string()])).optional() }),
       execute: async (input) => {
+        const recoloured = uiRecolour(session.doc, input.clip_id, input.kind);
+        if (recoloured) {
+          return { ok: false, error: recoloured };
+        }
         const id = deps.newId();
         const out = apply(addEffect(session.doc, input.clip_id, input.kind, id, input.params), `added ${input.kind} to ${input.clip_id}`);
         return out.ok ? { ...out, effect_id: id, animate: EFFECTS[input.kind].params.map((p) => effectKey(id, p.key)) } : out;
@@ -1366,6 +1505,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Colour-grade a clip with a LUT: a preset (${LUT_PRESET_IDS.join(', ')}) or the text of a .cube file. Without effect_id it adds a LUT effect at the end of the stack; amount 0..1 mixes it (animate fx.<effect id>.amount). Pair with levels and lift-gamma-gain effects (add_effect).`,
       inputSchema: z.object({ clip_id: z.string(), effect_id: z.string().optional(), preset: z.enum(LUT_PRESET_IDS).optional(), cube: z.string().max(4_000_000).optional(), name: z.string().max(80).optional(), amount: z.number().min(0).max(1).optional() }),
       execute: async (input) => {
+        const recoloured = uiRecolour(session.doc, input.clip_id, EffectKind.Lut);
+        if (recoloured) {
+          return { ok: false, error: recoloured };
+        }
         const lut = input.cube ? lutFromCube(input.cube, input.name ?? 'custom') : input.preset ? compileLut(LUT_PRESETS[input.preset].look, input.preset) : 'give a preset or a .cube';
         if (typeof lut === 'string') {
           return { ok: false, error: lut };
@@ -1514,6 +1657,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         return deps.batch({ doc: session.doc, rows });
       }
     }),
+
+    [SPAWN_AGENT]: spawnAgentTool(deps.spawn?.offers ?? [], async (input) => (deps.spawn ? deps.spawn.run(input) : { ok: false, error: 'sub-agents are not available here' })),
 
     render_video: tool({
       description:
@@ -1675,6 +1820,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Change the format (16:9, 9:16, 1:1, 4:5), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage).`,
       inputSchema: z.object({ format: z.enum(MOTION_FORMATS).optional(), duration: z.number().positive().max(MAX_SECONDS).optional(), fps: z.literal(FRAME_RATES).optional(), background: z.enum([Background.Brand, Background.Transparent]).optional() }),
       execute: async (input) => {
+        const stretched = input.duration !== undefined && session.doc.script ? durationProblem(input.duration, session.doc.script) : null;
+        if (stretched) {
+          return { ok: false, error: stretched };
+        }
         const paced = input.fps === undefined ? ({ ok: true, doc: session.doc } as OpResult) : setFrameRate(session.doc, input.fps);
         const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
         return apply(sized, 'changed the canvas');
@@ -1689,23 +1838,28 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     write_script: tool({
       description: `Save the research and the four-act script of a launch film before building it; the video is not built until this passes. Research: who it serves, the concrete problem, the struggle as an everyday scene, how the product works step by step (input → what happens → result), 1–3 benefits and up to 4 numbers or results, the tone, the promise. Every benefit, number, promise and proof cites its source: the url of a page analyze_site read and a quote copied from that page; a claim without a source on the site is refused, so never invent one. Acts ${ACTS.join(', ')} in order: problem shows the "before" UI, cluttered or slow, with realistic data; solution shows the product's real flow with specific content, written as a sequence of UI beats, one element per beat (the field and its typed text, the button pressed, the progress, the result); proof shows a number or result from the site; claim puts the site's own promise on screen. Keep on_screen lines few and short: each becomes its own full-frame title card, shown before the scene it announces, never over it. For an invented demo brand (no real site), set brand: fictional: no site is read and sources are the brand's own copy; the brief says it is fictional. Never use it for a real brand. The turn ends there: the user reads the brief in the chat, then says go or corrects it.`,
-      inputSchema: scriptSchema,
+      inputSchema: SCRIPT_INPUT,
       execute: async (raw) => {
-        const parsed = scriptSchema.safeParse(raw);
+        const parsed = SCRIPT_INPUT.safeParse(raw);
         if (!parsed.success) {
           return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };
         }
-        const input = parsed.data;
+        const { app_account: answer, ...input } = parsed.data;
         const sourcing = SOURCING[input.brand](input);
         if (sourcing.unread) {
           return { ok: false, error: 'read the site first: analyze_site gives the pages and quotes every claim must come from' };
         }
-        const problems = [...scriptProblems(input), ...sourcing.problems];
+        const ask = await accountMissing(input, answer);
+        if (ask) {
+          return { ok: false, error: ask };
+        }
+        const written = deps.copywrite ? await deps.copywrite(input) : input;
+        const problems = [...scriptProblems(written), ...sourcing.problems];
         if (problems.length) {
           return { ok: false, error: problems.join('; ') };
         }
-        const saved = apply({ ok: true, doc: { ...session.doc, script: input } }, 'saved the research and the script');
-        return saved.ok ? { ok: true, brief: briefOf(input) } : saved;
+        const saved = apply({ ok: true, doc: { ...session.doc, script: written } }, 'saved the research and the script');
+        return saved.ok ? { ok: true, brief: briefOf(written), lines: scriptLines(written) } : saved;
       }
     }),
 
@@ -1854,7 +2008,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     recreate_ui: tool({
-      description: `Rebuild a real product UI as a sharp, vector, animatable component. With url (best: the product's own page or app screen) the live page is read element by element (boxes, real texts, fonts, colours, corners, icons as SVG) into a faithful vector UI; every element gets an id (input-0, button-2, heading-0, stat-1, text-4…) that focus_ui, click_ui and add_shot animate; pictures that are photos stay flagged in raster. With asset_id instead, a vision model reads a capture into a simpler layout: ${RECREATE_STATES.join('; ')}. With start and duration it also places the clip. An app screen behind a login: sign in with app_browse first (a TEST account the user gave in chat), then pass its url here; the saved session opens it.`,
+      description: `Rebuild a real product UI as a sharp, vector, animatable component. With url (best: the product's own page or app screen) the live page is read element by element (boxes, real texts, fonts, colours, corners, icons as SVG) into a faithful vector UI; every element gets an id (input-0, button-2, heading-0, stat-1, text-4…) that focus_ui, click_ui and add_shot animate; elements come ranked by importance and focus lists the top ones (the input, the primary buttons, the result): frame those, never the sidebar or nav (zone nav); pictures that are photos stay flagged in raster. With asset_id instead, a vision model reads a capture into a simpler layout: ${RECREATE_STATES.join('; ')}. With start and duration it also places the clip. An app screen behind a login: sign in with app_browse first (a TEST account the user gave in chat), then pass its url here; the saved session opens it.`,
       inputSchema: z
         .object({
           url: z.string().url().optional(),
@@ -1900,12 +2054,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     list_shots: tool({
       description: 'The library of premium shots: handcrafted, deterministic scenes with their own camera move, secondary motion, house easing and holds. For a trailer or product film, direct with shots (add_shot) instead of laying out primitives.',
       inputSchema: z.object({}),
-      execute: async () => ({ ok: true, shots: SHOT_IDS.map((id) => ({ id, about: SHOTS[id].about, slots: Object.keys(SHOTS[id].slots.shape), text_limits: SHOTS[id].limits, seconds: SHOTS[id].seconds, needs_ui: SHOTS[id].ui === ShotUi.Required, preview: shotPreview(id) })) })
+      execute: async () => ({ ok: true, shots: SHOT_IDS.map((id) => ({ id, about: SHOTS[id].about, slots: Object.keys(SHOTS[id].slots.shape), text_limits: SHOTS[id].limits, seconds: SHOTS[id].seconds, needs_ui: SHOTS[id].ui === ShotUi.Required, cursor: SHOTS[id].cursor === ShotCursor.Scripted ? CURSOR_GUIDE : null, preview: shotPreview(id) })) })
     }),
 
     add_shot: tool({
-      description: `Place a premium shot from the library (list_shots): ${SHOT_IDS.map((id) => `${id} (${SHOTS[id].about})`).join('; ')}. slots are its data only: texts, element ids of the recreated UI, and font ink paper muted accent. Every text slot holds a few words at most (text_limits in list_shots: a title is a claim of up to 6 words, never a sentence); a longer text is refused with a cut to use. ui is the name of a UI rebuilt with recreate_ui from a url; the shots that show the product need it. at and seconds place it (2–4 s, transitions shorter); with beats marked (mark_beats) start and end snap to the beat grid. The shot is an ordinary clip: its slots stay editable as props.`,
-      inputSchema: z.object({ shot: z.enum(SHOT_IDS), slots: z.record(z.string(), z.union([z.string(), z.number()])).default({}), ui: z.string().optional(), at: z.number().min(0), seconds: z.number().positive().optional(), track_id: z.string().optional() }),
+      description: `Place a premium shot from the library (list_shots): ${SHOT_IDS.map((id) => `${id} (${SHOTS[id].about})`).join('; ')}. slots are its data only: texts, element ids of the recreated UI, and font ink paper muted accent. Every text slot holds a few words at most (text_limits in list_shots: a title is a claim of up to 6 words, never a sentence); a longer text is refused with a cut to use. ui is the name of a UI rebuilt with recreate_ui from a url; the shots that show the product need it. at and seconds place it (2–4 s, transitions shorter); with beats marked (mark_beats) start and end snap to the beat grid. The shot is an ordinary clip: its slots stay editable as props. ui-focus and ui-morph are driven by a cursor: without a cursor slot they write a script from the element roles (a field is typed into, a button or link clicked, the rest hovered); with one, ${CURSOR_GUIDE}`,
+      inputSchema: z.object({ shot: z.enum(SHOT_IDS), slots: z.record(z.string(), z.union([z.string(), z.number(), CURSOR_SLOT])).default({}), ui: z.string().optional(), at: z.number().min(0), seconds: z.number().positive().optional(), track_id: z.string().optional(), sound: z.enum(ShotSound).default(ShotSound.Off).describe('on: a click on every cursor click and a key tap per typed character, on an SFX audio track'), focus: z.enum(ShotFocus).default(ShotFocus.Action).describe('navigation only when the script line is about moving through the app: then sidebar and top-bar elements may be framed') }),
       execute: async (input) => {
         const offSite = offSiteFigures(input.shot, input.slots);
         if (offSite) {
@@ -1915,10 +2069,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (!fonts.ok) {
           return fonts;
         }
+        const script = session.doc.script;
+        const off = script ? offScript(copyTexts(input.slots), script) : [];
+        if (script && off.length) {
+          return { ok: false, error: `${off.map((t) => `"${t}"`).join(', ')} is not a line of the script: on-screen titles come only from its lines, in their order: ${scriptLines(script).map((l) => `"${l}"`).join(' / ')}` };
+        }
         const id = deps.newId();
-        const made = addShot(fonts.doc, { shot: input.shot, slots: input.slots, ui: input.ui, at: input.at, seconds: input.seconds, trackId: input.track_id }, id);
+        const made = addShot(fonts.doc, { shot: input.shot, slots: input.slots, ui: input.ui, at: input.at, seconds: input.seconds, trackId: input.track_id, sound: input.sound ?? ShotSound.Off, focus: input.focus }, id);
         const shown = created(apply(made, `added shot ${input.shot}`), id);
-        return shown.ok && made.ok && made.placed ? { ...shown, from: made.placed.from / session.doc.fps, seconds: made.placed.frames / session.doc.fps, on_beat: made.placed.snapped } : shown;
+        if (!shown.ok || !made.ok || !made.placed) {
+          return shown;
+        }
+        const sounded = await soundCues(made.cues ?? []);
+        return { ...shown, from: made.placed.from / session.doc.fps, seconds: made.placed.frames / session.doc.fps, on_beat: made.placed.snapped, ...(sounded ? { sound: sounded } : {}) };
       }
     }),
 
@@ -1951,7 +2114,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     [WRITE_COMPONENT]: tool({
       description: `Create or replace a custom component written in code. The editor runs it in a sandbox and checks that seeking gives the same frame from any direction (a live component: its video still); a failing check comes back as an error with the offending frames. Use it in clips with add_clip component "Custom", props { name, ...props }.`,
       inputSchema: z.object({
-        mode: z.enum(ComponentMode).optional().describe('deterministic (default): every frame from tl, seekable, exact in the video. live: for games, generative pieces that differ on every view and interactive heroes meant for the website embed; runs its own loop (requestAnimationFrame, timers, Math.random) and reads input.x, input.y, input.down, input.keys, input.tiltX/Y, with onPause, onResume, onDestroy; gets the game engines LittleJS (LittleJS.engineInit(init, update, updatePost, render, renderPost)) and kaplay (const k = kaplay({ background: [0, 0, 0] })), and p5 loops on its own. The video shows a still of a live component: its first frame, seeded, or what it returns as { still(t) {} }'),
+        mode: z.enum(ComponentMode).optional().describe('deterministic (default): every frame from tl, seekable, exact in the video. live: for games, generative pieces that differ on every view and interactive heroes meant for the website embed; runs its own loop (requestAnimationFrame, timers, Math.random) and reads input.x, input.y, input.down, input.keys, input.tiltX/Y, input.vars (the runtime variables by name, as the embedding site sets them), with onPause, onResume, onDestroy; gets the game engines LittleJS (LittleJS.engineInit(init, update, updatePost, render, renderPost)) and kaplay (const k = kaplay({ background: [0, 0, 0] })), and p5 loops on its own. The video shows a still of a live component: its first frame, seeded, or what it returns as { still(t) {} }'),
         name: z.string().describe('PascalCase, e.g. NodeGraph'),
         html: z.string().max(MAX_HTML).describe('markup inside the component root; no script, style, iframe, media or external urls'),
         css: z.string().max(MAX_CSS).describe('scoped to the component root (:scope is the root); no animation, transition, @keyframes, @import or external url()'),
@@ -1972,13 +2135,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
-    [PATCH_COMPONENT]: tool({
-      description: 'Change a custom component by replacing text in one of its files; each find must occur exactly once. Cheaper than rewriting it. The determinism check runs again.',
+    [UPDATE_COMPONENTS]: tool({
+      description: 'Change a custom component by replacing text in its html, css or js. Each find must occur exactly once unless occurrence names first, last or all. Cheaper than rewriting it. Lint and the determinism check run again; returns a small diff.',
       inputSchema: z.object({
-        name: z.string(),
-        edits: z.array(z.object({ file: z.enum(SOURCE_FILES), find: z.string().min(1), replace: z.string() })).min(1).max(20)
+        component: z.string(),
+        edits: z.array(z.object({ file: z.enum(SOURCE_FILES), find: z.string().min(1), replace: z.string(), occurrence: z.enum(Occurrence).optional() })).min(1).max(20)
       }),
-      execute: async (input, { toolCallId }) => codeWrite(patchComponent(session.doc, input.name, input.edits), input.name, `patched ${input.name}`, toolCallId)
+      execute: async (input, { toolCallId }) => {
+        const result = updateComponent(session.doc, input.component, input.edits);
+        const out = await codeWrite(result, input.component, `updated ${input.component}`, toolCallId);
+        return result.ok ? { ...out, diff: result.diff } : out;
+      }
     }),
 
     remove_component: tool({
@@ -2006,12 +2173,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const stats = deps.inspect ? await deps.inspect(frames) : [];
         const audioAssets = deps.assets.filter((a) => a.kind === AssetKind.Audio).length;
         const pixels = assetPixels();
-        session.gate = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos], referencesSeen: Boolean(session.references?.length) }), ...frameProblems(stats)];
+        const seam = deps.seam && seamChecked(session.doc) ? await deps.seam() : null;
+        const jump = seam === null ? null : loopJump(session.doc, seam);
+        session.gate = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos], referencesSeen: Boolean(session.references?.length) }), ...frameProblems(stats), ...(jump ? [{ kind: Quality.LoopJump, at: end, detail: jump }] : [])];
+        session.look = { times: frames.map((f) => f.time), described: false };
         const quality = session.gate.map((p) => p.detail);
         const open = blocking(session.gate).map((p) => p.detail);
-        return { ok: true, times: frames.map((f) => f.time), quality, blocking: open, note: open.length ? 'blocking lists what must be fixed before the video can be delivered: fix each one, then look again. The frames are attached as images.' : quality.length ? 'The quality gate found the problems in quality: fix each one, then look again. The frames are attached as images.' : 'The frames are attached as images.' };
+        return { ok: true, times: session.look.times, quality, blocking: open, gate: gateBlock(session.gate), note: `The frames are attached as images. ${DESCRIBE_ASK}` };
       }
     }),
+
+    [DESCRIBE_FRAMES]: describeFramesTool(session),
 
     add_music: tool({
       description: 'Music under the whole video: a generated track when the workspace has a music generator, otherwise a CC0 track from the built-in library, chosen by mood and bpm. It lands on an Audio clip from 0 to the end and its beats are marked ("beat N"), ready for cut_to_beat. A launch film always has music.',
@@ -2107,20 +2279,26 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
-    insert_template: tool({
-      description: 'Insert a template (id from list_templates) as one locked Precomp clip on a new top track at start seconds. Fill it with set_template_fields; its structure stays fixed unless detach_template.',
-      inputSchema: z.object({ template_id: z.string(), start: z.number().min(0).default(0) }),
+    add_template: tool({
+      description: 'Insert a template (id from list_templates) as one locked Precomp clip on a new top track at `at` seconds, with its fields filled from vars (keys as in list_templates, checked like set_template_fields). sound (default true) lays its key taps and clicks on the SFX track. Its structure stays fixed unless detach_template.',
+      inputSchema: z.object({ id: z.string(), at: z.number().min(0).default(0), vars: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}), sound: z.boolean().default(true) }),
       execute: async (input) => {
-        const entry = ((await deps.templates?.list()) ?? []).find((e) => e.id === input.template_id);
+        const entry = ((await deps.templates?.list()) ?? []).find((e) => e.id === input.id);
         if (!entry) {
-          return { ok: false, error: `no template ${input.template_id}: call list_templates` };
+          return { ok: false, error: `no template ${input.id}: call list_templates` };
         }
-        const placed = insertTemplate(session.doc, entry, { from: frames(input.start), newId: deps.newId });
+        const placed = insertTemplate(session.doc, entry, { from: frames(input.at ?? 0), newId: deps.newId });
         if (!placed.ok) {
           return placed;
         }
-        const out = apply(placed, `inserted template ${entry.template.name}`);
-        return out.ok ? { ...out, clip_id: placed.clipId, fields: templateFields(session.doc, placed.clipId).map((f) => ({ ...fieldSpec(f), value: f.value })) } : out;
+        const values = Object.fromEntries(Object.entries(input.vars ?? {}).map(([k, v]) => [k, String(v)]));
+        const filled = Object.keys(values).length ? setTemplateValues(placed.doc, placed.clipId, values) : placed;
+        const out = apply(filled, `inserted template ${entry.template.name}`);
+        if (!out.ok) {
+          return out;
+        }
+        const sounds = input.sound !== false ? await soundCues(templateCues(session.doc, placed.clipId)) : null;
+        return { ...out, clip_id: placed.clipId, ...(sounds ? { sounds } : {}), fields: templateFields(session.doc, placed.clipId).map((f) => ({ ...fieldSpec(f), value: f.value })) };
       }
     }),
 
@@ -2203,7 +2381,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return ((await nested.execute(parsed.data, options)) ?? {}) as { ok?: boolean; error?: unknown };
   }
 
-  return { ...withFrames(oneAtATime(tools), session), ...(deps.web ? createWebTools(deps.web) : {}) };
+  return { ...withFrames(oneAtATime(lookFirst(tools, session)), session), ...(deps.web ? createWebTools(deps.web) : {}) };
 }
 
 type Execute = (input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown>;

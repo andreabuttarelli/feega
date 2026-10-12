@@ -6,7 +6,7 @@ import { orgCreditBalance } from '$lib/server/credits';
 import { listProjectAssets } from '$lib/server/repos/assets';
 import { signedAssets } from '$lib/server/studio/studio-media';
 import { startUpscale, UPSCALE_START_DEPS, type UpscaleSourceInput } from '$lib/server/upscale/start';
-import { upscaleJob, upscalePricing } from '$lib/server/upscale/job';
+import { recentUpscales, upscaleJob, upscalePricing } from '$lib/server/upscale/job';
 import { OPENROUTER_UPSCALE_MODEL, upscaleLimitsOf } from '$lib/video-models';
 import { UPSCALE_REFUSAL_TEXT, UpscaleMode, UpscaleTarget, type UpscaleRefusal } from '$lib/upscale';
 
@@ -14,6 +14,7 @@ const HTTP_BAD_REQUEST = 400;
 const HTTP_UNPROCESSABLE = 422;
 const HTTP_SEE_OTHER = 303;
 const LIBRARY_SIZE = 12;
+const HISTORY_SIZE = 8;
 const JOB_PARAM = 'job';
 
 const LIMITS = upscaleLimitsOf(OPENROUTER_UPSCALE_MODEL)!;
@@ -21,11 +22,12 @@ const LIMITS = upscaleLimitsOf(OPENROUTER_UPSCALE_MODEL)!;
 export const load: PageServerLoad = async (event) => {
   const { db, orgId, projectId } = await toolScope(event);
   const jobId = event.url.searchParams.get(JOB_PARAM);
-  const [pricing, assets, balance, job] = await Promise.all([
+  const [pricing, assets, balance, job, history] = await Promise.all([
     upscalePricing(db),
     listProjectAssets(db, { orgId, projectId }),
     orgCreditBalance(db as never, orgId),
-    jobId ? upscaleJob(db, { orgId, projectId, nodeId: jobId }) : Promise.resolve(null)
+    jobId ? upscaleJob(db, { orgId, projectId, nodeId: jobId }) : Promise.resolve(null),
+    recentUpscales(db, { orgId, projectId }, HISTORY_SIZE)
   ]);
 
   const videos = assets.filter((a) => a.type === 'video' && LIMITS.inputMimeTypes.includes(a.mimeType ?? '')).slice(0, LIBRARY_SIZE);
@@ -38,6 +40,7 @@ export const load: PageServerLoad = async (event) => {
     limits: LIMITS,
     balance,
     job,
+    history,
     library: videos.map((v) => ({ id: v.id, bytes: v.bytes, url: urls[v.id] ?? null }))
   };
 };

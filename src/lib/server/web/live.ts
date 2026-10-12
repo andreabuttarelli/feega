@@ -16,6 +16,7 @@ import { vectorCapture, type UiCapture } from './vector-capture';
 import { browserless, localBrowser, type BrowserlessUse, type OpenAppBrowser } from './browser';
 import { appBrowse, savedSession } from './app-browse';
 import { appAccountStore } from '$lib/server/repos/app-accounts';
+import { uiFidelity } from './ui-fidelity';
 import { browse } from './browse';
 import { directFetch, exaContents, renderedSite, secondarySources, type SiteStrategy } from './site-fetch';
 import { screenshotPage } from './screenshot';
@@ -170,7 +171,12 @@ export function liveBrowser(scope: Metered): OpenAppBrowser | null {
 export function uiCapture(db: Db, scope: Metered): UiCapture | undefined {
   const open = liveBrowser(scope);
   const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: { kind: 'agent', id: scope.userId } });
-  return open ? vectorCapture(open, undefined, savedSession(accounts)) : undefined;
+  return open ? vectorCapture(open, undefined, savedSession(accounts), uiFidelity) : undefined;
+}
+
+export function appAccountKept(db: Db, scope: Metered): () => Promise<boolean> {
+  const accounts = appAccountStore(db, { orgId: scope.orgId, projectId: scope.projectId, actor: { kind: 'agent', id: scope.userId } });
+  return async () => (await accounts.read()) !== null;
 }
 
 function meteredExa(scope: Metered, key: string): SiteStrategy {

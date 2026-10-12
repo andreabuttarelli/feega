@@ -1,7 +1,8 @@
-import { RAW_CAPTURE, VectorHint, VectorKind, vectorUi, type RawCapture, type VectorUi } from '$lib/motion/vector-ui/model';
-import type { OpenAppBrowser } from './browser';
+import { RAW_CAPTURE, VectorHint, VectorKind, VectorRole, vectorUi, type RawCapture, type VectorUi } from '$lib/motion/vector-ui/model';
+import type { AppTab, OpenAppBrowser } from './browser';
 import { signInPath, type KeptSession } from './app-browse';
 import { dismissOverlays } from './overlays';
+import { leadsIntoApp } from './app-entry';
 
 export type CaptureLimits = { max: number; text: number; svg: number };
 
@@ -218,7 +219,20 @@ export function framedNodes(inner: RawCapture, box: FrameBox): RawCapture['nodes
   return [backdrop, ...inner.nodes.map((n) => ({ ...n, x: n.x + box.x, y: n.y + box.y }))];
 }
 
-export type UiCapture = (url: string) => Promise<{ ok: true; ui: VectorUi; dismissed?: string[] } | { ok: false; error: string }>;
+export enum CaptureSession {
+  Kept = 'kept',
+  None = 'none'
+}
+
+const SIGN_IN_ROLES: readonly VectorRole[] = [VectorRole.Link, VectorRole.Button];
+
+export const offersSignIn = (ui: VectorUi) => ui.nodes.some((n) => SIGN_IN_ROLES.includes(n.role) && leadsIntoApp(n.text ?? ''));
+
+export const FIDELITY_MIN = 0.85;
+
+export type UiFidelity = (tab: AppTab, ui: VectorUi, page: Buffer) => Promise<number>;
+
+export type UiCapture = (url: string) => Promise<{ ok: true; ui: VectorUi; session: CaptureSession; fidelity?: number; dismissed?: string[] } | { ok: false; error: string }>;
 
 export type SignedIn = (url: string) => Promise<KeptSession | null>;
 
@@ -226,7 +240,22 @@ const SIGNED_OUT: SignedIn = async () => null;
 
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export function vectorCapture(open: OpenAppBrowser, settleMs = SETTLE_MS, signedIn: SignedIn = SIGNED_OUT): UiCapture {
+type Read = { ui: VectorUi; fidelity?: number };
+
+const closer = (a: Read, b: Read) => ((b.fidelity ?? 0) > (a.fidelity ?? 0) ? b : a);
+
+export function vectorCapture(open: OpenAppBrowser, settleMs = SETTLE_MS, signedIn: SignedIn = SIGNED_OUT, score?: UiFidelity): UiCapture {
+  const readOnce = async (tab: AppTab): Promise<Read | string> => {
+    const shot = score ? await tab.shot() : null;
+    const parsed = RAW_CAPTURE.safeParse(await tab.vector());
+    if (!parsed.success) {
+      return `the page could not be read as vector UI: ${parsed.error.issues[0]?.message ?? 'unknown shape'}`;
+    }
+    const ui = vectorUi(parsed.data);
+    return score && shot ? { ui, fidelity: await score(tab, ui, shot) } : { ui };
+  };
+
+
   return async (url) => {
     const tab = await open();
     try {
@@ -243,11 +272,19 @@ export function vectorCapture(open: OpenAppBrowser, settleMs = SETTLE_MS, signed
       }
       await pause(settleMs);
       const dismissed = await dismissOverlays(tab);
-      const parsed = RAW_CAPTURE.safeParse(await tab.vector());
-      if (!parsed.success) {
-        return { ok: false, error: `the page could not be read as vector UI: ${parsed.error.issues[0]?.message ?? 'unknown shape'}` };
+      const first = await readOnce(tab);
+      if (typeof first === 'string') {
+        return { ok: false, error: first };
       }
-      return { ok: true, ui: vectorUi(parsed.data), ...(dismissed.length ? { dismissed } : {}) };
+      let best = first;
+      if (first.fidelity !== undefined && first.fidelity < FIDELITY_MIN) {
+        await tab.goto(url).catch(() => null);
+        await pause(settleMs * 2);
+        await dismissOverlays(tab);
+        const again = await readOnce(tab);
+        best = typeof again === 'string' ? first : closer(first, again);
+      }
+      return { ok: true, ui: best.ui, ...(best.fidelity === undefined ? {} : { fidelity: best.fidelity }), session: kept ? CaptureSession.Kept : CaptureSession.None, ...(dismissed.length ? { dismissed } : {}) };
     } catch (e) {
       return { ok: false, error: e instanceof Error ? e.message : String(e) };
     } finally {

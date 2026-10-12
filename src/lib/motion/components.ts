@@ -14,6 +14,8 @@ import { CELL_FITS, CELL_TIMINGS } from './bento/model';
 import { BENTO_GRID } from '../canvas/composition/bento';
 import { GLASS_NUMBERS, GLASS_NUMBER_KEYS, GLASS_TINT, GlassSection } from './glass/model';
 import { BLOB_NUMBERS, BLOB_NUMBER_KEYS, BLOB_TINT, BlobSection } from './blob/model';
+import { SEEKABLE_EFFECTS, SHADER_EFFECT_IDS, ShaderEffectId } from './shader-effects/catalogue';
+import { effectProblem } from './shader-effects/preset';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
@@ -529,6 +531,25 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(4),
     schema: z.object({ ...blobNumbers, [BLOB_TINT.key]: color(BLOB_TINT.fallback, BLOB_TINT.label) }).strict()
+  },
+  ShaderEffect: {
+    label: 'Shader effect',
+    description: `A GPU shader effect from the open-source shaders library (WebGPU), seeked frame by frame like every other clip. effect picks one of: ${SEEKABLE_EFFECTS.join(', ')}; cursor effects (cursor-ripples, chroma-flow) only move in interactive embeds. Filters (glass, grain, light leak, distortions, wipes, blurs) apply to image (a picture asset), or to a mesh gradient without one. Every number and colour of the effect is a prop of the clip and takes set_keyframes, except speed (fixed per clip).`,
+    track: TrackKind.Visual,
+    durationInFrames: seconds(4),
+    schema: z
+      .object({
+        effect: choice(SHADER_EFFECT_IDS, ShaderEffectId.MeshGradient, 'Effect', Group.Content),
+        image: asset(AssetKind.Image, 'Picture (filters)')
+      })
+      .catchall(z.union([z.number(), z.string()]))
+      .superRefine((props, ctx) => {
+        const { effect, image, ...knobs } = props;
+        const problem = effectProblem(effect, knobs as Record<string, unknown>);
+        if (problem) {
+          ctx.addIssue({ code: 'custom', message: problem });
+        }
+      })
   },
   Precomp: {
     label: 'Precomp',

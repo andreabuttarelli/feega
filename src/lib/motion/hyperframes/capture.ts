@@ -14,6 +14,7 @@ import { offStageClip } from './off-stage';
 import { POSE_ATTR, neutralised as neutralise, pathStyles as stylesOf, restingPose as resting } from './raster-key';
 export { contentStamp } from '../stamp';
 
+export const COMPOSITION_ID = 'main';
 export const CAPTURE_REQUEST = 'feega:capture';
 export const CAPTURE_REPLY = 'feega:frame';
 const MEDIA_TIMEOUT_MS = 8000;
@@ -36,9 +37,9 @@ export enum Settle {
 
 export type CaptureRequest = { type: typeof CAPTURE_REQUEST; id: string; format: FrameFormat; width: number; height: number; quality?: number; settle?: Settle; layering?: Layering };
 export type ClipError = { clip: string; component: string; message: string };
-export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; url?: string; bitmap?: ImageBitmap; tree?: LayerTree; sheets?: ImageBitmap[]; error?: string; layout?: string; errors?: ClipError[] };
+export type CaptureReply = { type: typeof CAPTURE_REPLY; id: string; stamp?: string; time?: number; url?: string; bitmap?: ImageBitmap; tree?: LayerTree; sheets?: ImageBitmap[]; error?: string; layout?: string; errors?: ClipError[] };
 
-type RuntimeConfig = { request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle; grainTile: number; grainOffset: number; webkitUa: string; notWebkitUa: string; particleState: string; poseAttr: string };
+type RuntimeConfig = { timeline: string; request: string; reply: string; lib: string; width: number; height: number; mediaTimeoutMs: number; stamp: string; errorsKey: string; settle: Settle; grainTile: number; grainOffset: number; webkitUa: string; notWebkitUa: string; particleState: string; poseAttr: string };
 type Shot = { body: Record<string, unknown>; transfer: Transferable[] };
 type HtmlToImage = {
   toSvg: (node: HTMLElement, options: Record<string, unknown>) => Promise<string>;
@@ -884,6 +885,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
     return (hash >>> 0).toString(36);
   };
   const errors = () => ((window as unknown as Record<string, unknown>)[cfg.errorsKey] as unknown[] | undefined) ?? [];
+  const drawnAt = () => (window as unknown as { __timelines?: Record<string, { totalTime: () => number } | undefined> }).__timelines?.[cfg.timeline]?.totalTime();
 
   addEventListener('message', (e: MessageEvent) => {
     const m = e.data as CaptureRequest;
@@ -903,7 +905,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
       .then(() => (fonts ??= tool().getFontEmbedCSS(root)))
       .then((embed) => freeze().then((thaw) => output[m.format](root, m, embed).finally(thaw)))
       .then(
-        (shot) => reply({ ...shot.body, layout: layout(root), errors: errors() }, shot.transfer),
+        (shot) => reply({ ...shot.body, time: drawnAt(), layout: layout(root), errors: errors() }, shot.transfer),
         (err) => reply({ error: reason(err) }, [])
       );
   });
@@ -916,6 +918,6 @@ export function stampOf(html: string): string | null {
 }
 
 export function captureScript(doc: { width: number; height: number }, stamp: string, lib: string): string {
-  const cfg: RuntimeConfig = { request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source, particleState: PARTICLE_STATE, poseAttr: POSE_ATTR };
+  const cfg: RuntimeConfig = { timeline: COMPOSITION_ID, request: CAPTURE_REQUEST, reply: CAPTURE_REPLY, lib, width: doc.width, height: doc.height, mediaTimeoutMs: MEDIA_TIMEOUT_MS, stamp, errorsKey: ERRORS, settle: Settle.Paint, grainTile: GRAIN_TILE, grainOffset: GRAIN_SAMPLE_OFFSET, webkitUa: WEBKIT_UA.source, notWebkitUa: NOT_WEBKIT_UA.source, particleState: PARTICLE_STATE, poseAttr: POSE_ATTR };
   return `<script>(${captureRuntime.toString()})(${js(cfg)},(${freezeMasks.toString()}),(${inlineMedia.toString()}),(${shrinkImage.toString()}),(${paintSvg.toString()}),(${planLayers.toString()}),(${grainPixels.toString()}),(${turbulenceTile.toString()}),(${chainAffine.toString()}),(${cssAffine.toString()}),(${cssRgba.toString()}),(${joinRasters.toString()}),(${readMasks.toString()}),(${readFilters.toString()}),(${filtersFit.toString()}),(${neutralise.toString()}),(${stylesOf.toString()}),(${resting.toString()}),(${offStageClip.toString()}));</script>`;
 }

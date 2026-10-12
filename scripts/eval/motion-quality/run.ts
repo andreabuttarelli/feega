@@ -10,16 +10,21 @@ import { analyzeAudio } from '$lib/motion/audio-analysis';
 import { UI_KIT } from '$lib/motion/ui-kit/kit';
 import { billedUsdInScope, withOrgContext } from '$lib/server/ai-log';
 import { judge } from './judge';
-import { claimPort, turnSettled, type AgentState } from './drive';
+import { AccountGiven, Teardowns, accountAfter, asksUser, serverEnv, claimPort, cutAnswerFor, replyTo, turnSettled, type AgentState, type TestAccount } from './drive';
 import { contactSheet, cuts, duration, grayFrames, judgeFrames, monoSamples, PROBE_SIZE } from './media';
 import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, uiLayers, TASTE_AXES, type CaseResult, type Facts } from './score';
 
+enum AccountSource {
+  None = 'none',
+  OwnSession = 'own-session'
+}
+
 const CASES = [
-  { name: 'feega', prompt: 'Fammi un trailer motion di feega.app' },
-  { name: 'linear', prompt: 'launch video for linear.app' },
-  { name: 'stripe', prompt: 'promo for stripe.com payments' },
-  { name: 'shop', prompt: 'product video for the snowboards at hydrogen.shop' },
-  { name: 'app', prompt: 'promo video for the Things mobile app, culturedcode.com/things' }
+  { name: 'feega', prompt: 'Fammi un trailer motion di feega.app', account: AccountSource.OwnSession },
+  { name: 'linear', prompt: 'launch video for linear.app', account: AccountSource.None },
+  { name: 'stripe', prompt: 'promo for stripe.com payments', account: AccountSource.None },
+  { name: 'shop', prompt: 'product video for the snowboards at hydrogen.shop', account: AccountSource.None },
+  { name: 'app', prompt: 'promo video for the Things mobile app, culturedcode.com/things', account: AccountSource.None }
 ];
 
 const EST_CASE_USD = 2.5;
@@ -46,11 +51,11 @@ const kitNames = new Set(Object.values(UI_KIT).map((p) => p.name));
 
 const say = (s: string) => console.log(`[${new Date().toISOString().slice(11, 19)}] ${s}`);
 
-function replyTo(question: string): string {
-  return /account|login|log in|credenzial|password|accesso/i.test(question) ? 'Salta: non ho un account di prova, usa il sito pubblico.' : 'Sì, vai pure. Decidi tu il resto.';
-}
+const teardowns = new Teardowns();
 
-async function answerCard(page: Page): Promise<string | null> {
+const accountFor = (source: AccountSource, session: E2eSession): TestAccount | null => (source === AccountSource.OwnSession ? { loginUrl: `${BASE_URL}/login`, email: session.email, password: session.password } : null);
+
+async function answerCard(page: Page, cutsAnswered: number): Promise<string | null> {
   const pick = page.locator('[data-testid="reference-pick"][data-state="waiting"]');
   if (await pick.count()) {
     const candidates = pick.last().locator('[data-testid="pick-candidate"]');
@@ -61,10 +66,11 @@ async function answerCard(page: Page): Promise<string | null> {
     await pick.last().locator('[data-testid="pick-go"]').click();
     return `reference pick: first ${n}`;
   }
-  const cut = page.locator('[data-testid="cut-apply"]');
+  const answer = cutAnswerFor(cutsAnswered);
+  const cut = page.locator(`[data-testid="${answer}"]`);
   if ((await cut.count()) && (await cut.last().isVisible())) {
     await cut.last().click();
-    return 'cut review: Apply fixes';
+    return `cut review: ${answer}`;
   }
   const brief = page.locator('[data-testid="brief-go"]');
   if ((await brief.count()) && (await brief.last().isVisible())) {
@@ -74,15 +80,18 @@ async function answerCard(page: Page): Promise<string | null> {
   return null;
 }
 
-async function drive(page: Page, agentUrl: string): Promise<void> {
+async function drive(page: Page, agentUrl: string, account: TestAccount | null): Promise<void> {
   const start = Date.now();
   let replies = 0;
+  let cutsAnswered = 0;
+  let given = AccountGiven.No;
   let before: AgentState | null = null;
   while (Date.now() - start < TURN_CAP_MS) {
     await page.waitForTimeout(POLL_MS);
-    const answered = await answerCard(page);
+    const answered = await answerCard(page, cutsAnswered);
     if (answered) {
       say(`  answered ${answered}`);
+      cutsAnswered += answered.startsWith('cut review') ? 1 : 0;
       before = null;
       continue;
     }
@@ -94,10 +103,11 @@ async function drive(page: Page, agentUrl: string): Promise<void> {
       continue;
     }
     const last = (await page.locator('[role="log"] .prose').allInnerTexts()).at(-1)?.trim() ?? '';
-    if (!last.endsWith('?') || replies >= MAX_REPLIES) {
+    if (!asksUser(last, given) || replies >= MAX_REPLIES) {
       return;
     }
-    const reply = replyTo(last);
+    const reply = replyTo(last, account);
+    given = accountAfter(last, reply, account, given);
     say(`  agent asked, replying: ${reply}`);
     const input = page.locator('#chat-composer-input');
     await input.fill(reply);
@@ -157,6 +167,7 @@ async function runCase(c: (typeof CASES)[number], out: string, browserPage: () =
   const dir = join(out, c.name);
   mkdirSync(dir, { recursive: true });
   const session: E2eSession = await createE2eSession();
+  const teardown = teardowns.add(session.orgId, () => teardownE2eSession(session));
   const t0 = Date.now();
   const pageErrors: string[] = [];
   let judgeUsd = 0;
@@ -176,7 +187,7 @@ async function runCase(c: (typeof CASES)[number], out: string, browserPage: () =
     await input.fill(c.prompt);
     await input.press('Enter');
     say(`  sent; node ${nodeId}`);
-    await drive(page, `/api/v1/projects/${session.projectId}/motion/${nodeId}/agent`);
+    await drive(page, `/api/v1/projects/${session.projectId}/motion/${nodeId}/agent`, accountFor(c.account, session));
     const wallS = (Date.now() - t0) / 1000;
     await page.reload();
     await page.waitForLoadState('networkidle');
@@ -215,7 +226,7 @@ async function runCase(c: (typeof CASES)[number], out: string, browserPage: () =
     });
     return { name: c.name, prompt: c.prompt, unrun: null, facts, taste, judgeUsd };
   } finally {
-    await teardownE2eSession(session).catch((e) => say(`  TEARDOWN FAILED ${session.orgId}: ${e}`));
+    await teardown().catch((e) => say(`  TEARDOWN FAILED ${session.orgId}: ${e}`));
   }
 }
 
@@ -251,18 +262,34 @@ async function startServer(): Promise<ChildProcess | null> {
   if (await serverUp()) {
     return null;
   }
-  const child = spawn('npx', ['vite', 'dev', '--port', String(port), '--strictPort'], { stdio: 'ignore', detached: true });
+  const env = { ...process.env, ...serverEnv(BASE_URL, chromium.executablePath()) };
+  const child = spawn('npx', ['vite', 'dev', '--port', String(port), '--strictPort'], { stdio: 'ignore', detached: true, env });
   for (let i = 0; i < 90 && !(await serverUp()); i++) {
     await new Promise((r) => setTimeout(r, 1000));
   }
   return child;
 }
 
+async function tearDownAndExit(why: string): Promise<never> {
+  say(`driver stopped (${why}): tearing down live sessions`);
+  const failed = await teardowns.runAll();
+  if (failed.length) {
+    say(`TEARDOWN FAILED for orgs ${failed.join(', ')}`);
+  }
+  process.exit(1);
+}
+
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => void tearDownAndExit(signal));
+}
+process.on('uncaughtException', (e) => void tearDownAndExit(String(e)));
+process.on('unhandledRejection', (e) => void tearDownAndExit(String(e)));
+
 async function main() {
   if (port === FORBIDDEN_PORT) {
     throw new Error(`port ${FORBIDDEN_PORT} is the shared dev server: pass --port=<other>`);
   }
-  const chosen = CASES.filter((c) => !only || c.name === only);
+  const chosen = CASES.filter((c) => !only || only.split(',').includes(c.name));
   if (!chosen.length) {
     throw new Error(`no case ${only}: ${CASES.map((c) => c.name).join(', ')}`);
   }
@@ -301,13 +328,13 @@ async function main() {
       writeFileSync(join(out, 'results.json'), JSON.stringify({ stamp, totalUsd: total, results }, null, 1));
     }
   } finally {
+    writeFileSync(join(out, 'report.md'), report(stamp, results, previous, total));
     await browser.close();
     if (server?.pid) {
       process.kill(-server.pid);
     }
     release();
   }
-  writeFileSync(join(out, 'report.md'), report(stamp, results, previous, total));
   console.log(readFileSync(join(out, 'report.md'), 'utf8'));
   console.log(`\n${out}`);
 }

@@ -263,6 +263,17 @@ frame identici a occhio (feature-grid e device-fly-in, run v4). Le trasformazion
 Move: profondità simulata in 2D (`translate` + `scale`), `transform: none` a riposo; riprodurre
 con `seekPlan` + hash dei jpeg prima di toccare il codice.
 
+### Il seek check fallisce un componente puro dopo la tolleranza di luma
+Signal: "differs between visits" su un frame a metà animazione, 4–5 pixel oltre la soglia, tutti
+dentro un blocco 8x8; nessuna variabile tenuta, `reply.time` uguale al tempo chiesto. È la JPEG
+dei frame di controllo: un rumore sotto soglia sposta un coefficiente quantizzato e tutto il
+blocco cambia. Move: confrontare medie di blocco 8x8, non pixel; riprodurre con il doc dell'eval
+in `seekCheckDoc` (20 giri, Chromium basta), non con lo shot rifatto da `addShot`, che non falliva.
+
+### Un dev server con `NO_HMR=1` serve i moduli vecchi dopo un edit
+Signal: un giro Playwright dopo una modifica si comporta come prima, o `window.x is not a function`
+su una funzione appena aggiunta. Move: riavviare il dev server dopo ogni edit prima di misurare.
+
 ### `app_browse` non entra in una pagina di login SvelteKit
 Signal: login failed, nello screenshot email vuota e password piena, nessun messaggio d'errore;
 la POST dell'azione risponde 403. Non è l'idratazione: Chromium lanciato con gli argomenti di
@@ -2791,3 +2802,55 @@ log Vercel: `[video] submit openrouter rifiutato: ...`. Mossa: `get_runtime_logs
 `video` sulla finestra del run; poi confronta il payload con
 `curl https://openrouter.ai/api/v1/videos/models` (`supported_frame_images`): un modello senza
 riferimenti rifiuta `input_references`.
+
+### Un turno motion supera il suo tetto di 4 volte
+Segnale: `motion-fixer-code` $3.03 in `ai_calls` con una quota di $0.75. Il tetto contava
+`spentUsd` dal listino (`gatewayRate`), non la fattura del gateway. Mossa: il turno gira in
+`billingScope` e il tetto legge `max(stima, gatewayUsd())`. `pgrep -f run.ts` in un ciclo
+`until` trova anche il ciclo stesso: aspetta il PID (`kill -0`).
+
+### Un trailer costa $6 con ogni turno sotto il suo tetto
+Segnale: in `ai_calls` per ora, dopo `motion-fixer` altre righe `motion-agent` da $1.2 + $0.4 e un nuovo `motion-critic` a ogni risposta dell'utente ("Salta…", "Ship the cut"). Il tetto era per turno: ogni risposta apriva un turno pieno e una nuova revisione.
+Mossa: budget per video (`VIDEO_CAP_USD`, somma di `ai_calls.node_id`), critic una volta per video, "tieni il taglio" senza modello.
+
+### WebGPU manca nel WebKit di Playwright 1.60
+Segnale: `navigator.gpu` undefined in WebKit, uno ShaderEffect dipinge il gradiente di ripiego,
+mentre lo stesso codice gira col Playwright del checkout principale (1.63). Mossa: per provare
+WebGPU su WebKit usa Playwright ≥1.63; il ripiego non è un difetto dell'effetto.
+
+### Una tela WebGPU letta nel task sbagliato è vuota o vecchia
+Segnale: `drawImage` di una tela WebGPU dà zero pixel (Chromium) o il primo frame (WebKit) dopo
+un `await`. Mossa: render con `waitForGpu: false` e copia nello stesso task; su WebKit ricopia al
+frame successivo.
+
+
+### `motion-smoothness` segnala un flicker su parole che salgono di 0.2em
+Segnale: `flicker` nei primi frame di un ingresso parola per parola, diff che alternano su e
+giù, più evidente su sfondo chiaro. Causa: `translateY` su uno `span` inline-block non
+composto viene arrotondato al pixel, quindi la salita procede a scatti. Mossa:
+`will-change: transform, opacity` sulla parola; la salita torna sub-pixel e il flicker sparisce.
+
+### A custom component that throws renders a still, not an error
+Signal: a template render shows static text, 0 jolts, reseek diff 0. The runtime caught the throw into `window.__feegaErrors` (and `data-error` on the root). Move: read `__feegaErrors` after load before trusting a render.
+
+### `chromiumFrames` in locale: Chrome desktop muore, le librerie motion mancano
+Segnale: `TargetCloseError … setTouchEmulationEnabled` con `CHROMIUM_PATH` su Google Chrome, poi
+`Waiting failed: 20000ms` su `__playerReady` (`/motion-libs/...` dà 404 su feega.app e dazero.co).
+Mossa: `CHROMIUM_PATH` = `chrome-headless-shell` di Playwright (`~/Library/Caches/ms-playwright/
+chromium_headless_shell-*/…`) e `PUBLIC_APP_URL` su un `vite dev` locale (porta libera).
+
+### `motion-smoothness` segnala un flicker su parole che salgono di 0.2em
+Segnale: `flicker` nei primi frame di un ingresso parola per parola, diff che alternano su e
+giù, più evidente su sfondo chiaro. Causa: `translateY` su uno `span` inline-block non
+composto viene arrotondato al pixel, quindi la salita procede a scatti. Mossa:
+`will-change: transform, opacity` sulla parola; la salita torna sub-pixel e il flicker sparisce.
+
+### A test file that fails to parse is not in the `Tests` count
+Signal: `Tests N passed` locally, CI red with `Transform failed … Unexpected end of file`. A conflict resolved by keeping both sides dropped a closing `});`; vitest counts the file under `Test Files … failed`, not `Tests`. Move: read the `Test Files` line too.
+
+### A word that "steps at the end" is fading in before it moves
+Signal: a title entrance reads as a final hop, yet frames show no pixel snap. Cause: opacity
+finishes before an in-out position curve starts moving, so the visible motion is only its fast
+middle. Move: measure the word's sub-pixel centroid per frame against its opacity; the position
+curve must be out-shaped, moving during the fade and reaching zero speed at rest
+(`word-entrance.test.ts`).

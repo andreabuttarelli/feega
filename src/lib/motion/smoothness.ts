@@ -12,6 +12,7 @@ const LIMITS: Required<Omit<JoltLimits, 'cuts'>> = { popRatio: 3, popFloor: 1, s
 const NEIGHBOURS = 3;
 const FLICKER_WINDOW = 8;
 const FLICKER_FLIPS = 3;
+const FLICKER_SHARE = 0.25;
 
 const median = (values: number[]) => {
   const sorted = [...values].sort((a, b) => a - b);
@@ -50,7 +51,7 @@ function stops(d: readonly number[], at: Required<Omit<JoltLimits, 'cuts'>>, cut
 function flickers(d: readonly number[], at: Required<Omit<JoltLimits, 'cuts'>>): JoltAt[] {
   const found: JoltAt[] = [];
   for (let i = 0; i + FLICKER_WINDOW <= d.length; i++) {
-    const deltas = d.slice(i + 1, i + FLICKER_WINDOW).map((v, k) => v - d[i + k]).filter((delta) => Math.abs(delta) > at.flickerDelta);
+    const deltas = d.slice(i + 1, i + FLICKER_WINDOW).map((v, k) => [v - d[i + k], Math.max(v, d[i + k])]).filter(([delta, level]) => Math.abs(delta) > Math.max(at.flickerDelta, FLICKER_SHARE * level)).map(([delta]) => delta);
     const flips = deltas.slice(1).filter((delta, k) => Math.sign(delta) !== Math.sign(deltas[k])).length;
     if (flips < FLICKER_FLIPS) {
       continue;
@@ -94,6 +95,8 @@ export function joltMeter(): JoltMeter {
     jolts: (limits) => motionJolts(diffs, limits)
   };
 }
+
+export const seamDiff = (first: ArrayLike<number>, last: ArrayLike<number>): number => frameDiffs([last, first])[0];
 
 type Edged = { from: number; durationInFrames: number; junction?: unknown };
 

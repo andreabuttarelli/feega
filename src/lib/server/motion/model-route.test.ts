@@ -21,11 +21,11 @@ describe('which model a motion step runs on', () => {
   });
 
   it('offers the code-writing tools only on the code model', () => {
-    const names = ['get_motion_doc', 'write_component', 'patch_component', 'read_component'];
+    const names = ['get_motion_doc', 'write_component', 'update_components', 'read_component'];
 
     expect(activeTools(Tier.Edit, names)).toEqual(['get_motion_doc', 'read_component']);
     expect(activeTools(Tier.Code, names)).toEqual(names);
-    expect([...toolsWritingCode]).toEqual(['write_component', 'patch_component']);
+    expect([...toolsWritingCode]).toEqual(['write_component', 'update_components']);
   });
 
   it('prices the steps of a turn at each step model rate', () => {

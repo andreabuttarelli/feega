@@ -6,7 +6,6 @@ import { extractParams } from './params';
 import { ComponentMode, parseComponent, type ComponentCheck, type CustomSource, type PropsSchema, type SourceFile } from './component';
 
 export type ComponentDraft = { source: CustomSource; propsSchema: PropsSchema; mode?: ComponentMode };
-export type SourceEdit = { file: SourceFile; find: string; replace: string };
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -38,24 +37,59 @@ export function writeComponent(doc: MotionDoc, name: string, draft: ComponentDra
   return settled({ ...doc, components: { ...doc.components, [name]: parsed.component } });
 }
 
+export enum Occurrence {
+  First = 'first',
+  Last = 'last',
+  All = 'all'
+}
+
+export type SourceEdit = { file: SourceFile; find: string; replace: string; occurrence?: Occurrence };
+export type EditDiff = { file: SourceFile; replaced: number; before: string; after: string };
+export type UpdateResult = { ok: true; doc: MotionDoc; diff: EditDiff[] } | { ok: false; error: string };
+
+const DIFF_CHARS = 160;
+
 function occurrences(text: string, find: string): number {
   return find ? text.split(find).length - 1 : 0;
 }
 
-export function patchComponent(doc: MotionDoc, name: string, edits: SourceEdit[]): OpResult {
+function lineAround(text: string, at: number): string {
+  const start = text.lastIndexOf('\n', at - 1) + 1;
+  const end = text.indexOf('\n', at);
+  return text.slice(start, end === -1 ? text.length : end).trim().slice(0, DIFF_CHARS);
+}
+
+function replaced(text: string, edit: SourceEdit): string {
+  if (edit.occurrence === Occurrence.All) {
+    return text.split(edit.find).join(edit.replace);
+  }
+  const at = edit.occurrence === Occurrence.Last ? text.lastIndexOf(edit.find) : text.indexOf(edit.find);
+  return text.slice(0, at) + edit.replace + text.slice(at + edit.find.length);
+}
+
+export function updateComponent(doc: MotionDoc, name: string, edits: SourceEdit[]): UpdateResult {
   const component = doc.components[name];
   if (!component) {
-    return fail(`no custom component ${name}`);
+    return { ok: false, error: `no custom component ${name}` };
   }
   const source = { ...component.source };
+  const diff: EditDiff[] = [];
   for (const edit of edits) {
-    const count = occurrences(source[edit.file], edit.find);
-    if (count !== 1) {
-      return fail(`${edit.file}: the text to replace must occur exactly once, it occurs ${count} times: ${JSON.stringify(edit.find.slice(0, 80))}`);
+    const text = source[edit.file];
+    const count = occurrences(text, edit.find);
+    const quoted = JSON.stringify(edit.find.slice(0, 80));
+    if (count === 0) {
+      return { ok: false, error: `${edit.file}: the text to replace is not there: ${quoted}` };
     }
-    source[edit.file] = source[edit.file].replace(edit.find, () => edit.replace);
+    if (count > 1 && !edit.occurrence) {
+      return { ok: false, error: `${edit.file}: the text to replace occurs ${count} times, name occurrence first, last or all, or widen it: ${quoted}` };
+    }
+    const at = edit.occurrence === Occurrence.Last ? text.lastIndexOf(edit.find) : text.indexOf(edit.find);
+    source[edit.file] = replaced(text, edit);
+    diff.push({ file: edit.file, replaced: edit.occurrence === Occurrence.All ? count : 1, before: lineAround(text, at), after: lineAround(source[edit.file], at) });
   }
-  return writeComponent(doc, name, { source, propsSchema: component.propsSchema, mode: component.mode });
+  const written = writeComponent(doc, name, { source, propsSchema: component.propsSchema, mode: component.mode });
+  return written.ok ? { ...written, diff } : written;
 }
 
 export function removeComponent(doc: MotionDoc, name: string): OpResult {

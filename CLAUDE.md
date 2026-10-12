@@ -360,6 +360,14 @@ holds now. A second family — bad network, tab closed and reopened mid-work, a 
 in this repo measures it. A product that answers well and loses work when the line drops is not
 ready, so that gap is real, not a nitpick — it just isn't closed by a command you can run today.
 
+## Agent PRs go to `dev`, never to `main` (a rule, not a habit)
+
+`main` is the repo's default branch and what production deploys. Every merge into it is a
+production deploy, and one per PR was too many. So every PR an agent opens branches from an
+up-to-date `origin/dev` and targets `dev` (`gh pr create --base dev`); it is merged there when CI
+`test` passes. `main` only receives batched releases `dev → main`, and only when the user says so.
+A production hotfix straight to `main` happens only when the user asks for that specific fix.
+
 ## The commit author, or Vercel won't build
 
 Vercel blocks the deploy when the commit author is not a team member — and "member" is decided

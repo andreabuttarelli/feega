@@ -39,6 +39,7 @@
   import { CHECK_REQUEST, FRAMES_REQUEST, Head, Landing, adoptAgentAssets, agentDraft, landTurn, type AgentDraft, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
   import { Agent, showsStart } from '$lib/motion/start-prompt';
   import { runCheck, type CheckPorts } from '$lib/motion/custom/run-check';
+  import { decodeLuma } from '$lib/motion/custom/luma-decode';
   import { recordCheck } from '$lib/motion/custom/ops';
   import { unverified } from '$lib/motion/custom/determinism';
   import { CheckState, sourceHash } from '$lib/motion/custom/component';
@@ -58,14 +59,18 @@
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
-  import { Liveness } from '$lib/motion/interactive/settings';
+  import { Liveness, interactiveOf } from '$lib/motion/interactive/settings';
+  import { defaultsOf, type VarValues } from '$lib/motion/interactive/var-model';
+  import VarsPanel from '$lib/components/motion/VarsPanel.svelte';
   import { applyInteractivePreset } from '$lib/motion/interactive/presets';
   import { InputKey } from '$lib/motion/expression/inputs';
   import TemplateDialog from '$lib/components/motion/TemplateDialog.svelte';
   import type { FrameSource } from '$lib/motion/export/browser-render';
   import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
-  import { insertTemplate, isLockedComp, type TemplateEntry } from '$lib/motion/template/library';
+  import { carryEdits, insertTemplate, isLockedComp, type Inserted, type Instance, type TemplateEntry } from '$lib/motion/template/library';
+  import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
+  import { catalogue, starterDoc, starterFormatOf, type StarterFormat } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
@@ -144,6 +149,9 @@
   let brandAsk = $state<ChatPrefill | null>(null);
   let browsing = $state(false);
   let templates = $state<TemplateEntry[]>(data.templates);
+  let browseFirst = $state<string | null>(null);
+  let componentsOpen = $state(false);
+  const components = $derived(catalogue(templates));
   let previewDoc = $state<MotionDoc | null>(null);
   let draft = $state<AgentDraft>(null);
   let sounding = $state<SoundKind | null>(null);
@@ -239,6 +247,7 @@
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
   let interactive = $state(false);
   let tiltX = $state(0);
+  let previewVars = $state<VarValues>({});
   let tiltY = $state(0);
   const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
   const liveScene = $derived(liveComponents(doc));
@@ -530,7 +539,8 @@
 
   const checkPorts: CheckPorts = {
     compose: (d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses }),
-    capture: (times, source) => (preview ? preview.capture(times, source, CHECK_WIDTH) : Promise.reject(new Error('the preview is still loading')))
+    capture: (times, source) => (preview ? preview.capture(times, source, CHECK_WIDTH) : Promise.reject(new Error('the preview is still loading'))),
+    luma: decodeLuma
   };
 
   async function answerCheck(request: CheckRequest) {
@@ -637,13 +647,60 @@
     selection = [id];
   }
 
-  function insertEntry(entry: TemplateEntry) {
-    browsing = false;
-    const placed = insertTemplate(doc, entry, { from: frame, newId });
-    apply(placed, `Inserted ${entry.template.name}`);
-    if (placed.ok) {
-      selection = [placed.clipId];
+  function componentDraft(id: string, format: StarterFormat): Instance | null {
+    const entry = templates.find((t) => t.id === id);
+    const made = entry ? starterDoc(entry, format, newId) : null;
+    return made?.ok ? { doc: made.doc, clipId: made.clipId } : null;
+  }
+
+  const composeDraft = (d: MotionDoc) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen });
+
+  function insertComponent(id: string, sounds: boolean, draft: Instance | null) {
+    componentsOpen = false;
+    const entry = templates.find((t) => t.id === id);
+    if (entry) {
+      void insertEntry(entry, sounds, draft);
     }
+  }
+
+  function placedWith(entry: TemplateEntry, draft: Instance | null): Inserted {
+    const placed = insertTemplate(doc, entry, { from: frame, newId });
+    if (!placed.ok || !draft) {
+      return placed;
+    }
+    const carried = carryEdits(draft, placed);
+    return carried.ok ? { ...placed, doc: carried.doc } : carried;
+  }
+
+  async function insertEntry(entry: TemplateEntry, sounds: boolean, draft: Instance | null = null) {
+    browsing = false;
+    const placed = placedWith(entry, draft);
+    apply(placed, `Inserted ${entry.template.name}`);
+    if (!placed.ok) {
+      return;
+    }
+    selection = [placed.clipId];
+    showProperties();
+    if (sounds) {
+      await addTemplateSounds(placed.doc, placed.clipId, history.present);
+    }
+  }
+
+  async function addTemplateSounds(withTemplate: MotionDoc, clipId: string, at: MotionDoc) {
+    const form = new FormData();
+    form.set('doc', JSON.stringify(withTemplate));
+    form.set('clipId', clipId);
+    const res = await fetch(`${editorUrl}?/templateSounds`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+    const result = deserialize(await res.text());
+    if (result.type !== 'success') {
+      notice = 'The template is in; its sounds could not be added.';
+      return;
+    }
+    if (history.present !== at) {
+      notice = 'The video changed while its sounds were made: insert the template again to add them.';
+      return;
+    }
+    apply({ ok: true, doc: (result.data as { doc: MotionDoc }).doc }, 'Added template sounds');
   }
 
   function enterComp(comp: string) {
@@ -1227,11 +1284,16 @@
       {frame}
       {editorUrl}
       compose={(d) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses })}
+      initial={browseFirst}
       oninsert={insertEntry}
       onsaved={(entry) => ((templates = [...templates, entry]), (notice = `Saved ${entry.template.name} to the templates.`))}
       onremoved={(id) => (templates = templates.filter((t) => t.id !== id))}
       onclose={() => (browsing = false)}
     />
+  {/if}
+
+  {#if componentsOpen}
+    <ComponentLibrary items={components} format={starterFormatOf(doc)} draftOf={componentDraft} compose={composeDraft} {assets} onpick={insertComponent} onclose={() => (componentsOpen = false)} />
   {/if}
 
   {#if templating}
@@ -1255,7 +1317,7 @@
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed}>
     <section class="stage" aria-label="Preview" bind:this={stageEl}>
       <ZoomStage bind:this={zoomStage} frame={{ width: doc.width, height: doc.height }} onspace={COMMANDS[Command.TogglePlay]}>
-      <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null}>
+      <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -1267,6 +1329,7 @@
       {#if liveScene.length}<span class="live-badge" data-testid="live-badge" title={`${liveScene.join(', ')} ${liveScene.length === 1 ? 'runs' : 'run'} live: different on every view, a still in the video`}>live</span>{/if}
       <div class="live-bar">
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
+        {#if interactive}<VarsPanel {doc} bind:values={previewVars} clip={selected ?? null} onchange={edit} />{/if}
       </div>
       {#if blank}
         <div class="empty-state" data-testid="empty-state">
@@ -1336,8 +1399,10 @@
                   <button type="button" role="menuitem" onclick={() => startTemplate(id)}>{AD_TEMPLATES[id].label}</button>
                 {/each}
                 <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
+                <span class="menu-head">Components</span>
+                <button type="button" role="menuitem" data-testid="open-components" onclick={() => ((adding = false), (componentsOpen = true))}>Browse components…</button>
                 <span class="menu-head">Templates</span>
-                <button type="button" role="menuitem" data-testid="open-templates" onclick={() => ((adding = false), (browsing = true))}>Browse templates…</button>
+                <button type="button" role="menuitem" data-testid="open-templates" onclick={() => ((adding = false), (browseFirst = null), (browsing = true))}>Browse templates…</button>
                 <span class="menu-head">Audio</span>
                 <button type="button" role="menuitem" onclick={() => ((adding = false), (sounding = 'voice'))}>Generate voice-over…</button>
                 <button type="button" role="menuitem" onclick={() => ((adding = false), (sounding = 'music'))}>Generate music…</button>

@@ -4,6 +4,7 @@
   import { FieldType } from '$lib/motion/template/field-model';
   import { locateClip, setDeepProps, setField } from '$lib/motion/template/fields';
   import type { TemplateFieldValue } from '$lib/motion/template/library';
+  import { FieldLayout } from '$lib/motion/template/key-fields';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
   type Media = { assetId: string; kind: 'image' | 'video' };
@@ -14,14 +15,28 @@
     fields,
     assets,
     setValue,
-    onchange
-  }: { doc: MotionDoc; fields: TemplateFieldValue[]; assets: Asset[]; setValue: (f: TemplateFieldValue, raw: string) => Change; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+    onchange,
+    layout = FieldLayout.Grouped
+  }: {
+    doc: MotionDoc;
+    fields: TemplateFieldValue[];
+    assets: Asset[];
+    setValue: (f: TemplateFieldValue, raw: string) => Change;
+    onchange: (doc: MotionDoc, summary: string) => void;
+    layout?: FieldLayout;
+  } = $props();
 
   const MEDIA_KIND: Record<string, AssetKind> = { Image: AssetKind.Image, Video: AssetKind.Video, Logo: AssetKind.Image };
   const CROPPABLE = new Set(['Image', 'Video']);
   const LIST_KINDS = new Set(['image', 'video']);
 
   let error = $state('');
+
+  const UNGROUPED = '';
+  const HEX_VALUE = /^#[0-9a-f]{6}/i;
+  const groups = $derived([...new Set(fields.map((f) => f.group ?? UNGROUPED))].map((name) => ({ name, fields: fields.filter((f) => (f.group ?? UNGROUPED) === name) })));
+  const ranged = (f: TemplateFieldValue) => f.min !== undefined && f.max !== undefined;
+  const stepOf = (f: TemplateFieldValue) => ((f.max ?? 1) - (f.min ?? 0)) / 100;
 
   const target = (f: TemplateFieldValue) => locateClip(doc, f.clipId)?.clip ?? null;
   const preview = (id: unknown) => assets.find((a) => a.id === id)?.previewUrl ?? '';
@@ -43,13 +58,23 @@
   }
 </script>
 
-{#each fields as f (f.docKey)}
+{#each groups as group (group.name)}
+{#if group.name && layout === FieldLayout.Grouped}<h4 class="group" data-testid="field-group">{group.name}</h4>{/if}
+{#each group.fields as f (f.docKey)}
   <label class="field">
     <span>{f.label}{f.unit ? ` (${f.unit})` : ''}</span>
     {#if f.type === FieldType.Text}
       <textarea rows="2" value={String(f.value ?? '')} onchange={(e) => set(f, e.currentTarget.value)}></textarea>
     {:else if f.type === FieldType.Color}
-      <input type="color" value={String(f.value ?? '#000000').slice(0, 7)} onchange={(e) => set(f, e.currentTarget.value)} />
+      <span class="colour">
+        <input type="color" value={HEX_VALUE.test(String(f.value)) ? String(f.value).slice(0, 7) : '#000000'} onchange={(e) => set(f, e.currentTarget.value)} />
+        <output>{HEX_VALUE.test(String(f.value)) ? f.value : 'none'}</output>
+      </span>
+    {:else if f.type === FieldType.Number && ranged(f)}
+      <span class="slider">
+        <input type="range" min={f.min} max={f.max} step={stepOf(f)} value={Number(f.value ?? 0)} oninput={(e) => set(f, e.currentTarget.value)} />
+        <output>{Number(f.value ?? 0)}</output>
+      </span>
     {:else if f.type === FieldType.Number}
       <input type="number" min={f.min} max={f.max} step="any" value={Number(f.value ?? 0)} onchange={(e) => set(f, e.currentTarget.value)} />
     {:else if f.type === FieldType.Select}
@@ -90,10 +115,39 @@
     {/if}
   </label>
 {/each}
+{/each}
 
 {#if error}<p class="error">{error}</p>{/if}
 
 <style>
+  .group {
+    margin: 8px 0 0;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--ui-ink-2);
+    text-transform: lowercase;
+  }
+
+  .slider {
+    display: grid;
+    grid-template-columns: 1fr 44px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .colour {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .colour output,
+  .slider output {
+    font-family: var(--ui-mono);
+    font-size: 11px;
+    text-align: right;
+  }
+
   .field {
     display: flex;
     flex-direction: column;

@@ -14,6 +14,8 @@
   import ScriptBrief from './ScriptBrief.svelte';
   import ReferencePick from './ReferencePick.svelte';
   import CutReview from './CutReview.svelte';
+  import VideoBudget from './VideoBudget.svelte';
+  import { CONTINUE_MESSAGE, budgetRaisePath, pendingBudget } from '$lib/motion/budget-card';
   import { cutAnswer, pendingReview } from '$lib/motion/cut-review';
   import { PickState, answerLabel, answerText, pickCards, rejectText, type Mark, type PickAsk } from '$lib/reference-pick';
   import { BRIEF_AUTO_GO_S, GO_MESSAGE, pendingBoard, pendingBrief } from '$lib/motion/script-brief';
@@ -91,6 +93,14 @@
   const brief = $derived(motionNodeId && !busy ? pendingBrief(messages) : null);
   const pendingOutline = $derived(brief ? pendingBoard(messages) : null);
   const review = $derived(motionNodeId && !busy ? pendingReview(messages) : null);
+  const budget = $derived(motionNodeId && !busy ? pendingBudget(messages) : null);
+
+  async function raiseBudget() {
+    const raised = await fetch(budgetRaisePath(scopeProjectId, motionNodeId), { method: 'POST' });
+    if (raised.ok) {
+      send(CONTINUE_MESSAGE);
+    }
+  }
   const board = $derived(pendingOutline ? { href: `/p/${scopeProjectId}/c/${pendingOutline.canvasId}`, outline: pendingOutline.outline } : null);
   let editingBrief = $state(false);
   const picks = $derived(pickCards(messages));
@@ -296,6 +306,9 @@
         {/if}
         {#if review}
           <CutReview {review} sheetHref={review.sheet ? viewedHref(review.sheet, scopeProjectId, canvasId) : null} onanswer={(answer) => send(cutAnswer(answer, review.fixes))} />
+        {/if}
+        {#if budget}
+          <VideoBudget {budget} oncontinue={raiseBudget} />
         {/if}
       </div>
     </div>

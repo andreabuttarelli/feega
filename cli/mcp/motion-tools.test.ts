@@ -51,6 +51,10 @@ const fake: Server = createServer((req, res) => {
       send(200, { run_id: 'render-1', mode: 'browser', status: 'done', asset_id: 'a1', file_url: 'https://files/a1.mp4' });
       return;
     }
+    if (route === '/api/v1/motion/shader-effects') {
+      send(200, { effects: [{ id: 'iris-wipe', category: 'transition', source: 'filter', live: false }] });
+      return;
+    }
     if (route === '/api/v1/motion') {
       send(200, { videos: [{ node_id: NODE, name: 'Launch', version: 3 }] });
       return;
@@ -63,6 +67,10 @@ const fake: Server = createServer((req, res) => {
     if (route === `/api/v1/motion/${NODE}/embed`) {
       const published = req.method !== 'DELETE';
       send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, react: `<FeegaMotion id="${NODE}" />`, flutter: `FeegaMotion(id: '${NODE}')`, revision: 3 } : { published });
+      return;
+    }
+    if (route === `/api/v1/motion/${NODE}/budget`) {
+      send(200, { ok: true, spent_usd: 2.04, cap_usd: req.method === 'POST' ? 3 : 2, raise_usd: 1 });
       return;
     }
     if (route === `/api/v1/motion/${NODE}/revisions`) {
@@ -149,6 +157,13 @@ describe('the motion agent over MCP', () => {
     expect(calls).toHaveLength(1);
   });
 
+  test('list_shader_effects reads the catalogue', async () => {
+    const result = await callTool('list_shader_effects', {});
+
+    expect(calls[0].path).toBe('/api/v1/motion/shader-effects');
+    expect(result?.structuredContent).toMatchObject({ effects: [{ id: 'iris-wipe' }] });
+  });
+
   test('get_motion_run reads a run', async () => {
     polls = 5;
     const result = await callTool('get_motion_run', { run_id: RUN });
@@ -199,6 +214,18 @@ describe('the motion agent over MCP', () => {
     expect(result?.structuredContent).toMatchObject({ published: false });
   });
 
+  test('motion_budget reads what a video spent across all its turns', async () => {
+    const result = await callTool('motion_budget', { node_id: NODE });
+    expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/budget` });
+    expect(result?.structuredContent).toMatchObject({ spent_usd: 2.04, cap_usd: 2 });
+  });
+
+  test('motion_budget with raise lets the video spend more, as the continue card does', async () => {
+    const result = await callTool('motion_budget', { node_id: NODE, action: 'raise' });
+    expect(calls[0]).toMatchObject({ method: 'POST', path: `/api/v1/motion/${NODE}/budget` });
+    expect(result?.structuredContent).toMatchObject({ cap_usd: 3 });
+  });
+
   test('get_motion_embed reads the embed state', async () => {
     await callTool('get_motion_embed', { node_id: NODE });
     expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/embed` });
@@ -219,6 +246,18 @@ describe('the motion agent over MCP', () => {
     expect(JSON.stringify(result)).toContain('21');
   });
 
+  test('list_motion_templates reads the templates; add_motion_template posts the copy with its vars', async () => {
+    await callTool('list_motion_templates', {});
+    await callTool('add_motion_template', { node_id: NODE, id: 'builtin:prompt-input', at: 2, vars: { text: 'Hi', shape: 'pill' } });
+    expect(calls[0]).toMatchObject({ method: 'GET', path: '/api/v1/motion/templates' });
+    expect(calls[1]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/templates`, body: { id: 'builtin:prompt-input', at: 2, vars: { text: 'Hi', shape: 'pill' } } });
+  });
+
+  test('new_motion_from_template posts the component, format and project', async () => {
+    await callTool('new_motion_from_template', { template: 'builtin:prompt-input', format: '9:16', project: 'p-1' });
+    expect(calls[0]).toEqual({ method: 'POST', path: '/api/v1/motion/from-template', body: { template: 'builtin:prompt-input', format: '9:16', project: 'p-1' } });
+  });
+
   test('list_motion_revisions reads the versions with their clip counts', async () => {
     const result = await callTool('list_motion_revisions', { node_id: NODE });
     expect(calls[0]).toMatchObject({ method: 'GET', path: `/api/v1/motion/${NODE}/revisions` });
@@ -235,7 +274,7 @@ describe('the motion agent over MCP', () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
     const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
 
-    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_videos', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
+    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['add_motion_template', 'ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_templates', 'list_motion_videos', 'motion_budget', 'new_motion_from_template', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
     expect(names).toContain('render_video');
     expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');

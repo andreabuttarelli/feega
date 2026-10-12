@@ -3,7 +3,8 @@ import type { Tool } from 'ai';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
-import { createMotionTools, type MotionSession } from './motion-tools';
+import { createMotionTools, type MotionToolDeps, type MotionSession } from './motion-tools';
+import { TrackKind } from '$lib/motion/components';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
@@ -64,16 +65,16 @@ describe('motion agent template tools', () => {
 
   it('the prompt mentions templates and batches', () => {
     expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing })).toContain('render_batch');
-    expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing })).toContain('insert_template');
+    expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Missing })).toContain('add_template');
   });
 });
 
-function withLibrary() {
+function withLibrary(sfx?: MotionToolDeps['sfx']) {
   let n = 0;
   const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
   const save = vi.fn(async () => ({ ok: true as const, entry: { id: 'saved-1', template: BUILTIN_TEMPLATES[0].template } }));
   const templates = { list: async () => BUILTIN_TEMPLATES, save, remove: async () => false };
-  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), templates });
+  const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), templates, sfx });
   const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' });
   return { session, run, save };
 }
@@ -87,10 +88,10 @@ describe('motion agent template library tools', () => {
     expect(listed.templates.find((t) => t.id === 'builtin:lower-third')?.fields.map((f) => f.key)).toEqual(['name', 'role', 'accent']);
   });
 
-  it('insert_template places a locked precomp; set_template_fields fills it, checked against its schema', async () => {
+  it('add_template places a locked precomp; set_template_fields fills it, checked against its schema', async () => {
     const { run, session } = withLibrary();
 
-    const placed = await run('insert_template', { template_id: 'builtin:lower-third', start: 1 });
+    const placed = await run('add_template', { id: 'builtin:lower-third', at: 1 });
     const clip = String(placed.clip_id);
 
     expect(placed).toMatchObject({ ok: true, fields: expect.arrayContaining([expect.objectContaining({ key: 'name' })]) });
@@ -100,10 +101,82 @@ describe('motion agent template library tools', () => {
     expect(JSON.stringify(session.doc)).toContain('Grace Hopper');
   });
 
+  it('add_template fills the fields it is given and lays key taps and the send click on the SFX track', async () => {
+    const sfx = vi.fn(async (kind: string) => ({ ok: true as const, assetId: `sfx-${kind}`, url: null, seconds: 0.1 }));
+    const { run, session } = withLibrary(sfx);
+
+    const placed = await run('add_template', { id: 'builtin:prompt-input', at: 0, vars: { text: 'Zqx hello there', accent: '#ff5a1f' } });
+    const audio = session.doc.tracks.find((t) => t.kind === TrackKind.Audio);
+
+    expect(placed).toMatchObject({ ok: true, sounds: expect.stringContaining('sound effects') });
+    expect(JSON.stringify(session.doc)).toContain('Zqx hello there');
+    expect(audio?.clips.length).toBeGreaterThan(10);
+    expect(await run('add_template', { id: 'builtin:prompt-input', at: 0, vars: { speed: '999' } })).toMatchObject({ ok: false });
+  });
+
+  it('list_templates offers floating media and add_template fills its title and media', async () => {
+    const { run, session } = withLibrary();
+
+    expect(JSON.stringify(await run('list_templates', {}))).toContain('builtin:floating-media');
+    expect(await run('add_template', { id: 'builtin:floating-media', at: 0, vars: { title: 'zqx slow water', media: 'pic1, video:clip1', layout: 'cloud' } })).toMatchObject({ ok: true });
+    expect(JSON.stringify(session.doc)).toContain('zqx slow water');
+    expect(JSON.stringify(session.doc)).toContain('"assetId":"clip1"');
+  });
+
+  it('add_template places the feature scroll with its titles and list', async () => {
+    const { run, session } = withLibrary(vi.fn() as never);
+
+    const placed = await run('add_template', { id: 'builtin:feature-scroll', at: 0, vars: { open_title: 'Zqx all of it', lines: 'zqx one\nzqx two' } });
+
+    expect(placed).toMatchObject({ ok: true, fields: expect.arrayContaining([expect.objectContaining({ key: 'read_speed' })]) });
+    expect(JSON.stringify(session.doc)).toContain('Zqx all of it');
+    expect(await run('add_template', { id: 'builtin:feature-scroll', at: 0, vars: { align: 'right' } })).toMatchObject({ ok: false });
+  });
+
+  it('add_template places the split headline with its headline and image', async () => {
+    const { run, session } = withLibrary(vi.fn() as never);
+
+    const placed = await run('add_template', { id: 'builtin:split-headline', at: 0, vars: { headline: 'Zqx wide open', radius: '20' } });
+
+    expect(placed).toMatchObject({ ok: true, fields: expect.arrayContaining([expect.objectContaining({ key: 'media' })]) });
+    expect(JSON.stringify(session.doc)).toContain('Zqx wide open');
+    expect(await run('add_template', { id: 'builtin:split-headline', at: 0, vars: { stack: 'diagonal' } })).toMatchObject({ ok: false });
+  });
+
+  it('add_template places the image globe with its title and turn', async () => {
+    const { run, session } = withLibrary(vi.fn() as never);
+
+    const placed = await run('add_template', { id: 'builtin:image-globe', at: 0, vars: { title: 'Zqx round world', turns: 2 } });
+
+    expect(placed).toMatchObject({ ok: true, fields: expect.arrayContaining([expect.objectContaining({ key: 'turns' })]) });
+    expect(JSON.stringify(session.doc)).toContain('Zqx round world');
+    expect(await run('add_template', { id: 'builtin:image-globe', at: 0, vars: { turns: 'fast' } })).toMatchObject({ ok: false });
+  });
+
+  it('add_template places the parallax grid with its motion and columns', async () => {
+    const { run, session } = withLibrary(vi.fn() as never);
+
+    const placed = await run('add_template', { id: 'builtin:parallax-grid', at: 0, vars: { title: 'Zqx scrolling', motion: 'alternate', columns: 5 } });
+
+    expect(placed).toMatchObject({ ok: true, fields: expect.arrayContaining([expect.objectContaining({ key: 'motion' })]) });
+    expect(JSON.stringify(session.doc)).toContain('Zqx scrolling');
+    expect(await run('add_template', { id: 'builtin:parallax-grid', at: 0, vars: { motion: 'bounce' } })).toMatchObject({ ok: false });
+  });
+
+  it('add_template with sound off lays no sound', async () => {
+    const sfx = vi.fn();
+    const { run, session } = withLibrary(sfx as never);
+
+    await run('add_template', { id: 'builtin:prompt-input', at: 0, sound: false });
+
+    expect(sfx).not.toHaveBeenCalled();
+    expect(session.doc.tracks.filter((t) => t.kind === TrackKind.Audio).flatMap((t) => t.clips)).toEqual([]);
+  });
+
   it('a composition is a template too: the agent inserts the ring and turns its knobs with the template tools', async () => {
     const { run, session } = withLibrary();
 
-    const placed = await run('insert_template', { template_id: 'builtin:composition-ring', start: 0 });
+    const placed = await run('add_template', { id: 'builtin:composition-ring', at: 0 });
     const clip = String(placed.clip_id);
 
     expect((await run('set_template_fields', { clip_id: clip, values: { tilt_x: -30, corner_radius: 24, turns: 2 } })).ok).toBe(true);
@@ -114,7 +187,7 @@ describe('motion agent template library tools', () => {
   it('the bento is a template too: grid, gap and corner radius are its fields', async () => {
     const { run, session } = withLibrary();
 
-    const placed = await run('insert_template', { template_id: 'builtin:composition-bento', start: 0 });
+    const placed = await run('add_template', { id: 'builtin:composition-bento', at: 0 });
     const clip = String(placed.clip_id);
 
     expect((await run('set_template_fields', { clip_id: clip, values: { columns: 2, rows: 2, gap: 40, corner_radius: 48, enter: 'scale' } })).ok).toBe(true);
@@ -138,7 +211,7 @@ describe('motion agent template library tools', () => {
 
   it('edit_comp refuses a template until detach_template unlocks it', async () => {
     const { run, session } = withLibrary();
-    const clip = String((await run('insert_template', { template_id: 'builtin:quote', start: 0 })).clip_id);
+    const clip = String((await run('add_template', { id: 'builtin:quote', at: 0 })).clip_id);
     const comp = String(session.doc.tracks[0].clips[0].props.comp);
 
     expect(await run('edit_comp', { comp, calls: [] })).toMatchObject({ ok: false, error: expect.stringMatching(/detach/) });
