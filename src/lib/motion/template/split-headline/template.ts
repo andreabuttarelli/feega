@@ -7,12 +7,11 @@ export const SPLIT_TEMPLATE_ID = `${BUILTIN_PREFIX}split-headline`;
 export const SPLIT_CLIP = 'split';
 export const SPLIT_VARS = ['headline', 'splitAt', 'media', 'textColor', 'background', 'radius', 'imageHeight', 'aspect', 'gap', 'openSeconds', 'holdSeconds', 'innerZoom', 'leave'];
 
-export const SPLIT_KEY_FIELDS = ['headline', 'media', 'text_color', 'background', 'radius'];
-
 export const SPLIT_HEADLINE_TEMPLATE: TemplateEntry = {
   id: SPLIT_TEMPLATE_ID,
   template: {
     name: 'Split headline',
+    keyFields: ['headline', 'media', 'text_color', 'background', 'radius'],
     description: 'A headline enters, then an image grows from nothing between its two halves, pushing the words apart as it opens. Every part is a field or a runtime variable.',
     doc: customTemplateDoc({ name: 'split-headline', component: SPLIT_COMPONENT, code: splitComponent(), props: SPLIT_PROPS, fonts: SPLIT_FONTS, varPrefix: SPLIT_VAR_PREFIX, vars: SPLIT_VARS, clip: SPLIT_CLIP, seconds: 8, fps: 30 })
   }
