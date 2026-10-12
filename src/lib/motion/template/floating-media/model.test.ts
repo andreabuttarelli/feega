@@ -13,10 +13,11 @@ type Model = {
 
 const model = new Function(`${FLOAT_MODEL}; return { floatLayout, floatFrame, scaleAt, safeBox, frameBox };`)() as Model;
 
-const PARAMS = { title: 'made to move', count: 5, layout: 'orbit', depth: 2, drift: 0.035, speed: 1, resistance: 0.8, cardSize: 0.26, safeWidth: 0.5, safeHeight: 0.34, tilt: 1, focusBlur: 6, dim: 0.35, entrance: true, leave: true, enterAt: 0, stagger: 0.12, titleAt: 0, titleBlur: 0.25, push: 0.25 };
+const PARAMS = { title: 'made to move', count: 5, layout: 'orbit', depth: 2, drift: 0.02, speed: 0.6, resistance: 0.8, cardSize: 0.36, safeWidth: 0.5, safeHeight: 0.34, tilt: 0.4, focusBlur: 1.5, dim: 0.35, entrance: true, leave: true, enterAt: 0, stagger: 0.12, titleAt: 0, titleBlur: 0, contain: true, push: 0.25 };
 const LENGTH = 10;
 const FPS = 30;
 const ASPECTS = { landscape: [1920, 1080], vertical: [1080, 1920], square: [1080, 1080] } as const;
+const BLUR_UNIT = 0.0012;
 const LAYOUTS = ['orbit', 'cloud', 'grid-depth'];
 
 const times = (length = LENGTH) => Array.from({ length: Math.round(length * FPS) + 1 }, (_, i) => i / FPS);
@@ -131,11 +132,39 @@ describe('the floating media model', () => {
     });
   }
 
-  it('puts some cards clearly far back, where they blur', () => {
+  it('puts some cards clearly far back, only slightly soft', () => {
     const p = { ...PARAMS, entrance: false };
     const cards = model.floatFrame(model.floatLayout(p, 1920, 1080), p, 5, LENGTH).cards;
 
     expect(Math.min(...cards.map((c) => c.z))).toBeLessThan(-1.2);
-    expect(Math.max(...cards.map((c) => c.blur))).toBeGreaterThan(3);
+    expect(Math.max(...cards.map((c) => c.blur))).toBeGreaterThan(0);
   });
+
+  it('keeps the far blur under 2px at 1080', () => {
+    const layout = model.floatLayout(PARAMS, 1920, 1080);
+
+    for (const t of times()) {
+      for (const c of model.floatFrame(layout, PARAMS, t, LENGTH).cards) {
+        expect(c.blur * BLUR_UNIT * 1080).toBeLessThanOrEqual(2);
+      }
+    }
+  });
+
+  for (const layout of LAYOUTS) {
+    for (const [name, [width, height]] of Object.entries(ASPECTS)) {
+      it(`keeps every ${layout} card inside the ${name} frame`, () => {
+        const p = { ...PARAMS, layout };
+        const box = model.frameBox(width, height);
+        const placed = model.floatLayout(p, width, height);
+
+        for (const t of times().filter((_, i) => i % 5 === 0)) {
+          for (const c of model.floatFrame(placed, p, t, LENGTH).cards.filter((c) => c.opacity > 0.05)) {
+            const s = screen(c);
+            expect(Math.abs(s.x) + s.hw, `${layout} ${name} t=${t}`).toBeLessThanOrEqual(box.ax);
+            expect(Math.abs(s.y) + s.hh, `${layout} ${name} t=${t}`).toBeLessThanOrEqual(box.ay);
+          }
+        }
+      });
+    }
+  }
 });

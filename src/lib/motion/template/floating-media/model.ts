@@ -6,10 +6,12 @@ const SETTLE = 0.012;
 const ENTER = 1.6;
 const EXIT = 1.1;
 const WORD_IN = 1.1;
-const WORD_GAP = 0.12;
+const WORD_GAP = 0.08;
 const NATURAL = 2 * Math.PI * 0.12;
 const PUSH_OUT = 1.06;
-const PUSH_STEPS = 60;
+const PUSH_STEPS = 80;
+const SHRINK = 0.95;
+const ARRIVE_DEPTH = 0.5;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const span = (t, at, length) => clamp01((t - at) / Math.max(length, 1e-6));
@@ -35,8 +37,8 @@ function safeBox(p, box) {
   return { hw: Math.min(box.ax * 0.92, (p.safeWidth * box.ax * 2) / 2), hh: p.safeHeight / 2 };
 }
 
-function footprint(card, margin) {
-  const s = scaleAt(card.z);
+function footprint(card, margin, push) {
+  const s = scaleAt(card.z + push);
   return { x: card.x * s, y: card.y * s, hw: (card.w / 2 + margin) * s * 1.08, hh: (card.h / 2 + margin) * s * 1.08 };
 }
 
@@ -70,21 +72,64 @@ function seeds(layout, n, box, depth) {
   return cards;
 }
 
-function floatLayout(p, width, height) {
-  const box = frameBox(width, height);
-  const safe = safeBox(p, box);
+function crowded(cards, p) {
+  return [0, p.push].some((push) => overlapping(cards.map((c) => footprint(c, p.drift, push))));
+}
+
+function overlapping(boxes) {
+  return boxes.some((a, i) => boxes.slice(i + 1).some((b) => Math.abs(a.x - b.x) < a.hw + b.hw && Math.abs(a.y - b.y) < a.hh + b.hh));
+}
+
+function placed(p, box, safe, size) {
   const n = Math.max(1, Math.min(MAX_CARDS, Math.round(p.count)));
-  const depth = Math.max(0, p.depth);
-  return seeds(p.layout, n, box, depth).map((seed, i) => {
-    const w = p.cardSize * (0.8 + 0.4 * hash01(i, 31));
+  return seeds(p.layout, n, box, Math.max(0, p.depth)).map((seed, i) => {
+    const w = size * (0.8 + 0.4 * hash01(i, 31));
     const card = { ...seed, w, h: w * CARD_RATIO, i };
-    for (let step = 0; step < PUSH_STEPS && overlaps(footprint(card, p.drift), safe); step++) {
-      const away = card.x === 0 && card.y === 0 ? { x: 0, y: 1e-3 } : card;
-      card.x = away.x * PUSH_OUT;
-      card.y = away.y * PUSH_OUT;
+    clearOf(card, p, safe);
+    if (p.contain) {
+      fitInside(card, p, safe, box);
     }
     return { ...card, phase: hash01(i, 41) * 2 * Math.PI, tilt: signed(i, 42) };
   });
+}
+
+function floatLayout(p, width, height) {
+  const box = frameBox(width, height);
+  const safe = safeBox(p, box);
+  let size = p.cardSize;
+  let cards = placed(p, box, safe, size);
+  for (let step = 0; step < PUSH_STEPS && crowded(cards, p); step++) {
+    size *= SHRINK;
+    cards = placed(p, box, safe, size);
+  }
+  return cards;
+}
+
+function clearOf(card, p, safe) {
+  for (let step = 0; step < PUSH_STEPS && overlaps(footprint(card, p.drift, 0), safe); step++) {
+    const away = card.x === 0 && card.y === 0 ? { x: 0, y: 1e-3 } : card;
+    card.x = away.x * PUSH_OUT;
+    card.y = away.y * PUSH_OUT;
+  }
+}
+
+function fitInside(card, p, safe, box) {
+  for (let step = 0; step < PUSH_STEPS; step++) {
+    const f = footprint(card, p.drift, p.push);
+    const s = scaleAt(card.z + p.push);
+    const overX = Math.abs(f.x) + f.hw - box.ax;
+    const overY = Math.abs(f.y) + f.hh - box.ay;
+    if (overX <= 0 && overY <= 0 && !overlaps(footprint(card, p.drift, 0), safe)) {
+      return;
+    }
+    card.x -= overX > 0 ? Math.sign(card.x) * overX / s : 0;
+    card.y -= overY > 0 ? Math.sign(card.y) * overY / s : 0;
+    if (overlaps(footprint(card, p.drift, 0), safe) || overX > f.hw || overY > f.hh) {
+      card.w *= SHRINK;
+      card.h *= SHRINK;
+      clearOf(card, p, safe);
+    }
+  }
 }
 
 function cycles(p, length) {
@@ -110,8 +155,8 @@ function drift(card, p, t, length) {
     x: p.drift * wobble(1.3),
     y: p.drift * wobble(2.9),
     z: p.drift * 0.6 * wobble(4.1),
-    rx: 6 * p.drift / 0.04 * wobble(5.3),
-    ry: 8 * p.drift / 0.04 * wobble(6.7)
+    rx: 2 * p.tilt * wobble(5.3),
+    ry: 3 * p.tilt * wobble(6.7)
   };
 }
 
@@ -126,14 +171,14 @@ function entranceAt(card, n, p, t, length, start) {
   return { in: span(t, at, ENTER), out: span(t, leave - 0.05, EXIT) };
 }
 
-function cardFrame(card, n, p, t, length, start) {
+function cardFrame(card, n, p, t, length, start, push) {
   const d = drift(card, p, t, length);
   const e = entranceAt(card, n, p, t, length, start);
-  const arrive = settle(e.in);
+  const arrive = expoInOut(e.in);
   const leave = expoInOut(e.out);
   const away = (1 - arrive) + leave;
-  const z = card.z + d.z - away * (1.2 + p.depth);
-  const sight = scaleAt(card.z + d.z) / scaleAt(z);
+  const z = card.z + d.z - away * ARRIVE_DEPTH + push;
+  const sight = scaleAt(card.z + d.z + push) / scaleAt(z);
   const visible = smooth(clamp01(e.in * 1.6)) * (1 - smooth(e.out));
   const depthShare = p.depth > 0 ? clamp01(-z / (p.depth + 0.4)) : 0;
   return {
@@ -146,7 +191,7 @@ function cardFrame(card, n, p, t, length, start) {
     ry: card.x * 18 * p.tilt + d.ry,
     rz: card.tilt * 4 * p.tilt,
     opacity: visible,
-    blur: p.focusBlur * Math.max(0, depthShare - 0.15) + 8 * away,
+    blur: p.focusBlur * Math.max(0, depthShare - 0.15),
     dim: p.dim * depthShare
   };
 }
@@ -154,10 +199,10 @@ function cardFrame(card, n, p, t, length, start) {
 function wordFrames(words, p, t, length) {
   return words.map((_, i) => {
     const at = p.titleAt + i * WORD_GAP;
-    const e = settle(span(t, at, WORD_IN));
+    const e = expoInOut(span(t, at, WORD_IN));
     const out = p.leave ? expoInOut(span(t, length - EXIT - 0.2 + i * 0.04, EXIT * 0.8)) : 0;
     const shown = smooth(span(t, at, WORD_IN * 0.35)) * (1 - smooth(out));
-    return { y: 0.42 * (1 - e) - 0.2 * out, blur: p.titleBlur * (1 - e + out), opacity: shown };
+    return { y: 0.2 * (1 - e) - 0.1 * out, blur: p.titleBlur * (1 - e + out), opacity: shown };
   });
 }
 
@@ -166,7 +211,7 @@ function floatFrame(layout, p, t, length) {
   const push = p.push * Math.pow(Math.sin((Math.PI * clamp01(t / length))), 2);
   const sub = p.leave ? 1 - smooth(span(t, length - EXIT - 0.2, EXIT * 0.8)) : 1;
   return {
-    cards: layout.map((card) => cardFrame(card, layout.length, p, t, length, titleEnd(words.length, p))),
+    cards: layout.map((card) => cardFrame(card, layout.length, p, t, length, titleEnd(words.length, p), push)),
     words: wordFrames(words, p, t, length),
     subtitle: smooth(span(t, p.titleAt + 0.35 + words.length * WORD_GAP, 0.8)) * sub,
     camera: push
