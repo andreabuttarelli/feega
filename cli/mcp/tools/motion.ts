@@ -203,6 +203,19 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'new_motion_from_template',
+    {
+      title: 'Start a motion video from a template',
+      description:
+        'Create a new motion video that already holds a template (id from `list_motion_templates`) at 0s, sized to `format` (16:9 default, 9:16, 1:1), ' +
+        'in `project` (default: the most recently active). Returns node_id and editor_url; change its fields with `add_motion_template` vars or `ask_motion_agent`. No AI, free.',
+      inputSchema: z.object({ org, template: z.string(), format: z.enum(['16:9', '9:16', '1:1']).optional(), project: z.string().optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, ...body }) => withAuth((token) => motionApi.fromTemplate(token, body, org))
+  );
+
+  server.registerTool(
     'add_motion_template',
     {
       title: 'Add a template to a motion video',

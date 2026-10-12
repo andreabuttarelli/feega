@@ -18,6 +18,8 @@ const LENGTH = 10;
 const FPS = 30;
 const ASPECTS = { landscape: [1920, 1080], vertical: [1080, 1920], square: [1080, 1080] } as const;
 const BLUR_UNIT = 0.0012;
+const KEPT = { landscape: 0.75, vertical: 0.55, square: 0.55 };
+const PARAMS_FOR = (layout: string) => ({ ...PARAMS, layout });
 const LAYOUTS = ['orbit', 'cloud', 'grid-depth'];
 
 const times = (length = LENGTH) => Array.from({ length: Math.round(length * FPS) + 1 }, (_, i) => i / FPS);
@@ -163,6 +165,18 @@ describe('the floating media model', () => {
             expect(Math.abs(s.x) + s.hw, `${layout} ${name} t=${t}`).toBeLessThanOrEqual(box.ax);
             expect(Math.abs(s.y) + s.hh, `${layout} ${name} t=${t}`).toBeLessThanOrEqual(box.ay);
           }
+        }
+      });
+    }
+  }
+
+  for (const layout of LAYOUTS) {
+    for (const [name, [width, height]] of Object.entries(ASPECTS)) {
+      it(`keeps ${layout} cards large in ${name}: spread apart, not shrunk to dots`, () => {
+        const cards = model.floatLayout(PARAMS_FOR(layout), width, height) as Card[];
+
+        for (const c of cards) {
+          expect(c.w, `${layout} ${name}`).toBeGreaterThan(PARAMS.cardSize * 0.8 * KEPT[name as keyof typeof KEPT]);
         }
       });
     }

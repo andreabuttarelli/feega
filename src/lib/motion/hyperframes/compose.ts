@@ -432,7 +432,8 @@ const RESOLVE: Record<PropFormat, ValueResolver> = {
   [PropFormat.Color]: (v, ctx) => ctx.color(String(v)),
   [PropFormat.Asset]: (v, ctx) => ctx.asset(typeof v === 'string' ? v : null),
   [PropFormat.Textarea]: (v) => v,
-  [PropFormat.Font]: (v, ctx) => ctx.font(String(v))
+  [PropFormat.Font]: (v, ctx) => ctx.font(String(v)),
+  [PropFormat.Media]: (v, ctx) => (Array.isArray(v) ? v.map((m) => ({ src: ctx.asset(m.assetId), kind: m.kind })).filter((m) => m.src) : v)
 };
 
 const ENV_LOAD: Record<Target, EnvLoad> = { [Target.Video]: EnvLoad.Wait, [Target.Screen]: EnvLoad.Swap };

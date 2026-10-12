@@ -221,6 +221,7 @@ list. Returns how many combinations it actually stopped.
 | `list_motion_revisions` | `feega motion revisions <nodeId>` |
 | `restore_motion_revision` | `feega motion revisions <nodeId> --restore <version>` |
 | `list_motion_templates` | `feega motion templates` |
+| `new_motion_from_template` | `feega motion new --template <id> [--format 16:9, 9:16 or 1:1] [--project id]` |
 | `add_motion_template` | `feega motion add-template <nodeId> <templateId> [--at s] [--var k=v] [--no-sound]` |
 | `get_storyboard` | `feega motion storyboard <nodeId>` |
 | `write_storyboard` | `feega motion storyboard <nodeId> --write beats.json` |

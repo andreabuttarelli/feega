@@ -59,7 +59,8 @@
   }
 </script>
 
-<div class="vars" data-testid="vars-panel">
+<details class="vars" data-testid="vars-panel">
+  <summary>Interactive · Advanced</summary>
   {#each vars as decl (decl.name)}
     <div class="var" data-testid={`var-${decl.name}`}>
       <code>{decl.name}</code>
@@ -106,7 +107,7 @@
     </div>
   {/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
-</div>
+</details>
 
 <style>
   .vars {
@@ -115,6 +116,11 @@
     gap: 4px;
     font-size: 12px;
     padding: 4px 0;
+  }
+
+  summary {
+    cursor: pointer;
+    color: var(--ui-ink-2);
   }
   .var,
   .row {

@@ -15,6 +15,10 @@ import { listGallery } from '$lib/server/repos/gallery';
 import { gallerySearchSchema } from '$lib/gallery/model';
 import { loadAttachments } from '$lib/server/chat-attachments/register';
 import { parseAttachments } from '$lib/chat-attachments';
+import { FROM_TEMPLATE_DEPS, FROM_TEMPLATE_ERROR, FROM_TEMPLATE_STATUS, FromTemplate, fromTemplateBody, startFromTemplate } from '$lib/server/motion/from-template';
+import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
+import { catalogue } from '$lib/motion/template/catalogue';
+import { motionEditorPath } from '$lib/canvas/motion-node';
 import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefEditorPath, briefMessage, briefName } from '$lib/motion/video-brief';
 
 const HTTP_SEE_OTHER = 303;
@@ -38,7 +42,7 @@ export const load: PageServerLoad = async (event) => {
     listGallery(db, gallerySearchSchema.parse({ limit: HOME_GALLERY_SIZE })),
     toolScope(event).then((scope) => scope.projectId, () => null)
   ]);
-  return { dashboard, gallery, templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
+  return { dashboard, gallery, components: catalogue(BUILTIN_TEMPLATES), templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
 };
 
 function projectSlug(): string {
@@ -64,6 +68,22 @@ export const actions: Actions = {
     }
 
     throw redirect(HTTP_SEE_OTHER, briefEditorPath(started, briefMessage(brief), attachments.map((a) => a.assetId)));
+  },
+
+  fromTemplate: async (event) => {
+    const form = await event.request.formData();
+    const body = fromTemplateBody.safeParse({ template: form.get('template'), format: form.get('format') || undefined, project: form.get('projectId') || undefined });
+    if (!body.success) {
+      return fail(HTTP_BAD_REQUEST, { error: 'Pick a component and a format' });
+    }
+
+    const scope = await toolScope(event, body.data.project ?? null);
+    const started = await startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, { orgId: scope.orgId, projectId: scope.projectId, userId: scope.userId, templateId: body.data.template, format: body.data.format });
+    if (started.outcome !== FromTemplate.Started) {
+      return fail(FROM_TEMPLATE_STATUS[started.outcome], { error: FROM_TEMPLATE_ERROR[started.outcome] });
+    }
+
+    throw redirect(HTTP_SEE_OTHER, motionEditorPath(started.start));
   },
 
   project: async (event) => {
