@@ -6,10 +6,11 @@ import Page from './+page.svelte';
 const motion = { id: 'm1', name: 'acme.com', projectName: 'Launch', updatedAt: '2026-10-03', format: '9:16', poster: 'https://signed/poster.jpg', preview: null, href: '/p/p1/c/c1/motion/m1' };
 const project = { id: 'p1', name: 'Launch', href: '/p/p1', updatedAt: '2026-10-03', canvases: [], thumbs: [], videoCount: 1, posters: ['https://signed/poster.jpg'] };
 const card = { id: 'g1', title: 'Gallery film', authorName: 'Feega', kind: 'motion', format: 'landscape', durationS: 8, tags: [], posterUrl: null, previewUrl: null, remixCount: 0, remixedFrom: null };
+const component = { id: 'builtin:prompt-input', name: 'Prompt input', description: 'A prompt that types', seconds: 9, kind: 'component', fields: [], preview: { poster: '/component-previews/builtin-prompt-input.jpg', video: '/component-previews/builtin-prompt-input.mp4' } };
 const PLACEHOLDER = 'Paste your website or describe the video you want…';
 
 function page(motions: (typeof motion)[] = [motion], projects: (typeof project)[] = [project], moreVideos: string | null = null) {
-  const data = { dashboard: { projects, batches: [], motions, moreVideos }, gallery: [card], templates: [{ id: 't', name: 'Logo reveal', brief: 'A logo reveal' }], tools: [], attachProjectId: 'p1' };
+  const data = { dashboard: { projects, batches: [], motions, moreVideos }, gallery: [card], components: [component], templates: [{ id: 't', name: 'Logo reveal', brief: 'A logo reveal' }], tools: [], attachProjectId: 'p1' };
   return render(Page, { props: { data, form: null } as never }).body;
 }
 
@@ -22,6 +23,18 @@ describe('the /app dashboard puts the one prompt before everything', () => {
     expect(at('data-testid="video-brief"')).toBeLessThan(at('data-testid="home-videos"'));
     expect(at('data-testid="home-videos"')).toBeLessThan(at('data-testid="home-projects"'));
     expect(at('data-testid="home-projects"')).toBeLessThan(at('data-testid="home-gallery"'));
+  });
+
+  it('the components row starts a new video from one, with its stored preview', () => {
+    const body = page();
+    const row = body.slice(body.indexOf('data-testid="home-components"'), body.indexOf('data-testid="home-projects"'));
+
+    expect(body.indexOf('data-testid="home-videos"')).toBeLessThan(body.indexOf('data-testid="home-components"'));
+    expect(row).toContain('action="/app?/fromTemplate"');
+    expect(row).toContain('name="template" value="builtin:prompt-input"');
+    expect(row).toContain('name="format" value="16:9"');
+    expect(row).toContain('src="/component-previews/builtin-prompt-input.jpg"');
+    expect(row).toContain('use in new video');
   });
 
   it('the hero points down at the videos', () => {

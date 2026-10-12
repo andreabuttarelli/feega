@@ -1,8 +1,10 @@
+import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MotionFormat } from '$lib/motion/doc';
 import { BUILTIN_TEMPLATES, builtinTemplate } from './builtins';
 import { PROMPT_TEMPLATE_ID } from './prompt-input/template';
-import { ComponentKind, catalogue, componentKind, matching, starterDoc, STARTER_FORMATS } from './catalogue';
+import { ComponentKind, catalogue, componentKind, matching, previewOf, starterDoc, STARTER_FORMATS } from './catalogue';
+import PREVIEWED from './previews.json';
 
 const entry = (id: string) => {
   const found = builtinTemplate(id);
@@ -16,8 +18,17 @@ describe('the component library lists whatever is registered', () => {
   it('has one item per built-in, prompt input among them', () => {
     const items = catalogue(BUILTIN_TEMPLATES);
 
-    expect(items.map((i) => i.id)).toEqual(BUILTIN_TEMPLATES.map((e) => e.id));
+    expect(items.map((i) => i.id).sort()).toEqual(BUILTIN_TEMPLATES.map((e) => e.id).sort());
     expect(items.find((i) => i.id === PROMPT_TEMPLATE_ID)?.kind).toBe(ComponentKind.Component);
+  });
+
+  it('leads with components, then media layouts, then scenes', () => {
+    const kinds = catalogue(BUILTIN_TEMPLATES).map((i) => i.kind);
+    const firstOf = (k: ComponentKind) => kinds.indexOf(k);
+    const lastOf = (k: ComponentKind) => kinds.lastIndexOf(k);
+
+    expect(lastOf(ComponentKind.Component)).toBeLessThan(firstOf(ComponentKind.Layout));
+    expect(lastOf(ComponentKind.Layout)).toBeLessThan(firstOf(ComponentKind.Scene));
   });
 
   it('sorts a custom component, a media layout and a plain scene into their kinds', () => {
@@ -33,6 +44,17 @@ describe('the component library lists whatever is registered', () => {
     expect(matching(items, 'prompt', null).map((i) => i.id)).toContain(PROMPT_TEMPLATE_ID);
     expect(matching(items, '', ComponentKind.Layout).every((i) => i.kind === ComponentKind.Layout)).toBe(true);
     expect(matching(items, 'prompt', ComponentKind.Layout)).toEqual([]);
+  });
+});
+
+describe('previews are stored files, never rendered per view', () => {
+  it('every listed preview has its poster and clip under static/', () => {
+    const missing = PREVIEWED.flatMap((id) => {
+      const preview = previewOf(id);
+      return preview ? [preview.poster, preview.video].filter((path) => !existsSync(`static${path}`)) : [id];
+    });
+
+    expect(missing).toEqual([]);
   });
 });
 

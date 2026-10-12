@@ -2823,3 +2823,9 @@ Segnale: `drawImage` di una tela WebGPU dà zero pixel (Chromium) o il primo fra
 un `await`. Mossa: render con `waitForGpu: false` e copia nello stesso task; su WebKit ricopia al
 frame successivo.
 
+
+### `chromiumFrames` in locale: Chrome desktop muore, le librerie motion mancano
+Segnale: `TargetCloseError … setTouchEmulationEnabled` con `CHROMIUM_PATH` su Google Chrome, poi
+`Waiting failed: 20000ms` su `__playerReady` (`/motion-libs/...` dà 404 su feega.app e dazero.co).
+Mossa: `CHROMIUM_PATH` = `chrome-headless-shell` di Playwright (`~/Library/Caches/ms-playwright/
+chromium_headless_shell-*/…`) e `PUBLIC_APP_URL` su un `vite dev` locale (porta libera).

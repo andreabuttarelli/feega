@@ -55,8 +55,10 @@ export function componentKind(entry: TemplateEntry): ComponentKind {
   return ComponentKind.Scene;
 }
 
+const KIND_ORDER = Object.values(ComponentKind);
+
 export function catalogue(entries: readonly TemplateEntry[]): CatalogueItem[] {
-  return entries.map((e) => ({
+  const items = entries.map((e) => ({
     id: e.id,
     name: e.template.name,
     description: e.template.description,
@@ -65,6 +67,7 @@ export function catalogue(entries: readonly TemplateEntry[]): CatalogueItem[] {
     fields: e.template.doc.fields.map((f) => ({ label: f.label, type: FIELD_TYPE_LABEL[f.type] })),
     preview: previewOf(e.id)
   }));
+  return items.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
 }
 
 export function matching(items: readonly CatalogueItem[], query: string, kind: ComponentKind | null): CatalogueItem[] {

@@ -22,7 +22,7 @@ function deps(overrides: Partial<FromTemplateDeps> = {}): FromTemplateDeps {
   };
 }
 
-const input = { orgId: 'org', projectId: 'p1', userId: 'u1', templateId: PROMPT_TEMPLATE_ID, format: MotionFormat.Vertical };
+const input = { orgId: 'org', projectId: 'p1', userId: 'u1', templateId: PROMPT_TEMPLATE_ID, format: MotionFormat.Vertical as const };
 
 describe('a video started from a component', () => {
   it('is a new motion node whose first revision already holds the component', async () => {
