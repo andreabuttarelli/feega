@@ -5,7 +5,7 @@ import { addClip, addTrack } from '$lib/motion/timeline';
 import { MAX_FIELDS, type ExposedField } from './field-model';
 import { applyValues, fieldValues, locateClip, type FieldValue } from './fields';
 import { VAR_PREFIX, paramVar } from '$lib/motion/custom/component';
-import { interactiveOf } from '$lib/motion/interactive/settings';
+import { DEFAULT_INTERACTIVE, interactiveOf } from '$lib/motion/interactive/settings';
 import { MAX_VARS, coerceVars, type VarDecl } from '$lib/motion/interactive/var-model';
 
 export const motionTemplateSchema = z.object({
@@ -152,6 +152,14 @@ function adoptVars(doc: MotionDoc, vars: VarDecl[]): MotionDoc {
   return { ...doc, interactive: { ...mine, vars: [...mine.vars, ...vars] } };
 }
 
+function adoptPlayback(doc: MotionDoc, source: MotionDoc): MotionDoc {
+  const { playback, scrollLength } = interactiveOf(source);
+  if (interactiveOf(doc).playback !== DEFAULT_INTERACTIVE.playback || playback === DEFAULT_INTERACTIVE.playback) {
+    return doc;
+  }
+  return { ...doc, interactive: { ...interactiveOf(doc), playback, scrollLength } };
+}
+
 export function insertTemplate(doc: MotionDoc, entry: TemplateEntry, at: Placement): Inserted {
   const source = entry.template.doc;
   const prefix = at.newId();
@@ -185,7 +193,7 @@ export function insertTemplate(doc: MotionDoc, entry: TemplateEntry, at: Placeme
   const nested = Object.fromEntries(Object.entries(source.comps).map(([id, c]) => [rename(id), { ...unmarked(c), tracks: tracks(c.tracks) }]));
   const comp: MotionComp = { template: { id: entry.id, name: entry.template.name, keys }, name: entry.template.name, durationInFrames: source.durationInFrames, tracks: tracks(source.tracks.filter((t) => t.kind === TrackKind.Visual)) };
   const next: MotionDoc = {
-    ...adoptVars(doc, movedVars(interactiveOf(source).vars, moves)),
+    ...adoptVars(adoptPlayback(doc, source), movedVars(interactiveOf(source).vars, moves)),
     comps: { ...doc.comps, ...nested, [compId]: comp },
     fields: [...doc.fields, ...fields],
     assets: byName(doc.assets, source.assets, (a) => a.id),
