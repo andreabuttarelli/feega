@@ -35,10 +35,14 @@ const buildTiles = (p, layout) => {
   }
   const items = mediaList(p.media);
   grid.innerHTML = '';
-  const tiles = layout.map((c) => Array.from({ length: c.n }, (_, j) => {
+  const pick = (i, j) => {
+    const k = j + Math.round(i * items.length * GOLDEN);
+    return items[(i % 2 ? items.length - 1 - (k % items.length) : k) % items.length];
+  };
+  const tiles = layout.map((c, i) => Array.from({ length: c.n }, (_, j) => {
     const node = document.createElement('div');
     node.className = 'pg-tile';
-    node.innerHTML = tileHtml(items.length ? items[(c.start + j) % items.length] : null);
+    node.innerHTML = tileHtml(items.length ? pick(i, j) : null);
     grid.appendChild(node);
     const video = node.querySelector('video');
     if (video) {

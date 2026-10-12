@@ -75,6 +75,15 @@ describe('the parallax grid model', () => {
     expect(Math.max(...steps)).toBeLessThan(0.05);
   });
 
+  it('leaves and reaches each rest without a jump', () => {
+    const path = times().map((t) => model.scrollAt(PARAMS, t, LENGTH));
+    const steps = path.slice(1).map((v, i) => v - path[i]);
+    const edges = steps.filter((s, i) => s > 0 && (steps[i - 1] === 0 || steps[i + 1] === 0));
+
+    expect(edges.length).toBeGreaterThan(0);
+    edges.forEach((s) => expect(s).toBeLessThan(1e-4));
+  });
+
   it.each(MOTIONS)('%s wraps each column on a seam nobody sees', (motion) => {
     for (const aspect of Object.values(ASPECTS)) {
       const p = with_({ motion });

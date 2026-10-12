@@ -12,6 +12,9 @@ const PUSH = 0.06;
 const TITLE_OUT = 1.1;
 const VEIL = 0.4;
 const VEIL_IN = 1.2;
+const EXPO_EDGE = Math.pow(2, -10) / 2;
+
+const glide = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : (expoInOut(x) - EXPO_EDGE) / (1 - 2 * EXPO_EDGE));
 
 const ALL_UP = () => -1;
 const ODD_DOWN = (i) => (i % 2 ? 1 : -1);
@@ -64,7 +67,7 @@ function loopScroll(p, u, length) {
   const local = (u / length) * segments;
   const k = Math.floor(local);
   const move = clamp01((local - k - (1 - MOVE_SHARE) / 2) / MOVE_SHARE);
-  return (k + expoInOut(move)) / segments;
+  return (k + glide(move)) / segments;
 }
 
 function scrollAt(p, t, length) {
