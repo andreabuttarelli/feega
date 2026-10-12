@@ -15,6 +15,7 @@ import { PHOTO_STRIP_TEMPLATE } from './photo-strip/template';
 import { FEATURE_SCROLL_TEMPLATE } from './feature-scroll/template';
 import { SPLIT_HEADLINE_TEMPLATE } from './split-headline/template';
 import { IMAGE_GLOBE_TEMPLATE } from './image-globe/template';
+import { SCROLL_STORY_TEMPLATE } from './scroll-story/template';
 import { PHONE_SPLIT_TEMPLATE } from './phone-split/template';
 
 export { BUILTIN_PREFIX } from './design-kit';
@@ -158,7 +159,7 @@ function compositionDesign(layout: LayoutId): Design {
   };
 }
 
-export const BUILTIN_TEMPLATES: TemplateEntry[] = [...[...LAUNCH_SCENES, ...SCENES, ...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build), UI_MORPH_TEMPLATE, PROMPT_INPUT_TEMPLATE, FLOATING_MEDIA_TEMPLATE, PHOTO_STRIP_TEMPLATE, FEATURE_SCROLL_TEMPLATE, IMAGE_GLOBE_TEMPLATE, SPLIT_HEADLINE_TEMPLATE, PHONE_SPLIT_TEMPLATE];
+export const BUILTIN_TEMPLATES: TemplateEntry[] = [...[...LAUNCH_SCENES, ...SCENES, ...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build), UI_MORPH_TEMPLATE, PROMPT_INPUT_TEMPLATE, FLOATING_MEDIA_TEMPLATE, PHOTO_STRIP_TEMPLATE, FEATURE_SCROLL_TEMPLATE, IMAGE_GLOBE_TEMPLATE, SPLIT_HEADLINE_TEMPLATE, SCROLL_STORY_TEMPLATE, PHONE_SPLIT_TEMPLATE];
 
 export function builtinTemplate(id: string): TemplateEntry | null {
   return BUILTIN_TEMPLATES.find((e) => e.id === id) ?? null;
