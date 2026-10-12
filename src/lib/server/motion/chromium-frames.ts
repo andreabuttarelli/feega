@@ -10,7 +10,7 @@ const SEEK_TIMEOUT_MS = 10_000;
 const MEDIA_TIMEOUT_MS = 8_000;
 
 type Stage = Window & {
-  __player?: { renderSeek: (t: number) => void };
+  __player?: { renderSeek: (t: number, options: { exact: boolean }) => void };
   __playerReady?: boolean;
   __renderReady?: boolean;
   __fontsReady?: Promise<unknown>;
@@ -44,7 +44,7 @@ async function seek(page: Page, seconds: number) {
   await page.evaluate(
     async (t, mediaMs) => {
       const stage = window as Stage;
-      stage.__player?.renderSeek(t);
+      stage.__player?.renderSeek(t, { exact: true });
       await stage.__hfWaitForSeekCompletion?.();
       const seeked = (v: HTMLVideoElement) =>
         new Promise((r) => {
