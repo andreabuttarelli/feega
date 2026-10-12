@@ -11,7 +11,8 @@ export const FLOATING_MEDIA_TEMPLATE: TemplateEntry = {
   id: FLOAT_TEMPLATE_ID,
   template: {
     name: 'Floating media',
-    description: 'A big title enters while pictures and videos float around it in 3D depth, drifting slowly as if through water. Every part is a field or a runtime variable.',
+    description: 'A big title enters while pictures and videos float around it in 3D depth, drifting slowly as if through water.',
+    keyFields: ['title', 'subtitle', 'media', 'background', 'title_color'],
     doc: customTemplateDoc({ name: 'floating-media', component: FLOAT_COMPONENT, code: floatComponent(), props: FLOAT_PROPS, fonts: FLOAT_FONTS, varPrefix: FLOAT_VAR_PREFIX, vars: FLOAT_VARS, clip: FLOAT_CLIP, seconds: 10, fps: 30 })
   }
 };

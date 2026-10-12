@@ -47,6 +47,13 @@ describe('the image globe template', () => {
     const keys = IMAGE_GLOBE_TEMPLATE.template.doc.fields.map((f) => f.key);
 
     expect(keys).toEqual(expect.arrayContaining(GLOBE_KEY_FIELDS));
+    expect(IMAGE_GLOBE_TEMPLATE.template.keyFields).toEqual(GLOBE_KEY_FIELDS);
+  });
+
+  it('groups its fields into text, media, style, globe, camera and motion', () => {
+    const groups = [...new Set(IMAGE_GLOBE_TEMPLATE.template.doc.fields.map((f) => f.group))];
+
+    expect(groups).toEqual(['Text', 'Media', 'Style', 'Globe', 'Camera', 'Motion']);
   });
 
   it('declares runtime variables an embedding site can set', () => {

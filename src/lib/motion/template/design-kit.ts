@@ -4,11 +4,12 @@ import type { FontFace } from '$lib/motion/fonts/model';
 import { assemble, type Beat, type TrackSpec } from '$lib/motion/template-kit';
 import { exposeField, FieldType, type FieldInput } from './fields';
 import type { TemplateEntry } from './library';
+import type { KeyFields } from './key-fields';
 
 export const BUILTIN_PREFIX = 'builtin:';
 
 export type Field = Omit<FieldInput, 'type'> & { type: FieldType };
-export type Design = { id: string; name: string; description: string; seconds: number; beats: Beat[]; fields: Field[]; fonts?: FontFace[] };
+export type Design = { id: string; name: string; description: string; seconds: number; beats: Beat[]; fields: Field[]; fonts?: FontFace[]; keyFields?: KeyFields };
 
 const FORMAT = MotionFormat.Landscape;
 const FRAME = { width: 1920, height: 1080 };
@@ -35,5 +36,5 @@ export function build(design: Design): TemplateEntry {
     }
     doc = exposed.doc;
   }
-  return { id: `${BUILTIN_PREFIX}${design.id}`, template: { name: design.name, description: design.description, doc } };
+  return { id: `${BUILTIN_PREFIX}${design.id}`, template: { name: design.name, description: design.description, keyFields: design.keyFields, doc } };
 }

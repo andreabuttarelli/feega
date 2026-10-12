@@ -4,6 +4,7 @@
   import { FieldType } from '$lib/motion/template/field-model';
   import { locateClip, setDeepProps, setField } from '$lib/motion/template/fields';
   import type { TemplateFieldValue } from '$lib/motion/template/library';
+  import { FieldLayout } from '$lib/motion/template/key-fields';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
   type Media = { assetId: string; kind: 'image' | 'video' };
@@ -14,8 +15,16 @@
     fields,
     assets,
     setValue,
-    onchange
-  }: { doc: MotionDoc; fields: TemplateFieldValue[]; assets: Asset[]; setValue: (f: TemplateFieldValue, raw: string) => Change; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+    onchange,
+    layout = FieldLayout.Grouped
+  }: {
+    doc: MotionDoc;
+    fields: TemplateFieldValue[];
+    assets: Asset[];
+    setValue: (f: TemplateFieldValue, raw: string) => Change;
+    onchange: (doc: MotionDoc, summary: string) => void;
+    layout?: FieldLayout;
+  } = $props();
 
   const MEDIA_KIND: Record<string, AssetKind> = { Image: AssetKind.Image, Video: AssetKind.Video, Logo: AssetKind.Image };
   const CROPPABLE = new Set(['Image', 'Video']);
@@ -50,7 +59,7 @@
 </script>
 
 {#each groups as group (group.name)}
-{#if group.name}<h4 class="group" data-testid="field-group">{group.name}</h4>{/if}
+{#if group.name && layout === FieldLayout.Grouped}<h4 class="group" data-testid="field-group">{group.name}</h4>{/if}
 {#each group.fields as f (f.docKey)}
   <label class="field">
     <span>{f.label}{f.unit ? ` (${f.unit})` : ''}</span>

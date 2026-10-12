@@ -1,9 +1,9 @@
 import { existsSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { FORMATS, MotionFormat } from '$lib/motion/doc';
+import { FORMATS, MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { BUILTIN_TEMPLATES, builtinTemplate } from './builtins';
 import { PROMPT_TEMPLATE_ID } from './prompt-input/template';
-import { ComponentKind, catalogue, componentKind, matching, previewOf, starterDoc, STARTER_FORMATS } from './catalogue';
+import { ComponentKind, catalogue, componentKind, matching, previewOf, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
 import PREVIEWED from './previews.json';
 
 const entry = (id: string) => {
@@ -76,5 +76,30 @@ describe('a new video starts from a component', () => {
 
   it('offers landscape, vertical and square', () => {
     expect(STARTER_FORMATS).toEqual([MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Square]);
+  });
+});
+
+describe('every built-in names its key fields', () => {
+  it.each(BUILTIN_TEMPLATES.filter((e) => e.template.keyFields).map((e) => [e.id, e] as const))('%s declares only fields it exposes', (_id, e) => {
+    const keys = new Set(e.template.doc.fields.map((f) => f.key));
+
+    expect(e.template.keyFields?.every((k) => keys.has(k))).toBe(true);
+  });
+
+  it('prompt input leads with the typed text, the button, the theme and the accent', () => {
+    expect(entry(PROMPT_TEMPLATE_ID).template.keyFields).toEqual(['text', 'button_label', 'theme', 'accent']);
+  });
+
+  it('the custom components declare theirs instead of relying on a guess', () => {
+    const custom = catalogue(BUILTIN_TEMPLATES).filter((i) => i.kind === ComponentKind.Component);
+
+    expect(custom.every((i) => entry(i.id).template.keyFields?.length)).toBe(true);
+  });
+});
+
+describe('the library previews in the format of the video it inserts into', () => {
+  it('keeps a starter format and falls back to landscape for any other', () => {
+    expect(starterFormatOf(newMotionDoc(MotionFormat.Vertical))).toBe(MotionFormat.Vertical);
+    expect(starterFormatOf({ width: 1080, height: 1350 })).toBe(MotionFormat.Landscape);
   });
 });

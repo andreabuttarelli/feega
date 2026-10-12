@@ -68,9 +68,9 @@
   import type { FrameSource } from '$lib/motion/export/browser-render';
   import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
-  import { insertTemplate, isLockedComp, type TemplateEntry } from '$lib/motion/template/library';
+  import { carryEdits, insertTemplate, isLockedComp, type Inserted, type Instance, type TemplateEntry } from '$lib/motion/template/library';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
-  import { catalogue } from '$lib/motion/template/catalogue';
+  import { catalogue, starterDoc, starterFormatOf, type StarterFormat } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
@@ -647,17 +647,34 @@
     selection = [id];
   }
 
-  function insertComponent(id: string, sounds: boolean) {
+  function componentDraft(id: string, format: StarterFormat): Instance | null {
+    const entry = templates.find((t) => t.id === id);
+    const made = entry ? starterDoc(entry, format, newId) : null;
+    return made?.ok ? { doc: made.doc, clipId: made.clipId } : null;
+  }
+
+  const composeDraft = (d: MotionDoc) => composeHtml({ doc: d, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen });
+
+  function insertComponent(id: string, sounds: boolean, draft: Instance | null) {
     componentsOpen = false;
     const entry = templates.find((t) => t.id === id);
     if (entry) {
-      void insertEntry(entry, sounds);
+      void insertEntry(entry, sounds, draft);
     }
   }
 
-  async function insertEntry(entry: TemplateEntry, sounds: boolean) {
-    browsing = false;
+  function placedWith(entry: TemplateEntry, draft: Instance | null): Inserted {
     const placed = insertTemplate(doc, entry, { from: frame, newId });
+    if (!placed.ok || !draft) {
+      return placed;
+    }
+    const carried = carryEdits(draft, placed);
+    return carried.ok ? { ...placed, doc: carried.doc } : carried;
+  }
+
+  async function insertEntry(entry: TemplateEntry, sounds: boolean, draft: Instance | null = null) {
+    browsing = false;
+    const placed = placedWith(entry, draft);
     apply(placed, `Inserted ${entry.template.name}`);
     if (!placed.ok) {
       return;
@@ -1276,7 +1293,7 @@
   {/if}
 
   {#if componentsOpen}
-    <ComponentLibrary items={components} onpick={insertComponent} onclose={() => (componentsOpen = false)} />
+    <ComponentLibrary items={components} format={starterFormatOf(doc)} draftOf={componentDraft} compose={composeDraft} {assets} onpick={insertComponent} onclose={() => (componentsOpen = false)} />
   {/if}
 
   {#if templating}

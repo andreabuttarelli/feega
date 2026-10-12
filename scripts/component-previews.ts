@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { formatOf } from '$lib/motion/doc';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
+import { setTemplateValues } from '$lib/motion/template/library';
 import { PREVIEW_DIR, previewSlug, starterDoc, type StarterFormat } from '$lib/motion/template/catalogue';
 import { drawFrames } from '$lib/server/motion/server-frames';
 import { chromiumFrames } from '$lib/server/motion/chromium-frames';
@@ -18,6 +19,15 @@ const MAX_WINDOW_S = 8;
 const POSTER_AT = 0.6;
 const LAYOUT_SAMPLES = join('static', 'compose-templates');
 const LAYOUT_PREFIX = 'builtin:composition-';
+
+const SAMPLES = join(OUT, 'samples');
+const SAMPLE_PHOTOS = ['p1015', 'p1016', 'p1018', 'p1039', 'p1043'];
+const SAMPLE_MEDIA: Record<string, { field: string; photos: string[] }> = {
+  'builtin:floating-media': { field: 'media', photos: SAMPLE_PHOTOS },
+  'builtin:image-globe': { field: 'media', photos: SAMPLE_PHOTOS }
+};
+
+const sampleAssets = (photos: string[]) => Object.fromEntries(photos.map((id) => [id, `data:image/jpeg;base64,${readFileSync(join(SAMPLES, `${id}.jpg`)).toString('base64')}`]));
 
 const only = process.argv.slice(2);
 mkdirSync(OUT, { recursive: true });
@@ -41,9 +51,17 @@ for (const entry of BUILTIN_TEMPLATES.filter((e) => !only.length || only.include
     continue;
   }
 
+  const media = SAMPLE_MEDIA[entry.id];
+  const filled = media ? setTemplateValues(placed.doc, placed.clipId, { [media.field]: media.photos.join(', ') }) : placed;
+  if (!filled.ok) {
+    console.warn(entry.id, filled.error);
+    continue;
+  }
+  const assets = media ? sampleAssets(media.photos) : {};
+
   const seconds = Math.min(source.durationInFrames / source.fps, MAX_WINDOW_S);
   const times = Array.from({ length: PREVIEW_FRAMES }, (_, i) => (i * seconds) / PREVIEW_FRAMES);
-  const frames = await drawFrames(chromiumFrames, { compose: { doc: placed.doc, tokens: FEEGA_TOKENS, assets: {} }, times, size: PREVIEW_SIZE });
+  const frames = await drawFrames(chromiumFrames, { compose: { doc: filled.doc, tokens: FEEGA_TOKENS, assets }, times, size: PREVIEW_SIZE });
 
   const work = mkdtempSync(join(tmpdir(), 'preview-'));
   frames.forEach((f, i) => writeFileSync(join(work, `${String(i).padStart(3, '0')}.jpg`), f.bytes));
