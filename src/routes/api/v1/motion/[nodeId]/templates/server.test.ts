@@ -91,6 +91,18 @@ describe('/api/v1/motion templates', () => {
     expect(JSON.stringify((head?.doc as MotionDoc).comps)).toContain('Zqx in front');
   });
 
+  it('lists and inserts the comment grid', async () => {
+    const url = new URL('https://feega.test/api/v1/motion/templates');
+    const body = await (await GET({ request: new Request(url, { headers: { authorization: 'Bearer t' } }), url } as never)).json();
+    const grid = body.templates.find((t: { id: string }) => t.id === 'builtin:comment-grid');
+    const res = await post(NODE, { id: 'builtin:comment-grid', vars: { title: 'Zqx said so' } });
+    const head = await readHead(state.db as never, { orgId: ORG, nodeId: NODE });
+
+    expect(grid.fields).toEqual(expect.arrayContaining([expect.objectContaining({ key: 'avatars', group: 'Media' }), expect.objectContaining({ key: 'comments', group: 'Text' })]));
+    expect(res.status).toBe(200);
+    expect(JSON.stringify((head?.doc as MotionDoc).comps)).toContain('Zqx said so');
+  });
+
   it('POST refuses an unknown template, a bad value and a read-only key', async () => {
     expect((await post(NODE, { id: 'builtin:nope' })).status).toBe(404);
     expect((await post(NODE, { id: 'builtin:prompt-input', vars: { theme: 'sepia' } })).status).toBe(400);
