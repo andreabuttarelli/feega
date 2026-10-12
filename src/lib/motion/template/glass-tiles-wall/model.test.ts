@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GTW_MODEL } from './model';
 
-type Tile = { row: number; slot: number; item: number; x: number; y: number; z: number; a: number; b: number; facing: number; shown: boolean };
+type Tile = { row: number; slot: number; item: number; x: number; y: number; z: number; a: number; b: number; facing: number; shown: boolean; reflect: number; warp: number; dx: number; dy: number };
 type Frame = { tilt: number; tiles: Tile[] };
 type Layout = { tileW: number; tileH: number; rows: { slots: number }[] };
 type Model = {
@@ -13,7 +13,7 @@ type Model = {
 
 const model = new Function(`${GTW_MODEL}; return { wallLayout, wallFrame, panAt, orbitAt };`)() as Model;
 
-const PARAMS = { tileSize: 0.34, tileAspect: 1.42, gap: 0.06, curve: 0.9, moves: 3, step: 2, tilt: 4, lift: 1, stagger: 1, orbit: 6 };
+const PARAMS = { glass: 1, tileSize: 0.34, tileAspect: 1.42, gap: 0.06, curve: 0.9, moves: 3, step: 2, tilt: 4, lift: 1, stagger: 1, orbit: 6 };
 const SIZES = { landscape: [1920, 1080], vertical: [1080, 1920], square: [1080, 1080] } as const;
 const LENGTH = 12;
 const FPS = 60;
@@ -94,5 +94,32 @@ describe('the glass tiles wall model', () => {
     at.slice(1).forEach((o, i) => expect(Math.abs(o.yaw - at[i].yaw)).toBeLessThan(0.01));
     const still = model.orbitAt({ ...PARAMS, orbit: 0 }, 4, LENGTH);
     expect(Math.abs(still.yaw) + Math.abs(still.pitch)).toBe(0);
+  });
+
+  it('makes side tiles strongly reflective and warped, front tiles clear', () => {
+    const shown = frameOf(0).tiles.filter((x) => x.shown);
+    const front = shown.reduce((a, b) => (a.facing > b.facing ? a : b));
+    const side = shown.reduce((a, b) => (a.facing < b.facing ? a : b));
+    expect(front.reflect).toBeLessThan(0.15);
+    expect(front.warp).toBeLessThan(0.03);
+    expect(side.reflect).toBeGreaterThan(0.6);
+    expect(side.warp).toBeGreaterThan(0.5);
+    const byFacing = [...shown].sort((a, b) => a.facing - b.facing);
+    byFacing.slice(1).forEach((x, i) => expect(x.reflect).toBeLessThanOrEqual(byFacing[i].reflect + 1e-12));
+  });
+
+  it('changes reflection and warp smoothly from frame to frame', () => {
+    const layout = model.wallLayout(PARAMS, 1920, 1080);
+    let previous = model.wallFrame(layout, PARAMS, 0, LENGTH);
+    for (const t of times().slice(1)) {
+      const next = model.wallFrame(layout, PARAMS, t, LENGTH);
+      next.tiles.forEach((tile, i) => {
+        if (tile.shown && previous.tiles[i].shown) {
+          expect(Math.abs(tile.reflect - previous.tiles[i].reflect)).toBeLessThan(0.05);
+          expect(Math.abs(tile.warp - previous.tiles[i].warp)).toBeLessThan(0.05);
+        }
+      });
+      previous = next;
+    }
   });
 });

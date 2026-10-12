@@ -15,6 +15,9 @@ const SWAY = 0.06;
 const STAGGER_DEPTH = 0.16;
 const GOLDEN = 0.6180339887;
 const PITCH_SHARE = 0.4;
+const SIDE_RANGE = 0.6;
+const REFLECT_FRONT = 0.04;
+const REFLECT_SIDE = 0.92;
 
 const glide = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : (expoInOut(x) - EXPO_EDGE) / (1 - 2 * EXPO_EDGE));
 const wrap = (x, period) => x - period * Math.floor(x / period);
@@ -58,6 +61,12 @@ function itemOf(layout, row, slot) {
   return wrap(wrap(slot, layout.k) + row.r * (layout.k + 1), 1e6);
 }
 
+function glassOptics(p, x, y, facing) {
+  const side = smooth(clamp01((1 - facing) / SIDE_RANGE));
+  const reach = Math.max(1, Math.hypot(x, y));
+  return { reflect: REFLECT_FRONT + (REFLECT_SIDE - REFLECT_FRONT) * side, warp: Math.max(0, p.glass) * side, dx: x / reach, dy: y / reach };
+}
+
 function placeTile(layout, p, row, slot, q, tilt) {
   const span = row.slots * layout.pitchX;
   const s = wrap(slot * layout.pitchX + row.shift - q + span / 2, span) - span / 2;
@@ -74,12 +83,15 @@ function placeTile(layout, p, row, slot, q, tilt) {
   const item = itemOf(layout, row, slot);
   const stagger = p.stagger * STAGGER_DEPTH * layout.tileW * (2 * wrap(item * GOLDEN, 1) - 1);
   const lift = p.lift * LIFT_DEPTH * layout.tileW * Math.pow(Math.max(0, facing), LIFT_SHARPNESS);
+  const x = R * cb * Math.sin(a);
+  const y = y0 * ct - z0 * st;
   return {
+    ...glassOptics(p, x, y, facing),
     row: row.r,
     slot,
     item,
-    x: R * cb * Math.sin(a),
-    y: y0 * ct - z0 * st,
+    x,
+    y,
     z: y0 * st + z0 * ct - R + lift + stagger,
     a,
     b: row.b,

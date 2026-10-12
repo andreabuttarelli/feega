@@ -9,6 +9,27 @@ const MEDIA_INSET = 0.03;
 const CURVE_SEGMENTS = 10;
 const BEVEL_SEGMENTS = 5;
 const ENV_BLUR = 0.03;
+const SIDE_GLARE = 3.2;
+const SIDE_DIM = 0.35;
+const SIDE_SHEEN = 0.75;
+const REFLECT_FLOOR = 0.04;
+const FACE_VERTEX = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+const FACE_FRAGMENT = [
+  'uniform sampler2D map; uniform float warp; uniform vec2 dir; uniform float dim; uniform float sheen; varying vec2 vUv;',
+  'void main() {',
+  '  vec2 c = vUv - 0.5;',
+  '  vec2 uv = 0.5 + c * (1.0 - 0.16 * warp * (1.0 - 2.0 * dot(c, c)));',
+  '  float across = dot(c, vec2(-dir.y, dir.x));',
+  '  uv -= dir * warp * 0.11 * (1.0 - 4.0 * across * across);',
+  '  float outward = clamp(0.5 + dot(c, dir) * 1.4 + c.y * 0.5, 0.0, 1.0);',
+  '  vec3 sky = mix(vec3(0.12, 0.14, 0.2), vec3(0.95, 0.97, 1.0), outward * outward);',
+  '  vec3 base = texture2D(map, clamp(uv, 0.0, 1.0)).rgb * dim;',
+  '  float streak = exp(-pow((dot(c, vec2(0.62, 0.78)) + dir.x * (0.5 - warp * 0.4)) / 0.09, 2.0)) + 0.5 * exp(-pow((dot(c, vec2(0.62, 0.78)) + dir.x * (0.32 - warp * 0.4)) / 0.03, 2.0));',
+  '  vec3 glare = clamp(sky + streak * vec3(0.9, 0.93, 1.0), 0.0, 1.0);',
+  '  gl_FragColor = vec4(base + (vec3(1.0) - base) * glare * sheen, 1.0);',
+  '  #include <colorspace_fragment>',
+  '}'
+].join('\n');
 const STUDIO_PANELS = [
   [-3, 2.4, 2.4, 2.6, 1.4, 0.1, 3.5],
   [3.2, 1.6, 1.8, 1.4, 2.6, 0.1, 4],
@@ -21,7 +42,7 @@ root.insertAdjacentHTML('beforeend', '<div class="gt"><canvas class="gt-canvas">
 const scene = root.querySelector('.gt');
 const canvas = root.querySelector('.gt-canvas');
 
-let cache = { layoutKey: '', layout: null, tilesKey: '', tiles: [], faces: [], lookKey: '' };
+let cache = { layoutKey: '', layout: null, tilesKey: '', tiles: [], faces: [], lookKey: '', glass: 1 };
 
 const sizeOf = () => ({ width: scene.clientWidth || 1920, height: scene.clientHeight || 1080 });
 const listOf = (raw, mark) => String(raw || '').split(mark).map((s) => s.trim()).filter(Boolean);
@@ -75,7 +96,7 @@ const world = (() => {
   const camera = new THREE.PerspectiveCamera(30, 16 / 9, 1, 100000);
   const wall = new THREE.Group();
   scene3.add(wall);
-  const glass = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: 0, roughness: 0.05, transmission: 1, ior: 1.4, thickness: 1, clearcoat: 1, clearcoatRoughness: 0.04, specularIntensity: 1, envMapIntensity: 1.1, attenuationColor: new THREE.Color(0xdfe8ff), attenuationDistance: 1 });
+  const glass = new THREE.MeshPhysicalMaterial({ color: 0x000000, metalness: 0, roughness: 0.04, ior: 1.5, clearcoat: 1, clearcoatRoughness: 0.03, specularIntensity: 1, envMapIntensity: 1.1, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
   return { renderer, scene: scene3, camera, wall, glass, env, geometries: [] };
 })();
 
@@ -85,6 +106,7 @@ onDestroy(() => {
     f.texture.dispose();
     f.material.dispose();
   });
+  cache.tiles.forEach(disposeTile);
   world.glass.dispose();
   world.env.dispose();
   world.renderer.dispose();
@@ -121,8 +143,6 @@ const layoutFor = (p) => {
   const faceH = h - 2 * inset;
   const face = faceGeometry(faceW, faceH, Math.max(1, corner - inset), -depth / 2 - bevel * 0.6);
   world.geometries = [slab, face];
-  world.glass.thickness = depth + 2 * bevel;
-  world.glass.attenuationDistance = (depth + 2 * bevel) * 8;
   world.renderer.setSize(width, height, false);
   world.camera.aspect = width / height;
   world.camera.fov = (2 * Math.atan(height / 2 / layout.distance)) / DEG;
@@ -190,8 +210,7 @@ const makeFace = (p, layout, item, text) => {
   const texture = new THREE.CanvasTexture(c);
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.anisotropy = world.renderer.capabilities.getMaxAnisotropy();
-  const material = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false });
-  const face = { g: c.getContext('2d'), width: c.width, height: c.height, texture, material, ...text, media: null, video: null, stamp: '' };
+  const face = { g: c.getContext('2d'), width: c.width, height: c.height, texture, ...text, media: null, video: null, stamp: '' };
   if (!item) {
     return face;
   }
@@ -218,6 +237,13 @@ const refresh = (face, p) => {
   paintFace(face, p);
 };
 
+const faceMaterial = (texture) => new THREE.ShaderMaterial({ uniforms: { map: { value: texture }, warp: { value: 0 }, dir: { value: new THREE.Vector2() }, dim: { value: 1 }, sheen: { value: 0 } }, vertexShader: FACE_VERTEX, fragmentShader: FACE_FRAGMENT, toneMapped: false });
+
+const disposeTile = (tile) => {
+  tile.face.material.dispose();
+  tile.slab.material.dispose();
+};
+
 const buildTiles = (p, layout, frame) => {
   const key = JSON.stringify([p.media, p.titles, p.captions, p.label, p.font, p.fontWeight, p.tracking, p.textColor, p.placeholderColor, layout.rows.map((r) => r.slots), cache.layoutKey]);
   if (key === cache.tilesKey) {
@@ -227,20 +253,20 @@ const buildTiles = (p, layout, frame) => {
   const titles = listOf(p.titles, ',');
   const captions = listOf(p.captions, '|');
   const kinds = Math.max(1, items.length, titles.length);
-  cache.faces.forEach((f) => {
-    f.texture.dispose();
-    f.material.dispose();
-  });
+  cache.faces.forEach((f) => f.texture.dispose());
+  cache.tiles.forEach(disposeTile);
   const at = (list, i) => (list.length ? list[i % list.length] : '');
   const total = Math.max(1, titles.length);
   const faces = Array.from({ length: kinds }, (_, i) => makeFace(p, layout, items.length ? items[i % items.length] : null, { title: at(titles, i), caption: at(captions, i), n: (i % total) + 1, total }));
   world.wall.clear();
   const tiles = frame.tiles.map((tile) => {
     const group = new THREE.Group();
-    group.add(new THREE.Mesh(layout.face, faces[tile.item % kinds].material));
-    group.add(new THREE.Mesh(layout.slab, world.glass));
+    const face = new THREE.Mesh(layout.face, faceMaterial(faces[tile.item % kinds].texture));
+    const slab = new THREE.Mesh(layout.slab, world.glass.clone());
+    slab.renderOrder = 1;
+    group.add(face, slab);
     world.wall.add(group);
-    return group;
+    return { group, face, slab };
   });
   cache = { ...cache, tilesKey: key, tiles, faces };
   return tiles;
@@ -253,10 +279,7 @@ const paintLook = (p) => {
   }
   cache = { ...cache, lookKey: key };
   scene.style.setProperty('--gt-bg', p.background);
-  const strength = Math.min(1, p.glass);
-  world.glass.transmission = strength;
-  world.glass.clearcoat = strength;
-  world.glass.envMapIntensity = 1.1 * p.glass;
+  cache = { ...cache, glass: Math.max(0, p.glass) };
 };
 
 const target = new THREE.Vector3();
@@ -276,11 +299,16 @@ const draw = () => {
   world.camera.updateMatrixWorld();
 
   f.tiles.forEach((c, i) => {
-    const group = tiles[i];
+    const { group, face, slab } = tiles[i];
     group.visible = c.shown;
     if (!c.shown) {
       return;
     }
+    face.material.uniforms.warp.value = c.warp;
+    face.material.uniforms.dir.value.set(c.dx, -c.dy);
+    face.material.uniforms.dim.value = 1 - SIDE_DIM * c.reflect * Math.min(1, cache.glass);
+    face.material.uniforms.sheen.value = SIDE_SHEEN * Math.min(1, cache.glass) * Math.max(0, c.reflect - REFLECT_FLOOR);
+    slab.material.envMapIntensity = cache.glass * (1 + SIDE_GLARE * c.reflect);
     group.position.set(c.x, -c.y, c.z);
     target.set(2 * c.x, -2 * c.y, 2 * c.z + layout.radius);
     group.lookAt(target);
