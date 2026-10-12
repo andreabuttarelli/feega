@@ -1,17 +1,9 @@
+import { MEDIA_LIST } from '../media-list';
+
 export const FLOAT_VIEW = String.raw`
-const VIDEO_MARK = 'video:';
-const LINK = /^(https?:|data:|blob:|\/)/;
+${MEDIA_LIST}
 const BLUR_UNIT = 0.0012;
 const BORDER_BASE = 1080;
-
-const picked = (item) => ({ src: item.src, video: item.kind === 'video' });
-
-const mediaList = (raw) => Array.isArray(raw) ? raw.map(picked).filter((m) => m.src) : String(raw || '').split(',').map((s) => s.trim()).filter(Boolean).map((item) => {
-  const video = item.startsWith(VIDEO_MARK);
-  const id = video ? item.slice(VIDEO_MARK.length).trim() : item;
-  const src = LINK.test(id) ? id : assets[id];
-  return src ? { src, video } : null;
-}).filter(Boolean);
 
 root.insertAdjacentHTML('beforeend', '<div class="fm"><div class="fm-world"></div><div class="fm-title"><h1 class="fm-headline"></h1><div class="fm-sub"></div></div></div>');
 
@@ -101,16 +93,6 @@ const paintTitle = (p) => {
   sub.textContent = p.subtitle;
   cache = { ...cache, titleKey: key, words: nodes };
   return nodes;
-};
-
-const seekVideo = (video, t) => {
-  if (!video || !(video.duration > 0)) {
-    return;
-  }
-  const at = t % video.duration;
-  if (Math.abs(video.currentTime - at) > 0.5 / fps) {
-    video.currentTime = at;
-  }
 };
 
 const draw = () => {
