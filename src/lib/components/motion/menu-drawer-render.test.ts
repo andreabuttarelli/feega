@@ -5,7 +5,7 @@ import MenuDrawer from './MenuDrawer.svelte';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { SaveState } from '$lib/motion/editor-bar';
 
-const EDITOR_PAGE = 'src/routes/p/[projectId]/c/[canvasId]/motion/[nodeId]/+page.svelte';
+const EDITOR_PAGE = 'src/lib/components/motion/MotionEditorShell.svelte';
 const noop = () => {};
 
 const html = () =>
