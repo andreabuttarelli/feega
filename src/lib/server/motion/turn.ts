@@ -59,7 +59,7 @@ import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
-import { DESCRIBE_FRAMES, SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep, type Frame } from '$lib/server/motion/frames';
+import { DESCRIBE_FRAMES, SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep, latestFrames, type Frame } from '$lib/server/motion/frames';
 import { frameDensities, frameStats, seamLuma } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, storeAssetFile } from '$lib/server/repos/asset-storage';
@@ -494,7 +494,8 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
         const tier = stepTier(stepTiers.at(-1) ?? opening, steps.map((s) => s.toolCalls));
         stepTiers.push(tier);
         const tierModel = TIER_MODEL[tier];
-        const routed = visionModel ? visionStep({ messages: current, shown: framesShown, stepModel: tierModel, visionModel: tier === Tier.Code ? codeModel : visionModel }) : undefined;
+        const pruned = latestFrames(current);
+        const routed = visionModel ? visionStep({ messages: pruned, shown: framesShown, stepModel: tierModel, visionModel: tier === Tier.Code ? codeModel : visionModel }) : undefined;
         routed?.shown?.forEach((id) => framesShown.add(id));
         const stepModel = routed?.model ?? tierModel;
         stepModels.push(stepModel);
@@ -504,7 +505,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
           stepModels[stepModels.length - 1] = roleModel(roundRole, stepModel);
           return { model: llmLanguageModel(stepModels.at(-1)!, PromptCache.On), activeTools: roleTools(roundRole, toolNames) };
         }
-        return { model: llmLanguageModel(stepModel, PromptCache.On), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), ...(routed?.messages ? { messages: routed.messages } : {}), ...forced };
+        return { model: llmLanguageModel(stepModel, PromptCache.On), providerOptions: stepModel === model ? reasoningProviderOptions(reasoning) : {}, activeTools: activeTools(tier, toolNames), messages: routed?.messages ?? pruned, ...forced };
       }
         }));
 

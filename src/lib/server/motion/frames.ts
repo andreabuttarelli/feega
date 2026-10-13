@@ -102,6 +102,16 @@ function blind(message: ModelMessage): ModelMessage {
   return { ...message, content: message.content.map((part) => (framedResult(part as Part) && part.type === 'tool-result' && part.output.type === 'content' ? { ...part, output: { ...part.output, value: [...part.output.value.filter((v) => !isFile(v)), { type: 'text' as const, text: SEEN }] } } : part)) };
 }
 
+const framedTool = (message: ModelMessage) => message.role === 'tool' && hasImage(message);
+
+export function latestFrames(messages: ModelMessage[]): ModelMessage[] {
+  const last = messages.findLastIndex(framedTool);
+  if (last < 0 || !messages.slice(0, last).some(framedTool)) {
+    return messages;
+  }
+  return messages.map((m, i) => (i < last && framedTool(m) ? blind(m) : m));
+}
+
 function imageCalls(messages: readonly ModelMessage[]): string[] {
   return messages.flatMap((m) => (m.role === 'tool' ? m.content.flatMap((part) => (framedResult(part as Part) && part.type === 'tool-result' ? [part.toolCallId] : [])) : []));
 }

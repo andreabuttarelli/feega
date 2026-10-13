@@ -3,7 +3,7 @@ import type { ModelMessage } from 'ai';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { writeComponent } from '$lib/motion/custom/ops';
-import { finalReply } from './frames';
+import { finalReply, latestFrames } from './frames';
 import { FrameUpload, MAX_SELF_CHECK_REFS, checkMessage, viewedReferences, MAX_FRAME_BYTES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, decodeFrame, docTexts, keyFrameTimes, selfCheckDue, usageByModel, Vision, visionStep } from './frames';
 
 const jpeg = (bytes: number) => `data:image/jpeg;base64,${Buffer.alloc(bytes, 1).toString('base64')}`;
@@ -86,6 +86,30 @@ describe('a main model that cannot see hands the frames to the vision model', ()
 
   it('a step with no images anywhere changes nothing', () => {
     expect(visionStep({ messages: base, shown: new Set(), ...blindStep })).toBeUndefined();
+  });
+});
+
+describe('frames resent to the model on every step', () => {
+  const view = (id: string): ModelMessage[] => [
+    { role: 'assistant', content: [{ type: 'tool-call', toolCallId: id, toolName: VIEW_FRAMES, input: {} }] },
+    { role: 'tool', content: [{ type: 'tool-result', toolCallId: id, toolName: VIEW_FRAMES, output: { type: 'content', value: [{ type: 'text', text: '{}' }, { type: 'file', mediaType: 'image/jpeg', data: { type: 'data', data: id } }] } }] }
+  ];
+  const attached: ModelMessage = { role: 'user', content: [{ type: 'text', text: 'like this' }, { type: 'file', mediaType: 'image/png', data: 'REF' }] };
+
+  it('only the latest frames stay as pictures: older views become a note, the user attachments stay', () => {
+    const pruned = latestFrames([attached, ...view('old'), ...view('new')]);
+    const text = JSON.stringify(pruned);
+
+    expect(text).not.toContain('"data":"old"');
+    expect(text).toContain('"data":"new"');
+    expect(text).toContain('REF');
+    expect(text).toContain('frames already inspected');
+  });
+
+  it('one view or none changes nothing', () => {
+    const one = [attached, ...view('only')];
+
+    expect(latestFrames(one)).toBe(one);
   });
 });
 
