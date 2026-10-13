@@ -51,6 +51,15 @@ describe('POST /api/v1/motion/from-template', () => {
     expect(Object.values(store.revisions[0].doc.comps).some((c) => c.template?.id === 'builtin:prompt-input')).toBe(true);
   });
 
+  it('a still poster: the A-poster size, pinned to the frame asked for', async () => {
+    const res = await post({ template: 'builtin:prompt-input', format: 'A poster', project: 'p-1', still: 1.5 });
+    const doc = store.revisions[0].doc as unknown as { width: number; height: number; still: { frame: number } };
+
+    expect(res.status).toBe(200);
+    expect(doc).toMatchObject({ width: 1080, height: 1527, still: { frame: 45 } });
+    expect(store.nodes[0]).toMatchObject({ data: expect.objectContaining({ format: 'A poster' }) });
+  });
+
   it('without a project, lands in the most recent one', async () => {
     const res = await post({ template: 'builtin:prompt-input' });
     expect((await res.json()).project_id).toBe('p-recent');

@@ -94,7 +94,7 @@ export function matching(items: readonly CatalogueItem[], query: string, kind: C
   return items.filter((i) => (!kind || i.kind === kind) && (!words || `${i.name} ${i.description}`.toLowerCase().includes(words)));
 }
 
-export function starterDoc(entry: TemplateEntry, format: StarterFormat, newId: () => string): Inserted {
+export function starterDoc(entry: TemplateEntry, format: MotionFormat, newId: () => string): Inserted {
   const source = entry.template.doc;
   const blank = { ...newMotionDoc(format), fps: source.fps, durationInFrames: source.durationInFrames };
   return insertTemplate(blank, entry, { from: 0, newId });

@@ -62,7 +62,7 @@ export function sequentialIds(): () => string {
   return () => `t${++n}`;
 }
 
-export type TemplatePick = { format: StarterFormat; values: Record<string, string> };
+export type TemplatePick = { format: MotionFormat; values: Record<string, string> };
 
 export function composedTemplate(entry: TemplateEntry, pick: TemplatePick, cards: readonly UpstreamCard[], newId: () => string): Inserted {
   const placed = starterDoc(entry, pick.format, newId);

@@ -664,7 +664,14 @@ function kitBesideRealUi(doc: MotionDoc): QualityProblem[] {
     .map((c) => ({ kind: Quality.KitUi, at: seconds(doc, c.from), detail: `${String(c.props.name)} is a generic kit card in a film that has the real product (${rebuilt.join(', ')}): fill this beat with the recreated UI instead (add_shot ui-focus, ui-morph or whip-zoom on it, focus_ui on its elements), or remove it` }));
 }
 
+export const TIMELINE_ONLY: ReadonlySet<Quality> = new Set([Quality.Silent, Quality.EmptyFrames, Quality.TrailingEmpty, Quality.CutMidAnimation, Quality.NoHold, Quality.RepeatedLayout, Quality.DeadJunction, Quality.LoopJump, Quality.NoMicroMotion]);
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
+  const all = timelineProblems(doc, input);
+  return doc.still ? all.filter((p) => !TIMELINE_ONLY.has(p.kind as Quality)) : all;
+}
+
+function timelineProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
   return [...unscripted(doc), ...productUiMissing(doc), ...uiShare(doc), ...smallUi(doc), ...alteredUi(doc), ...kitBesideRealUi(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...deadJunctions(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail })), ...lookProblems(doc, placedClips(doc), input.referencesSeen ?? false).map((p) => ({ kind: Quality.OffLook, effect: p.miss, detail: p.detail }))];

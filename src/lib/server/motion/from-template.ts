@@ -5,9 +5,9 @@ import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { findProjectById, listProjects } from '$lib/server/repos/projects';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
-import { MotionFormat } from '$lib/motion/doc';
+import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { setStill } from '$lib/motion/still';
 import type { TemplateEntry } from '$lib/motion/template/library';
-import { STARTER_FORMATS, type StarterFormat } from '$lib/motion/template/catalogue';
 import { composedTemplate } from '$lib/canvas/composition-template';
 import type { UpstreamCard } from '$lib/canvas/composition-node';
 import { MOTION_START_DEPS, startMotion, type MotionStart, type MotionStartDeps } from './start';
@@ -45,11 +45,12 @@ export const FROM_TEMPLATE_DEPS: FromTemplateDeps = {
 
 export const fromTemplateBody = z.object({
   template: z.string().min(1),
-  format: z.enum(STARTER_FORMATS).default(MotionFormat.Landscape),
-  project: z.string().optional()
+  format: z.enum(MOTION_FORMATS).default(MotionFormat.Landscape),
+  project: z.string().optional(),
+  still: z.number().min(0).optional()
 });
 
-type Input = { orgId: string; projectId: string; canvasId?: string | null; userId: string; templateId: string; format: StarterFormat; values?: Record<string, string>; wired?: UpstreamCard[]; actor?: Actor };
+type Input = { orgId: string; projectId: string; canvasId?: string | null; userId: string; templateId: string; format: MotionFormat; still?: number; values?: Record<string, string>; wired?: UpstreamCard[]; actor?: Actor };
 
 const newId = () => crypto.randomUUID().slice(0, ID_LENGTH);
 
@@ -60,7 +61,8 @@ export async function startFromTemplate(db: Db, deps: FromTemplateDeps, input: I
     return { outcome: FromTemplate.Unknown };
   }
 
-  const placed = composedTemplate(entry, { format: input.format, values: input.values ?? {} }, input.wired ?? [], newId);
+  const composed = composedTemplate(entry, { format: input.format, values: input.values ?? {} }, input.wired ?? [], newId);
+  const placed = composed.ok && input.still !== undefined ? setStill(composed.doc, input.still) : composed;
   if (!placed.ok) {
     return { outcome: FromTemplate.Invalid, error: placed.error };
   }
@@ -107,7 +109,7 @@ export async function videoFromTemplate(db: Db, scope: { orgId: string; userId: 
   }
 
   const actor = agentActor(scope.userId, API_AGENT_KEY);
-  const started = await startFromTemplate(db, FROM_TEMPLATE_DEPS, { ...scope, projectId, templateId: body.data.template, format: body.data.format, actor });
+  const started = await startFromTemplate(db, FROM_TEMPLATE_DEPS, { ...scope, projectId, templateId: body.data.template, format: body.data.format, still: body.data.still, actor });
   if (started.outcome !== FromTemplate.Started) {
     return json({ error: FROM_TEMPLATE_ERROR[started.outcome] }, { status: FROM_TEMPLATE_STATUS[started.outcome] });
   }

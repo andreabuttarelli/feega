@@ -207,9 +207,9 @@ export function registerMotionTools(server: McpServer) {
     {
       title: 'Start a motion video from a template',
       description:
-        'Create a new motion video that already holds a template (id from `list_motion_templates`) at 0s, sized to `format` (16:9 default, 9:16, 1:1), ' +
-        'in `project` (default: the most recently active). Returns node_id and editor_url; change its fields with `add_motion_template` vars or `ask_motion_agent`. No AI, free.',
-      inputSchema: z.object({ org, template: z.string(), format: z.enum(['16:9', '9:16', '1:1']).optional(), project: z.string().optional() }),
+        'Create a new motion video that already holds a template (id from `list_motion_templates`) at 0s, sized to `format` (16:9 default; 9:16 story, 4:5 post, "A poster"), ' +
+        'in `project` (default: the most recently active). `still`: seconds of the one frame to keep, making it a still graphic (post, poster) instead of a video. Returns node_id and editor_url; change its fields with `add_motion_template` vars or `ask_motion_agent`. No AI, free.',
+      inputSchema: z.object({ org, template: z.string(), format: z.enum(['16:9', '9:16', '1:1', '4:5', '1:1 1440', 'A poster']).optional(), project: z.string().optional(), still: z.number().min(0).optional() }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
     async ({ org, ...body }) => withAuth((token) => motionApi.fromTemplate(token, body, org))
@@ -226,6 +226,30 @@ export function registerMotionTools(server: McpServer) {
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
     async ({ org, node_id, ...body }) => withAuth((token) => motionApi.addTemplate(token, node_id, body, org))
+  );
+
+  server.registerTool(
+    'motion_tool',
+    {
+      title: 'Run a motion editor tool',
+      description:
+        'Every tool of the motion editor agent (add_clip, set_props, set_keyframes, add_template, set_canvas, export_image... over 140), run directly on a video with no AI and no credits. ' +
+        'No `tool`: lists them by name. `tool` alone: its description and JSON input schema. `tool` with `node_id`: runs it on the saved video with `input`; an edit is saved as a new revision (`version` answers the new one; pass the `version` you read to refuse a stale write with 409). ' +
+        'Still graphics: `set_canvas` with `still` (seconds of the frame) and `format` "4:5" post, "9:16" story or "A poster"; `export_image` (`format` png, jpg, webp; `scale` 1 or 2) saves the image to the project and returns its `url`. ' +
+        'Tools that need a chat turn (research, voice, sub-agents) answer with an error: use `ask_motion_agent` for those.',
+      inputSchema: z.object({ org, tool: z.string().optional(), node_id: z.string().optional(), input: z.record(z.string(), z.unknown()).optional(), version: z.number().int().min(0).optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, tool, node_id, input, version }) =>
+      withAuth((token) => {
+        if (!tool) {
+          return motionApi.tools(token, undefined, org);
+        }
+        if (!node_id) {
+          return motionApi.tools(token, tool, org);
+        }
+        return motionApi.runTool(token, node_id, { tool, ...(input ? { input } : {}), ...(version === undefined ? {} : { version }) }, org);
+      })
   );
 
   server.registerTool(
