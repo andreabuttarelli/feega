@@ -45,7 +45,7 @@
     [ExportFormat.PngSequence]: 'PNG frames'
   };
   const RESOLUTION_LABEL: Record<Resolution, string> = { [Resolution.P720]: '720p', [Resolution.P1080]: '1080p', [Resolution.P1440]: '1440p', [Resolution.P2160]: '4K' };
-  const QUALITY_LABEL: Record<Quality, string> = { [Quality.Standard]: 'Standard', [Quality.High]: 'High' };
+  const QUALITY_LABEL: Record<Quality, string> = { [Quality.Standard]: 'Standard', [Quality.High]: 'High', [Quality.Max]: 'Max' };
   const MODE_TITLE: Record<ExportMode, string> = { [ExportMode.Video]: 'Video file', [ExportMode.Interactive]: 'Embed on a website' };
 
   const STAGE_LABEL: Record<RenderStage, string> = {
@@ -253,6 +253,7 @@
         doc: target,
         assetUrls,
         size,
+        quality: settings.quality,
         withAudio: hasAudio && Boolean(caps?.aac),
         frames: render,
         signal,
@@ -335,7 +336,7 @@
     <div class="field">
       <span class="label">Quality</span>
       <div class="seg" role="radiogroup" aria-label="Quality" data-testid="export-quality">
-        {#each [Quality.Standard, Quality.High] as q (q)}
+        {#each Object.values(Quality) as q (q)}
           <button type="button" role="radio" aria-checked={settings.quality === q} disabled={locked} onclick={() => (settings.quality = q)}>{QUALITY_LABEL[q]}</button>
         {/each}
       </div>

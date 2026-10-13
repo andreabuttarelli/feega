@@ -47,7 +47,7 @@ export async function requestRender(db: Db, input: RenderAskInput): Promise<Rend
   }
 
   if (input.mode === RenderMode.Browser) {
-    const link = await createRenderLink(db, { orgId: input.orgId, nodeId: input.nodeId, version: head.version, actor: input.actor });
+    const link = await createRenderLink(db, { orgId: input.orgId, nodeId: input.nodeId, version: head.version, quality: input.settings.quality, actor: input.actor });
     return { ok: true, body: { mode: RenderMode.Browser, run_id: link.runId, render_url: `${input.origin}${renderPagePath(link.token)}`, expires_at: link.expiresAt, revision: head.version, credits: BROWSER_RENDER_CREDITS } };
   }
 
