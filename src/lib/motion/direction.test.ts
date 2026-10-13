@@ -126,6 +126,15 @@ describe('the quality gate reads the direction of the video', () => {
       [Quality.WhiteArea, 3]
     ]);
   });
+
+  it('a film whose sampled frames are mostly near-black, with only faint small content, is blocked', () => {
+    const dim = { luma: 12, lumaStd: 9, whiteShare: 0, litShare: 0.01 };
+    const lit = { luma: 60, lumaStd: 50, whiteShare: 0, litShare: 0.3 };
+    const dark = (stats: Parameters<typeof frameProblems>[0]) => blocking(frameProblems(stats)).filter((p) => p.kind === Quality.DarkFrames);
+
+    expect(dark([{ time: 1, ...dim }, { time: 2, ...dim }, { time: 3, ...lit }])).toHaveLength(1);
+    expect(dark([{ time: 1, ...dim }, { time: 2, ...lit }, { time: 3, ...lit }])).toEqual([]);
+  });
 });
 
 describe('the real brand logo stays as it is', () => {
