@@ -27,7 +27,8 @@ export enum Need {
 }
 
 export enum Product {
-  Shown = 'shown',
+  Rebuilt = 'rebuilt',
+  Pictured = 'pictured',
   Absent = 'absent'
 }
 
@@ -146,8 +147,8 @@ export type Piece = { acts: readonly Act[]; research: Need; lines: Need; product
 const TOLD: Piece = { acts: MOVEMENTS, research: Need.Free, lines: Need.Required, product: Product.Absent, needs: {} };
 
 export const PIECES: Record<PieceKind, Piece> = {
-  [PieceKind.Launch]: { acts: ACTS, research: Need.Required, lines: Need.Required, product: Product.Shown, needs: LAUNCH_NEEDS },
-  [PieceKind.Showcase]: { ...TOLD, product: Product.Shown },
+  [PieceKind.Launch]: { acts: ACTS, research: Need.Required, lines: Need.Required, product: Product.Rebuilt, needs: LAUNCH_NEEDS },
+  [PieceKind.Showcase]: { ...TOLD, product: Product.Pictured },
   [PieceKind.Promo]: TOLD,
   [PieceKind.Event]: TOLD,
   [PieceKind.Quote]: TOLD,

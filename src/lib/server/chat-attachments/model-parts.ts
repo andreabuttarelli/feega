@@ -54,4 +54,6 @@ export async function userContent(db: Db, input: { orgId: string; text: string; 
 export const canvasPlaceHint = (projectId: string): PlaceHint => (a) =>
   `To place it on a canvas: create_node type "image" with data {"prompt":"","assetId":"${a.assetId}","url":"/p/${projectId}/c/<canvasId>/assets/${a.assetId}","name":"${a.name}","mimeType":"${a.mimeType}"}, <canvasId> being the canvas you create it on.`;
 
-export const motionPlaceHint: PlaceHint = (a) => `It is in this video's assets as id ${a.assetId}: use that asset id to place it in the video.`;
+const SCREENSHOT_USE = 'When it is a screenshot of the app the video shows (write_script kind showcase), show this picture itself, sharp and large: one Device3D moment with screen set to it, then an Image of it filling the frame, keyframing zoom, focusX and focusY onto one element at a time (the field, the button, the number), 2–3 s each on the house ease; never recreate_ui it into a smaller or darker copy, never on a dark empty frame.';
+
+export const motionPlaceHint: PlaceHint = (a) => `It is in this video's assets as id ${a.assetId}: use that asset id to place it in the video. ${SCREENSHOT_USE}`;

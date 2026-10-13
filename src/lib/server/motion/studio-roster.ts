@@ -130,7 +130,7 @@ const unbuilt = (doc: Pick<MotionDoc, 'tracks'>) => doc.tracks.every((t) => t.cl
 
 const blank = (doc: Pick<MotionDoc, 'script' | 'tracks'>) => !doc.script && doc.tracks.every((t) => t.clips.length === 0);
 
-const BUILDS: Record<Product, StudioRole> = { [Product.Shown]: StudioRole.ShotBuilder, [Product.Absent]: StudioRole.Builder };
+const BUILDS: Record<Product, StudioRole> = { [Product.Rebuilt]: StudioRole.ShotBuilder, [Product.Pictured]: StudioRole.Builder, [Product.Absent]: StudioRole.Builder };
 
 export function turnRole(message: string, doc: Pick<MotionDoc, 'script' | 'tracks'>): StudioRole {
   if (answersCut(message)) {

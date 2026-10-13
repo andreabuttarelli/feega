@@ -8,6 +8,7 @@ import { Looks } from './look';
 const empty = newMotionDoc(MotionFormat.Landscape);
 const scripted = { ...empty, script: { kind: 'launch', research: {}, acts: [] } } as never;
 const quoted = { ...empty, script: { kind: 'quote', acts: [] } } as never;
+const showcased = { ...empty, script: { kind: 'showcase', acts: [] } } as never;
 const built = { ...empty, tracks: [{ id: 't', kind: 'visual', name: 'V', clips: [{ id: 'c' }] }] } as never;
 const names = ['analyze_site', 'write_script', 'web_search', 'recreate_ui', 'add_clip', 'add_music', 'view_frames'];
 
@@ -32,6 +33,10 @@ describe('the studio roster', () => {
 
   it('versus run1: a scripted quote is built with every tool, not library product shots (it never got add_clip)', () => {
     expect(turnRole('go', quoted)).toBe(StudioRole.Builder);
+  });
+
+  it('versus run1: an app shown from its attached screenshots is built with every tool (device and zoomed pictures), not rebuilt as tiny library UI', () => {
+    expect(turnRole('go', showcased)).toBe(StudioRole.Builder);
   });
 
   it('once there is a cut, the builder takes every tool', () => {

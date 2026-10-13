@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { AttachmentKind, attachedNote, type ChatAttachment } from '$lib/chat-attachments';
-import { MODEL_IMAGE_MAX_PX, userContent } from './model-parts';
+import { MODEL_IMAGE_MAX_PX, motionPlaceHint, userContent } from './model-parts';
 
 const logo: ChatAttachment = { assetId: 'a-1', kind: AttachmentKind.Image, name: 'logo.png', mimeType: 'image/png', bytes: 10 };
 const brief: ChatAttachment = { assetId: 'a-2', kind: AttachmentKind.Document, name: 'brief.pdf', mimeType: 'application/pdf', bytes: 10 };
@@ -56,6 +56,17 @@ describe('userContent', () => {
 
     expect(JSON.stringify(content)).toContain('could not be loaded');
     expect(JSON.stringify(content)).not.toContain('"type":"image"');
+  });
+});
+
+describe('motionPlaceHint', () => {
+  it('versus run1: an attached app screenshot is shown as itself, large, one element at a time, never rebuilt small and dark', () => {
+    const hint = motionPlaceHint(logo);
+
+    expect(hint).toContain('a-1');
+    expect(hint).toContain('Device3D');
+    expect(hint).toMatch(/zoom/);
+    expect(hint).toMatch(/never recreate_ui/);
   });
 });
 
