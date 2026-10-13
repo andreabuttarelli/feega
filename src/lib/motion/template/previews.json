@@ -74,6 +74,7 @@
   "builtin:scroll-story",
   "builtin:social-stat",
   "builtin:split-headline",
+  "builtin:stack-words",
   "builtin:title-card",
   "builtin:ui-morph-reel"
 ]
