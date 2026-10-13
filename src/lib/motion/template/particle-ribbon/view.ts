@@ -4,7 +4,7 @@ export const RIBBON_VIEW = String.raw`
 const VERTEX = ${JSON.stringify(RIBBON_VERTEX)};
 const FRAGMENT = ${JSON.stringify(RIBBON_FRAGMENT)};
 const FOV = 30;
-const SPAN = { width: 2.5, height: 2.8 };
+const SPAN = { width: 2.5, height: 3.4 };
 const SIZE_AT_1080 = 3;
 
 root.insertAdjacentHTML('beforeend', '<div class="pr"><canvas class="pr-canvas"></canvas><i class="pr-veil"></i><div class="pr-title"><h1 class="pr-headline"></h1></div></div>');
