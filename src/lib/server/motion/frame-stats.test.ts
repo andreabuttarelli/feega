@@ -32,6 +32,8 @@ describe('what a frame looks like, in numbers', () => {
     expect(black.lumaStd).toBeLessThan(2);
     expect(half.whiteShare).toBeGreaterThan(0.4);
     expect(half.lumaStd).toBeGreaterThan(20);
+    expect(black.litShare).toBe(0);
+    expect(half.litShare).toBeGreaterThan(0.5);
   });
 });
 

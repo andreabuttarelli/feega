@@ -147,5 +147,25 @@ describe('figures in shot text come from the site, like the script', () => {
     expect(saved).toMatchObject({ ok: true, lines });
     expect(session.doc.script?.acts[0].on_screen).toEqual(['Three sites. One new price.']);
   });
+
+  it('versus run1: saves a quote with no site, no research and no copywriter rewriting the words', async () => {
+    const copywrite = vi.fn<NonNullable<MotionToolDeps['copywrite']>>(async (s) => ({ ...s, acts: s.acts.map((a) => ({ ...a, on_screen: ['Rewritten'] })) }));
+    const { run, session } = setup(copywrite);
+    const quote = {
+      kind: 'quote',
+      acts: [
+        { act: 'open', start: 0, end: 2.5, scene: 'One word alone', on_screen: ['Simplicity'] },
+        { act: 'build', start: 2.5, end: 5, scene: 'The line builds', on_screen: ['is the ultimate'] },
+        { act: 'peak', start: 5, end: 8, scene: 'The last word lands', on_screen: ['sophistication.'] },
+        { act: 'close', start: 8, end: 10, scene: 'The author signs', on_screen: ['Leonardo da Vinci'] }
+      ]
+    };
+
+    const out = await run('write_script', quote);
+
+    expect(out).toMatchObject({ ok: true });
+    expect(session.doc.script?.kind).toBe('quote');
+    expect(session.doc.script?.acts.map((a) => a.on_screen[0])).toEqual(['Simplicity', 'is the ultimate', 'sophistication.', 'Leonardo da Vinci']);
+  });
 });
 

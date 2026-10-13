@@ -402,3 +402,18 @@ describe('render_video', () => {
     expect(renderLink.mock.calls).toEqual([['high'], ['max']]);
   });
 });
+
+describe('get_motion_doc sent back to the model every step', () => {
+  it('leaves out clip fields that hold their default, so a built video costs a fraction of its full dump', async () => {
+    const { run } = setup();
+    for (let i = 0; i < 8; i++) {
+      await run('add_clip', { component: 'Title', start: i, duration: 1 });
+    }
+    const doc = (await run('get_motion_doc', {})) as { tracks: { clips: Record<string, unknown>[] }[] };
+    const clip = doc.tracks.flatMap((t) => t.clips)[0];
+
+    expect(['junction', 'mask', 'maskStack', 'effects', 'shaders', 'animators', 'expressions', 'parent', 'textPath', 'physics', 'path', 'in', 'out'].filter((k) => k in clip)).toEqual([]);
+    expect(clip).toMatchObject({ id: expect.any(String), component: 'Title', start: 0, duration: 1 });
+    expect(JSON.stringify(doc).length).toBeLessThan(4000);
+  });
+});

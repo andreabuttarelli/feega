@@ -4,7 +4,32 @@ export enum Act {
   Problem = 'problem',
   Solution = 'solution',
   Proof = 'proof',
-  Claim = 'claim'
+  Claim = 'claim',
+  Open = 'open',
+  Build = 'build',
+  Peak = 'peak',
+  Close = 'close'
+}
+
+export enum PieceKind {
+  Launch = 'launch',
+  Showcase = 'showcase',
+  Promo = 'promo',
+  Event = 'event',
+  Quote = 'quote',
+  Kinetic = 'kinetic',
+  Abstract = 'abstract'
+}
+
+export enum Need {
+  Required = 'required',
+  Free = 'free'
+}
+
+export enum Product {
+  Rebuilt = 'rebuilt',
+  Pictured = 'pictured',
+  Absent = 'absent'
 }
 
 export enum BrandKind {
@@ -13,6 +38,12 @@ export enum BrandKind {
 }
 
 export const ACTS = [Act.Problem, Act.Solution, Act.Proof, Act.Claim] as const;
+
+export const MOVEMENTS = [Act.Open, Act.Build, Act.Peak, Act.Close] as const;
+
+export const ALL_ACTS = Object.values(Act) as [Act, ...Act[]];
+
+export const PIECE_KINDS = Object.values(PieceKind) as [PieceKind, ...PieceKind[]];
 
 const TEXT = 400;
 
@@ -30,16 +61,16 @@ export const researchSchema = z.object({
 });
 
 export const actSchema = z.object({
-  act: z.enum(ACTS),
+  act: z.enum(ALL_ACTS),
   start: z.number().min(0),
   end: z.number().positive(),
   scene: z.string().min(3).max(TEXT),
-  on_screen: z.array(z.string().min(1).max(160)).min(1).max(6),
+  on_screen: z.array(z.string().min(1).max(160)).max(6),
   ui: z.string().max(TEXT).default(''),
   sources: z.array(sourceSchema).max(4).default([])
 });
 
-export const scriptSchema = z.object({ brand: z.enum(BrandKind).default(BrandKind.Real), research: researchSchema, acts: z.array(actSchema).length(ACTS.length) });
+export const scriptSchema = z.object({ kind: z.enum(PIECE_KINDS).default(PieceKind.Launch), brand: z.enum(BrandKind).default(BrandKind.Real), research: researchSchema.optional(), acts: z.array(actSchema).min(1).max(ACTS.length) });
 
 export type Research = z.infer<typeof researchSchema>;
 export type ScriptAct = z.infer<typeof actSchema>;
@@ -102,25 +133,56 @@ function lengthProblems(script: LaunchScript): string[] {
   return [`${lines} on-screen lines in ${rounded(seconds)} s: each line needs its own title card and scene (about ${LINE_SECONDS} s), so at most ${fit} fit; merge or drop lines`];
 }
 
-const NEEDS: Record<Act, (act: ScriptAct, research: Research) => string | null> = {
+type ActNeed = (act: ScriptAct, research: Research) => string | null;
+
+const LAUNCH_NEEDS: Partial<Record<Act, ActNeed>> = {
   [Act.Problem]: (a) => (a.ui.length < MIN_UI_DETAIL ? 'the problem act shows the "before": a recognisable, messy or slow screen described with its real-looking data (names, counts, states)' : null),
   [Act.Solution]: (a, r) => (a.ui.length < MIN_UI_DETAIL ? `the solution act shows the product's real flow (${r.flow.join(' → ')}) with specific content, never empty boxes` : null),
   [Act.Proof]: (a) => (a.sources.length ? null : 'the proof act shows a number or a result from the site, with its source'),
   [Act.Claim]: (a, r) => (plain(a.on_screen.join(' ')).includes(plain(r.promise.text)) ? null : `the claim act puts the site's own promise on screen, split into lines of up to ${MAX_LINE_WORDS} words: "${r.promise.text}"`)
 };
 
+export type Piece = { acts: readonly Act[]; research: Need; lines: Need; product: Product; needs: Partial<Record<Act, ActNeed>> };
+
+const TOLD: Piece = { acts: MOVEMENTS, research: Need.Free, lines: Need.Required, product: Product.Absent, needs: {} };
+
+export const PIECES: Record<PieceKind, Piece> = {
+  [PieceKind.Launch]: { acts: ACTS, research: Need.Required, lines: Need.Required, product: Product.Rebuilt, needs: LAUNCH_NEEDS },
+  [PieceKind.Showcase]: { ...TOLD, product: Product.Pictured },
+  [PieceKind.Promo]: TOLD,
+  [PieceKind.Event]: TOLD,
+  [PieceKind.Quote]: TOLD,
+  [PieceKind.Kinetic]: TOLD,
+  [PieceKind.Abstract]: { ...TOLD, lines: Need.Free }
+};
+
+export const kindOf = (script: Partial<Pick<LaunchScript, 'kind'>>): PieceKind => script.kind ?? PieceKind.Launch;
+
+export const pieceOf = (script: Partial<Pick<LaunchScript, 'kind'>>): Piece => PIECES[kindOf(script)];
+
+const unlined = (script: LaunchScript) => (pieceOf(script).lines === Need.Required ? script.acts.filter((a) => !a.on_screen.length).map((a) => `the ${a.act} act puts at least one line on screen`) : []);
+
+const unresearched = (script: LaunchScript) => (pieceOf(script).research === Need.Required && !script.research ? [`a ${script.kind} film needs its research: who it serves, the problem, the flow, sourced benefits and the promise`] : []);
+
 export function scriptProblems(script: LaunchScript): string[] {
+  const piece = pieceOf(script);
   const order = script.acts.map((a) => a.act).join(',');
-  if (order !== ACTS.join(',')) {
-    return [`the acts go ${ACTS.join(', ')} in this order, once each (got ${order})`];
+  if (order !== piece.acts.join(',')) {
+    return [`a ${script.kind} piece tells the acts ${piece.acts.join(', ')} in this order, once each (got ${order})`];
+  }
+  const missing = unresearched(script);
+  if (missing.length) {
+    return missing;
   }
   const timing = script.acts.flatMap((a) => (a.end <= a.start ? [`${a.act} ends before it starts`] : []));
-  return [...timing, ...script.acts.flatMap((a) => NEEDS[a.act](a, script.research) ?? []), ...lineProblems(script), ...lengthProblems(script)];
+  const needs = script.research ? script.acts.flatMap((a) => piece.needs[a.act]?.(a, script.research!) ?? []) : [];
+  return [...timing, ...unlined(script), ...needs, ...lineProblems(script), ...lengthProblems(script)];
 }
 
 export function sourcesOf(script: LaunchScript): Source[] {
   const r = script.research;
-  return [...r.benefits.map((b) => b.source), ...r.numbers.map((n) => n.source), r.promise.source, ...script.acts.flatMap((a) => a.sources)];
+  const researched = r ? [...r.benefits.map((b) => b.source), ...r.numbers.map((n) => n.source), r.promise.source] : [];
+  return [...researched, ...script.acts.flatMap((a) => a.sources)];
 }
 
 const BRAND_NOTE: Record<BrandKind, string[]> = {
@@ -128,11 +190,12 @@ const BRAND_NOTE: Record<BrandKind, string[]> = {
   [BrandKind.Fictional]: ['**Fictional brand**: invented name, logo and domain; its claims are the brand\'s own copy, not quotes from a site.', '']
 };
 
-export function briefOf(script: LaunchScript): string {
-  const r = script.research;
+function researchLines(r: Research | undefined): string[] {
+  if (!r) {
+    return [];
+  }
   const cite = (s: Source) => `"${s.quote}" (${s.url})`;
   return [
-    ...BRAND_NOTE[script.brand],
     '**Research**',
     `- For: ${r.audience}`,
     `- Problem: ${r.problem}`,
@@ -142,7 +205,14 @@ export function briefOf(script: LaunchScript): string {
     ...r.numbers.map((n) => `- Number: ${n.value}, from ${cite(n.source)}`),
     `- Tone: ${r.tone}`,
     `- Promise: ${cite(r.promise.source)}`,
-    '',
+    ''
+  ];
+}
+
+export function briefOf(script: LaunchScript): string {
+  return [
+    ...BRAND_NOTE[script.brand],
+    ...researchLines(script.research),
     '**Script**',
     ...script.acts.map((a) => `- ${a.start}–${a.end} s, ${a.act}: ${a.scene} On screen: ${a.on_screen.map((t) => `"${t}"`).join(', ')}.${a.ui ? ` UI: ${a.ui}` : ''}`)
   ].join('\n');

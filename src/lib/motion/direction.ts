@@ -10,6 +10,7 @@ import { emptyContent, interactionOf, isUiPiece, Interaction, skeletons } from '
 import { FillKind, ShapeKind } from './shape/schema';
 import { CutFault, cutProblems } from './cuts';
 import { scriptDrift } from './script-drift';
+import { PieceKind, kindOf } from './script';
 import { contentEnd, shownSpans, type Span } from './fit-duration';
 import { liveNote, stillStandIns } from './custom/determinism';
 import { maskAt } from './ui-focus';
@@ -57,7 +58,8 @@ export enum Quality {
   OneScreen = 'one-screen',
   RecolouredUi = 'recoloured-ui',
   ShrunkUi = 'shrunk-ui',
-  SmallUi = 'small-ui'
+  SmallUi = 'small-ui',
+  DarkFrames = 'dark-frames'
 }
 
 export enum Severity {
@@ -101,6 +103,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.RecolouredUi]: Severity.Blocking,
   [Quality.ShrunkUi]: Severity.Blocking,
   [Quality.SmallUi]: Severity.Blocking,
+  [Quality.DarkFrames]: Severity.Blocking,
   [LookMiss.Unrecorded]: Severity.Blocking,
   [LookMiss.TypeScale]: Severity.Warning,
   [LookMiss.TypeScaleGross]: Severity.Blocking,
@@ -148,13 +151,15 @@ export const severityOf = (p: QualityProblem) => SEVERITY[p.effect ?? p.kind];
 
 export const blocking = (problems: readonly QualityProblem[]) => problems.filter((p) => severityOf(p) === Severity.Blocking);
 
-export type FrameStat = { time: number; luma: number; lumaStd: number; whiteShare: number };
+export type FrameStat = { time: number; luma: number; lumaStd: number; whiteShare: number; litShare?: number };
 
 const SCENE_JOIN_S = 0.5;
 const SCENE_SHARE = 0.9;
 const MIN_TITLE_AREA = 0.12;
 const BLANK_STD = 4;
 const WHITE_SHARE = 0.15;
+const DIM_LIT_SHARE = 0.03;
+const DARK_FILM_SHARE = 0.5;
 const SOFT_UPSCALE = 1.25;
 const SIDES_KEPT = 0.75;
 const LEFT = 0.4;
@@ -664,14 +669,44 @@ function kitBesideRealUi(doc: MotionDoc): QualityProblem[] {
     .map((c) => ({ kind: Quality.KitUi, at: seconds(doc, c.from), detail: `${String(c.props.name)} is a generic kit card in a film that has the real product (${rebuilt.join(', ')}): fill this beat with the recreated UI instead (add_shot ui-focus, ui-morph or whip-zoom on it, focus_ui on its elements), or remove it` }));
 }
 
+const NO_PRODUCT: readonly Check[] = [Quality.NoProductUi, Quality.LittleUi, Quality.OneScreen, Quality.SmallUi, Quality.KitUi, Forbidden.MissingStoryBeat, Forbidden.Screenshots];
+
+const PIECE_SKIPS: Record<PieceKind, ReadonlySet<Check>> = {
+  [PieceKind.Launch]: new Set(),
+  [PieceKind.Showcase]: new Set([Quality.NoProductUi, Quality.LittleUi, Quality.OneScreen, Forbidden.MissingStoryBeat, Forbidden.Screenshots]),
+  [PieceKind.Promo]: new Set(NO_PRODUCT),
+  [PieceKind.Event]: new Set(NO_PRODUCT),
+  [PieceKind.Quote]: new Set(NO_PRODUCT),
+  [PieceKind.Kinetic]: new Set(NO_PRODUCT),
+  [PieceKind.Abstract]: new Set([...NO_PRODUCT, Quality.Silent])
+};
+
+const NO_SKIPS: ReadonlySet<Check> = new Set();
+
+const skipsOf = (doc: MotionDoc) => (doc.script ? PIECE_SKIPS[kindOf(doc.script)] : NO_SKIPS);
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
+  const skips = skipsOf(doc);
+  return everyDocProblem(doc, input).filter((p) => !skips.has(p.effect ?? p.kind));
+}
+
+function everyDocProblem(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
   return [...unscripted(doc), ...productUiMissing(doc), ...uiShare(doc), ...smallUi(doc), ...alteredUi(doc), ...kitBesideRealUi(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...deadJunctions(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail })), ...lookProblems(doc, placedClips(doc), input.referencesSeen ?? false).map((p) => ({ kind: Quality.OffLook, effect: p.miss, detail: p.detail }))];
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {
-  return [...flatFrames(stats), ...flashes(stats)];
+  return [...flatFrames(stats), ...flashes(stats), ...darkFilm(stats)];
+}
+
+function darkFilm(stats: readonly FrameStat[]): QualityProblem[] {
+  const measured = stats.filter((s) => s.litShare !== undefined);
+  const dim = measured.filter((s) => s.litShare! < DIM_LIT_SHARE);
+  if (!measured.length || dim.length / measured.length < DARK_FILM_SHARE) {
+    return [];
+  }
+  return [{ kind: Quality.DarkFrames, at: dim[0].time, detail: `${dim.length} of ${measured.length} frames (${dim.map((s) => `${s.time}s`).join(', ')}) are near-black: under ${DIM_LIT_SHARE * 100}% of the picture is lit. The viewer sees a black screen: make the content large and bright enough to fill the frame (bigger UI, lighter surfaces, a lit background) before delivering` }];
 }
 
 function flatFrames(stats: readonly FrameStat[]): QualityProblem[] {

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ACTS, MAX_LINE_WORDS, scriptProblems, type LaunchScript } from '$lib/motion/script';
+import { ACTS, MAX_LINE_WORDS, type Act, scriptProblems, type LaunchScript, type Research } from '$lib/motion/script';
 
 const LINES = z.object({ acts: z.array(z.object({ act: z.enum(ACTS), on_screen: z.array(z.string().trim().min(1)).min(1).max(4) })).length(ACTS.length) });
 
@@ -9,8 +9,7 @@ export type CopyPorts = { ask: (prompt: string) => Promise<{ answer: unknown; us
 
 const hostOf = (url: string) => url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
 
-export function copyPrompt(script: LaunchScript): string {
-  const r = script.research;
+export function copyPrompt(script: LaunchScript, r: Research): string {
   const site = hostOf(r.promise.source.url);
   return [
     'You are the copywriter of a product launch trailer. Write the on-screen lines, act by act; each line is its own full-frame title card, read in order as one short story.',
@@ -46,12 +45,15 @@ export function applyCopy(script: LaunchScript, answer: unknown): LaunchScript {
   if (!parsed.success) {
     return script;
   }
-  const byAct = new Map(parsed.data.acts.map((a) => [a.act, wholeSentences(a.on_screen)]));
+  const byAct = new Map<Act, string[]>(parsed.data.acts.map((a) => [a.act, wholeSentences(a.on_screen)]));
   const copied = { ...script, acts: script.acts.map((a) => ({ ...a, on_screen: byAct.get(a.act) ?? a.on_screen })) };
   return scriptProblems(copied).length ? script : copied;
 }
 
 export async function copywrite(ports: CopyPorts, script: LaunchScript): Promise<{ script: LaunchScript; usd: number }> {
-  const asked = await ports.ask(copyPrompt(script)).catch(() => null);
+  if (!script.research) {
+    return { script, usd: 0 };
+  }
+  const asked = await ports.ask(copyPrompt(script, script.research)).catch(() => null);
   return asked ? { script: applyCopy(script, asked.answer), usd: asked.usd } : { script, usd: 0 };
 }

@@ -3,7 +3,7 @@ import type { Tool } from 'ai';
 import type { z } from 'zod';
 import { MotionFormat, motionDocSchema, newMotionDoc } from '$lib/motion/doc';
 import { cameraSchema } from '$lib/motion/camera';
-import { createMotionTools, type MotionSession } from './motion-tools';
+import { CLIP_DEFAULTS, createMotionTools, type MotionSession } from './motion-tools';
 import { LAYOUTS } from '$lib/canvas/composition/index';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 
@@ -142,7 +142,7 @@ describe('every editable part of a motion video has an agent path', () => {
     expect(['analyze_site', 'use_brand', 'import_asset'].filter((t) => !tools[t])).toEqual([]);
   });
 
-  it('get_motion_doc shows every writable field of the doc, its tracks, clips and camera', async () => {
+  it('get_motion_doc shows every writable field of the doc, its tracks, clips and camera, or names its default', async () => {
     const { run } = setup();
     await run('add_clip', { component: 'Shape', start: 0, duration: 2 });
     await run('set_camera', { enabled: true });
@@ -152,7 +152,7 @@ describe('every editable part of a motion video has an agent path', () => {
     for (const [name, table] of TABLES) {
       for (const [field, access] of Object.entries(table)) {
         if ('read' in access) {
-          expect({ name, field, shown: access.read in views[name] }).toEqual({ name, field, shown: true });
+          expect({ name, field, shown: access.read in views[name] || (name === 'clip' && access.read in CLIP_DEFAULTS) }).toEqual({ name, field, shown: true });
         }
       }
     }

@@ -17,7 +17,7 @@ type Window = { act: Act; from: number; to: number; marked: boolean };
 
 const LOGOS: ReadonlySet<string> = new Set(['Logo']);
 
-const BEAT_OF: Record<Act, StoryBeat> = {
+const BEAT_OF: Partial<Record<Act, StoryBeat>> = {
   [Act.Problem]: StoryBeat.Problem,
   [Act.Solution]: StoryBeat.Solution,
   [Act.Proof]: StoryBeat.Proof,
@@ -78,13 +78,19 @@ function shown(doc: MotionDoc, tracks: MotionDoc['tracks'], offset: number, end:
 function windows(doc: MotionDoc, script: LaunchScript): Window[] {
   const marks = new Map((doc.markers ?? []).map((m) => [m.label.toLowerCase(), m.frame]));
   const starts = script.acts.map((a) => {
-    const label = storyLabel(BEAT_OF[a.act]);
-    return { act: a.act, marked: marks.has(label), from: marks.get(label) ?? Math.round(a.start * doc.fps), planned: Math.round(a.end * doc.fps) };
+    const beat = BEAT_OF[a.act];
+    const from = Math.round(a.start * doc.fps);
+    const planned = Math.round(a.end * doc.fps);
+    if (!beat) {
+      return { act: a.act, marked: true, from, planned, timed: true };
+    }
+    const label = storyLabel(beat);
+    return { act: a.act, marked: marks.has(label), from: marks.get(label) ?? from, planned, timed: false };
   });
   const sorted = [...starts].sort((a, b) => a.from - b.from);
   return starts.map((s) => {
     const next = sorted.find((o) => o.from > s.from);
-    return { act: s.act, marked: s.marked, from: s.from, to: s.marked ? (next?.from ?? doc.durationInFrames) : s.planned };
+    return { act: s.act, marked: s.marked, from: s.from, to: s.marked && !s.timed ? (next?.from ?? doc.durationInFrames) : s.planned };
   });
 }
 
@@ -124,7 +130,7 @@ export function scriptDrift(doc: MotionDoc): DriftProblem[] {
     const inside = clips.filter((c) => c.from < window.to && c.to > window.from).sort((a, b) => a.from - b.from);
     const hay = inside.flatMap((c) => wordsOf(c.text));
     const unmarked = window.marked ? [] : [{ frame: window.from, detail: `the ${window.act} act is not in the video: mark where it starts with mark_story and build its scene (${act.scene})` }];
-    const lines = window.act === Act.Claim ? [...new Set([...act.on_screen, script.research.promise.text])] : act.on_screen;
+    const lines = window.act === Act.Claim && script.research ? [...new Set([...act.on_screen, script.research.promise.text])] : act.on_screen;
     const logo = window.act === Act.Claim && !inside.some((c) => c.logo) ? [{ frame: window.from, detail: 'the claim has no logo: close on the original logo, flat and intact, with the promise and the address' }] : [];
     return [...unmarked, ...lines.flatMap((line) => lineProblem(line, window, hay, doc)), ...logo];
   })];

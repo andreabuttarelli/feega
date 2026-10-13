@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Act, briefOf, durationProblem, scriptProblems, scriptSchema, type LaunchScript } from './script';
+import { Act, PieceKind, briefOf, durationProblem, scriptProblems, scriptSchema, type LaunchScript } from './script';
 
 const SITE = 'https://supasito.com/';
 
@@ -93,6 +93,52 @@ describe('the launch script', () => {
     s.acts[1].on_screen = [...s.acts[3].on_screen.slice(0, 1)];
 
     expect(scriptProblems(s).join(' ')).toContain(`"${s.acts[3].on_screen[0]}" appears twice`);
+  });
+});
+
+describe('the piece kind decides which acts and proof a script needs', () => {
+  const quote = () =>
+    scriptSchema.parse({
+      kind: 'quote',
+      acts: [
+        { act: 'open', start: 0, end: 2.5, scene: 'One word alone', on_screen: ['Simplicity'] },
+        { act: 'build', start: 2.5, end: 5, scene: 'The line builds', on_screen: ['is the ultimate'] },
+        { act: 'peak', start: 5, end: 8, scene: 'The last word lands', on_screen: ['sophistication.'] },
+        { act: 'close', start: 8, end: 10, scene: 'The author signs', on_screen: ['Leonardo da Vinci'] }
+      ]
+    });
+
+  it('versus run1: a quote is saved without a messy "before" screen, a sourced number or research', () => {
+    expect(scriptProblems(quote())).toEqual([]);
+    expect(briefOf(quote())).toContain('Simplicity');
+  });
+
+  it('a quote told in launch acts is refused with the acts a quote takes', () => {
+    const script = { ...quote(), acts: quote().acts.map((a, i) => ({ ...a, act: [Act.Problem, Act.Solution, Act.Proof, Act.Claim][i] })) };
+
+    expect(scriptProblems(script).join(' ')).toContain('open, build, peak, close');
+  });
+
+  it('an abstract loop may run without words on screen', () => {
+    const script = scriptSchema.parse({ kind: 'abstract', acts: quote().acts.map((a) => ({ ...a, on_screen: [] })) });
+
+    expect(scriptProblems(script)).toEqual([]);
+  });
+
+  it('a quote still needs its words on screen', () => {
+    const script = { ...quote(), acts: quote().acts.map((a) => ({ ...a, on_screen: [] })) };
+
+    expect(scriptProblems(script).join(' ')).toContain('on screen');
+  });
+
+  it('a launch film still needs its research: a script without it is refused, not saved', () => {
+    const script = { ...good(), research: undefined };
+
+    expect(scriptProblems(script).join(' ')).toContain('research');
+  });
+
+  it('a script written before kinds existed reads as a launch film', () => {
+    expect(scriptSchema.parse(good()).kind).toBe(PieceKind.Launch);
   });
 });
 

@@ -4,6 +4,7 @@ import { applyCopy, copyPrompt, copywrite } from './copywriter';
 
 const source = { url: 'https://supasito.com/', quote: 'Every site you run. Up to date. In one place.' };
 const SCRIPT: LaunchScript = {
+  kind: 'launch' as never,
   brand: 'real' as never,
   research: { audience: 'People who run several websites', problem: 'Changes scatter across chats', struggle: 'A client sends a new price for three sites', flow: ['Pick the site', 'Say what should change'], benefits: [{ claim: 'One place', source }], numbers: [{ value: '3x faster', source }], tone: 'calm', promise: { text: 'Every site you run. Up to date. In one place.', source } },
   acts: [
@@ -25,7 +26,7 @@ const LINES = {
 
 describe('the copywriter', () => {
   it('is briefed with the real facts: who, the problem, how it works, the proof, the promise, and the url to close on', () => {
-    const prompt = copyPrompt(SCRIPT);
+    const prompt = copyPrompt(SCRIPT, SCRIPT.research!);
 
     expect(prompt).toContain('one language for every line: the language of the site');
     expect(prompt).toContain('verbatim');
@@ -50,13 +51,13 @@ describe('the copywriter', () => {
 
   it('a one-sentence tagline split across cards, as "Make / your brand / move." came back, is put back on one card', () => {
     const promise = { text: 'Make your brand move.', source: { ...source, quote: 'Make your brand move.' } };
-    const moving = { ...SCRIPT, research: { ...SCRIPT.research, promise } };
+    const moving = { ...SCRIPT, research: { ...SCRIPT.research!, promise } };
     const split = { acts: LINES.acts.map((a) => (a.act === 'claim' ? { ...a, on_screen: ['Make', 'your brand', 'move.', 'supasito.com'] } : a)) };
 
     const claim = applyCopy(moving, split).acts.find((a) => a.act === 'claim');
 
     expect(claim?.on_screen).toEqual(['Make your brand move.', 'supasito.com']);
-    expect(copyPrompt(SCRIPT)).toContain('never split a sentence');
+    expect(copyPrompt(SCRIPT, SCRIPT.research!)).toContain('never split a sentence');
   });
 
   it('a failing copywriter costs nothing more than its call and keeps the script', async () => {

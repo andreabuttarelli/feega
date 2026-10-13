@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { inlineMedia } from './inline-media';
+import { inlineMedia, shrinkImage } from './inline-media';
 
 type FakeEl = { tagName: string; src?: string; style: Record<string, string> & { setProperty: (k: string, v: string) => void }; bg: string };
 
@@ -31,5 +31,17 @@ describe('inlineMedia', () => {
     expect(card.style['background-image']).toBe('url("data:image/webp;base64,19")');
     expect(plain.style['background-image']).toBeUndefined();
     expect(done.src).toBe('data:image/png;base64,AA');
+  });
+});
+
+describe('shrinkImage', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('gives up on a picture whose download never finishes, so the frame still draws', async () => {
+    vi.stubGlobal('fetch', (_url: string, init?: RequestInit) => new Promise((_, fail) => init?.signal?.addEventListener('abort', () => fail(new Error('aborted')))));
+
+    await expect(shrinkImage('https://cdn/stalled.png', 20)).rejects.toThrow();
   });
 });

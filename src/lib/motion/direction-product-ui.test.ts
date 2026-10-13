@@ -79,3 +79,21 @@ describe('reading time never stretches a shot', () => {
     expect(found?.detail).toMatch(/needs 3.2 s/);
   });
 });
+
+describe('the piece kind decides which product checks apply', () => {
+  const QUOTE = { kind: 'quote', brand: 'real', acts: [{ act: 'open', start: 0, end: 4, scene: 'The word alone', on_screen: ['Simplicity'], ui: '', sources: [] }] };
+  const titledScene = () => must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Title', from: 0, durationInFrames: 120, props: { text: 'Simplicity' } }, 't1'));
+  const quoted = () => ({ ...titledScene(), script: QUOTE }) as unknown as MotionDoc;
+  const kinds = (doc: MotionDoc) => docProblems(doc, { audioAssets: 1 }).map((p) => String(p.effect ?? p.kind));
+
+  it('versus run1: a quote is never asked for the real product UI, a story or an app share', () => {
+    const found = kinds(quoted());
+
+    expect(found).not.toContain(Quality.NoProductUi);
+    expect(found).not.toContain('missing-story-beat');
+  });
+
+  it('a launch film without the product UI is still blocked', () => {
+    expect(kinds({ ...quoted(), script: { ...QUOTE, kind: 'launch' } } as unknown as MotionDoc)).toContain(Quality.NoProductUi);
+  });
+});
