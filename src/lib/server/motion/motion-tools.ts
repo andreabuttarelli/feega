@@ -1895,7 +1895,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (ask) {
           return { ok: false, error: ask };
         }
-        const written = deps.copywrite ? await deps.copywrite(input) : input;
+        const written = deps.copywrite && pieceOf(input).research === Need.Required ? await deps.copywrite(input) : input;
         const problems = [...scriptProblems(written), ...sourcing.problems];
         if (problems.length) {
           return { ok: false, error: problems.join('; ') };

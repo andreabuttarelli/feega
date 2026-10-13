@@ -149,7 +149,7 @@ describe('figures in shot text come from the site, like the script', () => {
   });
 
   it('versus run1: saves a quote with no site, no research and no copywriter rewriting the words', async () => {
-    const copywrite = vi.fn(async (s: never) => s);
+    const copywrite = vi.fn<NonNullable<MotionToolDeps['copywrite']>>(async (s) => ({ ...s, acts: s.acts.map((a) => ({ ...a, on_screen: ['Rewritten'] })) }));
     const { run, session } = setup(copywrite);
     const quote = {
       kind: 'quote',
