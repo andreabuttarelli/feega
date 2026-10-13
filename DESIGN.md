@@ -13,7 +13,9 @@ the tokens and component rules it names live in `docs/design/app-ui.md` and `src
 |---|---|
 | Shapes | **a sharp rectangle or a perfect circle, nothing in between.** Pages, panels, menus, nodes, cards, inputs: 0px (`--radius: 0`). Icon buttons, avatars, status dots and a button pill may be fully round (`rounded-full`). Never an intermediate radius (`rounded-md`, `8px`). |
 | Dark background | **`#000`**, pure. Surfaces step up in small increments (`#0a0a0a`, `#111`, `#161616`). |
-| Light background | `#ffffff`, one secondary surface `#fafaf8`. |
+| Light background | `#ffffff`, one secondary surface `#f7f7f7`. |
+| Greyscale | **chrome is pure grey**, no tint: bars, panels, fields and text are neutral greys (`--ui-*` in `src/app.css`), separated by surface steps. Text greys read at WCAG AA on every ground (`src/lib/greyscale-tokens.test.ts`). Colour is only the accent, on selection and the primary action. |
+| Canvas | a mid-light grey of its own, `--canvas-bg` `#e6e6e6` with a `--canvas-dot` `#c8c8c8` grid (dark: `#1c1c1c` / `#333333`), so white nodes and the bars around it stand apart without lines. |
 | Accent | one: `#0099ff` (`--ui-accent`). Selection, focus, primary action. Nothing else is blue. |
 | Borders | **almost none.** Separate with space and a slightly different surface, not lines. A hairline only where a boundary is functional (inputs, the timeline grid). |
 | Density | super minimal: small, clean type, generous space, one primary action per view. |

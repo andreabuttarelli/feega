@@ -873,8 +873,8 @@
     width: 100%;
     height: 100%;
 
-    --xy-background-color: var(--paper, #fff);
-    --xy-background-pattern-color: var(--line-2, #d2d2d7);
+    --xy-background-color: var(--canvas-bg);
+    --xy-background-pattern-color: var(--canvas-dot);
 
     /* L'attribuzione resta — nasconderla è del piano Pro — quindi almeno si veste come il resto,
        invece di essere l'unico riquadro bianco su una tela scura. */

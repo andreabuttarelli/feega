@@ -56,9 +56,15 @@ describe('editor top bar', () => {
     expect(bar.indexOf('action={Action.Menu}')).toBeLessThan(bar.indexOf('class="group transport"'));
   });
 
-  it('no longer carries what moved into the drawer', () => {
+  it('no longer carries what moved into the drawer, except in the More menu that replaces the drawer on the canvas', () => {
+    const moreOnly = /\{#if menu === MenuPlace\.More\}[\s\S]*?\{\/if\}/g;
+    const outsideMore = bar.replace(moreOnly, '');
     for (const id of ['template-open', 'save-state', 'comp-settings', 'guide-open-menu', 'comp-breadcrumb']) {
-      expect(bar, id).not.toContain(`data-testid="${id}"`);
+      expect(outsideMore, id).not.toContain(`data-testid="${id}"`);
     }
+  });
+
+  it('on the canvas the drawer burger is gone: one burger, the canvas one', () => {
+    expect(bar).toMatch(/\{#if menu === MenuPlace\.Drawer\}<IconButton action=\{Action\.Menu\}/);
   });
 });
