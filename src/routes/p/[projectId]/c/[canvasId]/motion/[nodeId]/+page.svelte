@@ -36,7 +36,7 @@
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import ZoomStage from '$lib/components/motion/ZoomStage.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
-  import { CHECK_REQUEST, FRAMES_REQUEST, Head, Landing, adoptAgentAssets, agentDraft, landTurn, type AgentDraft, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
+  import { CHECK_REQUEST, FRAMES_REQUEST, Head, frameUploads, Landing, adoptAgentAssets, agentDraft, landTurn, type AgentDraft, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
   import { Agent, showsStart } from '$lib/motion/start-prompt';
   import { runCheck, type CheckPorts } from '$lib/motion/custom/run-check';
   import { decodeLuma } from '$lib/motion/custom/luma-decode';
@@ -619,7 +619,9 @@
     if (!frames) {
       return;
     }
-    await fetch(`${agentUrl}/frames`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ callId: request.callId, frames }) });
+    for (const upload of frameUploads(request.callId, frames)) {
+      await fetch(`${agentUrl}/frames`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(upload) });
+    }
   }
 
   const newId = () => crypto.randomUUID().slice(0, 8);

@@ -68,6 +68,15 @@ describe('a template from a precomp', () => {
 
     expect(made.ok && made.template.doc.tracks.map((t) => t.kind)).toEqual([TrackKind.Visual]);
   });
+
+  it('keeps the key fields it is saved with, the few a person edits first', () => {
+    let doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 60 }, 't1'));
+    doc = must(exposeField(doc, { key: 'headline', label: 'Headline', type: FieldType.Text, clipId: 't1', prop: 'text' }));
+
+    const made = templateFromDoc(doc, { name: 'Whole', keyFields: ['headline'] });
+
+    expect(made.ok && made.template.keyFields).toEqual(['headline']);
+  });
 });
 
 describe('inserting a template', () => {

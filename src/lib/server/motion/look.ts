@@ -22,7 +22,9 @@ const READS: ReadonlySet<string> = new Set([
   'list_templates',
   'list_revisions',
   'read_storyboard',
-  'read_component'
+  'read_component',
+  'read_template_source',
+  'check_motion'
 ]);
 
 const FrameLine = z.object({

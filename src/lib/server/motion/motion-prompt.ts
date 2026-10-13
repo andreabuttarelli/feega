@@ -8,6 +8,7 @@ import { HOUSE_DEFAULTS_RULE, STYLES } from '$lib/motion/style';
 import { DEFAULT_STYLE, type MotionStyle } from '$lib/motion/style-model';
 import { WEB_GUIDANCE } from '$lib/server/web/web-tools';
 import { LOOP_RULE } from '$lib/motion/loop';
+import { CRAFT_COMPOSITION } from '$lib/motion/craft';
 
 export const PRODUCT_SCREENS_RULE =
   '2a. Product screens: the page after login is a hub, not the product. app_browse returns the links of the app: open the screens where the work happens (the editor with its timeline and chat, the canvas with its nodes, the export or result), photograph them with app_browse pages, then recreate_ui each url. A product trailer shows at least two distinct work screens, filled edge to edge; never only the landing, the dashboard or a welcome dialog.';
@@ -91,6 +92,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     ].join('\n'),
     'Timing (start, duration) is set_timing, never a prop. A tool that fails tells you why: read the error and retry with what it says.',
     componentContract(input.frame ?? { width: 1920, height: 1080 }),
+    `New composition from a reference picture (a look, a generative background, a layout the library does not have): call ${CRAFT_COMPOSITION} with the reference asset ids and a brief, instead of writing it in one shot; its crafting agent writes, looks next to the reference, measures the motion and fixes over several rounds, and can save it as a team template. Then tell the user what it made and what still differs.`,
     'generate_voiceover spends credits: only when the user asked for a voice-over.',
     `${WEB_GUIDANCE} In a launch film every claim still comes from the brand's own site through analyze_site and write_script: the web helps you find the site and references, never a claim's source. import_asset a picture you found to use it.`,
     'References: once you have looked at reference pictures, call set_reference_look with what they measure (largest type as a share of the frame height, bleed, columns, small text, palette, font class, imagery) before building. Every view_frames then shows them next to your frames, and the gate blocks a video far from them.',

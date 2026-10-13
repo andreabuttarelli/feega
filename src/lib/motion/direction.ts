@@ -664,7 +664,32 @@ function kitBesideRealUi(doc: MotionDoc): QualityProblem[] {
     .map((c) => ({ kind: Quality.KitUi, at: seconds(doc, c.from), detail: `${String(c.props.name)} is a generic kit card in a film that has the real product (${rebuilt.join(', ')}): fill this beat with the recreated UI instead (add_shot ui-focus, ui-morph or whip-zoom on it, focus_ui on its elements), or remove it` }));
 }
 
+export enum Piece {
+  Film = 'film',
+  Composition = 'composition'
+}
+
+const PIECE_SKIPS: Record<Piece, ReadonlySet<Quality | Forbidden | LookMiss>> = {
+  [Piece.Film]: new Set(),
+  [Piece.Composition]: new Set([Quality.NoScript, Quality.Silent, Quality.NoProductUi, Forbidden.MissingStoryBeat, Forbidden.NoPeak, LookMiss.TypeScale, LookMiss.TypeScaleGross, LookMiss.TypeRoleMissing])
+};
+
+const GENERATIVE: ReadonlySet<ComponentId> = new Set(['Custom', 'ShaderEffect', 'Particles', 'LiquidBlob', 'LiquidGlass']);
+const ABSTRACT_COMPANIONS: ReadonlySet<ComponentId> = new Set([...GENERATIVE, 'Title', 'Text', 'Kicker', 'Caption', 'Shape', 'Shape3D', 'Text3D', 'BrandBackground', 'Null', 'Adjustment']);
+
+export function pieceOf(doc: MotionDoc): Piece {
+  const visual = doc.tracks.filter((t) => t.kind === TrackKind.Visual).flatMap((t) => t.clips);
+  const told = Boolean(doc.script) || (doc.markers ?? []).some((m) => STORY_MARK.test(m.label));
+  const abstract = visual.some((c) => GENERATIVE.has(c.component)) && visual.every((c) => ABSTRACT_COMPANIONS.has(c.component));
+  return abstract && !told ? Piece.Composition : Piece.Film;
+}
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
+  const skips = PIECE_SKIPS[pieceOf(doc)];
+  return allDocProblems(doc, input).filter((p) => !skips.has(p.kind) && !(p.effect && skips.has(p.effect)));
+}
+
+function allDocProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
   return [...unscripted(doc), ...productUiMissing(doc), ...uiShare(doc), ...smallUi(doc), ...alteredUi(doc), ...kitBesideRealUi(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...deadJunctions(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail })), ...lookProblems(doc, placedClips(doc), input.referencesSeen ?? false).map((p) => ({ kind: Quality.OffLook, effect: p.miss, detail: p.detail }))];

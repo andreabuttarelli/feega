@@ -9,6 +9,7 @@
 
 import { WRITE_SCRIPT, WRITE_STORYBOARD } from '$lib/motion/script-brief';
 import { ASK_REFERENCE_PICK } from '$lib/reference-pick';
+import { CRAFT_COMPOSITION } from '$lib/motion/craft';
 
 export type StreamToolCallState = {
   toolCallId: string;
@@ -98,7 +99,7 @@ export function applyChatStreamEvent(state: ChatStreamState, evt: any): boolean 
     case 'tool-output-error': {
       const toolCallId = String(evt.toolCallId ?? evt.id ?? '');
       if (!toolCallId) return false;
-      const status = evt.type === 'tool-output-error' ? 'error' : 'done';
+      const status = evt.type === 'tool-output-error' ? 'error' : evt.preliminary ? 'running' : 'done';
       const errorText =
         typeof evt.errorText === 'string' ? evt.errorText : evt.error ? String(evt.error) : undefined;
       state.tools = state.tools.map((t) =>
@@ -155,7 +156,7 @@ export function readSseEvents(buffered: string): { events: unknown[]; rest: stri
 /** Un input più lungo di così non è un parametro: è un payload travestito. */
 const MAX_MIRRORED_PAYLOAD_CHARS = 2_000;
 
-export const VIEWING_TOOLS: ReadonlySet<string> = new Set(['view_images', 'view_video_frames']);
+export const VIEWING_TOOLS: ReadonlySet<string> = new Set(['view_images', 'view_video_frames', CRAFT_COMPOSITION]);
 
 const OUTPUTS_READ_BACK = new Set([WRITE_SCRIPT, WRITE_STORYBOARD, ASK_REFERENCE_PICK, ...VIEWING_TOOLS]);
 

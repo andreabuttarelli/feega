@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Jolt, docCuts, frameDiffs, joltMeter, joltNote, lumaOf, motionJolts, seamDiff } from './smoothness';
+import { Jolt, docCuts, frameDiffs, frozenSpans, joltMeter, joltNote, lumaOf, motionJolts, seamDiff } from './smoothness';
 
 const ramp = (n: number, peak: number) => Array.from({ length: n }, (_, i) => peak * Math.sin((Math.PI * i) / (n - 1)));
 
@@ -86,5 +86,15 @@ describe('the loop seam', () => {
   it('measures how far the last frame is from the first, as one more frame step', () => {
     expect(seamDiff(new Uint8Array([10, 20]), new Uint8Array([30, 20]))).toBe(10);
     expect(seamDiff(new Uint8Array([10, 20]), new Uint8Array([10, 20]))).toBe(0);
+  });
+});
+
+describe('frozenSpans', () => {
+  it('finds runs of frames that do not change, long enough to count', () => {
+    expect(frozenSpans([2, 2, 0, 0, 0, 0, 2, 0, 2], 3)).toEqual([{ from: 2, to: 6 }]);
+  });
+
+  it('a steady move is never frozen', () => {
+    expect(frozenSpans(Array(20).fill(1.5), 2)).toEqual([]);
   });
 });

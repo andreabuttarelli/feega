@@ -85,13 +85,18 @@ function cutTracks(tracks: MotionDoc['tracks'], end: number): MotionDoc['tracks'
   }));
 }
 
-export function fitDuration(doc: MotionDoc): OpResult {
+export enum Hold {
+  Added = 'added',
+  AsTimed = 'as-timed'
+}
+
+export function fitDuration(doc: MotionDoc, hold = Hold.Added): OpResult {
   const end = contentEnd(doc);
   if (end === 0) {
     return { ok: false, error: 'nothing is on screen yet: add content before fitting the duration' };
   }
 
-  const tracks = heldTracks(doc, end, holdFrames(doc));
+  const tracks = hold === Hold.Added ? heldTracks(doc, end, holdFrames(doc)) : doc.tracks;
   const held = tracks.some((t, i) => t.clips.some((c, j) => c !== doc.tracks[i].clips[j]));
   const target = held ? end + holdFrames(doc) : end;
   const workArea = doc.workArea && doc.workArea.to > target ? null : doc.workArea;

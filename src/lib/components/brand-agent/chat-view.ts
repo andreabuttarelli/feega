@@ -109,7 +109,7 @@ export function viewedPicturesOf(call: ToolCall, projectId: string, canvasId: st
   }
   return images.flatMap((image) => {
     const href = typeof image.path === 'string' ? viewedHref(image.path, projectId, canvasId) : null;
-    return href ? [{ href, source: String(image.url ?? '') }] : [];
+    return href ? [{ href, source: String(image.url ?? href) }] : [];
   });
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, uiLayers, type CaseResult } from './score';
+import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, craftRounds, uiLayers, type CaseResult } from './score';
 
 const VECTOR_JS = 'const U = {"width":1280,"height":800,"nodes":[]};\nconst boxOf = 1;';
 
@@ -126,5 +126,13 @@ describe('compareRuns', () => {
 
   test('a case missing before has no deltas', () => {
     expect(compareRuns([result('a', 20)], [])).toEqual({ a: {} });
+  });
+});
+
+describe('craftRounds', () => {
+  test('the rounds the crafting agent ran, null when it never ran or failed', () => {
+    expect(craftRounds([{ tool_calls: [call('craft_composition', { ok: true, rounds: 3 })] }])).toBe(3);
+    expect(craftRounds([{ tool_calls: [call('craft_composition', { ok: false, error: 'x' })] }])).toBeNull();
+    expect(craftRounds([{ tool_calls: [call('add_clip', { ok: true })] }])).toBeNull();
   });
 });

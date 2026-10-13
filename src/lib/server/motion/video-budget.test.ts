@@ -13,7 +13,7 @@ vi.mock('$lib/server/repos/canvas', () => ({
   }
 }));
 
-const { Reserve, budgetCard, budgetSpent, raiseVideoBudget, readVideoBudget, turnBudgetUsd, videoBudget } = await import('./video-budget');
+const { Reserve, budgetCard, budgetSpent, raiseVideoBudget, readVideoBudget, turnBudgetUsd, videoBudget, videoLeftUsd } = await import('./video-budget');
 
 function rowsDb(rows: { cost_usd: number | null }[], seen: string[][] = []) {
   const chain = {
@@ -32,6 +32,11 @@ describe('a motion video has one budget across all its turns', () => {
   it('a turn gets only what is left of the video, never a fresh cap (eval: linear spent $6.33 in five turns)', () => {
     expect(turnBudgetUsd(videoBudget(VIDEO_CAP_USD - 0.3, 0))).toBeCloseTo(0.3);
     expect(turnBudgetUsd(videoBudget(VIDEO_CAP_USD + 1, 0))).toBe(0);
+  });
+
+  it('a crafted composition may spend what is left of the whole video, beyond one turn cap', () => {
+    expect(videoLeftUsd(videoBudget(0, 0))).toBe(VIDEO_CAP_USD);
+    expect(videoLeftUsd(videoBudget(VIDEO_CAP_USD, VIDEO_RAISE_USD))).toBe(VIDEO_RAISE_USD);
   });
 
   it('what the user added on top is spendable', () => {

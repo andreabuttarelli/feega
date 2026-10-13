@@ -1,4 +1,4 @@
-import { stepCountIs, streamText, tool, type Tool } from 'ai';
+import { stepCountIs, streamText, tool, type StepResult, type Tool, type ToolSet, type UserContent } from 'ai';
 import { llmLanguageModel } from '$lib/server/llm';
 import { PromptCache } from '$lib/server/prompt-cache';
 import { billingScope, extractSdkUsage, type SdkUsage } from '$lib/server/ai-log';
@@ -27,33 +27,42 @@ export const spawnOffers = (): ModelOffer[] =>
     .filter((m) => m.tools)
     .map((m) => ({ id: m.id, inputUsdPerM: m.rate.input, outputUsdPerM: m.rate.output, vision: m.usable }));
 
+export type ChildAsk = { model: string; system: string; content: UserContent; tools: Record<string, Tool>; budgetUsd: number; steps: number; onStep?: (step: StepResult<ToolSet>) => void };
+
+export type ChildRun = { text: string; usd: number; usage: SdkUsage; steps: StepResult<ToolSet>[] };
+
+export async function runChild(host: Pick<SpawnHost, 'orgId' | 'abort'>, ask: ChildAsk): Promise<ChildRun> {
+  const billing = billingScope(host.orgId);
+  let estimate = 0;
+  const ran = billing.run(() =>
+    streamText({
+      model: llmLanguageModel(ask.model, PromptCache.On),
+      system: ask.system,
+      messages: [{ role: 'user', content: ask.content }],
+      tools: ask.tools,
+      abortSignal: host.abort,
+      stopWhen: [stepCountIs(ask.steps), () => Math.max(estimate, billing.gatewayUsd()) > ask.budgetUsd],
+      onStepFinish: (step) => {
+        estimate += spentUsd([extractSdkUsage(step.usage)], [ask.model], gatewayRate);
+        ask.onStep?.(step);
+      }
+    })
+  );
+  const text = await ran.text;
+  const usage = extractSdkUsage(await ran.totalUsage);
+  return { text, usd: Math.max(estimate, billing.gatewayUsd()), usage, steps: await ran.steps };
+}
+
 export function spawnAgents(host: SpawnHost, offers: readonly ModelOffer[]) {
   const runner = spawnRunner(
     {
       run: async (plan) => {
         const mark = host.changes();
-        const billing = billingScope(host.orgId);
-        let estimate = 0;
         const all = host.tools();
-        const ran = billing.run(() =>
-          streamText({
-            model: llmLanguageModel(plan.model, PromptCache.On),
-            system: CHILD_SYSTEM,
-            messages: [{ role: 'user', content: plan.prompt }],
-            tools: Object.fromEntries(plan.tools.map((n) => [n, all[n]])),
-            abortSignal: host.abort,
-            stopWhen: [stepCountIs(SPAWN_STEPS), () => Math.max(estimate, billing.gatewayUsd()) > plan.budgetUsd],
-            onStepFinish: (step) => {
-              estimate += spentUsd([extractSdkUsage(step.usage)], [plan.model], gatewayRate);
-            }
-          })
-        );
-        const text = await ran.text;
-        const usage = extractSdkUsage(await ran.totalUsage);
-        const usd = Math.max(estimate, billing.gatewayUsd());
-        host.onSpent(usd);
-        host.log({ label: plan.label, model: plan.model, agentKey: `${SPAWNED_KEY}:${plan.label}`, usage });
-        return { text, usd, changed: host.changedSince(mark) };
+        const out = await runChild(host, { model: plan.model, system: CHILD_SYSTEM, content: plan.prompt, tools: Object.fromEntries(plan.tools.map((n) => [n, all[n]])), budgetUsd: plan.budgetUsd, steps: SPAWN_STEPS });
+        host.onSpent(out.usd);
+        host.log({ label: plan.label, model: plan.model, agentKey: `${SPAWNED_KEY}:${plan.label}`, usage: out.usage });
+        return { text: out.text, usd: out.usd, changed: host.changedSince(mark) };
       }
     },
     host.remainingUsd

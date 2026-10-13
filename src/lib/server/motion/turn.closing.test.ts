@@ -260,6 +260,7 @@ vi.mock('$lib/server/motion/frame-store', async (importOriginal) => ({
 vi.mock('$lib/server/motion/frame-stats', () => ({
   frameDensities: async (frames: unknown[]) => frames.map(() => 0.5),
   seamLuma: async () => 0,
+  frameLumas: async (frames: unknown[]) => frames.map(() => new Uint8Array(4)),
   frameStats: async (frames: { time: number }[]) => {
     world.views++;
     const blank = world.views <= world.blankViews;
@@ -410,6 +411,12 @@ describe('a motion turn closes on a look and a summary', () => {
     await turn();
 
     expect(world.tools[0]).toContain('add_clip');
+  });
+
+  it('the builder can hand a composition from a reference to the crafting agent and measure the motion', async () => {
+    await turn();
+
+    expect(world.tools[0]).toEqual(expect.arrayContaining(['craft_composition', 'check_motion', 'read_template_source']));
   });
 
   it('the turn stops on what the gateway billed, not only on the rate card (v6: a $0.75 fixer share spent $3.4)', async () => {

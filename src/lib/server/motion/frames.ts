@@ -5,6 +5,7 @@ import { fieldsOf } from '$lib/motion/inspector';
 import type { MotionDoc } from '$lib/motion/doc';
 import { blocking, type QualityProblem } from '$lib/motion/direction';
 import { REFERENCE_TOOLS } from '$lib/server/web/web-tools';
+import { FRAMES_PER_UPLOAD } from '$lib/motion/frames-request';
 
 export const VIEW_FRAMES = 'view_frames';
 export const DESCRIBE_FRAMES = 'describe_frames';
@@ -25,7 +26,7 @@ export const FrameUpload = z
     callId: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/),
     frames: z
       .array(z.object({ time: z.number().min(0), data: z.string().max(Math.ceil((MAX_FRAME_BYTES * 4) / 3) + 64) }))
-      .max(MAX_FRAMES_PER_VIEW),
+      .max(FRAMES_PER_UPLOAD),
     verdict: z.object({ ok: z.boolean(), problems: z.array(z.string().max(500)).max(20) }).optional()
   })
   .refine((u) => u.frames.length > 0 || u.verdict, 'nothing to upload');
