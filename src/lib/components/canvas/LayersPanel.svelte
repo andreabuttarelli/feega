@@ -6,6 +6,7 @@
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import Square from '@lucide/svelte/icons/square';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { PART_SEP } from '$lib/motion/poster-parts';
   import { LayerAction, LayerKind, Pick, dropLayer, layerEdit, layerKey, layerRows, pickLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
@@ -13,19 +14,24 @@
 
   const canvas = $derived(layersSource.canvas);
   const video = $derived(layersSource.video);
-  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc } : null));
+  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts } : null));
   const order = $derived(rows.map((r) => r.id));
 
   let picked = $state<string[]>([]);
   let renaming = $state<string | null>(null);
   let dragged = $state<string | null>(null);
 
-  const isPicked = (row: LayerRow) => picked.includes(row.id) || (row.kind === LayerKind.Node ? canvas?.selected.includes(row.id) : video?.selection.includes(row.id));
+  const isPicked = (row: LayerRow) => (row.kind === LayerKind.Part ? video?.part === row.id : picked.includes(row.id) || (row.kind === LayerKind.Node ? canvas?.selected.includes(row.id) : video?.selection.includes(row.id)));
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
 
   const pickOf = (e: MouseEvent | KeyboardEvent): Pick => (e.shiftKey ? Pick.Range : e.metaKey || e.ctrlKey ? Pick.Toggle : Pick.One);
 
   function choose(row: LayerRow, e: MouseEvent) {
+    if (row.kind === LayerKind.Part) {
+      const at = row.id.indexOf(PART_SEP);
+      video?.selectPart(row.id.slice(0, at), row.id.slice(at + 1));
+      return;
+    }
     picked = pickLayers(picked, row.id, pickOf(e), order);
     if (row.kind === LayerKind.Node) {
       canvas?.select(picked.filter((id) => rows.some((r) => r.id === id && r.kind === LayerKind.Node)));

@@ -3,12 +3,14 @@ import { COMPONENTS, type ComponentId } from '$lib/motion/components';
 import { moveClip, moveTrack, renameTrack, type OpResult } from '$lib/motion/timeline';
 import { setClipFlags, setTrackFlags } from '$lib/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
+import { PART_SEP, parsePart } from '$lib/motion/poster-parts';
 
 export enum LayerKind {
   Node = 'node',
   Track = 'track',
   Clip = 'clip',
-  Group = 'group'
+  Group = 'group',
+  Part = 'part'
 }
 
 export enum LayerAction {
@@ -26,7 +28,8 @@ export enum Pick {
 }
 
 export type CanvasLayer = { id: string; type: string; name: string | null };
-export type OpenVideo = { nodeId: string; doc: MotionDoc };
+export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string, readonly string[]> };
+type Parts = Record<string, readonly string[]>;
 
 export type LayerRow = {
   id: string;
@@ -48,14 +51,14 @@ const TRACK_DEPTH = 1;
 
 const clipLabel = (clip: Clip) => COMPONENTS[clip.component as ComponentId]?.label ?? clip.component;
 
-function trackRows(doc: MotionDoc, tracks: readonly Track[], nodeId: string, depth: number, nested: boolean): LayerRow[] {
+function trackRows(doc: MotionDoc, tracks: readonly Track[], nodeId: string, depth: number, nested: boolean, parts: Parts = {}): LayerRow[] {
   return tracks.flatMap((track) => [
     { id: track.id, kind: LayerKind.Track, depth, label: track.name || track.id, type: track.kind, nodeId, hidden: !!track.hidden, locked: !!track.locked, nested },
-    ...track.clips.flatMap((clip) => clipRows(doc, clip, nodeId, depth + 1, nested))
+    ...track.clips.flatMap((clip) => clipRows(doc, clip, nodeId, depth + 1, nested, parts))
   ]);
 }
 
-function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nested: boolean): LayerRow[] {
+function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nested: boolean, parts: Parts): LayerRow[] {
   const comp = clip.component === 'Precomp' ? String((clip.props as { comp?: string }).comp ?? '') : '';
   const template = comp !== '' && isLockedComp(doc, comp);
   const row: LayerRow = {
@@ -70,13 +73,23 @@ function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nes
     nested
   };
   const inside = comp && !template ? (doc.comps[comp]?.tracks ?? []) : [];
-  return [row, ...trackRows(doc, inside, nodeId, depth + 1, true)];
+  const own = (parts[clip.id] ?? []).map((part) => partRow(clip, part, nodeId, depth + 1));
+  return [row, ...own, ...trackRows(doc, inside, nodeId, depth + 1, true)];
+}
+
+function partLabel(part: string): string {
+  const { field, index } = parsePart(part);
+  return index === null ? field : `${field} ${index + 1}`;
+}
+
+function partRow(clip: Clip, part: string, nodeId: string, depth: number): LayerRow {
+  return { id: `${clip.id}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(part), type: 'part', nodeId, hidden: false, locked: false, nested: true };
 }
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null): LayerRow[] {
   return nodes.flatMap((node) => {
     const row: LayerRow = { id: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || node.type, type: node.type, nodeId: node.id, hidden: false, locked: false, nested: false };
-    return open?.nodeId === node.id ? [row, ...trackRows(open.doc, open.doc.tracks, node.id, TRACK_DEPTH, false)] : [row];
+    return open?.nodeId === node.id ? [row, ...trackRows(open.doc, open.doc.tracks, node.id, TRACK_DEPTH, false, open.parts)] : [row];
   });
 }
 

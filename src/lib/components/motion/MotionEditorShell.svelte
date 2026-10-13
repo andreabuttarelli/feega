@@ -117,6 +117,7 @@
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { PART_SEP, parsePart } from '$lib/motion/poster-parts';
 
   const SAVE_DEBOUNCE_MS = 700;
   const CHECK_WIDTH = 480;
@@ -172,6 +173,8 @@
   let detent = $state(Detent.Half);
   let sheetDrag = $state<{ y: number; from: number; height: number } | null>(null);
   let stageEl = $state<HTMLElement | null>(null);
+  let selectedPart = $state<string | null>(null);
+  let partsByClip = $state.raw<Record<string, string[]>>({});
   let viewportH = $state(0);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
@@ -215,6 +218,16 @@
           },
           get selection() {
             return selection;
+          },
+          get parts() {
+            return partsByClip;
+          },
+          get part() {
+            return selection.length === 1 && selectedPart ? `${selection[0]}${PART_SEP}${selectedPart}` : null;
+          },
+          selectPart: (clipId, part) => {
+            selection = [clipId];
+            queueMicrotask(() => (selectedPart = part));
           },
           select: (ids) => (selection = ids),
           edit: (result, summary) => apply(result, summary)
@@ -1370,7 +1383,7 @@
       {#snippet player()}
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
-        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
+        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -1409,7 +1422,7 @@
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
         <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
-        <MotionInspector {doc} {analyses} clip={selected} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        <MotionInspector {doc} {analyses} clip={selected} focus={selectedPart ? parsePart(selectedPart).field : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}

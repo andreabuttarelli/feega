@@ -54,6 +54,19 @@ describe('layer rows', () => {
   });
 });
 
+describe('poster parts in layers', () => {
+  it('lists the tagged parts of a clip under it, one level deeper, as part rows', () => {
+    const doc = video();
+    const rows = layerRows(NODES, { nodeId: 'm1', doc, parts: { t1: ['lines:0', 'footer1'] } });
+    const clip = rows.findIndex((r) => r.id === 't1');
+
+    expect(rows.slice(clip + 1, clip + 3).map((r) => [r.id, r.kind, r.depth, r.label])).toEqual([
+      ['t1#lines:0', LayerKind.Part, 3, 'lines 1'],
+      ['t1#footer1', LayerKind.Part, 3, 'footer1']
+    ]);
+  });
+});
+
 describe('layer edits go through the doc operations the editor and the agent already use', () => {
   it('moves a track up the stack and back down', () => {
     const doc = video();

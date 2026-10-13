@@ -16,11 +16,12 @@ export type MeasureReply = {
   boxes: Record<string, MeasuredBox>;
 };
 
-type Kinds = { posed: string; solid: string[] };
+type Kinds = { posed: string; solid: string[]; part: string };
 
 const KINDS: Kinds = {
   posed: '.kp,.kf,.ks,.fx,.layer,#world',
-  solid: ['svg', 'canvas', 'img', 'video', 'iframe']
+  solid: ['svg', 'canvas', 'img', 'video', 'iframe'],
+  part: 'data-part'
 };
 
 export function measureClips(root: HTMLElement, kinds: Kinds = KINDS): Record<string, MeasuredBox> {
@@ -67,6 +68,21 @@ export function measureClips(root: HTMLElement, kinds: Kinds = KINDS): Record<st
       width: (right - left) / frame.width,
       height: (bottom - top) / frame.height
     };
+  }
+
+  for (const layer of root.querySelectorAll<HTMLElement>('[data-clip]')) {
+    for (const el of layer.querySelectorAll<HTMLElement>('[' + kinds.part + ']')) {
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0 || frame.width <= 0 || frame.height <= 0) {
+        continue;
+      }
+      boxes[layer.dataset.clip + '#' + el.getAttribute(kinds.part)] = {
+        left: (r.left - frame.left) / frame.width,
+        top: (r.top - frame.top) / frame.height,
+        width: r.width / frame.width,
+        height: r.height / frame.height
+      };
+    }
   }
 
   posed.forEach((el, i) => (el.style.transform = saved[i]));

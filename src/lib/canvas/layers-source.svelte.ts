@@ -12,7 +12,10 @@ export type VideoSide = {
   readonly nodeId: string;
   readonly doc: MotionDoc;
   readonly selection: readonly string[];
+  readonly parts: Record<string, readonly string[]>;
+  readonly part: string | null;
   select(ids: string[]): void;
+  selectPart(clipId: string, part: string): void;
   edit(result: OpResult, summary: string): void;
 };
 

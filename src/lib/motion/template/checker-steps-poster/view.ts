@@ -78,20 +78,23 @@ const draw = () => {
     .map((line, i) => {
       const x = (i + 2 - p.shift + STEP_PAD) * cell.w;
       const y = start + (i + 2) * cell.h - BASELINE * size;
-      return '<div class="cs-step" style="left:' + x + 'px;top:' + y + 'px;font-size:' + size + 'px">' + escaped(line) + '</div>';
+      return '<div class="cs-step" data-part="title:' + i + '" style="left:' + x + 'px;top:' + y + 'px;font-size:' + size + 'px">' + escaped(line) + '</div>';
     })
     .join('');
 
   bar.style.cssText = box(BODY_X * width, BODY_TOP * height, BAR[0] * width, BAR[1] * width);
   body.style.cssText = 'left:' + BODY_X * width + 'px;top:' + (BODY_TOP * height + BAR[1] * width * 1.6) + 'px;width:' + BODY_WIDTH * width + 'px;font-size:' + (p.bodySize * width) / 100 + 'px';
   body.textContent = String(p.body || '');
+  body.setAttribute('data-part', 'body');
 
   const indexPx = (p.bodySize * width) / 100;
   index.style.cssText = 'left:' + BODY_TOP * height + 'px;top:' + BODY_TOP * height + 'px;font-size:' + indexPx + 'px;border-top-width:' + BAR[1] * width * 0.35 + 'px';
   index.textContent = String(p.index || '');
+  index.setAttribute('data-part', 'index');
   const d = MARKER * width;
   marker.style.cssText = box(width - d - BODY_TOP * height * 1.2, start + MARKER_ROW * cell.h, d, d) + 'font-size:' + d * 0.36 + 'px';
   marker.textContent = String(p.marker || '');
+  marker.setAttribute('data-part', 'marker');
 };
 
 draw();
