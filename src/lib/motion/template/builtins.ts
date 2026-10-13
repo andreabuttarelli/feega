@@ -16,6 +16,7 @@ import { FEATURE_SCROLL_TEMPLATE } from './feature-scroll/template';
 import { SPLIT_HEADLINE_TEMPLATE } from './split-headline/template';
 import { IMAGE_GLOBE_TEMPLATE } from './image-globe/template';
 import { SAAS_MONITOR_TEMPLATE } from './saas-monitor/template';
+import { WIRE_GLOBE_PAGES_TEMPLATE } from './wire-globe-pages/template';
 import { PGRID_TEMPLATES } from './parallax-grid/template';
 import { EDITORIAL_WORDS_MEDIA_TEMPLATE } from './editorial-words-media/template';
 import { SCROLL_STORY_TEMPLATE } from './scroll-story/template';
@@ -24,9 +25,33 @@ import { PHONE_SPLIT_TEMPLATE } from './phone-split/template';
 import { MARQUEE_TEMPLATE } from './marquee/template';
 import { CIRCULAR_CAROUSEL_TEMPLATE } from './circular-carousel/template';
 import { ROWS_SPACED_TITLE_TEMPLATE } from './rows-spaced-title/template';
+import { STEPS_LIST_TEMPLATE } from './steps-list/template';
 import { SCATTER_TITLE_TEMPLATE } from './scatter-title/template';
+import { COLLAGE_STACK_TEMPLATE } from './collage-stack-rotate/template';
 import { RING_THROUGH_TITLE_TEMPLATE } from './ring-through-title/template';
 import { MEDIA_CLOUD_TEMPLATE } from './media-cloud/template';
+import { BRACKET_GRADIENT_TEMPLATE } from './bracket-gradient/template';
+import { STACK_WORDS_TEMPLATE } from './stack-words/template';
+import { PARTICLE_RIBBON_TEMPLATE } from './particle-ribbon/template';
+import { WORD_WHEEL_UI_TEMPLATE } from './word-wheel-ui/template';
+import { MELTING_TYPE_POSTER_TEMPLATE } from './melting-type-poster/template';
+import { POSTER_LIQUID_GLASS_TEMPLATE } from './poster-liquid-glass/template';
+import { PHONE_CHAT_TEMPLATE } from './phone-chat/template';
+import { PATH_CARDS_TEMPLATE } from './path-cards/template';
+import { INTRODUCING_BADGE_TEMPLATE } from './introducing-badge/template';
+import { IRIDESCENT_BLOBS_TEMPLATE } from './iridescent-blobs/template';
+import { FLOW_LINES_TEMPLATE } from './flow-lines/template';
+import { TYPE_GRID_POSTER_TEMPLATE } from './type-grid-poster/template';
+import { CHECKER_STEPS_POSTER_TEMPLATE } from './checker-steps-poster/template';
+import { OVERLAY_GRID_POSTER_TEMPLATE } from './overlay-grid-poster/template';
+import { CIRCLE_EVENT_POSTER_TEMPLATE } from './circle-event-poster/template';
+import { BLOCK_TITLE_POSTER_TEMPLATE } from './block-title-poster/template';
+import { BOXED_TYPE_POSTER_TEMPLATE } from './boxed-type-poster/template';
+import { SQUARE_WORDS_POSTER_TEMPLATE } from './square-words-poster/template';
+import { ISO_BLOCKS_POSTER_TEMPLATE } from './iso-blocks-poster/template';
+import { PHOTO_GRID_POSTER_TEMPLATE } from './photo-grid-poster/template';
+import { WHITE_SHAPES_POSTER_TEMPLATE } from './white-shapes-poster/template';
+import { VERTICAL_TYPE_POSTER_TEMPLATE } from './vertical-type-poster/template';
 
 export { BUILTIN_PREFIX } from './design-kit';
 
@@ -169,7 +194,7 @@ function compositionDesign(layout: LayoutId): Design {
   };
 }
 
-export const BUILTIN_TEMPLATES: TemplateEntry[] = [...[...LAUNCH_SCENES, ...SCENES, ...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build), UI_MORPH_TEMPLATE, PROMPT_INPUT_TEMPLATE, FLOATING_MEDIA_TEMPLATE, PHOTO_STRIP_TEMPLATE, FEATURE_SCROLL_TEMPLATE, IMAGE_GLOBE_TEMPLATE, SPLIT_HEADLINE_TEMPLATE, SCROLL_STORY_TEMPLATE, COMMENT_GRID_TEMPLATE, SAAS_MONITOR_TEMPLATE, PHONE_SPLIT_TEMPLATE, MARQUEE_TEMPLATE, CIRCULAR_CAROUSEL_TEMPLATE, ...PGRID_TEMPLATES, ROWS_SPACED_TITLE_TEMPLATE, SCATTER_TITLE_TEMPLATE, RING_THROUGH_TITLE_TEMPLATE, EDITORIAL_WORDS_MEDIA_TEMPLATE, MEDIA_CLOUD_TEMPLATE];
+export const BUILTIN_TEMPLATES: TemplateEntry[] = [...[...LAUNCH_SCENES, ...SCENES, ...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build), UI_MORPH_TEMPLATE, PROMPT_INPUT_TEMPLATE, FLOATING_MEDIA_TEMPLATE, PHOTO_STRIP_TEMPLATE, FEATURE_SCROLL_TEMPLATE, IMAGE_GLOBE_TEMPLATE, SPLIT_HEADLINE_TEMPLATE, SCROLL_STORY_TEMPLATE, COMMENT_GRID_TEMPLATE, SAAS_MONITOR_TEMPLATE, PHONE_SPLIT_TEMPLATE, MARQUEE_TEMPLATE, CIRCULAR_CAROUSEL_TEMPLATE, ...PGRID_TEMPLATES, ROWS_SPACED_TITLE_TEMPLATE, SCATTER_TITLE_TEMPLATE, RING_THROUGH_TITLE_TEMPLATE, EDITORIAL_WORDS_MEDIA_TEMPLATE, MEDIA_CLOUD_TEMPLATE, COLLAGE_STACK_TEMPLATE, BRACKET_GRADIENT_TEMPLATE, STACK_WORDS_TEMPLATE, STEPS_LIST_TEMPLATE, INTRODUCING_BADGE_TEMPLATE, MELTING_TYPE_POSTER_TEMPLATE, POSTER_LIQUID_GLASS_TEMPLATE, WIRE_GLOBE_PAGES_TEMPLATE, PHONE_CHAT_TEMPLATE, PATH_CARDS_TEMPLATE, WORD_WHEEL_UI_TEMPLATE, IRIDESCENT_BLOBS_TEMPLATE, PARTICLE_RIBBON_TEMPLATE, FLOW_LINES_TEMPLATE, TYPE_GRID_POSTER_TEMPLATE, CHECKER_STEPS_POSTER_TEMPLATE, OVERLAY_GRID_POSTER_TEMPLATE, CIRCLE_EVENT_POSTER_TEMPLATE, BLOCK_TITLE_POSTER_TEMPLATE, BOXED_TYPE_POSTER_TEMPLATE, SQUARE_WORDS_POSTER_TEMPLATE, ISO_BLOCKS_POSTER_TEMPLATE, PHOTO_GRID_POSTER_TEMPLATE, WHITE_SHAPES_POSTER_TEMPLATE, VERTICAL_TYPE_POSTER_TEMPLATE];
 
 export function builtinTemplate(id: string): TemplateEntry | null {
   return BUILTIN_TEMPLATES.find((e) => e.id === id) ?? null;

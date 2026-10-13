@@ -145,3 +145,18 @@ export function graphLanes(doc: MotionDoc, selection: readonly string[], keySele
   }
   return numeric.filter((l) => selection.includes(l.clipId) || (camera && l.clipId === CAMERA_LANE));
 }
+
+const HEADERS: readonly { from: number; px: number }[] = [
+  { from: 760, px: 240 },
+  { from: 520, px: 180 },
+  { from: 0, px: 88 }
+];
+
+export const headerPx = (timelineWidth: number): number => HEADERS.find((h) => timelineWidth >= h.from)!.px;
+
+const FIT_SLACK = 0.95;
+
+export function fitZoom(doc: { durationInFrames: number; fps: number }, lanesPx: number): number {
+  const seconds = doc.durationInFrames / doc.fps;
+  return clampZoom((lanesPx * FIT_SLACK) / (BASE_PX_PER_SECOND * seconds));
+}

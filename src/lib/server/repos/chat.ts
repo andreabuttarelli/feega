@@ -102,7 +102,7 @@ export async function openNodeThread(
       brand_id: input.brandId ?? null,
       created_by: input.userId,
       surface: MOTION_SURFACE,
-      title: 'Motion'
+      title: 'Frame'
     } as never)
     .select('id')
     .single();

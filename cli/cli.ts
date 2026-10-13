@@ -103,7 +103,7 @@ program
     await cmdMedia(opts);
   });
 
-const motion = program.command('motion').description('Motion videos: list, ask the editor agent to change one, render, publish as a web embed');
+const motion = program.command('motion').description('Frames (videos and stills): list, ask the editor agent to change one, render, publish as a web embed');
 
 motion
   .command('ask <nodeId> <prompt>')
@@ -136,7 +136,7 @@ motion
   .option('--server', 'Render on our servers (not available yet)')
   .option('--resolution <r>', '720p, 1080p, 1440p or 2160p')
   .option('--format <f>', 'With --server: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif')
-  .option('--quality <q>', 'standard or high')
+  .option('--quality <q>', 'standard, high (default) or max')
   .option('--fps <n>', '24, 25, 30, 50 or 60')
   .option('--org <id>', 'Which org, if you belong to more than one')
   .action(async (nodeId: string, opts) => {
@@ -198,7 +198,8 @@ motion
   .command('new')
   .description('Start a new video from a template, e.g. --template builtin:prompt-input (free)')
   .requiredOption('--template <id>', 'Template id, from `feega motion templates`')
-  .option('--format <ratio>', '16:9 (default), 9:16 or 1:1')
+  .option('--format <ratio>', '16:9 (default), 9:16 story, 1:1, 4:5 post or "A poster"')
+  .option('--still <seconds>', 'Keep one frame: a still graphic (post, poster) instead of a video')
   .option('--project <id>', 'Project to create it in (default: the most recent)')
   .option('--org <id>', 'Which org, if you belong to more than one')
   .action(async (opts) => {
@@ -216,6 +217,39 @@ motion
   .action(async (nodeId: string, templateId: string, opts) => {
     const { cmdMotionAddTemplate } = await import('./commands/motion.ts');
     await cmdMotionAddTemplate(nodeId, templateId, opts);
+  });
+
+motion
+  .command('tool <nodeId> <tool>')
+  .description('Run one motion editor tool on the saved video, e.g. set_canvas --input \'{"still":1}\' (free, no AI)')
+  .option('--input <json>', 'The tool input as JSON')
+  .option('--version <n>', 'Refuse if the video is no longer at this revision')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, tool: string, opts) => {
+    const { cmdMotionTool } = await import('./commands/motion.ts');
+    await cmdMotionTool(nodeId, tool, opts);
+  });
+
+motion
+  .command('tools [name]')
+  .description('List the motion editor tools, or describe one with its input schema')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (name: string | undefined, opts) => {
+    const { cmdMotionTools } = await import('./commands/motion.ts');
+    await cmdMotionTools(name, opts);
+  });
+
+motion
+  .command('still <nodeId>')
+  .description('Export the still (or a frame) of the saved video as an image at full size (free)')
+  .option('--format <f>', 'png (default), jpg or webp')
+  .option('--scale <n>', '1 (default) or 2')
+  .option('--time <seconds>', 'Frame to draw for a video (a still draws its own)')
+  .option('--out <file>', 'Where to save it (default: <nodeId>.<format>)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionStill } = await import('./commands/motion.ts');
+    await cmdMotionStill(nodeId, opts);
   });
 
 motion

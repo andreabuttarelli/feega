@@ -89,6 +89,7 @@ const RESTANO = [
   'motion_budget',
   'new_motion_from_template',
   'view_motion_frames',
+  'motion_tool',
   'search_gallery',
   'remix_gallery_item',
   'publish_to_gallery',

@@ -464,7 +464,7 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
 
     remix_gallery_item: tool({
       description:
-        'Remix a gallery item, free: copies its video and files into a new motion node of THIS project (on canvasId, or on the Motion canvas), with its main texts, colours, logo and media exposed as fields. Then offer to put the user brand on it: open the editor and ask the motion agent. Returns nodeId and editorPath.',
+        'Remix a gallery item, free: copies its video and files into a new Frame node (type motion) of THIS project (on canvasId, or on the Motion canvas), with its main texts, colours, logo and media exposed as fields. Then offer to put the user brand on it: open the editor and ask the motion agent. Returns nodeId and editorPath.',
       inputSchema: z.object({ itemId: z.string(), canvasId: z.string().optional() }).strict(),
       execute: async (input: { itemId: string; canvasId?: string }) => {
         const remixed = await remixInto({ db: deps.db, orgId: deps.orgId, userId: deps.userId, actor }, { itemId: input.itemId, projectId: deps.projectId, canvasId: input.canvasId ?? null });
@@ -474,7 +474,7 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
 
     publish_to_gallery: tool({
       description:
-        'Publish a motion node of the workspace to the public gallery, free, so anyone can remix it. Only when the user asks. Refused for uncensored projects, real brands (their logo, a script about a real brand, logos or pictures imported from a website) and content the moderation refuses. title up to 80 characters, description up to 500, up to 8 one-word tags. Returns the gallery id and url.',
+        'Publish a Frame node (type motion) of the workspace to the public gallery, free, so anyone can remix it. Only when the user asks. Refused for uncensored projects, real brands (their logo, a script about a real brand, logos or pictures imported from a website) and content the moderation refuses. title up to 80 characters, description up to 500, up to 8 one-word tags. Returns the gallery id and url.',
       inputSchema: z.object({ nodeId: z.string(), title: z.string(), description: z.string().optional(), tags: z.array(z.string()).optional() }).strict(),
       execute: async (input: { nodeId: string; title: string; description?: string; tags?: string[] }) => {
         const { nodeId, ...meta } = input;

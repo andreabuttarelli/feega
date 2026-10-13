@@ -106,6 +106,7 @@
         doc: render.doc,
         assetUrls: render.assetUrls,
         size,
+        quality: render.quality,
         withAudio: Boolean(caps?.aac),
         frames: (times, s, onFrame, signal) => preview!.render(times, s, onFrame, signal, html, profileOf(page.url.searchParams.get(CAPTURE_PARAM))),
         signal: controller.signal,

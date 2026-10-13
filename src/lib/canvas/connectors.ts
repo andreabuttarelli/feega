@@ -65,7 +65,7 @@ export const CONNECTOR_STYLE: Record<ConnectorType, { label: string; color: stri
   videos: { label: 'Video', color: '#db2777' },
   audios: { label: 'Audio', color: '#d97706' },
   models3d: { label: '3D model', color: '#0f766e' },
-  motions: { label: 'Motion', color: '#4f46e5' },
+  motions: { label: 'Frame', color: '#4f46e5' },
   first_frame: { label: 'First frame', color: '#7c3aed' },
   last_frame: { label: 'Last frame', color: '#0891b2' }
 };

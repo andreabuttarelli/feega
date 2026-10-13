@@ -7,6 +7,11 @@ describe('la rail: due gruppi, un comportamento a testa', () => {
     expect(navEntriesByGroup('panel').map((e) => e.id)).toEqual(['assets', 'brands', 'influencers']);
   });
 
+  it('the "canvas" group is Layers: a panel beside the canvas, never a burger link to a page that does not exist', () => {
+    expect(navEntriesByGroup('canvas').map((e) => [e.id, e.family])).toEqual([['layers', 'panel']]);
+    expect(BURGER_ENTRIES.map((e) => e.id)).not.toContain('layers');
+  });
+
   it('il gruppo "workbench" è Calendar, Ads, Studio, Settings, in quest\'ordine', () => {
     expect(navEntriesByGroup('workbench').map((e) => e.id)).toEqual(['calendar', 'ads', 'studio', 'settings']);
   });

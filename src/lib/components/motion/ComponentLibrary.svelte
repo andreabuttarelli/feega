@@ -6,6 +6,7 @@
   import ComponentDetail from './ComponentDetail.svelte';
   import { Action } from '$lib/motion/actions';
   import { Dismiss, dismissFrom, gridStep } from '$lib/motion/template/browser';
+  import { DocMode } from '$lib/motion/still';
   import { AddTarget, ComponentKind, KIND_LABEL, matching, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
   import type { Instance } from '$lib/motion/template/library';
 
@@ -35,10 +36,12 @@
 
   let query = $state('');
   let kind = $state<ComponentKind | null>(null);
+  let mode = $state<DocMode | null>(null);
+  const MODE_LABEL: Record<DocMode, string> = { [DocMode.Video]: 'Videos', [DocMode.Still]: 'Stills' };
   let openId = $state<string | null>(null);
   let grid = $state<HTMLUListElement | null>(null);
 
-  const shown = $derived(matching(items, query, kind));
+  const shown = $derived(matching(items, query, kind, mode));
   const open = $derived(items.find((i) => i.id === openId) ?? null);
 
   const cards = () => [...(grid?.querySelectorAll<HTMLButtonElement>('[data-component]') ?? [])];
@@ -93,6 +96,13 @@
       <IconButton action={Action.Close} onclick={onclose} />
     </header>
 
+    <div class="kinds" role="tablist" aria-label="Video or still">
+      <button type="button" role="tab" aria-selected={mode === null} class:on={mode === null} onclick={() => (mode = null)}>Both</button>
+      {#each Object.values(DocMode) as m (m)}
+        <button type="button" role="tab" aria-selected={mode === m} class:on={mode === m} data-mode-tab={m} onclick={() => (mode = m)}>{MODE_LABEL[m]}</button>
+      {/each}
+    </div>
+
     <div class="kinds" role="tablist" aria-label="Category">
       <button type="button" role="tab" aria-selected={kind === null} class:on={kind === null} onclick={() => (kind = null)}>All</button>
       {#each KINDS as k (k)}
@@ -103,7 +113,7 @@
     <ul class="grid" bind:this={grid} role="presentation" onclick={outside} data-testid="component-grid">
       {#each shown as item, i (item.id)}
         <li>
-          <button type="button" class="card" class:on={item.id === openId} aria-pressed={item.id === openId} data-component={item.id} onclick={() => (openId = item.id)} onkeydown={(e) => move(e, i)}>
+          <button type="button" class="card" class:on={item.id === openId} aria-pressed={item.id === openId} data-component={item.id} data-mode={item.mode} onclick={() => (openId = item.id)} onkeydown={(e) => move(e, i)}>
             <ComponentPreview preview={item.preview} name={item.name} />
             <span class="name">{item.name}</span>
             {#if item.description}<span class="line">{item.description}</span>{/if}

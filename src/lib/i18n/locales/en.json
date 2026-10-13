@@ -108,7 +108,9 @@
       "invalidCredentials": "Wrong email or password.",
       "emailExists": "An account with this email already exists. Sign in instead.",
       "mismatch": "Passwords don't match.",
-      "generic": "Something went wrong. Please try again."
+      "generic": "Something went wrong. Please try again.",
+      "oauth": "Sign-in was cancelled or the provider refused it. Try again.",
+      "link": "This link is invalid or expired. Sign in again."
     },
     "resetPage": {
       "title": "Set a new password",
@@ -128,7 +130,8 @@
       "create": "Create account",
       "sendReset": "Send reset link",
       "or": "or",
-      "github": "Continue with GitHub"
+      "github": "Continue with GitHub",
+      "google": "Continue with Google"
     },
     "inapp": {
       "title": "Open in your browser",
@@ -258,6 +261,7 @@
   },
   "app": {
     "nav2": {
+      "layers": "Layers",
       "materials": "Assets",
       "brands": "Brands",
       "influencers": "Influencers",

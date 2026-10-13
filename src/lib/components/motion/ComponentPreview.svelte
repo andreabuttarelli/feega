@@ -34,7 +34,7 @@
 <span class="preview" role="presentation" use:watch onpointerenter={() => (hovered = true)} onpointerleave={() => (hovered = false)}>
   {#if preview}
     <img src={preview.poster} alt="" loading="lazy" decoding="async" />
-    {#if playing}<video bind:this={video} src={preview.video} poster={preview.poster} muted loop playsinline preload="none" aria-label={name}></video>{/if}
+    {#if playing && preview.video}<video bind:this={video} src={preview.video} poster={preview.poster} muted loop playsinline preload="none" aria-label={name}></video>{/if}
   {:else}
     <span class="blank">{name}</span>
   {/if}

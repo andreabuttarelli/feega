@@ -18,9 +18,15 @@
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import { FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, type MotionNode } from '$lib/canvas/motion-node';
+  import { NodeMode } from '$lib/canvas/inline-motion';
+  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { Engagement, PreviewMode, Sight, previewClock, previewMode, scrubFrame, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
-  let { node, href, previewUrl, posterUrl = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null } = $props();
+  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode } = $props();
+
+  let host = $state<HTMLDivElement | null>(null);
+
+  $effect(() => (host ? inlineStage.offer(node.id, host) : undefined));
 
   const ICON = 16;
   const RELEASE_MS = 3000;
@@ -139,6 +145,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="motion"
+  class:editing={nodeMode === NodeMode.Edit}
   data-testid="motion-node"
   data-mode={mode}
   style={`--bar-h: ${MOTION_NODE_BAR_H}px;`}
@@ -149,7 +156,9 @@
   onfocusout={() => (hovered = false)}
 >
   <div class="stage" data-testid="motion-node-stage">
-    {#if mode === PreviewMode.Live && preview}
+    {#if nodeMode === NodeMode.Edit}
+      <div class="host nodrag nopan" data-testid="motion-node-editing" bind:this={host}></div>
+    {:else if mode === PreviewMode.Live && preview}
       <MotionPreview bind:this={player} html={preview.html} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} />
       <span class="clock" data-testid="motion-node-timecode">{previewClock(frame, preview.fps, preview.durationInFrames)}</span>
       <input
@@ -172,10 +181,13 @@
         <span class="format">{size.label}</span>
       </div>
     {/if}
-    <a class="open nodrag" {href} data-testid="open-motion-editor">Open editor</a>
+    {#if nodeMode === NodeMode.Preview}<a class="open nodrag" {href} data-testid="open-motion-editor">Open editor</a>{/if}
   </div>
 
   <div class="bar nodrag nopan" onpointerdown={isolate} onclick={isolate} ondblclick={isolate}>
+    {#if nodeMode === NodeMode.Edit}
+    <span class="editing-label" data-testid="motion-node-editing-label">Editing</span>
+    {:else}
     <button type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={toggle}>
       {#if playing}<Pause size={ICON} />{:else}<Play size={ICON} />{/if}
     </button>
@@ -186,6 +198,7 @@
     <button type="button" aria-label={muted ? 'Unmute' : 'Mute'} aria-pressed={muted} onclick={() => (muted = !muted)}>
       {#if muted}<VolumeX size={ICON} />{:else}<Volume2 size={ICON} />{/if}
     </button>
+    {/if}
     <span class="rev">{node.docHeadRevision ? `Rev ${node.docHeadRevision}` : 'Empty'}</span>
   </div>
 </div>
@@ -213,6 +226,17 @@
     container-type: size;
     background: #000;
     color: #f0eee9;
+  }
+
+  .host {
+    position: absolute;
+    inset: 0;
+  }
+
+  .editing-label {
+    padding: 0 8px;
+    font-size: var(--ui-text-xs);
+    color: var(--ui-accent);
   }
 
   .poster {

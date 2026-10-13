@@ -126,8 +126,8 @@ const parsedVar = (raw: string): [string, string] => {
   return [raw.slice(0, at), raw.slice(at + 1)];
 };
 
-export async function cmdMotionNew(opts: { template: string; format?: '16:9' | '9:16' | '1:1'; project?: string; org?: string }) {
-  const made = await motionApi.fromTemplate(await token(), { template: opts.template, format: opts.format, project: opts.project }, opts.org);
+export async function cmdMotionNew(opts: { template: string; format?: string; project?: string; org?: string; still?: string }) {
+  const made = await motionApi.fromTemplate(await token(), { template: opts.template, format: opts.format, project: opts.project, ...(opts.still === undefined ? {} : { still: Number(opts.still) }) }, opts.org);
   console.log(`Created video ${made.node_id} from ${opts.template}, revision ${made.version}.`);
   console.log(`Edit it: ${made.editor_url}`);
 }
@@ -238,4 +238,42 @@ export async function cmdMotionBudget(nodeId: string, opts: { org?: string; rais
   const bearer = await token();
   const budget = opts.raise ? await motionApi.raiseBudget(bearer, nodeId, opts.org) : await motionApi.budget(bearer, nodeId, opts.org);
   console.log(`spent $${budget.spent_usd.toFixed(2)} of $${budget.cap_usd.toFixed(2)}`);
+}
+
+type ToolOpts = { org?: string; input?: string; version?: string };
+
+export async function cmdMotionTool(nodeId: string, tool: string, opts: ToolOpts) {
+  await toolAndReport(await token(), nodeId, tool, opts);
+}
+
+export async function toolAndReport(bearer: string, nodeId: string, tool: string, opts: ToolOpts) {
+  const ran = await motionApi.runTool(bearer, nodeId, { tool, ...(opts.input ? { input: JSON.parse(opts.input) } : {}), ...(opts.version ? { version: Number(opts.version) } : {}) }, opts.org);
+  console.log(JSON.stringify(ran.output, null, 2));
+  console.log(ran.saved ? `Saved as revision ${ran.version}.` : `Nothing changed: revision ${ran.version}.`);
+}
+
+export async function cmdMotionTools(name: string | undefined, opts: { org?: string }) {
+  console.log(JSON.stringify(await motionApi.tools(await token(), name, opts.org), null, 2));
+}
+
+type StillOpts = { org?: string; format?: string; scale?: string; time?: string; out?: string };
+
+export async function cmdMotionStill(nodeId: string, opts: StillOpts) {
+  await stillAndReport(await token(), nodeId, opts);
+}
+
+export async function stillAndReport(bearer: string, nodeId: string, opts: StillOpts) {
+  const input = { format: opts.format ?? 'png', ...(opts.scale ? { scale: Number(opts.scale) } : {}), ...(opts.time ? { time: Number(opts.time) } : {}) };
+  const ran = await motionApi.runTool(bearer, nodeId, { tool: 'export_image', input }, opts.org);
+  const made = ran.output as { ok: boolean; url?: string; error?: string; width?: number; height?: number };
+  if (!made.ok || !made.url) {
+    console.error(made.error ?? 'the image was not exported');
+    process.exitCode = 1;
+    return;
+  }
+  const file = opts.out ?? `${nodeId}.${input.format}`;
+  const res = await fetch(made.url);
+  await writeFile(file, Buffer.from(await res.arrayBuffer()));
+  console.log(`Saved ${file} (${made.width}x${made.height}).`);
+  console.log(`URL: ${made.url}`);
 }

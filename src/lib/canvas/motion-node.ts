@@ -45,13 +45,19 @@ const MOTION_STAGE_WIDTH: Record<MotionFormat, number> = {
   [MotionFormat.Vertical]: 288,
   [MotionFormat.Square]: 320,
   [MotionFormat.Portrait]: 300,
-  [MotionFormat.SquareLarge]: 320
+  [MotionFormat.SquareLarge]: 320,
+  [MotionFormat.Poster]: 280
 };
 
 export function motionNodeSize(format: MotionFormat = MotionFormat.Vertical): { w: number; h: number } {
   const { width, height } = FORMATS[format];
   const w = MOTION_STAGE_WIDTH[format];
   return { w, h: Math.round((w * height) / width) + MOTION_NODE_BAR_H };
+}
+
+export function frameNodeSize(width: number, picture: { width: number; height: number }): { w: number; h: number } {
+  const w = Math.round(width);
+  return { w, h: Math.round((w * picture.height) / picture.width) + MOTION_NODE_BAR_H };
 }
 
 export function newMotionData(format: MotionFormat = MotionFormat.Vertical): Record<string, unknown> {

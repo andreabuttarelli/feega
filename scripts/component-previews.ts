@@ -18,6 +18,7 @@ const PREVIEW_FPS = 12;
 const PREVIEW_FRAMES = 48;
 const MAX_WINDOW_S = 8;
 const POSTER_AT = 0.6;
+const POSTER_BEFORE_TITLE: Record<string, number> = { 'builtin:particle-ribbon': 0.2 };
 const LAYOUT_SAMPLES = join('static', 'compose-templates');
 const LAYOUT_PREFIX = 'builtin:composition-';
 
@@ -37,7 +38,12 @@ const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: R
   'builtin:scatter-title': { field: 'media', photos: STRIP_PHOTOS },
   'builtin:ring-through-title': { field: 'media', photos: STRIP_PHOTOS },
   'builtin:editorial-words-media': { field: 'media', photos: STRIP_PHOTOS },
-  'builtin:media-cloud-white': { field: 'media', photos: STRIP_PHOTOS }
+  'builtin:media-cloud-white': { field: 'media', photos: STRIP_PHOTOS },
+  'builtin:collage-stack-rotate': { field: 'media', photos: STRIP_PHOTOS },
+  'builtin:stack-words': { field: 'media', photos: STRIP_PHOTOS },
+  'builtin:phone-chat': { field: 'avatars', photos: ['p1074', 'p1069', 'p1080', 'p1015'] },
+  'builtin:wire-globe-pages': { field: 'media', photos: STRIP_PHOTOS },
+  'builtin:path-cards': { field: 'media', photos: ['p1015', 'p1016', 'p1018'] }
 };
 
 const sampleAssets = (photos: string[]) => Object.fromEntries(photos.map((id) => [id, `data:image/jpeg;base64,${readFileSync(join(SAMPLES, `${id}.jpg`)).toString('base64')}`]));
@@ -78,7 +84,7 @@ for (const entry of BUILTIN_TEMPLATES.filter((e) => !only.length || only.include
 
   const work = mkdtempSync(join(tmpdir(), 'preview-'));
   frames.forEach((f, i) => writeFileSync(join(work, `${String(i).padStart(3, '0')}.jpg`), f.bytes));
-  writeFileSync(join(OUT, `${slug}.jpg`), frames[Math.floor(frames.length * POSTER_AT)].bytes);
+  writeFileSync(join(OUT, `${slug}.jpg`), frames[Math.floor(frames.length * (POSTER_BEFORE_TITLE[entry.id] ?? POSTER_AT))].bytes);
   execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', String(PREVIEW_FPS), '-i', join(work, '%03d.jpg'), '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '30', '-movflags', '+faststart', '-an', join(OUT, `${slug}.mp4`)]);
   rmSync(work, { recursive: true });
   done.push(entry.id);

@@ -1,3 +1,4 @@
+import { Quality } from '$lib/motion/export-formats';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { LinkRefusal, RENDER_LINK_OPEN_MS } from '$lib/motion/render-link';
 
@@ -69,7 +70,7 @@ const runRow = (params: Record<string, unknown>) => ({ id: RUN, orgId: ORG, node
 async function mint(now = Date.now()) {
   const row = { id: RUN, org_id: ORG, node_id: NODE, params: {}, status: 'running' };
   const { db, calls } = fakeDb({ node_runs: [row] });
-  const link = await createRenderLink(db, { orgId: ORG, nodeId: NODE, version: 4, actor: { kind: 'agent', id: 'user-1', agentKey: 'mcp' } }, now);
+  const link = await createRenderLink(db, { orgId: ORG, nodeId: NODE, version: 4, quality: Quality.High, actor: { kind: 'agent', id: 'user-1', agentKey: 'mcp' } }, now);
   store.run = runRow((calls.find((c) => c.op === 'insert')!.payload as { params: Record<string, unknown> }).params);
   return link.token;
 }

@@ -8,6 +8,7 @@
   import VideoCard from '$lib/components/app/VideoCard.svelte';
   import ProjectCard from '$lib/components/app/ProjectCard.svelte';
   import ComponentShelf from '$lib/components/app/ComponentShelf.svelte';
+  import PosterShelf from '$lib/components/app/PosterShelf.svelte';
   import type { VideoPage } from '$lib/server/dashboard/dashboard';
   import { GALLERY_PATH, byline, itemPath } from '$lib/gallery/model';
   import { BRIEF_MAX } from '$lib/motion/video-brief';
@@ -237,6 +238,8 @@
   </section>
 
   <ComponentShelf items={data.components} projectId={data.attachProjectId} />
+
+  {#if data.posters.length}<PosterShelf items={data.posters} projectId={data.attachProjectId} />{/if}
 
   <section class="shelf" aria-labelledby="projects-heading">
     <div class="head">

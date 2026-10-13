@@ -158,6 +158,22 @@ describe('/app is the dashboard for a returning user', () => {
     expect(data.components.find((c) => c.id === 'builtin:prompt-input')?.kind).toBe('component');
   });
 
+  it('the home lists the posters row: stills only', async () => {
+    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as { posters: { id: string; mode: string }[] };
+
+    expect(data.posters.map((c) => c.id)).toContain('builtin:poster-photo-grid');
+    expect(data.posters.every((c) => c.mode === 'still')).toBe(true);
+  });
+
+  it('a poster from the row opens the editor on a 4:5 still that holds it', async () => {
+    const redirected = await thrown(() => actions.fromTemplate({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ template: 'builtin:poster-white-shapes', format: '4:5' }) } as never));
+
+    const doc = (appendRevision.mock.calls[0][1] as { doc: { comps: Record<string, { template?: { id: string } }>; height: number; width: number; still?: unknown } }).doc;
+    expect(Object.values(doc.comps).some((c) => c.template?.id === 'builtin:poster-white-shapes')).toBe(true);
+    expect(doc).toMatchObject({ width: 1080, height: 1350, still: expect.anything() });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new' });
+  });
+
   it('use in new video opens the editor on a video that already holds the component', async () => {
     const redirected = await thrown(() => actions.fromTemplate({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ template: 'builtin:prompt-input', format: '9:16' }) } as never));
 

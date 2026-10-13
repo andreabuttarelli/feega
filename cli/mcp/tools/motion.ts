@@ -19,7 +19,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'ask_motion_agent',
     {
-      title: 'Ask the motion editor agent',
+      title: 'Ask the frame editor agent',
       description:
         'Edit a motion video (a `motion` canvas node) by asking the motion editor\'s own AI in plain words, ' +
         'e.g. "make the title red and add a bounce". It runs one turn of the same agent as the editor chat, ' +
@@ -66,7 +66,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'get_motion_run',
     {
-      title: 'Read a motion agent run',
+      title: 'Read a frame agent run',
       description:
         'State of an `ask_motion_agent` run: `status` (running, done, failed, expired), the agent `reply`, ' +
         'the `summary` of its edits, the new revision `version` (null when nothing was saved), `cost_usd` and `editor_url`. Reads only.',
@@ -79,7 +79,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'render_video',
     {
-      title: 'Render a motion video',
+      title: 'Render a frame',
       description:
         'Render the saved revision of a motion video to MP4. Default `mode: "browser"`: free, returns a `render_url` — a one-time link ' +
         '(expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file ' +
@@ -92,7 +92,7 @@ export function registerMotionTools(server: McpServer) {
         mode: z.enum(['browser', 'server']).optional(),
         resolution: z.enum(['720p', '1080p', '1440p', '2160p']).optional(),
         format: z.string().optional().describe('server only: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif'),
-        quality: z.enum(['standard', 'high']).optional(),
+        quality: z.enum(['standard', 'high', 'max']).optional(),
         fps: z.union([z.literal(24), z.literal(25), z.literal(30), z.literal(50), z.literal(60)]).optional()
       }),
       annotations: { readOnlyHint: false, destructiveHint: false }
@@ -114,7 +114,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'get_storyboard',
     {
-      title: 'Read the storyboard of a motion video',
+      title: 'Read the storyboard of a frame',
       description:
         'The storyboard canvas linked to a motion video: its cards left to right (`node_id`, `text`, the `clip_ids` that play it), ' +
         'the pictures and clips on it with their asset ids and the card each feeds, and the card-to-card `flow`. `storyboard: null` when none was written. Reads only.',
@@ -127,7 +127,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'write_storyboard',
     {
-      title: 'Write the storyboard of a motion video',
+      title: 'Write the storyboard of a frame',
       description:
         'Lay out a motion video as a storyboard canvas: one card per beat, story order left to right, stronger emotion higher. ' +
         'Each beat: `act` (problem, solution, proof, claim), `kind` (title_card, ui_beat, product_shot, scene, logo), `title`, `intent`, `on_screen`, ' +
@@ -153,7 +153,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'get_motion_summary',
     {
-      title: 'Read a motion video',
+      title: 'Read a frame',
       description:
         'The saved state of a motion video: revision `version`, last change and who made it, size, fps, ' +
         'duration and every track and clip with start/duration in seconds. Reads only, spends nothing.',
@@ -166,7 +166,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'list_motion_revisions',
     {
-      title: 'List the saved versions of a motion video',
+      title: 'List the saved versions of a frame',
       description:
         'Every saved revision of a motion video, newest first: `version`, who saved it (`actorKind` user or agent), the `summary` ' +
         'of the change and how many `clips` it had, so a broken or emptied version can be told from a good one. Reads only.',
@@ -179,7 +179,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'restore_motion_revision',
     {
-      title: 'Restore a saved version of a motion video',
+      title: 'Restore a saved version of a frame',
       description:
         'Put an earlier revision of a motion video back (number from `list_motion_revisions`). It is saved as a NEW revision: ' +
         'no history is deleted, and restoring again undoes it. Free.',
@@ -192,7 +192,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'list_motion_templates',
     {
-      title: 'List motion templates',
+      title: 'List frame templates',
       description:
         'Ready-made pieces to drop into a motion video (built-in and saved by the org), e.g. builtin:prompt-input, a prompt field that types, presses send and thinks. ' +
         'Each with `id`, `seconds` and its `fields`: key, type (text, number min..max, color #rrggbb, boolean, select options), group and default. Reads only, free.',
@@ -205,11 +205,11 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'new_motion_from_template',
     {
-      title: 'Start a motion video from a template',
+      title: 'Start a frame from a template',
       description:
-        'Create a new motion video that already holds a template (id from `list_motion_templates`) at 0s, sized to `format` (16:9 default, 9:16, 1:1), ' +
-        'in `project` (default: the most recently active). Returns node_id and editor_url; change its fields with `add_motion_template` vars or `ask_motion_agent`. No AI, free.',
-      inputSchema: z.object({ org, template: z.string(), format: z.enum(['16:9', '9:16', '1:1']).optional(), project: z.string().optional() }),
+        'Create a new motion video that already holds a template (id from `list_motion_templates`) at 0s, sized to `format` (16:9 default; 9:16 story, 4:5 post, "A poster"), ' +
+        'in `project` (default: the most recently active). `still`: seconds of the one frame to keep, making it a still graphic (post, poster) instead of a video. Returns node_id and editor_url; change its fields with `add_motion_template` vars or `ask_motion_agent`. No AI, free.',
+      inputSchema: z.object({ org, template: z.string(), format: z.enum(['16:9', '9:16', '1:1', '4:5', '1:1 1440', 'A poster']).optional(), project: z.string().optional(), still: z.number().min(0).optional() }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
     async ({ org, ...body }) => withAuth((token) => motionApi.fromTemplate(token, body, org))
@@ -218,7 +218,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'add_motion_template',
     {
-      title: 'Add a template to a motion video',
+      title: 'Add a template to a frame',
       description:
         'Insert an editable copy of a template (id from `list_motion_templates`) at `at` seconds, its fields set from `vars` (keys and types as listed). ' +
         '`sound` (default true) lays its key taps and clicks on the SFX track. Saved as a new revision; no AI, free.',
@@ -229,9 +229,33 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'motion_tool',
+    {
+      title: 'Run a frame editor tool',
+      description:
+        'Every tool of the motion editor agent (add_clip, set_props, set_keyframes, add_template, set_canvas, export_image... over 140), run directly on a video with no AI and no credits. ' +
+        'No `tool`: lists them by name. `tool` alone: its description and JSON input schema. `tool` with `node_id`: runs it on the saved video with `input`; an edit is saved as a new revision (`version` answers the new one; pass the `version` you read to refuse a stale write with 409). ' +
+        'Still graphics: `set_canvas` with `still` (seconds of the frame) and `format` "4:5" post, "9:16" story or "A poster"; `export_image` (`format` png, jpg, webp; `scale` 1 or 2) saves the image to the project and returns its `url`. ' +
+        'Tools that need a chat turn (research, voice, sub-agents) answer with an error: use `ask_motion_agent` for those.',
+      inputSchema: z.object({ org, tool: z.string().optional(), node_id: z.string().optional(), input: z.record(z.string(), z.unknown()).optional(), version: z.number().int().min(0).optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, tool, node_id, input, version }) =>
+      withAuth((token) => {
+        if (!tool) {
+          return motionApi.tools(token, undefined, org);
+        }
+        if (!node_id) {
+          return motionApi.tools(token, tool, org);
+        }
+        return motionApi.runTool(token, node_id, { tool, ...(input ? { input } : {}), ...(version === undefined ? {} : { version }) }, org);
+      })
+  );
+
+  server.registerTool(
     'list_motion_videos',
     {
-      title: 'List motion videos',
+      title: 'List frames',
       description:
         'The motion videos (`motion` canvas nodes) of the org, newest first, optionally of one project: `node_id`, `name`, ' +
         '`project_id`, `canvas_id`, `format`, saved revision `version` (0 = empty), signed `poster_url` and `last_render_url` ' +
@@ -245,7 +269,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'publish_motion_embed',
     {
-      title: 'Publish a motion video as a web embed',
+      title: 'Publish a frame as a web embed',
       description:
         'Host the interactive web export of the saved revision on feega and return the public `url` and a `snippet` to paste ' +
         'into any site: feega\'s loader script and a `<feega-motion>` element that fills 100% of its box, reading playback and scroll length from feega (keeps pointer, tilt, scroll, key and tap input; live components such as games and generative pieces run live there). Publishing again updates the same embed in place, so the site needs no ' +
@@ -259,7 +283,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'motion_budget',
     {
-      title: 'Read or raise the budget of a motion video',
+      title: 'Read or raise the budget of a frame',
       description:
         'What a motion video has spent on AI across all its agent turns (`spent_usd`) and what it may spend (`cap_usd`). ' +
         'When an ask returns `video_budget`, the agent stopped because the video used its budget: its work is saved. ' +
@@ -273,7 +297,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'view_motion_frames',
     {
-      title: 'See frames of a motion video',
+      title: 'See still images of a frame',
       description:
         `Draw the saved revision of a motion video at up to ${MAX_FRAMES} exact times (seconds) and see them as JPEG images, ` +
         'with the quality gate the editor agent uses: `quality` lists every problem found (clipped or tiny text, flat or blank frames, ' +
@@ -301,7 +325,7 @@ export function registerMotionTools(server: McpServer) {
   server.registerTool(
     'get_motion_embed',
     {
-      title: 'Read a motion web embed',
+      title: 'Read a frame web embed',
       description:
         'Whether the web embed of a motion video is `published`, its public `url`, the loader `snippet` and the saved `revision`. ' +
         'The self-contained HTML file (no hosting) is downloaded with `feega motion embed <node> --download <file>`, or GET ' +

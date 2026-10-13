@@ -78,6 +78,6 @@ export const ADDABLE_LABEL: Record<Addable, string> = {
   calendar: 'Calendar',
   audio: 'Audio',
   model3d: '3D model',
-  motion: 'Motion',
+  motion: 'Frame',
   studio_batch: 'Studio batch'
 };
