@@ -8,10 +8,12 @@ describe('inline stage', () => {
     const take = inlineStage.offer('m1', body);
 
     expect(inlineStage.of('m1')).toBe(body);
+    expect(inlineStage.editing).toBe(true);
     expect(inlineStage.of('m2')).toBeNull();
 
     take();
     expect(inlineStage.of('m1')).toBeNull();
+    expect(inlineStage.editing).toBe(false);
   });
 
   it('the editor stage moves into the node body, so one player exists, and leaves with the editor', () => {

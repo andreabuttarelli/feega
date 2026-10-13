@@ -110,7 +110,8 @@
   import { ATTACH_PARAM, BRIEF_PARAM } from '$lib/motion/video-brief';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
-  import { MOUNT, Mount, Stage, Zoom, timelineFits } from '$lib/motion/editor-mount';
+  import { MOUNT, Measure, Mount, PART_DOCK, Part, Stage, Zoom, timelineFits } from '$lib/motion/editor-mount';
+  import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { hostedIn, inlineStage } from '$lib/canvas/inline-stage.svelte';
 
@@ -179,7 +180,8 @@
   let agentBusy = $state(false);
   let display = $state(TimeDisplay.Timecode);
   let width = $state(1440);
-  const viewport = $derived(viewportOf(width));
+  let hostWidth = $state(0);
+  const viewport = $derived(viewportOf(rules.measure === Measure.Host && hostWidth ? hostWidth : width));
   const chatPlace = $derived(CHAT_PLACE[viewport]);
   let moreOpen = $state(false);
   let menuOpen = $state(false);
@@ -200,6 +202,7 @@
   }
 
   $effect(() => (rules.closes ? keyRegion.follow() : undefined));
+  const dockOf = (part: Part) => ({ [DOCK_ATTR]: PART_DOCK[viewport][part] });
   const stageHost = $derived(rules.stage === Stage.Node ? inlineStage.of(data.node.id) : null);
 
   onMount(() => {
@@ -1165,15 +1168,15 @@
 <svelte:head>{#if rules.ownsTitle}<title>{data.node.name ?? 'Motion'} · Motion editor</title>{/if}</svelte:head>
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
-<div class="editor" data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
+<div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
   <header class="bar">
-    <div data-panel class="group lead">
+    <div class="group lead" {...dockOf(Part.Bar)}>
       <IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />
       <span class="title" title={data.node.name ?? 'Motion'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Motion'}</span>
       <span class="save-dot" data-tone={SAVE_TONE[saveState]} role="status" aria-label={`${saveState} · v${version}`}></span>
     </div>
 
-    <div data-panel class="group transport" role="group" aria-label="Transport">
+    <div class="group transport" {...dockOf(Part.Transport)} role="group" aria-label="Transport">
       <IconButton action={Action.GoStart} onclick={COMMANDS[Command.GoStart]} />
       <IconButton action={Action.StepBack} class="step" onclick={COMMANDS[Command.StepBack]} />
       <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" onclick={COMMANDS[Command.TogglePlay]} />
@@ -1194,7 +1197,7 @@
       </div>
     </div>
 
-    <div data-panel class="group trail" data-testid="bar-trail">
+    <div class="group trail" {...dockOf(Part.Bar)} data-testid="bar-trail">
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
       <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
       <div class="popover-anchor">
@@ -1368,7 +1371,7 @@
 
     <SideColumn place={chatPlace} side={layout.side} onside={(side) => relayout({ side })} widthPx={sideWidth(layout.sidePx, width)} onwidth={(sidePx) => (layout = { ...layout, sidePx })} oncommit={() => relayout({})} busy={agentBusy}>
     {#snippet properties()}
-    <aside data-panel class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
+    <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
@@ -1391,14 +1394,14 @@
     </aside>
     {/snippet}
     {#snippet chat()}
-    <aside data-panel class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
+    <aside class="chat" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Agent</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} prefill={brandAsk} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />
     </aside>
     {/snippet}
     </SideColumn>
 
-    <section data-panel class="timeline-area" aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc)}>
+    <section class="timeline-area" {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc)}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: DEFAULT_LAYOUT.timelinePx })}></div>
 
       {#if clipBarShown}
@@ -1460,7 +1463,7 @@
     </section>
   </div>
 
-  <nav data-panel class="tabs" aria-label="Panels">
+  <nav class="tabs" {...dockOf(Part.Tabs)} aria-label="Panels">
     <button type="button" class:on={sheet === Sheet.Properties} onclick={() => (sheet = sheet === Sheet.Properties ? Sheet.None : Sheet.Properties)}>Properties</button>
     <button type="button" class:on={sheet === Sheet.Agent} onclick={() => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)}>Agent</button>
   </nav>
@@ -1490,6 +1493,7 @@
   }
 
   .editor[data-mount='canvas'] {
+    position: absolute;
     z-index: 60;
     background: transparent;
     pointer-events: none;
@@ -1513,6 +1517,33 @@
   .editor[data-mount='canvas'] .props,
   .editor[data-mount='canvas'] .chat {
     background: var(--ui-bg);
+  }
+
+  .editor[data-mount='canvas'][data-viewport='tablet'] .bar {
+    display: flex;
+    justify-content: space-between;
+    gap: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .editor[data-mount='canvas'][data-viewport='tablet'] .bar .group {
+    gap: 0;
+  }
+
+  .editor[data-mount='canvas'][data-viewport='tablet'] .bar > * {
+    flex: 0 0 auto;
+    width: auto;
+  }
+
+  .editor[data-mount='canvas'][data-viewport='tablet'] .lead .title,
+  .editor[data-mount='canvas'][data-viewport='tablet'] .transport :global(.step),
+  .editor[data-mount='canvas'][data-viewport='tablet'] .clock i {
+    display: none;
+  }
+
+  .editor[data-mount='canvas'][data-viewport='phone'] .trail .popover-anchor {
+    display: none;
   }
 
   .editor[data-mount='canvas'][data-viewport='phone'] .body {

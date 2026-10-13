@@ -363,35 +363,25 @@
 
 <style>
   .canvas-topbar {
-    position: absolute;
+    position: relative;
     z-index: 20;
-    top: 0;
-    left: 0;
-    right: 0;
-    pointer-events: none;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    height: 52px;
+    padding: 0 8px;
+    background: var(--ui-surface);
   }
 
   .top-box {
-    position: absolute;
-    top: 8px;
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
     height: 44px;
     padding: 0 4px;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
-    pointer-events: auto;
-  }
-
-  .top-box.left {
-    left: 8px;
-    max-width: calc(100vw - 16px);
-  }
-
-  .top-box.right {
-    right: 8px;
   }
 
   .sep {

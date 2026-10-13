@@ -21,10 +21,23 @@ const JPEG = 'data:image/jpeg;base64,';
 const sse = (parts: unknown[]) => [...parts.map((p) => `data: ${JSON.stringify(p)}\n\n`), 'data: [DONE]\n\n'].join('');
 const askFrames = (callId: string) => sse([{ type: 'start' }, { type: 'data-motion-frames', data: { callId, times: [0.5, 1.5], doc } }, { type: 'finish' }]);
 
-const OPEN_AGENT: Record<'phone' | 'tablet', (page: Page) => Promise<void>> = {
+const OPEN_AGENT: Record<string, (page: Page) => Promise<void>> = {
   phone: (page) => page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Agent' }).click(),
-  tablet: (page) => page.getByTestId('toggle-chat').click()
+  tablet: (page) => page.getByTestId('toggle-chat').click(),
+  desktop: async () => {}
 };
+
+const emptyCanvasPoint = (page: Page) =>
+  page.evaluate(() => {
+    for (let y = 60; y < innerHeight; y += 20) {
+      for (let x = 80; x < innerWidth; x += 20) {
+        if (document.elementFromPoint(x, y)?.classList.contains('svelte-flow__pane')) {
+          return { x, y };
+        }
+      }
+    }
+    return null;
+  });
 
 const viewportTransform = (page: Page) => page.locator('.svelte-flow__viewport').evaluate((el) => getComputedStyle(el).transform);
 
@@ -77,7 +90,9 @@ test.describe('motion editor inside the canvas @real', () => {
     expect((await admin.from('nodes').select('deleted_at').eq('id', first).single()).data?.deleted_at).toBeNull();
 
     const before = await viewportTransform(page);
-    await page.mouse.move(640, 120);
+    const spot = await emptyCanvasPoint(page);
+    expect(spot).not.toBeNull();
+    await page.mouse.move(spot!.x, spot!.y);
     await page.mouse.wheel(0, -100);
     await expect.poll(() => viewportTransform(page)).not.toBe(before);
     await expect(editor).toBeVisible();
@@ -87,16 +102,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await expect(page.getByTestId('motion-preview')).toHaveCount(1);
     await shoot(page, '5-switched');
 
-    const empty = await page.evaluate(() => {
-      for (let y = 60; y < innerHeight; y += 20) {
-        for (let x = 80; x < innerWidth; x += 20) {
-          if (document.elementFromPoint(x, y)?.classList.contains('svelte-flow__pane')) {
-            return { x, y };
-          }
-        }
-      }
-      return null;
-    });
+    const empty = await emptyCanvasPoint(page);
     expect(empty).not.toBeNull();
     await page.mouse.click(empty!.x, empty!.y);
     await expect(editor).toHaveCount(0);
@@ -134,14 +140,14 @@ test.describe('motion editor inside the canvas @real', () => {
       await page.getByTestId('motion-node-stage').first().click({ position: { x: 60, y: 10 } });
 
       const editor = page.getByTestId('motion-editor');
-      await expect(editor).toHaveAttribute('data-viewport', name, { timeout: 15_000 });
+      await expect(editor).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
       await expect(page.getByTestId('motion-node').first().getByTestId('editor-stage')).toBeAttached();
       await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible();
-      await page.waitForTimeout(1500);
       await page.waitForTimeout(2500);
       await shoot(page, `${name}-open`);
 
-      await OPEN_AGENT[name](page);
+      await OPEN_AGENT[(await editor.getAttribute('data-viewport')) ?? 'desktop'](page);
+      await page.waitForTimeout(800);
       await expect(page.getByLabel('Agent', { exact: true })).toBeVisible();
       await shoot(page, `${name}-agent`);
     });

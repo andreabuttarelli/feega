@@ -49,16 +49,12 @@
 
 <style>
   .left-panel {
-    position: absolute;
-    z-index: 15;
-    left: 60px;
-    top: 44px;
-    bottom: 0;
+    flex: 0 0 auto;
+    align-self: stretch;
+    min-height: 0;
     display: flex;
     flex-direction: column;
-    background: var(--paper, #fff);
-    border-left: 1px solid var(--line, #ededef);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    background: var(--ui-bg);
   }
 
   .left-panel-head {

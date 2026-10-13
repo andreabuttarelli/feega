@@ -10,6 +10,9 @@ export const inlineStage = {
       }
     };
   },
+  get editing() {
+    return offered !== null;
+  },
   of(nodeId: string): HTMLElement | null {
     return offered?.nodeId === nodeId ? offered.el : null;
   }

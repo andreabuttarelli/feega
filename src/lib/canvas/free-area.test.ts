@@ -1,33 +1,59 @@
 import { describe, expect, it } from 'vitest';
-import { fitPadding, freeArea } from './free-area';
+import { DOCK_EDGE, Dock, Edge, fitPadding, freeArea } from './free-area';
 
 const SCREEN = { width: 1280, height: 720 };
 
+describe('docked regions', () => {
+  it('each region docks to one edge, declared once', () => {
+    expect(DOCK_EDGE).toEqual({
+      [Dock.TopBar]: Edge.Top,
+      [Dock.LeftBar]: Edge.Left,
+      [Dock.LeftPanel]: Edge.Left,
+      [Dock.RightPanel]: Edge.Right,
+      [Dock.Timeline]: Edge.Bottom
+    });
+  });
+});
+
 describe('free area', () => {
-  it('leaves out the bar on top, the timeline below and the column on the right', () => {
-    const panels = [
-      { left: 0, top: 0, right: 1280, bottom: 44 },
-      { left: 0, top: 360, right: 880, bottom: 720 },
-      { left: 880, top: 44, right: 1280, bottom: 720 }
+  it('is what the bar, the timeline and the right column leave', () => {
+    const docked = [
+      { dock: Dock.TopBar, box: { left: 0, top: 0, right: 1280, bottom: 44 } },
+      { dock: Dock.Timeline, box: { left: 0, top: 360, right: 880, bottom: 720 } },
+      { dock: Dock.RightPanel, box: { left: 880, top: 44, right: 1280, bottom: 720 } }
     ];
 
-    expect(freeArea(SCREEN, panels)).toEqual({ top: 44, right: 400, bottom: 360, left: 0 });
+    expect(freeArea(SCREEN, docked)).toEqual({ top: 44, right: 400, bottom: 360, left: 0 });
   });
 
-  it('on a phone the bar is split in groups along the top, and the timeline is a band at the bottom', () => {
+  it('an open left panel pushes the free area right of it', () => {
+    const docked = [
+      { dock: Dock.LeftBar, box: { left: 0, top: 0, right: 48, bottom: 720 } },
+      { dock: Dock.LeftPanel, box: { left: 48, top: 0, right: 328, bottom: 720 } }
+    ];
+
+    expect(freeArea(SCREEN, docked).left).toBe(328);
+  });
+
+  it('a phone splits the bar in groups on top and keeps transport and tabs at the bottom', () => {
     const phone = { width: 390, height: 844 };
-    const panels = [
-      { left: 0, top: 0, right: 150, bottom: 56 },
-      { left: 150, top: 0, right: 390, bottom: 56 },
-      { left: 0, top: 400, right: 390, bottom: 720 },
-      { left: 0, top: 720, right: 390, bottom: 844 }
+    const docked = [
+      { dock: Dock.TopBar, box: { left: 0, top: 0, right: 150, bottom: 56 } },
+      { dock: Dock.TopBar, box: { left: 150, top: 0, right: 390, bottom: 56 } },
+      { dock: Dock.Timeline, box: { left: 0, top: 400, right: 390, bottom: 720 } },
+      { dock: Dock.Timeline, box: { left: 0, top: 720, right: 390, bottom: 844 } }
     ];
 
-    expect(freeArea(phone, panels)).toEqual({ top: 56, right: 0, bottom: 444, left: 0 });
+    expect(freeArea(phone, docked)).toEqual({ top: 56, right: 0, bottom: 444, left: 0 });
   });
 
-  it('ignores panels that are hidden and take no room', () => {
-    expect(freeArea(SCREEN, [{ left: 0, top: 0, right: 0, bottom: 0 }])).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
+  it('ignores hidden regions and the part of a region outside the screen', () => {
+    const docked = [
+      { dock: Dock.TopBar, box: { left: 0, top: 0, right: 0, bottom: 0 } },
+      { dock: Dock.LeftBar, box: { left: -48, top: 0, right: 0, bottom: 720 } }
+    ];
+
+    expect(freeArea(SCREEN, docked)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
   });
 
   it('frames the node inside what is left, with a margin', () => {

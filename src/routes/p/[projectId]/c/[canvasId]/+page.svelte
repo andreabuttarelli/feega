@@ -2515,7 +2515,7 @@
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
 
-<div class="canvas">
+<div class="canvas" class:editing={inlineMotion !== null}>
   {#if peers.length}
     <div class="peers" aria-label="Persone sulla tela">{peers.map((peer) => peer.name).join(', ')}</div>
   {/if}
@@ -2877,6 +2877,12 @@
 </div>
 
 <style>
+  @media (max-width: 767px) {
+    .canvas.editing :global([role='toolbar'][aria-label='Selection actions']) {
+      display: none;
+    }
+  }
+
   .canvas {
     position: relative;
     flex: 1 1 auto;

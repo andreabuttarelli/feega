@@ -5,6 +5,7 @@
   import { onDestroy, untrack } from 'svelte';
   import CanvasTopBar from '$lib/components/canvas/CanvasTopBar.svelte';
   import FloatingRail from '$lib/components/canvas/FloatingRail.svelte';
+  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import CanvasChatPanel from '$lib/components/canvas/CanvasChatPanel.svelte';
   import CanvasSheet from '$lib/components/canvas/CanvasSheet.svelte';
   import ChatLeaveGuard from '$lib/components/canvas/ChatLeaveGuard.svelte';
@@ -174,54 +175,54 @@
       {/if}
     </main>
   {:else if onCanvasRoute}
+    <CanvasTopBar
+      {projectId}
+      projectName={data.project.name}
+      projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string; mode: string }) => ({
+        id: p.id,
+        name: p.name,
+        href: p.href,
+        updatedAt: p.updatedAt,
+        mode: p.mode
+      }))}
+      projectMode={data.project.mode}
+      brandName={data.brand?.name ?? null}
+      canvasName={currentCanvas?.name ?? ''}
+      canvasHref={currentCanvas?.href ?? ''}
+      canvases={data.canvases}
+      creditBalance={data.creditBalance}
+      {chatOpen}
+      onToggleChat={toggleChat}
+      {shareToken}
+      {onShare}
+      profile={data.profile}
+      org={data.org}
+    />
     <div class="canvas-row">
+      <FloatingRail
+        activePanel={leftPanel}
+        activeSheet={activeSheetId}
+        onPanel={onRailPanel}
+        onSheet={onRailSheet}
+        onRoute={(entry) => goto(navHref(projectId, entry))}
+        mode={modeOf(data.project.mode)}
+      />
+      {#if browser && leftPanel}
+        {#await CHROME_LOADERS.leftPanel() then { default: CanvasLeftPanel }}
+          <CanvasLeftPanel
+            {projectId}
+            kind={leftPanel}
+            labelKey={leftPanel === 'assets' ? 'app.nav2.materials' : leftPanel === 'brands' ? 'app.nav2.brands' : 'app.nav2.influencers'}
+            onclose={() => (leftPanel = null)}
+          />
+        {/await}
+      {/if}
       <div class="canvas-stage">
         {@render children()}
-        <CanvasTopBar
-          {projectId}
-          projectName={data.project.name}
-          projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string; mode: string }) => ({
-            id: p.id,
-            name: p.name,
-            href: p.href,
-            updatedAt: p.updatedAt,
-            mode: p.mode
-          }))}
-          projectMode={data.project.mode}
-          brandName={data.brand?.name ?? null}
-          canvasName={currentCanvas?.name ?? ''}
-          canvasHref={currentCanvas?.href ?? ''}
-          canvases={data.canvases}
-          creditBalance={data.creditBalance}
-          {chatOpen}
-          onToggleChat={toggleChat}
-          {shareToken}
-          {onShare}
-          profile={data.profile}
-          org={data.org}
-        />
-        <FloatingRail
-          activePanel={leftPanel}
-          activeSheet={activeSheetId}
-          onPanel={onRailPanel}
-          onSheet={onRailSheet}
-          onRoute={(entry) => goto(navHref(projectId, entry))}
-          mode={modeOf(data.project.mode)}
-        />
-        {#if browser && leftPanel}
-          {#await CHROME_LOADERS.leftPanel() then { default: CanvasLeftPanel }}
-            <CanvasLeftPanel
-              {projectId}
-              kind={leftPanel}
-              labelKey={leftPanel === 'assets' ? 'app.nav2.materials' : leftPanel === 'brands' ? 'app.nav2.brands' : 'app.nav2.influencers'}
-              onclose={() => (leftPanel = null)}
-            />
-          {/await}
-        {/if}
         <CanvasSheet {projectId} />
       </div>
 
-      <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={chatOpen} />
+      <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={chatOpen && !inlineStage.editing} />
     </div>
   {:else}
     <DesktopPageBar

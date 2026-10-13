@@ -77,7 +77,7 @@
   }
 </script>
 
-<div class="side" data-panel class:docked style={docked ? `--side-w: ${widthPx}px;` : undefined} data-testid="side-column">
+<div class="side" class:docked style={docked ? `--side-w: ${widthPx}px;` : undefined} data-testid="side-column">
   {#if docked}
     <div
       class="edge"
