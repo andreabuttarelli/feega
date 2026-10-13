@@ -1,5 +1,6 @@
 [
   "builtin:circular-carousel",
+  "builtin:collage-stack-rotate",
   "builtin:comment-grid",
   "builtin:composition-bento",
   "builtin:composition-carousel-3d",
