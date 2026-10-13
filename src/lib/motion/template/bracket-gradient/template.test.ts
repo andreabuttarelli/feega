@@ -43,6 +43,12 @@ describe('the bracket gradient template', () => {
     expect(fields.find((f) => f.prop === 'leave')?.type).toBe(FieldType.Boolean);
   });
 
+  it('opens on a neutral sentence of its own, not the reference copy', () => {
+    const placed = inserted();
+
+    expect(templateFields(placed.doc, placed.clipId).find((f) => f.key === 'headline')?.value).toBe('Every idea deserves a clear frame');
+  });
+
   it('names its key fields among the fields it exposes', () => {
     const keys = BRACKET_GRADIENT_TEMPLATE.template.doc.fields.map((f) => f.key);
 

@@ -13,7 +13,7 @@ const number = (title: string, value: number, minimum: number, maximum: number, 
 const colour = (title: string, value: string): PropSpec => ({ type: 'string', title, format: PropFormat.Color, default: value, group: 'Style' });
 
 export const BRACKET_PROPS: Record<string, PropSpec> = {
-  headline: text('Sentence', 'The AI powered platform for modern creatives', { maxLength: 120 }),
+  headline: text('Sentence', 'Every idea deserves a clear frame', { maxLength: 120 }),
   font: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter', group: 'Style' },
   fontSize: number('Text size (% of the short side)', 4.8, 2, 12, 'Style', 0.1),
   fontWeight: number('Text weight', 300, 200, 700, 'Style', 100),
