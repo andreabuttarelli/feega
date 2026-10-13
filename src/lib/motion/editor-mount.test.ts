@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BAR_PLACE, BarPlace, MOUNT, Measure, Mount, PART_DOCK, Part, Stage, Zoom, timelineFits } from './editor-mount';
+import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, Zoom, timelineFits } from './editor-mount';
 import { Viewport } from './editor-layout';
 import { Dock } from '$lib/canvas/free-area';
 import { MotionFormat, newMotionDoc } from './doc';
@@ -41,5 +41,14 @@ describe('one bar on top while a frame is open', () => {
     expect(BAR_PLACE[Viewport.Desktop]).toBe(BarPlace.CanvasBar);
     expect(BAR_PLACE[Viewport.Tablet]).toBe(BarPlace.CanvasBar);
     expect(BAR_PLACE[Viewport.Phone]).toBe(BarPlace.OwnRow);
+  });
+});
+
+describe('one burger on top', () => {
+  it('in the canvas bar the editor has no drawer of its own (the canvas burger is the one); alone on a phone it keeps its drawer', () => {
+    expect(menuPlace(Mount.Canvas, Viewport.Desktop)).toBe(MenuPlace.More);
+    expect(menuPlace(Mount.Canvas, Viewport.Tablet)).toBe(MenuPlace.More);
+    expect(menuPlace(Mount.Canvas, Viewport.Phone)).toBe(MenuPlace.Drawer);
+    expect(menuPlace(Mount.Page, Viewport.Desktop)).toBe(MenuPlace.Drawer);
   });
 });
