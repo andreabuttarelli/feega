@@ -1,5 +1,5 @@
 const MAX_BLOBS = 10;
-const MAX_BUBBLES = 64;
+const MAX_BUBBLES = 176;
 
 const VERTEX = `
 varying vec2 vUv;
@@ -14,10 +14,12 @@ precision highp float;
 varying vec2 vUv;
 uniform vec2 uRes;
 uniform float uPortrait;
-uniform vec3 uBlobs[${MAX_BLOBS}];
-uniform vec3 uBubbles[${MAX_BUBBLES}];
+uniform vec4 uBlobs[${MAX_BLOBS}];
+uniform vec4 uBubbles[${MAX_BUBBLES}];
 uniform int uBubbleCount;
 uniform float uPhase;
+uniform float uYaw;
+uniform float uPitch;
 uniform float uSeed;
 uniform float uGlitter;
 uniform float uDim;
@@ -27,10 +29,16 @@ uniform vec3 uSheen;
 uniform vec3 uRim;
 uniform vec3 uGlow;
 
-float hash21(vec2 p) {
-  p = fract(p * vec2(123.34, 456.21));
-  p += dot(p, p + 45.32 + uSeed);
-  return fract(p.x * p.y);
+const float CAMERA_DISTANCE = 3.0;
+const float FOCAL = 3.0;
+const float BLEND = 0.13;
+const int STEPS = 72;
+const vec3 LIGHT = vec3(-0.45, 0.62, 0.64);
+
+float hash31(vec3 p) {
+  p = fract(p * vec3(0.1031, 0.1030, 0.0973) + uSeed);
+  p += dot(p, p.yxz + 33.33);
+  return fract((p.x + p.y) * p.z);
 }
 
 vec3 hash33(vec3 p) {
@@ -41,127 +49,164 @@ vec3 hash33(vec3 p) {
 float noise3(vec3 p) {
   vec3 i = floor(p);
   vec3 f = fract(p);
-  vec3 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  vec3 u = f * f * (3.0 - 2.0 * f);
   return mix(mix(mix(dot(hash33(i), f), dot(hash33(i + vec3(1, 0, 0)), f - vec3(1, 0, 0)), u.x),
                  mix(dot(hash33(i + vec3(0, 1, 0)), f - vec3(0, 1, 0)), dot(hash33(i + vec3(1, 1, 0)), f - vec3(1, 1, 0)), u.x), u.y),
              mix(mix(dot(hash33(i + vec3(0, 0, 1)), f - vec3(0, 0, 1)), dot(hash33(i + vec3(1, 0, 1)), f - vec3(1, 0, 1)), u.x),
                  mix(dot(hash33(i + vec3(0, 1, 1)), f - vec3(0, 1, 1)), dot(hash33(i + vec3(1, 1, 1)), f - vec3(1, 1, 1)), u.x), u.y), u.z);
 }
 
-vec3 loopNoise(vec2 p, float radius, float seed) {
-  vec2 ring = vec2(cos(uPhase), sin(uPhase)) * radius;
-  return vec3(p + ring, seed);
+vec3 drifting(vec3 p, float radius) {
+  return p + vec3(cos(uPhase), sin(uPhase), 0.0) * radius + uSeed;
 }
 
-vec2 warp(vec2 m) {
-  vec2 a = vec2(noise3(loopNoise(m * 2.1, 0.55, 1.7 + uSeed)), noise3(loopNoise(m * 2.1 + 9.0, 0.55, 4.3 + uSeed)));
-  return m + a * 0.055;
+float smin(float a, float b, float k) {
+  float h = clamp(0.5 + 0.5 * (b - a) / k, 0.0, 1.0);
+  return mix(b, a, h) - k * h * (1.0 - h);
 }
 
-float field(vec2 m) {
-  vec2 w = warp(m);
-  float f = 0.0;
+float mass(vec3 p) {
+  float d = 10.0;
   for (int i = 0; i < ${MAX_BLOBS}; i++) {
-    vec3 b = uBlobs[i];
-    vec2 d = w - b.xy;
-    float k = (b.z * b.z) / (dot(d, d) + 0.0004);
-    f += k * k;
+    vec4 b = uBlobs[i];
+    d = smin(d, length(p - b.xyz) - b.w, BLEND);
   }
-  return f;
+  return d + 0.022 * noise3(drifting(p * 5.0, 0.8));
 }
 
-float lumps(vec2 m) {
-  return noise3(loopNoise(m * 5.5, 0.9, 11.0 + uSeed)) * 0.55 + noise3(loopNoise(m * 11.0, 1.3, 23.0 + uSeed)) * 0.2;
+vec3 normalAt(vec3 p) {
+  vec2 e = vec2(0.0025, -0.0025);
+  return normalize(e.xyy * mass(p + e.xyy) + e.yyx * mass(p + e.yyx) + e.yxy * mass(p + e.yxy) + e.xxx * mass(p + e.xxx));
 }
 
-float height(vec2 m) {
-  float f = field(m);
-  float dome = sqrt(1.0 - exp(-max(f - 1.0, 0.0) * 0.9));
-  return dome + lumps(m) * 0.22 * smoothstep(1.0, 3.0, f);
+float occlusion(vec3 p, vec3 n) {
+  float occ = 0.0;
+  float weight = 1.0;
+  for (int i = 1; i <= 4; i++) {
+    float h = 0.025 * float(i);
+    occ += (h - mass(p + n * h)) * weight;
+    weight *= 0.7;
+  }
+  return clamp(1.0 - occ * 7.0, 0.0, 1.0);
+}
+
+mat3 orbit() {
+  float cy = cos(uYaw), sy = sin(uYaw), cp = cos(uPitch), sp = sin(uPitch);
+  mat3 yaw = mat3(cy, 0.0, -sy, 0.0, 1.0, 0.0, sy, 0.0, cy);
+  mat3 pitch = mat3(1.0, 0.0, 0.0, 0.0, cp, sp, 0.0, -sp, cp);
+  return yaw * pitch;
+}
+
+float sphereHit(vec3 ro, vec3 rd, vec4 s) {
+  vec3 oc = ro - s.xyz;
+  float b = dot(oc, rd);
+  float c = dot(oc, oc) - s.w * s.w;
+  float h = b * b - c;
+  return h < 0.0 ? -1.0 : -b - sqrt(h);
+}
+
+vec3 pearlOf(vec3 n, vec3 p) {
+  float hue = 0.5 + 0.5 * sin(n.x * 3.5 + n.y * 2.5 + noise3(drifting(p * 2.2, 0.4) + 31.0) * 3.5);
+  vec3 cyan = vec3(uBody.r * 0.6, min(1.0, uBody.g * 1.12), uBody.b);
+  return mix(mix(cyan, uBody, smoothstep(0.0, 0.55, hue)), uSheen, smoothstep(0.5, 1.0, hue) * 0.85);
 }
 
 void main() {
   vec2 px = gl_FragCoord.xy;
   float unit = min(uRes.x, uRes.y);
   vec2 s = (px - 0.5 * uRes) / unit;
-  s.y = -s.y;
   vec2 m = uPortrait > 0.5 ? s : s.yx;
-  float pixel = 1.0 / unit;
+  mat3 rot = orbit();
+  vec3 ro = rot * vec3(0.0, 0.0, CAMERA_DISTANCE);
+  vec3 rd = rot * normalize(vec3(m, -FOCAL));
 
-  float f = field(m);
-  float aa = max(fwidth(f), 1e-4);
-  float inside = smoothstep(1.0 - aa, 1.0 + aa, f);
+  float t = CAMERA_DISTANCE - 0.7;
+  float closest = 10.0;
+  float hit = -1.0;
+  for (int i = 0; i < STEPS; i++) {
+    float d = mass(ro + rd * t);
+    closest = min(closest, d);
+    if (d < 0.0008) {
+      hit = t;
+      break;
+    }
+    t += d * 0.85;
+    if (t > CAMERA_DISTANCE + 0.7) {
+      break;
+    }
+  }
 
-  float e = 2.5 * pixel;
-  float h = height(m);
-  vec2 grad = vec2(height(m + vec2(e, 0.0)) - h, height(m + vec2(0.0, e)) - h) / e;
-  vec3 n = normalize(vec3(-grad * 0.11, 1.0));
-  float facing = clamp(n.z, 0.0, 1.0);
-  float fres = pow(1.0 - facing, 1.6);
-
-  vec3 light = normalize(vec3(-0.45, 0.6, 0.66));
-  float diff = clamp(dot(n, light) * 0.5 + 0.5, 0.0, 1.0);
-  float spec = pow(clamp(dot(reflect(-light, n), vec3(0.0, 0.0, 1.0)), 0.0, 1.0), 18.0);
-
-  float hue = 0.5 + 0.5 * sin(n.x * 4.0 + n.y * 3.0 + noise3(loopNoise(m * 1.4, 0.4, 31.0 + uSeed)) * 3.5);
-  vec3 cyan = mix(uBody, vec3(uBody.r * 0.6, min(1.0, uBody.g * 1.12), uBody.b), 0.6);
-  vec3 pearl = mix(mix(cyan, uBody, smoothstep(0.0, 0.55, hue)), uSheen, smoothstep(0.55, 1.0, hue) * 0.85);
-  vec3 col = pearl * (0.42 + 0.7 * diff);
-  col += vec3(1.0, 0.97, 1.0) * spec * 0.45;
-
-  float near = 0.0;
-  float shadow = 0.0;
+  float bubbleT = 1e3;
   vec4 bubble = vec4(0.0);
-  vec2 w = warp(m) * 0.35 + m * 0.65;
   for (int i = 0; i < ${MAX_BUBBLES}; i++) {
     if (i >= uBubbleCount) {
       break;
     }
-    vec3 b = uBubbles[i];
-    float d = length(w - b.xy);
-    near += exp(-pow(max(d - b.z, 0.0) / (b.z * 2.6 + 0.02), 2.0)) * smoothstep(0.0, 0.05, b.z);
-    shadow = max(shadow, exp(-max(d - b.z, 0.0) / (b.z * 0.45 + 0.004)));
-    float cover = smoothstep(b.z + pixel, b.z - pixel, d);
-    if (cover > bubble.a) {
-      vec2 q = (w - b.xy) / b.z;
-      vec3 bn = normalize(vec3(q, sqrt(max(1.0 - dot(q, q), 0.0))));
-      float rim = pow(1.0 - bn.z, 3.0);
-      float glint = pow(clamp(dot(reflect(-light, bn), vec3(0.0, 0.0, 1.0)), 0.0, 1.0), 40.0);
-      vec3 inner = uBg * 0.6 + uGlow * rim * 0.22 + cyan * rim * 0.12 + vec3(glint) * 0.35;
-      bubble = vec4(inner, cover);
+    float tb = sphereHit(ro, rd, uBubbles[i]);
+    if (tb > 0.0 && tb < bubbleT) {
+      bubbleT = tb;
+      bubble = uBubbles[i];
     }
   }
-  near = clamp(near, 0.0, 1.0);
 
-  float edgeGlow = smoothstep(1.2, 2.2, f) * (1.0 - smoothstep(2.5, 6.0, f));
-  float drift = smoothstep(-0.1, 0.45, noise3(loopNoise(m * 1.6, 0.5, 47.0 + uSeed)));
-  float green = clamp(near * 0.9 + edgeGlow * drift * 0.55, 0.0, 1.0);
-  col = mix(col, uGlow * (0.55 + 0.45 * diff), green * 0.55);
-  col *= 1.0 - shadow * 0.55;
+  vec3 light = normalize(LIGHT);
+  vec3 col = uBg + uRim * exp(-max(closest, 0.0) * 55.0) * 0.28;
 
-  float rimBand = smoothstep(1.45, 1.0, f);
-  col = mix(col, uRim * (0.85 + 0.4 * diff), clamp(pow(fres, 1.4) * 0.8 + rimBand * 0.7, 0.0, 1.0) * 0.9);
-  col += uRim * pow(rimBand, 3.0) * 0.25;
+  if (hit > 0.0 && hit < bubbleT) {
+    vec3 p = ro + rd * hit;
+    vec3 n = normalAt(p);
+    vec3 v = -rd;
+    float facing = clamp(dot(n, v), 0.0, 1.0);
+    float fres = pow(1.0 - facing, 2.2);
+    float diff = clamp(dot(n, light) * 0.5 + 0.5, 0.0, 1.0);
+    vec3 h = normalize(light + v);
+    float spec = pow(clamp(dot(n, h), 0.0, 1.0), 60.0) * 0.55 + pow(clamp(dot(n, h), 0.0, 1.0), 9.0) * 0.12;
+    float ao = occlusion(p, n);
+    float thick = clamp(-mass(p - n * 0.07) / 0.07, 0.0, 1.0);
 
-  vec2 cell = m * 260.0;
-  vec2 id = floor(cell);
-  float pick = hash21(id);
-  vec2 dot2 = fract(cell) - (0.2 + 0.6 * vec2(hash21(id + 3.1), hash21(id + 7.7)));
-  float twinkle = 0.5 + 0.5 * sin(uPhase * floor(1.0 + pick * 3.0) + pick * 40.0);
-  float sparkle = step(1.0 - 0.14 * uGlitter, pick) * smoothstep(0.22, 0.0, length(dot2)) * twinkle;
-  vec3 tint = mix(vec3(1.0, 0.98, 0.85), uGlow + 0.35, step(0.5, hash21(id + 1.3)));
-  col += tint * sparkle * 1.3 * smoothstep(1.2, 2.0, f);
+    float near = 0.0;
+    float shadow = 0.0;
+    for (int i = 0; i < ${MAX_BUBBLES}; i++) {
+      if (i >= uBubbleCount) {
+        break;
+      }
+      vec4 b = uBubbles[i];
+      float gap = max(length(p - b.xyz) - b.w, 0.0);
+      near += exp(-gap / (b.w * 1.6 + 0.012)) * smoothstep(0.004, 0.03, b.w);
+      shadow = max(shadow, exp(-gap / (b.w * 0.35 + 0.003)));
+    }
+    near = clamp(near * 0.6, 0.0, 1.0);
 
-  col = mix(col, bubble.rgb, bubble.a * smoothstep(0.55, 1.0, f));
+    vec3 pearl = pearlOf(n, p);
+    col = pearl * (0.38 + 0.62 * diff) * mix(0.42, 1.0, ao);
+    col += pearl * (1.0 - thick) * 0.25;
+    col = mix(col, uGlow * (0.5 + 0.5 * diff), near * 0.6 * ao);
+    col *= 1.0 - shadow * 0.6;
+    col = mix(col, uRim * (0.9 + 0.4 * diff), clamp(fres * 1.25, 0.0, 1.0) * 0.9);
+    col += vec3(1.0, 0.97, 1.0) * spec * ao;
 
-  float halo = exp(-max(1.0 - f, 0.0) * 9.0) * (1.0 - inside);
-  vec3 bg = uBg + uRim * halo * 0.22;
-  vec3 outCol = mix(bg, col, inside);
+    vec3 cell = p * 170.0;
+    vec3 id = floor(cell);
+    float pick = hash31(id);
+    float dotSize = length(fract(cell) - 0.5);
+    float twinkle = 0.5 + 0.5 * sin(uPhase * floor(1.0 + pick * 3.0) + pick * 40.0);
+    float sparkle = step(1.0 - 0.12 * uGlitter, pick) * smoothstep(0.3, 0.05, dotSize) * twinkle * facing;
+    vec3 tint = mix(vec3(1.0, 0.97, 0.85), uGlow + 0.35, step(0.5, hash31(id + 1.3)));
+    col += tint * sparkle * 1.2;
+  } else if (bubbleT < 1e2) {
+    vec3 p = ro + rd * bubbleT;
+    vec3 n = normalize(p - bubble.xyz);
+    vec3 v = -rd;
+    float fres = pow(1.0 - clamp(dot(n, v), 0.0, 1.0), 3.0);
+    float glint = pow(clamp(dot(reflect(-light, n), v), 0.0, 1.0), 90.0);
+    float sheen = pow(clamp(dot(reflect(-light, n), v), 0.0, 1.0), 12.0);
+    col = uBg * 0.5 + 0.015 + uGlow * fres * 0.16 + uBody * fres * 0.18 + vec3(glint) * 0.9 + vec3(sheen) * 0.05;
+  }
 
   float vignette = 1.0 - 0.25 * smoothstep(0.35, 1.1, length(s));
-  outCol *= vignette * (1.0 - uDim);
-  outCol += (hash21(px + 0.5) - 0.5) / 255.0;
-  gl_FragColor = vec4(clamp(outCol, 0.0, 1.0), 1.0);
+  col *= vignette * (1.0 - uDim);
+  col += (hash31(vec3(px, 0.5)) - 0.5) / 255.0;
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }
 `;
 

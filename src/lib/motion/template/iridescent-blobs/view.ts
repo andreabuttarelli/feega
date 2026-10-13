@@ -8,14 +8,17 @@ const headline = root.querySelector('.ib-headline');
 const renderer = three.renderer(canvas);
 const stage = new THREE.Scene();
 const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-const vec3s = (n) => Array.from({ length: n }, () => new THREE.Vector3());
+const RENDER_SCALE = 0.75;
+const vec4s = (n) => Array.from({ length: n }, () => new THREE.Vector4());
 const uniforms = {
   uRes: { value: new THREE.Vector2(1, 1) },
   uPortrait: { value: 1 },
-  uBlobs: { value: vec3s(MAX_BLOB_UNIFORMS) },
-  uBubbles: { value: vec3s(MAX_BUBBLE_UNIFORMS) },
+  uBlobs: { value: vec4s(MAX_BLOB_UNIFORMS) },
+  uBubbles: { value: vec4s(MAX_BUBBLE_UNIFORMS) },
   uBubbleCount: { value: 0 },
   uPhase: { value: 0 },
+  uYaw: { value: 0 },
+  uPitch: { value: 0 },
   uSeed: { value: 0 },
   uGlitter: { value: 0 },
   uDim: { value: 0 },
@@ -54,7 +57,7 @@ const fit = (width, height) => {
     return;
   }
   cache = { ...cache, sizeKey: key };
-  renderer.setSize(width, height, false);
+  renderer.setSize(Math.round(width * RENDER_SCALE), Math.round(height * RENDER_SCALE), false);
 };
 
 const paintLook = (p) => {
@@ -102,9 +105,12 @@ const draw = (t) => {
   renderer.getDrawingBufferSize(buffer);
   uniforms.uRes.value.copy(buffer);
   uniforms.uPortrait.value = height >= width ? 1 : 0;
-  f.blobs.forEach((b, i) => uniforms.uBlobs.value[i].set(b.x, b.y, b.r));
-  f.bubbles.forEach((b, i) => uniforms.uBubbles.value[i].set(b.x, b.y, b.r));
-  uniforms.uBubbleCount.value = f.bubbles.length;
+  const bubbles = f.bubbles.slice(0, MAX_BUBBLE_UNIFORMS);
+  f.blobs.forEach((b, i) => uniforms.uBlobs.value[i].set(b.x, b.y, b.z, b.r));
+  bubbles.forEach((b, i) => uniforms.uBubbles.value[i].set(b.x, b.y, b.z, b.r));
+  uniforms.uBubbleCount.value = bubbles.length;
+  uniforms.uYaw.value = f.yaw;
+  uniforms.uPitch.value = f.pitch;
   uniforms.uPhase.value = f.phase;
   uniforms.uSeed.value = (Math.round(p.seed) % 17) * 0.37;
   uniforms.uGlitter.value = p.glitter;

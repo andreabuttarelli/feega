@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { BLOBS_MODEL } from './model';
 
-type Ball = { x: number; y: number; r: number };
+type Ball = { x: number; y: number; z: number; r: number };
 type Word = { y: number; opacity: number };
-type Frame = { blobs: Ball[]; bubbles: Ball[]; phase: number; words: Word[]; dim: number };
+type Frame = { blobs: Ball[]; bubbles: Ball[]; phase: number; yaw: number; pitch: number; words: Word[]; dim: number };
 type Model = {
   blobsLayout: (p: object) => object;
   blobsFrame: (layout: object, p: object, t: number, length: number) => Frame;
@@ -27,8 +27,11 @@ describe('the iridescent blobs model', () => {
     balls(first).forEach((b, i) => {
       expect(balls(last)[i].x).toBeCloseTo(b.x, 9);
       expect(balls(last)[i].y).toBeCloseTo(b.y, 9);
+      expect(balls(last)[i].z).toBeCloseTo(b.z, 9);
       expect(balls(last)[i].r).toBeCloseTo(b.r, 9);
     });
+    expect(last.yaw).toBeCloseTo(first.yaw, 9);
+    expect(last.pitch).toBeCloseTo(first.pitch, 9);
     expect(Math.cos(last.phase)).toBeCloseTo(Math.cos(first.phase), 9);
   });
 
@@ -42,7 +45,7 @@ describe('the iridescent blobs model', () => {
       const a = balls(frame(times[i - 1]));
       const b = balls(frame(times[i]));
       a.forEach((ball, k) => {
-        worst = Math.max(worst, Math.hypot(ball.x - b[k].x, ball.y - b[k].y));
+        worst = Math.max(worst, Math.hypot(ball.x - b[k].x, ball.y - b[k].y, ball.z - b[k].z));
       });
     }
 
@@ -71,11 +74,41 @@ describe('the iridescent blobs model', () => {
     expect(frame(1, { ...PARAMS, bubbles: 1 }).bubbles.length).toBeGreaterThan(frame(1, { ...PARAMS, bubbles: 0.3 }).bubbles.length);
   });
 
+  it('is a volume: blobs sit at different depths and the camera sways so it reads', () => {
+    const f = frame(2);
+    const depths = f.blobs.map((b) => b.z);
+    const yaws = times.map((t) => frame(t).yaw);
+
+    expect(Math.max(...depths) - Math.min(...depths)).toBeGreaterThan(0.1);
+    expect(Math.max(...yaws) - Math.min(...yaws)).toBeGreaterThan(0.1);
+    expect(Math.max(...yaws.map(Math.abs))).toBeLessThan(0.4);
+  });
+
+  it('packs many bubbles: dense clusters, scattered ones and tiny dot trails', () => {
+    const f = frame(1, { ...PARAMS, bubbles: 1 });
+    const tiny = f.bubbles.filter((b) => b.r < 0.008).length;
+    const big = f.bubbles.filter((b) => b.r > 0.025).length;
+
+    expect(f.bubbles.length).toBeGreaterThanOrEqual(140);
+    expect(tiny).toBeGreaterThan(30);
+    expect(big).toBeGreaterThan(15);
+  });
+
+  it('embeds bubbles at the surface of their blob, mostly facing the camera', () => {
+    const f = frame(5, { ...PARAMS, bubbles: 1 });
+    const surface = f.bubbles.filter((b) => f.blobs.some((blob) => {
+      const d = Math.hypot(b.x - blob.x, b.y - blob.y, b.z - blob.z);
+      return d > blob.r * 0.7 && d < blob.r * 1.05;
+    }));
+
+    expect(surface.length / f.bubbles.length).toBeGreaterThan(0.9);
+  });
+
   it('keeps every bubble inside the reach of a blob', () => {
     const f = frame(5);
 
     f.bubbles.forEach((b) => {
-      const near = Math.min(...f.blobs.map((blob) => Math.hypot(b.x - blob.x, b.y - blob.y) - blob.r));
+      const near = Math.min(...f.blobs.map((blob) => Math.hypot(b.x - blob.x, b.y - blob.y, b.z - blob.z) - blob.r));
       expect(near).toBeLessThan(0.02);
     });
   });

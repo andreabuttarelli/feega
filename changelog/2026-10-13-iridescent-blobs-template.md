@@ -20,3 +20,15 @@ shared `three.renderer` (one WebGL context, freed in `onDestroy`).
 - Found: inserting a 30 fps template into a 60 fps doc keeps the nested composition at the
   template's frame count (360), so the video goes blank after 6 s. The local render script
   patches it; the library is untouched here.
+
+## Real 3D (review 1: "make it 3D, more black bubbles")
+
+- Raymarched SDF: 10 spheres smooth-unioned (k 0.13) plus one noise octave drifting on the
+  loop circle; 72 steps, tetrahedral normals, 4-tap AO in the folds, thickness term for a
+  subsurface-ish lift, fresnel rim, two-lobe specular. Camera yaws ±0.2 rad and pitches
+  ±0.08 rad once per loop for parallax.
+- Bubbles are real spheres (analytic ray hits, nearest wins over the body), glossy black with
+  a thin glint and contact shadow. 176 of them from one kind table: dense clusters, scattered,
+  tiny dot trails; placed at the host sphere's surface facing the camera.
+- Drawn at 0.75 of the frame and upscaled. 60 fps exact seek on GPU Chrome: 0 jolts.
+- The 2D field version above is replaced.
