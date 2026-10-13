@@ -55,4 +55,17 @@ describe('inline stage', () => {
     expect([stage.style.visibility, stage.style.left, stage.style.width]).toEqual(['', '', '']);
     anchor.destroy();
   });
+  it('a fixed element is placed in window coordinates: the editor bar laid into the canvas top bar', () => {
+    const bar = document.createElement('header');
+    bar.style.position = 'fixed';
+    const slot = document.createElement('div');
+    document.body.append(bar, slot);
+    slot.getBoundingClientRect = () => ({ left: 300, top: 0, width: 600, height: 52, right: 900, bottom: 52, x: 300, y: 0, toJSON: () => ({}) }) as DOMRect;
+
+    const anchor = anchoredTo(bar, slot);
+    anchor.place();
+
+    expect([bar.style.left, bar.style.top, bar.style.width, bar.style.height]).toEqual(['300px', '0px', '600px', '52px']);
+    anchor.destroy();
+  });
 });

@@ -112,7 +112,7 @@
   import { ATTACH_PARAM, BRIEF_PARAM } from '$lib/motion/video-brief';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
-  import { MOUNT, Measure, Mount, PART_DOCK, Part, Stage, Zoom, timelineFits } from '$lib/motion/editor-mount';
+  import { BAR_PLACE, BarPlace, MOUNT, Measure, Mount, PART_DOCK, Part, Stage, Zoom, timelineFits } from '$lib/motion/editor-mount';
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
@@ -234,6 +234,9 @@
         })
       : undefined
   );
+  const TOP_SLOT = '[data-top-slot]';
+  const inCanvasBar = $derived(rules.closes && BAR_PLACE[viewport] === BarPlace.CanvasBar);
+  const barHost = $derived(inCanvasBar && typeof document !== 'undefined' ? document.querySelector<HTMLElement>(TOP_SLOT) : undefined);
   const dockOf = (part: Part) => ({ [DOCK_ATTR]: PART_DOCK[viewport][part] });
   const stageHost = $derived(rules.stage === Stage.Node ? inlineStage.of(data.node.id) : undefined);
 
@@ -1210,7 +1213,7 @@
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
 <div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
-  <header class="bar">
+  <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost}>
     <div class="group lead" {...dockOf(Part.Bar)}>
       <IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />
       <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
@@ -1595,6 +1598,38 @@
 
   .editor[data-mount='canvas'][data-viewport='phone'] .timeline-area {
     flex: 0 0 38vh;
+  }
+
+  .bar.in-canvas-bar {
+    position: fixed;
+    z-index: 30;
+    height: auto;
+    background: transparent;
+    pointer-events: auto;
+    overflow: hidden;
+  }
+
+  .editor[data-mount='canvas'] .bar.in-canvas-bar > :global(*) {
+    background: transparent;
+  }
+
+  .bar.in-canvas-bar .title,
+  .bar.in-canvas-bar .transport :global(.step),
+  .bar.in-canvas-bar .clock i,
+  .bar.in-canvas-bar .wide {
+    display: none;
+  }
+
+  .editor .bar.in-canvas-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ui-space-2);
+  }
+
+  .bar.in-canvas-bar > :global(*) {
+    flex: 0 1 auto;
+    min-width: 0;
   }
 
   .editor .stage.hosted {

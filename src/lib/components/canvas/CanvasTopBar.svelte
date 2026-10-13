@@ -328,6 +328,7 @@
     onConfirm={deleteCurrent}
   />
 
+  <div class="top-slot" data-top-slot></div>
   <div class="top-box right">
     <a href={BILLING_PATH} class="credits">
       <CreditAmount amount={creditBalance} />
@@ -373,6 +374,12 @@
     height: 52px;
     padding: 0 8px;
     background: var(--ui-surface);
+  }
+
+  .top-slot {
+    flex: 1;
+    min-width: 0;
+    align-self: stretch;
   }
 
   .top-box {

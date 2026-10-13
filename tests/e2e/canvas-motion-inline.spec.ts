@@ -84,14 +84,26 @@ async function expectOnNode(page: Page, node: Locator) {
     .toBeLessThan(OVERLAP_TOLERANCE_PX);
 }
 
-async function expectFramed(page: Page, node: Locator) {
-  await expectOnNode(page, node);
+async function expectLit(page: Page) {
   const stage = page.getByTestId('editor-stage');
   const inner = async () => {
     const box = (await stage.boundingBox())!;
     return page.screenshot({ clip: { x: box.x + box.width * INSET, y: box.y + box.height * INSET, width: box.width * (1 - 2 * INSET), height: box.height * (1 - 2 * INSET) } });
   };
   await expect.poll(async () => shareAbove(await inner(), LIT_LUMA), { timeout: 15_000, message: 'the title draws inside the node, not a black box' }).toBeGreaterThan(MIN_LIT_SHARE);
+}
+
+async function expectOneBar(page: Page) {
+  const top = (await page.locator('.canvas-topbar').boundingBox())!;
+  const bar = (await page.getByTestId('editor-bar').boundingBox())!;
+  expect(bar.y, 'the editor bar sits inside the canvas top bar').toBeGreaterThanOrEqual(top.y - 1);
+  expect(bar.y + bar.height, 'one bar on top, not two rows').toBeLessThanOrEqual(top.y + top.height + 1);
+  await expect(page.locator('.canvas-topbar').getByRole('button', { name: /E2E project/ })).toBeVisible();
+}
+
+async function expectFramed(page: Page, node: Locator) {
+  await expectOnNode(page, node);
+  await expectLit(page);
 
   await expect
     .poll(
@@ -104,16 +116,25 @@ async function expectFramed(page: Page, node: Locator) {
     )
     .toBeLessThan(CENTRE_TOLERANCE_PX);
 
-  const body = (await node.getByTestId('motion-node').boundingBox())!;
-  const band = () => page.screenshot({ clip: { x: body.x + 2, y: body.y + body.height * 0.88, width: body.width - 4, height: body.height * 0.1 } });
-  await expect.poll(async () => shareAbove(await band(), PAPER_LUMA), { timeout: 5000, message: 'no light band under the player' }).toBeLessThan(0.01);
-  const picture = (await page.getByTestId('motion-preview').boundingBox())!;
-  expect(Math.abs(picture.y + picture.height / 2 - (body.y + body.height / 2)), 'the picture sits in the middle of the node, no band on one side').toBeLessThan(OVERLAP_TOLERANCE_PX);
+  await expect
+    .poll(
+      async () => {
+        const [picture, body] = [await page.getByTestId('motion-preview').boundingBox(), await node.getByTestId('motion-node-editing').boundingBox()];
+        return picture && body ? Math.max(Math.abs(picture.width - body.width), Math.abs(picture.height - body.height)) : Infinity;
+      },
+      { timeout: 10_000, message: 'the node takes the shape of the graphic: the picture fills its body, no bands' }
+    )
+    .toBeLessThan(OVERLAP_TOLERANCE_PX * 2);
+
+  const [frameBox, addBar] = [await node.boundingBox(), await page.locator('.add-bar').boundingBox()];
+  if (frameBox && addBar) {
+    expect(addBar.y >= frameBox.y + frameBox.height || addBar.y + addBar.height <= frameBox.y || addBar.x >= frameBox.x + frameBox.width || addBar.x + addBar.width <= frameBox.x, 'the add bar never covers the edited frame').toBe(true);
+  }
 
   await expect(page.getByRole('toolbar', { name: 'Selection actions' })).toHaveCount(0);
 }
 
-const SHARP_EDGE = 150;
+const SHARP_EDGE = 130;
 const RULER_FILL = 0.85;
 const PHONE_HEAD_SHARE = 0.25;
 
@@ -168,6 +189,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible();
     await expect(page.getByLabel('Agent', { exact: true })).toBeVisible();
     await expectFramed(page, nodeOf(first));
+    await expectOneBar(page);
     await shoot(page, '2-open');
 
     const timecode = editor.getByTestId('timecode');
@@ -215,7 +237,9 @@ test.describe('motion editor inside the canvas @real', () => {
     await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
 
     await expectFramed(page, node);
+    await expectOneBar(page);
     await expectTimelineFits(page);
+    await expectLit(page);
     await shoot(page, '2-open-1440');
   });
 
@@ -253,6 +277,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await expect(layers).toBeVisible();
     expect((await page.locator('.canvas-stage').boundingBox())!.x).toBeGreaterThan(stageBefore!.x + 100);
 
+    await expect(layers.locator(`[data-layer="${first}"]`), 'the node is called Frame').toContainText('Frame');
     await layers.locator(`[data-layer="${first}"]`).click();
     await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
     const clip = layers.locator('[data-layer="t"]');

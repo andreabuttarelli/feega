@@ -56,3 +56,14 @@ export const PART_DOCK: Record<Viewport, Record<Part, Dock>> = {
   [Viewport.Tablet]: WIDE,
   [Viewport.Phone]: { ...WIDE, [Part.Transport]: Dock.Timeline, [Part.Panel]: Dock.Timeline }
 };
+
+export enum BarPlace {
+  CanvasBar = 'canvas-bar',
+  OwnRow = 'own-row'
+}
+
+export const BAR_PLACE: Record<Viewport, BarPlace> = {
+  [Viewport.Desktop]: BarPlace.CanvasBar,
+  [Viewport.Tablet]: BarPlace.CanvasBar,
+  [Viewport.Phone]: BarPlace.OwnRow
+};

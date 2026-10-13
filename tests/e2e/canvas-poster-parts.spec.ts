@@ -33,8 +33,10 @@ test.describe('poster parts on the canvas @real', () => {
     const box = (await overlay.boundingBox())!;
     const title = { x: box.width * 0.4, y: box.height * 0.1 };
 
-    await overlay.click({ position: title });
-    await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 10_000 });
+    await expect(async () => {
+      await overlay.click({ position: title });
+      await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 1000 });
+    }, 'the poster selects once the preview has measured it').toPass({ timeout: 15_000 });
     await overlay.click({ position: title });
     const part = page.getByTestId('part-box');
     await expect(part).toHaveAttribute('data-part', TITLE_LINE);

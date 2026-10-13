@@ -184,7 +184,10 @@
     {#if nodeMode === NodeMode.Preview}<a class="open nodrag" {href} data-testid="open-motion-editor">Open editor</a>{/if}
   </div>
 
-  <div class="bar nodrag nopan" class:dormant={nodeMode === NodeMode.Edit} onpointerdown={isolate} onclick={isolate} ondblclick={isolate}>
+  <div class="bar nodrag nopan" onpointerdown={isolate} onclick={isolate} ondblclick={isolate}>
+    {#if nodeMode === NodeMode.Edit}
+    <span class="editing-label" data-testid="motion-node-editing-label">Editing</span>
+    {:else}
     <button type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={toggle}>
       {#if playing}<Pause size={ICON} />{:else}<Play size={ICON} />{/if}
     </button>
@@ -195,6 +198,7 @@
     <button type="button" aria-label={muted ? 'Unmute' : 'Mute'} aria-pressed={muted} onclick={() => (muted = !muted)}>
       {#if muted}<VolumeX size={ICON} />{:else}<Volume2 size={ICON} />{/if}
     </button>
+    {/if}
     <span class="rev">{node.docHeadRevision ? `Rev ${node.docHeadRevision}` : 'Empty'}</span>
   </div>
 </div>
@@ -229,17 +233,10 @@
     inset: 0;
   }
 
-  .motion.editing {
-    position: relative;
-    background: #000;
-  }
-
-  .motion.editing .stage {
-    position: static;
-  }
-
-  .bar.dormant {
-    visibility: hidden;
+  .editing-label {
+    padding: 0 8px;
+    font-size: var(--ui-text-xs);
+    color: var(--ui-accent);
   }
 
   .poster {

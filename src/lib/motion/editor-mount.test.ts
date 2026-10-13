@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MOUNT, Measure, Mount, PART_DOCK, Part, Stage, Zoom, timelineFits } from './editor-mount';
+import { BAR_PLACE, BarPlace, MOUNT, Measure, Mount, PART_DOCK, Part, Stage, Zoom, timelineFits } from './editor-mount';
 import { Viewport } from './editor-layout';
 import { Dock } from '$lib/canvas/free-area';
 import { MotionFormat, newMotionDoc } from './doc';
@@ -33,5 +33,13 @@ describe('where each part of the editor docks', () => {
     for (const viewport of Object.values(Viewport)) {
       expect(Object.keys(PART_DOCK[viewport]).sort()).toEqual(Object.values(Part).sort());
     }
+  });
+});
+
+describe('one bar on top while a frame is open', () => {
+  it('on desktop and tablet the editor bar lives inside the canvas top bar; on a phone it is the only bar', () => {
+    expect(BAR_PLACE[Viewport.Desktop]).toBe(BarPlace.CanvasBar);
+    expect(BAR_PLACE[Viewport.Tablet]).toBe(BarPlace.CanvasBar);
+    expect(BAR_PLACE[Viewport.Phone]).toBe(BarPlace.OwnRow);
   });
 });

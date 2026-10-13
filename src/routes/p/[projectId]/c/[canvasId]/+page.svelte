@@ -77,7 +77,8 @@
   import { AssetKind } from '$lib/motion/components';
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
-  import { motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
+  import { frameNodeSize, motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
+  import { FORMATS } from '$lib/motion/doc';
   import { NodeMode, inlineMotionTarget } from '$lib/canvas/inline-motion';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -1708,7 +1709,33 @@
    * quella calcolata da `grownTextNodeHeight` — un ridimensionamento a mano vince sulla crescita
    * automatica, la stessa regola già scritta in `text-node-grow.ts`.
    */
-  async function resize(id: string, w: number, h: number) {
+  const FIT_SLACK_PX = 1;
+
+  function frameFit(id: string, w: number): { w: number; h: number } | null {
+    const motion = motionOf(nodes.find((node) => node.id === id) ?? { id, type: '', data: {} });
+    if (!motion) {
+      return null;
+    }
+    const open = layersSource.video;
+    return frameNodeSize(w, open?.nodeId === id ? open.doc : FORMATS[motion.format]);
+  }
+
+  $effect(() => {
+    const open = layersSource.video;
+    const row = open ? untrack(() => nodes.find((node) => node.id === open.nodeId)) : null;
+    if (!open || !row) {
+      return;
+    }
+    const fit = frameNodeSize(row.w, open.doc);
+    if (Math.abs(fit.h - row.h) > FIT_SLACK_PX) {
+      void resize(row.id, fit.w, fit.h);
+    }
+  });
+
+  async function resize(id: string, width: number, height: number) {
+    const fit = frameFit(id, width);
+    const w = fit?.w ?? width;
+    const h = fit?.h ?? height;
     const before = nodes.find((node) => node.id === id);
     nodes = nodes.map((n) => (n.id === id ? { ...n, w, h, userHeight: h } : n));
 

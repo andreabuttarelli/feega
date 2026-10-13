@@ -30,7 +30,7 @@ export function anchoredTo(stage: HTMLElement, host: Anchor) {
     if (target === undefined) {
       return;
     }
-    const layer = (stage.offsetParent ?? stage.parentElement)?.getBoundingClientRect();
+    const layer = getComputedStyle(stage).position === 'fixed' ? { left: 0, top: 0 } : (stage.offsetParent ?? stage.parentElement)?.getBoundingClientRect();
     if (!target || !layer) {
       stage.style.visibility = 'hidden';
       return;
