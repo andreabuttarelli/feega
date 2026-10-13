@@ -22,9 +22,18 @@ const px = (n: number) => `${Math.round(n * 100) / 100}px`;
 
 export type Anchor = HTMLElement | null | undefined;
 
+const MOVES = { attributes: true, attributeFilter: ['style', 'class'] };
+
+function ancestors(el: HTMLElement): HTMLElement[] {
+  const chain: HTMLElement[] = [];
+  for (let at: HTMLElement | null = el; at; at = at.parentElement) {
+    chain.push(at);
+  }
+  return chain;
+}
+
 export function anchoredTo(stage: HTMLElement, host: Anchor) {
   let target = host;
-  let frame = 0;
 
   function place() {
     if (target === undefined) {
@@ -39,6 +48,20 @@ export function anchoredTo(stage: HTMLElement, host: Anchor) {
     Object.assign(stage.style, { visibility: '', left: px(r.left - layer.left), top: px(r.top - layer.top), width: px(r.width), height: px(r.height) });
   }
 
+  const moves = new MutationObserver(place);
+  const resizes = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place);
+
+  function watch() {
+    moves.disconnect();
+    resizes?.disconnect();
+    const watched = [...(target ? ancestors(target) : []), ...(stage.parentElement ? ancestors(stage.parentElement) : [])];
+    for (const el of watched) {
+      moves.observe(el, MOVES);
+      resizes?.observe(el);
+    }
+    place();
+  }
+
   function forwardWheel(e: WheelEvent) {
     if (!target) {
       return;
@@ -47,21 +70,22 @@ export function anchoredTo(stage: HTMLElement, host: Anchor) {
     target.dispatchEvent(new WheelEvent('wheel', e));
   }
 
-  function loop() {
-    place();
-    frame = requestAnimationFrame(loop);
-  }
-
   stage.addEventListener('wheel', forwardWheel, { passive: false });
-  frame = requestAnimationFrame(loop);
+  addEventListener('resize', place);
+  addEventListener('scroll', place, true);
+  watch();
   return {
     place,
     update(next: Anchor) {
       target = next;
+      watch();
     },
     destroy() {
-      cancelAnimationFrame(frame);
+      moves.disconnect();
+      resizes?.disconnect();
       stage.removeEventListener('wheel', forwardWheel);
+      removeEventListener('resize', place);
+      removeEventListener('scroll', place, true);
     }
   };
 }
