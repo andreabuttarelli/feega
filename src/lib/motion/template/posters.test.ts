@@ -11,13 +11,28 @@ import { TYPE_GRID_COMPONENT } from './type-grid-poster/component';
 import { TYPE_GRID_POSTER_TEMPLATE, TYPE_GRID_TEMPLATE_ID } from './type-grid-poster/template';
 import { CHECKER_COMPONENT } from './checker-steps-poster/component';
 import { CHECKER_STEPS_POSTER_TEMPLATE, CHECKER_TEMPLATE_ID } from './checker-steps-poster/template';
+import { OVERLAY_GRID_COMPONENT } from './overlay-grid-poster/component';
+import { OVERLAY_GRID_POSTER_TEMPLATE, OVERLAY_GRID_TEMPLATE_ID } from './overlay-grid-poster/template';
+import { CIRCLE_EVENT_COMPONENT } from './circle-event-poster/component';
+import { CIRCLE_EVENT_POSTER_TEMPLATE, CIRCLE_EVENT_TEMPLATE_ID } from './circle-event-poster/template';
+import { BLOCK_TITLE_COMPONENT } from './block-title-poster/component';
+import { BLOCK_TITLE_POSTER_TEMPLATE, BLOCK_TITLE_TEMPLATE_ID } from './block-title-poster/template';
+import { BOXED_TYPE_COMPONENT } from './boxed-type-poster/component';
+import { BOXED_TYPE_POSTER_TEMPLATE, BOXED_TYPE_TEMPLATE_ID } from './boxed-type-poster/template';
+import { SQUARE_WORDS_COMPONENT } from './square-words-poster/component';
+import { SQUARE_WORDS_POSTER_TEMPLATE, SQUARE_WORDS_TEMPLATE_ID } from './square-words-poster/template';
 
 const POSTERS: [string, TemplateEntry, string][] = [
   [TYPE_GRID_TEMPLATE_ID, TYPE_GRID_POSTER_TEMPLATE, TYPE_GRID_COMPONENT],
-  [CHECKER_TEMPLATE_ID, CHECKER_STEPS_POSTER_TEMPLATE, CHECKER_COMPONENT]
+  [CHECKER_TEMPLATE_ID, CHECKER_STEPS_POSTER_TEMPLATE, CHECKER_COMPONENT],
+  [OVERLAY_GRID_TEMPLATE_ID, OVERLAY_GRID_POSTER_TEMPLATE, OVERLAY_GRID_COMPONENT],
+  [CIRCLE_EVENT_TEMPLATE_ID, CIRCLE_EVENT_POSTER_TEMPLATE, CIRCLE_EVENT_COMPONENT],
+  [BLOCK_TITLE_TEMPLATE_ID, BLOCK_TITLE_POSTER_TEMPLATE, BLOCK_TITLE_COMPONENT],
+  [BOXED_TYPE_TEMPLATE_ID, BOXED_TYPE_POSTER_TEMPLATE, BOXED_TYPE_COMPONENT],
+  [SQUARE_WORDS_TEMPLATE_ID, SQUARE_WORDS_POSTER_TEMPLATE, SQUARE_WORDS_COMPONENT]
 ];
 
-const REFERENCE_WORDS = /galeria|azur|berlin|karl|marx/i;
+const REFERENCE_WORDS = /galeria|azur|berlin|karl|marx|ferran|adri|interbrand|wooster|soho|intef|darmstadt|doda|fassbender|guadagnino|cholovdenko|malek|laverne|tenderness|ui\/ux/i;
 
 describe.each(POSTERS)('the %s still template', (id, entry, name) => {
   const doc = entry.template.doc;
@@ -36,8 +51,9 @@ describe.each(POSTERS)('the %s still template', (id, entry, name) => {
     expect(customValues(component, {}, Strictness.Strict).ok).toBe(true);
   });
 
-  it('keeps every shape a sharp rectangle', () => {
-    expect(component.source.css).not.toMatch(/radius/);
+  it('keeps every shape a sharp rectangle or a full circle', () => {
+    const radii = component.source.css.match(/radius:[^;]+/g) ?? [];
+    expect(radii.filter((r) => r !== 'radius: 50%')).toEqual([]);
   });
 
   it('has its grain as an editable effect on the poster', () => {
