@@ -721,6 +721,16 @@ const CUSTOM_CARDS: Record<string, TemplateCard> = {
     edges: { start: LIGHT, end: LIGHT, transition: Joint.Fade },
     goodFor: ['AI agents at work', 'how it works in steps']
   }),
+  'flow-lines': card({
+    roles: [R.Background, R.Opener],
+    energy: Energy.Calm,
+    loops: true,
+    onScreen: [beat(0, 5, 'thousands of fine white strands swirl in a slow current on black'), beat(5, 8, 'the strands dim and a title holds alone over them'), beat(8, 10, 'the title leaves and the strands swirl back up')],
+    needs: { media: null, text: TextAmount.Line },
+    bestFormats: ALL_FORMATS,
+    edges: { transition: Joint.Fade },
+    goodFor: ['an abstract opener', 'a calm backdrop under a claim']
+  }),
   'introducing-badge': card({
     roles: [R.Opener, R.List],
     energy: Energy.Calm,
