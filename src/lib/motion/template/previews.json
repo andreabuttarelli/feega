@@ -26,6 +26,7 @@
   "builtin:end-card",
   "builtin:feature-scroll",
   "builtin:floating-media",
+  "builtin:flow-lines",
   "builtin:image-globe",
   "builtin:introducing-badge",
   "builtin:iridescent-blobs",
