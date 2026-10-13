@@ -78,6 +78,8 @@
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
+  import { inlineMotionTarget } from '$lib/canvas/inline-motion';
+  import InlineMotionEditor from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import { calendarBrand, calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
@@ -1001,6 +1003,15 @@
     if (ids.join() !== untrack(() => selectedIds.join())) { void saves.flush(); }
     selectedIds = ids;
   }
+
+  let dismissedMotion = $state<string | null>(null);
+  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion));
+
+  $effect(() => {
+    if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => dismissedMotion)) {
+      dismissedMotion = null;
+    }
+  });
 
   $effect(() => {
     canvasSelection.set(selectedIds);
@@ -2816,6 +2827,11 @@
       {/if}
     {/snippet}
   </CanvasFlow>
+  {#if inlineMotion}
+    {#key inlineMotion}
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} />
+    {/key}
+  {/if}
 
   {#if componentPicking}
     {@const pickingId = componentPicking.id}
