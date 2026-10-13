@@ -111,3 +111,16 @@ describe('save_template key fields', () => {
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ meta: expect.objectContaining({ keyFields: ['headline'] }) }));
   });
 });
+
+describe('shortening the one clip to the length asked', () => {
+  it('set_timing to 8 s leaves an 8 s video, not 8 s plus a hold the brief never asked for (eval craft: 8.6 s)', async () => {
+    const { run, session } = setup();
+    await run('add_clip', { component: 'Title', start: 0, duration: 8.5, props: { text: 'slow light' } });
+    await run('set_canvas', { duration: 8.5 });
+
+    await run('set_timing', { clip_id: 'id1', duration: 8 });
+
+    expect(session.doc.durationInFrames / session.doc.fps).toBe(8);
+    expect(await run('set_canvas', { duration: 8 })).toMatchObject({ ok: true });
+  });
+});

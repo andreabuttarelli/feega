@@ -43,7 +43,7 @@ import type { PickAnswer } from '$lib/reference-pick';
 import { DESCRIBE_FRAMES, MAX_FRAMES_PER_VIEW, MAX_VIEWS_PER_TURN, VIEW_FRAMES, withFrames, type Frame, type Reference } from './frames';
 import { loopJump, seamChecked } from '$lib/motion/loop';
 import { DESCRIBE_ASK, describeFramesTool, gateBlock, lookFirst, type Looks, type Viewing } from './look';
-import { contentEnd, fitDuration } from '$lib/motion/fit-duration';
+import { contentEnd, Hold, fitDuration } from '$lib/motion/fit-duration';
 import { Quality, blocking, docProblems, frameProblems, softPictures, uiRecolour, uiShrink, type FrameStat, type Pixels, type QualityProblem } from '$lib/motion/direction';
 import { CheckState, ComponentMode, MAX_CSS, MAX_HTML, MAX_JS, SOURCE_FILES, checkState, modeOf, propsSchemaSchema, sourceHash, type CustomComponent, type CustomSource } from '$lib/motion/custom/component';
 import { Occurrence, recordCheck, removeComponent, updateComponent, writeComponent } from '$lib/motion/custom/ops';
@@ -580,7 +580,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     if (!result.ok || contentEnd(result.doc) >= contentEnd(session.doc)) {
       return result;
     }
-    const fitted = fitDuration(result.doc);
+    const fitted = fitDuration(result.doc, Hold.AsTimed);
     return fitted.ok ? fitted : result;
   };
 
