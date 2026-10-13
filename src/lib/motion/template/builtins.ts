@@ -16,6 +16,7 @@ import { FEATURE_SCROLL_TEMPLATE } from './feature-scroll/template';
 import { SPLIT_HEADLINE_TEMPLATE } from './split-headline/template';
 import { IMAGE_GLOBE_TEMPLATE } from './image-globe/template';
 import { SAAS_MONITOR_TEMPLATE } from './saas-monitor/template';
+import { WIRE_GLOBE_PAGES_TEMPLATE } from './wire-globe-pages/template';
 import { PGRID_TEMPLATES } from './parallax-grid/template';
 import { EDITORIAL_WORDS_MEDIA_TEMPLATE } from './editorial-words-media/template';
 import { SCROLL_STORY_TEMPLATE } from './scroll-story/template';
@@ -29,6 +30,9 @@ import { COLLAGE_STACK_TEMPLATE } from './collage-stack-rotate/template';
 import { RING_THROUGH_TITLE_TEMPLATE } from './ring-through-title/template';
 import { MEDIA_CLOUD_TEMPLATE } from './media-cloud/template';
 import { WORD_WHEEL_UI_TEMPLATE } from './word-wheel-ui/template';
+import { MELTING_TYPE_POSTER_TEMPLATE } from './melting-type-poster/template';
+import { POSTER_LIQUID_GLASS_TEMPLATE } from './poster-liquid-glass/template';
+import { PHONE_CHAT_TEMPLATE } from './phone-chat/template';
 import { INTRODUCING_BADGE_TEMPLATE } from './introducing-badge/template';
 
 export { BUILTIN_PREFIX } from './design-kit';
@@ -172,7 +176,7 @@ function compositionDesign(layout: LayoutId): Design {
   };
 }
 
-export const BUILTIN_TEMPLATES: TemplateEntry[] = [...[...LAUNCH_SCENES, ...SCENES, ...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build), UI_MORPH_TEMPLATE, PROMPT_INPUT_TEMPLATE, FLOATING_MEDIA_TEMPLATE, PHOTO_STRIP_TEMPLATE, FEATURE_SCROLL_TEMPLATE, IMAGE_GLOBE_TEMPLATE, SPLIT_HEADLINE_TEMPLATE, SCROLL_STORY_TEMPLATE, COMMENT_GRID_TEMPLATE, SAAS_MONITOR_TEMPLATE, PHONE_SPLIT_TEMPLATE, MARQUEE_TEMPLATE, CIRCULAR_CAROUSEL_TEMPLATE, ...PGRID_TEMPLATES, ROWS_SPACED_TITLE_TEMPLATE, SCATTER_TITLE_TEMPLATE, RING_THROUGH_TITLE_TEMPLATE, EDITORIAL_WORDS_MEDIA_TEMPLATE, MEDIA_CLOUD_TEMPLATE, COLLAGE_STACK_TEMPLATE, INTRODUCING_BADGE_TEMPLATE, WORD_WHEEL_UI_TEMPLATE];
+export const BUILTIN_TEMPLATES: TemplateEntry[] = [...[...LAUNCH_SCENES, ...SCENES, ...DESIGNS, ...(Object.keys(LAYOUTS) as LayoutId[]).map(compositionDesign)].map(build), UI_MORPH_TEMPLATE, PROMPT_INPUT_TEMPLATE, FLOATING_MEDIA_TEMPLATE, PHOTO_STRIP_TEMPLATE, FEATURE_SCROLL_TEMPLATE, IMAGE_GLOBE_TEMPLATE, SPLIT_HEADLINE_TEMPLATE, SCROLL_STORY_TEMPLATE, COMMENT_GRID_TEMPLATE, SAAS_MONITOR_TEMPLATE, PHONE_SPLIT_TEMPLATE, MARQUEE_TEMPLATE, CIRCULAR_CAROUSEL_TEMPLATE, ...PGRID_TEMPLATES, ROWS_SPACED_TITLE_TEMPLATE, SCATTER_TITLE_TEMPLATE, RING_THROUGH_TITLE_TEMPLATE, EDITORIAL_WORDS_MEDIA_TEMPLATE, MEDIA_CLOUD_TEMPLATE, COLLAGE_STACK_TEMPLATE, MELTING_TYPE_POSTER_TEMPLATE, POSTER_LIQUID_GLASS_TEMPLATE, WIRE_GLOBE_PAGES_TEMPLATE, INTRODUCING_BADGE_TEMPLATE, PHONE_CHAT_TEMPLATE, WORD_WHEEL_UI_TEMPLATE];
 
 export function builtinTemplate(id: string): TemplateEntry | null {
   return BUILTIN_TEMPLATES.find((e) => e.id === id) ?? null;
