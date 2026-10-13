@@ -42,6 +42,7 @@
   "builtin:parallax-grid-drift",
   "builtin:parallax-grid-stagger",
   "builtin:parallax-grid-zoom",
+  "builtin:particle-ribbon",
   "builtin:phone-split",
   "builtin:photo-strip",
   "builtin:product-reveal",
