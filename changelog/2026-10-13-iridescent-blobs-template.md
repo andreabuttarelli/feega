@@ -14,8 +14,9 @@ shared `three.renderer` (one WebGL context, freed in `onDestroy`).
   multiples of the loop phase.
 - Landscape swaps axes, so the mass always runs along the long side.
 - Key fields: title, body, rim, glow, bubbles. Var prefix `blobs`.
-- Discarded: raymarched 3D SDF (too slow in the software GL the local render uses: 2D field
-  already costs ~6 s/frame at 1080×1920 there).
+- Discarded: raymarched 3D SDF. The 2D field already costs ~10 s/frame at 1080×1920 in the
+  headless shell's software GL; a GPU Chrome renders it at ~12 frames/s. Verified at 60 fps
+  with exact seek: 0 jolts in `motion-smoothness`.
 - Found: inserting a 30 fps template into a 60 fps doc keeps the nested composition at the
   template's frame count (360), so the video goes blank after 6 s. The local render script
   patches it; the library is untouched here.
