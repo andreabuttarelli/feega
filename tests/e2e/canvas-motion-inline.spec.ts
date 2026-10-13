@@ -268,7 +268,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await shoot(page, '7-layers');
   });
 
-  test.fixme('on a phone the title in the node is as sharp on screen as in a fresh capture of the player', async ({ page, session }) => {
+  test('on a phone the title in the node is drawn sharp, at the size it is shown', async ({ page, session }) => {
     await page.setViewportSize(PHONE);
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await page.getByTestId('motion-node-stage').first().click({ position: { x: 60, y: 10 } });
