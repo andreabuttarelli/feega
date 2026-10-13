@@ -72,6 +72,7 @@
   "builtin:scroll-story",
   "builtin:social-stat",
   "builtin:split-headline",
+  "builtin:steps-list",
   "builtin:title-card",
   "builtin:ui-morph-reel"
 ]
