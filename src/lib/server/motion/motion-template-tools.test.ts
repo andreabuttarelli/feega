@@ -82,13 +82,13 @@ function withLibrary(sfx?: MotionToolDeps['sfx']) {
 }
 
 describe('motion agent template library tools', () => {
-  it('list_templates names each template with its card in one line and its field keys', async () => {
+  it('list_templates names each template with its card in one line and the fields a user edits first', async () => {
     const { run } = withLibrary();
 
-    const listed = (await run('list_templates', {})) as unknown as { templates: { id: string; card: string; fields: string[] }[] };
+    const listed = (await run('list_templates', {})) as unknown as { templates: { id: string; card: string; key_fields: string[] }[] };
     const lower = listed.templates.find((t) => t.id === 'builtin:lower-third');
 
-    expect(lower?.fields).toEqual(['name', 'role', 'accent']);
+    expect(lower?.key_fields).toEqual(['name', 'role', 'accent']);
     expect(lower?.card).toMatch(/0–0\.4s an accent bar wipes in/);
   });
 

@@ -119,8 +119,9 @@ import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/
 import { FIELD_TYPES, MAX_LINKED, type ExposedField } from '$lib/motion/template/field-model';
 import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields } from '$lib/motion/template/library';
 import type { TemplateLibrary } from './templates';
-import { SECTION_ROLES, cardDetail, cardLine } from '$lib/motion/template/card';
+import { ROLE_MEANING, SECTION_ROLES, cardDetail, cardLine } from '$lib/motion/template/card';
 import { templateCard } from '$lib/motion/template/cards';
+import { splitFields } from '$lib/motion/template/key-fields';
 import { templateCues } from './template-sounds';
 import { createWebTools, type WebToolDeps } from '$lib/server/web/web-tools';
 import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
@@ -2273,7 +2274,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     list_templates: tool({
-      description: `List the motion templates (built-in and saved by the team), each with its card in one line: roles · energy · loops · edges start→end and suggested transition · media count and aspect · text amount · best formats · what is on screen, second by second · good for; and its field keys. role narrows to one section role (${SECTION_ROLES.join(', ')}). get_template gives one in full with its typed fields.`,
+      description: `List the motion templates (built-in and saved by the team), each with its key_fields (the ones a user edits first; get_template lists all) and its card in one line: roles · energy · loops · edges start→end and suggested transition · media count and aspect · text amount · best formats · what is on screen, second by second · good for. role narrows to one section role: ${SECTION_ROLES.map((r) => `${r} (${ROLE_MEANING[r]})`).join(', ')}. get_template gives one in full with its typed fields.`,
       inputSchema: z.object({ role: z.enum(SECTION_ROLES).optional() }).strict(),
       execute: async (input) => {
         const entries = (await deps.templates?.list()) ?? [];
@@ -2282,7 +2283,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         return {
           templates: picked.map((e) => {
             const card = templateCard(e.id);
-            return { id: e.id, name: e.template.name, seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), card: card ? cardLine(card) : e.template.description, fields: e.template.doc.fields.map((f) => f.key) };
+            return { id: e.id, name: e.template.name, seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), card: card ? cardLine(card) : e.template.description, key_fields: splitFields(e.template.doc.fields, e.template.keyFields).key.map((f) => f.key) };
           })
         };
       }

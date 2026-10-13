@@ -8,12 +8,13 @@ or whether two templates chain.
 `cards.ts` data): roles (opener, feature, product, proof, stat, list, gallery, transition,
 closer, background), energy, loops, `onScreen` beat by beat with seconds, needs (media count,
 aspect, text amount), best formats, edges (tone at start and end, suggested joint), good for.
-Enums and their meaning live in one table, `CARD_VOCABULARY`.
+Enums live next to the model; what each role means is one table, `ROLE_MEANING`, which the
+`list_templates` description prints.
 
 - `card.test.ts` fails when a built-in has no card, an empty field, or beats past its end.
-- `list_templates` returns one compact card line and field keys per template, with a `role`
-  filter; `get_template` returns the full card and typed fields. The full field specs left the
-  list: they made it the largest read of a turn.
+- `list_templates` returns one compact card line and the key fields per template, with a
+  `role` filter; `get_template` returns the full card and every typed field. The full field
+  specs left the list: 84 templates went from ~99k to ~33k characters, held under 40k by a test.
 - `GET /api/v1/motion/templates` carries the card, so `list_motion_templates` (MCP) and
   `feega motion templates` show it.
 - Prompt: `TEMPLATE_SECTIONS_RULE` replaces the "ready-made designs" line.

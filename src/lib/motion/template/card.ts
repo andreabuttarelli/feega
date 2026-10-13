@@ -51,23 +51,18 @@ export enum Joint {
   MatchCut = 'match-cut'
 }
 
-export const CARD_VOCABULARY = {
-  role: {
-    [SectionRole.Opener]: 'the hook: first 2–5 s, the claim or the brand',
-    [SectionRole.Feature]: 'one benefit or feature, said or shown',
-    [SectionRole.Product]: 'the product itself: app screen, device, product photo',
-    [SectionRole.Proof]: 'testimonials, logos, quotes',
-    [SectionRole.Stat]: 'one or two numbers',
-    [SectionRole.List]: 'several features or steps in one go',
-    [SectionRole.Gallery]: 'many pictures or clips at once',
-    [SectionRole.Transition]: 'a short bridge between sections',
-    [SectionRole.Closer]: 'the end: logo, call to action, address',
-    [SectionRole.Background]: 'motion behind other clips, holds no message alone'
-  },
-  energy: { [Energy.Calm]: 'slow drift, long holds', [Energy.Medium]: 'steady moves', [Energy.Fast]: 'cuts on the beat, whips, bursts' },
-  text: { [TextAmount.None]: 'no text', [TextAmount.Word]: 'one to three words', [TextAmount.Line]: 'one short line', [TextAmount.Lines]: 'several lines or a list' },
-  edge: { [EdgeTone.Dark]: 'near-black', [EdgeTone.Light]: 'white or cream', [EdgeTone.Colour]: 'a saturated colour field', [EdgeTone.Media]: 'full-frame pictures' }
-} as const;
+export const ROLE_MEANING: Record<SectionRole, string> = {
+  [SectionRole.Opener]: 'the hook: first 2–5 s, the claim or the brand',
+  [SectionRole.Feature]: 'one benefit or feature, said or shown',
+  [SectionRole.Product]: 'the product itself: app screen, device, product photo',
+  [SectionRole.Proof]: 'testimonials, logos, quotes',
+  [SectionRole.Stat]: 'one or two numbers',
+  [SectionRole.List]: 'several features or steps in one go',
+  [SectionRole.Gallery]: 'many pictures or clips at once',
+  [SectionRole.Transition]: 'a short bridge between sections',
+  [SectionRole.Closer]: 'the end: logo, call to action, address',
+  [SectionRole.Background]: 'motion behind other clips, holds no message alone'
+};
 
 export type OnScreenBeat = { from: number; to?: number; what: string };
 export type MediaNeed = { min: number; max: number; aspect: MediaAspect };

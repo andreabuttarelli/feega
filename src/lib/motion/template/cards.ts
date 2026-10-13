@@ -614,6 +614,44 @@ const CUSTOM_CARDS: Record<string, TemplateCard> = {
     edges: { start: COLOUR, end: COLOUR },
     goodFor: ['fashion or editorial', 'an archive or collection']
   }),
+  'melting-type-poster': card({
+    roles: [R.Transition, R.Opener],
+    energy: Energy.Medium,
+    loops: true,
+    onScreen: [beat(0, 1, 'a dark editorial poster page: big headline, number, small columns'), beat(1, 4, 'it crumbles top to bottom into fine sand'), beat(4, 6, 'the sand piles at the foot of an empty page'), beat(6, 9, 'it rises back into type'), beat(9, 10, 'the page holds whole')],
+    needs: { media: null, text: TextAmount.Lines },
+    bestFormats: [PORTRAIT, SQUARE, TALL],
+    goodFor: ['a poster or editorial piece', 'change, time, erosion']
+  }),
+  'poster-liquid-glass': card({
+    roles: [R.Opener, R.Background],
+    energy: Energy.Calm,
+    loops: true,
+    onScreen: [beat(0, 10, 'a Swiss poster on a grey wall: one huge word over dates and places; clear liquid glass flows over it, drops break away and melt back, bending the type')],
+    needs: { media: null, text: TextAmount.Lines },
+    bestFormats: [PORTRAIT, SQUARE, TALL],
+    edges: { start: LIGHT, end: LIGHT },
+    goodFor: ['an event poster', 'a typographic statement']
+  }),
+  'phone-chat': card({
+    roles: [R.Feature, R.Product],
+    energy: Energy.Medium,
+    loops: false,
+    onScreen: [beat(0, 1, 'a phone close-up with an empty group chat'), beat(1, 7, 'each message types, then lands as a grey bubble with name and avatar, one every ~1.5 s, the camera slowly pushing in'), beat(7, 8, 'the last message lands'), beat(8, 9, 'the chat fades out')],
+    needs: { media: media(0, 6, MediaAspect.Square), text: TextAmount.Lines },
+    bestFormats: [SQUARE, TALL],
+    edges: { start: LIGHT, end: LIGHT },
+    goodFor: ['messaging or social apps', 'a conversation as a story']
+  }),
+  'wire-globe-pages': card({
+    roles: [R.Gallery, R.Background],
+    energy: Energy.Calm,
+    loops: true,
+    onScreen: [beat(0, 12, 'pages and pictures bent onto a slowly turning wireframe globe, the back side dimmed through the wire; no text')],
+    needs: { media: media(8, 24), text: TextAmount.None },
+    bestFormats: ALL_FORMATS,
+    goodFor: ['global reach', 'a body of work', 'a backdrop under a title']
+  }),
   'introducing-badge': card({
     roles: [R.Opener, R.List],
     energy: Energy.Calm,
