@@ -10,12 +10,10 @@ const PLACE_OUT = 0.2;
 const PLACE_BACK = 0.05;
 const REVIEW_ALONG = 0.25;
 const REVIEW_IN = 0.13;
-const START_VIEW = 0.6;
-const END_VIEW = 0.5;
-const VIEW_AHEAD = -0.12;
-const VIEW_OUT = 0.04;
-const CAMERA_LAG = 0.1;
-const CAMERA_TAIL = 0.5;
+const VIEW_AHEAD = 0.1;
+const CAMERA_CROSS = 0.5;
+const STOP_SLOW = 0.22;
+const DOT_IN_PAST_START = 0.3;
 const PLACE_LEAD = 0.25;
 const REVIEW_LAG = 0.1;
 const POP_FADE = 0.45;
@@ -26,6 +24,8 @@ const SHARP_NEAR = 0.65;
 const BLUR_SPAN = 0.7;
 const PUSH = 0.08;
 const BASE_ZOOM = 0.84;
+const STOP_ZOOM = 0.12;
+const STOP_ZOOM_SPAN = 1.1;
 const LEAVE = 1.0;
 const LEAVE_END = 0.3;
 
@@ -70,21 +70,49 @@ function pathLayout(p, aspect) {
     const review = { x: place.x + axis.x * REVIEW_ALONG - normal.x * stop.side * REVIEW_IN, y: place.y + axis.y * REVIEW_ALONG - normal.y * stop.side * REVIEW_IN };
     return [{ stop: i, kind: 'place', ...place }, { stop: i, kind: 'review', ...review }];
   });
-  const view = (w, ahead, out) => at(w.x * axis.x + w.y * axis.y + ahead, out);
-  const views = [view(ways[0], START_VIEW, 0), ...stops.map((st) => view(st, VIEW_AHEAD, st.side * VIEW_OUT)), view(ways[ways.length - 1], -END_VIEW, 0)];
-  return { points, s, length, wayS, stops, cards, views };
+  return { points, s, length, wayS, stops, cards, axis, normal };
 }
 
-function moveStart(p, k) {
-  return p.startAt + k * (p.moveSeconds + p.holdSeconds);
+function stopTimes(layout, p, length) {
+  const every = p.moveSeconds + p.holdSeconds;
+  const last = p.moveSeconds + every * (layout.stops.length - 1);
+  const room = length - (p.leave ? LEAVE + LEAVE_END : 0) - p.startAt;
+  const fit = Math.min(1, room / Math.max(1e-6, last));
+  return layout.stops.map((_, i) => p.startAt + (p.moveSeconds + every * i) * fit);
 }
 
-function drawnAt(layout, p, t) {
-  let drawn = 0;
-  for (let k = 0; k < layout.wayS.length - 1; k++) {
-    drawn = lerp(drawn, layout.wayS[k + 1], expoInOut(span(t, moveStart(p, k), p.moveSeconds)));
+function travelKnots(layout, p, length) {
+  const knots = [{ t: p.startAt, s: 0 }, ...stopTimes(layout, p, length).map((t, i) => ({ t, s: layout.stops[i].s })), { t: length, s: 1 }];
+  const pace = knots.slice(1).map((k, i) => (k.s - knots[i].s) / Math.max(1e-6, k.t - knots[i].t));
+  return knots.map((k, i) => {
+    const first = i === 0;
+    const last = i === knots.length - 1;
+    const v = first ? 0 : last ? pace[i - 1] : STOP_SLOW * Math.min(pace[i - 1], pace[i]);
+    return { ...k, v };
+  });
+}
+
+function quintic(a, b, t) {
+  const d = b.t - a.t;
+  const u = clamp01((t - a.t) / Math.max(1e-6, d));
+  const u3 = u * u * u;
+  const u4 = u3 * u;
+  const u5 = u4 * u;
+  const rise = 10 * u3 - 15 * u4 + 6 * u5;
+  const leaveV = u - 6 * u3 + 8 * u4 - 3 * u5;
+  const arriveV = -4 * u3 + 7 * u4 - 3 * u5;
+  return a.s + (b.s - a.s) * rise + d * (a.v * leaveV + b.v * arriveV);
+}
+
+function drawnAt(knots, t) {
+  if (t <= knots[0].t) {
+    return 0;
   }
-  return drawn;
+  const i = knots.findIndex((k) => k.t >= t);
+  if (i < 0) {
+    return 1;
+  }
+  return quintic(knots[i - 1], knots[i], t);
 }
 
 function pointAt(layout, s) {
@@ -95,17 +123,17 @@ function pointAt(layout, s) {
   return { x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k) };
 }
 
-function cameraAt(layout, p, t) {
-  let cam = { ...layout.views[0] };
-  for (let k = 0; k < layout.views.length - 1; k++) {
-    const e = expoInOut(span(t, moveStart(p, k) + CAMERA_LAG, p.moveSeconds + CAMERA_TAIL));
-    cam = { x: lerp(cam.x, layout.views[k + 1].x, e), y: lerp(cam.y, layout.views[k + 1].y, e) };
-  }
-  return cam;
+function cameraAt(layout, head) {
+  const main = head.x * layout.axis.x + head.y * layout.axis.y + VIEW_AHEAD;
+  const cross = (head.x * layout.normal.x + head.y * layout.normal.y) * CAMERA_CROSS;
+  return { x: layout.axis.x * main + layout.normal.x * cross, y: layout.axis.y * main + layout.normal.y * cross };
 }
 
-function cardAt(card, p, t, camera) {
-  const arrive = moveStart(p, card.stop) + p.moveSeconds;
+function stopZoom(arrivals, t) {
+  return arrivals.reduce((sum, at) => sum + STOP_ZOOM * smooth(clamp01(1 - Math.abs(t - at) / STOP_ZOOM_SPAN)), 0);
+}
+
+function cardAt(card, arrive, t, camera, p) {
   const at = card.kind === 'place' ? arrive - PLACE_LEAD : arrive + REVIEW_LAG;
   const grow = landSoftly(span(t, at, POP_GROW));
   const far = Math.hypot(card.x - camera.x, card.y - camera.y);
@@ -120,16 +148,19 @@ function cardAt(card, p, t, camera) {
 }
 
 function pathFrame(layout, p, t, length) {
-  const drawn = drawnAt(layout, p, t);
-  const camera = cameraAt(layout, p, t);
+  const knots = travelKnots(layout, p, length);
+  const arrivals = knots.slice(1, -1).map((k) => k.t);
+  const drawn = drawnAt(knots, t);
+  const head = pointAt(layout, drawn);
+  const camera = cameraAt(layout, head);
   return {
     drawn,
-    head: pointAt(layout, drawn),
-    dot: smooth(span(t, 0, p.startAt)),
+    head,
+    dot: smooth(span(t, 0, p.startAt + DOT_IN_PAST_START)),
     camera,
-    zoom: BASE_ZOOM + PUSH * clamp01(t / length),
+    zoom: BASE_ZOOM + PUSH * clamp01(t / length) + stopZoom(arrivals, t),
     fade: p.leave ? 1 - smooth(span(t, length - LEAVE - LEAVE_END, LEAVE)) : 1,
-    cards: layout.cards.map((card) => cardAt(card, p, t, camera))
+    cards: layout.cards.map((card) => cardAt(card, arrivals[card.stop], t, camera, p))
   };
 }
 `;

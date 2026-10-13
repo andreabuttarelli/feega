@@ -28,22 +28,47 @@ describe('the path cards model', () => {
   });
 
   it('draws the path forward only, and the dot rides its head', () => {
-    const path = times(0, 10).map((t) => frame(t));
+    const path = times().map((t) => frame(t));
     path.slice(1).forEach((f, i) => expect(f.drawn).toBeGreaterThanOrEqual(path[i].drawn - 1e-9));
     expect(frame(0).drawn).toBe(0);
-    expect(frame(10).drawn).toBeCloseTo(1, 6);
+    expect(frame(LENGTH).drawn).toBeCloseTo(1, 6);
   });
 
-  it('pauses the dot on each stop while its cards appear', () => {
+  it('never stops the dot once it sets off', () => {
+    const drawn = times(PARAMS.startAt + 0.2).map((t) => frame(t).drawn);
+    drawn.slice(1).forEach((d, i) => expect(d - drawn[i]).toBeGreaterThan(1e-5));
+  });
+
+  it('slows down on each stop while its cards appear, then speeds up again', () => {
     const l = layout();
+    const speed = (t: number) => (frame(t + 0.5 / FPS).drawn - frame(t - 0.5 / FPS).drawn) * FPS;
     l.stops.forEach((stop, i) => {
       const arrived = times().find((t) => frame(t).drawn >= stop.s - 1e-6)!;
       const cards = frame(arrived + 0.8).cards.filter((_, k) => l.cards[k].stop === i);
 
-      expect(frame(arrived + 0.3).drawn).toBeCloseTo(stop.s, 4);
+      expect(speed(arrived)).toBeLessThan(speed(arrived - 0.8) * 0.5);
+      expect(speed(arrived)).toBeLessThan(speed(arrived + 0.8) * 0.5);
       cards.forEach((c) => expect(c.opacity).toBeGreaterThan(0.9));
       expect(frame(arrived - 0.6).cards.filter((_, k) => l.cards[k].stop === i).every((c) => c.opacity < 0.05)).toBe(true);
     });
+  });
+
+  it('changes speed without a jerk', () => {
+    const drawn = times().map((t) => frame(t).drawn);
+    const speeds = drawn.slice(1).map((d, i) => d - drawn[i]);
+    speeds.slice(1).forEach((v, i) => expect(Math.abs(v - speeds[i])).toBeLessThan(0.0012));
+  });
+
+  it('zooms in softly on each stop and back out after', () => {
+    const l = layout();
+    l.stops.forEach((stop) => {
+      const arrived = times().find((t) => frame(t).drawn >= stop.s - 1e-6)!;
+      expect(frame(arrived).zoom).toBeGreaterThan(frame(arrived - 1.2).zoom + 0.03);
+      expect(frame(arrived).zoom).toBeGreaterThan(frame(arrived + 1.2).zoom + 0.03);
+    });
+    const zooms = times().map((t) => frame(t).zoom);
+    const steps = zooms.slice(1).map((z, i) => z - zooms[i]);
+    steps.slice(1).forEach((s, i) => expect(Math.abs(s - steps[i])).toBeLessThan(0.002));
   });
 
   it('keeps the head in frame: the camera follows it', () => {

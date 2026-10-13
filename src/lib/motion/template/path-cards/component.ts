@@ -30,7 +30,7 @@ export const PATH_PROPS: Record<string, PropSpec> = {
   blur: number('Depth blur on far cards (px)', 3, 0, 8, 'Camera', 0.5),
   startAt: number('Path starts (seconds)', 0.5, 0, 3, 'Motion', 0.1),
   moveSeconds: number('Travel between stops (seconds)', 1.6, 0.6, 4, 'Motion', 0.1),
-  holdSeconds: number('Hold on each stop (seconds)', 0.9, 0, 3, 'Motion', 0.1),
+  holdSeconds: number('Slow pass on each stop (seconds)', 0.9, 0, 3, 'Motion', 0.1),
   leave: { type: 'boolean', title: 'Loop: everything leaves at the end', default: true, group: 'Motion' },
   [VAR_PREFIX]: text('Runtime variable prefix', PATH_VAR_PREFIX, { group: 'Layout', maxLength: 20 })
 };
