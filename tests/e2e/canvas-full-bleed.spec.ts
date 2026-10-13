@@ -20,7 +20,8 @@ async function expectFlowFillsItsCanvas(page: Page): Promise<void> {
   expect(Math.abs(flowBox.x - canvasBox.x)).toBeLessThanOrEqual(TOLERANCE_PX);
   expect(Math.abs(flowBox.width - canvasBox.width)).toBeLessThanOrEqual(TOLERANCE_PX);
   expect(Math.abs(flowBox.height - canvasBox.height)).toBeLessThanOrEqual(TOLERANCE_PX);
-  expect(canvasBox.x).toBeLessThanOrEqual(TOLERANCE_PX);
+  const rail = (await page.locator('nav.rail').count()) ? await page.locator('nav.rail').first().boundingBox() : null;
+  expect(canvasBox.x, 'the canvas starts at the window edge, or right after the docked left bar').toBeLessThanOrEqual((rail ? rail.x + rail.width : 0) + TOLERANCE_PX);
 }
 
 test.describe('canvas full bleed @real', () => {
