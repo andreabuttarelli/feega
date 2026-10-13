@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { build } from 'esbuild';
-import type { Plugin } from 'vite';
+import type { Connect, Plugin } from 'vite';
 import { HOSTED, MODULES, MODULE_EXTERNAL, MOTION_LIBS_ROUTE, OPENTYPE, Packing, folderOf, type Hosted, type HostedModule, type Script } from '../src/lib/motion/libs/catalog';
 
 export const MOTION_LIBS_MODULE = 'virtual:motion-libs';
@@ -76,6 +76,15 @@ export async function writeMotionLibs(root: string): Promise<Integrity> {
 
 const resolved = `\0${MOTION_LIBS_MODULE}`;
 
+function allowOpaqueFrames(middlewares: Connect.Server) {
+  for (const route of [MOTION_LIBS_ROUTE, MOTION_ENV_ROUTE]) {
+    middlewares.use(route, (_req, res, next) => {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      next();
+    });
+  }
+}
+
 export function motionLibs(): Plugin {
   let written: Promise<Integrity> | null = null;
   const ready = (root: string) => (written ??= writeMotionLibs(root));
@@ -90,13 +99,7 @@ export function motionLibs(): Plugin {
     },
     resolveId: (id) => (id === MOTION_LIBS_MODULE ? resolved : null),
     load: async (id) => (id === resolved ? `export default ${JSON.stringify(await ready(root))};` : null),
-    configureServer: (server) => {
-      for (const route of [MOTION_LIBS_ROUTE, MOTION_ENV_ROUTE]) {
-        server.middlewares.use(route, (_req, res, next) => {
-          res.setHeader('Access-Control-Allow-Origin', '*');
-          next();
-        });
-      }
-    }
+    configureServer: (server) => allowOpaqueFrames(server.middlewares),
+    configurePreviewServer: (server) => allowOpaqueFrames(server.middlewares)
   };
 }
