@@ -38,3 +38,18 @@ system prompt (tens of KB per step).
 
 Known, not fixed here: a 30 fps template inserted into a 60 fps doc keeps its inner length in
 frames and goes black halfway.
+
+Second pass, after the first eval run (reference match 6/10, $2.35, 3 rounds):
+
+- `compare_reference`: after each look the crafting agent lists concrete differences and scores
+  the match 1-10; it keeps going until 8 or the budget runs out. Generative guidance added
+  (supersampling/AA, raymarch detail, clustered scatter, text scrims).
+- Each round (sheet, score, differences, check_motion numbers) is in the tool output and streams
+  as preliminary results; the chat keeps the chip running while rounds arrive.
+- The budget is clamped to what the video has left instead of being refused.
+- Quality gate: a table per kind of piece (`Piece` in `direction.ts`). An abstract generative
+  piece (no script, no story marks) is not asked for script, music, story beats, a peak or
+  the type scale of text it cannot measure. This applies to the whole motion agent.
+- `set_timing` that shortens a clip refits the video as timed, without an added hold.
+
+Second run: reference match 7/10, 7 rounds (self-score 4 → 7), $2.80 total, 0 tool errors.
