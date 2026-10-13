@@ -8,7 +8,7 @@ import { interactiveOf } from '$lib/motion/interactive/settings';
 import { builtinTemplate } from '../builtins';
 import { insertTemplate, setTemplateValues } from '../library';
 import { FieldType } from '../field-model';
-import { BADGE_COMPONENT } from './component';
+import { BADGE_COMPONENT, BADGE_PROPS } from './component';
 import { BADGE_KEY_FIELDS, BADGE_TEMPLATE_ID, INTRODUCING_BADGE_TEMPLATE } from './template';
 
 const inserted = (format = MotionFormat.Landscape) => {
@@ -44,7 +44,8 @@ describe('the introducing badge template', () => {
     const fields = INTRODUCING_BADGE_TEMPLATE.template.doc.fields;
 
     expect(fields.find((f) => f.prop === 'logo')?.type).toBe(FieldType.MediaList);
-    expect(fields.find((f) => f.prop === 'product')?.type).toBe(FieldType.Text);
+    expect(fields.find((f) => f.prop === 'features')?.type).toBe(FieldType.Text);
+    expect(BADGE_KEY_FIELDS).toContain('features');
     expect(BADGE_KEY_FIELDS.length).toBeLessThanOrEqual(5);
     expect(fields.map((f) => f.key)).toEqual(expect.arrayContaining(BADGE_KEY_FIELDS));
   });
@@ -58,13 +59,13 @@ describe('the introducing badge template', () => {
   it('declares runtime variables for the texts, never one that would shadow the logo', () => {
     const names = interactiveOf(INTRODUCING_BADGE_TEMPLATE.template.doc).vars.map((v) => v.name);
 
-    expect(names).toEqual(expect.arrayContaining(['badge_intro', 'badge_product']));
+    expect(names).toEqual(expect.arrayContaining(['badge_intro', 'badge_features']));
     expect(names).not.toContain('badge_logo');
   });
 
   it('takes the logo from the media picker and hands it to the component', () => {
     const placed = inserted();
-    const set = setTemplateValues(placed.doc, placed.clipId, { logo: 'pic1', product: 'zqx icons' });
+    const set = setTemplateValues(placed.doc, placed.clipId, { logo: 'pic1', features: 'zqx icons\nzqx sync' });
     if (!set.ok) {
       throw new Error(set.error);
     }
@@ -72,10 +73,17 @@ describe('the introducing badge template', () => {
 
     expect(html).toContain('zqx-logo.png');
     expect(html).toContain('zqx icons');
+    expect(html).toContain('zqx sync');
+  });
+
+  it('ships no brand of its own: no sample wordmark copied from the reference', () => {
+    const defaults = JSON.stringify(Object.values(BADGE_PROPS).map((p) => p.default));
+
+    expect(defaults).not.toMatch(/nova|rtm/i);
   });
 
   it.each([MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Square])('composes in %s with the variables reaching the component', (format) => {
-    const html = composeHtml({ doc: inserted(format).doc, tokens: FEEGA_TOKENS, assets: {}, vars: { badge_product: 'zqx from the host' } });
+    const html = composeHtml({ doc: inserted(format).doc, tokens: FEEGA_TOKENS, assets: {}, vars: { badge_features: 'zqx from the host' } });
 
     expect(html).toContain('zqx from the host');
     expect(html).toContain('ib-planet');

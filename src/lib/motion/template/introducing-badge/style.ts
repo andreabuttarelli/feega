@@ -56,7 +56,19 @@ export const BADGE_CSS = String.raw`
 }
 
 .ib-name {
+  display: grid;
   color: var(--ib-accent);
+}
+
+.ib-feature {
+  grid-area: 1 / 1;
+  will-change: transform, opacity;
+}
+
+@container (aspect-ratio < 1.25) {
+  .ib-feature {
+    justify-self: center;
+  }
 }
 
 .ib-word {

@@ -2,10 +2,10 @@ import { MEDIA_LIST } from '../media-list';
 
 export const BADGE_VIEW = String.raw`
 ${MEDIA_LIST}
-const GLYPH = '<svg class="ib-glyph" viewBox="0 0 24 24"><path d="M3 3h5.5L16 14.5V3h5v18h-5.5L8 9.5V21H3z"/></svg>';
+const GLYPH = '<svg class="ib-glyph" viewBox="0 0 24 24"><path d="M12 1c.6 5.7 5.3 10.4 11 11-5.7.6-10.4 5.3-11 11-.6-5.7-5.3-10.4-11-11 5.7-.6 10.4-5.3 11-11z"/></svg>';
 const PLANET_TOP = 0.78;
 
-root.insertAdjacentHTML('beforeend', '<div class="ib"><div class="ib-planet"></div><div class="ib-row"><span class="ib-words ib-intro"></span><span class="ib-badge"><span class="ib-logo"></span><span class="ib-mark"></span><span class="ib-suffix"></span><span class="ib-shine"></span></span><span class="ib-words ib-name"></span></div></div>');
+root.insertAdjacentHTML('beforeend', '<div class="ib"><div class="ib-planet"></div><div class="ib-row"><span class="ib-words ib-intro"></span><span class="ib-badge"><span class="ib-logo"></span><span class="ib-mark"></span><span class="ib-suffix"></span><span class="ib-shine"></span></span><span class="ib-name"></span></div></div>');
 
 const scene = root.querySelector('.ib');
 const planet = root.querySelector('.ib-planet');
@@ -48,14 +48,26 @@ const wordsInto = (host, raw) => {
   });
 };
 
+const featuresInto = (host, raw) => {
+  const lines = String(raw || '').split('\n').map((l) => l.trim()).filter(Boolean);
+  host.innerHTML = '';
+  return lines.map((line) => {
+    const node = document.createElement('span');
+    node.className = 'ib-feature';
+    node.textContent = line;
+    host.appendChild(node);
+    return node;
+  });
+};
+
 const paintText = (p) => {
-  const key = JSON.stringify([p.intro, p.product, p.brand, p.brandSuffix]);
+  const key = JSON.stringify([p.intro, p.features, p.brand, p.brandSuffix]);
   if (key === cache.textKey) {
     return;
   }
   root.querySelector('.ib-mark').textContent = p.brand;
   root.querySelector('.ib-suffix').textContent = p.brandSuffix;
-  cache = { ...cache, textKey: key, intro: wordsInto(intro, p.intro), name: wordsInto(name, p.product) };
+  cache = { ...cache, textKey: key, intro: wordsInto(intro, p.intro), name: featuresInto(name, p.features) };
 };
 
 const paintLogo = (p) => {

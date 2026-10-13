@@ -13,11 +13,12 @@ type Model = { badgeFrame: (p: object, t: number, length: number, intro: number,
 const model = new Function(`${BADGE_MODEL}; return { badgeFrame };`)() as Model;
 
 const PARAMS = { introAt: 0.3, badgeAt: 0.9, nameAt: 1.5, arcRise: 0.18, leave: true };
-const LENGTH = 8;
+const LENGTH = 14;
+const FEATURES = 5;
 const FPS = 30;
 
 const times = () => Array.from({ length: LENGTH * FPS + 1 }, (_, i) => i / FPS);
-const frame = (t: number) => model.badgeFrame(PARAMS, t, LENGTH, 1, 2);
+const frame = (t: number) => model.badgeFrame(PARAMS, t, LENGTH, 1, FEATURES);
 const firstShown = (pick: (f: Frame) => number) => times().find((t) => pick(frame(t)) > 0.5)!;
 
 describe('the introducing badge model', () => {
@@ -77,7 +78,7 @@ describe('the introducing badge model', () => {
   });
 
   it('brings words in rising while they fade, never flickering', () => {
-    const entrance = times().filter((t) => t < 3).map((t) => frame(t).name[0]);
+    const entrance = times().filter((t) => t < 1.2).map((t) => frame(t).intro[0]);
     const firstIn = entrance.findIndex((w) => w.opacity > 0.2);
 
     expect(entrance[firstIn].y).toBeGreaterThan(0);
@@ -85,9 +86,37 @@ describe('the introducing badge model', () => {
   });
 
   it('holds everything still when the loop exit is off', () => {
-    const last = model.badgeFrame({ ...PARAMS, leave: false }, LENGTH, LENGTH, 1, 2);
+    const last = model.badgeFrame({ ...PARAMS, leave: false }, LENGTH, LENGTH, 1, FEATURES);
 
     expect(last.badge.opacity).toBeCloseTo(1, 4);
-    expect(last.name[1].opacity).toBeCloseTo(1, 4);
+    expect(last.name[FEATURES - 1].opacity).toBeCloseTo(1, 4);
+  });
+
+  it('cycles the features in order, one at a time', () => {
+    const shown = times().map((t) => frame(t).name.findIndex((w) => w.opacity > 0.99)).filter((k) => k >= 0);
+    const order = shown.filter((k, i) => k !== shown[i - 1]);
+
+    expect(order).toEqual(Array.from({ length: FEATURES }, (_, k) => k));
+    times().forEach((t) => expect(frame(t).name.filter((w) => w.opacity > 0.5).length).toBeLessThanOrEqual(1));
+  });
+
+  it('holds every feature still for at least a second and a half', () => {
+    for (let k = 0; k < FEATURES; k++) {
+      const still = times().filter((t) => frame(t).name[k].opacity > 0.999 && Math.abs(frame(t).name[k].y) < 1e-3);
+
+      expect(still.length / FPS).toBeGreaterThanOrEqual(1.5);
+    }
+  });
+
+  it('swaps features with a strong expo in-out: still at the ends, fast in the middle, never past the target', () => {
+    const k = 1;
+    const ys = times().map((t) => frame(t).name[k].y);
+    const steps = ys.slice(1).map((y, i) => y - ys[i]);
+    const moving = steps.map((s, i) => [i, s] as const).filter(([, s]) => Math.abs(s) > 1e-6);
+    const first = moving[0][0];
+    const run = steps.slice(first, first + 20).map(Math.abs);
+
+    steps.forEach((s) => expect(s).toBeLessThanOrEqual(1e-9));
+    expect(Math.max(...run)).toBeGreaterThan(run[0] * 5);
   });
 });
