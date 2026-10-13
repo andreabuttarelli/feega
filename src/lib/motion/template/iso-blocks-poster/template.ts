@@ -12,7 +12,7 @@ export const ISO_BLOCKS_POSTER_TEMPLATE: TemplateEntry = {
   id: ISO_BLOCKS_TEMPLATE_ID,
   template: {
     name: 'Poster iso blocks',
-    description: 'A club night poster on white: a round mark and a four-line header by a rule, big black isometric blocks stacked down the page with the line-up slanted on their faces, one top face in orange under a numbered circle.',
+    description: 'A club night poster on white: a big four-line header, big black isometric blocks stacked down the page with the line-up slanted on their faces, one top face in orange under a numbered circle.',
     keyFields: ISO_BLOCKS_KEY_FIELDS,
     doc: posterTemplateDoc({ name: 'poster-iso-blocks', component: ISO_BLOCKS_COMPONENT, code: isoBlocksComponent(), props: ISO_BLOCKS_PROPS, fonts: ISO_BLOCKS_FONTS, varPrefix: ISO_BLOCKS_VAR_PREFIX, vars: [], clip: ISO_BLOCKS_CLIP }, ISO_BLOCKS_GRAIN)
   }

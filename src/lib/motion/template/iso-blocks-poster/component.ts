@@ -14,7 +14,6 @@ const BLOCKS = ['4 40 44 20 20', '60 54 16 22 20', '28 76 20 18 16'].join('\n');
 
 export const ISO_BLOCKS_PROPS: Record<string, PropSpec> = {
   header: linesProp('Event header, top right', HEADER),
-  mark: linesProp('Name under the mark, top left', 'STUDIO\nNAME'),
   lineup: linesProp('Block text, one block per paragraph', LINEUP),
   blocks: linesProp('Blocks: left top length depth height, % per line', BLOCKS),
   info: linesProp('Venue info, by the rule', INFO),
@@ -26,7 +25,7 @@ export const ISO_BLOCKS_PROPS: Record<string, PropSpec> = {
   ink: colourProp('Block and type colour', '#000000'),
   accent: colourProp('Accent: one top face and the circle', '#ff4a1c'),
   accentBlock: numberProp('Block with the accent top face', 2, 0, 3, 1, 'Style'),
-  headerSize: numberProp('Header size (% of the width)', 5.2, 2, 9, 0.1),
+  headerSize: numberProp('Header size (% of the width)', 7.4, 2, 9, 0.1),
   blockTextSize: numberProp('Block text size (% of the width)', 5.4, 2, 10, 0.1),
   [VAR_PREFIX]: prefixProp(ISO_BLOCKS_VAR_PREFIX)
 };

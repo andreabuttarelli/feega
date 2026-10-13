@@ -26,13 +26,6 @@ export const ISO_BLOCKS_CSS = String.raw`
   letter-spacing: -0.04em;
 }
 
-.ib-mark {
-  font-weight: 700;
-  line-height: 1.05;
-  letter-spacing: 0.14em;
-  text-align: center;
-}
-
 .ib-face {
   position: absolute;
   margin: 0;
@@ -74,9 +67,6 @@ const COS = Math.cos(Math.PI / 6);
 const SIN = 0.5;
 const MARGIN = 0.05;
 const HEAD_TOP = 0.05;
-const MARK_WIDTH = 0.22;
-const RULE_X = 0.31;
-const HEAD_X = 0.335;
 const FACE_PAD = 0.12;
 const INFO_SIZE = 0.021;
 const INFO_TOP = 0.72;
@@ -119,9 +109,6 @@ const faceText = (g, i, text, size) => {
   return '<div class="ib-face"' + part('lineup', i) + ' style="left:' + start[0] + 'px;top:' + start[1] + 'px;font-size:' + fit + 'px;transform:' + matrix + '">' + escaped(text) + '</div>';
 };
 
-const markSvg = (size, ink, paper) =>
-  '<svg width="' + size + '" height="' + size + '" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="' + ink + '"/><polygon points="50,22 78,70 22,70" fill="' + paper + '"/><circle cx="50" cy="56" r="7" fill="' + ink + '"/></svg>';
-
 const draw = (p, width, height) => {
   const s = scene.style;
   s.setProperty('--ib-paper', p.paper);
@@ -134,13 +121,8 @@ const draw = (p, width, height) => {
   const margin = MARGIN * width;
   const headTop = HEAD_TOP * width;
   const headSize = px(p.headerSize);
-  const headLines = linesOf(p.header).length;
-  const headHeight = headLines * headSize * 0.98;
 
-  const markSize = MARK_WIDTH * width * 0.62;
-  const mark = '<div class="ib-text ib-mark"' + part('mark') + ' style="left:' + margin + 'px;top:' + headTop + 'px;width:' + MARK_WIDTH * width + 'px;font-size:' + headSize * 0.42 + 'px">' + markSvg(markSize, p.ink, p.paper) + '<div style="margin-top:' + headSize * 0.3 + 'px">' + escaped(p.mark) + '</div></div>';
-  const rule = '<div class="ib-rule" style="' + box(RULE_X * width, headTop + headSize * 0.1, Math.max(2, width * 0.0018), headHeight) + '"></div>';
-  const header = '<div class="ib-text ib-header"' + part('header') + ' style="left:' + HEAD_X * width + 'px;top:' + headTop + 'px;font-size:' + headSize + 'px">' + escaped(p.header) + '</div>';
+  const header = '<div class="ib-text ib-header"' + part('header') + ' style="left:' + margin + 'px;top:' + headTop + 'px;font-size:' + headSize + 'px">' + escaped(p.header) + '</div>';
 
   const lines = linesOf(p.blocks).filter((l) => l.trim());
   const texts = String(p.lineup || '').split(/\n\s*\n/);
@@ -162,6 +144,6 @@ const draw = (p, width, height) => {
   const infoRule = '<div class="ib-rule" style="' + box(margin, infoTop, Math.max(2, width * 0.0018), infoLines * infoSize * 1.12) + '"></div>';
   const caption = upright(p.caption, width - margin * 0.7, height - margin, infoSize * 0.85, p.ink);
 
-  scene.innerHTML = svg + faces + marker + mark + rule + header + info + infoRule + caption;
+  scene.innerHTML = svg + faces + marker + header + info + infoRule + caption;
 };
 `;

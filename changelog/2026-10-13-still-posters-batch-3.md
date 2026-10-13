@@ -2,9 +2,9 @@
 
 **Templates**, one per reference, placeholder copy and generated placeholder photos only. Each
 carries 2–3 marks of its own from the first render (the batch-2 rule):
-- `builtin:poster-iso-blocks`: true isometric blocks drawn from a `blocks` list (left top length
-  depth height), line-up slanted on a face with a shear matrix and auto-fitted to it. Own: a
-  round placeholder mark instead of a crest, one top face in an accent with a numbered circle
+- `builtin:poster-iso-blocks`: no logo, only a big header top left; true isometric blocks drawn from a `blocks` list (left top length
+  depth height), line-up slanted on a face with a shear matrix and auto-fitted to it. Own:
+  one top face in an accent with a numbered circle
   (`accentBlock`, `marker`), a vertical caption, the info rule moved to the left of its block.
 - `builtin:poster-photo-grid`: a square grid (`columns`), a six-line letterspaced title fitted to
   the width, photo tiles cut from one picture per photo through SVG clip paths, `f` puts a tile
