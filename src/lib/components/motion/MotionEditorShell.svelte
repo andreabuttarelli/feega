@@ -220,7 +220,7 @@
       : undefined
   );
   const dockOf = (part: Part) => ({ [DOCK_ATTR]: PART_DOCK[viewport][part] });
-  const stageHost = $derived(rules.stage === Stage.Node ? inlineStage.of(data.node.id) : null);
+  const stageHost = $derived(rules.stage === Stage.Node ? inlineStage.of(data.node.id) : undefined);
 
   onMount(() => {
     const at = clipSeek(doc, location.search);

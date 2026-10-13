@@ -45,4 +45,14 @@ describe('inline stage', () => {
     anchor.destroy();
   });
 
+  it('leaves a stage alone when it is not meant to float: the dedicated page keeps its own preview', () => {
+    const stage = document.createElement('div');
+    document.body.append(stage);
+
+    const anchor = anchoredTo(stage, undefined);
+    anchor.place();
+
+    expect([stage.style.visibility, stage.style.left, stage.style.width]).toEqual(['', '', '']);
+    anchor.destroy();
+  });
 });

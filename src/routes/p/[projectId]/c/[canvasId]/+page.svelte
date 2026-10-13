@@ -2894,6 +2894,14 @@
     display: none;
   }
 
+  @media (max-width: 767px) {
+    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing']))),
+    .canvas.editing :global(.svelte-flow__edge) {
+      opacity: 0;
+      pointer-events: none;
+    }
+  }
+
   .canvas {
     position: relative;
     flex: 1 1 auto;

@@ -20,11 +20,16 @@ export const inlineStage = {
 
 const px = (n: number) => `${Math.round(n * 100) / 100}px`;
 
-export function anchoredTo(stage: HTMLElement, host: HTMLElement | null) {
+export type Anchor = HTMLElement | null | undefined;
+
+export function anchoredTo(stage: HTMLElement, host: Anchor) {
   let target = host;
   let frame = 0;
 
   function place() {
+    if (target === undefined) {
+      return;
+    }
     const layer = (stage.offsetParent ?? stage.parentElement)?.getBoundingClientRect();
     if (!target || !layer) {
       stage.style.visibility = 'hidden';
@@ -51,7 +56,7 @@ export function anchoredTo(stage: HTMLElement, host: HTMLElement | null) {
   frame = requestAnimationFrame(loop);
   return {
     place,
-    update(next: HTMLElement | null) {
+    update(next: Anchor) {
       target = next;
     },
     destroy() {

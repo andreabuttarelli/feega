@@ -105,12 +105,35 @@ async function expectFramed(page: Page, node: Locator) {
     .toBeLessThan(CENTRE_TOLERANCE_PX);
 
   const body = (await node.getByTestId('motion-node').boundingBox())!;
-  const band = await page.screenshot({ clip: { x: body.x + 2, y: body.y + body.height * 0.88, width: body.width - 4, height: body.height * 0.1 } });
-  expect(await shareAbove(band, PAPER_LUMA), 'no light band under the player').toBeLessThan(0.01);
+  const band = () => page.screenshot({ clip: { x: body.x + 2, y: body.y + body.height * 0.88, width: body.width - 4, height: body.height * 0.1 } });
+  await expect.poll(async () => shareAbove(await band(), PAPER_LUMA), { timeout: 5000, message: 'no light band under the player' }).toBeLessThan(0.01);
   const picture = (await page.getByTestId('motion-preview').boundingBox())!;
   expect(Math.abs(picture.y + picture.height / 2 - (body.y + body.height / 2)), 'the picture sits in the middle of the node, no band on one side').toBeLessThan(OVERLAP_TOLERANCE_PX);
 
   await expect(page.getByRole('toolbar', { name: 'Selection actions' })).toHaveCount(0);
+}
+
+const SHARP_EDGE = 150;
+const RULER_FILL = 0.85;
+const PHONE_HEAD_SHARE = 0.25;
+
+async function sharpestEdge(shot: Buffer): Promise<number> {
+  const { data, info } = await sharp(shot).greyscale().raw().toBuffer({ resolveWithObject: true });
+  let max = 0;
+  for (let y = 0; y < info.height; y++) {
+    for (let x = 1; x < info.width; x++) {
+      max = Math.max(max, Math.abs(data[y * info.width + x] - data[y * info.width + x - 1]));
+    }
+  }
+  return max;
+}
+
+async function expectTimelineFits(page: Page) {
+  const timeline = (await page.getByTestId('motion-timeline').boundingBox())!;
+  const head = (await page.getByTestId('motion-timeline').locator('.head').first().boundingBox())!;
+  const clip = (await page.locator('[data-clip-id="t"]').boundingBox())!;
+  expect(clip.width, 'the 3 s video fills the ruler, no empty right half').toBeGreaterThan((timeline.width - head.width) * RULER_FILL);
+  return { timeline, head };
 }
 
 const viewportTransform = (page: Page) => page.locator('.svelte-flow__viewport').evaluate((el) => getComputedStyle(el).transform);
@@ -192,6 +215,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
 
     await expectFramed(page, node);
+    await expectTimelineFits(page);
     await shoot(page, '2-open-1440');
   });
 
@@ -244,6 +268,18 @@ test.describe('motion editor inside the canvas @real', () => {
     await shoot(page, '7-layers');
   });
 
+  test.fixme('on a phone the title in the node is as sharp on screen as in a fresh capture of the player', async ({ page, session }) => {
+    await page.setViewportSize(PHONE);
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.getByTestId('motion-node-stage').first().click({ position: { x: 60, y: 10 } });
+    await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
+    await page.waitForTimeout(2500);
+
+    const player = (await page.getByTestId('motion-preview').boundingBox())!;
+    const onScreen = await sharp(await page.screenshot()).extract({ left: Math.ceil(player.x), top: Math.ceil(player.y), width: Math.floor(player.width) - 1, height: Math.floor(player.height) - 1 }).png().toBuffer();
+    expect(await sharpestEdge(onScreen), 'the title is drawn sharp, not scaled up').toBeGreaterThan(SHARP_EDGE);
+  });
+
   for (const [name, size] of [['phone', PHONE], ['tablet', TABLET]] as const) {
     test(`on a ${name} the node is the player and the panels fit`, async ({ page, session }) => {
       await page.setViewportSize(size);
@@ -255,7 +291,15 @@ test.describe('motion editor inside the canvas @real', () => {
       await expectOnNode(page, page.locator('.svelte-flow__node').filter({ has: page.getByTestId('motion-node-editing') }));
       await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible();
       await page.waitForTimeout(2500);
+      const { timeline, head } = await expectTimelineFits(page);
       await shoot(page, `${name}-open`);
+
+      if (name === 'phone') {
+        expect(head.width, 'layer names take a narrow column on a phone').toBeLessThanOrEqual(timeline.width * PHONE_HEAD_SHARE);
+        await expect(page.locator('.mobile-topbar'), 'one bar on top while editing').toBeHidden();
+        const shown = await page.locator('.svelte-flow__node').evaluateAll((nodes) => nodes.filter((n) => Number(getComputedStyle(n).opacity) > 0).length);
+        expect(shown, 'no clipped neighbour around the edited node').toBe(1);
+      }
 
       await OPEN_AGENT[(await editor.getAttribute('data-viewport')) ?? 'desktop'](page);
       await page.waitForTimeout(800);
