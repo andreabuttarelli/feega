@@ -1,5 +1,6 @@
 [
   "builtin:circular-carousel",
+  "builtin:collage-stack-rotate",
   "builtin:comment-grid",
   "builtin:composition-bento",
   "builtin:composition-carousel-3d",
@@ -25,6 +26,7 @@
   "builtin:feature-scroll",
   "builtin:floating-media",
   "builtin:image-globe",
+  "builtin:introducing-badge",
   "builtin:iridescent-blobs",
   "builtin:launch-beat-montage",
   "builtin:launch-device-fly",
@@ -43,6 +45,7 @@
   "builtin:parallax-grid-drift",
   "builtin:parallax-grid-stagger",
   "builtin:parallax-grid-zoom",
+  "builtin:phone-chat",
   "builtin:phone-split",
   "builtin:photo-strip",
   "builtin:product-reveal",
