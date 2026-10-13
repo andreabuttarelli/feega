@@ -27,13 +27,15 @@ import { scriptSchema } from './script';
 import { physicsSchema } from './physics/model';
 import { MOTION_STYLES } from './style-model';
 import { referenceLookSchema } from './reference-look-model';
+import { stillSchema } from './still-model';
 
 export enum MotionFormat {
   Landscape = '16:9',
   Vertical = '9:16',
   Square = '1:1',
   Portrait = '4:5',
-  SquareLarge = '1:1 1440'
+  SquareLarge = '1:1 1440',
+  Poster = 'A poster'
 }
 
 export const FORMATS: Record<MotionFormat, { width: number; height: number; label: string }> = {
@@ -41,7 +43,8 @@ export const FORMATS: Record<MotionFormat, { width: number; height: number; labe
   [MotionFormat.Vertical]: { width: 1080, height: 1920, label: '9:16' },
   [MotionFormat.Square]: { width: 1080, height: 1080, label: '1:1' },
   [MotionFormat.Portrait]: { width: 1080, height: 1350, label: '4:5' },
-  [MotionFormat.SquareLarge]: { width: 1440, height: 1440, label: '1:1 1440' }
+  [MotionFormat.SquareLarge]: { width: 1440, height: 1440, label: '1:1 1440' },
+  [MotionFormat.Poster]: { width: 1080, height: 1527, label: 'A poster' }
 };
 
 export const MOTION_FORMATS = Object.values(MotionFormat) as [MotionFormat, ...MotionFormat[]];
@@ -166,10 +169,12 @@ export const motionDocSchema = z
     interactive: interactiveSchema.optional(),
     style: z.enum(MOTION_STYLES).optional(),
     script: scriptSchema.optional(),
-    referenceLook: referenceLookSchema.optional()
+    referenceLook: referenceLookSchema.optional(),
+    still: stillSchema.optional()
   })
   .refine((d) => Math.min(d.width, d.height) <= MAX_SHORT_SIDE || (d.width === d.height && d.width <= LARGE_SQUARE), 'resolution above 1080p (a 1440 square is the one exception)')
-  .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] });
+  .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] })
+  .refine((d) => !d.still || d.still.frame < d.durationInFrames, { message: 'the still frame is past the end of the doc', path: ['still'] });
 
 export type MotionDoc = z.infer<typeof motionDocSchema>;
 export type MotionTrack = MotionDoc['tracks'][number];

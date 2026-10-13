@@ -1,6 +1,6 @@
 import type { Browser, Page } from 'puppeteer-core';
 import shaderRuntime from 'virtual:motion-shader-fx';
-import type { BrowserPort, FramePage, Viewport } from './server-frames';
+import type { StillPage, StillPort, Viewport } from './server-frames';
 import type { GlPage } from '$lib/server/effects/check';
 
 const CHROMIUM_VERSION = '153.0.0';
@@ -60,7 +60,9 @@ async function seek(page: Page, seconds: number) {
   );
 }
 
-async function pageOf(viewport: Viewport): Promise<FramePage> {
+const SCREENSHOT_TYPE: Record<string, 'png' | 'jpeg' | 'webp'> = { 'image/png': 'png', 'image/jpeg': 'jpeg', 'image/webp': 'webp' };
+
+async function pageOf(viewport: Viewport): Promise<StillPage> {
   const page = await (await browser()).newPage();
   page.setDefaultTimeout(SEEK_TIMEOUT_MS);
   await page.setViewport({ width: viewport.width, height: viewport.height, deviceScaleFactor: viewport.scale });
@@ -68,13 +70,14 @@ async function pageOf(viewport: Viewport): Promise<FramePage> {
     load: (html) => load(page, html),
     seek: (seconds) => seek(page, seconds),
     jpeg: async (quality) => Buffer.from(await page.screenshot({ type: 'jpeg', quality })),
+    picture: async (mime, quality) => Buffer.from(await page.screenshot({ type: SCREENSHOT_TYPE[mime], quality, omitBackground: true })),
     close: () => page.close()
   };
 }
 
 export const serverFramesOpen = () => Boolean(process.env.VERCEL || process.env.CHROMIUM_PATH);
 
-export const chromiumFrames: BrowserPort = { open: pageOf };
+export const chromiumFrames: StillPort = { open: pageOf };
 
 export const chromiumPage = async (): Promise<Page> => (await browser()).newPage();
 

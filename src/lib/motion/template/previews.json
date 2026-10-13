@@ -53,6 +53,8 @@
   "builtin:phone-chat",
   "builtin:phone-split",
   "builtin:photo-strip",
+  "builtin:poster-checker-steps",
+  "builtin:poster-type-grid",
   "builtin:poster-liquid-glass",
   "builtin:product-reveal",
   "builtin:prompt-input",

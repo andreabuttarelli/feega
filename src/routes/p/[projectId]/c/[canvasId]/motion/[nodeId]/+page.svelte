@@ -58,6 +58,8 @@
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
+  import StillExport from '$lib/components/motion/StillExport.svelte';
+  import { DocMode, docMode, stillFrame } from '$lib/motion/still';
   import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
   import { Liveness, interactiveOf } from '$lib/motion/interactive/settings';
   import { defaultsOf, type VarValues } from '$lib/motion/interactive/var-model';
@@ -242,6 +244,15 @@
 
   const compPath = $derived(path.map((p) => p.comp));
   const doc = $derived(viewOf(draft?.doc ?? history.present, compPath));
+  const mode = $derived(docMode(history.present));
+
+  $effect(() => {
+    const pinned = stillFrame(history.present);
+    if (pinned !== null) {
+      frame = pinned;
+      playing = false;
+    }
+  });
   const beats = $derived(hitFrames(doc, analyses, Hit.Beats));
   const assets = $derived([...madeAssets, ...data.assets]);
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
@@ -1151,7 +1162,7 @@
 <svelte:head><title>{data.node.name ?? 'Motion'} · Motion editor</title></svelte:head>
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
-<div class="editor" data-testid="motion-editor" data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
+<div class="editor" data-testid="motion-editor" data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
   <header class="bar">
     <div class="group lead">
       <IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />
@@ -1260,7 +1271,9 @@
     <ShortcutHelp onclose={() => (helpOpen = false)} />
   {/if}
 
-  {#if exporting}
+  {#if exporting && mode === DocMode.Still}
+    <StillExport {doc} {editorUrl} fileName={data.node.name ?? 'still'} saved={saveState === SaveState.Saved} onclose={() => (exporting = false)} />
+  {:else if exporting}
     <ExportDialog
       {doc}
       assetUrls={assetUrls}
@@ -1790,6 +1803,11 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
+  }
+
+  [data-mode='still'] .transport,
+  [data-mode='still'] .timeline-area {
+    display: none;
   }
 
   .timeline-area {

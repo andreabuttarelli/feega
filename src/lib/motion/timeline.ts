@@ -301,7 +301,8 @@ export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durati
   if (durationInFrames > maxFrames(fitted.fps)) {
     return fail(`the video can be at most ${MAX_SECONDS} seconds`);
   }
-  return { ok: true, doc: { ...fitted, width: size.width, height: size.height, durationInFrames, background: input.background ?? fitted.background } };
+  const still = fitted.still ? { still: { frame: Math.min(fitted.still.frame, durationInFrames - 1) } } : {};
+  return { ok: true, doc: { ...fitted, width: size.width, height: size.height, durationInFrames, background: input.background ?? fitted.background, ...still } };
 }
 
 export function snapFrame(frame: number, targets: readonly number[], threshold: number): number {

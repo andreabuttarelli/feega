@@ -48,10 +48,11 @@ describe('the component library lists whatever is registered', () => {
 });
 
 describe('previews are stored files, never rendered per view', () => {
-  it('every listed preview has its poster and clip under static/', () => {
+  it('every listed preview has its poster under static/, and a video one its clip', () => {
+    const items = catalogue(BUILTIN_TEMPLATES);
     const missing = PREVIEWED.flatMap((id) => {
-      const preview = previewOf(id);
-      return preview ? [preview.poster, preview.video].filter((path) => !existsSync(`static${path}`)) : [id];
+      const preview = items.find((i) => i.id === id)?.preview ?? previewOf(id);
+      return preview ? [preview.poster, preview.video].filter((path): path is string => path !== null).filter((path) => !existsSync(`static${path}`)) : [id];
     });
 
     expect(missing).toEqual([]);

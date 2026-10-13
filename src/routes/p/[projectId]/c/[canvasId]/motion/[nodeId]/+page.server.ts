@@ -15,6 +15,8 @@ import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { saveExport } from '$lib/server/motion/export';
 import { savePoster } from '$lib/server/motion/poster';
+import { exportStill } from '$lib/server/motion/still-export';
+import { stillAskSchema, stillExport } from '$lib/motion/still-model';
 import { Sound, generateSound } from '$lib/server/motion/voiceover';
 import { withOrgContext } from '$lib/server/ai-log';
 import { saveFontUpload } from '$lib/server/motion/font-upload';
@@ -149,6 +151,23 @@ export const actions: Actions = {
   poster: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     return savePoster(scope.db, { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id, actor: { kind: 'user', id: scope.userId }, form: await request.formData() });
+  },
+
+  still: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const form = await request.formData();
+    const ask = stillAskSchema.safeParse({ format: form.get('format') ?? undefined, scale: form.get('scale') ?? undefined });
+    if (!ask.success) {
+      return fail(HTTP_BAD_REQUEST, { error: 'invalid_image_format' });
+    }
+    const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
+    const [head, tokens, assets] = await Promise.all([
+      headOrNew(scope.db, nodeScope, scope.motion.node),
+      motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
+      motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id }, SIGNED_URL_TTL_S.render)
+    ]);
+    const made = await exportStill(scope.db, { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id }, head.doc, stillExport(ask.data.format, ask.data.scale), { tokens, assets });
+    return made.ok ? made : fail(HTTP_UNAVAILABLE, { error: made.error });
   },
 
   uploadFont: async ({ locals, params, request }) => {
