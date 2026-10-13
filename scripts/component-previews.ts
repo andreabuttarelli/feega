@@ -38,7 +38,9 @@ const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: R
   'builtin:ring-through-title': { field: 'media', photos: STRIP_PHOTOS },
   'builtin:editorial-words-media': { field: 'media', photos: STRIP_PHOTOS },
   'builtin:media-cloud-white': { field: 'media', photos: STRIP_PHOTOS },
+  'builtin:phone-chat': { field: 'avatars', photos: ['p1074', 'p1069', 'p1080', 'p1015'] },
   'builtin:collage-stack-rotate': { field: 'media', photos: STRIP_PHOTOS },
+  'builtin:wire-globe-pages': { field: 'media', photos: STRIP_PHOTOS },
   'builtin:path-cards': { field: 'media', photos: ['p1015', 'p1016', 'p1018'] }
 };
 

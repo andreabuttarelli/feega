@@ -1,3 +1,5 @@
+import { PHONE_DEVICE_CSS } from '../phone-device';
+
 export const PHONE_CSS = String.raw`
 .ps {
   position: absolute;
@@ -45,81 +47,7 @@ export const PHONE_CSS = String.raw`
   will-change: transform;
 }
 
-.ps-device {
-  position: absolute;
-  inset: 0;
-  font-size: calc(var(--ps-w) / 100);
-  transform-style: preserve-3d;
-}
-
-.ps-back,
-.ps-body {
-  position: absolute;
-  inset: 0;
-  border-radius: 16.5em;
-}
-
-.ps-back {
-  background: var(--ps-rim-dark);
-  transform: translateZ(-4.5em);
-  box-shadow: 0 6em 14em rgba(0, 0, 0, var(--ps-shadow)), 0 2em 4em rgba(0, 0, 0, calc(var(--ps-shadow) * 0.6));
-}
-
-.ps-body {
-  background: var(--ps-rim);
-  box-shadow: inset 0 0 0 0.35em rgba(255, 255, 255, 0.35), inset 0 0 0 0.9em rgba(0, 0, 0, 0.12);
-}
-
-.ps-key {
-  position: absolute;
-  width: 1.2em;
-  border-radius: 9999px;
-  background: var(--ps-rim-dark);
-}
-
-.ps-bezel {
-  position: absolute;
-  inset: 1.3em;
-  border-radius: 15.2em;
-  background: #050505;
-  box-shadow: inset 0 0 0 0.25em rgba(255, 255, 255, 0.06);
-}
-
-.ps-screen {
-  position: absolute;
-  inset: 3.6em;
-  overflow: hidden;
-  border-radius: 12.9em;
-  background: #000;
-}
-
-.ps-screen img,
-.ps-screen video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-}
-
-.ps-island {
-  position: absolute;
-  left: 50%;
-  top: 2.6em;
-  width: 27em;
-  height: 7.8em;
-  margin-left: -13.5em;
-  border-radius: 9999px;
-  background: #000;
-}
-
-.ps-glare {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(118deg, rgba(255, 255, 255, 0.07) 0%, rgba(255, 255, 255, 0) 38%);
-  pointer-events: none;
-}
+${PHONE_DEVICE_CSS}
 
 .ps-ui {
   position: absolute;
