@@ -1,5 +1,6 @@
 import type { MotionDoc } from '../doc';
 import { audioPlan } from '../audio-plan';
+import type { Quality } from '../export-formats';
 import { frameTimes, samplesPerFrame, type Size } from '../export-plan';
 import { encodeMp4, mixAudio } from './encode';
 import { docCuts, joltMeter, type JoltAt } from '../smoothness';
@@ -16,6 +17,7 @@ export type BrowserJob = {
   doc: MotionDoc;
   assetUrls: Record<string, string>;
   size: Size;
+  quality: Quality;
   withAudio: boolean;
   frames: FrameSource;
   signal: AbortSignal;
@@ -40,6 +42,7 @@ export async function renderInBrowser(job: BrowserJob): Promise<Blob> {
     const blob = await encodeMp4({
       size: job.size,
       fps: job.doc.fps,
+      quality: job.quality,
       frames: job.doc.durationInFrames,
       samples: samplesPerFrame(job.doc),
       audio,

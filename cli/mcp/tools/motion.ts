@@ -92,7 +92,7 @@ export function registerMotionTools(server: McpServer) {
         mode: z.enum(['browser', 'server']).optional(),
         resolution: z.enum(['720p', '1080p', '1440p', '2160p']).optional(),
         format: z.string().optional().describe('server only: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif'),
-        quality: z.enum(['standard', 'high']).optional(),
+        quality: z.enum(['standard', 'high', 'max']).optional(),
         fps: z.union([z.literal(24), z.literal(25), z.literal(30), z.literal(50), z.literal(60)]).optional()
       }),
       annotations: { readOnlyHint: false, destructiveHint: false }

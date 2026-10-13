@@ -61,6 +61,14 @@ const STORAGE = 's.supabase.co';
 const blur = { shutterAngle: 180, shutterPhase: -90, samples: 8 };
 
 describe('launchPiece', () => {
+  it('Max arriva al producer della farm come high, l’unica qualità alta che conosce', async () => {
+    const { farm, workers } = fakeFarm();
+
+    await launchPiece(farm, { ...job, quality: Quality.Max }, { index: 0, size: 420 }, { upload: 'https://s.supabase.co/up/c0', storageHost: STORAGE, maxBytes: 1000 });
+
+    expect(specOf(workers[0]).config).toMatchObject({ quality: 'high' });
+  });
+
   it('starts the chunk detached on its own worker and returns the worker name the tick finds it by', async () => {
     const { farm, workers } = fakeFarm();
 
