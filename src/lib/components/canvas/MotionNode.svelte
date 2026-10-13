@@ -18,9 +18,15 @@
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import { FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, type MotionNode } from '$lib/canvas/motion-node';
+  import { NodeMode } from '$lib/canvas/inline-motion';
+  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { Engagement, PreviewMode, Sight, previewClock, previewMode, scrubFrame, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
-  let { node, href, previewUrl, posterUrl = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null } = $props();
+  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode } = $props();
+
+  let host = $state<HTMLDivElement | null>(null);
+
+  $effect(() => (host ? inlineStage.offer(node.id, host) : undefined));
 
   const ICON = 16;
   const RELEASE_MS = 3000;
@@ -149,7 +155,9 @@
   onfocusout={() => (hovered = false)}
 >
   <div class="stage" data-testid="motion-node-stage">
-    {#if mode === PreviewMode.Live && preview}
+    {#if nodeMode === NodeMode.Edit}
+      <div class="host nodrag nopan" data-testid="motion-node-editing" bind:this={host}></div>
+    {:else if mode === PreviewMode.Live && preview}
       <MotionPreview bind:this={player} html={preview.html} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} />
       <span class="clock" data-testid="motion-node-timecode">{previewClock(frame, preview.fps, preview.durationInFrames)}</span>
       <input
@@ -172,10 +180,10 @@
         <span class="format">{size.label}</span>
       </div>
     {/if}
-    <a class="open nodrag" {href} data-testid="open-motion-editor">Open editor</a>
+    {#if nodeMode === NodeMode.Preview}<a class="open nodrag" {href} data-testid="open-motion-editor">Open editor</a>{/if}
   </div>
 
-  <div class="bar nodrag nopan" onpointerdown={isolate} onclick={isolate} ondblclick={isolate}>
+  <div class="bar nodrag nopan" class:hidden={nodeMode === NodeMode.Edit} onpointerdown={isolate} onclick={isolate} ondblclick={isolate}>
     <button type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={toggle}>
       {#if playing}<Pause size={ICON} />{:else}<Play size={ICON} />{/if}
     </button>
@@ -213,6 +221,16 @@
     container-type: size;
     background: #000;
     color: #f0eee9;
+  }
+
+  .host {
+    width: 100%;
+    height: 100%;
+    display: flex;
+  }
+
+  .bar.hidden {
+    visibility: hidden;
   }
 
   .poster {

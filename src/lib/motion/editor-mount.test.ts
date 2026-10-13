@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { MOUNT, Mount, timelineFits } from './editor-mount';
+import { MOUNT, Mount, Stage, Zoom, timelineFits } from './editor-mount';
 import { MotionFormat, newMotionDoc } from './doc';
 
 describe('editor mount', () => {
-  it('the page owns the tab title and never closes; the canvas closes and leaves the title alone', () => {
-    expect(MOUNT[Mount.Page]).toEqual({ ownsTitle: true, closes: false });
-    expect(MOUNT[Mount.Canvas]).toEqual({ ownsTitle: false, closes: true });
+  it('the page owns the tab title, its stage and its zoom; never closes', () => {
+    expect(MOUNT[Mount.Page]).toEqual({ ownsTitle: true, closes: false, stage: Stage.Own, zoom: Zoom.Stage });
+  });
+
+  it('on the canvas the preview plays in the node, and the canvas zooms it', () => {
+    expect(MOUNT[Mount.Canvas]).toEqual({ ownsTitle: false, closes: true, stage: Stage.Node, zoom: Zoom.Canvas });
   });
 
   it('a video has a timeline, a single-frame still does not', () => {

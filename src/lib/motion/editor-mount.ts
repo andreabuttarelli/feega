@@ -5,11 +5,21 @@ export enum Mount {
   Canvas = 'canvas'
 }
 
-type MountRules = { ownsTitle: boolean; closes: boolean };
+export enum Stage {
+  Own = 'own',
+  Node = 'node'
+}
+
+export enum Zoom {
+  Stage = 'stage',
+  Canvas = 'canvas'
+}
+
+type MountRules = { ownsTitle: boolean; closes: boolean; stage: Stage; zoom: Zoom };
 
 export const MOUNT: Record<Mount, MountRules> = {
-  [Mount.Page]: { ownsTitle: true, closes: false },
-  [Mount.Canvas]: { ownsTitle: false, closes: true }
+  [Mount.Page]: { ownsTitle: true, closes: false, stage: Stage.Own, zoom: Zoom.Stage },
+  [Mount.Canvas]: { ownsTitle: false, closes: true, stage: Stage.Node, zoom: Zoom.Canvas }
 };
 
 const STILL_FRAMES = 1;

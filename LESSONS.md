@@ -290,6 +290,12 @@ diagnosticare un login, guarda lo status della POST.
 
 ## Ambiente e worktree
 
+### Un `vite dev` lasciato acceso serve moduli vecchi a Playwright
+Segnale: un giro Playwright verde (o rosso) che non cambia dopo un edit; un `console.log` appena
+aggiunto non compare; il CSS servito (`?svelte&type=style`) non contiene la regola nuova. Mossa:
+riavviare il dev server della propria porta prima di ogni giro e2e che deve vedere un edit; un
+verde ottenuto prima del riavvio non vale.
+
 ### Verde in locale, rosso in CI: una chiave del `.env` sceglie il ramo
 Il `.env` copiato nel worktree porta chiavi (es. `EXA_API_KEY`) che la CI non ha: in locale il
 codice prende un altro ramo e i mock del test non vengono mai toccati. Segnale: `No "X" export is

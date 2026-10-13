@@ -19,7 +19,7 @@
   import { useSvelteFlow, type Node } from '@xyflow/svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import type { Addable } from '$lib/canvas/addable';
-  import { KeyOwner, keyOwner } from '$lib/canvas/key-owner.svelte';
+  import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
 
   let {
     onadd,
@@ -118,7 +118,7 @@
   };
 
   function onKeydown(e: KeyboardEvent) {
-    if (keyOwner.current !== KeyOwner.Canvas) {
+    if (keyRegion.current !== Region.Canvas) {
       return;
     }
     const command = matchCanvasShortcut(e);

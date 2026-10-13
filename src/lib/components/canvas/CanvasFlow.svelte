@@ -1,6 +1,7 @@
 <script lang="ts">
   const MIN_ZOOM = 0.05;
   import { focusEdges } from '$lib/canvas/edge-focus';
+  import type { FocusRequest } from '$lib/canvas/free-area';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
   /**
    * LA TELA, SU SVELTEFLOW.
@@ -208,7 +209,7 @@
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
     onRedo?: () => void;
     onConnectNew?: (ids: string[], medium: GenMedium, prompt?: string) => void;
-    focus?: { ids: string[]; key: number } | null;
+    focus?: FocusRequest | null;
     /** "Collega a…": gli id scelti e il nodo su cui si è cliccato per chiudere la modalità bersaglio. */
     onConnectExisting?: (ids: string[], targetId: string) => void;
     /** "Esegui flusso": gli id scelti, così com'è per `onDelete`/`onPromote`. */

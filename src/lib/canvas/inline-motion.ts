@@ -1,3 +1,8 @@
+export enum NodeMode {
+  Preview = 'preview',
+  Edit = 'edit'
+}
+
 type Row = { id: string; type: string };
 
 export function inlineMotionTarget(selected: readonly string[], rows: readonly Row[], dismissed: string | null): string | null {

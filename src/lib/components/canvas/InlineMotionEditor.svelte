@@ -3,8 +3,11 @@
   import { Mount } from '$lib/motion/editor-mount';
   import { motionEditorPath } from '$lib/canvas/motion-node';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
+  import { PANEL_ATTR, fitPadding, freeArea, type FitPadding } from '$lib/canvas/free-area';
 
-  let { projectId, canvasId, nodeId, onclose }: { projectId: string; canvasId: string; nodeId: string; onclose: () => void } = $props();
+  let { projectId, canvasId, nodeId, onclose, onframe }: { projectId: string; canvasId: string; nodeId: string; onclose: () => void; onframe: (padding: FitPadding) => void } = $props();
+
+  const SETTLE_MS = 150;
 
   const editorPath = $derived(motionEditorPath({ projectId, canvasId, nodeId }));
   let session = $state.raw<MotionEditorData | null>(null);
@@ -27,6 +30,24 @@
     return () => {
       stale = true;
     };
+  });
+
+  $effect(() => {
+    if (!session) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      const flow = document.querySelector('.svelte-flow')?.getBoundingClientRect();
+      if (!flow) {
+        return;
+      }
+      const panels = [...document.querySelectorAll(`[data-testid="motion-editor"] [${PANEL_ATTR}]`)].map((el) => {
+        const r = el.getBoundingClientRect();
+        return { left: r.left - flow.left, top: r.top - flow.top, right: r.right - flow.left, bottom: r.bottom - flow.top };
+      });
+      onframe(fitPadding(freeArea({ width: flow.width, height: flow.height }, panels)));
+    }, SETTLE_MS);
+    return () => clearTimeout(timer);
   });
 </script>
 

@@ -78,7 +78,8 @@
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
-  import { inlineMotionTarget } from '$lib/canvas/inline-motion';
+  import { NodeMode, inlineMotionTarget } from '$lib/canvas/inline-motion';
+  import type { FitPadding, FocusRequest } from '$lib/canvas/free-area';
   import InlineMotionEditor from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
@@ -1889,10 +1890,10 @@
    * lo stesso che decide un collegamento a un nodo ESISTENTE (`connectExisting`, sotto): la
    * domanda "quale porta per quale sorgente" non cambia perché il bersaglio è appena nato.
    */
-  let focus = $state<{ ids: string[]; key: number } | null>(null);
+  let focus = $state<FocusRequest | null>(null);
 
-  function focusOn(ids: string[]) {
-    focus = { ids, key: (focus?.key ?? 0) + 1 };
+  function focusOn(ids: string[], padding?: FitPadding) {
+    focus = { ids, key: (focus?.key ?? 0) + 1, padding };
   }
 
   function rectOf(id: string): Rect | null {
@@ -2798,7 +2799,7 @@
           />
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} />
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if calendar && publishes(data.socialPublishing)}
@@ -2829,7 +2830,7 @@
   </CanvasFlow>
   {#if inlineMotion}
     {#key inlineMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(padding) => focusOn([inlineMotion], padding)} />
     {/key}
   {/if}
 

@@ -110,8 +110,9 @@
   import { ATTACH_PARAM, BRIEF_PARAM } from '$lib/motion/video-brief';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
-  import { MOUNT, Mount, timelineFits } from '$lib/motion/editor-mount';
-  import { KeyOwner, keyOwner } from '$lib/canvas/key-owner.svelte';
+  import { MOUNT, Mount, Stage, Zoom, timelineFits } from '$lib/motion/editor-mount';
+  import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
+  import { hostedIn, inlineStage } from '$lib/canvas/inline-stage.svelte';
 
   const SAVE_DEBOUNCE_MS = 700;
   const CHECK_WIDTH = 480;
@@ -198,7 +199,8 @@
     }
   }
 
-  $effect(() => (rules.closes ? keyOwner.claim(KeyOwner.Editor) : undefined));
+  $effect(() => (rules.closes ? keyRegion.follow() : undefined));
+  const stageHost = $derived(rules.stage === Stage.Node ? inlineStage.of(data.node.id) : null);
 
   onMount(() => {
     const at = clipSeek(doc, location.search);
@@ -1135,6 +1137,9 @@
   }
 
   function onKey(e: KeyboardEvent) {
+    if (rules.closes && keyRegion.current !== Region.Editor) {
+      return;
+    }
     if ((clockOpen || toolsOpen || clipMenu) && e.key === 'Escape') {
       clockOpen = false;
       toolsOpen = false;
@@ -1160,15 +1165,15 @@
 <svelte:head>{#if rules.ownsTitle}<title>{data.node.name ?? 'Motion'} · Motion editor</title>{/if}</svelte:head>
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
-<div class="editor" data-testid="motion-editor" data-mount={mount} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
+<div class="editor" data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
   <header class="bar">
-    <div class="group lead">
+    <div data-panel class="group lead">
       <IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />
       <span class="title" title={data.node.name ?? 'Motion'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Motion'}</span>
       <span class="save-dot" data-tone={SAVE_TONE[saveState]} role="status" aria-label={`${saveState} · v${version}`}></span>
     </div>
 
-    <div class="group transport" role="group" aria-label="Transport">
+    <div data-panel class="group transport" role="group" aria-label="Transport">
       <IconButton action={Action.GoStart} onclick={COMMANDS[Command.GoStart]} />
       <IconButton action={Action.StepBack} class="step" onclick={COMMANDS[Command.StepBack]} />
       <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" onclick={COMMANDS[Command.TogglePlay]} />
@@ -1189,7 +1194,7 @@
       </div>
     </div>
 
-    <div class="group trail" data-testid="bar-trail">
+    <div data-panel class="group trail" data-testid="bar-trail">
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
       <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
       <div class="popover-anchor">
@@ -1328,8 +1333,8 @@
   {/if}
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc)}>
-    <section class="stage" aria-label="Preview" bind:this={stageEl}>
-      <ZoomStage bind:this={zoomStage} frame={{ width: doc.width, height: doc.height }} onspace={COMMANDS[Command.TogglePlay]}>
+    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} aria-label="Preview" data-testid="editor-stage" {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:hostedIn={stageHost}>
+      {#snippet player()}
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} />{/if}
@@ -1338,7 +1343,12 @@
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
       </MotionPreview>
-      </ZoomStage>
+      {/snippet}
+      {#if rules.zoom === Zoom.Stage}
+        <ZoomStage bind:this={zoomStage} frame={{ width: doc.width, height: doc.height }} onspace={COMMANDS[Command.TogglePlay]}>{@render player()}</ZoomStage>
+      {:else}
+        {@render player()}
+      {/if}
       {#if liveScene.length}<span class="live-badge" data-testid="live-badge" title={`${liveScene.join(', ')} ${liveScene.length === 1 ? 'runs' : 'run'} live: different on every view, a still in the video`}>live</span>{/if}
       <div class="live-bar">
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
@@ -1358,7 +1368,7 @@
 
     <SideColumn place={chatPlace} side={layout.side} onside={(side) => relayout({ side })} widthPx={sideWidth(layout.sidePx, width)} onwidth={(sidePx) => (layout = { ...layout, sidePx })} oncommit={() => relayout({})} busy={agentBusy}>
     {#snippet properties()}
-    <aside class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
+    <aside data-panel class="props" class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
@@ -1381,14 +1391,14 @@
     </aside>
     {/snippet}
     {#snippet chat()}
-    <aside class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
+    <aside data-panel class="chat" class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Agent</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       <ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} prefill={brandAsk} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />
     </aside>
     {/snippet}
     </SideColumn>
 
-    <section class="timeline-area" aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc)}>
+    <section data-panel class="timeline-area" aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc)}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: DEFAULT_LAYOUT.timelinePx })}></div>
 
       {#if clipBarShown}
@@ -1450,7 +1460,7 @@
     </section>
   </div>
 
-  <nav class="tabs" aria-label="Panels">
+  <nav data-panel class="tabs" aria-label="Panels">
     <button type="button" class:on={sheet === Sheet.Properties} onclick={() => (sheet = sheet === Sheet.Properties ? Sheet.None : Sheet.Properties)}>Properties</button>
     <button type="button" class:on={sheet === Sheet.Agent} onclick={() => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)}>Agent</button>
   </nav>
@@ -1498,9 +1508,30 @@
     background: var(--ui-bg);
   }
 
-  .editor[data-mount='canvas'] .stage {
-    background: color-mix(in srgb, var(--ui-bg) 55%, transparent);
-    backdrop-filter: blur(2px);
+  .editor[data-mount='canvas'] .bar > :global(*),
+  .editor[data-mount='canvas'] .tabs,
+  .editor[data-mount='canvas'] .props,
+  .editor[data-mount='canvas'] .chat {
+    background: var(--ui-bg);
+  }
+
+  .editor[data-mount='canvas'][data-viewport='phone'] .body {
+    justify-content: flex-end;
+  }
+
+  .editor[data-mount='canvas'][data-viewport='phone'] .timeline-area {
+    flex: 0 0 38vh;
+  }
+
+  .stage.hosted {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    background: #000;
+  }
+
+  .stage.hosted .live-bar {
+    display: none;
   }
 
   [data-viewport='phone'] {
