@@ -17,6 +17,8 @@ const colour = (title: string, value: string): PropSpec => ({ type: 'string', ti
 export const CHECKER_PROPS: Record<string, PropSpec> = {
   title: text('Title, one step per line', TITLE, { format: PropFormat.Textarea, maxLength: 200 }),
   body: text('Text block, top right', BODY, { format: PropFormat.Textarea, maxLength: 600 }),
+  index: text('Index line, top left', 'NO. 12 — SERIES ON HABITS'),
+  marker: text('Number in the circle', '05', { maxLength: 4 }),
   font: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter Tight', group: 'Style' },
   fontWeight: number('Title weight', 700, 300, 900, 'Style', 100),
   tracking: number('Title tracking (em)', -0.045, -0.1, 0.05, 'Style', 0.005),

@@ -111,6 +111,32 @@ export const TYPE_GRID_CSS = String.raw`
   text-align: right;
 }
 
+.tg-rule {
+  position: absolute;
+  background: var(--tg-ink);
+}
+
+.tg-stamp {
+  position: absolute;
+  background: var(--tg-ink);
+  color: var(--tg-paper);
+  padding: 0.35em 0.6em;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: pre;
+}
+
+.tg-caption {
+  position: absolute;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: pre;
+  transform: rotate(-90deg);
+  transform-origin: 0 0;
+}
+
 .tg-probe {
   position: absolute;
   visibility: hidden;

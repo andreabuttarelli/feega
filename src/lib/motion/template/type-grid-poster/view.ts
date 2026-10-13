@@ -19,12 +19,13 @@ const escaped = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<':
 const partsOf = (line) => line.split(/(\[photo\]|->)/).map((s) => s.trim()).filter(Boolean);
 const wordsOf = (line) => partsOf(line).filter((s) => s !== PHOTO_MARK && s !== ARROW_MARK).join(' ');
 
-root.insertAdjacentHTML('beforeend', '<div class="tg"><div class="tg-stack"></div><div class="tg-foot"></div><span class="tg-probe"></span></div>');
+root.insertAdjacentHTML('beforeend', '<div class="tg"><div class="tg-stack"></div><div class="tg-foot"></div><div class="tg-extra"></div><span class="tg-probe"></span></div>');
 
 const scene = root.querySelector('.tg');
 const stack = root.querySelector('.tg-stack');
 const foot = root.querySelector('.tg-foot');
 const probe = root.querySelector('.tg-probe');
+const marks = root.querySelector('.tg-extra');
 
 let cache = { key: '' };
 
@@ -90,6 +91,11 @@ const draw = () => {
   const counter = { n: 0 };
   const pictures = mediaList(p.media);
   stack.innerHTML = lines.map((line) => lineHtml(line, pictures, counter)).join('');
+  const footTop = height - margin - footPx * FOOTER_ROWS * 0.62;
+  marks.innerHTML =
+    '<div class="tg-rule" style="left:' + margin + 'px;right:' + margin + 'px;top:' + (footTop - footPx * 0.9) + 'px;height:' + Math.max(2, width * 0.003) + 'px"></div>' +
+    '<div class="tg-stamp" style="right:' + margin + 'px;top:' + (footTop - footPx * 3.4) + 'px;font-size:' + footPx + 'px">' + escaped(p.issue) + '</div>' +
+    '<div class="tg-caption" style="left:' + (width - margin * 0.72) + 'px;top:' + (footTop - footPx * 4.5) + 'px;font-size:' + footPx * 0.75 + 'px">' + escaped(p.caption) + '</div>';
   foot.innerHTML = [p.footer1, p.footer2, p.footer3, p.footer4].map((c) => '<div>' + escaped(c || '') + '</div>').join('');
 };
 
