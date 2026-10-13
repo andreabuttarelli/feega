@@ -691,6 +691,36 @@ const CUSTOM_CARDS: Record<string, TemplateCard> = {
     edges: { start: LIGHT, end: LIGHT, transition: Joint.Fade },
     goodFor: ['a soft brand opener', 'a calm title card']
   }),
+  'bracket-gradient': card({
+    roles: [R.Feature, R.Transition],
+    energy: Energy.Calm,
+    loops: false,
+    onScreen: [beat(0, 1, 'a soft warm gradient drifts alone'), beat(1, 7, 'a thin sentence appears, four small corner marks opening from the centre around it, and holds'), beat(7, 8, 'the sentence fades, the marks close')],
+    needs: { media: null, text: TextAmount.Line },
+    bestFormats: ALL_FORMATS,
+    edges: { start: COLOUR, end: COLOUR, transition: Joint.Fade },
+    goodFor: ['one quiet statement', 'a pause between sections']
+  }),
+  'stack-words': card({
+    roles: [R.Gallery, R.Closer],
+    energy: Energy.Medium,
+    loops: false,
+    onScreen: [beat(0, 1, 'an empty light table'), beat(1, 4, 'portrait cards are dealt in from the left one after another, overlapping'), beat(4, 9, 'two words land above and below the last card and hold'), beat(9, 10, 'the cards slide out')],
+    needs: { media: media(4, 8, MediaAspect.Portrait), text: TextAmount.Word },
+    bestFormats: ALL_FORMATS,
+    edges: { start: LIGHT, end: LIGHT },
+    goodFor: ['a collection with a two-word claim', 'before and after']
+  }),
+  'steps-list': card({
+    roles: [R.List, R.Feature],
+    energy: Energy.Calm,
+    loops: false,
+    onScreen: [beat(0, 1, 'a heading fades in on light grey'), beat(1, 5, 'steps with line icons land one by one along a thin rail, the newest highlighted, a shimmering "Working" label below'), beat(5, 11, 'the list holds'), beat(11, 12, 'all fade out')],
+    needs: { media: null, text: TextAmount.Lines },
+    bestFormats: ALL_FORMATS,
+    edges: { start: LIGHT, end: LIGHT, transition: Joint.Fade },
+    goodFor: ['AI agents at work', 'how it works in steps']
+  }),
   'introducing-badge': card({
     roles: [R.Opener, R.List],
     energy: Energy.Calm,
