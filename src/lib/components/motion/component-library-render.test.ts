@@ -35,6 +35,14 @@ describe('the component library', () => {
     expect(body).not.toContain('data-testid="component-detail"');
   });
 
+  it('filters videos and stills, and marks a still card as one', () => {
+    const body = library();
+
+    expect(body).toContain('data-mode-tab="video"');
+    expect(body).toContain('data-mode-tab="still"');
+    expect(body).toMatch(/data-component="builtin:poster-type-grid"[^>]*data-mode="still"/);
+  });
+
   it('has no Back button: a component opens beside the grid and closes in place', () => {
     expect(library()).not.toMatch(/>\s*Back\s*</);
     expect(detail()).toContain('data-testid="close-detail"');

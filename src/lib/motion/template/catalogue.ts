@@ -2,6 +2,7 @@ import { MotionFormat, formatOf, newMotionDoc, type MotionDoc } from '$lib/motio
 import { FIELD_TYPE_LABEL } from './field-model';
 import { insertTemplate, type Inserted, type TemplateEntry } from './library';
 import PREVIEWED from './previews.json';
+import { DocMode, docMode } from '$lib/motion/still';
 
 export enum ComponentKind {
   Component = 'component',
@@ -41,12 +42,13 @@ export type CatalogueItem = {
   description: string;
   seconds: number;
   kind: ComponentKind;
+  mode: DocMode;
   format: StarterFormat;
   fields: { label: string; type: string }[];
   preview: Preview | null;
 };
 
-export type Preview = { poster: string; video: string };
+export type Preview = { poster: string; video: string | null };
 
 export const PREVIEW_DIR = 'component-previews';
 
@@ -54,9 +56,14 @@ const previewed: ReadonlySet<string> = new Set(PREVIEWED);
 
 export const previewSlug = (id: string) => id.replace(/[^a-z0-9-]+/gi, '-');
 
-export function previewOf(id: string): Preview | null {
+const PREVIEW_VIDEO: Record<DocMode, (slug: string) => string | null> = {
+  [DocMode.Video]: (slug) => `/${PREVIEW_DIR}/${slug}.mp4`,
+  [DocMode.Still]: () => null
+};
+
+export function previewOf(id: string, mode: DocMode = DocMode.Video): Preview | null {
   const slug = previewSlug(id);
-  return previewed.has(id) ? { poster: `/${PREVIEW_DIR}/${slug}.jpg`, video: `/${PREVIEW_DIR}/${slug}.mp4` } : null;
+  return previewed.has(id) ? { poster: `/${PREVIEW_DIR}/${slug}.jpg`, video: PREVIEW_VIDEO[mode](slug) } : null;
 }
 
 const LAYOUT_COMPONENT = 'Composition';
@@ -82,20 +89,21 @@ export function catalogue(entries: readonly TemplateEntry[]): CatalogueItem[] {
     description: e.template.description,
     seconds: e.template.doc.durationInFrames / e.template.doc.fps,
     kind: componentKind(e),
+    mode: docMode(e.template.doc),
     format: starterFormatOf(e.template.doc),
     fields: e.template.doc.fields.map((f) => ({ label: f.label, type: FIELD_TYPE_LABEL[f.type] })),
-    preview: previewOf(e.id)
+    preview: previewOf(e.id, docMode(e.template.doc))
   }));
   return items.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
 }
 
-export function matching(items: readonly CatalogueItem[], query: string, kind: ComponentKind | null): CatalogueItem[] {
+export function matching(items: readonly CatalogueItem[], query: string, kind: ComponentKind | null, mode: DocMode | null = null): CatalogueItem[] {
   const words = query.trim().toLowerCase();
-  return items.filter((i) => (!kind || i.kind === kind) && (!words || `${i.name} ${i.description}`.toLowerCase().includes(words)));
+  return items.filter((i) => (!kind || i.kind === kind) && (!mode || i.mode === mode) && (!words || `${i.name} ${i.description}`.toLowerCase().includes(words)));
 }
 
 export function starterDoc(entry: TemplateEntry, format: MotionFormat, newId: () => string): Inserted {
   const source = entry.template.doc;
-  const blank = { ...newMotionDoc(format), fps: source.fps, durationInFrames: source.durationInFrames };
+  const blank = { ...newMotionDoc(format), fps: source.fps, durationInFrames: source.durationInFrames, ...(source.still ? { still: source.still } : {}) };
   return insertTemplate(blank, entry, { from: 0, newId });
 }
