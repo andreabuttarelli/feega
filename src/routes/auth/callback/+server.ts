@@ -1,12 +1,17 @@
 import { redirect } from '@sveltejs/kit';
 import { takeOAuthReturn } from '$lib/server/oauth';
 import { inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
+import { SIGN_IN_ERROR_PARAM, SignInError } from '../../login/sign-in-error';
 import type { RequestHandler } from './$types';
 
 // Scambia il codice del magic link / OAuth per una sessione, poi instrada. Le destinazioni sono
 // tre: chi stava facendo altro (consenso OAuth, login del CLI) torna lì, tutti gli altri alla
 // propria tela — che apre da sé, senza parametri da portarsi dietro.
 export const GET: RequestHandler = async ({ url, cookies, locals: { supabase, db } }) => {
+  if (url.searchParams.has(SIGN_IN_ERROR_PARAM)) {
+    throw redirect(303, `/login?${SIGN_IN_ERROR_PARAM}=${SignInError.OAuth}`);
+  }
+
   const code = url.searchParams.get('code');
   if (!code) {
     throw redirect(303, '/login');
