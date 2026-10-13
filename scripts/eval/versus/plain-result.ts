@@ -9,7 +9,7 @@ export type PlainResult = { work: string; exitCode: number | null; timedOut: boo
 
 export type Usage = { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; costUsd: number };
 
-export type PlainArm = { video: string | null; usage: Usage | null; wallS: number | null; failure: string | null };
+export type PlainArm = { ran: boolean; video: string | null; usage: Usage | null; wallS: number | null; failure: string | null };
 
 type ClaudeJson = { total_cost_usd?: number; is_error?: boolean; subtype?: string; usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } };
 
@@ -48,9 +48,9 @@ export function failureOf(r: PlainResult): string | null {
 export function readPlain(dir: string): PlainArm {
   const file = join(dir, PLAIN_RESULT);
   if (!existsSync(file)) {
-    return { video: null, usage: null, wallS: null, failure: `Arm A never ran: ${file} missing (run npm run eval:versus:plain)` };
+    return { ran: false, video: null, usage: null, wallS: null, failure: `Arm A never ran: ${file} missing (run npm run eval:versus:plain)` };
   }
   const r = JSON.parse(readFileSync(file, 'utf8')) as PlainResult;
   const video = join(dir, PLAIN_VIDEO);
-  return { video: existsSync(video) ? video : null, usage: parseUsage(r.raw), wallS: r.wallS, failure: failureOf(r) };
+  return { ran: true, video: existsSync(video) ? video : null, usage: parseUsage(r.raw), wallS: r.wallS, failure: failureOf(r) };
 }

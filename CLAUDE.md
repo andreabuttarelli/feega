@@ -311,6 +311,17 @@ alignment, gate left, errors, cost from `ai_calls`), then a vision judge calibra
 stills in `scripts/eval/motion-quality/anchors/`. Output in `~/Documents/feega-videos/evals/<ts>/`.
 Never on port 5173; ~$2.5 per case.
 
+`npm run eval:versus -- --out=<dir> --port=5287 [--only=<brief>] [--cap=15]` puts feega against
+plain Claude Code on five fixed briefs with identical text and assets (`scripts/eval/versus/`).
+Arm A is run by a person first, never by an agent: `npm run eval:versus:plain -- --out=<dir>`
+(headless `claude -p`, Opus, $5 / 30 min per brief, no MCP, no user settings). The runner drives
+feega's editor chat (Arm B, cost and tokens from `ai_calls`), reads Arm A from `<dir>`, computes
+facts on both videos (resolution, fps, empty/black frames, jolts, freezes, loop seam), writes an
+hstack comparison per brief and asks a blind pairwise judge twice with the order swapped: only
+agreeing verdicts count. A missing video is a loss with its reason; a feega turn that spends $0
+for 8 minutes fails as a stall with screenshots and chat saved. Existing `feega.json` in `<dir>`
+is reused, so re-running after Arm A only pays the judge.
+
 **What does NOT exist, so nobody writes it in a report as if it had run:** `npm run eval`,
 `npm run eval:ux`, `npm run eval:durability`, `npm run eval:creative`, `npm run eval:clip` — the
 rubric/plan/post pipeline and the UGC clip renderer they walked are gone with the rest of the old

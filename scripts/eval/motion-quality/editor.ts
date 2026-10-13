@@ -78,7 +78,11 @@ export async function exportMp4(page: Page, file: string): Promise<void> {
   await page.getByTestId('export-mode-video').click();
   await page.getByTestId('export-start').click();
   const dl = page.getByTestId('export-download');
-  await dl.waitFor({ timeout: EXPORT_TIMEOUT_MS });
+  const failed = page.getByRole('alert').filter({ hasText: /failed/i });
+  await dl.or(failed).first().waitFor({ timeout: EXPORT_TIMEOUT_MS });
+  if (await failed.count()) {
+    throw new Error(`export refused: ${await failed.first().innerText()}`);
+  }
   const [ev] = await Promise.all([page.waitForEvent('download'), dl.click()]);
   await ev.saveAs(file);
 }

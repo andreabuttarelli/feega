@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { blackShare, cutFrames, freezes, joltCounts, loopSeam, parseProbe } from './facts';
-import { Arm, Outcome, Pick, byForfeit, settle, toArms, type PairVerdict } from './judge';
+import { Arm, Outcome, Pick, PlainRan, byForfeit, settle, toArms, type PairVerdict } from './judge';
 import { failureOf, parseUsage, type PlainResult } from './plain-result';
 import { feegaUsage, stalled } from './feega';
 
@@ -58,6 +58,10 @@ describe('the blind pairwise judge', () => {
     expect(byForfeit({ plain: true, feega: false })).toBe(Outcome.PlainWins);
     expect(byForfeit({ plain: false, feega: true })).toBe(Outcome.FeegaWins);
     expect(byForfeit({ plain: true, feega: true })).toBeNull();
+  });
+
+  it('a brief whose Arm A was never run is unrun, not a feega win', () => {
+    expect(byForfeit({ plain: false, feega: true }, PlainRan.Never)).toBe(Outcome.Unrun);
   });
 });
 

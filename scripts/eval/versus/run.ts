@@ -13,7 +13,7 @@ import { contactSheet, judgeFrames } from '../motion-quality/media';
 import { BRIEFS, Loop, briefText, makeFixtures, type Brief } from './briefs';
 import { videoFacts, MISSING, SEAM_RATIO_OK, type VideoFacts } from './facts';
 import { FEEGA_RESULT, FEEGA_VIDEO, runFeega, type FeegaResult } from './feega';
-import { Arm, Outcome, byForfeit, judgePair, settle, toArms, type ArmVerdict, type Shots } from './judge';
+import { Arm, Outcome, PlainRan, byForfeit, judgePair, settle, toArms, type ArmVerdict, type Shots } from './judge';
 import { readPlain, type Usage } from './plain-result';
 
 const DEFAULT_PORT = 5199;
@@ -82,12 +82,12 @@ async function runBrief(brief: Brief, out: string, fixtures: string, browser: Aw
   mkdirSync(dir, { recursive: true });
   say(`brief ${brief.name}`);
   const a = readPlain(dir);
-  const plain: ArmReport = { ...a, facts: facts(a.video) };
+  const plain: ArmReport = { video: a.video, usage: a.usage, wallS: a.wallS, failure: a.failure, facts: facts(a.video) };
   const b = await feegaArm(brief, fixtures, dir, browser);
   const feegaVideo = b.video ? join(dir, FEEGA_VIDEO) : null;
   const feega: ArmReport = { video: feegaVideo, facts: facts(feegaVideo), usage: b.usage, wallS: b.wallS, failure: b.failure };
-  const base = { name: brief.name, brief: briefText(brief), unrun: null, plain, feega, seamOk: brief.loop === Loop.Asked ? { [Arm.Plain]: seam(plain.facts), [Arm.Feega]: seam(feega.facts) } : null };
-  const forfeit = byForfeit({ [Arm.Plain]: Boolean(plain.video), [Arm.Feega]: Boolean(feega.video) });
+  const base = { name: brief.name, brief: briefText(brief), unrun: a.ran ? null : a.failure, plain, feega, seamOk: brief.loop === Loop.Asked ? { [Arm.Plain]: seam(plain.facts), [Arm.Feega]: seam(feega.facts) } : null };
+  const forfeit = byForfeit({ [Arm.Plain]: Boolean(plain.video), [Arm.Feega]: Boolean(feega.video) }, a.ran ? PlainRan.Yes : PlainRan.Never);
   if (forfeit) {
     return { report: { ...base, outcome: forfeit, verdicts: [], firstArm: null, comparison: null }, usd: b.usage.costUsd };
   }
@@ -125,7 +125,7 @@ function report(stamp: string, reports: BriefReport[], spent: number): string {
   for (const r of reports) {
     lines.push(`| ${r.name} | ${r.outcome ?? '—'} | ${r.plain?.failure ?? 'video'} | ${r.feega?.failure ?? 'video'} | ${fmt(tokens(r.plain?.usage))} | ${fmt(tokens(r.feega?.usage))} | ${fmt(r.plain?.usage?.costUsd)} | ${fmt(r.feega?.usage?.costUsd)} |`);
   }
-  for (const r of reports.filter((x) => !x.unrun)) {
+  for (const r of reports.filter((x) => x.plain || x.feega)) {
     lines.push('', `## ${r.name}`, '', `Brief: ${r.brief}`, '', '| fact | plain | feega |', '|---|---|---|');
     for (const k of Object.keys(MISSING) as Array<keyof VideoFacts>) {
       lines.push(`| ${k} | ${fmt(r.plain?.facts[k])} | ${fmt(r.feega?.facts[k])} |`);

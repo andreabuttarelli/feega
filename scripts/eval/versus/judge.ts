@@ -17,7 +17,13 @@ export enum Outcome {
   FeegaWins = 'feega',
   PlainWins = 'plain',
   Tie = 'tie',
-  Inconsistent = 'inconsistent'
+  Inconsistent = 'inconsistent',
+  Unrun = 'unrun'
+}
+
+export enum PlainRan {
+  Yes = 'yes',
+  Never = 'never'
 }
 
 export type Side = { fidelity: number; legible: boolean };
@@ -68,7 +74,10 @@ export function settle(a: ArmVerdict, b: ArmVerdict): Outcome {
   return a.winner === Arm.Feega ? Outcome.FeegaWins : a.winner === Arm.Plain ? Outcome.PlainWins : Outcome.Tie;
 }
 
-export function byForfeit(exists: Record<Arm, boolean>): Outcome | null {
+export function byForfeit(exists: Record<Arm, boolean>, ran = PlainRan.Yes): Outcome | null {
+  if (ran === PlainRan.Never) {
+    return Outcome.Unrun;
+  }
   if (exists.feega && exists.plain) {
     return null;
   }
