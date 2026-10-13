@@ -19,3 +19,9 @@ dense where it folds and dissolving into dust at the tips.
 - Discarded: additive blending (washes out on a light background) and
   a GPGPU simulation (state breaks seeking).
 - Runtime vars use the `ribbon_` prefix.
+
+Emptying a template text field (e.g. the title) in the inspector or via
+the agent used to restore the default: `applyValues` skipped blanks.
+`setTemplateValues` now passes `Blank.Clears`, and only types marked
+`clearable` in the coerce table (text) take the empty value; inserting
+with blanks still keeps defaults.

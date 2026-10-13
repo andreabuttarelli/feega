@@ -74,6 +74,18 @@ describe('the particle ribbon template', () => {
     expect(interactiveOf(set.doc).vars.find((v) => v.name === 'ribbon_density')?.default).toBe(800);
   });
 
+  it('an emptied title field clears the title everywhere it is read', () => {
+    const placed = inserted();
+    const set = setTemplateValues(placed.doc, placed.clipId, { title: '' });
+    if (!set.ok) {
+      throw new Error(set.error);
+    }
+
+    expect(templateFields(set.doc, placed.clipId).find((f) => f.key === 'title')?.value).toBe('');
+    expect(interactiveOf(set.doc).vars.find((v) => v.name === 'ribbon_title')?.default).toBe('');
+    expect(composeHtml({ doc: set.doc, tokens: FEEGA_TOKENS, assets: {} })).not.toContain('made of motion');
+  });
+
   it.each([MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Square])('composes in %s with three.js and the variables reaching the component', (format) => {
     const html = composeHtml({ doc: inserted(format).doc, tokens: FEEGA_TOKENS, assets: {}, vars: { ribbon_title: 'zqx from the host' } });
 

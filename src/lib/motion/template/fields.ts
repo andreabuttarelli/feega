@@ -10,7 +10,12 @@ export { FieldType, type ExposedField } from './field-model';
 export type FieldInput = Omit<ExposedField, 'default'> & { default?: unknown };
 export type FieldValue = ExposedField & { value: unknown; missing: boolean };
 
-type Coerce = { expects: (field: ExposedField) => string; parse: (raw: string, field: ExposedField) => unknown | undefined };
+type Coerce = { expects: (field: ExposedField) => string; parse: (raw: string, field: ExposedField) => unknown | undefined; clearable?: boolean };
+
+export enum Blank {
+  KeepsDefault = 'keeps-default',
+  Clears = 'clears'
+}
 type Located = { path: CompPath; clip: MotionClip };
 
 const HEX = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
@@ -21,7 +26,7 @@ const inRange = (n: number, field: ExposedField) => Number.isFinite(n) && n >= (
 const rangeOf = (field: ExposedField) => (field.min !== undefined && field.max !== undefined ? ` from ${field.min} to ${field.max}` : '');
 
 const COERCE: Record<FieldType, Coerce> = {
-  [FieldType.Text]: { expects: () => 'text', parse: (raw) => raw },
+  [FieldType.Text]: { expects: () => 'text', parse: (raw) => raw, clearable: true },
   [FieldType.Number]: { expects: (f) => `a number${rangeOf(f)}`, parse: (raw, f) => (raw.trim() !== '' && inRange(Number(raw), f) ? Number(raw) : undefined) },
   [FieldType.Color]: { expects: () => 'a #rrggbb colour', parse: (raw) => (HEX.test(raw) ? raw.toLowerCase() : undefined) },
   [FieldType.Asset]: { expects: () => 'an asset id', parse: (raw) => raw },
@@ -148,11 +153,13 @@ export function coerceValue(field: ExposedField, raw: string): { ok: true; value
   return value === undefined ? { ok: false, error: `${field.key} expects ${coerce.expects(field)}, got "${raw}"` } : { ok: true, value };
 }
 
-export function applyValues(doc: MotionDoc, values: Record<string, string>): OpResult {
+const skipped = (field: ExposedField, raw: string | undefined, blank: Blank) => raw === undefined || (raw === '' && !(blank === Blank.Clears && COERCE[field.type].clearable));
+
+export function applyValues(doc: MotionDoc, values: Record<string, string>, blank = Blank.KeepsDefault): OpResult {
   let current: OpResult = { ok: true, doc };
   for (const field of doc.fields) {
     const raw = values[field.key]?.trim();
-    if (!current.ok || !raw) {
+    if (!current.ok || skipped(field, raw, blank)) {
       continue;
     }
     const coerced = coerceValue(field, raw);

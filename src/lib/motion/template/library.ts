@@ -3,7 +3,7 @@ import { TrackKind } from '$lib/motion/components';
 import { motionDocSchema, parseMotionDoc, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { MAX_FIELDS, type ExposedField } from './field-model';
-import { applyValues, fieldValues, locateClip, setField, type FieldValue } from './fields';
+import { applyValues, Blank, fieldValues, locateClip, setField, type FieldValue } from './fields';
 import { keyFieldsSchema, type KeyFields } from './key-fields';
 import { VAR_PREFIX, paramVar } from '$lib/motion/custom/component';
 import { DEFAULT_INTERACTIVE, interactiveOf } from '$lib/motion/interactive/settings';
@@ -254,7 +254,7 @@ export function setTemplateValues(doc: MotionDoc, clipId: string, values: Record
   if (unknown) {
     return fail(`no field ${unknown}: this template has ${Object.keys(mark.keys).join(', ')}`);
   }
-  const applied = applyValues(doc, Object.fromEntries(Object.entries(values).map(([k, v]) => [mark.keys[k], v])));
+  const applied = applyValues(doc, Object.fromEntries(Object.entries(values).map(([k, v]) => [mark.keys[k], v])), Blank.Clears);
   return applied.ok ? { ok: true, doc: syncedVars(applied.doc, clipId) } : applied;
 }
 
