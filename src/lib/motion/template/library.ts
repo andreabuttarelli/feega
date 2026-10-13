@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { TrackKind } from '$lib/motion/components';
 import { motionDocSchema, parseMotionDoc, type MotionClip, type MotionComp, type MotionDoc, type MotionTrack } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
+import { setFrameRate } from '$lib/motion/frame-rate';
 import { MAX_FIELDS, type ExposedField } from './field-model';
 import { applyValues, Blank, fieldValues, locateClip, setField, type FieldValue } from './fields';
 import { keyFieldsSchema, type KeyFields } from './key-fields';
@@ -162,8 +163,13 @@ function adoptPlayback(doc: MotionDoc, source: MotionDoc): MotionDoc {
   return { ...doc, interactive: { ...interactiveOf(doc), playback, scrollLength } };
 }
 
+function sourceAt(doc: MotionDoc, fps: MotionDoc['fps']): MotionDoc {
+  const paced = setFrameRate(doc, fps);
+  return paced.ok ? paced.doc : doc;
+}
+
 export function insertTemplate(doc: MotionDoc, entry: TemplateEntry, at: Placement): Inserted {
-  const source = entry.template.doc;
+  const source = sourceAt(entry.template.doc, doc.fps);
   const prefix = at.newId();
   const rename = (id: string) => `${prefix}-${id}`;
   const squeeze = Math.min(1, tallness(source) / tallness(doc));
