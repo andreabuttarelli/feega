@@ -29,4 +29,4 @@ comes from the seed distribution, not a mask. Field calmer and scaled to the mas
   almost every strand vanished.
 - Field target is RGBA8 holding the unit direction, read with `textureLod` in the vertex shader.
 - ~0.2 s/frame at 1080×1920 on Apple Metal; very slow on software GL, so the library preview
-  was cut from a GPU render instead of `scripts/component-previews.ts`.
+  is cut from a GPU render (same 48 frames at 12 fps) instead of `scripts/component-previews.ts`.
