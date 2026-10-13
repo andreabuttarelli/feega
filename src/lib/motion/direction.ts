@@ -57,7 +57,8 @@ export enum Quality {
   OneScreen = 'one-screen',
   RecolouredUi = 'recoloured-ui',
   ShrunkUi = 'shrunk-ui',
-  SmallUi = 'small-ui'
+  SmallUi = 'small-ui',
+  DarkFrames = 'dark-frames'
 }
 
 export enum Severity {
@@ -101,6 +102,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.RecolouredUi]: Severity.Blocking,
   [Quality.ShrunkUi]: Severity.Blocking,
   [Quality.SmallUi]: Severity.Blocking,
+  [Quality.DarkFrames]: Severity.Blocking,
   [LookMiss.Unrecorded]: Severity.Blocking,
   [LookMiss.TypeScale]: Severity.Warning,
   [LookMiss.TypeScaleGross]: Severity.Blocking,
@@ -148,13 +150,15 @@ export const severityOf = (p: QualityProblem) => SEVERITY[p.effect ?? p.kind];
 
 export const blocking = (problems: readonly QualityProblem[]) => problems.filter((p) => severityOf(p) === Severity.Blocking);
 
-export type FrameStat = { time: number; luma: number; lumaStd: number; whiteShare: number };
+export type FrameStat = { time: number; luma: number; lumaStd: number; whiteShare: number; litShare?: number };
 
 const SCENE_JOIN_S = 0.5;
 const SCENE_SHARE = 0.9;
 const MIN_TITLE_AREA = 0.12;
 const BLANK_STD = 4;
 const WHITE_SHARE = 0.15;
+const DIM_LIT_SHARE = 0.03;
+const DARK_FILM_SHARE = 0.5;
 const SOFT_UPSCALE = 1.25;
 const SIDES_KEPT = 0.75;
 const LEFT = 0.4;
@@ -671,7 +675,16 @@ export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels
 }
 
 export function frameProblems(stats: readonly FrameStat[]): QualityProblem[] {
-  return [...flatFrames(stats), ...flashes(stats)];
+  return [...flatFrames(stats), ...flashes(stats), ...darkFilm(stats)];
+}
+
+function darkFilm(stats: readonly FrameStat[]): QualityProblem[] {
+  const measured = stats.filter((s) => s.litShare !== undefined);
+  const dim = measured.filter((s) => s.litShare! < DIM_LIT_SHARE);
+  if (!measured.length || dim.length / measured.length < DARK_FILM_SHARE) {
+    return [];
+  }
+  return [{ kind: Quality.DarkFrames, at: dim[0].time, detail: `${dim.length} of ${measured.length} frames (${dim.map((s) => `${s.time}s`).join(', ')}) are near-black: under ${DIM_LIT_SHARE * 100}% of the picture is lit. The viewer sees a black screen: make the content large and bright enough to fill the frame (bigger UI, lighter surfaces, a lit background) before delivering` }];
 }
 
 function flatFrames(stats: readonly FrameStat[]): QualityProblem[] {

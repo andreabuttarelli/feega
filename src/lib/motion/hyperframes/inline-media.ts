@@ -23,10 +23,10 @@ export async function inlineMedia(root: Element, shrink: (url: string) => Promis
   await Promise.all(work);
 }
 
-export async function shrinkImage(url: string): Promise<string> {
+export async function shrinkImage(url: string, waitMs = 8000): Promise<string> {
   const MAX_SIDE = 1280;
   const QUALITY = 0.9;
-  const blob = await fetch(url).then((r) => r.blob());
+  const blob = await fetch(url, { signal: AbortSignal.timeout(waitMs) }).then((r) => r.blob());
   const bitmap = await createImageBitmap(blob);
   const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
   const canvas = new OffscreenCanvas(Math.round(bitmap.width * scale), Math.round(bitmap.height * scale));
