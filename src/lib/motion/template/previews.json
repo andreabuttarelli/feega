@@ -40,6 +40,7 @@
   "builtin:lower-third",
   "builtin:marquee",
   "builtin:media-cloud-white",
+  "builtin:melting-type-poster",
   "builtin:parallax-grid",
   "builtin:parallax-grid-alternate",
   "builtin:parallax-grid-drift",
@@ -48,6 +49,7 @@
   "builtin:phone-chat",
   "builtin:phone-split",
   "builtin:photo-strip",
+  "builtin:poster-liquid-glass",
   "builtin:product-reveal",
   "builtin:prompt-input",
   "builtin:quote",
@@ -77,5 +79,6 @@
   "builtin:social-stat",
   "builtin:split-headline",
   "builtin:title-card",
-  "builtin:ui-morph-reel"
+  "builtin:ui-morph-reel",
+  "builtin:wire-globe-pages"
 ]
