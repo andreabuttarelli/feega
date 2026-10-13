@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ACTS, Act } from './script';
+import { ALL_ACTS, Act } from './script';
 import { findClip, type MotionDoc } from './doc';
 import { nodeSize } from '$lib/canvas/node-size';
 import { PLACEMENT_GAP } from '$lib/canvas/placement';
@@ -23,7 +23,7 @@ const MAX_BEATS = 40;
 const MAX_MEDIA = 4;
 
 export const beatSchema = z.object({
-  act: z.enum(ACTS),
+  act: z.enum(ALL_ACTS),
   kind: z.enum(BeatKind),
   title: z.string().min(1).max(120),
   intent: z.string().min(3).max(TEXT),
@@ -53,7 +53,7 @@ const MEDIA_STEP = MEDIA_SIZE.h + PLACEMENT_GAP;
 const MEDIA_TOP = CURVE_TOP + CURVE_SPAN + BRANCH_DROP + CARD.h + PLACEMENT_GAP;
 const FLOW = 'derives_from';
 
-const ACT_NAME: Record<Act, string> = { [Act.Problem]: 'Problem', [Act.Solution]: 'Solution', [Act.Proof]: 'Proof', [Act.Claim]: 'Claim' };
+const ACT_NAME: Record<Act, string> = { [Act.Problem]: 'Problem', [Act.Solution]: 'Solution', [Act.Proof]: 'Proof', [Act.Claim]: 'Claim', [Act.Open]: 'Open', [Act.Build]: 'Build', [Act.Peak]: 'Peak', [Act.Close]: 'Close' };
 
 const KIND_NAME: Record<BeatKind, string> = {
   [BeatKind.TitleCard]: 'title card',
@@ -107,7 +107,7 @@ export function planStoryboard(board: Storyboard, media: Record<string, MediaKin
     previous = i;
   });
 
-  for (const act of ACTS) {
+  for (const act of ALL_ACTS) {
     const first = beats.findIndex((b, i) => b.act === act && !isBranch(beats, i));
     if (first >= 0) {
       place(DOC, { content: `# ${ACT_NAME[act]}`, public: false }, column.get(first)! * COLUMN, 0);

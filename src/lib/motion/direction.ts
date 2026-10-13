@@ -10,6 +10,7 @@ import { emptyContent, interactionOf, isUiPiece, Interaction, skeletons } from '
 import { FillKind, ShapeKind } from './shape/schema';
 import { CutFault, cutProblems } from './cuts';
 import { scriptDrift } from './script-drift';
+import { PieceKind, kindOf } from './script';
 import { contentEnd, shownSpans, type Span } from './fit-duration';
 import { liveNote, stillStandIns } from './custom/determinism';
 import { maskAt } from './ui-focus';
@@ -664,7 +665,28 @@ function kitBesideRealUi(doc: MotionDoc): QualityProblem[] {
     .map((c) => ({ kind: Quality.KitUi, at: seconds(doc, c.from), detail: `${String(c.props.name)} is a generic kit card in a film that has the real product (${rebuilt.join(', ')}): fill this beat with the recreated UI instead (add_shot ui-focus, ui-morph or whip-zoom on it, focus_ui on its elements), or remove it` }));
 }
 
+const NO_PRODUCT: readonly Check[] = [Quality.NoProductUi, Quality.LittleUi, Quality.OneScreen, Quality.SmallUi, Quality.KitUi, Forbidden.MissingStoryBeat, Forbidden.Screenshots];
+
+const PIECE_SKIPS: Record<PieceKind, ReadonlySet<Check>> = {
+  [PieceKind.Launch]: new Set(),
+  [PieceKind.Showcase]: new Set([Quality.NoProductUi, Quality.LittleUi, Quality.OneScreen, Forbidden.MissingStoryBeat, Forbidden.Screenshots]),
+  [PieceKind.Promo]: new Set(NO_PRODUCT),
+  [PieceKind.Event]: new Set(NO_PRODUCT),
+  [PieceKind.Quote]: new Set(NO_PRODUCT),
+  [PieceKind.Kinetic]: new Set(NO_PRODUCT),
+  [PieceKind.Abstract]: new Set([...NO_PRODUCT, Quality.Silent])
+};
+
+const NO_SKIPS: ReadonlySet<Check> = new Set();
+
+const skipsOf = (doc: MotionDoc) => (doc.script ? PIECE_SKIPS[kindOf(doc.script)] : NO_SKIPS);
+
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
+  const skips = skipsOf(doc);
+  return everyDocProblem(doc, input).filter((p) => !skips.has(p.effect ?? p.kind));
+}
+
+function everyDocProblem(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
   const list = scenes(doc);
   const pixels = input.pixels ?? {};
   return [...unscripted(doc), ...productUiMissing(doc), ...uiShare(doc), ...smallUi(doc), ...alteredUi(doc), ...kitBesideRealUi(doc), ...drifted(doc), ...clickMisses(doc), ...emptyUis(doc), ...stillUis(doc), ...repeated(doc, list), ...smallTitles(doc), ...silent(doc, input.audioAssets), ...softPictures(doc, pixels), ...croppedScreens(doc, pixels), ...alteredLogos(doc, new Set(input.logos ?? [])), ...outOfFrame(doc), ...tiltedText(doc), ...emptyFrames(doc), ...trailingEmpty(doc), ...deadJunctions(doc), ...smallLogos(doc, pixels), ...cutsMidAnimation(doc), ...backgroundSeams(doc), ...liveScenes(doc), ...styleProblems(doc).map((p) => ({ kind: Quality.OffStyle, at: p.at, effect: p.effect, detail: p.detail })), ...lookProblems(doc, placedClips(doc), input.referencesSeen ?? false).map((p) => ({ kind: Quality.OffLook, effect: p.miss, detail: p.detail }))];

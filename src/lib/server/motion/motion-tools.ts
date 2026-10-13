@@ -63,7 +63,7 @@ import { STORY_BEATS, STORY_SHARE, markStory } from '$lib/motion/story';
 import { anchorsOf } from '$lib/motion/clicks';
 import { clickUi } from '$lib/motion/cursor-ops';
 import { Isolate, focusUi } from '$lib/motion/ui-focus';
-import { ACTS, BrandKind, briefOf, durationProblem, offScript, scriptLines, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
+import { ACTS, BrandKind, MOVEMENTS, Need, PIECE_KINDS, PieceKind, briefOf, durationProblem, offScript, pieceOf, scriptLines, scriptProblems, scriptSchema, sourcesOf, type LaunchScript } from '$lib/motion/script';
 import { quoted, unsourcedFigures, type SitePage } from './site-copy';
 import { MediaKind, boardMedia, outlineOf, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
 import { UPDATE_COMPONENTS, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
@@ -515,7 +515,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   };
 
   const accountMissing = async (script: LaunchScript, answer?: AppAccount): Promise<string | null> => {
-    if (script.brand === BrandKind.Fictional || !appEntry || answer === AppAccount.Declined || (await deps.appAccountKept?.())) {
+    if (pieceOf(script).research === Need.Free || script.brand === BrandKind.Fictional || !appEntry || answer === AppAccount.Declined || (await deps.appAccountKept?.())) {
       return null;
     }
     return `before the script, ask the user in chat for a TEST account of the app behind ${appEntry} (login url, email, password; say you will see them, so never a real one) and end the turn on that question: a trailer shows the real signed-in screens, not the marketing site. Then app_browse signs in and photographs the key screens, recreate_ui rebuilds them, and the script describes them. If the user has no account, write_script with app_account: declined`;
@@ -529,6 +529,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         .map((s) => `"${s.quote}" is not on ${s.url}: quote the page word for word or drop the claim`)
     }),
     [BrandKind.Fictional]: () => ({ unread: false, problems: [] })
+  };
+
+  const SOURCED: Record<Need, (script: LaunchScript) => { unread: boolean; problems: string[] }> = {
+    [Need.Required]: (script) => SOURCING[script.brand](script),
+    [Need.Free]: () => ({ unread: false, problems: [] })
   };
 
   const offSiteFigures = (shot: keyof typeof SHOTS, slots: Record<string, unknown>): string | null => {
@@ -1838,7 +1843,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     write_script: tool({
-      description: `Save the research and the four-act script of a launch film before building it; the video is not built until this passes. Research: who it serves, the concrete problem, the struggle as an everyday scene, how the product works step by step (input → what happens → result), 1–3 benefits and up to 4 numbers or results, the tone, the promise. Every benefit, number, promise and proof cites its source: the url of a page analyze_site read and a quote copied from that page; a claim without a source on the site is refused, so never invent one. Acts ${ACTS.join(', ')} in order: problem shows the "before" UI, cluttered or slow, with realistic data; solution shows the product's real flow with specific content, written as a sequence of UI beats, one element per beat (the field and its typed text, the button pressed, the progress, the result); proof shows a number or result from the site; claim puts the site's own promise on screen. Keep on_screen lines few and short: each becomes its own full-frame title card, shown before the scene it announces, never over it. For an invented demo brand (no real site), set brand: fictional: no site is read and sources are the brand's own copy; the brief says it is fictional. Never use it for a real brand. The turn ends there: the user reads the brief in the chat, then says go or corrects it.`,
+      description: `Save the script of a piece before building it; the video is not built until this passes. kind says what the piece is (${PIECE_KINDS.join(', ')}; default ${PieceKind.Launch}) and decides what it needs. ${PieceKind.Launch} (a product or SaaS film from a real site) needs the research and the acts ${ACTS.join(', ')}, below. Every other kind tells the acts ${MOVEMENTS.join(', ')} with no research and no sources: ${PieceKind.Showcase} shows an app from its screens (the attached screenshots), ${PieceKind.Promo} a brand or offer, ${PieceKind.Event} a date and place, ${PieceKind.Quote} and ${PieceKind.Kinetic} the user's words verbatim, ${PieceKind.Abstract} a generative loop (on_screen may be empty). Never force a non-product piece into the launch acts. Launch research: who it serves, the concrete problem, the struggle as an everyday scene, how the product works step by step (input → what happens → result), 1–3 benefits and up to 4 numbers or results, the tone, the promise. Every benefit, number, promise and proof cites its source: the url of a page analyze_site read and a quote copied from that page; a claim without a source on the site is refused, so never invent one. Acts ${ACTS.join(', ')} in order: problem shows the "before" UI, cluttered or slow, with realistic data; solution shows the product's real flow with specific content, written as a sequence of UI beats, one element per beat (the field and its typed text, the button pressed, the progress, the result); proof shows a number or result from the site; claim puts the site's own promise on screen. Keep on_screen lines few and short: each becomes its own full-frame title card, shown before the scene it announces, never over it. For an invented demo brand (no real site), set brand: fictional: no site is read and sources are the brand's own copy; the brief says it is fictional. Never use it for a real brand. The turn ends there: the user reads the brief in the chat, then says go or corrects it.`,
       inputSchema: SCRIPT_INPUT,
       execute: async (raw) => {
         const parsed = SCRIPT_INPUT.safeParse(raw);
@@ -1846,7 +1851,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') };
         }
         const { app_account: answer, ...input } = parsed.data;
-        const sourcing = SOURCING[input.brand](input);
+        const sourcing = SOURCED[pieceOf(input).research](input);
         if (sourcing.unread) {
           return { ok: false, error: 'read the site first: analyze_site gives the pages and quotes every claim must come from' };
         }

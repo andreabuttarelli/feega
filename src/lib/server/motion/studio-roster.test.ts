@@ -6,7 +6,8 @@ import { DESCRIBE_FRAMES, VIEW_FRAMES } from './frames';
 import { Looks } from './look';
 
 const empty = newMotionDoc(MotionFormat.Landscape);
-const scripted = { ...empty, script: { research: {}, acts: [] } } as never;
+const scripted = { ...empty, script: { kind: 'launch', research: {}, acts: [] } } as never;
+const quoted = { ...empty, script: { kind: 'quote', acts: [] } } as never;
 const built = { ...empty, tracks: [{ id: 't', kind: 'visual', name: 'V', clips: [{ id: 'c' }] }] } as never;
 const names = ['analyze_site', 'write_script', 'web_search', 'recreate_ui', 'add_clip', 'add_music', 'view_frames'];
 
@@ -27,6 +28,10 @@ describe('the studio roster', () => {
     expect(roleTools(StudioRole.ShotBuilder, ['mark_story'])).toEqual(['mark_story']);
     expect(REVIEWED.has(StudioRole.ShotBuilder)).toBe(true);
     expect(REVIEWED.has(StudioRole.Fixer)).toBe(false);
+  });
+
+  it('versus run1: a scripted quote is built with every tool, not library product shots (it never got add_clip)', () => {
+    expect(turnRole('go', quoted)).toBe(StudioRole.Builder);
   });
 
   it('once there is a cut, the builder takes every tool', () => {

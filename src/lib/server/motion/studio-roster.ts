@@ -1,4 +1,5 @@
 import type { MotionDoc } from '$lib/motion/doc';
+import { Product, pieceOf } from '$lib/motion/script';
 import { answersCut } from '$lib/motion/cut-review';
 import { WEB_TOOLS } from '$lib/server/web/web-tools';
 import { DESCRIBE_FRAMES } from './frames';
@@ -129,6 +130,8 @@ const unbuilt = (doc: Pick<MotionDoc, 'tracks'>) => doc.tracks.every((t) => t.cl
 
 const blank = (doc: Pick<MotionDoc, 'script' | 'tracks'>) => !doc.script && doc.tracks.every((t) => t.clips.length === 0);
 
+const BUILDS: Record<Product, StudioRole> = { [Product.Shown]: StudioRole.ShotBuilder, [Product.Absent]: StudioRole.Builder };
+
 export function turnRole(message: string, doc: Pick<MotionDoc, 'script' | 'tracks'>): StudioRole {
   if (answersCut(message)) {
     return StudioRole.Fixer;
@@ -136,5 +139,5 @@ export function turnRole(message: string, doc: Pick<MotionDoc, 'script' | 'track
   if (blank(doc)) {
     return NEW_VIDEO.test(message) ? StudioRole.Director : StudioRole.Builder;
   }
-  return doc.script && unbuilt(doc) ? StudioRole.ShotBuilder : StudioRole.Builder;
+  return doc.script && unbuilt(doc) ? BUILDS[pieceOf(doc.script).product] : StudioRole.Builder;
 }
