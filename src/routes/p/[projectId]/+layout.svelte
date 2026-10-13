@@ -5,6 +5,7 @@
   import { onDestroy, untrack } from 'svelte';
   import CanvasTopBar from '$lib/components/canvas/CanvasTopBar.svelte';
   import FloatingRail from '$lib/components/canvas/FloatingRail.svelte';
+  import type { LeftPanelKind } from '$lib/components/canvas/CanvasLeftPanel.svelte';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import CanvasChatPanel from '$lib/components/canvas/CanvasChatPanel.svelte';
   import CanvasSheet from '$lib/components/canvas/CanvasSheet.svelte';
@@ -16,7 +17,7 @@
   import MobileViewSwitch from '$lib/components/canvas/MobileViewSwitch.svelte';
   import { watchKeyboard } from '$lib/canvas/keyboard-inset';
   import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
-  import { sheetEntryForPath, directLoadMode, navHref, type NavEntry } from '$lib/shell-nav';
+  import { NAV_ENTRIES, sheetEntryForPath, directLoadMode, navHref, type NavEntry } from '$lib/shell-nav';
   import { goto } from '$app/navigation';
   import { INITIAL_MOBILE_VIEW, chatBadge, showView, turnEnded, type MobileView, type ChatTurn } from '$lib/canvas/mobile-view';
   import { anyChatRunning } from '$lib/components/brand-agent/chat-session.svelte';
@@ -37,7 +38,7 @@
   const currentCanvas = $derived(data.canvases.find((c: { id: string }) => c.id === canvasId));
   const activeSheetId = $derived(page.state.sheet ? sheetEntryForPath(page.state.sheet.path)?.id ?? null : null);
 
-  let leftPanel = $state<'assets' | 'brands' | 'influencers' | null>(null);
+  let leftPanel = $state<LeftPanelKind | null>(null);
   let chatOpen = $state(browser ? readChatOpen() : true);
   let mobileView = $state(INITIAL_MOBILE_VIEW);
 
@@ -83,7 +84,7 @@
   });
 
   function onRailPanel(entry: NavEntry) {
-    leftPanel = leftPanel === entry.id ? null : (entry.id as 'assets' | 'brands' | 'influencers');
+    leftPanel = leftPanel === entry.id ? null : (entry.id as LeftPanelKind);
   }
 
   function onRailSheet(entry: NavEntry) {
@@ -212,7 +213,7 @@
           <CanvasLeftPanel
             {projectId}
             kind={leftPanel}
-            labelKey={leftPanel === 'assets' ? 'app.nav2.materials' : leftPanel === 'brands' ? 'app.nav2.brands' : 'app.nav2.influencers'}
+            labelKey={NAV_ENTRIES.find((entry) => entry.id === leftPanel)?.labelKey ?? ''}
             onclose={() => (leftPanel = null)}
           />
         {/await}

@@ -5,6 +5,7 @@ import CalendarDays from '@lucide/svelte/icons/calendar-days';
 import Megaphone from '@lucide/svelte/icons/megaphone';
 import Settings from '@lucide/svelte/icons/settings';
 import Camera from '@lucide/svelte/icons/camera';
+import Layers from '@lucide/svelte/icons/layers';
 import type { Component } from 'svelte';
 import type { NavEntry } from '$lib/shell-nav';
 
@@ -15,5 +16,6 @@ export const NAV_ICONS: Record<NavEntry['icon'], Component<{ size?: number }>> =
   'calendar-days': CalendarDays,
   megaphone: Megaphone,
   settings: Settings,
-  camera: Camera
+  camera: Camera,
+  layers: Layers
 };

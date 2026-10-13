@@ -79,7 +79,8 @@
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
   import { NodeMode, inlineMotionTarget } from '$lib/canvas/inline-motion';
-  import type { FitPadding, FocusRequest } from '$lib/canvas/free-area';
+  import { FocusMode, type FitPadding, type FocusRequest } from '$lib/canvas/free-area';
+  import { layersSource } from '$lib/canvas/layers-source.svelte';
   import InlineMotionEditor from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
@@ -1892,9 +1893,21 @@
    */
   let focus = $state<FocusRequest | null>(null);
 
-  function focusOn(ids: string[], padding?: FitPadding) {
-    focus = { ids, key: (focus?.key ?? 0) + 1, padding };
+  function focusOn(ids: string[], padding?: FitPadding, mode = FocusMode.Frame) {
+    focus = { ids, key: (focus?.key ?? 0) + 1, padding, mode };
   }
+
+  $effect(() =>
+    layersSource.publishCanvas({
+      get nodes() {
+        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null }));
+      },
+      get selected() {
+        return selectedIds;
+      },
+      select: (ids) => focusOn(ids, undefined, FocusMode.Select)
+    })
+  );
 
   function rectOf(id: string): Rect | null {
     const tile = tiles.find((t) => t.id === id);

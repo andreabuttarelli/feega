@@ -79,7 +79,7 @@
 <Tooltip.Provider delayDuration={200}>
   <nav class="rail" data-dock="left-bar" aria-label={$_('app.shell.rail')}>
     <div class="rail-group">
-      {#each visibleNav(page.data.socialPublishing, navEntriesByGroup('panel')) as entry (entry.id)}
+      {#each [...navEntriesByGroup('canvas'), ...visibleNav(page.data.socialPublishing, navEntriesByGroup('panel'))] as entry (entry.id)}
         {@render railButton(entry)}
       {/each}
     </div>

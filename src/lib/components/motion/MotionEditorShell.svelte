@@ -114,6 +114,7 @@
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { hostedIn, inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { layersSource } from '$lib/canvas/layers-source.svelte';
 
   const SAVE_DEBOUNCE_MS = 700;
   const CHECK_WIDTH = 480;
@@ -202,6 +203,22 @@
   }
 
   $effect(() => (rules.closes ? keyRegion.follow() : undefined));
+
+  $effect(() =>
+    rules.closes
+      ? layersSource.publishVideo({
+          nodeId: data.node.id,
+          get doc() {
+            return doc;
+          },
+          get selection() {
+            return selection;
+          },
+          select: (ids) => (selection = ids),
+          edit: (result, summary) => apply(result, summary)
+        })
+      : undefined
+  );
   const dockOf = (part: Part) => ({ [DOCK_ATTR]: PART_DOCK[viewport][part] });
   const stageHost = $derived(rules.stage === Stage.Node ? inlineStage.of(data.node.id) : null);
 

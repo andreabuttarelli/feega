@@ -55,7 +55,12 @@ const MARGIN_PX = 32;
 
 type Px = `${number}px`;
 export type FitPadding = { top: Px; right: Px; bottom: Px; left: Px };
-export type FocusRequest = { ids: string[]; key: number; padding?: FitPadding };
+export enum FocusMode {
+  Frame = 'frame',
+  Select = 'select'
+}
+
+export type FocusRequest = { ids: string[]; key: number; padding?: FitPadding; mode?: FocusMode };
 
 const px = (n: number): Px => `${Math.round(n + MARGIN_PX)}px`;
 

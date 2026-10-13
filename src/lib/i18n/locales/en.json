@@ -261,6 +261,7 @@
   },
   "app": {
     "nav2": {
+      "layers": "Layers",
       "materials": "Assets",
       "brands": "Brands",
       "influencers": "Influencers",

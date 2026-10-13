@@ -1,7 +1,12 @@
+<script lang="ts" module>
+  export type LeftPanelKind = 'layers' | 'assets' | 'brands' | 'influencers';
+</script>
+
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import ProjectDragPanel from './ProjectDragPanel.svelte';
   import InfluencersPanel from './InfluencersPanel.svelte';
+  import LayersPanel from './LayersPanel.svelte';
   import X from '@lucide/svelte/icons/x';
   import { PANEL_WIDTHS } from '$lib/shell-nav';
 
@@ -21,7 +26,7 @@
     onclose
   }: {
     projectId: string;
-    kind: 'assets' | 'brands' | 'influencers';
+    kind: LeftPanelKind;
     labelKey: string;
     onclose: () => void;
   } = $props();
@@ -42,7 +47,11 @@
       </button>
     </div>
     <div class="left-panel-body">
-      <ProjectDragPanel {projectId} {kind} />
+      {#if kind === 'layers'}
+        <LayersPanel />
+      {:else}
+        <ProjectDragPanel {projectId} {kind} />
+      {/if}
     </div>
   </div>
 {/if}

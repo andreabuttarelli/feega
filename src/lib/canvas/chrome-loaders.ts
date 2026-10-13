@@ -6,6 +6,7 @@ export const CHROME_LOADERS = {
 };
 
 export const ENTRY_PREFETCH: Record<string, () => Promise<{ default: unknown }>> = {
+  layers: CHROME_LOADERS.leftPanel,
   assets: CHROME_LOADERS.leftPanel,
   brands: CHROME_LOADERS.leftPanel,
   influencers: CHROME_LOADERS.leftPanel,
