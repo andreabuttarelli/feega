@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { MOTION_NODE_BAR_H, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { MOTION_NODE_BAR_H, frameNodeSize, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
 import { nodeSize } from './node-size';
 
 describe('motion node', () => {
@@ -64,5 +64,16 @@ describe('the storyboard of a video', () => {
     expect(storyboardPath('p', { storyboard: { canvasId: 'board', placed: [] } })).toBe('/p/p/c/board');
     expect(storyboardPath('p', {})).toBeNull();
     expect(storyboardPath('p', { storyboard: { canvasId: '' } })).toBeNull();
+  });
+});
+
+describe('a frame node follows the shape of its graphic', () => {
+  it('keeps its width and takes the height of the picture plus the bar', () => {
+    expect(frameNodeSize(400, { width: 1080, height: 1350 })).toEqual({ w: 400, h: 500 + MOTION_NODE_BAR_H });
+    expect(frameNodeSize(420, { width: 1920, height: 1080 })).toEqual({ w: 420, h: 236 + MOTION_NODE_BAR_H });
+  });
+
+  it('a resize keeps the width the hand chose and fixes the height to the picture', () => {
+    expect(frameNodeSize(300.4, { width: 1080, height: 1920 })).toEqual({ w: 300, h: 533 + MOTION_NODE_BAR_H });
   });
 });

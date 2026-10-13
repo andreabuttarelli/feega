@@ -6,11 +6,11 @@ export type NavFamily = 'panel' | 'sheet' | 'route';
 export type NavEntry = {
   id: string;
   labelKey: string;
-  icon: 'images' | 'building' | 'user-round' | 'calendar-days' | 'megaphone' | 'settings' | 'camera';
+  icon: 'images' | 'building' | 'user-round' | 'calendar-days' | 'megaphone' | 'settings' | 'camera' | 'layers';
   family: NavFamily;
   path: string;
   mobilePath?: string;
-  group: 'panel' | 'workbench' | 'hidden';
+  group: 'canvas' | 'panel' | 'workbench' | 'hidden';
 };
 
 /**
@@ -27,10 +27,12 @@ export const NAV_ENTRIES: NavEntry[] = [
   { id: 'ads', labelKey: 'app.hub.ads.social', icon: 'megaphone', family: 'sheet', path: '/ads', group: 'workbench' },
   { id: 'studio', labelKey: 'app.nav2.studio', icon: 'camera', family: 'route', path: '/app/studio', group: 'workbench' },
   { id: 'settings', labelKey: 'app.nav.settings', icon: 'settings', family: 'sheet', path: '/settings/project', mobilePath: '/settings', group: 'workbench' },
-  { id: 'promote', labelKey: 'app.hub.publish.promote', icon: 'megaphone', family: 'sheet', path: '/promote', group: 'hidden' }
+  { id: 'promote', labelKey: 'app.hub.publish.promote', icon: 'megaphone', family: 'sheet', path: '/promote', group: 'hidden' },
+  { id: 'layers', labelKey: 'app.nav2.layers', icon: 'layers', family: 'panel', path: '', group: 'canvas' }
 ];
 
 export const PANEL_WIDTHS: Record<string, number> = {
+  layers: 280,
   assets: 320,
   brands: 320,
   influencers: 320

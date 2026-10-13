@@ -1,5 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
+import { libraryOf, loadEditorSession } from '$lib/server/motion/editor-session';
 import { motionScope as scopeFor } from '$lib/server/motion/editor-scope';
 import { Restore, assetUrls, headOrNew, motionAssets, motionTokens, restoreRevision, saveMotionDoc } from '$lib/server/motion/editor';
 import { RevisionOutcome, listRevisions } from '$lib/server/repos/motion-revisions';
@@ -45,42 +46,9 @@ const HTTP_BAD_REQUEST = 400;
 const HTTP_UNAVAILABLE = 503;
 const HTTP_NOT_FOUND = 404;
 
-export const load: PageServerLoad = async ({ locals, params, url }) => {
-  const scope = await scopeFor(locals, params);
-  const briefIds = briefAttachmentIds(url);
-  const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
-  const farm = motionRenderFarm();
-  const [head, tokens, assets, runs, uploadLimit, templates, gallery, briefAttachments] = await Promise.all([
-    headOrNew(scope.db, nodeScope, scope.motion.node),
-    motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
-    motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }),
-    listNodeRuns(scope.db, nodeScope),
-    farm ? motionRenderStorage().limit().catch(() => null) : null,
-    libraryOf(scope).list(),
-    editorGallery(scope.db, nodeScope),
-    briefIds.length ? loadAttachments(scope.db, { orgId: scope.orgId, projectId: params.projectId, ids: briefIds }) : []
-  ]);
-
-  return {
-    projectId: params.projectId,
-    canvas: { id: scope.canvas.id, name: scope.canvas.name },
-    orgId: scope.orgId,
-    node: { id: scope.motion.record.id, name: scope.motion.record.displayName, lastRenderAssetId: scope.motion.node.lastRenderAssetId, posterAssetId: scope.motion.node.posterAssetId },
-    head: { version: head.version, doc: head.doc },
-    tokens,
-    assets,
-    serverRender: { configured: farm !== null && serverRenderOpen(), latest: renderView(runs), queue: renderQueue(), uploadLimit },
-    batch: batchView(runs),
-    templates,
-    gallery,
-    briefAttachments,
-    storyboardHref: storyboardPath(params.projectId, scope.motion.record.data)
-  };
-};
+export const load: PageServerLoad = ({ locals, params, url }) => loadEditorSession(locals, params, url);
 
 const galleryScope = (scope: { db: Db; orgId: string; userId: string }) => ({ db: scope.db, orgId: scope.orgId, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } });
-
-const libraryOf = (scope: { db: Db; orgId: string; userId: string }) => templateLibrary(scope.db, { orgId: scope.orgId, actor: { kind: 'user', id: scope.userId } });
 
 export const actions: Actions = {
   save: async ({ locals, params, request }) => {

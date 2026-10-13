@@ -22,7 +22,7 @@ function rectOf(el: Element): R {
 function stage() {
   document.body.innerHTML = `<div id="root">
     <div class="layer" data-clip="a"><div class="fx" id="fx-a"><div class="kp"><div class="kf" style="transform: rotate(30deg)"><div class="ks">
-      <span data-rect="30,40,20,10">Hi</span><i data-rect="60,30,40,20"></i>
+      <span data-rect="30,40,20,10" data-part="lines:1">Hi</span><i data-rect="60,30,40,20"></i>
     </div></div></div></div></div>
     <div class="layer" data-clip="empty"><div class="fx"></div></div>
   </div>`;
@@ -66,6 +66,12 @@ describe('measuring the clips in the preview', () => {
     expect(measureClips(root).a.left).toBeCloseTo(0.1, 5);
   });
 
+  it('measures each tagged part of a clip as its own box, keyed clip#part', () => {
+    const boxes = measureClips(stage());
+
+    expect(boxes['a#lines:1']).toEqual({ left: 0.1, top: 0.2, width: 0.1, height: 0.1 });
+  });
+
   it('a clip with nothing drawn has no box', () => {
     expect(measureClips(stage()).empty).toBeUndefined();
   });
@@ -86,7 +92,7 @@ describe('measuring the clips in the preview', () => {
       {
         type: MEASURE_REPLY,
         id: 'q',
-        boxes: { a: { left: 0.1, top: 0.1, width: 0.35, height: 0.2 } }
+        boxes: { a: { left: 0.1, top: 0.1, width: 0.35, height: 0.2 }, 'a#lines:1': { left: 0.1, top: 0.2, width: 0.1, height: 0.1 } }
       }
     ]);
   });

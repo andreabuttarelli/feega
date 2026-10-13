@@ -4,6 +4,7 @@
   import { selectionView } from '$lib/motion/selection-context';
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
+  import { PartEdit, editablePart, partAt, partBoxes, partText, writePartText } from '$lib/motion/poster-parts';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, stackAt, writePatch, type Boxes, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
@@ -13,7 +14,9 @@
     measure,
     onpreview,
     onchange,
-    pickAt = null
+    pickAt = null,
+    part = $bindable(null),
+    onparts = () => {}
   }: {
     doc: MotionDoc;
     frame: number;
@@ -22,6 +25,8 @@
     onpreview: (doc: MotionDoc | null) => void;
     onchange: (doc: MotionDoc, summary: string) => void;
     pickAt?: Pt | null;
+    part?: string | null;
+    onparts?: (parts: Record<string, string[]>) => void;
   } = $props();
 
   const shared = selectionView()!;
@@ -55,6 +60,51 @@
   const quad = $derived(clip && boxes[clip.id] && onFrame(clip) ? quadOf(shown, clip.id, frame, boxes[clip.id]) : null);
   const hoverQuad = $derived(hover && hover !== selected && boxes[hover] ? quadOf(shown, hover, frame, boxes[hover]) : null);
   const anchor = $derived(quad && clip ? anchorOf(shown, clip.id, frame) : null);
+  const split = $derived(partBoxes(boxes));
+  const ownParts = $derived(selected ? (split.parts[selected] ?? []) : []);
+  const partBox = $derived(part ? (ownParts.find((p) => p.part === part)?.box ?? null) : null);
+  let editing = $state<{ part: string; text: string } | null>(null);
+  let partOf = '';
+
+  $effect(() => {
+    if (selected !== partOf) {
+      partOf = selected ?? '';
+      part = null;
+      editing = null;
+    }
+  });
+
+  $effect(() => {
+    if (Object.keys(boxes).length) {
+      onparts(Object.fromEntries(Object.entries(split.parts).map(([id, list]) => [id, list.map((p) => p.part)])));
+    }
+  });
+
+  function partHit(p: Pt): string | null {
+    return selected && clip && boxes[selected] ? partAt(ownParts, p) : null;
+  }
+
+  function editPart() {
+    if (!clip || !part || editablePart(doc, clip, part) !== PartEdit.Text) {
+      return;
+    }
+    editing = { part, text: partText(clip, part) };
+  }
+
+  function commitPart(text: string) {
+    const was = editing;
+    editing = null;
+    if (!was || !clip || text === partText(clip, was.part)) {
+      return;
+    }
+    const result = writePartText(doc, clip.id, was.part, text);
+    if (result.ok) {
+      onchange(result.doc, 'Edited text on the canvas');
+    }
+  }
+
+  const boxStyle = (b: { left: number; top: number; width: number; height: number }) =>
+    `left: ${(b.left / doc.width) * 100}%; top: ${(b.top / doc.height) * 100}%; width: ${(b.width / doc.width) * 100}%; height: ${(b.height / doc.height) * 100}%;`;
 
   let asked = 0;
 
@@ -116,6 +166,12 @@
 
   function press(e: PointerEvent) {
     const p = local(e);
+    const hit = partHit(p);
+    if (hit) {
+      part = hit;
+      return;
+    }
+    part = null;
     const mode = pickModeAt(lastPress, p, e.altKey ? Modifier.Alt : Modifier.None);
     lastPress = p;
     const next = pick(stackAt(doc, frame, boxes, p), selected, mode);
@@ -175,7 +231,7 @@
   }
 </script>
 
-<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={end} onpointerleave={() => (hover = null)}>
+<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={editPart} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={end} onpointerleave={() => (hover = null)}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} />{/if}
     {#if quad}<polygon class="box" points={points(quad)} data-testid="selection-box" />{/if}
@@ -193,6 +249,33 @@
     {/each}
     {#if anchor}
       <button type="button" class="target anchor" aria-label="Anchor point" data-testid="selection-anchor" style={pct(anchor)} onpointerdown={(e) => begin(e, Grip.Anchor, 0, clip.id)}><span></span></button>
+    {/if}
+    {#if partBox && part}
+      <div class="part-box" data-testid="part-box" data-part={part} style={boxStyle(partBox)}>
+        {#each [0, 1, 2, 3] as corner (corner)}<span class="part-handle" data-corner={corner}></span>{/each}
+      </div>
+    {/if}
+    {#if editing && partBox}
+      <!-- svelte-ignore a11y_autofocus -->
+      <textarea
+        class="part-edit"
+        data-testid="part-edit"
+        aria-label="Edit text"
+        style={boxStyle(partBox)}
+        value={editing.text}
+        autofocus
+        onpointerdown={(e) => e.stopPropagation()}
+        onblur={(e) => commitPart(e.currentTarget.value)}
+        onkeydown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            e.currentTarget.blur();
+          }
+          if (e.key === 'Escape') {
+            editing = null;
+          }
+        }}
+      ></textarea>
     {/if}
     {#if live}<output class="readout">{readout(clip.component as ComponentId, live.patch, doc)}</output>{/if}
   {/if}
@@ -276,6 +359,56 @@
     background: transparent;
     border: 1.5px solid var(--ui-accent);
     box-shadow: inset 0 0 0 3px #fff;
+  }
+
+  .part-box {
+    position: absolute;
+    outline: 1.5px dashed var(--ui-accent);
+    pointer-events: none;
+  }
+
+  .part-handle {
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    background: #fff;
+    border: 1.5px solid var(--ui-accent);
+    transform: translate(-50%, -50%);
+  }
+
+  .part-handle[data-corner='0'] {
+    left: 0;
+    top: 0;
+  }
+
+  .part-handle[data-corner='1'] {
+    left: 100%;
+    top: 0;
+  }
+
+  .part-handle[data-corner='2'] {
+    left: 100%;
+    top: 100%;
+  }
+
+  .part-handle[data-corner='3'] {
+    left: 0;
+    top: 100%;
+  }
+
+  .part-edit {
+    position: absolute;
+    min-width: 120px;
+    min-height: 1.6em;
+    padding: 2px 4px;
+    border: 1.5px solid var(--ui-accent);
+    border-radius: 0;
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-sm);
+    resize: none;
+    z-index: 2;
   }
 
   .readout {

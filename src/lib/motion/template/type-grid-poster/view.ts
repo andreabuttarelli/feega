@@ -34,8 +34,8 @@ const photoHtml = (pictures, n) => {
   return src ? '<span class="tg-photo"><img decoding="sync" draggable="false" src="' + escaped(src) + '"></span>' : '<span class="tg-photo tg-shape-' + (n % SHAPES) + '"></span>';
 };
 
-const lineHtml = (line, pictures, counter) =>
-  '<div class="tg-line">' +
+const lineHtml = (line, pictures, counter, i) =>
+  '<div class="tg-line" data-part="lines:' + i + '">' +
   partsOf(line)
     .map((part) => {
       if (part === PHOTO_MARK) {
@@ -78,7 +78,8 @@ const draw = () => {
   s.setProperty('--tg-grain', String(p.photoGrain));
   s.setProperty('--tg-noise', NOISE);
 
-  const lines = String(p.lines || '').split('\n').map((l) => l.trim()).filter(Boolean);
+  const rows = String(p.lines || '').split('\n').map((l, at) => ({ l: l.trim(), at })).filter((r) => r.l);
+  const lines = rows.map((r) => r.l);
   const room = width - 2 * margin;
   const tall = height - 2 * margin - footPx * FOOTER_ROWS;
   const byWidth = (room * p.fill) / widestEm(lines);
@@ -90,13 +91,13 @@ const draw = () => {
 
   const counter = { n: 0 };
   const pictures = mediaList(p.media);
-  stack.innerHTML = lines.map((line) => lineHtml(line, pictures, counter)).join('');
+  stack.innerHTML = lines.map((line, i) => lineHtml(line, pictures, counter, rows[i].at)).join('');
   const footTop = height - margin - footPx * FOOTER_ROWS * 0.62;
   marks.innerHTML =
     '<div class="tg-rule" style="left:' + margin + 'px;right:' + margin + 'px;top:' + (footTop - footPx * 0.9) + 'px;height:' + Math.max(2, width * 0.003) + 'px"></div>' +
     '<div class="tg-stamp" style="right:' + margin + 'px;top:' + (footTop - footPx * 3.4) + 'px;font-size:' + footPx + 'px">' + escaped(p.issue) + '</div>' +
     '<div class="tg-caption" style="left:' + (width - margin * 0.72) + 'px;top:' + (footTop - footPx * 4.5) + 'px;font-size:' + footPx * 0.75 + 'px">' + escaped(p.caption) + '</div>';
-  foot.innerHTML = [p.footer1, p.footer2, p.footer3, p.footer4].map((c) => '<div>' + escaped(c || '') + '</div>').join('');
+  foot.innerHTML = [p.footer1, p.footer2, p.footer3, p.footer4].map((c, i) => '<div data-part="footer' + (i + 1) + '">' + escaped(c || '') + '</div>').join('');
 };
 
 draw();

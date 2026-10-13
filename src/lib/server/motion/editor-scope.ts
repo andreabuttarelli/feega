@@ -22,7 +22,7 @@ export async function motionScope(locals: App.Locals, params: { projectId: strin
 
   const motion = await findMotionNode(db, { orgId: found.orgId, nodeId: params.nodeId, place: { canvasId: found.canvas.id } });
   if (!motion) {
-    throw error(404, 'This motion node does not exist');
+    throw error(404, 'This frame does not exist');
   }
   return { db, userId: user.id, orgId: found.orgId, canvas: found.canvas, mode: found.mode, projectBrandId: found.projectBrandId, motion };
 }
