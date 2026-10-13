@@ -10,6 +10,7 @@ export type Saved = { ok: true; entry: TemplateEntry } | { ok: false; error: str
 
 export type TemplateLibrary = {
   list: () => Promise<TemplateEntry[]>;
+  own: () => Promise<TemplateEntry[]>;
   save: (request: SaveRequest) => Promise<Saved>;
   remove: (id: string) => Promise<boolean>;
 };
@@ -17,6 +18,7 @@ export type TemplateLibrary = {
 export function templateLibrary(db: Db, scope: { orgId: string; actor: Actor }): TemplateLibrary {
   return {
     list: async () => [...BUILTIN_TEMPLATES, ...(await listOrgTemplates(db, scope.orgId))],
+    own: () => listOrgTemplates(db, scope.orgId),
     save: async (request) => {
       const made = request.compId ? templateFromComp(request.doc, request.compId, request.meta) : templateFromDoc(request.doc, request.meta);
       if (!made.ok) {

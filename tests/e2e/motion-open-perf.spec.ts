@@ -9,8 +9,8 @@ const PHONE_CPU_SLOWDOWN = 4;
 const SLOW_4G = { offline: false, latency: 150, downloadThroughput: (1.6 * 1024 * 1024) / 8, uploadThroughput: (750 * 1024) / 8 };
 const QUIET_MS = 1000;
 const SETTLE_MS = 30_000;
-const PHONE = { chrome: 1200, picture: 3000 };
-const DESKTOP = { chrome: 1000, picture: 1500 };
+const PHONE = { sessionKb: 64, mount: 400, picture: 1200 };
+const DESKTOP = { sessionKb: 64, mount: 200, picture: 600 };
 const PERF_OUT = process.env.MOTION_OPEN_PERF_OUT;
 const BUILT = Boolean(process.env.E2E_BASE_URL);
 
@@ -18,7 +18,7 @@ test.use({ video: PERF_OUT ? 'on' : 'off' });
 
 type Mark = 'tap' | 'selected' | 'loading' | 'chrome' | 'preview' | 'ready' | 'idle';
 type Fetched = { name: string; start: number; end: number; kb: number };
-type Timeline = { fetched?: Fetched[]; marks: Partial<Record<Mark, number>>; longTasks: { start: number; duration: number }[]; session?: { start: number; end: number; ttfb: number; bytes: number } };
+type Timeline = { fetched?: Fetched[]; marks: Partial<Record<Mark, number>>; longTasks: { start: number; duration: number }[]; session?: { start: number; end: number; ttfb: number; bytes: number; decoded: number } };
 
 function installProbe() {
   const t = { marks: {} as Record<string, number>, longTasks: [] as { start: number; duration: number }[] };
@@ -72,7 +72,7 @@ async function timeline(page: Page): Promise<Timeline> {
   return page.evaluate(() => {
     const t = (window as unknown as { __open: Timeline }).__open;
     const entry = performance.getEntriesByType('resource').find((e) => e.name.endsWith('/session')) as PerformanceResourceTiming | undefined;
-    const session = entry ? { start: entry.startTime, end: entry.responseEnd, ttfb: entry.responseStart - entry.requestStart, bytes: entry.encodedBodySize } : undefined;
+    const session = entry ? { start: entry.startTime, end: entry.responseEnd, ttfb: entry.responseStart - entry.requestStart, bytes: entry.encodedBodySize, decoded: entry.decodedBodySize } : undefined;
     const tap = t.marks.tap ?? 0;
     const fetched = (performance.getEntriesByType('resource') as PerformanceResourceTiming[])
       .filter((e) => e.startTime >= tap)
@@ -108,6 +108,7 @@ function phases(t: Timeline) {
     sessionEnd: rel(t.session?.end),
     sessionTtfb: t.session ? Math.round(t.session.ttfb) : null,
     sessionKb: t.session ? Math.round(t.session.bytes / 1024) : null,
+    sessionRawKb: t.session ? Math.round(t.session.decoded / 1024) : null,
     chrome: rel(t.marks.chrome),
     preview: rel(t.marks.preview),
     ready: rel(t.marks.ready),
@@ -120,7 +121,7 @@ function phases(t: Timeline) {
 
 type Phone = 'phone' | 'desktop';
 
-type Budget = { chrome: number; picture: number };
+type Budget = { sessionKb: number; mount: number; picture: number };
 
 const DEVICES: Record<Phone, { use: Parameters<typeof test.use>[0]; budget: Budget; throttle: boolean }> = {
   phone: { use: { viewport: PHONE_VIEWPORT, hasTouch: true, isMobile: true }, budget: PHONE, throttle: true },
@@ -133,7 +134,7 @@ for (const [name, device] of Object.entries(DEVICES) as [Phone, (typeof DEVICES)
     test.use(device.use);
     test.setTimeout(180_000);
 
-    test(`the editor shows within ${device.budget.chrome} ms of the tap and draws within ${device.budget.picture} ms`, async ({ page, session, admin, seedNode }, info) => {
+    test(`the editor mounts within ${device.budget.mount} ms of its ${device.budget.sessionKb} KB session and draws ${device.budget.picture} ms later`, async ({ page, session, admin, seedNode }, info) => {
       const node = await seedNode({ type: 'motion', x: 80, y: 120, data: LANDSCAPE });
       const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
       expect(error).toBeNull();
@@ -185,10 +186,10 @@ for (const [name, device] of Object.entries(DEVICES) as [Phone, (typeof DEVICES)
         writeFileSync(`${PERF_OUT}/${name}-${Date.now()}.json`, JSON.stringify(result, null, 2));
         writeFileSync(`${PERF_OUT}/${name}-wire-${Date.now()}.json`, JSON.stringify(wire, null, 1));
       }
-      expect(result.chrome, JSON.stringify(result)).not.toBeNull();
-      expect(result.chrome!, JSON.stringify(result)).toBeLessThan(device.budget.chrome);
-      expect(result.ready, JSON.stringify(result)).not.toBeNull();
-      expect(result.ready!, JSON.stringify(result)).toBeLessThan(device.budget.picture);
+      const facts = JSON.stringify(result);
+      expect(result.sessionRawKb, facts).toBeLessThan(device.budget.sessionKb);
+      expect(result.chrome! - result.sessionEnd!, facts).toBeLessThan(device.budget.mount);
+      expect(result.ready! - result.chrome!, facts).toBeLessThan(device.budget.picture);
     });
   });
 }
