@@ -4,6 +4,7 @@
   import { motionEditorPath } from '$lib/canvas/motion-node';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
   import { DOCK_ATTR, freeArea, type Dock, type Insets } from '$lib/canvas/free-area';
+  import { warmPlayer } from '$lib/motion/hyperframes/warm-player';
 
   let { projectId, canvasId, nodeId, onclose, onframe }: { projectId: string; canvasId: string; nodeId: string; onclose: () => void; onframe: (free: Insets) => void } = $props();
 
@@ -12,6 +13,10 @@
   const editorPath = $derived(motionEditorPath({ projectId, canvasId, nodeId }));
   let session = $state.raw<MotionEditorData | null>(null);
   let failed = $state(false);
+
+  $effect(() => {
+    void warmPlayer(location.origin);
+  });
 
   $effect(() => {
     const url = `${editorPath}/session`;
