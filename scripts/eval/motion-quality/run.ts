@@ -44,6 +44,7 @@ const TURN_CAP_MS = 40 * 60_000;
 const EXPORT_TIMEOUT_MS = 45 * 60_000;
 const POLL_MS = 10_000;
 const MAX_REPLIES = 3;
+const MAX_FAILED_POLLS = 3;
 const PICK_COUNT = 3;
 const FPS = 30;
 const OUT_ROOT = join(process.env.HOME!, 'Documents/feega-videos/evals');
@@ -95,6 +96,7 @@ async function drive(page: Page, agentUrl: string, account: TestAccount | null):
   let cutsAnswered = 0;
   let given = AccountGiven.No;
   let before: AgentState | null = null;
+  let failedPolls = 0;
   while (Date.now() - start < TURN_CAP_MS) {
     await page.waitForTimeout(POLL_MS);
     const answered = await answerCard(page, cutsAnswered);
@@ -105,8 +107,9 @@ async function drive(page: Page, agentUrl: string, account: TestAccount | null):
       continue;
     }
     const r = await page.request.get(agentUrl);
-    if (!r.ok()) {
-      say(`  agent poll ${r.status()}`);
+    failedPolls = r.ok() ? 0 : failedPolls + 1;
+    if (failedPolls >= MAX_FAILED_POLLS) {
+      throw new Error(`agent poll answered ${r.status()} ${failedPolls} times in a row: see server.log`);
     }
     const now: AgentState = r.ok() ? await r.json() : { running: true, messages: [] };
     const settled = turnSettled(before, now);
