@@ -61,10 +61,9 @@ function itemOf(layout, row, slot) {
   return wrap(wrap(slot, layout.k) + row.r * (layout.k + 1), 1e6);
 }
 
-function glassOptics(p, x, y, facing) {
+function reflectionOf(facing) {
   const side = smooth(clamp01((1 - facing) / SIDE_RANGE));
-  const reach = Math.max(1, Math.hypot(x, y));
-  return { reflect: REFLECT_FRONT + (REFLECT_SIDE - REFLECT_FRONT) * side, warp: Math.max(0, p.glass) * side, dx: x / reach, dy: y / reach };
+  return REFLECT_FRONT + (REFLECT_SIDE - REFLECT_FRONT) * side;
 }
 
 function placeTile(layout, p, row, slot, q, tilt) {
@@ -86,7 +85,7 @@ function placeTile(layout, p, row, slot, q, tilt) {
   const x = R * cb * Math.sin(a);
   const y = y0 * ct - z0 * st;
   return {
-    ...glassOptics(p, x, y, facing),
+    reflect: reflectionOf(facing),
     row: row.r,
     slot,
     item,
