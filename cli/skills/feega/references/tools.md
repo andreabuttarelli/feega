@@ -221,7 +221,8 @@ list. Returns how many combinations it actually stopped.
 | `list_motion_revisions` | `feega motion revisions <nodeId>` |
 | `restore_motion_revision` | `feega motion revisions <nodeId> --restore <version>` |
 | `list_motion_templates` | `feega motion templates` |
-| `new_motion_from_template` | `feega motion new --template <id> [--format 16:9, 9:16 or 1:1] [--project id]` |
+| `new_motion_from_template` | `feega motion new --template <id> [--format 16:9, 9:16, 1:1, 4:5 or "A poster"] [--still s] [--project id]` |
+| `motion_tool` | `feega motion tools [name]`, `feega motion tool <nodeId> <tool> [--input json] [--version n]`, `feega motion still <nodeId> [--format png] [--scale 2] [--out file]` |
 | `add_motion_template` | `feega motion add-template <nodeId> <templateId> [--at s] [--var k=v] [--no-sound]` |
 | `get_storyboard` | `feega motion storyboard <nodeId>` |
 | `write_storyboard` | `feega motion storyboard <nodeId> --write beats.json` |
@@ -268,6 +269,15 @@ Opened alone, the embed page scrolls itself. `get_motion_embed({ org, node_id })
 before delivery). `width` is the longest side, default and max 960. Free, read-only, about 10 calls
 a minute per workspace (429 past that); bad times 400, empty video 409. API:
 `POST /api/v1/motion/{node_id}/frames` `{ times, width? }` → `{ revision, frames: [{ time, mime, data }], quality, blocking }`.
+
+`motion_tool({ org, tool?, node_id?, input?, version? })` reaches every tool of the motion editor
+agent with no AI. No `tool`: `GET /api/v1/motion/tools` → `{ tools: [{ name, summary }] }`. `tool`
+alone: `GET /api/v1/motion/tools?name=` → `{ tool: { name, description, input_schema } }`. With
+`node_id`: `POST /api/v1/motion/{node_id}/tools` `{ tool, input, version? }` → `{ tool, version,
+saved, output }`, the input checked by the tool's own schema (400), screened like a chat prompt
+(422), saved as a revision by the agent; a stale `version` is 409, an unknown tool 404. Tools that
+need a chat turn answer `ok: false`. `export_image` `{ format: png|jpg|webp, scale: 1|2, time? }`
+draws the still frame (or `time`) at full size and returns `{ asset_id, url, width, height }`.
 
 ## Gallery
 

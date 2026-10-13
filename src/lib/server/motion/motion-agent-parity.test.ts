@@ -31,7 +31,8 @@ const DOC: Record<string, Access> = {
   interactive: { write: ['set_interactive', 'apply_interactive_preset', 'declare_var', 'remove_var', 'bind_var', 'unbind_var'], read: 'interactive' },
   style: { write: ['set_style'], read: 'style' },
   script: { write: ['write_script'], read: 'script' },
-  referenceLook: { write: ['set_reference_look'], read: 'referenceLook' }
+  referenceLook: { write: ['set_reference_look'], read: 'referenceLook' },
+  still: { write: ['set_canvas'], read: 'still' }
 };
 
 const TRACK: Record<string, Access> = {
