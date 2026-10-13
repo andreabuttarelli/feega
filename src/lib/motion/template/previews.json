@@ -45,6 +45,7 @@
   "builtin:parallax-grid-drift",
   "builtin:parallax-grid-stagger",
   "builtin:parallax-grid-zoom",
+  "builtin:phone-chat",
   "builtin:phone-split",
   "builtin:photo-strip",
   "builtin:poster-liquid-glass",
