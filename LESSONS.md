@@ -4,6 +4,13 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Un template a 60 fps che va al doppio e diventa nero a metà
+Ogni frame di un doc (clip, keyframe, comp) è nell'fps del doc: un pezzo che arriva da un doc con
+un altro fps va convertito tutto, comps comprese. Segnale: template da 12 s che finisce a 6 s, o
+precomp che si ferma a metà dopo un cambio di frame rate. Mossa: passare per `setFrameRate`
+(`frame-rate.ts`), che converte tracce, comps, marker e work area; `insertTemplate` lo fa sulla
+sorgente. Mai rifare il render a 30 fps per aggirarlo.
+
 ### L'agente dice "le immagini non mi sono arrivate" dopo un `view_frames` riuscito
 Un'immagine iniettata da `prepareStep` (`messages` sostituiti) vale per quello step solo: lo step
 dopo, e ogni round successivo del turno, ricostruisce i messaggi dalle risposte e l'immagine non
