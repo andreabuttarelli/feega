@@ -1,4 +1,5 @@
 [
+  "builtin:bracket-gradient",
   "builtin:circular-carousel",
   "builtin:collage-stack-rotate",
   "builtin:comment-grid",
@@ -27,6 +28,7 @@
   "builtin:floating-media",
   "builtin:image-globe",
   "builtin:introducing-badge",
+  "builtin:iridescent-blobs",
   "builtin:launch-beat-montage",
   "builtin:launch-device-fly",
   "builtin:launch-device-orbit",
@@ -45,6 +47,8 @@
   "builtin:parallax-grid-drift",
   "builtin:parallax-grid-stagger",
   "builtin:parallax-grid-zoom",
+  "builtin:particle-ribbon",
+  "builtin:path-cards",
   "builtin:phone-chat",
   "builtin:phone-split",
   "builtin:photo-strip",
@@ -77,7 +81,10 @@
   "builtin:scroll-story",
   "builtin:social-stat",
   "builtin:split-headline",
+  "builtin:stack-words",
+  "builtin:steps-list",
   "builtin:title-card",
   "builtin:ui-morph-reel",
-  "builtin:wire-globe-pages"
+  "builtin:wire-globe-pages",
+  "builtin:word-wheel-ui"
 ]
