@@ -183,7 +183,7 @@
     {#if nodeMode === NodeMode.Preview}<a class="open nodrag" {href} data-testid="open-motion-editor">Open editor</a>{/if}
   </div>
 
-  <div class="bar nodrag nopan" class:hidden={nodeMode === NodeMode.Edit} onpointerdown={isolate} onclick={isolate} ondblclick={isolate}>
+  <div class="bar nodrag nopan" class:dormant={nodeMode === NodeMode.Edit} onpointerdown={isolate} onclick={isolate} ondblclick={isolate}>
     <button type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={toggle}>
       {#if playing}<Pause size={ICON} />{:else}<Play size={ICON} />{/if}
     </button>
@@ -229,7 +229,7 @@
     display: flex;
   }
 
-  .bar.hidden {
+  .bar.dormant {
     visibility: hidden;
   }
 

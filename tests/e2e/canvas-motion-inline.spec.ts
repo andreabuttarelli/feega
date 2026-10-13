@@ -17,6 +17,10 @@ async function shoot(page: Page, name: string) {
 const latestVersion = async (admin: Parameters<Parameters<typeof test>[2]>[0]['admin'], nodeId: string) =>
   (await admin.from('motion_revisions').select('version').eq('node_id', nodeId).order('version', { ascending: false }).limit(1)).data?.[0]?.version ?? 0;
 
+const JPEG = 'data:image/jpeg;base64,';
+const sse = (parts: unknown[]) => [...parts.map((p) => `data: ${JSON.stringify(p)}\n\n`), 'data: [DONE]\n\n'].join('');
+const askFrames = (callId: string) => sse([{ type: 'start' }, { type: 'data-motion-frames', data: { callId, times: [0.5, 1.5], doc } }, { type: 'finish' }]);
+
 const OPEN_AGENT: Record<'phone' | 'tablet', (page: Page) => Promise<void>> = {
   phone: (page) => page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Agent' }).click(),
   tablet: (page) => page.getByTestId('toggle-chat').click()
@@ -97,6 +101,30 @@ test.describe('motion editor inside the canvas @real', () => {
     await page.mouse.click(empty!.x, empty!.y);
     await expect(editor).toHaveCount(0);
     await shoot(page, '6-closed');
+  });
+
+  test('the agent sees frames captured by the player inside the node', async ({ page, session }, info) => {
+    const [first] = info.annotations.filter((a) => a.type === 'node').map((a) => a.description!);
+    const stored: string[] = [];
+    await page.route(/\/motion\/[^/]+\/agent$/, (route) =>
+      route.request().method() === 'POST' ? route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: askFrames('call_inline') }) : route.fallback()
+    );
+    page.on('response', (res) => {
+      if (!res.url().endsWith('/agent/frames') || !res.ok()) {
+        return;
+      }
+      const body = res.request().postDataJSON() as { callId: string; frames: { data: string }[] };
+      if (body.frames.length === 2 && body.frames.every((f) => f.data.startsWith(JPEG))) {
+        stored.push(body.callId);
+      }
+    });
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.locator(`.svelte-flow__node[data-id="${first}"]`).getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
+    const input = page.getByLabel('Agent', { exact: true }).locator('textarea');
+    await input.fill('look');
+    await input.press('Enter');
+    await expect.poll(() => stored, { timeout: 20_000 }).toContain('call_inline');
   });
 
   for (const [name, size] of [['phone', PHONE], ['tablet', TABLET]] as const) {
