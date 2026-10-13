@@ -93,6 +93,10 @@ async function expectLit(page: Page) {
   await expect.poll(async () => shareAbove(await inner(), LIT_LUMA), { timeout: 15_000, message: 'the title draws inside the node, not a black box' }).toBeGreaterThan(MIN_LIT_SHARE);
 }
 
+async function expectOneBurger(page: Page) {
+  await expect(page.locator('.burger-btn:visible, [data-testid="menu-open"]:visible'), 'one burger on top, never the canvas one and the editor one').toHaveCount(1);
+}
+
 async function expectOneBar(page: Page) {
   const top = (await page.locator('.canvas-topbar').boundingBox())!;
   const bar = (await page.getByTestId('editor-bar').boundingBox())!;
@@ -190,6 +194,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await expect(page.getByLabel('Agent', { exact: true })).toBeVisible();
     await expectFramed(page, nodeOf(first));
     await expectOneBar(page);
+    await expectOneBurger(page);
     await shoot(page, '2-open');
 
     const timecode = editor.getByTestId('timecode');
@@ -238,6 +243,13 @@ test.describe('motion editor inside the canvas @real', () => {
 
     await expectFramed(page, node);
     await expectOneBar(page);
+    await expectOneBurger(page);
+
+    await page.getByRole('tab', { name: 'Properties' }).click();
+    const frame = page.getByTestId('composition-inspector');
+    await expect(frame, 'with the frame selected and nothing inside it, Properties shows the frame').toBeVisible();
+    await expect(frame).toContainText('Format');
+    await expect(frame).toContainText('Length');
     await expectTimelineFits(page);
     await expectLit(page);
     await shoot(page, '2-open-1440');
@@ -317,6 +329,7 @@ test.describe('motion editor inside the canvas @real', () => {
       await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible();
       await page.waitForTimeout(2500);
       const { timeline, head } = await expectTimelineFits(page);
+      await expectOneBurger(page);
       await shoot(page, `${name}-open`);
 
       if (name === 'phone') {

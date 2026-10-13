@@ -112,12 +112,15 @@
   import { ATTACH_PARAM, BRIEF_PARAM } from '$lib/motion/video-brief';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
-  import { BAR_PLACE, BarPlace, MOUNT, Measure, Mount, PART_DOCK, Part, Stage, Zoom, timelineFits } from '$lib/motion/editor-mount';
+  import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, Zoom, timelineFits } from '$lib/motion/editor-mount';
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { PART_SEP, parsePart } from '$lib/motion/poster-parts';
+  import { PropertiesView, propertiesFor } from '$lib/motion/properties-view';
+  import Keyboard from '@lucide/svelte/icons/keyboard';
+  import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 
   const SAVE_DEBOUNCE_MS = 700;
   const CHECK_WIDTH = 480;
@@ -235,6 +238,7 @@
       : undefined
   );
   const TOP_SLOT = '[data-top-slot]';
+  const menu = $derived(menuPlace(mount, viewport));
   const inCanvasBar = $derived(rules.closes && BAR_PLACE[viewport] === BarPlace.CanvasBar);
   const barHost = $derived(inCanvasBar && typeof document !== 'undefined' ? document.querySelector<HTMLElement>(TOP_SLOT) : undefined);
   const dockOf = (part: Part) => ({ [DOCK_ATTR]: PART_DOCK[viewport][part] });
@@ -306,6 +310,7 @@
   const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
+  const view = $derived(propertiesFor({ clip: selected?.id ?? null, part: selectedPart }));
   const agent = $derived(agentBusy || draft ? Agent.Working : Agent.Idle);
   const blank = $derived(!path.length && showsStart(doc, agentBusy ? Agent.Working : Agent.Idle));
 
@@ -1215,7 +1220,7 @@
 <div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
   <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost}>
     <div class="group lead" {...dockOf(Part.Bar)}>
-      <IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />
+      {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
       <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
       <span class="save-dot" data-tone={SAVE_TONE[saveState]} role="status" aria-label={`${saveState} · v${version}`}></span>
     </div>
@@ -1264,11 +1269,15 @@
         <a class="secondary storyboard" href={data.storyboardHref} data-testid="storyboard-open">Storyboard</a>
       {/if}
       <button type="button" class="secondary wide" onclick={() => (leaveTo(0), (publishing = true))} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
-      <div class="popover-anchor narrow">
+      <div class="popover-anchor narrow" class:always={menu === MenuPlace.More}>
         <IconButton action={Action.More} aria-expanded={moreOpen} data-testid="more-actions" onclick={() => (moreOpen = !moreOpen)} />
         {#if moreOpen}
           <div class="menu more" role="menu">
             <button type="button" role="menuitem" onclick={() => ((moreOpen = false), leaveTo(0), (publishing = true))}><Upload size={14} /><span>{listed ? 'In gallery' : 'Publish'}</span></button>
+            {#if menu === MenuPlace.More}
+              <button type="button" role="menuitem" data-testid="template-open" onclick={() => ((moreOpen = false), leaveTo(0), (templating = true))}><LayoutTemplate size={14} /><span>Template</span></button>
+              <button type="button" role="menuitem" data-testid="guide-open-menu" onclick={() => ((moreOpen = false), COMMANDS[Command.Help]())}><Keyboard size={14} /><span>Keyboard & gestures</span></button>
+            {/if}
           </div>
         {/if}
       </div>
@@ -1425,7 +1434,7 @@
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
         <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
-        <MotionInspector {doc} {analyses} clip={selected} focus={selectedPart ? parsePart(selectedPart).field : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        <MotionInspector {doc} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart ? parsePart(selectedPart).field : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
@@ -2180,6 +2189,10 @@
 
   .narrow {
     display: none;
+  }
+
+  .popover-anchor.always {
+    display: block;
   }
 
   @media (max-width: 1359px) {

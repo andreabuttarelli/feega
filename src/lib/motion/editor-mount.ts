@@ -22,6 +22,11 @@ export enum Measure {
   Host = 'host'
 }
 
+export enum MenuPlace {
+  Drawer = 'drawer',
+  More = 'more'
+}
+
 type MountRules = { ownsTitle: boolean; closes: boolean; stage: Stage; zoom: Zoom; measure: Measure };
 
 export const MOUNT: Record<Mount, MountRules> = {
@@ -67,3 +72,10 @@ export const BAR_PLACE: Record<Viewport, BarPlace> = {
   [Viewport.Tablet]: BarPlace.CanvasBar,
   [Viewport.Phone]: BarPlace.OwnRow
 };
+
+const MENU_IN_BAR: Record<BarPlace, MenuPlace> = {
+  [BarPlace.CanvasBar]: MenuPlace.More,
+  [BarPlace.OwnRow]: MenuPlace.Drawer
+};
+
+export const menuPlace = (mount: Mount, viewport: Viewport): MenuPlace => (MOUNT[mount].closes ? MENU_IN_BAR[BAR_PLACE[viewport]] : MenuPlace.Drawer);
