@@ -18,20 +18,45 @@ export const inlineStage = {
   }
 };
 
-export function hostedIn(stage: HTMLElement, host: HTMLElement | null) {
-  const home = { parent: stage.parentElement, next: stage.nextSibling };
+const px = (n: number) => `${Math.round(n * 100) / 100}px`;
 
-  function place(target: HTMLElement | null) {
-    if (target) {
-      target.append(stage);
+export function anchoredTo(stage: HTMLElement, host: HTMLElement | null) {
+  let target = host;
+  let frame = 0;
+
+  function place() {
+    const layer = (stage.offsetParent ?? stage.parentElement)?.getBoundingClientRect();
+    if (!target || !layer) {
+      stage.style.visibility = 'hidden';
       return;
     }
-    home.parent?.insertBefore(stage, home.next);
+    const r = target.getBoundingClientRect();
+    Object.assign(stage.style, { visibility: '', left: px(r.left - layer.left), top: px(r.top - layer.top), width: px(r.width), height: px(r.height) });
   }
 
-  place(host);
+  function forwardWheel(e: WheelEvent) {
+    if (!target) {
+      return;
+    }
+    e.preventDefault();
+    target.dispatchEvent(new WheelEvent('wheel', e));
+  }
+
+  function loop() {
+    place();
+    frame = requestAnimationFrame(loop);
+  }
+
+  stage.addEventListener('wheel', forwardWheel, { passive: false });
+  frame = requestAnimationFrame(loop);
   return {
-    update: place,
-    destroy: () => stage.remove()
+    place,
+    update(next: HTMLElement | null) {
+      target = next;
+    },
+    destroy() {
+      cancelAnimationFrame(frame);
+      stage.removeEventListener('wheel', forwardWheel);
+    }
   };
 }

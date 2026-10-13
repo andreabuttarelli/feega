@@ -53,15 +53,19 @@ export function freeArea(screen: Screen, docked: readonly { dock: Dock; box: Box
 
 const MARGIN_PX = 32;
 
-type Px = `${number}px`;
-export type FitPadding = { top: Px; right: Px; bottom: Px; left: Px };
+type Bounds = { x: number; y: number; width: number; height: number };
+export type Viewport = { x: number; y: number; zoom: number };
+
+export function frameIn(node: Bounds, screen: Screen, free: Insets, maxZoom: number): Viewport {
+  const room = { width: screen.width - free.left - free.right - 2 * MARGIN_PX, height: screen.height - free.top - free.bottom - 2 * MARGIN_PX };
+  const zoom = Math.min(maxZoom, room.width / node.width, room.height / node.height);
+  const centre = { x: free.left + (screen.width - free.left - free.right) / 2, y: free.top + (screen.height - free.top - free.bottom) / 2 };
+  return { zoom, x: centre.x - (node.x + node.width / 2) * zoom, y: centre.y - (node.y + node.height / 2) * zoom };
+}
+
 export enum FocusMode {
   Frame = 'frame',
   Select = 'select'
 }
 
-export type FocusRequest = { ids: string[]; key: number; padding?: FitPadding; mode?: FocusMode };
-
-const px = (n: number): Px => `${Math.round(n + MARGIN_PX)}px`;
-
-export const fitPadding = (free: Insets): FitPadding => ({ top: px(free.top), right: px(free.right), bottom: px(free.bottom), left: px(free.left) });
+export type FocusRequest = { ids: string[]; key: number; free?: Insets; mode?: FocusMode };

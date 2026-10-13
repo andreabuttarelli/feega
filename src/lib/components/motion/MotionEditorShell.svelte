@@ -113,7 +113,7 @@
   import { MOUNT, Measure, Mount, PART_DOCK, Part, Stage, Zoom, timelineFits } from '$lib/motion/editor-mount';
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
-  import { hostedIn, inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
 
   const SAVE_DEBOUNCE_MS = 700;
@@ -1353,7 +1353,7 @@
   {/if}
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc)}>
-    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} aria-label="Preview" data-testid="editor-stage" {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:hostedIn={stageHost}>
+    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} aria-label="Preview" data-testid="editor-stage" {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
@@ -1571,14 +1571,20 @@
     flex: 0 0 38vh;
   }
 
-  .stage.hosted {
-    width: 100%;
-    height: 100%;
+  .editor .stage.hosted {
+    position: absolute;
+    z-index: 0;
     padding: 0;
     background: #000;
   }
 
-  .stage.hosted .live-bar {
+  .editor[data-mount='canvas'] .bar > :global(*),
+  .editor[data-mount='canvas'] .body > :global(:not(.stage)) {
+    position: relative;
+    z-index: 1;
+  }
+
+  .editor .stage.hosted .live-bar {
     display: none;
   }
 

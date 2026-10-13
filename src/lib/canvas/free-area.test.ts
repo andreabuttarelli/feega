@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOCK_EDGE, Dock, Edge, fitPadding, freeArea } from './free-area';
+import { DOCK_EDGE, Dock, Edge, frameIn, freeArea } from './free-area';
 
 const SCREEN = { width: 1280, height: 720 };
 
@@ -55,8 +55,28 @@ describe('free area', () => {
 
     expect(freeArea(SCREEN, docked)).toEqual({ top: 0, right: 0, bottom: 0, left: 0 });
   });
+});
 
-  it('frames the node inside what is left, with a margin', () => {
-    expect(fitPadding({ top: 44, right: 400, bottom: 360, left: 0 })).toEqual({ top: '76px', right: '432px', bottom: '392px', left: '32px' });
+describe('framing the edited node', () => {
+  const free = { left: 0, top: 44, width: 1280 - 400, height: 720 - 44 - 360 };
+
+  it('centres the node in the free area and fits it inside the margin', () => {
+    const view = frameIn({ x: 100, y: 100, width: 400, height: 250 }, SCREEN, { top: 44, right: 400, bottom: 360, left: 0 }, 4);
+    const left = 100 * view.zoom + view.x;
+    const top = 100 * view.zoom + view.y;
+    const right = free.left + free.width - (left + 400 * view.zoom);
+    const bottom = free.top + free.height - (top + 250 * view.zoom);
+
+    expect(left - free.left).toBeCloseTo(right, 5);
+    expect(top - free.top).toBeCloseTo(bottom, 5);
+    expect(Math.min(left - free.left, top - free.top)).toBeGreaterThanOrEqual(32 - 1e-9);
+  });
+
+  it('never zooms past the cap, and stays centred when capped', () => {
+    const view = frameIn({ x: 0, y: 0, width: 10, height: 10 }, SCREEN, { top: 0, right: 0, bottom: 0, left: 0 }, 2);
+
+    expect(view.zoom).toBe(2);
+    expect(view.x + 10).toBeCloseTo(640, 5);
+    expect(view.y + 10).toBeCloseTo(360, 5);
   });
 });

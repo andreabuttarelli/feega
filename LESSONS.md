@@ -290,6 +290,12 @@ diagnosticare un login, guarda lo status della POST.
 
 ## Ambiente e worktree
 
+### Spostare nel DOM un nodo che contiene un iframe lo ricarica vuoto
+Segnale: la preview motion montata altrove (dentro un nodo della tela) resta nera, la timeline
+scorre, nessun errore in console. Mossa: non riparentare il player; ancorarlo sopra il bersaglio
+con posizione calcolata a ogni frame (`anchoredTo` in `inline-stage.svelte.ts`). Un'asserzione
+sui pixel accesi al centro del player (non sul riquadro intero: i bordi ingannano) lo prende.
+
 ### Un `vite dev` lasciato acceso serve moduli vecchi a Playwright
 Segnale: un giro Playwright verde (o rosso) che non cambia dopo un edit; un `console.log` appena
 aggiunto non compare; il CSS servito (`?svelte&type=style`) non contiene la regola nuova. Mossa:

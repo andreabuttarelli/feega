@@ -3,9 +3,9 @@
   import { Mount } from '$lib/motion/editor-mount';
   import { motionEditorPath } from '$lib/canvas/motion-node';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
-  import { DOCK_ATTR, fitPadding, freeArea, type Dock, type FitPadding } from '$lib/canvas/free-area';
+  import { DOCK_ATTR, freeArea, type Dock, type Insets } from '$lib/canvas/free-area';
 
-  let { projectId, canvasId, nodeId, onclose, onframe }: { projectId: string; canvasId: string; nodeId: string; onclose: () => void; onframe: (padding: FitPadding) => void } = $props();
+  let { projectId, canvasId, nodeId, onclose, onframe }: { projectId: string; canvasId: string; nodeId: string; onclose: () => void; onframe: (free: Insets) => void } = $props();
 
   const SETTLE_MS = 150;
 
@@ -45,7 +45,7 @@
         const r = el.getBoundingClientRect();
         return { dock: el.getAttribute(DOCK_ATTR) as Dock, box: { left: r.left - flow.left, top: r.top - flow.top, right: r.right - flow.left, bottom: r.bottom - flow.top } };
       });
-      onframe(fitPadding(freeArea({ width: flow.width, height: flow.height }, docked)));
+      onframe(freeArea({ width: flow.width, height: flow.height }, docked));
     }, SETTLE_MS);
     return () => clearTimeout(timer);
   });

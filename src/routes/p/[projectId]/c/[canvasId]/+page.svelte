@@ -79,7 +79,7 @@
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
   import { NodeMode, inlineMotionTarget } from '$lib/canvas/inline-motion';
-  import { FocusMode, type FitPadding, type FocusRequest } from '$lib/canvas/free-area';
+  import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import InlineMotionEditor from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
@@ -1893,8 +1893,8 @@
    */
   let focus = $state<FocusRequest | null>(null);
 
-  function focusOn(ids: string[], padding?: FitPadding, mode = FocusMode.Frame) {
-    focus = { ids, key: (focus?.key ?? 0) + 1, padding, mode };
+  function focusOn(ids: string[], free?: Insets, mode = FocusMode.Frame) {
+    focus = { ids, key: (focus?.key ?? 0) + 1, free, mode };
   }
 
   $effect(() =>
@@ -2843,7 +2843,7 @@
   </CanvasFlow>
   {#if inlineMotion}
     {#key inlineMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(padding) => focusOn([inlineMotion], padding)} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => focusOn([inlineMotion], free)} />
     {/key}
   {/if}
 
@@ -2890,10 +2890,8 @@
 </div>
 
 <style>
-  @media (max-width: 767px) {
-    .canvas.editing :global([role='toolbar'][aria-label='Selection actions']) {
-      display: none;
-    }
+  .canvas.editing :global([role='toolbar'][aria-label='Selection actions']) {
+    display: none;
   }
 
   .canvas {

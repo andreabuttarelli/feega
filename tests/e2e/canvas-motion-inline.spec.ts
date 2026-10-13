@@ -1,5 +1,6 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import sharp from 'sharp';
 import doc from './fixtures/motion-doc.json' with { type: 'json' };
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
@@ -39,6 +40,79 @@ const emptyCanvasPoint = (page: Page) =>
     return null;
   });
 
+const LIT_LUMA = 60;
+const PAPER_LUMA = 200;
+const CENTRE_TOLERANCE_PX = 24;
+const DESKTOP_WIDE = { width: 1440, height: 900 };
+
+async function shareAbove(shot: Buffer, luma: number): Promise<number> {
+  const { data, info } = await sharp(shot).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  let lit = 0;
+  for (let i = 0; i < data.length; i += info.channels) {
+    if (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2] > luma) {
+      lit++;
+    }
+  }
+  return lit / (data.length / info.channels);
+}
+
+async function freeCentre(page: Page) {
+  return page.evaluate(() => {
+    const boxes = (dock: string) => [...document.querySelectorAll(`[data-dock="${dock}"]`)].map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+    const flow = document.querySelector('.svelte-flow')!.getBoundingClientRect();
+    const top = Math.max(flow.top, ...boxes('top-bar').map((r) => r.bottom));
+    const bottom = Math.min(flow.bottom, ...boxes('timeline').map((r) => r.top));
+    const right = Math.min(flow.right, ...boxes('right-panel').map((r) => r.left));
+    return { x: (flow.left + right) / 2, y: (top + bottom) / 2 };
+  });
+}
+
+const OVERLAP_TOLERANCE_PX = 2;
+const INSET = 0.1;
+const MIN_LIT_SHARE = 0.005;
+
+async function expectOnNode(page: Page, node: Locator) {
+  const body = node.getByTestId('motion-node-editing');
+  await expect
+    .poll(
+      async () => {
+        const [stage, host] = [await page.getByTestId('editor-stage').boundingBox(), await body.boundingBox()];
+        return stage && host ? Math.max(Math.abs(stage.x - host.x), Math.abs(stage.y - host.y), Math.abs(stage.width - host.width), Math.abs(stage.height - host.height)) : Infinity;
+      },
+      { timeout: 15_000, message: 'the editor player covers the node body exactly' }
+    )
+    .toBeLessThan(OVERLAP_TOLERANCE_PX);
+}
+
+async function expectFramed(page: Page, node: Locator) {
+  await expectOnNode(page, node);
+  const stage = page.getByTestId('editor-stage');
+  const inner = async () => {
+    const box = (await stage.boundingBox())!;
+    return page.screenshot({ clip: { x: box.x + box.width * INSET, y: box.y + box.height * INSET, width: box.width * (1 - 2 * INSET), height: box.height * (1 - 2 * INSET) } });
+  };
+  await expect.poll(async () => shareAbove(await inner(), LIT_LUMA), { timeout: 15_000, message: 'the title draws inside the node, not a black box' }).toBeGreaterThan(MIN_LIT_SHARE);
+
+  await expect
+    .poll(
+      async () => {
+        const box = (await node.boundingBox())!;
+        const centre = await freeCentre(page);
+        return Math.max(Math.abs(box.x + box.width / 2 - centre.x), Math.abs(box.y + box.height / 2 - centre.y));
+      },
+      { timeout: 5000, message: 'the edited node is centred in the room the panels leave' }
+    )
+    .toBeLessThan(CENTRE_TOLERANCE_PX);
+
+  const body = (await node.getByTestId('motion-node').boundingBox())!;
+  const band = await page.screenshot({ clip: { x: body.x + 2, y: body.y + body.height * 0.88, width: body.width - 4, height: body.height * 0.1 } });
+  expect(await shareAbove(band, PAPER_LUMA), 'no light band under the player').toBeLessThan(0.01);
+  const picture = (await page.getByTestId('motion-preview').boundingBox())!;
+  expect(Math.abs(picture.y + picture.height / 2 - (body.y + body.height / 2)), 'the picture sits in the middle of the node, no band on one side').toBeLessThan(OVERLAP_TOLERANCE_PX);
+
+  await expect(page.getByRole('toolbar', { name: 'Selection actions' })).toHaveCount(0);
+}
+
 const viewportTransform = (page: Page) => page.locator('.svelte-flow__viewport').evaluate((el) => getComputedStyle(el).transform);
 
 test.use({ video: SHOTS ? 'on' : 'off' });
@@ -65,12 +139,12 @@ test.describe('motion editor inside the canvas @real', () => {
 
     const editor = page.getByTestId('motion-editor');
     await expect(editor).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
-    await expect(nodeOf(first).getByTestId('editor-stage')).toBeVisible();
+    await expectOnNode(page, nodeOf(first));
     await expect(page.getByTestId('motion-preview')).toHaveCount(1);
     await expect(page).toHaveURL(new RegExp(`/c/${session.canvasId}$`));
     await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible();
     await expect(page.getByLabel('Agent', { exact: true })).toBeVisible();
-    await page.waitForTimeout(1500);
+    await expectFramed(page, nodeOf(first));
     await shoot(page, '2-open');
 
     const timecode = editor.getByTestId('timecode');
@@ -98,7 +172,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await expect(editor).toBeVisible();
 
     await nodeOf(second).getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
-    await expect(nodeOf(second).getByTestId('editor-stage')).toBeVisible({ timeout: 15_000 });
+    await expectOnNode(page, nodeOf(second));
     await expect(page.getByTestId('motion-preview')).toHaveCount(1);
     await shoot(page, '5-switched');
 
@@ -107,6 +181,18 @@ test.describe('motion editor inside the canvas @real', () => {
     await page.mouse.click(empty!.x, empty!.y);
     await expect(editor).toHaveCount(0);
     await shoot(page, '6-closed');
+  });
+
+  test('at 1440x900 the edited node is framed, centred and drawn', async ({ page, session }, info) => {
+    const [first] = info.annotations.filter((a) => a.type === 'node').map((a) => a.description!);
+    await page.setViewportSize(DESKTOP_WIDE);
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const node = page.locator(`.svelte-flow__node[data-id="${first}"]`);
+    await node.getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
+    await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
+
+    await expectFramed(page, node);
+    await shoot(page, '2-open-1440');
   });
 
   test('the agent sees frames captured by the player inside the node', async ({ page, session }, info) => {
@@ -166,7 +252,7 @@ test.describe('motion editor inside the canvas @real', () => {
 
       const editor = page.getByTestId('motion-editor');
       await expect(editor).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
-      await expect(page.getByTestId('motion-node').first().getByTestId('editor-stage')).toBeAttached();
+      await expectOnNode(page, page.locator('.svelte-flow__node').filter({ has: page.getByTestId('motion-node-editing') }));
       await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible();
       await page.waitForTimeout(2500);
       await shoot(page, `${name}-open`);

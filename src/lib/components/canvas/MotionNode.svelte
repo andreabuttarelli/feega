@@ -145,6 +145,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="motion"
+  class:editing={nodeMode === NodeMode.Edit}
   data-testid="motion-node"
   data-mode={mode}
   style={`--bar-h: ${MOTION_NODE_BAR_H}px;`}
@@ -224,9 +225,17 @@
   }
 
   .host {
-    width: 100%;
-    height: 100%;
-    display: flex;
+    position: absolute;
+    inset: 0;
+  }
+
+  .motion.editing {
+    position: relative;
+    background: #000;
+  }
+
+  .motion.editing .stage {
+    position: static;
   }
 
   .bar.dormant {

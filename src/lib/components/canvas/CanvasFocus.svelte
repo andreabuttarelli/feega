@@ -2,12 +2,22 @@
   import { untrack } from 'svelte';
   import { useSvelteFlow } from '@xyflow/svelte';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import { FocusMode, type FocusRequest } from '$lib/canvas/free-area';
+  import { FocusMode, frameIn, type FocusRequest, type Insets } from '$lib/canvas/free-area';
 
   let { focus }: { focus: FocusRequest | null } = $props();
 
   const FIT_DURATION_MS = 250;
-  const { fitView, getNodes, updateNode } = useSvelteFlow();
+  const { fitView, getNodes, updateNode, getNodesBounds, setViewport } = useSvelteFlow();
+  const EDIT_MAX_ZOOM = 2;
+
+
+  function frameEdited(ids: readonly string[], free: Insets) {
+    const flow = document.querySelector('.svelte-flow')?.getBoundingClientRect();
+    if (!flow) {
+      return;
+    }
+    void setViewport(frameIn(getNodesBounds([...ids]), { width: flow.width, height: flow.height }, free, EDIT_MAX_ZOOM), { duration: FIT_DURATION_MS });
+  }
 
   function select(ids: readonly string[]) {
     for (const node of getNodes()) {
@@ -17,7 +27,7 @@
 
   $effect(() => {
     const ids = focus?.ids;
-    const padding = focus?.padding ?? FIT_PADDING;
+    const free = focus?.free;
     if (!ids?.length) {
       return;
     }
@@ -26,7 +36,7 @@
     }
 
     const frame = requestAnimationFrame(() =>
-      requestAnimationFrame(() => void fitView({ nodes: ids.map((id) => ({ id })), padding, maxZoom: READABLE_ZOOM, duration: FIT_DURATION_MS }))
+      requestAnimationFrame(() => (free ? frameEdited(ids, free) : void fitView({ nodes: ids.map((id) => ({ id })), padding: FIT_PADDING, maxZoom: READABLE_ZOOM, duration: FIT_DURATION_MS })))
     );
     return () => cancelAnimationFrame(frame);
   });
