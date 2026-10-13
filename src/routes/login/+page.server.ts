@@ -7,6 +7,7 @@ import { sanitizeWebsiteParam } from '$lib/website-param';
 import { appOrigin } from '$lib/server/app-url';
 import { takeOAuthReturn } from '$lib/server/oauth';
 import { INVITE_ERROR_PARAM, INVITE_PARAM, inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
+import { signInErrorIn } from './sign-in-error';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -34,7 +35,8 @@ export const load: PageServerLoad = async ({ url, cookies, locals: { safeGetSess
   const cliState = url.searchParams.get('cli_state') ?? '';
   const inviteToken = inviteTokenIn(url.searchParams);
   const inviteError = inviteErrorIn(url);
-  const page = { cliPort, cliState, inviteToken, inviteError, homeHref: null as string | null, preferSignup: preferSignup(url) };
+  const signInError = signInErrorIn(url);
+  const page = { cliPort, cliState, inviteToken, inviteError, signInError, homeHref: null as string | null, preferSignup: preferSignup(url) };
 
   const { session, user } = await safeGetSession();
   const client = session && user ? await db() : null;

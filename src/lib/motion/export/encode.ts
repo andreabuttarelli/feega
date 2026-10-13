@@ -3,6 +3,8 @@ import type { AudioEntry } from '../audio-plan';
 import { scheduleEntry } from '../audio-graph';
 import { exportSize, type Capabilities, type Size } from '../export-plan';
 import { Resolution } from '../render-quote';
+import type { Quality } from '../export-formats';
+import { bitrateLadder } from './bitrate';
 import type { MotionDoc } from '../doc';
 import { lumaOf, type JoltMeter } from '../smoothness';
 
@@ -15,7 +17,7 @@ const PROBE_LONG_SIDE = 192;
 
 export type FrameRenderer = (onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>) => Promise<void>;
 
-export type EncodeJob = { size: Size; fps: number; frames: number; samples: number; render: FrameRenderer; audio: AudioBuffer | null; onFrame: (done: number) => void; signal: AbortSignal; gate?: () => Promise<void>; meter?: JoltMeter };
+export type EncodeJob = { size: Size; fps: number; quality: Quality; frames: number; samples: number; render: FrameRenderer; audio: AudioBuffer | null; onFrame: (done: number) => void; signal: AbortSignal; gate?: () => Promise<void>; meter?: JoltMeter };
 
 export async function capabilities(doc: Pick<MotionDoc, 'width' | 'height'>): Promise<Capabilities> {
   if (typeof VideoEncoder === 'undefined') {
@@ -67,6 +69,16 @@ export function probeOf(size: Size, meter: JoltMeter | undefined): ((source: Can
   };
 }
 
+async function acceptedBitrate(size: Size, fps: number, quality: Quality): Promise<number> {
+  const ladder = bitrateLadder(size, fps, quality);
+  for (const bitrate of ladder) {
+    if (await canEncodeVideo('avc', { ...size, bitrate })) {
+      return bitrate;
+    }
+  }
+  return ladder[ladder.length - 1];
+}
+
 export async function encodeMp4(job: EncodeJob): Promise<Blob> {
   const canvas = new OffscreenCanvas(job.size.width, job.size.height);
   const paint = canvas.getContext('2d');
@@ -77,7 +89,8 @@ export async function encodeMp4(job: EncodeJob): Promise<Blob> {
   const measure = probeOf(job.size, job.meter);
   const target = new BufferTarget();
   const output = new Output({ format: new Mp4OutputFormat({ fastStart: 'in-memory' }), target });
-  const video = new CanvasSource(canvas, { codec: 'avc', bitrate: QUALITY_HIGH, keyFrameInterval: KEYFRAME_SECONDS });
+  const bitrate = await acceptedBitrate(job.size, job.fps, job.quality);
+  const video = new CanvasSource(canvas, { codec: 'avc', bitrate, bitrateMode: 'variable', latencyMode: 'quality', keyFrameInterval: KEYFRAME_SECONDS });
   output.addVideoTrack(video, { frameRate: job.fps });
   const audio = job.audio ? new AudioBufferSource({ codec: 'aac', bitrate: AUDIO_BITRATE }) : null;
   if (audio) {

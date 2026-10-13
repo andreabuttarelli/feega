@@ -15,6 +15,7 @@ import { saveExport } from './export';
 import { clipsOf, type MotionDoc } from '$lib/motion/doc';
 import { exportPath } from '$lib/motion/export-plan';
 import { LinkRefusal, RENDER_LINK_OPEN_MS } from '$lib/motion/render-link';
+import { Quality } from '$lib/motion/export-formats';
 import type { BrandTokens } from '$lib/motion/brand';
 import type { AudioAnalysis } from '$lib/motion/audio-analysis';
 
@@ -24,7 +25,7 @@ const SEPARATOR = '.';
 const BROWSER_MODEL = 'browser';
 
 type LinkState = { hash: string; expiresAt: string; claim: string | null };
-type LinkParams = { kind: typeof LINK_KIND; revision: number; link: LinkState; actor: Actor };
+type LinkParams = { kind: typeof LINK_KIND; revision: number; quality: Quality; link: LinkState; actor: Actor };
 
 export enum Claim {
   Take = 'take',
@@ -34,7 +35,7 @@ export enum Claim {
 export type LinkVerdict = { ok: true; fresh: boolean } | { ok: false; error: LinkRefusal };
 export type RenderLink = { runId: string; token: string; expiresAt: string };
 export type OpenLink = { ok: true; run: NodeRun; claim: string | null } | { ok: false; error: LinkRefusal };
-export type LinkPayload = { name: string; revision: number; doc: MotionDoc; tokens: BrandTokens; assetUrls: Record<string, string>; analyses: Record<string, AudioAnalysis> };
+export type LinkPayload = { name: string; revision: number; quality: Quality; doc: MotionDoc; tokens: BrandTokens; assetUrls: Record<string, string>; analyses: Record<string, AudioAnalysis> };
 export type Finished = { ok: true; assetId: string } | { ok: false; error: string };
 
 export const hashOf = (secret: string) => createHash('sha256').update(secret).digest('hex');
@@ -56,6 +57,8 @@ export function parseToken(token: string): { runId: string; secret: string } | n
 
 const linkOf = (run: NodeRun) => run.params as Partial<LinkParams>;
 
+export const linkQuality = (run: NodeRun): Quality => linkOf(run).quality ?? Quality.High;
+
 export function isBrowserRender(run: Pick<NodeRun, 'externalJobId'>): boolean {
   return Boolean(run.externalJobId?.startsWith(BROWSER_RENDER_PREFIX));
 }
@@ -74,10 +77,10 @@ export function linkVerdict(run: NodeRun, secretText: string, claim: string | nu
   return now > Date.parse(link.expiresAt) ? { ok: false, error: LinkRefusal.Expired } : { ok: true, fresh: true };
 }
 
-export async function createRenderLink(db: Db, input: { orgId: string; nodeId: string; version: number; actor: Actor }, now = Date.now()): Promise<RenderLink> {
+export async function createRenderLink(db: Db, input: { orgId: string; nodeId: string; version: number; quality: Quality; actor: Actor }, now = Date.now()): Promise<RenderLink> {
   const raw = secret();
   const expiresAt = new Date(now + RENDER_LINK_OPEN_MS).toISOString();
-  const params: LinkParams = { kind: LINK_KIND, revision: input.version, link: { hash: hashOf(raw), expiresAt, claim: null }, actor: input.actor };
+  const params: LinkParams = { kind: LINK_KIND, revision: input.version, quality: input.quality, link: { hash: hashOf(raw), expiresAt, claim: null }, actor: input.actor };
   const run = await createRun(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,
@@ -157,7 +160,7 @@ export async function linkPayload(db: Db, run: NodeRun): Promise<LinkPayload | n
   ]);
   const soundIds = clipsOf(head.doc).map((c) => String(c.props.assetId ?? ''));
   const analyses = await analyzeSounds(storageAnalysis(db), { orgId: run.orgId, projectId: project.id }, assets, soundIds);
-  return { name: place.record.displayName ?? 'motion', revision, doc: head.doc, tokens, assetUrls: assetUrls(assets), analyses };
+  return { name: place.record.displayName ?? 'motion', revision, quality: linkQuality(run), doc: head.doc, tokens, assetUrls: assetUrls(assets), analyses };
 }
 
 export async function uploadSlot(db: Db, run: NodeRun): Promise<{ path: string; token: string } | null> {
