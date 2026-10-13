@@ -390,3 +390,15 @@ describe('the video length follows its content', () => {
     expect(session.doc.durationInFrames).toBeLessThan(7 * session.doc.fps);
   });
 });
+
+describe('render_video', () => {
+  it('rende in High se l’utente non chiede altro, e passa la qualità scelta al link', async () => {
+    const renderLink = vi.fn(async () => ({ ok: true }));
+    const { run } = setup({ renderLink });
+
+    await run('render_video', {});
+    await run('render_video', { quality: 'max' });
+
+    expect(renderLink.mock.calls).toEqual([['high'], ['max']]);
+  });
+});

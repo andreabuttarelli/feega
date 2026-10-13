@@ -1,3 +1,4 @@
+import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { THREE_GUIDANCE } from './three-guidance';
 import { GUIDES, guidesFor, type GuideTopic } from './guides';
 import { lintAdvice } from '$lib/motion/custom/lint';
@@ -164,7 +165,7 @@ export type MotionToolDeps = {
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   spawn?: { offers: readonly ModelOffer[]; run: (input: SpawnInput) => Promise<SpawnResult> };
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
-  renderLink?: () => Promise<Record<string, unknown>>;
+  renderLink?: (quality: ExportQuality) => Promise<Record<string, unknown>>;
   embed?: (action: EmbedAction) => Promise<Record<string, unknown>>;
   templates?: TemplateLibrary;
   revisions?: RevisionLibrary;
@@ -1669,8 +1670,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     render_video: tool({
       description:
         'Render the saved video to an MP4 for free on the user\'s own device. Returns render_url: give it to the user as a markdown link titled "Render on this device"; they open it (on this or another device), it renders there and lands in the project assets. The link works once and expires in 30 minutes. The saved video is rendered, so edits of this turn must be saved first.',
-      inputSchema: z.object({}).strict(),
-      execute: async () => (deps.renderLink ? deps.renderLink() : { ok: false, error: 'rendering is not available here' })
+      inputSchema: z.object({ quality: z.enum(ExportQuality).optional().describe('Encoding quality: standard (smaller file), high (default), max (largest file, finest grain and lines)') }).strict(),
+      execute: async ({ quality = ExportQuality.High }) => (deps.renderLink ? deps.renderLink(quality) : { ok: false, error: 'rendering is not available here' })
     }),
 
     set_style: tool({

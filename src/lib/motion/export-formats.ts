@@ -23,7 +23,8 @@ export enum Master {
 
 export enum Quality {
   Standard = 'standard',
-  High = 'high'
+  High = 'high',
+  Max = 'max'
 }
 
 export enum Preset {
@@ -47,13 +48,15 @@ export const FORMAT: Record<ExportFormat, FormatSpec> = {
 
 export const EXPORT_FORMATS = Object.values(ExportFormat) as [ExportFormat, ...ExportFormat[]];
 
+export const QUALITY_SCALE: Record<Quality, number> = { [Quality.Standard]: 1, [Quality.High]: 2.8, [Quality.Max]: 5 };
+
 export const GIF = { fps: 15, maxWidth: 640, maxSeconds: 15 } as const;
 const BITS_PER_BYTE = 8;
 
 export const settingsSchema = z.object({
   format: z.enum(EXPORT_FORMATS),
   fps: z.literal(FRAME_RATES),
-  quality: z.enum([Quality.Standard, Quality.High]),
+  quality: z.enum(Quality),
   resolution: z.enum(Object.values(Resolution) as [Resolution, ...Resolution[]]).default(Resolution.P1080)
 });
 
@@ -95,7 +98,7 @@ export function estimateBytes(doc: Pick<MotionDoc, 'width' | 'height' | 'duratio
   const gif = settings.format === ExportFormat.Gif;
   const { width, height } = gif ? gifSize(doc) : outputSize(doc, settings.resolution);
   const frames = seconds * (gif ? GIF.fps : settings.fps);
-  return Math.round((width * height * frames * FORMAT[settings.format].bitsPerPixel) / BITS_PER_BYTE);
+  return Math.round((width * height * frames * FORMAT[settings.format].bitsPerPixel * QUALITY_SCALE[settings.quality]) / BITS_PER_BYTE);
 }
 
 export function exportProblem(doc: Pick<MotionDoc, 'width' | 'height' | 'durationInFrames' | 'fps'>, settings: RenderSettings): string | null {

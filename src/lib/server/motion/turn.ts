@@ -65,7 +65,7 @@ import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, storeAssetFile } from '$lib/serv
 import { ASSETS_ADDED, CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
 import { rowRequests } from '$lib/server/motion/batch-input';
 import { startFarmBatch } from '$lib/server/motion/render-start';
-import { Preset, settingsOf } from '$lib/motion/export-formats';
+import { Preset, settingsOf, type Quality } from '$lib/motion/export-formats';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import type { MotionNode } from '$lib/canvas/motion-node';
 import { createRenderLink } from './render-link';
@@ -398,11 +398,11 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       askCheck({ callId, name, doc, assets: assets.slice(knownAssets) });
       return awaitVerdict(bucket, framesPrefix(frameScope, callId), { timeoutMs: CHECK_WAIT_MS, pollMs: FRAME_POLL_MS });
     },
-    renderLink: async () => {
+    renderLink: async (quality: Quality) => {
       if (session.edits.length) {
         return { ok: false, error: 'this turn has unsaved edits: the link renders the saved video, so finish the turn and run render_video in the next one' };
       }
-      const link = await createRenderLink(db, { orgId, nodeId: motion.record.id, version: head.version, actor });
+      const link = await createRenderLink(db, { orgId, nodeId: motion.record.id, version: head.version, quality, actor });
       return { ok: true, render_url: renderPagePath(link.token), expires_at: link.expiresAt, credits: BROWSER_RENDER_CREDITS };
     },
     embed: async (action) => {

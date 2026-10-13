@@ -51,8 +51,10 @@
   const set = (f: TemplateFieldValue, raw: string) => done(setValue(f, raw), `Set ${f.label}`);
   const crop = (f: TemplateFieldValue, axis: 'focusX' | 'focusY', value: number) => done(setDeepProps(doc, f.clipId, { [axis]: value }), `Cropped ${f.label}`);
 
+  const mediaOf = (f: TemplateFieldValue): Media[] => (Array.isArray(f.value) ? f.value : []);
+
   function toggleMedia(f: TemplateFieldValue, asset: Asset) {
-    const list = (f.value as Media[] | null) ?? [];
+    const list = mediaOf(f);
     const next = list.some((m) => m.assetId === asset.id) ? list.filter((m) => m.assetId !== asset.id) : [...list, { assetId: asset.id, kind: asset.kind as Media['kind'] }];
     done(setField(doc, f, next), `Set ${f.label}`);
   }
@@ -105,7 +107,7 @@
     {:else if f.type === FieldType.MediaList}
       <div class="assets">
         {#each assets.filter((a) => LIST_KINDS.has(a.kind)) as asset (asset.id)}
-          <button type="button" class="asset" class:on={((f.value as Media[] | null) ?? []).some((m) => m.assetId === asset.id)} title={asset.label} onclick={() => toggleMedia(f, asset)}>
+          <button type="button" class="asset" class:on={mediaOf(f).some((m) => m.assetId === asset.id)} title={asset.label} onclick={() => toggleMedia(f, asset)}>
             {#if asset.kind === 'image'}<img src={asset.previewUrl} alt="" />{:else}<span>{asset.label}</span>{/if}
           </button>
         {:else}

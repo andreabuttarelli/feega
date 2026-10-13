@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { BROWSER_RENDER_PREFIX, type NodeRun } from '$lib/server/repos/node-runs';
 import { LinkRefusal, RENDER_LINK_OPEN_MS } from '$lib/motion/render-link';
-import { createRenderLink, hashOf, linkVerdict, parseToken } from './render-link';
+import { Quality } from '$lib/motion/export-formats';
+import { createRenderLink, hashOf, linkQuality, linkVerdict, parseToken } from './render-link';
 
 const NOW = Date.parse('2026-10-07T10:00:00Z');
 const ORG = 'org-1';
@@ -41,7 +42,7 @@ describe('il token di render', () => {
     const row = { id: 'run-9', org_id: ORG, node_id: NODE, prompt: '', model: null, params: {}, status: 'running', error: null, output_asset_id: null, external_job_id: `${BROWSER_RENDER_PREFIX}4`, cost_usd: null, attempts: 0, actor_id: USER, started_at: '', finished_at: null };
     const { db, calls } = fakeDb({ node_runs: [row] });
 
-    const link = await createRenderLink(db, { orgId: ORG, nodeId: NODE, version: 4, actor: { kind: 'agent', id: USER, agentKey: 'mcp' } }, NOW);
+    const link = await createRenderLink(db, { orgId: ORG, nodeId: NODE, version: 4, quality: Quality.High, actor: { kind: 'agent', id: USER, agentKey: 'mcp' } }, NOW);
 
     const insert = calls.find((c) => c.op === 'insert')!.payload as { org_id: string; actor_id: string; external_job_id: string; params: { revision: number; link: { hash: string; claim: null } } };
     expect(insert).toMatchObject({ org_id: ORG, actor_id: USER, external_job_id: `${BROWSER_RENDER_PREFIX}4` });
@@ -49,6 +50,19 @@ describe('il token di render', () => {
     expect(JSON.stringify(insert)).not.toContain(parseToken(link.token)!.secret);
     expect(insert.params.link.hash).toBe(hashOf(parseToken(link.token)!.secret));
     expect(link.expiresAt).toBe(new Date(NOW + RENDER_LINK_OPEN_MS).toISOString());
+  });
+});
+
+describe('la qualità del link', () => {
+  it('il link porta la qualità chiesta fino al dispositivo che rende', async () => {
+    const { db, calls } = fakeDb({ node_runs: [] });
+    await createRenderLink(db, { orgId: ORG, nodeId: NODE, version: 4, quality: Quality.Max, actor: { kind: 'user', id: USER } }, NOW);
+    const params = (calls.find((c) => c.op === 'insert')!.payload as { params: Record<string, unknown> }).params;
+    expect(linkQuality(run({ params }))).toBe(Quality.Max);
+  });
+
+  it('un link nato prima della scelta rende in High', () => {
+    expect(linkQuality(run())).toBe(Quality.High);
   });
 });
 
