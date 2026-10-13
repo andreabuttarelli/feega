@@ -3,13 +3,17 @@ import { FLOW_MODEL } from './model';
 
 type Word = { y: number; opacity: number };
 type Frame = { orbit: [number, number]; phase: number; words: Word[]; veil: number };
-type Look = { sparsity: number; octave: number; frequency: number };
+type Look = { strands: number; octave: number; frequency: number };
+type Seed = { x: number; y: number; offset: number };
+type Span = { tail: number; head: number; alpha: number };
 type Model = {
   flowFrame: (p: object, t: number, length: number) => Frame;
   flowLook: (p: object) => Look;
+  strandSeeds: (count: number) => Seed[];
+  strandSpan: (life: number) => Span;
 };
 
-const model = new Function(`${FLOW_MODEL}; return { flowFrame, flowLook };`)() as Model;
+const model = new Function(`${FLOW_MODEL}; return { flowFrame, flowLook, strandSeeds, strandSpan };`)() as Model;
 
 const PARAMS = { title: 'go with the flow', density: 0.6, turbulence: 0.5, speed: 2, titleAt: 5, titleSeconds: 3, titleDim: 0.75 };
 const LENGTH = 10;
@@ -76,10 +80,48 @@ describe('the flow lines model', () => {
     const calm = model.flowLook({ ...PARAMS, turbulence: 0 });
     const wild = model.flowLook({ ...PARAMS, turbulence: 1 });
 
-    expect(thick.sparsity).toBeLessThan(thin.sparsity);
+    expect(thick.strands).toBeGreaterThan(thin.strands);
+    expect(thin.strands).toBeGreaterThanOrEqual(10000);
+    expect(thick.strands).toBeLessThanOrEqual(60000);
     expect(wild.octave).toBeGreaterThan(calm.octave);
     expect(wild.frequency).toBeGreaterThan(calm.frequency);
     expect(model.flowLook({ ...PARAMS, density: 9 })).toEqual(thick);
     expect(model.flowLook({ ...PARAMS, turbulence: -3 })).toEqual(calm);
+  });
+
+  it('seeds the same strands every time, a round mass that thins out towards a feathered edge', () => {
+    const seeds = model.strandSeeds(20000);
+    const radii = seeds.map((s) => Math.hypot(s.x, s.y));
+    const inner = radii.filter((r) => r < 0.5).length / (Math.PI * 0.25);
+    const outer = radii.filter((r) => r >= 0.5 && r < 1).length / (Math.PI * 0.75);
+
+    expect(model.strandSeeds(20000)).toEqual(seeds);
+    expect(seeds.every((s) => s.offset >= 0 && s.offset < 1)).toBe(true);
+    expect(Math.max(...radii)).toBeLessThan(1.25);
+    expect(radii.filter((r) => r > 1).length).toBeGreaterThan(0);
+    expect(inner).toBeGreaterThan(outer * 1.5);
+  });
+
+  it('staggers the strands, so they are born and die at different moments', () => {
+    const offsets = model.strandSeeds(10000).map((s) => s.offset);
+    const tenths = Array.from({ length: 10 }, (_, i) => offsets.filter((o) => Math.floor(o * 10) === i).length);
+
+    tenths.forEach((n) => expect(n).toBeGreaterThan(800));
+  });
+
+  it('grows a strand from its head, holds it, then retracts its tail, invisible at both ends of its life', () => {
+    const lives = Array.from({ length: 101 }, (_, i) => i / 100);
+    const spans = lives.map((l) => model.strandSpan(l));
+
+    expect(spans[0].alpha).toBeCloseTo(0, 9);
+    expect(spans[100].alpha).toBeCloseTo(0, 9);
+    expect(spans[0].head).toBe(spans[0].tail);
+    expect(model.strandSpan(0.5)).toMatchObject({ tail: 0, head: 1 });
+    spans.slice(1).forEach((s, i) => {
+      expect(s.head).toBeGreaterThanOrEqual(spans[i].head);
+      expect(s.tail).toBeGreaterThanOrEqual(spans[i].tail);
+      expect(s.tail).toBeLessThanOrEqual(s.head);
+    });
+    expect(spans.find((s) => s.tail > 0 && s.tail < 1)?.alpha).toBeGreaterThan(0);
   });
 });

@@ -19,7 +19,7 @@ export const FLOW_LINES_TEMPLATE: TemplateEntry = {
   id: FLOW_TEMPLATE_ID,
   template: {
     name: 'Flow lines',
-    description: 'Thousands of fine lines follow a slowly swirling current on black, with a title in its own beat. Generative, loops seamlessly.',
+    description: 'Thousands of fine strands grow, follow a slowly swirling current and fade on black, with a title in its own beat. Generative, loops seamlessly.',
     keyFields: FLOW_KEY_FIELDS,
     doc: customTemplateDoc({ name: 'flow-lines', component: FLOW_COMPONENT, code: flowComponent(), props: FLOW_PROPS, fonts: FLOW_FONTS, varPrefix: FLOW_VAR_PREFIX, vars: FLOW_VARS, clip: FLOW_CLIP, seconds: 10, fps: 60, groups: FLOW_GROUPS })
   }

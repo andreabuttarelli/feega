@@ -25,7 +25,7 @@ export const FLOW_PROPS: Record<string, PropSpec> = {
   tracking: number('Title tracking (em)', -0.04, -0.08, 0.05, 'Style', 0.005),
   density: number('Density', 0.6, 0, 1, 'Layout', 0.05),
   turbulence: number('Turbulence', 0.5, 0, 1, 'Layout', 0.05),
-  size: number('Mass size (share of the short side)', 0.5, 0.2, 0.8, 'Layout', 0.01),
+  size: number('Mass size (share of the short side)', 0.36, 0.2, 0.8, 'Layout', 0.01),
   speed: number('Flow speed (passes per loop)', 3, 0, 8, 'Motion', 1),
   titleAt: number('Title starts (seconds)', 5, 0, 8, 'Motion', 0.1),
   titleSeconds: number('Title holds (seconds)', 2.6, 1, 6, 'Motion', 0.1),

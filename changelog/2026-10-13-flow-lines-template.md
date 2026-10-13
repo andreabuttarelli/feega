@@ -15,3 +15,18 @@ on black, swirling round a few vortices, bright ribbons and dark gaps, round fea
   particles with trails (not deterministic per seek).
 - Cost: ~0.23 s/frame at 1080×1920 on Apple Metal; on a software-GL headless Chromium
   (render farm args) ~20 s/frame at that size.
+
+## Individual strands (rebuild after review)
+
+The LIC look let the underlying shapes show (ribbons were bands of the stream function). Now
+up to 56k seeded strands, each integrated through the field in the vertex shader (RK2, 56
+points, instanced thin quads, additive). Each strand grows from its head, holds, retracts its
+tail and fades on its own staggered phase (`fract(offset + speed·t/L)`), so lines appear and
+disappear independently. Brightness comes only from strand density; the round feathered mass
+comes from the seed distribution, not a mask. Field calmer and scaled to the mass.
+
+- Strand quads face either way, so the material is `DoubleSide`: with back-face culling
+  almost every strand vanished.
+- Field target is RGBA8 holding the unit direction, read with `textureLod` in the vertex shader.
+- ~0.2 s/frame at 1080×1920 on Apple Metal; very slow on software GL, so the library preview
+  was cut from a GPU render instead of `scripts/component-previews.ts`.

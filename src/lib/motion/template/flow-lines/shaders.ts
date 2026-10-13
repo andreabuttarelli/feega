@@ -1,3 +1,7 @@
+export const STRAND = { grow: 0.42, fade: 0.2, points: 56 };
+
+const glsl = (x: number) => x.toFixed(4);
+
 const SIMPLEX_4D = `
 vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
 float mod289(float x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
@@ -79,10 +83,10 @@ uniform float uRadius;
 ${SIMPLEX_4D}
 
 float potential(vec2 p) {
-  vec4 a = vec4(p * uFrequency, uOrbit * 0.38);
-  vec4 b = vec4(p * uFrequency * 2.3 + 7.1, uOrbit.yx * 0.55 + 3.3);
-  float r = length(p) / uRadius;
-  float hold = 0.2 * r * r;
+  vec2 q = p / uRadius;
+  vec4 a = vec4(q * uFrequency, uOrbit * 0.24);
+  vec4 b = vec4(q * uFrequency * 2.3 + 7.1, uOrbit.yx * 0.32 + 3.3);
+  float hold = 0.12 * dot(q, q);
   return snoise(a) + uOctave * 0.5 * snoise(b) + hold;
 }
 
@@ -92,63 +96,72 @@ void main() {
   float dx = potential(p + vec2(e, 0.0)) - potential(p - vec2(e, 0.0));
   float dy = potential(p + vec2(0.0, e)) - potential(p - vec2(0.0, e));
   vec2 v = vec2(dy, -dx) / (2.0 * e);
-  gl_FragColor = vec4(v, potential(p), 1.0);
+  gl_FragColor = vec4(normalize(v + 1e-6) * 0.5 + 0.5, 0.0, 1.0);
 }
 `;
 
-export const LINES_FRAGMENT = `
+export const STRAND_VERTEX = `
 precision highp float;
-varying vec2 vUv;
 uniform sampler2D uField;
-uniform sampler2D uNoise;
 uniform vec2 uSpan;
 uniform vec2 uPixels;
-uniform float uNoiseSize;
-uniform float uStep;
-uniform float uPhase;
-uniform float uSparsity;
 uniform float uRadius;
-uniform float uVeil;
-uniform float uGain;
-uniform vec3 uLine;
-uniform vec3 uBackground;
+uniform float uStepLength;
+uniform float uPhase;
+uniform float uWidth;
+attribute vec2 corner;
+attribute vec3 seed;
+varying float vAlpha;
+varying float vSide;
 
-const int STEPS = 26;
-const float TAU = 6.28318530718;
-const float PI = 3.14159265;
-const float RIBBONS = 17.0;
+const int POINTS = ${STRAND.points};
+const float GROW = ${glsl(STRAND.grow)};
+const float FADE = ${glsl(STRAND.fade)};
 
-float roundMass(vec2 uv, float wobble) {
-  float r = length((uv - 0.5) * uSpan) / uRadius + wobble;
-  return 1.0 - smoothstep(0.7, 1.12, r);
+float smoothish(float x) {
+  x = clamp(x, 0.0, 1.0);
+  return x * x * x * (x * (x * 6.0 - 15.0) + 10.0);
 }
 
-float strand(vec2 uv) {
-  return pow(texture2D(uNoise, uv * uPixels / uNoiseSize).r, uSparsity);
+vec2 heading(vec2 p) {
+  vec2 v = textureLod(uField, p / uSpan + 0.5, 0.0).xy * 2.0 - 1.0;
+  return v / max(length(v), 1e-5);
 }
 
 void main() {
-  vec2 toUv = uStep / uPixels;
-  float total = 0.0;
-  float weight = 0.0;
-  for (int side = 0; side < 2; side++) {
-    vec2 uv = vUv;
-    float heading = side == 0 ? 1.0 : -1.0;
-    for (int i = 0; i < STEPS; i++) {
-      float s = float(i) / float(STEPS);
-      float w = (0.5 + 0.5 * cos(PI * s)) * (0.6 + 0.4 * cos(TAU * (heading * s * 0.5 - uPhase)));
-      total += strand(uv) * roundMass(uv, 0.0) * w;
-      weight += w;
-      vec2 v = texture2D(uField, uv).xy;
-      uv += heading * v / max(length(v), 1e-5) * toUv;
-    }
+  float life = fract(seed.z + uPhase);
+  float head = smoothish(life / GROW);
+  float tail = min(head, smoothish((life - 1.0 + GROW) / GROW));
+  float fade = smoothish(life / FADE) * (1.0 - smoothish((life - 1.0 + FADE) / FADE));
+  float along = corner.x / float(POINTS - 1);
+  float steps = mix(tail, head, along) * float(POINTS);
+  vec2 p = seed.xy * uRadius;
+  vec2 d = heading(p);
+  for (int i = 0; i < POINTS; i++) {
+    float h = clamp(steps - float(i), 0.0, 1.0);
+    vec2 mid = p + d * uStepLength * h * 0.5;
+    vec2 turn = heading(mid);
+    p += turn * uStepLength * h;
+    d = mix(d, heading(p), step(1e-4, h));
   }
-  float lic = total / max(weight, 1e-5) * (uSparsity + 1.0);
-  vec4 f = texture2D(uField, vUv);
-  float speed = smoothstep(0.1, 2.6, length(f.xy));
-  float ribbon = pow(0.5 + 0.5 * cos(f.z * RIBBONS), 6.0);
-  float glow = (0.12 + 2.2 * ribbon * (0.55 + 0.45 * speed) + 0.45 * speed * speed) * roundMass(vUv, 0.1 * f.z);
-  float ink = (1.0 - exp(-lic * glow * uGain)) * (1.0 - uVeil);
-  gl_FragColor = vec4(mix(uBackground, uLine, ink), 1.0);
+  vec2 ndc = 2.0 * p / uSpan + vec2(-d.y, d.x) * corner.y * uWidth * 2.0 / uPixels;
+  vAlpha = fade * sqrt(sin(3.14159265 * along)) * step(1e-4, head - tail);
+  vSide = corner.y;
+  gl_Position = vec4(ndc, 0.0, 1.0);
+}
+`;
+
+export const STRAND_FRAGMENT = `
+precision highp float;
+uniform vec3 uLine;
+uniform float uStrength;
+uniform float uVeil;
+varying float vAlpha;
+varying float vSide;
+
+void main() {
+  float edge = 1.0 - abs(vSide);
+  float a = vAlpha * edge * edge * uStrength * (1.0 - uVeil);
+  gl_FragColor = vec4(uLine, a);
 }
 `;
