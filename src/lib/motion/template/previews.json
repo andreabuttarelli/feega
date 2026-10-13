@@ -81,5 +81,6 @@
   "builtin:split-headline",
   "builtin:title-card",
   "builtin:ui-morph-reel",
-  "builtin:wire-globe-pages"
+  "builtin:wire-globe-pages",
+  "builtin:word-wheel-ui"
 ]
