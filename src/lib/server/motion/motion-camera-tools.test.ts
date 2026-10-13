@@ -4,7 +4,7 @@ import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
 import { Space } from '$lib/motion/camera';
 import { motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
-import { createMotionTools, type MotionSession } from './motion-tools';
+import { CLIP_DEFAULTS, createMotionTools, type MotionSession } from './motion-tools';
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
@@ -77,7 +77,7 @@ describe('motion agent camera tools', () => {
     const doc = (await run('get_motion_doc', {})) as { camera: { keyframes: Record<string, { time: number }[]> }; tracks: { clips: { depth: number; space: string }[] }[] };
 
     expect(doc.camera.keyframes.z.map((k) => k.time)).toEqual([0, 1]);
-    expect(doc.tracks[0].clips[0]).toMatchObject({ depth: 0, space: 'world' });
+    expect({ ...CLIP_DEFAULTS, ...doc.tracks[0].clips[0] }).toMatchObject({ depth: 0, space: 'world' });
   });
 
   it('the prompt teaches the camera', () => {

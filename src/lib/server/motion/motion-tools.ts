@@ -255,6 +255,42 @@ const fieldSpec = (f: ExposedField) => ({ key: f.key, label: f.label, type: f.ty
 const framesAt = (s: number, fps: number) => Math.round(s * fps);
 const secondsAt = (f: number, fps: number) => Math.round((f / fps) * 100) / 100;
 
+const NO_EDGE = { kind: 'none', duration: 0 };
+
+export const CLIP_DEFAULTS: Record<string, unknown> = {
+  trimStart: 0,
+  in: NO_EDGE,
+  out: NO_EDGE,
+  junction: null,
+  transform: {},
+  mask: null,
+  maskStack: [],
+  matte: 'none',
+  keyframes: {},
+  depth: 0,
+  space: 'world',
+  parent: null,
+  parentOpacity: 'inherit',
+  expressions: {},
+  effects: [],
+  shaders: [],
+  blend: 'normal',
+  animators: [],
+  textPath: null,
+  hidden: false,
+  locked: false,
+  bleed: false,
+  markers: [],
+  physics: null,
+  path: null
+};
+
+export const CLIP_DEFAULTS_NOTE = `clip fields left out hold their default: ${JSON.stringify(CLIP_DEFAULTS)}`;
+
+const isDefault = (key: string, value: unknown) => key in CLIP_DEFAULTS && JSON.stringify(value) === JSON.stringify(CLIP_DEFAULTS[key]);
+
+const compactClip = (clip: Record<string, unknown>) => Object.fromEntries(Object.entries(clip).filter(([key, value]) => value !== undefined && !isDefault(key, value)));
+
 export function docSummary(doc: MotionDoc, selection: string[]) {
   const secs = (f: number) => secondsAt(f, doc.fps);
   const edgeSummary = (edge: { kind: string; durationInFrames: number }) => ({ kind: edge.kind, duration: secs(edge.durationInFrames) });
@@ -278,7 +314,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
       name: t.name,
       hidden: t.hidden ?? false,
       locked: t.locked ?? false,
-      clips: t.clips.map((c) => ({
+      clips: t.clips.map((c) => compactClip({
         id: c.id,
         component: c.component,
         start: secs(c.from),
@@ -710,7 +746,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
   const tools: Record<string, Tool> = {
     get_motion_doc: tool({
-      description: 'Read the video being edited: size, duration in seconds, tracks and clips (start/duration in seconds), and the clips the user has selected.',
+      description: `Read the video being edited: size, duration in seconds, tracks and clips (start/duration in seconds), and the clips the user has selected. ${CLIP_DEFAULTS_NOTE}.`,
       inputSchema: z.object({}).strict(),
       execute: async () => docSummary(session.doc, session.selection)
     }),
