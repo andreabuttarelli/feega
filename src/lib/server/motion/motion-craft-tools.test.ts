@@ -59,7 +59,7 @@ describe('craft_composition', () => {
 
     const out = await run('craft_composition', { brief: 'iridescent blobs behind a title', reference_asset_ids: ['a1'] });
 
-    expect(craft).toHaveBeenCalledWith(expect.objectContaining({ brief: 'iridescent blobs behind a title', rounds: 4, budget_usd: 2.5 }));
+    expect(craft).toHaveBeenCalledWith(expect.objectContaining({ brief: 'iridescent blobs behind a title', rounds: 4, budget_usd: 2 }));
     expect(out).toMatchObject({ ok: true, rounds: 3, images: [{ path: 'org/p/uploads/web-views/v1/sheet.jpg' }] });
   });
 

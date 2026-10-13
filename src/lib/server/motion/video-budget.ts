@@ -26,6 +26,8 @@ const RESERVED_USD: Record<Reserve, number> = { [Reserve.Kept]: VIDEO_CAP_USD * 
 
 const leftUsd = (budget: VideoBudget, reserve: Reserve) => Math.max(0, budget.capUsd - RESERVED_USD[reserve] - budget.spentUsd);
 
+export const videoLeftUsd = (budget: VideoBudget) => leftUsd(budget, Reserve.Drawn);
+
 export const turnBudgetUsd = (budget: VideoBudget, reserve = Reserve.Drawn) => Math.min(AGENT_TURN_CAP_USD, leftUsd(budget, reserve));
 
 export const budgetSpent = (budget: VideoBudget, reserve = Reserve.Drawn) => leftUsd(budget, reserve) < MIN_STEP_USD;

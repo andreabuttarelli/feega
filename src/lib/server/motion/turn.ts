@@ -33,7 +33,7 @@ import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { AGENT_SELF_SAVE_MS } from '$lib/server/project-agent/limits';
-import { Reserve, VIDEO_BUDGET, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
+import { Reserve, VIDEO_BUDGET, videoLeftUsd, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
 import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/server/motion/critic';
 import { VIEWER_MODEL, VIEWER_SCHEMA, viewFrames } from '$lib/server/motion/viewer';
 import { CutGate, KEPT_CUT, REVIEW_CUT, cutGate, keepsCut, reviewedBefore, type CutReview } from '$lib/motion/cut-review';
@@ -479,7 +479,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     session,
     assets: () => assets,
     tools: () => tools,
-    remainingUsd: () => roleBudgetUsd(role, turnCapUsd) - charged(),
+    remainingUsd: () => videoLeftUsd(budget) - charged(),
     onStep: () => announce(),
     onSpent: (usd) => {
       spent += usd;
