@@ -24,6 +24,8 @@ const OPEN_AGENT: Record<'phone' | 'tablet', (page: Page) => Promise<void>> = {
 
 const viewportTransform = (page: Page) => page.locator('.svelte-flow__viewport').evaluate((el) => getComputedStyle(el).transform);
 
+test.use({ video: SHOTS ? 'on' : 'off' });
+
 test.describe('motion editor inside the canvas @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
