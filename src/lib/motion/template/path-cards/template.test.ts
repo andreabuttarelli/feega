@@ -81,4 +81,12 @@ describe('the path cards template', () => {
     expect(html).toContain('zqx from the host');
     expect(html).toContain('pc-world');
   });
+
+  it('paints the path and its dot under the cards', () => {
+    const js = PATH_CARDS_TEMPLATE.template.doc.components[PATH_COMPONENT].source.js;
+    const order = ['pc-path', 'pc-dot', 'pc-cards'].map((cls) => js.indexOf(`class="${cls}"`));
+
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
 });

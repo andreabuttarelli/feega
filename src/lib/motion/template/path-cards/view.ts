@@ -5,7 +5,7 @@ ${MEDIA_LIST}
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const STARS = '★★★★★';
 
-root.insertAdjacentHTML('beforeend', '<div class="pc"><div class="pc-world"><svg class="pc-path"><path pathLength="1"></path></svg><div class="pc-cards"></div><i class="pc-dot"></i></div></div>');
+root.insertAdjacentHTML('beforeend', '<div class="pc"><div class="pc-world"><svg class="pc-path"><path pathLength="1"></path></svg><i class="pc-dot"></i><div class="pc-cards"></div></div></div>');
 
 const scene = root.querySelector('.pc');
 const world = root.querySelector('.pc-world');
