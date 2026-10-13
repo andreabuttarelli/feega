@@ -1,5 +1,6 @@
 [
   "builtin:circular-carousel",
+  "builtin:collage-stack-rotate",
   "builtin:comment-grid",
   "builtin:composition-bento",
   "builtin:composition-carousel-3d",
@@ -26,6 +27,7 @@
   "builtin:floating-media",
   "builtin:flow-lines",
   "builtin:image-globe",
+  "builtin:introducing-badge",
   "builtin:launch-beat-montage",
   "builtin:launch-device-fly",
   "builtin:launch-device-orbit",
@@ -38,13 +40,17 @@
   "builtin:lower-third",
   "builtin:marquee",
   "builtin:media-cloud-white",
+  "builtin:melting-type-poster",
   "builtin:parallax-grid",
   "builtin:parallax-grid-alternate",
   "builtin:parallax-grid-drift",
   "builtin:parallax-grid-stagger",
   "builtin:parallax-grid-zoom",
+  "builtin:path-cards",
+  "builtin:phone-chat",
   "builtin:phone-split",
   "builtin:photo-strip",
+  "builtin:poster-liquid-glass",
   "builtin:product-reveal",
   "builtin:prompt-input",
   "builtin:quote",
@@ -74,5 +80,7 @@
   "builtin:social-stat",
   "builtin:split-headline",
   "builtin:title-card",
-  "builtin:ui-morph-reel"
+  "builtin:ui-morph-reel",
+  "builtin:wire-globe-pages",
+  "builtin:word-wheel-ui"
 ]
