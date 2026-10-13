@@ -75,6 +75,7 @@
   "builtin:social-stat",
   "builtin:split-headline",
   "builtin:stack-words",
+  "builtin:steps-list",
   "builtin:title-card",
   "builtin:ui-morph-reel"
 ]
