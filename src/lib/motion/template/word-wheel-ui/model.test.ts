@@ -163,6 +163,13 @@ describe('the word wheel model', () => {
     });
   }
 
+  it('keeps the whole panel inside the frame in portrait', () => {
+    const { panel, box } = model.wheelLayout(PARAMS, 1080, 1920, MEASURE);
+
+    expect(panel.x0).toBeGreaterThan(-box.ax);
+    expect(panel.x1).toBeLessThan(box.ax);
+  });
+
   it('lays out side by side in landscape and stacked in portrait', () => {
     expect(model.wheelLayout(PARAMS, 1920, 1080, MEASURE).axis).toBe('row');
     expect(model.wheelLayout(PARAMS, 1080, 1920, MEASURE).axis).toBe('column');

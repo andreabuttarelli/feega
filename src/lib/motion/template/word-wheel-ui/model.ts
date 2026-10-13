@@ -8,8 +8,8 @@ const ROW_TEXT_SHARE = 0.86;
 const COLUMN_TEXT_SHARE = 0.86;
 const ROW_PANEL_TOP = 0.66;
 const COLUMN_TEXT_Y = 0.42;
-const COLUMN_PANEL_SCALE = 1.5;
-const COLUMN_PANEL_LEFT = 0.72;
+const COLUMN_PANEL_SCALE = 1.4;
+const COLUMN_PANEL_MAX = 0.88;
 const PANEL_GAP = 0.05;
 const PANEL_ASPECT = 0.82;
 const ROW_PITCH = 1.12;
@@ -51,8 +51,8 @@ function columnLayout(p, box, m) {
   const width = groupEm * em;
   const height = TEXT_ROWS * em;
   const text = rect(-width / 2, -box.ay * COLUMN_TEXT_Y - height / 2, width, height);
-  const panelW = p.panelSize * COLUMN_PANEL_SCALE * 2 * box.ax;
-  const panel = rect(-box.ax * COLUMN_PANEL_LEFT, text.y1 + PANEL_GAP, panelW, panelW * PANEL_ASPECT);
+  const panelW = Math.min(p.panelSize * COLUMN_PANEL_SCALE, COLUMN_PANEL_MAX) * 2 * box.ax;
+  const panel = rect(-panelW / 2, text.y1 + PANEL_GAP, panelW, panelW * PANEL_ASPECT);
   return { axis: 'column', box, em, text, panel };
 }
 
