@@ -28,6 +28,7 @@ import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { fitNewVideo } from '$lib/motion/fit-duration';
+import { sizedToBrief } from '$lib/motion/brief-canvas';
 import { AGENT_SELF_SAVE_MS } from '$lib/server/project-agent/limits';
 import { Reserve, VIDEO_BUDGET, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
 import { CRITIC_SCHEMA, critique, criticMessage, type Critique } from '$lib/server/motion/critic';
@@ -76,6 +77,7 @@ import { motionPlaceHint, userContent } from '$lib/server/chat-attachments/model
 
 export const MOTION_AGENT_KEY = 'motion';
 const CHECK_WAIT_MS = 90_000;
+const SIZED_TO_BRIEF = 'sized the video to the brief';
 const NEEDS_EDITOR = 'this needs the motion editor open in a browser to draw frames: nobody has it open for this turn';
 
 export enum Browser {
@@ -295,7 +297,8 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   }
 
   const knownAssets = assets.length;
-  const session: MotionSession = { doc: head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick };
+  const briefed = sizedToBrief(head.doc, message);
+  const session: MotionSession = { doc: briefed ?? head.doc, baseVersion: head.version, edits: briefed ? [SIZED_TO_BRIEF] : [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick };
   const moderationScope = { orgId, userId, projectId: project.id, nodeId: motion.record.id, actor };
   const bucket = db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket;
   const frameScope = { orgId, projectId: project.id, nodeId: motion.record.id };
@@ -432,7 +435,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const vision = BROWSER_VISION[browser](visionModel);
   const asksPick = !choosesForUser(message);
   const toolNames = roleTools(role, Object.keys(tools)).filter((name) => (vision === Vision.Available || (name !== VIEW_FRAMES && name !== DESCRIBE_FRAMES)) && (asksPick || name !== ASK_REFERENCE_PICK));
-  const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
+  const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: session.doc, style: styleOf(head.doc) });
   const t0 = Date.now();
   const stepModels: string[] = [];
   const openingMessages = [...history, { role: 'user', content: openingContent }] as ModelMessage[];

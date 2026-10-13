@@ -400,6 +400,14 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(JSON.stringify(world.calls[0].prompt)).toContain('Studio memory');
   });
 
+  it('the size and length the brief names are saved on the video even when the turn only writes a script (the quote came out 1080x1920, 15 s)', async () => {
+    world.message = 'Kinetic typography video of this quote. Square 1080x1080, about 10 seconds.';
+    await turn();
+
+    const saved = (world.writes.at(-1) as unknown as { doc: { width: number; height: number; durationInFrames: number; fps: number } }).doc;
+    expect({ width: saved.width, height: saved.height, seconds: saved.durationInFrames / saved.fps }).toEqual({ width: 1080, height: 1080, seconds: 10 });
+  });
+
   it('a builder turn is not told the last video memory: it already has its own doc', async () => {
     await turn();
 
