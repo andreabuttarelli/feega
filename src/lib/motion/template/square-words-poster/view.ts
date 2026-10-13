@@ -32,7 +32,20 @@ export const SQUARE_WORDS_CSS = String.raw`
   letter-spacing: -0.005em;
 }
 
+.sw-index {
+  position: absolute;
+  border-top: 2px solid var(--sw-ink);
+  padding-top: 0.6em;
+  letter-spacing: 0.01em;
+  white-space: pre;
+}
+
 .sw-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sw-paper);
+  letter-spacing: -0.02em;
   position: absolute;
   border-radius: 50%;
   background: var(--sw-dot);
@@ -79,8 +92,11 @@ const draw = (p, width, height) => {
 
   const d = px(p.dotSize);
   s.setProperty('--sw-ring', RING * d + 'px');
-  const dot = '<div class="sw-dot" style="' + box(sq.x + sq.w - d / 2, (p.dotY * height) / 100 - d / 2, d, d) + '"></div>';
+  const dot = '<div class="sw-dot" style="' + box(sq.x + sq.w - d / 2, (p.dotY * height) / 100 - d / 2, d, d) + 'font-size:' + d * 0.34 + 'px">' + escaped(p.dotLabel) + '</div>';
+  const edge = width * 0.06;
+  const index = '<div class="sw-index" style="left:' + edge + 'px;right:' + edge + 'px;bottom:' + edge * 0.8 + 'px;font-size:' + px(p.bodySize) + 'px">' + escaped(p.index) + '</div>';
+  const caption = upright(p.caption, width - edge * 0.75, height * 0.62, px(p.bodySize) * 0.85, p.ink);
 
-  scene.innerHTML = words.slice(0, split).join('') + square + body + dot + words.slice(split).join('');
+  scene.innerHTML = words.slice(0, split).join('') + square + body + dot + words.slice(split).join('') + index + caption;
 };
 `;

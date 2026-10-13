@@ -12,17 +12,21 @@ const BODY_X = 0.727;
 const BODY_TOP = 0.03;
 const BODY_WIDTH = 0.245;
 const BAR = [0.043, 0.0115];
+const MARKER = 0.115;
+const MARKER_ROW = 3.2;
 
 const fontOf = (p) => (String(p.font).includes(',') ? p.font : '"' + p.font + '", system-ui, sans-serif');
 const escaped = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
-root.insertAdjacentHTML('beforeend', '<div class="cs"><div class="cs-grid"></div><div class="cs-title"></div><div class="cs-bar"></div><p class="cs-body"></p></div>');
+root.insertAdjacentHTML('beforeend', '<div class="cs"><div class="cs-grid"></div><div class="cs-title"></div><div class="cs-bar"></div><p class="cs-body"></p><div class="cs-index"></div><div class="cs-marker"></div></div>');
 
 const scene = root.querySelector('.cs');
 const grid = root.querySelector('.cs-grid');
 const title = root.querySelector('.cs-title');
 const bar = root.querySelector('.cs-bar');
 const body = root.querySelector('.cs-body');
+const index = root.querySelector('.cs-index');
+const marker = root.querySelector('.cs-marker');
 
 let cache = { key: '' };
 
@@ -81,6 +85,13 @@ const draw = () => {
   bar.style.cssText = box(BODY_X * width, BODY_TOP * height, BAR[0] * width, BAR[1] * width);
   body.style.cssText = 'left:' + BODY_X * width + 'px;top:' + (BODY_TOP * height + BAR[1] * width * 1.6) + 'px;width:' + BODY_WIDTH * width + 'px;font-size:' + (p.bodySize * width) / 100 + 'px';
   body.textContent = String(p.body || '');
+
+  const indexPx = (p.bodySize * width) / 100;
+  index.style.cssText = 'left:' + BODY_TOP * height + 'px;top:' + BODY_TOP * height + 'px;font-size:' + indexPx + 'px;border-top-width:' + BAR[1] * width * 0.35 + 'px';
+  index.textContent = String(p.index || '');
+  const d = MARKER * width;
+  marker.style.cssText = box(width - d - BODY_TOP * height * 1.2, start + MARKER_ROW * cell.h, d, d) + 'font-size:' + d * 0.36 + 'px';
+  marker.textContent = String(p.marker || '');
 };
 
 draw();

@@ -46,6 +46,25 @@ export const BLOCK_TITLE_CSS = String.raw`
   background: var(--bt-block);
 }
 
+.bt-number,
+.bt-label {
+  position: absolute;
+  color: var(--bt-paper);
+  white-space: pre;
+}
+
+.bt-number {
+  font-family: var(--bt-font);
+  font-weight: var(--bt-weight);
+  letter-spacing: -0.04em;
+  line-height: 0.8;
+}
+
+.bt-label {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
 .bt-foot {
   position: absolute;
 }
@@ -137,6 +156,15 @@ const draw = (p, width, height) => {
 
   scene.innerHTML = foot + byline + '<div class="bt-block"></div>' + title + '<div class="bt-wear"></div>';
   const footTop = scene.querySelector('.bt-foot').offsetTop;
-  scene.querySelector('.bt-block').style.cssText = box(margin, blockTop, room, Math.max(0, footTop - BLOCK_GAP * width - blockTop));
+  const blockBottom = footTop - BLOCK_GAP * width;
+  scene.querySelector('.bt-block').style.cssText = box(margin, blockTop, room, Math.max(0, blockBottom - blockTop));
+  const inset = margin * 0.6;
+  const numberPx = size * 0.9;
+  scene.querySelector('.bt-wear').insertAdjacentHTML(
+    'beforebegin',
+    '<div class="bt-number" style="right:' + (margin + inset) + 'px;top:' + (blockBottom - inset - numberPx * 0.8) + 'px;font-size:' + numberPx + 'px">' + escaped(p.blockNumber) + '</div>' +
+      '<div class="bt-label" style="left:' + (margin + inset) + 'px;top:' + (blockBottom - inset - px(p.bylineSize) * 0.6) + 'px;font-size:' + px(p.bylineSize) * 0.6 + 'px">' + escaped(p.blockLabel) + '</div>' +
+      upright(p.caption, width - margin * 0.72, blockBottom, px(p.bylineSize) * 0.55, p.ink)
+  );
 };
 `;

@@ -39,6 +39,8 @@ const fontOf = (f) => (String(f).includes(',') ? f : '"' + f + '", system-ui, sa
 const escaped = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const linesOf = (s) => String(s || '').split('\n');
 const box = (x, y, w, h) => 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px;';
+const upright = (text, x, bottom, px, colour) =>
+  '<div style="position:absolute;left:' + x + 'px;top:' + bottom + 'px;font-size:' + px + 'px;line-height:1;white-space:pre;letter-spacing:0.08em;text-transform:uppercase;transform:rotate(-90deg);transform-origin:0 0;color:' + colour + '">' + escaped(text) + '</div>';
 `;
 
 const POSTER_RUN = String.raw`

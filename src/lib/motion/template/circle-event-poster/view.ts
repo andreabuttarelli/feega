@@ -16,6 +16,21 @@ export const CIRCLE_EVENT_CSS = String.raw`
   background: var(--ce-accent);
 }
 
+.ce-marker {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--ce-ink);
+  color: var(--ce-paper);
+  letter-spacing: -0.03em;
+}
+
+.ce-rule {
+  background: var(--ce-accent);
+}
+
 .ce-text {
   position: absolute;
   margin: 0;
@@ -95,10 +110,18 @@ const draw = (p, width, height) => {
   const bodyTop = infoTop + (infoLines + BODY_GAP) * 1.04 * px(p.infoSize);
   const body = text('ce-body', 'left:' + infoX + 'px;top:' + bodyTop + 'px;width:' + BODY_WIDTH * width + 'px;font-size:' + BODY_SIZE * width + 'px', escaped(p.body));
 
+  const markerD = diameter * 0.16;
+  const angle = Math.PI * 1.25;
+  const mx = px(p.circleX) + Math.cos(angle) * diameter * 0.5 - markerD / 2;
+  const my = (p.circleY * height) / 100 + Math.sin(angle) * diameter * 0.5 - markerD / 2;
+  const marker = '<div class="ce-marker" style="' + box(mx, my, markerD, markerD) + 'font-size:' + markerD * 0.42 + 'px">' + escaped(p.marker) + '</div>';
+  const caption = upright(p.caption, width - margin * 0.75, height - FOOT_BOTTOM * width, BODY_SIZE * width * 1.3, p.ink);
+  const rule = '<div class="ce-rule" style="width:' + px(p.dateSize) * 2.2 + 'px;height:' + Math.max(3, width * 0.006) + 'px;margin-bottom:' + width * 0.018 + 'px"></div>';
+
   const date = text('ce-date', 'position:relative;font-size:' + px(p.dateSize) + 'px;margin-bottom:' + DATE_GAP * width + 'px', escaped(p.date));
   const title = text('ce-title', 'position:relative;font-size:' + px(p.titleSize) + 'px', titleHtml(linesOf(p.title)));
-  const foot = '<div class="ce-foot" style="left:' + margin * 0.8 + 'px;bottom:' + FOOT_BOTTOM * width + 'px">' + date + title + '</div>';
+  const foot = '<div class="ce-foot" style="left:' + margin * 0.8 + 'px;bottom:' + FOOT_BOTTOM * width + 'px">' + rule + date + title + '</div>';
 
-  scene.innerHTML = circle + name + info + body + foot;
+  scene.innerHTML = circle + marker + name + info + body + foot + caption;
 };
 `;

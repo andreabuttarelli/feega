@@ -1,5 +1,5 @@
 import { VAR_PREFIX, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
-import { colourProp, fontProp, linesProp, numberProp, posterComponent, prefixProp } from '../poster-kit';
+import { colourProp, fontProp, linesProp, numberProp, posterComponent, prefixProp, textProp } from '../poster-kit';
 import { SQUARE_WORDS_CSS, SQUARE_WORDS_VIEW } from './view';
 
 export const SQUARE_WORDS_COMPONENT = 'SquareWordsPoster';
@@ -16,6 +16,9 @@ export const SQUARE_WORDS_PROPS: Record<string, PropSpec> = {
   places: linesProp('Word places, "left baseline" per line (% width, % height)', PLACES),
   front: numberProp('Words from this line on sit over the square', 5, 1, 20, 1),
   body: linesProp('Text in the square', BODY, 400),
+  dotLabel: textProp('Number in the circle', '07', { maxLength: 4 }),
+  index: textProp('Index line, foot', '(07) — Studio Name, Index 2027', { maxLength: 60 }),
+  caption: textProp('Vertical caption, right edge', 'brand notes, sheet seven', { maxLength: 60 }),
   font: fontProp('Font', 'Work Sans'),
   fontWeight: numberProp('Weight', 400, 200, 800, 100, 'Style'),
   paper: colourProp('Background colour', '#c9c8c8'),

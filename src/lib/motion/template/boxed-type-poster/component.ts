@@ -15,6 +15,8 @@ export const BOXED_TYPE_PROPS: Record<string, PropSpec> = {
   tag1: linesProp('Tag, left', 'STUDIO NAME &\nDESIGN TEAM'),
   tag2: linesProp('Tag, centre', 'NOTES ON\nOUR DESIGN PROCESS'),
   tag3: linesProp('Tag, right', 'N.08'),
+  counter: textProp('Counter in the dark box', '01 / 05', { maxLength: 12 }),
+  caption: textProp('Vertical caption, right edge', 'TYPE ONLY — NO IMAGES USED', { maxLength: 60 }),
   font: fontProp('Font', 'Inter'),
   fontWeight: numberProp('Weight', 500, 300, 800, 100, 'Style'),
   paper: colourProp('Paper colour', '#d5d5d4'),

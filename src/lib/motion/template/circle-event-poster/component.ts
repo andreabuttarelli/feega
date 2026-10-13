@@ -1,5 +1,5 @@
 import { VAR_PREFIX, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
-import { colourProp, fontProp, linesProp, numberProp, posterComponent, prefixProp } from '../poster-kit';
+import { colourProp, fontProp, linesProp, numberProp, posterComponent, prefixProp, textProp } from '../poster-kit';
 import { CIRCLE_EVENT_CSS, CIRCLE_EVENT_VIEW } from './view';
 
 export const CIRCLE_EVENT_COMPONENT = 'CircleEventPoster';
@@ -17,6 +17,8 @@ export const CIRCLE_EVENT_PROPS: Record<string, PropSpec> = {
   date: linesProp('Date, above the title', 'mon 00\nthursday'),
   info: linesProp('Schedule column, right', INFO),
   body: linesProp('Small text, right', BODY, 800),
+  marker: textProp('Number in the small circle', '03', { maxLength: 4 }),
+  caption: textProp('Vertical caption, right edge', 'talk series — evening three', { maxLength: 60 }),
   font: fontProp('Font', 'Inter Tight'),
   fontWeight: numberProp('Weight', 700, 300, 900, 100, 'Style'),
   paper: colourProp('Paper colour', '#ffffff'),

@@ -27,3 +27,9 @@ A prop named `name` breaks a Custom clip (it collides with the component name), 
 poster's name is `heading`. Prop titles are capped at 60 characters.
 
 The shape test now accepts `radius: 50%` (perfect circles) and nothing else.
+
+**Own marks.** The first renders were too close to their references. Every poster, the two
+older ones included, now carries 2–3 elements of its own, all editable fields: a vertical caption
+(`upright` in the kit), a stamp or issue label, a numbered circle marker, a counter, an index line
+with rule, a number and label inside the block. A test holds it: each poster exposes at least two
+of these props. Rule for new posters: never ship a straight copy of the reference.

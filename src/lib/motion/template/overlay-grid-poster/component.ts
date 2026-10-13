@@ -1,5 +1,5 @@
 import { VAR_PREFIX, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
-import { colourProp, fontProp, linesProp, numberProp, posterComponent, prefixProp } from '../poster-kit';
+import { colourProp, fontProp, linesProp, numberProp, posterComponent, prefixProp, textProp } from '../poster-kit';
 import { OVERLAY_GRID_CSS, OVERLAY_GRID_VIEW } from './view';
 
 export const OVERLAY_GRID_COMPONENT = 'OverlayGridPoster';
@@ -17,6 +17,8 @@ export const OVERLAY_GRID_PROPS: Record<string, PropSpec> = {
   foot2: linesProp('Footer, right column', 'OPENING HOURS:\nTUE–SAT 2–7 PM\nSUN 2–5 PM\n\nAND BY APPOINTMENT\nTEL. 000 000 00 00'),
   overlay: linesProp('Overlaid words, right', '2 ROOMS\n16 DESIGNS\n 5 MONITORS\n2 PROJECTORS\n16 CATALOGUES\n7 CORPORATE'),
   overlayLow: linesProp('Overlaid words, lower left', 'ER\nRE\nAYER\nGE\n\nATE DESIGNS'),
+  issue: textProp('Stamp, top right', 'NO. 07', { maxLength: 20 }),
+  caption: textProp('Vertical caption, right edge', 'EXHIBITION SERIES — SHEET 07 / 12', { maxLength: 60 }),
   font: fontProp('Font', 'Azeret Mono'),
   fontWeight: numberProp('Weight', 500, 300, 800, 100, 'Style'),
   paper: colourProp('Paper colour', '#c9c9c7'),

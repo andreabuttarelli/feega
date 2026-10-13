@@ -48,6 +48,19 @@ export const BOXED_TYPE_CSS = String.raw`
   padding: 0 0.4em;
 }
 
+.bx-counter {
+  position: absolute;
+  color: var(--bx-rule);
+  letter-spacing: 0.04em;
+  line-height: 1;
+  white-space: pre;
+}
+
+.bx-square {
+  position: absolute;
+  background: var(--bx-rule);
+}
+
 .bx-word {
   position: absolute;
   display: flex;
@@ -116,7 +129,11 @@ const draw = (p, width, height) => {
   const word = '<div class="bx-word" style="' + box(wordLeft, wordTop, WORD_RIGHT * width - wordLeft, wordHeight) + 'font-size:' + wordPx + 'px;padding-right:' + WORD_PAD * wordPx + 'px">' + escaped(p.word) + '</div>';
   const statement = stack('bx-statement', margin, wordTop + STATEMENT_DROP * wordHeight, statementPx, p.statement);
 
-  scene.innerHTML = '<div class="bx-rule" style="height:' + RULE * width + 'px"></div>' + tagRow(TAG_TOP * width) + title + word + statement + tagRow(bottomTop) + '<div class="bx-note-slot"></div>';
+  const counter = '<div class="bx-counter" style="left:' + (wordLeft + tagPx) + 'px;top:' + (wordTop + tagPx) + 'px;font-size:' + tagPx * 1.2 + 'px">' + escaped(p.counter) + '</div>';
+  const square = '<div class="bx-square" style="' + box(WORD_RIGHT * width - tagPx * 1.6, bottomTop - tagPx * 3.4, tagPx * 1.6, tagPx * 1.6) + '"></div>';
+  const caption = upright(p.caption, width - margin * 0.62, wordTop + wordHeight, tagPx, p.ink);
+
+  scene.innerHTML = '<div class="bx-rule" style="height:' + RULE * width + 'px"></div>' + tagRow(TAG_TOP * width) + title + word + statement + tagRow(bottomTop) + counter + square + caption + '<div class="bx-note-slot"></div>';
 
   scene.querySelectorAll('.bx-title .bx-line').forEach((line) => {
     line.style.padding = '0 ' + TITLE_PAD * titlePx + 'px';

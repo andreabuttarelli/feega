@@ -60,6 +60,11 @@ describe.each(POSTERS)('the %s still template', (id, entry, name) => {
     expect(doc.tracks.flatMap((t) => t.clips).flatMap((c) => c.effects).map((e) => e.kind)).toContain(EffectKind.Noise);
   });
 
+  it('carries marks of its own design beyond the reference, each editable', () => {
+    const own = ['caption', 'issue', 'marker', 'counter', 'index', 'blockNumber', 'blockLabel', 'dotLabel'];
+    expect(own.filter((key) => key in component.propsSchema.properties).length).toBeGreaterThanOrEqual(2);
+  });
+
   it('offers at most five key fields, each a real field', () => {
     const keys = entry.template.keyFields ?? [];
     expect(keys.length).toBeLessThanOrEqual(5);

@@ -20,6 +20,8 @@ export const TYPE_GRID_PROPS: Record<string, PropSpec> = {
   footer2: lines('Footer column 2', '30 Apr\n2027'),
   footer3: lines('Footer column 3', 'Studio Name\nCity'),
   footer4: lines('Footer column 4', 'Venue name,\nStreet 00'),
+  issue: text('Stamp above the footer', 'ISSUE 04 / SPRING', { maxLength: 30 }),
+  caption: text('Vertical caption, right edge', 'studio sessions — open to all', { maxLength: 60 }),
   media: text('Pictures, in order of the [photo] marks', '', { format: PropFormat.Media, maxLength: 2000 }),
   font: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter Tight', group: 'Style' },
   fontWeight: number('Type weight', 700, 300, 900, 'Style', 100),

@@ -32,6 +32,20 @@ export const OVERLAY_GRID_CSS = String.raw`
   letter-spacing: 0.04em;
 }
 
+.og-stamp {
+  position: absolute;
+  background: var(--og-ink);
+  color: var(--og-paper);
+  padding: 0.3em 0.55em;
+  line-height: 1;
+  white-space: pre;
+}
+
+.og-rule {
+  position: absolute;
+  background: var(--og-ink);
+}
+
 .og-mark {
   position: absolute;
   border: 0 solid var(--og-ink);
@@ -98,6 +112,10 @@ const draw = (p, width, height) => {
 
   const marks = mark('tl', left, FRAME.top * height - drop * 0.4, arm, line) + mark('bl', left, FRAME.bottom * height, arm, line) + mark('br', FRAME.right * width, FRAME.bottom * height, arm, line);
 
-  scene.innerHTML = yellowHtml + rowHtml + footHtml + marks;
+  const stamp = '<div class="og-stamp" style="right:' + (1 - FRAME.right) * width + 'px;top:' + FRAME.top * height + 'px;font-size:' + small + 'px">' + escaped(p.issue) + '</div>';
+  const rule = '<div class="og-rule" style="' + box(HEAD_X * width, rows[2][0] - drop * 0.6, (FRAME.right - HEAD_X) * width, line * 2) + '"></div>';
+  const caption = upright(p.caption, (FRAME.right + 0.03) * width, FRAME.bottom * height, foot, p.ink);
+
+  scene.innerHTML = yellowHtml + rowHtml + footHtml + marks + rule + stamp + caption;
 };
 `;

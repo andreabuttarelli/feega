@@ -1,5 +1,5 @@
 import { VAR_PREFIX, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
-import { colourProp, fontProp, linesProp, numberProp, posterComponent, prefixProp } from '../poster-kit';
+import { colourProp, fontProp, linesProp, numberProp, posterComponent, prefixProp, textProp } from '../poster-kit';
 import { BLOCK_TITLE_CSS, BLOCK_TITLE_VIEW } from './view';
 
 export const BLOCK_TITLE_COMPONENT = 'BlockTitlePoster';
@@ -14,6 +14,9 @@ export const BLOCK_TITLE_PROPS: Record<string, PropSpec> = {
   byline: linesProp('Line above the title', 'Name Surname & Name Surname'),
   names: linesProp('Names in the row, one per line', 'Name Surname\nName Surname\nName Surname\nName Surname'),
   body: linesProp('Paragraph at the foot', BODY, 800),
+  blockNumber: textProp('Number in the block', '01', { maxLength: 6 }),
+  blockLabel: textProp('Label in the block', 'FILM NO. 01 — FESTIVAL SELECTION', { maxLength: 60 }),
+  caption: textProp('Vertical caption, right edge', 'IN CINEMAS SPRING 2027', { maxLength: 60 }),
   font: fontProp('Title font', 'Rubik'),
   textFont: fontProp('Text font', 'Inter Tight'),
   fontWeight: numberProp('Title weight', 800, 300, 900, 100, 'Style'),
