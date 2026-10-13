@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { setStill } from '$lib/motion/still';
 import { ImageFormat, ImageScale, stillExport } from '$lib/motion/still-model';
-import { drawStill } from './still-export';
+import { drawStill, exportStill } from './still-export';
 import type { StillPort, Viewport } from './server-frames';
 
 const TOKENS = { name: 'feega', colors: {}, fonts: {} } as never;
@@ -30,6 +30,18 @@ function fakePort() {
   };
   return { port, opened, seeks, pictures };
 }
+
+describe('exportStill', () => {
+  it('a renderer that dies answers an error the caller can show, not a 500', async () => {
+    vi.stubEnv('CHROMIUM_PATH', '/chrome');
+    const port: StillPort = { open: async () => Promise.reject(new Error('Session closed')) };
+
+    const made = await exportStill({} as never, { orgId: 'o', projectId: 'p', nodeId: 'n' }, newMotionDoc(MotionFormat.Square), stillExport(ImageFormat.Png, ImageScale.One), { tokens: TOKENS, assets: [] }, port);
+
+    expect(made).toEqual({ ok: false, error: expect.stringContaining('Session closed') });
+    vi.unstubAllEnvs();
+  });
+});
 
 describe('drawStill', () => {
   it('draws the still frame at the full size of the doc times the scale, in the format asked', async () => {

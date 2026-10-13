@@ -33,7 +33,11 @@ export async function exportStill(db: Db, scope: StillScope, doc: MotionDoc, spe
   if (!serverFramesOpen()) {
     return { ok: false, error: 'image export needs the server renderer, which is not available here' };
   }
-  const bytes = await drawStill(port, { doc, tokens: sources.tokens, assets: assetUrls(sources.assets) }, spec);
+  const drawn = await drawStill(port, { doc, tokens: sources.tokens, assets: assetUrls(sources.assets) }, spec).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+  if (drawn instanceof Error) {
+    return { ok: false, error: `the image could not be drawn: ${drawn.message}` };
+  }
+  const bytes = drawn;
   const { width, height } = spec.size(doc);
   const path = `${canvasUploadPrefix(scope.orgId, scope.projectId)}stills/${crypto.randomUUID()}.${spec.ext}`;
   await storeAssetFile(db, path, new File([new Uint8Array(bytes)], path.split('/').at(-1) as string, { type: spec.mime }));
