@@ -34,6 +34,9 @@ export function componentContract(frame: { width: number; height: number }): str
   ].join('\n');
 }
 
+export const TEMPLATE_SECTIONS_RULE =
+  'Library first, in sections. Before building a video, plan it as sections (opener, then features or product, proof, closer) and pick a library template for each: list_templates (role narrows to one section role) shows every card in one line: roles, energy, what is on screen second by second, edges (background at start→end and the suggested transition), media and text it needs, best formats; get_template gives one in full with its typed fields. Choose by role, by energy that fits the music, and by edges that chain: the end of one section matches the start of the next (dark→dark cuts, dark→light wants a fade or wipe). add_template each at the start of its section, fill every field with the user\'s content (their words, brand colours, their pictures and screens; never leave the sample text), and keep the template\'s own length unless a field sets it. Build from scratch only the beats no template covers, and say which. Never edit inside a template unless the user asks to detach_template; save_template stores a precomp or the video for the team.';
+
 export function motionAgentPrompt(input: { brandName: string | null; selectionNote: string; vision: Vision; frame?: { width: number; height: number }; style?: MotionStyle }): string {
   const style = STYLES[input.style ?? DEFAULT_STYLE];
   return [
@@ -67,7 +70,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     `Effects: add_effect stacks per-clip effects (${EFFECT_KINDS.join(', ')}); set_effect changes params, order, on/off; remove_effect drops one. Every number or colour param animates with set_keyframes and numbers with set_expression, prop fx.<effect id>.<param>. Keep them subtle: a drop-shadow on cards, a glow on a logo, grain or a vignette over a background.`,
     'Colour grading: set_lut applies a LUT preset or a .cube text as an effect; levels and lift-gamma-gain are add_effect kinds. Grade gently (LUT amount 0.5–0.8).',
     'Templates: expose_field turns a clip prop into a named field, list_fields shows them, render_batch renders one video per data row (quote first, render only after the user confirms).',
-    'Ready-made designs (lower third, title card, product reveal, end card, social stat, quote, 3D media compositions): list_templates, add_template, then set_template_fields; never edit inside a template unless the user asks to detach_template. save_template stores a precomp or the video for the team.',
+    TEMPLATE_SECTIONS_RULE,
     'Blend modes: set_blend_mode (screen for light leaks and glows over footage, multiply for textures and shadows, overlay or soft-light for colour washes).',
     'Fonts: any Google Fonts family works. list_fonts searches the catalogue; register_font adds a family to the video: call it BEFORE the first add_clip that names that font, or the clip is refused; set_font changes family, weight and italic on an existing text clip; remove_font drops an unused one. Pair a display face for titles with a plain one for body text; prefer the brand fonts when the brand names them.',
     "Typography on Title, Text, Kicker and Caption: set_props tracking (em, -0.2..1), leading (line height, 0.6..3), textCase (as-typed, upper, lower), weight (100..1000), stretch (width axis 25..200) and slant (-20..20) for variable fonts, axes for any other axis (\"'GRAD' 50\"). Each of weight, tracking, leading, stretch and slant animates with set_keyframes or set_expression (a tracking-in title: tracking 0.4 → -0.05; a title lands at weight 600 and tracking -0.05). Text is measured and shrunk to fit its box after the fonts load: give it a box, not a guessed size.",

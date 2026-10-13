@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PRODUCT_SCREENS_RULE, motionAgentPrompt } from './motion-prompt';
+import { PRODUCT_SCREENS_RULE, TEMPLATE_SECTIONS_RULE, motionAgentPrompt } from './motion-prompt';
 import { Vision } from './frames';
 import { HOUSE_DEFAULTS, STYLES, TITLE_CARD_RULE, TITLE_TYPE_RULE, UI_FOCUS_RULE } from '$lib/motion/style';
 import { MotionStyle } from '$lib/motion/style-model';
@@ -16,6 +16,16 @@ const prompt = (style: MotionStyle) =>
 describe('videos loop', () => {
   it('every role is told to end where the video began', () => {
     expect(prompt(MotionStyle.LaunchFilm)).toContain(LOOP_RULE);
+  });
+});
+
+describe('a video is built from library sections', () => {
+  it.each(Object.values(MotionStyle))('%s plans sections and picks templates by their cards before building from scratch', (style) => {
+    expect(prompt(style)).toContain(TEMPLATE_SECTIONS_RULE);
+    expect(TEMPLATE_SECTIONS_RULE).toMatch(/list_templates/);
+    expect(TEMPLATE_SECTIONS_RULE).toMatch(/get_template/);
+    expect(TEMPLATE_SECTIONS_RULE).toMatch(/edges/);
+    expect(TEMPLATE_SECTIONS_RULE).toMatch(/from scratch/);
   });
 });
 

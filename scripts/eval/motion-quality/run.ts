@@ -12,7 +12,7 @@ import { billedUsdInScope, withOrgContext } from '$lib/server/ai-log';
 import { judge } from './judge';
 import { AccountGiven, Teardowns, accountAfter, asksUser, serverEnv, claimPort, cutAnswerFor, replyTo, turnSettled, type AgentState, type TestAccount } from './drive';
 import { contactSheet, cuts, duration, grayFrames, judgeFrames, monoSamples, PROBE_SIZE } from './media';
-import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, uiLayers, TASTE_AXES, type CaseResult, type Facts } from './score';
+import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, libraryTemplates, spentUsd, textMinShare, toolErrors, uiLayers, TASTE_AXES, type CaseResult, type Facts } from './score';
 
 enum AccountSource {
   None = 'none',
@@ -24,8 +24,17 @@ const CASES = [
   { name: 'linear', prompt: 'launch video for linear.app', account: AccountSource.None },
   { name: 'stripe', prompt: 'promo for stripe.com payments', account: AccountSource.None },
   { name: 'shop', prompt: 'product video for the snowboards at hydrogen.shop', account: AccountSource.None },
-  { name: 'app', prompt: 'promo video for the Things mobile app, culturedcode.com/things', account: AccountSource.None }
+  { name: 'app', prompt: 'promo video for the Things mobile app, culturedcode.com/things', account: AccountSource.None },
+  { name: 'sections', prompt: 'a 20 second product video for linear.app: what it is, three features, a call to action', account: AccountSource.None, minTemplates: 2 }
 ];
+
+const meetsMinimum = (name: string, facts: Facts | null) => {
+  const min = CASES.find((c) => c.name === name)?.minTemplates;
+  if (min === undefined || facts?.libraryTemplates == null) {
+    return null;
+  }
+  return facts.libraryTemplates >= min ? `pass (≥${min})` : `FAIL (needs ≥${min})`;
+};
 
 const EST_CASE_USD = 2.5;
 const DEFAULT_CAP_USD = 20;
@@ -159,7 +168,8 @@ function videoFacts(video: string, doc: unknown) {
     textMinShare: doc ? textMinShare(doc as never) : null,
     recreatedUi: ui?.recreated ?? null,
     kitUi: ui?.kit ?? null,
-    beatAlignment: beatAlignment(cutTimes, beats)
+    beatAlignment: beatAlignment(cutTimes, beats),
+    libraryTemplates: doc ? libraryTemplates(doc as never) : null
   };
 }
 
@@ -210,7 +220,7 @@ async function runCase(c: (typeof CASES)[number], out: string, browserPage: () =
     writeFileSync(join(dir, 'page-errors.txt'), pageErrors.join('\n'));
     const base = { gateBlockingLeft: gateBlockingLeft(msgs), toolErrors: toolErrors(msgs), pageErrors: pageErrors.length, costUsd: spentUsd(calls), wallS };
     if (!existsSync(video)) {
-      const facts: Facts = { exists: false, duration: null, scenes: null, meanHold: null, maxHold: null, emptyShare: null, textMinShare: null, recreatedUi: null, kitUi: null, beatAlignment: null, ...base };
+      const facts: Facts = { exists: false, duration: null, scenes: null, meanHold: null, maxHold: null, emptyShare: null, textMinShare: null, recreatedUi: null, kitUi: null, beatAlignment: null, libraryTemplates: doc ? libraryTemplates(doc as never) : null, ...base };
       return { name: c.name, prompt: c.prompt, unrun: null, facts, taste: null, judgeUsd };
     }
     const facts: Facts = { exists: true, ...videoFacts(video, doc), ...base };
@@ -244,6 +254,10 @@ function report(stamp: string, results: CaseResult[], previous: CaseResult[] | n
     lines.push(`## ${r.name}`, '', `Prompt: "${r.prompt}"`, '', '| fact | value |', '|---|---|');
     for (const [k, v] of Object.entries(r.facts ?? {})) {
       lines.push(`| ${k} | ${fmt(v)}${signed(deltas[r.name]?.[k as keyof Facts])} |`);
+    }
+    const minimum = meetsMinimum(r.name, r.facts);
+    if (minimum) {
+      lines.push(`| library sections | ${minimum} |`);
     }
     lines.push('', '| taste | score | reason |', '|---|---|---|');
     for (const axis of TASTE_AXES) {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, uiLayers, type CaseResult } from './score';
+import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, libraryTemplates, spentUsd, textMinShare, toolErrors, uiLayers, type CaseResult } from './score';
 
 const VECTOR_JS = 'const U = {"width":1280,"height":800,"nodes":[]};\nconst boxOf = 1;';
 
@@ -126,5 +126,17 @@ describe('compareRuns', () => {
 
   test('a case missing before has no deltas', () => {
     expect(compareRuns([result('a', 20)], [])).toEqual({ a: {} });
+  });
+});
+
+describe('libraryTemplates', () => {
+  test('counts the distinct library templates a video was built from', () => {
+    const doc = { comps: { a: { template: { id: 'builtin:scene-hero-title' } }, b: { template: { id: 'builtin:marquee' } }, c: { template: { id: 'builtin:marquee' } }, d: {} } };
+
+    expect(libraryTemplates(doc)).toBe(2);
+  });
+
+  test('a video built from scratch used none', () => {
+    expect(libraryTemplates({})).toBe(0);
   });
 });

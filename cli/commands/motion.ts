@@ -117,6 +117,10 @@ export async function cmdMotionTemplates(opts: { org?: string }) {
   const { templates } = await motionApi.templates(await token(), opts.org);
   for (const t of templates) {
     console.log(`${t.id}  ${t.name}  ${t.seconds}s  ${t.description}`);
+    if (t.card) {
+      console.log(`  ${t.card.roles.join('/')} · ${t.card.energy}${t.card.loops ? ' · loops' : ''} · ${t.card.edges.start}→${t.card.edges.end} ${t.card.edges.transition}`);
+      console.log(`  ${t.card.onScreen.join('; ')}`);
+    }
     console.log(`  ${t.fields.map((f) => `${f.key}:${f.type}`).join(', ')}`);
   }
 }

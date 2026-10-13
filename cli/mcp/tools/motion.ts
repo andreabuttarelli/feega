@@ -195,7 +195,7 @@ export function registerMotionTools(server: McpServer) {
       title: 'List motion templates',
       description:
         'Ready-made pieces to drop into a motion video (built-in and saved by the org), e.g. builtin:prompt-input, a prompt field that types, presses send and thinks. ' +
-        'Each with `id`, `seconds` and its `fields`: key, type (text, number min..max, color #rrggbb, boolean, select options), group and default. Reads only, free.',
+        'Each with `id`, `seconds`, its `card` (roles such as opener/feature/proof/closer, energy, loops, onScreen beat by beat with seconds, edges start→end with a suggested transition, goodFor) and its `fields`: key, type (text, number min..max, color #rrggbb, boolean, select options), group and default. Plan a video as sections and pick one template per section by card. Reads only, free.',
       inputSchema: z.object({ org }),
       annotations: { readOnlyHint: true }
     },

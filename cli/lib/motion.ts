@@ -63,7 +63,8 @@ const id = encodeURIComponent;
 export type ShaderEffect = { id: string; category: string; source: string; live: boolean; about: string; knobs: Record<string, { label: string; min: number; max: number; default: number; keyframes: boolean }>; colours: Record<string, string> };
 
 export type MotionTemplateField = { key: string; label: string; type: string; group?: string; min?: number; max?: number; options?: string[]; default?: unknown };
-export type MotionTemplate = { id: string; name: string; description: string; seconds: number; fields: MotionTemplateField[] };
+export type MotionTemplateCard = { roles: string[]; energy: string; loops: boolean; onScreen: string[]; edges: { start: string; end: string; transition: string }; goodFor: string[] };
+export type MotionTemplate = { id: string; name: string; description: string; seconds: number; card?: MotionTemplateCard; fields: MotionTemplateField[] };
 export type FromTemplate = { template: string; format?: '16:9' | '9:16' | '1:1'; project?: string };
 export type FromTemplateMade = { node_id: string; project_id: string; canvas_id: string; version: number; editor_url: string };
 export type AddTemplate = { id: string; at?: number; vars?: Record<string, string | number | boolean>; sound?: boolean };
