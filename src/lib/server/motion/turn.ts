@@ -6,7 +6,7 @@ import type { SpawnInput } from '$lib/server/agents/spawn';
 import { OPUS } from '$lib/server/agents/spawn';
 import { spawnAgents, spawnOffers } from '$lib/server/agents/spawn-agent';
 import { CRAFT_KEY, craftAgent } from '$lib/server/motion/craft-agent';
-import { CRAFT_COMPOSITION, type CraftInput, type CraftResult } from '$lib/server/motion/craft';
+import { CRAFT_COMPOSITION, type CraftInput, type CraftProgress, type CraftResult } from '$lib/server/motion/craft';
 import { CHECK_MOTION } from '$lib/server/motion/motion-check';
 import { toolsWritingCode } from '$lib/server/motion/model-route';
 import type { Db } from '$lib/server/db/client';
@@ -340,11 +340,11 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   };
 
   let spawnRun: (input: SpawnInput) => Promise<Record<string, unknown>> = async () => ({ ok: false, error: 'sub-agents start once the turn is running' });
-  let craftRun: (input: CraftInput) => Promise<CraftResult> = async () => ({ ok: false, error: 'the crafting agent starts once the turn is running' });
+  let craftRun: (input: CraftInput, progress?: (update: CraftProgress) => void) => Promise<CraftResult> = async () => ({ ok: false, error: 'the crafting agent starts once the turn is running' });
   const offers = spawnOffers();
   const tools = createMotionTools({
     spawn: { offers, run: (input) => spawnRun(input) as never },
-    craft: (input) => craftRun(input),
+    craft: (input, progress) => craftRun(input, progress),
     lumas: frameLumas,
     session,
     assets,

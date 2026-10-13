@@ -99,7 +99,7 @@ export function applyChatStreamEvent(state: ChatStreamState, evt: any): boolean 
     case 'tool-output-error': {
       const toolCallId = String(evt.toolCallId ?? evt.id ?? '');
       if (!toolCallId) return false;
-      const status = evt.type === 'tool-output-error' ? 'error' : 'done';
+      const status = evt.type === 'tool-output-error' ? 'error' : evt.preliminary ? 'running' : 'done';
       const errorText =
         typeof evt.errorText === 'string' ? evt.errorText : evt.error ? String(evt.error) : undefined;
       state.tools = state.tools.map((t) =>

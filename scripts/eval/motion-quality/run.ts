@@ -10,6 +10,7 @@ import { analyzeAudio } from '$lib/motion/audio-analysis';
 import { UI_KIT } from '$lib/motion/ui-kit/kit';
 import { billedUsdInScope, withOrgContext } from '$lib/server/ai-log';
 import { judge, judgeReference } from './judge';
+import { CRAFT_COMPOSITION } from '$lib/motion/craft';
 import { AccountGiven, Teardowns, accountAfter, asksUser, serverEnv, claimPort, cutAnswerFor, replyTo, turnSettled, type AgentState, type TestAccount } from './drive';
 import { contactSheet, cuts, duration, grayFrames, judgeFrames, monoSamples, PROBE_SIZE } from './media';
 import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, craftRounds, uiLayers, TASTE_AXES, type CaseResult, type Facts } from './score';
@@ -170,9 +171,21 @@ function videoFacts(video: string, doc: unknown) {
   };
 }
 
+async function saveSheets(msgs: { tool_calls?: { toolName?: string; output?: { images?: { path: string; round: number }[] } }[] | null }[], dir: string): Promise<void> {
+  const sheets = msgs.flatMap((m) => (m.tool_calls ?? []).filter((t) => t.toolName === CRAFT_COMPOSITION).flatMap((t) => t.output?.images ?? []));
+  mkdirSync(join(dir, 'craft-sheets'), { recursive: true });
+  for (const sheet of sheets) {
+    const { data } = await admin.storage.from('canvas-assets').download(sheet.path);
+    if (data) {
+      writeFileSync(join(dir, 'craft-sheets', `round-${sheet.round}-${sheet.path.split('/').at(-2)}.jpg`), Buffer.from(await data.arrayBuffer()));
+    }
+  }
+}
+
 async function keepEvidence(orgId: string, dir: string): Promise<void> {
   const msgs = (await admin.from('chat_messages').select('*').eq('org_id', orgId).order('seq')).data ?? [];
   writeFileSync(join(dir, 'chat_messages.json'), JSON.stringify(msgs, null, 1));
+  await saveSheets(msgs, dir);
   const calls = (await admin.from('ai_calls').select('*').eq('org_id', orgId)).data ?? [];
   writeFileSync(join(dir, 'ai_calls.json'), JSON.stringify(calls, null, 1));
 }
@@ -217,6 +230,7 @@ async function runCase(c: Case, out: string, browserPage: () => Promise<Page>): 
 
     const msgs = (await admin.from('chat_messages').select('*').eq('org_id', session.orgId).order('seq')).data ?? [];
     writeFileSync(join(dir, 'chat_messages.json'), JSON.stringify(msgs, null, 1));
+    await saveSheets(msgs, dir);
     const calls = (await admin.from('ai_calls').select('*').eq('org_id', session.orgId)).data ?? [];
     writeFileSync(join(dir, 'ai_calls.json'), JSON.stringify(calls, null, 1));
     const rev = await admin.from('motion_revisions').select('version, doc').eq('org_id', session.orgId).eq('node_id', nodeId).order('version', { ascending: false }).limit(1).maybeSingle();

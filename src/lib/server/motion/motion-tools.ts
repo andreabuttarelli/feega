@@ -66,7 +66,7 @@ import { ACTS, BrandKind, briefOf, durationProblem, offScript, scriptLines, scri
 import { quoted, unsourcedFigures, type SitePage } from './site-copy';
 import { MediaKind, boardMedia, outlineOf, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
 import { UPDATE_COMPONENTS, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
-import { CRAFT_COMPOSITION, READ_TEMPLATE_SOURCE, craftInput, templateSource, type CraftInput, type CraftResult } from './craft';
+import { CRAFT_COMPOSITION, READ_TEMPLATE_SOURCE, craftInput, templateSource, type CraftInput, type CraftProgress, type CraftResult } from './craft';
 import { CHECK_FRAMES, CHECK_MOTION, checkTimes, motionCheck } from './motion-check';
 import { keyFieldsSchema } from '$lib/motion/template/key-fields';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
@@ -164,7 +164,7 @@ export type MotionToolDeps = {
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   spawn?: { offers: readonly ModelOffer[]; run: (input: SpawnInput) => Promise<SpawnResult> };
-  craft?: (input: CraftInput) => Promise<CraftResult>;
+  craft?: (input: CraftInput, progress?: (update: CraftProgress) => void) => Promise<CraftResult>;
   lumas?: (frames: Frame[]) => Promise<Uint8Array[]>;
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
   renderLink?: () => Promise<Record<string, unknown>>;
@@ -2419,11 +2419,30 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
   return { ...withFrames({ ...oneAtATime(lookFirst(tools, session)), ...lookFirst(delegating, session) }, session), ...(deps.web ? createWebTools(deps.web) : {}) };
 }
 
-function craftTool(craft: (input: CraftInput) => Promise<CraftResult>): Tool {
+function craftTool(craft: NonNullable<MotionToolDeps['craft']>): Tool {
   return tool({
     description: 'Make a new premium composition from scratch that matches reference pictures: a dedicated crafting agent on the strongest model studies library templates, writes a custom component, renders frames, compares them with the references, measures the motion and fixes it, round after round. Use it when the user gives a reference picture of a look or composition the library does not have; it may save the result as a team template. Returns the rounds it ran, what it cost and a contact sheet per round.',
     inputSchema: craftInput,
-    execute: async (input) => craft(craftInput.parse(input))
+    execute: async function* (input) {
+      const updates: CraftProgress[] = [];
+      let wake = () => {};
+      let finished = false;
+      const done = craft(craftInput.parse(input), (update) => {
+        updates.push(update);
+        wake();
+      }).finally(() => {
+        finished = true;
+        wake();
+      });
+      while (!finished || updates.length) {
+        if (!updates.length) {
+          await new Promise<void>((resolve) => (wake = resolve));
+          continue;
+        }
+        yield updates.shift()!;
+      }
+      yield await done;
+    }
   });
 }
 

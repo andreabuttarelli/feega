@@ -65,6 +65,14 @@ describe('applyChatStreamEvent', () => {
     });
   });
 
+  it('a preliminary output shows progress while the call keeps running (a crafting round)', () => {
+    const state = feed([
+      { type: 'tool-input-available', toolCallId: 't1', toolName: 'craft_composition', input: {} },
+      { type: 'tool-output-available', toolCallId: 't1', output: { rounds: 1 }, preliminary: true }
+    ]);
+    expect(state.tools[0]).toMatchObject({ status: 'running', output: { rounds: 1 } });
+  });
+
   it('keeps the params of a call that then failed, and records why', () => {
     const state = feed([
       { type: 'tool-input-available', toolCallId: 't1', toolName: 'x', input: { a: 1 } },

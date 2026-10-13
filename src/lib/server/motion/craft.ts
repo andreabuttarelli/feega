@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { UserContent } from 'ai';
+import { tool, type UserContent } from 'ai';
 import type { TemplateEntry } from '$lib/motion/template/library';
 import { LOOP_RULE } from '$lib/motion/loop';
 import { KEY_FIELDS_MAX } from '$lib/motion/template/key-fields';
@@ -16,9 +16,18 @@ export const MAX_CRAFT_ROUNDS = 5;
 const DEFAULT_CRAFT_ROUNDS = 4;
 const MAX_CRAFT_REFERENCES = 3;
 const DEFAULT_CRAFT_USD = 2;
+const MIN_CRAFT_USD = 0.3;
+export const TARGET_SCORE = 8;
+export const COMPARE_REFERENCE = 'compare_reference';
 const MAX_CRAFT_USD = 5;
 const STEPS_BEFORE_ROUNDS = 8;
 const STEPS_PER_ROUND = 7;
+
+export const compareReferenceTool = tool({
+  description: `After every ${VIEW_FRAMES} and describe_frames: set your frames next to the reference and list the concrete differences that remain, biggest first, each naming what, where and how much ("bubbles 3x too big and glossy: the reference has dense clusters of tiny matte ones, lower right"), then score the match 1-10 as a strict judge would. Below ${TARGET_SCORE} fix the first differences and look again.`,
+  inputSchema: z.object({ differences: z.array(z.string().min(8).max(300)).min(1).max(10), score: z.number().int().min(1).max(10) }),
+  execute: async ({ score }) => ({ ok: true, score, keep_going: score < TARGET_SCORE })
+});
 
 export const craftStepsFor = (rounds: number) => STEPS_BEFORE_ROUNDS + rounds * STEPS_PER_ROUND;
 
@@ -52,7 +61,8 @@ export const CRAFT_TOOLS: readonly string[] = [
   'expose_field',
   'list_fields',
   'precompose',
-  'save_template'
+  'save_template',
+  COMPARE_REFERENCE
 ];
 
 const HOUSE_MOTION = [
@@ -70,7 +80,8 @@ export function craftSystem(frame: { width: number; height: number }): string {
     `2. Write: ${WRITE_COMPONENT} the whole composition, then add_clip component "Custom" over the full length of the video (fit_duration to the length the brief asks).`,
     `3. Look: ${VIEW_FRAMES} at up to ${MAX_FRAMES_PER_VIEW} times spread over the piece; the reference pictures come back next to your frames. ${DESCRIBE_FRAMES}, then list every difference from the reference: composition, scale, colour, light, texture, type, how it moves.`,
     `4. Measure: ${CHECK_MOTION} on the busiest second (${CHECK_FRAMES} consecutive frames) for jolts and frozen frames; ${VIEW_FRAMES} reports a loop seam that jumps.`,
-    `5. Fix the biggest differences first with ${UPDATE_COMPONENTS}, then look again. One round is write or fix → look → measure. Stop at the round limit, or earlier when nothing important differs and the checks are clean.`,
+    `5. Compare: ${COMPARE_REFERENCE} after every look, the concrete differences that remain and a strict 1-10 score of the match. Fix the first differences with ${UPDATE_COMPONENTS} and look again. One round is write or fix → look → compare → measure. Keep going until the score reaches ${TARGET_SCORE}, or the rounds or budget run out; never stop on a lower score while rounds are left.`,
+    `Generative craft: render shaders supersampled (draw at 2x and let the browser scale down, or average 4 jittered samples per pixel) and antialias every edge (smoothstep over fwidth of the distance), never a hard step. Raymarch with enough steps (96+) and a small epsilon, blend shapes with a smooth minimum, displace the surface with layered noise (fbm) for folds and creases, light it with a fresnel rim and a soft inner glow. Scatter small things the way nature does: clusters around a few seeds, many tiny members and few large ones (radii from a power law), not a handful of equal spheres. Keep text readable over a busy background: a soft dark scrim or glow behind it.`,
     `6. Reuse: the parameters a person would change (the text, the colours, the pictures, the speed) are param() fields; expose_field at most ${KEY_FIELDS_MAX} of them on the clip. When asked to save it as a template: if the video holds other clips, precompose your clip first and save_template with that comp; otherwise save_template without comp, key_fields the exposed keys.`,
     `House motion rules:\n${HOUSE_MOTION.map((r) => `- ${r}`).join('\n')}`,
     componentContract(frame),
@@ -96,34 +107,94 @@ export function templateSource(entry: TemplateEntry) {
   };
 }
 
-export type CraftAsk = { system: string; content: UserContent; tools: readonly string[]; budgetUsd: number; steps: number };
+export type ChildCall = { toolCallId: string; toolName: string; input: unknown; output: unknown };
+
+export type CraftAsk = { system: string; content: UserContent; tools: readonly string[]; budgetUsd: number; steps: number; onCalls: (calls: readonly ChildCall[]) => void };
 
 export type CraftPorts = {
   references: (assetIds: readonly string[]) => Promise<Reference[]>;
-  run: (ask: CraftAsk) => Promise<{ text: string; usd: number; views: string[] }>;
+  run: (ask: CraftAsk) => Promise<{ text: string; usd: number; calls: ChildCall[] }>;
   sheet: (viewCallId: string) => Promise<string | null>;
   remainingUsd: () => number;
 };
 
-export type CraftResult = { ok: true; rounds: number; cost_usd: number; text: string; images: { path: string; round: number }[] } | { ok: false; error: string };
+type Motion = { jolts: unknown[]; frozen: unknown[] };
 
-export async function craftRun(ports: CraftPorts, input: CraftInput, ctx: { session: { references?: Reference[] }; frame: { width: number; height: number } }): Promise<CraftResult> {
-  if (input.budget_usd > ports.remainingUsd()) {
-    return { ok: false, error: `budget $${input.budget_usd.toFixed(2)} is more than this turn has left: $${Math.max(0, ports.remainingUsd()).toFixed(2)}` };
+export type CraftRound = { round: number; score: number | null; differences: string[]; motion: Motion | null; sheet: string | null };
+
+export type CraftProgress = { ok: true; running: true; rounds: number; best_score: number | null; log: CraftRound[]; images: { path: string; round: number }[] };
+
+export type CraftResult = { ok: true; rounds: number; best_score: number | null; cost_usd: number; text: string; budget_usd: number; images: { path: string; round: number }[]; log: CraftRound[] } | { ok: false; error: string };
+
+type Compared = { score: number; differences: string[] };
+
+function roundsOf(calls: readonly ChildCall[], sheets: ReadonlyMap<string, string | null>): CraftRound[] {
+  const rounds: CraftRound[] = [];
+  for (const call of calls) {
+    const current = rounds.at(-1);
+    if (call.toolName === VIEW_FRAMES) {
+      rounds.push({ round: rounds.length + 1, score: null, differences: [], motion: null, sheet: sheets.get(call.toolCallId) ?? null });
+      continue;
+    }
+    if (!current) {
+      continue;
+    }
+    if (call.toolName === COMPARE_REFERENCE) {
+      const compared = call.input as Compared;
+      current.score = compared.score;
+      current.differences = compared.differences;
+    }
+    const measured = call.output as (Motion & { ok?: boolean }) | null;
+    if (call.toolName === CHECK_MOTION && measured?.ok) {
+      current.motion = { jolts: measured.jolts, frozen: measured.frozen };
+    }
+  }
+  return rounds;
+}
+
+const bestOf = (log: readonly CraftRound[]) => log.reduce<number | null>((best, r) => (r.score === null ? best : Math.max(best ?? 0, r.score)), null);
+
+const imagesOf = (log: readonly CraftRound[]) => log.flatMap((r) => (r.sheet ? [{ path: r.sheet, round: r.round }] : []));
+
+export async function craftRun(ports: CraftPorts, input: CraftInput, ctx: { session: { references?: Reference[] }; frame: { width: number; height: number }; progress?: (update: CraftProgress) => void }): Promise<CraftResult> {
+  const budgetUsd = Math.min(input.budget_usd, ports.remainingUsd());
+  if (budgetUsd < MIN_CRAFT_USD) {
+    return { ok: false, error: `budget: only $${Math.max(0, budgetUsd).toFixed(2)} is left of this video, less than one crafting round` };
   }
   const references = await ports.references(input.reference_asset_ids);
   if (!references.length) {
     return { ok: false, error: 'no reference picture could be read from those asset ids: attach or import the reference first' };
   }
 
+  const sheets = new Map<string, Promise<string | null>>();
+  const resolved = async (calls: readonly ChildCall[]) => {
+    const views = calls.filter((c) => c.toolName === VIEW_FRAMES).map((c) => c.toolCallId);
+    views.filter((id) => !sheets.has(id)).forEach((id) => sheets.set(id, ports.sheet(id)));
+    return new Map(await Promise.all(views.map(async (id) => [id, await sheets.get(id)!] as const)));
+  };
+
+  let reported = '';
+  let reporting: Promise<void> = Promise.resolve();
+  const report = (calls: readonly ChildCall[]) => {
+    reporting = reporting.then(async () => {
+      const log = roundsOf(calls, await resolved(calls));
+      const closed = JSON.stringify(log.map((r) => [r.score, r.motion]));
+      if (closed === reported || !ctx.progress) {
+        return;
+      }
+      reported = closed;
+      ctx.progress({ ok: true, running: true, rounds: log.length, best_score: bestOf(log), log, images: imagesOf(log) });
+    });
+  };
+
   const before = ctx.session.references;
   ctx.session.references = references;
   try {
     const content: UserContent = [{ type: 'text', text: craftBrief(input, references.length) }, ...references.map((r) => ({ type: 'image' as const, image: r.data, mediaType: r.mediaType }))];
-    const out = await ports.run({ system: craftSystem(ctx.frame), content, tools: CRAFT_TOOLS, budgetUsd: input.budget_usd, steps: craftStepsFor(input.rounds) });
-    const sheets = await Promise.all(out.views.map(ports.sheet));
-    const images = sheets.flatMap((path, i) => (path ? [{ path, round: i + 1 }] : []));
-    return { ok: true, rounds: out.views.length, cost_usd: out.usd, text: out.text, images };
+    const out = await ports.run({ system: craftSystem(ctx.frame), content, tools: CRAFT_TOOLS, budgetUsd, steps: craftStepsFor(input.rounds), onCalls: report });
+    await reporting;
+    const log = roundsOf(out.calls, await resolved(out.calls));
+    return { ok: true, rounds: log.length, best_score: bestOf(log), cost_usd: out.usd, budget_usd: budgetUsd, text: out.text, images: imagesOf(log), log };
   } finally {
     ctx.session.references = before;
   }

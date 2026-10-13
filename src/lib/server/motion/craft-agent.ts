@@ -1,9 +1,9 @@
 import sharp from 'sharp';
-import type { Tool } from 'ai';
+import type { StepResult, Tool, ToolSet } from 'ai';
 import { runChild } from '$lib/server/agents/spawn-agent';
 import type { SdkUsage } from '$lib/server/ai-log';
 import { MODEL_IMAGE_MAX_PX } from '$lib/server/chat-attachments/model-parts';
-import { craftRun, type CraftInput, type CraftPorts, type CraftResult } from './craft';
+import { COMPARE_REFERENCE, compareReferenceTool, craftRun, type ChildCall, type CraftInput, type CraftPorts, type CraftProgress, type CraftResult } from './craft';
 import type { MotionAsset } from './editor';
 import { VIEW_FRAMES, type Frame, type Reference } from './frames';
 import { fetchImageBytes } from './ui-read';
@@ -36,7 +36,15 @@ async function referenceOf(url: string): Promise<Reference | null> {
   return jpeg ? { mediaType: 'image/jpeg', data: jpeg.toString('base64') } : null;
 }
 
-export function craftAgent(host: CraftHost): (input: CraftInput) => Promise<CraftResult> {
+function callsOf(steps: readonly StepResult<ToolSet>[], frames: ReadonlyMap<string, Frame[]>): ChildCall[] {
+  return steps.flatMap((step) =>
+    step.toolResults
+      .filter((r) => r.toolName !== VIEW_FRAMES || frames.has(r.toolCallId))
+      .map((r) => ({ toolCallId: r.toolCallId, toolName: r.toolName, input: r.input, output: r.output }))
+  );
+}
+
+export function craftAgent(host: CraftHost): (input: CraftInput, progress?: (update: CraftProgress) => void) => Promise<CraftResult> {
   const ports: CraftPorts = {
     references: async (ids) => {
       const urls = ids.flatMap((id) => host.assets().find((a) => a.id === id)?.url ?? []);
@@ -44,12 +52,17 @@ export function craftAgent(host: CraftHost): (input: CraftInput) => Promise<Craf
       return read.filter((r): r is Reference => r !== null);
     },
     run: async (ask) => {
-      const all = host.tools();
-      const out = await runChild(host, { model: host.model, system: ask.system, content: ask.content, tools: Object.fromEntries(ask.tools.flatMap((n) => (all[n] ? [[n, all[n]]] : []))), budgetUsd: ask.budgetUsd, steps: ask.steps, onStep: host.onStep });
+      const all = { ...host.tools(), [COMPARE_REFERENCE]: compareReferenceTool };
+      const steps: StepResult<ToolSet>[] = [];
+      const onStep = (step: StepResult<ToolSet>) => {
+        steps.push(step);
+        host.onStep();
+        ask.onCalls(callsOf(steps, host.session.frames));
+      };
+      const out = await runChild(host, { model: host.model, system: ask.system, content: ask.content, tools: Object.fromEntries(ask.tools.flatMap((n) => (all[n] ? [[n, all[n]]] : []))), budgetUsd: ask.budgetUsd, steps: ask.steps, onStep });
       host.onSpent(out.usd);
       host.log(out.usage);
-      const views = out.steps.flatMap((s) => s.toolCalls.filter((c) => c.toolName === VIEW_FRAMES).map((c) => c.toolCallId)).filter((id) => host.session.frames.has(id));
-      return { text: out.text, usd: out.usd, views };
+      return { text: out.text, usd: out.usd, calls: callsOf(out.steps, host.session.frames) };
     },
     sheet: async (callId) => {
       const frames = host.session.frames.get(callId);
@@ -57,5 +70,5 @@ export function craftAgent(host: CraftHost): (input: CraftInput) => Promise<Craf
     },
     remainingUsd: host.remainingUsd
   };
-  return (input) => craftRun(ports, input, { session: host.session, frame: host.frame });
+  return (input, progress) => craftRun(ports, input, { session: host.session, frame: host.frame, progress });
 }

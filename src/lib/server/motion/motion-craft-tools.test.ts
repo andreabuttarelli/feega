@@ -9,13 +9,25 @@ import { createMotionTools, type MotionToolDeps, type MotionSession } from './mo
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
+async function outputsOf(result: unknown): Promise<Record<string, unknown>[]> {
+  if (result && typeof result === 'object' && Symbol.asyncIterator in result) {
+    const all: Record<string, unknown>[] = [];
+    for await (const out of result as AsyncIterable<Record<string, unknown>>) {
+      all.push(out);
+    }
+    return all;
+  }
+  return [(await result) as Record<string, unknown>];
+}
+
 function setup(over: Partial<MotionToolDeps> = {}) {
   const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
   const save = vi.fn(async () => ({ ok: true as const, entry: { id: 'saved-1', template: BUILTIN_TEMPLATES[0].template } }));
   const templates = { list: async () => BUILTIN_TEMPLATES, save, remove: async () => false };
   const tools = createMotionTools({ session, assets: [], newId: () => 'id1', voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), templates, ...over });
-  const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' });
-  return { session, run, save, tools };
+  const run = async (name: string, input: unknown) => (await outputsOf((tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' }))).at(-1)!;
+  const outputs = async (name: string, input: unknown) => outputsOf((tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' }));
+  return { session, run, outputs, save, tools };
 }
 
 describe('read_template_source', () => {
@@ -59,7 +71,7 @@ describe('craft_composition', () => {
 
     const out = await run('craft_composition', { brief: 'iridescent blobs behind a title', reference_asset_ids: ['a1'] });
 
-    expect(craft).toHaveBeenCalledWith(expect.objectContaining({ brief: 'iridescent blobs behind a title', rounds: 4, budget_usd: 2 }));
+    expect(craft).toHaveBeenCalledWith(expect.objectContaining({ brief: 'iridescent blobs behind a title', rounds: 4, budget_usd: 2 }), expect.any(Function));
     expect(out).toMatchObject({ ok: true, rounds: 3, images: [{ path: 'org/p/uploads/web-views/v1/sheet.jpg' }] });
   });
 
@@ -93,6 +105,19 @@ describe('craft_composition', () => {
 
   it('the chat agent is told to hand a reference composition to the crafting agent, not write it in one shot', () => {
     expect(motionAgentPrompt({ brandName: null, selectionNote: '', vision: Vision.Available })).toMatch(/craft_composition with the reference asset ids/);
+  });
+
+  it('streams each closed round to the chat before the final result', async () => {
+    const round = { ok: true as const, running: true as const, rounds: 1, best_score: 6, log: [], images: [] };
+    const craft = vi.fn(async (_input: unknown, progress?: (u: typeof round) => void) => {
+      progress?.(round);
+      return { ok: true as const, rounds: 1, best_score: 6, cost_usd: 1, budget_usd: 2, text: 'done', images: [], log: [] };
+    });
+    const { outputs } = setup({ craft });
+
+    const all = await outputs('craft_composition', { brief: 'a slow aurora behind a title', reference_asset_ids: ['a1'] });
+
+    expect(all.map((o) => o.running ?? false)).toEqual([true, false]);
   });
 
   it('is not offered where no crafting agent runs', () => {
