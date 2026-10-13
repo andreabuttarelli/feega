@@ -4,6 +4,7 @@ import type { Db } from '$lib/server/db/client';
 import { AttachmentKind, type ChatAttachment } from '$lib/chat-attachments';
 import { findAssets, type Asset } from '$lib/server/repos/assets';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
+import { paletteNote, paletteOf } from './palette';
 
 export const MODEL_IMAGE_MAX_PX = 1568;
 const JPEG_QUALITY = 85;
@@ -12,23 +13,27 @@ type Part = TextPart | ImagePart;
 
 export type PlaceHint = (attachment: ChatAttachment) => string;
 
-async function modelImage(db: Db, asset: Asset): Promise<ImagePart | null> {
+type Seen = { image: ImagePart; palette: string };
+
+async function modelImage(db: Db, asset: Asset): Promise<Seen | null> {
   const download = await db.storage.from(CANVAS_ASSET_BUCKET).download(asset.url ?? '');
   if (download.error || !download.data) {
     return null;
   }
-  const resized = sharp(Buffer.from(await download.data.arrayBuffer())).resize(MODEL_IMAGE_MAX_PX, MODEL_IMAGE_MAX_PX, { fit: 'inside', withoutEnlargement: true });
+  const bytes = Buffer.from(await download.data.arrayBuffer());
+  const resized = sharp(bytes).resize(MODEL_IMAGE_MAX_PX, MODEL_IMAGE_MAX_PX, { fit: 'inside', withoutEnlargement: true });
   const jpeg = asset.mimeType === 'image/jpeg';
   const out = jpeg ? resized.jpeg({ quality: JPEG_QUALITY }) : resized.png();
-  return { type: 'image', image: new Uint8Array(await out.toBuffer()), mediaType: jpeg ? 'image/jpeg' : 'image/png' };
+  const palette = paletteNote(await paletteOf(bytes));
+  return { image: { type: 'image', image: new Uint8Array(await out.toBuffer()), mediaType: jpeg ? 'image/jpeg' : 'image/png' }, palette };
 }
 
 const PARTS_OF: Record<AttachmentKind, (db: Db, a: ChatAttachment, asset: Asset, hint: PlaceHint) => Promise<Part[]>> = {
   [AttachmentKind.Document]: async (_db, a, asset) => [{ type: 'text', text: `### Attached file: ${a.name}\n\n${asset.content ?? ''}` }],
   [AttachmentKind.Image]: async (db, a, asset, hint) => {
-    const image = await modelImage(db, asset);
-    const label: Part = { type: 'text', text: `Attached image: ${a.name} — project asset ${a.assetId}.${image ? '' : ' Its picture could not be loaded: you cannot see it.'} ${hint(a)}`.trim() };
-    return image ? [label, image] : [label];
+    const seen = await modelImage(db, asset);
+    const label: Part = { type: 'text', text: [`Attached image: ${a.name} — project asset ${a.assetId}.${seen ? '' : ' Its picture could not be loaded: you cannot see it.'}`, hint(a), seen?.palette ?? ''].filter(Boolean).join(' ') };
+    return seen ? [label, seen.image] : [label];
   }
 };
 
