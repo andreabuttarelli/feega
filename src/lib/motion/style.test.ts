@@ -123,6 +123,16 @@ const film = () => blank(MotionStyle.LaunchFilm);
 const beatMarkers = (doc: MotionDoc, every: number) => ({ ...doc, markers: Array.from({ length: 20 }, (_, i) => ({ frame: at(i * every), label: `beat ${i + 1}` })) });
 
 describe('the launch film style', () => {
+  it('builds in library sections first and shots only for what no template covers (eval: 31 add_shot, 0 templates)', () => {
+    const rules = STYLES[MotionStyle.LaunchFilm].rules.join('\n');
+
+    expect(rules).toMatch(/section/i);
+    expect(rules.indexOf('list_templates')).toBeGreaterThan(-1);
+    expect(rules.indexOf('list_templates')).toBeLessThan(rules.indexOf('add_shot'));
+    expect(rules).not.toMatch(/sequence of premium shots/);
+    expect(rules).not.toMatch(/Raw primitives only for what no shot covers/);
+  });
+
   it('is the default style of every new video', () => {
     expect(DEFAULT_STYLE).toBe(MotionStyle.LaunchFilm);
     expect(styleOf(newMotionDoc(MotionFormat.Landscape))).toBe(MotionStyle.LaunchFilm);

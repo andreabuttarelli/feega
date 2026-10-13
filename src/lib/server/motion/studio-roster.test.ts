@@ -17,6 +17,12 @@ describe('the studio roster', () => {
     expect(roleTools(StudioRole.Director, names)).toEqual(['analyze_site', 'write_script', 'web_search', 'recreate_ui']);
   });
 
+  it('the shot builder can read and place library templates: sections come first (eval: it could not, and built 0)', () => {
+    const tools = ['list_templates', 'get_template', 'add_template', 'set_template_fields', 'detach_template'];
+
+    expect(roleTools(StudioRole.ShotBuilder, tools)).toEqual(['list_templates', 'get_template', 'add_template', 'set_template_fields']);
+  });
+
   it('a scripted video with nothing built yet goes to the shot builder: library shots only, no free code', () => {
     const shotNames = [...names, 'add_shot', 'list_shots', 'write_component', 'update_components'];
 
