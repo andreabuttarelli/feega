@@ -85,7 +85,7 @@ async function answerCard(page: Page, cutsAnswered: number): Promise<string | nu
   return null;
 }
 
-async function drive(page: Page, agentUrl: string, account: TestAccount | null): Promise<void> {
+async function drive(page: Page, agentUrl: string, account: TestAccount | null, dir: string): Promise<void> {
   const start = Date.now();
   let replies = 0;
   let cutsAnswered = 0;
@@ -93,6 +93,7 @@ async function drive(page: Page, agentUrl: string, account: TestAccount | null):
   let before: AgentState | null = null;
   while (Date.now() - start < TURN_CAP_MS) {
     await page.waitForTimeout(POLL_MS);
+    await page.screenshot({ path: join(dir, 'progress.png') }).catch(() => {});
     const answered = await answerCard(page, cutsAnswered);
     if (answered) {
       say(`  answered ${answered}`);
@@ -102,6 +103,7 @@ async function drive(page: Page, agentUrl: string, account: TestAccount | null):
     }
     const r = await page.request.get(agentUrl);
     const now: AgentState = r.ok() ? await r.json() : { running: true, messages: [] };
+    say(`  poll: agent ${r.status()} running=${now.running} messages=${now.messages.length}`);
     const settled = turnSettled(before, now);
     before = now;
     if (!settled) {
@@ -168,6 +170,13 @@ function videoFacts(video: string, doc: unknown) {
   };
 }
 
+async function keepEvidence(orgId: string, dir: string): Promise<void> {
+  const msgs = (await admin.from('chat_messages').select('*').eq('org_id', orgId).order('seq')).data ?? [];
+  writeFileSync(join(dir, 'chat_messages.json'), JSON.stringify(msgs, null, 1));
+  const calls = (await admin.from('ai_calls').select('*').eq('org_id', orgId)).data ?? [];
+  writeFileSync(join(dir, 'ai_calls.json'), JSON.stringify(calls, null, 1));
+}
+
 async function runCase(c: Case, out: string, browserPage: () => Promise<Page>): Promise<CaseResult & { judgeUsd: number }> {
   const dir = join(out, c.name);
   mkdirSync(dir, { recursive: true });
@@ -197,7 +206,10 @@ async function runCase(c: Case, out: string, browserPage: () => Promise<Page>): 
     await input.fill(c.prompt);
     await input.press('Enter');
     say(`  sent; node ${nodeId}`);
-    await drive(page, `/api/v1/projects/${session.projectId}/motion/${nodeId}/agent`, accountFor(c.account, session));
+    await drive(page, `/api/v1/projects/${session.projectId}/motion/${nodeId}/agent`, accountFor(c.account, session), dir).catch(async (e) => {
+      await keepEvidence(session.orgId, dir);
+      throw e;
+    });
     const wallS = (Date.now() - t0) / 1000;
     await page.reload();
     await page.waitForLoadState('networkidle');
