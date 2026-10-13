@@ -34,7 +34,7 @@ describe('layer rows', () => {
     expect(rows.filter((r) => r.depth === 0).map((r) => [r.id, r.kind, r.label])).toEqual([
       ['n1', LayerKind.Node, 'Hook'],
       ['m1', LayerKind.Node, 'Teaser'],
-      ['m2', LayerKind.Node, 'motion']
+      ['m2', LayerKind.Node, 'Frame']
     ]);
     const inside = rows.filter((r) => r.nodeId === 'm1' && r.depth > 0);
     expect(inside.map((r) => r.kind)).toEqual([...doc.tracks.flatMap((t) => [LayerKind.Track, ...t.clips.map(() => LayerKind.Clip)])]);

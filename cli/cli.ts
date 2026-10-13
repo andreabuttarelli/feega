@@ -103,7 +103,7 @@ program
     await cmdMedia(opts);
   });
 
-const motion = program.command('motion').description('Motion videos: list, ask the editor agent to change one, render, publish as a web embed');
+const motion = program.command('motion').description('Frames (videos and stills): list, ask the editor agent to change one, render, publish as a web embed');
 
 motion
   .command('ask <nodeId> <prompt>')

@@ -61,7 +61,7 @@
         {/each}
       </ul>
     {:else}
-      <p class="muted">No videos yet. Create one above, or add a Motion node to any canvas.</p>
+      <p class="muted">No videos yet. Create one above, or add a Frame to any canvas.</p>
     {/if}
   </section>
 </div>

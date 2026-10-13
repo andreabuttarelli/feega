@@ -4,6 +4,8 @@ import { moveClip, moveTrack, renameTrack, type OpResult } from '$lib/motion/tim
 import { setClipFlags, setTrackFlags } from '$lib/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
 import { PART_SEP, parsePart } from '$lib/motion/poster-parts';
+import { NODE_KIND_LABEL } from './node-label';
+import type { NodeType } from './node-data';
 
 export enum LayerKind {
   Node = 'node',
@@ -88,7 +90,7 @@ function partRow(clip: Clip, part: string, nodeId: string, depth: number): Layer
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null): LayerRow[] {
   return nodes.flatMap((node) => {
-    const row: LayerRow = { id: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || node.type, type: node.type, nodeId: node.id, hidden: false, locked: false, nested: false };
+    const row: LayerRow = { id: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.type, nodeId: node.id, hidden: false, locked: false, nested: false };
     return open?.nodeId === node.id ? [row, ...trackRows(open.doc, open.doc.tracks, node.id, TRACK_DEPTH, false, open.parts)] : [row];
   });
 }

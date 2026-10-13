@@ -1206,14 +1206,14 @@
   }
 </script>
 
-<svelte:head>{#if rules.ownsTitle}<title>{data.node.name ?? 'Motion'} · Motion editor</title>{/if}</svelte:head>
+<svelte:head>{#if rules.ownsTitle}<title>{data.node.name ?? 'Frame'} · Frame editor</title>{/if}</svelte:head>
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
 <div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
   <header class="bar">
     <div class="group lead" {...dockOf(Part.Bar)}>
       <IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />
-      <span class="title" title={data.node.name ?? 'Motion'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Motion'}</span>
+      <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
       <span class="save-dot" data-tone={SAVE_TONE[saveState]} role="status" aria-label={`${saveState} · v${version}`}></span>
     </div>
 
@@ -1307,7 +1307,7 @@
     <MenuDrawer
       canvasHref={`/p/${data.projectId}/c/${data.canvas.id}`}
       canvasName={data.canvas.name}
-      crumbs={[data.node.name ?? 'Motion', ...pathNames(history.present, compPath)].map((name, i, all) => ({ name, go: i === all.length - 1 ? null : () => leaveTo(i) }))}
+      crumbs={[data.node.name ?? 'Frame', ...pathNames(history.present, compPath)].map((name, i, all) => ({ name, go: i === all.length - 1 ? null : () => leaveTo(i) }))}
       {doc}
       onchange={apply}
       {saveState}
