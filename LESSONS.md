@@ -2861,3 +2861,9 @@ finishes before an in-out position curve starts moving, so the visible motion is
 middle. Move: measure the word's sub-pixel centroid per frame against its opacity; the position
 curve must be out-shaped, moving during the fade and reaching zero speed at rest
 (`word-entrance.test.ts`).
+
+### A motion eval that "stalls 40 min" may be waiting on an export that already failed
+Signal: the turn is done and paid, then nothing for ~45 min, no video. The export dialog shows
+`Export failed: the frame at Xs did not draw within 60s`, but the driver only waited for
+`export-download`. Move: wait for the download OR a `role=alert` containing "failed", and throw
+on the alert (`scripts/eval/motion-quality/editor.ts`).
