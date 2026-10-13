@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, parseMotionDoc } from '$lib/motion/doc';
-import { customValues, Strictness } from '$lib/motion/custom/component';
+import { customValues, PropFormat, Strictness } from '$lib/motion/custom/component';
 import { lintAdvice, lintSource } from '$lib/motion/custom/lint';
 import { EffectKind } from '$lib/motion/effects/registry';
 import { DocMode, docMode } from '$lib/motion/still';
@@ -21,6 +21,14 @@ import { BOXED_TYPE_COMPONENT } from './boxed-type-poster/component';
 import { BOXED_TYPE_POSTER_TEMPLATE, BOXED_TYPE_TEMPLATE_ID } from './boxed-type-poster/template';
 import { SQUARE_WORDS_COMPONENT } from './square-words-poster/component';
 import { SQUARE_WORDS_POSTER_TEMPLATE, SQUARE_WORDS_TEMPLATE_ID } from './square-words-poster/template';
+import { ISO_BLOCKS_COMPONENT } from './iso-blocks-poster/component';
+import { ISO_BLOCKS_POSTER_TEMPLATE, ISO_BLOCKS_TEMPLATE_ID } from './iso-blocks-poster/template';
+import { PHOTO_GRID_COMPONENT } from './photo-grid-poster/component';
+import { PHOTO_GRID_POSTER_TEMPLATE, PHOTO_GRID_TEMPLATE_ID } from './photo-grid-poster/template';
+import { WHITE_SHAPES_COMPONENT } from './white-shapes-poster/component';
+import { WHITE_SHAPES_POSTER_TEMPLATE, WHITE_SHAPES_TEMPLATE_ID } from './white-shapes-poster/template';
+import { VERTICAL_TYPE_COMPONENT } from './vertical-type-poster/component';
+import { VERTICAL_TYPE_POSTER_TEMPLATE, VERTICAL_TYPE_TEMPLATE_ID } from './vertical-type-poster/template';
 
 const POSTERS: [string, TemplateEntry, string][] = [
   [TYPE_GRID_TEMPLATE_ID, TYPE_GRID_POSTER_TEMPLATE, TYPE_GRID_COMPONENT],
@@ -32,9 +40,18 @@ const POSTERS: [string, TemplateEntry, string][] = [
   [SQUARE_WORDS_TEMPLATE_ID, SQUARE_WORDS_POSTER_TEMPLATE, SQUARE_WORDS_COMPONENT]
 ];
 
-const REFERENCE_WORDS = /galeria|azur|berlin|karl|marx|ferran|adri|interbrand|wooster|soho|intef|darmstadt|doda|fassbender|guadagnino|cholovdenko|malek|laverne|tenderness|ui\/ux/i;
+const PART_TAGGED: [string, TemplateEntry, string][] = [
+  [ISO_BLOCKS_TEMPLATE_ID, ISO_BLOCKS_POSTER_TEMPLATE, ISO_BLOCKS_COMPONENT],
+  [PHOTO_GRID_TEMPLATE_ID, PHOTO_GRID_POSTER_TEMPLATE, PHOTO_GRID_COMPONENT],
+  [WHITE_SHAPES_TEMPLATE_ID, WHITE_SHAPES_POSTER_TEMPLATE, WHITE_SHAPES_COMPONENT],
+  [VERTICAL_TYPE_TEMPLATE_ID, VERTICAL_TYPE_POSTER_TEMPLATE, VERTICAL_TYPE_COMPONENT]
+];
 
-describe.each(POSTERS)('the %s still template', (id, entry, name) => {
+const NOT_A_PART: (string | undefined)[] = [PropFormat.Color, PropFormat.Font, PropFormat.Media];
+
+const REFERENCE_WORDS = /cosmic|aoxomoxoa|aachen|myspace|smets|sibel|thorwart|tomek|kennedy|tomorrow|marvels|new york|paju|isang|moving sites|wine|cheese and|galeria|azur|berlin|karl|marx|ferran|adri|interbrand|wooster|soho|intef|darmstadt|doda|fassbender|guadagnino|cholovdenko|malek|laverne|tenderness|ui\/ux/i;
+
+describe.each([...POSTERS, ...PART_TAGGED])('the %s still template', (id, entry, name) => {
   const doc = entry.template.doc;
   const component = doc.components[name];
 
@@ -89,5 +106,18 @@ describe.each(POSTERS)('the %s still template', (id, entry, name) => {
     expect(items[0].mode).toBe(DocMode.Still);
     expect(matching(items, '', null, DocMode.Still)).toHaveLength(1);
     expect(matching(items, '', null, DocMode.Video)).toHaveLength(0);
+  });
+});
+
+describe.each(PART_TAGGED)('the %s poster parts', (_id, entry, name) => {
+  const component = entry.template.doc.components[name];
+
+  it('tags every key content field it draws, so the canvas can select it', () => {
+    const props = component.propsSchema.properties;
+    const drawn = entry.template.doc.fields
+      .filter((f) => (entry.template.keyFields ?? []).includes(f.key))
+      .map((f) => f.prop)
+      .filter((prop) => !NOT_A_PART.includes(props[prop]?.format));
+    expect(drawn.filter((prop) => !component.source.js.includes(`part('${prop}'`))).toEqual([]);
   });
 });

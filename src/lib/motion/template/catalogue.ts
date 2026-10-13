@@ -102,6 +102,13 @@ export function matching(items: readonly CatalogueItem[], query: string, kind: C
   return items.filter((i) => (!kind || i.kind === kind) && (!mode || i.mode === mode) && (!words || `${i.name} ${i.description}`.toLowerCase().includes(words)));
 }
 
+export const POSTER_FORMATS = [MotionFormat.Portrait, MotionFormat.Vertical, MotionFormat.Poster] as const;
+export type PosterFormat = (typeof POSTER_FORMATS)[number];
+
+export function posterShelf(items: readonly CatalogueItem[]): CatalogueItem[] {
+  return matching(items, '', null, DocMode.Still).sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export function starterDoc(entry: TemplateEntry, format: MotionFormat, newId: () => string): Inserted {
   const source = entry.template.doc;
   const blank = { ...newMotionDoc(format), fps: source.fps, durationInFrames: source.durationInFrames, ...(source.still ? { still: source.still } : {}) };

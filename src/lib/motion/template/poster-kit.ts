@@ -5,6 +5,7 @@ import { addEffect } from '$lib/motion/effects/ops';
 import { setStill } from '$lib/motion/still';
 import type { OpResult } from '$lib/motion/timeline';
 import { customTemplateDoc, type CustomTemplateSpec } from './custom-template';
+import { MEDIA_LIST } from './media-list';
 
 export const POSTER_SECONDS = 2;
 export const POSTER_FORMAT = MotionFormat.Portrait;
@@ -39,8 +40,10 @@ const fontOf = (f) => (String(f).includes(',') ? f : '"' + f + '", system-ui, sa
 const escaped = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const linesOf = (s) => String(s || '').split('\n');
 const box = (x, y, w, h) => 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px;';
-const upright = (text, x, bottom, px, colour) =>
-  '<div style="position:absolute;left:' + x + 'px;top:' + bottom + 'px;font-size:' + px + 'px;line-height:1;white-space:pre;letter-spacing:0.08em;text-transform:uppercase;transform:rotate(-90deg);transform-origin:0 0;color:' + colour + '">' + escaped(text) + '</div>';
+const part = (field, index) => ' data-part="' + field + (index === undefined ? '' : ':' + index) + '"';
+const numbersOf = (line) => String(line || '').trim().split(/[\s,]+/).map(Number).map((n) => (Number.isFinite(n) ? n : 0));
+const upright = (text, x, bottom, px, colour, field = 'caption') =>
+  '<div' + part(field) + ' style="position:absolute;left:' + x + 'px;top:' + bottom + 'px;font-size:' + px + 'px;line-height:1;white-space:pre;letter-spacing:0.08em;text-transform:uppercase;transform:rotate(-90deg);transform-origin:0 0;color:' + colour + '">' + escaped(text) + '</div>';
 `;
 
 const POSTER_RUN = String.raw`
@@ -66,6 +69,13 @@ if (document.fonts) {
 }
 tl.to({}, { duration, ease: 'none', onUpdate: run }, 0);
 `;
+
+export const POSTER_PHOTOS = String.raw`
+${MEDIA_LIST}
+const photosOf = (raw) => mediaList(raw).filter((m) => !m.video).map((m) => m.src);
+`;
+
+export const mediaProp = (title: string): PropSpec => textProp(title, '', { format: PropFormat.Media, maxLength: 2000 });
 
 export type PosterSource = { css: string; js: string };
 

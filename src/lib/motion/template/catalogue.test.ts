@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { FORMATS, MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { BUILTIN_TEMPLATES, builtinTemplate } from './builtins';
 import { PROMPT_TEMPLATE_ID } from './prompt-input/template';
-import { ComponentKind, catalogue, componentKind, matching, previewOf, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
+import { ComponentKind, POSTER_FORMATS, catalogue, componentKind, matching, posterShelf, previewOf, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
+import { DocMode } from '$lib/motion/still';
 import PREVIEWED from './previews.json';
 
 const entry = (id: string) => {
@@ -44,6 +45,23 @@ describe('the component library lists whatever is registered', () => {
     expect(matching(items, 'prompt', null).map((i) => i.id)).toContain(PROMPT_TEMPLATE_ID);
     expect(matching(items, '', ComponentKind.Layout).every((i) => i.kind === ComponentKind.Layout)).toBe(true);
     expect(matching(items, 'prompt', ComponentKind.Layout)).toEqual([]);
+  });
+});
+
+describe('the posters row', () => {
+  it('holds only stills, each with its picture, ordered by name', () => {
+    const items = catalogue(BUILTIN_TEMPLATES);
+    const shelf = posterShelf(items);
+    const names = shelf.map((i) => i.name);
+
+    expect(shelf.length).toBe(items.filter((i) => i.mode === DocMode.Still).length);
+    expect(shelf.every((i) => i.mode === DocMode.Still && i.preview?.poster.endsWith('.jpg'))).toBe(true);
+    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    expect(shelf.map((i) => i.id)).toEqual(expect.arrayContaining(['builtin:poster-iso-blocks', 'builtin:poster-photo-grid', 'builtin:poster-white-shapes', 'builtin:poster-vertical-type']));
+  });
+
+  it('starts in the print formats, 4:5 first', () => {
+    expect(POSTER_FORMATS).toEqual([MotionFormat.Portrait, MotionFormat.Vertical, MotionFormat.Poster]);
   });
 });
 
