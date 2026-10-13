@@ -305,7 +305,8 @@ in it — `store_failed` can still come back for reasons neither of those catche
 
 `npm run eval:motion -- --port=5199 [--only=<case>] [--compare=<run dir>] [--cap=20]` is the
 motion agent's quality eval: five fixed briefs (feega, linear, stripe, a Shopify demo store, a
-mobile app), each on a throwaway account, driven through the editor chat by Playwright, exported
+mobile app) plus `craft` (a reference picture → a composition crafted from scratch, judged
+against it), each on a throwaway account, driven through the editor chat by Playwright, exported
 in the browser. Facts first (duration, holds, empty frames, text size, recreated vs kit UI, beat
 alignment, gate left, errors, cost from `ai_calls`), then a vision judge calibrated on anchor
 stills in `scripts/eval/motion-quality/anchors/`. Output in `~/Documents/feega-videos/evals/<ts>/`.

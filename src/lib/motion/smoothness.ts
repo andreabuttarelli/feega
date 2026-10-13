@@ -96,7 +96,30 @@ export function joltMeter(): JoltMeter {
   };
 }
 
-export const seamDiff = (first: ArrayLike<number>, last: ArrayLike<number>): number => frameDiffs([last, first])[0];
+const STILL_DIFF = 0.05;
+
+export type FrozenSpan = { from: number; to: number };
+
+export function frozenSpans(diffs: readonly number[], minRun: number): FrozenSpan[] {
+  const spans: FrozenSpan[] = [];
+  let start = -1;
+  for (let i = 0; i <= diffs.length; i++) {
+    const still = i < diffs.length && diffs[i] < STILL_DIFF;
+    if (still && start < 0) {
+      start = i;
+    }
+    if (still || start < 0) {
+      continue;
+    }
+    if (i - start >= minRun) {
+      spans.push({ from: start, to: i });
+    }
+    start = -1;
+  }
+  return spans;
+}
+
+export const seamDiff =(first: ArrayLike<number>, last: ArrayLike<number>): number => frameDiffs([last, first])[0];
 
 type Edged = { from: number; durationInFrames: number; junction?: unknown };
 

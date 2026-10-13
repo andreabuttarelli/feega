@@ -36,6 +36,16 @@ describe('looking is split from checking', () => {
     expect(edit).not.toHaveBeenCalled();
   });
 
+  it('measuring the motion and reading a template are reads: they run before the frames are described', async () => {
+    const session: LookSession = { look: { times: [1], described: false } };
+    const read = vi.fn(async () => ({ ok: true }));
+    const tools = lookFirst({ check_motion: tool({ inputSchema: z.object({}), execute: read }), read_template_source: tool({ inputSchema: z.object({}), execute: read }) }, session);
+
+    for (const name of ['check_motion', 'read_template_source']) {
+      expect(await (tools[name] as Tool & { execute: Exec }).execute({}, { toolCallId: 'c' })).toEqual({ ok: true });
+    }
+  });
+
   it('a role that cannot describe frames (sound, v7: add_music refused) is never held by a look it did not take', async () => {
     const { run, edit, session } = setup();
     await run('view_frames', { times: [1, 2] });

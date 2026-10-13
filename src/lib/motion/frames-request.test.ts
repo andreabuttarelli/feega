@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AssetKind } from './components';
-import { adoptAgentAssets, agentDraft, landTurn, ASSETS_ADDED, CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST, Head, Landing, type AgentAsset, type AgentDraft } from './frames-request';
+import { FRAMES_PER_UPLOAD, adoptAgentAssets, agentDraft, frameUploads, landTurn, ASSETS_ADDED, CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST, Head, Landing, type AgentAsset, type AgentDraft } from './frames-request';
 import type { MotionDoc } from './doc';
 
 const asset = (id: string, url: string): AgentAsset => ({ id, kind: AssetKind.Image, label: id, previewUrl: '', url });
@@ -62,5 +62,17 @@ describe('a finished turn lands on the saved head, never on an older doc', () =>
   it('a turn without edits changes nothing', () => {
     expect(landTurn(null, Head.Same)).toBe(Landing.Nothing);
     expect(landTurn(null, Head.Newer)).toBe(Landing.Head);
+  });
+});
+
+describe('frameUploads', () => {
+  it('splits a long run of frames into uploads the endpoint accepts, in order', () => {
+    const frames = Array.from({ length: 14 }, (_, i) => ({ time: i / 30, data: `f${i}` }));
+
+    const uploads = frameUploads('call', frames);
+
+    expect(uploads.map((u) => u.frames.length)).toEqual([FRAMES_PER_UPLOAD, FRAMES_PER_UPLOAD, 2]);
+    expect(uploads.flatMap((u) => u.frames)).toEqual(frames);
+    expect(uploads.every((u) => u.callId === 'call')).toBe(true);
   });
 });

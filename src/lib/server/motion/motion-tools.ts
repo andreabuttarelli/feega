@@ -66,6 +66,9 @@ import { ACTS, BrandKind, briefOf, durationProblem, offScript, scriptLines, scri
 import { quoted, unsourcedFigures, type SitePage } from './site-copy';
 import { MediaKind, boardMedia, outlineOf, storyboardSchema, type Storyboard, type StoryboardRead } from '$lib/motion/storyboard';
 import { UPDATE_COMPONENTS, READ_COMPONENT, WRITE_COMPONENT } from './model-route';
+import { CRAFT_COMPOSITION, READ_TEMPLATE_SOURCE, craftInput, templateSource, type CraftInput, type CraftResult } from './craft';
+import { CHECK_FRAMES, CHECK_MOTION, checkTimes, motionCheck } from './motion-check';
+import { keyFieldsSchema } from '$lib/motion/template/key-fields';
 import { CAMERA, CAMERA_KEYS, CAMERA_LANE, SPACES, type Camera } from '$lib/motion/camera';
 import { ENV_PRESETS, HDRI, LIGHT, envPresetInput, LIGHT_KEYS, LIGHT_KINDS, type Look } from '$lib/motion/look';
 import { removeLight, removeLook, setLight, setLightKeyframes, setLook } from '$lib/motion/look-ops';
@@ -161,6 +164,8 @@ export type MotionToolDeps = {
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   spawn?: { offers: readonly ModelOffer[]; run: (input: SpawnInput) => Promise<SpawnResult> };
+  craft?: (input: CraftInput) => Promise<CraftResult>;
+  lumas?: (frames: Frame[]) => Promise<Uint8Array[]>;
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
   renderLink?: () => Promise<Record<string, unknown>>;
   embed?: (action: EmbedAction) => Promise<Record<string, unknown>>;
@@ -1658,8 +1663,6 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
-    [SPAWN_AGENT]: spawnAgentTool(deps.spawn?.offers ?? [], async (input) => (deps.spawn ? deps.spawn.run(input) : { ok: false, error: 'sub-agents are not available here' })),
-
     render_video: tool({
       description:
         'Render the saved video to an MP4 for free on the user\'s own device. Returns render_url: give it to the user as a markdown link titled "Render on this device"; they open it (on this or another device), it renders there and lands in the project assets. The link works once and expires in 30 minutes. The saved video is rendered, so edits of this turn must be saved first.',
@@ -2319,13 +2322,40 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     save_template: tool({
       description: 'Save a precomp (comp id) or, without comp, the whole video as a reusable team template. Its exposed fields (expose_field) become the template fields; at least one is required.',
-      inputSchema: z.object({ name: z.string().min(1).max(60), description: z.string().max(200).default(''), comp: z.string().nullable().optional() }),
+      inputSchema: z.object({ name: z.string().min(1).max(60), description: z.string().max(200).default(''), comp: z.string().nullable().optional(), key_fields: keyFieldsSchema }),
       execute: async (input) => {
         if (!deps.templates) {
           return { ok: false, error: 'the template library is not available here' };
         }
-        const saved = await deps.templates.save({ doc: session.doc, compId: input.comp ?? null, meta: { name: input.name, description: input.description ?? '' }, posterFrame: 0 });
+        const saved = await deps.templates.save({ doc: session.doc, compId: input.comp ?? null, meta: { name: input.name, description: input.description ?? '', keyFields: input.key_fields }, posterFrame: 0 });
         return saved.ok ? { ok: true, template_id: saved.entry.id } : saved;
+      }
+    }),
+
+    [READ_TEMPLATE_SOURCE]: tool({
+      description: 'Read the code of a library template (id from list_templates): its components (html, css, js), their param fields, length and key fields. Study two or three close to what you build before writing a composition from scratch.',
+      inputSchema: z.object({ id: z.string() }),
+      execute: async (input) => {
+        const entries = (await deps.templates?.list()) ?? [];
+        const entry = entries.find((e) => e.id === input.id);
+        return entry ? { ok: true, ...templateSource(entry) } : { ok: false, error: `no template ${input.id}; there are ${entries.map((e) => e.id).join(', ')}` };
+      }
+    }),
+
+    [CHECK_MOTION]: tool({
+      description: `Measure how the video moves: draws ${CHECK_FRAMES} consecutive frames from \`from\` (seconds) and returns the jolts (pop: a value that jumps; stop: a move that halts dead; flicker) and the frozen spans, with their times. Point it at the busiest second, a transition or the end of a move.`,
+      inputSchema: z.object({ from: z.number().min(0), frames: z.number().int().min(8).max(CHECK_FRAMES).default(CHECK_FRAMES) }),
+      execute: async (input, { toolCallId }) => {
+        if (!deps.lumas) {
+          return { ok: false, error: 'motion checks are not available here' };
+        }
+        const times = checkTimes({ from: input.from, count: input.frames ?? CHECK_FRAMES, fps: session.doc.fps, end: session.doc.durationInFrames / session.doc.fps });
+        const frames = (await deps.frames(toolCallId, times))?.filter((f) => f.bytes.length > 0) ?? [];
+        if (frames.length < times.length) {
+          return { ok: false, error: 'frames unavailable: neither the editor nor the server could draw them' };
+        }
+        const ordered = [...frames].sort((a, b) => a.time - b.time);
+        return { ok: true, from: times[0], to: times.at(-1), ...motionCheck(await deps.lumas(ordered), ordered.map((f) => f.time)) };
       }
     }),
 
@@ -2381,7 +2411,20 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return ((await nested.execute(parsed.data, options)) ?? {}) as { ok?: boolean; error?: unknown };
   }
 
-  return { ...withFrames(oneAtATime(lookFirst(tools, session)), session), ...(deps.web ? createWebTools(deps.web) : {}) };
+  const delegating: Record<string, Tool> = {
+    [SPAWN_AGENT]: spawnAgentTool(deps.spawn?.offers ?? [], async (input) => (deps.spawn ? deps.spawn.run(input) : { ok: false, error: 'sub-agents are not available here' })),
+    ...(deps.craft ? { [CRAFT_COMPOSITION]: craftTool(deps.craft) } : {})
+  };
+
+  return { ...withFrames({ ...oneAtATime(lookFirst(tools, session)), ...lookFirst(delegating, session) }, session), ...(deps.web ? createWebTools(deps.web) : {}) };
+}
+
+function craftTool(craft: (input: CraftInput) => Promise<CraftResult>): Tool {
+  return tool({
+    description: 'Make a new premium composition from scratch that matches reference pictures: a dedicated crafting agent on the strongest model studies library templates, writes a custom component, renders frames, compares them with the references, measures the motion and fixes it, round after round. Use it when the user gives a reference picture of a look or composition the library does not have; it may save the result as a team template. Returns the rounds it ran, what it cost and a contact sheet per round.',
+    inputSchema: craftInput,
+    execute: async (input) => craft(craftInput.parse(input))
+  });
 }
 
 type Execute = (input: unknown, options: ToolExecutionOptions<unknown>) => Promise<unknown>;

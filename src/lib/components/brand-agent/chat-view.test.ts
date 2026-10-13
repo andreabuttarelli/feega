@@ -92,6 +92,15 @@ describe('pictures the agent looked at', () => {
     expect(viewedPicturesOf(watched, 'p1', 'c1').map((p) => p.href)).toEqual(['/p/p1/c/c1/web-views/f1/cover.jpg', '/p/p1/c/c1/web-views/f1/50.jpg']);
   });
 
+  it('shows a contact sheet per round of a crafted composition, opening the sheet itself', () => {
+    const crafted = { toolName: 'craft_composition', status: 'done' as const, output: { ok: true, rounds: 2, images: [{ path: 'o/p1/web-views/craft-sheet-a1/sheet.jpg', round: 1 }, { path: 'o/p1/web-views/craft-sheet-b2/sheet.jpg', round: 2 }] } };
+
+    expect(viewedPicturesOf(crafted, 'p1', 'c1')).toEqual([
+      { href: '/p/p1/c/c1/web-views/craft-sheet-a1/sheet.jpg', source: '/p/p1/c/c1/web-views/craft-sheet-a1/sheet.jpg' },
+      { href: '/p/p1/c/c1/web-views/craft-sheet-b2/sheet.jpg', source: '/p/p1/c/c1/web-views/craft-sheet-b2/sheet.jpg' }
+    ]);
+  });
+
   it('shows nothing without a canvas or for other tools', () => {
     expect(viewedPicturesOf(call([{ url: 'u', path: 'o/p/web-views/v/0.jpg' }]), 'p1', '')).toEqual([]);
     expect(viewedPicturesOf({ toolName: 'read_page', output: { images: [{ path: 'o/p/web-views/v/0.jpg' }] } }, 'p1', 'c1')).toEqual([]);

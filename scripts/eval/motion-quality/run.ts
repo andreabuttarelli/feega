@@ -9,22 +9,27 @@ import { createE2eSession, signInE2e, teardownE2eSession, type E2eSession } from
 import { analyzeAudio } from '$lib/motion/audio-analysis';
 import { UI_KIT } from '$lib/motion/ui-kit/kit';
 import { billedUsdInScope, withOrgContext } from '$lib/server/ai-log';
-import { judge } from './judge';
+import { judge, judgeReference } from './judge';
 import { AccountGiven, Teardowns, accountAfter, asksUser, serverEnv, claimPort, cutAnswerFor, replyTo, turnSettled, type AgentState, type TestAccount } from './drive';
 import { contactSheet, cuts, duration, grayFrames, judgeFrames, monoSamples, PROBE_SIZE } from './media';
-import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, uiLayers, TASTE_AXES, type CaseResult, type Facts } from './score';
+import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, craftRounds, uiLayers, TASTE_AXES, type CaseResult, type Facts } from './score';
 
 enum AccountSource {
   None = 'none',
   OwnSession = 'own-session'
 }
 
-const CASES = [
+const REFERENCES = join(import.meta.dirname, 'references');
+
+type Case = { name: string; prompt: string; account: AccountSource; reference?: string };
+
+const CASES: Case[] = [
   { name: 'feega', prompt: 'Fammi un trailer motion di feega.app', account: AccountSource.OwnSession },
   { name: 'linear', prompt: 'launch video for linear.app', account: AccountSource.None },
   { name: 'stripe', prompt: 'promo for stripe.com payments', account: AccountSource.None },
   { name: 'shop', prompt: 'product video for the snowboards at hydrogen.shop', account: AccountSource.None },
-  { name: 'app', prompt: 'promo video for the Things mobile app, culturedcode.com/things', account: AccountSource.None }
+  { name: 'app', prompt: 'promo video for the Things mobile app, culturedcode.com/things', account: AccountSource.None },
+  { name: 'craft', prompt: 'Make this composition from scratch, like the picture I attached: an 8 second seamless loop with the title "slow light". Save it as a template.', account: AccountSource.None, reference: join(REFERENCES, 'iridescent-blobs.jpg') }
 ];
 
 const EST_CASE_USD = 2.5;
@@ -163,7 +168,7 @@ function videoFacts(video: string, doc: unknown) {
   };
 }
 
-async function runCase(c: (typeof CASES)[number], out: string, browserPage: () => Promise<Page>): Promise<CaseResult & { judgeUsd: number }> {
+async function runCase(c: Case, out: string, browserPage: () => Promise<Page>): Promise<CaseResult & { judgeUsd: number }> {
   const dir = join(out, c.name);
   mkdirSync(dir, { recursive: true });
   const session: E2eSession = await createE2eSession();
@@ -184,6 +189,11 @@ async function runCase(c: (typeof CASES)[number], out: string, browserPage: () =
     await page.waitForLoadState('networkidle');
     const nodeId = page.url().split('/motion/')[1].split(/[?#/]/)[0];
     const input = page.locator('#chat-composer-input');
+    if (c.reference) {
+      await page.locator('input[type="file"]').first().setInputFiles(c.reference);
+      await page.locator('.chips .chip').first().waitFor({ timeout: 60_000 });
+      await page.locator('.chips [role="progressbar"]').waitFor({ state: 'detached', timeout: 60_000 });
+    }
     await input.fill(c.prompt);
     await input.press('Enter');
     say(`  sent; node ${nodeId}`);
@@ -208,10 +218,10 @@ async function runCase(c: (typeof CASES)[number], out: string, browserPage: () =
       await page.screenshot({ path: join(dir, 'export-failure.png') });
     });
     writeFileSync(join(dir, 'page-errors.txt'), pageErrors.join('\n'));
-    const base = { gateBlockingLeft: gateBlockingLeft(msgs), toolErrors: toolErrors(msgs), pageErrors: pageErrors.length, costUsd: spentUsd(calls), wallS };
+    const base = { gateBlockingLeft: gateBlockingLeft(msgs), toolErrors: toolErrors(msgs), craftRounds: craftRounds(msgs), pageErrors: pageErrors.length, costUsd: spentUsd(calls), wallS };
     if (!existsSync(video)) {
       const facts: Facts = { exists: false, duration: null, scenes: null, meanHold: null, maxHold: null, emptyShare: null, textMinShare: null, recreatedUi: null, kitUi: null, beatAlignment: null, ...base };
-      return { name: c.name, prompt: c.prompt, unrun: null, facts, taste: null, judgeUsd };
+      return { name: c.name, prompt: c.prompt, unrun: null, facts, taste: null, reference: null, judgeUsd };
     }
     const facts: Facts = { exists: true, ...videoFacts(video, doc), ...base };
     contactSheet(video, facts.duration ?? 0, join(dir, 'contact-sheet.jpg'));
@@ -221,10 +231,16 @@ async function runCase(c: (typeof CASES)[number], out: string, browserPage: () =
         say(`  judge failed: ${e}`);
         return null;
       });
+      const r = c.reference
+        ? await judgeReference(frames, c.reference, c.prompt).catch((e) => {
+            say(`  reference judge failed: ${e}`);
+            return null;
+          })
+        : null;
       judgeUsd = billedUsdInScope() ?? 0;
-      return t;
+      return { t, r };
     });
-    return { name: c.name, prompt: c.prompt, unrun: null, facts, taste, judgeUsd };
+    return { name: c.name, prompt: c.prompt, unrun: null, facts, taste: taste.t, reference: taste.r, judgeUsd };
   } finally {
     await teardown().catch((e) => say(`  TEARDOWN FAILED ${session.orgId}: ${e}`));
   }
@@ -248,6 +264,9 @@ function report(stamp: string, results: CaseResult[], previous: CaseResult[] | n
     lines.push('', '| taste | score | reason |', '|---|---|---|');
     for (const axis of TASTE_AXES) {
       lines.push(`| ${axis} | ${r.taste ? r.taste[axis].score : '—'} | ${r.taste?.[axis].reason ?? 'judge unrun'} |`);
+    }
+    if (r.reference !== undefined) {
+      lines.push(`| referenceMatch | ${r.reference?.score ?? '—'} | ${r.reference?.reason ?? 'judge unrun'} |`);
     }
     lines.push('');
   }
@@ -319,7 +338,7 @@ async function main() {
       try {
         const r = await runCase(c, out, () => context.newPage());
         total += (r.facts?.costUsd ?? 0) + r.judgeUsd;
-        results.push({ name: r.name, prompt: r.prompt, unrun: r.unrun, facts: r.facts, taste: r.taste });
+        results.push({ name: r.name, prompt: r.prompt, unrun: r.unrun, facts: r.facts, taste: r.taste, reference: r.reference });
       } catch (e) {
         results.push({ name: c.name, prompt: c.prompt, unrun: `failed: ${e instanceof Error ? e.message : String(e)}`, facts: null, taste: null });
       } finally {

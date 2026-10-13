@@ -3,7 +3,11 @@ import { briefAwaits, promptTexts } from '$lib/motion/script-brief';
 import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, rejectedRounds, shownRefs, savedPick, type PickAnswer, type PickAsk } from '$lib/reference-pick';
 import { createUIMessageStream, streamText, type ModelMessage, type Tool, type UIMessageChunk } from 'ai';
 import type { SpawnInput } from '$lib/server/agents/spawn';
+import { OPUS } from '$lib/server/agents/spawn';
 import { spawnAgents, spawnOffers } from '$lib/server/agents/spawn-agent';
+import { CRAFT_KEY, craftAgent } from '$lib/server/motion/craft-agent';
+import { CRAFT_COMPOSITION, type CraftInput, type CraftResult } from '$lib/server/motion/craft';
+import { CHECK_MOTION } from '$lib/server/motion/motion-check';
 import { toolsWritingCode } from '$lib/server/motion/model-route';
 import type { Db } from '$lib/server/db/client';
 import { llmCodeModel, llmLanguageModel, llmStructured, llmVisionModel, type LlmMediaPart } from '$lib/server/llm';
@@ -59,7 +63,7 @@ import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
 import { DESCRIBE_FRAMES, SELF_CHECK_MAX_STEPS, SUMMARY_PROMPT, VIEW_FRAMES, Vision, deliveryBlocked, docTexts, checkMessage, keyFrameTimes, openErrors, selfCheckDue, stillOpenNote, finalReply, viewedReferences, usageByModel, visionStep, type Frame } from '$lib/server/motion/frames';
-import { frameDensities, frameStats, seamLuma } from '$lib/server/motion/frame-stats';
+import { frameDensities, frameLumas, frameStats, seamLuma } from '$lib/server/motion/frame-stats';
 import { awaitFrames, awaitVerdict, framesPrefix, FRAME_POLL_MS, type FrameBucket } from '$lib/server/motion/frame-store';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, storeAssetFile } from '$lib/server/repos/asset-storage';
 import { ASSETS_ADDED, CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
@@ -123,6 +127,8 @@ const STILL_OPEN_ID = 'still-open';
 const LAST_LOOK_ID = 'last-look';
 const CRITIC_ID = 'critic-sheet';
 const LOOP_SEAM_ID = 'loop-seam';
+const CRAFT_SHEET_ID = 'craft-sheet';
+const SEES_FRAMES: ReadonlySet<string> = new Set([VIEW_FRAMES, DESCRIBE_FRAMES, CHECK_MOTION, CRAFT_COMPOSITION]);
 const CUT_REVIEW_ID = 'cut-review';
 const SHEET_FILE = 'sheet.jpg';
 
@@ -334,9 +340,12 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   };
 
   let spawnRun: (input: SpawnInput) => Promise<Record<string, unknown>> = async () => ({ ok: false, error: 'sub-agents start once the turn is running' });
+  let craftRun: (input: CraftInput) => Promise<CraftResult> = async () => ({ ok: false, error: 'the crafting agent starts once the turn is running' });
   const offers = spawnOffers();
   const tools = createMotionTools({
     spawn: { offers, run: (input) => spawnRun(input) as never },
+    craft: (input) => craftRun(input),
+    lumas: frameLumas,
     session,
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
@@ -431,7 +440,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const visionModel = gatewayModel(model)?.usable ? model : llmVisionModel();
   const vision = BROWSER_VISION[browser](visionModel);
   const asksPick = !choosesForUser(message);
-  const toolNames = roleTools(role, Object.keys(tools)).filter((name) => (vision === Vision.Available || (name !== VIEW_FRAMES && name !== DESCRIBE_FRAMES)) && (asksPick || name !== ASK_REFERENCE_PICK));
+  const toolNames = roleTools(role, Object.keys(tools)).filter((name) => (vision === Vision.Available || !SEES_FRAMES.has(name)) && (asksPick || name !== ASK_REFERENCE_PICK));
   const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
   const t0 = Date.now();
   const stepModels: string[] = [];
@@ -462,6 +471,23 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     },
     offers
   );
+
+  craftRun = craftAgent({
+    orgId,
+    model: OPUS,
+    frame: session.doc,
+    session,
+    assets: () => assets,
+    tools: () => tools,
+    remainingUsd: () => roleBudgetUsd(role, turnCapUsd) - charged(),
+    onStep: () => announce(),
+    onSpent: (usd) => {
+      spent += usd;
+    },
+    storeSheet: async (frames) => storeSheet(await tileSheet(frames), CRAFT_SHEET_ID),
+    log: (usage) => withOrgContext(orgId, () => logAiCall({ label: CRAFT_KEY, provider: 'llm', model: OPUS, ms: 0, ok: true, orgId, userId, threadId, projectId: project.id, actorKind: 'agent', actorId: userId, agentKey: CRAFT_KEY, ...usage })),
+    abort: cut.signal
+  });
 
   const round = (messages: ModelMessage[], kind: Round, onStep: (step: TurnStep & { response: { messages: unknown[] } }) => void, toolSet: typeof tools = tools) =>
     billing.run(() => streamText({
@@ -518,11 +544,11 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   };
 
   let sheetBatch = 0;
-  const storeSheet = async (bytes: Buffer | null): Promise<string | null> => {
+  const storeSheet = async (bytes: Buffer | null, id = CRITIC_ID): Promise<string | null> => {
     if (!bytes) {
       return null;
     }
-    const path = `${webViewPrefix({ orgId, projectId: project.id }, `${CRITIC_ID}-${crypto.randomUUID().slice(0, 8)}`)}/${SHEET_FILE}`;
+    const path = `${webViewPrefix({ orgId, projectId: project.id }, `${id}-${crypto.randomUUID().slice(0, 8)}`)}/${SHEET_FILE}`;
     return storeAssetFile(db, path, new File([new Uint8Array(bytes)], SHEET_FILE, { type: 'image/jpeg' }))
       .then(() => path)
       .catch(() => null);

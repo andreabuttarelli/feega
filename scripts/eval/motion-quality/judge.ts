@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { llmStructured, type LlmMediaPart } from '$lib/server/llm';
-import { TASTE_AXES, type Taste } from './score';
+import { TASTE_AXES, type ReferenceMatch, type Taste } from './score';
 
 export const JUDGE_MODEL = 'anthropic/claude-sonnet-5.5';
 
@@ -26,4 +26,13 @@ export async function judge(frames: string[], brief: string): Promise<Taste> {
   const good = anchors('good-');
   const bad = anchors('bad-');
   return llmStructured<Taste>({ prompt: prompt(good.length, bad.length, frames.length, brief), schema: SCHEMA, model: JUDGE_MODEL, images: [...good, ...bad, ...frames.map(jpeg)], temperature: 0, label: 'eval.motion-judge' });
+}
+
+const REFERENCE_SCHEMA = AXIS;
+
+const referencePrompt = (frames: number, brief: string) =>
+  `The first image is a reference picture a user gave an AI motion agent with the request: "${brief}". The next ${frames} images are evenly spaced stills of the video it made. Score 1-10 how closely the video matches the reference: composition, scale, palette, light, texture, type, overall look (10 = could be the same piece, 1 = unrelated). One short concrete reason naming the biggest difference you see.`;
+
+export async function judgeReference(frames: string[], reference: string, brief: string): Promise<ReferenceMatch> {
+  return llmStructured<ReferenceMatch>({ prompt: referencePrompt(frames.length, brief), schema: REFERENCE_SCHEMA, model: JUDGE_MODEL, images: [jpeg(reference), ...frames.map(jpeg)], temperature: 0, label: 'eval.motion-reference' });
 }

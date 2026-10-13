@@ -18,7 +18,7 @@ export const motionTemplateSchema = z.object({
 
 export type MotionTemplate = z.infer<typeof motionTemplateSchema>;
 export type TemplateEntry = { id: string; template: MotionTemplate };
-export type TemplateMeta = { name: string; description?: string };
+export type TemplateMeta = { name: string; description?: string; keyFields?: KeyFields };
 export type Made = { ok: true; template: MotionTemplate } | { ok: false; error: string };
 export type Inserted = { ok: true; doc: MotionDoc; clipId: string } | { ok: false; error: string };
 export type Changed = { ok: true; doc: MotionDoc } | { ok: false; error: string };
@@ -97,7 +97,8 @@ export function templateFromComp(doc: MotionDoc, compId: string, meta: TemplateM
     return fail(`no composition ${compId}`);
   }
   const back = new Map(Object.entries(comp.template?.keys ?? {}).map(([local, key]) => [key, local]));
-  return made(meta, contentDoc(doc, comp.tracks, comp.durationInFrames, (key) => back.get(key) ?? key));
+  const local = (key: string) => back.get(key) ?? key;
+  return made({ ...meta, keyFields: meta.keyFields?.map(local) }, contentDoc(doc, comp.tracks, comp.durationInFrames, local));
 }
 
 export function templateFromDoc(doc: MotionDoc, meta: TemplateMeta): Made {

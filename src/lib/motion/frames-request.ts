@@ -7,6 +7,14 @@ export type AgentAsset = { id: string; kind: AssetKind; label: string; previewUr
 
 export type FramesRequest = { callId: string; times: number[]; doc: MotionDoc; assets?: AgentAsset[] };
 
+export const FRAMES_PER_UPLOAD = 6;
+
+export type CapturedFrame = { time: number; data: string };
+
+export function frameUploads(callId: string, frames: readonly CapturedFrame[]): { callId: string; frames: CapturedFrame[] }[] {
+  return Array.from({ length: Math.ceil(frames.length / FRAMES_PER_UPLOAD) }, (_, i) => ({ callId, frames: frames.slice(i * FRAMES_PER_UPLOAD, (i + 1) * FRAMES_PER_UPLOAD) }));
+}
+
 export const CHECK_REQUEST = 'data-motion-check';
 
 export const ASSETS_ADDED = 'data-motion-assets';

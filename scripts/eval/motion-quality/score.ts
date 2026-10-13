@@ -1,5 +1,6 @@
 import { VECTOR_TOKEN } from '$lib/motion/vector-ui/piece';
 import { EMPTY_EDGE_DENSITY } from '$lib/motion/emptiness';
+import { CRAFT_COMPOSITION } from '$lib/motion/craft';
 export { EMPTY_EDGE_DENSITY, edgeDensity } from '$lib/motion/emptiness';
 export const BEAT_TOLERANCE_S = 0.1;
 
@@ -18,6 +19,7 @@ export type Facts = {
   beatAlignment: number | null;
   gateBlockingLeft: number | null;
   toolErrors: number | null;
+  craftRounds: number | null;
   pageErrors: number | null;
   costUsd: number | null;
   wallS: number | null;
@@ -29,7 +31,9 @@ export type TasteAxis = (typeof TASTE_AXES)[number];
 
 export type Taste = Record<TasteAxis, { score: number; reason: string }>;
 
-export type CaseResult = { name: string; prompt: string; unrun: string | null; facts: Facts | null; taste: Taste | null };
+export type ReferenceMatch = { score: number; reason: string };
+
+export type CaseResult = { name: string; prompt: string; unrun: string | null; facts: Facts | null; taste: Taste | null; reference?: ReferenceMatch | null };
 
 type Clip = { component: string; props?: Record<string, unknown> };
 type Doc = { tracks: Array<{ clips: Clip[] }>; components?: Record<string, { source: { js: string } }> };
@@ -96,6 +100,12 @@ export function gateBlockingLeft(messages: readonly Message[]): number | null {
 export function toolErrors(messages: readonly Message[]): number {
   const failed = (c: ToolCall) => c.status === 'error' || (c.output as { ok?: boolean } | null)?.ok === false;
   return callsOf(messages).filter(failed).length;
+}
+
+export function craftRounds(messages: readonly Message[]): number | null {
+  const crafted = callsOf(messages).filter((c) => c.toolName === CRAFT_COMPOSITION).map((c) => c.output as { ok?: boolean; rounds?: number } | null);
+  const rounds = crafted.flatMap((o) => (o?.ok && typeof o.rounds === 'number' ? [o.rounds] : []));
+  return rounds.length ? rounds.reduce((a, b) => a + b, 0) : null;
 }
 
 export function spentUsd(calls: ReadonlyArray<{ cost_usd: number | string | null }>): number {

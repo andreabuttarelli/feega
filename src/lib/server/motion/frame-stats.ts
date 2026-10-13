@@ -37,6 +37,8 @@ const SEAM_PROBE_PX = 64;
 
 const lumaGrid = async (frame: Frame) => new Uint8Array(await sharp(frame.bytes).resize(SEAM_PROBE_PX, SEAM_PROBE_PX, { fit: 'fill' }).greyscale().raw().toBuffer());
 
+export const frameLumas = (frames: readonly Frame[]): Promise<Uint8Array[]> => Promise.all(frames.map(lumaGrid));
+
 export async function seamLuma(frames: readonly Frame[]): Promise<number | null> {
   const first = frames[0];
   const last = frames.at(-1);
