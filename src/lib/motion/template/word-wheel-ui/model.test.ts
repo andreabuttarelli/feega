@@ -4,7 +4,8 @@ import { WHEEL_MODEL } from './model';
 type Rect = { x0: number; y0: number; x1: number; y1: number };
 type Layout = { axis: string; box: { ax: number; ay: number }; em: number; text: Rect; panel: Rect & { w: number; h: number } };
 type Word = { offset: number; opacity: number; focus: number };
-type Frame = { lead: { opacity: number; rise: number }; words: Word[]; panel: { shift: number; yaw: number; opacity: number }; glow: number };
+type Screen = { from: number; to: number; mix: number };
+type Frame = { screen: Screen; lead: { opacity: number; rise: number }; words: Word[]; panel: { shift: number; yaw: number; opacity: number }; glow: number };
 type Measure = { leadW: number; wordW: number };
 type Model = {
   wheelLayout: (p: object, width: number, height: number, m: Measure) => Layout;
@@ -66,6 +67,30 @@ describe('the word wheel model', () => {
     }
 
     expect(Math.min(...runs) / FPS).toBeGreaterThan(1.2);
+  });
+
+  it('shows the screen of the word in focus while it holds', () => {
+    times().forEach((t) => {
+      const f = at(t);
+      const i = focused(f);
+      if (i >= 0) {
+        const settled = Math.min(f.screen.mix, 1 - f.screen.mix);
+        expect(settled, String(t)).toBeLessThan(0.1);
+        expect(f.screen.mix < 0.5 ? f.screen.from : f.screen.to, String(t)).toBe(i);
+      }
+    });
+  });
+
+  it('changes the screen with the wheel, one way, to the next word', () => {
+    const frames = times().map((t) => at(t).screen);
+    frames.slice(1).forEach((s, k) => {
+      const before = frames[k];
+      expect(s.to).toBe((s.from + 1) % WORDS);
+      if (s.from === before.from) {
+        expect(s.mix).toBeGreaterThanOrEqual(before.mix - 1e-9);
+      }
+    });
+    expect(Math.max(...frames.map((s) => s.mix))).toBeGreaterThan(0.99);
   });
 
   it('dims every word but the centred one', () => {

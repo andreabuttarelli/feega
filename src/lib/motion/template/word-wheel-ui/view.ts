@@ -8,12 +8,9 @@ const PERSPECTIVE = 2.4;
 const OFFSTAGE = 0.35;
 const GLOW_EM = 0.32;
 const LIFT_EM = 0.5;
-const CHECK_SVG = '<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="10" fill="currentColor"/><path d="M5.6 10.4l2.9 2.8 5.9-6.1" fill="none" stroke="#0b0d0c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CHEVRON_UP = '<svg viewBox="0 0 12 12"><path d="M3 7.5l3-3 3 3" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>';
 const CHEVRON_DOWN = '<svg viewBox="0 0 12 12"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>';
-const DOC_SVG = '<svg viewBox="0 0 16 16"><path d="M4 1.5h5.5L12.5 4.5V14.5H4z" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6 8h4.5M6 10.5h4.5" stroke="currentColor" stroke-width="1.3"/></svg>';
-const PLAY_SVG = '<svg viewBox="0 0 16 16"><path d="M4.5 2.5l9 5.5-9 5.5z" fill="currentColor"/></svg>';
-const LOGO_SVG = '<svg viewBox="0 0 24 24"><path d="M3 21V3h7l-7 9z" fill="var(--ww-accent)"/><path d="M12 3h9l-9 9h9l-9 9z" fill="var(--ww-accent)" opacity="0.75"/></svg>';
+const LOGO_SVG = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="var(--ww-accent)" stroke-width="2.4"/><circle cx="12" cy="12" r="4" fill="var(--ww-accent)"/></svg>';
 
 root.insertAdjacentHTML('beforeend', '<div class="ww"><div class="ww-glow"></div><div class="ww-stage"><div class="ww-panel"></div></div><div class="ww-text"><span class="ww-lead"></span><div class="ww-wheel"></div></div><span class="ww-text ww-measure"></span></div>');
 
@@ -26,7 +23,7 @@ const lead = root.querySelector('.ww-lead');
 const wheel = root.querySelector('.ww-wheel');
 const measure = root.querySelector('.ww-measure');
 
-let cache = { lookKey: '', wordsKey: '', words: [], nodes: [], panelKey: '', video: null, measureKey: '', measured: null };
+let cache = { lookKey: '', wordsKey: '', words: [], nodes: [], panelKey: '', video: null, screens: [], marks: [], measureKey: '', measured: null };
 
 const sizeOf = () => ({ width: scene.clientWidth || 1920, height: scene.clientHeight || 1080 });
 const fontsReady = () => (document.fonts ? document.fonts.status : 'loaded');
@@ -55,11 +52,11 @@ const paintLook = (p) => {
 };
 
 const paintWords = (p) => {
-  const key = JSON.stringify([p.lead, p.words]);
+  const key = JSON.stringify([p.lead, p.features]);
   if (key === cache.wordsKey) {
     return cache.words;
   }
-  const given = listOf(p.words);
+  const given = featuresOf(p.features).map((f) => f.word);
   const base = given.length ? given : [' '];
   const words = Array.from({ length: Math.max(MIN_WORDS, Math.ceil(MIN_WORDS / base.length) * base.length) }, (_, i) => base[i % base.length]);
   lead.textContent = p.lead;
@@ -75,40 +72,64 @@ const paintWords = (p) => {
   return words;
 };
 
-const sideHtml = (p) => {
-  const items = listOf(p.menu).map((item) => '<div class="ww-item">' + escapeHtml(item) + '</div>').join('');
+const featuresOf = (raw) => String(raw || '').split('\n').map((line) => line.split('|').map((part) => part.trim())).filter((parts) => parts[0]).map(([word, title, items]) => ({ word, title: title || word, items: listOf(items) }));
+
+const ITEMS_SHOWN = 3;
+const BAR_HEIGHTS = [0.42, 0.66, 0.54, 0.88];
+const SCREEN_SHIFT = 0.06;
+
+const itemsOf = (f) => Array.from({ length: ITEMS_SHOWN }, (_, i) => f.items[i] ?? f.items[i % Math.max(1, f.items.length)] ?? '');
+
+const tilesHtml = (f) => '<div class="ww-tiles">' + itemsOf(f).map((item) => '<div class="ww-tile"><b></b>' + escapeHtml(item) + '</div>').join('') + '</div>';
+const togglesHtml = (f) => itemsOf(f).map((item, i) => '<div class="ww-toggle">' + escapeHtml(item) + '<span class="ww-switch' + (i < 2 ? ' is-on' : '') + '"></span></div>').join('');
+const chartHtml = (f) => '<div class="ww-chart">' + [...itemsOf(f), ''].map((item, i) => '<div class="ww-bar"><b style="height:' + BAR_HEIGHTS[i] * 100 + '%"></b>' + escapeHtml(item) + '</div>').join('') + '</div>';
+const SCREEN_BODIES = [tilesHtml, togglesHtml, chartHtml];
+
+const screenHtml = (f, i) => '<div class="ww-screen"><div class="ww-card"><div class="ww-kicker">' + escapeHtml(f.word) + '</div><div class="ww-head">' + escapeHtml(f.title) + '</div></div>' + SCREEN_BODIES[i % SCREEN_BODIES.length](f) + '</div>';
+
+const sideHtml = (p, features) => {
+  const items = features.map((f) => '<div class="ww-item"><i></i>' + escapeHtml(f.word) + '</div>').join('');
   return '<div class="ww-side"><div class="ww-chip"><span class="ww-logo">' + LOGO_SVG + '</span><span class="ww-brand">' + escapeHtml(p.brand) + '</span><span class="ww-pill">v2.0</span></div>' +
-    '<div class="ww-label">Get started</div><div class="ww-item is-on">Welcome</div>' +
     '<div class="ww-label">Features' + CHEVRON_UP + '</div>' + items +
-    '<div class="ww-label">Settings' + CHEVRON_DOWN + '</div><div class="ww-label">Information' + CHEVRON_DOWN + '</div></div>';
+    '<div class="ww-label">Settings' + CHEVRON_DOWN + '</div></div>';
 };
 
-const mainHtml = (p) => {
+const mainHtml = (p, features) => {
   const item = mediaList(p.media)[0];
   if (item) {
     return '<div class="ww-main">' + (item.video ? '<video class="ww-shot" muted playsinline preload="auto" src="' + item.src + '"></video>' : '<img class="ww-shot" decoding="sync" src="' + item.src + '">') + '</div>';
   }
-  return '<div class="ww-main"><div class="ww-hello">Hello, <b>' + escapeHtml(p.user) + '</b><br>Welcome to ' + escapeHtml(p.brand) + ' Studio</div>' +
-    '<div class="ww-status"><span class="ww-ok">' + CHECK_SVG + 'License active</span><span>Upgrade available</span></div>' +
-    '<div class="ww-card"><div class="ww-kicker">' + escapeHtml(p.kicker) + '</div><div class="ww-head">' + escapeHtml(p.headline) + '</div>' +
-    '<div class="ww-copy">Build, launch and grow faster with ready-made blocks, smart layouts and one calm place for every page.</div>' +
-    '<div class="ww-actions"><span class="ww-button">' + DOC_SVG + 'Read the docs</span><span class="ww-button">' + PLAY_SVG + 'Watch the tour</span></div></div>' +
-    '<div class="ww-card"><div class="ww-news">What\'s new</div>' +
-    '<div class="ww-row"><span class="ww-ok">' + CHECK_SVG + '</span>Theme builder<small>Design headers, archives, carts and checkout pages visually.</small></div>' +
-    '<div class="ww-row"><span class="ww-ok">' + CHECK_SVG + '</span>New extensions<small>Twelve new blocks for forms, pricing and stories.</small></div></div></div>';
+  return '<div class="ww-main"><div class="ww-hello">Welcome back<br><b>' + escapeHtml(p.brand) + '</b></div>' +
+    '<div class="ww-screens">' + features.map(screenHtml).join('') + '</div></div>';
 };
 
 const paintPanel = (p) => {
-  const key = JSON.stringify([p.brand, p.user, p.kicker, p.headline, p.menu, p.media]);
+  const key = JSON.stringify([p.brand, p.features, p.media]);
   if (key === cache.panelKey) {
     return;
   }
-  panel.innerHTML = '<div class="ww-ui">' + sideHtml(p) + mainHtml(p) + '</div><div class="ww-shade"></div>';
+  const features = featuresOf(p.features);
+  panel.innerHTML = '<div class="ww-ui">' + sideHtml(p, features) + mainHtml(p, features) + '</div><div class="ww-shade"></div>';
   const video = panel.querySelector('video');
   if (video) {
     video.addEventListener('loadedmetadata', () => seekVideo(video, tl.time()));
   }
-  cache = { ...cache, panelKey: key, video };
+  cache = { ...cache, panelKey: key, video, screens: [...panel.querySelectorAll('.ww-screen')], marks: [...panel.querySelectorAll('.ww-item i')] };
+};
+
+const paintScreens = (screen) => {
+  const n = cache.screens.length;
+  const weight = (i) => (n && i === screen.from % n ? 1 - screen.mix : 0) + (n && i === screen.to % n ? screen.mix : 0);
+  cache.screens.forEach((node, i) => {
+    const w = weight(i);
+    const offset = i === screen.to % n && i !== screen.from % n ? 1 - screen.mix : -screen.mix;
+    node.style.opacity = String(w);
+    node.style.visibility = w > 0.002 ? 'visible' : 'hidden';
+    node.style.transform = 'translate3d(0, ' + offset * SCREEN_SHIFT * 100 + 'cqh, 0)';
+  });
+  cache.marks.forEach((node, i) => {
+    node.style.opacity = String(weight(i));
+  });
 };
 
 const measureText = (p, words) => {
@@ -153,6 +174,7 @@ const draw = () => {
   ps.visibility = f.panel.opacity > 0.002 ? 'visible' : 'hidden';
   ps.transform = 'translate3d(' + (cx + px(box.x0) + travel) + 'px, ' + (cy + px(box.y0)) + 'px, 0) rotateY(' + f.panel.yaw + 'deg) rotateX(' + p.pitch + 'deg) rotateZ(' + p.roll + 'deg)';
   seekVideo(cache.video, t);
+  paintScreens(f.screen);
 
   const text = layout.text;
   const ts = textBox.style;

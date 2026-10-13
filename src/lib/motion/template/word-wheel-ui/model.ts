@@ -91,7 +91,9 @@ function wheelFrame(p, t, length, n) {
   const arrive = expoInOut(span(t, p.enterAt, p.enterSeconds));
   const depart = p.leave ? expoInOut(span(t, b.leaveAt, b.exit)) : 0;
   const visible = smooth(clamp01(arrive / VISIBLE_AT)) * (1 - smooth(clamp01((depart - VISIBLE_AT) / (1 - VISIBLE_AT))));
+  const passed = Math.floor(turned + 1e-9);
   return {
+    screen: { from: passed % n, to: (passed + 1) % n, mix: clamp01(turned - passed) },
     lead: { opacity: leadIn.opacity * (1 - out), rise: leadIn.rise - EXIT_RISE * out },
     wheel: { rise: wheelIn.rise - EXIT_RISE * out },
     words,

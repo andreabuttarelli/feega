@@ -29,7 +29,7 @@ export const WHEEL_CSS = String.raw`
   overflow: hidden;
   transform-origin: 0 50%;
   container-type: size;
-  background: linear-gradient(180deg, #161a19 0%, #0f1211 55%, #0b0d0c 100%);
+  background: linear-gradient(180deg, #181818 0%, #111111 55%, #0c0c0c 100%);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 1px 0 0 color-mix(in srgb, var(--ww-accent) 45%, transparent), 0 4vmin 12vmin rgba(0, 0, 0, 0.6);
   will-change: transform, opacity;
 }
@@ -38,7 +38,7 @@ export const WHEEL_CSS = String.raw`
   position: absolute;
   inset: 0;
   display: flex;
-  color: #e9ecea;
+  color: #eaeaea;
 }
 
 .ww-side {
@@ -56,7 +56,7 @@ export const WHEEL_CSS = String.raw`
   align-items: center;
   gap: 0.8cqw;
   padding: 1.5cqw 1.4cqw;
-  background: linear-gradient(180deg, #232826, #1a1e1d);
+  background: linear-gradient(180deg, #262626, #1c1c1c);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
   margin-bottom: 2.4cqw;
 }
@@ -81,12 +81,12 @@ export const WHEEL_CSS = String.raw`
   padding: 0.25cqw 0.7cqw;
   border-radius: 9999px;
   background: rgba(255, 255, 255, 0.1);
-  color: #b8bdbb;
+  color: #bbbbbb;
 }
 
 .ww-label {
   font-size: 1cqw;
-  color: #7c827f;
+  color: #7f7f7f;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -100,7 +100,7 @@ export const WHEEL_CSS = String.raw`
 
 .ww-item {
   font-size: 1.05cqw;
-  color: #c9cecc;
+  color: #cccccc;
   display: flex;
   align-items: center;
   gap: 0.9cqw;
@@ -112,7 +112,7 @@ export const WHEEL_CSS = String.raw`
   width: 0.6cqw;
   height: 0.6cqw;
   border-radius: 50%;
-  background: #8d9390;
+  background: #909090;
 }
 
 .ww-item.is-on {
@@ -138,7 +138,7 @@ export const WHEEL_CSS = String.raw`
   font-size: 2.6cqw;
   line-height: 1.12;
   letter-spacing: -0.02em;
-  color: #cfd4d2;
+  color: #d2d2d2;
   white-space: nowrap;
 }
 
@@ -151,7 +151,7 @@ export const WHEEL_CSS = String.raw`
   display: flex;
   gap: 2.2cqw;
   font-size: 0.95cqw;
-  color: #6f7572;
+  color: #727272;
   margin-top: 0.6cqw;
 }
 
@@ -186,7 +186,7 @@ export const WHEEL_CSS = String.raw`
   font-size: 3.5cqw;
   line-height: 1.12;
   letter-spacing: -0.025em;
-  color: #e6e9e8;
+  color: #e8e8e8;
   white-space: pre;
   padding-bottom: 1.4cqw;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
@@ -195,7 +195,7 @@ export const WHEEL_CSS = String.raw`
 .ww-copy {
   font-size: 1.1cqw;
   line-height: 1.45;
-  color: #868c89;
+  color: #898989;
   max-width: 46cqw;
 }
 
@@ -231,13 +231,13 @@ export const WHEEL_CSS = String.raw`
   column-gap: 1cqw;
   row-gap: 0.4cqw;
   font-size: 1.15cqw;
-  color: #f0f2f1;
+  color: #f1f1f1;
 }
 
 .ww-row small {
   grid-column: 2;
   font-size: 1cqw;
-  color: #868c89;
+  color: #898989;
   line-height: 1.4;
 }
 
@@ -258,7 +258,7 @@ export const WHEEL_CSS = String.raw`
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: linear-gradient(112deg, rgba(255, 255, 255, 0.04) 0%, transparent 30%), linear-gradient(180deg, transparent 60%, rgba(2, 4, 3, 0.55) 100%);
+  background: linear-gradient(112deg, rgba(255, 255, 255, 0.04) 0%, transparent 30%), linear-gradient(180deg, transparent 60%, rgba(3, 3, 3, 0.55) 100%);
 }
 
 .ww-text {
@@ -301,5 +301,117 @@ export const WHEEL_CSS = String.raw`
   visibility: hidden;
   white-space: nowrap;
   font-size: 100px;
+}
+.ww-item {
+  position: relative;
+}
+
+.ww-item i {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.ww-screens {
+  position: relative;
+  flex: 1;
+}
+
+.ww-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.8cqw;
+  will-change: transform, opacity;
+}
+
+.ww-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.2cqw;
+}
+
+.ww-tile {
+  height: 11cqw;
+  padding: 1.4cqw;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 1.1cqw;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.ww-tile b {
+  display: block;
+  width: 60%;
+  height: 3.2cqw;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04));
+}
+
+.ww-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 1.2cqw;
+  padding: 1.5cqw 1.8cqw;
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.ww-switch {
+  width: 3.6cqw;
+  height: 2cqw;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.12);
+  position: relative;
+}
+
+.ww-switch::after {
+  content: '';
+  position: absolute;
+  top: 0.3cqw;
+  left: 0.3cqw;
+  width: 1.4cqw;
+  height: 1.4cqw;
+  border-radius: 50%;
+  background: #8a8a8a;
+}
+
+.ww-switch.is-on {
+  background: var(--ww-accent);
+}
+
+.ww-switch.is-on::after {
+  left: auto;
+  right: 0.3cqw;
+  background: var(--ww-bg);
+}
+
+.ww-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.4cqw;
+  height: 16cqw;
+  padding: 1.6cqw;
+  background: rgba(255, 255, 255, 0.025);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.ww-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 0.8cqw;
+  height: 100%;
+  font-size: 1cqw;
+  color: #8a8a8a;
+}
+
+.ww-bar b {
+  display: block;
+  background: linear-gradient(180deg, var(--ww-accent), rgba(255, 255, 255, 0.08));
 }
 `;

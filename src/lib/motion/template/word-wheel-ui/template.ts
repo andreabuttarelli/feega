@@ -5,11 +5,11 @@ import { WHEEL_COMPONENT, WHEEL_FONTS, WHEEL_PROPS, WHEEL_VAR_PREFIX, wheelCompo
 
 export const WHEEL_TEMPLATE_ID = `${BUILTIN_PREFIX}word-wheel-ui`;
 export const WHEEL_CLIP = 'wheel';
-export const WHEEL_VARS = ['lead', 'words', 'brand', 'headline', 'accent', 'background', 'glow', 'yaw', 'drift', 'stepSeconds', 'leave'];
-export const WHEEL_KEY_FIELDS = ['lead', 'words', 'brand', 'accent', 'media'];
+export const WHEEL_VARS = ['lead', 'features', 'brand', 'accent', 'background', 'glow', 'yaw', 'drift', 'stepSeconds', 'leave'];
+export const WHEEL_KEY_FIELDS = ['lead', 'features', 'brand', 'accent', 'media'];
 
 const IN_GROUP: Record<string, readonly string[]> = {
-  Panel: ['brand', 'user', 'kicker', 'headline', 'menu'],
+  Panel: ['brand'],
   Camera: ['panelSize', 'yaw', 'pitch', 'roll', 'drift']
 };
 
@@ -20,7 +20,7 @@ export const WORD_WHEEL_UI_TEMPLATE: TemplateEntry = {
   template: {
     name: 'Word wheel UI',
     keyFields: WHEEL_KEY_FIELDS,
-    description: 'A fixed word and a slot-machine wheel of words turn on a dark glow, the centred word lit in the accent, while a tilted dashboard panel glides in from the right in perspective. Every part is a field or a runtime variable.',
+    description: 'A fixed word and a slot-machine wheel of words turn on a dark glow, the centred word lit in the accent, while a tilted, unbranded app panel glides in from the right in perspective and switches to the screen of each feature as it comes into focus. Every part is a field or a runtime variable.',
     doc: customTemplateDoc({ name: 'word-wheel-ui', component: WHEEL_COMPONENT, code: wheelComponent(), props: WHEEL_PROPS, fonts: WHEEL_FONTS, varPrefix: WHEEL_VAR_PREFIX, vars: WHEEL_VARS, clip: WHEEL_CLIP, seconds: 12, fps: 30, groups: WHEEL_GROUPS })
   }
 };
