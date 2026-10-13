@@ -20,6 +20,14 @@ describe('videos loop', () => {
 });
 
 describe('a video is built from library sections', () => {
+  it('the launch film workflow reaches for library templates before shots, not after (eval: 0 templates, all add_ui)', () => {
+    const launch = prompt(MotionStyle.LaunchFilm);
+
+    expect(launch).not.toMatch(/templates and the UI kit only for a beat no shot covers/);
+    expect(launch.indexOf('list_templates role')).toBeGreaterThan(-1);
+    expect(launch.indexOf('list_templates role')).toBeLessThan(launch.indexOf('Then add_shot'));
+  });
+
   it.each(Object.values(MotionStyle))('%s plans sections and picks templates by their cards before building from scratch', (style) => {
     expect(prompt(style)).toContain(TEMPLATE_SECTIONS_RULE);
     expect(TEMPLATE_SECTIONS_RULE).toMatch(/list_templates/);

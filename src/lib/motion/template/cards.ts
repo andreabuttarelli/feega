@@ -652,6 +652,45 @@ const CUSTOM_CARDS: Record<string, TemplateCard> = {
     bestFormats: ALL_FORMATS,
     goodFor: ['global reach', 'a body of work', 'a backdrop under a title']
   }),
+  'path-cards': card({
+    roles: [R.Proof, R.Gallery],
+    energy: Energy.Calm,
+    loops: true,
+    onScreen: [beat(0, 1, 'a blue dot on white starts drawing a curved path'), beat(1, 4, 'at its end a place card (photo, name, rating) and a review card pop in'), beat(4, 6, 'the path moves on, the cards fade, the next pair pops in'), beat(6, 12, 'a third stop, then the path fades and loops')],
+    needs: { media: media(3, 6, MediaAspect.Landscape), text: TextAmount.Lines },
+    bestFormats: ALL_FORMATS,
+    edges: { start: LIGHT, end: LIGHT, transition: Joint.Fade },
+    goodFor: ['travel, places, maps', 'reviews along a journey']
+  }),
+  'word-wheel-ui': card({
+    roles: [R.Feature, R.Product],
+    energy: Energy.Medium,
+    loops: true,
+    onScreen: [beat(0, 1, '"New" alone on dark'), beat(1, 3, 'a word wheel beside it (Features / Interface / Upgrade) and a tilted dark app UI below'), beat(3, 12, 'every ~2.5 s the wheel turns to the next word and the UI swaps panel: cards, toggles, a bar chart')],
+    needs: { media: null, text: TextAmount.Word },
+    bestFormats: [SQUARE, TALL, WIDE],
+    goodFor: ['a release or update', '"new features" with UI']
+  }),
+  'iridescent-blobs': card({
+    roles: [R.Background, R.Opener],
+    energy: Energy.Calm,
+    loops: true,
+    onScreen: [beat(0, 3, 'iridescent glossy blobs merge and split on black'), beat(3, 7, 'a title appears over them'), beat(7, 12, 'the blobs keep flowing without text')],
+    needs: { media: null, text: TextAmount.Line },
+    bestFormats: ALL_FORMATS,
+    edges: { start: COLOUR, end: COLOUR, transition: Joint.Fade },
+    goodFor: ['an abstract, premium mood', 'a backdrop under a claim']
+  }),
+  'particle-ribbon': card({
+    roles: [R.Opener, R.Background],
+    energy: Energy.Calm,
+    loops: true,
+    onScreen: [beat(0, 3, 'a grainy gradient ribbon of particles twists on cream'), beat(3, 4, 'it fades back'), beat(4, 6, 'a title holds over the faint ribbon'), beat(6, 10, 'the title leaves and the ribbon reforms')],
+    needs: { media: null, text: TextAmount.Line },
+    bestFormats: ALL_FORMATS,
+    edges: { start: LIGHT, end: LIGHT, transition: Joint.Fade },
+    goodFor: ['a soft brand opener', 'a calm title card']
+  }),
   'introducing-badge': card({
     roles: [R.Opener, R.List],
     energy: Energy.Calm,

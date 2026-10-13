@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium, type Page } from 'playwright';
@@ -105,6 +105,9 @@ async function drive(page: Page, agentUrl: string, account: TestAccount | null):
       continue;
     }
     const r = await page.request.get(agentUrl);
+    if (!r.ok()) {
+      say(`  agent poll ${r.status()}`);
+    }
     const now: AgentState = r.ok() ? await r.json() : { running: true, messages: [] };
     const settled = turnSettled(before, now);
     before = now;
@@ -136,6 +139,14 @@ async function exportMp4(page: Page, file: string): Promise<void> {
   await dl.waitFor({ timeout: EXPORT_TIMEOUT_MS });
   const [ev] = await Promise.all([page.waitForEvent('download'), dl.click()]);
   await ev.saveAs(file);
+}
+
+async function saveTranscript(orgId: string, dir: string): Promise<void> {
+  const msgs = (await admin.from('chat_messages').select('*').eq('org_id', orgId).order('seq')).data ?? [];
+  writeFileSync(join(dir, 'chat_messages.json'), JSON.stringify(msgs, null, 1));
+  const calls = (await admin.from('ai_calls').select('*').eq('org_id', orgId)).data ?? [];
+  writeFileSync(join(dir, 'ai_calls.json'), JSON.stringify(calls, null, 1));
+  say(`  saved ${msgs.length} messages, ${calls.length} ai calls, $${spentUsd(calls).toFixed(2)}`);
 }
 
 async function saveAssets(orgId: string, dir: string): Promise<void> {
@@ -197,7 +208,11 @@ async function runCase(c: (typeof CASES)[number], out: string, browserPage: () =
     await input.fill(c.prompt);
     await input.press('Enter');
     say(`  sent; node ${nodeId}`);
-    await drive(page, `/api/v1/projects/${session.projectId}/motion/${nodeId}/agent`, accountFor(c.account, session));
+    await drive(page, `/api/v1/projects/${session.projectId}/motion/${nodeId}/agent`, accountFor(c.account, session)).catch(async (e) => {
+      await saveTranscript(session.orgId, dir);
+      await page.screenshot({ path: join(dir, 'stalled.png') });
+      throw e;
+    });
     const wallS = (Date.now() - t0) / 1000;
     await page.reload();
     await page.waitForLoadState('networkidle');
@@ -272,12 +287,12 @@ async function serverUp(): Promise<boolean> {
   return fetch(BASE_URL).then(() => true, () => false);
 }
 
-async function startServer(): Promise<ChildProcess | null> {
+async function startServer(log: string): Promise<ChildProcess | null> {
   if (await serverUp()) {
     return null;
   }
   const env = { ...process.env, ...serverEnv(BASE_URL, chromium.executablePath()) };
-  const child = spawn('npx', ['vite', 'dev', '--port', String(port), '--strictPort'], { stdio: 'ignore', detached: true, env });
+  const child = spawn('npx', ['vite', 'dev', '--port', String(port), '--strictPort'], { stdio: ['ignore', openSync(log, 'a'), openSync(log, 'a')], detached: true, env });
   for (let i = 0; i < 90 && !(await serverUp()); i++) {
     await new Promise((r) => setTimeout(r, 1000));
   }
@@ -318,7 +333,8 @@ async function main() {
   mkdirSync(out, { recursive: true });
 
   const release = claimPort(port, tmpdir());
-  const server = await startServer();
+  mkdirSync(out, { recursive: true });
+  const server = await startServer(join(out, 'server.log'));
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   const results: CaseResult[] = [];
   let total = 0;
