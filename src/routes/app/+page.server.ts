@@ -17,7 +17,7 @@ import { loadAttachments } from '$lib/server/chat-attachments/register';
 import { parseAttachments } from '$lib/chat-attachments';
 import { FROM_TEMPLATE_DEPS, FROM_TEMPLATE_ERROR, FROM_TEMPLATE_STATUS, FromTemplate, fromTemplateBody, startFromTemplate } from '$lib/server/motion/from-template';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
-import { catalogue } from '$lib/motion/template/catalogue';
+import { catalogue, posterShelf } from '$lib/motion/template/catalogue';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefEditorPath, briefMessage, briefName } from '$lib/motion/video-brief';
 
@@ -42,7 +42,8 @@ export const load: PageServerLoad = async (event) => {
     listGallery(db, gallerySearchSchema.parse({ limit: HOME_GALLERY_SIZE })),
     toolScope(event).then((scope) => scope.projectId, () => null)
   ]);
-  return { dashboard, gallery, components: catalogue(BUILTIN_TEMPLATES), templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
+  const components = catalogue(BUILTIN_TEMPLATES);
+  return { dashboard, gallery, components, posters: posterShelf(components), templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
 };
 
 function projectSlug(): string {
