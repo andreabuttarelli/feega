@@ -512,3 +512,37 @@ describe('transitions that cannot play', () => {
     expect(dead(pair(90))).toEqual([]);
   });
 });
+
+describe('what the gate asks depends on the kind of piece', () => {
+  const composition = (): MotionDoc => {
+    const written = must(writeComponent(newMotionDoc(MotionFormat.Vertical), 'SlowLight', { source: { html: '<h1>slow light</h1>', css: '', js: '' }, propsSchema: { type: 'object', properties: {} } }));
+    const placed = must(addClip(written, { component: 'Custom', from: 0, durationInFrames: written.durationInFrames, props: { name: 'SlowLight' } }, 'c1'));
+    return { ...placed, referenceLook: { largestType: 0.08, type: [{ role: 'display', font: 'grotesk', size: 0.08, weight: 600 }] } as MotionDoc['referenceLook'] };
+  };
+
+  it('a single crafted composition, a generative loop, is not asked for a script, music, story beats or a peak', () => {
+    const asked = docProblems(composition(), { audioAssets: 0, referencesSeen: true }).flatMap((p) => [p.kind, p.effect]);
+
+    for (const notAsked of [Quality.NoScript, Quality.Silent, Forbidden.MissingStoryBeat, Forbidden.NoPeak]) {
+      expect(asked).not.toContain(notAsked);
+    }
+  });
+
+  it('an abstract loop built from library pieces (a shader and a word, no script) is not asked either', () => {
+    let loop = must(addClip(newMotionDoc(MotionFormat.Vertical), { component: 'ShaderEffect', from: 0, durationInFrames: 240 }, 's1'));
+    loop = must(addClip(loop, { component: 'Title', from: 0, durationInFrames: 240, props: { text: 'drift' } }, 't1'));
+
+    const asked = docProblems(loop, { audioAssets: 0 }).flatMap((p) => [p.kind, p.effect]);
+
+    for (const notAsked of [Quality.NoScript, Quality.Silent, Forbidden.MissingStoryBeat, Forbidden.NoPeak]) {
+      expect(asked).not.toContain(notAsked);
+    }
+  });
+
+  it('a launch film still is', () => {
+    const film = must(addClip(newMotionDoc(MotionFormat.Vertical), { component: 'Title', from: 0, durationInFrames: 90, props: { text: 'Ship' } }, 't1'));
+    film.tracks[0].clips.push({ ...film.tracks[0].clips[0], id: 't2', from: 90 });
+
+    expect(docProblems(film, { audioAssets: 0 }).map((p) => p.kind)).toContain(Quality.Silent);
+  });
+});
