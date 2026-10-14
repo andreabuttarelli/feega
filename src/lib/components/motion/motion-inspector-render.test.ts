@@ -77,6 +77,17 @@ describe('Properties for one clip', () => {
     }
   });
 
+  it('Fill and Stroke add from their section header, not from inside the stack', () => {
+    const html = inspect('Shape');
+    for (const [section, add] of [['fill', 'Add fill'], ['stroke', 'Add stroke']]) {
+      const at = html.indexOf(`data-section="${section}"`);
+      const body = html.slice(at, html.indexOf('</section>', at));
+      const head = body.slice(0, body.indexOf('section-body'));
+      expect({ section, inHead: head.includes(`aria-label="${add}"`) }).toEqual({ section, inHead: true });
+      expect({ section, inBody: body.split(`aria-label="${add}"`).length - 1 }).toEqual({ section, inBody: 1 });
+    }
+  });
+
   it('a shape adds stroke and its path, and no text', () => {
     const list = sections(inspect('Shape'));
 

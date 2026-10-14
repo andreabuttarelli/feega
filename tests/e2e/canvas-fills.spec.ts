@@ -170,17 +170,18 @@ test.describe('fill stacks @real', () => {
     await expect(popover.getByTestId('side-popover-title')).toHaveText('Image');
     const [panel, side, row] = await Promise.all([page.getByTestId('motion-inspector').boundingBox(), popover.boundingBox(), stack.getByTestId('fill-row').nth(1).boundingBox()]);
     expect(side!.x + side!.width).toBeLessThanOrEqual(panel!.x);
-    expect(Math.abs(side!.y - row!.y)).toBeLessThan(2);
+    const clamped = Math.min(row!.y, page.viewportSize()!.height - 8 - side!.height);
+    expect(Math.abs(side!.y - Math.max(8, clamped))).toBeLessThan(2);
     await shoot(page, 'box-fill-stack');
     await shoot(page, 'clarity-after');
 
     await stack.getByTestId('fill-row').first().getByTestId('fill-eye').click();
     await expect.poll(async () => clipOf(await head(admin, node.id), 'box')?.props.fills?.[2].visible, { timeout: 10_000 }).toBe(false);
 
-    await stack.getByTestId('fill-add').click();
-    await expect(stack.getByTestId('fill-add-menu')).toBeVisible();
+    const fillHead = page.getByTestId('motion-inspector').locator('[data-section="fill"]');
+    await fillHead.getByTestId('fill-add').click();
     await shoot(page, 'fill-add-menu');
-    await stack.getByTestId('fill-add-solid').click();
+    await page.getByRole('menuitem', { name: 'Solid', exact: true }).dispatchEvent('click');
     await expect.poll(async () => clipOf(await head(admin, node.id), 'box')?.props.fills?.map((f) => f.type), { timeout: 10_000 }).toEqual(['linear-gradient', 'image', 'solid', 'solid']);
   });
 

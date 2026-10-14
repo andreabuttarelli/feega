@@ -3,13 +3,14 @@
   import { FIELD_INPUT, FOCUS_RING, MENU_CONTENT, MENU_ITEM, SECTION_LABEL } from '$lib/components/ui/shell/styles';
   import { BLEND_MODES } from '$lib/motion/blend';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
-  import { FILL_TYPES, FillType, IMAGE_FITS, addFill, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '$lib/motion/fill/model';
+  import { FILL_LABEL, FILL_TYPES, FillType, IMAGE_FITS, addFill, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '$lib/motion/fill/model';
   import ColorField from './ColorField.svelte';
+  import { Adder } from './stack-adder';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
 
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
 
-  let { fills, assets, tokens, title = '', onchange }: { fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; onchange: (fills: Fill[], summary: string) => void } = $props();
+  let { fills, assets, tokens, title = '', adder = Adder.Own, onchange }: { fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const IMAGE = 'image';
@@ -17,12 +18,7 @@
   const LABEL = 'text-ui-label text-ui-text-2';
   const FIELD_ROW = 'flex items-center justify-between gap-2';
 
-  const TYPE_LABEL: Record<FillType, string> = {
-    [FillType.Solid]: 'Solid',
-    [FillType.Linear]: 'Linear',
-    [FillType.Radial]: 'Radial',
-    [FillType.Image]: 'Image'
-  };
+  const TYPE_LABEL = FILL_LABEL;
 
   let open = $state<number | null>(null);
   let adding = $state(false);
@@ -122,6 +118,7 @@
 {/snippet}
 
 <div class="flex flex-col gap-0.5" data-testid="fill-stack" bind:this={root}>
+  {#if adder === Adder.Own}
   <div class="relative flex h-(--ui-row) items-center justify-between">
     <span class={SECTION_LABEL}>{title}</span>
     <button type="button" class={ICON} data-testid="fill-add" aria-label="Add fill" aria-expanded={adding} onclick={() => (adding = !adding)}>+</button>
@@ -133,6 +130,7 @@
       </div>
     {/if}
   </div>
+  {/if}
 
   {#each topFirst as { fill, index } (index)}
     <div

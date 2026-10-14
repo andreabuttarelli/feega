@@ -6,9 +6,10 @@
   import { CAPS, JOINS } from '$lib/motion/shape/schema';
   import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, removeStroke, setStroke, type Stroke, type StrokePatch } from '$lib/motion/stroke/model';
   import ColorField from './ColorField.svelte';
+  import { Adder } from './stack-adder';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
 
-  let { strokes, tokens, sided = false, short, title = '', onchange }: { strokes: Stroke[]; tokens: BrandTokens; sided?: boolean; short: number; title?: string; onchange: (strokes: Stroke[], summary: string) => void } = $props();
+  let { strokes, tokens, sided = false, short, title = '', adder = Adder.Own, onchange }: { strokes: Stroke[]; tokens: BrandTokens; sided?: boolean; short: number; title?: string; adder?: Adder; onchange: (strokes: Stroke[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const PX_DIGITS = 10;
@@ -85,10 +86,12 @@
 {/snippet}
 
 <div class="flex flex-col gap-0.5" data-testid="stroke-stack" bind:this={root}>
-  <div class="flex h-(--ui-row) items-center justify-between">
-    <span class={SECTION_LABEL}>{title}</span>
-    <button type="button" class={ICON} data-testid="stroke-add" aria-label="Add stroke" onclick={add}>+</button>
-  </div>
+  {#if adder === Adder.Own}
+    <div class="flex h-(--ui-row) items-center justify-between">
+      <span class={SECTION_LABEL}>{title}</span>
+      <button type="button" class={ICON} data-testid="stroke-add" aria-label="Add stroke" onclick={add}>+</button>
+    </div>
+  {/if}
 
   {#each topFirst as { stroke, index } (index)}
     <div

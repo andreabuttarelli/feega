@@ -130,7 +130,7 @@ test.describe('stroke stacks @real', () => {
     await stack.getByTestId('stroke-row').last().getByTestId('stroke-eye').click();
     await expect.poll(async () => clipOf(await head(admin, node.id), 'box')?.props.strokes?.[0].visible, { timeout: 10_000 }).toBe(false);
 
-    await stack.getByTestId('stroke-add').click();
+    await page.getByTestId('motion-inspector').locator('[data-section="stroke"]').getByTestId('stroke-add').click();
     await expect.poll(async () => clipOf(await head(admin, node.id), 'box')?.props.strokes?.length, { timeout: 10_000 }).toBe(3);
     await shoot(page, 'pr2-stroke-stack-edited');
   });
