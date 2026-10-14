@@ -68,6 +68,37 @@ macOS notarisation, distribution cert + provisioning for iOS), Google Play Conso
 upload key), Windows code-signing cert (OV/EV or Azure Trusted Signing), a Tauri updater key pair,
 and the bundle id `app.feega.desktop` reserved in both stores.
 
+## Desktop performance decides the desktop shell
+
+Tauri on macOS is WKWebView (Safari's engine); on Windows it is WebView2 (Chromium). Electron ships
+Chromium everywhere. The canvas has WebKit-only workarounds (#495 player transform, #553 pan/zoom
+lag), so on macOS the question is whether WKWebView holds the canvas budget of #553: >=55 fps
+average, >=45 fps p5.
+
+Measured 2026-10-14, M-series Mac, the #553 harness (23 motion tiles, synthetic posters) driven by
+`apps/native/bench/bench.js`: 6 s of wheel pan, 6 s of ctrl-wheel zoom, rAF gaps recorded in page.
+
+| Shell | pan avg / p5 fps | zoom avg / p5 fps | frames >33 ms | size | memory |
+|---|---|---|---|---|---|
+| Chromium 153 (Playwright, headed) | 60 / 56 | 60 / 56 | 0 / 0 | — | 167 MB JS heap |
+| WebKit 26.6 (Playwright, headed) | 58 / 53 | 60 / 56 | 2 / 0 | — | — |
+| Electron 44 (Chromium 152) | 60 / 55 | 59 / 55 | 0 / 2 | 288 MB runtime | 868 MB RSS, all processes |
+| Tauri 2, system WKWebView | **not measured** | **not measured** | — | 10.4 MB `.app` | — |
+
+The Tauri row is empty because the Mac's screen was locked during the run: WKWebView reported
+`visibilityState: hidden` and delivered 0 animation frames, so nothing could be timed. The other
+rows ran with background throttling disabled and no visible compositor, so they show the main
+thread keeps up, not what a GPU-composited window on a 120 Hz display does. All three measured
+engines pass the budget.
+
+Decision for desktop: **provisional**. Tauri stays the default because the measured WebKit engine
+passes, and the cost gap is large (10 MB vs ~290 MB, ~3x memory). The shell is a thin layer (start
+URL, deep link, external navigation in `routing.rs`): swapping desktop to Electron is about a day.
+Gate: run `apps/native/bench` on an unlocked Mac, Tauri vs Electron. If Tauri's WKWebView misses
+55/45 on either sweep, or shows WebKit-only visual defects the Chromium build does not, desktop
+moves to Electron and mobile stays Tauri (Capacitor adds nothing Tauri lacks for a remote-URL
+shell). Windows is Chromium (WebView2) under Tauri either way.
+
 ## (d) A static, frontend-only build talking to the API
 
 The alternative to loading the site: ship a SvelteKit build with `adapter-static` and an SPA
