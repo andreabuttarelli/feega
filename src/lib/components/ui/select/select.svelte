@@ -16,10 +16,10 @@
 	<select
 		bind:this={ref}
 		bind:value
-		class="h-9 w-full min-w-0 appearance-none border border-input bg-background pr-8 pl-3 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive"
+		class="h-8 w-full min-w-0 appearance-none rounded-sm border-0 bg-ui-input pr-8 pl-2.5 text-ui-body text-ui-text outline-none transition-colors duration-(--ui-dur-fast) hover:bg-ui-input-hover focus-visible:shadow-[var(--ui-ring)] disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:shadow-[0_0_0_2px_var(--ui-danger)] pointer-coarse:h-11"
 		{...restProps}
 	>
 		{@render children?.()}
 	</select>
-	<ChevronDown class="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+	<ChevronDown class="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-ui-icon" aria-hidden="true" />
 </span>

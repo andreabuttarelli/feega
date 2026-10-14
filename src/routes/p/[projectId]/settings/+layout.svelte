@@ -129,7 +129,7 @@
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-text-secondary, #6e6e73);
   }
   .page-sub {
     margin: 6px 0 0;
@@ -164,11 +164,11 @@
   .nav-group {
     margin: 16px 0 4px;
     padding: 0 8px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    font-size: var(--ui-type-section);
+    font-weight: var(--ui-weight-semibold);
+    letter-spacing: var(--ui-tracking-caps);
     text-transform: uppercase;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary);
   }
 
   .nav-group:first-child {
@@ -178,28 +178,31 @@
   .nav-item {
     display: flex;
     align-items: center;
-    height: 32px;
+    height: var(--ui-row-lg);
     padding: 0 8px;
-    font-size: 13px;
-    font-weight: 500;
+    border-radius: var(--ui-radius-sm);
+    font-size: var(--ui-type-body);
+    font-weight: var(--ui-weight-regular);
     text-decoration: none;
-    color: var(--ink-soft, #6e6e73);
+    transition: background var(--ui-dur-fast) var(--ui-ease);
+    color: var(--ui-text-secondary, #6e6e73);
   }
 
   .nav-item:hover {
-    color: var(--ink);
-    background: var(--paper-3);
+    color: var(--ui-text);
+    background: var(--ui-wash);
   }
 
   .nav-item.is-active {
-    color: var(--ink);
-    background: var(--paper-3);
-    font-weight: 600;
+    color: var(--ui-text);
+    background: var(--ui-wash);
+    font-weight: var(--ui-weight-medium);
+    border-radius: var(--ui-radius-md);
   }
 
   .nav-item:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   :global([data-viewport='mobile']) .settings-frame.has-nav {
@@ -218,7 +221,7 @@
     font-size: 14px;
     font-weight: 600;
     text-decoration: none;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-text-secondary, #6e6e73);
   }
   :global([data-viewport='mobile']) .back-to-sections {
     display: inline-flex;

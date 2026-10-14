@@ -41,17 +41,18 @@
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-text-secondary, #6e6e73);
   }
   ul {
     margin: 0;
     padding: 0;
     list-style: none;
-    border: 1px solid var(--line, #ededef);
-    background: var(--paper, #fff);
+    border: 1px solid var(--ui-divider, #ededef);
+    background: var(--ui-panel, #fff);
+    border-radius: var(--ui-radius-md);
   }
   li + li {
-    border-top: 1px solid var(--line, #ededef);
+    border-top: 1px solid var(--ui-divider, #ededef);
   }
   a {
     display: flex;
@@ -62,7 +63,7 @@
     font-size: 14px;
     font-weight: 500;
     text-decoration: none;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-text, #1d1d1f);
   }
 
   .legal-wrap {

@@ -101,16 +101,17 @@
   .logo-slot {
     width: 64px;
     height: 64px;
-    border: 1px solid var(--line);
-    background: var(--paper-2);
+    border: 1px solid var(--ui-divider);
+    background: var(--ui-panel-sunken);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     flex: none;
+    border-radius: var(--ui-radius-md);
   }
   .logo-slot.empty {
-    color: var(--ink-faint);
+    color: var(--ui-text-tertiary);
   }
   .logo-slot img {
     max-width: 80%;
