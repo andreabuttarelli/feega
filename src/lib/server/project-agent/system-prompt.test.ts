@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { projectAgentPrompt } from './system-prompt';
+import { DocMode } from '$lib/motion/still';
 
 describe('il prompt dichiara lo scope, non un brand obbligatorio', () => {
   const project = { id: 'p1', name: 'Lancio autunno' };
@@ -47,5 +48,24 @@ describe('il prompt dichiara lo scope, non un brand obbligatorio', () => {
     expect(prompt).toContain('THIS project only');
     expect(prompt.toLowerCase()).not.toContain('you need a brand');
     expect(prompt.toLowerCase()).not.toContain('select a brand');
+  });
+});
+
+describe('the chat knows the frame open in the editor', () => {
+  const project = { id: 'p1', name: 'Launch' };
+  const frame = { nodeId: 'n-7', selection: ['clip-a', 'clip-b'], playhead: 2.5, mode: DocMode.Still };
+
+  it('names the open frame, its selection and playhead, and makes it the default target', () => {
+    const prompt = projectAgentPrompt({ project, canvases: [], brand: null, frame });
+
+    expect(prompt).toContain('n-7');
+    expect(prompt).toContain('clip-a, clip-b');
+    expect(prompt).toContain('2.5s');
+    expect(prompt).toContain('a still');
+    expect(prompt).toContain('frame_tool');
+  });
+
+  it('with no frame open it says frame tools need a node_id', () => {
+    expect(projectAgentPrompt({ project, canvases: [], brand: null })).toContain('No frame is open');
   });
 });

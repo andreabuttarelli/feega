@@ -76,6 +76,7 @@
   import { catalogue, starterDoc, starterFormatOf, type StarterFormat } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
+  import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
   import { findClip, type MotionDoc } from '$lib/motion/doc';
@@ -391,6 +392,8 @@
     }
   });
   const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
+
+  const openFrame = () => ({ canvasId: data.canvas.id, frame: { nodeId: data.node.id, selection, playhead: frame / history.present.fps, mode } });
 
   const soundAssets = $derived(findSoundAssets(doc));
 
@@ -1479,7 +1482,7 @@
     {#snippet chat()}
     <aside class="chat" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Agent</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
-      {#if panelsDue}<ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} prefill={brandAsk} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />{/if}
+      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} /><ChatPanel projectId={data.projectId} reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />{/if}
     </aside>
     {/snippet}
     </SideColumn>
