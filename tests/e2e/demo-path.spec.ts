@@ -10,13 +10,25 @@ const TURN_MS = 300_000;
 const IMAGE_MS = 120_000;
 const VIDEO_MS = 300_000;
 
+enum TurnEnd {
+  Wait = 'wait',
+  StopWhenLong = 'stop-when-long'
+}
+
 const nodes = (page: Page) => page.locator('.svelte-flow__node');
 const pane = (page: Page) => page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
 
-async function waitTurn(page: Page) {
+async function waitTurn(page: Page, ending = TurnEnd.Wait) {
   const stop = page.getByRole('button', { name: 'Stop generating' });
   await stop.waitFor({ state: 'visible', timeout: 20_000 }).catch(() => {});
-  await stop.waitFor({ state: 'hidden', timeout: TURN_MS });
+  const ended = await stop.waitFor({ state: 'hidden', timeout: TURN_MS }).then(() => true, () => false);
+  if (ended) {
+    return;
+  }
+  if (ending === TurnEnd.Wait) {
+    throw new Error(`the turn was still running after ${TURN_MS / 1000}s`);
+  }
+  await stop.click();
 }
 
 async function ask(page: Page, text: string) {
@@ -58,7 +70,7 @@ async function openFrame(page: Page, id: string) {
 
 test.describe('the demo path @real', () => {
   test.skip(!REAL_STACK || !process.env.OPENROUTER_API_KEY, 'real stack and real models: E2E_REAL_STACK=1 and OPENROUTER_API_KEY');
-  test.setTimeout(30 * 60_000);
+  test.setTimeout(20 * 60_000);
 
   test('brief → canvas → generate → poster and motion frames → chat edits → export → share', async ({ page, session, admin, browser }) => {
     const latest = async (nodeId: string) => {
@@ -75,7 +87,7 @@ test.describe('the demo path @real', () => {
     await page.getByTestId('brief-send').click();
     await page.waitForURL(new RegExp(`/p/${session.projectId}/c/`));
     await expect(page.getByText(BRIEF).first()).toBeVisible();
-    await waitTurn(page);
+    await waitTurn(page, TurnEnd.StopWhenLong);
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
 
@@ -86,20 +98,22 @@ test.describe('the demo path @real', () => {
     const poster = await addTemplate(page, POSTER);
     await expect(page.locator(`[data-motion-node="${poster}"] [data-testid=motion-node-poster]`), 'a new frame shows its picture').toBeVisible({ timeout: 30_000 });
 
-    await page.getByTestId('drag-to-frame').first().dragTo(page.locator(`[data-motion-node="${poster}"]`));
-
     await openFrame(page, poster);
     const overlay = page.getByTestId('selection-overlay');
     const box = (await overlay.boundingBox())!;
     const title = { x: box.width * 0.3, y: box.height * 0.12 };
-    await overlay.click({ position: title });
-    await overlay.dblclick({ position: title });
+    await expect(async () => {
+      await overlay.click({ position: title });
+      await page.waitForTimeout(500);
+      await overlay.dblclick({ position: title });
+      await expect(page.getByTestId('part-edit')).toBeVisible({ timeout: 2000 });
+    }, 'a double-click on the headline types over it').toPass({ timeout: 30_000 });
     await page.getByTestId('part-edit').fill('AIR MAX');
     await page.getByTestId('part-edit').press('Enter');
     await expect.poll(() => latest(poster)).toContain('air max');
 
-    await page.getByRole('button', { name: 'Design', exact: true }).click();
-    await page.getByRole('button', { name: 'Motion', exact: true }).click();
+    await page.getByRole('radio', { name: 'Design', exact: true }).click({ timeout: 15_000 });
+    await page.getByRole('radio', { name: 'Motion', exact: true }).click({ timeout: 15_000 });
 
     await page.getByTestId('export-open').click();
     const png = page.waitForEvent('download');
@@ -107,7 +121,14 @@ test.describe('the demo path @real', () => {
     await page.getByTestId('still-export-file').click({ timeout: IMAGE_MS });
     expect((await png).suggestedFilename()).toMatch(/\.png$/);
     await page.keyboard.press('Escape');
-    await page.getByTestId('inline-close').click();
+    await page.getByTestId('inline-close').click().catch(() => {});
+
+    const before = await latest(poster);
+    await pane(page);
+    await page.keyboard.press('0');
+    await page.waitForTimeout(600);
+    await page.getByTestId('drag-to-frame').first().dragTo(page.locator(`[data-motion-node="${poster}"]`).getByTestId('motion-node-stage'), { force: true });
+    await expect.poll(() => latest(poster), 'the dropped output lands in the frame').not.toBe(before);
 
     const motion = await addTemplate(page, MOTION);
     await openFrame(page, motion);
