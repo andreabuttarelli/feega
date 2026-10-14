@@ -9,8 +9,12 @@ Segnale: `editor-scrub-budget.spec.ts` in WebKit dà host 60 fps e iframe 30 (pl
 via di seek). WebKit limita il rAF degli iframe cross-origin mai toccati dall'utente a 30 fps
 (`NonInteractedCrossOriginFrame`, changeset 215070); il player è `sandbox-origin="opaque"`, quindi
 cross-origin, e i clic li prendono i nostri overlay, non l'iframe. Mossa: misurare il rAF dentro
-l'iframe (sonda nello srcdoc), mai solo quello dell'host; togliere il limite vuol dire un iframe
-same-origin o un'interazione vera dentro il frame — scelta di sicurezza, non di performance.
+l'iframe (sonda nello srcdoc), mai solo quello dell'host. Solo i callback rAF sono limitati, non il
+disegno. Lo sblocca solo un evento vero nel documento del frame: focus, `postMessage` durante un
+gesto e hover no. Mai rubare il press agli overlay per darlo al frame (#594, revert #596: pen,
+drag e selezione rotti, replay sintetico non basta); il frame riceve solo il tocco che mette in
+pausa mentre suona (`listenTap`), quando gli overlay non ci sono. Prova: spec `@real` del
+canvas/editor, non solo l'harness perf.
 
 ### Il contorno di selezione è spostato o piccolo rispetto al disegno
 Segnale: il box blu non copre l'elemento, ma `measure()` restituisce frazioni giuste. Prima di

@@ -249,7 +249,7 @@ test.describe('motion editor a dito @real', () => {
       await expect(page.getByTestId('clip-bar')).toHaveCount(0);
 
       await page.getByRole('button', { name: 'Play', exact: true }).click();
-      await page.getByTestId('play-catch').tap();
+      await page.getByTestId('motion-preview').tap();
 
       await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
       await expect(page.getByTestId('clip-bar')).toBeVisible();
