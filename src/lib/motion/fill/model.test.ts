@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FillType, ImageFit, addFill, addStop, removeStop, fillsOf, fillsSchema, moveFill, photoFills, removeFill, retypeFill, setFill, type Fill } from './model';
+import { FillType, ImageFit, addFill, addStop, colourAlpha, removeStop, withAlpha, fillsOf, fillsSchema, moveFill, photoFills, removeFill, retypeFill, setFill, type Fill } from './model';
 
 const solid = (color: string, extra: Record<string, unknown> = {}) => fillsSchema.parse([{ type: FillType.Solid, color, ...extra }])[0];
 const colors = (stack: Fill[]) => stack.map((f) => (f as { color: string }).color);
@@ -130,6 +130,19 @@ describe('fill stack model', () => {
     ];
     expect(removeStop(stops, 0)).toEqual(stops);
     expect(removeStop([...stops, { color: '#ff0000', pos: 0.5 }], 2)).toEqual(stops);
+  });
+
+  it('a colour carries its own alpha in its last hex pair', () => {
+    expect(colourAlpha('#ff000080')).toEqual({ base: '#ff0000', alpha: 0.502 });
+    expect(colourAlpha('#ff0000')).toEqual({ base: '#ff0000', alpha: 1 });
+    expect(colourAlpha('brand.accent')).toEqual({ base: 'brand.accent', alpha: 1 });
+  });
+
+  it('writing an alpha appends it, resolving a brand colour first; full alpha keeps the colour as it was', () => {
+    const resolve = (c: string) => (c === 'brand.accent' ? '#00ff00' : c);
+    expect(withAlpha('#ff0000', 0.5, resolve)).toBe('#ff000080');
+    expect(withAlpha('brand.accent', 0.25, resolve)).toBe('#00ff0040');
+    expect(withAlpha('brand.accent', 1, resolve)).toBe('brand.accent');
   });
 
   it('retype keeps opacity, visibility and blend, and carries the colour into the stops', () => {

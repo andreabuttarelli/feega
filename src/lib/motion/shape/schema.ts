@@ -44,12 +44,7 @@ export const GEOMETRY_OF: Record<ShapeKind, readonly (typeof GEOMETRY)[number][]
   [ShapeKind.Path]: []
 };
 
-export const LEGACY_FILL_KEYS = ['fillKind', 'fill', 'fill2', 'gradientAngle'] as const;
-
 export function shapeFieldShown(kind: ShapeKind, key: string): boolean {
-  if ((LEGACY_FILL_KEYS as readonly string[]).includes(key)) {
-    return false;
-  }
   return !(GEOMETRY as readonly string[]).includes(key) || (GEOMETRY_OF[kind] as readonly string[]).includes(key);
 }
 

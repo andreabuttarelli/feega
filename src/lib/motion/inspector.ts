@@ -1,5 +1,6 @@
 import { PartKind, parsePart, partKind } from './poster-parts';
 import { withModifierParam } from './shape/model';
+import { fillReplaces } from './fill/elements';
 import { modifierOfKey, shapeFieldShown, type Modifier, type ShapeKind } from './shape/schema';
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, Control, Group, type ComponentId } from './components';
@@ -126,6 +127,10 @@ export function customFields(schema: PropsSchema): Field[] {
 }
 
 export function clipFieldGroups(doc: MotionDoc, clip: MotionClip): { group: Group; fields: Field[] }[] {
+  return componentGroups(doc, clip).map((g) => ({ ...g, fields: g.fields.filter((f) => !fillReplaces(clip.component, f.key)) }));
+}
+
+function componentGroups(doc: MotionDoc, clip: MotionClip): { group: Group; fields: Field[] }[] {
   if (clip.component === 'Shape') {
     const kind = clip.props.shape as ShapeKind;
     return fieldGroups('Shape').map((g) => ({ ...g, fields: g.fields.filter((f) => shapeFieldShown(kind, f.key)) }));

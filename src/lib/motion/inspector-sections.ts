@@ -140,6 +140,7 @@ const KEY_SECTION: Record<string, Section> = {
 
 const CONTROL_SECTION: Partial<Record<Control, Section>> = {
   [Control.Color]: Section.Fill,
+  [Control.Fills]: Section.Fill,
   [Control.Font]: Section.Text
 };
 

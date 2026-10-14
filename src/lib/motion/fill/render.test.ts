@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fillsSchema } from './model';
-import { fillLayersHtml, resolveFills, svgFills, type FillPaint } from './render';
+import { fillLayersHtml, resolveFills, svgFills, textPaint, type FillPaint } from './render';
 
 const stack = (raw: unknown[]) => fillsSchema.parse(raw);
 const paint: FillPaint = {
@@ -122,6 +122,35 @@ describe('fill stack in svg', () => {
       { type: 'solid', color: '#000000', opacity: 0.3 }
     ]);
     expect(svgFills(fills, paint, PATHS, 'nonzero')).toEqual(svgFills(fills, paint, PATHS, 'nonzero'));
+  });
+});
+
+describe('fill stack on text', () => {
+  const text = (raw: unknown[]) => textPaint(stack(raw), paint.color, paint.asset);
+
+  it('one opaque colour stays a plain text colour, so old text renders as before', () => {
+    expect(text([{ type: 'solid', color: 'brand.text' }])).toEqual({ color: 'resolved(brand.text)' });
+  });
+
+  it('no visible layer is transparent text', () => {
+    expect(text([{ type: 'solid', color: '#000000', visible: false }])).toEqual({ color: 'transparent' });
+  });
+
+  it('layers clip to the glyphs, top layer first as css lists them, opacity folded into each colour', () => {
+    const css = text([
+      { type: 'linear-gradient', angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] },
+      { type: 'solid', color: '#ff0000', opacity: 0.5, blend: 'multiply' }
+    ]);
+    expect(css.backgroundImage).toBe('linear-gradient(#ff000080,#ff000080),linear-gradient(90deg,#000000 0%,#ffffff 100%)');
+    expect(css.backgroundBlendMode).toBe('multiply,normal');
+    expect(css).toMatchObject({ backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent' });
+  });
+
+  it('a picture fills the glyphs with its fit and focus', () => {
+    const css = text([{ type: 'image', assetId: 'pic', fit: 'cover', focus: { x: 0.2, y: 0.8 } }, { type: 'solid', color: '#000000', opacity: 0.2 }]);
+    expect(css.backgroundImage).toContain('url("https://cdn/pic.png")');
+    expect(css.backgroundSize).toBe('auto,cover');
+    expect(css.backgroundPosition).toBe('0% 0%,20% 80%');
   });
 });
 

@@ -178,6 +178,7 @@ export const COMPOSITION_MEDIA_KINDS = ['image', 'video'] as const;
 export const COMPOSITION_CARD_KINDS = [...COMPOSITION_MEDIA_KINDS, 'comp'] as const;
 export const MAX_COMPOSITION_MEDIA = 40;
 
+const fillStack = () => fillsSchema.optional().meta({ control: Control.Fills, label: 'Fill', group: Group.Style });
 const managed = (label: string) => ({ control: Control.Managed, label, group: Group.Content });
 const compositionParams = (label: string) => z.record(z.string(), z.union([z.number(), z.string()])).default({}).meta(managed(label));
 
@@ -262,21 +263,21 @@ export const COMPONENTS = {
     description: 'Large headline, lines reveal one after another. Use \\n for line breaks.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ text: text('Better marketing\non canvas.', 'Text', true), ...typography(0.11, 'brand.text', { ...TITLE_LOOK, leading: 0.95 }), ...layout({ height: 0.4 }) }).strict()
+    schema: z.object({ text: text('Better marketing\non canvas.', 'Text', true), fills: fillStack(), ...typography(0.11, 'brand.text', { ...TITLE_LOOK, leading: 0.95 }), ...layout({ height: 0.4 }) }).strict()
   },
   Text: {
     label: 'Text',
     description: 'Body copy that fades up.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ text: text('Write something.', 'Text', true), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), ...layout({ y: 0.65, height: 0.2 }) }).strict()
+    schema: z.object({ text: text('Write something.', 'Text', true), fills: fillStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), ...layout({ y: 0.65, height: 0.2 }) }).strict()
   },
   Kicker: {
     label: 'Kicker',
     description: 'Small monospaced uppercase label above a title.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ text: text('( feega )', 'Text'), ...typography(0.025, 'brand.accent', { tracking: 0.02, leading: 1.2 }), ...layout({ y: 0.3, height: 0.06 }) }).strict()
+    schema: z.object({ text: text('( feega )', 'Text'), fills: fillStack(), ...typography(0.025, 'brand.accent', { tracking: 0.02, leading: 1.2 }), ...layout({ y: 0.3, height: 0.06 }) }).strict()
   },
   Caption: {
     label: 'Caption',
@@ -284,7 +285,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(2),
     schema: z
-      .object({ text: text('A caption', 'Text'), ...typography(0.035, '#ffffff', { weight: MEDIUM, tracking: 0, leading: 1.25 }), background: color('#111111', 'Box'), ...layout({ y: 0.85, height: 0.1 }) })
+      .object({ text: text('A caption', 'Text'), fills: fillStack(), ...typography(0.035, '#ffffff', { weight: MEDIUM, tracking: 0, leading: 1.25 }), background: color('#111111', 'Box'), ...layout({ y: 0.85, height: 0.1 }) })
       .strict()
   },
   Image: {
@@ -339,7 +340,7 @@ export const COMPONENTS = {
         morph: range(0, MAX_MORPHS, 0.01, 0, 'Morph', Group.Content),
         morphStart: range(0, 1, 0.01, 0, 'Morph start point', Group.Content),
         modifiers: z.array(modifierSchema).max(MAX_MODIFIERS).default([]).meta(managed('Modifiers')),
-        fills: fillsSchema.optional().meta({ control: Control.Fills, label: 'Fill', group: Group.Style }),
+        fills: fillStack(),
         fillKind: choice(FILL_KINDS, FillKind.Solid, 'Fill type', Group.Style),
         fill: color('brand.accent', 'Fill'),
         fill2: color('brand.primary', 'Gradient end'),

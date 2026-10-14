@@ -793,7 +793,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_props: tool({
-      description: 'Change some props of a clip; the rest are kept. Validated against the component. A Shape takes fills (see add_shape); a poster photo slot in a media list ({assetId, kind}) takes fills too, the same layer stack.',
+      description: 'Change some props of a clip; the rest are kept. Validated against the component. A Shape and text (Title, Text, Kicker, Caption) take fills (see add_shape; fills replaces a text colour, colours may carry alpha as #rrggbbaa); a poster photo slot in a media list ({assetId, kind}) takes fills too, the same layer stack.',
       inputSchema: z.object({ clip_id: z.string(), props: z.record(z.string(), z.unknown()) }),
       execute: async (input) => {
         if (!assetKnown(input.props.assetId)) {

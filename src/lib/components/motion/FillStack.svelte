@@ -1,14 +1,20 @@
 <script lang="ts">
+  import { cn } from '$lib/utils.js';
+  import { FIELD_INPUT, FOCUS_RING, MENU_CONTENT, MENU_ITEM, SECTION_LABEL } from '$lib/components/ui/shell/styles';
   import { BLEND_MODES } from '$lib/motion/blend';
-  import { FILL_TYPES, FillType, IMAGE_FITS, addFill, addStop, moveFill, removeFill, removeStop, retypeFill, setFill, type Fill, type FillOf, type FillPatch, type Stop } from '$lib/motion/fill/model';
+  import { resolveColor, type BrandTokens } from '$lib/motion/brand';
+  import { FILL_TYPES, FillType, IMAGE_FITS, addFill, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '$lib/motion/fill/model';
+  import ColorField from './ColorField.svelte';
 
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
 
-  let { fills, assets, color, onchange }: { fills: Fill[]; assets: Asset[]; color: (value: string) => string; onchange: (fills: Fill[], summary: string) => void } = $props();
+  let { fills, assets, tokens, title = '', onchange }: { fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const IMAGE = 'image';
-  const HEX = /^#[0-9a-f]{6}$/i;
+  const ICON = cn('inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-ui-icon hover:bg-ui-wash hover:text-ui-text', FOCUS_RING);
+  const LABEL = 'text-ui-label text-ui-text-2';
+  const FIELD_ROW = 'flex items-center justify-between gap-2';
 
   const TYPE_LABEL: Record<FillType, string> = {
     [FillType.Solid]: 'Solid',
@@ -18,13 +24,13 @@
   };
 
   let open = $state<number | null>(null);
+  let adding = $state(false);
   let stopAt = $state(0);
   let dragged = $state<number | null>(null);
 
   const topFirst = $derived(fills.map((fill, index) => ({ fill, index })).reverse());
   const pct = (n: number) => Math.round(n * PERCENT);
-  const hex = (value: string) => (HEX.test(color(value)) ? color(value) : '#000000');
-
+  const color = (value: string) => resolveColor(value, tokens);
   const stopCss = (stops: Stop[]) => [...stops].sort((a, b) => a.pos - b.pos).map((s) => `${color(s.color)} ${pct(s.pos)}%`).join(',');
 
   const SWATCH: Record<FillType, (f: Fill) => string> = {
@@ -33,16 +39,18 @@
     [FillType.Radial]: (f) => `radial-gradient(circle,${stopCss((f as FillOf<FillType.Radial>).stops)})`,
     [FillType.Image]: (f) => {
       const preview = assets.find((a) => a.id === (f as FillOf<FillType.Image>).assetId)?.previewUrl ?? (f as FillOf<FillType.Image>).src;
-      return preview ? `center / cover no-repeat url("${preview}")` : 'var(--ui-field)';
+      return preview ? `center / cover no-repeat url("${preview}")` : 'var(--ui-input)';
     }
   };
 
   const patch = (i: number, p: FillPatch, summary: string) => onchange(setFill(fills, i, p), summary);
   const percentOf = (e: Event) => Math.max(0, Math.min(PERCENT, Number((e.currentTarget as HTMLInputElement).value))) / PERCENT;
+  const toggle = (i: number) => (open = open === i ? null : i);
 
-  function add() {
-    onchange(addFill(fills, FillType.Solid), 'Add fill');
+  function add(type: FillType) {
+    onchange(addFill(fills, type), 'Add fill');
     open = fills.length;
+    adding = false;
   }
 
   function remove(i: number) {
@@ -51,32 +59,23 @@
   }
 
   function drop(to: number) {
-    if (dragged === null || dragged === to) {
-      dragged = null;
-      return;
+    if (dragged !== null && dragged !== to) {
+      onchange(moveFill(fills, dragged, to), 'Reorder fills');
     }
-    onchange(moveFill(fills, dragged, to), 'Reorder fills');
     dragged = null;
   }
 
-  function stopsOf(i: number): Stop[] {
-    return (fills[i] as FillOf<FillType.Linear>).stops;
-  }
-
-  function setStop(i: number, s: number, p: Partial<Stop>) {
-    patch(i, { stops: stopsOf(i).map((stop, at) => (at === s ? { ...stop, ...p } : stop)) }, 'Edit gradient');
-  }
-
-  function barPos(e: MouseEvent): number {
-    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    return box.width ? Math.max(0, Math.min(1, (e.clientX - box.left) / box.width)) : 0;
-  }
+  const stopsOf = (i: number): Stop[] => (fills[i] as FillOf<FillType.Linear>).stops;
+  const setStop = (i: number, s: number, p: Partial<Stop>) => patch(i, { stops: stopsOf(i).map((stop, at) => (at === s ? { ...stop, ...p } : stop)) }, 'Edit gradient');
+  const recolour = (value: string, alpha: number) => withAlpha(value, alpha, color);
 
   function addStopAt(i: number, e: MouseEvent) {
     if (e.target !== e.currentTarget) {
       return;
     }
-    const stops = addStop(stopsOf(i), Math.round(barPos(e) * PERCENT) / PERCENT);
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const pos = box.width ? Math.max(0, Math.min(1, (e.clientX - box.left) / box.width)) : 0;
+    const stops = addStop(stopsOf(i), Math.round(pos * PERCENT) / PERCENT);
     patch(i, { stops }, 'Add gradient stop');
     stopAt = stops.length - 1;
   }
@@ -108,24 +107,37 @@
   </svg>
 {/snippet}
 
-<div class="fills" data-testid="fill-stack">
-  <div class="head">
-    <span class="title">Fill</span>
-    <button type="button" class="icon" data-testid="fill-add" aria-label="Add fill" title="Add fill" onclick={add}>+</button>
+{#snippet colour(name: string, value: string, write: (next: string) => void)}
+  {@const { base, alpha } = colourAlpha(value)}
+  <div class="flex min-w-0 items-center gap-1">
+    <div class="min-w-0 flex-1"><ColorField {name} value={base} {tokens} onchange={(next) => write(recolour(next, alpha))} /></div>
+    <input class={cn(FIELD_INPUT, 'w-12')} type="number" min="0" max="100" step="1" data-testid="fill-alpha" aria-label={`${name} alpha`} title="Alpha %" value={pct(alpha)} onchange={(e) => write(recolour(base, percentOf(e)))} />
+  </div>
+{/snippet}
+
+<div class="flex flex-col gap-0.5" data-testid="fill-stack">
+  <div class="relative flex h-(--ui-row) items-center justify-between">
+    <span class={SECTION_LABEL}>{title}</span>
+    <button type="button" class={ICON} data-testid="fill-add" aria-label="Add fill" aria-expanded={adding} onclick={() => (adding = !adding)}>+</button>
+    {#if adding}
+      <div class={cn(MENU_CONTENT, 'absolute top-full right-0 min-w-36')} role="menu" data-testid="fill-add-menu">
+        {#each FILL_TYPES as type (type)}
+          <button type="button" role="menuitem" class={MENU_ITEM} data-testid={`fill-add-${type}`} onclick={() => add(type)}>{TYPE_LABEL[type]}</button>
+        {/each}
+      </div>
+    {/if}
   </div>
 
   {#each topFirst as { fill, index } (index)}
     <div
-      class="row"
-      class:off={!fill.visible}
-      class:open={open === index}
+      class={cn('grid grid-cols-[10px_18px_minmax(0,1fr)_48px_24px_24px] items-center gap-1 rounded-sm px-0.5', open === index && 'bg-ui-wash', !fill.visible && '[&>.dim]:opacity-40')}
       role="button"
       tabindex="0"
       draggable="true"
       data-testid="fill-row"
       data-index={index}
-      onclick={() => (open = open === index ? null : index)}
-      onkeydown={(e) => e.key === 'Enter' && (open = open === index ? null : index)}
+      onclick={() => toggle(index)}
+      onkeydown={(e) => e.key === 'Enter' && toggle(index)}
       ondragstart={() => (dragged = index)}
       ondragover={(e) => e.preventDefault()}
       ondrop={(e) => {
@@ -133,241 +145,108 @@
         drop(index);
       }}
     >
-      <span class="grip" aria-hidden="true">⋮⋮</span>
-      <span class="swatch" style={`background:${SWATCH[fill.type](fill)}`}></span>
-      <select data-testid="fill-type" aria-label="Fill type" value={fill.type} onclick={(e) => e.stopPropagation()} onchange={(e) => onchange(retypeFill(fills, index, e.currentTarget.value as FillType), 'Change fill type')}>
+      <span class="cursor-grab text-ui-text-3 select-none" aria-hidden="true">⋮</span>
+      <span class="dim size-[18px] rounded-xs border border-ui-divider" style={`background:${SWATCH[fill.type](fill)}`}></span>
+      <select class={cn(FIELD_INPUT, 'dim')} data-testid="fill-type" aria-label="Fill type" value={fill.type} onclick={(e) => e.stopPropagation()} onchange={(e) => onchange(retypeFill(fills, index, e.currentTarget.value as FillType), 'Change fill type')}>
         {#each FILL_TYPES as type (type)}<option value={type}>{TYPE_LABEL[type]}</option>{/each}
       </select>
-      <input class="pct" type="number" min="0" max="100" step="1" data-testid="fill-opacity" aria-label="Fill opacity" value={pct(fill.opacity)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { opacity: percentOf(e) }, 'Fill opacity')} />
-      <button type="button" class="icon" data-testid="fill-eye" aria-label={fill.visible ? 'Hide fill' : 'Show fill'} onclick={(e) => { e.stopPropagation(); patch(index, { visible: !fill.visible }, fill.visible ? 'Hide fill' : 'Show fill'); }}>
-        {#if fill.visible}{@render eye(true)}{:else}{@render eye(false)}{/if}
-      </button>
-      <button type="button" class="icon" data-testid="fill-remove" aria-label="Remove fill" onclick={(e) => { e.stopPropagation(); remove(index); }}>−</button>
+      <input class={cn(FIELD_INPUT, 'dim')} type="number" min="0" max="100" step="1" data-testid="fill-opacity" aria-label="Layer opacity" title="Layer opacity %" value={pct(fill.opacity)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { opacity: percentOf(e) }, 'Fill opacity')} />
+      <button
+        type="button"
+        class={ICON}
+        data-testid="fill-eye"
+        aria-label={fill.visible ? 'Hide fill' : 'Show fill'}
+        onclick={(e) => {
+          e.stopPropagation();
+          patch(index, { visible: !fill.visible }, fill.visible ? 'Hide fill' : 'Show fill');
+        }}>{@render eye(fill.visible)}</button
+      >
+      <button
+        type="button"
+        class={ICON}
+        data-testid="fill-remove"
+        aria-label="Remove fill"
+        onclick={(e) => {
+          e.stopPropagation();
+          remove(index);
+        }}>−</button
+      >
     </div>
 
     {#if open === index}
-      <div class="editor" data-testid="fill-editor">
+      <div class="flex flex-col gap-1.5 py-1.5 pl-4" data-testid="fill-editor">
         {#if fill.type === FillType.Solid}
-          <label class="field">Colour <input type="color" data-testid="fill-color" value={hex(fill.color)} onchange={(e) => patch(index, { color: e.currentTarget.value }, 'Fill colour')} /></label>
+          {@render colour('Fill colour', fill.color, (next) => patch(index, { color: next }, 'Fill colour'))}
         {:else if fill.type === FillType.Linear || fill.type === FillType.Radial}
-          {@const stop = fill.stops[Math.min(stopAt, fill.stops.length - 1)]}
+          {@const at = Math.min(stopAt, fill.stops.length - 1)}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-          <div class="bar" data-testid="fill-bar" title="Click to add a stop" style={`background:linear-gradient(90deg,${stopCss(fill.stops)})`} onclick={(e) => addStopAt(index, e)}>
+          <div class="relative mx-2 my-1 h-4 cursor-copy rounded-xs border border-ui-divider" data-testid="fill-bar" title="Click to add a stop" style={`background:linear-gradient(90deg,${stopCss(fill.stops)})`} onclick={(e) => addStopAt(index, e)}>
             {#each fill.stops as s, si (si)}
-              <button type="button" class="stop" class:on={si === Math.min(stopAt, fill.stops.length - 1)} data-testid="fill-stop" aria-label={`Stop ${si + 1}`} style={`left:${pct(s.pos)}%;background:${color(s.color)}`} onclick={(e) => { e.stopPropagation(); stopAt = si; }} onpointerdown={(e) => dragStop(index, si, e)}></button>
+              <button
+                type="button"
+                class={cn('absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize rounded-full border-2 border-white shadow-ui-float', si === at && 'ring-2 ring-ui-accent-solid')}
+                data-testid="fill-stop"
+                aria-label={`Stop ${si + 1}`}
+                style={`left:${pct(s.pos)}%;background:${color(s.color)}`}
+                onclick={(e) => {
+                  e.stopPropagation();
+                  stopAt = si;
+                }}
+                onpointerdown={(e) => dragStop(index, si, e)}
+              ></button>
             {/each}
           </div>
-          <div class="field">
-            Stop
-            <span class="inline">
-              <input type="color" data-testid="fill-stop-color" aria-label="Stop colour" value={hex(stop.color)} onchange={(e) => setStop(index, Math.min(stopAt, fill.stops.length - 1), { color: e.currentTarget.value })} />
-              <input class="pct" type="number" min="0" max="100" aria-label="Stop position" value={pct(stop.pos)} onchange={(e) => setStop(index, Math.min(stopAt, fill.stops.length - 1), { pos: percentOf(e) })} />
-              <button type="button" class="icon" aria-label="Remove stop" disabled={fill.stops.length <= 2} onclick={() => { patch(index, { stops: removeStop(fill.stops, Math.min(stopAt, fill.stops.length - 1)) }, 'Remove gradient stop'); stopAt = 0; }}>−</button>
+          {@render colour(`Stop ${at + 1} colour`, fill.stops[at].color, (next) => setStop(index, at, { color: next }))}
+          <div class={FIELD_ROW}>
+            <span class={LABEL}>Position</span>
+            <span class="flex items-center gap-1">
+              <input class={cn(FIELD_INPUT, 'w-14')} type="number" min="0" max="100" aria-label="Stop position" value={pct(fill.stops[at].pos)} onchange={(e) => setStop(index, at, { pos: percentOf(e) })} />
+              <button
+                type="button"
+                class={ICON}
+                aria-label="Remove stop"
+                disabled={fill.stops.length <= 2}
+                onclick={() => {
+                  patch(index, { stops: removeStop(fill.stops, at) }, 'Remove gradient stop');
+                  stopAt = 0;
+                }}>−</button
+              >
             </span>
           </div>
           {#if fill.type === FillType.Linear}
-            <label class="field">Angle <input type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Angle</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></label>
           {:else}
-            <label class="field">Centre X <input type="range" min="0" max="1" step="0.01" value={fill.center.x} onchange={(e) => patch(index, { center: { ...fill.center, x: Number(e.currentTarget.value) } }, 'Gradient centre')} /></label>
-            <label class="field">Centre Y <input type="range" min="0" max="1" step="0.01" value={fill.center.y} onchange={(e) => patch(index, { center: { ...fill.center, y: Number(e.currentTarget.value) } }, 'Gradient centre')} /></label>
-            <label class="field">Radius <input type="range" min="0.05" max="4" step="0.01" data-testid="fill-radius" value={fill.radius} onchange={(e) => patch(index, { radius: Number(e.currentTarget.value) }, 'Gradient radius')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Centre X</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Centre Y</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Radius</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="1" max="400" step="1" data-testid="fill-radius" value={pct(fill.radius)} onchange={(e) => patch(index, { radius: Math.max(1, Number(e.currentTarget.value)) / PERCENT }, 'Gradient radius')} /></label>
           {/if}
         {:else}
-          <div class="assets">
+          <div class="grid grid-cols-4 gap-1">
             {#each assets.filter((a) => a.kind === IMAGE) as asset (asset.id)}
-              <button type="button" class="asset" class:on={fill.assetId === asset.id} data-testid="fill-asset" title={asset.label} onclick={() => patch(index, { assetId: asset.id, src: undefined }, 'Fill image')}><img src={asset.previewUrl} alt={asset.label} /></button>
+              <button type="button" class={cn('aspect-square overflow-hidden rounded-xs border border-ui-divider p-0.5', fill.assetId === asset.id && 'ring-2 ring-ui-accent-solid', FOCUS_RING)} data-testid="fill-asset" title={asset.label} onclick={() => patch(index, { assetId: asset.id, src: undefined }, 'Fill image')}><img class="size-full object-cover" src={asset.previewUrl} alt={asset.label} /></button>
             {:else}
-              <span class="empty">No images in this project yet.</span>
+              <span class="col-span-4 text-ui-caption text-ui-text-3">No images in this project yet.</span>
             {/each}
           </div>
-          <label class="field">Fit
-            <select data-testid="fill-fit" value={fill.fit} onchange={(e) => patch(index, { fit: e.currentTarget.value }, 'Image fit')}>
+          <label class={FIELD_ROW}
+            ><span class={LABEL}>Fit</span>
+            <select class={cn(FIELD_INPUT, 'w-28')} data-testid="fill-fit" value={fill.fit} onchange={(e) => patch(index, { fit: e.currentTarget.value }, 'Image fit')}>
               {#each IMAGE_FITS as fit (fit)}<option value={fit}>{fit}</option>{/each}
             </select>
           </label>
-          <label class="field">Focus X <input type="range" min="0" max="1" step="0.01" data-testid="fill-focus-x" value={fill.focus.x} onchange={(e) => patch(index, { focus: { ...fill.focus, x: Number(e.currentTarget.value) } }, 'Image focus')} /></label>
-          <label class="field">Focus Y <input type="range" min="0" max="1" step="0.01" data-testid="fill-focus-y" value={fill.focus.y} onchange={(e) => patch(index, { focus: { ...fill.focus, y: Number(e.currentTarget.value) } }, 'Image focus')} /></label>
-          <label class="field">Scale <input type="range" min="0.1" max="4" step="0.05" data-testid="fill-scale" value={fill.scale} onchange={(e) => patch(index, { scale: Number(e.currentTarget.value) }, 'Image scale')} /></label>
+          <label class={FIELD_ROW}><span class={LABEL}>Focus X</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" data-testid="fill-focus-x" value={pct(fill.focus.x)} onchange={(e) => patch(index, { focus: { ...fill.focus, x: percentOf(e) } }, 'Image focus')} /></label>
+          <label class={FIELD_ROW}><span class={LABEL}>Focus Y</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" data-testid="fill-focus-y" value={pct(fill.focus.y)} onchange={(e) => patch(index, { focus: { ...fill.focus, y: percentOf(e) } }, 'Image focus')} /></label>
+          <label class={FIELD_ROW}><span class={LABEL}>Scale</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="10" max="1000" step="5" data-testid="fill-scale" value={pct(fill.scale)} onchange={(e) => patch(index, { scale: Math.max(10, Number(e.currentTarget.value)) / PERCENT }, 'Image scale')} /></label>
         {/if}
-        <label class="field">Blend
-          <select data-testid="fill-blend" value={fill.blend} onchange={(e) => patch(index, { blend: e.currentTarget.value }, 'Fill blend')}>
+        <label class={FIELD_ROW}
+          ><span class={LABEL}>Blend</span>
+          <select class={cn(FIELD_INPUT, 'w-28')} data-testid="fill-blend" value={fill.blend} onchange={(e) => patch(index, { blend: e.currentTarget.value }, 'Fill blend')}>
             {#each BLEND_MODES as mode (mode)}<option value={mode}>{mode}</option>{/each}
           </select>
         </label>
       </div>
     {/if}
   {:else}
-    <span class="empty">No fill. + adds one.</span>
+    <span class="text-ui-caption text-ui-text-3">No fill. + adds one.</span>
   {/each}
 </div>
-
-<style>
-  .fills {
-    display: grid;
-    gap: 2px;
-  }
-
-  .head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  .title {
-    font-size: var(--ui-text-sm, 11px);
-    color: var(--ui-ink-2);
-  }
-
-  .row {
-    display: grid;
-    grid-template-columns: 12px 18px 1fr 44px 22px 22px;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 0;
-    cursor: default;
-  }
-
-  .row.open {
-    background: var(--ui-field);
-  }
-
-  .row.off .swatch,
-  .row.off select,
-  .row.off .pct {
-    opacity: 0.4;
-  }
-
-  .grip {
-    color: var(--ui-muted);
-    cursor: grab;
-    display: inline-flex;
-  }
-
-  .swatch {
-    width: 18px;
-    height: 18px;
-    border: 1px solid var(--ui-line);
-  }
-
-  select,
-  input[type='number'] {
-    height: 22px;
-    min-width: 0;
-    padding: 0 4px;
-    border: 1px solid transparent;
-    border-radius: 0;
-    background: var(--ui-field);
-    color: var(--ui-ink);
-    font: inherit;
-    font-size: var(--ui-text-sm, 11px);
-  }
-
-  .icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 0;
-    border-radius: 9999px;
-    background: transparent;
-    color: var(--ui-ink-2);
-  }
-
-  .icon:hover {
-    background: var(--ui-field);
-  }
-
-  .editor {
-    display: grid;
-    gap: 6px;
-    padding: 6px 0 8px 16px;
-  }
-
-  .bar {
-    position: relative;
-    height: 16px;
-    margin: 4px 7px 6px;
-    border: 1px solid var(--ui-line);
-    cursor: copy;
-  }
-
-  .stop {
-    position: absolute;
-    top: 50%;
-    width: 14px;
-    height: 14px;
-    padding: 0;
-    border: 2px solid #ffffff;
-    border-radius: 9999px;
-    box-shadow: 0 0 0 1px var(--ui-line);
-    transform: translate(-50%, -50%);
-    cursor: ew-resize;
-  }
-
-  .stop.on {
-    box-shadow: 0 0 0 2px var(--ui-accent);
-  }
-
-  .field {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    font-size: var(--ui-text-sm, 11px);
-    color: var(--ui-ink-2);
-  }
-
-  .field select,
-  .field input[type='range'] {
-    width: 60%;
-  }
-
-  .inline {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  input[type='color'] {
-    width: 28px;
-    height: 22px;
-    padding: 0;
-    border: 1px solid var(--ui-line);
-    border-radius: 0;
-    background: none;
-  }
-
-  .assets {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-  }
-
-  .asset {
-    aspect-ratio: 1;
-    padding: 2px;
-    overflow: hidden;
-    border: 1px solid var(--ui-line);
-    border-radius: 0;
-    background: var(--ui-surface);
-  }
-
-  .asset img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .asset.on {
-    outline: 2px solid var(--ui-accent);
-    outline-offset: 1px;
-  }
-
-  .empty {
-    grid-column: 1 / -1;
-    font-size: var(--ui-text-sm, 11px);
-    color: var(--ui-muted);
-  }
-</style>

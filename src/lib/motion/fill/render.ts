@@ -1,5 +1,5 @@
 import { BlendMode } from '../blend';
-import { FillType, type Fill, type FillOf, type Stop } from './model';
+import { FillType, ImageFit, colourAlpha, withAlpha, type Fill, type FillOf, type Stop } from './model';
 
 export type FillPaint = {
   id: string;
@@ -95,6 +95,54 @@ export function fillLayersHtml(fills: readonly HtmlFill[]): string {
     return image(f);
   };
   return '<div class="fls" style="position:absolute;inset:0;overflow:hidden;container-type:size">' + fills.map(html).join('') + '</div>';
+}
+
+type TextLayer = { image: string; size: string; position: string; repeat: string };
+
+const ORIGIN = '0% 0%';
+const TEXT_TILE_SHARE = 25;
+const faded = (colour: string, opacity: number) => withAlpha(colour, colourAlpha(colour).alpha * opacity, (c) => c);
+const cssStops = (stops: Stop[], opacity: number) => [...stops].sort((a, b) => a.pos - b.pos).map((s) => `${faded(s.color, opacity)} ${round(s.pos * 100)}%`).join(',');
+const cssAt = (p: { x: number; y: number }) => `${round(p.x * 100)}% ${round(p.y * 100)}%`;
+const flat = (image: string): TextLayer => ({ image, size: 'auto', position: ORIGIN, repeat: 'no-repeat' });
+
+const IMAGE_SIZE: Record<ImageFit, (scale: number) => string> = {
+  [ImageFit.Cover]: () => 'cover',
+  [ImageFit.Contain]: () => 'contain',
+  [ImageFit.Fill]: () => '100% 100%',
+  [ImageFit.Tile]: (scale) => `${round(scale * TEXT_TILE_SHARE)}% auto`
+};
+
+const TEXT_LAYER: { [T in FillType]: (f: FillOf<T>) => TextLayer } = {
+  [FillType.Solid]: (f) => flat(`linear-gradient(${faded(f.color, f.opacity)},${faded(f.color, f.opacity)})`),
+  [FillType.Linear]: (f) => flat(`linear-gradient(${round(f.angle + 90)}deg,${cssStops(f.stops, f.opacity)})`),
+  [FillType.Radial]: (f) => flat(`radial-gradient(${round(f.radius * 50)}% ${round(f.radius * 50)}% at ${cssAt(f.center)},${cssStops(f.stops, f.opacity)})`),
+  [FillType.Image]: (f) => ({ image: `url("${f.src}")`, size: IMAGE_SIZE[f.fit](f.scale), position: cssAt(f.focus), repeat: f.fit === ImageFit.Tile ? 'repeat' : 'no-repeat' })
+};
+
+const plainColour = (fills: Fill[]) => fills.length === 1 && fills[0].type === FillType.Solid && fills[0].opacity === 1 && fills[0].blend === BlendMode.Normal;
+
+export function textPaint(fills: readonly Fill[], color: FillPaint['color'], asset: FillPaint['asset']): Record<string, string> {
+  const shown = resolveFills(fills, color, asset).filter((f) => f.visible && (f.type !== FillType.Image || f.src));
+  if (!shown.length) {
+    return { color: 'transparent' };
+  }
+  if (plainColour(shown)) {
+    return { color: (shown[0] as FillOf<FillType.Solid>).color };
+  }
+  const top = [...shown].reverse();
+  const layers = top.map((f) => (TEXT_LAYER[f.type] as (f: Fill) => TextLayer)(f));
+  return {
+    backgroundImage: layers.map((l) => l.image).join(','),
+    backgroundSize: layers.map((l) => l.size).join(','),
+    backgroundPosition: layers.map((l) => l.position).join(','),
+    backgroundRepeat: layers.map((l) => l.repeat).join(','),
+    backgroundBlendMode: top.map((f) => f.blend).join(','),
+    WebkitBackgroundClip: 'text',
+    backgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    color: 'transparent'
+  };
 }
 
 const gradientId = (id: string, i: number) => `sg-${id}-f${i}`;

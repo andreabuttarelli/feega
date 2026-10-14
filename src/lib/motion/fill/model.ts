@@ -185,6 +185,25 @@ export function setFill(fills: readonly Fill[], i: number, patch: FillPatch): Fi
   return fills.map((f, at) => (at === i ? fillSchema.parse({ ...f, ...patch, ...opacity, type: f.type }) : f));
 }
 
+const HEX_ALPHA = /^(#[0-9a-f]{6})([0-9a-f]{2})$/i;
+const HEX6 = /^#[0-9a-f]{6}$/i;
+const BYTE = 255;
+const ALPHA_DIGITS = 1000;
+
+export function colourAlpha(colour: string): { base: string; alpha: number } {
+  const split = HEX_ALPHA.exec(colour);
+  return split ? { base: split[1], alpha: Math.round((parseInt(split[2], 16) / BYTE) * ALPHA_DIGITS) / ALPHA_DIGITS } : { base: colour, alpha: 1 };
+}
+
+export function withAlpha(colour: string, alpha: number, resolve: (c: string) => string): string {
+  const { base } = colourAlpha(colour);
+  if (alpha >= 1) {
+    return base;
+  }
+  const hex = HEX6.test(base) ? base : resolve(base);
+  return HEX6.test(hex) ? hex + Math.round(Math.max(0, alpha) * BYTE).toString(16).padStart(2, '0') : base;
+}
+
 const MIN_STOPS = 2;
 
 export function addStop(stops: readonly Stop[], pos: number): Stop[] {
