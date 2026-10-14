@@ -38,6 +38,7 @@ import { undoGesture } from '$lib/server/canvas/undo';
 import { parseUndoItem, type UndoItem } from '$lib/canvas/undo-plan';
 import { endOnboarding, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
+import { nextStepsFor, nodeTextCost } from '$lib/server/canvas/node-hints';
 import { setCanvasShare } from '$lib/server/canvas/canvas-share';
 import { ShareState } from '$lib/canvas/shared-view';
 import { CANVAS_TEMPLATES } from '$lib/canvas/templates';
@@ -263,6 +264,10 @@ const undoGestureInput = z
   .object({ canvasId: z.string(), items: z.array(z.unknown()).min(1).describe('the gesture items the canvas recorded, newest write first') })
   .strict();
 const endOnboardingInput = z.object({ status: z.enum([OnboardingStatus.Dismissed, OnboardingStatus.Completed]) }).strict();
+const textCostInput = z
+  .object({ canvasId: z.string(), nodeId: z.string(), prompt: z.string().default(''), model: z.string().optional().describe('Omit for the default text model.') })
+  .strict();
+const nodeOnCanvasInput = z.object({ canvasId: z.string(), nodeId: z.string() }).strict();
 const INVALID_GESTURE = { error: 'invalid_gesture' };
 const CHAIN_INCOMPLETE = { error: 'chain_incomplete' };
 const galleryItemInput = z.object({ itemId: z.string() }).strict();
@@ -460,6 +465,27 @@ export const CANVAS_OPS = {
       }
       const out = await pasteNodes(ctx.db, { ...input, orgId: ctx.orgId, projectId: ctx.projectId, actor: ctx.actor });
       return 'refused' in out ? { error: 'invalid_data', message: out.refused } : out;
+    }
+  }),
+
+  estimate_text_cost: op({
+    access: Access.Read,
+    input: textCostInput,
+    run: async (ctx, input) =>
+      (await inProject(ctx, input.canvasId))
+        ? nodeTextCost(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, nodeId: input.nodeId, prompt: input.prompt, model: input.model || null })
+        : NOT_IN_PROJECT
+  }),
+
+  suggest_next_steps: op({
+    access: Access.Read,
+    input: nodeOnCanvasInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const suggestions = await nextStepsFor(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, nodeId: input.nodeId });
+      return suggestions ? { suggestions } : NODE_NOT_FOUND;
     }
   }),
 

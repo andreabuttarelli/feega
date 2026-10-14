@@ -188,4 +188,28 @@ describe('the canvas page action and its /api/v1 op answer the same', () => {
     expect(action.status).toBe(200);
     expect(endpoint).toEqual(action);
   });
+
+  it('estimate_text_cost and estimate_text_cost', async () => {
+    const action = await viaAction('estimate_text_cost', { node_id: NODE, prompt: 'write a haiku', model: '' });
+    const endpoint = await viaEndpoint('estimate_text_cost', { canvasId: CANVAS, nodeId: NODE, prompt: 'write a haiku' });
+
+    expect(action.status).toBe(200);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('suggestNextStep and suggest_next_steps', async () => {
+    const action = await viaAction('suggestNextStep', { node_id: NODE });
+    const endpoint = await viaEndpoint('suggest_next_steps', { canvasId: CANVAS, nodeId: NODE });
+
+    expect(action.status).toBe(200);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('suggest_next_steps answers a missing node like the action', async () => {
+    const action = await viaAction('suggestNextStep', { node_id: 'missing' });
+    const endpoint = await viaEndpoint('suggest_next_steps', { canvasId: CANVAS, nodeId: 'missing' });
+
+    expect(action.status).toBe(404);
+    expect(endpoint.data.error).toBe('node_not_found');
+  });
 });

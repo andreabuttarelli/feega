@@ -34,7 +34,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   voice_save: canvas('save_voice'),
   voice_clone: canvas('clone_voice'),
   voice_delete: canvas('delete_voice'),
-  estimate_text_cost: uiOnly('cost hint under the prompt; agents read credits from preview_run_graph and preview_node_loop'),
+  estimate_text_cost: canvas('estimate_text_cost'),
   upload: canvas('register_upload'),
   snapshot: canvas('canvas_snapshot'),
   revision: canvas('canvas_revision'),
@@ -72,7 +72,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   frame_template: canvas('add_frame_from_template'),
   template: canvas('insert_template'),
   undo: canvas('undo_gesture'),
-  suggestNextStep: uiOnly('suggestion chips for a person')
+  suggestNextStep: canvas('suggest_next_steps')
 };
 
 export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
