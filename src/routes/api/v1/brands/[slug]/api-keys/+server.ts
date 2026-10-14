@@ -16,19 +16,14 @@ export const GET: RequestHandler = async ({ request, params }) => {
   // Own keys only — the API-key path runs as service-role, so the user filter can't be left to RLS.
   const { data: keys, error } = await auth.supabase
     .from('api_keys')
-    .select('id, name, key_prefix, permissions, created_at, last_used_at')
+    .select('id, name, key_prefix, scopes, created_at, last_used_at')
     .eq('user_id', auth.user.id)
+    .eq('org_id', brand.org_id)
     .order('created_at', { ascending: false });
 
   if (error) return json({ error: error.message }, { status: 500 });
 
-  // Filter to keys that have access to this brand
-  const filtered = (keys ?? []).filter((k: any) => {
-    const brandIds = k.permissions?.brand_ids;
-    return brandIds === '*' || (Array.isArray(brandIds) && brandIds.includes(brand.id));
-  });
-
-  return json({ keys: filtered });
+  return json({ keys: keys ?? [] });
 };
 
 /** POST — create a new API key. Returns the raw key once. */
@@ -49,7 +44,6 @@ export const POST: RequestHandler = async ({ request, params }) => {
   const body = await request.json().catch(() => ({}));
   const name: string = (body.name || '').trim() || 'API Key';
   const requestedScopes: string[] = Array.isArray(body.scopes) ? body.scopes : ['read'];
-  const allBrands: boolean = body.all_brands === true;
 
   // Validate scopes
   const validScopes = requestedScopes.filter((s) => s === 'read' || s === 'write');
@@ -57,23 +51,17 @@ export const POST: RequestHandler = async ({ request, params }) => {
 
   const { raw, hash, prefix } = await generateApiKey();
 
-  // API-key requests are always brand-scoped to this brand — which is within the key's own scope
-  // because loadBrandForUser just verified access.
-  const permissions = {
-    brand_ids: allBrands ? '*' : [brand.id],
-    scopes: validScopes
-  };
-
   const { data, error } = await auth.supabase
     .from('api_keys')
     .insert({
+      org_id: brand.org_id,
       user_id: auth.user.id,
       name,
       key_hash: hash,
       key_prefix: prefix,
-      permissions
+      scopes: validScopes
     })
-    .select('id, name, key_prefix, permissions, created_at')
+    .select('id, name, key_prefix, scopes, created_at')
     .single();
 
   if (error) return json({ error: error.message }, { status: 500 });

@@ -13,7 +13,6 @@ const VIEWS = [
   'src/routes/app/studio/+page.svelte',
   'src/routes/app/studio/[batchId]/+page.svelte',
   'src/routes/app/upscale/+page.svelte',
-  'src/routes/app/api-keys/+page.svelte',
   'src/routes/p/[projectId]/settings/+layout.svelte',
   'src/routes/login/+page.svelte'
 ];

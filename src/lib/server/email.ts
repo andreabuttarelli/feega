@@ -651,64 +651,6 @@ export function prepublishHeldEmailText(
 
 // ── Credit warning email ───────────────────────────────────────────────────────
 
-export function creditWarningEmailSubject(locale: Locale, brandName: string, percent: number): string {
-  return tEmail(locale, 'credit_warning.subject', { brand: brandName, percent });
-}
-
-export function creditWarningEmailHtml(locale: Locale, opts: {
-  percent: number; used: number; quota: number;
-  resetDate: Date; brandName: string; dashboardUrl: string;
-}): string {
-  const resetStr = opts.resetDate.toLocaleDateString(locale === 'it' ? 'it-IT' : 'en-US', { day: 'numeric', month: 'long' });
-  return shell(undefined, `
-    <h2 style="font-size:18px;font-weight:600;margin:0 0 12px;">${tEmail(locale, 'credit_warning.heading')}</h2>
-    <p style="font-size:15px;line-height:1.5;color:#1d1d1f;margin:0 0 16px;">
-      ${tEmail(locale, 'credit_warning.intro', {
-        brand: esc(opts.brandName),
-        used: formatCredits(opts.used),
-        quota: formatCredits(opts.quota),
-        percent: opts.percent,
-        resetDate: resetStr
-      })}
-    </p>
-    <div style="background:#f5f5f7;border-radius:10px;padding:16px;margin:0 0 16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <span style="font-size:13px;color:#86868b;">${tEmail(locale, 'credit_warning.heading')}</span>
-        <span style="font-size:14px;font-weight:600;">${formatCredits(opts.used)} / ${formatCredits(opts.quota)}</span>
-      </div>
-      <div style="background:#e5e5ea;border-radius:4px;height:8px;overflow:hidden;">
-        <div style="background:${opts.percent >= 80 ? '#dc2626' : opts.percent >= 60 ? '#f59e0b' : '#16a34a'};height:100%;width:${Math.min(100, opts.percent)}%;border-radius:4px;"></div>
-      </div>
-    </div>
-    ${cta(opts.dashboardUrl, tEmail(locale, 'credit_warning.cta'))}
-    <p style="font-size:12px;color:#86868b;margin:16px 0 0;">${tEmail(locale, 'credit_warning.footer')}</p>
-  `);
-}
-
-export function creditWarningEmailText(locale: Locale, opts: {
-  percent: number; used: number; quota: number;
-  resetDate: Date; brandName: string; dashboardUrl: string;
-}): string {
-  const resetStr = opts.resetDate.toLocaleDateString(locale === 'it' ? 'it-IT' : 'en-US', { day: 'numeric', month: 'long' });
-  return [
-    tEmail(locale, 'credit_warning.heading'),
-    '',
-    tEmail(locale, 'credit_warning.intro', {
-      brand: opts.brandName,
-      used: formatCredits(opts.used),
-      quota: formatCredits(opts.quota),
-      percent: opts.percent,
-      resetDate: resetStr
-    }),
-    '',
-    `${formatCredits(opts.used)} / ${formatCredits(opts.quota)} (${opts.percent}%)`,
-    '',
-    `${tEmail(locale, 'credit_warning.cta')} ${opts.dashboardUrl}`,
-    '',
-    tEmail(locale, 'credit_warning.footer')
-  ].join('\n');
-}
-
 // ── Agent notification (chat tool `notify_user`) ────────────────────────────────────────────────
 // Il corpo lo scrive l'agente, non noi: qui c'è solo la cornice (intestazione, occhiello, CTA,
 // piede) e la conversione da testo a HTML. Nessuna copy fissa oltre a quella, altrimenti ogni

@@ -2,7 +2,6 @@ import type { Db } from '$lib/server/db/client';
 import { activeRenderRuns, claimRun, completeRun, createRun, failRun, listNodeRuns, queuedRenderRuns, releaseClaim, RENDER_JOB_PREFIX, setRunParams, type NodeRun } from '$lib/server/repos/node-runs';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { logAiCall } from '$lib/server/ai-log';
-import { sendPushToUser } from '$lib/server/web-push';
 import { formatOf, type MotionDoc } from '$lib/motion/doc';
 import { creditsOfCost, HOLD_BUFFER, RENDER_CALL_LABEL, renderClass, renderQuote, sandboxCostUsd, type RenderQuote } from '$lib/motion/render-quote';
 import { advance, startProgress, progressOf, type RenderEvent, type RenderProgress, type RenderView } from '$lib/motion/server-render';
@@ -432,7 +431,6 @@ async function finish(db: Db, farm: RenderFarm, run: NodeRun, state: RenderState
   const costUsd = await charge(farm, run, saving);
   await completeRun(db, { orgId: run.orgId, runId: run.id, assetId: saved.assetId, costUsd });
   await saveState(db, run, saving, { kind: 'done' });
-  await sendPushToUser(db as never, scope.userId, { title: 'feega', body: 'Your video is ready', url: scope.editorUrl, tag: `motion-render-${run.id}`, skipIfFocused: true }).catch(() => {});
   return Step.Done;
 }
 
