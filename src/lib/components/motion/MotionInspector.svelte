@@ -45,10 +45,12 @@
   import CodeEditor from './CodeEditor.svelte';
   import MarkedLines from './MarkedLines.svelte';
   import FillStack from './FillStack.svelte';
-  import { elementFills } from '$lib/motion/fill/elements';
+  import { FILLED, elementFills } from '$lib/motion/fill/elements';
+  import { FILL_LABEL, FILL_TYPES, addFill } from '$lib/motion/fill/model';
+  import { Adder } from './stack-adder';
   import StrokeStack from './StrokeStack.svelte';
-  import { elementStrokes } from '$lib/motion/stroke/elements';
-  import { sidesShown } from '$lib/motion/stroke/model';
+  import { STROKED, elementStrokes } from '$lib/motion/stroke/elements';
+  import { addStroke, sidesShown } from '$lib/motion/stroke/model';
   import { MarkedField, markedField } from '$lib/motion/poster-lines';
   import { componentLabel } from '$lib/motion/poster-parts';
   import FontPicker from './FontPicker.svelte';
@@ -398,7 +400,7 @@
     [Section.Parent]: visual || maskProps.length > 0
   });
 
-  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu });
+  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu, ...(FILLED[clip.component] ? { [Section.Fill]: addFillMenu } : {}), ...(STROKED[clip.component] ? { [Section.Stroke]: addStrokeButton } : {}) });
 
   const BODIES: Record<Section, Snippet> = $derived({
     [Section.Content]: contentBody,
@@ -523,9 +525,9 @@
     <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
   {:else if field.control === Control.Fills}
-    <div class="stack" data-prop={field.key}><FillStack fills={elementFills(clip.component, clip.props)} {assets} {tokens} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><FillStack fills={elementFills(clip.component, clip.props)} adder={Adder.Section} {assets} {tokens} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
   {:else if field.control === Control.Strokes}
-    <div class="stack" data-prop={field.key}><StrokeStack strokes={elementStrokes(clip.component, clip.props)} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><StrokeStack strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
   {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
@@ -817,6 +819,23 @@
     </div>
   {/if}
   {@render groupFields(Section.Animate)}
+{/snippet}
+
+{#snippet addFillMenu()}
+  <Menu>
+    <MenuTrigger>
+      {#snippet child({ props })}
+        <ShellIconButton {...props} label="Add fill" data-testid="fill-add"><Plus /></ShellIconButton>
+      {/snippet}
+    </MenuTrigger>
+    <MenuContent align="end">
+      {#each FILL_TYPES as type (type)}<MenuItem label={FILL_LABEL[type]} onSelect={() => commit(setProps(doc, clip.id, { fills: addFill(elementFills(clip.component, clip.props), type) }), 'Add fill')} />{/each}
+    </MenuContent>
+  </Menu>
+{/snippet}
+
+{#snippet addStrokeButton()}
+  <ShellIconButton label="Add stroke" data-testid="stroke-add" onclick={() => commit(setProps(doc, clip.id, { strokes: addStroke(elementStrokes(clip.component, clip.props)) }), 'Add stroke')}><Plus /></ShellIconButton>
 {/snippet}
 
 {#snippet addEffectMenu()}

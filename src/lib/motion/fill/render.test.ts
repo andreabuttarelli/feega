@@ -151,6 +151,12 @@ describe('fill stack on text', () => {
     expect(css.backgroundImage).toContain("url('https://x/a%22b%27c.png')");
   });
 
+  it('a picture layer on text keeps its opacity by cross-fading to nothing', () => {
+    const faded = text([{ type: 'image', assetId: 'pic', opacity: 0.4 }]);
+    expect(faded.backgroundImage).toBe("-webkit-cross-fade(url('https://cdn/pic.png'),linear-gradient(transparent,transparent),60%)");
+    expect(text([{ type: 'image', assetId: 'pic' }]).backgroundImage).toBe("url('https://cdn/pic.png')");
+  });
+
   it('a picture fills the glyphs with its fit and focus', () => {
     const css = text([{ type: 'image', assetId: 'pic', fit: 'cover', focus: { x: 0.2, y: 0.8 } }, { type: 'solid', color: '#000000', opacity: 0.2 }]);
     expect(css.backgroundImage).toContain("url('https://cdn/pic.png')");

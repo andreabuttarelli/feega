@@ -16,6 +16,12 @@ export enum ImageFit {
 }
 
 export const FILL_TYPES = Object.values(FillType) as [FillType, ...FillType[]];
+export const FILL_LABEL: Record<FillType, string> = {
+  [FillType.Solid]: 'Solid',
+  [FillType.Linear]: 'Linear',
+  [FillType.Radial]: 'Radial',
+  [FillType.Image]: 'Image'
+};
 export const IMAGE_FITS = Object.values(ImageFit) as [ImageFit, ...ImageFit[]];
 export const MAX_FILLS = 8;
 export const MAX_STOPS = 8;
