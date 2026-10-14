@@ -794,18 +794,11 @@ async function startVideo(opts: GenerateMediaOpts): Promise<VideoJobResult> {
   });
   if (!submitted) return { ok: false, error: 'render_failed', ...(submitReason ? { reason: submitReason } : {}) };
 
-  const { data: job } = await admin
-    .from('video_renders')
-    .select('id')
-    .eq('task_id', submitted.taskId)
-    .maybeSingle();
-  if (!job) return { ok: false, error: 'store_failed' };
-
   return {
     ok: true,
     status: 'rendering',
     media: [],
-    jobId: job.id as string,
+    jobId: submitted.jobId,
     model: submitted.model ?? null,
     renders: 0,
     durationSeconds: submitted.durationSeconds ?? wanted ?? null
