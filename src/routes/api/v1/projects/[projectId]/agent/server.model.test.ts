@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { MockLanguageModelV4 } from 'ai/test';
 import { CostTier, type ChatModelOption } from '$lib/chat-model';
 
-const calls = vi.hoisted(() => ({ models: [] as string[], providerOptions: [] as unknown[], logged: [] as Array<{ model?: string }> }));
+const calls = vi.hoisted(() => ({ models: [] as string[], providerOptions: [] as unknown[], logged: [] as Array<{ model?: string }>, systems: [] as string[] }));
 
 function finishingModel() {
   return new MockLanguageModelV4({
     doStream: async (options) => {
       calls.providerOptions.push(options.providerOptions);
+      calls.systems.push(JSON.stringify(options.prompt.filter((m) => m.role === 'system')));
       return {
         stream: new ReadableStream({
           start(controller) {
@@ -64,7 +65,7 @@ vi.mock('$lib/server/ai-log', () => ({
 }));
 vi.mock('$lib/server/cli-auth', () => ({ gateAiAction: async () => null, gateOrgAiAction: async () => null }));
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
-vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()), listCanvases: async () => [] }));
+vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()), listCanvases: async () => [{ id: 'c-open', projectId: 'p-1', name: 'Prima tela', viewport: null }] }));
 vi.mock('$lib/server/projects/lookup', () => ({
   findReachableProject: async () => ({ orgId: 'org-1', project: { id: 'p-1', name: 'P', brandId: null } })
 }));
@@ -101,6 +102,7 @@ describe('the project agent runs the model the user chose', () => {
     calls.models.length = 0;
     calls.providerOptions.length = 0;
     calls.logged.length = 0;
+    calls.systems.length = 0;
   });
 
   it('no choice: the default model at low, billed as that model', async () => {
@@ -119,6 +121,11 @@ describe('the project agent runs the model the user chose', () => {
     await settled(await POST(postEvent({ model: 'mistralai/plain' })));
     expect(calls.models).toEqual(['mistralai/plain']);
     expect(calls.providerOptions[0]).not.toHaveProperty('openai.reasoningEffort');
+  });
+
+  it('tells the model which canvas the user has open', async () => {
+    await settled(await POST(postEvent({ canvasId: 'c-open' })));
+    expect(calls.systems[0]).toContain('The user has canvas \\"Prima tela\\" (c-open) open');
   });
 
   it('refuses a model the catalogue does not offer, before spending', async () => {
