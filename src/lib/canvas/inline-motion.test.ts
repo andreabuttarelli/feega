@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Reframe, reframesOn, NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, inlineMotionTarget, nodeLayers, openingOf, ownPlayer } from './inline-motion';
+import { Reframe, reframesOn, NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, dismissedAfterClick, inlineMotionTarget, nodeLayers, openingOf, ownPlayer } from './inline-motion';
 import { Viewport } from '$lib/motion/editor-layout';
 
 const rows = [
@@ -73,5 +73,16 @@ describe('the canvas around an opening editor', () => {
     expect(reframesOn(Viewport.Desktop)).toBe(Reframe.Stay);
     expect(reframesOn(Viewport.Tablet)).toBe(Reframe.Frame);
     expect(reframesOn(Viewport.Phone)).toBe(Reframe.Frame);
+  });
+});
+
+describe('a frame closed and clicked again', () => {
+  it('opens again: the click undoes the close, even though the frame never left the selection', () => {
+    const dismissed = dismissedAfterClick('m1', 'm1');
+    expect(inlineMotionTarget(['m1'], [{ id: 'm1', type: 'motion' }], dismissed, Opening.OnSelect)).toBe('m1');
+  });
+
+  it('a click on another node leaves the closed frame closed', () => {
+    expect(dismissedAfterClick('m1', 'other')).toBe('m1');
   });
 });

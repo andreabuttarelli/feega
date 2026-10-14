@@ -137,6 +137,7 @@
     onPaste,
     onTemplate,
     onFrameTemplates,
+    onNodeClicked,
     barContext,
     onUndo,
     onRedo,
@@ -214,6 +215,7 @@
     onPaste?: (at: { x: number; y: number }) => void;
     onTemplate?: (id: string, at: { x: number; y: number }) => void;
     onFrameTemplates?: (at: { x: number; y: number }) => void;
+    onNodeClicked?: (id: string) => void;
     barContext?: BarContext;
     /** ⌘Z: annulla l'ultimo gesto di questa scheda. */
     onUndo?: () => void;
@@ -552,6 +554,7 @@
   let targeting = $state<string[] | null>(null);
 
   function onNodeClick({ node }: { node: Node }) {
+    onNodeClicked?.(node.id);
     if (!targeting) return;
     if (targeting.includes(node.id)) return;
 

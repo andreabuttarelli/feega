@@ -20,6 +20,8 @@ export const openingOf = (viewport: Viewport): Opening => OPENING[viewport];
 
 type Row = { id: string; type: string };
 
+export const dismissedAfterClick = (dismissed: string | null, clicked: string): string | null => (dismissed === clicked ? null : dismissed);
+
 export function inlineMotionTarget(selected: readonly string[], rows: readonly Row[], dismissed: string | null, opening: Opening, requested: string | null = null): string | null {
   if (selected.length !== 1 || selected[0] === dismissed) {
     return null;
