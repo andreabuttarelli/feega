@@ -12,7 +12,7 @@ export function registerCanvasTools(server: McpServer) {
       title: 'Work a project canvas',
       description:
         'The canvas ops of the project chat, on one project (`project_id`), with `input` in camelCase. ' +
-        'Reads: list_canvases {}, list_nodes {canvasId}, list_runs {nodeId}, preview_node_loop {nodeId}, ' +
+        'Reads: list_canvases {}, list_nodes {canvasId}, canvas_snapshot {canvasId} (nodes, connections, runs, products, socialPosts, influencers, revision), canvas_revision {canvasId} (live revision, or canvas/project gone), list_runs {nodeId}, preview_node_loop {nodeId}, ' +
         'preview_run_graph {graph:"downstream",nodeId} | {graph:"stale",canvasId,nodeIds?} (ordered steps + credits: quote before run_graph). ' +
         'Writes, free: create_node {canvasId,type,x,y,displayName?,data?} (data per describe_node_types), update_node {nodeId,data} (only changed fields, null removes), ' +
         'move_node {nodeId,x,y,z?}, resize_node {nodeId,width,height}, connect_nodes {canvasId,sourceNodeId,targetNodeId,sourceHandle?,targetHandle?}, delete_node {nodeId} (soft, drops its lines), cancel_node_loop {nodeId}, ' +

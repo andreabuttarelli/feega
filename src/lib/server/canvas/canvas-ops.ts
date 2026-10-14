@@ -31,6 +31,9 @@ import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
+import { canvasSnapshot } from '$lib/server/canvas/snapshot';
+import { canvasRevision } from '$lib/server/canvas/revision';
+import { listMemberships } from '$lib/server/repos/orgs';
 import { setCanvasShare } from '$lib/server/canvas/canvas-share';
 import { ShareState } from '$lib/canvas/shared-view';
 import { CANVAS_TEMPLATES } from '$lib/canvas/templates';
@@ -344,6 +347,21 @@ export const CANVAS_OPS = {
     access: Access.Read,
     input: listNodesInput,
     run: async (ctx, input) => ({ nodes: await listNodes(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) })
+  }),
+
+  canvas_snapshot: op({
+    access: Access.Read,
+    input: canvasIdInput,
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? canvasSnapshot(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) : NOT_IN_PROJECT)
+  }),
+
+  canvas_revision: op({
+    access: Access.Read,
+    input: canvasIdInput,
+    run: async (ctx, input) => {
+      const memberships = (await listMemberships(ctx.db, ctx.userId)).filter((m) => m.org.id === ctx.orgId);
+      return canvasRevision(ctx.db, { canvasId: input.canvasId, projectId: ctx.projectId, memberships });
+    }
   }),
 
   create_node: op({
