@@ -30,17 +30,19 @@
 
 <style>
   .gate { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; max-width: 520px; }
-  .gate-title { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink); }
-  .gate-hint { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ink-soft); }
+  .gate-title { margin: 0; font-size: 18px; font-weight: 600; color: var(--ui-text); }
+  .gate-hint { margin: 0; font-size: 14px; line-height: 1.5; color: var(--ui-text-secondary); }
   .gate-form { display: flex; gap: 8px; width: 100%; }
   .gate-form select {
-    flex: 1; font: inherit; font-size: 14px; color: var(--ink); background: var(--paper);
-    border: 1px solid var(--line); padding: 9px 10px;
+    flex: 1; font: inherit; font-size: 14px; color: var(--ui-text); background: var(--ui-panel);
+    border: 1px solid var(--ui-divider); padding: 9px 10px;
+    border-radius: var(--ui-radius-sm);
   }
   .btn {
     font-size: 13px; font-weight: 600; padding: 9px 16px; cursor: pointer; line-height: 1;
     border: 1px solid transparent; text-decoration: none;
+    border-radius: var(--ui-radius-sm);
   }
   .btn.primary { background: var(--accent, #7c5cff); color: #fff; }
-  .btn.ghost { background: transparent; color: var(--ink-soft); border-color: var(--line); }
+  .btn.ghost { background: transparent; color: var(--ui-text-secondary); border-color: var(--ui-divider); }
 </style>

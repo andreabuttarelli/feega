@@ -1,10 +1,3 @@
-/*
- * Stili condivisi delle pagine Impostazioni (bottoni, form, liste api-key, dialog
- * billing...). Vivevano come `.settings-shell :global(...)` dentro il +layout di
- * /settings: estratti qui perché il modal Impostazioni (SettingsModal) ospita le
- * stesse +page.svelte SENZA montare quel layout — la classe `.settings-shell` sul
- * wrapper è l'unico contratto, chiunque la metta eredita questi stili.
- */
 .settings-shell .acct .glyph {
   color: #fff; font-weight: 700; font-size: 12px;
   display: flex; align-items: center; justify-content: center;
@@ -14,34 +7,33 @@
 .settings-shell .bbtn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit;
   font-size: 13.5px; font-weight: 600; padding: 9px 15px; cursor: pointer;
-  text-decoration: none; background: var(--paper-2, #f5f5f7); color: var(--ink, #1d1d1f);
-  border: 1px solid var(--line, #e3e3e6);
+  text-decoration: none; background: var(--ui-input); color: var(--ui-text);
+  border: 0; border-radius: var(--ui-radius-sm);
 }
-.settings-shell .bbtn:hover { border-color: var(--line-2, #d2d2d7); }
+.settings-shell .bbtn:hover { background: var(--ui-input-hover); }
 .settings-shell .bbtn.primary {
-  background: var(--invert-surface, #1d1d1f);
-  color: #fff;
-  border-color: var(--invert-surface, #1d1d1f);
+  background: var(--ui-accent-solid);
+  color: var(--ui-on-accent);
 }
 .settings-shell .bbtn.danger {
-  background: transparent; color: #c0392b; border-color: rgba(192, 57, 43, 0.3);
+  background: var(--ui-input); color: var(--ui-danger);
 }
 .settings-shell .bbtn.danger:hover {
-  background: rgba(192, 57, 43, 0.06); border-color: rgba(192, 57, 43, 0.45);
+  background: var(--ui-input-hover);
 }
 .settings-shell .bbtn:disabled { opacity: 0.55; cursor: default; }
 .settings-shell .bbtn.big { width: 100%; padding: 13px 18px; font-size: 15px; }
 
 .settings-shell .bill-notice {
-  font-size: 13px; line-height: 1.5; color: #b45309; background: rgba(180, 83, 9, 0.06);
-  border: 1px solid rgba(180, 83, 9, 0.2); padding: 12px 14px;
+  font-size: 13px; line-height: 1.5; color: var(--ui-warn); background: color-mix(in srgb, var(--ui-warn) 10%, transparent);
+  border-radius: var(--ui-radius-md); padding: 12px 14px;
 }
 .settings-shell .bill-cancel { display: flex; justify-content: flex-end; padding: 10px 22px 4px; }
 .settings-shell .cancel-link {
   background: none; border: none; font: inherit; font-size: 11px; cursor: pointer;
-  color: var(--ink-faint, #86868b); opacity: 0.6; text-decoration: underline; padding: 2px;
+  color: var(--ui-text-tertiary, #86868b); opacity: 0.6; text-decoration: underline; padding: 2px;
 }
-.settings-shell .cancel-link:hover { opacity: 1; color: var(--ink-soft, #6e6e73); }
+.settings-shell .cancel-link:hover { opacity: 1; color: var(--ui-text-secondary, #6e6e73); }
 
 .settings-shell .cx-overlay {
   position: fixed; inset: 0; z-index: 200; background: rgba(0, 0, 0, 0.4);
@@ -49,14 +41,14 @@
   display: flex; align-items: center; justify-content: center; padding: 24px;
 }
 .settings-shell .cx-card {
-  background: #fff; padding: 26px; width: 100%; max-width: 440px;
-  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.4);
+  background: var(--ui-panel-raised); color: var(--ui-text); padding: 24px; width: 100%; max-width: 440px;
+  border-radius: var(--ui-radius-lg); box-shadow: var(--ui-shadow-float);
 }
 .settings-shell .cx-card h3 {
   margin: 0 0 8px; font-size: 20px; font-weight: 600; letter-spacing: -0.02em;
 }
 .settings-shell .cx-sub {
-  margin: 0; font-size: 14px; color: var(--ink-soft, #6e6e73); line-height: 1.5;
+  margin: 0; font-size: 14px; color: var(--ui-text-secondary, #6e6e73); line-height: 1.5;
 }
 .settings-shell .cx-actions {
   display: flex; gap: 10px; justify-content: flex-end; margin-top: 22px;
@@ -64,78 +56,79 @@
 .settings-shell .cx-actions.col { flex-direction: column; align-items: stretch; gap: 12px; }
 .settings-shell .cx-actions.split { justify-content: space-between; align-items: center; }
 .settings-shell .cx-reasons { display: flex; flex-direction: column; gap: 8px; margin: 16px 0 12px; }
-.settings-shell .cx-reason {
+.settings-shell .cx-reason { border-radius: var(--ui-radius-sm);
   display: flex; align-items: center; gap: 10px; padding: 11px 14px; cursor: pointer;
-  border: 1px solid var(--line, #e3e3e6); font-size: 14px; color: var(--ink, #1d1d1f);
+  border: 1px solid var(--ui-divider, #e3e3e6); font-size: 14px; color: var(--ui-text, #1d1d1f);
 }
 .settings-shell .cx-reason.sel {
-  border-color: var(--accent); background: rgba(var(--accent-rgb, 124, 92, 255), 0.05);
+  border-color: var(--ui-accent); background: var(--ui-selected);
 }
-.settings-shell .cx-reason input { accent-color: var(--accent); }
-.settings-shell .cx-text {
+.settings-shell .cx-reason input { accent-color: var(--ui-accent); }
+.settings-shell .cx-text { border-radius: var(--ui-radius-sm);
   width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; padding: 11px 13px;
-  border: 1px solid var(--line, #e3e3e6); resize: vertical; outline: none;
+  border: 1px solid var(--ui-divider, #e3e3e6); resize: vertical; outline: none;
 }
-.settings-shell .cx-text:focus { border-color: var(--accent); }
-.settings-shell .cx-text.err { border-color: #c0392b; }
-.settings-shell .cx-err { margin-top: 8px; font-size: 12.5px; color: #c0392b; }
+.settings-shell .cx-text:focus { border-color: var(--ui-accent); }
+.settings-shell .cx-text.err { border-color: var(--ui-danger); }
+.settings-shell .cx-err { margin-top: 8px; font-size: 12.5px; color: var(--ui-danger); }
 .settings-shell .up-list { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 4px; }
-.settings-shell .up-plan {
+.settings-shell .up-plan { border-radius: var(--ui-radius-sm);
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 13px 15px; border: 1px solid var(--line, #e3e3e6);
+  padding: 13px 15px; border: 1px solid var(--ui-divider, #e3e3e6);
 }
-.settings-shell .up-name { font-size: 15px; font-weight: 600; color: var(--ink, #1d1d1f); }
-.settings-shell .up-meta { font-size: 12.5px; color: var(--ink-soft, #6e6e73); margin-top: 2px; }
+.settings-shell .up-name { font-size: 15px; font-weight: 600; color: var(--ui-text, #1d1d1f); }
+.settings-shell .up-meta { font-size: 12.5px; color: var(--ui-text-secondary, #6e6e73); margin-top: 2px; }
 .settings-shell .cx-offer { text-align: center; }
 .settings-shell .cx-badge {
   display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
-  text-transform: uppercase; color: #fff; background: var(--accent); padding: 6px 14px; margin-bottom: 14px;
+  text-transform: uppercase; color: var(--ui-on-accent); background: var(--ui-accent-solid); border-radius: var(--ui-radius-full); padding: 6px 14px; margin-bottom: 14px;
 }
 .settings-shell .cx-link {
   background: none; border: none; font: inherit; font-size: 13px; cursor: pointer;
-  color: var(--ink-faint, #86868b); text-decoration: underline; padding: 6px;
+  color: var(--ui-text-tertiary, #86868b); text-decoration: underline; padding: 6px;
 }
-.settings-shell .cx-link:hover { color: var(--ink-soft, #6e6e73); }
+.settings-shell .cx-link:hover { color: var(--ui-text-secondary, #6e6e73); }
 .settings-shell .cx-link:disabled { opacity: 0.55; cursor: default; }
 
 .settings-shell .team-form { display: flex; align-items: center; gap: 10px; flex: 1; }
-.settings-shell .team-input {
+.settings-shell .team-input { border-radius: var(--ui-radius-sm);
   flex: 1; font: inherit; font-size: 14px; padding: 9px 12px;
-  border: 1px solid var(--line-2, #d2d2d7); background: var(--paper, #fff); outline: none;
+  border: 0; background: var(--ui-input); color: var(--ui-text); outline: none;
 }
-.settings-shell .team-input:focus { border-color: var(--accent); }
+.settings-shell .team-input:focus { box-shadow: var(--ui-ring); }
 
 .settings-shell .tz-form { display: flex; align-items: center; gap: 10px; }
-.settings-shell .tz-select {
+.settings-shell .tz-select { border-radius: var(--ui-radius-sm);
   font: inherit; font-size: 14px; padding: 9px 12px;
-  border: 1px solid var(--line-2, #d2d2d7); background: var(--paper, #fff); outline: none;
+  border: 0; background: var(--ui-input); color: var(--ui-text); outline: none;
 }
-.settings-shell .tz-select:focus { border-color: var(--accent); }
+.settings-shell .tz-select:focus { box-shadow: var(--ui-ring); }
 .settings-shell .disc-btn {
-  background: none; border: none; color: var(--ink-faint, #86868b); font-size: 12.5px;
+  background: none; border: none; color: var(--ui-text-tertiary, #86868b); font-size: 12.5px;
   font-weight: 500; cursor: pointer; padding: 0 0 0 12px;
 }
-.settings-shell .disc-btn:hover { color: #c0392b; }
+.settings-shell .disc-btn:hover { color: var(--ui-danger); }
 .settings-shell .disc-confirm { display: flex; align-items: center; gap: 8px; }
-.settings-shell .mini.danger { background: #c0392b; color: #fff; border: none; }
+.settings-shell .mini.danger { background: var(--ui-danger); color: #fff; border: none; }
 .settings-shell .mini.ghost {
-  background: none; border: 1px solid var(--line-2, #d2d2d7); color: var(--ink-soft, #6e6e73);
+  background: none; border: 1px solid var(--ui-divider-strong, #d2d2d7); color: var(--ui-text-secondary, #6e6e73);
 }
 
 .settings-shell .apikey-list {
-  display: flex; flex-direction: column; gap: 1px; background: var(--line, #e3e3e6); overflow: hidden; margin-top: 8px;
+  border-radius: var(--ui-radius-md);
+  display: flex; flex-direction: column; gap: 1px; background: var(--ui-divider, #e3e3e6); overflow: hidden; margin-top: 8px;
 }
 .settings-shell .apikey-row {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 13px 15px; background: var(--paper, #fff);
+  padding: 13px 15px; background: var(--ui-panel-sunken);
 }
 .settings-shell .apikey-info { min-width: 0; flex: 1; }
-.settings-shell .apikey-name { font-weight: 600; font-size: 14px; color: var(--ink, #1d1d1f); }
+.settings-shell .apikey-name { font-weight: 600; font-size: 14px; color: var(--ui-text, #1d1d1f); }
 .settings-shell .apikey-meta {
   display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap;
 }
 .settings-shell .apikey-prefix {
-  font-size: 12px; color: var(--ink-faint, #86868b); background: var(--paper-2, #f5f5f7);
+  font-size: 12px; color: var(--ui-text-tertiary, #86868b); background: var(--ui-panel-sunken, #f5f5f7);
   padding: 2px 6px;
 }
 .settings-shell .apikey-scope { display: flex; gap: 4px; }
@@ -144,32 +137,32 @@
   text-transform: uppercase; letter-spacing: 0.03em;
 }
 .settings-shell .scope-badge.read {
-  background: rgba(var(--accent-rgb, 124, 92, 255), 0.1); color: var(--accent, #7c5cff);
+  background: var(--ui-selected); color: var(--ui-accent-text);
 }
 .settings-shell .scope-badge.write { background: rgba(16, 185, 129, 0.1); color: #059669; }
 .settings-shell .scope-badge.all { background: rgba(59, 130, 246, 0.1); color: #2563eb; }
 .settings-shell .apikey-dates {
-  font-size: 11.5px; color: var(--ink-faint, #86868b); margin-top: 4px;
+  font-size: 11.5px; color: var(--ui-text-tertiary, #86868b); margin-top: 4px;
 }
-.settings-shell .apikey-created {
+.settings-shell .apikey-created { border-radius: var(--ui-radius-sm);
   background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.2); padding: 14px 16px; margin-top: 8px;
 }
 .settings-shell .apikey-warning {
   font-size: 12.5px; font-weight: 600; color: #b45309; margin-bottom: 10px;
 }
 .settings-shell .apikey-copy-row { display: flex; align-items: center; gap: 8px; }
-.settings-shell .apikey-raw {
-  font-size: 12px; padding: 8px 10px; background: var(--paper-2, #f5f5f7);
-  border: 1px solid var(--line, #e3e3e6); word-break: break-all;
+.settings-shell .apikey-raw { border-radius: var(--ui-radius-sm);
+  font-size: 12px; padding: 8px 10px; background: var(--ui-panel-sunken, #f5f5f7);
+  border: 1px solid var(--ui-divider, #e3e3e6); word-break: break-all;
   flex: 1; user-select: all;
 }
 .settings-shell .apikey-form-field { margin-bottom: 16px; }
 .settings-shell .apikey-form-field label {
-  display: block; font-size: 13px; font-weight: 600; color: var(--ink, #1d1d1f); margin-bottom: 6px;
+  display: block; font-size: 13px; font-weight: 600; color: var(--ui-text, #1d1d1f); margin-bottom: 6px;
 }
-.settings-shell .apikey-form-field input[type='text'] {
+.settings-shell .apikey-form-field input[type='text'] { border-radius: var(--ui-radius-sm);
   width: 100%; box-sizing: border-box; font: inherit; font-size: 14px; padding: 10px 12px;
-  border: 1px solid var(--line-2, #d2d2d7); outline: none;
+  border: 1px solid var(--ui-divider-strong, #d2d2d7); outline: none;
 }
-.settings-shell .apikey-form-field input[type='text']:focus { border-color: var(--accent); }
+.settings-shell .apikey-form-field input[type='text']:focus { border-color: var(--ui-accent); }
 .settings-shell .apikey-scopes { display: flex; gap: 8px; }

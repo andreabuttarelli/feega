@@ -69,19 +69,21 @@
   .wrap { display: flex; justify-content: center; padding: 48px 20px; }
   .card {
     width: 100%; max-width: 560px; background: var(--card, #fff);
-    border: 1px solid var(--line, #ececf1); padding: 28px;
+    border: 1px solid var(--ui-divider, #ececf1); padding: 28px;
+    border-radius: var(--ui-radius-md);
   }
-  .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ink-faint, #8a8a99); }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; color: var(--ui-text-tertiary, #8a8a99); }
   .badge {
     display: inline-grid; place-items: center; width: 26px; height: 26px;
     background: #1877f2; color: #fff; font-size: 15px; font-weight: 700; font-family: Georgia, serif;
   }
   h1 { margin: 14px 0 4px; font-size: 22px; }
-  .sub { color: var(--ink-faint, #8a8a99); margin: 0 0 20px; }
-  .section { margin: 22px 0 10px; font-size: 13px; font-weight: 600; color: var(--ink-faint, #8a8a99); text-transform: uppercase; letter-spacing: .04em; }
+  .sub { color: var(--ui-text-tertiary, #8a8a99); margin: 0 0 20px; }
+  .section { margin: 22px 0 10px; font-size: 13px; font-weight: 600; color: var(--ui-text-tertiary, #8a8a99); text-transform: uppercase; letter-spacing: .04em; }
   .row {
     display: flex; align-items: center; gap: 12px; padding: 12px;
-    border: 1px solid var(--line, #ececf1); margin-bottom: 10px;
+    border: 1px solid var(--ui-divider, #ececf1); margin-bottom: 10px;
+    border-radius: var(--ui-radius-md);
   }
   .ico {
     width: 38px; height: 38px; flex: 0 0 auto;
@@ -89,16 +91,16 @@
   }
   .meta { flex: 1; min-width: 0; }
   .meta .h { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .meta .s { font-size: 13px; color: var(--ink-faint, #8a8a99); }
+  .meta .s { font-size: 13px; color: var(--ui-text-tertiary, #8a8a99); }
   .btn {
     border: none; padding: 9px 16px; font-weight: 600; cursor: pointer;
     text-decoration: none; font-size: 14px; white-space: nowrap;
   }
   .btn.primary { background: var(--accent, #7c5cff); color: #fff; }
   .btn.primary:disabled { opacity: .6; cursor: default; }
-  .btn.ghost { background: transparent; color: var(--ink-faint, #8a8a99); border: 1px solid var(--line, #ececf1); }
+  .btn.ghost { background: transparent; color: var(--ui-text-tertiary, #8a8a99); border: 1px solid var(--ui-divider, #ececf1); border-radius: var(--ui-radius-sm); }
   .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
-  .empty { color: var(--ink-faint, #8a8a99); font-size: 14px; padding: 8px 2px 4px; }
+  .empty { color: var(--ui-text-tertiary, #8a8a99); font-size: 14px; padding: 8px 2px 4px; }
   .err {
     background: #fdecec; color: #c0392b; padding: 12px 14px; margin-bottom: 8px; font-size: 14px;
   }
