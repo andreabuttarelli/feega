@@ -147,4 +147,37 @@ test.describe('two people in one frame @real', () => {
       await admin.auth.admin.deleteUser(mate.userId);
     }
   });
+
+  test('each sees where the other points and what the other selected; the canvas shows who is in', async ({ page, browser, session, admin, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: FRAME_DATA });
+    expect((await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: twoTitles, actor_kind: 'user', actor_id: session.userId })).error).toBeNull();
+    const mate = await teammate(admin, session);
+
+    try {
+      const bo = await secondPage(browser, mate);
+      await gotoHydrated(bo, `/p/${session.projectId}/c/${session.canvasId}`);
+      await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+      await expect(page.getByTestId('peer-avatars').locator('li')).toHaveCount(1, { timeout: 15_000 });
+      await expect(bo.getByTestId('peer-avatars').locator('li')).toHaveCount(1);
+
+      const path = `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`;
+      await gotoHydrated(page, path);
+      await gotoHydrated(bo, path);
+      await bo.locator('[data-clip-id="b"]').first().click();
+      const stage = (await bo.getByTestId('frame-peers').boundingBox())!;
+      await bo.mouse.move(stage.x + stage.width * 0.3, stage.y + stage.height * 0.4);
+      await bo.mouse.move(stage.x + stage.width * 0.35, stage.y + stage.height * 0.45, { steps: 5 });
+
+      const cursor = page.getByTestId('peer-cursor');
+      await expect(cursor).toBeVisible({ timeout: 15_000 });
+      await expect(cursor).toContainText(mate.email.split('@')[0]);
+      await expect(page.getByTestId('peer-selection')).toHaveCount(1, { timeout: 15_000 });
+      const outline = (await page.getByTestId('peer-selection').boundingBox())!;
+      const area = (await page.getByTestId('frame-peers').boundingBox())!;
+      expect(outline.x >= area.x && outline.y >= area.y && outline.x + outline.width <= area.x + area.width && outline.y + outline.height <= area.y + area.height, 'the outline is drawn on the stage').toBe(true);
+      await bo.context().close();
+    } finally {
+      await admin.auth.admin.deleteUser(mate.userId);
+    }
+  });
 });

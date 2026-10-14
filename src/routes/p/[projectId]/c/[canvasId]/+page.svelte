@@ -30,6 +30,8 @@
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { PresencePeer } from '$lib/realtime/presence-peers';
+  import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
+  import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
   import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
@@ -1005,6 +1007,8 @@
   let failed = $state<string | null>(null);
   let failedIsCreditsExhausted = $state(false);
   let peers = $state<PresencePeer[]>([]);
+  const frames = frameHub({ userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
+  provideFramePresence(frames.port);
   let pending = 0;
   let snapshotMissed = false;
   let snapshotVersion = 0;
@@ -1206,7 +1210,8 @@
       onReconnect: () => { void checkStale(Trigger.Reconnect); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
       onPeers: (value) => { peers = value; },
-      onLink: (state) => { canvasLink.set(state); }
+      onLink: (state) => { canvasLink.set(state); },
+      frames: frames.line
     });
     return () => {
       disconnect();
@@ -2708,7 +2713,7 @@
 
 <div class="canvas" class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
   {#if peers.length}
-    <div class="peers" aria-label="People on this canvas">{peers.map((peer) => peer.name).join(', ')}</div>
+    <div class="peers"><PeerAvatars {peers} /></div>
   {/if}
   <p class="save-status" role="status" data-status={saveStatus}>{SAVE_LABEL[saveStatus]}</p>
   {#if failed}
