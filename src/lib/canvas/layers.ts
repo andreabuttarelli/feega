@@ -4,6 +4,8 @@ import { moveClip, moveTrack, renameTrack, type OpResult } from '$lib/motion/tim
 import { setClipFlags, setTrackFlags } from '$lib/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
 import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '$lib/motion/poster-parts';
+import { EditMode } from '$lib/motion/edit-mode';
+import { TrackKind } from '$lib/motion/components';
 import { NODE_KIND_LABEL } from './node-label';
 import type { NodeType } from './node-data';
 
@@ -28,8 +30,17 @@ export enum Pick {
   Toggle = 'toggle'
 }
 
-export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null };
-export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string, readonly string[]> };
+export enum NodeIcon {
+  Still = 'still',
+  Video = 'video'
+}
+
+export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean };
+export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string, readonly string[]>; mode?: EditMode };
+
+const FRAME_TYPE = 'motion';
+
+export const nodeIcon = (node: { type: string; still?: boolean }): string => (node.type === FRAME_TYPE ? (node.still ? NodeIcon.Still : NodeIcon.Video) : node.type);
 type Parts = Record<string, readonly string[]>;
 
 export type LayerRow = {
@@ -43,6 +54,7 @@ export type LayerRow = {
   hidden: boolean;
   locked: boolean;
   nested: boolean;
+  thumb?: string | null;
 };
 
 type Track = MotionDoc['tracks'][number];
@@ -55,21 +67,47 @@ const clipLabel = (clip: Clip) => (clip.component === CUSTOM_CLIP ? componentLab
 
 const KEY_SEP = '/';
 
-function trackRows(doc: MotionDoc, tracks: readonly Track[], nodeId: string, depth: number, nested: boolean, parts: Parts = {}, path = ''): LayerRow[] {
-  return tracks.flatMap((track) => [
-    { id: track.id, key: `${path}${track.id}`, kind: LayerKind.Track, depth, label: track.name || track.id, type: track.kind, nodeId, hidden: !!track.hidden, locked: !!track.locked, nested },
-    ...track.clips.flatMap((clip) => clipRows(doc, clip, nodeId, depth + 1, nested, parts, path))
-  ]);
+const DEFAULT_TRACK_NAME: Record<TrackKind, RegExp> = {
+  [TrackKind.Visual]: /^Video \d+$/,
+  [TrackKind.Audio]: /^Audio \d+$/
+};
+
+const MAX_NAMED_CLIPS = 2;
+const NAME_JOIN = ' · ';
+
+function groupLabel(track: Track, index: number): string {
+  if (track.name && !DEFAULT_TRACK_NAME[track.kind].test(track.name)) {
+    return track.name;
+  }
+  const known = [...new Set(track.clips.map(clipLabel).filter(Boolean))];
+  return known.length ? known.slice(0, MAX_NAMED_CLIPS).join(NAME_JOIN) : `Track ${index + 1}`;
 }
 
-function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nested: boolean, parts: Parts, path: string): LayerRow[] {
+type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode };
+
+const groupsTrack = (track: Track, mode: EditMode) => mode === EditMode.Motion && track.clips.length > 1;
+
+function trackRows(walk: Walk, tracks: readonly Track[], depth: number): LayerRow[] {
+  return tracks.flatMap((track, index) => {
+    if (!groupsTrack(track, walk.mode)) {
+      return track.clips.flatMap((clip) => clipRows(walk, clip, depth));
+    }
+    const group: LayerRow = { id: track.id, key: `${walk.path}${track.id}`, kind: LayerKind.Track, depth, label: groupLabel(track, index), type: track.kind, nodeId: walk.nodeId, hidden: !!track.hidden, locked: !!track.locked, nested: walk.nested };
+    return [group, ...track.clips.flatMap((clip) => clipRows(walk, clip, depth + 1))];
+  });
+}
+
+const isComponent = (clip: Clip, template: boolean, parts: Parts) => template || clip.component === CUSTOM_CLIP || (parts[clip.id]?.length ?? 0) > 0;
+
+function clipRows(walk: Walk, clip: Clip, depth: number): LayerRow[] {
+  const { doc, nodeId, nested, parts, path } = walk;
   const comp = clip.component === 'Precomp' ? String((clip.props as { comp?: string }).comp ?? '') : '';
   const template = comp !== '' && isLockedComp(doc, comp);
   const key = `${path}${clip.id}`;
   const row: LayerRow = {
     id: clip.id,
     key,
-    kind: template ? LayerKind.Group : LayerKind.Clip,
+    kind: isComponent(clip, template, parts) ? LayerKind.Group : LayerKind.Clip,
     depth,
     label: template ? (doc.comps[comp]?.name ?? clipLabel(clip)) : clipLabel(clip),
     type: clip.component,
@@ -80,27 +118,29 @@ function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nes
   };
   const inside = comp && !template ? (doc.comps[comp]?.tracks ?? []) : [];
   const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1, key));
-  return [row, ...own, ...trackRows(doc, inside, nodeId, depth + 1, true, {}, `${key}${KEY_SEP}`)];
+  return [row, ...own, ...trackRows({ ...walk, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1)];
 }
 
 function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth: number, clipKey: string): LayerRow {
   return { id: `${clip.id}${PART_SEP}${part}`, key: `${clipKey}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(doc, clip, part), type: partIcon(doc, clip, part), nodeId, hidden: false, locked: false, nested: true };
 }
 
-export const frameRows = (doc: MotionDoc, nodeId: string, parts: Parts = {}): LayerRow[] => trackRows(doc, doc.tracks, nodeId, TRACK_DEPTH, false, parts);
+const frameWalk = (doc: MotionDoc, nodeId: string, parts: Parts, mode: EditMode): Walk => ({ doc, nodeId, nested: false, parts, path: '', mode });
+
+export const frameRows = (doc: MotionDoc, nodeId: string, parts: Parts = {}): LayerRow[] => trackRows(frameWalk(doc, nodeId, parts, EditMode.Design), doc.tracks, TRACK_DEPTH);
 
 export type FrameOutlines = Record<string, readonly LayerRow[]>;
 
 function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlines): LayerRow[] {
   if (open?.nodeId === nodeId) {
-    return trackRows(open.doc, open.doc.tracks, nodeId, TRACK_DEPTH, false, open.parts);
+    return trackRows(frameWalk(open.doc, nodeId, open.parts ?? {}, open.mode ?? EditMode.Design), open.doc.tracks, TRACK_DEPTH);
   }
   return (outlines[nodeId] ?? []).map((row) => ({ ...row, nested: true }));
 }
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
-    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.type, nodeId: node.id, hidden: false, locked: false, nested: false };
+    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null };
     return folded.has(node.id) ? [row] : [row, ...childRows(node.id, open, outlines)];
   });
 }

@@ -1950,10 +1950,15 @@
     focus = { ids, key: (focus?.key ?? 0) + 1, free, mode };
   }
 
+  function frameLook(n: { id: string; type: string; data: Record<string, unknown> }) {
+    const motion = motionOf(n);
+    return motion ? { poster: assetUrl(motion.posterAssetId), still: motion.format === MotionFormat.Poster } : {};
+  }
+
   $effect(() =>
     layersSource.publishCanvas({
       get nodes() {
-        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data) }));
+        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), ...frameLook(n) }));
       },
       outlinesUrl: `/p/${data.projectId}/c/${data.canvas.id}/frame-outlines`,
       previewUrl: (nodeId) => motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId }),

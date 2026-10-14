@@ -264,7 +264,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await expect.poll(() => stored, { timeout: 20_000 }).toContain('call_inline');
   });
 
-  test('the layers panel docks left, opens the video from its node, selects a clip and moves a track, persisted', async ({ page, session, admin }, info) => {
+  test('the layers panel docks left, opens the video from its node, selects a clip, lists no track rows', async ({ page, session }, info) => {
     const [first] = info.annotations.filter((a) => a.type === 'node').map((a) => a.description!);
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const stageBefore = await page.locator('.canvas-stage').boundingBox();
@@ -277,15 +277,11 @@ test.describe('motion editor inside the canvas @real', () => {
     await expect(layers.locator(`[data-layer="${first}"]`), 'the node is called Frame').toContainText('Frame');
     await layers.locator(`[data-layer="${first}"]`).click();
     await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
-    const clip = layers.locator('[data-layer="t"]');
+    const clip = layers.locator('[data-layer="t"]').first();
     await clip.click();
     await expect(clip).toHaveAttribute('aria-selected', 'true');
 
-    await layers.locator('[data-layer="v1"]').click();
-    await page.keyboard.press('ControlOrMeta+BracketLeft');
-    await expect
-      .poll(async () => ((await admin.from('motion_revisions').select('doc').eq('node_id', first).order('version', { ascending: false }).limit(1)).data?.[0]?.doc as { tracks: { id: string }[] } | undefined)?.tracks.map((t) => t.id), { timeout: 10_000 })
-      .toEqual(['a1', 'v1']);
+    await expect(layers.locator('[data-kind="track"]'), 'a track holding one clip is not a row').toHaveCount(0);
     await page.waitForTimeout(800);
     await shoot(page, '7-layers');
   });
