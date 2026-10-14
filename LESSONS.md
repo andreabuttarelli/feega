@@ -2948,3 +2948,6 @@ by path, never by an id that can repeat.
 
 ### A worktree dev server breaks with `reading 'call'` after a restart
 Signal: `@real` specs time out on a click ("element is not visible", "<span> intercepts pointer events"); the page logs `pageerror: Cannot read properties of undefined (reading 'call')`. Cause: `node_modules` symlinked to the main checkout shares `node_modules/.vite`; another worktree's server re-optimized the deps under yours. Move: start your server with its own `cacheDir` (a scratch vite config that spreads `vite.config.ts`), never `rm` the shared cache.
+
+### A `tv()` variant drops its text colour next to a `text-ui-*` size
+Signal: a button or hint has the right size but the default text colour (white on white, grey on grey); `buttonVariants(...)` output lacks `text-ui-on-accent`. Cause: `tailwind-variants` merges with its own tailwind-merge, which reads `text-ui-label` as a colour and keeps only the last `text-*`. `cn()` knows the type roles; `tv()` does not unless told. Move: every `tv()` takes `{ twMergeConfig: TW_MERGE_CONFIG }` from `$lib/utils`.

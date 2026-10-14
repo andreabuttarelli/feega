@@ -1,5 +1,6 @@
 <script lang="ts" module>
 	import { tv } from "tailwind-variants";
+	import { TW_MERGE_CONFIG } from "$lib/utils.js";
 
 	export const FieldLayout = { Stack: "stack", Row: "row" } as const;
 	export type FieldLayout = (typeof FieldLayout)[keyof typeof FieldLayout];
@@ -20,7 +21,7 @@
 			},
 		},
 		defaultVariants: { layout: "stack" },
-	});
+	}, { twMergeConfig: TW_MERGE_CONFIG });
 </script>
 
 <script lang="ts">

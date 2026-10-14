@@ -1,5 +1,6 @@
 <script lang="ts" module>
 	import { type VariantProps, tv } from "tailwind-variants";
+	import { TW_MERGE_CONFIG } from "$lib/utils.js";
 
 	export const noticeVariants = tv({
 		base: "mb-4 border px-3.5 py-2.5 text-[0.8125rem] leading-snug",
@@ -11,7 +12,7 @@
 			},
 		},
 		defaultVariants: { tone: "info" },
-	});
+	}, { twMergeConfig: TW_MERGE_CONFIG });
 
 	export type NoticeTone = VariantProps<typeof noticeVariants>["tone"];
 </script>
