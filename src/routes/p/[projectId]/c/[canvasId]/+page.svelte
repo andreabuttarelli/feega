@@ -41,7 +41,7 @@
   import { CoachStep, ONBOARDING_EVENT, OnboardingStatus, chainOf, stepOf, type CoachChain } from '$lib/onboarding/coach';
   import { DEMO_PRESET, exampleFor, isDemoMedium } from '$lib/onboarding/demo';
   import OnboardingCoach from '$lib/components/canvas/OnboardingCoach.svelte';
-  import { placeBeside, type Rect } from '$lib/canvas/placement';
+  import { placeBeside, placeNear, type Rect } from '$lib/canvas/placement';
   import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
@@ -1307,9 +1307,11 @@
       return;
     }
 
-    const shown = pendingFrame(at, doc);
+    const probe = pendingFrame(at, doc);
+    const spot = placeNear(at, { w: probe.size.width ?? 0, h: probe.size.height ?? 0 }, occupiedRects());
+    const shown = pendingFrame(spot, doc);
     nodes = [...nodes, toTile(shown)];
-    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: at.x, y: at.y });
+    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y });
     const node = result?.node as CanvasNodeRecord | undefined;
     nodes = nodes.filter((n) => n.id !== shown.id);
     if (node && !nodes.some((n) => n.id === node.id)) {
@@ -1365,6 +1367,10 @@
     pushGesture(createManyGesture([created], wire ? [wire] : []));
   }
 
+  function occupiedRects(): Rect[] {
+    return tiles.map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }));
+  }
+
   function sizeForAddable(what: Addable): { w: number; h: number } {
     return nodeSize(what);
   }
@@ -1375,12 +1381,12 @@
   }
 
   async function create(what: Addable, at: { x: number; y: number }) {
-    const { w, h } = sizeForAddable(what);
+    const spot = placeNear(at, sizeForAddable(what), occupiedRects());
 
     const res = await post('create', {
       type: what,
-      x: at.x - w / 2,
-      y: at.y - h / 2,
+      x: spot.x,
+      y: spot.y,
       data: JSON.stringify(newNodeRow(what))
     });
 
