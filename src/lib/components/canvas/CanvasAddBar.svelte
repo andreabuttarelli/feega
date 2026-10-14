@@ -244,8 +244,8 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    padding: 4px;
-    border-radius: var(--ui-radius-lg);
+    padding: 5px;
+    border-radius: var(--ui-radius-full);
     background: var(--ui-panel-raised);
     box-shadow: var(--ui-shadow-float);
   }
@@ -299,14 +299,14 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 32px;
-    height: 32px;
-    padding: 0 8px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 9px;
     font: inherit;
     color: var(--ui-icon-ink);
     background: none;
     border: none;
-    border-radius: var(--ui-radius-sm);
+    border-radius: var(--ui-radius-full);
     cursor: grab;
     transition: background-color var(--ui-dur-fast) var(--ui-ease), color var(--ui-dur-fast) var(--ui-ease);
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LayerAction, LayerKind, Pick, dropLayer, frameHover, frameRows, rowPicked, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { LayerAction, LayerKind, Pick, dropLayer, frameHover, frameRows, rowPicked, rowsInside, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
@@ -243,5 +243,19 @@ describe('hovering a layer row', () => {
     expect(frameHover({ nodeId: 'm1', id: 'poster#title' }, 'm1')).toBe('poster#title');
     expect(frameHover({ nodeId: 'm1', id: 'm1' }, 'm1')).toBeNull();
     expect(frameHover({ nodeId: 'm2', id: 't1' }, 'm1')).toBeNull();
+  });
+});
+
+describe('the rows inside a picked row are tinted with it', () => {
+  const row = (key: string, depth: number) => ({ key, depth });
+
+  it('every deeper row right after a picked row is inside it, up to the next sibling', () => {
+    const rows = [row('a', 0), row('b', 1), row('c', 2), row('d', 1), row('e', 0)];
+    expect([...rowsInside(rows, (r) => r.key === 'b')]).toEqual(['c']);
+    expect([...rowsInside(rows, (r) => r.key === 'a')]).toEqual(['b', 'c', 'd']);
+  });
+
+  it('nothing is inside when nothing is picked', () => {
+    expect(rowsInside([row('a', 0), row('b', 1)], () => false).size).toBe(0);
   });
 });

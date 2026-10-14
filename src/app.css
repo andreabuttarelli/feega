@@ -246,10 +246,10 @@
   --ui-tracking-title: -0.01em;
   --ui-leading-tight: 1.2;
   --ui-leading: 1.45;
-  --ui-row-sm: 24px;
-  --ui-row: 28px;
-  --ui-row-lg: 32px;
-  --ui-header-h: 40px;
+  --ui-row-sm: 28px;
+  --ui-row: 32px;
+  --ui-row-lg: 36px;
+  --ui-header-h: 48px;
   --ui-icon-xs: 12px;
   --ui-icon-lg: 20px;
   --ui-dur-fast: 120ms;

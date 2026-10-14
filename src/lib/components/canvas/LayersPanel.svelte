@@ -17,7 +17,7 @@
   import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import PartsProbe from './PartsProbe.svelte';
-  import { LayerAction, LayerKind, Pick, dropLayer, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { LayerAction, LayerKind, Pick, dropLayer, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const INDENT_PX = 14;
@@ -88,6 +88,7 @@
 
   const ROW_ICON: Record<string, typeof Square> = { motion: Clapperboard, image: ImageIcon, text: TypeIcon, arrow: ArrowRight };
   const isPicked = (row: LayerRow) => rowPicked(row, selection);
+  const inside = $derived(rowsInside(rows, isPicked));
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
 
   const pickOf = (e: MouseEvent | KeyboardEvent): Pick => pickFor({ shift: e.shiftKey, mod: e.metaKey || e.ctrlKey });
@@ -175,6 +176,7 @@
     <div
       class="row"
       class:picked={isPicked(row)}
+      class:inside={inside.has(row.key)}
       class:muted={row.hidden}
       role="treeitem"
       aria-level={row.depth + 1}
@@ -234,8 +236,8 @@
     align-items: center;
     gap: 8px;
     height: var(--ui-row);
-    padding-right: 4px;
-    border-radius: var(--ui-radius-sm);
+    padding-right: 6px;
+    border-radius: var(--ui-radius-md);
     color: var(--ui-text);
     cursor: default;
     user-select: none;
@@ -251,11 +253,22 @@
   }
 
   .row.picked {
-    background: var(--ui-selected);
-    color: var(--ui-accent-text);
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
+    font-weight: var(--ui-weight-medium);
   }
 
-  .row.picked .icon {
+  .row.picked .icon,
+  .row.picked .flag {
+    color: var(--ui-on-accent);
+  }
+
+  .row.inside {
+    background: var(--ui-selected);
+    border-radius: 0;
+  }
+
+  .row.inside .icon {
     color: var(--ui-accent-text);
   }
 

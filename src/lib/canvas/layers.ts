@@ -202,3 +202,16 @@ export type LayerHover = { nodeId: string; id: string } | null;
 export const tileHovered = (hover: LayerHover, nodeId: string, openNodeId: string | null): boolean => !!hover && hover.nodeId === nodeId && (hover.id === nodeId || openNodeId !== nodeId);
 
 export const frameHover = (hover: LayerHover, openNodeId: string | null): string | null => (hover && hover.nodeId === openNodeId && hover.id !== openNodeId ? hover.id : null);
+
+export function rowsInside<R extends { key: string; depth: number }>(rows: readonly R[], picked: (row: R) => boolean): Set<string> {
+  const inside = new Set<string>();
+  let parentDepth: number | null = null;
+  for (const row of rows) {
+    if (parentDepth !== null && row.depth > parentDepth) {
+      inside.add(row.key);
+      continue;
+    }
+    parentDepth = picked(row) ? row.depth : null;
+  }
+  return inside;
+}
