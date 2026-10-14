@@ -52,6 +52,8 @@ import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { templateLibrary } from '$lib/server/motion/templates';
+import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
+import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
 import { undoGesture } from '$lib/server/canvas/undo';
@@ -1612,6 +1614,34 @@ export const actions: Actions = {
     }
 
     return { ended: await endOnboarding(scope.db, scope.userId, to) };
+  },
+
+  frame_template: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+
+    const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
+    const format = String(fd.get('format') ?? MotionFormat.Landscape) as MotionFormat;
+    if (!Number.isFinite(at.x) || !Number.isFinite(at.y) || !MOTION_FORMATS.includes(format)) {
+      return fail(400, { error: 'invalid frame' });
+    }
+
+    const actor = userActor(scope);
+    const started = await startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, {
+      orgId: scope.orgId,
+      projectId: scope.canvas.projectId,
+      canvasId: scope.canvasId,
+      userId: scope.userId,
+      templateId: String(fd.get('template') ?? ''),
+      format,
+      at,
+      actor
+    });
+    if (started.outcome !== FromTemplate.Started) {
+      return fail(400, { error: started.outcome });
+    }
+
+    return { node: await findNode(scope.db, { orgId: scope.orgId, nodeId: started.start.nodeId }) };
   },
 
   template: async ({ request, params, locals }) => {

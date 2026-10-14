@@ -110,7 +110,8 @@ secondi nello stesso intervallo, e poco prima c'è un `DELETE /rest/v1/orgs` (IP
 role) con `origin_time` > 8 s finito `500`/`statement timeout`. Il cascade di un'org tocca tabelle
 con foreign key senza indice e ferma il progetto. Mossa: query a bucket di 5 s su `origin_time`
 prima di accusare il codice della richiesta lenta; niente teardown di eval sul database di
-produzione mentre qualcuno lo usa.
+produzione mentre qualcuno lo usa. Ogni nuova foreign key nasce con il suo indice nella stessa
+migration: il lint `unindexed_foreign_keys` dell'advisor deve restare a zero in `public`.
 
 ### Un render server riesce e il salvataggio fallisce con `EntityTooLarge`
 Storage del progetto accetta al massimo 50 MB per file (limite globale, non del bucket): un
@@ -2913,3 +2914,6 @@ produzione mostra il banner cookie: la spec mette il cookie di consenso, o il lo
 
 ### Every motion e2e fails at once after a run was killed
 Signal: a batch of `@real` motion specs fails together (`motion-editor` never appears), each passes alone. Cause: a killed playwright run left `reuseExistingServer` on a dying dev server. Move: rerun on a clean server before judging a spec.
+
+### A seeded e2e on production stalls production
+Signal: `@real` specs create and tear down orgs on the production Supabase project; a teardown froze production for 30 s. Move: run seeded e2e only against a non-production database; until one exists, unit and route tests with fakes.

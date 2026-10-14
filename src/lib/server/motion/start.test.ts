@@ -59,3 +59,12 @@ describe('a new video from the dashboard is a motion node on a canvas', () => {
     expect(d.createNode).not.toHaveBeenCalled();
   });
 });
+
+describe('a frame started from the canvas add bar', () => {
+  it('lands where the canvas is looking, not to the right of everything', async () => {
+    const d = deps({ listNodes: vi.fn(async () => [node(100, 400)]) });
+    await startMotion(db, d, { ...input, canvasId: 'c1', at: { x: 30, y: -40 } });
+
+    expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ x: 30, y: -40 }));
+  });
+});

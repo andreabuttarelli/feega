@@ -19,7 +19,7 @@ export const MOTION_START_DEPS: MotionStartDeps = { listCanvases, createCanvas, 
 
 export type MotionStart = { projectId: string; canvasId: string; nodeId: string };
 
-type StartInput = { orgId: string; projectId: string; canvasId: string | null; userId: string; name: string; format?: MotionFormat; near?: string[]; actor?: Actor };
+type StartInput = { orgId: string; projectId: string; canvasId: string | null; userId: string; name: string; format?: MotionFormat; near?: string[]; at?: { x: number; y: number }; actor?: Actor };
 
 async function motionCanvasId(db: Db, deps: MotionStartDeps, input: StartInput): Promise<string | null> {
   const canvases = await deps.listCanvases(db, { orgId: input.orgId, projectId: input.projectId });
@@ -59,7 +59,7 @@ export async function startMotion(db: Db, deps: MotionStartDeps, input: StartInp
     projectId: input.projectId,
     canvasId,
     type: 'motion',
-    ...spotFor(nodes, input.near),
+    ...(input.at ?? spotFor(nodes, input.near)),
     displayName: input.name,
     data: newMotionData(input.format),
     actor: input.actor ?? { kind: 'user', id: input.userId }

@@ -26,7 +26,7 @@
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import { Detent, nearestDetent, nextDetent, sheetHeight } from '$lib/motion/sheet-detents';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
-  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, defaultTimelinePx, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import { Lens, addLens } from '$lib/motion/glass/ops';
@@ -270,12 +270,14 @@
     return () => el.removeEventListener('ready', ready, true);
   });
 
+  const firstLayout = (): EditorLayout => ({ ...DEFAULT_LAYOUT, timelinePx: defaultTimelinePx(viewportOf(innerWidth), innerHeight) });
+
   onMount(() => {
     const at = clipSeek(doc, location.search);
     if (at !== null) {
       seekTo(at);
     }
-    layout = readLayout(browserStore());
+    layout = readLayout(browserStore(), firstLayout());
     const url = new URL(window.location.href);
     if (url.searchParams.has(BRAND_PARAM)) {
       void askBrand();
@@ -1504,7 +1506,7 @@
     </SideColumn>
 
     <section class="timeline-area" {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc)}>
-      <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: DEFAULT_LAYOUT.timelinePx })}></div>
+      <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
 
       {#if clipBarShown}
         <ClipBar {doc} {selection} pick={pickMode} onrun={runFromBar} ondone={() => (pickMode = PickMode.One)} />
@@ -2034,6 +2036,22 @@
   [data-mode='still'] .transport,
   [data-mode='still'] .timeline-area {
     display: none;
+  }
+
+  .editor[data-mount='canvas'] .timeline-area {
+    animation: rise var(--chrome-move) var(--ease-expo) both;
+  }
+
+  @keyframes rise {
+    from {
+      transform: translateY(100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .editor[data-mount='canvas'] .timeline-area {
+      animation: none;
+    }
   }
 
   .timeline-area {
