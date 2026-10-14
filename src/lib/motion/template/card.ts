@@ -10,6 +10,7 @@ export enum SectionRole {
   Gallery = 'gallery',
   Transition = 'transition',
   Closer = 'closer',
+  Poster = 'poster',
   Background = 'background'
 }
 
@@ -61,6 +62,7 @@ export const ROLE_MEANING: Record<SectionRole, string> = {
   [SectionRole.Gallery]: 'many pictures or clips at once',
   [SectionRole.Transition]: 'a short bridge between sections',
   [SectionRole.Closer]: 'the end: logo, call to action, address',
+  [SectionRole.Poster]: 'a still poster: one designed frame, for a still post or a held beat',
   [SectionRole.Background]: 'motion behind other clips, holds no message alone'
 };
 
@@ -126,7 +128,6 @@ export function cardLine(card: TemplateCard): string {
     `${card.edges.start}→${card.edges.end} ${card.edges.transition}`,
     mediaLine(card.needs.media),
     `text ${card.needs.text}`,
-    card.bestFormats.join(' '),
     card.onScreen.map(beatLine).join('; '),
     `for ${card.goodFor.join(', ')}`
   ]

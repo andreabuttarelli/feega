@@ -77,9 +77,9 @@
 {/snippet}
 
 <Tooltip.Provider delayDuration={200}>
-  <nav class="rail" aria-label={$_('app.shell.rail')}>
+  <nav class="rail" data-dock="left-bar" aria-label={$_('app.shell.rail')}>
     <div class="rail-group">
-      {#each visibleNav(page.data.socialPublishing, navEntriesByGroup('panel')) as entry (entry.id)}
+      {#each [...navEntriesByGroup('canvas'), ...visibleNav(page.data.socialPublishing, navEntriesByGroup('panel'))] as entry (entry.id)}
         {@render railButton(entry)}
       {/each}
     </div>
@@ -96,19 +96,15 @@
 
 <style>
   .rail {
-    position: absolute;
+    flex: 0 0 auto;
+    align-self: stretch;
     z-index: 20;
-    left: 8px;
-    top: 50%;
-    transform: translateY(-50%);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 6px;
     padding: 8px 5px;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line, #ededef);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+    background: var(--ui-surface);
   }
 
   .rail-group {

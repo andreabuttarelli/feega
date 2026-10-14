@@ -96,6 +96,14 @@ Vite osserva anche `changelog/*.md`: scriverne uno mentre l'harness naviga l'edi
 `page reload <file>` all'ora del fallimento. Mossa: niente edit nel worktree servito finché il
 giro non è finito, o un dev server da un checkout separato.
 
+### Un editor lento solo in produzione: `VERCEL=1` accende rami che in locale non esistono
+La chat del motion editor restava sullo scheletro 8–15 s in produzione e partiva in 0,4 s in
+locale. In produzione `farmAccess` vede `VERCEL=1`, e la sessione dell'editor aspettava la sonda
+del limite di upload (ricerca binaria: ~40 POST in serie a `storage/v1/upload/resumable`, per
+istanza fredda). Segnale: negli `edge_logs` di Supabase una raffica di `POST 413 .../upload/resumable`
+tra la sessione e la prima chiamata della chat. Mossa: rifare il giro e2e col dev server lanciato
+con `VERCEL=1`; un dato accessorio non blocca mai il caricamento (`knownUploadLimit`).
+
 ### Un render server riesce e il salvataggio fallisce con `EntityTooLarge`
 Storage del progetto accetta al massimo 50 MB per file (limite globale, non del bucket): un
 ProRes, un 4K o un PNG lungo esce dal farm e muore all'upload con `413`. La dimensione dipende
@@ -289,6 +297,18 @@ Move: `originHeaders` rimette l'origine della pagina sulle richieste che cambian
 diagnosticare un login, guarda lo status della POST.
 
 ## Ambiente e worktree
+
+### Spostare nel DOM un nodo che contiene un iframe lo ricarica vuoto
+Segnale: la preview motion montata altrove (dentro un nodo della tela) resta nera, la timeline
+scorre, nessun errore in console. Mossa: non riparentare il player; ancorarlo sopra il bersaglio
+con posizione calcolata a ogni frame (`anchoredTo` in `inline-stage.svelte.ts`). Un'asserzione
+sui pixel accesi al centro del player (non sul riquadro intero: i bordi ingannano) lo prende.
+
+### Un `vite dev` lasciato acceso serve moduli vecchi a Playwright
+Segnale: un giro Playwright verde (o rosso) che non cambia dopo un edit; un `console.log` appena
+aggiunto non compare; il CSS servito (`?svelte&type=style`) non contiene la regola nuova. Mossa:
+riavviare il dev server della propria porta prima di ogni giro e2e che deve vedere un edit; un
+verde ottenuto prima del riavvio non vale.
 
 ### Verde in locale, rosso in CI: una chiave del `.env` sceglie il ramo
 Il `.env` copiato nel worktree porta chiavi (es. `EXA_API_KEY`) che la CI non ha: in locale il
@@ -2861,3 +2881,27 @@ finishes before an in-out position curve starts moving, so the visible motion is
 middle. Move: measure the word's sub-pixel centroid per frame against its opacity; the position
 curve must be out-shaped, moving during the fade and reaching zero speed at rest
 (`word-entrance.test.ts`).
+
+### A local production build never shows the motion player
+Signal: `vite preview` opens the editor but the frame stays blank; the opaque player frame's fetch of `/motion-libs` fails CORS. Dev server and Vercel send the header, preview did not. Move: preview must send it too (`scripts/motion-libs.ts`); measure perf on a build, not dev.
+
+### A layer placed by its own rAF lags a transform written in the same frame
+Signal: an overlay slides off its node while the canvas animates (70 px on a phone). Cause: the overlay's requestAnimationFrame ran before the canvas wrote its transform, so every frame painted the old position. Move: re-place on ancestor style/size change (MutationObserver/ResizeObserver, microtask before paint), not by polling rAF.
+
+### A perf budget on server TTFB flakes
+Signal: the open-frame budget swings by 2 s between runs with no code change. Move: budget what the client controls - payload size, mount after response, picture after mount.
+
+### A video on iPhone shows a black, zoomed-in corner of the frame
+Signal: on iOS Safari the editor player is black with a few specks while the node poster is fine; desktop WebKit (Playwright `iPhone 15`) renders the same doc correctly. Cause: CSS `zoom` on the player iframe (sharpness fix for Chromium) shrinks the box but iOS lays the frame's document out unzoomed, so only the top-left ~1/6 of the 1920 px composition shows. Move: scale the player iframe by `zoom` only where it is proven (`crispFor` in `crisp-scale.ts`, Chromium); WebKit keeps the player's transform. Emulated WebKit is not iOS: verify iframe/zoom fixes on a device.
+
+### Una tela lenta con pochi nodi: i player montati al passaggio del puntatore
+Segnale: pan/zoom a scatti (p5 < 20 fps, secondi di long task in 10 s) su una tela con DOM statico
+piccolo e zero player dopo il load; durante il pan compaiono `hyperframes-player` dentro i nodi.
+Un `pointerenter` (o un tocco) che monta un player lo fa a ogni nodo attraversato. Mossa: contare
+`[data-testid="motion-node"] hyperframes-player` durante il gesto (`canvas-perf.spec.ts`), non
+dopo; il player del nodo parte solo da Play (`motion-preview.ts`). Il pan su telefono va misurato
+senza tap: un tap apre l'editor inline, che ha il suo player e sporca i numeri. Il build di
+produzione mostra il banner cookie: la spec mette il cookie di consenso, o il login non clicca.
+
+### Every motion e2e fails at once after a run was killed
+Signal: a batch of `@real` motion specs fails together (`motion-editor` never appears), each passes alone. Cause: a killed playwright run left `reuseExistingServer` on a dying dev server. Move: rerun on a clean server before judging a spec.

@@ -16,6 +16,10 @@ export type FramePage = {
 
 export type BrowserPort = { open: (viewport: Viewport) => Promise<FramePage> };
 
+export type StillPage = FramePage & { picture: (mime: string, quality?: number) => Promise<Buffer> };
+
+export type StillPort = { open: (viewport: Viewport) => Promise<StillPage> };
+
 export type FrameAsk = { compose: ComposeInput; times: readonly number[]; size?: number };
 
 function scaleFor(doc: ComposeInput['doc'], size: number): number {

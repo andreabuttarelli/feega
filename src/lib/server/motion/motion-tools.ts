@@ -1,3 +1,4 @@
+import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { THREE_GUIDANCE } from './three-guidance';
 import { GUIDES, guidesFor, type GuideTopic } from './guides';
 import { lintAdvice } from '$lib/motion/custom/lint';
@@ -132,6 +133,8 @@ import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '$lib/motion/style-model';
 import { SPAWN_AGENT, type ModelOffer, type SpawnInput, type SpawnResult } from '$lib/server/agents/spawn';
 import { spawnAgentTool } from '$lib/server/agents/spawn-agent';
+import { setStill } from '$lib/motion/still';
+import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '$lib/motion/still-model';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
 const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
@@ -165,7 +168,7 @@ export type MotionToolDeps = {
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   spawn?: { offers: readonly ModelOffer[]; run: (input: SpawnInput) => Promise<SpawnResult> };
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
-  renderLink?: () => Promise<Record<string, unknown>>;
+  renderLink?: (quality: ExportQuality) => Promise<Record<string, unknown>>;
   embed?: (action: EmbedAction) => Promise<Record<string, unknown>>;
   templates?: TemplateLibrary;
   revisions?: RevisionLibrary;
@@ -181,7 +184,10 @@ export type MotionToolDeps = {
   web?: WebToolDeps;
   storyboard?: StoryboardPort;
   copywrite?: (script: LaunchScript) => Promise<LaunchScript>;
+  exportStill?: (doc: MotionDoc, spec: StillExport) => Promise<StillMade>;
 };
+
+export type StillMade = { ok: true; asset_id: string; url: string; width: number; height: number } | { ok: false; error: string };
 
 export type StoryboardPort = {
   write: (board: Storyboard, media: Record<string, MediaKind>) => Promise<{ canvasId: string; nodes: number; connections: number }>;
@@ -273,6 +279,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     background: doc.background,
     motionBlur: doc.motionBlur,
     duration: secs(doc.durationInFrames),
+    still: doc.still ? { time: secs(doc.still.frame) } : null,
     selected: selection,
     tracks: doc.tracks.map((t) => ({
       id: t.id,
@@ -1666,8 +1673,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     render_video: tool({
       description:
         'Render the saved video to an MP4 for free on the user\'s own device. Returns render_url: give it to the user as a markdown link titled "Render on this device"; they open it (on this or another device), it renders there and lands in the project assets. The link works once and expires in 30 minutes. The saved video is rendered, so edits of this turn must be saved first.',
-      inputSchema: z.object({}).strict(),
-      execute: async () => (deps.renderLink ? deps.renderLink() : { ok: false, error: 'rendering is not available here' })
+      inputSchema: z.object({ quality: z.enum(ExportQuality).optional().describe('Encoding quality: standard (smaller file), high (default), max (largest file, finest grain and lines)') }).strict(),
+      execute: async ({ quality = ExportQuality.High }) => (deps.renderLink ? deps.renderLink(quality) : { ok: false, error: 'rendering is not available here' })
     }),
 
     set_style: tool({
@@ -1820,8 +1827,14 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_canvas: tool({
-      description: `Change the format (16:9, 9:16, 1:1, 4:5), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage).`,
-      inputSchema: z.object({ format: z.enum(MOTION_FORMATS).optional(), duration: z.number().positive().max(MAX_SECONDS).optional(), fps: z.literal(FRAME_RATES).optional(), background: z.enum([Background.Brand, Background.Transparent]).optional() }),
+      description: `Change the format (16:9, 9:16, 1:1, 4:5), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again.`,
+      inputSchema: z.object({
+        format: z.enum(MOTION_FORMATS).optional(),
+        duration: z.number().positive().max(MAX_SECONDS).optional(),
+        fps: z.literal(FRAME_RATES).optional(),
+        background: z.enum([Background.Brand, Background.Transparent]).optional(),
+        still: z.union([z.number().min(0), z.literal(false)]).optional()
+      }),
       execute: async (input) => {
         const stretched = input.duration !== undefined && session.doc.script ? durationProblem(input.duration, session.doc.script) : null;
         if (stretched) {
@@ -1829,7 +1842,23 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const paced = input.fps === undefined ? ({ ok: true, doc: session.doc } as OpResult) : setFrameRate(session.doc, input.fps);
         const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
-        return apply(sized, 'changed the canvas');
+        const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
+        return apply(pinned, 'changed the canvas');
+      }
+    }),
+
+    export_image: tool({
+      description: `Draw one frame of the video as an image file at full resolution and save it to the project: ${IMAGE_FORMATS.join(', ')}, scale 1 (the canvas size) or 2 (double). A still graphic draws its still frame; a video draws \`time\` (default its first frame). Returns the file url and asset id. Use it to deliver a post or a poster, not to check your work (view_frames is free and faster).`,
+      inputSchema: z.object({ format: z.enum(IMAGE_FORMATS).optional(), scale: z.literal(IMAGE_SCALES).optional(), time: z.number().min(0).optional() }),
+      execute: async (input) => {
+        if (!deps.exportStill) {
+          return UNREADABLE('image export');
+        }
+        const pinned = session.doc.still && input.time === undefined ? ({ ok: true, doc: session.doc } as OpResult) : setStill(session.doc, input.time ?? 0);
+        if (!pinned.ok) {
+          return pinned;
+        }
+        return deps.exportStill(pinned.doc, stillExport(input.format ?? ImageFormat.Png, input.scale ?? ImageScale.One));
       }
     }),
 
@@ -2274,7 +2303,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     list_templates: tool({
-      description: `List the motion templates (built-in and saved by the team), each with its key_fields (the ones a user edits first; get_template lists all) and its card in one line: roles · energy · loops · edges start→end and suggested transition · media count and aspect · text amount · best formats · what is on screen, second by second · good for. role narrows to one section role: ${SECTION_ROLES.map((r) => `${r} (${ROLE_MEANING[r]})`).join(', ')}. get_template gives one in full with its typed fields.`,
+      description: `List the motion templates (built-in and saved by the team), each with its key_fields (the ones a user edits first; get_template lists all) and its card in one line: roles · energy · loops · edges start→end and suggested transition · media count and aspect · text amount · what is on screen, second by second · good for. role narrows to one section role: ${SECTION_ROLES.map((r) => `${r} (${ROLE_MEANING[r]})`).join(', ')}. get_template gives one in full with its typed fields.`,
       inputSchema: z.object({ role: z.enum(SECTION_ROLES).optional() }).strict(),
       execute: async (input) => {
         const entries = (await deps.templates?.list()) ?? [];

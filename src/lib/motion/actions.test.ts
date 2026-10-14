@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { ACTIONS, Action, GuideGroup, MenuSection, Place, guideSections, menuSections, placeOf, tipText } from './actions';
 import { Command } from './shortcuts';
 
-const EDITOR_PAGE = 'src/routes/p/[projectId]/c/[canvasId]/motion/[nodeId]/+page.svelte';
+const EDITOR_PAGE = 'src/lib/components/motion/MotionEditorShell.svelte';
 const MOTION_COMPONENTS = 'src/lib/components/motion';
 
 const editorFiles = () => [EDITOR_PAGE, ...readdirSync(MOTION_COMPONENTS).filter((f) => f.endsWith('.svelte')).map((f) => join(MOTION_COMPONENTS, f))];

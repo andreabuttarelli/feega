@@ -12,7 +12,7 @@
   import { compOf, type MotionClip, type MotionDoc } from '$lib/motion/doc';
   import { ClipEdge, moveClip, moveKeyframes, moveTrack, removeKeyframes, setKeyEase, setKeyInterp, setKeyframe, trimClip, type KeyRef, type OpResult } from '$lib/motion/timeline';
   import { withParams } from '$lib/motion/custom/params';
-  import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, frameAt, keyLanes, pxPerFrame, snapped } from '$lib/motion/timeline-view';
+  import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, fitZoom, frameAt, headerPx, keyLanes, pxPerFrame, snapped } from '$lib/motion/timeline-view';
   import { Axis, lockAxis, pinchView, type PinchStart } from '$lib/motion/timeline-touch';
   import { KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
   import { MASK_KINDS, Matte } from '$lib/motion/mask';
@@ -31,9 +31,6 @@
   import { PEAKS_PER_SECOND, clipPeaks, wavePath } from '$lib/motion/waveform';
   import { FadeEdge, dragFade, fadeHandles } from '$lib/motion/fade-handles';
 
-  const HEADER_PX = 240;
-  const COMPACT_HEADER_PX = 180;
-  const COMPACT_BELOW_PX = 760;
   const TILE_PX = 64;
   const MAX_TILES = 48;
 
@@ -86,8 +83,17 @@
   let shy = $state<string[]>([]);
   let hideShy = $state(false);
   let filter = $state('');
-  let viewportWidth = $state(1440);
-  const headPx = $derived(viewportWidth < COMPACT_BELOW_PX ? COMPACT_HEADER_PX : HEADER_PX);
+  let timelineWidth = $state(0);
+  const headPx = $derived(headerPx(timelineWidth || 1440));
+  let fitAt: number | null = null;
+
+  $effect(() => {
+    if (!timelineWidth || (fitAt !== null && zoom !== fitAt)) {
+      return;
+    }
+    fitAt = fitZoom(doc, timelineWidth - headPx);
+    zoom = fitAt;
+  });
   let strips = $state<Record<string, Strip>>({});
 
   let open = $state<string[]>([]);
@@ -624,7 +630,7 @@
   }
 </script>
 
-<svelte:window bind:innerWidth={viewportWidth} onpointermove={onMove} onpointerup={onUp} />
+<svelte:window onpointermove={onMove} onpointerup={onUp} />
 
 {#snippet propRow(owner: KeyOwner, lane: PropLane, rowId: string)}
   {@const keys = owner.keyframes[lane.prop] ?? []}
@@ -674,7 +680,7 @@
   </div>
 {/snippet}
 
-<div class="timeline" bind:this={lanes} data-testid="motion-timeline" style={`--head: ${headPx}px;`} onpointerdowncapture={touchDown} onpointermovecapture={touchMove} onpointerupcapture={touchUp} onpointercancelcapture={touchUp}>
+<div class="timeline" bind:this={lanes} bind:clientWidth={timelineWidth} data-narrow={headPx < 120 ? '' : undefined} data-testid="motion-timeline" style={`--head: ${headPx}px;`} onpointerdowncapture={touchDown} onpointermovecapture={touchMove} onpointerupcapture={touchUp} onpointercancelcapture={touchUp}>
   <div class="inner" style={`width: ${width + headPx}px;`}>
     <div class="ruler" role="slider" tabindex="-1" aria-label="Playhead" aria-valuenow={frame} onpointerdown={startScrub}>
       <div class="corner">
@@ -1057,6 +1063,11 @@
   .row.prop {
     height: var(--prop-row);
     background: var(--ui-surface);
+  }
+
+  .timeline[data-narrow] .head :global(.flags),
+  .timeline[data-narrow] .head :global(.twirl) {
+    display: none;
   }
 
   .head {

@@ -5,6 +5,8 @@
   import { onDestroy, untrack } from 'svelte';
   import CanvasTopBar from '$lib/components/canvas/CanvasTopBar.svelte';
   import FloatingRail from '$lib/components/canvas/FloatingRail.svelte';
+  import type { LeftPanelKind } from '$lib/components/canvas/CanvasLeftPanel.svelte';
+  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import CanvasChatPanel from '$lib/components/canvas/CanvasChatPanel.svelte';
   import CanvasSheet from '$lib/components/canvas/CanvasSheet.svelte';
   import ChatLeaveGuard from '$lib/components/canvas/ChatLeaveGuard.svelte';
@@ -15,7 +17,7 @@
   import MobileViewSwitch from '$lib/components/canvas/MobileViewSwitch.svelte';
   import { watchKeyboard } from '$lib/canvas/keyboard-inset';
   import DesktopPageBar from '$lib/components/canvas/DesktopPageBar.svelte';
-  import { sheetEntryForPath, directLoadMode, navHref, type NavEntry } from '$lib/shell-nav';
+  import { NAV_ENTRIES, sheetEntryForPath, directLoadMode, navHref, type NavEntry } from '$lib/shell-nav';
   import { goto } from '$app/navigation';
   import { INITIAL_MOBILE_VIEW, chatBadge, showView, turnEnded, type MobileView, type ChatTurn } from '$lib/canvas/mobile-view';
   import { anyChatRunning } from '$lib/components/brand-agent/chat-session.svelte';
@@ -36,7 +38,7 @@
   const currentCanvas = $derived(data.canvases.find((c: { id: string }) => c.id === canvasId));
   const activeSheetId = $derived(page.state.sheet ? sheetEntryForPath(page.state.sheet.path)?.id ?? null : null);
 
-  let leftPanel = $state<'assets' | 'brands' | 'influencers' | null>(null);
+  let leftPanel = $state<LeftPanelKind | null>(null);
   let chatOpen = $state(browser ? readChatOpen() : true);
   let mobileView = $state(INITIAL_MOBILE_VIEW);
 
@@ -82,7 +84,7 @@
   });
 
   function onRailPanel(entry: NavEntry) {
-    leftPanel = leftPanel === entry.id ? null : (entry.id as 'assets' | 'brands' | 'influencers');
+    leftPanel = leftPanel === entry.id ? null : (entry.id as LeftPanelKind);
   }
 
   function onRailSheet(entry: NavEntry) {
@@ -140,7 +142,7 @@
 
 <ChatLeaveGuard {projectId} />
 
-<div class="project-shell ui-app" class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-mode={data.project.mode}>
+<div class="project-shell ui-app" class:is-editing={inlineStage.editing} class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-mode={data.project.mode}>
   {#if isMobile}
     <MobileTopBar
       {projectId}
@@ -174,54 +176,54 @@
       {/if}
     </main>
   {:else if onCanvasRoute}
+    <CanvasTopBar
+      {projectId}
+      projectName={data.project.name}
+      projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string; mode: string }) => ({
+        id: p.id,
+        name: p.name,
+        href: p.href,
+        updatedAt: p.updatedAt,
+        mode: p.mode
+      }))}
+      projectMode={data.project.mode}
+      brandName={data.brand?.name ?? null}
+      canvasName={currentCanvas?.name ?? ''}
+      canvasHref={currentCanvas?.href ?? ''}
+      canvases={data.canvases}
+      creditBalance={data.creditBalance}
+      {chatOpen}
+      onToggleChat={toggleChat}
+      {shareToken}
+      {onShare}
+      profile={data.profile}
+      org={data.org}
+    />
     <div class="canvas-row">
+      <FloatingRail
+        activePanel={leftPanel}
+        activeSheet={activeSheetId}
+        onPanel={onRailPanel}
+        onSheet={onRailSheet}
+        onRoute={(entry) => goto(navHref(projectId, entry))}
+        mode={modeOf(data.project.mode)}
+      />
+      {#if browser && leftPanel}
+        {#await CHROME_LOADERS.leftPanel() then { default: CanvasLeftPanel }}
+          <CanvasLeftPanel
+            {projectId}
+            kind={leftPanel}
+            labelKey={NAV_ENTRIES.find((entry) => entry.id === leftPanel)?.labelKey ?? ''}
+            onclose={() => (leftPanel = null)}
+          />
+        {/await}
+      {/if}
       <div class="canvas-stage">
         {@render children()}
-        <CanvasTopBar
-          {projectId}
-          projectName={data.project.name}
-          projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string; mode: string }) => ({
-            id: p.id,
-            name: p.name,
-            href: p.href,
-            updatedAt: p.updatedAt,
-            mode: p.mode
-          }))}
-          projectMode={data.project.mode}
-          brandName={data.brand?.name ?? null}
-          canvasName={currentCanvas?.name ?? ''}
-          canvasHref={currentCanvas?.href ?? ''}
-          canvases={data.canvases}
-          creditBalance={data.creditBalance}
-          {chatOpen}
-          onToggleChat={toggleChat}
-          {shareToken}
-          {onShare}
-          profile={data.profile}
-          org={data.org}
-        />
-        <FloatingRail
-          activePanel={leftPanel}
-          activeSheet={activeSheetId}
-          onPanel={onRailPanel}
-          onSheet={onRailSheet}
-          onRoute={(entry) => goto(navHref(projectId, entry))}
-          mode={modeOf(data.project.mode)}
-        />
-        {#if browser && leftPanel}
-          {#await CHROME_LOADERS.leftPanel() then { default: CanvasLeftPanel }}
-            <CanvasLeftPanel
-              {projectId}
-              kind={leftPanel}
-              labelKey={leftPanel === 'assets' ? 'app.nav2.materials' : leftPanel === 'brands' ? 'app.nav2.brands' : 'app.nav2.influencers'}
-              onclose={() => (leftPanel = null)}
-            />
-          {/await}
-        {/if}
         <CanvasSheet {projectId} />
       </div>
 
-      <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={chatOpen} />
+      <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={chatOpen && !inlineStage.editing} />
     </div>
   {:else}
     <DesktopPageBar
@@ -242,6 +244,10 @@
   .project-shell.is-uncensored {
     box-shadow: inset 0 3px 0 var(--color-destructive);
   }
+  .project-shell.is-editing :global(.mobile-topbar) {
+    display: none;
+  }
+
   .project-shell {
     height: 100dvh;
     display: flex;

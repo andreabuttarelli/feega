@@ -65,7 +65,9 @@ export type ShaderEffect = { id: string; category: string; source: string; live:
 export type MotionTemplateField = { key: string; label: string; type: string; group?: string; min?: number; max?: number; options?: string[]; default?: unknown };
 export type MotionTemplateCard = { roles: string[]; energy: string; loops: boolean; onScreen: string[]; edges: { start: string; end: string; transition: string }; goodFor: string[] };
 export type MotionTemplate = { id: string; name: string; description: string; seconds: number; card?: MotionTemplateCard; fields: MotionTemplateField[] };
-export type FromTemplate = { template: string; format?: '16:9' | '9:16' | '1:1'; project?: string };
+export type FromTemplate = { template: string; format?: string; project?: string; still?: number };
+export type ToolRun = { tool: string; version: number; saved: boolean; output: Record<string, unknown> };
+export type ToolAsk = { tool: string; input?: unknown; version?: number };
 export type FromTemplateMade = { node_id: string; project_id: string; canvas_id: string; version: number; editor_url: string };
 export type AddTemplate = { id: string; at?: number; vars?: Record<string, string | number | boolean>; sound?: boolean };
 
@@ -98,6 +100,8 @@ export const motionApi = {
     request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}/storyboard`, org), token, { method: 'POST', body: JSON.stringify(board) }),
   editStoryboard: (token: string, nodeId: string, cardId: string, text: string, org?: string) =>
     request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}/storyboard`, org), token, { method: 'PATCH', body: JSON.stringify({ card_id: cardId, text }) }),
+  tools: (token: string, name?: string, org?: string) => request<Record<string, unknown>>(withQuery('/api/v1/motion/tools', { name, org }), token),
+  runTool: (token: string, nodeId: string, ask: ToolAsk, org?: string) => request<ToolRun>(withOrg(`/api/v1/motion/${id(nodeId)}/tools`, org), token, { method: 'POST', body: JSON.stringify(ask) }),
   bundle: (token: string, nodeId: string, org?: string) => download(withOrg(`/api/v1/motion/${id(nodeId)}/embed/bundle`, org), token)
 };
 

@@ -77,7 +77,13 @@
   import { AssetKind } from '$lib/motion/components';
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
-  import { motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
+  import { frameNodeSize, motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
+  import { FORMATS } from '$lib/motion/doc';
+  import { NodeMode, Opening, inlineMotionTarget, neighbourStyle, openingOf } from '$lib/canvas/inline-motion';
+  import { viewportOf } from '$lib/motion/editor-layout';
+  import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
+  import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import { calendarBrand, calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
@@ -887,6 +893,9 @@
    * lascia passare tutto.
    */
   function tileHeight(n: Tile): number {
+    if (n.id === inlineMotion) {
+      return frameFit(n.id, n.w, NodeMode.Edit)?.h ?? n.h;
+    }
     if (n.type !== 'text' || !(n.id in grownHeights)) return n.h;
     return grownTextNodeHeight(grownHeights[n.id], n.userHeight);
   }
@@ -1000,6 +1009,33 @@
   function selectionChanged(ids: string[]) {
     if (ids.join() !== untrack(() => selectedIds.join())) { void saves.flush(); }
     selectedIds = ids;
+  }
+
+  let dismissedMotion = $state<string | null>(null);
+  let requestedMotion = $state<string | null>(null);
+  let pageWidth = $state(0);
+  const opening = $derived(openingOf(viewportOf(pageWidth)));
+  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, opening, requestedMotion));
+
+  $effect(() => {
+    if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => dismissedMotion)) {
+      dismissedMotion = null;
+    }
+    if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => requestedMotion)) {
+      requestedMotion = null;
+    }
+  });
+
+  $effect(() => {
+    const [id] = selectedIds;
+    if (selectedIds.length === 1 && untrack(() => nodes.find((n) => n.id === id))?.type === 'motion') {
+      prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
+    }
+  });
+
+  function requestMotion(id: string) {
+    dismissedMotion = null;
+    requestedMotion = id;
   }
 
   $effect(() => {
@@ -1695,7 +1731,33 @@
    * quella calcolata da `grownTextNodeHeight` — un ridimensionamento a mano vince sulla crescita
    * automatica, la stessa regola già scritta in `text-node-grow.ts`.
    */
-  async function resize(id: string, w: number, h: number) {
+  const FIT_SLACK_PX = 1;
+
+  function frameFit(id: string, w: number, mode: NodeMode = NodeMode.Preview): { w: number; h: number } | null {
+    const motion = motionOf(nodes.find((node) => node.id === id) ?? { id, type: '', data: {} });
+    if (!motion) {
+      return null;
+    }
+    const open = layersSource.video;
+    return frameNodeSize(w, open?.nodeId === id ? open.doc : FORMATS[motion.format], mode);
+  }
+
+  $effect(() => {
+    const open = layersSource.video;
+    const row = open ? untrack(() => nodes.find((node) => node.id === open.nodeId)) : null;
+    if (!open || !row) {
+      return;
+    }
+    const fit = frameNodeSize(row.w, open.doc);
+    if (Math.abs(fit.h - row.h) > FIT_SLACK_PX) {
+      void resize(row.id, fit.w, fit.h);
+    }
+  });
+
+  async function resize(id: string, width: number, height: number) {
+    const fit = frameFit(id, width);
+    const w = fit?.w ?? width;
+    const h = fit?.h ?? height;
     const before = nodes.find((node) => node.id === id);
     nodes = nodes.map((n) => (n.id === id ? { ...n, w, h, userHeight: h } : n));
 
@@ -1878,11 +1940,23 @@
    * lo stesso che decide un collegamento a un nodo ESISTENTE (`connectExisting`, sotto): la
    * domanda "quale porta per quale sorgente" non cambia perché il bersaglio è appena nato.
    */
-  let focus = $state<{ ids: string[]; key: number } | null>(null);
+  let focus = $state<FocusRequest | null>(null);
 
-  function focusOn(ids: string[]) {
-    focus = { ids, key: (focus?.key ?? 0) + 1 };
+  function focusOn(ids: string[], free?: Insets, mode = FocusMode.Frame) {
+    focus = { ids, key: (focus?.key ?? 0) + 1, free, mode };
   }
+
+  $effect(() =>
+    layersSource.publishCanvas({
+      get nodes() {
+        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null }));
+      },
+      get selected() {
+        return selectedIds;
+      },
+      select: (ids) => focusOn(ids, undefined, FocusMode.Select)
+    })
+  );
 
   function rectOf(id: string): Rect | null {
     const tile = tiles.find((t) => t.id === id);
@@ -2503,7 +2577,9 @@
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
 
-<div class="canvas">
+<svelte:window bind:innerWidth={pageWidth} />
+
+<div class="canvas" class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
   {#if peers.length}
     <div class="peers" aria-label="Persone sulla tela">{peers.map((peer) => peer.name).join(', ')}</div>
   {/if}
@@ -2787,7 +2863,7 @@
           />
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} />
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if calendar && publishes(data.socialPublishing)}
@@ -2816,6 +2892,11 @@
       {/if}
     {/snippet}
   </CanvasFlow>
+  {#if inlineMotion}
+    {#key inlineMotion}
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => focusOn([inlineMotion], free)} />
+    {/key}
+  {/if}
 
   {#if componentPicking}
     {@const pickingId = componentPicking.id}
@@ -2860,6 +2941,28 @@
 </div>
 
 <style>
+  .canvas.editing :global([role='toolbar'][aria-label='Selection actions']) {
+    display: none;
+  }
+
+  @media (max-width: 767px) {
+    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing']))) {
+      opacity: var(--neighbour-body);
+    }
+
+    .canvas.editing :global(.svelte-flow__edge) {
+      opacity: var(--neighbour-edges);
+    }
+
+    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing'])) .node-label) {
+      opacity: var(--neighbour-label);
+    }
+
+    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing'])) .svelte-flow__handle) {
+      opacity: var(--neighbour-ports);
+    }
+  }
+
   .canvas {
     position: relative;
     flex: 1 1 auto;

@@ -209,8 +209,17 @@ Plan a video as sections and pick one template per section by its card;
 `add_motion_template` inserts an editable copy at `at` seconds with `vars` as field values and
 its key/click sounds. Free, no AI. CLI: `feega motion templates`,
 `feega motion add-template <nodeId> builtin:prompt-input --var text="..."`.
-`new_motion_from_template` starts a new video holding one at 0s (`format` 16:9, 9:16 or 1:1);
+`new_motion_from_template` starts a new video holding one at 0s (`format` 16:9, 9:16 story,
+1:1, 4:5 post or "A poster"; `still` seconds makes it a still graphic);
 CLI: `feega motion new --template builtin:prompt-input --format 9:16`.
+
+Every tool of the editor agent (add_clip, set_props, set_keyframes, set_canvas, export_image...)
+runs directly through `motion_tool`: no `tool` lists them, `tool` alone describes one with its
+JSON schema, `tool` with `node_id` and `input` runs it on the saved video as a new revision
+(`version` guards a stale write, 409). Free, no AI. A still graphic (post, story, poster) is a
+video pinned to one frame: `set_canvas` `{ format: "A poster", still: 2 }`, then `export_image`
+`{ format: "png", scale: 2 }` returns the image `url`. CLI: `feega motion tool <nodeId> <tool>
+--input '{...}'`, `feega motion tools [name]`, `feega motion still <nodeId> --scale 2 --out poster.png`.
 
 A launch film's script is also laid out as a storyboard canvas linked to the video: one card per
 beat, story order left to right, stronger emotion higher. `get_storyboard` reads it (the user's

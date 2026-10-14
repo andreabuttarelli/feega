@@ -5,7 +5,7 @@ import MenuDrawer from './MenuDrawer.svelte';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { SaveState } from '$lib/motion/editor-bar';
 
-const EDITOR_PAGE = 'src/routes/p/[projectId]/c/[canvasId]/motion/[nodeId]/+page.svelte';
+const EDITOR_PAGE = 'src/lib/components/motion/MotionEditorShell.svelte';
 const noop = () => {};
 
 const html = () =>
@@ -49,16 +49,22 @@ describe('menu drawer', () => {
 
 describe('editor top bar', () => {
   const page = readFileSync(EDITOR_PAGE, 'utf8');
-  const bar = page.slice(page.indexOf('<header class="bar">'), page.indexOf('</header>'));
+  const bar = page.slice(page.indexOf('<header class="bar"'), page.indexOf('</header>'));
 
   it('opens the drawer from a Menu button, first in the bar', () => {
     expect(bar.indexOf('action={Action.Menu}')).toBeGreaterThan(-1);
     expect(bar.indexOf('action={Action.Menu}')).toBeLessThan(bar.indexOf('class="group transport"'));
   });
 
-  it('no longer carries what moved into the drawer', () => {
+  it('no longer carries what moved into the drawer, except in the More menu that replaces the drawer on the canvas', () => {
+    const moreOnly = /\{#if menu === MenuPlace\.More\}[\s\S]*?\{\/if\}/g;
+    const outsideMore = bar.replace(moreOnly, '');
     for (const id of ['template-open', 'save-state', 'comp-settings', 'guide-open-menu', 'comp-breadcrumb']) {
-      expect(bar, id).not.toContain(`data-testid="${id}"`);
+      expect(outsideMore, id).not.toContain(`data-testid="${id}"`);
     }
+  });
+
+  it('on the canvas the drawer burger is gone: one burger, the canvas one', () => {
+    expect(bar).toMatch(/\{#if menu === MenuPlace\.Drawer\}<IconButton action=\{Action\.Menu\}/);
   });
 });

@@ -26,6 +26,11 @@ const fake: Server = createServer((req, res) => {
       send(200, { id: 'user-1', email: 'test@feega.app', aud: 'authenticated', role: 'authenticated' });
       return;
     }
+    if (path === '/files/still.png') {
+      res.writeHead(200, { 'Content-Type': 'image/png' });
+      res.end(Buffer.from('PNGBYTES'));
+      return;
+    }
     if (!path.startsWith('/api/')) {
       send(200, []);
       return;
@@ -79,6 +84,16 @@ const fake: Server = createServer((req, res) => {
     }
     if (route === `/api/v1/motion/${NODE}/storyboard`) {
       send(200, req.method === 'GET' ? { canvas_id: 'board', cards: [{ node_id: 'c1', text: '## Hook', clip_ids: [] }], media: [], flow: [] } : { ok: true, canvas_id: 'board' });
+      return;
+    }
+    if (route === '/api/v1/motion/tools') {
+      const name = new URL(path, 'http://x').searchParams.get('name');
+      send(200, name ? { tool: { name, description: 'Change the format', input_schema: { type: 'object', properties: { still: {} } } } } : { tools: [{ name: 'set_canvas', summary: 'Change the format.' }] });
+      return;
+    }
+    if (route === `/api/v1/motion/${NODE}/tools`) {
+      const tool = (raw ? JSON.parse(raw) : {}).tool;
+      send(200, { tool, version: 4, saved: tool !== 'get_motion_doc', output: tool === 'export_image' ? { ok: true, asset_id: 'img-1', url: `${origin}/files/still.png`, width: 2160, height: 2700 } : { ok: true } });
       return;
     }
     if (route === `/api/v1/motion/${NODE}/frames`) {
@@ -274,10 +289,72 @@ describe('the motion agent over MCP', () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
     const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
 
-    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['add_motion_template', 'ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_templates', 'list_motion_videos', 'motion_budget', 'new_motion_from_template', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
+    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['add_motion_template', 'ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_templates', 'list_motion_videos', 'motion_budget', 'motion_tool', 'new_motion_from_template', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
     expect(names).toContain('render_video');
     expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');
+  });
+});
+
+describe('the editor tools over MCP, through one tool', () => {
+  test('motion_tool with no tool lists them', async () => {
+    const result = await callTool('motion_tool', {});
+
+    expect(calls[0]).toMatchObject({ method: 'GET', path: '/api/v1/motion/tools' });
+    expect(JSON.stringify(result)).toContain('set_canvas');
+  });
+
+  test('motion_tool with a tool and no node describes it with its input schema', async () => {
+    const result = await callTool('motion_tool', { tool: 'set_canvas' });
+
+    expect(calls[0].path).toBe('/api/v1/motion/tools?name=set_canvas');
+    expect(JSON.stringify(result)).toContain('still');
+  });
+
+  test('motion_tool with a node runs it on the saved video, version guarded', async () => {
+    const result = await callTool('motion_tool', { node_id: NODE, tool: 'set_canvas', input: { format: 'A poster', still: 1 }, version: 3 });
+
+    expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/tools`, body: { tool: 'set_canvas', input: { format: 'A poster', still: 1 }, version: 3 } });
+    expect(result?.structuredContent).toMatchObject({ version: 4, saved: true });
+  });
+
+  test('new_motion_from_template starts a still poster', async () => {
+    await callTool('new_motion_from_template', { template: 'builtin:prompt-input', format: 'A poster', still: 2 });
+
+    expect(calls[0]).toMatchObject({ method: 'POST', path: '/api/v1/motion/from-template', body: { template: 'builtin:prompt-input', format: 'A poster', still: 2 } });
+  });
+});
+
+describe('feega motion tool and still', () => {
+  async function quiet(work: () => Promise<void>): Promise<string> {
+    const lines: string[] = [];
+    const log = console.log;
+    console.log = (...args: unknown[]) => {
+      lines.push(args.join(' '));
+    };
+    await work().finally(() => {
+      console.log = log;
+    });
+    return lines.join('\n');
+  }
+
+  test('runs a named editor tool with its JSON input', async () => {
+    const { toolAndReport } = await import('../commands/motion.ts');
+    const out = await quiet(() => toolAndReport('token', NODE, 'set_canvas', { input: '{"still":1}' }));
+
+    expect(calls[0]).toEqual({ method: 'POST', path: `/api/v1/motion/${NODE}/tools`, body: { tool: 'set_canvas', input: { still: 1 } } });
+    expect(out).toContain('revision 4');
+  });
+
+  test('exports the image and saves it where asked', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'feega-still-'));
+    const file = join(dir, 'poster.png');
+    const { stillAndReport } = await import('../commands/motion.ts');
+
+    await quiet(() => stillAndReport('token', NODE, { format: 'png', scale: '2', out: file }));
+
+    expect(calls[0].body).toEqual({ tool: 'export_image', input: { format: 'png', scale: 2 } });
+    expect(readFileSync(file).toString()).toBe('PNGBYTES');
   });
 });
 

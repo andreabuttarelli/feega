@@ -1,0 +1,26 @@
+import { describe, expect, it } from 'vitest';
+import { earlyFetch } from './early-fetch';
+
+describe('fetching the editor session when the frame is selected', () => {
+  it('the open takes the request already in flight once, then asks again', async () => {
+    let now = 0;
+    const asked: string[] = [];
+    const early = earlyFetch<string>({ load: async (url) => (asked.push(url), `doc ${asked.length}`), now: () => now });
+
+    early.start('/a/session');
+    early.start('/a/session');
+    expect(await early.take('/a/session')).toBe('doc 1');
+    expect(await early.take('/a/session')).toBe('doc 2');
+    expect(asked).toEqual(['/a/session', '/a/session']);
+  });
+
+  it('a selection long ago is stale: the open asks again, never edits an old version', async () => {
+    let now = 0;
+    let n = 0;
+    const early = earlyFetch<number>({ load: async () => ++n, now: () => now });
+
+    early.start('/a/session');
+    now = 60_000;
+    expect(await early.take('/a/session')).toBe(2);
+  });
+});

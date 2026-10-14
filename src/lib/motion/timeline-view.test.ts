@@ -5,7 +5,7 @@ import { Source } from './keyframes';
 import { addClip, setKeyframes, type OpResult } from './timeline';
 import { feegaTrailerV2 } from './trailer-v2';
 import { withParams } from './custom/params';
-import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, graphLanes, handleAt, keyLanes, pxPerFrame, snapped, timecode } from './timeline-view';
+import { Grip, HANDLE_PX, Reveal, Snap, easePath, edgeHandles, frameAt, graphLanes, handleAt, keyLanes, pxPerFrame, snapped, timecode, headerPx, fitZoom, ZOOM_MIN } from './timeline-view';
 
 describe('timeline view', () => {
   it('at zoom 1 a second is 60 px', () => {
@@ -141,5 +141,25 @@ describe('timeline view at another frame rate', () => {
     expect(pxPerFrame(1, 60) * 60).toBe(60);
     expect(frameAt(60, 1, 60)).toBe(60);
     expect(timecode(90, 60)).toBe('00:01:30');
+  });
+});
+
+describe('timeline header and fit', () => {
+  it('the layer-name column narrows with the room the timeline has, never half a phone', () => {
+    expect(headerPx(1200)).toBe(240);
+    expect(headerPx(700)).toBe(180);
+    expect(headerPx(390)).toBeLessThanOrEqual(390 / 4);
+  });
+
+  it('fits the whole video into the lanes, so the ruler fills the width', () => {
+    const lanes = 900;
+    const zoom = fitZoom({ durationInFrames: 90, fps: 30 }, lanes);
+
+    expect(pxPerFrame(zoom, 30) * 90).toBeLessThanOrEqual(lanes);
+    expect(pxPerFrame(zoom, 30) * 90).toBeGreaterThan(lanes * 0.9);
+  });
+
+  it('a very long video stays within the zoom limits', () => {
+    expect(fitZoom({ durationInFrames: 30 * 3600, fps: 30 }, 900)).toBe(ZOOM_MIN);
   });
 });

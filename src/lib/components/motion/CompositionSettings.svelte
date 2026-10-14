@@ -6,6 +6,7 @@
   import { setCanvas, type OpResult } from '$lib/motion/timeline';
   import { parseDecimal, secondsLabel } from '$lib/motion/inspector';
   import { fitDuration } from '$lib/motion/fit-duration';
+  import { DocMode, docMode, setStill } from '$lib/motion/still';
 
   let { doc, onchange }: { doc: MotionDoc; onchange: (result: OpResult, summary: string) => void } = $props();
 
@@ -16,6 +17,14 @@
     }
     onchange(setCanvas(doc, { durationInFrames: Math.round(seconds * doc.fps) }), 'Changed duration');
   }
+
+  function setStillAt(text: string) {
+    const seconds = parseDecimal(text);
+    if (seconds === null) {
+      return;
+    }
+    onchange(setStill(doc, seconds), 'Moved the still');
+  }
 </script>
 
 <div class="settings" data-testid="composition-settings">
@@ -25,6 +34,19 @@
       {#each MOTION_FORMATS as format (format)}<option value={format}>{FORMATS[format].label} · {FORMATS[format].width}×{FORMATS[format].height}</option>{/each}
     </select>
   </label>
+  <label class="toggle" title="One frame: a post or a poster exported as an image, no timeline">
+    <span>Still</span>
+    <input type="checkbox" checked={docMode(doc) === DocMode.Still} onchange={(e) => onchange(setStill(doc, e.currentTarget.checked ? 0 : null), e.currentTarget.checked ? 'Made a still' : 'Made a video')} data-testid="still" />
+  </label>
+  {#if doc.still}
+    <label>
+      <span>Frame</span>
+      <span class="unit-field">
+        <input type="text" inputmode="decimal" title="The moment the still shows" value={secondsLabel(doc.still.frame, doc.fps)} onchange={(e) => setStillAt(e.currentTarget.value)} data-testid="still-at" />
+        <em>s</em>
+      </span>
+    </label>
+  {/if}
   <label>
     <span>Length</span>
     <span class="unit-field">

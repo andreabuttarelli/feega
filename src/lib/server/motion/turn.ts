@@ -65,10 +65,11 @@ import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, storeAssetFile } from '$lib/serv
 import { ASSETS_ADDED, CHECK_REQUEST, DOC_EDITED, FRAMES_REQUEST, type CheckRequest, type FramesRequest } from '$lib/motion/frames-request';
 import { rowRequests } from '$lib/server/motion/batch-input';
 import { startFarmBatch } from '$lib/server/motion/render-start';
-import { Preset, settingsOf } from '$lib/motion/export-formats';
+import { Preset, settingsOf, type Quality } from '$lib/motion/export-formats';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import type { MotionNode } from '$lib/canvas/motion-node';
 import { createRenderLink } from './render-link';
+import { exportStill } from './still-export';
 import { renderPagePath } from '$lib/motion/render-link';
 import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
 import type { ChatAttachment } from '$lib/chat-attachments';
@@ -380,6 +381,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     layouts: layoutStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
     storyboard,
+    exportStill: (doc, spec) => exportStill(db, { orgId, projectId: project.id, nodeId: motion.record.id }, doc, spec, { tokens, assets }),
     copywrite: async (script) => {
       const ask = async (prompt: string) => ({ answer: await llmStructured({ prompt, schema: COPY_SCHEMA, model: roleModel(StudioRole.Copywriter, model), temperature: 0.4, label: STUDIO_ROSTER[StudioRole.Copywriter].label }), usd: billedUsdInScope() ?? 0 });
       const out = await withOrgContext(orgId, () => copywrite({ ask }, script));
@@ -398,11 +400,11 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       askCheck({ callId, name, doc, assets: assets.slice(knownAssets) });
       return awaitVerdict(bucket, framesPrefix(frameScope, callId), { timeoutMs: CHECK_WAIT_MS, pollMs: FRAME_POLL_MS });
     },
-    renderLink: async () => {
+    renderLink: async (quality: Quality) => {
       if (session.edits.length) {
         return { ok: false, error: 'this turn has unsaved edits: the link renders the saved video, so finish the turn and run render_video in the next one' };
       }
-      const link = await createRenderLink(db, { orgId, nodeId: motion.record.id, version: head.version, actor });
+      const link = await createRenderLink(db, { orgId, nodeId: motion.record.id, version: head.version, quality, actor });
       return { ok: true, render_url: renderPagePath(link.token), expires_at: link.expiresAt, credits: BROWSER_RENDER_CREDITS };
     },
     embed: async (action) => {

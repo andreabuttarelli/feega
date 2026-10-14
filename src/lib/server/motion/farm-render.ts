@@ -36,6 +36,7 @@ export type PieceLinks = { upload: string | null; storageHost: string; maxBytes:
 export type AssemblyLinks = { pieces: string[]; output: string; maxBytes: number };
 
 const RUNTIME_HOSTS = ['cdn.jsdelivr.net', new URL(FONT_CSS_ORIGIN).host, new URL(FONT_FILE_ORIGIN).host];
+const PRODUCER_QUALITY: Record<Quality, Quality> = { [Quality.Standard]: Quality.Standard, [Quality.High]: Quality.High, [Quality.Max]: Quality.High };
 const MAX_PARALLEL_CHUNKS_CEILING = 256;
 const WHOLE_CAPTURE_WORKERS = 6;
 const FULL_HD_PIXELS = 1920 * 1080;
@@ -244,7 +245,7 @@ const producerShutter = (s: Shutter): ProducerShutter => ({ shutterAngle: s.shut
 function chunkSpec(job: FarmJob, slice: Slice): ChunkSpec {
   const { format, codec } = masterOf(job);
   const blur = job.motionBlur ? producerShutter(job.motionBlur) : null;
-  const base = { fps: job.fps, quality: job.quality, format };
+  const base = { fps: job.fps, quality: PRODUCER_QUALITY[job.quality], format };
   const route = routeOf(job);
   const config = route === RenderRoute.Chunked ? { ...base, ...(codec ? { codec } : {}), width: job.width, height: job.height, chunkSize: slice.size, maxParallelChunks: MAX_PARALLEL_CHUNKS_CEILING, runtimeCap: 'none' } : { ...base, ...(blur ? { motionBlur: blur } : {}), workers: WHOLE_CAPTURE_WORKERS };
   return { route, project: PROJECT_DIR, planDir: PLAN_DIR, index: slice.index, out: chunkPath(job, slice), blur: route === RenderRoute.Chunked ? blur : null, config };

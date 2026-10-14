@@ -742,10 +742,56 @@ const CUSTOM_CARDS: Record<string, TemplateCard> = {
   })
 };
 
+const POSTER_SECONDS = 2;
+
+const POSTERS: Record<string, { what: string; photos: [number, number] | null; tone: EdgeTone; goodFor: string }> = {
+  'type-grid': { what: 'huge all-caps lines on acid yellow, grainy photo crops inline between the words, four detail columns at the foot', photos: [1, 4], tone: COLOUR, goodFor: 'an event announcement' },
+  'checker-steps': { what: 'a blue and white checker staircase, a black title one word per step, a small text block top right', photos: null, tone: LIGHT, goodFor: 'a step-by-step claim' },
+  'overlay-grid': { what: 'black monospace text blocks on a grid over huge yellow repeating words on grey paper', photos: null, tone: LIGHT, goodFor: 'an exhibition' },
+  'circle-event': { what: 'a giant two-line name, a huge green circle, a schedule column, the title at the foot', photos: null, tone: LIGHT, goodFor: 'a talk or speaker' },
+  'block-title': { what: 'a huge lowercase title on worn paper, a violet block rising into its last line, four names and a paragraph', photos: null, tone: LIGHT, goodFor: 'a film or launch title' },
+  'boxed-type': { what: 'a grainy grey type poster: a title stepping on boxes, one huge white word in a black box', photos: null, tone: LIGHT, goodFor: 'a bold statement' },
+  'square-words': { what: 'large words staggered on a grey gradient, a red-orange square with a paragraph, a black circle', photos: null, tone: LIGHT, goodFor: 'a studio or brand statement' },
+  'iso-blocks': { what: 'a four-line header and black isometric blocks with the line-up on their faces', photos: null, tone: LIGHT, goodFor: 'a line-up or schedule' },
+  'photo-grid': { what: 'a huge letterspaced title on a fine grid with black and white photo tiles snapped to cells', photos: [3, 8], tone: LIGHT, goodFor: 'a photo-led title' },
+  'white-shapes': { what: 'white skewed blocks floating on black with a two-language title and small info blocks', photos: null, tone: DARK, goodFor: 'an exhibition' },
+  'vertical-type': { what: 'huge pixel words running up grid columns, black cells, a grainy photo and a two-column list', photos: [1, 1], tone: LIGHT, goodFor: 'a menu or list' },
+  'curated-board': { what: 'a bold wordmark ringed by small numbered poster thumbnails on light grey', photos: [4, 12], tone: LIGHT, goodFor: 'a collection or selection' },
+  'repeat-lineup': { what: 'a bold three-line line-up repeated down the page over acid blocks and construction lines', photos: null, tone: LIGHT, goodFor: 'a club night or line-up' },
+  'festival-grid': { what: 'a festival poster on a thin grid: big title and year, arrows across a photo cell, a programme and partners', photos: [1, 1], tone: LIGHT, goodFor: 'a festival or programme' },
+  'wide-filmstrip': { what: 'a huge thin title, two text columns, a black film strip with two photos, a huge date range', photos: [2, 2], tone: LIGHT, goodFor: 'an exhibition with dates' },
+  'scattered-type': { what: 'big dates, scattered and turned text blocks, photos of different sizes and a huge time range', photos: [2, 5], tone: LIGHT, goodFor: 'an open studio or event' },
+  'sliced-photo': { what: 'a black and white photo cut into shifted strips on grainy orange, caps phrases at the corners', photos: [1, 1], tone: COLOUR, goodFor: 'one striking photo' },
+  'red-number': { what: 'an editorial page: a red duotone photo square, two text columns and a huge dark number at the foot', photos: [1, 1], tone: LIGHT, goodFor: 'an editorial or issue number' },
+  'haze-grid': { what: 'a huge light wordmark on a fine grid over a blue-black haze, numbered superscripts and a paragraph', photos: null, tone: DARK, goodFor: 'a brand wordmark' },
+  'flow-quote': { what: 'a quote split across white pill labels joined by thick lines on black, the author in two pills', photos: null, tone: DARK, goodFor: 'a quote or testimonial' },
+  'stacked-plus': { what: 'huge lowercase words stacked, each wedged against a small paragraph, with simple colour shapes', photos: null, tone: LIGHT, goodFor: 'a manifesto' },
+  'barcode-table': { what: 'a white table grid: a barcode column, two titles, event rows, date, venue and partner marks', photos: null, tone: LIGHT, goodFor: 'an event with details' },
+  'pixel-caps': { what: 'a heavy caps title over orange pixels, two black number blocks, two photos and caps text columns', photos: [2, 2], tone: LIGHT, goodFor: 'an announcement with numbers' },
+  'month-grid': { what: 'huge thin month words down the page under a grid of yellow event cards', photos: null, tone: LIGHT, goodFor: 'a calendar of events' },
+  'rotated-cards': { what: 'a serif title over slightly rotated colour cards, each with a date, a tag and a name', photos: null, tone: LIGHT, goodFor: 'a series of dates or people' },
+  'brick-caps': { what: 'black bars with big white caps lines over a brick grid on pale yellow, an accent circle', photos: null, tone: COLOUR, goodFor: 'an event day and programme' },
+  'dark-tags': { what: 'a huge light grey multi-line title on dark grey with small coloured name tags scattered across it', photos: null, tone: DARK, goodFor: 'names or credits' }
+};
+
+const posterCard = (p: (typeof POSTERS)[string]): TemplateCard =>
+  card({
+    roles: [R.Poster, R.Transition],
+    energy: Energy.Calm,
+    loops: false,
+    onScreen: [beat(0, POSTER_SECONDS, `still: ${p.what}`)],
+    needs: { media: p.photos ? media(p.photos[0], p.photos[1]) : null, text: TextAmount.Lines },
+    bestFormats: [PORTRAIT, SQUARE, TALL],
+    edges: { start: p.tone, end: p.tone },
+    goodFor: [p.goodFor, 'a still post', 'a held title frame between sections']
+  });
+
+const POSTER_CARDS = Object.fromEntries(Object.entries(POSTERS).map(([key, p]) => [`poster-${key}`, posterCard(p)]));
+
 const COMPOSITION_CARDS = Object.fromEntries((Object.keys(COMPOSITIONS) as LayoutId[]).map((layout) => [`composition-${layout}`, compositionCard(layout)]));
 
 export const TEMPLATE_CARDS: Record<string, TemplateCard> = Object.fromEntries(
-  Object.entries({ ...LAUNCH_CARDS, ...SCENE_CARDS, ...DESIGN_CARDS, ...COMPOSITION_CARDS, ...CUSTOM_CARDS }).map(([id, c]) => [`${BUILTIN_PREFIX}${id}`, c])
+  Object.entries({ ...LAUNCH_CARDS, ...SCENE_CARDS, ...DESIGN_CARDS, ...COMPOSITION_CARDS, ...CUSTOM_CARDS, ...POSTER_CARDS }).map(([id, c]) => [`${BUILTIN_PREFIX}${id}`, c])
 );
 
 export const templateCard = (id: string): TemplateCard | null => TEMPLATE_CARDS[id] ?? null;

@@ -65,7 +65,7 @@
   }
 </script>
 
-<div class="add-bar">
+<div class="add-bar" data-dock="timeline">
   <span class="tool">
     <button type="button" title="Upload file" aria-label="Upload file" onclick={pickFile}>
       <Upload size={17} strokeWidth={1.7} />

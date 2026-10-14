@@ -7,7 +7,7 @@ import { createMotionTools, type MotionToolDeps, type MotionSession } from './mo
 import { TrackKind } from '$lib/motion/components';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 
-const LIST_BUDGET_CHARS = 40_000;
+const LIST_CHARS_PER_TEMPLATE = 400;
 
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
@@ -75,7 +75,7 @@ function withLibrary(sfx?: MotionToolDeps['sfx']) {
   let n = 0;
   const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
   const save = vi.fn(async () => ({ ok: true as const, entry: { id: 'saved-1', template: BUILTIN_TEMPLATES[0].template } }));
-  const templates = { list: async () => BUILTIN_TEMPLATES, save, remove: async () => false };
+  const templates = { list: async () => BUILTIN_TEMPLATES, own: async () => [], save, remove: async () => false };
   const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), templates, sfx });
   const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' });
   return { session, run, save };
@@ -115,7 +115,9 @@ describe('motion agent template library tools', () => {
   it('a whole template list stays small enough to read every turn', async () => {
     const { run } = withLibrary();
 
-    expect(JSON.stringify(await run('list_templates', {})).length).toBeLessThan(LIST_BUDGET_CHARS);
+    const listed = (await run('list_templates', {})) as unknown as { templates: unknown[] };
+
+    expect(JSON.stringify(listed).length).toBeLessThan(LIST_CHARS_PER_TEMPLATE * listed.templates.length);
   });
 
   it('add_template places a locked precomp; set_template_fields fills it, checked against its schema', async () => {

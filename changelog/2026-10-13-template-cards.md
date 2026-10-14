@@ -25,3 +25,15 @@ exists; for launch scenes, apple scenes, designs and compositions it comes from 
 
 **Discarded.** A `card` field on `TemplateEntry`: copying entries broke identity checks in every
 template test, and saved team templates have no card. Cards are looked up by id instead.
+
+**Later in the same PR.**
+
+- The scripted build runs as the shot builder, whose tool set had no template tools: the agent
+  could not place a template whatever the prompt said. It now has `list_templates`,
+  `get_template`, `add_template` and `set_template_fields`; crews keep `add_template` inside
+  their range like `add_shot`. The launch film rules (`SHOTS_RULE`) define a film as template
+  sections, with shots only for uncovered beats.
+- `add_shot` refusals name the unknown slot, the required slots and the valid seconds.
+- Still posters get the `poster` role; their cards are built from one table in `cards.ts`.
+- The list budget is per template (400 characters), so it grows with the library.
+- Not verified by a paid eval: the user stopped model spending before the rerun.
