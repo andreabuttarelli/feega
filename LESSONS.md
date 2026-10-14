@@ -112,6 +112,19 @@ Vite osserva anche `changelog/*.md`: scriverne uno mentre l'harness naviga l'edi
 `page reload <file>` all'ora del fallimento. Mossa: niente edit nel worktree servito finché il
 giro non è finito, o un dev server da un checkout separato.
 
+### Un e2e da un worktree agente prova codice vecchio
+`vite.config.ts` esclude `**/.claude/worktrees/**` dal watcher: un dev server lanciato DENTRO un
+worktree agente non vede nessun file salvato dopo l'avvio. Segnale: l'e2e fallisce su
+un comportamento appena scritto, o un doc nuovo non si apre (parse fallito, editor in `video`).
+Mossa: riavvia il dev server dopo ogni modifica, prima di ogni giro Playwright.
+
+### `backdrop-filter` che non sfoca niente
+Un antenato con `will-change: opacity` (o `filter`, `opacity < 1`, `mask`, `clip-path`,
+`mix-blend-mode`) è una Backdrop Root: il blur vede solo ciò che sta dentro di lui, cioè niente.
+`.fx` ha `will-change: transform, opacity`. Segnale: `#ef-<id>` ha `backdrop-filter` nel computed
+style ma sotto non si sfoca. Mossa: la classe `bd` su `.fx` (`seesBehind`) toglie `opacity` dal
+`will-change`.
+
 ### Un editor lento solo in produzione: `VERCEL=1` accende rami che in locale non esistono
 La chat del motion editor restava sullo scheletro 8–15 s in produzione e partiva in 0,4 s in
 locale. In produzione `farmAccess` vede `VERCEL=1`, e la sessione dell'editor aspettava la sonda

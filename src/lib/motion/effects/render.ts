@@ -30,6 +30,9 @@ function valuesAt(clip: EffectClip, effect: Effect, local: number, resolve: Reso
 
 const active = (clip: EffectClip) => clip.effects.filter((e) => e.enabled);
 
+export const seesBehind = (clip: Pick<EffectClip, 'effects'>): boolean => clip.effects.some((e) => e.enabled && EFFECTS[e.kind].behind);
+export const BEHIND_CSS = '.fx.bd,.fx.bd .kf,.fx.bd .ks{will-change:transform}';
+
 function rendered(clip: EffectClip, effect: Effect, frame: Frame, local: number, resolve: Resolve, area: Box | null): Rendered {
   const spec = EFFECTS[effect.kind];
   const values = valuesAt(clip, effect, local, resolve);
@@ -88,6 +91,9 @@ function filterMarkup(clip: EffectClip, effect: Effect, out: Rendered, area: Box
     .join('');
 }
 
+const backdropOf = (layers: { out: Rendered }[]) => layers.map((r) => r.out.backdrop ?? '').filter(Boolean).join(' ');
+const backdropStyle = (backdrop: string) => (backdrop ? `;backdrop-filter:${esc(backdrop)};-webkit-backdrop-filter:${esc(backdrop)}` : '');
+
 export function effectLayer(clip: EffectClip, frame: Frame, resolve: Resolve, inner: string, area: Box | null = null): string {
   const layers = renderAt(clip, frame, 0, resolve, area);
   if (!layers.length) {
@@ -96,7 +102,7 @@ export function effectLayer(clip: EffectClip, frame: Frame, resolve: Resolve, in
   const filter = layers.map((r) => r.out.filter).join(' ');
   const defs = layers.map((r) => filterMarkup(clip, r.effect, r.out, area, resolve)).join('');
   const svg = defs ? `<svg class="efd" aria-hidden="true"><defs>${defs}</defs></svg>` : '';
-  return `<div class="ef" id="${layerId(clip)}" style="filter:${esc(filter)}">${svg}${inner}</div>`;
+  return `<div class="ef" id="${layerId(clip)}" style="filter:${esc(filter)}${backdropStyle(backdropOf(layers))}">${svg}${inner}</div>`;
 }
 
 type Adjusting = EffectClip & { blend: string };
@@ -132,7 +138,7 @@ function animated(clip: EffectClip, resolve: Resolve): boolean {
   return active(clip).some((effect) => effectMoves(clip, effect, resolve));
 }
 
-type Snapshot = { filter: string; attrs: Map<string, Record<string, string | number>> };
+type Snapshot = { filter: string; backdrop: string; attrs: Map<string, Record<string, string | number>> };
 
 function snapshot(clip: EffectClip, frame: Frame, local: number, resolve: Resolve, area: Box | null): Snapshot {
   const layers = renderAt(clip, frame, local, resolve, area);
@@ -142,7 +148,7 @@ function snapshot(clip: EffectClip, frame: Frame, local: number, resolve: Resolv
       primitives(filter.children ?? []).forEach((n, i) => attrs.set(`#${filterId(clip, effect)}-${i}`, n.attrs));
     }
   }
-  return { filter: layers.map((r) => r.out.filter).join(' '), attrs };
+  return { filter: layers.map((r) => r.out.filter).join(' '), backdrop: backdropOf(layers), attrs };
 }
 
 const PRECISION = 10000;
@@ -161,6 +167,9 @@ export function effectTimeline(clip: EffectClip, frame: Frame, resolve: Resolve,
     const at = setTime(clip.from + local, frame.fps);
     if (next.filter !== previous.filter) {
       sets.push({ target: `#${layerId(clip)}`, vars: { filter: next.filter }, at });
+    }
+    if (next.backdrop !== previous.backdrop) {
+      sets.push({ target: `#${layerId(clip)}`, vars: { backdropFilter: next.backdrop, webkitBackdropFilter: next.backdrop }, at });
     }
     for (const [target, attrs] of next.attrs) {
       const before = previous.attrs.get(target) ?? {};

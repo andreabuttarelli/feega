@@ -54,7 +54,7 @@ export const SECTION_TITLE: Record<Section, string> = {
   [Section.Parent]: 'Parent & mask'
 };
 
-const OPEN_FIRST: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Layer, Section.Fill, Section.Stroke, Section.Text]);
+const OPEN_FIRST: ReadonlySet<Section> = new Set([Section.Content, Section.Layout, Section.Layer, Section.Fill, Section.Stroke, Section.Effects, Section.Text]);
 
 const DEFAULT_OPEN = Object.fromEntries(SECTION_ORDER.map((s) => [s, OPEN_FIRST.has(s)])) as Record<Section, boolean>;
 
