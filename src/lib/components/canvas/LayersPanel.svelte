@@ -21,7 +21,7 @@
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import PartsProbe from './PartsProbe.svelte';
   import { IconButton, IconSize } from '$lib/components/ui/shell';
-  import { LayerAction, LayerKind, NodeIcon, Pick, dropLayer, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropPlace, restack, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
@@ -90,6 +90,17 @@
 
   let renaming = $state<string | null>(null);
   let dragged = $state<string | null>(null);
+  let landing = $state<{ key: string; place: Place } | null>(null);
+
+  function over(row: LayerRow, e: DragEvent) {
+    if (!dragged || !editable(row) || row.id === dragged) {
+      landing = null;
+      return;
+    }
+    e.preventDefault();
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    landing = { key: row.key, place: dropPlace(row.kind, (e.clientY - box.top) / box.height) };
+  }
 
   const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, Audio: Music };
   const KIND_ICON: Partial<Record<LayerKind, typeof Square>> = { [LayerKind.Group]: Component, [LayerKind.Track]: Rows3 };
@@ -160,11 +171,13 @@
 
   function drop(row: LayerRow) {
     const from = dragged;
+    const place = landing?.place;
     dragged = null;
-    if (!video || !from || from === row.id) {
+    landing = null;
+    if (!video || !from || !place || from === row.id) {
       return;
     }
-    video.edit(dropLayer(video.doc, from, row.id), 'Moved a layer');
+    video.edit(restack(video.doc, from, row.id, place), 'Moved a layer');
   }
 </script>
 
@@ -196,8 +209,11 @@
       onpointerleave={() => layersSource.hover(null)}
       onkeydown={(e) => e.key === 'Enter' && choose(row, e as unknown as MouseEvent)}
       ondblclick={() => row.kind === LayerKind.Track && !row.nested && (renaming = row.id)}
-      ondragstart={() => (dragged = row.id)}
-      ondragover={(e) => row.kind === LayerKind.Track && e.preventDefault()}
+      ondragstart={(e) => ((dragged = row.id), e.dataTransfer?.setData('text/plain', row.id))}
+      data-drop={landing?.key === row.key ? landing.place : undefined}
+      ondragover={(e) => over(row, e)}
+      ondragleave={() => landing?.key === row.key && (landing = null)}
+      ondragend={() => ((dragged = null), (landing = null))}
       ondrop={() => drop(row)}
     >
       {#if row.kind === LayerKind.Node && frames.has(row.id)}
@@ -250,6 +266,18 @@
 
   .row:hover {
     background: var(--ui-hover);
+  }
+
+  .row[data-drop='above'] {
+    box-shadow: inset 0 2px 0 var(--ui-accent);
+  }
+
+  .row[data-drop='below'] {
+    box-shadow: inset 0 -2px 0 var(--ui-accent);
+  }
+
+  .row[data-drop='into'] {
+    box-shadow: inset 0 0 0 2px var(--ui-accent);
   }
 
   .row.hovered {

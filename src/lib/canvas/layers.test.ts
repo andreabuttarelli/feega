@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LayerAction, LayerKind, NodeIcon, Pick, nodeIcon, dropLayer, frameHover, frameRows, rowPicked, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropPlace, nodeIcon, frameHover, frameRows, rowPicked, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
@@ -165,32 +165,6 @@ describe('layer edits go through the doc operations the editor and the agent alr
   });
 });
 
-describe('dragging a layer', () => {
-  it('drops a track onto another track: it takes that place in the stack', () => {
-    const doc = video();
-    const ids = doc.tracks.map((t) => t.id);
-    const last = ids[ids.length - 1];
-
-    expect(ok(dropLayer(doc, last, ids[0])).tracks[0].id).toBe(last);
-  });
-
-  it('drops a clip onto a track of its kind: it moves there at the same time', () => {
-    const doc = video();
-    const other = doc.tracks.find((t) => t.kind === 'visual' && !t.clips.some((c) => c.id === 't1'))!;
-
-    const moved = ok(dropLayer(doc, 't1', other.id));
-    expect(moved.tracks.find((t) => t.id === other.id)!.clips.map((c) => c.id)).toContain('t1');
-  });
-
-  it('refuses a clip dropped on a track of another kind, or on a clip', () => {
-    const doc = video();
-    const audio = doc.tracks.find((t) => t.kind === 'audio')!;
-
-    expect(dropLayer(doc, 't1', audio.id).ok).toBe(false);
-    expect(dropLayer(doc, doc.tracks[0].id, 't1').ok).toBe(false);
-  });
-});
-
 describe('layer keys and selection', () => {
   it('⌘] brings forward, ⌘[ sends backward, nothing else is a layer key', () => {
     expect(layerKey({ key: ']', mod: true })).toBe(LayerAction.Up);
@@ -335,5 +309,65 @@ describe('a frame row shows what the frame looks like', () => {
     expect(nodeIcon({ type: 'motion', still: true })).toBe(NodeIcon.Still);
     expect(nodeIcon({ type: 'motion', still: false })).toBe(NodeIcon.Video);
     expect(nodeIcon({ type: 'text' })).toBe('text');
+  });
+});
+
+const zOrder = (doc: MotionDoc) => doc.tracks.filter((t) => t.kind === TrackKind.Visual).map((t) => t.clips.map((c) => c.id).join('+')).filter(Boolean);
+let ids = 0;
+const nextId = () => `n${++ids}`;
+
+describe('dragging a row restacks the frame, with no track in sight', () => {
+  it('a clip alone on its track dropped above another clip moves its whole track there', () => {
+    const doc = ok(restack(sequence(), 'c', 'a', Place.Above, nextId));
+
+    expect(zOrder(doc)).toEqual(['c', 'a+b']);
+    expect(doc.tracks.length).toBe(3);
+  });
+
+  it('a clip sharing its track gets a new track of its own, at the drop, keeping its time', () => {
+    const doc = ok(restack(sequence(), 'b', 'c', Place.Below, nextId));
+
+    expect(zOrder(doc)).toEqual(['a', 'c', 'b']);
+    expect(doc.tracks.flatMap((t) => t.clips).find((c) => c.id === 'b')!.from).toBe(60);
+  });
+
+  it('dropped onto a group, a clip joins that track', () => {
+    expect(zOrder(ok(restack(sequence(), 'c', 'v2', Place.Into, nextId)))).toEqual(['a+b+c']);
+  });
+
+  it('dragging a clip out of a group above it lifts it to its own track', () => {
+    expect(zOrder(ok(restack(sequence(), 'b', 'a', Place.Above, nextId)))).toEqual(['b', 'a', 'c']);
+  });
+
+  it('a group dropped below a clip moves its track under that clip', () => {
+    expect(zOrder(ok(restack(sequence(), 'v2', 'c', Place.Below, nextId)))).toEqual(['c', 'a+b']);
+  });
+
+  it('refuses a clip among tracks of another kind, nested rows, and itself', () => {
+    const doc = sequence();
+    const audio: MotionDoc = { ...doc, tracks: doc.tracks.map((t) => (t.id === 'a1' ? { ...t, clips: [{ ...clipOf(doc, 'snd', 0), component: 'Audio' }] } : t)) };
+
+    expect(restack(audio, 'snd', 'a', Place.Above, nextId).ok).toBe(false);
+    expect(restack(doc, 'a', 'a', Place.Above, nextId).ok).toBe(false);
+    expect(restack(doc, 'nope', 'a', Place.Above, nextId).ok).toBe(false);
+  });
+
+  it('⌘] on a clip with no track above makes one, so the key always works', () => {
+    const doc = ok(layerEdit(sequence(), 'a', LayerAction.Up, undefined, nextId));
+
+    expect(zOrder(doc)).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('where a drop lands on a row', () => {
+  it('the top half of a clip row is above it, the bottom half below', () => {
+    expect(dropPlace(LayerKind.Clip, 0.2)).toBe(Place.Above);
+    expect(dropPlace(LayerKind.Clip, 0.8)).toBe(Place.Below);
+  });
+
+  it('the middle of a group row drops into it', () => {
+    expect(dropPlace(LayerKind.Track, 0.5)).toBe(Place.Into);
+    expect(dropPlace(LayerKind.Track, 0.1)).toBe(Place.Above);
+    expect(dropPlace(LayerKind.Track, 0.9)).toBe(Place.Below);
   });
 });
