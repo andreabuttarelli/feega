@@ -184,4 +184,14 @@ describe('POST /api/v1/org/canvas — the chat canvas ops, for CLI and MCP', () 
 
     expect(gateOrgAiAction).not.toHaveBeenCalled();
   });
+
+  it('refuses a canvas of an uncensored project the caller has not unlocked, like the page does', async () => {
+    const { db } = fakeDb({ projects: [{ ...projectRow, mode: 'uncensored' }], nodes: [nodeRow] }, { filter: true });
+    caller(db);
+
+    const { res, body } = await call({ project_id: PROJECT, op: 'list_nodes', input: { canvasId: CANVAS } });
+
+    expect(res.status).toBe(404);
+    expect(body).toEqual({ error: 'project_not_found' });
+  });
 });
