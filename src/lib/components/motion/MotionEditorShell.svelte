@@ -54,6 +54,8 @@
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import FramePeers from '$lib/components/motion/FramePeers.svelte';
+  import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
@@ -137,6 +139,8 @@
   const CHECK_WIDTH = 480;
   const CHECK_DEBOUNCE_MS = 900;
   const COALESCE_MS = 800;
+  const CURSOR_SEND_MS = 60;
+  const PRESENCE_BEAT_MS = 3000;
   const HEAD_POLL_TRIES = 6;
   const HEAD_POLL_MS = 500;
   const ZOOM_STEP = 1.25;
@@ -164,6 +168,13 @@
   let snap = $state(Snap.On);
   let graphOpen = $state(false);
   let saveState = $state<SaveState>(SaveState.Saved);
+  const presence = framePresence();
+  let marks = $state(new Map<string, FrameMark>());
+  let clock = $state(Date.now());
+  let cursor: FrameCursor | null = null;
+  let cursorSentAt = 0;
+  let cursorTimer: ReturnType<typeof setTimeout> | null = null;
+  const peers = $derived(presence ? peersIn(marks, data.node.id, presence.self.userId, clock) : []);
   let notice = $state('');
   const supabase = createSupabaseBrowserClient();
   const UPLOAD_WEIGHT = 400;
@@ -331,6 +342,45 @@
   function revealLanes(next: Reveal) {
     reveal = reveal === next ? Reveal.Animated : next;
   }
+
+  function sendMark() {
+    cursorSentAt = Date.now();
+    presence?.send({ nodeId: data.node.id, cursor, selection: [...selection] });
+  }
+
+  function pointAt(next: FrameCursor | null) {
+    cursor = next;
+    if (cursorTimer) {
+      return;
+    }
+    const wait = Math.max(0, cursorSentAt + CURSOR_SEND_MS - Date.now());
+    cursorTimer = setTimeout(() => {
+      cursorTimer = null;
+      sendMark();
+    }, wait);
+  }
+
+  onMount(() => {
+    if (!presence) {
+      return;
+    }
+    const stop = presence.listen((mark) => (marks = keepMark(marks, mark)));
+    const beat = setInterval(() => {
+      clock = Date.now();
+      sendMark();
+    }, PRESENCE_BEAT_MS);
+    return () => {
+      stop();
+      clearInterval(beat);
+      clearTimeout(cursorTimer ?? undefined);
+      presence.send({ nodeId: null, cursor: null, selection: [] });
+    };
+  });
+
+  $effect(() => {
+    void selection.join();
+    untrack(sendMark);
+  });
 
   let lastEdit = { summary: '', at: 0 };
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1513,6 +1563,7 @@
       {#snippet player()}
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
+        {#if presence}<FramePeers {doc} {frame} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
         {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
