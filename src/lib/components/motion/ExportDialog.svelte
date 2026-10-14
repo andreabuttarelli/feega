@@ -458,10 +458,12 @@
     flex-direction: column;
     gap: var(--ui-space-6);
     padding: 0 var(--ui-space-6) var(--ui-space-6);
-    background: var(--ui-raised);
     color: var(--ui-ink);
-    box-shadow: 0 24px 64px rgb(0 0 0 / 0.24);
     font-size: var(--ui-text-md);
+    border: 0;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   header {
@@ -518,7 +520,7 @@
   }
 
   .choice:hover .icon {
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
   }
 
@@ -687,7 +689,7 @@
   }
 
   .primary {
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
   }
 

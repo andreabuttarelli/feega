@@ -804,7 +804,7 @@
   {/if}
 
   {#if spec.chrome && onCreate}
-    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} ontemplate={onTemplate ? templateAtCentre : undefined} onframes={onFrameTemplates ? framesAtCentre : undefined} context={barContext} />
+    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} ontemplate={onTemplate ? templateAtCentre : undefined} onframes={onFrameTemplates ? framesAtCentre : undefined} context={barContext} zoom={selection.zoom} />
   {/if}
 
   {#if spec.chrome}

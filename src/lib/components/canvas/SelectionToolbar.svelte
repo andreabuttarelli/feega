@@ -213,8 +213,8 @@
     transform: translate(-50%, calc(-100% - var(--toolbar-gap))) scale(var(--toolbar-scale, 1));
     padding: 4px;
     font-family: var(--sans);
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
+    background: var(--ui-panel);
+    border: 1px solid var(--ui-divider-strong);
     box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
   }
 
@@ -238,7 +238,7 @@
     padding: 0 6px;
   }
   .group + .group {
-    border-left: 1px solid var(--line, #e5e5e5);
+    border-left: 1px solid var(--ui-divider);
   }
   .group:first-child {
     padding-left: 0;
@@ -279,7 +279,7 @@
     padding: 0 6px;
     font-size: 12px;
     font-variant-numeric: tabular-nums;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-text-secondary);
     white-space: nowrap;
   }
 </style>

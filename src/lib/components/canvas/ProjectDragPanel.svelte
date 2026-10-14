@@ -289,7 +289,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary);
   }
   .section:first-child {
     margin-top: 2px;
@@ -300,7 +300,7 @@
     padding: 16px 4px;
     text-align: center;
     font-size: 12.5px;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-text-secondary);
   }
   .state {
     margin: auto 0;
@@ -322,7 +322,7 @@
     font: inherit;
     font-size: 12px;
     font-weight: 600;
-    color: var(--accent-ink, var(--accent, #7c5cff));
+    color: var(--ui-accent-text);
     cursor: pointer;
   }
   .retry:hover {
@@ -340,9 +340,9 @@
     position: relative;
     aspect-ratio: 1;
     overflow: hidden;
-    border: 1px solid var(--line, #ededef);
+    border: 1px solid var(--ui-divider);
     border-radius: 0;
-    background: var(--paper-2, #f9f9f9);
+    background: var(--ui-wash);
   }
   .tile[draggable='true'] {
     cursor: grab;
@@ -360,15 +360,15 @@
     display: grid;
     place-items: center;
     font-size: 10px;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
   .skel {
     aspect-ratio: 1;
-    border: 1px solid var(--line, #ededef);
+    border: 1px solid var(--ui-divider);
     border-radius: 0;
-    background: var(--paper-2, #f9f9f9);
+    background: var(--ui-wash);
     animation: skel-pulse 1.2s ease-in-out infinite;
   }
   @keyframes skel-pulse {
@@ -390,13 +390,13 @@
     margin-bottom: 12px;
     font-size: 13px;
     font-weight: 500;
-    color: var(--ink, #1d1d1f);
-    background: var(--paper, #fff);
-    border: 1px solid var(--line, #ededef);
+    color: var(--ui-text);
+    background: var(--ui-panel);
+    border: 1px solid var(--ui-divider);
     text-decoration: none;
   }
   .new-brand:hover {
-    background: var(--paper-2, #f9f9f9);
+    background: var(--ui-wash);
   }
   .new-brand:focus-visible {
     outline: 2px solid var(--accent);
@@ -410,9 +410,9 @@
     padding: 2px 1px 10px;
   }
   .brand-card {
-    border: 1px solid var(--line, #ededef);
+    border: 1px solid var(--ui-divider);
     border-radius: 0;
-    background: var(--paper-2, #f9f9f9);
+    background: var(--ui-wash);
   }
   .brand-head {
     appearance: none;
@@ -433,9 +433,9 @@
     height: 28px;
     flex: 0 0 auto;
     overflow: hidden;
-    border: 1px solid var(--line, #ededef);
+    border: 1px solid var(--ui-divider);
     border-radius: 0;
-    background: var(--paper, #fff);
+    background: var(--ui-panel);
     display: grid;
     place-items: center;
     font-size: 10px;
@@ -445,14 +445,14 @@
     flex: 1;
     font-size: 12.5px;
     font-weight: 600;
-    color: var(--ink);
+    color: var(--ui-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   .chevron {
     flex: 0 0 auto;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary);
     transition: transform 0.12s ease;
   }
   .chevron.open {
@@ -476,9 +476,9 @@
     gap: 6px;
     min-width: 0;
     padding: 5px 6px;
-    border: 1px solid var(--line, #ededef);
+    border: 1px solid var(--ui-divider);
     border-radius: 0;
-    background: var(--paper, #fff);
+    background: var(--ui-panel);
     cursor: grab;
   }
   .piece-kind {
@@ -487,7 +487,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary);
   }
   .piece-thumb {
     width: 18px;
@@ -499,13 +499,13 @@
     width: 14px;
     height: 14px;
     flex: 0 0 auto;
-    border: 1px solid var(--line, #ededef);
+    border: 1px solid var(--ui-divider);
   }
   .piece-label {
     min-width: 0;
     flex: 1;
     font-size: 12px;
-    color: var(--ink);
+    color: var(--ui-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

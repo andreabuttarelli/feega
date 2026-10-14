@@ -21,7 +21,7 @@
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import PartsProbe from './PartsProbe.svelte';
   import { IconButton, IconSize } from '$lib/components/ui/shell';
-  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropPlace, restack, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropPlace, restack, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
@@ -105,6 +105,10 @@
   const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, Audio: Music };
   const KIND_ICON: Partial<Record<LayerKind, typeof Square>> = { [LayerKind.Group]: Component, [LayerKind.Track]: Rows3 };
   const isPicked = (row: LayerRow) => rowPicked(row, selection);
+  const inside = $derived(rowsInside(rows, isPicked));
+  let query = $state('');
+  const shown = $derived(searchRows(rows, query));
+  const ROW_HUE: Record<string, string> = { motion: 'var(--ui-type-frame)', image: 'var(--ui-type-media)', video: 'var(--ui-type-media)', text: 'var(--ui-type-text)' };
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
 
   const pickOf = (e: MouseEvent | KeyboardEvent): Pick => pickFor({ shift: e.shiftKey, mod: e.metaKey || e.ctrlKey });
@@ -187,13 +191,16 @@
   {/key}
 {/if}
 
+<input class="search" type="search" placeholder="Search layers…" aria-label="Search layers" data-testid="layers-search" bind:value={query} />
+
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" onkeydown={onKey}>
-  {#each rows as row (`${row.nodeId}/${row.key}`)}
+  {#each shown as row (`${row.nodeId}/${row.key}`)}
     {@const RowIcon = KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square}
     <div
       class="row"
       class:picked={isPicked(row)}
+      class:inside={inside.has(row.key)}
       class:muted={row.hidden}
       role="treeitem"
       aria-level={row.depth + 1}
@@ -224,7 +231,7 @@
       {#if row.thumb}
         <img class="thumb" src={row.thumb} alt="" loading="lazy" decoding="async" data-testid="layer-thumb" />
       {/if}
-      <span class="icon"><RowIcon size={ICON} /></span>
+      <span class="icon" style:--hue={ROW_HUE[row.type]}><RowIcon size={ICON} /></span>
       {#if renaming === row.id}
         <!-- svelte-ignore a11y_autofocus -->
         <input class="name-input" value={row.label} autofocus aria-label="Track name" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
@@ -241,31 +248,60 @@
       {/if}
     </div>
   {:else}
-    <p class="empty">Nothing on this canvas yet</p>
+    <p class="empty">{query.trim() ? 'No layer matches' : 'Nothing on this canvas yet'}</p>
   {/each}
 </div>
 
 <style>
+  .search {
+    width: 100%;
+    height: var(--ui-row);
+    margin-bottom: 8px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font: inherit;
+    font-size: var(--ui-type-body);
+    outline: none;
+  }
+
+  .search::placeholder {
+    color: var(--ui-text-tertiary);
+  }
+
+  .search:hover {
+    background: var(--ui-input-hover);
+  }
+
+  .search:focus-visible {
+    box-shadow: var(--ui-ring);
+  }
+
   .layers {
     display: flex;
     flex-direction: column;
+    gap: 1px;
     outline: none;
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-type-label);
   }
 
   .row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    height: 28px;
-    padding-right: 4px;
-    color: var(--ui-ink);
+    gap: 8px;
+    height: var(--ui-row);
+    padding-right: 6px;
+    border-radius: var(--ui-radius-md);
+    color: var(--ui-text);
     cursor: default;
     user-select: none;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease);
   }
 
   .row:hover {
-    background: var(--ui-hover);
+    background: var(--ui-wash);
   }
 
   .row[data-drop='above'] {
@@ -285,22 +321,37 @@
   }
 
   .row.picked {
-    background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
-    color: var(--ui-accent);
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
+    font-weight: var(--ui-weight-medium);
+  }
+
+  .row.picked .icon,
+  .row.picked .flag {
+    color: var(--ui-on-accent);
+  }
+
+  .row.inside {
+    background: var(--ui-selected);
+    border-radius: 0;
+  }
+
+  .row.inside .icon {
+    color: var(--ui-accent-text);
   }
 
   .row.muted .name {
-    opacity: 0.45;
+    color: var(--ui-text-disabled);
   }
 
   .row[data-kind='track'] {
-    font-weight: 600;
+    font-weight: var(--ui-weight-medium);
   }
 
   .icon {
     display: grid;
     place-items: center;
-    color: var(--ui-text-3);
+    color: var(--hue, var(--ui-icon-ink));
   }
 
   .thumb {
@@ -323,8 +374,14 @@
     flex: 1;
     min-width: 0;
     height: 22px;
-    border-radius: 0;
+    padding: 0 6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-panel);
+    box-shadow: var(--ui-ring);
+    color: var(--ui-text);
     font: inherit;
+    outline: none;
   }
 
   .fold {
@@ -346,6 +403,7 @@
 
   .empty {
     margin: 12px 8px;
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-tertiary);
   }
 </style>

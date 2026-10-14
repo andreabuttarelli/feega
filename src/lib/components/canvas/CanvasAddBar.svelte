@@ -5,7 +5,7 @@
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
-  import { BAR_SLOTS, BarContext, BarSlot, barHidden, barKeys, barLift } from '$lib/canvas/bottom-bar';
+  import { BAR_SLOTS, BarContext, BarSlot, barHidden, barKeys, barLift, barShift } from '$lib/canvas/bottom-bar';
   import { KEY_REGION_ATTR } from '$lib/canvas/key-region.svelte';
   import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -23,8 +23,33 @@
     onupload,
     ontemplate,
     onframes,
-    context = BarContext.Canvas
-  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; context?: BarContext } = $props();
+    context = BarContext.Canvas,
+    zoom
+  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; context?: BarContext; zoom?: number } = $props();
+
+  const PERCENT = 100;
+
+  let barEl = $state<HTMLElement | null>(null);
+  let timelinePx = $state(0);
+  $effect(() => {
+    const timeline = frameBar.timeline;
+    const host = barEl?.parentElement;
+    if (!timeline || !host) {
+      timelinePx = 0;
+      return;
+    }
+    let frame = 0;
+    const follow = () => {
+      const rect = timeline.getBoundingClientRect();
+      const px = rect.height ? Math.max(0, Math.round(host.getBoundingClientRect().bottom - rect.top)) : 0;
+      if (px !== timelinePx) {
+        timelinePx = px;
+      }
+      frame = requestAnimationFrame(follow);
+    };
+    follow();
+    return () => cancelAnimationFrame(frame);
+  });
 
   let showMore = $state(false);
   let showTemplates = $state(false);
@@ -194,12 +219,15 @@
   </span>
 {/snippet}
 
-<div class="add-bar" class:covered={barHidden(context, frameBar.covered)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, frameBar.timelinePx)}px`}>
+<div bind:this={barEl} class="add-bar" class:covered={barHidden(context, frameBar.covered)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
   {#key context}
     <div class="group" data-testid={`bar-${context}`}>
       {#each BAR_SLOTS[context] as s (s)}{@render SLOT[s]()}{/each}
     </div>
   {/key}
+  {#if zoom !== undefined && context === BarContext.Canvas}
+    <span class="zoom" data-testid="canvas-zoom" title="Zoom · 0 fits the canvas">{Math.round(zoom * PERCENT)}%</span>
+  {/if}
   <input
     bind:this={fileInput}
     type="file"
@@ -242,41 +270,59 @@
     position: absolute;
     z-index: 61;
     bottom: var(--lift, 0px);
-    left: 50%;
+    left: calc(50% - var(--shift, 0px));
     transform: translateX(-50%);
-    transition: bottom var(--chrome-move) var(--ease-expo);
+    transition: bottom var(--chrome-move) var(--ease-expo), left var(--chrome-move) var(--ease-expo);
     display: flex;
     align-items: center;
-    gap: 3px;
-    padding: 4px;
-    border-radius: 0;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
+    gap: 2px;
+    padding: 5px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   .group {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
     animation: bar-in 240ms var(--ease-expo-out);
   }
 
   .draw {
     display: inline-flex;
-    gap: 3px;
-    padding-right: 3px;
-    margin-right: 3px;
-    border-right: 1px solid var(--line-2, #d2d2d7);
+    gap: 2px;
+    padding-right: 4px;
+    margin-right: 4px;
+    border-right: 1px solid var(--ui-divider);
   }
 
   .pick {
     cursor: pointer;
   }
 
+  .zoom {
+    display: inline-flex;
+    align-items: center;
+    height: 36px;
+    margin-left: 4px;
+    padding: 0 12px 0 10px;
+    border-left: 1px solid var(--ui-divider);
+    font-family: var(--ui-mono);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 767px) {
+    .zoom {
+      display: none;
+    }
+  }
+
   .pick.on {
-    color: var(--accent, #0071e3);
-    background: var(--paper-3, #f4f4f4);
+    color: var(--ui-accent-text);
+    background: var(--ui-selected);
   }
 
   @keyframes bar-in {
@@ -304,17 +350,24 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 8px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 9px;
     font: inherit;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-icon-ink);
     background: none;
     border: none;
-    border-radius: 0;
+    border-radius: var(--ui-radius-full);
     cursor: grab;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease), color var(--ui-dur-fast) var(--ui-ease);
   }
-  button:hover,
+  button:hover {
+    background: var(--ui-wash);
+    color: var(--ui-text);
+  }
   button:focus-visible {
-    background: var(--paper-2, #f9f9f9);
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
   button:active {
     cursor: grabbing;
@@ -322,7 +375,8 @@
 
   @media (max-width: 767px) {
     .add-bar {
-      bottom: calc(env(safe-area-inset-bottom, 0px) + var(--lift, 0px));
+      left: 50%;
+      bottom: calc(var(--mobile-bar-inset) + env(safe-area-inset-bottom, 0px) + var(--lift, 0px));
       gap: 0;
       padding: var(--mobile-bar-pad);
       box-shadow: var(--mobile-bar-shadow);
@@ -338,7 +392,7 @@
     }
     button:active,
     .keys-toggle[aria-expanded='true'] {
-      background: var(--paper-3, #f4f4f4);
+      background: var(--ui-wash);
     }
     .add-tip {
       display: none;
@@ -357,7 +411,7 @@
 
   .keys-toggle {
     cursor: pointer;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-text-secondary);
   }
 
   .add-tip {
@@ -368,12 +422,12 @@
     transform: translateX(-50%);
     padding: 4px 8px;
     white-space: nowrap;
-    font-size: 11px;
-    color: var(--ink, #1d1d1f);
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    border-radius: 0;
-    box-shadow: 0 4px 14px rgb(0 0 0 / 0.1);
+    font-size: var(--ui-type-label);
+    font-weight: var(--ui-weight-medium);
+    color: var(--ui-tooltip-ink);
+    background: var(--ui-tooltip);
+    border-radius: var(--ui-radius-sm);
+    box-shadow: var(--ui-shadow-raised);
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms ease;
@@ -410,16 +464,18 @@
     grid-template-columns: repeat(3, 96px);
     gap: 4px;
     padding: 6px;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
   .more-item {
     display: grid;
     justify-items: center;
     gap: 6px;
     padding: 12px 6px;
-    font-size: 11.5px;
+    height: auto;
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-secondary);
     text-align: center;
   }
 </style>

@@ -91,9 +91,11 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    height: 44px;
-    padding: 0 var(--ui-space-4);
-    border-bottom: 1px solid var(--ui-line);
+    height: var(--ui-header-h);
+    padding: 0 12px;
+    border-bottom: 1px solid var(--ui-divider);
+    font-size: var(--ui-type-title);
+    font-weight: var(--ui-weight-semibold);
   }
 
   .icon {

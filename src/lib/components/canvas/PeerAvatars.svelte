@@ -24,7 +24,7 @@
     width: 28px;
     height: 28px;
     margin-left: -6px;
-    border: 2px solid var(--background, white);
+    border: 2px solid var(--ui-surface);
     border-radius: 9999px;
     color: white;
     font-size: 12px;

@@ -129,7 +129,7 @@
     height: 32px;
     padding: 0 12px;
     border: 1px solid var(--ui-ink);
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
     font-size: 13px;
     font-weight: 600;

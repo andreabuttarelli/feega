@@ -106,8 +106,8 @@
     height: calc(var(--mobile-topbar-h) + env(safe-area-inset-top, 0px));
     padding: env(safe-area-inset-top, 0px) max(4px, env(safe-area-inset-right, 0px)) 0
       max(4px, env(safe-area-inset-left, 0px));
-    border-bottom: 1px solid var(--line, #ededef);
-    background: var(--paper, #fff);
+    border-bottom: 1px solid var(--ui-divider);
+    background: var(--ui-panel);
   }
 
   .promote {
@@ -116,7 +116,7 @@
     width: var(--touch-target);
     height: var(--touch-target);
     flex-shrink: 0;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-text);
   }
 
   .mobile-topbar :global(.burger-btn),
@@ -128,7 +128,7 @@
     padding: 0;
     border: 0;
     background: transparent;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-text);
     -webkit-tap-highlight-color: transparent;
   }
   .mobile-topbar :global(.burger-btn svg),
@@ -145,7 +145,7 @@
   .title:active,
   .back:active,
   .credits:active {
-    background: var(--paper-3, #f4f4f4);
+    background: var(--ui-wash);
   }
 
   .title {
@@ -163,7 +163,7 @@
     font: inherit;
     font-size: 15px;
     font-weight: 600;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-text);
   }
 
   .title .truncate {
@@ -183,8 +183,8 @@
     font-size: 13px;
     font-weight: 600;
     text-decoration: none;
-    color: var(--ink, #1d1d1f);
-    border-right: 1px solid var(--line, #ededef);
+    color: var(--ui-text);
+    border-right: 1px solid var(--ui-divider);
   }
 
   .actions {
@@ -201,6 +201,6 @@
     font-size: 13px;
     font-weight: 600;
     text-decoration: none;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-text);
   }
 </style>

@@ -35,6 +35,10 @@ export const barContextOf = (state: CanvasState): BarContext => STATE_CONTEXT[st
 
 export const barLift = (context: BarContext, timelinePx: number): number => (CONTEXT[context].followsTimeline ? timelinePx : 0);
 
+const HALF = 2;
+
+export const barShift = (context: BarContext, sidePx: number): number => (CONTEXT[context].followsTimeline ? sidePx / HALF : 0);
+
 export const barKeys = (context: BarContext): Region => CONTEXT[context].keys;
 
 export const barHidden = (context: BarContext, frameDialogOpen: boolean): boolean => CONTEXT[context].yieldsToDialogs && frameDialogOpen;

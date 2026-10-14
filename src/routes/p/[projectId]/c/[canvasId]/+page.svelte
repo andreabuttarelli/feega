@@ -32,6 +32,7 @@
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
+  import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
   import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
@@ -41,7 +42,7 @@
   import { CoachStep, ONBOARDING_EVENT, OnboardingStatus, chainOf, stepOf, type CoachChain } from '$lib/onboarding/coach';
   import { DEMO_PRESET, exampleFor, isDemoMedium } from '$lib/onboarding/demo';
   import OnboardingCoach from '$lib/components/canvas/OnboardingCoach.svelte';
-  import { placeBeside, placeNear, type Rect } from '$lib/canvas/placement';
+  import { offCentre, placeBeside, placeNear, type Rect } from '$lib/canvas/placement';
   import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
@@ -873,6 +874,10 @@
   let failed = $state<string | null>(null);
   let failedIsCreditsExhausted = $state(false);
   let peers = $state<PresencePeer[]>([]);
+  let topPeers = $state<HTMLElement | null>(null);
+  $effect(() => {
+    topPeers = document.querySelector<HTMLElement>('[data-top-peers]');
+  });
   const frames = frameHub({ userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
   provideFramePresence(frames.port);
   let pending = 0;
@@ -1308,7 +1313,8 @@
     }
 
     const probe = pendingFrame(at, doc);
-    const spot = placeNear(at, { w: probe.size.width ?? 0, h: probe.size.height ?? 0 }, occupiedRects());
+    const frameSize = { w: probe.size.width ?? 0, h: probe.size.height ?? 0 };
+    const spot = placeNear(at, frameSize, occupiedRects());
     const shown = pendingFrame(spot, doc);
     nodes = [...nodes, toTile(shown)];
     const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y });
@@ -1316,6 +1322,9 @@
     nodes = nodes.filter((n) => n.id !== shown.id);
     if (node && !nodes.some((n) => n.id === node.id)) {
       nodes = [...nodes, toTile(node)];
+    }
+    if (node && offCentre(at, spot, frameSize)) {
+      focusOn([node.id]);
     }
   }
 
@@ -1381,7 +1390,8 @@
   }
 
   async function create(what: Addable, at: { x: number; y: number }) {
-    const spot = placeNear(at, sizeForAddable(what), occupiedRects());
+    const size = sizeForAddable(what);
+    const spot = placeNear(at, size, occupiedRects());
 
     const res = await post('create', {
       type: what,
@@ -1397,6 +1407,9 @@
 
     nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })];
     pushGesture(createGesture(created));
+    if (offCentre(at, spot, size)) {
+      focusOn([created.id]);
+    }
     if (created.type === 'influencer') {
       void refresh();
     }
@@ -2611,7 +2624,11 @@
 
 <div class="canvas" class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
   {#if peers.length}
-    <div class="peers"><PeerAvatars {peers} /></div>
+    {#if topPeers}
+      <Portal to={topPeers}><PeerAvatars {peers} /></Portal>
+    {:else}
+      <div class="peers"><PeerAvatars {peers} /></div>
+    {/if}
   {/if}
   <p class="save-status" role="status" data-status={saveStatus}>{SAVE_LABEL[saveStatus]}</p>
   {#if failed}
@@ -3088,6 +3105,10 @@
     font-size: 11px;
     color: var(--muted-foreground, #888);
     pointer-events: none;
+  }
+
+  @media (max-width: 767px) {
+    .save-status { bottom: var(--mobile-switch-bottom, 16px); }
   }
 
   .save-status[data-status='retrying'] { color: #c0392b; }

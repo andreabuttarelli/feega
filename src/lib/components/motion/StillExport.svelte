@@ -79,11 +79,12 @@
     flex-direction: column;
     gap: 12px;
     padding: 16px;
-    background: var(--ui-bg);
     color: var(--ui-ink);
-    border: 1px solid var(--ui-line);
-    box-shadow: 0 16px 48px rgb(0 0 0 / 0.2);
     font-size: 13px;
+    border: 0;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   header {
@@ -118,7 +119,7 @@
 
   .primary {
     padding: 8px 12px;
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
     font-size: 12px;
     text-align: center;

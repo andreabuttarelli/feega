@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BAR_SLOTS, BarContext, BarSlot, barContextOf, barHidden, barKeys, barLift } from './bottom-bar';
+import { BAR_SLOTS, BarContext, BarSlot, barContextOf, barHidden, barKeys, barLift, barShift } from './bottom-bar';
 import { CanvasState } from './inline-motion';
 import { Region } from './key-region.svelte';
 
@@ -23,6 +23,12 @@ describe('one bottom bar, its tools by context', () => {
     expect(barLift(BarContext.Canvas, 200)).toBe(0);
     expect(barLift(BarContext.Frame, 200)).toBe(200);
     expect(barLift(BarContext.Frame, 0)).toBe(0);
+  });
+
+  it('centres on the stage left visible: a frame panel docked on the right moves it left by half its width', () => {
+    expect(barShift(BarContext.Canvas, 400)).toBe(0);
+    expect(barShift(BarContext.Frame, 400)).toBe(200);
+    expect(barShift(BarContext.Frame, 0)).toBe(0);
   });
 
   it('a click on a frame tool keeps the keyboard with the frame', () => {

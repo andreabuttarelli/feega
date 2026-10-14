@@ -376,7 +376,7 @@
     font-size: var(--ui-text-xs);
   }
   .on .num {
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     border-color: var(--ui-accent);
     color: var(--ui-accent-ink);
   }
@@ -478,7 +478,7 @@
     place-items: center;
     width: 22px;
     height: 22px;
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
   }
   .styles {
@@ -627,8 +627,8 @@
     padding: 0 var(--ui-space-6);
     font-size: var(--ui-text-md);
     font-weight: 600;
-    border: 1px solid var(--ui-accent);
-    background: var(--ui-accent);
+    border: 1px solid var(--ui-accent-solid);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
     text-decoration: none;
     cursor: pointer;
