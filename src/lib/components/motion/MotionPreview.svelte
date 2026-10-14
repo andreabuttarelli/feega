@@ -5,6 +5,7 @@
   import { CAPTURE_TIMEOUT_MS, Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
   import { crispFor } from '$lib/motion/hyperframes/crisp-scale';
+  import { listenTap, type FramePoint } from '$lib/motion/hyperframes/frame-tap';
   import { laneVisibility, shootInLanes } from '$lib/motion/export/lanes';
   import { engineOf } from '$lib/motion/engine';
   import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
@@ -36,8 +37,9 @@
     live = null,
     vars = null,
     redraws = $bindable(0),
+    ontap = null,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; children?: Snippet } = $props();
 
   let pointer = $state<InputValues>({});
 
@@ -57,6 +59,7 @@
   });
 
   let host = $state<HTMLDivElement | null>(null);
+  let shown = $state<HTMLIFrameElement | null>(null);
   let player: Player | null = null;
   let reported = -1;
   let ready = false;
@@ -94,7 +97,7 @@
       el.loop = loop;
       el.addEventListener('ready', () => {
         crisp();
-        const shown = el.iframeElement;
+        shown = el.iframeElement;
         crisp = shown ? crispFor(engineOf(navigator.userAgent), shown) : () => {};
         ready = true;
         driver.seek(frame / fps);
@@ -273,6 +276,16 @@
       player.muted = sound;
       player.loop = again;
     }
+  });
+
+  $effect(() => {
+    const frameEl = shown;
+    const lift = host;
+    const tapped = ontap;
+    if (!frameEl || !lift || !tapped || live) {
+      return;
+    }
+    return listenTap(frameEl, lift, tapped);
   });
 
   $effect(() => {
