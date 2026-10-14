@@ -7,17 +7,16 @@ const CLI = fileURLToPath(new URL('../', import.meta.url));
 const MCP_TOOLS = join(CLI, 'mcp', 'tools');
 const SKILL = join(CLI, 'skills', 'feega', 'SKILL.md');
 const REFERENCE = join(CLI, 'skills', 'feega', 'references', 'tools.md');
-const BEHIND_SOCIAL_PUBLISHING = ['posts.ts'];
 
 /**
  * La superficie MCP reale non nasce da un registro: e' cablata a mano in
- * `cli/mcp/tools/{posts,ads,org-data,nodes}.ts`, ognuno un `server.registerTool('nome', ...)`.
+ * `cli/mcp/tools/{ads,org-data,nodes}.ts`, ognuno un `server.registerTool('nome', ...)`.
  * Un estrattore che leggesse un registro dichiarativo (`BRAND_ENDPOINTS` e simili) mentirebbe: quel
  * registro serve alle rotte REST brand-scoped che il CLI chiama ancora, non a `tools/list`.
  */
 function registeredTools(): Set<string> {
   const source = readdirSync(MCP_TOOLS)
-    .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts') && !BEHIND_SOCIAL_PUBLISHING.includes(file))
+    .filter((file) => file.endsWith('.ts') && !file.endsWith('.test.ts'))
     .map((file) => readFileSync(join(MCP_TOOLS, file), 'utf8'))
     .join('\n');
 

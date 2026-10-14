@@ -125,7 +125,6 @@
     onResize,
     onConnect,
     onDelete,
-    onPromote,
     onEdgeDelete,
     onEdgeRetype,
     onEdgeModeChange,
@@ -185,7 +184,6 @@
      */
     onDelete?: (ids: string[]) => void;
     /** "Crea post" dalla barra della selezione: gli id scelti, così com'è per `onDelete`. */
-    onPromote?: (ids: string[]) => void;
     /** Una linea da togliere. Senza, il primo errore resta sulla tela per sempre. */
     onEdgeDelete?: (edgeId: string) => void;
     /** Il verso di una linea che c'è già: si corregge, non si rifà. */
@@ -224,7 +222,7 @@
     focus?: FocusRequest | null;
     /** "Collega a…": gli id scelti e il nodo su cui si è cliccato per chiudere la modalità bersaglio. */
     onConnectExisting?: (ids: string[], targetId: string) => void;
-    /** "Esegui flusso": gli id scelti, così com'è per `onDelete`/`onPromote`. */
+    /** "Esegui flusso": gli id scelti, così com'è per `onDelete`. */
     onRunWorkflow?: (ids: string[]) => void;
     onRunGraph?: (graph: GraphScope, ids: string[]) => void;
     stale?: string[];
@@ -573,7 +571,6 @@
     'connect-existing': (ids) => {
       targeting = ids;
     },
-    promote: (ids) => onPromote?.(ids),
     'run-workflow': (ids) => onRunWorkflow?.(ids),
     'run-downstream': (ids) => onRunGraph?.(GraphScope.Downstream, ids),
     'run-stale': (ids) => onRunGraph?.(GraphScope.Stale, ids),
@@ -629,11 +626,7 @@
   }) {
     if (!selection.box || !toFlow) return;
 
-    if (suggestion.wiring === 'create-post') {
-      onPromote?.(selection.ids);
-      return;
-    }
-    if (!suggestion.createsNodeType) return;
+    if (suggestion.wiring === 'create-post' || !suggestion.createsNodeType) return;
 
     onConnectNew?.(selection.ids, suggestion.createsNodeType, suggestion.promptTemplate);
   }

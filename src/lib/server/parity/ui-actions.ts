@@ -23,7 +23,6 @@ const ONBOARDING = uiOnly('first-run coach for a person');
 const NAVIGATION = uiOnly('navigation between screens');
 
 const VOICES = 'custom voices (ElevenLabs design/clone/library) have no API route yet';
-const POSTS = 'posts and calendar are being retired with the focus on motion';
 
 export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   new_canvas: canvas('create_canvas'),
@@ -75,11 +74,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   frame_template: canvas('add_frame_from_template'),
   template: canvas('insert_template'),
   undo: uiOnly('replays the browser gesture stack; an agent reverses its own write with the inverse op or restore_motion_revision'),
-  suggestNextStep: uiOnly('suggestion chips for a person'),
-  create_post: gap(POSTS),
-  calendar_posts: gap(POSTS),
-  plan_post: gap(POSTS),
-  schedule_post: gap(POSTS)
+  suggestNextStep: uiOnly('suggestion chips for a person')
 };
 
 export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
@@ -212,7 +207,6 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   duplicate: canvas('duplicate_nodes'),
   'connect-new': canvas('connect_nodes'),
   'connect-existing': canvas('connect_nodes'),
-  promote: gap(POSTS),
   'run-workflow': canvas('run_workflow'),
   'run-downstream': canvas('run_graph'),
   'run-stale': canvas('run_graph'),

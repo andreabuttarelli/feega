@@ -211,7 +211,7 @@ describe('saveBanner: a failed read never claims a save failed', () => {
   });
 
   it('every read action stays silent on a server error', () => {
-    for (const action of ['snapshot', 'revision', 'estimate_text_cost', 'calendar_posts', 'audio_voices']) {
+    for (const action of ['snapshot', 'revision', 'estimate_text_cost', 'audio_voices']) {
       expect(actionKind(action)).toBe(ActionKind.Read);
       expect(saveBanner(action, { type: 'error', status: 500 })).toBeNull();
     }

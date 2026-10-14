@@ -3,7 +3,7 @@ import { actionsIn, enabledFor } from './selection-actions';
 
 describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
   it('secondarie, overflow e distruttive in gruppi fissi', () => {
-    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'promote']);
+    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate']);
     expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['copy-id', 'report']);
     expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
   });
@@ -15,18 +15,6 @@ describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
 });
 
 describe('enabledFor', () => {
-  it('promote è abilitata con un\'immagine nella selezione', () => {
-    const result = enabledFor('promote', [{ id: '1', type: 'image', data: { refId: 'a1' } }]);
-    expect(result.enabled).toBe(true);
-    expect(result.reason).toBeUndefined();
-  });
-
-  it('promote è disabilitata senza media né testo, e dà una ragione', () => {
-    const result = enabledFor('promote', [{ id: '1', type: 'iframe', data: { url: 'x' } }]);
-    expect(result.enabled).toBe(false);
-    expect(result.reason).toBe('Select at least one media or text node');
-  });
-
   it('duplicate è sempre abilitata, indipendentemente dal contenuto', () => {
     expect(enabledFor('duplicate', []).enabled).toBe(true);
     expect(enabledFor('duplicate', [{ id: '1', type: 'text', data: {} }]).enabled).toBe(true);
