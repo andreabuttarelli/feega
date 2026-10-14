@@ -4,7 +4,7 @@ import type { Db } from '$lib/server/db/client';
 import { createNode, deleteNode, findNode, listConnections } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
-import { newMotionData } from '$lib/canvas/motion-node';
+import { motionNodeSize, newMotionData } from '$lib/canvas/motion-node';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
 import { saveMotionDoc } from './editor';
@@ -144,6 +144,28 @@ async function targetOf(store: FrameStore, drop: Drop, versions?: Record<string,
     return refused(MoveOutcome.NotFound, `no frame ${drop.nodeId}`);
   }
   return stale(target, versions) ? refused(MoveOutcome.Conflict) : target;
+}
+
+export type FrameTarget = { frameId?: string; at: Point; frame?: number };
+
+const NEW_FRAME_GAP = 80;
+
+export async function landElement(store: FrameStore, from: StoredFrame & { right: number; top: number }, element: Element, target: FrameTarget): Promise<Moved> {
+  const drop: Drop = target.frameId ? { on: DropOn.Frame, nodeId: target.frameId, at: target.at, frame: target.frame } : { on: DropOn.Canvas, x: from.right + NEW_FRAME_GAP, y: from.top };
+  if (drop.on === DropOn.Frame && drop.nodeId === from.nodeId) {
+    return refused(MoveOutcome.SameFrame);
+  }
+  const frame = await targetOf(store, drop);
+  if (frame && !('doc' in frame)) {
+    return frame;
+  }
+  const landing = frame
+    ? await landInFrame(store, frame, element, drop as Extract<Drop, { on: DropOn.Frame }>, SUMMARY.movedIn)
+    : await landOnCanvas(store, from, element, drop as Extract<Drop, { on: DropOn.Canvas }>, docMode(from.doc), null);
+  if (!isLanding(landing)) {
+    return landing;
+  }
+  return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
 }
 
 export async function moveElement(store: FrameStore, ask: MoveAsk): Promise<Moved> {
@@ -295,4 +317,48 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor; project
     output: async (nodeId) => inScope(await generatedOutput(db, orgId, nodeId)),
     fedFrames: (nodeId) => framesFedBy(db, orgId, nodeId)
   };
+}
+
+export function frameMover(db: Db, scope: { orgId: string; actor: Actor; projectId: string }, sourceNodeId: string): (element: Element, target: FrameTarget) => Promise<Moved> {
+  return async (element, target) => {
+    const store = frameStore(db, scope);
+    const [from, record] = await Promise.all([store.read(sourceNodeId), findNode(db, { orgId: scope.orgId, nodeId: sourceNodeId })]);
+    if (!from || !record) {
+      return refused(MoveOutcome.NotFound, `no frame ${sourceNodeId}`);
+    }
+    const width = record.size.width ?? motionNodeSize(formatOf(from.doc)).w;
+    return landElement(store, { ...from, right: record.position.x + width, top: record.position.y }, element, target);
+  };
+}
+
+export type FrameAsk = { toFrameId?: string; x: number; y: number; canvasX?: number; canvasY?: number };
+
+export function dropFor(ask: FrameAsk): Drop {
+  return ask.toFrameId ? { on: DropOn.Frame, nodeId: ask.toFrameId, at: { x: ask.x, y: ask.y } } : { on: DropOn.Canvas, x: ask.canvasX ?? 0, y: ask.canvasY ?? 0 };
+}
+
+export function frameAnswer(moved: Moved): Record<string, unknown> {
+  if (moved.outcome !== MoveOutcome.Done) {
+    return { outcome: moved.outcome, message: moved.detail ?? moved.outcome };
+  }
+  return { outcome: moved.outcome, frame_id: moved.frameId, element_id: moved.clipId, new_frame: moved.created, revisions: moved.versions };
+}
+
+export const frameRequestSchema = z
+  .object({
+    frame_id: z.string().min(1).optional(),
+    element_id: z.string().min(1).optional(),
+    node_id: z.string().min(1).optional(),
+    to_frame_id: z.string().min(1).optional(),
+    x: fraction.default(0.5),
+    y: fraction.default(0.5),
+    canvas_x: z.number().finite().optional(),
+    canvas_y: z.number().finite().optional()
+  })
+  .strict()
+  .refine((a) => Boolean(a.frame_id && a.element_id) !== Boolean(a.node_id), 'name frame_id and element_id to move an element, or node_id to place a generated output');
+
+export function frameRequest(store: FrameStore, ask: z.infer<typeof frameRequestSchema>): Promise<Moved> {
+  const drop = dropFor({ toFrameId: ask.to_frame_id, x: ask.x, y: ask.y, canvasX: ask.canvas_x, canvasY: ask.canvas_y });
+  return ask.node_id ? placeOutput(store, { sourceNodeId: ask.node_id, drop }) : moveElement(store, { sourceNodeId: ask.frame_id ?? '', clipId: ask.element_id ?? '', drop });
 }

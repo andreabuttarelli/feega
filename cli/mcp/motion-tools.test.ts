@@ -74,6 +74,10 @@ const fake: Server = createServer((req, res) => {
       send(200, published ? { published, url: `https://feega.app/e/${NODE}`, snippet: `<iframe src="https://feega.app/e/${NODE}"></iframe>`, react: `<FeegaMotion id="${NODE}" />`, flutter: `FeegaMotion(id: '${NODE}')`, revision: 3 } : { published });
       return;
     }
+    if (route === '/api/v1/motion/elements') {
+      send(200, { outcome: 'done', frame_id: 'frame-b', element_id: 'txt', new_frame: false, revisions: { 'frame-b': 2, [NODE]: 4 } });
+      return;
+    }
     if (route === `/api/v1/motion/${NODE}/budget`) {
       send(200, { ok: true, spent_usd: 2.04, cap_usd: req.method === 'POST' ? 3 : 2, raise_usd: 1 });
       return;
@@ -227,6 +231,12 @@ describe('the motion agent over MCP', () => {
     const result = await callTool('publish_motion_embed', { node_id: NODE, action: 'unpublish' });
     expect(calls[0]).toMatchObject({ method: 'DELETE', path: `/api/v1/motion/${NODE}/embed` });
     expect(result?.structuredContent).toMatchObject({ published: false });
+  });
+
+  test('place_in_frame moves an element to another frame through the same op the canvas uses', async () => {
+    const result = await callTool('place_in_frame', { frame_id: NODE, element_id: 'txt', to_frame_id: 'frame-b', x: 0.4, y: 0.6 });
+    expect(calls[0]).toMatchObject({ method: 'POST', path: '/api/v1/motion/elements', body: { frame_id: NODE, element_id: 'txt', to_frame_id: 'frame-b', x: 0.4, y: 0.6 } });
+    expect(JSON.stringify(result)).toContain('frame-b');
   });
 
   test('motion_budget reads what a video spent across all its turns', async () => {

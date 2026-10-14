@@ -90,6 +90,7 @@ const RESTANO = [
   'new_motion_from_template',
   'view_motion_frames',
   'motion_tool',
+  'place_in_frame',
   'search_gallery',
   'remix_gallery_item',
   'publish_to_gallery',

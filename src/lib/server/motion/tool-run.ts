@@ -10,6 +10,7 @@ import { motionAssets, motionTokens, saveMotionDoc } from './editor';
 import { templateLibrary } from './templates';
 import { exportStill } from './still-export';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
+import { frameMover } from './move-element';
 
 export enum ToolRun {
   Done = 'done',
@@ -85,7 +86,8 @@ export async function runMotionTool(db: Db, scope: { orgId: string; userId: stri
     assets,
     templates: templateLibrary(db, { orgId: scope.orgId, actor }),
     revisions: { list: () => listRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null },
-    exportStill: (doc, spec) => exportStill(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId }, doc, spec, { tokens, assets })
+    exportStill: (doc, spec) => exportStill(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId }, doc, spec, { tokens, assets }),
+    moveOut: frameMover(db, { orgId: scope.orgId, actor, projectId: saved.project.id }, scope.nodeId)
   });
 
   const found = tools[ask.tool];

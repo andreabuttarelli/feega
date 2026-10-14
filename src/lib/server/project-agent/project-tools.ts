@@ -35,7 +35,7 @@ import { templateLibrary } from '$lib/server/motion/templates';
 import { componentKind } from '$lib/motion/template/catalogue';
 import { compositionOf } from '$lib/canvas-node-data';
 import { FORMAT_OF_ASPECT, composedTemplate, sequentialIds } from '$lib/canvas/composition-template';
-import { DropOn, MoveOutcome, frameStore, linkFrame, moveElement, placeOutput, type Drop, type Moved } from '$lib/server/motion/move-element';
+import { MoveOutcome, dropFor, frameAnswer, frameStore, linkFrame, moveElement, placeOutput } from '$lib/server/motion/move-element';
 
 /**
  * I TOOL DI PROGETTO E TELA. Sempre presenti, anche senza brand.
@@ -80,19 +80,6 @@ function outcomeOf(out: RunOutcome): Record<string, unknown> {
     return { outcome: 'conflict', message: 'Node was written by someone else. Re-read it and retry with the new version.' };
   }
   return { outcome: 'refused', error: out.error };
-}
-
-type FrameTarget = { toFrameId?: string; x: number; y: number; canvasX?: number; canvasY?: number };
-
-function dropFor(input: FrameTarget): Drop {
-  return input.toFrameId ? { on: DropOn.Frame, nodeId: input.toFrameId, at: { x: input.x, y: input.y } } : { on: DropOn.Canvas, x: input.canvasX ?? 0, y: input.canvasY ?? 0 };
-}
-
-function frameAnswer(moved: Moved): Record<string, unknown> {
-  if (moved.outcome !== MoveOutcome.Done) {
-    return { outcome: moved.outcome, message: moved.detail ?? moved.outcome };
-  }
-  return { outcome: moved.outcome, frame_id: moved.frameId, element_id: moved.clipId, new_frame: moved.created, revisions: moved.versions };
 }
 
 export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> {

@@ -253,6 +253,20 @@ export function registerMotionTools(server: McpServer) {
   );
 
   server.registerTool(
+    'place_in_frame',
+    {
+      title: 'Move an element or a generated output into a frame',
+      description:
+        'Frames hold graphic elements; image, video and text nodes generate. With `frame_id` + `element_id` (a clip id from `get_motion_summary`): moves that element out of its frame into `to_frame_id`, keeping props, style and keyframes (re-timed to the target). ' +
+        'With `node_id` (a generative image, video or text node): puts its generated output into `to_frame_id` as an image, video or text element; the node is not changed. ' +
+        'Without `to_frame_id`: a new frame at `canvas_x`/`canvas_y` holding only it. `x`/`y` (0..1 of the target frame) is where the centre lands. Both frames are saved as revisions. To keep an element following a node\'s next generations, connect the node to the frame (`insert_row` on `nodes_connections`). Free.',
+      inputSchema: z.object({ org, frame_id: z.string().optional(), element_id: z.string().optional(), node_id: z.string().optional(), to_frame_id: z.string().optional(), x: z.number().min(0).max(1).optional(), y: z.number().min(0).max(1).optional(), canvas_x: z.number().optional(), canvas_y: z.number().optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: false }
+    },
+    async ({ org, ...body }) => withAuth((token) => motionApi.frameElement(token, body, org))
+  );
+
+  server.registerTool(
     'list_motion_videos',
     {
       title: 'List frames',

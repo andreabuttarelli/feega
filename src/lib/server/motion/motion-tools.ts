@@ -131,6 +131,8 @@ import { MOTION_STYLES } from '$lib/motion/style-model';
 import { SPAWN_AGENT, type ModelOffer, type SpawnInput, type SpawnResult } from '$lib/server/agents/spawn';
 import { spawnAgentTool } from '$lib/server/agents/spawn-agent';
 import { setStill } from '$lib/motion/still';
+import { liftElement, type Element } from '$lib/motion/move-element';
+import { MoveOutcome, type FrameTarget, type Moved } from './move-element';
 import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '$lib/motion/still-model';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
@@ -182,6 +184,7 @@ export type MotionToolDeps = {
   storyboard?: StoryboardPort;
   copywrite?: (script: LaunchScript) => Promise<LaunchScript>;
   exportStill?: (doc: MotionDoc, spec: StillExport) => Promise<StillMade>;
+  moveOut?: (element: Element, target: FrameTarget) => Promise<Moved>;
 };
 
 export type StillMade = { ok: true; asset_id: string; url: string; width: number; height: number } | { ok: false; error: string };
@@ -1841,6 +1844,27 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         return apply(pinned, 'changed the canvas');
+      }
+    }),
+
+    move_to_frame: tool({
+      description:
+        'Move one clip of this video into another Frame on the canvas (frame_id, a motion node id), or, without frame_id, into a new Frame next to this one that holds only it. Props, style and keyframes go with it, re-timed to that frame; x/y (0..1 of the target frame) is where its centre lands, at_seconds where it starts in a video frame. It leaves this video.',
+      inputSchema: z.object({ clip_id: z.string(), frame_id: z.string().optional(), x: z.number().min(0).max(1).default(0.5), y: z.number().min(0).max(1).default(0.5), at_seconds: z.number().min(0).optional() }),
+      execute: async (input) => {
+        if (!deps.moveOut) {
+          return UNREADABLE('moving to another frame');
+        }
+        const lifted = liftElement(session.doc, input.clip_id);
+        if (!lifted.ok) {
+          return lifted;
+        }
+        const target: FrameTarget = { ...(input.frame_id ? { frameId: input.frame_id } : {}), at: { x: input.x, y: input.y }, ...(input.at_seconds === undefined ? {} : { frame: Math.round(input.at_seconds * session.doc.fps) }) };
+        const moved = await deps.moveOut(lifted.element, target);
+        if (moved.outcome !== MoveOutcome.Done) {
+          return { ok: false, error: moved.detail ?? moved.outcome };
+        }
+        return { ...apply({ ok: true, doc: lifted.doc }, `moved ${input.clip_id} to frame ${moved.frameId}`), frame_id: moved.frameId, element_id: moved.clipId, new_frame: moved.created };
       }
     }),
 
