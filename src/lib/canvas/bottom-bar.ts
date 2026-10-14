@@ -17,11 +17,11 @@ export enum BarSlot {
   FrameLibrary = 'frame-library'
 }
 
-type ContextRules = { slots: readonly BarSlot[]; followsTimeline: boolean; keys: Region };
+type ContextRules = { slots: readonly BarSlot[]; followsTimeline: boolean; keys: Region; yieldsToDialogs: boolean };
 
 const CONTEXT: Record<BarContext, ContextRules> = {
-  [BarContext.Canvas]: { slots: [BarSlot.Upload, BarSlot.Nodes, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates], followsTimeline: false, keys: Region.Canvas },
-  [BarContext.Frame]: { slots: [BarSlot.Draw, BarSlot.Image, BarSlot.FrameLibrary], followsTimeline: true, keys: Region.Editor }
+  [BarContext.Canvas]: { slots: [BarSlot.Upload, BarSlot.Nodes, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates], followsTimeline: false, keys: Region.Canvas, yieldsToDialogs: false },
+  [BarContext.Frame]: { slots: [BarSlot.Draw, BarSlot.Image, BarSlot.FrameLibrary], followsTimeline: true, keys: Region.Editor, yieldsToDialogs: true }
 };
 
 export const BAR_SLOTS = Object.fromEntries(Object.entries(CONTEXT).map(([context, rules]) => [context, rules.slots])) as Record<BarContext, readonly BarSlot[]>;
@@ -36,3 +36,5 @@ export const barContextOf = (state: CanvasState): BarContext => STATE_CONTEXT[st
 export const barLift = (context: BarContext, timelinePx: number): number => (CONTEXT[context].followsTimeline ? timelinePx : 0);
 
 export const barKeys = (context: BarContext): Region => CONTEXT[context].keys;
+
+export const barHidden = (context: BarContext, frameDialogOpen: boolean): boolean => CONTEXT[context].yieldsToDialogs && frameDialogOpen;
