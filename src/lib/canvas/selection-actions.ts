@@ -52,20 +52,21 @@ export function actionsIn(group: SelectionActionGroup, count: number): Selection
   return SELECTION_ACTIONS.filter((a) => a.group === group && count >= a.minNodes);
 }
 
-export function enabledFor(
-  id: SelectionActionId,
-  nodeSummaries: PostCompositionNode[],
-  edges: WorkflowEdge[] = []
-): { enabled: boolean; reason?: string } {
-  if (id === 'promote') {
+type Gate = { enabled: boolean; reason?: string };
+
+type GateInput = { nodeSummaries: PostCompositionNode[]; edges: WorkflowEdge[] };
+
+const ALWAYS: Gate = { enabled: true };
+
+const GATES: Partial<Record<SelectionActionId, (input: GateInput) => Gate>> = {
+  promote: ({ nodeSummaries }) => {
     const composition = postCompositionFor(nodeSummaries);
     return {
       enabled: composition.enabled,
       reason: composition.enabled ? undefined : 'Select at least one media or text node'
     };
-  }
-
-  if (id === 'run-workflow') {
+  },
+  'run-workflow': ({ nodeSummaries, edges }) => {
     const nodeTypesById = new Map(nodeSummaries.map((n) => [n.id, n.type]));
     const plan = planWorkflow(
       nodeSummaries.map((n) => n.id),
@@ -74,6 +75,12 @@ export function enabledFor(
     );
     return { enabled: plan.ok, reason: plan.ok ? undefined : plan.reason };
   }
+};
 
-  return { enabled: true };
+export function enabledFor(
+  id: SelectionActionId,
+  nodeSummaries: PostCompositionNode[],
+  edges: WorkflowEdge[] = []
+): Gate {
+  return GATES[id]?.({ nodeSummaries, edges }) ?? ALWAYS;
 }
