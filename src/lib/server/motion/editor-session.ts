@@ -1,6 +1,6 @@
 import { motionScope as scopeFor } from './editor-scope';
 import { headOrNew, motionAssets, motionTokens } from './editor';
-import { motionRenderFarm, motionRenderStorage } from './renderer';
+import { knownRenderLimit, motionRenderFarm } from './renderer';
 import { batchView, renderView } from './render-run';
 import { serverRenderOpen } from '$lib/motion/server-render';
 import { renderQueue } from './render-queue';
@@ -23,12 +23,12 @@ export async function loadEditorSession(locals: App.Locals, params: EditorParams
   const briefIds = briefAttachmentIds(url);
   const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
   const farm = motionRenderFarm();
-  const [head, tokens, assets, runs, uploadLimit, templates, gallery, briefAttachments] = await Promise.all([
+  const uploadLimit = farm ? knownRenderLimit() : null;
+  const [head, tokens, assets, runs, templates, gallery, briefAttachments] = await Promise.all([
     headOrNew(scope.db, nodeScope, scope.motion.node),
     motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
     motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }),
     listNodeRuns(scope.db, nodeScope),
-    farm ? motionRenderStorage().limit().catch(() => null) : null,
     libraryOf(scope).own(),
     editorGallery(scope.db, nodeScope),
     briefIds.length ? loadAttachments(scope.db, { orgId: scope.orgId, projectId: params.projectId, ids: briefIds }) : []
