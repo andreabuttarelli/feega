@@ -63,7 +63,8 @@ const id = encodeURIComponent;
 export type ShaderEffect = { id: string; category: string; source: string; live: boolean; about: string; knobs: Record<string, { label: string; min: number; max: number; default: number; keyframes: boolean }>; colours: Record<string, string> };
 
 export type MotionTemplateField = { key: string; label: string; type: string; group?: string; min?: number; max?: number; options?: string[]; default?: unknown };
-export type MotionTemplate = { id: string; name: string; description: string; seconds: number; fields: MotionTemplateField[] };
+export type MotionTemplateCard = { roles: string[]; energy: string; loops: boolean; onScreen: string[]; edges: { start: string; end: string; transition: string }; goodFor: string[] };
+export type MotionTemplate = { id: string; name: string; description: string; seconds: number; card?: MotionTemplateCard; fields: MotionTemplateField[] };
 export type FromTemplate = { template: string; format?: string; project?: string; still?: number };
 export type ToolRun = { tool: string; version: number; saved: boolean; output: Record<string, unknown> };
 export type ToolAsk = { tool: string; input?: unknown; version?: number };

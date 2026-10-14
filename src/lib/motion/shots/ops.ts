@@ -148,16 +148,29 @@ const SOUNDS: Record<ShotSound, (steps: Parameters<typeof cursorCues>[0]) => Sfx
   [ShotSound.On]: cursorCues
 };
 
+const optional = (v: unknown) => (v as z.ZodType).isOptional();
+
+const slotList = (slots: z.ZodObject<z.ZodRawShape>) =>
+  [...Object.entries(slots.shape).map(([k, v]) => `${k}${optional(v) ? '' : ' (required)'}`), ...Object.keys(STYLE_SLOTS.shape)].join(', ');
+
+function slotProblems(slots: z.ZodObject<z.ZodRawShape>, given: Record<string, unknown>): string {
+  const known = new Set([...Object.keys(slots.shape), ...Object.keys(STYLE_SLOTS.shape)]);
+  const unknown = Object.keys(given).filter((k) => !known.has(k)).map((k) => `${k} is not a slot`);
+  const missing = Object.entries(slots.shape).filter(([k, v]) => !optional(v) && given[k] === undefined).map(([k]) => `${k} is required`);
+  const parsed = slots.extend(STYLE_SLOTS.shape).safeParse(given);
+  const typed = parsed.success ? [] : parsed.error.issues.filter((i) => given[String(i.path[0])] !== undefined).map((i) => `${i.path.join('.')} ${i.message}`);
+  return [...unknown, ...missing, ...typed].join('; ');
+}
+
 export function addShot(doc: MotionDoc, plan: ShotPlan, id: string): OpResult & { placed?: Placed; cues?: SfxCue[] } {
   const spec = SHOTS[plan.shot];
   const parsed = spec.slots.extend(STYLE_SLOTS.shape).strict().safeParse(plan.slots);
   if (!parsed.success) {
-    const allowed = [...Object.keys(spec.slots.shape), ...Object.keys(STYLE_SLOTS.shape)];
-    return { ok: false, error: `${plan.shot} slots: ${parsed.error.issues.map((i) => `${i.path.join('.') || 'slots'} ${i.message}`).join('; ')} (its slots: ${allowed.join(', ')})` };
+    return { ok: false, error: `${plan.shot} slots: ${slotProblems(spec.slots, plan.slots)} (its slots: ${slotList(spec.slots)})` };
   }
   const seconds = plan.seconds ?? spec.seconds.best;
   if (seconds < spec.seconds.min || seconds > spec.seconds.max) {
-    return { ok: false, error: `${plan.shot} lasts ${spec.seconds.min}–${spec.seconds.max} s: never stretch a shot to fit words, cut the words` };
+    return { ok: false, error: `${plan.shot} lasts ${spec.seconds.min}–${spec.seconds.max} s: pass seconds ${spec.seconds.min}–${spec.seconds.max}, best ${spec.seconds.best}, or leave it out; never stretch a shot to fit words, cut the words` };
   }
   const crowded = overLimits(plan.shot, parsed.data);
   if (crowded) {

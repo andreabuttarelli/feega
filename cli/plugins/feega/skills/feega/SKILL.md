@@ -203,7 +203,9 @@ Every save is a revision. `list_motion_revisions` lists them (who saved, clip co
 `feega motion revisions <nodeId> [--restore <version>]`.
 
 Ready-made pieces: `list_motion_templates` lists them with their typed fields (e.g.
-`builtin:prompt-input`, a prompt box that types, presses send and thinks);
+`builtin:prompt-input`, a prompt box that types, presses send and thinks) and a card: roles
+(opener, feature, proof, closer…), energy, what is on screen second by second, and edges.
+Plan a video as sections and pick one template per section by its card;
 `add_motion_template` inserts an editable copy at `at` seconds with `vars` as field values and
 its key/click sounds. Free, no AI. CLI: `feega motion templates`,
 `feega motion add-template <nodeId> builtin:prompt-input --var text="..."`.

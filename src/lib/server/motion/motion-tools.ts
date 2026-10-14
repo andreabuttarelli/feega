@@ -120,6 +120,9 @@ import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/
 import { FIELD_TYPES, MAX_LINKED, type ExposedField } from '$lib/motion/template/field-model';
 import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields } from '$lib/motion/template/library';
 import type { TemplateLibrary } from './templates';
+import { ROLE_MEANING, SECTION_ROLES, cardDetail, cardLine } from '$lib/motion/template/card';
+import { templateCard } from '$lib/motion/template/cards';
+import { splitFields } from '$lib/motion/template/key-fields';
 import { templateCues } from './template-sounds';
 import { createWebTools, type WebToolDeps } from '$lib/server/web/web-tools';
 import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
@@ -2300,16 +2303,36 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     list_templates: tool({
-      description: 'List the motion templates (built-in and saved by the team): fixed designs customised only through their fields — text, colours, media slots (aspect = width/height of the crop), numbers (min..max, unit), choices (options).',
-      inputSchema: z.object({}).strict(),
-      execute: async () => {
+      description: `List the motion templates (built-in and saved by the team), each with its key_fields (the ones a user edits first; get_template lists all) and its card in one line: roles · energy · loops · edges start→end and suggested transition · media count and aspect · text amount · what is on screen, second by second · good for. role narrows to one section role: ${SECTION_ROLES.map((r) => `${r} (${ROLE_MEANING[r]})`).join(', ')}. get_template gives one in full with its typed fields.`,
+      inputSchema: z.object({ role: z.enum(SECTION_ROLES).optional() }).strict(),
+      execute: async (input) => {
         const entries = (await deps.templates?.list()) ?? [];
-        return { templates: entries.map((e) => ({ id: e.id, name: e.template.name, description: e.template.description, seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), fields: e.template.doc.fields.map(fieldSpec) })) };
+        const role = input.role;
+        const picked = role ? entries.filter((e) => templateCard(e.id)?.roles.includes(role)) : entries;
+        return {
+          templates: picked.map((e) => {
+            const card = templateCard(e.id);
+            return { id: e.id, name: e.template.name, seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), card: card ? cardLine(card) : e.template.description, key_fields: splitFields(e.template.doc.fields, e.template.keyFields).key.map((f) => f.key) };
+          })
+        };
+      }
+    }),
+
+    get_template: tool({
+      description: 'One template in full: its card (onScreen beat by beat with seconds, roles, energy, loops, needs, best formats, edges, good for) and every field with type, min..max, unit, options and media aspect (width/height of the crop).',
+      inputSchema: z.object({ id: z.string() }).strict(),
+      execute: async (input) => {
+        const entry = ((await deps.templates?.list()) ?? []).find((e) => e.id === input.id);
+        if (!entry) {
+          return { ok: false, error: `no template ${input.id}: call list_templates` };
+        }
+        const card = templateCard(entry.id);
+        return { id: entry.id, name: entry.template.name, description: entry.template.description, seconds: secondsAt(entry.template.doc.durationInFrames, entry.template.doc.fps), ...(card ? { card: cardDetail(card) } : {}), fields: entry.template.doc.fields.map(fieldSpec) };
       }
     }),
 
     add_template: tool({
-      description: 'Insert a template (id from list_templates) as one locked Precomp clip on a new top track at `at` seconds, with its fields filled from vars (keys as in list_templates, checked like set_template_fields). sound (default true) lays its key taps and clicks on the SFX track. Its structure stays fixed unless detach_template.',
+      description: 'Insert a template (id from list_templates) as one locked Precomp clip on a new top track at `at` seconds, with its fields filled from vars (keys as in get_template, checked like set_template_fields). sound (default true) lays its key taps and clicks on the SFX track. Its structure stays fixed unless detach_template.',
       inputSchema: z.object({ id: z.string(), at: z.number().min(0).default(0), vars: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}), sound: z.boolean().default(true) }),
       execute: async (input) => {
         const entry = ((await deps.templates?.list()) ?? []).find((e) => e.id === input.id);
@@ -2332,7 +2355,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_template_fields: tool({
-      description: 'Set fields of an inserted template (clip_id of its Precomp clip; keys as in list_templates). Each value is checked against the field type: text, #rrggbb colour, asset id, number in range, one of the options, comma-separated asset ids for a media list.',
+      description: 'Set fields of an inserted template (clip_id of its Precomp clip; keys as in get_template). Each value is checked against the field type: text, #rrggbb colour, asset id, number in range, one of the options, comma-separated asset ids for a media list.',
       inputSchema: z.object({ clip_id: z.string(), values: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])) }),
       execute: async (input) => {
         const values = Object.fromEntries(Object.entries(input.values).map(([k, v]) => [k, String(v)]));
