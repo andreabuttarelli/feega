@@ -1,4 +1,6 @@
 import { WEB_GUIDANCE } from '$lib/server/web/web-tools';
+import { DocMode } from '$lib/motion/still';
+import type { OpenFrame } from './frame-tools';
 
 /**
  * CHI È IN SCOPE IN QUESTO TURNO: il progetto, le sue tele, e il brand solo se ce n'è uno.
@@ -12,7 +14,18 @@ export type PromptScope = {
   canvases: Array<{ id: string; name: string }>;
   brand: { name: string; slug: string } | null;
   openCanvasId?: string | null;
+  frame?: OpenFrame | null;
 };
+
+const MODE_WORD: Record<DocMode, string> = { [DocMode.Still]: 'a still', [DocMode.Video]: 'a video' };
+
+function frameLine(frame: OpenFrame | null | undefined): string {
+  if (!frame) {
+    return 'No frame is open in the editor: frame_tool needs a node_id.';
+  }
+  const selected = frame.selection.length ? `selected clips: ${frame.selection.join(', ')}` : 'nothing selected';
+  return `The user has frame ${frame.nodeId} open in the editor (${MODE_WORD[frame.mode]}, playhead at ${frame.playhead}s, ${selected}). "this", "here" and "it" mean that frame; frame_tool acts on it unless you pass another node_id.`;
+}
 
 export function projectAgentPrompt(scope: PromptScope): string {
   const canvasLine = scope.canvases.length
@@ -36,7 +49,9 @@ export function projectAgentPrompt(scope: PromptScope): string {
     'To put written text on the canvas (copy, hooks, notes), create a node of type "doc" with data { content: "<markdown>", public: false }. A "text" node only generates: its prompt is an instruction, not what the canvas shows.',
     'update_node changes only the fields you send; the rest is kept.',
     'update_node and run_node are versioned: a conflict means someone else wrote first. Re-read and retry with the new version.',
-    'Motion videos are built by the motion agent, not by you: create_motion_video or ask_motion_agent hand it the request (pass canvas node ids in media for pictures, clips or sound it should use), then get_motion_run waits for it and view_motion_frames shows the result. Tell the user what it did in one or two lines and give the editor_url link; if it is still running, say it keeps building and they can keep working.',
+    frameLine(scope.frame),
+    'Edit frames (motion videos and stills) yourself with frame_tool: list_frame_tools names the editor tools, describe_frame_tool gives one schema. Small, precise changes (a text, a colour, a timing, a still export) go through frame_tool.',
+    'Building or rebuilding a whole video is the motion agent\'s job, which runs the quality checks: create_motion_video or ask_motion_agent hand it the request (pass canvas node ids in media for pictures, clips or sound it should use), then get_motion_run waits for it and view_motion_frames shows the result. Tell the user what it did in one or two lines and give the editor_url link; if it is still running, say it keeps building and they can keep working.',
     WEB_GUIDANCE,
     'To put a picture you found on the canvas, import_image it, then create a Generate image node (type image) with data { assetId: "<asset_id>" }.',
     'Anything that spends credits needs the user to ask for it first.',
