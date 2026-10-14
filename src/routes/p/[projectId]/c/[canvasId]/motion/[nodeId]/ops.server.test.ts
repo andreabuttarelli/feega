@@ -75,4 +75,14 @@ describe('the editor sends its edits as ops', () => {
     expect(out.status).toBe(400);
     expect(rows).toHaveLength(1);
   });
+
+  it('an open editor reads the head another writer left', async () => {
+    const { db } = await seeded();
+    await actions.ops(event(db, { version: '1', ops: opsOf(retext(start(), 'a', 'from the agent')), summary: 'Agent' }));
+
+    const out = (await actions.head(event(db, {}))) as { version: number; doc: MotionDoc };
+
+    expect(out.version).toBe(2);
+    expect(findClip(out.doc, 'a')?.clip.props.text).toBe('from the agent');
+  });
 });

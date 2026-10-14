@@ -414,6 +414,9 @@ Un eval o un test lanciato da un worktree misura un ibrido: `$lib` punta alla co
 ### Il worktree DENTRO la repo dir: la pagina è viva ma non risponde (403 su `entry.js`)
 Un worktree creato dentro la cartella della repo (`dazero/dazero-wt/<slug>`) risolve `@sveltejs/kit` dal `node_modules` del checkout padre: vite lo serve via `/@fs/...` **fuori dalla root del worktree** e risponde 403 — il bundle client non parte, la hydratazione non arriva, e ogni click "riuscito" dell'automazione browser non cambia nulla (SSR morto senza errori in console). Segnale: `performance.getEntriesByType('resource')` mostra `entry.js` con `responseStatus: 403`, i click vanno a un DOM senza handler. Mossa: il worktree sta **fuori** dalla repo (`../dazero-wt/<slug>`, come da docs/e2e-testing.md §1) con `npm ci` proprio.
 
+### Node 25: l'editor motion dà 500 in SSR con `browserStore(...)?.getItem is not a function`
+Node ≥ 25 ha un `localStorage` globale anche sul server, senza metodi se manca `--localstorage-file`: un `typeof localStorage !== 'undefined'` passa e `getItem` esplode in SSR. Segnale: la spec Playwright `@real` resta appesa sulla pagina "Something broke on our side", e il log del webServer mostra quello stack su `MotionEditorShell.svelte`. Mossa: `NODE_OPTIONS=--no-experimental-webstorage` per il dev server dei test (`node -v` prima di sospettare il tuo diff).
+
 ### Verifica il `workdir` prima di ogni Edit
 Con più worktree aperti (feature + verifica), un edit fatto nel checkout sbagliato tocca dev. È successo: `live.ts` modificato nel checkout principale per un secondo, poi `git checkout --` e riapplicato nel posto giusto. Il tool Edit non ti proteggere — proteggiti tu: guarda il percorso del file che stai per toccare, sempre.
 

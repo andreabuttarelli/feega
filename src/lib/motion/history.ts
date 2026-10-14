@@ -20,6 +20,10 @@ export function adoptHead(h: History, doc: MotionDoc, tabVersion: number): Histo
   return tabVersion === UNSAVED_VERSION ? startHistory(doc) : record(h, doc);
 }
 
+export function followHead(h: History, doc: MotionDoc): History {
+  return { ...h, present: doc };
+}
+
 export function undo(h: History, agent = Agent.Idle): History {
   const previous = h.past.at(-1);
   if (!previous || agent === Agent.Working) {

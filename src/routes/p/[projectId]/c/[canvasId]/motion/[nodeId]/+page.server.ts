@@ -110,6 +110,12 @@ export const actions: Actions = {
     return { version: commit.head.version, doc: commit.head.doc, rebased: commit.rebased };
   },
 
+  head: async ({ locals, params }) => {
+    const scope = await scopeFor(locals, params);
+    const head = await headOrNew(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id }, scope.motion.node);
+    return { version: head.version, doc: head.doc, actorKind: head.actorKind };
+  },
+
   revisions: async ({ locals, params }) => {
     const scope = await scopeFor(locals, params);
     return { revisions: await listRevisions(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id }) };
