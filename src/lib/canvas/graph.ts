@@ -29,6 +29,7 @@
 /** Cosa una cosa È. I tre primitivi, e nient'altro. */
 import { videoRefCapacity } from '$lib/video-models';
 import { MAX_COMPOSITION_MEDIA } from '$lib/motion/components';
+import { MAX_TRACKS } from '$lib/motion/doc';
 import { imageModelSpec } from '$lib/image-models';
 import { SELECTABLE_SOURCE_TYPES } from './select-node';
 import { audioInputMediums, audioOperationOf, type AudioOperationId } from './audio-operations';
@@ -145,7 +146,7 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   audio: { medium: 'audio', generated: true, accepts: ['text', 'audio', 'video'], requires: [] },
   model3d: { medium: 'model3d', generated: true, accepts: ['image', 'text'], requires: [], requiresOneOf: ['image', 'text'] },
   calendar: { medium: null, generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: [] },
-  motion: { medium: 'motion', generated: false, accepts: [], requires: [] },
+  motion: { medium: 'motion', generated: true, accepts: ['image', 'video', 'text'], requires: [] },
   studio_batch: { medium: 'image', generated: false, accepts: [], requires: [] }
 };
 
@@ -307,5 +308,6 @@ function capacityOf(node: CanvasNode): Partial<Record<Medium, number>> {
   // noto resta 1 — il caso oggi eseguito (`baseMediaId`), mai un numero inventato.
   if (node.kind === 'image') return { text: 1, image: imageModelSpec(node.model)?.maxRefs ?? 1, video: 0, audio: 0 };
   if (node.kind === 'composition') return { image: MAX_COMPOSITION_MEDIA, video: MAX_COMPOSITION_MEDIA, motion: MAX_COMPOSITION_MEDIA };
+  if (node.kind === 'motion') return { text: MAX_TRACKS, image: MAX_TRACKS, video: MAX_TRACKS };
   return { text: 1, image: 1, video: 0, audio: 1 };
 }

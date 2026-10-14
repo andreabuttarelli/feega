@@ -29,7 +29,7 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   calendar: { inputs: true, output: false },
   audio: { inputs: true, output: true },
   model3d: { inputs: true, output: false },
-  motion: { inputs: false, output: true },
+  motion: { inputs: true, output: true },
   studio_batch: { inputs: false, output: true }
 };
 
@@ -52,6 +52,15 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
       if (!spec) continue;
       expect(portsOf(type, ctx).inputs.length > 0).toBe(spec.generated && spec.accepts.length > 0);
     }
+  });
+
+  it('a Frame takes pictures, videos and text from generative nodes, never audio', () => {
+    const frame = { id: 'f', kind: 'motion' as const, model: null, uncensored: false };
+    expect(portsOf('motion', ctx).inputs).toEqual(['images', 'videos', 'text']);
+    for (const kind of ['image', 'video', 'text'] as const) {
+      expect(canConnect({ id: kind, kind, model: null, uncensored: false }, frame)).toEqual({ ok: true });
+    }
+    expect(canConnect({ id: 'a', kind: 'audio', model: null, uncensored: false }, frame).ok).toBe(false);
   });
 
   it('a 3D model takes an image or a text, whatever its model reads, and feeds nothing downstream', () => {

@@ -277,12 +277,13 @@ async function framesFedBy(db: Db, orgId: string, nodeId: string): Promise<strin
   return found.flatMap((n) => (n?.type === 'motion' ? [n.id] : []));
 }
 
-export function frameStore(db: Db, scope: { orgId: string; actor: Actor }): FrameStore {
+export function frameStore(db: Db, scope: { orgId: string; actor: Actor; projectId?: string }): FrameStore {
   const { orgId, actor } = scope;
+  const inScope = <T extends Place>(found: T | null) => (found && (!scope.projectId || found.projectId === scope.projectId) ? found : null);
   return {
     read: async (nodeId) => {
       const saved = await savedMotion(db, { orgId, nodeId });
-      return saved ? { nodeId, projectId: saved.project.id, canvasId: saved.record.canvasId, version: saved.version, doc: saved.doc } : null;
+      return inScope(saved ? { nodeId, projectId: saved.project.id, canvasId: saved.record.canvasId, version: saved.version, doc: saved.doc } : null);
     },
     write: (nodeId, expectedVersion, doc, summary) => saveMotionDoc(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
     create: async (at, doc) => {
@@ -291,7 +292,7 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor }): Fram
       return node.id;
     },
     remove: (nodeId) => deleteNode(db, { orgId, nodeId, actor }),
-    output: (nodeId) => generatedOutput(db, orgId, nodeId),
+    output: async (nodeId) => inScope(await generatedOutput(db, orgId, nodeId)),
     fedFrames: (nodeId) => framesFedBy(db, orgId, nodeId)
   };
 }

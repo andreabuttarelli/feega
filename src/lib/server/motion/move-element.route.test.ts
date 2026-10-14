@@ -117,3 +117,22 @@ describe('undo of a move', () => {
     expect(written(input, SOURCE).map((r) => [r.version, clipIds(r.doc)])).toEqual([[3, ['txt']]]);
   });
 });
+
+describe('connect action', () => {
+  it('a generated image connected to a frame shows up in it as an image element', async () => {
+    const input = event(
+      { source_node_id: GEN, target_node_id: TARGET, kind: 'derives_from' },
+      {
+        nodes: [frameRow(TARGET), { ...frameRow(GEN), type: 'image', data: { prompt: 'a cat', refId: ASSET } }],
+        assets: [{ id: ASSET, org_id: 'org', project_id: 'project', type: 'image', url: 'x.png', content: null, mime_type: 'image/png', bytes: 1, width: 512, height: 512, duration_s: null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' }]
+      }
+    );
+
+    const result = await actions.connect(input as never);
+
+    expect(result).toMatchObject({ linked: { outcome: 'done', frameId: TARGET } });
+    const doc = written(input, TARGET)[0].doc;
+    expect(doc.tracks[0].clips[0]).toMatchObject({ component: 'Image', props: { assetId: ASSET } });
+    expect(doc.links).toEqual({ [GEN]: doc.tracks[0].clips[0].id });
+  });
+});

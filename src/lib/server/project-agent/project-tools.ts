@@ -35,6 +35,7 @@ import { templateLibrary } from '$lib/server/motion/templates';
 import { componentKind } from '$lib/motion/template/catalogue';
 import { compositionOf } from '$lib/canvas-node-data';
 import { FORMAT_OF_ASPECT, composedTemplate, sequentialIds } from '$lib/canvas/composition-template';
+import { DropOn, MoveOutcome, frameStore, linkFrame, moveElement, placeOutput, type Drop, type Moved } from '$lib/server/motion/move-element';
 
 /**
  * I TOOL DI PROGETTO E TELA. Sempre presenti, anche senza brand.
@@ -81,6 +82,19 @@ function outcomeOf(out: RunOutcome): Record<string, unknown> {
   return { outcome: 'refused', error: out.error };
 }
 
+type FrameTarget = { toFrameId?: string; x: number; y: number; canvasX?: number; canvasY?: number };
+
+function dropFor(input: FrameTarget): Drop {
+  return input.toFrameId ? { on: DropOn.Frame, nodeId: input.toFrameId, at: { x: input.x, y: input.y } } : { on: DropOn.Canvas, x: input.canvasX ?? 0, y: input.canvasY ?? 0 };
+}
+
+function frameAnswer(moved: Moved): Record<string, unknown> {
+  if (moved.outcome !== MoveOutcome.Done) {
+    return { outcome: moved.outcome, message: moved.detail ?? moved.outcome };
+  }
+  return { outcome: moved.outcome, frame_id: moved.frameId, element_id: moved.clipId, new_frame: moved.created, revisions: moved.versions };
+}
+
 export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> {
   const actor: Actor = agentActor(deps.userId);
   const effects = effectStore({ db: deps.db, orgId: deps.orgId, actor: { kind: 'agent', id: deps.userId, agentKey: SIDEBAR_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null });
@@ -90,6 +104,8 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
 
   const billed = <T>(fn: () => Promise<T>): Promise<T> =>
     deps.brandId ? withBrandContext(deps.brandId, fn) : withOrgContext(deps.orgId, fn);
+
+  const frames = () => frameStore(deps.db, { orgId: deps.orgId, actor, projectId: deps.projectId });
 
   return {
     list_canvases: tool({
@@ -252,8 +268,44 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
           targetHandle: input.targetHandle ?? null,
           actor
         });
-        return { connection };
+        const linked = await linkFrame(frames(), { sourceNodeId: input.sourceNodeId, frameNodeId: input.targetNodeId });
+        return { connection, ...(linked.outcome === MoveOutcome.Done ? { placed_in_frame: { clip_id: linked.clipId, revision: linked.versions[linked.frameId] } } : {}) };
       }
+    }),
+
+    move_frame_element: tool({
+      description:
+        'Move one element (a clip: text, image, video, shape, component) out of a Frame into another Frame of THIS project, or onto the empty canvas as a new Frame holding only it. Props, style and keyframes are kept and re-timed to the target frame rate; x/y (0..1 of the target frame) is where its centre lands. Never turns an element into a generative node. Both frames are saved as revisions.',
+      inputSchema: z
+        .object({
+          frameId: z.string().describe('the Frame node the element is in'),
+          elementId: z.string().describe('the clip id inside that frame'),
+          toFrameId: z.string().optional().describe('the Frame to move it into; omit to make a new Frame on the canvas'),
+          x: z.number().min(0).max(1).default(0.5),
+          y: z.number().min(0).max(1).default(0.5),
+          canvasX: z.number().optional().describe('canvas position of a new Frame'),
+          canvasY: z.number().optional()
+        })
+        .strict(),
+      execute: async (input: { frameId: string; elementId: string; toFrameId?: string; x: number; y: number; canvasX?: number; canvasY?: number }) =>
+        frameAnswer(await moveElement(frames(), { sourceNodeId: input.frameId, clipId: input.elementId, drop: dropFor(input) }))
+    }),
+
+    place_in_frame: tool({
+      description:
+        "Put the generated output of an image, video or text node of THIS project into a Frame as an element (image, video at the frame's start, or text), centred at x/y (0..1). Omit toFrameId to make a new Frame on the canvas holding only it. The generative node is not changed. To keep the element following the node's next generations, connect_nodes the node to the Frame instead.",
+      inputSchema: z
+        .object({
+          nodeId: z.string().describe('the generative image, video or text node'),
+          toFrameId: z.string().optional(),
+          x: z.number().min(0).max(1).default(0.5),
+          y: z.number().min(0).max(1).default(0.5),
+          canvasX: z.number().optional(),
+          canvasY: z.number().optional()
+        })
+        .strict(),
+      execute: async (input: { nodeId: string; toFrameId?: string; x: number; y: number; canvasX?: number; canvasY?: number }) =>
+        frameAnswer(await placeOutput(frames(), { sourceNodeId: input.nodeId, drop: dropFor(input) }))
     }),
 
     delete_node: tool({

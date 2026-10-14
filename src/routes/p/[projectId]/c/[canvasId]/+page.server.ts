@@ -130,6 +130,10 @@ function jsonField(fd: FormData, key: string): unknown {
   }
 }
 
+function canvasFrames(scope: Scope) {
+  return frameStore(scope.db, { orgId: scope.orgId, actor: userActor(scope), projectId: scope.canvas.projectId });
+}
+
 function movedAnswer(moved: Moved) {
   return moved.outcome === MoveOutcome.Done ? moved : fail(MOVE_STATUS[moved.outcome], { error: moved.outcome, detail: moved.detail });
 }
@@ -1399,7 +1403,7 @@ export const actions: Actions = {
       actor: userActor(scope)
     });
 
-    const linked = targetNode?.type === 'motion' ? await linkFrame(frameStore(scope.db, { orgId: scope.orgId, actor: userActor(scope) }), { sourceNodeId, frameNodeId: targetNodeId }) : null;
+    const linked = targetNode?.type === 'motion' ? await linkFrame(canvasFrames(scope), { sourceNodeId, frameNodeId: targetNodeId }) : null;
     return { connection, linked: linked?.outcome === MoveOutcome.Done ? linked : null };
   },
 
@@ -1410,7 +1414,7 @@ export const actions: Actions = {
     if (!ask.success) {
       return fail(400, { error: 'spostamento non valido' });
     }
-    return movedAnswer(await moveElement(frameStore(scope.db, { orgId: scope.orgId, actor: userActor(scope) }), ask.data));
+    return movedAnswer(await moveElement(canvasFrames(scope), ask.data));
   },
 
   placeOutput: async ({ request, params, locals }) => {
@@ -1420,7 +1424,7 @@ export const actions: Actions = {
     if (!ask.success) {
       return fail(400, { error: 'rilascio non valido' });
     }
-    return movedAnswer(await placeOutput(frameStore(scope.db, { orgId: scope.orgId, actor: userActor(scope) }), ask.data));
+    return movedAnswer(await placeOutput(canvasFrames(scope), ask.data));
   },
 
   disconnect: async ({ request, params, locals }) => {

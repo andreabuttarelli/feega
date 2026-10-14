@@ -8,6 +8,8 @@ import type { Tool } from 'ai';
 import { fakeDb } from '$lib/server/db/fake-db';
 import { createProjectTools } from './project-tools';
 import { SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
+import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { addClip } from '$lib/motion/timeline';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const PROJECT = '22222222-2222-2222-2222-222222222222';
@@ -328,5 +330,58 @@ describe('set_composition_component — a canvas composition on a library compon
     const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
 
     expect(await run(tools.set_composition_component, { nodeId: NODE, component: STRIP })).toMatchObject({ outcome: 'invalid' });
+  });
+});
+
+describe('frame elements, the same op the canvas drag uses', () => {
+  const A = '77777777-7777-4777-8777-777777777777';
+  const B = '88888888-8888-4888-8888-888888888888';
+  const GEN = '99999999-9999-4999-8999-999999999999';
+  const ASSET = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const frame = (id: string) => ({ ...nodeRow, id, type: 'motion', data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+  const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, props: { text: 'hi' } }, 'txt');
+  const withText = added.ok ? added.doc : newMotionDoc(MotionFormat.Landscape);
+  const revision = (nodeId: string, doc: unknown) => ({ org_id: ORG, node_id: nodeId, version: 1, doc, summary: null, actor_kind: 'user' });
+  const rows = () => ({
+    nodes: [frame(A), frame(B), { ...nodeRow, id: GEN, type: 'image', data: { prompt: 'a cat', refId: ASSET } }],
+    projects: [{ id: PROJECT, org_id: ORG, name: 'P', slug: 'p', brand_id: null, archived_at: null, updated_at: '', mode: 'standard' }],
+    motion_revisions: [revision(A, withText), revision(B, newMotionDoc(MotionFormat.Square))],
+    assets: [{ id: ASSET, org_id: ORG, project_id: PROJECT, type: 'image', url: 'x.png', content: null, mime_type: 'image/png', bytes: 1, width: 64, height: 64, duration_s: null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' }],
+    nodes_connections: [],
+    canvas_events: [{}]
+  });
+  const revisionsOf = (calls: { table: string; op: string; payload?: unknown }[], nodeId: string) =>
+    calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert' && (c.payload as { node_id: string }).node_id === nodeId).map((c) => (c.payload as { doc: { tracks: { clips: { id: string; component: string }[] }[] } }).doc.tracks.flatMap((t) => t.clips));
+
+  it('move_frame_element moves a text element from one frame to another', async () => {
+    const { db, calls } = fakeDb(rows(), { filter: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    const out = await run(tools.move_frame_element, { frameId: A, elementId: 'txt', toFrameId: B, x: 0.5, y: 0.5 });
+
+    expect(out).toMatchObject({ outcome: 'done', frame_id: B, element_id: 'txt' });
+    expect(revisionsOf(calls, B).map((clips) => clips.map((c) => c.id))).toEqual([['txt']]);
+    expect(revisionsOf(calls, A)).toEqual([[]]);
+  });
+
+  it('place_in_frame drops a generated picture in a frame and leaves the generative node alone', async () => {
+    const { db, calls } = fakeDb(rows(), { filter: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    const out = await run(tools.place_in_frame, { nodeId: GEN, toFrameId: B, x: 0.2, y: 0.2 });
+
+    expect(out).toMatchObject({ outcome: 'done', frame_id: B });
+    expect(revisionsOf(calls, B)[0].map((c) => c.component)).toEqual(['Image']);
+    expect(calls.some((c) => c.table === 'nodes' && c.op === 'update' && c.filters.some(([k, v]) => k === 'id' && v === GEN))).toBe(false);
+  });
+
+  it('connect_nodes from a generated image to a frame places the picture in it', async () => {
+    const { db, calls } = fakeDb(rows(), { filter: true });
+    const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+    const out = await run(tools.connect_nodes, { canvasId: CANVAS, sourceNodeId: GEN, targetNodeId: B });
+
+    expect(out).toMatchObject({ placed_in_frame: { clip_id: expect.any(String) } });
+    expect(revisionsOf(calls, B)[0].map((c) => c.component)).toEqual(['Image']);
   });
 });

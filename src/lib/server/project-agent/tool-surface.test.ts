@@ -60,10 +60,12 @@ describe('la superficie del modello mostra solo ciò che può usare', () => {
         'remix_gallery_item',
         'publish_to_gallery',
         'list_components',
-        'set_composition_component'
+        'set_composition_component',
+        'move_frame_element',
+        'place_in_frame'
       ])
     );
-    expect(names).toHaveLength(20);
+    expect(names).toHaveLength(22);
   });
 
   it('col brand i tool di brand ci sono, accanto a quelli di progetto', () => {
