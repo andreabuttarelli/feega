@@ -186,3 +186,11 @@ describe('arrows by edit mode', () => {
     expect(inMode(EditMode.Design, ' ')).toBe(Command.TogglePlay);
   });
 });
+
+describe('mask keys', () => {
+  it('control-command-M uses the selection as mask, as in Figma; command-M alone does not', () => {
+    expect(commandFor({ key: 'm', code: 'KeyM', mod: true, shift: false, ctrlCmd: true })).toBe(Command.UseAsMask);
+    expect(commandFor({ key: 'm', code: 'KeyM', mod: true, shift: false })).toBeNull();
+    expect(press('m')).toBe(Command.AddMarker);
+  });
+});

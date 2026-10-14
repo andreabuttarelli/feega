@@ -79,6 +79,8 @@ import AudioWaveform from '@lucide/svelte/icons/audio-waveform';
 import ScissorsLineDashed from '@lucide/svelte/icons/scissors-line-dashed';
 import Menu from '@lucide/svelte/icons/menu';
 import Paperclip from '@lucide/svelte/icons/paperclip';
+import Contrast from '@lucide/svelte/icons/contrast';
+import CircleOff from '@lucide/svelte/icons/circle-off';
 import { Command, SHORTCUTS } from './shortcuts';
 
 export enum Tool {
@@ -190,6 +192,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Deselect]: { name: 'Deselect', icon: X, group: GuideGroup.Edit, gesture: 'Tap an empty lane', menu: MenuSection.Layer },
   [Command.Precompose]: { name: 'Precompose', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Tool.NullFromSelection]: { name: 'Null parent', icon: CircleDashed, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.StartHere]: { name: 'Move clip to start here', icon: AlignStart, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },
   [Command.EndHere]: { name: 'Move clip to end here', icon: AlignEnd, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },

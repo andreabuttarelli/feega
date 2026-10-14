@@ -6,6 +6,8 @@ import { isLockedComp } from '$lib/motion/template/library';
 import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '$lib/motion/poster-parts';
 import { EditMode } from '$lib/motion/edit-mode';
 import { TrackKind } from '$lib/motion/components';
+import { joinMask, leaveMask, maskMembers, maskOf, releaseMasks, useAsMask } from '$lib/motion/mask-group';
+import { Command } from '$lib/motion/shortcuts';
 import { NODE_KIND_LABEL } from './node-label';
 import type { NodeType } from './node-data';
 
@@ -14,6 +16,7 @@ export enum LayerKind {
   Track = 'track',
   Clip = 'clip',
   Group = 'group',
+  Mask = 'mask',
   Part = 'part'
 }
 
@@ -83,7 +86,15 @@ function groupLabel(track: Track, index: number): string {
   return known.length ? known.slice(0, MAX_NAMED_CLIPS).join(NAME_JOIN) : `Track ${index + 1}`;
 }
 
-type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode };
+type Masks = ReadonlyMap<string, readonly string[]>;
+type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode; masks: Masks; masked: ReadonlySet<string> };
+
+const NO_MASKS = { masks: new Map(), masked: new Set<string>() };
+
+function masksOf(doc: MotionDoc): { masks: Masks; masked: ReadonlySet<string> } {
+  const masks = new Map([...maskMembers(doc)].filter(([id]) => findClip(doc, id)));
+  return { masks, masked: new Set([...masks.values()].flat()) };
+}
 
 const groupsTrack = (track: Track, mode: EditMode) => mode === EditMode.Motion && track.clips.length > 1;
 
@@ -99,7 +110,17 @@ function trackRows(walk: Walk, tracks: readonly Track[], depth: number): LayerRo
 
 const isComponent = (clip: Clip, template: boolean, parts: Parts) => template || clip.component === CUSTOM_CLIP || (parts[clip.id]?.length ?? 0) > 0;
 
+const kindOf = (walk: Walk, clip: Clip, template: boolean) => (walk.masks.has(clip.id) ? LayerKind.Mask : isComponent(clip, template, walk.parts) ? LayerKind.Group : LayerKind.Clip);
+
 function clipRows(walk: Walk, clip: Clip, depth: number): LayerRow[] {
+  return walk.masked.has(clip.id) ? [] : layerTree(walk, clip, depth);
+}
+
+function maskedRows(walk: Walk, maskId: string, depth: number): LayerRow[] {
+  return (walk.masks.get(maskId) ?? []).flatMap((id) => layerTree(walk, findClip(walk.doc, id)!.clip, depth));
+}
+
+function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
   const { doc, nodeId, nested, parts, path } = walk;
   const comp = clip.component === 'Precomp' ? String((clip.props as { comp?: string }).comp ?? '') : '';
   const template = comp !== '' && isLockedComp(doc, comp);
@@ -107,7 +128,7 @@ function clipRows(walk: Walk, clip: Clip, depth: number): LayerRow[] {
   const row: LayerRow = {
     id: clip.id,
     key,
-    kind: isComponent(clip, template, parts) ? LayerKind.Group : LayerKind.Clip,
+    kind: kindOf(walk, clip, template),
     depth,
     label: template ? (doc.comps[comp]?.name ?? clipLabel(clip)) : clipLabel(clip),
     type: clip.component,
@@ -118,14 +139,14 @@ function clipRows(walk: Walk, clip: Clip, depth: number): LayerRow[] {
   };
   const inside = comp && !template ? (doc.comps[comp]?.tracks ?? []) : [];
   const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1, key));
-  return [row, ...own, ...trackRows({ ...walk, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1)];
+  return [row, ...own, ...trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1), ...maskedRows(walk, clip.id, depth + 1)];
 }
 
 function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth: number, clipKey: string): LayerRow {
   return { id: `${clip.id}${PART_SEP}${part}`, key: `${clipKey}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(doc, clip, part), type: partIcon(doc, clip, part), nodeId, hidden: false, locked: false, nested: true };
 }
 
-const frameWalk = (doc: MotionDoc, nodeId: string, parts: Parts, mode: EditMode): Walk => ({ doc, nodeId, nested: false, parts, path: '', mode });
+const frameWalk = (doc: MotionDoc, nodeId: string, parts: Parts, mode: EditMode): Walk => ({ doc, nodeId, nested: false, parts, path: '', mode, ...masksOf(doc) });
 
 export const frameRows = (doc: MotionDoc, nodeId: string, parts: Parts = {}): LayerRow[] => trackRows(frameWalk(doc, nodeId, parts, EditMode.Design), doc.tracks, TRACK_DEPTH);
 
@@ -218,7 +239,33 @@ const HALF = 0.5;
 const GROUP_DROP = (at: number) => (at < EDGE ? Place.Above : at > 1 - EDGE ? Place.Below : Place.Into);
 const ROW_DROP = (at: number) => (at < HALF ? Place.Above : Place.Below);
 
-export const dropPlace = (kind: LayerKind, at: number): Place => (kind === LayerKind.Track ? GROUP_DROP : ROW_DROP)(at);
+const DROP: Record<LayerKind, (at: number) => Place> = {
+  [LayerKind.Node]: ROW_DROP,
+  [LayerKind.Track]: GROUP_DROP,
+  [LayerKind.Clip]: ROW_DROP,
+  [LayerKind.Group]: ROW_DROP,
+  [LayerKind.Mask]: GROUP_DROP,
+  [LayerKind.Part]: ROW_DROP
+};
+
+export const dropPlace = (kind: LayerKind, at: number): Place => DROP[kind](at);
+
+export type LayerMenuItem = { command: Command.UseAsMask | Command.RemoveMask; summary: string; op: (doc: MotionDoc, ids: readonly string[]) => OpResult };
+
+export const LAYER_MENU: readonly LayerMenuItem[] = [
+  { command: Command.UseAsMask, summary: 'Used as mask', op: useAsMask },
+  { command: Command.RemoveMask, summary: 'Removed a mask', op: releaseMasks }
+];
+
+export function dropLayer(doc: MotionDoc, dragged: string, target: string, place: Place, newId: NewId = newTrackId): OpResult {
+  const into = place === Place.Into && maskMembers(doc).has(target);
+  const moved = restack(doc, dragged, target, into ? Place.Above : place, newId);
+  if (!moved.ok) {
+    return moved;
+  }
+  const mask = into ? target : maskOf(doc, target);
+  return mask && mask !== dragged ? joinMask(moved.doc, dragged, mask) : leaveMask(moved.doc, dragged);
+}
 
 const TRACK_EDIT: Record<LayerAction, (doc: MotionDoc, track: Track, index: number, name?: string) => OpResult> = {
   [LayerAction.Up]: (doc, track, index) => (index > 0 ? moveTrack(doc, track.id, index - 1) : fail('already the top track')),

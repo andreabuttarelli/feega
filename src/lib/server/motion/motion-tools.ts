@@ -91,6 +91,7 @@ import { DEVICE_PRESETS, PRESET as DEVICE_PRESET, addDeviceRow, applyDevicePrese
 import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCameraKeyframes, setClipDepth } from '$lib/motion/camera-ops';
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
+import { releaseMask, useAsMask } from '$lib/motion/mask-group';
 import { leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout } from '$lib/motion/layout/ops';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from '$lib/motion/layout/model';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
@@ -322,6 +323,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         mask: c.mask && shownMask(c.component, c.mask, doc),
         maskStack: c.maskStack.map((m) => shownMask(c.component, m, doc)),
         matte: c.matte,
+        matteFrom: c.matteFrom ?? null,
         keyframes: inSeconds(shownKeyframes(c.component, c.keyframes, doc)),
         depth: c.depth,
         space: c.space,
@@ -1106,6 +1108,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         'Use the clip directly above (on the track above, overlapping in time) as a matte for this clip. The matte is that clip as rendered, frame by frame: any kind (text, shape, picture, video, 3D, custom) with its keyframes and animation. alpha shows this clip where the matte is drawn, luma where it is bright; alpha-inverted and luma-inverted the opposite. The matte clip itself is hidden. none turns it off. Animated text over a video: Title on the upper track, Video below with matte alpha.',
       inputSchema: z.object({ clip_id: z.string(), matte: z.enum(MATTES) }),
       execute: async (input) => apply(setTrackMatte(session.doc, input.clip_id, input.matte), `matte ${input.matte} on ${input.clip_id}`)
+    }),
+
+    use_as_mask: tool({
+      description:
+        'Figma "Use as mask": of clip_ids, the bottom-most clip (lowest track) becomes the mask of the others, which must sit on tracks above it. The mask is drawn nowhere; its alpha as rendered cuts every masked clip: a Shape rect, ellipse or path with its corner radius and smoothing, a gradient fill fading to transparent gives a soft mask, its keyframes move the mask. Hide the mask clip (set_visibility) to turn masking off; release_mask removes it.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(2) }),
+      execute: async (input) => apply(useAsMask(session.doc, input.clip_ids), `masked ${input.clip_ids.length - 1} clip(s)`)
+    }),
+
+    release_mask: tool({
+      description: 'Undo use_as_mask: every clip masked by mask_id draws whole again, and the mask clip paints as itself.',
+      inputSchema: z.object({ mask_id: z.string() }),
+      execute: async (input) => apply(releaseMask(session.doc, input.mask_id), `released the mask ${input.mask_id}`)
     }),
 
     set_camera: tool({

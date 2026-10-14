@@ -28,6 +28,9 @@ const overlap = (a: MotionClip, b: MotionClip) => Math.min(a.from + a.durationIn
 
 export function matteSource(doc: MotionDoc, clipId: string): MotionClip | null {
   const found = findClip(doc, clipId);
+  if (found?.clip.matteFrom) {
+    return findClip(doc, found.clip.matteFrom)?.clip ?? null;
+  }
   const index = found ? doc.tracks.indexOf(found.track) : -1;
   const above = doc.tracks[index - 1];
   if (!found || !above || above.kind !== TrackKind.Visual) {

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropPlace, nodeIcon, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropLayer, dropPlace, nodeIcon, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
 import { EditMode } from '$lib/motion/edit-mode';
+import { maskMembers, useAsMask } from '$lib/motion/mask-group';
+import { Command } from '$lib/motion/shortcuts';
 import { CUSTOM_CLIP } from '$lib/motion/poster-parts';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from '$lib/motion/template/type-grid-poster/template';
 
@@ -400,5 +402,61 @@ describe('searching the layers keeps a match where it lives', () => {
 
   it('an empty query shows every row', () => {
     expect(searchRows(rows, ' ')).toHaveLength(rows.length);
+  });
+});
+
+describe('a mask in Layers', () => {
+  function masked(): MotionDoc {
+    let doc = ok(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, props: { shape: 'ellipse' } }, 'disc'));
+    for (const [track, clip, component] of [['t2', 'photo', 'Image'], ['t3', 'title', 'Title'], ['t4', 'note', 'Title']] as const) {
+      doc = ok(addClip(ok(addTrack(doc, TrackKind.Visual, track)), { component, from: 0, trackId: track, props: component === 'Image' ? { assetId: 'pic' } : {} }, clip));
+    }
+    return ok(useAsMask(doc, ['title', 'photo', 'disc']));
+  }
+  const tree = (doc: MotionDoc) => frameRows(doc, 'm1').map((r) => [r.id, r.kind, r.depth]);
+  const membersOf = (doc: MotionDoc) => maskMembers(doc).get('disc') ?? [];
+
+  it('the mask row carries the mask kind, its masked layers indented under it', () => {
+    expect(tree(masked())).toEqual([
+      ['note', LayerKind.Clip, 1],
+      ['disc', LayerKind.Mask, 1],
+      ['title', LayerKind.Clip, 2],
+      ['photo', LayerKind.Clip, 2]
+    ]);
+  });
+
+  it('a mask row takes drops into it, like a group', () => {
+    expect(dropPlace(LayerKind.Mask, 0.5)).toBe(Place.Into);
+  });
+
+  it('a layer dropped into the mask is masked by it', () => {
+    const doc = ok(dropLayer(masked(), 'note', 'disc', Place.Into));
+
+    expect(membersOf(doc)).toContain('note');
+    expect(tree(doc).find(([id]) => id === 'note')).toEqual(['note', LayerKind.Clip, 2]);
+  });
+
+  it('a layer dropped beside a masked layer joins its mask', () => {
+    expect(membersOf(ok(dropLayer(masked(), 'note', 'photo', Place.Below)))).toContain('note');
+  });
+
+  it('a masked layer dragged out of the group is unmasked', () => {
+    const doc = ok(dropLayer(masked(), 'photo', 'note', Place.Above));
+
+    expect(membersOf(doc)).toEqual(['title']);
+    expect(tree(doc)[0]).toEqual(['photo', LayerKind.Clip, 1]);
+  });
+
+  it('the right-click menu offers use as mask on a free stack and remove mask on a masked one', () => {
+    const offered = (doc: MotionDoc, ids: string[]) => LAYER_MENU.filter((item) => item.op(doc, ids).ok).map((item) => item.command);
+
+    expect(offered(masked(), ['photo'])).toEqual([Command.RemoveMask]);
+    expect(offered(ok(dropLayer(masked(), 'photo', 'note', Place.Above)), ['note', 'photo'])).toEqual([Command.UseAsMask]);
+  });
+
+  it('the eye on the mask hides the mask, which turns masking off', () => {
+    const doc = ok(layerEdit(masked(), 'disc', LayerAction.Hide));
+
+    expect(frameRows(doc, 'm1').find((r) => r.id === 'disc')).toMatchObject({ kind: LayerKind.Mask, hidden: true });
   });
 });

@@ -11,6 +11,8 @@ import { CssComposite, stackLayers } from './masks';
 import { MATTE_RUNTIME } from './mattes';
 import { keyframeTweens } from './animate';
 import { composeHtml } from './compose';
+import { useAsMask } from '../mask-group';
+import { setClipFlags } from '../organize';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -282,5 +284,37 @@ describe('several masks on one clip', () => {
     expect(html).toContain('<mask id="mk-img"');
     expect(html).toContain('<mask id="m1k-img"');
     expect(html).toContain('height:1080px;mask:url(#m1k-img),url(#mk-img);-webkit-mask:url(#m1k-img),url(#mk-img);mask-composite:intersect,add"');
+  });
+});
+
+describe('a shape used as mask', () => {
+  const softRect = { shape: 'rect', roundness: 0.4, smoothing: 0.6, fills: [{ type: 'linear-gradient', stops: [{ color: '#ffffff', pos: 0 }, { color: 'transparent', pos: 1 }] }], width: 0.5, height: 0.5 };
+  const withShape = must(addClip(base, { component: 'Shape', from: 30, durationInFrames: 120, props: softRect }, 'cut'));
+  const twoAbove = must(
+    addClip(must(addTrack(must(addTrack(withShape, TrackKind.Visual, 'mid')), TrackKind.Visual, 'top')), { component: 'Title', from: 30, durationInFrames: 120, trackId: 'top', props: { text: 'GO' } }, 'title')
+  );
+  const both = must(addClip(twoAbove, { component: 'Image', from: 30, durationInFrames: 120, trackId: 'mid', props: { assetId: 'pic' } }, 'pic2'));
+  const masked = must(useAsMask(both, ['title', 'pic2', 'cut']));
+
+  it('cuts every layer above it with its rendered alpha, its own fill drawn nowhere', () => {
+    const html = compose(masked);
+
+    expect(html).toMatch(/<div class="matte-src" style="opacity:0;pointer-events:none"><div id="c-cut" class="clip layer"/);
+    expect(html).toContain('id="kt-title"');
+    expect(html).toContain('id="kt-pic2"');
+    expect(html).toContain(JSON.stringify([{ target: 'title', source: 'cut', matte: Matte.Alpha }, { target: 'pic2', source: 'cut', matte: Matte.Alpha }]));
+  });
+
+  it('a soft gradient fill reaches the matte as drawn: the shape keeps its transparent stop', () => {
+    const source = compose(masked).split('class="matte-src"')[1];
+
+    expect(source).toMatch(/<linearGradient[^>]*>.*stop-color:transparent/);
+  });
+
+  it('a mask turned off leaves its layers whole and paints nothing of its own', () => {
+    const html = compose(must(setClipFlags(masked, 'cut', { hidden: true })));
+
+    expect(html).not.toContain('kt-title');
+    expect(html).not.toContain('c-cut');
   });
 });

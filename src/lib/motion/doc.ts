@@ -89,6 +89,7 @@ const clipSchema = z.object({
   mask: maskSchema.nullable().default(null),
   maskStack: maskStackSchema.default([]),
   matte: z.enum(MATTES).default(Matte.None),
+  matteFrom: z.string().min(1).nullable().optional(),
   depth: depthSchema.default(DEPTH.fallback),
   space: z.enum(SPACES).default(Space.World),
   parent: z.string().min(1).nullable().default(null),

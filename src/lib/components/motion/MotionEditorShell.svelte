@@ -34,6 +34,7 @@
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
   import { nullFromSelection } from '$lib/motion/parent-ops';
   import { addAutoLayout } from '$lib/motion/layout/ops';
+  import { releaseMasks, useAsMask } from '$lib/motion/mask-group';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import ZoomStage from '$lib/components/motion/ZoomStage.svelte';
@@ -1335,7 +1336,9 @@
     [Command.ToggleTimeline]: () => relayout(toggleTimeline(layout)),
     [Command.Help]: () => (helpOpen = !helpOpen),
     [Command.Precompose]: precomposeSelection,
-    [Command.AutoLayout]: autoLayoutSelection
+    [Command.AutoLayout]: autoLayoutSelection,
+    [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
+    [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask')
   };
 
   const TOOL_RUN: Partial<Record<ActionId, () => void>> = {
@@ -1347,7 +1350,7 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
@@ -1463,7 +1466,7 @@
     if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
       return;
     }
-    const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, editMode);
+    const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey, ctrlCmd: e.metaKey && e.ctrlKey }, editMode);
     if (!command) {
       return;
     }
