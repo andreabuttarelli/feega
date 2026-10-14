@@ -1,5 +1,6 @@
 import { baseOf, type NodeData } from './node-patch';
 import { SERVER_WRITTEN_FIELDS } from './node-data';
+import { DB_BUSY, isStatementTimeout } from '$lib/db-busy';
 
 export enum SaveFailure {
   Conflict = 'conflict',
@@ -8,7 +9,8 @@ export enum SaveFailure {
   Credits = 'credits',
   Auth = 'auth',
   Network = 'network',
-  Server = 'server'
+  Server = 'server',
+  Busy = 'busy'
 }
 
 const HTTP_CONFLICT = 409;
@@ -25,13 +27,15 @@ const SAVE_MESSAGES: Record<SaveFailure, string> = {
   [SaveFailure.Credits]: 'Not enough credits.',
   [SaveFailure.Auth]: 'Your session expired. Sign in again.',
   [SaveFailure.Network]: 'No connection: the change was not sent. Try again.',
-  [SaveFailure.Server]: 'The server failed to save this change. Try again.'
+  [SaveFailure.Server]: 'The server failed to save this change. Try again.',
+  [SaveFailure.Busy]: 'The database was too busy to save this change. Try again in a moment.'
 };
 
 export type ActionAnswer = {
   type: string;
   status?: number;
   data?: unknown;
+  error?: { message?: string };
 };
 
 type FailureData = { error?: string; message?: string; conflict?: boolean };
@@ -49,6 +53,9 @@ export function failureOf(result: ActionAnswer): SaveFailure {
   }
   if (result.type === 'redirect') {
     return SaveFailure.Auth;
+  }
+  if (result.error?.message === DB_BUSY || isStatementTimeout(data.error)) {
+    return SaveFailure.Busy;
   }
   if (result.type === 'error' || status >= HTTP_SERVER_ERROR) {
     return SaveFailure.Server;
@@ -203,7 +210,8 @@ function written(result: ActionAnswer): Written | null {
 }
 
 export async function writeWithRetry(attempt: WriteAttempt): Promise<WriteOutcome> {
-  const first = await attempt.send(attempt.patch, attempt.base);
+  const tried = await attempt.send(attempt.patch, attempt.base);
+  const first = failureOf(tried) === SaveFailure.Busy ? await attempt.send(attempt.patch, attempt.base) : tried;
   const node = written(first);
   if (node) {
     return { ok: true, node };
