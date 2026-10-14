@@ -195,9 +195,25 @@
     }
   }
 
+  .named {
+    background: linear-gradient(90deg, transparent var(--named-label), var(--ui-field) var(--named-label));
+    border-color: transparent;
+    --named-label: 96px;
+  }
+
+  .named:hover,
+  .named:focus-within {
+    border-color: transparent;
+  }
+
+  .named .num:focus-visible {
+    box-shadow: inset 0 -1px var(--ui-accent);
+  }
+
   .named .label {
-    width: 96px;
+    width: var(--named-label);
     max-width: none;
+    padding-left: 0;
     color: var(--ui-ink-2);
   }
 

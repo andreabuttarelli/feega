@@ -7,7 +7,7 @@
   import { TRANSFORM, isAnimatable } from '$lib/motion/keyframes';
   import { sliderOf, toShown, toStored } from '$lib/motion/units';
   import { fieldLook } from '$lib/motion/inspector-sections';
-  import { BLEND_MODES, type BlendMode } from '$lib/motion/blend';
+  import { BLEND_MODES, blendLabel, type BlendMode } from '$lib/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { MIXED, shared, type Shared } from '$lib/motion/mixed';
   import { FieldKind } from '$lib/motion/number-field';
@@ -73,7 +73,7 @@
         <span>Blend</span>
         <select aria-label="Blend mode" data-testid="multi-blend" value={blend === MIXED ? MIXED_OPTION : blend} onchange={(e) => setBlend(e.currentTarget.value)}>
           {#if blend === MIXED}<option value={MIXED_OPTION}>Mixed</option>{/if}
-          {#each BLEND_MODES as m (m)}<option value={m}>{m}</option>{/each}
+          {#each BLEND_MODES as m (m)}<option value={m}>{blendLabel(m)}</option>{/each}
         </select>
       </label>
     </section>

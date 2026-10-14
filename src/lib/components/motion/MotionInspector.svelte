@@ -56,7 +56,7 @@
   import { cornerRadii, withCorner } from '$lib/motion/shape/geometry';
   import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '$lib/motion/text-animators/model';
   import { TEXT_COMPONENTS, TEXT_PRESETS, applyPreset as applyTextPreset, removeAnimator, setAnimator, type TextPreset } from '$lib/motion/text-animators/ops';
-  import { BLEND_MODES, type BlendMode } from '$lib/motion/blend';
+  import { BLEND_MODES, blendLabel, type BlendMode } from '$lib/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
@@ -243,7 +243,6 @@
 
   const faults = $derived(Object.fromEntries(expressionErrors(doc, analyses).filter((f) => f.clipId === clip.id).map((f) => [f.key, f.error])));
   const DEFAULT_EXPRESSION = 'value';
-  const BLEND_LABEL = Object.fromEntries(BLEND_MODES.map((m) => [m, m.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ')])) as Record<BlendMode, string>;
 
   function toggleExpression(key: string) {
     const off = clip.expressions[key] !== undefined;
@@ -591,6 +590,7 @@
 {/snippet}
 
 {#snippet layoutBody()}
+  {@render groupFields(Section.Layout)}
   {#if layoutProps.length}
     <div class="stackable" data-testid="transform-section">
       {@render animGrid(layoutProps)}
@@ -607,7 +607,6 @@
       </div>
     </div>
   {/if}
-  {@render groupFields(Section.Layout)}
 {/snippet}
 
 {#snippet layerBody()}
@@ -617,7 +616,7 @@
     <div class="line" data-testid="blend-section">
       <label class="label" for="blend-mode">Blend</label>
       <select id="blend-mode" aria-label="Blend mode" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
-        {#each BLEND_MODES as mode (mode)}<option value={mode}>{BLEND_LABEL[mode]}</option>{/each}
+        {#each BLEND_MODES as mode (mode)}<option value={mode}>{blendLabel(mode)}</option>{/each}
       </select>
     </div>
     {#if doc.motionBlur.enabled}
@@ -1032,6 +1031,7 @@
   input[type='text'],
   textarea,
   select {
+    box-sizing: border-box;
     width: 100%;
     height: 28px;
     padding: 0 8px;

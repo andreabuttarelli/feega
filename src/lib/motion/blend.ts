@@ -19,6 +19,8 @@ export enum BlendMode {
 
 export const BLEND_MODES = Object.values(BlendMode) as [BlendMode, ...BlendMode[]];
 
+export const blendLabel = (mode: BlendMode): string => mode.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+
 export function blendStyle(mode: BlendMode): string | undefined {
   return mode === BlendMode.Normal ? undefined : mode;
 }

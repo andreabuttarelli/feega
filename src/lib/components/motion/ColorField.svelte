@@ -136,7 +136,7 @@
     position: absolute;
     z-index: 20;
     top: calc(100% + 4px);
-    left: -1px;
+    right: -1px;
     display: grid;
     gap: 6px;
     width: 196px;
