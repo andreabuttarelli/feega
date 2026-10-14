@@ -40,7 +40,8 @@
     }
     let frame = 0;
     const follow = () => {
-      const px = Math.max(0, Math.round(host.getBoundingClientRect().bottom - timeline.getBoundingClientRect().top));
+      const rect = timeline.getBoundingClientRect();
+      const px = rect.height ? Math.max(0, Math.round(host.getBoundingClientRect().bottom - rect.top)) : 0;
       if (px !== timelinePx) {
         timelinePx = px;
       }
