@@ -171,7 +171,7 @@
 
 <svelte:window {onkeydown} />
 
-<div class="fixed inset-0 z-40 bg-black/40" role="presentation" onclick={onclose}></div>
+<div class="fixed inset-0 z-70 bg-black/40" role="presentation" onclick={onclose}></div>
 <Panel
   surface={Surface.Raised}
   role="dialog"
@@ -179,7 +179,7 @@
   aria-label="Frame templates"
   data-testid="component-library"
   class={cn(
-    'fixed inset-0 z-41 grid grid-cols-[minmax(0,1fr)] overflow-hidden sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-[min(860px,calc(100dvh-48px))] sm:w-[min(1240px,calc(100vw-48px))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg',
+    'fixed inset-0 z-71 grid grid-cols-[minmax(0,1fr)] overflow-hidden sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-[min(860px,calc(100dvh-48px))] sm:w-[min(1240px,calc(100vw-48px))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg',
     open && 'sm:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]'
   )}
 >

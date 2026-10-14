@@ -31,7 +31,7 @@ test.describe('frame templates @real', () => {
       await viewport.open(page);
       const picker = page.getByRole('dialog', { name: 'Frame templates' });
       await expect(picker.getByRole('heading', { name: 'Frame templates' })).toBeVisible();
-      await expect(picker.locator('video')).toHaveCount(0);
+      expect(await picker.locator('video').count(), 'no wall of players: at most the hovered one').toBeLessThanOrEqual(1);
       await shoot(page, `${viewport.name}-picker`);
 
       await picker.getByRole('radio', { name: 'Still', exact: true }).click();

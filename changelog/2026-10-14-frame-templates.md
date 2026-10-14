@@ -5,12 +5,13 @@ The same catalogue was called "components" (picker on the canvas and in the edit
 everywhere a user reads it. Routes, test ids and code names (`ComponentLibrary`, `catalogue.ts`)
 stay: renaming them buys nothing and breaks links and specs.
 
-`ComponentLibrary.svelte` was redesigned:
+`ComponentLibrary.svelte` was redesigned on the shell primitives (`Panel` raised, `PanelHeader`,
+`SegmentedControl`, `IconButton`, `Kbd`, `FIELD_INPUT`), colour roles only, `lg` radius for the
+dialog, `md` for cards, `sm` for the input:
 
 - **Real format.** Every preview was squeezed into a 16:9 box, so 4:5 posters sat in black bars.
-  `CatalogueItem.native` keeps the template's own format (`format` still falls back to a starter
-  format, because that is what gets inserted); `byShape` groups the grid by shape, each group
-  with its own column width, so no card is letterboxed.
+  `byShape` groups the grid by each template's own format (`CatalogueItem.format`, made native by
+  the parallel poster-frame fix), each group with its own column width: no card is letterboxed.
 - **Filters.** All / Video / Still as one segmented control, then role chips from the template
   cards (`roles` in `cards.ts`). The kind tabs (components / media layouts / scenes) are gone:
   they described how a template is built, not what it is for. Search also matches roles.
@@ -23,5 +24,5 @@ stay: renaming them buys nothing and breaks links and specs.
   rectangles. ArrowDown from search enters the grid; Esc closes the detail, then the picker.
 - **States.** Shimmer skeleton until each lazy poster loads; empty state with "Clear filters".
 
-Not touched: `CanvasAddBar` and the `frame_template` action (format sent for a 4:5 poster is still
-16:9) — both owned by parallel work.
+Not touched: `CanvasAddBar` and the `frame_template` action — owned by parallel work. The
+picker sits at z 70/71 so the add bar (z 61) stays under it.
