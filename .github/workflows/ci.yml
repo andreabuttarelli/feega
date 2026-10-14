@@ -35,3 +35,24 @@ jobs:
 
       - name: E2E smoke tests
         run: npx playwright test
+
+  schema-drift:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      PUBLIC_SUPABASE_URL: ${{ secrets.DRIFT_SUPABASE_URL }}
+      PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.DRIFT_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Schema drift against production (anon key, zero rows read)
+        run: |
+          if [ -z "$PUBLIC_SUPABASE_URL" ]; then
+            echo "::warning::DRIFT_SUPABASE_URL / DRIFT_SUPABASE_ANON_KEY secrets not set; drift check skipped"
+            exit 0
+          fi
+          node scripts/schema-drift-check.mjs
