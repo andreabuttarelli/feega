@@ -850,9 +850,10 @@
   const timelineHidden = $derived(layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design);
   $effect(() => (rules.tools === ToolsPlace.CanvasBar ? frameBar.attach({ act: (action) => FRAME_ACTS[action]() }) : undefined));
   let timelineShownPx = $state(0);
+  let timelineEl = $state<HTMLElement | null>(null);
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
-      frameBar.timelinePx = timelineHidden ? 0 : timelineShownPx;
+      frameBar.timeline = timelineHidden ? null : timelineEl;
     }
   });
   $effect(() => {
@@ -1702,7 +1703,7 @@
     {/snippet}
     </SideColumn>
 
-    <section class="timeline-area" bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
+    <section class="timeline-area" bind:this={timelineEl} bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
 
       {#if clipBarShown}
@@ -2549,7 +2550,7 @@
 
   [data-viewport='phone'] {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto auto;
     grid-template-areas: 'lead trail' 'body body' 'transport transport' 'tabs tabs';
   }
@@ -2567,7 +2568,18 @@
   [data-viewport='phone'] .trail {
     grid-area: trail;
     height: 56px;
+    min-width: 0;
     padding-right: var(--ui-space-2);
+    justify-content: safe flex-end;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  [data-viewport='phone'] .trail > :global([data-testid='inline-close']) {
+    position: sticky;
+    right: 0;
+    flex-shrink: 0;
+    background: var(--ui-bg);
   }
 
   [data-viewport='phone'] .transport {

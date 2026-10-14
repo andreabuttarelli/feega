@@ -29,6 +29,27 @@
 
   const PERCENT = 100;
 
+  let barEl = $state<HTMLElement | null>(null);
+  let timelinePx = $state(0);
+  $effect(() => {
+    const timeline = frameBar.timeline;
+    const host = barEl?.parentElement;
+    if (!timeline || !host) {
+      timelinePx = 0;
+      return;
+    }
+    let frame = 0;
+    const follow = () => {
+      const px = Math.max(0, Math.round(host.getBoundingClientRect().bottom - timeline.getBoundingClientRect().top));
+      if (px !== timelinePx) {
+        timelinePx = px;
+      }
+      frame = requestAnimationFrame(follow);
+    };
+    follow();
+    return () => cancelAnimationFrame(frame);
+  });
+
   let showMore = $state(false);
   let showTemplates = $state(false);
 
@@ -197,7 +218,7 @@
   </span>
 {/snippet}
 
-<div class="add-bar" data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, frameBar.timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
+<div bind:this={barEl} class="add-bar" data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
   {#key context}
     <div class="group" data-testid={`bar-${context}`}>
       {#each BAR_SLOTS[context] as s (s)}{@render SLOT[s]()}{/each}
@@ -349,7 +370,8 @@
 
   @media (max-width: 767px) {
     .add-bar {
-      bottom: calc(env(safe-area-inset-bottom, 0px) + var(--lift, 0px));
+      left: 50%;
+      bottom: calc(var(--mobile-bar-inset) + env(safe-area-inset-bottom, 0px) + var(--lift, 0px));
       gap: 0;
       padding: var(--mobile-bar-pad);
       box-shadow: var(--mobile-bar-shadow);

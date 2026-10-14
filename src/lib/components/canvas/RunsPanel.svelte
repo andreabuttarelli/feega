@@ -57,6 +57,12 @@
     gap: 6px;
   }
 
+  @media (max-width: 767px) {
+    .runs {
+      bottom: var(--mobile-stack-top, 12px);
+    }
+  }
+
   button {
     font: inherit;
     padding: 4px 10px;

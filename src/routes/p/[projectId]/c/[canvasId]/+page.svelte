@@ -3088,6 +3088,10 @@
     pointer-events: none;
   }
 
+  @media (max-width: 767px) {
+    .save-status { bottom: var(--mobile-switch-bottom, 16px); }
+  }
+
   .save-status[data-status='retrying'] { color: #c0392b; }
 
   .warning {
