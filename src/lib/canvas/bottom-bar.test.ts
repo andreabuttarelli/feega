@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BAR_SLOTS, BarContext, BarSlot, barContextOf, barKeys, barLift, barShift } from './bottom-bar';
+import { BAR_SLOTS, BarContext, BarSlot, barContextOf, barHidden, barKeys, barLift, barShift } from './bottom-bar';
 import { CanvasState } from './inline-motion';
 import { Region } from './key-region.svelte';
 
@@ -34,5 +34,11 @@ describe('one bottom bar, its tools by context', () => {
   it('a click on a frame tool keeps the keyboard with the frame', () => {
     expect(barKeys(BarContext.Canvas)).toBe(Region.Canvas);
     expect(barKeys(BarContext.Frame)).toBe(Region.Editor);
+  });
+
+  it('only a frame being edited hides the bar for its dialogs; back on the canvas a dialog left open in the frame never hides it', () => {
+    expect(barHidden(BarContext.Frame, true)).toBe(true);
+    expect(barHidden(BarContext.Frame, false)).toBe(false);
+    expect(barHidden(BarContext.Canvas, true)).toBe(false);
   });
 });
