@@ -41,7 +41,8 @@ async function openAndGrab(page: Page, nodeId: string) {
     await overlay.click();
     await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 1000 });
   }, 'the text selects once the preview has measured it').toPass({ timeout: 15_000 });
-  return centre(overlay);
+  const middle = await centre(overlay);
+  return { x: middle.x - 40, y: middle.y + 10 };
 }
 
 async function dragTo(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
@@ -62,6 +63,8 @@ async function generated(admin: SupabaseClient, session: { orgId: string; projec
   expect(error).toBeNull();
   return data!.id as string;
 }
+
+test.use({ video: process.env.E2E_VIDEO ? 'on' : 'off' });
 
 test.describe('moving elements between frames @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1 — mai il progetto di produzione');
