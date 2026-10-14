@@ -7,7 +7,7 @@ import { MAX_ATTACHMENTS } from '../../lib/attachments.ts';
 const MAX_FRAMES = 6;
 const MAX_FRAME_WIDTH = 960;
 
-const EDITOR_READS = 'read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render)';
+const EDITOR_READS = 'editor_session {briefIds?} (everything the editor page loads: head, assets, tokens, templates, render state, gallery), read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render)';
 const EDITOR_WRITES =
   'save_doc {version,doc,summary?} (whole doc; 409 answers the head), apply_ops {version,ops,summary?} (doc ops, rebased on newer edits), ' +
   'record_export {path,width,height,seconds} (an mp4 already in storage becomes the render asset), upload_font {path} (a font file already in storage), analyze_sounds {assetIds} (tempo, beats, speech), ' +

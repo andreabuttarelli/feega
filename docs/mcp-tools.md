@@ -4,7 +4,7 @@
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
 **50 tool** — 19 in lettura, 25 in scrittura, 6 che distruggono.
-Il payload di `tools/list` pesa **49.305 caratteri**, circa **12.326 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+Il payload di `tools/list` pesa **49.424 caratteri**, circa **12.356 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
@@ -359,7 +359,7 @@ What a motion video has spent on AI across all its agent turns (`spent_usd`) and
 
 *Run a frame editor action*
 
-The actions the frame editor page runs on a `motion` node (`node_id`), same answers as the page, with `input` in camelCase. Reads: read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render). Writes: save_doc {version,doc,summary?} (whole doc; 409 answers the head), apply_ops {version,ops,summary?} (doc ops, rebased on newer edits), record_export {path,width,height,seconds} (an mp4 already in storage becomes the render asset), upload_font {path} (a font file already in storage), analyze_sounds {assetIds} (tempo, beats, speech), template_sounds {doc,clipId} (lays the template clip SFX; answers the doc), save_template {doc,name,description,compId?,posterFrame?}. Spends credits: generate_sound {sound:voice|music,text,seconds?} (answers assetId, url), render_batch {version,rows:[{name,values}],settings?} (one server render per row of template field values; poll batch_status). Unknown op answers the list; bad input answers the issues; a stale `version` answers 409.
+The actions the frame editor page runs on a `motion` node (`node_id`), same answers as the page, with `input` in camelCase. Reads: editor_session {briefIds?} (everything the editor page loads: head, assets, tokens, templates, render state, gallery), read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render). Writes: save_doc {version,doc,summary?} (whole doc; 409 answers the head), apply_ops {version,ops,summary?} (doc ops, rebased on newer edits), record_export {path,width,height,seconds} (an mp4 already in storage becomes the render asset), upload_font {path} (a font file already in storage), analyze_sounds {assetIds} (tempo, beats, speech), template_sounds {doc,clipId} (lays the template clip SFX; answers the doc), save_template {doc,name,description,compId?,posterFrame?}. Spends credits: generate_sound {sound:voice|music,text,seconds?} (answers assetId, url), render_batch {version,rows:[{name,values}],settings?} (one server render per row of template field values; poll batch_status). Unknown op answers the list; bad input answers the issues; a stale `version` answers 409.
 
 | campo | tipo | |
 |---|---|---|

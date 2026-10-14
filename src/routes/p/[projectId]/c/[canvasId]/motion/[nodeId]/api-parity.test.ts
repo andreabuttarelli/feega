@@ -34,7 +34,7 @@ vi.mock('$lib/server/canvas/lookup', () => ({
 vi.mock('$lib/server/canvas/sign-media', async (real) => ({ ...(await real<object>()), createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: () => reachable() }));
 
-const { actions } = await import('./+page.server');
+const { actions, load } = await import('./+page.server');
 const { POST } = await import('../../../../../../api/v1/motion/[nodeId]/ops/+server');
 const { POST: POST_POSTER } = await import('../../../../../../api/v1/motion/[nodeId]/poster/+server');
 
@@ -305,6 +305,20 @@ describe('the frame editor spending actions answer like their ops', () => {
     expect(action.status).toBe(402);
     expect(action.data.error).toBe('credits_exhausted');
     expect(endpoint).toEqual(action);
+  });
+});
+
+describe('the frame editor page load and its op answer the same', () => {
+  it('load and editor_session', async () => {
+    const db = seed();
+    const page = await (load as (event: unknown) => Promise<unknown>)({
+      params: { projectId: PROJECT, canvasId: CANVAS, nodeId: NODE },
+      url: new URL(`https://feega.test/p/${PROJECT}/c/${CANVAS}/motion/${NODE}`),
+      locals: { safeGetSession: async () => ({ session: {}, user: { id: USER } }), db: async () => db }
+    });
+    const endpoint = await viaEndpoint('editor_session', {});
+
+    expect(endpoint).toEqual({ status: 200, data: JSON.parse(JSON.stringify(page)) });
   });
 });
 

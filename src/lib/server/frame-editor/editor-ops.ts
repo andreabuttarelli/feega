@@ -22,6 +22,7 @@ import { startFarmBatch } from '$lib/server/motion/render-start';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { settingsFrom } from '$lib/motion/export-formats';
 import { motionEditorPath } from '$lib/canvas/motion-node';
+import { editorSession } from '$lib/server/motion/editor-session';
 
 export enum EditorAccess {
   Read = 'read',
@@ -54,6 +55,15 @@ const placeOf = (ctx: EditorCtx) => ({ db: ctx.db, orgId: ctx.orgId, projectId: 
 const soundScope = (ctx: EditorCtx) => ({ orgId: ctx.orgId, projectId: ctx.canvas.projectId, nodeId: ctx.motion.record.id, userId: ctx.userId, actor: ctx.actor });
 
 export const EDITOR_OPS = {
+  editor_session: op({
+    access: EditorAccess.Read,
+    input: z.object({ briefIds: z.array(z.string()).optional() }),
+    run: async (ctx, input) => {
+      const found = { orgId: ctx.orgId, canvas: ctx.canvas, mode: ctx.mode, projectBrandId: ctx.projectBrandId };
+      return ok(await editorSession({ db: ctx.db, userId: ctx.userId, found }, { projectId: ctx.canvas.projectId, nodeId: ctx.motion.record.id, briefIds: input.briefIds ?? [] }));
+    }
+  }),
+
   read_head: op({
     access: EditorAccess.Read,
     input: z.object({}),
