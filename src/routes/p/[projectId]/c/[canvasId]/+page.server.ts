@@ -62,17 +62,7 @@ import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { listNodeProducts } from '$lib/server/repos/products';
 import { listNodeSocialPosts } from '$lib/server/repos/social-posts';
 import { getInfluencer, listInfluencerViewsByIds, signInfluencerViewFiles } from '$lib/server/repos/influencers';
-import { createPostFromNodes } from '$lib/server/repos/create-post-from-nodes';
-import { findBrand } from '$lib/server/repos/brands';
-import { listBrandAccounts } from '$lib/server/repos/social-accounts';
-import { promoteNodesToPost } from '$lib/server/repos/post-from-nodes';
-import { promoteToPost, setPostStatus, listSourcesForNodes } from '$lib/server/repos/posts';
-import { scheduleDelivery, deliveryStatus } from '$lib/server/repos/post-delivery';
-import { PlanOutcome, PlanScope, listPlannedPosts, planPost, type PlanResult } from '$lib/server/repos/post-planning';
-import { schedulePlanned } from '$lib/server/repos/schedule-planned';
-import { listOrgBrands } from '$lib/server/repos/brands';
-import { publisher } from '$lib/server/publishing';
-import { listNodesByIds } from '$lib/server/repos/canvas';
+import { listSourcesForNodes } from '$lib/server/repos/posts';
 import { suggestNextSteps } from '$lib/canvas/suggest-next-steps';
 import { actionFrequencyFor } from '$lib/server/next-step-stats';
 import { decideWithJev } from '$lib/server/jev';
@@ -339,13 +329,7 @@ function jsonObject(value: FormDataEntryValue | null): Record<string, unknown> |
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
-const HTTP_UNPROCESSABLE = 422;
 
-const PLAN_ANSWERS: Record<PlanOutcome, (planned: PlanResult) => unknown> = {
-  [PlanOutcome.Planned]: (planned) => ({ planned }),
-  [PlanOutcome.Conflict]: () => fail(HTTP_CONFLICT, { error: 'conflict' }),
-  [PlanOutcome.Gone]: () => fail(HTTP_NOT_FOUND, { error: 'post_not_found' })
-};
 
 const PATCH_ANSWERS: { [K in PatchWrite['outcome']]: (written: Extract<PatchWrite, { outcome: K }>) => unknown } = {
   written: (written) => ({ node: written.node }),
@@ -1593,117 +1577,6 @@ export const actions: Actions = {
         confidence: s.confidence
       }))
     };
-  },
-
-  /**
-   * DALLA SELEZIONE DEL CANVAS A UN POST — la promozione, opzionalmente programmata.
-   * `media_order_node_id` porta l'ordine scelto nel composer (il drag/i pulsanti su e giù),
-   * separato da `node_id` perché quest'ultimo include anche i nodi caption/riferimento; questa
-   * action non sceglie una caption, la riceve già scelta. `mode`: senza `scheduled_for` resta
-   * `draft`, con un `scheduled_for` (e almeno un account) prova a consegnare via Zernio.
-   */
-  create_post: async ({ request, params, locals }) => {
-    const scope = await scopeAllowing(locals, params.canvasId, Capability.Publish);
-    const fd = await request.formData();
-
-    const brandId = String(fd.get('brand_id') ?? '');
-    const caption = fd.has('caption') ? String(fd.get('caption')) : undefined;
-    const nodeIds = fd.getAll('node_id').map(String);
-    const mediaOrder = fd.getAll('media_order_node_id').map(String);
-    const accountIds = fd.getAll('account_id').map(String);
-    const scheduledFor = String(fd.get('scheduled_for') ?? '').trim();
-    const plannedFor = String(fd.get('planned_for') ?? '').trim() || undefined;
-
-    if (!brandId || !nodeIds.length) {
-      return fail(400, { error: 'brand_and_nodes_required' });
-    }
-
-    const mode = scheduledFor ? ({ kind: 'schedule', at: scheduledFor } as const) : ({ kind: 'draft', plannedFor } as const);
-
-    const result = await createPostFromNodes(
-      scope.db,
-      {
-        brands: { findBrand },
-        accounts: { listBrandAccounts },
-        promoteNodesToPost: (db, _repos, input) =>
-          promoteNodesToPost(db, { canvas: { listNodesByIds }, posts: { promoteToPost } }, input),
-        setPostStatus,
-        scheduleDelivery
-      },
-      {
-        orgId: scope.orgId,
-        userId: scope.userId,
-        brandId,
-        nodeIds,
-        caption,
-        mediaOrder: mediaOrder.length ? mediaOrder : undefined,
-        accountIds,
-        mode
-      },
-      publisher
-    );
-
-    if (!result.ok) {
-      return fail(result.error === 'node_not_found' ? 400 : 422, result);
-    }
-    return { post: result.post };
-  },
-
-  calendar_posts: async ({ request, params, locals }) => {
-    const scope = await scopeAllowing(locals, params.canvasId, Capability.Schedule);
-    const fd = await request.formData();
-    const brandId = String(fd.get('brand_id') ?? '');
-    const planScope = String(fd.get('scope') ?? '') === PlanScope.Brand ? PlanScope.Brand : PlanScope.Canvas;
-
-    if (planScope === PlanScope.Brand && !brandId) {
-      return fail(HTTP_BAD_REQUEST, { error: 'brand_required' });
-    }
-
-    const scopeInput =
-      planScope === PlanScope.Brand
-        ? ({ kind: PlanScope.Brand, brandId } as const)
-        : ({ kind: PlanScope.Canvas, canvasId: scope.canvasId } as const);
-
-    const [posts, brands] = await Promise.all([
-      listPlannedPosts(scope.db, { orgId: scope.orgId, scope: scopeInput }),
-      listOrgBrands(scope.db, scope.orgId)
-    ]);
-    const withDeliveries = await Promise.all(
-      posts.map(async (post) => ({
-        ...post,
-        deliveries: post.scheduled ? await deliveryStatus(scope.db, publisher, { orgId: scope.orgId, postId: post.id }).catch(() => []) : []
-      }))
-    );
-
-    return { posts: withDeliveries, brands: brands.map((b) => ({ id: b.id, name: b.name })) };
-  },
-
-  plan_post: async ({ request, params, locals }) => {
-    const scope = await scopeAllowing(locals, params.canvasId, Capability.Schedule);
-    const fd = await request.formData();
-    const postId = String(fd.get('post_id') ?? '');
-    const plannedFor = String(fd.get('planned_for') ?? '').trim() || null;
-    const expectedUpdatedAt = String(fd.get('expected_updated_at') ?? '');
-
-    if (!postId || !expectedUpdatedAt) {
-      return fail(HTTP_BAD_REQUEST, { error: 'post_and_version_required' });
-    }
-
-    const planned = await planPost(scope.db, { orgId: scope.orgId, postId, plannedFor, expectedUpdatedAt });
-    return PLAN_ANSWERS[planned.outcome](planned);
-  },
-
-  schedule_post: async ({ request, params, locals }) => {
-    const scope = await scopeAllowing(locals, params.canvasId, Capability.Schedule);
-    const postId = String((await request.formData()).get('post_id') ?? '');
-    if (!postId) {
-      return fail(HTTP_BAD_REQUEST, { error: 'post_required' });
-    }
-
-    const scheduled = await schedulePlanned(scope.db, publisher, { orgId: scope.orgId, postId, now: new Date() });
-    if (!scheduled.ok) {
-      return fail(HTTP_UNPROCESSABLE, scheduled);
-    }
-    return { scheduled };
   }
+
 };
