@@ -1,76 +1,41 @@
-import { FEEGA_TOKENS } from "../../../src/lib/motion/brand";
-import { composeHtml } from "../../../src/lib/motion/hyperframes/compose";
-import { armFirstTouch } from "../../../src/lib/motion/hyperframes/first-touch";
-import { exactSeek } from "../../../src/lib/motion/hyperframes/exact-seek";
-import { splitHeadline } from "./fps-probe";
+import { FEEGA_TOKENS } from '../../../src/lib/motion/brand';
+import { composeHtml } from '../../../src/lib/motion/hyperframes/compose';
+import { exactSeek } from '../../../src/lib/motion/hyperframes/exact-seek';
+import { splitHeadline } from './fps-probe';
 
-const INNER_PROBE = `<script>(function(){var gaps=[],work=[],last=0,on=false;var ch=new MessageChannel();var t0=0;ch.port1.onmessage=function(){if(on){work.push(performance.now()-t0);}};function tick(now){if(on&&last){gaps.push(now-last);t0=performance.now();ch.port2.postMessage(0);}last=now;requestAnimationFrame(tick);}requestAnimationFrame(tick);var paints=[],lp=0,box=document.createElement('div'),w=1;box.style.cssText='position:fixed;left:0;top:0;height:1px;opacity:0;pointer-events:none';document.documentElement.appendChild(box);new ResizeObserver(function(){var n=performance.now();if(on&&lp){paints.push(n-lp);}lp=n;}).observe(box);addEventListener('message',function(){w=w%50+1;box.style.width=w+'px';},true);addEventListener('message',function(e){var m=e.data;if(!m||m.type!=='probe:frames'){return;}if(m.start){gaps=[];work=[];paints=[];lp=0;on=true;return;}on=false;e.source.postMessage({type:'probe:report',gaps:gaps,work:work,paints:paints},'*');});})();</script>`;
+const INNER_PROBE = `<script>(function(){var gaps=[],work=[],last=0,on=false;var ch=new MessageChannel();var t0=0;ch.port1.onmessage=function(){if(on){work.push(performance.now()-t0);}};function tick(now){if(on&&last){gaps.push(now-last);t0=performance.now();ch.port2.postMessage(0);}last=now;requestAnimationFrame(tick);}requestAnimationFrame(tick);addEventListener('message',function(e){var m=e.data;if(!m||m.type!=='probe:frames'){return;}if(m.start){gaps=[];work=[];on=true;return;}on=false;e.source.postMessage({type:'probe:report',gaps:gaps,work:work},'*');});})();</script>`;
 
-const PHOTO =
-  "data:image/svg+xml;base64," +
-  btoa(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#777"/></svg>',
-  );
+const PHOTO = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><rect width="10" height="10" fill="#777"/></svg>');
 
 export enum SeekPath {
-  Both = "both",
-  PlayerOnly = "player",
-  ExactOnly = "exact",
+  Both = 'both',
+  PlayerOnly = 'player',
+  ExactOnly = 'exact'
 }
 
-type Player = HTMLElement & {
-  seek: (t: number) => void;
-  play: () => void;
-  pause: () => void;
-  iframeElement?: HTMLIFrameElement;
-};
+type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; iframeElement?: HTMLIFrameElement };
 
 let player: Player;
 let seconds = 0;
-const hits: string[] = [];
 
 async function mountEditor(): Promise<void> {
-  await import("@hyperframes/player");
+  await import('@hyperframes/player');
   const doc = splitHeadline();
   seconds = doc.durationInFrames / doc.fps;
-  player = document.createElement("hyperframes-player") as Player;
-  player.setAttribute("sandbox-origin", "opaque");
-  player.setAttribute("assets-loading-ui", "none");
-  player.setAttribute("disable-click-to-play", "");
-  player.style.cssText = "position:fixed;left:0;top:0;width:960px;height:540px";
-  const overlay = document.createElement("div");
-  overlay.style.cssText =
-    "position:fixed;left:0;top:0;width:960px;height:540px;z-index:1";
-  for (const kind of ["pointerdown", "pointerup", "click"]) {
-    overlay.addEventListener(kind, () => hits.push(kind));
-  }
-  overlay.addEventListener("pointerdown", (e) => {
-    try {
-      overlay.setPointerCapture(e.pointerId);
-      hits.push("captured");
-    } catch {
-      hits.push("capture refused");
-    }
-  });
-  document.body.replaceChildren(player, overlay);
-  const ready = new Promise((resolve) =>
-    player.addEventListener("ready", resolve, { once: true }),
-  );
-  player.setAttribute(
-    "srcdoc",
-    composeHtml({
-      doc,
-      tokens: FEEGA_TOKENS,
-      assets: { photo: PHOTO },
-    }).replace("</body>", `${INNER_PROBE}</body>`),
-  );
+  player = document.createElement('hyperframes-player') as Player;
+  player.setAttribute('sandbox-origin', 'opaque');
+  player.setAttribute('assets-loading-ui', 'none');
+  player.setAttribute('disable-click-to-play', '');
+  player.style.cssText = 'position:fixed;left:0;top:0;width:960px;height:540px';
+  document.body.replaceChildren(player);
+  const ready = new Promise((resolve) => player.addEventListener('ready', resolve, { once: true }));
+  player.setAttribute('srcdoc', composeHtml({ doc, tokens: FEEGA_TOKENS, assets: { photo: PHOTO } }).replace('</body>', `${INNER_PROBE}</body>`));
   await ready;
-  armFirstTouch(player.iframeElement!, player);
 }
 
 function post(message: unknown): boolean {
   const target = player.iframeElement?.contentWindow;
-  target?.postMessage(message, "*");
+  target?.postMessage(message, '*');
   return !!target;
 }
 
@@ -80,7 +45,7 @@ const SEEKS: Record<SeekPath, (t: number) => void> = {
     post(exactSeek(t));
   },
   [SeekPath.PlayerOnly]: (t) => player.seek(t),
-  [SeekPath.ExactOnly]: (t) => post(exactSeek(t)),
+  [SeekPath.ExactOnly]: (t) => post(exactSeek(t))
 };
 
 function scrub(path: SeekPath, ms: number): Promise<number> {
@@ -107,50 +72,32 @@ function play(ms: number): Promise<void> {
     setTimeout(() => {
       player.pause();
       resolve();
-    }, ms),
+    }, ms)
   );
 }
 
 function startInner() {
-  post({ type: "probe:frames", start: true });
+  post({ type: 'probe:frames', start: true });
 }
 
-function stopInner(): Promise<{
-  gaps: number[];
-  work: number[];
-  paints: number[];
-}> {
+function stopInner(): Promise<{ gaps: number[]; work: number[] }> {
   return new Promise((resolve) => {
     const listen = (e: MessageEvent) => {
-      if (e.data?.type !== "probe:report") {
+      if (e.data?.type !== 'probe:report') {
         return;
       }
-      removeEventListener("message", listen);
-      resolve({ gaps: e.data.gaps, work: e.data.work, paints: e.data.paints });
+      removeEventListener('message', listen);
+      resolve({ gaps: e.data.gaps, work: e.data.work });
     };
-    addEventListener("message", listen);
-    post({ type: "probe:frames", start: false });
+    addEventListener('message', listen);
+    post({ type: 'probe:frames', start: false });
   });
 }
 
 declare global {
   interface Window {
-    editorScrub: {
-      mount: typeof mountEditor;
-      scrub: typeof scrub;
-      play: typeof play;
-      startInner: typeof startInner;
-      stopInner: typeof stopInner;
-      overlayHits: () => string[];
-    };
+    editorScrub: { mount: typeof mountEditor; scrub: typeof scrub; play: typeof play; startInner: typeof startInner; stopInner: typeof stopInner };
   }
 }
 
-window.editorScrub = {
-  mount: mountEditor,
-  scrub,
-  play,
-  startInner,
-  stopInner,
-  overlayHits: () => hits,
-};
+window.editorScrub = { mount: mountEditor, scrub, play, startInner, stopInner };
