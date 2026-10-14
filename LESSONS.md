@@ -2882,3 +2882,6 @@ Signal: an overlay slides off its node while the canvas animates (70 px on a pho
 
 ### A perf budget on server TTFB flakes
 Signal: the open-frame budget swings by 2 s between runs with no code change. Move: budget what the client controls - payload size, mount after response, picture after mount.
+
+### A video on iPhone shows a black, zoomed-in corner of the frame
+Signal: on iOS Safari the editor player is black with a few specks while the node poster is fine; desktop WebKit (Playwright `iPhone 15`) renders the same doc correctly. Cause: CSS `zoom` on the player iframe (sharpness fix for Chromium) shrinks the box but iOS lays the frame's document out unzoomed, so only the top-left ~1/6 of the 1920 px composition shows. Move: scale the player iframe by `zoom` only where it is proven (`crispFor` in `crisp-scale.ts`, Chromium); WebKit keeps the player's transform. Emulated WebKit is not iOS: verify iframe/zoom fixes on a device.
