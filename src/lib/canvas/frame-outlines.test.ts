@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { cacheOutlines, canvasHeads, frameHead, headsParam, missingHeads, outlinesFor, parseHeads } from './frame-outlines';
+import { cacheOutlines, canvasHeads, frameHead, headsParam, missingHeads, outlinesFor, parseHeads, parseParts, partIds, partsParam, posterHeads } from './frame-outlines';
 import { LayerKind, type LayerRow } from './layers';
 
-const row = (id: string, nodeId: string): LayerRow => ({ id, kind: LayerKind.Clip, depth: 2, label: id, type: 'Title', nodeId, hidden: false, locked: false, nested: false });
+const row = (id: string, nodeId: string): LayerRow => ({ id, key: id, kind: LayerKind.Clip, depth: 2, label: id, type: 'Title', nodeId, hidden: false, locked: false, nested: false });
 
 describe('frame outlines on the client', () => {
   it('round-trips the heads of a canvas through one query parameter, dropping junk', () => {
@@ -30,5 +30,27 @@ describe('frame outlines on the client', () => {
     expect(frameHead('motion', { docHeadRevision: 0 })).toBeNull();
     expect(frameHead('text', { docHeadRevision: 5 })).toBeNull();
     expect(canvasHeads([{ id: 'm1', head: 5 }, { id: 'n1', head: null }, { id: 'n2' }])).toEqual([{ nodeId: 'm1', version: 5 }]);
+  });
+});
+
+describe('closed posters list their parts', () => {
+  const poster = (nodeId: string): LayerRow => ({ ...row('p', nodeId), type: 'Custom' });
+
+  it('probes only a closed frame whose outline holds a custom clip, once per revision', () => {
+    const heads = [{ nodeId: 'm1', version: 1 }, { nodeId: 'm2', version: 1 }, { nodeId: 'm3', version: 1 }];
+    const cache = cacheOutlines({}, heads, { m1: [poster('m1')], m2: [row('t', 'm2')], m3: [poster('m3')] });
+
+    expect(posterHeads(heads, cache, new Set(), 'm3')).toEqual([{ nodeId: 'm1', version: 1 }]);
+    expect(posterHeads(heads, cache, new Set(['m1:1']), null)).toEqual([{ nodeId: 'm3', version: 1 }]);
+  });
+
+  it('keeps the part ids of a measure, per clip, without their boxes', () => {
+    const box = { left: 0, top: 0, width: 1, height: 1 };
+
+    expect(partIds({ p: box, 'p#lines:0': box, 'p#footer1': box })).toEqual({ p: ['lines:0', 'footer1'] });
+  });
+
+  it('carries the parts of one frame through the query and back', () => {
+    expect(parseParts(partsParam('m1', { p: ['lines:0'] }))).toEqual({ m1: { p: ['lines:0'] } });
   });
 });

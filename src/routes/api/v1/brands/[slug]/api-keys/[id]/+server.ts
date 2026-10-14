@@ -10,17 +10,14 @@ export const DELETE: RequestHandler = async ({ request, params }) => {
   const { brand, error: brandError } = await loadBrandForUser(auth.supabase, params.slug, auth.apiKey);
   if (brandError) return brandError;
 
-  // Own keys only: the API-key path is service-role, so RLS is not doing this for us. And the key
-  // must actually belong to THIS brand (same filter GET lists with): on user_id alone, a key
-  // scoped to brand A could revoke the keys of brand B under the same owner.
   const { data: key } = await auth.supabase
     .from('api_keys')
-    .select('id, permissions')
+    .select('id')
     .eq('id', params.id)
     .eq('user_id', auth.user.id)
+    .eq('org_id', brand.org_id)
     .maybeSingle();
-  const brandIds = (key?.permissions as { brand_ids?: string[] | '*' } | null)?.brand_ids;
-  if (!key || !(brandIds === '*' || (Array.isArray(brandIds) && brandIds.includes(brand.id)))) {
+  if (!key) {
     return json({ error: 'API key not found' }, { status: 404 });
   }
 

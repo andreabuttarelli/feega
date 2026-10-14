@@ -19,7 +19,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name, email, avatar_url')
+    .select('name, email, avatar_url')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -30,7 +30,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
 
   const customAvatar =
     typeof profile?.avatar_url === 'string' && profile.avatar_url ? profile.avatar_url : null;
-  const { firstName, lastName } = splitName(profile?.full_name);
+  const { firstName, lastName } = splitName(profile?.name);
 
   return {
     firstName,

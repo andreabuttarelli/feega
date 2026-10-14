@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { test as base, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import { purgeStorage, type StoragePort } from './storage-purge';
+import { E2eTarget, TEST_ACCOUNT_EMAIL, assertTestAccount, refuseAdminWrites, targetOf } from '../../../scripts/e2e/target';
 
 /**
  * LA SESSIONE USA-E-GETTA CHE OGNI SPEC `@real` COSTRUISCE SOPRA. Stesso pattern di
@@ -22,10 +23,39 @@ export type E2eSession = {
   projectId: string;
   canvasId: string;
   canvasName: string;
+  target: E2eTarget;
 };
 
 /** Abbondante per qualunque scenario reale della suite: una generazione di testo costa ~14 crediti. */
 export const E2E_ORG_CREDITS = 5000;
+
+const CLIENT_OPTIONS = { auth: { persistSession: false, autoRefreshToken: false } };
+
+function supabaseUrl(): string {
+  const url = process.env.PUBLIC_SUPABASE_URL;
+  if (!url) {
+    throw new Error('E2E_REAL_STACK=1 richiede PUBLIC_SUPABASE_URL');
+  }
+  return url;
+}
+
+export function e2eTarget(): E2eTarget {
+  return targetOf(supabaseUrl());
+}
+
+async function userClient(email: string, password: string): Promise<{ db: SupabaseClient; userId: string }> {
+  const anonKey = process.env.PUBLIC_SUPABASE_ANON_KEY;
+  if (!anonKey) {
+    throw new Error('E2E_REAL_STACK=1 richiede PUBLIC_SUPABASE_ANON_KEY');
+  }
+  const db = createClient(supabaseUrl(), anonKey, CLIENT_OPTIONS);
+  const signed = await db.auth.signInWithPassword({ email, password });
+  if (signed.error || !signed.data.user) {
+    throw new Error(`e2e sign-in failed: ${signed.error?.message ?? 'no user'}`);
+  }
+  assertTestAccount(e2eTarget(), signed.data.user.email);
+  return { db, userId: signed.data.user.id };
+}
 
 function adminClient(): SupabaseClient {
   const url = process.env.PUBLIC_SUPABASE_URL;
@@ -55,7 +85,66 @@ export enum E2eTour {
 
 export const TOUR_SEEN_KEY = 'feega:tour-seen';
 
-export async function createE2eSession(opts: { withCredits?: boolean; tour?: E2eTour } = {}): Promise<E2eSession> {
+type SessionOptions = { withCredits?: boolean; tour?: E2eTour };
+
+export async function createE2eSession(opts: SessionOptions = {}): Promise<E2eSession> {
+  return LIFECYCLE[e2eTarget()].create(opts);
+}
+
+export async function teardownE2eSession(session: E2eSession): Promise<void> {
+  await LIFECYCLE[session.target].teardown(session);
+}
+
+function testAccountCredentials(): { email: string; password: string } {
+  const email = process.env.E2E_TEST_EMAIL;
+  const password = process.env.E2E_TEST_PASSWORD;
+  if (!email || !password) {
+    throw new Error('e2e on production needs E2E_TEST_EMAIL and E2E_TEST_PASSWORD');
+  }
+  assertTestAccount(E2eTarget.Production, email);
+  return { email, password };
+}
+
+async function createInTestAccount(opts: SessionOptions): Promise<E2eSession> {
+  if (opts.withCredits === false) {
+    throw new Error(`a zero-credit org cannot be staged on ${TEST_ACCOUNT_EMAIL}`);
+  }
+  const { email, password } = testAccountCredentials();
+  const { db, userId } = await userClient(email, password);
+
+  const membership = await checked(db.from('orgs_members').select('org_id').eq('user_id', userId).eq('role', 'owner').limit(1).single());
+  const orgId = membership?.org_id;
+  if (!orgId) {
+    throw new Error(`${email} owns no org`);
+  }
+  const projectId = randomUUID();
+  const canvasId = randomUUID();
+  const canvasName = 'Prima tela';
+
+  const tourSeenAt = (opts.tour ?? E2eTour.Seen) === E2eTour.Seen ? new Date().toISOString() : null;
+  await checked(db.from('profiles').update({ onboarding_seen_at: tourSeenAt }).eq('id', userId));
+  await checked(db.from('projects').insert({ id: projectId, org_id: orgId, name: 'E2E project', slug: `e2e-project-${projectId}` }));
+  await checked(db.from('canvases').insert({ id: canvasId, org_id: orgId, project_id: projectId, name: canvasName }));
+
+  return { userId, email, password, orgId, projectId, canvasId, canvasName, target: E2eTarget.Production };
+}
+
+const PROJECT_ROWS = ['assets', 'chat_threads', 'nodes', 'canvases'] as const;
+const CANVAS_BUCKET = 'canvas-assets';
+
+async function teardownInTestAccount(session: E2eSession): Promise<void> {
+  const { db, userId } = await userClient(session.email, session.password);
+
+  await purgeStorage(fixedBuckets(db, [CANVAS_BUCKET]), [`${session.orgId}/${session.projectId}`]);
+  for (const table of PROJECT_ROWS) {
+    await checked(db.from(table).delete().eq('project_id', session.projectId));
+  }
+  await checked(db.from('projects').delete().eq('id', session.projectId));
+  await checked(db.from('profiles').update({ onboarding_seen_at: new Date().toISOString() }).eq('id', userId));
+}
+
+async function createDisposable(opts: SessionOptions): Promise<E2eSession> {
+  refuseAdminWrites(e2eTarget());
   const db = adminClient();
   const email = `e2e-shell-${randomUUID()}@feega.app`;
   const password = randomUUID();
@@ -94,7 +183,7 @@ export async function createE2eSession(opts: { withCredits?: boolean; tour?: E2e
     );
   }
 
-  return { userId, email, password, orgId, projectId, canvasId, canvasName };
+  return { userId, email, password, orgId, projectId, canvasId, canvasName, target: E2eTarget.Disposable };
 }
 
 const LIST_PAGE = 1000;
@@ -109,7 +198,12 @@ function storageOf(db: SupabaseClient): StoragePort {
   };
 }
 
-export async function teardownE2eSession(session: E2eSession): Promise<void> {
+function fixedBuckets(db: SupabaseClient, buckets: string[]): StoragePort {
+  return { ...storageOf(db), buckets: async () => buckets };
+}
+
+async function teardownDisposable(session: E2eSession): Promise<void> {
+  refuseAdminWrites(session.target);
   const db = adminClient();
 
   await purgeStorage(storageOf(db), [session.orgId, session.userId, `colours/${session.orgId}`]);
@@ -117,6 +211,21 @@ export async function teardownE2eSession(session: E2eSession): Promise<void> {
   await db.from('orgs').delete().eq('id', session.orgId);
   await db.auth.admin.deleteUser(session.userId);
 }
+
+type Lifecycle = {
+  create(opts: SessionOptions): Promise<E2eSession>;
+  teardown(session: E2eSession): Promise<void>;
+  client(session: E2eSession): Promise<SupabaseClient>;
+};
+
+const LIFECYCLE: Record<E2eTarget, Lifecycle> = {
+  [E2eTarget.Production]: {
+    create: createInTestAccount,
+    teardown: teardownInTestAccount,
+    client: async (session) => (await userClient(session.email, session.password)).db
+  },
+  [E2eTarget.Disposable]: { create: createDisposable, teardown: teardownDisposable, client: async () => adminClient() }
+};
 
 /**
  * OGNI NAVIGAZIONE DI QUESTA SUITE PASSA DA QUI, non da `page.goto` nudo: in dev Vite compila
@@ -204,8 +313,8 @@ export const test = base.extend<{
     }
   },
 
-  admin: async ({}, use) => {
-    await use(adminClient());
+  admin: async ({ session }, use) => {
+    await use(await LIFECYCLE[session.target].client(session));
   },
 
   page: async ({ page, session }, use) => {
@@ -242,4 +351,5 @@ export const test = base.extend<{
 export { expect };
 
 export const REAL_STACK = process.env.E2E_REAL_STACK === '1';
+export const ON_PRODUCTION = REAL_STACK && !!process.env.PUBLIC_SUPABASE_URL && e2eTarget() === E2eTarget.Production;
 export const SOCIAL_PUBLISHING = process.env.E2E_SOCIAL_PUBLISHING === '1';

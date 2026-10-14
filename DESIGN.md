@@ -82,6 +82,20 @@ between the two is the point.
   proportions), sliders for ranges. Every list has an empty state with a way out.
 - Every UI works at 390px and on touch: targets of at least 44px, no hover-only features.
 
+### properties panel
+
+The right panel reads like Figma's: a head with the selection's icon, name and kind, then
+sections in one fixed order — Layout, Layer, Fill, Stroke, Effects, Text, Animation (Motion mode
+only). Which sections a selection gets is one table (`src/lib/motion/properties-view.ts`); which
+section a field lands in is another (`src/lib/motion/inspector-sections.ts`).
+
+- Rows are 28px, labels in English on the left (88px), never a glyph alone; numbers carry their
+  unit and scrub when the label is dragged. Short numbers pair up in two columns.
+- A colour is one field: swatch, hex, and a popover with the picker, brand and recent colours.
+- Two to three exclusive options are a segmented toggle (align, fit), not a dropdown.
+- Several layers show their shared value, or an empty field reading `Mixed`.
+- The panel runs the editor's full height and scrolls on its own.
+
 ### states
 
 Hover is a wash (`--ui-wash`), pressed a deeper grey (`--ui-pressed`), focus an accent ring, selection an accent wash with accent text.
