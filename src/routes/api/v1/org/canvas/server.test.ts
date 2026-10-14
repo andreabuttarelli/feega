@@ -156,6 +156,27 @@ describe('POST /api/v1/org/canvas — the chat canvas ops, for CLI and MCP', () 
     expect(res.status).toBe(402);
   });
 
+  it('quotes a downstream run without spending or queueing', async () => {
+    const { db, calls } = fakeDb({ projects: [projectRow], nodes: [nodeRow], nodes_connections: [] }, { filter: true });
+    caller(db, false);
+
+    const { res, body } = await call({ project_id: PROJECT, op: 'preview_run_graph', input: { graph: 'downstream', nodeId: NODE } });
+
+    expect(res.status).toBe(200);
+    expect(body.steps).toEqual([{ nodeId: NODE, dependsOn: [] }]);
+    expect(body.credits).toBeGreaterThan(0);
+    expect(calls.some((c) => c.op === 'insert')).toBe(false);
+  });
+
+  it('running the graph spends, so it passes the credit gate', async () => {
+    caller(fakeDb({ projects: [projectRow], nodes: [nodeRow] }, { filter: true }).db);
+    gateOrgAiAction.mockResolvedValue(new Response('{}', { status: 402 }));
+
+    const { res } = await call({ project_id: PROJECT, op: 'run_graph', input: { graph: 'stale', canvasId: CANVAS } });
+
+    expect(res.status).toBe(402);
+  });
+
   it('reads never touch the credit gate', async () => {
     caller(fakeDb({ projects: [projectRow], nodes: [nodeRow] }, { filter: true }).db);
 

@@ -63,10 +63,12 @@ describe('la superficie del modello mostra solo ciò che può usare', () => {
         'set_composition_component',
         'preview_node_loop',
         'run_node_loop',
-        'cancel_node_loop'
+        'cancel_node_loop',
+        'preview_run_graph',
+        'run_graph'
       ])
     );
-    expect(names).toHaveLength(23);
+    expect(names).toHaveLength(25);
   });
 
   it('col brand i tool di brand ci sono, accanto a quelli di progetto', () => {

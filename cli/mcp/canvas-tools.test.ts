@@ -76,7 +76,7 @@ describe('canvas_tool: the chat canvas ops over MCP', () => {
     const tools = (await rpc('tools/list', {})).result?.tools ?? [];
     const description = tools.find((t) => t.name === 'canvas_tool')?.description ?? '';
 
-    for (const op of ['list_canvases', 'list_nodes', 'create_node', 'update_node', 'move_node', 'connect_nodes', 'delete_node', 'run_node', 'list_runs']) {
+    for (const op of ['list_canvases', 'list_nodes', 'create_node', 'update_node', 'move_node', 'connect_nodes', 'delete_node', 'run_node', 'list_runs', 'preview_run_graph', 'run_graph']) {
       expect(description).toContain(op);
     }
   });
