@@ -89,6 +89,11 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['orgs_members', 'projects', 'canvases', 'nodes', 'canvas_events', 'motion_revisions', 'assets']
   },
   {
+    path: 'scripts/demo/seed-demo.ts',
+    why: "Uno script lanciato a mano, senza sessione utente: semina un set di progetti demo (tre clienti, una tela ciascuno, frame da template) in un'org ESISTENTE di cui l'account passato per email è owner. Non crea né cancella org o utenti: legge profiles e orgs_members solo per trovare l'account e verificare che l'org sia sua. Idempotente: ritrova progetti per slug e frame per nome.",
+    tables: ['profiles', 'orgs_members', 'projects', 'canvases', 'nodes', 'canvas_events', 'motion_revisions', 'motion_templates']
+  },
+  {
     path: 'scripts/seed-reference-images.ts',
     why: "Uno script una tantum, senza sessione utente: semina il catalogo globale delle foto di riferimento (`reference_images.org_id = null`, bucket `reference-images` sotto `catalogue/`), che nessuna policy lascia scrivere a un JWT — il catalogo si legge da ogni org e non lo scrive nessuna.",
     tables: ['reference_images']
