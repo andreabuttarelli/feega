@@ -2853,6 +2853,14 @@ Signal: a server-side edit (a tool, a port) has no effect in agent turns, and no
 storage, while unit tests pass. The dev server kept the old module for turns running in the
 background. Move: restart `vite dev` after server edits before trusting a real-check run.
 
+## A zoomed-out canvas pans below 60 fps though its images are already on one canvas
+
+Signal: a Chrome trace of the pan is ~80% `Layerize` / `PaintArtifactCompositor::Update`; a no-op
+poster draw, `ImageBitmap` thumbs or `display:none` on node children change nothing. Cause: 500
+node shells still go through layerization every frame, with nothing visible inside. Images were
+not the cost. Move: measure with the shells out of layout (`display:none`) before blaming decode;
+under LOD, `.moving` takes unselected poster shells out of layout (`canvas-poster-lod.spec.ts`).
+
 ## An export flickers every other frame but a 1-lane render is smooth
 
 Signal: consecutive exported frames alternate between two states (`bench:export --lanes=4` vs
