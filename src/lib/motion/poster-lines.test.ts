@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LineEdit, MarkedField, markedField, editLines, lineRows, markedPoster, photoAt, setPhoto, setPhotoLook, wordsOf } from './poster-lines';
+import { LineEdit, MarkedField, markedField, editLines, removePhoto, lineRows, markedPoster, photoAt, setPhoto, setPhotoLook, wordsOf } from './poster-lines';
 
 const LINES = ['STUDIO', 'NAME [photo]', 'SPACE [photo]', 'SESSION', '01 [photo] ->'].join('\n');
 const A = { assetId: 'a', kind: 'image' as const };
@@ -106,5 +106,19 @@ describe('a photo slot', () => {
       fit: 'contain',
       focusX: 0.2
     });
+  });
+});
+
+describe('a photo is its own element', () => {
+  const C = { assetId: 'c', kind: 'image' as const };
+  const TWO = ['NAME [photo] [photo]', 'SPACE [photo] ->'].join('\n');
+
+  it('deleting a photo removes its own slot and only its own', () => {
+    expect(removePhoto({ lines: TWO, media: [A, B, C] }, 1)).toEqual({ lines: ['NAME [photo]', 'SPACE [photo] ->'].join('\n'), media: [A, C] });
+    expect(removePhoto({ lines: TWO, media: [A, B, C] }, 2)).toEqual({ lines: ['NAME [photo] [photo]', 'SPACE ->'].join('\n'), media: [A, B] });
+  });
+
+  it('a photo that is not there changes nothing', () => {
+    expect(removePhoto({ lines: TWO, media: [A, B, C] }, 9)).toEqual({ lines: TWO, media: [A, B, C] });
   });
 });
