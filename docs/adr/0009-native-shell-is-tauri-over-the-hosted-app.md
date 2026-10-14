@@ -17,7 +17,9 @@ Options weighed:
 | Size | ~10 MB desktop, system WebView | Electron ~150 MB | 0 |
 | Store review 4.2 | needs native features | same | not in store |
 
-Decision: **(a) Tauri 2 for all four platforms, PWA as the baseline.** Default confirmed.
+Decision: **(a) Tauri 2 for all four platforms, PWA as the baseline.** Default confirmed. The
+shell loads the hosted app today and is built to load a static bundle later (option (d) below):
+the start URL is configuration, not code.
 
 - One shell. Capacitor's real edge is its mobile plugin catalogue; the features we need first
   (deep link, external browser, dialog, notifications) exist as official Tauri 2 plugins, and the
@@ -65,6 +67,68 @@ Accounts and signing the user provides: Apple Developer Program (99 USD/yr; Deve
 macOS notarisation, distribution cert + provisioning for iOS), Google Play Console (25 USD once,
 upload key), Windows code-signing cert (OV/EV or Azure Trusted Signing), a Tauri updater key pair,
 and the bundle id `app.feega.desktop` reserved in both stores.
+
+## (d) A static, frontend-only build talking to the API
+
+The alternative to loading the site: ship a SvelteKit build with `adapter-static` and an SPA
+fallback inside the shell, calling the hosted API with a bearer token.
+
+Inventory on `dev` (2026-10-14):
+
+| What the UI relies on | Count | Lines |
+|---|---|---|
+| `+page.server.ts` (load and/or actions) | 52 | 5,353 |
+| `+layout.server.ts` | 5 | 258 |
+| files with form actions | 35 | ~160 actions |
+| non-API `+server.ts` (callbacks, embeds, renders) | 39 | — |
+| `/api/v1` endpoints (CLI/MCP, bearer auth) | 82 | — |
+| `hooks.server.ts` (host redirect, CSRF, cookie Supabase client, org/landing cookies) | 1 | 266 |
+
+The heavy part is concentrated: the canvas page (`p/[projectId]/c/[canvasId]`, 1,582 lines, ~20
+actions: `write`, `batchWrite`, `template`, `create`, `move`, `resize`, `connect`, `run`, …) and the
+motion editor (341 lines, 21 actions). Already covered by bearer-auth equivalents:
+
+- canvas: `POST /api/v1/org/canvas` with `CANVAS_OPS` (40 ops: create/update/move/resize/connect/
+  delete/run/duplicate/share/templates/uploads) — most canvas actions map 1:1;
+- motion: `/api/v1/motion/[nodeId]` (+ revisions, render, frames, templates, agent);
+- brand settings, products, api-keys, billing checkout/portal, gallery, media, attachments sign.
+
+Not covered: login (10 actions; becomes client-side Supabase), project/team/profile/danger
+settings, studio, compose, upscale, assets, influencers, calendar, ads, and every page `load`
+(the SPA needs a read endpoint per page, or `/org/query`/`/org/rows` extended).
+
+What must stay server-side whatever the client: Realtime authorisation (client subscribes with
+the user JWT, RLS decides — already the case), storage signing (`attachments/sign`,
+`signKnowledgePaths`), paid actions behind `gateAiAction`/`gateOrgAiAction`, Stripe, provider keys,
+Server-Timing.
+
+Auth in (d): the Supabase client lives in the bundle with PKCE (verifier in app storage), the
+system browser does OAuth, `feega://auth/callback?code=` returns to the shell, the client exchanges
+the code itself, and every API call carries `Authorization: Bearer <jwt>` — which `resolveOrgCaller`
+already accepts. No cookies, no CSRF.
+
+Migration path, route by route, never big-bang:
+
+1. For each page, move `load` and actions into `/api/v1` endpoints (or `CANVAS_OPS`-style op
+   tables), with the page's server file calling the same function. Web keeps working; CLI and MCP
+   gain the operation for free. Canvas first (largest, mostly done), then motion, settings, the rest.
+2. Client-side data layer: pages read through a `fetch`-based client instead of `PageData`.
+3. When no route the native app opens has a `+page.server.ts`, add a second build target
+   (`adapter-static`, `fallback: 'index.html'`, `ssr = false`) for `apps/native`, and point the
+   shell's start URL at the bundle.
+
+Effort: ~6–8 engineer-weeks (canvas 1–2, motion 1, settings/brand/billing 1–2, the other ten
+pages 2, auth + static target + shell 1), plus a test per moved endpoint. What it buys:
+
+- one API for app, CLI and MCP — the rule "app → CLI → MCP" becomes structural, not discipline;
+- a bundled UI that starts offline and paints without a network round-trip;
+- a stronger 4.2 case (an app, not a website), though Apple still judges features, not bundling;
+- cost: the UI no longer updates with a deploy — store review for every UI release on iOS unless
+  the bundle is fetched remotely, which returns to (a). Server and bundle versions must be
+  compatible across releases.
+
+Recommendation: do (a) now; pursue step 1 for its own sake (it is the API the CLI and MCP need
+anyway) and decide step 3 when the canvas and motion pages have no server file left.
 
 Consequences:
 
