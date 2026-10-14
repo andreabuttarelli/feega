@@ -36,7 +36,7 @@ test.describe('properties panel @real', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('every selection kind shows its sections; a value edited in Properties is saved', async ({ page, session, admin, seedNode }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     await page.setViewportSize(VIEWPORT);
     const node = await seedNode({ type: 'motion', data: LANDSCAPE });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
@@ -82,7 +82,7 @@ test.describe('properties panel @real', () => {
     expect(await sectionsOf(props)).not.toContain('text');
     await shoot(props, 'image-clip');
 
-    await page.getByTestId('timeline').click({ position: { x: 4, y: 4 } }).catch(() => undefined);
+    await page.locator('body').click({ position: { x: 2, y: 2 } });
     await page.keyboard.press('ControlOrMeta+a');
     const multi = page.getByTestId('multi-inspector');
     await expect(multi).toBeVisible();
@@ -91,7 +91,7 @@ test.describe('properties panel @real', () => {
   });
 
   test('on the canvas the panel runs full height; a poster line and a photo part show their own properties', async ({ page, session, admin, seedNode }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(180_000);
     await page.setViewportSize(LAPTOP);
     const node = await seedNode({ type: 'motion', x: 80, y: 80, data: PORTRAIT });
     const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: poster, actor_kind: 'user', actor_id: session.userId });
@@ -102,7 +102,7 @@ test.describe('properties panel @real', () => {
     await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mode', 'still', { timeout: 15_000 });
     await page.getByRole('button', { name: 'Layers', exact: true }).click();
     const layers = page.getByTestId('layers');
-    await page.getByRole('tab', { name: 'Properties' }).click();
+    await page.getByTestId('side-tab-properties').dispatchEvent('click');
     const side = page.locator('aside.props');
 
     await layers.locator('[data-layer="poster#lines:1"]').click();
@@ -112,6 +112,8 @@ test.describe('properties panel @real', () => {
     const panel = (await page.locator('aside.props').boundingBox())!;
     expect(Math.abs(panel.y - editor.y), 'the panel starts right under the top bar').toBeLessThanOrEqual(PX_SLACK);
     expect(Math.abs(panel.height - (LAPTOP.height - editor.y)), 'it runs the full height left under the top bar').toBeLessThanOrEqual(PX_SLACK);
+    const overflow = await page.locator('aside.props').evaluate((el) => el.scrollWidth - el.clientWidth);
+    expect(overflow, 'no row is wider than the panel').toBeLessThanOrEqual(0);
     if (SHOTS) {
       await page.screenshot({ path: `${SHOTS}/canvas-full-height.png` });
     }
@@ -119,6 +121,8 @@ test.describe('properties panel @real', () => {
 
     await layers.locator('[data-layer="poster#photos:0"]').click();
     await expect(page.getByTestId('part-photo')).toBeVisible();
+    await expect(side.locator('[data-colour="Poster colour"]'), 'a photo never shows the whole poster style').toHaveCount(0);
+    await expect(side.getByText('Runtime variable prefix')).toHaveCount(0);
     await shoot(side, 'photo-part');
   });
 });

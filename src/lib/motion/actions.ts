@@ -1,5 +1,6 @@
 import type { Component } from 'svelte';
 import Play from '@lucide/svelte/icons/play';
+import Pipette from '@lucide/svelte/icons/pipette';
 import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
 import TypeIcon from '@lucide/svelte/icons/type';
 import SquareIcon from '@lucide/svelte/icons/square';
@@ -117,7 +118,8 @@ export enum Tool {
   OpenComp = 'open-comp',
   ParentTo = 'parent-to',
   SelectSeveral = 'select-several',
-  ClipProperties = 'clip-properties'
+  ClipProperties = 'clip-properties',
+  SampleColour = 'sample-colour'
 }
 
 export const Action = { ...Command, ...Tool } as const;
@@ -258,6 +260,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Tool.ItemUp]: { name: 'Move up', icon: ChevronUp },
   [Tool.ItemDown]: { name: 'Move down', icon: ChevronDown },
   [Tool.Remove]: { name: 'Remove', icon: X },
+  [Tool.SampleColour]: { name: 'Pick a colour from the screen', icon: Pipette },
   [Tool.Shuffle]: { name: 'Shuffle the order', icon: Shuffle },
   [Tool.InOrder]: { name: 'Keep the order', icon: ArrowRight },
   [Tool.GraphMode]: { name: 'Graph editor', icon: ChartSpline, group: GuideGroup.Timeline, menu: MenuSection.View },

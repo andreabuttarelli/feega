@@ -75,8 +75,8 @@
     height: 28px;
     padding: 0 8px;
     border: 1px solid transparent;
-    border-radius: 0;
-    background: var(--ui-field);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
     color: var(--ui-ink);
     font: inherit;
   }
@@ -106,8 +106,8 @@
     height: 28px;
     padding: 0 8px;
     border: 0;
-    border-radius: 0;
-    background: var(--ui-field);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
     color: var(--ui-ink);
     font: inherit;
     font-size: var(--ui-text-xs);

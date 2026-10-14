@@ -181,21 +181,29 @@ export function partFieldKeys(doc: MotionDoc, clip: MotionClip, field: string): 
 
 enum PartField {
   Shown = 'shown',
-  Own = 'own'
+  Own = 'own',
+  Alone = 'alone'
 }
+
+const PHOTO_KEY = /^photo/;
 
 const PART_FIELD: Record<PartKind, PartField> = {
   [PartKind.Text]: PartField.Shown,
   [PartKind.Other]: PartField.Shown,
   [PartKind.Line]: PartField.Own,
-  [PartKind.Photo]: PartField.Own,
+  [PartKind.Photo]: PartField.Alone,
   [PartKind.Arrow]: PartField.Own
 };
 
 export function partFocus(doc: MotionDoc, clip: MotionClip, part: string): string[] {
   const { field } = parsePart(part);
   const keys = [...new Set(partFieldKeys(doc, clip, field))];
-  return PART_FIELD[partKind(doc, clip, part)] === PartField.Shown ? keys : keys.filter((k) => k !== field);
+  const scope = PART_FIELD[partKind(doc, clip, part)];
+  if (scope === PartField.Alone) {
+    const all = clipFieldGroups(doc, clip).flatMap((g) => g.fields.map((f) => f.key));
+    return [...new Set([...ownFields(all, String(clip.props.name), field), ...all.filter((k) => PHOTO_KEY.test(k))])];
+  }
+  return scope === PartField.Shown ? keys : keys.filter((k) => k !== field);
 }
 
 const SECONDS_PRECISION = 100;

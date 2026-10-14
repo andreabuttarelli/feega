@@ -200,7 +200,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Tool.OpenComp]: NAVIGATION,
   [Tool.ParentTo]: motion('set_parent'),
   [Tool.SelectSeveral]: VIEW,
-  [Tool.ClipProperties]: VIEW
+  [Tool.ClipProperties]: VIEW,
+  [Tool.SampleColour]: motion('set_props')
 };
 
 export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {

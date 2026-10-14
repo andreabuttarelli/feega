@@ -300,4 +300,14 @@ describe('a selected poster part shows only its own fields', () => {
     expect(partFocus(doc, clip, 'photos:0')).not.toContain('lines');
     expect(partFocus(doc, clip, 'arrow:4')[0]).toBe('arrowColor');
   });
+
+  it('a photo shows only its own fields, never the whole poster style', () => {
+    const focus = partFocus(doc, clip, 'photos:0');
+
+    expect(focus).toEqual(expect.arrayContaining(['photoTint', 'photoGrain']));
+    expect(focus).not.toContain('ink');
+    expect(focus).not.toContain('paper');
+    expect(focus).not.toContain('font');
+    expect(focus).not.toContain('margin');
+  });
 });

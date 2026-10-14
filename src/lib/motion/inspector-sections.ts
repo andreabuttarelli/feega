@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ClipFamily } from './track-style';
 import type { LayoutStore } from './editor-layout';
 import { Control, Group } from './components';
+import { VAR_PREFIX } from './custom/component';
 import { FieldFill } from './number-field';
 import { Source, type Transform } from './keyframes';
 import { secondsLabel } from './inspector';
@@ -157,6 +158,10 @@ export function fieldSection(field: Sorted, typed: Typed): Section {
   }
   return KEY_SECTION[field.key] ?? CONTROL_SECTION[field.control] ?? GROUP_SECTION[field.group];
 }
+
+const UI_HIDDEN: ReadonlySet<string> = new Set([VAR_PREFIX]);
+
+export const uiHidden = (key: string): boolean => UI_HIDDEN.has(key);
 
 const SHADOWED_BY_TRANSFORM: Record<string, string> = { opacity: 'opacity', scale: 'scale', rotation: 'rotateZ' };
 

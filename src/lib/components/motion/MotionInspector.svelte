@@ -24,10 +24,12 @@
   import InspectorSection from './InspectorSection.svelte';
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
-  import { DIAL_KEYS, Part, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, transformSection, type SectionState } from '$lib/motion/inspector-sections';
+  import { DIAL_KEYS, Part, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
   import { clipName as layerName } from '$lib/motion/organize';
   import ColorField from './ColorField.svelte';
+  import Plus from '@lucide/svelte/icons/plus';
+  import { IconButton as ShellIconButton, Menu, MenuContent, MenuItem, MenuTrigger } from '$lib/components/ui/shell';
   import { hasSegments, segmentsOf } from '$lib/motion/segments';
   import SegmentedField from './SegmentedField.svelte';
   import FamilyIcon from './FamilyIcon.svelte';
@@ -154,6 +156,7 @@
   const fields = $derived(
     clipFieldGroups(doc, clip)
       .flatMap((g) => g.fields)
+      .filter((f) => !uiHidden(f.key))
       .filter((f) => !focus || focus.includes(f.key))
       .filter((f) => !shadowed(f.key, (clip.props as Record<string, unknown>)[f.key], f.fallback, transformKeys))
   );
@@ -278,13 +281,7 @@
     }
   }
 
-  function addEffectOf(select: HTMLSelectElement) {
-    const kind = select.value as EffectKind;
-    select.value = '';
-    if (kind) {
-      commit(addEffect(doc, clip.id, kind, crypto.randomUUID().slice(0, 8)), `Added ${EFFECTS[kind].label.toLowerCase()}`);
-    }
-  }
+  const addEffectOf = (kind: EffectKind) => commit(addEffect(doc, clip.id, kind, crypto.randomUUID().slice(0, 8)), `Added ${EFFECTS[kind].label.toLowerCase()}`);
 
   const shapeModifiers = $derived(clip.component === 'Shape' ? ((clip.props.modifiers as Modifier[]) ?? []) : []);
   const shapeMorphs = $derived(clip.component === 'Shape' ? ((clip.props.morphs as string[]) ?? []) : []);
@@ -380,6 +377,8 @@
     [Section.Parent]: visual || maskProps.length > 0
   });
 
+  const SECTION_ACTIONS: Partial<Record<Section, Snippet>> = $derived({ [Section.Effects]: addEffectMenu });
+
   const BODIES: Record<Section, Snippet> = $derived({
     [Section.Content]: contentBody,
     [Section.Layout]: layoutBody,
@@ -417,7 +416,7 @@
   {:else}
     {@render lead?.()}
     {#each sectionsFor(family, view, mode).filter((s) => has[s]) as section (section)}
-      <InspectorSection title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section) || (!!focus && fieldsIn(section).length > 0)} ontoggle={() => toggleSection(section)}>
+      <InspectorSection actions={SECTION_ACTIONS[section]} title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section) || (!!focus && fieldsIn(section).length > 0)} ontoggle={() => toggleSection(section)}>
         {@render BODIES[section]()}
       </InspectorSection>
     {/each}
@@ -774,6 +773,19 @@
   {@render groupFields(Section.Animate)}
 {/snippet}
 
+{#snippet addEffectMenu()}
+  <Menu>
+    <MenuTrigger>
+      {#snippet child({ props })}
+        <ShellIconButton {...props} label="Add effect" data-testid="add-effect"><Plus /></ShellIconButton>
+      {/snippet}
+    </MenuTrigger>
+    <MenuContent align="end">
+      {#each EFFECT_KINDS as kind (kind)}<MenuItem label={EFFECTS[kind].label} onSelect={() => addEffectOf(kind)} />{/each}
+    </MenuContent>
+  </Menu>
+{/snippet}
+
 {#snippet effectsBody()}
   <div class="stackable" data-testid="effects-section">
     {#each clip.effects as effect, i (effect.id)}
@@ -799,10 +811,7 @@
         {/each}
       </div>
     {/each}
-    <select class="add" aria-label="Add effect" data-testid="add-effect" value="" onchange={(e) => addEffectOf(e.currentTarget)}>
-      <option value="">Add effect…</option>
-      {#each EFFECT_KINDS as kind (kind)}<option value={kind}>{EFFECTS[kind].label}</option>{/each}
-    </select>
+    {#if !clip.effects.length}<p class="hint">No effects. Add one with +.</p>{/if}
   </div>
 {/snippet}
 
@@ -949,6 +958,7 @@
 
   .stackable {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 6px;
   }
 
@@ -998,8 +1008,9 @@
   .clock {
     display: flex;
     align-items: center;
-    height: 28px;
-    background: var(--ui-field);
+    height: var(--ui-row);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
     border: 1px solid transparent;
   }
 
@@ -1042,8 +1053,8 @@
     height: 28px;
     padding: 0 8px;
     border: 1px solid transparent;
-    border-radius: 0;
-    background: var(--ui-field);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
     color: var(--ui-ink);
     font: inherit;
   }
@@ -1125,7 +1136,7 @@
   .secondary {
     height: 28px;
     border: 1px solid var(--ui-line-strong);
-    border-radius: 0;
+    border-radius: var(--ui-radius-sm);
     background: var(--ui-bg);
     color: var(--ui-ink);
     padding: 0 var(--ui-space-2);
@@ -1276,8 +1287,8 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 18px;
-    height: 22px;
+    width: 16px;
+    height: 26px;
     border: 0;
     background: none;
     cursor: pointer;
@@ -1285,10 +1296,17 @@
 
   .key::before {
     content: '';
-    width: 7px;
-    height: 7px;
+    width: 5px;
+    height: 5px;
     transform: rotate(45deg);
-    border: 1.5px solid var(--ui-ink-3);
+    border: 1px solid var(--ui-ink-3);
+    opacity: 0.5;
+  }
+
+  .line:hover .key::before,
+  .key[data-mark='here']::before,
+  .key[data-mark='animated']::before {
+    opacity: 1;
   }
 
   .key[data-mark='here']::before {
@@ -1306,7 +1324,7 @@
     grid-template-columns: repeat(3, 8px);
     gap: 4px;
     padding: 4px;
-    background: var(--ui-field);
+    background: var(--ui-input);
   }
 
   .anchor button {
@@ -1315,7 +1333,7 @@
     padding: 0;
     border: 0;
     border-radius: 50%;
-    background: var(--ui-line-strong);
+    background: var(--ui-divider-strong);
   }
 
   .anchor button.on {
