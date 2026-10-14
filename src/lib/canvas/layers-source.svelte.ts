@@ -6,6 +6,7 @@ export type CanvasSide = {
   readonly nodes: readonly CanvasLayer[];
   readonly selected: readonly string[];
   readonly outlinesUrl: string;
+  previewUrl(nodeId: string): string;
   select(ids: string[]): void;
 };
 

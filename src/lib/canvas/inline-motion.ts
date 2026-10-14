@@ -53,6 +53,8 @@ const LAYERS: Record<NodeMode, Record<Paint, Layers>> = {
 
 export const nodeLayers = (mode: NodeMode, paint: Paint): Layers => LAYERS[mode][paint];
 
+export const ownPlayer = (mode: NodeMode, paint: Paint, live: boolean): boolean => live && nodeLayers(mode, paint).own;
+
 export enum Part {
   Body = 'body',
   Edges = 'edges',

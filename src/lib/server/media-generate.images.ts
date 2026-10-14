@@ -9,7 +9,7 @@ import { getBrandContext, getOrgContext } from '$lib/server/ai-log';
 import { NANO_BANANA_2_LITE } from '$lib/server/google-models';
 import { defaultImageModel } from '$lib/server/media-generate.image-model';
 import { generateImageOnOpenrouterImages } from '$lib/server/openrouter-images-api';
-import { GEMINI_NANO_BANANA_2, googleImageModel, imageModelSpec } from '$lib/image-models';
+import { GEMINI_NANO_BANANA_2, googleImageModel, rendersOnImagesApi } from '$lib/image-models';
 import { structured } from '$lib/server/research';
 import { signKnowledgePaths } from '$lib/server/media-archive';
 import { generateImageOnOpenrouter } from '$lib/server/openrouter-image';
@@ -320,7 +320,7 @@ export async function renderPostImage(
 
   const req = buildImageRequest(imagePrompt, opts);
   const imageModel = req.model;
-  if (imageModelSpec(imageModel)?.openrouterImages) {
+  if (rendersOnImagesApi(imageModel)) {
     const dataUrl = await generateImageOnOpenrouterImages(req, { context: `image:${imageModel}` });
     return await review(dataUrl);
   }

@@ -4,7 +4,7 @@ import { listMemberships } from '$lib/server/repos/orgs';
 import { findCanvasForUser } from '$lib/server/canvas/lookup';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { frameOutlines } from '$lib/server/motion/frame-outlines';
-import { HEADS_PARAM, parseHeads } from '$lib/canvas/frame-outlines';
+import { HEADS_PARAM, PARTS_PARAM, parseHeads, parseParts } from '$lib/canvas/frame-outlines';
 
 const HTTP_UNAUTHORIZED = 401;
 const HTTP_NOT_FOUND = 404;
@@ -21,5 +21,7 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
     throw error(HTTP_NOT_FOUND, 'This canvas does not exist, or is not yours');
   }
 
-  return json(await frameOutlines(db, { orgId: found.orgId, heads: parseHeads(url.searchParams.get(HEADS_PARAM) ?? '') }));
+  const heads = parseHeads(url.searchParams.get(HEADS_PARAM) ?? '');
+  const parts = parseParts(url.searchParams.get(PARTS_PARAM) ?? '{}');
+  return json(await frameOutlines(db, { orgId: found.orgId, heads, parts }));
 };

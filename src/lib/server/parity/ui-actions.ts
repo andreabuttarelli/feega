@@ -22,7 +22,6 @@ const CLIPBOARD = uiOnly('browser clipboard; the paste lands through a saved too
 const ONBOARDING = uiOnly('first-run coach for a person');
 const NAVIGATION = uiOnly('navigation between screens');
 
-const VOICES = 'custom voices (ElevenLabs design/clone/library) have no API route yet';
 
 export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   new_canvas: canvas('create_canvas'),
@@ -30,14 +29,14 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   delete_canvas: canvas('delete_canvas'),
   rename_project: canvas('rename_project'),
   audio_voices: tool('describe_node_types'),
-  voice_library: gap(VOICES),
-  voice_use_library: gap(VOICES),
-  voice_design: gap(VOICES),
-  voice_save: gap(VOICES),
-  voice_clone: gap(VOICES),
-  voice_delete: gap(VOICES),
+  voice_library: canvas('voice_library'),
+  voice_use_library: canvas('use_library_voice'),
+  voice_design: canvas('design_voice'),
+  voice_save: canvas('save_voice'),
+  voice_clone: canvas('clone_voice'),
+  voice_delete: canvas('delete_voice'),
   estimate_text_cost: uiOnly('cost hint under the prompt; agents read credits from preview_run_graph and preview_node_loop'),
-  upload: gap('binary upload into a canvas node; agents can only attach files to ask_motion_agent or import_asset into a frame'),
+  upload: canvas('register_upload'),
   snapshot: canvas('list_nodes'),
   revision: uiOnly('realtime freshness poll of the open canvas'),
   run: canvas('run_node'),
@@ -89,7 +88,7 @@ export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
   uploadFont: motion('register_font'),
   analyze: motion('analyze_audio'),
   sound: tool('ask_motion_agent'),
-  render: gap('server (farm) render: render_video refuses mode "server" over the API'),
+  render: tool('render_video'),
   renderBatch: tool('ask_motion_agent'),
   templateSounds: motion('add_template'),
   saveTemplate: motion('save_template'),

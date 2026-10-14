@@ -1,28 +1,22 @@
-# Layers: every frame's children, one selection, hover outline
+# Layers: every frame unfolded, posters with their parts
 
-Three defects in the Layers panel, fixed together because they share the row model in
-`src/lib/canvas/layers.ts`.
+**Before.** #505 listed closed frames from a batched `frame-outlines` read, but in production
+no frame showed children unless it was the open one. The read worked (200, rows in the body):
+the Layers `{#each}` keyed rows by `nodeId + id`, and a composition played by two clips lists
+its insides twice with the same ids. Svelte threw `each_key_duplicate` and the tree stopped at
+the node rows. Test docs never reused a scene; real canvases do.
 
-**Two rows selected.** `LayersPanel` kept its own `picked` list next to the canvas and editor
-selections and lit a row if any of the three named it. Pick node A in Layers, click node B on the
-canvas: A stayed lit. Now the panel holds no selection: `selectedLayers` derives it from the
-canvas and the open editor (the editor's picks stand in for the frame being edited, a part for
-its clip), and `rowPicked` also matches the frame, so a clip id shared by two frames lights up
-only in the open one. Shift and ⌘ both add/remove, as on the canvas; the old shift-range is gone.
+**Now.**
+- `LayerRow.key` is the row's path (`clip/track/clip#part`), unique in the tree; the panel keys on it.
+- Frames unfold by default; a chevron folds one, kept per frame in `localStorage` (`layer-folds.ts`).
+- Closed posters list their parts. Part ids exist only in the rendered DOM (`data-part`, set by
+  each template's JS), so the server cannot derive them without running component code. The panel
+  renders one closed poster at a time in a hidden `PartsProbe` (preview endpoint + player +
+  `measure()`), then asks `frame-outlines` again with `parts=` so labels come from the doc.
+  Probed once per revision.
 
-**Only the open frame unfolded.** Closed frames now list their tracks and clips from the latest
-saved revision. `GET /p/[projectId]/c/[canvasId]/frame-outlines?heads=id:version,...` reads every
-requested head in one `readHeads` query and answers `frameRows` per frame. The client caches by
-`nodeId:version` (`frame-outlines.ts`); a new `docHeadRevision` arriving via realtime on `nodes`
-changes the key, so only that frame is refetched. Closed-frame rows are read-only (`nested`).
-Clicking one selects the frame (which opens it inline) and then picks the child once the editor
-publishes.
+**Discarded.** Running template JS on the server (linkedom): executes user/agent-authored code.
+A per-template part registry: duplicates every view's markup and drifts.
 
-**Hover.** Hovering a row outlines its target in `--ui-hover-outline` (new token, violet, never
-the accent): the node on the canvas, a closed frame for any of its children, the clip or the
-poster part inside the open frame. Hovering a clip in the open frame lights its row back.
-
-Not done: a child of a *closed* frame outlines the whole frame, not its own box. Element boxes
-are measured in the browser by the renderer and never stored; storing them per revision is a
-separate change. Part rows (poster text blocks) likewise only appear once a frame is open, for
-the same reason.
+**Proof.** `tests/e2e/layers-closed-frames.spec.ts` (four frames incl. a reused scene and a
+poster; fold survives reload), red before each fix.

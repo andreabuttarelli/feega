@@ -2935,7 +2935,13 @@ produzione mostra il banner cookie: la spec mette il cookie di consenso, o il lo
 Signal: a batch of `@real` motion specs fails together (`motion-editor` never appears), each passes alone. Cause: a killed playwright run left `reuseExistingServer` on a dying dev server. Move: rerun on a clean server before judging a spec.
 
 ### A seeded e2e on production stalls production
-Signal: `@real` specs create and tear down orgs on the production Supabase project; a teardown froze production for 30 s. Move: run seeded e2e only against a non-production database; until one exists, unit and route tests with fakes.
+Signal: `@real` specs create and tear down orgs on the production Supabase project; a teardown froze production for 30 s. Move: run seeded e2e only against a non-production database; until one exists, unit and route tests with fakes. To confirm a user's slow request was ours: Supabase `edge_logs` around it, `DELETE /rest/v1/orgs` or `/auth/v1/admin/users` with `response.origin_time` > 10 s and every concurrent query at 2–13 s.
 
 ### An e2e keeps seeing the old component after an edit
 Signal: a `@real` spec reads a style or behaviour you already changed (a computed `z-index` still the old value) on a long-running `vite dev` in a worktree. Move: restart the dev server before believing the red; HMR does not always reach a component mounted inside the canvas.
+
+### A Svelte list that renders only its first level
+Signal: a keyed `{#each}` shows the top rows and nothing below, no error on screen; the data is in
+the network response. Cause: `each_key_duplicate` in the console (a composition reused by two
+clips repeats ids). Move: listen to `pageerror` in Playwright on a canvas with real docs; key rows
+by path, never by an id that can repeat.

@@ -11,14 +11,6 @@ const FRAME_PAGE = 'src/routes/p/[projectId]/c/[canvasId]/motion/[nodeId]/+page.
 const MCP_DOCS = 'docs/mcp-tools.md';
 
 const KNOWN_GAPS = [
-  'CANVAS_PAGE_ACTIONS.voice_library',
-  'CANVAS_PAGE_ACTIONS.voice_use_library',
-  'CANVAS_PAGE_ACTIONS.voice_design',
-  'CANVAS_PAGE_ACTIONS.voice_save',
-  'CANVAS_PAGE_ACTIONS.voice_clone',
-  'CANVAS_PAGE_ACTIONS.voice_delete',
-  'CANVAS_PAGE_ACTIONS.upload',
-  'FRAME_PAGE_ACTIONS.render'
 ];
 
 function formActions(file: string): string[] {
