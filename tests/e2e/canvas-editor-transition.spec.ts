@@ -61,7 +61,7 @@ test.describe('the canvas around the inline editor on desktop @real', () => {
   test('a still poster picked from the add bar becomes a frame on the canvas, saved', async ({ page, session, admin }) => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await page.getByTestId('frame-templates').click();
-    await page.locator('[data-mode-tab="still"]').click();
+    await page.getByRole('radio', { name: 'Still', exact: true }).click();
     await shoot(page, 'desktop-frame-templates');
     await page.locator('[data-mode="still"][data-component]').first().click();
 

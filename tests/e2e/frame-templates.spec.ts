@@ -30,11 +30,11 @@ test.describe('frame templates @real', () => {
 
       await viewport.open(page);
       const picker = page.getByRole('dialog', { name: 'Frame templates' });
-      await expect(picker.getByRole('heading', { name: 'frame templates' })).toBeVisible();
+      await expect(picker.getByRole('heading', { name: 'Frame templates' })).toBeVisible();
       await expect(picker.locator('video')).toHaveCount(0);
       await shoot(page, `${viewport.name}-picker`);
 
-      await picker.locator('[data-mode-tab="still"]').click();
+      await picker.getByRole('radio', { name: 'Still', exact: true }).click();
       await expect(picker.locator('[data-mode="video"]')).toHaveCount(0);
       await expect(picker.locator('section[data-shape="4:5"]')).toBeVisible();
       await shoot(page, `${viewport.name}-still`);
@@ -44,7 +44,7 @@ test.describe('frame templates @real', () => {
       await picker.getByRole('button', { name: 'Clear filters' }).click();
       await expect(picker.locator('[data-mode="video"]').first()).toBeVisible();
 
-      await picker.locator('[data-mode-tab="still"]').click();
+      await picker.getByRole('radio', { name: 'Still', exact: true }).click();
       await picker.getByTestId('component-search').fill('checker');
       await expect(picker.locator('[data-component]')).toHaveCount(1);
       await shoot(page, `${viewport.name}-search`);

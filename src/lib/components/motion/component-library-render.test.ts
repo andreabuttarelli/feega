@@ -29,10 +29,11 @@ describe('the frame templates picker', () => {
     const body = library();
 
     expect(body).toContain('aria-label="Frame templates"');
-    expect(body).toMatch(/<h2[^>]*>frame templates<\/h2>/);
+    expect(body).toMatch(/<h2[^>]*>Frame templates<\/h2>/);
     expect(body).toContain('placeholder="Search frame templates"');
-    expect(body).toContain('data-mode-tab="video"');
-    expect(body).toContain('data-mode-tab="still"');
+    expect(body).toMatch(/role="radiogroup"[^>]*aria-label="Video or still"/);
+    expect(body).toMatch(/role="radio"[^>]*>\s*Video\s*</);
+    expect(body).toMatch(/role="radio"[^>]*>\s*Still\s*</);
     expect(body).not.toMatch(/components/i);
   });
 
