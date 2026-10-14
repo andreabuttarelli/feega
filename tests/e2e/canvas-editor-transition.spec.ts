@@ -64,7 +64,6 @@ test.describe('the canvas around the inline editor on desktop @real', () => {
     await page.locator('[data-mode-tab="still"]').click();
     await shoot(page, 'desktop-frame-templates');
     await page.locator('[data-mode="still"][data-component]').first().click();
-    await page.getByTestId('insert-component').click();
 
     await expect(page.locator('[data-testid=motion-node]')).toHaveCount(1, { timeout: 15_000 });
     await expect

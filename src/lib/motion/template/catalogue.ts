@@ -1,8 +1,10 @@
-import { MotionFormat, formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { FORMATS, MotionFormat, formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { FIELD_TYPE_LABEL } from './field-model';
 import { insertTemplate, type Inserted, type TemplateEntry } from './library';
 import PREVIEWED from './previews.json';
 import { DocMode, docMode } from '$lib/motion/still';
+import { SectionRole } from './card';
+import { templateCard } from './cards';
 
 export enum ComponentKind {
   Component = 'component',
@@ -46,6 +48,8 @@ export type CatalogueItem = {
   kind: ComponentKind;
   mode: DocMode;
   format: StarterFormat;
+  native: MotionFormat;
+  roles: SectionRole[];
   fields: { label: string; type: string }[];
   preview: Preview | null;
 };
@@ -93,16 +97,46 @@ export function catalogue(entries: readonly TemplateEntry[]): CatalogueItem[] {
     kind: componentKind(e),
     mode: docMode(e.template.doc),
     format: starterFormatOf(e.template.doc),
+    native: formatOf(e.template.doc),
+    roles: templateCard(e.id)?.roles ?? [],
     fields: e.template.doc.fields.map((f) => ({ label: f.label, type: FIELD_TYPE_LABEL[f.type] })),
     preview: previewOf(e.id, docMode(e.template.doc))
   }));
   return items.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
 }
 
-export function matching(items: readonly CatalogueItem[], query: string, kind: ComponentKind | null, mode: DocMode | null = null): CatalogueItem[] {
+const searchable = (i: CatalogueItem) => `${i.name} ${i.description} ${i.roles.join(' ')}`.toLowerCase();
+
+export function matching(items: readonly CatalogueItem[], query: string, kind: ComponentKind | null, mode: DocMode | null = null, role: SectionRole | null = null): CatalogueItem[] {
   const words = query.trim().toLowerCase();
-  return items.filter((i) => (!kind || i.kind === kind) && (!mode || i.mode === mode) && (!words || `${i.name} ${i.description}`.toLowerCase().includes(words)));
+  return items.filter((i) => (!kind || i.kind === kind) && (!mode || i.mode === mode) && (!role || i.roles.includes(role)) && (!words || searchable(i).includes(words)));
 }
+
+export const rolesIn = (items: readonly CatalogueItem[]): SectionRole[] => Object.values(SectionRole).filter((r) => items.some((i) => i.roles.includes(r)));
+
+const SHAPE_RANK: Record<MotionFormat, number> = {
+  [MotionFormat.Landscape]: 0,
+  [MotionFormat.Vertical]: 1,
+  [MotionFormat.Portrait]: 2,
+  [MotionFormat.Poster]: 3,
+  [MotionFormat.Square]: 4,
+  [MotionFormat.SquareLarge]: 5
+};
+
+const SHAPE_ORDER = (Object.keys(SHAPE_RANK) as MotionFormat[]).sort((a, b) => SHAPE_RANK[a] - SHAPE_RANK[b]);
+
+export type ShapeGroup = { native: MotionFormat; items: CatalogueItem[] };
+
+export function byShape(items: readonly CatalogueItem[]): ShapeGroup[] {
+  return SHAPE_ORDER.map((native) => ({ native, items: items.filter((i) => i.native === native) })).filter((g) => g.items.length);
+}
+
+const LENGTH: Record<DocMode, (i: CatalogueItem) => string> = {
+  [DocMode.Video]: (i) => `${Math.round(i.seconds * 10) / 10}s`,
+  [DocMode.Still]: () => 'still'
+};
+
+export const metaLine = (i: CatalogueItem): string => `${FORMATS[i.native].label} · ${LENGTH[i.mode](i)}`;
 
 export const POSTER_FORMATS = [MotionFormat.Portrait, MotionFormat.Vertical, MotionFormat.Poster] as const;
 export type PosterFormat = (typeof POSTER_FORMATS)[number];

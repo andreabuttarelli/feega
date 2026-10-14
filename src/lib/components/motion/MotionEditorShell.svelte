@@ -1700,8 +1700,8 @@
                   <button type="button" role="menuitem" onclick={() => startTemplate(id)}>{AD_TEMPLATES[id].label}</button>
                 {/each}
                 <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
-                <span class="menu-head">Components</span>
-                <button type="button" role="menuitem" data-testid="open-components" onclick={() => ((adding = false), (componentsOpen = true))}>Browse components…</button>
+                <span class="menu-head">Frame templates</span>
+                <button type="button" role="menuitem" data-testid="open-components" onclick={() => ((adding = false), (componentsOpen = true))}>Browse frame templates…</button>
                 <span class="menu-head">Templates</span>
                 <button type="button" role="menuitem" data-testid="open-templates" onclick={() => ((adding = false), (browseFirst = null), (browsing = true))}>Browse templates…</button>
                 <span class="menu-head">Audio</span>

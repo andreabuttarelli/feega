@@ -1,13 +1,16 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import type { AssetKind } from '$lib/motion/components';
   import IconButton from './IconButton.svelte';
-  import ComponentPreview from './ComponentPreview.svelte';
   import ComponentDetail from './ComponentDetail.svelte';
   import { Action } from '$lib/motion/actions';
-  import { Dismiss, dismissFrom, gridStep } from '$lib/motion/template/browser';
+  import { FORMATS, MotionFormat } from '$lib/motion/doc';
+  import { Dismiss, dismissFrom, spatialStep } from '$lib/motion/template/browser';
   import { DocMode } from '$lib/motion/still';
-  import { AddTarget, ComponentKind, KIND_LABEL, matching, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
+  import type { SectionRole } from '$lib/motion/template/card';
+  import { ADD_TARGET, AddTarget, byShape, matching, metaLine, rolesIn, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
   import type { Instance } from '$lib/motion/template/library';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
@@ -32,35 +35,87 @@
     onclose: () => void;
   } = $props();
 
-  const KINDS = Object.values(ComponentKind).filter((k) => items.some((i) => i.kind === k));
+  const MODE_LABEL: Record<DocMode, string> = { [DocMode.Video]: 'Video', [DocMode.Still]: 'Still' };
+
+  const CARD_MIN_PX: Record<MotionFormat, number> = {
+    [MotionFormat.Landscape]: 280,
+    [MotionFormat.Vertical]: 150,
+    [MotionFormat.Portrait]: 180,
+    [MotionFormat.Poster]: 170,
+    [MotionFormat.Square]: 200,
+    [MotionFormat.SquareLarge]: 200
+  };
+
+  const HOVER = '(hover: hover)';
 
   let query = $state('');
-  let kind = $state<ComponentKind | null>(null);
   let mode = $state<DocMode | null>(null);
-  const MODE_LABEL: Record<DocMode, string> = { [DocMode.Video]: 'Videos', [DocMode.Still]: 'Stills' };
+  let role = $state<SectionRole | null>(null);
   let openId = $state<string | null>(null);
-  let grid = $state<HTMLUListElement | null>(null);
+  let playing = $state<string | null>(null);
+  let grid = $state<HTMLDivElement | null>(null);
+  let search = $state<HTMLInputElement | null>(null);
+  const loaded = new SvelteSet<string>();
 
-  const shown = $derived(matching(items, query, kind, mode));
+  const roles = $derived(rolesIn(matching(items, '', null, mode)));
+  const shown = $derived(matching(items, query, null, mode, role));
+  const groups = $derived(byShape(shown));
+  const ordered = $derived(groups.flatMap((g) => g.items));
   const open = $derived(items.find((i) => i.id === openId) ?? null);
+  const filtered = $derived(Boolean(query.trim() || mode || role));
+
+  onMount(() => {
+    if (matchMedia(HOVER).matches) {
+      search?.focus();
+    }
+  });
 
   const cards = () => [...(grid?.querySelectorAll<HTMLButtonElement>('[data-component]') ?? [])];
-  const columns = () => {
-    const [first, ...rest] = cards();
-    return first ? 1 + rest.filter((c) => c.offsetTop === first.offsetTop).length : 1;
-  };
+
+  function pick(item: CatalogueItem) {
+    onpick(item.id, ADD_TARGET[target].sounds, null);
+  }
+
+  function setMode(next: DocMode | null) {
+    mode = next;
+    if (role && !rolesIn(matching(items, '', null, next)).includes(role)) {
+      role = null;
+    }
+  }
+
+  function clearFilters() {
+    query = '';
+    mode = null;
+    role = null;
+    search?.focus();
+  }
+
+  function preview(id: string) {
+    if (matchMedia(HOVER).matches) {
+      playing = id;
+    }
+  }
+
+  function rest(id: string) {
+    if (playing === id) {
+      playing = null;
+    }
+  }
+
+  function ready(img: HTMLImageElement, id: string) {
+    const done = () => loaded.add(id);
+    if (img.complete && img.naturalWidth) {
+      done();
+      return;
+    }
+    img.addEventListener('load', done, { once: true });
+  }
 
   async function closeDetail() {
     const id = openId;
     openId = null;
     await tick();
     cards().find((c) => c.dataset.component === id)?.focus();
-  }
-
-  function outside(e: MouseEvent) {
-    if (open && e.target === e.currentTarget) {
-      void closeDetail();
-    }
   }
 
   function onkeydown(e: KeyboardEvent) {
@@ -75,54 +130,106 @@
     onclose();
   }
 
+  function fromSearch(e: KeyboardEvent) {
+    if (e.key !== 'ArrowDown') {
+      return;
+    }
+    e.preventDefault();
+    cards()[0]?.focus();
+  }
+
   function move(e: KeyboardEvent, at: number) {
-    const next = gridStep(at, e.key, { count: shown.length, columns: columns() });
+    const all = cards();
+    const next = spatialStep(
+      all.map((c) => c.getBoundingClientRect()),
+      at,
+      e.key
+    );
     if (next === null) {
       return;
     }
     e.preventDefault();
-    cards()[next]?.focus();
+    all[next]?.focus();
   }
 </script>
 
 <svelte:window {onkeydown} />
 
 <div class="scrim" role="presentation" onclick={onclose}></div>
-<div class="dialog" class:open={Boolean(open)} role="dialog" aria-modal="true" aria-label="Components" data-testid="component-library">
-  <div class="browse" role="presentation" onclick={outside}>
+<div class="dialog" class:open={Boolean(open)} role="dialog" aria-modal="true" aria-label="Frame templates" data-testid="component-library">
+  <div class="browse">
     <header>
-      <h2>components</h2>
-      <input type="search" placeholder="Search components" aria-label="Search components" bind:value={query} data-testid="component-search" />
+      <h2>frame templates</h2>
       <IconButton action={Action.Close} onclick={onclose} />
     </header>
 
-    <div class="kinds" role="tablist" aria-label="Video or still">
-      <button type="button" role="tab" aria-selected={mode === null} class:on={mode === null} onclick={() => (mode = null)}>Both</button>
-      {#each Object.values(DocMode) as m (m)}
-        <button type="button" role="tab" aria-selected={mode === m} class:on={mode === m} data-mode-tab={m} onclick={() => (mode = m)}>{MODE_LABEL[m]}</button>
-      {/each}
+    <div class="bar">
+      <input bind:this={search} type="search" placeholder="Search frame templates" aria-label="Search frame templates" bind:value={query} onkeydown={fromSearch} data-testid="component-search" />
+      <div class="segmented" role="tablist" aria-label="Video or still">
+        <button type="button" role="tab" aria-selected={mode === null} class:on={mode === null} onclick={() => setMode(null)}>All</button>
+        {#each Object.values(DocMode) as m (m)}
+          <button type="button" role="tab" aria-selected={mode === m} class:on={mode === m} data-mode-tab={m} onclick={() => setMode(m)}>{MODE_LABEL[m]}</button>
+        {/each}
+      </div>
     </div>
 
-    <div class="kinds" role="tablist" aria-label="Category">
-      <button type="button" role="tab" aria-selected={kind === null} class:on={kind === null} onclick={() => (kind = null)}>All</button>
-      {#each KINDS as k (k)}
-        <button type="button" role="tab" aria-selected={kind === k} class:on={kind === k} data-kind={k} onclick={() => (kind = k)}>{KIND_LABEL[k]}</button>
-      {/each}
-    </div>
+    {#if roles.length}
+      <div class="roles" role="group" aria-label="Role">
+        {#each roles as r (r)}
+          <button type="button" aria-pressed={role === r} class:on={role === r} data-role={r} onclick={() => (role = role === r ? null : r)}>{r}</button>
+        {/each}
+      </div>
+    {/if}
 
-    <ul class="grid" bind:this={grid} role="presentation" onclick={outside} data-testid="component-grid">
-      {#each shown as item, i (item.id)}
-        <li>
-          <button type="button" class="card" class:on={item.id === openId} aria-pressed={item.id === openId} data-component={item.id} data-mode={item.mode} onclick={() => (openId = item.id)} onkeydown={(e) => move(e, i)}>
-            <ComponentPreview preview={item.preview} name={item.name} />
-            <span class="name">{item.name}</span>
-            {#if item.description}<span class="line">{item.description}</span>{/if}
-          </button>
-        </li>
+    <div class="scroll" bind:this={grid} data-testid="component-grid">
+      {#each groups as g (g.native)}
+        <section data-shape={FORMATS[g.native].label} aria-label={FORMATS[g.native].label}>
+          <ul class="grid" style:--card-min={`${CARD_MIN_PX[g.native]}px`}>
+            {#each g.items as item (item.id)}
+              {@const at = ordered.indexOf(item)}
+              <li class="card" class:on={item.id === openId}>
+                <button
+                  type="button"
+                  class="pick"
+                  aria-label={`Add ${item.name}`}
+                  data-component={item.id}
+                  data-mode={item.mode}
+                  onclick={() => pick(item)}
+                  onkeydown={(e) => move(e, at)}
+                  onpointerenter={() => preview(item.id)}
+                  onpointerleave={() => rest(item.id)}
+                  onfocus={() => preview(item.id)}
+                  onblur={() => rest(item.id)}
+                >
+                  <span class="thumb" class:ready={!item.preview || loaded.has(item.id)} style:aspect-ratio={`${FORMATS[item.native].width} / ${FORMATS[item.native].height}`}>
+                    {#if item.preview}
+                      <img src={item.preview.poster} alt="" loading="lazy" decoding="async" use:ready={item.id} />
+                      {#if playing === item.id && item.preview.video}<video src={item.preview.video} poster={item.preview.poster} muted loop playsinline autoplay preload="auto"></video>{/if}
+                    {:else}
+                      <span class="blank">{item.name}</span>
+                    {/if}
+                  </span>
+                  <span class="name">{item.name}</span>
+                  <span class="meta">{metaLine(item)}</span>
+                </button>
+                <button type="button" class="more" aria-label={`Customise ${item.name}`} data-testid="template-details" onclick={() => (openId = item.id)}>
+                  <SlidersHorizontal size={14} />
+                </button>
+              </li>
+            {/each}
+          </ul>
+        </section>
       {:else}
-        <li class="none">No component matches.</li>
+        <div class="none" data-testid="frame-templates-empty">
+          {#if filtered}
+            <p>No frame template matches.</p>
+            <button type="button" onclick={clearFilters}>Clear filters</button>
+          {:else}
+            <p>No frame templates yet.</p>
+          {/if}
+        </div>
       {/each}
-    </ul>
+    </div>
   </div>
 
   {#if open}
@@ -138,7 +245,7 @@
     position: fixed;
     inset: 0;
     z-index: 40;
-    background: rgb(0 0 0 / 0.4);
+    background: rgb(0 0 0 / 0.5);
   }
 
   .dialog {
@@ -146,14 +253,14 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: min(1180px, calc(100vw - 32px));
-    height: min(760px, calc(100dvh - 32px));
+    width: min(1240px, calc(100vw - 48px));
+    height: min(860px, calc(100dvh - 48px));
     z-index: 41;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     background: var(--ui-bg);
     color: var(--ui-ink);
-    border: 1px solid var(--ui-line);
+    box-shadow: 0 24px 80px rgb(0 0 0 / 0.25);
   }
 
   .dialog.open {
@@ -163,77 +270,139 @@
   .browse {
     display: flex;
     flex-direction: column;
-    gap: 12px;
     min-height: 0;
-    padding: 16px;
+    padding: var(--ui-space-6) var(--ui-space-6) 0;
+    gap: var(--ui-space-4);
   }
 
   header {
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: space-between;
+    gap: var(--ui-space-4);
   }
 
   h2 {
     margin: 0;
-    font-size: 22px;
+    font-size: 32px;
     font-weight: 600;
+    line-height: 0.95;
     letter-spacing: -0.04em;
   }
 
-  header input {
+  .bar {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-3);
+  }
+
+  .bar input {
     flex: 1;
     min-width: 0;
-    height: 32px;
-    padding: 0 10px;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-surface);
+    height: 40px;
+    padding: 0 var(--ui-space-3);
+    border: 0;
+    background: var(--ui-field);
     color: inherit;
     font: inherit;
     font-size: 16px;
   }
 
-  .kinds {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
+  .bar input:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus);
   }
 
-  .kinds button {
+  .segmented {
     flex: none;
-    height: 30px;
-    padding: 0 14px;
-    border: 1px solid var(--ui-line);
+    display: flex;
+    padding: 3px;
+    border-radius: 9999px;
+    background: var(--ui-field);
+  }
+
+  .segmented button {
+    height: 34px;
+    padding: 0 16px;
+    border: 0;
     border-radius: 9999px;
     background: none;
     color: var(--ui-ink-2);
     font: inherit;
-    font-size: 13px;
+    font-size: var(--ui-text-md);
+    cursor: pointer;
   }
 
-  .kinds button.on {
-    background: var(--ui-ink);
-    color: var(--ui-bg);
-    border-color: var(--ui-ink);
+  .segmented button.on {
+    background: var(--ui-bg);
+    color: var(--ui-ink);
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+  }
+
+  .roles {
+    display: flex;
+    gap: var(--ui-space-1);
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 calc(-1 * var(--ui-space-2));
+  }
+
+  .roles button {
+    flex: none;
+    height: 30px;
+    padding: 0 var(--ui-space-3);
+    border: 0;
+    border-radius: 9999px;
+    background: none;
+    color: var(--ui-ink-2);
+    font: inherit;
+    font-size: var(--ui-text-md);
+    cursor: pointer;
+  }
+
+  .roles button:hover {
+    background: var(--ui-hover);
+  }
+
+  .roles button.on {
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent);
+  }
+
+  .segmented button:focus-visible,
+  .roles button:focus-visible,
+  .none button:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus);
+  }
+
+  .scroll {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: var(--ui-space-1) 0 var(--ui-space-8);
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-8);
   }
 
   .grid {
     list-style: none;
     margin: 0;
-    padding: 2px;
-    flex: 1;
-    overflow: auto;
+    padding: 0;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 20px 14px;
-    align-content: start;
+    grid-template-columns: repeat(auto-fill, minmax(min(var(--card-min), 100%), 1fr));
+    gap: var(--ui-space-6) var(--ui-space-4);
+    align-items: start;
   }
 
   .card {
+    position: relative;
+  }
+
+  .pick {
     display: flex;
     flex-direction: column;
-    gap: 2px;
     width: 100%;
     padding: 0;
     border: 0;
@@ -244,31 +413,158 @@
     cursor: pointer;
   }
 
-  .card:focus-visible {
-    outline: 2px solid var(--ui-ink);
-    outline-offset: 2px;
+  .pick:focus-visible {
+    outline: none;
   }
 
-  .card.on :global(.preview) {
-    outline: 2px solid var(--ui-ink);
+  .pick:focus-visible .thumb,
+  .card.on .thumb {
+    box-shadow: var(--ui-focus);
+  }
+
+  .thumb {
+    position: relative;
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    background: var(--ui-surface);
+  }
+
+  .thumb:not(.ready)::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, var(--ui-hover), transparent);
+    animation: shimmer 1.2s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .thumb:not(.ready)::after {
+      animation: none;
+    }
+  }
+
+  img,
+  video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  img {
+    opacity: 0;
+    transition: opacity 200ms ease-out;
+  }
+
+  .thumb.ready img {
+    opacity: 1;
+  }
+
+  .pick:hover .thumb img,
+  .pick:hover .thumb video {
+    transform: scale(1.02);
+    transition:
+      transform 400ms cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 200ms ease-out;
+  }
+
+  .blank {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    padding: var(--ui-space-2);
+    font-size: var(--ui-text-sm);
+    color: var(--ui-text-3);
+    text-align: center;
   }
 
   .name {
-    margin-top: 8px;
-    font-size: 14px;
-    font-weight: 500;
-  }
-
-  .line {
+    margin-top: var(--ui-space-2);
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-size: 12px;
-    color: var(--ui-ink-2);
+    font-size: var(--ui-text-lg);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  .meta {
+    margin-top: 2px;
+    font-family: var(--ui-mono);
+    font-size: var(--ui-text-xs);
+    color: var(--ui-text-2);
+  }
+
+  .more {
+    position: absolute;
+    top: var(--ui-space-2);
+    right: var(--ui-space-2);
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 9999px;
+    background: rgb(0 0 0 / 0.55);
+    color: #fff;
+    opacity: 0;
+    cursor: pointer;
+    transition: opacity 150ms ease-out;
+  }
+
+  .card:hover .more,
+  .card:focus-within .more,
+  .more:focus-visible {
+    opacity: 1;
+  }
+
+  .more:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus);
+  }
+
+  @media (hover: none) {
+    .more {
+      opacity: 1;
+    }
   }
 
   .none {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--ui-space-3);
+    padding: var(--ui-space-8) 0;
     color: var(--ui-ink-2);
+  }
+
+  .none p {
+    margin: 0;
+    font-size: var(--ui-text-lg);
+  }
+
+  .none button {
+    height: 36px;
+    padding: 0 var(--ui-space-4);
+    border: 0;
+    border-radius: 9999px;
+    background: var(--ui-field);
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-md);
+    cursor: pointer;
   }
 
   .sheet-scrim {
@@ -282,12 +578,40 @@
       transform: none;
       width: 100vw;
       height: 100dvh;
-      border: 0;
+      box-shadow: none;
       grid-template-columns: minmax(0, 1fr);
+    }
+
+    .browse {
+      padding: var(--ui-space-4) var(--ui-space-4) 0;
+      gap: var(--ui-space-3);
+    }
+
+    h2 {
+      font-size: 28px;
+    }
+
+    .bar {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .segmented button {
+      flex: 1;
+      height: 38px;
+    }
+
+    .roles button {
+      height: 36px;
     }
 
     .grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--ui-space-4) var(--ui-space-3);
+    }
+
+    section[data-shape='16:9'] .grid {
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .sheet-scrim {
@@ -305,8 +629,6 @@
       bottom: 0;
       z-index: 2;
       max-height: 88dvh;
-      border-left: 0;
-      border-top: 1px solid var(--ui-line);
     }
   }
 </style>
