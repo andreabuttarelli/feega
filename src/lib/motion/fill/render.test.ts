@@ -146,9 +146,14 @@ describe('fill stack on text', () => {
     expect(css).toMatchObject({ backgroundClip: 'text', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent' });
   });
 
+  it('a picture url never closes the style attribute it is written in', () => {
+    const css = textPaint(stack([{ type: 'image', src: `https://x/a"b'c.png` }, { type: 'solid', color: '#000000', opacity: 0.2 }]), paint.color, () => null);
+    expect(css.backgroundImage).toContain("url('https://x/a%22b%27c.png')");
+  });
+
   it('a picture fills the glyphs with its fit and focus', () => {
     const css = text([{ type: 'image', assetId: 'pic', fit: 'cover', focus: { x: 0.2, y: 0.8 } }, { type: 'solid', color: '#000000', opacity: 0.2 }]);
-    expect(css.backgroundImage).toContain('url("https://cdn/pic.png")');
+    expect(css.backgroundImage).toContain("url('https://cdn/pic.png')");
     expect(css.backgroundSize).toBe('auto,cover');
     expect(css.backgroundPosition).toBe('0% 0%,20% 80%');
   });

@@ -104,6 +104,7 @@ const TEXT_TILE_SHARE = 25;
 const faded = (colour: string, opacity: number) => withAlpha(colour, colourAlpha(colour).alpha * opacity, (c) => c);
 const cssStops = (stops: Stop[], opacity: number) => [...stops].sort((a, b) => a.pos - b.pos).map((s) => `${faded(s.color, opacity)} ${round(s.pos * 100)}%`).join(',');
 const cssAt = (p: { x: number; y: number }) => `${round(p.x * 100)}% ${round(p.y * 100)}%`;
+const quotedUrl = (src: string) => src.replaceAll('"', '%22').replaceAll("'", '%27');
 const flat = (image: string): TextLayer => ({ image, size: 'auto', position: ORIGIN, repeat: 'no-repeat' });
 
 const IMAGE_SIZE: Record<ImageFit, (scale: number) => string> = {
@@ -117,7 +118,7 @@ const TEXT_LAYER: { [T in FillType]: (f: FillOf<T>) => TextLayer } = {
   [FillType.Solid]: (f) => flat(`linear-gradient(${faded(f.color, f.opacity)},${faded(f.color, f.opacity)})`),
   [FillType.Linear]: (f) => flat(`linear-gradient(${round(f.angle + 90)}deg,${cssStops(f.stops, f.opacity)})`),
   [FillType.Radial]: (f) => flat(`radial-gradient(${round(f.radius * 50)}% ${round(f.radius * 50)}% at ${cssAt(f.center)},${cssStops(f.stops, f.opacity)})`),
-  [FillType.Image]: (f) => ({ image: `url("${f.src}")`, size: IMAGE_SIZE[f.fit](f.scale), position: cssAt(f.focus), repeat: f.fit === ImageFit.Tile ? 'repeat' : 'no-repeat' })
+  [FillType.Image]: (f) => ({ image: `url('${quotedUrl(f.src ?? '')}')`, size: IMAGE_SIZE[f.fit](f.scale), position: cssAt(f.focus), repeat: f.fit === ImageFit.Tile ? 'repeat' : 'no-repeat' })
 };
 
 const plainColour = (fills: Fill[]) => fills.length === 1 && fills[0].type === FillType.Solid && fills[0].opacity === 1 && fills[0].blend === BlendMode.Normal;

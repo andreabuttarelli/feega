@@ -146,7 +146,18 @@
       }}
     >
       <span class="cursor-grab text-ui-text-3 select-none" aria-hidden="true">⋮</span>
-      <span class="dim size-[18px] rounded-xs border border-ui-divider" style={`background:${SWATCH[fill.type](fill)}`}></span>
+      <button
+        type="button"
+        class={cn('dim size-[18px] rounded-xs border border-ui-divider p-0', FOCUS_RING)}
+        data-testid="fill-swatch"
+        aria-label={`Edit ${TYPE_LABEL[fill.type].toLowerCase()} fill`}
+        aria-expanded={open === index}
+        style={`background:${SWATCH[fill.type](fill)}`}
+        onclick={(e) => {
+          e.stopPropagation();
+          toggle(index);
+        }}
+      ></button>
       <select class={cn(FIELD_INPUT, 'dim')} data-testid="fill-type" aria-label="Fill type" value={fill.type} onclick={(e) => e.stopPropagation()} onchange={(e) => onchange(retypeFill(fills, index, e.currentTarget.value as FillType), 'Change fill type')}>
         {#each FILL_TYPES as type (type)}<option value={type}>{TYPE_LABEL[type]}</option>{/each}
       </select>

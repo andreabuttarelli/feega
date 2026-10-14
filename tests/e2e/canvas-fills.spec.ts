@@ -83,14 +83,21 @@ function boxDoc(assetId: string) {
     component: 'Shape',
     props: { shape: 'rect', x: 0.5, y: 0.5, width: 0.7, height: 0.6, fills }
   };
+  const title = {
+    id: 'title',
+    from: 0,
+    durationInFrames: 150,
+    component: 'Title',
+    props: { text: 'FILLED\nTYPE', y: 0.85, height: 0.25, fills: [{ type: 'linear-gradient', angle: 0, stops: [{ color: '#ffd400', pos: 0 }, { color: '#ff2d55', pos: 1 }] }, { type: 'image', assetId, fit: 'cover', opacity: 0.5, blend: 'multiply' }] }
+  };
   return {
     version: 5,
     fps: 30,
     width: 1080,
     height: 1350,
     durationInFrames: 150,
-    still: { frame: 0 },
-    tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [box] }],
+    still: { frame: 90 },
+    tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [box, title] }],
     comps: {},
     assets: [{ id: assetId, kind: 'image' }]
   };
@@ -154,9 +161,10 @@ test.describe('fill stacks @real', () => {
       timeout: 15_000
     });
 
-    const stack = page.getByTestId('motion-inspector').getByTestId('fill-stack');
+    await page.getByRole('tab', { name: 'Properties' }).click();
+    const stack = page.getByTestId('motion-inspector').getByTestId('fill-stack').first();
     await expect(stack.getByTestId('fill-row')).toHaveCount(3);
-    await stack.getByTestId('fill-row').nth(1).click();
+    await stack.getByTestId('fill-row').nth(1).getByTestId('fill-swatch').click();
     await expect(stack.getByTestId('fill-editor')).toBeVisible();
     await shoot(page, 'box-fill-stack');
 
@@ -164,6 +172,9 @@ test.describe('fill stacks @real', () => {
     await expect.poll(async () => clipOf(await head(admin, node.id), 'box')?.props.fills?.[2].visible, { timeout: 10_000 }).toBe(false);
 
     await stack.getByTestId('fill-add').click();
+    await expect(stack.getByTestId('fill-add-menu')).toBeVisible();
+    await shoot(page, 'fill-add-menu');
+    await stack.getByTestId('fill-add-solid').click();
     await expect.poll(async () => clipOf(await head(admin, node.id), 'box')?.props.fills?.map((f) => f.type), { timeout: 10_000 }).toEqual(['linear-gradient', 'image', 'solid', 'solid']);
   });
 
@@ -194,12 +205,13 @@ test.describe('fill stacks @real', () => {
 
     const photo = page.getByTestId('part-photo');
     await photo.getByTestId('fill-add').click();
-    await photo.getByTestId('fill-row').first().getByTestId('fill-type').selectOption('image');
-    await photo.getByTestId('fill-row').first().click();
+    await photo.getByTestId('fill-add-image').click();
+    await photo.getByTestId('fill-swatch').first().click();
     await photo.getByTestId('fill-asset').first().click();
     await expect.poll(async () => clipOf(await head(admin, node.id), 'poster')?.props.media?.[0], { timeout: 10_000 }).toMatchObject({ assetId, fills: [{ type: 'image', assetId }] });
 
     await photo.getByTestId('fill-add').click();
+    await photo.getByTestId('fill-add-solid').click();
     await photo.getByTestId('fill-row').first().getByTestId('fill-opacity').fill('40');
     await photo.getByTestId('fill-row').first().getByTestId('fill-opacity').press('Enter');
     await expect.poll(async () => clipOf(await head(admin, node.id), 'poster')?.props.media?.[0].fills?.map((f) => f.type), { timeout: 10_000 }).toEqual(['image', 'solid']);

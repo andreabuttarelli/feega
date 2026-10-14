@@ -103,6 +103,12 @@ describe('the fill stack in Properties', () => {
     expect(sent(onchange)[0]).toMatchObject({ type: 'linear-gradient', stops: [{ color: '#111111', pos: 0 }, { color: '#ffffff', pos: 1 }] });
   });
 
+  it('the swatch opens the layer editor', () => {
+    show(TWO);
+    click(inRow(0, 'fill-swatch'));
+    expect(document.querySelectorAll('[data-testid="fill-editor"]')).toHaveLength(1);
+  });
+
   it('a layer shows only its own type fields', () => {
     show(stack([{ type: 'solid', color: '#000000' }]));
     click(rows()[0]);

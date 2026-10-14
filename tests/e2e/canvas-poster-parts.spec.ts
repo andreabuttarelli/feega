@@ -118,6 +118,7 @@ test.describe('poster parts on the canvas @real', () => {
     await expect(page.getByTestId('poster-part')).toHaveAttribute('data-kind', 'photo');
     await expect(page.getByTestId('part-photo')).toBeVisible();
     await page.getByTestId('part-photo').getByTestId('fill-add').click();
+    await page.getByTestId('part-photo').getByTestId('fill-add-solid').click();
     await shoot(page, '16-photo-part');
 
     await expect
