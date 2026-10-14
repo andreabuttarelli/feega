@@ -1,7 +1,9 @@
 import { cornerRadii, ellipseOutline, parsePath, pathData, polygonOutline, rectOutline, scaled, starOutline, type Outline, type Size } from './geometry';
 import { morphOutline } from './morph';
 import { IDENTITY, applyModifiers, modifierFilter, modifierReach, type AppliedModifier, type Layer } from './modifiers';
-import { FillKind, ShapeKind, StrokeKind, modifierValues, type Modifier } from './schema';
+import { ShapeKind, StrokeKind, modifierValues, type Modifier } from './schema';
+import { fillsOf } from '../fill/model';
+import { svgFills } from '../fill/render';
 
 export type ShapeLook = {
   shape: ShapeKind;
@@ -15,7 +17,8 @@ export type ShapeLook = {
   morph: number;
   morphStart: number;
   modifiers: Modifier[];
-  fillKind: FillKind;
+  fills?: unknown;
+  fillKind: string;
   fill: string;
   fill2: string;
   gradientAngle: number;
@@ -29,7 +32,7 @@ export type ShapeLook = {
   join: string;
 };
 
-export type Paint = { id: string; size: Size; unit: number; time: number; color: (value: string) => string };
+export type Paint = { id: string; size: Size; unit: number; time: number; color: (value: string) => string; asset?: (id: string | null) => string | null };
 
 const DIGITS = 1000;
 const round = (n: number) => Math.round(n * DIGITS) / DIGITS;
@@ -101,24 +104,14 @@ function filterOf(p: ShapeLook, paint: Paint, extent: Extent | null): string {
   return `<filter id="${filterId(paint.id)}" filterUnits="userSpaceOnUse" x="${round(extent.left)}" y="${round(extent.top)}" width="${round(extent.right - extent.left)}" height="${round(extent.bottom - extent.top)}" color-interpolation-filters="sRGB">${primitives}</filter>`;
 }
 
-function gradient(p: ShapeLook, paint: Paint): string {
+function strokeGradient(p: ShapeLook, paint: Paint): string {
   const { w, h } = paint.size;
   const stops = `<stop offset="0" style="stop-color:${paint.color(p.fill)}"/><stop offset="1" style="stop-color:${paint.color(p.fill2)}"/>`;
-  if (p.fillKind === FillKind.Radial) {
-    return `<radialGradient id="${gradientId(paint.id)}" gradientUnits="userSpaceOnUse" cx="${round(w / 2)}" cy="${round(h / 2)}" r="${round(Math.max(w, h) / 2)}">${stops}</radialGradient>`;
-  }
   const r = (p.gradientAngle * Math.PI) / 180;
   const dx = (Math.cos(r) * w) / 2;
   const dy = (Math.sin(r) * h) / 2;
   return `<linearGradient id="${gradientId(paint.id)}" gradientUnits="userSpaceOnUse" x1="${round(w / 2 - dx)}" y1="${round(h / 2 - dy)}" x2="${round(w / 2 + dx)}" y2="${round(h / 2 + dy)}">${stops}</linearGradient>`;
 }
-
-const FILL: Record<FillKind, (p: ShapeLook, paint: Paint) => string> = {
-  [FillKind.Solid]: (p, paint) => paint.color(p.fill),
-  [FillKind.Linear]: (_p, paint) => `url(#${gradientId(paint.id)})`,
-  [FillKind.Radial]: (_p, paint) => `url(#${gradientId(paint.id)})`,
-  [FillKind.None]: () => 'none'
-};
 
 const STROKE: Record<StrokeKind, (p: ShapeLook, paint: Paint) => string> = {
   [StrokeKind.None]: () => 'none',
@@ -126,14 +119,15 @@ const STROKE: Record<StrokeKind, (p: ShapeLook, paint: Paint) => string> = {
   [StrokeKind.Gradient]: (_p, paint) => `url(#${gradientId(paint.id)})`
 };
 
-const usesGradient = (p: ShapeLook) => p.fillKind === FillKind.Linear || p.fillKind === FillKind.Radial || p.strokeKind === StrokeKind.Gradient;
-
-function paintStyle(p: ShapeLook, paint: Paint): string {
-  const stroke = STROKE[p.strokeKind](p, paint);
+function strokeGroup(p: ShapeLook, paint: Paint, paths: string): string {
+  if (p.strokeKind === StrokeKind.None) {
+    return '';
+  }
   const dashed = p.dash > 0 ? `;stroke-dasharray:${round(p.dash * paint.unit)} ${round((p.gap || p.dash) * paint.unit)}` : '';
-  const line = stroke === 'none' ? '' : `;stroke-width:${round(p.strokeWidth * paint.unit)};stroke-linecap:${p.cap};stroke-linejoin:${p.join}${dashed}`;
-  return `fill:${FILL[p.fillKind](p, paint)};fill-rule:${p.fillRule};stroke:${stroke}${line}`;
+  return `<g style="fill:none;stroke:${STROKE[p.strokeKind](p, paint)};stroke-width:${round(p.strokeWidth * paint.unit)};stroke-linecap:${p.cap};stroke-linejoin:${p.join}${dashed}">${paths}</g>`;
 }
+
+const NO_ASSET = () => null;
 
 const matrixAttr = (m: Layer['matrix']) => (m.every((n, i) => n === IDENTITY[i]) ? '' : ` transform="matrix(${m.map(round).join(' ')})"`);
 const opacityAttr = (o: number) => (o === 1 ? '' : ` opacity="${round(o)}"`);
@@ -147,7 +141,10 @@ export function shapeDrawing(p: ShapeLook, paint: Paint): { markup: string; exte
   const paths = layers.map((l) => `<path d="${pathData(l.outline)}"${matrixAttr(l.matrix)}${opacityAttr(l.opacity)}/>`).join('');
   const extent = paintedExtent(p, paint, layers);
   const filter = filterOf(p, paint, extent);
-  const defs = usesGradient(p) || filter ? `<defs>${usesGradient(p) ? gradient(p, paint) : ''}${filter}</defs>` : '';
+  const fills = svgFills(fillsOf(p), { id: paint.id, size: paint.size, color: paint.color, asset: paint.asset ?? NO_ASSET }, paths, p.fillRule);
+  const stroked = p.strokeKind === StrokeKind.Gradient ? strokeGradient(p, paint) : '';
+  const inner = fills.defs + stroked + filter;
+  const defs = inner ? `<defs>${inner}</defs>` : '';
   const filtered = filter ? ` filter="url(#${filterId(paint.id)})"` : '';
-  return { markup: `${defs}<g style="${paintStyle(p, paint)}"${filtered}>${paths}</g>`, extent };
+  return { markup: `${defs}<g${filtered}>${fills.body}${strokeGroup(p, paint, paths)}</g>`, extent };
 }

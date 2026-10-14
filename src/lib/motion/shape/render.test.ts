@@ -25,9 +25,21 @@ describe('shape markup', () => {
 
   it('a linear gradient fill points along its angle, colours resolved', () => {
     const svg = shapeMarkup(look({ fillKind: 'linear', gradientAngle: 0, fill: 'brand.accent', fill2: '#000000' }), paint);
-    expect(svg).toContain('<linearGradient id="sg-a" gradientUnits="userSpaceOnUse" x1="0" y1="50" x2="200" y2="50">');
+    expect(svg).toContain('<linearGradient id="sg-a-f0" gradientUnits="userSpaceOnUse" x1="0" y1="50" x2="200" y2="50">');
     expect(svg).toContain('stop-color:resolved(brand.accent)');
-    expect(svg).toContain('fill:url(#sg-a)');
+    expect(svg).toContain('fill:url(#sg-a-f0)');
+  });
+
+  it('a fill stack paints bottom to top under the stroke, the legacy colour ignored', () => {
+    const svg = shapeMarkup(look({ fill: '#ff0000', strokeKind: 'solid', stroke: '#111111', fills: [{ type: 'solid', color: '#00ff00' }, { type: 'solid', color: '#0000ff', opacity: 0.5 }] }), paint);
+    expect(svg).not.toContain('#ff0000');
+    expect(svg.indexOf('#00ff00')).toBeLessThan(svg.indexOf('#0000ff'));
+    expect(svg.indexOf('#0000ff')).toBeLessThan(svg.indexOf('stroke:#111111'));
+  });
+
+  it('an image fill resolves its asset through the paint', () => {
+    const svg = shapeMarkup(look({ fills: [{ type: 'image', assetId: 'pic' }] }), { ...paint, asset: (id) => `https://cdn/${id}.png` });
+    expect(svg).toContain('src="https://cdn/pic.png"');
   });
 
   it('a stroke carries width, dash, caps and joins in frame units', () => {

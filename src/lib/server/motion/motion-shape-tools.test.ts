@@ -47,6 +47,26 @@ describe('motion agent shape tools', () => {
     expect(findClip(session.doc, 'id1')!.clip.keyframes['mod.id2.end']).toBeUndefined();
   });
 
+  it('add_shape and set_props take a fill stack, bottom to top, and refuse a bad layer', async () => {
+    const { session, run } = setup();
+    const fills = [
+      { type: 'radial-gradient', stops: [{ color: '#ffffff', pos: 0 }, { color: '#000000', pos: 1 }], center: { x: 0.3, y: 0.3 } },
+      { type: 'solid', color: '#ff0000', opacity: 0.3, blend: 'multiply' }
+    ];
+    expect(await run('add_shape', { kind: 'rect', start: 0, fills })).toMatchObject({ ok: true, clip_id: 'id1' });
+    expect(findClip(session.doc, 'id1')!.clip.props.fills).toMatchObject(fills);
+
+    expect((await run('set_props', { clip_id: 'id1', props: { fills: [{ type: 'solid', color: '#00ff00' }] } })).ok).toBe(true);
+    expect(findClip(session.doc, 'id1')!.clip.props.fills).toMatchObject([{ type: 'solid', color: '#00ff00', opacity: 1, visible: true }]);
+    expect((await run('set_props', { clip_id: 'id1', props: { fills: [{ type: 'solid', color: '#00ff00', opacity: 3 }] } })).ok).toBe(false);
+  });
+
+  it('the shape tool tells the agent about fill stacks', () => {
+    const { session } = setup();
+    const tools = createMotionTools({ session, assets: [], newId: () => 'x', voiceover: vi.fn(), frames: vi.fn(), check: vi.fn() });
+    expect(String((tools.add_shape as Tool).description)).toContain('fills');
+  });
+
   it('set_path refuses markup and names what path data takes', async () => {
     const { run } = setup();
     await run('add_shape', { kind: 'rect', start: 0 });

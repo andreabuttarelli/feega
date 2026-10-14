@@ -36,6 +36,8 @@
   import type { LayoutStore } from '$lib/motion/editor-layout';
   import CodeEditor from './CodeEditor.svelte';
   import MarkedLines from './MarkedLines.svelte';
+  import FillStack from './FillStack.svelte';
+  import { elementFills } from '$lib/motion/fill/elements';
   import { MarkedField, markedField } from '$lib/motion/poster-lines';
   import { componentLabel } from '$lib/motion/poster-parts';
   import FontPicker from './FontPicker.svelte';
@@ -498,6 +500,8 @@
   {#if field.control === Control.Range}
     <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
+  {:else if field.control === Control.Fills}
+    <div class="stack" data-prop={field.key}><FillStack fills={elementFills(clip.component, clip.props)} {assets} {tokens} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
   {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>

@@ -117,16 +117,17 @@ test.describe('poster parts on the canvas @real', () => {
     await photoRow.click();
     await expect(page.getByTestId('poster-part')).toHaveAttribute('data-kind', 'photo');
     await expect(page.getByTestId('part-photo')).toBeVisible();
-    await page.getByTestId('poster-part').getByRole('combobox').selectOption('contain');
+    await page.getByTestId('part-photo').getByTestId('fill-add').click();
+    await page.getByTestId('part-photo').getByTestId('fill-add-solid').click();
     await shoot(page, '16-photo-part');
 
     await expect
       .poll(async () => {
         const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1);
-        const doc = data?.[0]?.doc as { tracks: { clips: { id: string; props: { media?: { fit?: string }[] } }[] }[] } | undefined;
-        return doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'poster')?.props.media?.[0]?.fit;
+        const doc = data?.[0]?.doc as { tracks: { clips: { id: string; props: { media?: { fills?: { type: string }[] }[] } }[] }[] } | undefined;
+        return doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'poster')?.props.media?.[0]?.fills?.map((f) => f.type);
       }, { timeout: 10_000 })
-      .toBe('contain');
+      .toEqual(['solid']);
 
     await layers.locator('[data-layer="poster"]').click();
     const lines = page.getByTestId('marked-lines');

@@ -71,6 +71,36 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(html).toContain('object-position:100% 0%');
   });
 
+  it('a box with a fill stack composes gradient, picture and overlay, the same page every time', () => {
+    const fills = [
+      { type: 'linear-gradient', stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] },
+      { type: 'image', assetId: 'a', fit: 'cover', focus: { x: 0.3, y: 0.6 } },
+      { type: 'solid', color: '#ff0000', opacity: 0.35 }
+    ];
+    const box = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', width: 0.5, height: 0.5, fills } }, 'box'));
+
+    const html = compose(box, { a: 'https://x/a.png' });
+
+    expect(html).toContain('<linearGradient id="sg-box-f0"');
+    expect(html).toContain('src="https://x/a.png"');
+    expect(html).toContain('object-position:30% 60%');
+    expect(html).toMatch(/fill:#ff0000;fill-rule:nonzero;stroke:none" opacity="0.35"/);
+    expect(compose(box, { a: 'https://x/a.png' })).toBe(html);
+  });
+
+  it('text with a fill stack clips its layers to the glyphs; plain text keeps its colour', () => {
+    const fills = [{ type: 'linear-gradient', angle: 0, stops: [{ color: '#ff0000', pos: 0 }, { color: '#0000ff', pos: 1 }] }, { type: 'solid', color: '#000000', opacity: 0.2 }];
+    const titled = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Hi\nthere', fills } }, 'tt'));
+    const texted = must(addClip(titled, { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'Body', fills } }, 'tx'));
+    const plain = must(addClip(texted, { component: 'Kicker', from: 0, durationInFrames: 30, props: { text: 'Kick', color: '#123456' } }, 'kk'));
+
+    const html = compose(plain);
+
+    expect(html.match(/-webkit-background-clip:text/g)?.length).toBe(3);
+    expect(html).toContain('linear-gradient(#00000033,#00000033),linear-gradient(90deg,#ff0000 0%,#0000ff 100%)');
+    expect(html).toContain('color:#123456');
+  });
+
   it('registers one paused timeline under the composition id', () => {
     expect(compose(doc)).toContain('window.__timelines["main"]=tl');
   });

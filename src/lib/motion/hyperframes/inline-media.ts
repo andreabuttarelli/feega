@@ -1,6 +1,6 @@
 export async function inlineMedia(root: Element, shrink: (url: string) => Promise<string>, cache: Map<string, Promise<string>>): Promise<void> {
   const REMOTE = /^(https?|blob):/;
-  const CSS_URL = /url\(["']?([^"')]+)["']?\)/;
+  const CSS_URLS = /url\(["']?([^"')]+)["']?\)/g;
   const small = (url: string) => {
     if (!cache.has(url)) {
       cache.set(url, shrink(url).catch(() => url));
@@ -15,9 +15,10 @@ export async function inlineMedia(root: Element, shrink: (url: string) => Promis
       work.push(small(el.src).then((data) => void (el.src = data)));
       continue;
     }
-    const remote = CSS_URL.exec(getComputedStyle(el).backgroundImage)?.[1];
-    if (remote && REMOTE.test(remote)) {
-      work.push(small(remote).then((data) => el.style.setProperty('background-image', `url("${data}")`)));
+    const background = getComputedStyle(el).backgroundImage;
+    const remote = [...background.matchAll(CSS_URLS)].map((m) => m[1]).filter((url) => REMOTE.test(url));
+    if (remote.length) {
+      work.push(Promise.all(remote.map(small)).then((data) => el.style.setProperty('background-image', remote.reduce((out, url, i) => out.replace(url, data[i]), background))));
     }
   }
   await Promise.all(work);

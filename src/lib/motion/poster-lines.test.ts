@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { LineEdit, MarkedField, markedField, editLines, removePhoto, lineRows, markedPoster, photoAt, setPhoto, setPhotoLook, wordsOf } from './poster-lines';
+import { LineEdit, MarkedField, markedField, editLines, removePhoto, lineRows, markedPoster, photoAt, photoStack, setPhoto, setPhotoFills, setPhotoLook, wordsOf } from './poster-lines';
+import { FillType, ImageFit } from './fill/model';
+import { BlendMode } from './blend';
 
 const LINES = ['STUDIO', 'NAME [photo]', 'SPACE [photo]', 'SESSION', '01 [photo] ->'].join('\n');
 const A = { assetId: 'a', kind: 'image' as const };
@@ -120,5 +122,24 @@ describe('a photo is its own element', () => {
 
   it('a photo that is not there changes nothing', () => {
     expect(removePhoto({ lines: TWO, media: [A, B, C] }, 9)).toEqual({ lines: TWO, media: [A, B, C] });
+  });
+});
+
+describe('a photo is a box filled by a stack', () => {
+  const image = (assetId: string) => ({ type: FillType.Image as const, assetId, fit: ImageFit.Cover, focus: { x: 0.5, y: 0.5 }, scale: 1, opacity: 1, visible: true, blend: BlendMode.Normal });
+  const overlay = { type: FillType.Solid as const, color: '#000000', opacity: 0.4, visible: true, blend: BlendMode.Normal };
+
+  it('reads an old photo as one image layer', () => {
+    expect(photoStack([{ assetId: 'a', kind: 'image', fit: 'contain' }], 0)).toEqual([{ ...image('a'), fit: ImageFit.Contain }]);
+  });
+
+  it('writes the stack and keeps the slot pointing at its first picture', () => {
+    const media = setPhotoFills([{ assetId: 'a', kind: 'image' }], 0, [image('b'), overlay]);
+    expect(media[0]).toMatchObject({ assetId: 'b', kind: 'image', fills: [image('b'), overlay] });
+    expect(photoStack(media, 0)).toEqual([image('b'), overlay]);
+  });
+
+  it('a stack with no picture leaves the slot empty but keeps the colours', () => {
+    expect(setPhotoFills([], 1, [overlay])).toEqual([{ assetId: '', kind: 'image' }, { assetId: '', kind: 'image', fills: [overlay] }]);
   });
 });

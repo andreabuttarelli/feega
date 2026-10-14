@@ -52,11 +52,20 @@ describe('Properties for one clip', () => {
   });
 
   it('a colour is a swatch, a hex field and a picker, not a row of brand swatches', () => {
-    const html = inspect('Title');
+    const html = inspect('Caption');
 
-    expect(html).toContain('data-colour="Colour"');
-    expect(html).toContain('id="f-color"');
+    expect(html).toContain('data-colour="Box"');
+    expect(html).toContain('id="f-background"');
     expect(html).not.toContain('class="swatches');
+  });
+
+  it('a title and a shape fill with a layer stack, never the single-colour fields', () => {
+    for (const component of ['Title', 'Shape'] as const) {
+      const html = inspect(component);
+      expect(html).toContain('data-testid="fill-stack"');
+      expect(html).not.toContain('id="f-color"');
+      expect(html).not.toContain('id="f-fillKind"');
+    }
   });
 
   it('a shape adds stroke and its path, and no text', () => {
