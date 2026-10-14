@@ -238,6 +238,24 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
       execute: (input: z.infer<typeof CANVAS_OPS.list_runs.input>) => CANVAS_OPS.list_runs.run(ctx, input)
     }),
 
+    preview_node_loop: tool({
+      description: 'How many combinations run_node_loop would queue on a node of THIS project, and what they would cost. Free, reads only: call it first when the count is unknown.',
+      inputSchema: CANVAS_OPS.preview_node_loop.input,
+      execute: (input: z.infer<typeof CANVAS_OPS.preview_node_loop.input>) => CANVAS_OPS.preview_node_loop.run(ctx, input)
+    }),
+
+    run_node_loop: tool({
+      description: 'Queue every combination of a node\'s inputs (iterate wires, lists) as separate generations into a results list node; a cron runs them in the next minutes. Costs credits for the whole loop: only when the user asked. Above 50 combinations it answers needs_confirmation until confirm: true; above 1000 it is refused.',
+      inputSchema: CANVAS_OPS.run_node_loop.input,
+      execute: (input: z.infer<typeof CANVAS_OPS.run_node_loop.input>) => CANVAS_OPS.run_node_loop.run(ctx, input)
+    }),
+
+    cancel_node_loop: tool({
+      description: 'Stop the queued combinations of a node loop that have not started yet. Finished results stay.',
+      inputSchema: CANVAS_OPS.cancel_node_loop.input,
+      execute: (input: z.infer<typeof CANVAS_OPS.cancel_node_loop.input>) => CANVAS_OPS.cancel_node_loop.run(ctx, input)
+    }),
+
     search_gallery: tool({
       description:
         'Search the public gallery of free motion videos and compositions anyone can remix (many by Feega). Filters: query (title words), kind, format, duration (short up to 6 s, medium 6 to 15 s, long over 15 s), tag. Returns id, title, author, format, seconds, remixes and url. Free, reads only.',

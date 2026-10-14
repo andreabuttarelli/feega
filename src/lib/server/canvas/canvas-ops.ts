@@ -18,6 +18,7 @@ import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
+import { cancelLoop, enqueueLoop, planLoop } from '$lib/server/canvas/loop';
 
 export type CanvasDeps = {
   db: Db;
@@ -125,6 +126,13 @@ const runNodeInput = z
     model: z.string().optional().describe('Omit to keep the model already on the node.'),
     params: z.record(z.string(), z.unknown()).optional().describe('e.g. { aspectRatio: "1:1", duration: 8 }.'),
     expectedVersion: z.number().int()
+  })
+  .strict();
+
+const runLoopInput = z
+  .object({
+    nodeId: z.string(),
+    confirm: z.boolean().optional().describe('Required true above 50 combinations, after the user agreed to the cost.')
   })
   .strict();
 
@@ -283,6 +291,44 @@ export const CANVAS_OPS = {
     access: Access.Read,
     input: nodeIdInput,
     run: async (ctx, input) => ({ runs: await runsOf(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId }) })
+  }),
+
+  preview_node_loop: op({
+    access: Access.Read,
+    input: nodeIdInput,
+    run: async (ctx, input) => {
+      const node = await findNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId });
+      if (!node) {
+        return NODE_NOT_FOUND;
+      }
+      return planLoop(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, nodeId: node.id });
+    }
+  }),
+
+  run_node_loop: op({
+    access: Access.Spend,
+    input: runLoopInput,
+    run: async (ctx, input) => {
+      const node = await findNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId });
+      if (!node) {
+        return NODE_NOT_FOUND;
+      }
+      return enqueueLoop(ctx.db, {
+        orgId: ctx.orgId,
+        projectId: ctx.projectId,
+        canvasId: node.canvasId,
+        nodeId: node.id,
+        userId: ctx.userId,
+        confirmed: input.confirm === true,
+        actor: ctx.actor
+      });
+    }
+  }),
+
+  cancel_node_loop: op({
+    access: Access.Write,
+    input: nodeIdInput,
+    run: async (ctx, input) => cancelLoop(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId })
   })
 };
 
