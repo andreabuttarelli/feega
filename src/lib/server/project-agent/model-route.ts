@@ -1,8 +1,17 @@
-import { DEFAULT_CHAT_CHOICE, type ChatModelChoice } from '$lib/chat-model';
+import type { ChatModelChoice } from '$lib/chat-model';
 
 export enum TurnKind {
   Edit = 'edit',
   Open = 'open'
+}
+
+export enum Pick {
+  Auto = 'auto',
+  User = 'user'
+}
+
+export function pickOf(askedModel: unknown): Pick {
+  return askedModel === undefined ? Pick.Auto : Pick.User;
 }
 
 export const EDIT_MODEL = 'anthropic/claude-sonnet-5.5';
@@ -26,8 +35,8 @@ const ROUTE: Record<TurnKind, (choice: ChatModelChoice) => ChatModelChoice> = {
   [TurnKind.Open]: (choice) => choice
 };
 
-export function turnModel(choice: ChatModelChoice, message: string): ChatModelChoice {
-  if (choice.model !== DEFAULT_CHAT_CHOICE.model) {
+export function turnModel(choice: ChatModelChoice, pick: Pick, message: string): ChatModelChoice {
+  if (pick === Pick.User) {
     return choice;
   }
   return ROUTE[turnKind(message)](choice);

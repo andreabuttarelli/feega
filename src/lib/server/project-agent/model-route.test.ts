@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_CHAT_CHOICE } from '$lib/chat-model';
-import { EDIT_MODEL, TurnKind, turnKind, turnModel } from './model-route';
+import { EDIT_MODEL, Pick, pickOf, TurnKind, turnKind, turnModel } from './model-route';
 
 const PICKED = { model: 'openai/gpt-5.6-sol', reasoning: null };
 
@@ -13,15 +13,24 @@ describe('the canvas chat routes a simple edit to a cheaper model', () => {
     expect(turnKind(message)).toBe(TurnKind.Open);
   });
 
-  it('an edit on the default choice runs on the edit model', () => {
-    expect(turnModel(DEFAULT_CHAT_CHOICE, 'change the headline to "Hi"').model).toBe(EDIT_MODEL);
+  it('an edit with no model asked runs on the edit model', () => {
+    expect(turnModel(DEFAULT_CHAT_CHOICE, Pick.Auto, 'change the headline to "Hi"').model).toBe(EDIT_MODEL);
   });
 
   it('a model the user picked is never overridden', () => {
-    expect(turnModel(PICKED, 'change the headline to "Hi"')).toEqual(PICKED);
+    expect(turnModel(PICKED, Pick.User, 'change the headline to "Hi"')).toEqual(PICKED);
   });
 
-  it('creative work on the default choice stays on it', () => {
-    expect(turnModel(DEFAULT_CHAT_CHOICE, 'create a poster frame from a template')).toEqual(DEFAULT_CHAT_CHOICE);
+  it('Opus picked by the user stays Opus on an edit', () => {
+    expect(turnModel(DEFAULT_CHAT_CHOICE, Pick.User, 'change the headline to "Hi"')).toEqual(DEFAULT_CHAT_CHOICE);
+  });
+
+  it('creative work with no model asked stays on the default', () => {
+    expect(turnModel(DEFAULT_CHAT_CHOICE, Pick.Auto, 'create a poster frame from a template')).toEqual(DEFAULT_CHAT_CHOICE);
+  });
+
+  it('a turn that names no model is auto, one that names a model is the user\'s', () => {
+    expect(pickOf(undefined)).toBe(Pick.Auto);
+    expect(pickOf('anthropic/claude-opus-5.5')).toBe(Pick.User);
   });
 });

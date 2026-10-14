@@ -8,9 +8,10 @@ of system + tools per step, for 4–10 steps, uncached, on Opus.
 - The project agent now sends Anthropic `cache_control` (`PromptCache.On`), like
   the motion agent already did (~90% hit share there).
 - `turnModel` (project-agent/model-route.ts): one table routes a short edit
-  request (change/set/export/rename…) to Sonnet when the user is on the default
-  model. A model the user picked is never overridden; creative/open requests
-  keep the default (Opus).
+  request (change/set/export/rename…) to Sonnet only when the turn names no
+  model. The panel now sends a model only if the user picked one (saved or
+  chosen; `GET /api/v1/chat-models` returns `picked`), so a user who picks
+  Opus keeps Opus. Creative/open requests keep the default (Opus).
 - `frame_tool`'s description names every editor tool, so turns stop opening with
   `list_frame_tools` (28 KB of output, read again at every later step).
 

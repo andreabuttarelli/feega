@@ -5,7 +5,7 @@ import { createUIMessageStream, createUIMessageStreamResponse, streamText, type 
 import type { Db } from '$lib/server/db/client';
 import { llmLanguageModel } from '$lib/server/llm';
 import { PromptCache } from '$lib/server/prompt-cache';
-import { turnModel } from '$lib/server/project-agent/model-route';
+import { pickOf, turnModel } from '$lib/server/project-agent/model-route';
 import { offeredChatModels, reasoningProviderOptions, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { extractSdkUsage, logAiCall, withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
@@ -105,7 +105,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   if (!resolved.ok) {
     return json({ error: resolved.error }, { status: 400 });
   }
-  const { model, reasoning } = turnModel(resolved.choice, text);
+  const { model, reasoning } = turnModel(resolved.choice, pickOf(askedModel), text);
 
   const screening = screenModelInput(db, {
     profile: ModerationProfile.Standard,

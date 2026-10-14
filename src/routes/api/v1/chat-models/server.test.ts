@@ -65,6 +65,12 @@ describe('chat model picker endpoint', () => {
     expect((await res.json()).choice).toEqual({ model: 'anthropic/claude-opus-5.5', reasoning: 'low' });
   });
 
+  it('says whether the choice is the user\'s, so an unpicked turn is left to the server', async () => {
+    expect((await (await GET(event({}).ev)).json()).picked).toBe(false);
+    expect((await (await GET(event({ chat_model: { model: 'gone/model', reasoning: 'low' } }).ev)).json()).picked).toBe(false);
+    expect((await (await GET(event({ chat_model: { model: 'z-ai/glm-5.3-flash', reasoning: 'low' } }).ev)).json()).picked).toBe(true);
+  });
+
   it('saves a valid choice on the user', async () => {
     const { ev, updateUser } = event({}, { model: 'z-ai/glm-5.3-flash', reasoning: 'high' });
     const res = await PUT(ev);

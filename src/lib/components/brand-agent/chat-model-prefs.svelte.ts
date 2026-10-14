@@ -5,6 +5,7 @@ const ENDPOINT = '/api/v1/chat-models';
 export class ChatModelPrefs {
   groups = $state<ChatModelGroup[]>([]);
   choice = $state<ChatModelChoice | null>(null);
+  #picked = $state(false);
 
   readonly #fetch: typeof fetch;
   #loading: Promise<void> | null = null;
@@ -20,11 +21,12 @@ export class ChatModelPrefs {
 
   async choose(next: ChatModelChoice) {
     this.choice = next;
+    this.#picked = true;
     await this.#fetch(ENDPOINT, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(next) }).catch(() => undefined);
   }
 
   turnFields(): Partial<ChatModelChoice> {
-    return this.choice ? { ...this.choice } : {};
+    return this.choice && this.#picked ? { ...this.choice } : {};
   }
 
   async #read() {
@@ -33,9 +35,12 @@ export class ChatModelPrefs {
       this.#loading = null;
       return;
     }
-    const body = (await res.json()) as { groups: ChatModelGroup[]; choice: ChatModelChoice };
+    const body = (await res.json()) as { groups: ChatModelGroup[]; choice: ChatModelChoice; picked?: boolean };
     this.groups = body.groups;
-    this.choice ??= body.choice;
+    if (!this.choice) {
+      this.choice = body.choice;
+      this.#picked = body.picked === true;
+    }
   }
 }
 
