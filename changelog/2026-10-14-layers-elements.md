@@ -17,5 +17,5 @@ showed a generic clapperboard.
 - Discarded: grouping tracks in Design mode too — time order only matters
   where time is edited. Dropping a clip on a clip (no track row left) is
   not wired: drag still targets track groups only.
-- Shell primitives (`Row`, `IconButton`) from PR #539 are not used: that
-  PR is still open.
+- Hide/lock use the shell `IconButton` (#539). Rows stay hand-built:
+  `Row` has no slot for the fold, thumbnail or rename input.

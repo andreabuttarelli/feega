@@ -20,6 +20,7 @@
   import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import PartsProbe from './PartsProbe.svelte';
+  import { IconButton, IconSize } from '$lib/components/ui/shell';
   import { LayerAction, LayerKind, NodeIcon, Pick, dropLayer, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
@@ -215,12 +216,12 @@
         <span class="name">{row.label}</span>
       {/if}
       {#if editable(row)}
-        <button type="button" class="flag" aria-label={row.hidden ? 'Show' : 'Hide'} aria-pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
-          {#if row.hidden}<EyeOff size={ICON} />{:else}<Eye size={ICON} />{/if}
-        </button>
-        <button type="button" class="flag" aria-label={row.locked ? 'Unlock' : 'Lock'} aria-pressed={row.locked} disabled={row.kind === LayerKind.Group && row.type === PRECOMP} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Lock, SUMMARY[LayerAction.Lock]))}>
-          {#if row.locked}<Lock size={ICON} />{:else}<LockOpen size={ICON} />{/if}
-        </button>
+        <IconButton size={IconSize.Sm} label={row.hidden ? 'Show' : 'Hide'} pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
+          {#if row.hidden}<EyeOff />{:else}<Eye />{/if}
+        </IconButton>
+        <IconButton size={IconSize.Sm} label={row.locked ? 'Unlock' : 'Lock'} pressed={row.locked} disabled={row.kind === LayerKind.Group && row.type === PRECOMP} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Lock, SUMMARY[LayerAction.Lock]))}>
+          {#if row.locked}<Lock />{:else}<LockOpen />{/if}
+        </IconButton>
       {/if}
     </div>
   {:else}
@@ -278,6 +279,7 @@
     width: 20px;
     height: 20px;
     object-fit: cover;
+    border-radius: var(--ui-radius-xs);
     background: var(--ui-hover);
   }
 
@@ -311,22 +313,6 @@
   }
 
   .fold:hover {
-    color: var(--ui-ink);
-  }
-
-  .flag {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    border: 0;
-    border-radius: 9999px;
-    background: transparent;
-    color: var(--ui-text-3);
-  }
-
-  .flag:hover {
-    background: var(--ui-hover);
     color: var(--ui-ink);
   }
 
