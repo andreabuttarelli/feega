@@ -1,8 +1,8 @@
 import type { ComponentId } from '../components';
 import type { Size } from './auto-layout';
 
-export const AVERAGE_ADVANCE = 0.56;
-export const CAPITAL_ADVANCE = 0.68;
+export const AVERAGE_ADVANCE = 0.5;
+export const CAPITAL_ADVANCE = 0.62;
 
 type TextProps = { text?: unknown; size?: unknown; leading?: unknown; tracking?: unknown; textCase?: unknown };
 type Inset = { across: number; down: number };
