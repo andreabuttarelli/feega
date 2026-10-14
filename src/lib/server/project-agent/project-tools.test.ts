@@ -385,3 +385,35 @@ describe('frame elements, the same op the canvas drag uses', () => {
     expect(revisionsOf(calls, B)[0].map((c) => c.component)).toEqual(['Image']);
   });
 });
+
+describe('the chat reaches every canvas op of the API, from the same table', () => {
+  const opsOf = (surface: Record<string, Tool>) => (surface.canvas_tool as unknown as { inputSchema: { shape: { op: { options: string[] } } } }).inputSchema.shape.op.options;
+  const tools = () => createProjectTools({ db: fakeDb({}).db, orgId: ORG, projectId: PROJECT, userId: USER });
+
+  it('every op the chat can send is a tool or an op of canvas_tool', async () => {
+    const { CANVAS_OPS, chatSendsOp } = await import('$lib/server/canvas/canvas-ops');
+    const surface = tools();
+
+    const missing = Object.keys(CANVAS_OPS).filter((name) => chatSendsOp(name as never) && !(name in surface) && !opsOf(surface).includes(name));
+
+    expect(missing).toEqual([]);
+  });
+
+  it('canvas_tool offers no op that already is a tool of its own', () => {
+    const surface = tools();
+
+    expect(opsOf(surface).filter((name) => name in surface)).toEqual([]);
+  });
+
+  it('canvas_tool runs an op with its checked input', async () => {
+    const surface = tools();
+
+    expect(await run(surface.canvas_tool!, { op: 'rename_canvas', input: { canvasId: CANVAS } })).toMatchObject({ error: 'invalid_input' });
+    expect(await run(surface.canvas_tool!, { op: 'list_templates', input: {} })).toHaveProperty('templates');
+  });
+
+  it('keeps the ops that need bytes the chat cannot send out of it', () => {
+    expect(opsOf(tools())).not.toContain('request_upload');
+    expect(opsOf(tools())).not.toContain('clone_voice');
+  });
+});
