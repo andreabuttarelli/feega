@@ -411,7 +411,7 @@ export async function revokeApiKey(event: Ev) {
   return { apiKeyRevoked: true };
 }
 
-/** Update the signed-in user's display name (first + last → profiles.full_name). */
+/** Update the signed-in user's display name (first + last → profiles.name). */
 export async function updateProfile({
   request,
   locals: { supabase, safeGetSession }
@@ -428,7 +428,7 @@ export async function updateProfile({
   const fullName = [firstName, lastName].filter(Boolean).join(' ').slice(0, 160);
   const { error } = await supabase
     .from('profiles')
-    .update({ full_name: fullName || null })
+    .update({ name: fullName || null })
     .eq('id', user.id);
   if (error) return fail(500, { error: error.message });
   return { profileSaved: true };
