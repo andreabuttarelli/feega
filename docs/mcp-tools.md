@@ -3,12 +3,12 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**48 tool** — 19 in lettura, 25 in scrittura, 4 che distruggono.
-Il payload di `tools/list` pesa **43.948 caratteri**, circa **10.987 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+**49 tool** — 19 in lettura, 25 in scrittura, 5 che distruggono.
+Il payload di `tools/list` pesa **45.367 caratteri**, circa **11.342 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
-| Altro | 18 |
+| Altro | 19 |
 | Video motion | 14 |
 | Accesso diretto al database | 5 |
 | Ads | 4 |
@@ -30,6 +30,19 @@ Applies one effect or a chain (`list_effects`) and lands the result as a new ass
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
 | `effects`? | object[] |  |
+
+### `canvas_tool` · D
+
+*Work a project canvas*
+
+The canvas ops of the project chat, on one project (`project_id`), with `input` in camelCase. Reads: list_canvases {}, list_nodes {canvasId}, list_runs {nodeId}, preview_node_loop {nodeId}, preview_run_graph {graph:"downstream",nodeId} | {graph:"stale",canvasId,nodeIds?} (ordered steps + credits: quote before run_graph). Writes, free: create_node {canvasId,type,x,y,displayName?,data?} (data per describe_node_types), update_node {nodeId,data} (only changed fields, null removes), move_node {nodeId,x,y,z?}, connect_nodes {canvasId,sourceNodeId,targetNodeId,sourceHandle?,targetHandle?}, delete_node {nodeId} (soft), cancel_node_loop {nodeId}. Spends credits: run_node {nodeId,medium,prompt?,model?,params?,expectedVersion}, run_node_loop {nodeId,confirm?}, run_graph (same input as preview_run_graph; queued, each step after its inputs; cycles refused). Unknown op answers the list; bad input answers the issues.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `project_id` | string |  |
+| `op` | string |  |
+| `input`? | object |  |
 
 ### `edit_storyboard_card` · W
 
@@ -103,7 +116,7 @@ State of a `render_video` run: `status` (running, done, failed, expired), `mode`
 
 ### `get_storyboard` · R
 
-*Read the storyboard of a motion video*
+*Read the storyboard of a frame*
 
 The storyboard canvas linked to a motion video: its cards left to right (`node_id`, `text`, the `clip_ids` that play it), the pictures and clips on it with their asset ids and the card each feeds, and the card-to-card `flow`. `storyboard: null` when none was written. Reads only.
 
@@ -182,7 +195,7 @@ Replaces the spec of a custom layout at its `version` (`list_layouts`); a stale 
 
 ### `render_video` · W
 
-*Render a motion video*
+*Render a frame*
 
 Render the saved revision of a motion video to MP4. Default `mode: "browser"`: free, returns a `render_url` — a one-time link (expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file to the project. Show the link to the user. `mode: "server"` is not available yet: it is refused with 403. A live component (a game or generative piece) cannot be seeked: the video shows a still of it; publish it as an embed instead. Poll `get_render` with the `run_id` for the file.
 
@@ -193,7 +206,7 @@ Render the saved revision of a motion video to MP4. Default `mode: "browser"`: f
 | `mode`? | `browser` \| `server` |  |
 | `resolution`? | `720p` \| `1080p` \| `1440p` \| `2160p` |  |
 | `format`? | string | server only: mp4-h264, mp4-h265, prores-422hq, prores-4444, webm-alpha, png-sequence, gif |
-| `quality`? | `standard` \| `high` |  |
+| `quality`? | `standard` \| `high` \| `max` |  |
 | `fps`? | number \| number \| number \| number \| number |  |
 
 ### `write_effect` · W
@@ -223,7 +236,7 @@ Writes a custom composition layout for the workspace (same name replaces it). `s
 
 ### `write_storyboard` · W
 
-*Write the storyboard of a motion video*
+*Write the storyboard of a frame*
 
 Lay out a motion video as a storyboard canvas: one card per beat, story order left to right, stronger emotion higher. Each beat: `act` (problem, solution, proof, claim), `kind` (title_card, ui_beat, product_shot, scene, logo), `title`, `intent`, `on_screen`, `emotion`, `intensity` 0-1, `duration` seconds, `visual`, `music`, `media` (project image/video asset ids), `branch_of` (index of an earlier beat it replaces). Replaces the cards written before; what the user added stays.
 
@@ -237,7 +250,7 @@ Lay out a motion video as a storyboard canvas: one card per beat, story order le
 
 ### `add_motion_template` · W
 
-*Add a template to a motion video*
+*Add a template to a frame*
 
 Insert an editable copy of a template (id from `list_motion_templates`) at `at` seconds, its fields set from `vars` (keys and types as listed). `sound` (default true) lays its key taps and clicks on the SFX track. Saved as a new revision; no AI, free.
 
@@ -252,7 +265,7 @@ Insert an editable copy of a template (id from `list_motion_templates`) at `at` 
 
 ### `ask_motion_agent` · W
 
-*Ask the motion editor agent*
+*Ask the frame editor agent*
 
 Edit a motion video (a `motion` canvas node) by asking the motion editor's own AI in plain words, e.g. "make the title red and add a bounce". It runs one turn of the same agent as the editor chat, with its own tools, writes a new revision of the video and posts the exchange in the editor chat. Find the node id with `list_motion_videos`; read the video first with `get_motion_summary` to name clips precisely. Returns at once with a `run_id` (`running`): poll `get_motion_run` every few seconds until `done`, which carries the reply, the summary and the new revision `version`. `wait: true` polls for you, up to about 4 minutes of a turn that can run up to 30. The agent looks at its own frames even with no editor open. Spends credits. `attachments` (up to 10): images (PNG, JPG, WebP, GIF) the agent sees and can place in the video, and PDF/DOCX/PPTX/XLSX/CSV/TXT/MD/HTML files it reads as text — each one a public `url`, an `asset_id` of the project, or inline base64 `data` with `name` and `mime_type`; at most 20 MB each. When the agent wants the user's taste it ends its turn with `reference_pick` in the run (question and candidate pictures with ids): show them to the user, then call again with `reference_pick: { follow: [ids], avoid: [ids], note }` (prompt optional), or `{ follow: [], avoid: [], rejected: true, query, avoid_all }` when none fit: the agent searches again. Followed pictures become the targets, avoided ones what not to do.
 
@@ -267,7 +280,7 @@ Edit a motion video (a `motion` canvas node) by asking the motion editor's own A
 
 ### `get_motion_embed` · R
 
-*Read a motion web embed*
+*Read a frame web embed*
 
 Whether the web embed of a motion video is `published`, its public `url`, the loader `snippet` and the saved `revision`. The self-contained HTML file (no hosting) is downloaded with `feega motion embed <node> --download <file>`, or GET `/api/v1/motion/{node_id}/embed/bundle`. Reads only.
 
@@ -278,7 +291,7 @@ Whether the web embed of a motion video is `published`, its public `url`, the lo
 
 ### `get_motion_run` · R
 
-*Read a motion agent run*
+*Read a frame agent run*
 
 State of an `ask_motion_agent` run: `status` (running, done, failed, expired), the agent `reply`, the `summary` of its edits, the new revision `version` (null when nothing was saved), `cost_usd` and `editor_url`. Reads only.
 
@@ -289,7 +302,7 @@ State of an `ask_motion_agent` run: `status` (running, done, failed, expired), t
 
 ### `get_motion_summary` · R
 
-*Read a motion video*
+*Read a frame*
 
 The saved state of a motion video: revision `version`, last change and who made it, size, fps, duration and every track and clip with start/duration in seconds. Reads only, spends nothing.
 
@@ -300,7 +313,7 @@ The saved state of a motion video: revision `version`, last change and who made 
 
 ### `list_motion_revisions` · R
 
-*List the saved versions of a motion video*
+*List the saved versions of a frame*
 
 Every saved revision of a motion video, newest first: `version`, who saved it (`actorKind` user or agent), the `summary` of the change and how many `clips` it had, so a broken or emptied version can be told from a good one. Reads only.
 
@@ -311,9 +324,9 @@ Every saved revision of a motion video, newest first: `version`, who saved it (`
 
 ### `list_motion_templates` · R
 
-*List motion templates*
+*List frame templates*
 
-Ready-made pieces to drop into a motion video (built-in and saved by the org), e.g. builtin:prompt-input, a prompt field that types, presses send and thinks. Each with `id`, `seconds` and its `fields`: key, type (text, number min..max, color #rrggbb, boolean, select options), group and default. Reads only, free.
+Ready-made pieces to drop into a motion video (built-in and saved by the org), e.g. builtin:prompt-input, a prompt field that types, presses send and thinks. Each with `id`, `seconds`, its `card` (roles such as opener/feature/proof/closer, energy, loops, onScreen beat by beat with seconds, edges start→end with a suggested transition, goodFor) and its `fields`: key, type (text, number min..max, color #rrggbb, boolean, select options), group and default. Plan a video as sections and pick one template per section by card. Reads only, free.
 
 | campo | tipo | |
 |---|---|---|
@@ -321,7 +334,7 @@ Ready-made pieces to drop into a motion video (built-in and saved by the org), e
 
 ### `list_motion_videos` · R
 
-*List motion videos*
+*List frames*
 
 The motion videos (`motion` canvas nodes) of the org, newest first, optionally of one project: `node_id`, `name`, `project_id`, `canvas_id`, `format`, saved revision `version` (0 = empty), signed `poster_url` and `last_render_url` (one hour, null when none) and `editor_url`. Use it to find the `node_id` the other motion tools take. Reads only.
 
@@ -332,7 +345,7 @@ The motion videos (`motion` canvas nodes) of the org, newest first, optionally o
 
 ### `motion_budget` · W
 
-*Read or raise the budget of a motion video*
+*Read or raise the budget of a frame*
 
 What a motion video has spent on AI across all its agent turns (`spent_usd`) and what it may spend (`cap_usd`). When an ask returns `video_budget`, the agent stopped because the video used its budget: its work is saved. `action: "raise"` adds `raise_usd` to the cap (only when the user asked to continue), then `ask_motion_agent` continues.
 
@@ -344,7 +357,7 @@ What a motion video has spent on AI across all its agent turns (`spent_usd`) and
 
 ### `motion_tool` · W
 
-*Run a motion editor tool*
+*Run a frame editor tool*
 
 Every tool of the motion editor agent (add_clip, set_props, set_keyframes, add_template, set_canvas, export_image... over 140), run directly on a video with no AI and no credits. No `tool`: lists them by name. `tool` alone: its description and JSON input schema. `tool` with `node_id`: runs it on the saved video with `input`; an edit is saved as a new revision (`version` answers the new one; pass the `version` you read to refuse a stale write with 409). Still graphics: `set_canvas` with `still` (seconds of the frame) and `format` "4:5" post, "9:16" story or "A poster"; `export_image` (`format` png, jpg, webp; `scale` 1 or 2) saves the image to the project and returns its `url`. Tools that need a chat turn (research, voice, sub-agents) answer with an error: use `ask_motion_agent` for those.
 
@@ -358,7 +371,7 @@ Every tool of the motion editor agent (add_clip, set_props, set_keyframes, add_t
 
 ### `new_motion_from_template` · W
 
-*Start a motion video from a template*
+*Start a frame from a template*
 
 Create a new motion video that already holds a template (id from `list_motion_templates`) at 0s, sized to `format` (16:9 default; 9:16 story, 4:5 post, "A poster"), in `project` (default: the most recently active). `still`: seconds of the one frame to keep, making it a still graphic (post, poster) instead of a video. Returns node_id and editor_url; change its fields with `add_motion_template` vars or `ask_motion_agent`. No AI, free.
 
@@ -372,7 +385,7 @@ Create a new motion video that already holds a template (id from `list_motion_te
 
 ### `publish_motion_embed` · W
 
-*Publish a motion video as a web embed*
+*Publish a frame as a web embed*
 
 Host the interactive web export of the saved revision on feega and return the public `url` and a `snippet` to paste into any site: feega's loader script and a `<feega-motion>` element that fills 100% of its box, reading playback and scroll length from feega (keeps pointer, tilt, scroll, key and tap input; live components such as games and generative pieces run live there). Publishing again updates the same embed in place, so the site needs no new paste. Also returns `react` and `flutter`: the same embed for a React app (`@feega/motion-react`) or a Flutter app (`feega_motion`), running the same player. `action: "unpublish"` takes it down. Videos from an uncensored project are refused (403, `refusal`). Free.
 
@@ -384,7 +397,7 @@ Host the interactive web export of the saved revision on feega and return the pu
 
 ### `restore_motion_revision` · W
 
-*Restore a saved version of a motion video*
+*Restore a saved version of a frame*
 
 Put an earlier revision of a motion video back (number from `list_motion_revisions`). It is saved as a NEW revision: no history is deleted, and restoring again undoes it. Free.
 
@@ -396,7 +409,7 @@ Put an earlier revision of a motion video back (number from `list_motion_revisio
 
 ### `view_motion_frames` · R
 
-*See frames of a motion video*
+*See still images of a frame*
 
 Draw the saved revision of a motion video at up to 6 exact times (seconds) and see them as JPEG images, with the quality gate the editor agent uses: `quality` lists every problem found (clipped or tiny text, flat or blank frames, flashes, missing music...), `blocking` the ones that must be fixed before delivery. `width` is the longest side in pixels (default and max 960). Use it to check a video before and after `ask_motion_agent`. Free; about 10 calls a minute per workspace.
 

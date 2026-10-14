@@ -228,6 +228,26 @@ describe('fields shown for a selected poster part', () => {
     expect(partFieldKeys(doc, clip, 'caption')).toEqual(['caption', 'captionWeight', 'captionSize', 'font', 'ink', 'margin']);
   });
 
+  it('a part also claims its text, background, border and tag colours and its height', () => {
+    const doc = must(
+      writeComponent(newMotionDoc(MotionFormat.Landscape), 'Pills', {
+        source: { html: '', css: '', js: '' },
+        propsSchema: {
+          type: 'object',
+          properties: {
+            pills: { type: 'string', title: 'Pills', default: 'A', group: 'Content' },
+            pillsTextColor: { type: 'string', title: 'Text', format: PropFormat.Color, default: '#000', group: 'Style' },
+            pillsBgColor: { type: 'string', title: 'Bg', format: PropFormat.Color, default: '#000', group: 'Style' },
+            pillsHeight: { type: 'number', title: 'Height', default: 3, group: 'Layout' },
+            paper: { type: 'string', title: 'Paper', format: PropFormat.Color, default: '#fff', group: 'Style' }
+          }
+        }
+      })
+    );
+    const withClip = must(addClip(doc, { component: 'Custom', from: 0, props: { name: 'Pills' } }, 'k'));
+    expect(partFieldKeys(withClip, findClip(withClip, 'k')!.clip, 'pills')).toEqual(['pills', 'pillsTextColor', 'pillsBgColor', 'pillsHeight', 'paper']);
+  });
+
   it('a poster whose field names break the convention claims them through its table row', () => {
     const doc = must(
       writeComponent(newMotionDoc(MotionFormat.Landscape), 'CircleEventPoster', {

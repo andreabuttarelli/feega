@@ -500,6 +500,32 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
   });
 });
 
+describe('a finished run refreshes the frames it feeds', () => {
+  it('an image node connected to a Frame lands its new picture in that frame', async () => {
+    generateImagesWithoutBrand.mockReset();
+    generateImagesWithoutBrand.mockResolvedValue({ ok: true, media: [{ storage_path: 'u/media/generated.png', mime: 'image/png', width: 1024, height: 1024 }], costUsd: 0.02 });
+    const FRAME = '77777777-7777-4777-8777-777777777777';
+    const ASSET = '88888888-8888-4888-8888-888888888888';
+    const frameRow = { ...freshNodeRow, org_id: ORG, id: FRAME, type: 'motion', data: { format: '1:1', docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } };
+    const { db, calls } = fakeDb(
+      {
+        nodes: [{ ...freshNodeRow, org_id: ORG, type: 'image' }, frameRow],
+        nodes_connections: [{ id: 'edge', org_id: ORG, canvas_id: CANVAS, source_node_id: NODE, target_node_id: FRAME, source_handle: null, target_handle: null, mode: 'fixed' }],
+        projects: [{ id: PROJECT, org_id: ORG, name: 'P', slug: 'p', brand_id: null, archived_at: null, updated_at: '', mode: 'standard' }],
+        assets: [{ id: ASSET, org_id: ORG, project_id: PROJECT, type: 'image', url: 'u/media/generated.png', content: null, mime_type: 'image/png', bytes: 1, width: 1024, height: 1024, duration_s: null, source: 'generated', source_node_id: NODE, uncensored: false, created_at: '' }],
+        motion_revisions: [],
+        node_runs: []
+      },
+      { filter: true, mutate: true, newId: () => ASSET }
+    );
+
+    await runGenNode(db, { orgId: ORG, projectId: PROJECT, canvasId: CANVAS, nodeId: NODE, userId: USER, medium: 'image', prompt: 'a cat', model: 'bytedance-seed/seedream-4.5', params: {}, expectedVersion: 1 });
+
+    const frameWrite = calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert');
+    expect(frameWrite?.payload).toMatchObject({ node_id: FRAME, doc: { links: { [NODE]: expect.any(String) } } });
+  });
+});
+
 /**
  * `params.enhancePrompt` RISCRIVE IL PROMPT PRIMA DI GENERARE, SOLO SU IMAGE/VIDEO E SOLO SE
  * ACCESO — mai a insaputa dell'utente, mai sul testo. `enhancePrompt` (`prompt-enhance.ts`) verifica

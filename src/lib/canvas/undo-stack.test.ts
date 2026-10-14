@@ -15,6 +15,15 @@ describe('createUndoStack: uno stack per scheda, undo e redo', () => {
     expect(stack.popRedo()).toBeNull();
   });
 
+  it('the next undo can be read without taking it', () => {
+    const stack = createUndoStack<string>();
+    expect(stack.nextUndo()).toBeNull();
+    stack.push('a');
+    stack.push('b');
+    expect(stack.nextUndo()).toBe('b');
+    expect(stack.popUndo()).toBe('b');
+  });
+
   it('un push rende il gesto disponibile a popUndo, in ordine LIFO', () => {
     const stack = createUndoStack<Gesture>();
     stack.push(gestureFor('a'));

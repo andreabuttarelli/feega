@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { PartEdit, editablePart, partAt, partBoxes, partText, writePartText } from './poster-parts';
+import { CLIP_TEXT, PartEdit, editablePart, partAt, partBoxes, partText, writePartText } from './poster-parts';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from './template/type-grid-poster/template';
-import { findClip } from './doc';
+import { MotionFormat, findClip, newMotionDoc } from './doc';
+import { addClip } from './timeline';
 
 const doc = TYPE_GRID_POSTER_TEMPLATE.template.doc;
 const clip = findClip(doc, TYPE_GRID_CLIP)!.clip;
@@ -45,5 +46,30 @@ describe('poster parts', () => {
 
   it('refuses to write a part that is not text', () => {
     expect(writePartText(doc, clip.id, 'media:0', 'x').ok).toBe(false);
+  });
+});
+
+describe('a drawn text clip edits in place like a poster part', () => {
+  const drawn = () => {
+    const made = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, props: { text: 'Text' } }, 't1');
+    if (!made.ok) {
+      throw new Error(made.error);
+    }
+    return made.doc;
+  };
+
+  it('its whole text is one editable part, written back to its text prop', () => {
+    const doc = drawn();
+    const clip = findClip(doc, 't1')!.clip;
+
+    expect(editablePart(doc, clip, CLIP_TEXT)).toBe(PartEdit.Text);
+    const written = writePartText(doc, 't1', CLIP_TEXT, 'Hello');
+    expect(written.ok && findClip(written.doc, 't1')!.clip.props.text).toBe('Hello');
+  });
+
+  it('a clip without text has nothing to edit', () => {
+    const made = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0 }, 's1');
+    const doc = made.ok ? made.doc : newMotionDoc(MotionFormat.Landscape);
+    expect(editablePart(doc, findClip(doc, 's1')!.clip, CLIP_TEXT)).toBe(PartEdit.None);
   });
 });

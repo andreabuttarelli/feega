@@ -8,7 +8,7 @@ import { motionToolList, motionToolSpec } from '$lib/server/motion/tool-run';
 
 const SCOPE = { orgId: 'o', projectId: 'p', userId: 'u' };
 const FRAME_TOOLS_MAX_CHARS = 2_000;
-const CANVAS_CHAT_MAX_CHARS = 20_000;
+const CANVAS_CHAT_MAX_CHARS = 22_000;
 const EDITOR_TO_FRAME_TOOLS_RATIO = 50;
 
 async function promptChars(tools: Record<string, Tool>): Promise<number> {

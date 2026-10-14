@@ -32,7 +32,8 @@ const DOC: Record<string, Access> = {
   style: { write: ['set_style'], read: 'style' },
   script: { write: ['write_script'], read: 'script' },
   referenceLook: { write: ['set_reference_look'], read: 'referenceLook' },
-  still: { write: ['set_canvas'], read: 'still' }
+  still: { write: ['set_canvas'], read: 'still' },
+  links: { fixed: 'written by the canvas when a generative node is connected to the frame (connect_nodes)' }
 };
 
 const TRACK: Record<string, Access> = {

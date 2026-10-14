@@ -10,7 +10,8 @@ showed almost nothing once it did.
 Which fields belong to a part is decided by `partFieldKeys(doc, clip, field)` in
 `inspector.ts`, in one place:
 
-- **its own fields by name**: `<part>` plus `<part>Color|Colour|Font|Size|Weight|X|Y|Leading`
+- **its own fields by name**: `<part>` plus `<part>Color|Colour|TextColor|BgColor|BorderColor|TagColor|Font|Size|Weight|Height|X|Y|Leading`
+  (the last suffixes came with the batch-5 posters, which name every part's fields this way)
   (`titleSize`, `overlayX`, `numberColour`…);
 - **a table row where a poster names them otherwise**: `PART_FIELDS_BY_POSTER`, e.g.
   `CircleEventPoster.heading → nameSize`, `OverlayGridPoster.overlayLow → lowX, lowY`. A test in

@@ -2,8 +2,9 @@
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import { boxOf } from '$lib/motion/layout';
   import { mapOutline, parsePath, pathData, type Outline, type Pt } from '$lib/motion/shape/geometry';
-  import { Handle, Mirror, addPoint, deletePoint, dragHandle, movePoint, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
+  import { Handle, Mirror, addPoint, deletePoint, dragHandle, insertPoint, movePoint, segmentHit, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
   import { setPath } from '$lib/motion/shape/ops';
+  import { isTyping } from '$lib/motion/shortcuts';
 
   let { doc, clip, onchange }: { doc: MotionDoc; clip: MotionClip; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
@@ -21,6 +22,9 @@
     return typeof parsed === 'string' ? [] : parsed;
   });
   const outline = $derived(live ?? saved);
+
+  const HIT_SCREEN_PX = 8;
+  const framed = $derived(mapOutline(outline, (p) => [box.left + p[0] * box.width, box.top + p[1] * box.height]));
 
   const toFrame = (p: Pt) => ({ x: box.left + p[0] * box.width, y: box.top + p[1] * box.height });
   const pct = (p: Pt) => {
@@ -58,6 +62,29 @@
     e.stopPropagation();
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     grab = { kind: 'handle', ref, handle };
+  }
+
+  function insertOnPath(e: PointerEvent) {
+    const rect = host!.getBoundingClientRect();
+    const at: Pt = [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height];
+    const hit = segmentHit(framed, at, (HIT_SCREEN_PX * doc.width) / Math.max(rect.width, 1));
+    if (!hit) {
+      return;
+    }
+    e.stopPropagation();
+    const next = insertPoint(outline, hit);
+    selected = next.ref;
+    commit(next.outline, 'Added a path point');
+  }
+
+  function deleteSelected(e: KeyboardEvent) {
+    if (!selected || (e.key !== 'Backspace' && e.key !== 'Delete') || isTyping(e.target as HTMLElement | null)) {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    commit(deletePoint(outline, selected), 'Deleted a path point');
+    selected = null;
   }
 
   function place(e: PointerEvent) {
@@ -101,10 +128,13 @@
   };
 </script>
 
+<svelte:window onkeydowncapture={deleteSelected} />
+
 <div class="overlay" class:pen bind:this={host} data-testid="pen-overlay" role="presentation" onpointerdown={place} onpointermove={move} onpointerup={end} onpointercancel={end}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     <rect class="frame" x={box.left} y={box.top} width={box.width} height={box.height} />
-    <path class="outline" d={pathData(mapOutline(outline, (p) => [box.left + p[0] * box.width, box.top + p[1] * box.height]))} />
+    <path class="outline" d={pathData(framed)} />
+    <path class="hit" role="presentation" data-testid="pen-path" d={pathData(framed)} onpointerdown={insertOnPath} />
     {#if selected}
       {#each handles(selected) as [, h] (h.join())}
         {@const a = toFrame(outline[selected.contour].vertices[selected.index].p)}
@@ -166,6 +196,15 @@
     stroke: var(--ui-accent);
     stroke-width: 1.5px;
     vector-effect: non-scaling-stroke;
+  }
+
+  .hit {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 12px;
+    vector-effect: non-scaling-stroke;
+    pointer-events: stroke;
+    cursor: copy;
   }
 
   .frame {

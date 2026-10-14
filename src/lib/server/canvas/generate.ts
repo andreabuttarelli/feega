@@ -30,6 +30,7 @@ import {
 } from '$lib/server/repos/node-runs';
 import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
 import type { Actor } from '$lib/server/repos/actor';
+import { frameStore, refreshLinks } from '$lib/server/motion/move-element';
 import { signMediaPaths } from './sign-media';
 import { peopleScreened, ReferenceMedium } from '$lib/server/moderation/people';
 import { composePrompt } from '$lib/canvas/compose-prompt';
@@ -178,6 +179,8 @@ async function land(
   return { kind: 'done', run: { ...run, status: 'done', outputAssetId: asset.id }, asset };
 }
 
+const SYSTEM_ACTOR: Actor = { kind: 'system', id: null };
+
 async function showRunState(
   db: Db,
   input: { orgId: string; nodeId: string; actor?: Actor },
@@ -190,7 +193,11 @@ async function showRunState(
     check: DataCheck.None,
     actor: input.actor
   }).catch(() => null);
-  return written?.outcome === 'written';
+  const shown = written?.outcome === 'written';
+  if (shown && typeof patch.refId === 'string') {
+    await refreshLinks(frameStore(db, { orgId: input.orgId, actor: input.actor ?? SYSTEM_ACTOR }), input.nodeId).catch(() => []);
+  }
+  return shown;
 }
 
 /**

@@ -2,14 +2,16 @@ import { asSchema, type Tool } from 'ai';
 import type { Db } from '$lib/server/db/client';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { agentActor } from '$lib/server/repos/actor';
-import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/motion-revisions';
+import { listRevisions, readRevision } from '$lib/server/repos/motion-revisions';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { savedMotion } from './agent-embed';
-import { assetUrls, motionAssets, motionTokens, saveMotionDoc } from './editor';
+import { assetUrls, motionAssets, motionTokens } from './editor';
+import { OpsOutcome, commitDoc } from './frame-ops';
 import { templateLibrary } from './templates';
 import { exportStill } from './still-export';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
+import { frameMover } from './move-element';
 import { drawFrames, firstFrames } from './server-frames';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
 import type { Frame } from './frames';
@@ -107,7 +109,8 @@ export async function runMotionTool(db: Db, scope: ToolRunScope, ask: ToolRunAsk
     assets,
     templates: templateLibrary(db, { orgId: scope.orgId, actor }),
     revisions: { list: () => listRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null },
-    exportStill: (doc, spec) => exportStill(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId }, doc, spec, { tokens, assets })
+    exportStill: (doc, spec) => exportStill(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId }, doc, spec, { tokens, assets }),
+    moveOut: frameMover(db, { orgId: scope.orgId, actor, projectId: saved.project.id }, scope.nodeId)
   }, frames);
 
   const found = tools[ask.tool];
@@ -130,12 +133,12 @@ export async function runMotionTool(db: Db, scope: ToolRunScope, ask: ToolRunAsk
     return { outcome: ToolRun.Done, output, version: saved.version, saved: false, frames: seen };
   }
 
-  const write = await saveMotionDoc(db, { ...nodeScope, expectedVersion: saved.version, doc: session.doc, actor, summary: session.edits.join('; ') || ask.tool });
-  if (write.outcome === RevisionOutcome.Invalid) {
-    return { outcome: ToolRun.Invalid, detail: write.error };
+  const commit = await commitDoc(db, { ...nodeScope, node: saved.node, base: saved, doc: session.doc, actor, summary: session.edits.join('; ') || ask.tool });
+  if (commit.outcome === OpsOutcome.Invalid) {
+    return { outcome: ToolRun.Invalid, detail: commit.error };
   }
-  if (write.outcome !== RevisionOutcome.Written) {
+  if (commit.outcome !== OpsOutcome.Written) {
     return { outcome: ToolRun.Conflict };
   }
-  return { outcome: ToolRun.Done, output, version: write.head.version, saved: true, frames: seen };
+  return { outcome: ToolRun.Done, output, version: commit.head.version, saved: true, frames: seen };
 }
