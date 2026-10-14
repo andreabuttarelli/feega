@@ -1,9 +1,11 @@
 import { cornerRadii, ellipseOutline, parsePath, pathData, polygonOutline, rectOutline, scaled, starOutline, type Outline, type Size } from './geometry';
 import { morphOutline } from './morph';
 import { IDENTITY, applyModifiers, modifierFilter, modifierReach, type AppliedModifier, type Layer } from './modifiers';
-import { ShapeKind, StrokeKind, modifierValues, type Modifier } from './schema';
+import { ShapeKind, modifierValues, type Modifier } from './schema';
 import { fillsOf } from '../fill/model';
 import { svgFills } from '../fill/render';
+import { SIDED, strokesOf } from '../stroke/model';
+import { strokeReach, svgStrokes } from '../stroke/render';
 
 export type ShapeLook = {
   shape: ShapeKind;
@@ -18,12 +20,13 @@ export type ShapeLook = {
   morphStart: number;
   modifiers: Modifier[];
   fills?: unknown;
+  strokes?: unknown;
   fillKind: string;
   fill: string;
   fill2: string;
   gradientAngle: number;
   fillRule: string;
-  strokeKind: StrokeKind;
+  strokeKind: string;
   stroke: string;
   strokeWidth: number;
   dash: number;
@@ -64,9 +67,7 @@ export function shapeLayers(p: ShapeLook, size: Size, time: number): Layer[] {
   return applyModifiers([{ outline, opacity: 1, matrix: IDENTITY }], stackOf(p), { size, time });
 }
 
-const gradientId = (id: string) => `sg-${id}`;
 const filterId = (id: string) => `sf-${id}`;
-const MITER_REACH = 4;
 
 export type Extent = { left: number; top: number; right: number; bottom: number };
 
@@ -85,7 +86,7 @@ function paintedExtent(p: ShapeLook, paint: Paint, layers: Layer[]): Extent | nu
   if (!drawn) {
     return null;
   }
-  const reach = modifierReach(stackOf(p), paint.unit) + (p.strokeKind === StrokeKind.None ? 0 : (p.strokeWidth * paint.unit * MITER_REACH) / 2);
+  const reach = modifierReach(stackOf(p), paint.unit) + strokeReach(strokesOf(p), paint.unit);
   return { left: drawn.left - reach, top: drawn.top - reach, right: drawn.right + reach, bottom: drawn.bottom + reach };
 }
 
@@ -104,29 +105,6 @@ function filterOf(p: ShapeLook, paint: Paint, extent: Extent | null): string {
   return `<filter id="${filterId(paint.id)}" filterUnits="userSpaceOnUse" x="${round(extent.left)}" y="${round(extent.top)}" width="${round(extent.right - extent.left)}" height="${round(extent.bottom - extent.top)}" color-interpolation-filters="sRGB">${primitives}</filter>`;
 }
 
-function strokeGradient(p: ShapeLook, paint: Paint): string {
-  const { w, h } = paint.size;
-  const stops = `<stop offset="0" style="stop-color:${paint.color(p.fill)}"/><stop offset="1" style="stop-color:${paint.color(p.fill2)}"/>`;
-  const r = (p.gradientAngle * Math.PI) / 180;
-  const dx = (Math.cos(r) * w) / 2;
-  const dy = (Math.sin(r) * h) / 2;
-  return `<linearGradient id="${gradientId(paint.id)}" gradientUnits="userSpaceOnUse" x1="${round(w / 2 - dx)}" y1="${round(h / 2 - dy)}" x2="${round(w / 2 + dx)}" y2="${round(h / 2 + dy)}">${stops}</linearGradient>`;
-}
-
-const STROKE: Record<StrokeKind, (p: ShapeLook, paint: Paint) => string> = {
-  [StrokeKind.None]: () => 'none',
-  [StrokeKind.Solid]: (p, paint) => paint.color(p.stroke),
-  [StrokeKind.Gradient]: (_p, paint) => `url(#${gradientId(paint.id)})`
-};
-
-function strokeGroup(p: ShapeLook, paint: Paint, paths: string): string {
-  if (p.strokeKind === StrokeKind.None) {
-    return '';
-  }
-  const dashed = p.dash > 0 ? `;stroke-dasharray:${round(p.dash * paint.unit)} ${round((p.gap || p.dash) * paint.unit)}` : '';
-  return `<g style="fill:none;stroke:${STROKE[p.strokeKind](p, paint)};stroke-width:${round(p.strokeWidth * paint.unit)};stroke-linecap:${p.cap};stroke-linejoin:${p.join}${dashed}">${paths}</g>`;
-}
-
 const NO_ASSET = () => null;
 
 const matrixAttr = (m: Layer['matrix']) => (m.every((n, i) => n === IDENTITY[i]) ? '' : ` transform="matrix(${m.map(round).join(' ')})"`);
@@ -142,9 +120,9 @@ export function shapeDrawing(p: ShapeLook, paint: Paint): { markup: string; exte
   const extent = paintedExtent(p, paint, layers);
   const filter = filterOf(p, paint, extent);
   const fills = svgFills(fillsOf(p), { id: paint.id, size: paint.size, color: paint.color, asset: paint.asset ?? NO_ASSET }, paths, p.fillRule);
-  const stroked = p.strokeKind === StrokeKind.Gradient ? strokeGradient(p, paint) : '';
-  const inner = fills.defs + stroked + filter;
+  const strokes = svgStrokes(strokesOf(p), paint, paths, { sided: SIDED[p.shape] });
+  const inner = fills.defs + strokes.defs + filter;
   const defs = inner ? `<defs>${inner}</defs>` : '';
   const filtered = filter ? ` filter="url(#${filterId(paint.id)})"` : '';
-  return { markup: `${defs}<g${filtered}>${fills.body}${strokeGroup(p, paint, paths)}</g>`, extent };
+  return { markup: `${defs}<g${filtered}>${fills.body}${strokes.body}</g>`, extent };
 }

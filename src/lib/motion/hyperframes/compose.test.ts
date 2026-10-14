@@ -101,6 +101,27 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(html).toContain('color:#123456');
   });
 
+  it('text with a stroke outlines its glyphs; text without one composes as before', () => {
+    const strokes = [{ paint: { type: 'solid', color: '#ff0000' }, width: 0.002, align: 'outside' }];
+    const titled = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Hi', strokes } }, 'tt'));
+    const texted = must(addClip(titled, { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'Body', strokes } }, 'tx'));
+    const kicked = must(addClip(texted, { component: 'Kicker', from: 0, durationInFrames: 30, props: { text: 'Kick', strokes } }, 'kk'));
+    const captioned = must(addClip(kicked, { component: 'Caption', from: 0, durationInFrames: 30, props: { text: 'Cap', strokes } }, 'cc'));
+    const plain = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Hi' } }, 'tt'));
+
+    const html = compose(captioned);
+
+    expect(html.match(/-webkit-text-stroke:4.32px #ff0000;paint-order:stroke fill/g)?.length).toBe(4);
+    expect(compose(plain)).not.toContain('text-stroke');
+  });
+
+  it('a shape with an outside stroke masks its inside out', () => {
+    const strokes = [{ paint: { type: 'solid', color: '#ff0000' }, align: 'outside' }];
+    const box = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', width: 0.5, height: 0.5, strokes } }, 'box'));
+
+    expect(compose(box)).toContain('mask="url(#sk-box-s0)"');
+  });
+
   it('registers one paused timeline under the composition id', () => {
     expect(compose(doc)).toContain('window.__timelines["main"]=tl');
   });
