@@ -16,5 +16,5 @@ Toggle in the top bar or E; remembered per browser (`feega.frame-edit-mode`). Th
 hides and shows on the new `--ease-expo-out` (320 ms), which ⌘J now uses too.
 
 Not done: plain V/T/R/O/P tool keys and arrow-key nudging in Design (arrows still step frames);
-the timeline's own value editing stays Motion, since it is hidden in Design. No e2e: seeded
-e2e on production is stopped and there is no other database.
+the timeline's own value editing stays Motion, since it is hidden in Design. e2e: the switch,
+the inert timeline and E are covered in `canvas-draw-tools.spec.ts`.

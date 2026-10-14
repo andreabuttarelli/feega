@@ -1519,7 +1519,7 @@
     {/snippet}
     </SideColumn>
 
-    <section class="timeline-area" {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc)}>
+    <section class="timeline-area" {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
 
       {#if clipBarShown}
