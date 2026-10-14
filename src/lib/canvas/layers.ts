@@ -98,10 +98,10 @@ function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlin
   return (outlines[nodeId] ?? []).map((row) => ({ ...row, nested: true }));
 }
 
-export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}): LayerRow[] {
+export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
     const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.type, nodeId: node.id, hidden: false, locked: false, nested: false };
-    return [row, ...childRows(node.id, open, outlines)];
+    return folded.has(node.id) ? [row] : [row, ...childRows(node.id, open, outlines)];
   });
 }
 

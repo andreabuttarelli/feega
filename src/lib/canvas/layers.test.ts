@@ -82,6 +82,14 @@ describe('every frame lists its children, open or not', () => {
     expect(closed.every((r) => r.nested)).toBe(true);
   });
 
+  it('a folded frame keeps only its own row; the others stay unfolded', () => {
+    const doc = video();
+    const rows = layerRows(NODES, { nodeId: 'm1', doc }, { m2: frameRows(doc, 'm2') }, new Set(['m1']));
+
+    expect(rows.filter((r) => r.nodeId === 'm1').map((r) => r.id)).toEqual(['m1']);
+    expect(rows.some((r) => r.nodeId === 'm2' && r.depth > 0)).toBe(true);
+  });
+
   it('the open frame reads its live doc, never the stored outline', () => {
     const doc = video();
     const rows = layerRows(NODES, { nodeId: 'm1', doc }, { m1: [] });

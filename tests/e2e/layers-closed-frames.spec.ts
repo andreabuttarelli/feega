@@ -42,4 +42,28 @@ test.describe('layers of closed frames @real', () => {
       await page.screenshot({ path: `${SHOTS}/layers-closed-frames.png` });
     }
   });
+
+  test('a frame folds on demand and stays folded after a reload', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(90_000);
+    const node = await seedNode({ type: 'motion', x: 80, y: 80, data: LANDSCAPE });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: motion, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+
+    const url = `/p/${session.projectId}/c/${session.canvasId}`;
+    await gotoHydrated(page, url);
+    await page.getByRole('button', { name: 'Layers', exact: true }).click();
+    const layers = page.getByTestId('layers');
+    await expect(layers.locator('[data-layer="v1"]')).toHaveCount(1, { timeout: 15_000 });
+
+    await layers.getByTestId('layer-fold').click();
+    await expect(layers.locator('[data-layer="v1"]')).toHaveCount(0);
+
+    await gotoHydrated(page, url);
+    await page.getByRole('button', { name: 'Layers', exact: true }).click();
+    await expect(layers.getByTestId('layer-fold')).toHaveAttribute('aria-expanded', 'false', { timeout: 15_000 });
+    await expect(layers.locator('[data-layer="v1"]')).toHaveCount(0);
+
+    await layers.getByTestId('layer-fold').click();
+    await expect(layers.locator('[data-layer="v1"]')).toHaveCount(1);
+  });
 });
