@@ -64,6 +64,8 @@ const CLIP: Record<string, Access> = {
   space: { write: ['set_clip_depth'], read: 'space' },
   parent: { write: ['set_parent', 'parent_clips'], read: 'parent' },
   parentOpacity: { write: ['set_parent'], read: 'parentOpacity' },
+  autoLayout: { write: ['add_auto_layout', 'set_auto_layout', 'reorder_auto_layout'], read: 'autoLayout' },
+  layoutItem: { write: ['add_auto_layout', 'set_layout_item'], read: 'layoutItem' },
   expressions: { write: ['set_expression', 'pulse_with_music'], read: 'expressions' },
   effects: { write: ['add_effect', 'set_effect', 'remove_effect', 'set_lut'], read: 'effects' },
   shaders: { write: ['add_custom_effect', 'set_custom_effect', 'remove_custom_effect'], read: 'shaders' },

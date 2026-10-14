@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { test, expect, REAL_STACK, gotoHydrated, createE2eSession, teardownE2eSession, signInE2e } from './fixtures/session';
+import { test, expect, ON_PRODUCTION, REAL_STACK, gotoHydrated, createE2eSession, teardownE2eSession, signInE2e } from './fixtures/session';
 
 /**
  * LA TELA, DAL VERO BROWSER — due percorsi critici, non una copertura esaustiva. @real: richiede
@@ -115,6 +115,7 @@ test.describe('canvas @real', () => {
   });
 
   test('a zero-credit org sees a readable message, not a generic save failure', async ({ page }) => {
+    test.skip(ON_PRODUCTION, 'il test account ha crediti: un portafoglio vuoto non si mette in scena su produzione');
     const session = await createE2eSession({ withCredits: false });
     try {
       await signInE2e(page, session);

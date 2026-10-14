@@ -152,6 +152,11 @@ const SPECS: ImageModelSpec[] = [
 
 export const IMAGE_MODEL_CHOICES = SPECS.map((s) => ({ id: s.id, label: s.label }));
 
+export function rendersOnImagesApi(model: string | undefined): boolean {
+  const spec = imageModelSpec(model);
+  return spec ? spec.openrouterImages !== null : Boolean(model);
+}
+
 export function isKnownImageModelId(value: unknown): value is string {
   return !!imageModelSpec(value);
 }

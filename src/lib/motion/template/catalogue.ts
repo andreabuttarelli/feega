@@ -1,6 +1,6 @@
 import { MotionFormat, formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { FIELD_TYPE_LABEL } from './field-model';
-import { insertTemplate, type Inserted, type TemplateEntry } from './library';
+import { insertTemplate, type Inserted, type Instance, type TemplateEntry } from './library';
 import PREVIEWED from './previews.json';
 import { DocMode, docMode } from '$lib/motion/still';
 
@@ -31,6 +31,15 @@ export const ADD_TARGET: Record<AddTarget, { label: string; sounds: boolean }> =
 export const STARTER_FORMATS = [MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Square] as const;
 export type StarterFormat = (typeof STARTER_FORMATS)[number];
 
+export enum Edits {
+  None = 'none',
+  Some = 'some'
+}
+
+export function draftToAdd(draft: Instance | null, edits: Edits, format: MotionFormat, opened: MotionFormat): Instance | null {
+  return edits === Edits.Some || format !== opened ? draft : null;
+}
+
 const isStarter = (f: MotionFormat): f is StarterFormat => (STARTER_FORMATS as readonly MotionFormat[]).includes(f);
 
 export function starterFormatOf(frame: Pick<MotionDoc, 'width' | 'height'>): StarterFormat {
@@ -45,7 +54,7 @@ export type CatalogueItem = {
   seconds: number;
   kind: ComponentKind;
   mode: DocMode;
-  format: StarterFormat;
+  format: MotionFormat;
   fields: { label: string; type: string }[];
   preview: Preview | null;
 };
@@ -92,7 +101,7 @@ export function catalogue(entries: readonly TemplateEntry[]): CatalogueItem[] {
     seconds: e.template.doc.durationInFrames / e.template.doc.fps,
     kind: componentKind(e),
     mode: docMode(e.template.doc),
-    format: starterFormatOf(e.template.doc),
+    format: ownFormat(e.template.doc),
     fields: e.template.doc.fields.map((f) => ({ label: f.label, type: FIELD_TYPE_LABEL[f.type] })),
     preview: previewOf(e.id, docMode(e.template.doc))
   }));
@@ -106,6 +115,21 @@ export function matching(items: readonly CatalogueItem[], query: string, kind: C
 
 export const POSTER_FORMATS = [MotionFormat.Portrait, MotionFormat.Vertical, MotionFormat.Poster] as const;
 export type PosterFormat = (typeof POSTER_FORMATS)[number];
+
+export const FORMATS_OF_MODE: Record<DocMode, readonly MotionFormat[]> = {
+  [DocMode.Video]: STARTER_FORMATS,
+  [DocMode.Still]: POSTER_FORMATS
+};
+
+function ownFormat(doc: MotionDoc): MotionFormat {
+  const offered = FORMATS_OF_MODE[docMode(doc)];
+  const format = formatOf(doc);
+  return offered.includes(format) ? format : offered[0];
+}
+
+export function libraryFormat(item: Pick<CatalogueItem, 'mode' | 'format'>, wanted: MotionFormat): MotionFormat {
+  return FORMATS_OF_MODE[item.mode].includes(wanted) ? wanted : item.format;
+}
 
 export function posterShelf(items: readonly CatalogueItem[]): CatalogueItem[] {
   return matching(items, '', null, DocMode.Still).sort((a, b) => a.name.localeCompare(b.name));

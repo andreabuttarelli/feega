@@ -5,7 +5,7 @@
   import { duckUnder, voicesOver } from '$lib/motion/duck';
   import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
-  import { BRAND_COLORS, COMPONENTS, Control, TrackKind, type AssetKind } from '$lib/motion/components';
+  import { COMPONENTS, Control, TrackKind, type AssetKind } from '$lib/motion/components';
   import { DEPTH, Space } from '$lib/motion/camera';
   import { setClipDepth } from '$lib/motion/camera-ops';
   import { ParentOpacity, parentChoices } from '$lib/motion/parent';
@@ -24,7 +24,13 @@
   import InspectorSection from './InspectorSection.svelte';
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
-  import { DIAL_KEYS, GROUP_SECTION, Part, SECTION_ORDER, SECTION_TITLE, Section, fieldLook, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shows, transformSection, type SectionState } from '$lib/motion/inspector-sections';
+  import { DIAL_KEYS, Part, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, transformSection, type SectionState } from '$lib/motion/inspector-sections';
+  import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
+  import { clipName as layerName } from '$lib/motion/organize';
+  import ColorField from './ColorField.svelte';
+  import { hasSegments, segmentsOf } from '$lib/motion/segments';
+  import SegmentedField from './SegmentedField.svelte';
+  import FamilyIcon from './FamilyIcon.svelte';
   import { CLIP_FAMILIES, familyOf } from '$lib/motion/track-style';
   import { KeyMark } from '$lib/motion/timeline-layers';
   import type { LayoutStore } from '$lib/motion/editor-layout';
@@ -52,7 +58,7 @@
   import { cornerRadii, withCorner } from '$lib/motion/shape/geometry';
   import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '$lib/motion/text-animators/model';
   import { TEXT_COMPONENTS, TEXT_PRESETS, applyPreset as applyTextPreset, removeAnimator, setAnimator, type TextPreset } from '$lib/motion/text-animators/ops';
-  import { BLEND_MODES, type BlendMode } from '$lib/motion/blend';
+  import { BLEND_MODES, blendLabel, type BlendMode } from '$lib/motion/blend';
   import { setBlendMode } from '$lib/motion/blend-ops';
   import { setClipsBlur } from '$lib/motion/motion-blur-ops';
   import { expressionErrors, expressionValue } from '$lib/motion/expression/bake';
@@ -122,7 +128,8 @@
   });
 
   const toggleSection = (section: Section) => (sections = flipSection(sections, family, section, sectionStore()));
-  const inGrid = (field: Field) => field.control === Control.Range && fieldLook(field.key).glyph !== null;
+  const segmented = (field: Field) => field.control === Control.Select && hasSegments(field.key);
+  const inGrid = (field: Field) => field.control === Control.Range && fieldLook(field.key).short !== null;
   const afterDot = (prop: AnimProp) => prop.label.split(' · ')[1] ?? prop.label;
 
   function grow(area: HTMLTextAreaElement) {
@@ -141,15 +148,23 @@
     commit(duckUnder(doc, clip.id, voiceId, analyses[assetId]?.speech ?? null), 'Ducked the music');
   }
 
-  const groups = $derived(clipFieldGroups(doc, clip).map((g) => ({ ...g, fields: g.fields.filter((f) => !focus || focus.includes(f.key)) })).filter((g) => g.fields.length));
+  const transformKeys = $derived(new Set(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform).map((p) => p.key)));
+  const typed = $derived(clipFieldGroups(doc, clip).some((g) => g.fields.some((f) => f.control === Control.Font)) ? Typed.Yes : Typed.No);
+  const fields = $derived(
+    clipFieldGroups(doc, clip)
+      .flatMap((g) => g.fields)
+      .filter((f) => !focus || focus.includes(f.key))
+      .filter((f) => !shadowed(f.key, (clip.props as Record<string, unknown>)[f.key], f.fallback, transformKeys))
+  );
   const animated = $derived(withParams(doc, clip));
   const customName = $derived(clip.component === 'Custom' ? String(clip.props.name) : null);
   const spec = $derived(COMPONENTS[clip.component]);
-  const transformProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && p.key !== 'anchorX' && p.key !== 'anchorY'));
+  const transformProps = $derived(focus ? [] : ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && p.key !== 'anchorX' && p.key !== 'anchorY'));
   const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Layout));
   const threeDProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.ThreeD));
+  const layerProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Layer));
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
-  const groupsIn = (section: Section) => groups.filter((g) => GROUP_SECTION[g.group] === section);
+  const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
   const sceneProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Scene));
   const maskProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Mask));
   const NO_MASK = 'none';
@@ -230,7 +245,6 @@
 
   const faults = $derived(Object.fromEntries(expressionErrors(doc, analyses).filter((f) => f.clipId === clip.id).map((f) => [f.key, f.error])));
   const DEFAULT_EXPRESSION = 'value';
-  const BLEND_LABEL = Object.fromEntries(BLEND_MODES.map((m) => [m, m.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ')])) as Record<BlendMode, string>;
 
   function toggleExpression(key: string) {
     const off = clip.expressions[key] !== undefined;
@@ -345,27 +359,33 @@
   const fieldStored = (field: Field, v: number) => toStored(propsOwner(clip.component), field.key, v, doc);
   const fieldSlider = (field: Field) => sliderOf(propsOwner(clip.component), fieldRange(field), doc);
   const value = (field: Field) => (keyedField(clip.component, field.key, animated.params) ? shown(field.key) : (clip.props as Record<string, unknown>)[field.key]);
-  const isHex = (v: unknown) => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
 
   const pulseShown = $derived(pulsable.length > 0 && shows(Part.Pulse, family) && doc.tracks.some((t) => t.clips.some((c) => c.component === 'Audio')));
   const visual = $derived(spec.track === TrackKind.Visual);
 
+  const view = $derived(focus ? PropertiesView.Part : PropertiesView.Clip);
   const has: Record<Section, boolean> = $derived({
-    [Section.Content]: groupsIn(Section.Content).length > 0,
-    [Section.Style]: groupsIn(Section.Style).length > 0,
-    [Section.Layout]: layoutProps.length > 0 || groupsIn(Section.Layout).length > 0,
+    [Section.Content]: fieldsIn(Section.Content).length > 0,
+    [Section.Layout]: layoutProps.length > 0 || fieldsIn(Section.Layout).length > 0,
+    [Section.Layer]: layerProps.length > 0 || fieldsIn(Section.Layer).length > 0 || (visual && !focus),
+    [Section.Fill]: fieldsIn(Section.Fill).length > 0,
+    [Section.Stroke]: fieldsIn(Section.Stroke).length > 0,
+    [Section.Text]: fieldsIn(Section.Text).length > 0,
     [Section.Timing]: true,
     [Section.Shape]: clip.component === 'Shape',
-    [Section.Animate]: visual || TEXT_COMPONENTS.has(clip.component) || pulseShown || (voices.length > 0 && shows(Part.Ducking, family)) || groupsIn(Section.Animate).length > 0 || !!(clip.keyframes.x?.length && clip.keyframes.y?.length),
+    [Section.Animate]: visual || TEXT_COMPONENTS.has(clip.component) || pulseShown || (voices.length > 0 && shows(Part.Ducking, family)) || fieldsIn(Section.Animate).length > 0 || !!(clip.keyframes.x?.length && clip.keyframes.y?.length),
     [Section.Effects]: visual && clip.component !== 'Null',
-    [Section.ThreeD]: threeDProps.length > 0 || sceneProps.length > 0 || groupsIn(Section.ThreeD).length > 0 || visual,
+    [Section.ThreeD]: threeDProps.length > 0 || sceneProps.length > 0 || fieldsIn(Section.ThreeD).length > 0 || visual,
     [Section.Parent]: visual || maskProps.length > 0
   });
 
   const BODIES: Record<Section, Snippet> = $derived({
     [Section.Content]: contentBody,
-    [Section.Style]: styleBody,
     [Section.Layout]: layoutBody,
+    [Section.Layer]: layerBody,
+    [Section.Fill]: fillBody,
+    [Section.Stroke]: strokeBody,
+    [Section.Text]: textBody,
     [Section.Timing]: timingBody,
     [Section.Shape]: shapeBody,
     [Section.Animate]: animateBody,
@@ -376,15 +396,11 @@
 </script>
 
 <div class="inspector" data-testid="motion-inspector" style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
-  <header>
-    <span class="swatch-bar" aria-hidden="true"></span>
-    <span class="kind">{customName ? componentLabel(customName) : spec.label}</span>
-    <span class="id">{clip.id}</span>
+  <header class="head" title={clip.id} data-testid="selection-head">
+    <span class="icon"><FamilyIcon {family} /></span>
+    <span class="name">{customName ? componentLabel(customName) : layerName(clip)}</span>
+    <span class="kind">{customName ? 'Component' : spec.label}</span>
   </header>
-
-  {@render lead?.()}
-
-  {#if warning}<p class="mode-warning" role="status" data-testid="design-animated-warning">{warning}</p>{/if}
 
   {#if customName}
     <div class="tabs" role="tablist">
@@ -393,11 +409,14 @@
     </div>
   {/if}
 
+  {#if warning}<p class="mode-warning" role="status" data-testid="design-animated-warning">{warning}</p>{/if}
+
   {#if customName && tab === InspectorTab.Code}
     <CodeEditor {doc} name={customName} previous={previousSource(customName)} {onchange} />
   {:else}
-    {#each SECTION_ORDER.filter((s) => has[s]) as section (section)}
-      <InspectorSection title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section) || (!!focus && groupsIn(section).length > 0)} ontoggle={() => toggleSection(section)}>
+    {@render lead?.()}
+    {#each sectionsFor(family, view, mode).filter((s) => has[s]) as section (section)}
+      <InspectorSection title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section) || (!!focus && fieldsIn(section).length > 0)} ontoggle={() => toggleSection(section)}>
         {@render BODIES[section]()}
       </InspectorSection>
     {/each}
@@ -424,8 +443,8 @@
   {@const look = fieldLook(prop.key, prop.source)}
   {@const range = slider(prop)}
   <NumberField
-    label={look.glyph ?? prop.label}
-    kind={look.glyph ? FieldKind.Glyph : FieldKind.Named}
+    label={look.short ?? prop.label}
+    kind={look.short ? FieldKind.Glyph : FieldKind.Named}
     name={prop.label}
     value={numberShown(prop)}
     {range}
@@ -443,7 +462,7 @@
   <div class="grid2">
     {#each props as prop (prop.key)}
       {@const look = fieldLook(prop.key, prop.source)}
-      <div class="grid-cell" class:wide={!look.glyph} data-prop={prop.key}>{@render animField(prop)}</div>
+      <div class="grid-cell" class:wide={!look.short} data-prop={prop.key}>{@render animField(prop)}</div>
     {/each}
   </div>
   {#each props as prop (prop.key)}{@render exprEditor(prop.key)}{/each}
@@ -461,8 +480,8 @@
   {@const look = fieldLook(field.key)}
   {@const range = fieldSlider(field)}
   <NumberField
-    label={look.glyph ?? field.label}
-    kind={look.glyph ? FieldKind.Glyph : FieldKind.Named}
+    label={look.short ?? field.label}
+    kind={look.short ? FieldKind.Glyph : FieldKind.Named}
     name={field.label}
     value={fieldShown(field)}
     {range}
@@ -503,12 +522,7 @@
         {:else if field.control === Control.Toggle}
           <input id={`f-${field.key}`} class="toggle" type="checkbox" checked={value(field) === true} onchange={(e) => setProp(field, e.currentTarget.checked)} />
         {:else if field.control === Control.Color}
-          <div class="swatches">
-            {#each BRAND_COLORS as token (token)}
-              <button type="button" class="swatch" class:on={value(field) === token} title={token} aria-label={token} style={`background: ${resolveColor(token, tokens)};`} onclick={() => setProp(field, token)}></button>
-            {/each}
-            <input id={`f-${field.key}`} type="color" value={isHex(value(field)) ? String(value(field)) : resolveColor(value(field), tokens)} onchange={(e) => setProp(field, e.currentTarget.value)} />
-          </div>
+          <ColorField id={`f-${field.key}`} name={field.label} value={value(field)} {tokens} onchange={(v) => setProp(field, v)} />
         {:else if field.control === Control.Asset}
           <div class="assets">
             <button type="button" class="asset none" class:on={!value(field)} onclick={() => setProp(field, null)}>None</button>
@@ -546,15 +560,20 @@
 {/snippet}
 
 {#snippet groupFields(section: Section)}
-  {#each groupsIn(section) as { group, fields } (group)}
-    {@const gridded = fields.filter(inGrid)}
-    {#each fields.filter((f) => !inGrid(f)) as field (field.key)}{@render fieldRow(field)}{/each}
-    {#if gridded.length}
-      <div class="grid2">
-        {#each gridded as field (field.key)}<div class="grid-cell" data-prop={field.key}>{@render rangeField(field)}</div>{/each}
-      </div>
-      {#each gridded as field (field.key)}{@render exprEditor(field.key)}{/each}
-    {/if}
+  {@const list = fieldsIn(section)}
+  {@const gridded = list.filter(inGrid)}
+  {#each list.filter((f) => !inGrid(f) && !segmented(f)) as field (field.key)}{@render fieldRow(field)}{/each}
+  {#if gridded.length}
+    <div class="grid2">
+      {#each gridded as field (field.key)}<div class="grid-cell" data-prop={field.key}>{@render rangeField(field)}</div>{/each}
+    </div>
+    {#each gridded as field (field.key)}{@render exprEditor(field.key)}{/each}
+  {/if}
+  {#each list.filter(segmented) as field (field.key)}
+    <div class="line" data-prop={field.key}>
+      <span class="label">{field.label}</span>
+      <SegmentedField name={field.label} options={segmentsOf(field.key, field.options ?? [])} value={String(value(field))} onchange={(v) => setProp(field, v)} />
+    </div>
   {/each}
 {/snippet}
 
@@ -562,13 +581,22 @@
   {@render groupFields(Section.Content)}
 {/snippet}
 
-{#snippet styleBody()}
-  {@render groupFields(Section.Style)}
+{#snippet fillBody()}
+  {@render groupFields(Section.Fill)}
+{/snippet}
+
+{#snippet strokeBody()}
+  {@render groupFields(Section.Stroke)}
+{/snippet}
+
+{#snippet textBody()}
+  {@render groupFields(Section.Text)}
 {/snippet}
 
 {#snippet layoutBody()}
+  {@render groupFields(Section.Layout)}
   {#if layoutProps.length}
-    <div data-testid="transform-section">
+    <div class="stackable" data-testid="transform-section">
       {@render animGrid(layoutProps)}
       <div class="line">
         <span class="label">Anchor</span>
@@ -583,7 +611,22 @@
       </div>
     </div>
   {/if}
-  {@render groupFields(Section.Layout)}
+{/snippet}
+
+{#snippet layerBody()}
+  {#if layerProps.length}<div class="stackable" data-testid="layer-transform">{@render animGrid(layerProps)}</div>{/if}
+  {@render groupFields(Section.Layer)}
+  {#if visual && !focus}
+    <div class="line" data-testid="blend-section">
+      <label class="label" for="blend-mode">Blend</label>
+      <select id="blend-mode" aria-label="Blend mode" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
+        {#each BLEND_MODES as mode (mode)}<option value={mode}>{blendLabel(mode)}</option>{/each}
+      </select>
+    </div>
+    {#if doc.motionBlur.enabled}
+      <label class="check" data-testid="clip-blur-section"><input type="checkbox" data-testid="clip-blur" checked={clip.motionBlur} onchange={(e) => commit(setClipsBlur(doc, [clip.id], e.currentTarget.checked), 'Changed motion blur')} /> Motion blur</label>
+    {/if}
+  {/if}
 {/snippet}
 
 {#snippet timingBody()}
@@ -608,7 +651,7 @@
 {/snippet}
 
 {#snippet shapeBody()}
-  <div data-testid="shape-section">
+  <div class="stackable" data-testid="shape-section">
     <div class="line">
       <span class="label">Path</span>
       {#if clip.props.shape !== ShapeKind.Path}
@@ -651,7 +694,7 @@
 
 {#snippet animateBody()}
   {#if TEXT_COMPONENTS.has(clip.component)}
-    <div data-testid="text-animators-section">
+    <div class="stackable" data-testid="text-animators-section">
       {#each clip.animators as animator, i (animator.id)}
         <div class="effect" data-animator={animator.id}>
           <div class="effect-head">
@@ -700,7 +743,7 @@
     </div>
   {/if}
   {#if visual}
-    <div data-testid="physics-section">
+    <div class="stackable" data-testid="physics-section">
       <div class="line">
         <label class="label" for="physics-preset">Physics</label>
         <select id="physics-preset" aria-label="Physics preset" data-testid="physics-preset" value="" onchange={(e) => applyPhysicsOf(e.currentTarget)}>
@@ -730,7 +773,7 @@
 {/snippet}
 
 {#snippet effectsBody()}
-  <div data-testid="effects-section">
+  <div class="stackable" data-testid="effects-section">
     {#each clip.effects as effect, i (effect.id)}
       <div class="effect" class:off={!effect.enabled} role="listitem" draggable="true" data-effect={effect.id} ondragstart={() => (draggedEffect = effect.id)} ondragover={(e) => e.preventDefault()} ondrop={() => dropEffect(i)}>
         <div class="effect-head">
@@ -745,7 +788,7 @@
           {#if prop.kind === ValueKind.Color}
             <div class="line" data-prop={prop.key}>
               <span class="label">{afterDot(prop)}</span>
-              <input type="color" aria-label={prop.label} value={resolve(String(shown(prop.key)))} onchange={(e) => animate(prop.key, e.currentTarget.value)} />
+              <div class="control"><ColorField name={prop.label} value={shown(prop.key)} {tokens} onchange={(v) => animate(prop.key, resolve(v))} /></div>
               {@render diamond(prop.key)}
             </div>
           {:else}
@@ -759,22 +802,13 @@
       {#each EFFECT_KINDS as kind (kind)}<option value={kind}>{EFFECTS[kind].label}</option>{/each}
     </select>
   </div>
-  <div class="line" data-testid="blend-section">
-    <label class="label" for="blend-mode">Blend</label>
-    <select id="blend-mode" aria-label="Blend mode" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
-      {#each BLEND_MODES as mode (mode)}<option value={mode}>{BLEND_LABEL[mode]}</option>{/each}
-    </select>
-  </div>
-  {#if doc.motionBlur.enabled}
-    <label class="check" data-testid="clip-blur-section"><input type="checkbox" data-testid="clip-blur" checked={clip.motionBlur} onchange={(e) => commit(setClipsBlur(doc, [clip.id], e.currentTarget.checked), 'Changed motion blur')} /> Motion blur on this clip</label>
-  {/if}
 {/snippet}
 
 {#snippet threeDBody()}
   {#if dialProps.length}
     <div class="dials">
       {#each dialProps as prop (prop.key)}
-        <div class="dial-cell"><Dial value={numberShown(prop)} label={prop.label} onchange={(v) => animate(prop.key, stored(prop.key, v))} /><span>{fieldLook(prop.key).glyph}</span></div>
+        <div class="dial-cell"><Dial value={numberShown(prop)} label={prop.label} onchange={(v) => animate(prop.key, stored(prop.key, v))} /><span>{fieldLook(prop.key).short}</span></div>
       {/each}
     </div>
   {/if}
@@ -782,7 +816,7 @@
   {#if sceneProps.length}{@render animGrid(sceneProps)}{/if}
   {@render groupFields(Section.ThreeD)}
   {#if spec.track === TrackKind.Visual}
-    <div data-testid="depth-section">
+    <div class="stackable" data-testid="depth-section">
       <div class="stack">
         <NumberField label={DEPTH.label} kind={FieldKind.Named} name="Depth" value={clip.depth} range={depthRange} unit={depthRange.unit ?? ''} disabled={clip.space === Space.Screen} onchange={(v) => commit(setClipDepth(doc, clip.id, { depth: v }), 'Changed depth')} />
       </div>
@@ -794,7 +828,7 @@
 
 {#snippet parentBody()}
   {#if spec.track === TrackKind.Visual}
-    <div data-testid="parent-section">
+    <div class="stackable" data-testid="parent-section">
       <div class="line">
         <label class="label" for="parent-select">Parent</label>
         <select id="parent-select" aria-label="Parent" data-testid="parent-select" value={clip.parent ?? NO_PARENT} onchange={(e) => commit(setParent(doc, clip.id, e.currentTarget.value === NO_PARENT ? null : e.currentTarget.value, { at: frame }), 'Changed the parent')}>
@@ -808,7 +842,7 @@
     </div>
   {/if}
   {#if maskProps.length}
-    <div data-testid="mask-section">
+    <div class="stackable" data-testid="mask-section">
       <div class="line">
         <label class="label" for="mask-kind">Mask</label>
         <select id="mask-kind" data-testid="mask-kind" value={clip.mask?.kind ?? NO_MASK} onchange={(e) => pickMask(e.currentTarget.value)}>
@@ -847,36 +881,38 @@
 <style>
   .inspector {
     display: flex;
+    flex: 1 0 auto;
     flex-direction: column;
     font-size: var(--ui-text-xs);
-    overflow: auto;
-    height: 100%;
   }
 
-  header {
+  .head {
     display: flex;
     align-items: center;
-    gap: var(--ui-space-2);
-    height: 48px;
+    gap: 8px;
+    height: 44px;
     flex-shrink: 0;
     padding: 0 var(--ui-space-4);
+    border-bottom: 1px solid var(--ui-line);
   }
 
-  .swatch-bar {
-    width: 3px;
-    height: 16px;
-    background: var(--hue);
+  .icon {
+    display: inline-flex;
+    color: var(--ui-ink-2);
+  }
+
+  .name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    font-size: var(--ui-text-sm);
   }
 
   .kind {
-    flex: 1;
-    font-weight: 600;
-    font-size: var(--ui-text-md);
-  }
-
-  .id {
-    font-family: var(--ui-mono);
-    font-size: 10px;
+    flex-shrink: 0;
     color: var(--ui-ink-3);
   }
 
@@ -884,23 +920,34 @@
     display: flex;
     gap: var(--ui-space-4);
     padding: 0 var(--ui-space-4);
+    border-bottom: 1px solid var(--ui-line);
   }
 
   .tabs button {
-    min-height: var(--ui-hit);
+    min-height: 32px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    font: inherit;
     font-size: var(--ui-text-xs);
     color: var(--ui-text-3);
+    cursor: pointer;
   }
 
   .tabs button.on {
     color: var(--ui-ink);
+    border-bottom-color: var(--ui-ink);
   }
 
   .grid2 {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 4px 6px;
-    margin-bottom: 6px;
+    gap: 6px;
+  }
+
+  .stackable {
+    display: grid;
+    gap: 6px;
   }
 
   .dials {
@@ -922,23 +969,17 @@
     grid-column: 1 / -1;
   }
 
-  .stack {
-    margin-bottom: 4px;
-  }
-
   .line {
     display: flex;
     align-items: center;
-    gap: 6px;
-    min-height: 24px;
-    margin-bottom: 4px;
+    gap: 8px;
+    min-height: 28px;
   }
 
   .line > label,
   .line > .label {
     flex-shrink: 0;
-    width: 84px;
-    padding-left: 6px;
+    width: 88px;
     color: var(--ui-ink-2);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -955,8 +996,8 @@
   .clock {
     display: flex;
     align-items: center;
-    height: 24px;
-    background: var(--ui-surface);
+    height: 28px;
+    background: var(--ui-field);
     border: 1px solid transparent;
   }
 
@@ -970,10 +1011,7 @@
 
   .clock span {
     flex-shrink: 0;
-    width: 28px;
-    text-align: center;
-    font-family: var(--ui-mono);
-    font-size: 10px;
+    padding: 0 6px 0 8px;
     color: var(--ui-ink-3);
   }
 
@@ -985,8 +1023,7 @@
     padding: 0 2px;
     border: 0;
     background: transparent;
-    font-family: var(--ui-mono);
-    font-size: 11px;
+    font: inherit;
     font-variant-numeric: tabular-nums;
   }
 
@@ -998,9 +1035,10 @@
   input[type='text'],
   textarea,
   select {
+    box-sizing: border-box;
     width: 100%;
-    height: 24px;
-    padding: 0 6px;
+    height: 28px;
+    padding: 0 8px;
     border: 1px solid transparent;
     border-radius: 0;
     background: var(--ui-field);
@@ -1036,31 +1074,6 @@
 
   .toggle {
     margin: 0;
-  }
-
-  .swatches {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .swatch {
-    width: 20px;
-    height: 20px;
-    border: 1px solid var(--ui-grid);
-  }
-
-  .swatch.on {
-    outline: 2px solid var(--ui-accent);
-    outline-offset: 1px;
-  }
-
-  input[type='color'] {
-    width: 24px;
-    height: 22px;
-    padding: 0;
-    border: 1px solid var(--ui-line-strong);
-    background: none;
   }
 
   .assets {
@@ -1108,7 +1121,7 @@
 
   .comp button,
   .secondary {
-    height: 24px;
+    height: 28px;
     border: 1px solid var(--ui-line-strong);
     border-radius: 0;
     background: var(--ui-bg);
@@ -1180,9 +1193,10 @@
   }
 
   .effect {
-    border: 1px solid var(--ui-line);
-    padding: 6px;
-    margin-bottom: 6px;
+    display: grid;
+    gap: 6px;
+    padding: 8px;
+    background: var(--ui-surface);
   }
 
   .effect.off {
@@ -1193,7 +1207,6 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    margin-bottom: 6px;
   }
 
   .effect-head select {
@@ -1288,14 +1301,19 @@
 
   .anchor {
     display: grid;
-    grid-template-columns: repeat(3, 12px);
-    gap: 3px;
+    grid-template-columns: repeat(3, 8px);
+    gap: 4px;
+    padding: 4px;
+    background: var(--ui-field);
   }
 
   .anchor button {
-    width: 12px;
-    height: 12px;
-    background: var(--ui-field);
+    width: 8px;
+    height: 8px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: var(--ui-line-strong);
   }
 
   .anchor button.on {

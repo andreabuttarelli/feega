@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { env } from '../_shims/env-private';
+import { refuseAdminWrites, targetOf } from '../e2e/target';
 import { createUserDb } from '$lib/server/db/client';
 import { enterApp, ENTRY_DEPS } from '$lib/server/tenancy/entry';
 
+refuseAdminWrites(targetOf(env.PUBLIC_SUPABASE_URL!));
 const admin = createClient(env.PUBLIC_SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { persistSession: false, autoRefreshToken: false }
 });

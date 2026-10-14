@@ -83,7 +83,7 @@ export function registerMotionTools(server: McpServer) {
       description:
         'Render the saved revision of a motion video to MP4. Default `mode: "browser"`: free, returns a `render_url` — a one-time link ' +
         '(expires in 30 minutes, bound to this revision) the user opens on any device; it renders in their browser and saves the file ' +
-        'to the project. Show the link to the user. `mode: "server"` is not available yet: it is refused with 403. ' +
+        'to the project. Show the link to the user. `mode: "server"` renders on the farm, the same path and credit gate as the editor Render button; while server rendering is closed for everyone it answers 403 `server_render_unavailable`. ' +
         'A live component (a game or generative piece) cannot be seeked: the video shows a still of it; publish it as an embed instead. ' +
         'Poll `get_render` with the `run_id` for the file.',
       inputSchema: z.object({

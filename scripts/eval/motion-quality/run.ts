@@ -191,7 +191,7 @@ async function runCase(c: (typeof CASES)[number], out: string, browserPage: () =
   const dir = join(out, c.name);
   mkdirSync(dir, { recursive: true });
   const session: E2eSession = await createE2eSession();
-  const teardown = teardowns.add(session.orgId, () => teardownE2eSession(session));
+  const teardown = teardowns.add(session.projectId, () => teardownE2eSession(session));
   const t0 = Date.now();
   const pageErrors: string[] = [];
   let judgeUsd = 0;

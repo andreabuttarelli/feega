@@ -67,10 +67,11 @@ describe('la superficie del modello mostra solo ciò che può usare', () => {
         'preview_run_graph',
         'run_graph',
         'move_frame_element',
-        'place_in_frame'
+        'place_in_frame',
+        'canvas_tool'
       ])
     );
-    expect(names).toHaveLength(27);
+    expect(names).toHaveLength(28);
   });
 
   it('col brand i tool di brand ci sono, accanto a quelli di progetto', () => {

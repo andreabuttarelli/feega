@@ -39,6 +39,14 @@ import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import { cancelRender } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { withdrawFromGallery } from '$lib/server/gallery/publish';
+import { registerCanvasUpload, UploadError } from '$lib/server/canvas/upload';
+import { canvasUploadPrefix, verdictForUpload } from '$lib/canvas/upload-kind';
+import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
+import { findProjectById } from '$lib/server/repos/projects';
+import { configuredVoiceDeps } from '$lib/server/voices/voices-config';
+import { cloneVoice, deleteVoice, designPreviews, saveDesignedVoice, voiceSlots, type Outcome, type VoiceDeps } from '$lib/server/voices/custom-voices';
+import { CONSENT_BASES, MIN_VOICE_DESCRIPTION, VOICE_REFUSAL_MESSAGE, type ConsentBasis } from '$lib/canvas/voices';
+import { ProjectMode } from '$lib/project-mode';
 
 export type CanvasDeps = {
   db: Db;
@@ -94,8 +102,14 @@ export enum Access {
   Spend = 'spend'
 }
 
+export enum Audience {
+  Everyone = 'everyone',
+  BytesSenders = 'bytes_senders'
+}
+
 type Op<S extends z.ZodType> = {
   access: Access;
+  audience?: Audience;
   input: S;
   run: (ctx: CanvasCtx, input: z.infer<S>) => Promise<unknown>;
 };
@@ -212,10 +226,80 @@ const workflowIdInput = z.object({ workflowId: z.string() }).strict();
 const workflowInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2) }).strict();
 const galleryItemInput = z.object({ itemId: z.string() }).strict();
 
+const MAX_VOICE_NAME = 100;
+const MAX_CLONE_SAMPLE_BYTES = 3 * 1024 * 1024;
+
+const requestUploadInput = z.object({ fileName: z.string().min(1), mimeType: z.string().min(1), bytes: z.number().int().positive() }).strict();
+const registerUploadInput = z
+  .object({
+    canvasId: z.string(),
+    path: z.string().describe('from request_upload, after the bytes were PUT to its uploadUrl'),
+    fileName: z.string().min(1),
+    mimeType: z.string().min(1),
+    bytes: z.number().int().positive(),
+    x: z.number().default(0),
+    y: z.number().default(0)
+  })
+  .strict();
+const voiceLibraryInput = z
+  .object({ search: z.string().optional(), language: z.string().optional(), gender: z.string().optional(), accent: z.string().optional(), useCase: z.string().optional(), page: z.number().int().min(0).optional() })
+  .strict();
+const voiceName = z.string().trim().min(1).transform((name) => name.slice(0, MAX_VOICE_NAME));
+const useLibraryVoiceInput = z.object({ ownerId: z.string().min(1), voiceId: z.string().min(1), name: voiceName }).strict();
+const designVoiceInput = z.object({ description: z.string().trim().min(MIN_VOICE_DESCRIPTION) }).strict();
+const saveVoiceInput = z.object({ generatedVoiceId: z.string().min(1), name: voiceName, description: z.string().default('') }).strict();
+const cloneVoiceInput = z
+  .object({
+    name: voiceName,
+    consentBasis: z.enum(Object.keys(CONSENT_BASES) as [ConsentBasis, ...ConsentBasis[]]),
+    speaker: z.string().default('').describe('consented_speaker: the name of the person who consented'),
+    attested: z.boolean().describe('true only when the user confirmed the consent'),
+    seconds: z.number().describe('length of the recording'),
+    sampleBase64: z.string().min(1).describe(`the recording, base64, at most ${MAX_CLONE_SAMPLE_BYTES / 1024 / 1024}MB`),
+    mimeType: z.string().default('audio/mpeg')
+  })
+  .strict();
+const voiceIdInput = z.object({ id: z.string().describe('a custom voice id from list_voices') }).strict();
+
 const NOT_IN_PROJECT = { error: 'canvas_not_found', message: 'No canvas with that id in this project.' };
 const LAST_CANVAS = { error: 'last_canvas', message: 'A project keeps at least one canvas.' };
 const NO_FARM = { error: 'rendering_not_configured' };
 const NOT_SYNCABLE = { error: 'not_syncable', message: 'Only products and social_account_feed nodes sync.' };
+
+const VOICES_OFF = { error: 'elevenlabs_not_configured' };
+const SAMPLE_TOO_LARGE = { error: 'recording_too_large', message: `The recording is over ${MAX_CLONE_SAMPLE_BYTES / 1024 / 1024}MB.` };
+
+function voiceAnswer<T extends object>(out: Outcome<T>): unknown {
+  if (out.ok) {
+    return out;
+  }
+  const message = out.error === 'voice_not_found' ? 'This voice does not exist.' : VOICE_REFUSAL_MESSAGE[out.error];
+  return { error: out.error, message };
+}
+
+async function withVoices(ctx: CanvasCtx, work: (deps: VoiceDeps) => Promise<unknown>): Promise<unknown> {
+  const deps = configuredVoiceDeps(ctx.db);
+  return deps ? work(deps) : VOICES_OFF;
+}
+
+const voiceScope = (ctx: CanvasCtx) => ({ orgId: ctx.orgId, userId: ctx.userId, actor: ctx.actor });
+
+async function projectMode(ctx: CanvasCtx): Promise<ProjectMode> {
+  return (await findProjectById(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId }))?.mode ?? ProjectMode.Standard;
+}
+
+const safeFileName = (name: string) => name.replace(/[\\/]/g, '_').replace(/\.\.+/g, '.');
+
+async function uploadAnswer(work: () => Promise<unknown>): Promise<unknown> {
+  try {
+    return await work();
+  } catch (cause) {
+    if (cause instanceof UploadError) {
+      return { error: 'invalid_upload', message: cause.message };
+    }
+    throw cause;
+  }
+}
 
 async function inProject(ctx: CanvasCtx, canvasId: string): Promise<boolean> {
   return (await listCanvases(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId })).some((c) => c.id === canvasId);
@@ -671,6 +755,94 @@ export const CANVAS_OPS = {
     }
   }),
 
+  request_upload: op({
+    access: Access.Write,
+    audience: Audience.BytesSenders,
+    input: requestUploadInput,
+    run: async (ctx, input) => {
+      const verdict = verdictForUpload(input.mimeType, input.fileName, input.bytes);
+      if (!verdict.ok) {
+        return { error: 'invalid_upload', message: verdict.why };
+      }
+      const path = `${canvasUploadPrefix(ctx.orgId, ctx.projectId)}${crypto.randomUUID()}-${safeFileName(input.fileName)}`;
+      const { data, error } = await ctx.db.storage.from(CANVAS_ASSET_BUCKET).createSignedUploadUrl(path);
+      if (error || !data) {
+        return { error: 'upload_not_signed', message: error?.message };
+      }
+      return { path, uploadUrl: data.signedUrl, kind: verdict.kind, then: 'PUT the bytes to uploadUrl with the Content-Type, then register_upload with this path.' };
+    }
+  }),
+
+  register_upload: op({
+    access: Access.Write,
+    audience: Audience.BytesSenders,
+    input: registerUploadInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return uploadAnswer(() => registerCanvasUpload(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, ...input }));
+    }
+  }),
+
+  list_voices: op({
+    access: Access.Read,
+    input: listCanvasesInput,
+    run: async (ctx) =>
+      withVoices(ctx, async (deps) => {
+        const [custom, slots] = await Promise.all([deps.store.list(ctx.orgId), voiceSlots(deps, ctx.orgId)]);
+        return { custom, slots };
+      })
+  }),
+
+  voice_library: op({
+    access: Access.Read,
+    input: voiceLibraryInput,
+    run: async (ctx, input) => withVoices(ctx, (deps) => deps.provider.library({ ...input, page: input.page ?? 0 }))
+  }),
+
+  use_library_voice: op({
+    access: Access.Write,
+    input: useLibraryVoiceInput,
+    run: async (ctx, input) => withVoices(ctx, async (deps) => ({ voiceId: await deps.provider.addShared(input), name: input.name }))
+  }),
+
+  design_voice: op({
+    access: Access.Spend,
+    input: designVoiceInput,
+    run: async (ctx, input) => withVoices(ctx, async (deps) => voiceAnswer(await ctx.billed(() => designPreviews(deps, voiceScope(ctx), input))))
+  }),
+
+  save_voice: op({
+    access: Access.Write,
+    input: saveVoiceInput,
+    run: async (ctx, input) => withVoices(ctx, async (deps) => voiceAnswer(await saveDesignedVoice(deps, voiceScope(ctx), input)))
+  }),
+
+  clone_voice: op({
+    access: Access.Spend,
+    audience: Audience.BytesSenders,
+    input: cloneVoiceInput,
+    run: async (ctx, input) => {
+      const bytes = new Uint8Array(Buffer.from(input.sampleBase64, 'base64'));
+      if (bytes.byteLength > MAX_CLONE_SAMPLE_BYTES) {
+        return SAMPLE_TOO_LARGE;
+      }
+      const mode = await projectMode(ctx);
+      const ask = { name: input.name, consentBasis: input.consentBasis, speaker: input.speaker, attested: input.attested, seconds: input.seconds, mode, samples: [{ bytes, mime: input.mimeType }] };
+      return withVoices(ctx, async (deps) => voiceAnswer(await ctx.billed(() => cloneVoice(deps, voiceScope(ctx), ask))));
+    }
+  }),
+
+  delete_voice: op({
+    access: Access.Write,
+    input: voiceIdInput,
+    run: async (ctx, input) => withVoices(ctx, async (deps) => {
+      const out = await deleteVoice(deps, ctx.orgId, input.id);
+      return out.ok ? { deleted: true } : voiceAnswer(out);
+    })
+  }),
+
   withdraw_from_gallery: op({
     access: Access.Write,
     input: galleryItemInput,
@@ -682,4 +854,8 @@ export type CanvasOpName = keyof typeof CANVAS_OPS;
 
 export function isCanvasOp(name: string): name is CanvasOpName {
   return Object.hasOwn(CANVAS_OPS, name);
+}
+
+export function chatSendsOp(name: CanvasOpName): boolean {
+  return (CANVAS_OPS[name].audience ?? Audience.Everyone) === Audience.Everyone;
 }
