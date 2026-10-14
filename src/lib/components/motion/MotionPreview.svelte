@@ -5,6 +5,7 @@
   import { CAPTURE_TIMEOUT_MS, Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
   import { crispFor } from '$lib/motion/hyperframes/crisp-scale';
+  import { armFirstTouch } from '$lib/motion/hyperframes/first-touch';
   import { laneVisibility, shootInLanes } from '$lib/motion/export/lanes';
   import { engineOf } from '$lib/motion/engine';
   import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
@@ -80,6 +81,7 @@
   onMount(() => {
     let disposed = false;
     let crisp = () => {};
+    let disarm = () => {};
     void import('@hyperframes/player').then(() => {
       if (disposed || !host) {
         return;
@@ -96,6 +98,8 @@
         crisp();
         const shown = el.iframeElement;
         crisp = shown ? crispFor(engineOf(navigator.userAgent), shown) : () => {};
+        disarm();
+        disarm = shown && host ? armFirstTouch(shown, host) : () => {};
         ready = true;
         driver.seek(frame / fps);
         driver.ready();
@@ -118,6 +122,7 @@
     return () => {
       disposed = true;
       crisp();
+      disarm();
       player?.remove();
       player = null;
     };
