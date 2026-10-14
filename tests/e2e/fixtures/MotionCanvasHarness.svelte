@@ -13,7 +13,7 @@
 </script>
 
 <div class="harness">
-  <CanvasFlow {tiles}>
+  <CanvasFlow {tiles} onSelectionChange={() => (window.selectionEmits = (window.selectionEmits ?? 0) + 1)}>
     {#snippet tile({ id })}
       <div class="stage" data-testid="motion-node">
         <img class="poster" src={posterOf.get(id)} alt="" draggable="false" loading="lazy" decoding="async" />
