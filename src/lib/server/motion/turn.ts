@@ -26,7 +26,8 @@ import { drawFrames, firstFrames } from '$lib/server/motion/server-frames';
 import { chromiumFrames, chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
-import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
+import { assetUrls, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
+import { commitDoc, revisionWriteOf } from '$lib/server/motion/frame-ops';
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { AGENT_SELF_SAVE_MS } from '$lib/server/project-agent/limits';
 import { Reserve, VIDEO_BUDGET, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
@@ -115,7 +116,6 @@ enum Round {
 type Stop = ReturnType<typeof agentStopWhen>;
 
 const CLOSING_RESERVE_MS = 60_000;
-const SAVE_ATTEMPTS = 4;
 
 export type TurnTiming = { landingMs: number; stopPollMs: number };
 
@@ -702,13 +702,8 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   });
 
   async function saveAgentDoc() {
-    const save = (expectedVersion: number) => saveMotionDoc(db, { orgId, nodeId: motion.record.id, expectedVersion, doc: session.doc, actor, summary: session.edits.join(', ') });
-    let write = await save(session.baseVersion);
-    for (let attempt = 1; attempt < SAVE_ATTEMPTS && write.outcome === RevisionOutcome.Conflict; attempt++) {
-      const latest = await headOrNew(db, nodeScope, motion.node);
-      write = await save(latest.version);
-    }
-    return write;
+    const commit = await commitDoc(db, { ...nodeScope, node: motion.node, base: { version: head.version, doc: head.doc }, doc: session.doc, actor, summary: session.edits.join(', ') });
+    return revisionWriteOf(commit);
   }
 
   const roleLabel = STUDIO_ROSTER[role].label;
