@@ -174,14 +174,16 @@ code:
   next case is added with a row and all of them are visible together. A rule written in five
   places diverges at the first change — and diverges silently.
 
-## Cerchi o rettangoli, niente in mezzo (una regola, non un'abitudine)
+## I raggi seguono una scala, non il gusto del momento (una regola, non un'abitudine)
 
-**Una forma è un rettangolo a spigoli vivi o un cerchio perfetto.** Pagine, pannelli, menu, nodi
-della tela, card, input, badge: rettangoli a 0px. Bottoni-icona, avatar, pallini di stato, pill di
-un bottone possono essere **completamente tondi** (`rounded-full`, `border-radius: 9999px`/`50%`).
-Mai un raggio intermedio: niente `rounded-md`, niente `border-radius: 8px`. Il token resta
-`--radius: 0rem` in `src/lib/styles/tailwind.css` (da cui `--radius-sm/md/lg/xl`); l'unica
-eccezione scritta è il tondo pieno. Sugli SVG `rx`/`ry` solo per disegnare un cerchio o una pill.
+Il 14/10/2026 la regola "cerchi o rettangoli" è stata tolta: il guscio ora usa **una scala di
+raggi con un ruolo per gradino** (`--ui-radius-*` in `src/app.css`, esposta da Tailwind come
+`rounded-xs/sm/md/lg`; `--radius` in `src/lib/styles/tailwind.css` vale `md`): `none` 0 per
+tele, contenuto dei nodi, pannelli e barre a tutta altezza; `xs` 2px per kbd, checkbox, swatch;
+`sm` 4px per bottoni, input, righe, segmenti; `md` 6px per menu, popover, card; `lg` 10px per
+dialog, sheet e barre flottanti; `full` per avatar, pallini, pill. Si sceglie il gradino per
+ruolo, mai un valore libero (`border-radius: 7px` no). Il dettaglio sta in `DESIGN.md`. Il
+contenuto dei video e dei template segue le sue regole, non questa.
 
 ## L'app comanda, CLI e MCP si adattano (una regola, non un'abitudine)
 

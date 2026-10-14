@@ -8,6 +8,7 @@ import { appOrigin } from '$lib/server/app-url';
 import { takeOAuthReturn } from '$lib/server/oauth';
 import { INVITE_ERROR_PARAM, INVITE_PARAM, inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
 import { signInErrorIn } from './sign-in-error';
+import { NATIVE_AUTH_BASE, isNativeShell } from '$lib/native-shell';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -178,7 +179,7 @@ function resetPasswordPath(inviteToken: string | null): string {
   return inviteToken ? `/auth/reset-password?${INVITE_PARAM}=${encodeURIComponent(inviteToken)}` : '/auth/reset-password';
 }
 
-function buildRedirectTo(url: URL, cliPort: string, cliState: string, inviteToken: string | null): string {
+function buildRedirectTo(authBase: string, cliPort: string, cliState: string, inviteToken: string | null): string {
   const cb = new URLSearchParams();
   if (cliPort) {
     cb.set('cli_port', cliPort);
@@ -187,7 +188,7 @@ function buildRedirectTo(url: URL, cliPort: string, cliState: string, inviteToke
   if (inviteToken) {
     cb.set(INVITE_PARAM, inviteToken);
   }
-  return `${appBase(url)}/auth/callback${cb.toString() ? `?${cb}` : ''}`;
+  return `${authBase}/callback${cb.toString() ? `?${cb}` : ''}`;
 }
 
 // Shared OAuth kickoff: ask Supabase for the provider URL and bounce the browser there.
@@ -195,7 +196,8 @@ async function oauthSignIn({ request, locals: { supabase }, url }: RequestEvent,
   const data = await request.formData();
   const cliPort = String(data.get('cli_port') ?? '');
   const cliState = String(data.get('cli_state') ?? '');
-  const redirectTo = buildRedirectTo(url, cliPort, cliState, inviteTokenIn(data));
+  const authBase = isNativeShell(request.headers.get('user-agent')) ? NATIVE_AUTH_BASE : `${appBase(url)}/auth`;
+  const redirectTo = buildRedirectTo(authBase, cliPort, cliState, inviteTokenIn(data));
   const { data: oauth, error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
 
   if (error || !oauth?.url) return fail(400, { error: error?.message ?? `Could not start ${provider} sign-in` });

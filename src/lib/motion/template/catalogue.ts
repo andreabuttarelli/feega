@@ -1,8 +1,10 @@
-import { MotionFormat, formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { FORMATS, MotionFormat, formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { FIELD_TYPE_LABEL } from './field-model';
-import { insertTemplate, type Inserted, type TemplateEntry } from './library';
+import { insertTemplate, type Inserted, type Instance, type TemplateEntry } from './library';
 import PREVIEWED from './previews.json';
 import { DocMode, docMode } from '$lib/motion/still';
+import { SectionRole } from './card';
+import { templateCard } from './cards';
 
 export enum ComponentKind {
   Component = 'component',
@@ -31,6 +33,15 @@ export const ADD_TARGET: Record<AddTarget, { label: string; sounds: boolean }> =
 export const STARTER_FORMATS = [MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Square] as const;
 export type StarterFormat = (typeof STARTER_FORMATS)[number];
 
+export enum Edits {
+  None = 'none',
+  Some = 'some'
+}
+
+export function draftToAdd(draft: Instance | null, edits: Edits, format: MotionFormat, opened: MotionFormat): Instance | null {
+  return edits === Edits.Some || format !== opened ? draft : null;
+}
+
 const isStarter = (f: MotionFormat): f is StarterFormat => (STARTER_FORMATS as readonly MotionFormat[]).includes(f);
 
 export function starterFormatOf(frame: Pick<MotionDoc, 'width' | 'height'>): StarterFormat {
@@ -45,7 +56,8 @@ export type CatalogueItem = {
   seconds: number;
   kind: ComponentKind;
   mode: DocMode;
-  format: StarterFormat;
+  format: MotionFormat;
+  roles: SectionRole[];
   fields: { label: string; type: string }[];
   preview: Preview | null;
 };
@@ -92,20 +104,64 @@ export function catalogue(entries: readonly TemplateEntry[]): CatalogueItem[] {
     seconds: e.template.doc.durationInFrames / e.template.doc.fps,
     kind: componentKind(e),
     mode: docMode(e.template.doc),
-    format: starterFormatOf(e.template.doc),
+    format: ownFormat(e.template.doc),
+    roles: templateCard(e.id)?.roles ?? [],
     fields: e.template.doc.fields.map((f) => ({ label: f.label, type: FIELD_TYPE_LABEL[f.type] })),
     preview: previewOf(e.id, docMode(e.template.doc))
   }));
   return items.sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
 }
 
-export function matching(items: readonly CatalogueItem[], query: string, kind: ComponentKind | null, mode: DocMode | null = null): CatalogueItem[] {
+const searchable = (i: CatalogueItem) => `${i.name} ${i.description} ${i.roles.join(' ')}`.toLowerCase();
+
+export function matching(items: readonly CatalogueItem[], query: string, kind: ComponentKind | null, mode: DocMode | null = null, role: SectionRole | null = null): CatalogueItem[] {
   const words = query.trim().toLowerCase();
-  return items.filter((i) => (!kind || i.kind === kind) && (!mode || i.mode === mode) && (!words || `${i.name} ${i.description}`.toLowerCase().includes(words)));
+  return items.filter((i) => (!kind || i.kind === kind) && (!mode || i.mode === mode) && (!role || i.roles.includes(role)) && (!words || searchable(i).includes(words)));
 }
+
+export const rolesIn = (items: readonly CatalogueItem[]): SectionRole[] => Object.values(SectionRole).filter((r) => items.some((i) => i.roles.includes(r)));
+
+const SHAPE_RANK: Record<MotionFormat, number> = {
+  [MotionFormat.Landscape]: 0,
+  [MotionFormat.Vertical]: 1,
+  [MotionFormat.Portrait]: 2,
+  [MotionFormat.Poster]: 3,
+  [MotionFormat.Square]: 4,
+  [MotionFormat.SquareLarge]: 5
+};
+
+const SHAPE_ORDER = (Object.keys(SHAPE_RANK) as MotionFormat[]).sort((a, b) => SHAPE_RANK[a] - SHAPE_RANK[b]);
+
+export type ShapeGroup = { format: MotionFormat; items: CatalogueItem[] };
+
+export function byShape(items: readonly CatalogueItem[]): ShapeGroup[] {
+  return SHAPE_ORDER.map((format) => ({ format, items: items.filter((i) => i.format === format) })).filter((g) => g.items.length);
+}
+
+const LENGTH: Record<DocMode, (i: CatalogueItem) => string> = {
+  [DocMode.Video]: (i) => `${Math.round(i.seconds * 10) / 10}s`,
+  [DocMode.Still]: () => 'still'
+};
+
+export const metaLine = (i: CatalogueItem): string => `${FORMATS[i.format].label} · ${LENGTH[i.mode](i)}`;
 
 export const POSTER_FORMATS = [MotionFormat.Portrait, MotionFormat.Vertical, MotionFormat.Poster] as const;
 export type PosterFormat = (typeof POSTER_FORMATS)[number];
+
+export const FORMATS_OF_MODE: Record<DocMode, readonly MotionFormat[]> = {
+  [DocMode.Video]: STARTER_FORMATS,
+  [DocMode.Still]: POSTER_FORMATS
+};
+
+function ownFormat(doc: MotionDoc): MotionFormat {
+  const offered = FORMATS_OF_MODE[docMode(doc)];
+  const format = formatOf(doc);
+  return offered.includes(format) ? format : offered[0];
+}
+
+export function libraryFormat(item: Pick<CatalogueItem, 'mode' | 'format'>, wanted: MotionFormat): MotionFormat {
+  return FORMATS_OF_MODE[item.mode].includes(wanted) ? wanted : item.format;
+}
 
 export function posterShelf(items: readonly CatalogueItem[]): CatalogueItem[] {
   return matching(items, '', null, DocMode.Still).sort((a, b) => a.name.localeCompare(b.name));

@@ -11,25 +11,19 @@ import {
   createConnection,
   createNode,
   deleteConnection,
-  deleteNode,
   findNode,
   listConnections,
   listNodes,
   moveNode,
-  resizeNode,
   setConnectionMode,
-  writeNodeData,
   patchNodeData,
   DataCheck,
-  type PatchWrite,
-  type CanvasNodeRecord
+  type PatchWrite
 } from '$lib/server/repos/canvas';
 import { nodeSize } from '$lib/canvas/node-size';
-import { isNodeType, docData, productsOf, socialFeedOf, influencerOf } from '$lib/canvas-node-data';
+import { isNodeType, influencerOf } from '$lib/canvas-node-data';
 import { validateNodeData } from '$lib/canvas/node-data';
 import type { Actor } from '$lib/server/repos/actor';
-import { mintShareToken } from '$lib/canvas/doc-node';
-import { clearDocShare, setDocShare } from '$lib/server/repos/doc-share';
 import { isCanvasEdgeKind, isWireMode } from '$lib/canvas-edges';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { Capability, catalogueIn, MODE_REFUSAL, modeAllows, modeOf, type ProjectMode } from '$lib/project-mode';
@@ -47,45 +41,27 @@ const VOICE_FAIL_STATUS: Partial<Record<VoiceRefusal | 'voice_not_found', number
 };
 import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from '$lib/server/uncensored-access';
 import { runGenNode, runsOf } from '$lib/server/canvas/generate';
-import { planLoop, enqueueLoop, cancelLoop, retryLoopCombination } from '$lib/server/canvas/loop';
-import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, estimateWorkflowCredits } from '$lib/server/canvas/workflow';
+import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/canvas/loop';
+import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
-import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { ShowRun, removeNodes, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
+import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
+import { serverTiming } from '$lib/server/server-timing';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
 import { undoGesture } from '$lib/server/canvas/undo';
-import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
+import { writeNodesBatch, type BatchItem } from '$lib/server/canvas/batch-write';
+import { pasteNodes, type PastedEdge, type PastedNode } from '$lib/server/canvas/paste';
+import { parseUndoItem, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
-import { listNodeProducts } from '$lib/server/repos/products';
-import { normalizeUrl } from '$lib/ads-fee';
-import { normalizeHandle } from '$lib/canvas/source-filters';
-import { listNodeSocialPosts } from '$lib/server/repos/social-posts';
-import { getInfluencer, listInfluencerViewsByIds, signInfluencerViewFiles } from '$lib/server/repos/influencers';
-import { syncProductsNode } from '$lib/server/canvas/products-sync';
-import { syncSocialFeedNode, syncSocialFeedEntries } from '$lib/server/canvas/social-feed-sync';
-import { isProductPlatform } from '$lib/canvas/products-node';
-import { isSocialFeedPlatform } from '$lib/canvas/social-feed-node';
-import { createPostFromNodes } from '$lib/server/repos/create-post-from-nodes';
-import { findBrand } from '$lib/server/repos/brands';
-import { listBrandAccounts } from '$lib/server/repos/social-accounts';
-import { promoteNodesToPost } from '$lib/server/repos/post-from-nodes';
-import { promoteToPost, setPostStatus, listSourcesForNodes } from '$lib/server/repos/posts';
-import { scheduleDelivery, deliveryStatus } from '$lib/server/repos/post-delivery';
-import { PlanOutcome, PlanScope, listPlannedPosts, planPost, type PlanResult } from '$lib/server/repos/post-planning';
-import { schedulePlanned } from '$lib/server/repos/schedule-planned';
-import { listOrgBrands } from '$lib/server/repos/brands';
-import { publisher } from '$lib/server/publishing';
-import { listNodesByIds } from '$lib/server/repos/canvas';
-import { suggestNextSteps } from '$lib/canvas/suggest-next-steps';
-import { actionFrequencyFor } from '$lib/server/next-step-stats';
-import { decideWithJev } from '$lib/server/jev';
-import { upstreamInputsFor } from '$lib/server/canvas/upstream';
-import { estimateCanvasTextCost } from '$lib/server/canvas/text-cost-estimate';
+import { canvasSnapshot, loadDownloaded, loadGenRuns } from '$lib/server/canvas/snapshot';
+import { listSourcesForNodes } from '$lib/server/repos/posts';
+import { nextStepsFor, nodeTextCost } from '$lib/server/canvas/node-hints';
 import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
 import { makeEffectsPair } from '$lib/server/canvas/effects-actions';
 import { nodeAcceptsConnection } from '$lib/canvas/connector-ports';
@@ -115,7 +91,7 @@ export const config = { maxDuration: 300 };
  * modo diverso di proposito — trascinare è last-write-wins, scrivere un prompt no — e qui si
  * rispetta quella divisione invece di uniformarla.
  */
-type Scope = { db: Db; orgId: string; canvasId: string; canvas: Canvas; userId: string; mode: ProjectMode; projectBrandId: string | null };
+type Scope = { db: Db; orgId: string; canvasId: string; canvas: Canvas; userId: string; accountCreatedAt: string; mode: ProjectMode; projectBrandId: string | null };
 
 /** Ogni gesto della tela che passa da qui è di una persona, mai un `system` muto: `canvas_events` deve saperlo. */
 function userActor(scope: { userId: string }): Actor {
@@ -164,7 +140,7 @@ async function scopeFor(locals: App.Locals, canvasId: string): Promise<Scope> {
     throw error(404, 'questa tela non esiste, o non è tua');
   }
 
-  return { db, orgId: found.orgId, canvasId, canvas: found.canvas, userId: user.id, mode, projectBrandId: found.projectBrandId };
+  return { db, orgId: found.orgId, canvasId, canvas: found.canvas, userId: user.id, accountCreatedAt: user.created_at, mode, projectBrandId: found.projectBrandId };
 }
 
 async function scopeAllowing(locals: App.Locals, canvasId: string, capability: Capability): Promise<Scope> {
@@ -204,92 +180,8 @@ async function spendOnVoice<T>(
   return work(deps, await import('$lib/server/voices/custom-voices'));
 }
 
-/** La storia dei giri, per nodo: quello che la striscia sotto il risultato deve poter mostrare. */
-async function loadGenRuns(
-  db: Db,
-  scope: { orgId: string; nodes: Awaited<ReturnType<typeof listNodes>> }
-): Promise<Record<string, unknown[]>> {
-  const entries = await Promise.all(
-    scope.nodes.map(async (node) => [node.id, await runsOf(db, { orgId: scope.orgId, nodeId: node.id })] as const)
-  );
-  return Object.fromEntries(entries);
-}
-
-/**
- * IL CATALOGO E IL FEED SCARICATI, per nodo: `products`/`social_account_feed` non portano il
- * contenuto in `data` — vive in `products`/`social_posts` — quindi la pagina lo legge qui, come
- * `loadGenRuns` legge `node_runs` per il nodo che produce.
- */
-async function loadDownloaded(
-  db: Db,
-  scope: { orgId: string; canvasId: string; nodes: Awaited<ReturnType<typeof listNodes>> }
-): Promise<{
-  products: Record<string, unknown[]>;
-  socialPosts: Record<string, unknown[]>;
-  influencers: Record<string, { name: string; views: { id: string; label: string; url: string | null }[] }>;
-}> {
-  const influencers: Record<string, { name: string; views: { id: string; label: string; url: string | null }[] }> = {};
-  const nodesOfType = (type: string) => scope.nodes.filter((node) => node.type === type);
-
-  const [products, socialPosts] = await Promise.all([
-    perNode(nodesOfType('products'), (nodeId) => listNodeProducts(db, { orgId: scope.orgId, nodeId })),
-    perNode(nodesOfType('social_account_feed'), (nodeId) => listNodeSocialPosts(db, { orgId: scope.orgId, nodeId })),
-    loadInfluencerViews(db, scope.nodes, influencers)
-  ]);
-
-  return { products, socialPosts, influencers };
-}
-
-async function perNode(nodes: { id: string }[], read: (nodeId: string) => Promise<unknown[]>): Promise<Record<string, unknown[]>> {
-  const entries = await Promise.all(nodes.map(async (node) => [node.id, await read(node.id)] as const));
-  return Object.fromEntries(entries);
-}
-
-/**
- * LE VISTE DI OGNI NODO `influencer`, firmate in un colpo solo — non una per nodo: una tela con
- * dieci volti firmerebbe settanta URL a chiamate separate senza questo. `influencer_id` porta a
- * `influencer_views` (mai a `nodes.data`, vedi `influencer-node.ts`); un influencer cancellato o
- * di un'org che non è più questa non compare — `getInfluencer` applica la stessa RLS di ogni
- * altra lettura, senza un controllo qui in più.
- */
-async function loadInfluencerViews(
-  db: Db,
-  nodes: Awaited<ReturnType<typeof listNodes>>,
-  out: Record<string, { name: string; views: { id: string; label: string; url: string | null }[] }>
-): Promise<void> {
-  const influencerNodes = nodes.filter((n) => n.type === 'influencer');
-  if (!influencerNodes.length) {
-    return;
-  }
-
-  const influencerIds = influencerNodes
-    .map((n) => (typeof n.data.influencer_id === 'string' ? n.data.influencer_id : null))
-    .filter((id): id is string => Boolean(id));
-
-  const [viewsByInfluencer, influencerRows] = await Promise.all([
-    listInfluencerViewsByIds(db, influencerIds),
-    Promise.all(influencerIds.map((id) => getInfluencer(db, id)))
-  ]);
-
-  const allPaths = [...viewsByInfluencer.values()].flatMap((views) => views.map((v) => v.storagePath));
-  const signed = await signInfluencerViewFiles(db, allPaths, 'canvas512');
-
-  const nameById = new Map(influencerRows.filter((r) => r !== null).map((r) => [r.id, r.name]));
-
-  for (const node of influencerNodes) {
-    const influencerId = typeof node.data.influencer_id === 'string' ? node.data.influencer_id : null;
-    if (!influencerId) continue;
-
-    const views = viewsByInfluencer.get(influencerId) ?? [];
-    out[node.id] = {
-      name: nameById.get(influencerId) ?? 'Influencer',
-      views: views.map((v) => ({ id: v.id, label: v.label, url: signed.get(v.storagePath) ?? null }))
-    };
-  }
-}
-
 export const load: PageServerLoad = async ({ params, locals, url }) => {
-  const { db, orgId, canvasId, canvas, mode, projectBrandId, userId } = await scopeFor(locals, params.canvasId);
+  const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
   const [nodes, connections, fullCatalogue, shareToken, references, uncensored] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
@@ -305,7 +197,7 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
-    firstRunFor(db, { userId, orgId, nodeCount: nodes.length }),
+    firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length }),
     templateLibrary(db, { orgId, actor: userActor({ userId }) }).list(),
     chatHandoff(db, { orgId, projectId: canvas.projectId }, url)
   ]);
@@ -347,13 +239,7 @@ function jsonObject(value: FormDataEntryValue | null): Record<string, unknown> |
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
-const HTTP_UNPROCESSABLE = 422;
 
-const PLAN_ANSWERS: Record<PlanOutcome, (planned: PlanResult) => unknown> = {
-  [PlanOutcome.Planned]: (planned) => ({ planned }),
-  [PlanOutcome.Conflict]: () => fail(HTTP_CONFLICT, { error: 'conflict' }),
-  [PlanOutcome.Gone]: () => fail(HTTP_NOT_FOUND, { error: 'post_not_found' })
-};
 
 const PATCH_ANSWERS: { [K in PatchWrite['outcome']]: (written: Extract<PatchWrite, { outcome: K }>) => unknown } = {
   written: (written) => ({ node: written.node }),
@@ -371,121 +257,11 @@ function coord(value: FormDataEntryValue | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/**
- * UN `UndoItem` COSÌ COM'È ARRIVATO DAL CLIENT: nessuna validazione di forma oltre "ha un kind che
- * conosciamo e gli id/record che quel kind richiede". Il client l'ha costruito da quello che il
- * server gli aveva già restituito (`inverseOf` legge `before`/`after` di scritture già avvenute),
- * quindi qui non si rivalida `data` come farebbe `create` — è `checkGesture` a decidere se vale
- * ancora applicarlo, guardando lo stato fresco, non la forma del payload.
- */
-function parseUndoItem(raw: unknown): UndoItem | null {
-  if (!raw || typeof raw !== 'object') {
-    return null;
-  }
-  const item = raw as Record<string, unknown>;
-
-  if (item.kind === 'node.create' && typeof item.nodeId === 'string') {
-    return { kind: 'node.create', nodeId: item.nodeId, after: (item.after as Record<string, unknown>) ?? {} };
-  }
-  if (item.kind === 'node.delete' && typeof item.nodeId === 'string') {
-    return { kind: 'node.delete', nodeId: item.nodeId, before: (item.before as Record<string, unknown>) ?? {} };
-  }
-  if (
-    item.kind === 'node.update' &&
-    typeof item.nodeId === 'string' &&
-    Number.isInteger(item.expectedVersion)
-  ) {
-    return {
-      kind: 'node.update',
-      nodeId: item.nodeId,
-      before: (item.before as Record<string, unknown>) ?? {},
-      after: (item.after as Record<string, unknown>) ?? {},
-      expectedVersion: item.expectedVersion as number
-    };
-  }
-  if (item.kind === 'edge.create' && typeof item.edgeId === 'string' && typeof item.sourceNodeId === 'string' && typeof item.targetNodeId === 'string') {
-    return { kind: 'edge.create', edgeId: item.edgeId, sourceNodeId: item.sourceNodeId, targetNodeId: item.targetNodeId };
-  }
-  if (item.kind === 'edge.delete' && typeof item.edgeId === 'string' && typeof item.sourceNodeId === 'string' && typeof item.targetNodeId === 'string') {
-    return { kind: 'edge.delete', edgeId: item.edgeId, sourceNodeId: item.sourceNodeId, targetNodeId: item.targetNodeId };
-  }
-  if (item.kind === 'doc.revision' && typeof item.nodeId === 'string' && Number.isInteger(item.before) && Number.isInteger(item.after)) {
-    return { kind: 'doc.revision', nodeId: item.nodeId, before: item.before as number, after: item.after as number };
-  }
-  return null;
-}
-
-type SyncNodeOutcome = { ok: true; synced: number; extra?: Record<string, unknown> } | { ok: false; error: string };
-
-/** `products`: `type`/`url`/`limit`/`after`/`only_first_photo` sono la query — `productsOf` li legge già validati. */
-async function syncProducts(db: Db, orgId: string, projectId: string | null, node: { id: string; data: Record<string, unknown> }): Promise<SyncNodeOutcome> {
-  const parsed = productsOf({ id: node.id, type: 'products', data: node.data });
-  const storeUrl = normalizeUrl(parsed?.url);
-  if (!parsed || !isProductPlatform(parsed.platform) || !storeUrl) {
-    return { ok: false, error: 'invalid_url: this node has no store URL to sync' };
-  }
-
-  const outcome = await syncProductsNode(db, {
-    orgId,
-    projectId,
-    nodeId: node.id,
-    platform: parsed.platform,
-    storeUrl,
-    limit: parsed.limit,
-    after: parsed.after,
-    onlyFirstPhoto: parsed.onlyFirstPhoto,
-    category: parsed.category
-  });
-
-  return outcome.ok
-    ? { ok: true, synced: outcome.synced, extra: { after: outcome.after, sync_summary: outcome.summary } }
-    : outcome;
-}
-
-/**
- * `social_account_feed`: `handle` porta quel che l'utente ha incollato — un handle nudo, un URL
- * di profilo, un URL di un post, più righe — e viene CLASSIFICATO prima di sincronizzare
- * (`social-url-classifier.ts`), non letto alla lettera come prima. La piattaforma scelta a mano
- * nel campo `platform` resta l'override per un handle nudo senza dominio nell'URL — un handle
- * come "nike" da solo non dice se è Instagram o TikTok, e lì la scelta manuale vince.
- */
-async function syncSocialFeed(db: Db, orgId: string, projectId: string | null, node: { id: string; data: Record<string, unknown> }): Promise<SyncNodeOutcome> {
-  const parsed = socialFeedOf({ id: node.id, type: 'social_account_feed', data: node.data });
-  const raw = (parsed?.handle ?? '').trim();
-  if (!parsed || !raw) {
-    return { ok: false, error: 'missing_handle: this node has no handle to sync' };
-  }
-
-  const looksLikeUrlOrMultiline = raw.includes('/') || raw.includes('\n') || raw.includes(',') || raw.startsWith('#');
-  if (!looksLikeUrlOrMultiline) {
-    const handle = normalizeHandle(raw);
-    if (!isSocialFeedPlatform(parsed.platform) || !handle) {
-      return { ok: false, error: 'missing_handle: this node has no handle to sync' };
-    }
-    return syncSocialFeedNode(db, { orgId, projectId, nodeId: node.id, platform: parsed.platform, handle, limit: parsed.limit });
-  }
-
-  const outcome = await syncSocialFeedEntries(db, { orgId, projectId, nodeId: node.id, raw, limit: parsed.limit });
-  if (!outcome.ok) {
-    return outcome;
-  }
-
-  const summary = outcome.entries
-    .map((e) => `${PLATFORM_LABELS[e.platform] ?? e.platform} · ${e.kind} · ${e.synced}`)
-    .concat(outcome.unsupported.map((u) => `${u.source}: ${u.message}`))
-    .join(' — ');
-
-  return { ok: true, synced: outcome.synced, extra: { sync_summary: summary } };
-}
-
-const PLATFORM_LABELS: Record<string, string> = {
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  x: 'X',
-  threads: 'Threads',
-  facebook: 'Facebook',
-  youtube: 'YouTube',
-  linkedin: 'LinkedIn'
+const SHOW_RUN_ANSWERS: { [K in ShowRun]: (shown: Extract<RunShown, { outcome: K }>) => unknown } = {
+  [ShowRun.Shown]: (shown) => ({ node: shown.node }),
+  [ShowRun.NodeMissing]: () => fail(HTTP_NOT_FOUND, { error: 'node not found' }),
+  [ShowRun.RunMissing]: () => fail(HTTP_NOT_FOUND, { error: 'generation not found' }),
+  [ShowRun.Conflict]: () => fail(HTTP_CONFLICT, { conflict: true })
 };
 
 function isShareState(value: string): value is ShareState {
@@ -671,25 +447,7 @@ export const actions: Actions = {
       return fail(400, { error: 'node not found' });
     }
 
-    const upstream = await upstreamInputsFor(scope.db, {
-      orgId: scope.orgId,
-      canvasId: scope.canvasId,
-      nodeId,
-      model,
-      medium: 'text'
-    });
-    const decide = process.env.TYPESAFE_API_KEY ? decideWithJev : null;
-    return estimateCanvasTextCost({
-      material: upstream.text,
-      ownPrompt: userPrompt,
-      inputCost:
-        upstream.referenceImageUrls.length > 0 ||
-        upstream.referenceVideoUrls.length > 0 ||
-        upstream.referenceAudioUrls.length > 0
-          ? 'variable_media'
-          : 'fixed',
-      decide
-    });
+    return nodeTextCost(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeId, prompt: userPrompt, model });
   },
 
   upload: async ({ request, params, locals }) => {
@@ -724,14 +482,7 @@ export const actions: Actions = {
   },
   snapshot: async ({ params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
-    const [nodes, connections] = await Promise.all([
-      listNodes(scope.db, scope), listConnections(scope.db, scope)
-    ]);
-    const [runs, { products, socialPosts, influencers }] = await Promise.all([
-      loadGenRuns(scope.db, { orgId: scope.orgId, nodes }),
-      loadDownloaded(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodes })
-    ]);
-    return { nodes, connections, runs, products, socialPosts, influencers, revision: recordsRevision(nodes, connections) };
+    return canvasSnapshot(scope.db, scope);
   },
 
   revision: async ({ params, locals }) => {
@@ -881,26 +632,16 @@ export const actions: Actions = {
       return fail(denied.status, denied.data);
     }
 
-    const runs = await listNodeRuns(scope.db, { orgId: scope.orgId, nodeId });
-    const ticket = runs.find((run) => {
-      const loop = (run.params as { loop?: { outputListNodeId?: string; label?: string } }).loop;
-      if (!loop || loop.outputListNodeId !== outputListNodeId) return false;
-      if (typeof runId === 'string' && runId) return run.id === runId;
-      return loop.label === label;
-    });
-    const values = (ticket?.params as { loop?: { values?: Record<string, string> } } | undefined)?.loop?.values ?? {};
-
-    const out = await retryLoopCombination(scope.db, {
+    return retryLoopCombo(scope.db, {
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
       nodeId,
       userId: scope.userId,
       outputListNodeId,
-      combination: { label, values }
+      label,
+      runId: typeof runId === 'string' && runId ? runId : null
     });
-
-    return out;
   },
 
   /**
@@ -921,15 +662,7 @@ export const actions: Actions = {
       return fail(400, { error: plan.reason });
     }
 
-    const nodes = await Promise.all(nodeIds.map((id) => findNode(scope.db, { orgId: scope.orgId, nodeId: id })));
-    const stepsCost = nodes
-      .filter((n): n is CanvasNodeRecord => n !== null)
-      .map((n) => ({
-        medium: (n.type === 'text' || n.type === 'video' ? n.type : 'image') as 'text' | 'image' | 'video',
-        model: typeof n.data.model === 'string' ? n.data.model : null
-      }));
-
-    return { steps: plan.steps, estimatedCredits: estimateWorkflowCredits(stepsCost) };
+    return { steps: plan.steps, estimatedCredits: await workflowCredits(scope.db, { orgId: scope.orgId, nodeIds }) };
   },
 
   /**
@@ -963,15 +696,7 @@ export const actions: Actions = {
       return fail(400, { error: out.error });
     }
 
-    const nodes = await Promise.all(nodeIds.map((id) => findNode(scope.db, { orgId: scope.orgId, nodeId: id })));
-    const stepsCost = nodes
-      .filter((n): n is CanvasNodeRecord => n !== null)
-      .map((n) => ({
-        medium: (n.type === 'text' || n.type === 'video' ? n.type : 'image') as 'text' | 'image' | 'video',
-        model: typeof n.data.model === 'string' ? n.data.model : null
-      }));
-
-    return { workflowId: out.workflowId, steps: out.steps, estimatedCredits: estimateWorkflowCredits(stepsCost) };
+    return { workflowId: out.workflowId, steps: out.steps, estimatedCredits: await workflowCredits(scope.db, { orgId: scope.orgId, nodeIds }) };
   },
 
   graph_plan: async ({ request, params, locals }) => {
@@ -1037,39 +762,10 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid request' });
     }
 
-    const node = await findNode(scope.db, { orgId: scope.orgId, nodeId });
-    if (!node || (node.type !== 'products' && node.type !== 'social_account_feed')) {
+    const written = await syncNode(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, nodeId, version, actor: userActor(scope) });
+    if (written.outcome === 'not_syncable') {
       return fail(404, { error: 'node not found' });
     }
-
-    const running = await writeNodeData(scope.db, {
-      orgId: scope.orgId,
-      nodeId,
-      expectedVersion: version,
-      data: { ...node.data, sync_status: 'running', sync_error: null },
-      actor: userActor(scope)
-    });
-    if (running.outcome === 'conflict') {
-      return fail(409, { conflict: true });
-    }
-
-    const outcome =
-      node.type === 'products'
-        ? await syncProducts(scope.db, scope.orgId, scope.canvas.projectId, node)
-        : await syncSocialFeed(scope.db, scope.orgId, scope.canvas.projectId, node);
-
-    const patch = outcome.ok
-      ? { sync_status: 'done', sync_error: null, synced_count: outcome.synced, synced_at: new Date().toISOString(), ...outcome.extra }
-      : { sync_status: 'failed', sync_error: outcome.error };
-
-    const written = await patchNodeData(scope.db, {
-      orgId: scope.orgId,
-      nodeId,
-      patch,
-      check: DataCheck.None,
-      actor: userActor(scope)
-    });
-
     return (PATCH_ANSWERS[written.outcome] as (w: PatchWrite) => unknown)(written);
   },
 
@@ -1087,33 +783,8 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid request' });
     }
 
-    const node = await findNode(scope.db, { orgId: scope.orgId, nodeId });
-    if (!node || node.type !== 'text' && node.type !== 'image' && node.type !== 'video') {
-      return fail(404, { error: 'node not found' });
-    }
-
-    const run = (await runsOf(scope.db, { orgId: scope.orgId, nodeId })).find((r) => r.id === runId);
-    if (!run?.outputAssetId) {
-      return fail(404, { error: 'generation not found' });
-    }
-
-    const shown = await writeNodeData(scope.db, {
-      orgId: scope.orgId,
-      nodeId,
-      expectedVersion: node.version,
-      data: {
-        ...node.data,
-        refId: run.outputAssetId,
-        runId: run.id,
-        running: false,
-        error: null
-      },
-      actor: userActor(scope)
-    });
-    if (shown.outcome === 'conflict') {
-      return fail(409, { conflict: true });
-    }
-    return { node: shown.node };
+    const shown = await showRun(scope.db, { orgId: scope.orgId, nodeId, runId, actor: userActor(scope) });
+    return SHOW_RUN_ANSWERS[shown.outcome](shown as never);
   },
 
   create: async ({ request, params, locals }) => {
@@ -1206,19 +877,9 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid resize' });
     }
 
-    const existing = (await listNodes(scope.db, scope)).find((node) => node.id === nodeId);
-    if (!existing) {
+    if (!(await resizeOnCanvas(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeId, width, height }))) {
       return fail(404, { error: 'node not found' });
     }
-
-    const min = nodeSize(existing.type, existing.data);
-    await resizeNode(scope.db, {
-      orgId: scope.orgId,
-      nodeId,
-      width: Math.max(min.w, width),
-      height: Math.max(min.h, height)
-    });
-
     return { resized: true };
   },
 
@@ -1310,7 +971,7 @@ export const actions: Actions = {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
 
-    let items: { node_id: string; version: number; patch: Record<string, unknown> }[];
+    let items: BatchItem[];
     try {
       items = JSON.parse(String(fd.get('items') ?? '[]'));
       if (!Array.isArray(items) || !items.length) {
@@ -1320,31 +981,7 @@ export const actions: Actions = {
       return fail(400, { error: 'unreadable content' });
     }
 
-    const known = new Map((await listNodes(scope.db, scope)).map((node) => [node.id, node]));
-
-    const results: { nodeId: string; outcome: 'written' | 'conflict' | 'not_found'; node?: CanvasNodeRecord }[] = [];
-    for (const item of items) {
-      const current = known.get(item.node_id);
-      if (!current) {
-        results.push({ nodeId: item.node_id, outcome: 'not_found' });
-        continue;
-      }
-
-      const written = await writeNodeData(scope.db, {
-        orgId: scope.orgId,
-        nodeId: item.node_id,
-        data: { ...current.data, ...item.patch },
-        expectedVersion: item.version,
-        actor: userActor(scope)
-      });
-
-      results.push(
-        written.outcome === 'conflict'
-          ? { nodeId: item.node_id, outcome: 'conflict' }
-          : { nodeId: item.node_id, outcome: 'written', node: written.node }
-      );
-    }
-
+    const results = await writeNodesBatch(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, items, actor: userActor(scope) });
     return { results };
   },
 
@@ -1362,32 +999,8 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid document' });
     }
 
-    const node = (await listNodes(scope.db, scope)).find((row) => row.id === nodeId);
-    if (!node || node.type !== 'doc') {
-      return fail(404, { error: 'document not found' });
-    }
-
-    const data = docData({
-      id: node.id,
-      content: typeof node.data.content === 'string' ? node.data.content : '',
-      public: on
-    });
-
-    if (!on) {
-      await clearDocShare(scope.db, { orgId: scope.orgId, nodeId, data });
-      return { public: false };
-    }
-
-    const { token, token_hash } = await mintShareToken();
-    await setDocShare(scope.db, {
-      orgId: scope.orgId,
-      nodeId,
-      data,
-      tokenHash: token_hash,
-      expiresAt: null
-    });
-
-    return { public: true, path: `/d/${token}` };
+    const shared = await shareDoc(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeId, on });
+    return shared ?? fail(404, { error: 'document not found' });
   },
 
   share_canvas: async ({ request, params, locals }) => {
@@ -1533,21 +1146,9 @@ export const actions: Actions = {
       return fail(400, { error: 'nothing to delete' });
     }
 
-    const canvasNodes = new Set((await listNodes(scope.db, scope)).map((node) => node.id));
-    if (nodeIds.some((id) => !canvasNodes.has(id))) {
+    if (!(await removeNodes(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds, actor: userActor(scope) }))) {
       return fail(404, { error: 'node not found' });
     }
-    const connectionIds = (await listConnections(scope.db, scope))
-      .filter((edge) => nodeIds.includes(edge.sourceNodeId) || nodeIds.includes(edge.targetNodeId))
-      .map((edge) => edge.id);
-
-    for (const connectionId of connectionIds) {
-      await deleteConnection(scope.db, { orgId: scope.orgId, connectionId, actor: userActor(scope) });
-    }
-    for (const nodeId of nodeIds) {
-      await deleteNode(scope.db, { orgId: scope.orgId, nodeId, actor: userActor(scope) });
-    }
-
     return { removed: true };
   },
 
@@ -1586,8 +1187,8 @@ export const actions: Actions = {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
 
-    let pasted: { type: string; data: Record<string, unknown>; x: number; y: number }[];
-    let edges: { sourceIndex: number; targetIndex: number; sourceHandle: string | null; targetHandle: string | null }[];
+    let pasted: PastedNode[];
+    let edges: PastedEdge[];
     try {
       pasted = JSON.parse(String(fd.get('nodes') ?? '[]'));
       edges = JSON.parse(String(fd.get('edges') ?? '[]'));
@@ -1601,47 +1202,15 @@ export const actions: Actions = {
       return fail(400, { error: 'nothing to paste' });
     }
 
-    const nodes: Awaited<ReturnType<typeof createNode>>[] = [];
-    for (const p of pasted) {
-      const verdict = validateNodeData(p.type, p.data);
-      if (!verdict.ok) {
-        return fail(400, { error: verdict.error });
-      }
-
-      const node = await createNode(scope.db, {
-        orgId: scope.orgId,
-        projectId: scope.canvas.projectId,
-        canvasId: scope.canvasId,
-        type: p.type,
-        x: p.x,
-        y: p.y,
-        data: verdict.data,
-        actor: userActor(scope)
-      });
-      nodes.push(node);
-    }
-
-    const connections: Awaited<ReturnType<typeof createConnection>>[] = [];
-    for (const e of edges) {
-      const source = nodes[e.sourceIndex];
-      const target = nodes[e.targetIndex];
-      if (!source || !target) {
-        continue;
-      }
-      connections.push(
-        await createConnection(scope.db, {
-          orgId: scope.orgId,
-          canvasId: scope.canvasId,
-          sourceNodeId: source.id,
-          targetNodeId: target.id,
-          sourceHandle: e.sourceHandle,
-          targetHandle: e.targetHandle,
-          actor: userActor(scope)
-        })
-      );
-    }
-
-    return { nodes, connections };
+    const out = await pasteNodes(scope.db, {
+      orgId: scope.orgId,
+      projectId: scope.canvas.projectId,
+      canvasId: scope.canvasId,
+      nodes: pasted,
+      edges,
+      actor: userActor(scope)
+    });
+    return 'refused' in out ? fail(400, { error: out.refused }) : out;
   },
 
   demo_run: async ({ params, locals }) => {
@@ -1664,8 +1233,9 @@ export const actions: Actions = {
     return { ended: await endOnboarding(scope.db, scope.userId, to) };
   },
 
-  frame_template: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
+  frame_template: async ({ request, params, locals, setHeaders }) => {
+    const phases = serverTiming();
+    const scope = await phases.time('scope', scopeFor(locals, params.canvasId));
     const fd = await request.formData();
 
     const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
@@ -1675,7 +1245,7 @@ export const actions: Actions = {
     }
 
     const actor = userActor(scope);
-    const started = await startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, {
+    const started = await phases.time('start', startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, {
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
@@ -1684,12 +1254,14 @@ export const actions: Actions = {
       format,
       at,
       actor
-    });
+    }));
     if (started.outcome !== FromTemplate.Started) {
       return fail(400, { error: started.outcome });
     }
 
-    return { node: await findNode(scope.db, { orgId: scope.orgId, nodeId: started.start.nodeId }) };
+    const node = await phases.time('read', findNode(scope.db, { orgId: scope.orgId, nodeId: started.start.nodeId }));
+    setHeaders({ 'server-timing': phases.header() });
+    return { node };
   },
 
   template: async ({ request, params, locals }) => {
@@ -1771,136 +1343,11 @@ export const actions: Actions = {
     const fd = await request.formData();
 
     const nodeId = String(fd.get('node_id') ?? '');
-    const node = (await listNodes(scope.db, scope)).find((n) => n.id === nodeId);
-    if (!node) {
+    const suggestions = await nextStepsFor(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeId });
+    if (!suggestions) {
       return fail(404, { error: 'node not found' });
     }
-
-    const frequency = await actionFrequencyFor(scope.db, scope.orgId, node.type);
-    const decide = process.env.TYPESAFE_API_KEY ? decideWithJev : null;
-    const suggestions = await suggestNextSteps(node.type, frequency, decide, node.data);
-
-    return {
-      suggestions: suggestions.map((s) => ({
-        id: s.action.id,
-        label: s.action.label,
-        createsNodeType: s.action.createsNodeType,
-        wiring: s.action.wiring,
-        promptTemplate: s.action.promptTemplate,
-        confidence: s.confidence
-      }))
-    };
-  },
-
-  /**
-   * DALLA SELEZIONE DEL CANVAS A UN POST — la promozione, opzionalmente programmata.
-   * `media_order_node_id` porta l'ordine scelto nel composer (il drag/i pulsanti su e giù),
-   * separato da `node_id` perché quest'ultimo include anche i nodi caption/riferimento; questa
-   * action non sceglie una caption, la riceve già scelta. `mode`: senza `scheduled_for` resta
-   * `draft`, con un `scheduled_for` (e almeno un account) prova a consegnare via Zernio.
-   */
-  create_post: async ({ request, params, locals }) => {
-    const scope = await scopeAllowing(locals, params.canvasId, Capability.Publish);
-    const fd = await request.formData();
-
-    const brandId = String(fd.get('brand_id') ?? '');
-    const caption = fd.has('caption') ? String(fd.get('caption')) : undefined;
-    const nodeIds = fd.getAll('node_id').map(String);
-    const mediaOrder = fd.getAll('media_order_node_id').map(String);
-    const accountIds = fd.getAll('account_id').map(String);
-    const scheduledFor = String(fd.get('scheduled_for') ?? '').trim();
-    const plannedFor = String(fd.get('planned_for') ?? '').trim() || undefined;
-
-    if (!brandId || !nodeIds.length) {
-      return fail(400, { error: 'brand_and_nodes_required' });
-    }
-
-    const mode = scheduledFor ? ({ kind: 'schedule', at: scheduledFor } as const) : ({ kind: 'draft', plannedFor } as const);
-
-    const result = await createPostFromNodes(
-      scope.db,
-      {
-        brands: { findBrand },
-        accounts: { listBrandAccounts },
-        promoteNodesToPost: (db, _repos, input) =>
-          promoteNodesToPost(db, { canvas: { listNodesByIds }, posts: { promoteToPost } }, input),
-        setPostStatus,
-        scheduleDelivery
-      },
-      {
-        orgId: scope.orgId,
-        userId: scope.userId,
-        brandId,
-        nodeIds,
-        caption,
-        mediaOrder: mediaOrder.length ? mediaOrder : undefined,
-        accountIds,
-        mode
-      },
-      publisher
-    );
-
-    if (!result.ok) {
-      return fail(result.error === 'node_not_found' ? 400 : 422, result);
-    }
-    return { post: result.post };
-  },
-
-  calendar_posts: async ({ request, params, locals }) => {
-    const scope = await scopeAllowing(locals, params.canvasId, Capability.Schedule);
-    const fd = await request.formData();
-    const brandId = String(fd.get('brand_id') ?? '');
-    const planScope = String(fd.get('scope') ?? '') === PlanScope.Brand ? PlanScope.Brand : PlanScope.Canvas;
-
-    if (planScope === PlanScope.Brand && !brandId) {
-      return fail(HTTP_BAD_REQUEST, { error: 'brand_required' });
-    }
-
-    const scopeInput =
-      planScope === PlanScope.Brand
-        ? ({ kind: PlanScope.Brand, brandId } as const)
-        : ({ kind: PlanScope.Canvas, canvasId: scope.canvasId } as const);
-
-    const [posts, brands] = await Promise.all([
-      listPlannedPosts(scope.db, { orgId: scope.orgId, scope: scopeInput }),
-      listOrgBrands(scope.db, scope.orgId)
-    ]);
-    const withDeliveries = await Promise.all(
-      posts.map(async (post) => ({
-        ...post,
-        deliveries: post.scheduled ? await deliveryStatus(scope.db, publisher, { orgId: scope.orgId, postId: post.id }).catch(() => []) : []
-      }))
-    );
-
-    return { posts: withDeliveries, brands: brands.map((b) => ({ id: b.id, name: b.name })) };
-  },
-
-  plan_post: async ({ request, params, locals }) => {
-    const scope = await scopeAllowing(locals, params.canvasId, Capability.Schedule);
-    const fd = await request.formData();
-    const postId = String(fd.get('post_id') ?? '');
-    const plannedFor = String(fd.get('planned_for') ?? '').trim() || null;
-    const expectedUpdatedAt = String(fd.get('expected_updated_at') ?? '');
-
-    if (!postId || !expectedUpdatedAt) {
-      return fail(HTTP_BAD_REQUEST, { error: 'post_and_version_required' });
-    }
-
-    const planned = await planPost(scope.db, { orgId: scope.orgId, postId, plannedFor, expectedUpdatedAt });
-    return PLAN_ANSWERS[planned.outcome](planned);
-  },
-
-  schedule_post: async ({ request, params, locals }) => {
-    const scope = await scopeAllowing(locals, params.canvasId, Capability.Schedule);
-    const postId = String((await request.formData()).get('post_id') ?? '');
-    if (!postId) {
-      return fail(HTTP_BAD_REQUEST, { error: 'post_required' });
-    }
-
-    const scheduled = await schedulePlanned(scope.db, publisher, { orgId: scope.orgId, postId, now: new Date() });
-    if (!scheduled.ok) {
-      return fail(HTTP_UNPROCESSABLE, scheduled);
-    }
-    return { scheduled };
+    return { suggestions };
   }
+
 };

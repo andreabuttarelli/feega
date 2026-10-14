@@ -102,41 +102,50 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    padding: 8px 5px;
+    gap: 8px;
+    padding: 8px 6px;
     background: var(--ui-surface);
   }
 
   .rail-group {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
 
   .rail-divider {
     width: 20px;
     height: 1px;
-    background: var(--line, #ededef);
+    background: var(--ui-divider-strong);
     margin: 2px 0;
   }
 
   .rail-btn {
     display: grid;
     place-items: center;
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     appearance: none;
     border: 0;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-icon-ink);
     cursor: pointer;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease), color var(--ui-dur-fast) var(--ui-ease);
   }
   .rail-btn:hover {
-    background: var(--paper-2, #f9f9f9);
-    color: var(--ink, #1d1d1f);
+    background: var(--ui-wash);
+    color: var(--ui-text);
+  }
+  .rail-btn:active {
+    background: var(--ui-pressed);
+  }
+  .rail-btn:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
   .rail-btn.is-active {
-    background: var(--nav-on, color-mix(in srgb, var(--accent) 12%, transparent));
-    color: var(--accent-ink, var(--accent, #7c5cff));
+    background: var(--ui-selected);
+    color: var(--ui-accent-text);
   }
 </style>

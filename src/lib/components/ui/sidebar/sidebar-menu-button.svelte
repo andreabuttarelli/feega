@@ -1,5 +1,6 @@
 <script lang="ts" module>
 	import { tv, type VariantProps } from "tailwind-variants";
+	import { TW_MERGE_CONFIG } from "$lib/utils.js";
 
 	export const sidebarMenuButtonVariants = tv({
 		// Press wash uses --paper (solid surface), not ink washes / --paper-3.
@@ -21,7 +22,7 @@
 			variant: "default",
 			size: "default",
 		},
-	});
+	}, { twMergeConfig: TW_MERGE_CONFIG });
 
 	export type SidebarMenuButtonVariant = VariantProps<
 		typeof sidebarMenuButtonVariants

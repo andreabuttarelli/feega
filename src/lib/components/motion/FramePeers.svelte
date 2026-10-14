@@ -7,12 +7,14 @@
   let {
     doc,
     frame,
+    redraws,
     peers,
     measure,
     onpointer
   }: {
     doc: MotionDoc;
     frame: number;
+    redraws: number;
     peers: FramePeer[];
     measure: () => Promise<Record<string, MeasuredBox>>;
     onpointer: (cursor: FrameCursor | null) => void;
@@ -31,6 +33,7 @@
   $effect(() => {
     void doc;
     void frame;
+    void redraws;
     if (!wanted) {
       return;
     }
@@ -125,11 +128,13 @@
 
   .cursor span {
     margin-top: 12px;
-    padding: 1px 8px;
-    border-radius: 9999px;
+    padding: 3px 10px;
+    border-radius: var(--ui-radius-full);
     background: var(--peer);
+    box-shadow: var(--ui-shadow-raised);
     color: white;
-    font-size: 11px;
+    font-size: var(--ui-type-label);
+    font-weight: var(--ui-weight-semibold);
     line-height: 16px;
     white-space: nowrap;
   }

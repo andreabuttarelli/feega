@@ -85,7 +85,8 @@
     position: relative;
     width: 100%;
     overflow: hidden;
-    background: var(--ui-surface);
+    background: var(--ui-panel-sunken);
+    border-radius: var(--ui-radius-md);
   }
 
   .media {
@@ -103,7 +104,7 @@
   }
 
   .loading {
-    background: linear-gradient(90deg, var(--ui-surface) 0%, var(--ui-hover) 50%, var(--ui-surface) 100%);
+    background: linear-gradient(90deg, var(--ui-panel-sunken) 0%, var(--ui-wash) 50%, var(--ui-panel-sunken) 100%);
     background-size: 200% 100%;
     animation: shimmer 1.4s linear infinite;
   }

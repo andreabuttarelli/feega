@@ -67,8 +67,12 @@ export function tourShowsOn(pathname: string): boolean {
   return TOUR_PATH_PREFIXES.some((prefix) => `${pathname}/`.startsWith(prefix));
 }
 
+export function predatesOnboarding(createdAt: string): boolean {
+  return new Date(createdAt) < new Date(TOUR_LAUNCHED_AT);
+}
+
 export function tourStateOf(input: { createdAt: string; seen: TourSeen }): TourState {
-  if (new Date(input.createdAt) < new Date(TOUR_LAUNCHED_AT)) {
+  if (predatesOnboarding(input.createdAt)) {
     return TourState.Seen;
   }
   if (input.seen === null) {

@@ -20,6 +20,8 @@ export const openingOf = (viewport: Viewport): Opening => OPENING[viewport];
 
 type Row = { id: string; type: string };
 
+export const dismissedAfterClick = (dismissed: string | null, clicked: string): string | null => (dismissed === clicked ? null : dismissed);
+
 export function inlineMotionTarget(selected: readonly string[], rows: readonly Row[], dismissed: string | null, opening: Opening, requested: string | null = null): string | null {
   if (selected.length !== 1 || selected[0] === dismissed) {
     return null;
@@ -52,6 +54,8 @@ const LAYERS: Record<NodeMode, Record<Paint, Layers>> = {
 };
 
 export const nodeLayers = (mode: NodeMode, paint: Paint): Layers => LAYERS[mode][paint];
+
+export const ownPlayer = (mode: NodeMode, paint: Paint, live: boolean): boolean => live && nodeLayers(mode, paint).own;
 
 export enum Part {
   Body = 'body',
@@ -86,15 +90,3 @@ export enum CanvasState {
   Browsing = 'browsing',
   Editing = 'editing'
 }
-
-export enum AddBar {
-  Shown = 'shown',
-  Away = 'away'
-}
-
-const ADD_BAR: Record<CanvasState, AddBar> = {
-  [CanvasState.Browsing]: AddBar.Shown,
-  [CanvasState.Editing]: AddBar.Away
-};
-
-export const addBarOf = (state: CanvasState): AddBar => ADD_BAR[state];

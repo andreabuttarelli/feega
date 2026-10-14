@@ -66,7 +66,7 @@ export async function remixGalleryItem(db: Db, ports: RemixPorts, input: RemixIn
     return fail(RemixError.ForeignFile, 'This gallery item points at a file outside the gallery.');
   }
 
-  const start = await startMotion(db, MOTION_START_DEPS, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId, userId: input.userId, name: item.title });
+  const start = await startMotion(db, MOTION_START_DEPS, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId, userId: input.userId, name: item.title, picture: item.doc });
   if (!start) {
     return fail(RemixError.CanvasNotFound, 'That canvas is not in this project.');
   }

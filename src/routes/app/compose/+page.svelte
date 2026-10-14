@@ -123,12 +123,12 @@
     margin: 0 0 12px;
     font-size: 15px;
     font-weight: 600;
-    color: var(--ui-ink);
+    color: var(--ui-text);
   }
 
   .muted {
     font-size: 12px;
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
   }
 
   .error {
@@ -143,8 +143,9 @@
     align-items: flex-end;
     gap: 16px;
     padding: 16px;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-bg);
+    border: 0;
+    background: var(--ui-panel-sunken);
+    border-radius: var(--ui-radius-sm);
   }
 
   .options label {
@@ -152,22 +153,28 @@
     flex-direction: column;
     gap: 4px;
     font-size: 12px;
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
   }
 
   .options select {
     height: 32px;
     min-width: 200px;
     padding: 0 8px;
-    border: 1px solid var(--ui-line-strong);
-    background: var(--ui-bg);
-    color: var(--ui-ink);
+    border: 0;
+    background: var(--ui-input);
+    color: var(--ui-text);
     font-size: 13px;
+    border-radius: var(--ui-radius-sm);
   }
 
   .formats {
     display: flex;
-    border: 1px solid var(--ui-line-strong);
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 2px;
+    background: var(--ui-input);
+    border: 0;
+    border-radius: var(--ui-radius-md);
   }
 
   .formats button {
@@ -177,9 +184,10 @@
     height: 32px;
     padding: 0 12px;
     font-size: 12.5px;
-    color: var(--ui-ink-2);
-    background: var(--ui-bg);
-    border-right: 1px solid var(--ui-line-strong);
+    color: var(--ui-text-secondary);
+    background: transparent;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
     cursor: pointer;
   }
 
@@ -188,8 +196,9 @@
   }
 
   .formats button.on {
-    background: var(--ui-accent-wash);
-    color: var(--ui-accent);
+    background: var(--ui-panel-raised);
+    color: var(--ui-text);
+    box-shadow: var(--ui-shadow-raised);
   }
 
   .ratio-glyph {
@@ -220,16 +229,17 @@
     width: 100%;
     height: 100%;
     padding: 0;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-bg);
-    color: var(--ui-ink);
+    border: 0;
+    background: var(--ui-panel-sunken);
+    color: var(--ui-text);
     text-align: left;
     cursor: pointer;
+    border-radius: var(--ui-radius-sm);
   }
 
   .template-button:hover,
   .template-button:focus-visible {
-    border-color: var(--ui-ink);
+    background: var(--ui-wash);
   }
 
   .stage {

@@ -29,12 +29,15 @@
    * che si colora e il menù dei versi, e tre copie diverrebbero diverse al primo caso nuovo.
    */
   import { untrack } from 'svelte';
-  import { SvelteFlow, Background, type Node } from '@xyflow/svelte';
+  import { SvelteFlow, type Node } from '@xyflow/svelte';
+  import CanvasDots from './CanvasDots.svelte';
+  import CanvasPosterLayer from './CanvasPosterLayer.svelte';
+  import { POSTER_CLASS } from '$lib/canvas/poster-lod';
   import '@xyflow/svelte/dist/style.css';
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
   import CanvasAddBar from './CanvasAddBar.svelte';
-  import type { AddBar } from '$lib/canvas/inline-motion';
+  import type { BarContext } from '$lib/canvas/bottom-bar';
   import CanvasKeys from './CanvasKeys.svelte';
   import CanvasSelectionBridge from './CanvasSelectionBridge.svelte';
   import CanvasImageTiers from './CanvasImageTiers.svelte';
@@ -65,6 +68,7 @@
   import type { RunQuote } from '$lib/canvas/run-quote';
   import { GraphScope } from '$lib/canvas/run-graph';
   import { DropVerdict, pointOf, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { ReportChange, reportChange } from '$lib/canvas/selection-report';
 
   /**
    * Dove sta una tile e quanto è grande, in unità di tela — le stesse di `brand_canvas_items`.
@@ -110,6 +114,7 @@
      *  seleziona; un inserimento realtime da un altro utente non la porta mai. */
     select?: boolean;
     settings?: boolean;
+    poster?: string;
   };
 
   let {
@@ -125,7 +130,6 @@
     onResize,
     onConnect,
     onDelete,
-    onPromote,
     onEdgeDelete,
     onEdgeRetype,
     onEdgeModeChange,
@@ -137,7 +141,8 @@
     onPaste,
     onTemplate,
     onFrameTemplates,
-    addBar,
+    onNodeClicked,
+    barContext,
     onUndo,
     onRedo,
     onConnectNew,
@@ -185,7 +190,6 @@
      */
     onDelete?: (ids: string[]) => void;
     /** "Crea post" dalla barra della selezione: gli id scelti, così com'è per `onDelete`. */
-    onPromote?: (ids: string[]) => void;
     /** Una linea da togliere. Senza, il primo errore resta sulla tela per sempre. */
     onEdgeDelete?: (edgeId: string) => void;
     /** Il verso di una linea che c'è già: si corregge, non si rifà. */
@@ -215,7 +219,8 @@
     onPaste?: (at: { x: number; y: number }) => void;
     onTemplate?: (id: string, at: { x: number; y: number }) => void;
     onFrameTemplates?: (at: { x: number; y: number }) => void;
-    addBar?: AddBar;
+    onNodeClicked?: (id: string) => void;
+    barContext?: BarContext;
     /** ⌘Z: annulla l'ultimo gesto di questa scheda. */
     onUndo?: () => void;
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
@@ -224,7 +229,7 @@
     focus?: FocusRequest | null;
     /** "Collega a…": gli id scelti e il nodo su cui si è cliccato per chiudere la modalità bersaglio. */
     onConnectExisting?: (ids: string[], targetId: string) => void;
-    /** "Esegui flusso": gli id scelti, così com'è per `onDelete`/`onPromote`. */
+    /** "Esegui flusso": gli id scelti, così com'è per `onDelete`. */
     onRunWorkflow?: (ids: string[]) => void;
     onRunGraph?: (graph: GraphScope, ids: string[]) => void;
     stale?: string[];
@@ -295,7 +300,7 @@
       minH: t.minH
     },
     type: 'tile',
-    class: t.settings ? 'has-settings' : undefined,
+    class: [t.settings && 'has-settings', t.poster && POSTER_CLASS].filter(Boolean).join(' ') || undefined,
     style: `width:${t.w}px;height:${t.h}px`
   });
 
@@ -528,6 +533,7 @@
    * riquadro a ogni cambio — la barra stessa vive fuori, sotto, perché non ha bisogno del contesto
    * della libreria, solo di coordinate già pronte.
    */
+  let moving = $state(false);
   let selection = $state<{ ids: string[]; box: { x: number; y: number; width: number; height: number } | null; zoom: number }>({
     ids: [],
     box: null,
@@ -552,6 +558,7 @@
   let targeting = $state<string[] | null>(null);
 
   function onNodeClick({ node }: { node: Node }) {
+    onNodeClicked?.(node.id);
     if (!targeting) return;
     if (targeting.includes(node.id)) return;
 
@@ -573,7 +580,6 @@
     'connect-existing': (ids) => {
       targeting = ids;
     },
-    promote: (ids) => onPromote?.(ids),
     'run-workflow': (ids) => onRunWorkflow?.(ids),
     'run-downstream': (ids) => onRunGraph?.(GraphScope.Downstream, ids),
     'run-stale': (ids) => onRunGraph?.(GraphScope.Stale, ids),
@@ -629,11 +635,7 @@
   }) {
     if (!selection.box || !toFlow) return;
 
-    if (suggestion.wiring === 'create-post') {
-      onPromote?.(selection.ids);
-      return;
-    }
-    if (!suggestion.createsNodeType) return;
+    if (suggestion.wiring === 'create-post' || !suggestion.createsNodeType) return;
 
     onConnectNew?.(selection.ids, suggestion.createsNodeType, suggestion.promptTemplate);
   }
@@ -722,12 +724,14 @@
   let wrap = $state<HTMLDivElement | null>(null);
 
   const tierBoard = provideTierBoard();
+  const posters = $derived(new Map(tiles.flatMap((t) => (t.poster ? [[t.id, t.poster] as const] : []))));
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -- il trascinamento è una scorciatoia sulla
      tela, non l'unico modo di creare un nodo: chi non trascina usa la barra o la tastiera. -->
 <div
   class="wrap"
+  class:moving
   bind:this={wrap}
   ondragover={onDragOver}
   ondrop={onDrop}
@@ -765,6 +769,8 @@
     {isValidConnection}
     onconnectend={() => (refusal = null)}
     {...spec.flow}
+    onmovestart={() => (moving = true)}
+    onmoveend={() => (moving = false)}
     fitView
     fitViewOptions={{ padding: FIT_PADDING, maxZoom: READABLE_ZOOM }}
     proOptions={ATTRIBUTION_IN_CREDITS_PAGE}
@@ -786,13 +792,20 @@
     {/if}
     <CanvasSelectionBridge
       onchange={(next) => {
+        const change = reportChange(selection, next);
+        if (change === ReportChange.None) {
+          return;
+        }
         selection = next;
-        settleSettingsColumns();
-        onSelectionChange?.(next.ids);
+        if (change === ReportChange.Ids) {
+          settleSettingsColumns();
+          onSelectionChange?.(next.ids);
+        }
       }}
     />
     <CanvasImageTiers board={tierBoard} />
-    <Background gap={24} />
+    <CanvasDots />
+    <CanvasPosterLayer {posters} />
   </SvelteFlow>
 
   {#if refusal}
@@ -806,7 +819,7 @@
   {/if}
 
   {#if spec.chrome && onCreate}
-    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} ontemplate={onTemplate ? templateAtCentre : undefined} onframes={onFrameTemplates ? framesAtCentre : undefined} shown={addBar} />
+    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} ontemplate={onTemplate ? templateAtCentre : undefined} onframes={onFrameTemplates ? framesAtCentre : undefined} context={barContext} zoom={selection.zoom} />
   {/if}
 
   {#if spec.chrome}
@@ -913,6 +926,14 @@
 
     --xy-edge-stroke: color-mix(in srgb, var(--ink-soft, #6e6e73) 45%, var(--paper, #fff));
     --xy-edge-stroke-selected: var(--accent, #7c5cff);
+  }
+
+  .wrap :global(.poster-lod .svelte-flow__node.has-poster:not(.selected) > *) {
+    visibility: hidden;
+  }
+
+  .wrap.moving :global(.svelte-flow__viewport) {
+    will-change: transform;
   }
 
   .wrap :global(.svelte-flow__node.has-settings) {

@@ -10,8 +10,10 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 type Row = Record<string, any>;
 
 const finishVideoRender = vi.fn();
+const submitVideoRender = vi.fn();
 
 vi.mock('$lib/server/video', () => ({
+	submitVideoRender: (...args: unknown[]) => submitVideoRender(...args),
 	finishVideoRender: (...args: unknown[]) => finishVideoRender(...args)
 }));
 vi.mock('$lib/server/ai-log', () => ({
@@ -44,6 +46,8 @@ function makeDb(seed: Record<string, Row[]>) {
 			eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), api),
 			neq: (c: string, v: unknown) => (filters.push((r) => r[c] !== v), api),
 			in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), api),
+			not: (c: string, _op: string, p: string) => (filters.push((r) => !String(r[c]).startsWith(p.replace('%', ''))), api),
+			like: (c: string, p: string) => (filters.push((r) => String(r[c]).startsWith(p.replace('%', ''))), api),
 			lt: (c: string, v: string) => (filters.push((r) => r[c] != null && r[c] < v), api),
 			order: () => api,
 			limit: (n: number) => ((limit = n), api),
@@ -460,30 +464,32 @@ describe('reconcileVideoRenders', () => {
 	});
 });
 
-describe('enqueueVideoRender', () => {
+describe('submitAndTrackVideoRender', () => {
 	it('writes the provider handle down with everything finishing it will need', async () => {
-		const { enqueueVideoRender } = await import('./video-render-queue');
+		const { submitAndTrackVideoRender } = await import('./video-render-queue');
 		const { tables, client } = makeDb({ video_renders: [] });
+		submitVideoRender.mockResolvedValue({
+			taskId: 'openrouter:task-9',
+			model: 'bytedance/seedance-2-5',
+			prompt: 'a clip',
+			durationSeconds: 22,
+			resolution: '720p',
+			coverUrl: 'https://cdn/cover.jpg',
+			persistOpts: { captions: true, fontName: 'Inter', tighten: true },
+			submittedAt: Date.now()
+		});
 
-		const id = await enqueueVideoRender(client as never, {
+		const tracked = await submitAndTrackVideoRender({
+			admin: client as never,
 			brandId: 'brand-1',
 			userId: 'user-1',
 			postId: 'post-1',
 			threadId: 'thread-1',
-			submitted: {
-				taskId: 'openrouter:task-9',
-				model: 'bytedance/seedance-2-5',
-				prompt: 'a clip',
-				durationSeconds: 22,
-				resolution: '720p',
-				coverUrl: 'https://cdn/cover.jpg',
-				persistOpts: { captions: true, fontName: 'Inter', tighten: true },
-				submittedAt: Date.now()
-			}
+			imagePrompt: 'a clip',
+			render: {}
 		});
 
-		expect(id).toBeTruthy();
-		// persist_opts cannot be re-derived later — the request that computed it is long gone.
+		expect(tracked?.jobId).toBeTruthy();
 		expect(tables.video_renders[0]).toMatchObject({
 			task_id: 'openrouter:task-9',
 			thread_id: 'thread-1',

@@ -73,6 +73,23 @@ describe('motion agent mask tools', () => {
     expect(findClip(session.doc, 'id1')!.clip.matte).toBe('alpha');
   });
 
+  it('use_as_mask makes the bottom-most clip the mask of the others, release_mask undoes it', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, props: { shape: 'ellipse' } });
+    await run('add_track', { kind: 'visual' });
+    await run('add_clip', { component: 'Image', start: 0, track_id: 'id2', props: { assetId: 'pic' } });
+
+    const out = await run('use_as_mask', { clip_ids: ['id1', 'id3'] });
+
+    expect(out.ok).toBe(true);
+    expect(findClip(session.doc, 'id3')!.clip).toMatchObject({ matte: 'alpha', matteFrom: 'id1' });
+    expect(JSON.stringify(await run('get_motion_doc', {}))).toContain('"matteFrom":"id1"');
+
+    expect((await run('release_mask', { mask_id: 'id1' })).ok).toBe(true);
+    expect(findClip(session.doc, 'id3')!.clip).toMatchObject({ matte: 'none', matteFrom: null });
+    expect((await run('release_mask', { mask_id: 'id1' })).ok).toBe(false);
+  });
+
   it('set_track_matte takes any clip above, a video too, and the inverted mattes', async () => {
     const { session, run } = setup();
     await run('add_clip', { component: 'Image', start: 0, props: { assetId: 'pic' } });

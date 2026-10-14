@@ -158,8 +158,8 @@ describe('/app is the dashboard for a returning user', () => {
   it('a poster template opens a new canvas on a 4:5 still that holds it', async () => {
     const redirected = await thrown(() => actions.fromTemplate({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ template: 'builtin:poster-white-shapes', format: '4:5' }) } as never));
 
-    const doc = (appendRevision.mock.calls[0][1] as { doc: { comps: Record<string, { template?: { id: string } }>; height: number; width: number; still?: unknown } }).doc;
-    expect(Object.values(doc.comps).some((c) => c.template?.id === 'builtin:poster-white-shapes')).toBe(true);
+    const doc = (appendRevision.mock.calls[0][1] as { doc: { tracks: { clips: { component: string }[] }[]; height: number; width: number; still?: unknown } }).doc;
+    expect(doc.tracks.flatMap((t) => t.clips).map((c) => c.component)).toEqual(['Custom']);
     expect(doc).toMatchObject({ width: 1080, height: 1350, still: expect.anything() });
     expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new/motion/m-new' });
   });

@@ -22,7 +22,7 @@
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, type MotionNode } from '$lib/canvas/motion-node';
-  import { NodeMode, nodeLayers } from '$lib/canvas/inline-motion';
+  import { NodeMode, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
   import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
@@ -54,9 +54,10 @@
   const mode = $derived(previewMode(sight, intent, still));
   const capturing = $derived(mode === PreviewMode.Capture && slots.capturing === node.id);
   const last = $derived(Math.max(0, (preview?.durationInFrames ?? 1) - 1));
-  const layers = $derived(nodeLayers(nodeMode, inlineStage.paintOf(node.id)));
+  const paint = $derived(inlineStage.paintOf(node.id));
+  const layers = $derived(nodeLayers(nodeMode, paint));
   const previewing = $derived(nodeMode === NodeMode.Preview);
-  const mounted = $derived(previewing && (mode === PreviewMode.Live || capturing));
+  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing));
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));
@@ -208,6 +209,8 @@
         {/if}
       {:else if poster}
         <img class="poster" src={poster} alt="" draggable="false" data-testid="motion-node-poster" loading="lazy" decoding="async" />
+      {:else if !previewing}
+        <div class="skeleton" data-testid="motion-node-skeleton"></div>
       {:else}
         <div class="empty">
           <Clapperboard size={28} />
@@ -274,6 +277,12 @@
     width: 100%;
     height: 100%;
     object-fit: contain;
+  }
+
+  .skeleton {
+    position: absolute;
+    inset: 0;
+    background: var(--ui-field, #f2f2f2);
   }
 
   .empty {

@@ -1,17 +1,18 @@
 <script lang="ts" module>
 	import { type VariantProps, tv } from "tailwind-variants";
+	import { TW_MERGE_CONFIG } from "$lib/utils.js";
 
 	export const noticeVariants = tv({
-		base: "mb-4 border px-3.5 py-2.5 text-[0.8125rem] leading-snug",
+		base: "mb-4 rounded-md px-3.5 py-2.5 text-ui-label leading-snug",
 		variants: {
 			tone: {
-				info: "border-border bg-muted text-foreground",
-				success: "border-success/30 bg-success/10 text-success",
-				error: "border-destructive/30 bg-destructive/10 text-destructive",
+				info: "bg-ui-input text-ui-text",
+				success: "bg-success/10 text-success",
+				error: "bg-ui-danger/10 text-ui-danger",
 			},
 		},
 		defaultVariants: { tone: "info" },
-	});
+	}, { twMergeConfig: TW_MERGE_CONFIG });
 
 	export type NoticeTone = VariantProps<typeof noticeVariants>["tone"];
 </script>

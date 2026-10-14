@@ -177,11 +177,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--paper-2);
-    border: 1px solid var(--line);
-    color: var(--ink-soft);
+    background: var(--ui-panel-sunken);
+    border: 1px solid var(--ui-divider);
+    color: var(--ui-text-secondary);
     font-size: 18px;
     font-weight: 700;
+    border-radius: var(--ui-radius-md);
   }
   .avatar-preview img {
     width: 100%;

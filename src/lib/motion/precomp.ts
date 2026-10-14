@@ -221,3 +221,16 @@ export function flattenComps(doc: MotionDoc): MotionDoc {
   }
   return { ...doc, tracks: expand(doc, doc.tracks, 0) };
 }
+
+export function liftSoleClip(doc: MotionDoc): MotionDoc {
+  const outer = doc.tracks.flatMap((t) => t.clips as MotionClip[]);
+  const host = outer.length === 1 ? outer[0] : null;
+  const id = host ? compOf(host) : null;
+  const inner = id ? doc.comps[id]?.tracks.flatMap((t) => t.clips as MotionClip[]) : null;
+  if (!host || !id || inner?.length !== 1) {
+    return doc;
+  }
+  const { [id]: _lifted, ...comps } = doc.comps;
+  const clip = { ...inner[0], from: host.from + inner[0].from };
+  return { ...doc, comps, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.length ? [clip] : [] })) };
+}

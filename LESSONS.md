@@ -4,6 +4,23 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### In Safari l'anteprima gira a 30 fps mentre la pagina è a 60
+Segnale: `editor-scrub-budget.spec.ts` in WebKit dà host 60 fps e iframe 30 (play e scrub, ogni
+via di seek). WebKit limita il rAF degli iframe cross-origin mai toccati dall'utente a 30 fps
+(`NonInteractedCrossOriginFrame`, changeset 215070); il player è `sandbox-origin="opaque"`, quindi
+cross-origin, e i clic li prendono i nostri overlay, non l'iframe. Mossa: misurare il rAF dentro
+l'iframe (sonda nello srcdoc), mai solo quello dell'host; togliere il limite vuol dire un iframe
+same-origin o un'interazione vera dentro il frame — scelta di sicurezza, non di performance.
+
+### Il contorno di selezione è spostato o piccolo rispetto al disegno
+Segnale: il box blu non copre l'elemento, ma `measure()` restituisce frazioni giuste. Prima di
+sospettare zoom/scala, confronta `hyperframes-player.currentTime` con il timecode: se differiscono,
+qualcuno ha spostato il player (lo `still()` del poster lo lasciava al 40%) e il contorno è
+calcolato al frame dell'editor sopra un disegno di un altro istante. Mossa: chi fa seek per uno
+scatto torna a `frame / fps`; il disegno che cambia da solo arriva come `REDRAWN` e fa rimisurare.
+L'oracolo nei test è il Range del testo dentro l'iframe scalato sul rect dell'iframe, mai il
+`boundingBox()` di Playwright su un elemento dentro un iframe con `zoom` (sbaglia di 2×).
+
 ### Una modifica al frame sulla tela fa sparire selezione e stage
 Segnale: dopo un cambio di proprietà nel frame aperto sulla tela la stage torna all'immagine
 vecchia e i box di selezione spariscono finché non si riseleziona. Due cause: un `$effect` che legge
@@ -102,6 +119,19 @@ Vite osserva anche `changelog/*.md`: scriverne uno mentre l'harness naviga l'edi
 `page reload` e il `goto` muore con `net::ERR_ABORTED`. Segnale: nel log del dev server
 `page reload <file>` all'ora del fallimento. Mossa: niente edit nel worktree servito finché il
 giro non è finito, o un dev server da un checkout separato.
+
+### Un e2e da un worktree agente prova codice vecchio
+`vite.config.ts` esclude `**/.claude/worktrees/**` dal watcher: un dev server lanciato DENTRO un
+worktree agente non vede nessun file salvato dopo l'avvio. Segnale: l'e2e fallisce su
+un comportamento appena scritto, o un doc nuovo non si apre (parse fallito, editor in `video`).
+Mossa: riavvia il dev server dopo ogni modifica, prima di ogni giro Playwright.
+
+### `backdrop-filter` che non sfoca niente
+Un antenato con `will-change: opacity` (o `filter`, `opacity < 1`, `mask`, `clip-path`,
+`mix-blend-mode`) è una Backdrop Root: il blur vede solo ciò che sta dentro di lui, cioè niente.
+`.fx` ha `will-change: transform, opacity`. Segnale: `#ef-<id>` ha `backdrop-filter` nel computed
+style ma sotto non si sfoca. Mossa: la classe `bd` su `.fx` (`seesBehind`) toglie `opacity` dal
+`will-change`.
 
 ### Un editor lento solo in produzione: `VERCEL=1` accende rami che in locale non esistono
 La chat del motion editor restava sullo scheletro 8–15 s in produzione e partiva in 0,4 s in
@@ -2926,4 +2956,24 @@ produzione mostra il banner cookie: la spec mette il cookie di consenso, o il lo
 Signal: a batch of `@real` motion specs fails together (`motion-editor` never appears), each passes alone. Cause: a killed playwright run left `reuseExistingServer` on a dying dev server. Move: rerun on a clean server before judging a spec.
 
 ### A seeded e2e on production stalls production
-Signal: `@real` specs create and tear down orgs on the production Supabase project; a teardown froze production for 30 s. Move: run seeded e2e only against a non-production database; until one exists, unit and route tests with fakes.
+Signal: `@real` specs create and tear down orgs on the production Supabase project; a `DELETE /rest/v1/orgs` cascade takes 11-23 s and every other query queues behind it (14/10/2026: two user frame opens of 6.7 s and 9.3 s landed inside such stalls). Move: on production the harness signs in as `test@dazero.co` (`E2E_TEST_EMAIL`/`E2E_TEST_PASSWORD`), creates one project per test and deletes only that project's rows; `scripts/e2e/target.ts` refuses any other account and any admin user/org write there. Runs serial. Never create or delete orgs or users on production. To confirm a user's slow request was ours: Supabase `edge_logs` around it, `DELETE /rest/v1/orgs` or `/auth/v1/admin/users` with `response.origin_time` > 10 s and every concurrent query at 2–13 s.
+
+### An e2e keeps seeing the old component after an edit
+Signal: a `@real` spec reads a style or behaviour you already changed (a computed `z-index` still the old value) on a long-running `vite dev` in a worktree. Move: restart the dev server before believing the red; HMR does not always reach a component mounted inside the canvas.
+
+### A Svelte list that renders only its first level
+Signal: a keyed `{#each}` shows the top rows and nothing below, no error on screen; the data is in
+the network response. Cause: `each_key_duplicate` in the console (a composition reused by two
+clips repeats ids). Move: listen to `pageerror` in Playwright on a canvas with real docs; key rows
+by path, never by an id that can repeat.
+
+### A worktree dev server breaks with `reading 'call'` after a restart
+Signal: `@real` specs time out on a click ("element is not visible", "<span> intercepts pointer events"); the page logs `pageerror: Cannot read properties of undefined (reading 'call')`. Cause: `node_modules` symlinked to the main checkout shares `node_modules/.vite`; another worktree's server re-optimized the deps under yours. Move: start your server with its own `cacheDir` (a scratch vite config that spreads `vite.config.ts`), never `rm` the shared cache.
+
+### Canvas smooth in Chromium, choppy zoom in Safari
+Signal: WebKit zoom p5 ~10 fps while Chromium holds 60/60 and per-frame JS stays under 5 ms. WebKit re-rasterizes whatever changes scale each frame: an SVG `<pattern>` background, every `<img>` inside the viewport. Move: measure in Playwright `webkit` with a rAF probe (`canvas-frame-budget.spec.ts`), bisect by injecting `display:none`/`visibility:hidden` CSS per suspect; draw the grid on a 2D canvas and set `will-change: transform` on the viewport only during the gesture. The bisection must use real tile sizes: an undersized harness hid the image cost.
+### A `tv()` variant drops its text colour next to a `text-ui-*` size
+Signal: a button or hint has the right size but the default text colour (white on white, grey on grey); `buttonVariants(...)` output lacks `text-ui-on-accent`. Cause: `tailwind-variants` merges with its own tailwind-merge, which reads `text-ui-label` as a colour and keeps only the last `text-*`. `cn()` knows the type roles; `tv()` does not unless told. Move: every `tv()` takes `{ twMergeConfig: TW_MERGE_CONFIG }` from `$lib/utils`.
+
+### A matted clip renders nothing in preview, still and video
+Signal: a clip with a track matte (or a Figma mask) is invisible everywhere; its `.kt` wrapper has a `mask:url(data:image/svg+xml…)` that, opened alone, shows the right shape. Cause: `.kt` was `position:absolute` with no box, 0×0, so `mask-size:100% 100%` covered nothing. Markup tests and the fast-vs-exact PSNR spec stayed green: black equals black. Move: look at pixels, not markup — `npm run bench:export -- --doc=<{doc,assets}.json> --engines=chromium --lanes=1 --keep` writes the real export mp4, `--parity --live` the preview frames; check `getBoundingClientRect()` of the wrapper.

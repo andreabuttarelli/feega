@@ -24,27 +24,27 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 :root {
-  --sh-background: var(--paper);
-  --sh-foreground: var(--ink);
-  --sh-card: var(--paper-2);
-  --sh-card-foreground: var(--ink);
-  --sh-popover: var(--paper-2);
-  --sh-popover-foreground: var(--ink);
-  --sh-primary: var(--ui-accent);
+  --sh-background: var(--ui-panel);
+  --sh-foreground: var(--ui-text);
+  --sh-card: var(--ui-panel-raised);
+  --sh-card-foreground: var(--ui-text);
+  --sh-popover: var(--ui-panel-raised);
+  --sh-popover-foreground: var(--ui-text);
+  --sh-primary: var(--ui-accent-solid);
   --sh-primary-foreground: var(--ui-accent-ink);
-  --sh-secondary: var(--paper-3);
-  --sh-secondary-foreground: var(--ink);
-  --sh-muted: var(--paper-2);
-  --sh-muted-foreground: var(--ink-soft);
-  --sh-accent: var(--paper-3); /* shadcn's subtle hover bg, NOT the brand pink */
-  --sh-accent-foreground: var(--ink);
+  --sh-secondary: var(--ui-input);
+  --sh-secondary-foreground: var(--ui-text);
+  --sh-muted: var(--ui-wash);
+  --sh-muted-foreground: var(--ui-text-secondary);
+  --sh-accent: var(--ui-wash);
+  --sh-accent-foreground: var(--ui-text);
   --sh-destructive: #c0392b;
   --sh-destructive-foreground: #fff;
   --sh-success: #1f8a4c;
   --sh-border: var(--ui-line);
-  --sh-input: var(--line);
+  --sh-input: var(--ui-divider-strong);
   --sh-ring: var(--ui-accent);
-  --radius: 0rem;
+  --radius: var(--ui-radius-md);
   --mobile-topbar-h: 48px;
   --touch-target: 44px;
   --mobile-bar-inset: 8px;
@@ -52,15 +52,16 @@
   --mobile-bar-h: calc(var(--touch-target) + 2 * var(--mobile-bar-pad) + 2px);
   --mobile-bar-clearance: calc(var(--mobile-bar-h) + 2 * var(--mobile-bar-inset) + env(safe-area-inset-bottom, 0px));
   --mobile-bar-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
+  --mobile-stack-gap: 8px;
   --page-gutter: 16px;
   /* App shell sidebar — light tint toward brand accent-2 (see --sidebar-bg in app.css). */
   --sh-sidebar: var(--sidebar-bg);
-  --sh-sidebar-foreground: var(--ink);
+  --sh-sidebar-foreground: var(--ui-text);
   --sh-sidebar-primary: var(--accent);
   --sh-sidebar-primary-foreground: #fff;
   /* Soft hover wash (not a solid dark fill). */
   --sh-sidebar-accent: color-mix(in srgb, var(--accent) 10%, transparent);
-  --sh-sidebar-accent-foreground: var(--ink);
+  --sh-sidebar-accent-foreground: var(--ui-text);
   --sh-sidebar-border: var(--sidebar-line, var(--line));
   --sh-sidebar-ring: var(--accent);
 }
@@ -103,10 +104,46 @@
   --color-sidebar-border: var(--sh-sidebar-border);
   --color-sidebar-ring: var(--sh-sidebar-ring);
 
-  --radius-sm: 0rem;
-  --radius-md: 0rem;
-  --radius-lg: 0rem;
-  --radius-xl: 0rem;
+  --radius-xs: var(--ui-radius-xs);
+  --radius-sm: var(--ui-radius-sm);
+  --radius-md: var(--ui-radius-md);
+  --radius-lg: var(--ui-radius-lg);
+  --radius-xl: var(--ui-radius-lg);
+
+  --color-ui-app: var(--ui-app);
+  --color-ui-canvas: var(--ui-canvas);
+  --color-ui-panel: var(--ui-panel);
+  --color-ui-sunken: var(--ui-panel-sunken);
+  --color-ui-raised: var(--ui-panel-raised);
+  --color-ui-input: var(--ui-input);
+  --color-ui-input-hover: var(--ui-input-hover);
+  --color-ui-wash: var(--ui-wash);
+  --color-ui-pressed: var(--ui-pressed);
+  --color-ui-selected: var(--ui-selected);
+  --color-ui-divider: var(--ui-divider);
+  --color-ui-divider-strong: var(--ui-divider-strong);
+  --color-ui-text: var(--ui-text);
+  --color-ui-text-2: var(--ui-text-secondary);
+  --color-ui-text-3: var(--ui-text-tertiary);
+  --color-ui-text-off: var(--ui-text-disabled);
+  --color-ui-icon: var(--ui-icon-ink);
+  --color-ui-accent: var(--ui-accent);
+  --color-ui-accent-solid: var(--ui-accent-solid);
+  --color-ui-accent-text: var(--ui-accent-text);
+  --color-ui-on-accent: var(--ui-on-accent);
+  --color-ui-tooltip: var(--ui-tooltip);
+  --color-ui-danger: var(--ui-danger);
+  --color-ui-tooltip-ink: var(--ui-tooltip-ink);
+
+  --text-ui-section: var(--ui-type-section);
+  --text-ui-caption: var(--ui-type-caption);
+  --text-ui-label: var(--ui-type-label);
+  --text-ui-body: var(--ui-type-body);
+  --text-ui-title: var(--ui-type-title);
+
+  --shadow-ui-raised: var(--ui-shadow-raised);
+  --shadow-ui-float: var(--ui-shadow-float);
+  --ease-ui: var(--ui-ease);
 
   --font-sans: var(--sans);
   --font-serif: var(--serif);

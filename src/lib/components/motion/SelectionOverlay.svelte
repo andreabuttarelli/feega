@@ -5,15 +5,18 @@
   import { DragPhase, isOutside, type ElementOut } from '$lib/canvas/canvas-drop';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { selectionView } from '$lib/motion/selection-context';
+  import { reorderAt } from '$lib/motion/layout/guides';
+  import { withAutoLayout } from '$lib/motion/layout/resolve';
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
-  import { CLIP_TEXT, PART_SEP, PartEdit, editablePart, partAt, partBoxes, partText, writePartText } from '$lib/motion/poster-parts';
+  import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
     doc,
     frame,
     html,
+    redraws,
     measure,
     onpreview,
     onchange,
@@ -28,6 +31,7 @@
     doc: MotionDoc;
     frame: number;
     html: string;
+    redraws: number;
     measure: () => Promise<Record<string, MeasuredBox>>;
     onpreview: (doc: MotionDoc | null) => void;
     onchange: (doc: MotionDoc, summary: string) => void;
@@ -65,7 +69,8 @@
   let grab = $state<Grab | null>(null);
   let live = $state<{ doc: MotionDoc; patch: Transform; guides: Guide[]; gaps: Gap[] } | null>(null);
 
-  const shown = $derived(live?.doc ?? doc);
+  const laid = $derived(withAutoLayout(doc));
+  const shown = $derived(live ? withAutoLayout(live.doc) : laid);
   const selected = $derived(selection.length === 1 ? selection[0] : null);
   const clip = $derived<MotionClip | null>(selected ? (findClip(shown, selected)?.clip ?? null) : null);
   const onFrame = (c: MotionClip) => frame >= c.from && frame < c.from + c.durationInFrames;
@@ -125,7 +130,32 @@
     }
   }
 
-  const boxStyle = (b: { left: number; top: number; width: number; height: number }) =>
+  let menu = $state<{ at: Pt; part: string; actions: PartAction[] } | null>(null);
+
+  function openMenu(e: MouseEvent) {
+    const at = local(e as PointerEvent);
+    const hit = partHit(at) ?? part;
+    const actions = clip && hit ? PART_ACTIONS[partKind(doc, clip, hit)] : [];
+    if (!hit || !actions.length) {
+      return;
+    }
+    e.preventDefault();
+    part = hit;
+    menu = { at, part: hit, actions };
+  }
+
+  function runMenu(action: PartAction) {
+    const was = menu;
+    menu = null;
+    const result = was && clip ? runPart(doc, clip, was.part, action) : null;
+    if (!result?.ok) {
+      return;
+    }
+    onchange(result.doc, PART_ACTION_LOOK[action].label);
+    part = PART_ACTION_LOOK[action].keepsPart ? was!.part : null;
+  }
+
+  const boxStyle = (b:{ left: number; top: number; width: number; height: number }) =>
     `left: ${(b.left / doc.width) * 100}%; top: ${(b.top / doc.height) * 100}%; width: ${(b.width / doc.width) * 100}%; height: ${(b.height / doc.height) * 100}%;`;
 
   let asked = 0;
@@ -152,7 +182,7 @@
     if (!pendingPick || !Object.keys(boxes).length) {
       return;
     }
-    const next = stackAt(doc, frame, boxes, pendingPick)[0];
+    const next = stackAt(laid, frame, boxes, pendingPick)[0];
     pendingPick = null;
     onselect(next ? [next] : []);
   }
@@ -160,6 +190,7 @@
   $effect(() => {
     void html;
     void frame;
+    void redraws;
     void remeasure();
     const later = setTimeout(() => void remeasure(), SETTLE_MS);
     return () => clearTimeout(later);
@@ -188,6 +219,7 @@
   let lastPress: Pt | null = null;
 
   function press(e: PointerEvent) {
+    menu = null;
     const p = local(e);
     const hit = partHit(p);
     if (hit) {
@@ -197,7 +229,7 @@
     part = null;
     const mode = pickModeAt(lastPress, p, e.altKey ? Modifier.Alt : Modifier.None);
     lastPress = p;
-    const next = pick(stackAt(doc, frame, boxes, p), selected, mode);
+    const next = pick(stackAt(laid, frame, boxes, p), selected, mode);
     if (!next) {
       onselect([]);
       return;
@@ -211,7 +243,7 @@
   function others(clipId: string) {
     return Object.keys(boxes)
       .filter((id) => id !== clipId && findClip(doc, id) && onFrame(findClip(doc, id)!.clip))
-      .map((id) => aabb(quadOf(doc, id, frame, boxes[id])));
+      .map((id) => aabb(quadOf(laid, id, frame, boxes[id])));
   }
 
   let out = false;
@@ -227,7 +259,7 @@
 
   function move(e: PointerEvent) {
     if (!grab) {
-      hover = e.pointerType === 'mouse' ? (stackAt(doc, frame, boxes, local(e))[0] ?? null) : null;
+      hover = e.pointerType === 'mouse' ? (stackAt(laid, frame, boxes, local(e))[0] ?? null) : null;
       return;
     }
     const outside = leaving(e);
@@ -244,12 +276,12 @@
     if (!box) {
       return;
     }
-    const { patch, guides } = dragPatch({ doc, clipId: grab.clipId, frame, box, grip: grab.grip, handle: grab.handle, from: grab.from, to: local(e), shift: e.shiftKey, snapTargets: others(grab.clipId), snapPx: snapReach() });
+    const { patch, guides } = dragPatch({ doc: laid, clipId: grab.clipId, frame, box, grip: grab.grip, handle: grab.handle, from: grab.from, to: local(e), shift: e.shiftKey, snapTargets: others(grab.clipId), snapPx: snapReach() });
     const result = writePatch(doc, grab.clipId, frame, patch);
     if (!result.ok) {
       return;
     }
-    const moved = aabb(quadOf(result.doc, grab.clipId, frame, box));
+    const moved = aabb(quadOf(withAutoLayout(result.doc), grab.clipId, frame, box));
     live = { doc: result.doc, patch, guides, gaps: grab.grip === Grip.Rotate ? [] : spacing(moved, others(grab.clipId), { width: doc.width, height: doc.height }) };
     onpreview(result.doc);
   }
@@ -257,6 +289,7 @@
   function end(e: PointerEvent | null) {
     const done = live;
     const grip = grab?.grip;
+    const reordered = done && grip === Grip.Move && grab && e ? reorderAt(doc, grab.clipId, local(e)) : null;
     const outside = grab && e ? leaving(e) : null;
     out = false;
     grab = null;
@@ -264,6 +297,10 @@
     onpreview(null);
     if (outside) {
       ondragout?.(outside, DragPhase.Drop);
+      return;
+    }
+    if (reordered?.ok) {
+      onchange(reordered.doc, 'Reordered in the auto layout');
       return;
     }
     if (done && grip) {
@@ -282,7 +319,7 @@
   }
 </script>
 
-<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={editPart} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
+<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={editPart} oncontextmenu={openMenu} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} />{/if}
     {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}
@@ -314,6 +351,13 @@
     {#if partBox && part}
       <div class="part-box" data-testid="part-box" data-part={part} style={boxStyle(partBox)}>
         {#each [0, 1, 2, 3] as corner (corner)}<span class="part-handle" data-corner={corner}></span>{/each}
+      </div>
+    {/if}
+    {#if menu}
+      <div class="part-menu" role="menu" data-testid="part-menu" style={pct(menu.at)} onpointerdown={(e) => e.stopPropagation()}>
+        {#each menu.actions as action (action)}
+          <button type="button" role="menuitem" onclick={() => runMenu(action)}>{PART_ACTION_LOOK[action].label}</button>
+        {/each}
       </div>
     {/if}
     {#if editing && editBox}
@@ -492,6 +536,33 @@
   .part-handle[data-corner='3'] {
     left: 0;
     top: 100%;
+  }
+
+  .part-menu {
+    position: absolute;
+    z-index: 3;
+    display: grid;
+    min-width: 140px;
+    padding: 4px;
+    background: var(--ui-bg);
+    border: 1px solid var(--ui-line);
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+    pointer-events: auto;
+  }
+
+  .part-menu button {
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-sm);
+    text-align: left;
+  }
+
+  .part-menu button:hover {
+    background: var(--ui-hover);
   }
 
   .part-edit {

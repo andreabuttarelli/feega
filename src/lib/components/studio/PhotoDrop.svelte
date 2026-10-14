@@ -154,7 +154,7 @@
     cursor: pointer;
   }
   button.primary {
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     border-color: var(--ui-accent);
     color: var(--ui-accent-ink);
   }

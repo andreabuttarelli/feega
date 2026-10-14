@@ -175,7 +175,7 @@
   .ladder td {
     padding: 0.6rem 0;
     text-align: left;
-    border-top: 1px solid var(--line, #e5e5e5);
+    border-top: 1px solid var(--ui-divider, #e5e5e5);
   }
   .ladder th {
     font-weight: 500;
@@ -187,7 +187,7 @@
       grid-template-columns: 1fr 1fr;
       gap: 0.5rem;
       padding: 0.75rem 0;
-      border-top: 1px solid var(--line, #e5e5e5);
+      border-top: 1px solid var(--ui-divider, #e5e5e5);
     }
     .ladder td {
       padding: 0;
@@ -204,7 +204,7 @@
   .brand-usage td {
     padding: 0.6rem 0;
     text-align: left;
-    border-top: 1px solid var(--line, #e5e5e5);
+    border-top: 1px solid var(--ui-divider, #e5e5e5);
   }
   .brand-usage thead th {
     border-top: 0;

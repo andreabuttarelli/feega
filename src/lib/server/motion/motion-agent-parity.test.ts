@@ -59,11 +59,14 @@ const CLIP: Record<string, Access> = {
   keyframes: { write: ['set_keyframes', 'remove_keyframes', 'duck_audio', 'set_time_remap', 'freeze_frame'], read: 'keyframes' },
   mask: { write: ['set_mask', 'remove_mask'], read: 'mask' },
   maskStack: { write: ['set_mask_stack', 'remove_mask'], read: 'maskStack' },
-  matte: { write: ['set_track_matte'], read: 'matte' },
+  matte: { write: ['set_track_matte', 'use_as_mask', 'release_mask'], read: 'matte' },
+  matteFrom: { write: ['use_as_mask', 'release_mask'], read: 'matteFrom' },
   depth: { write: ['set_clip_depth'], read: 'depth' },
   space: { write: ['set_clip_depth'], read: 'space' },
   parent: { write: ['set_parent', 'parent_clips'], read: 'parent' },
   parentOpacity: { write: ['set_parent'], read: 'parentOpacity' },
+  autoLayout: { write: ['add_auto_layout', 'set_auto_layout', 'reorder_auto_layout'], read: 'autoLayout' },
+  layoutItem: { write: ['add_auto_layout', 'set_layout_item'], read: 'layoutItem' },
   expressions: { write: ['set_expression', 'pulse_with_music'], read: 'expressions' },
   effects: { write: ['add_effect', 'set_effect', 'remove_effect', 'set_lut'], read: 'effects' },
   shaders: { write: ['add_custom_effect', 'set_custom_effect', 'remove_custom_effect'], read: 'shaders' },
@@ -76,6 +79,7 @@ const CLIP: Record<string, Access> = {
   hidden: { write: ['set_visibility'], read: 'hidden' },
   locked: { write: ['set_visibility'], read: 'locked' },
   bleed: { write: ['set_visibility'], read: 'bleed' },
+  clipContent: { write: ['set_visibility'], read: 'clipContent' },
   markers: { write: ['set_marker', 'remove_marker'], read: 'markers' }
 };
 
@@ -142,6 +146,15 @@ describe('every editable part of a motion video has an agent path', () => {
     const { tools } = setup();
 
     expect(['analyze_site', 'use_brand', 'import_asset'].filter((t) => !tools[t])).toEqual([]);
+  });
+
+  it('a fill stack the Properties panel edits, the agent writes and reads back', async () => {
+    const { run } = setup();
+    const fills = [{ type: 'image', assetId: '' }, { type: 'solid', color: '#000000', opacity: 0.4 }];
+    expect((await run('add_shape', { kind: 'rect', start: 0, fills })).ok).toBe(true);
+    const doc = (await run('get_motion_doc', {})) as { tracks: { clips: { props: Record<string, unknown> }[] }[] };
+
+    expect(doc.tracks[0].clips[0].props.fills).toMatchObject(fills);
   });
 
   it('get_motion_doc shows every writable field of the doc, its tracks, clips and camera', async () => {

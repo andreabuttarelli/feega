@@ -182,34 +182,34 @@
     flex-direction: column;
     gap: var(--ui-space-6);
     height: 100%;
-    padding: var(--ui-space-4) var(--ui-space-3);
+    padding: var(--ui-space-3) var(--ui-space-2);
     overflow-y: auto;
-    font-size: var(--ui-text-md);
-    color: var(--ui-ink-2);
+    font-size: var(--ui-type-body);
+    color: var(--ui-text-secondary);
   }
 
   .wordmark {
-    padding: var(--ui-space-1) var(--ui-space-2);
+    padding: var(--ui-space-2) var(--ui-space-2) 0;
     font-size: var(--ui-text-lg);
-    font-weight: 600;
+    font-weight: var(--ui-weight-semibold);
     letter-spacing: -0.02em;
-    color: var(--ui-ink);
+    color: var(--ui-text);
     text-decoration: none;
   }
 
   .group {
     display: flex;
     flex-direction: column;
-    gap: 1px;
+    gap: 2px;
   }
 
   .heading {
     padding: 0 var(--ui-space-2) var(--ui-space-1);
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
+    font-size: var(--ui-type-section);
+    font-weight: var(--ui-weight-semibold);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--ui-ink-3);
+    letter-spacing: var(--ui-tracking-caps);
+    color: var(--ui-text-tertiary);
   }
 
   .row {
@@ -217,37 +217,51 @@
     align-items: center;
     gap: var(--ui-space-2);
     width: 100%;
-    min-height: 30px;
+    min-height: var(--ui-row-lg);
     padding: 0 var(--ui-space-2);
     border: 0;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
     color: inherit;
     font: inherit;
     text-align: left;
     text-decoration: none;
     cursor: pointer;
-    transition: background 120ms, color 120ms;
+    transition: background var(--ui-dur-fast) var(--ui-ease), color var(--ui-dur-fast) var(--ui-ease);
+  }
+
+  .row :global(svg) {
+    flex: none;
+    color: var(--ui-icon-ink);
   }
 
   .new-project {
-    color: var(--ui-ink-3);
-    cursor: pointer;
+    color: var(--ui-text-tertiary);
   }
 
   .row:hover {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
+    background: var(--ui-wash);
+    color: var(--ui-text);
+  }
+
+  .row:active {
+    background: var(--ui-pressed);
   }
 
   .row[aria-current='page'] {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
-    font-weight: 500;
+    background: var(--ui-wash);
+    color: var(--ui-text);
+    font-weight: var(--ui-weight-medium);
   }
 
-  .row:focus-visible {
+  .row[aria-current='page'] :global(svg) {
+    color: var(--ui-text);
+  }
+
+  .row:focus-visible,
+  .account:focus-visible {
     outline: none;
-    box-shadow: inset 0 0 0 1px var(--ui-accent);
+    box-shadow: var(--ui-ring);
   }
 
   .row.static {
@@ -268,19 +282,21 @@
   }
 
   .badge {
-    padding: 0 4px;
+    padding: 0 var(--ui-space-1);
+    border-radius: var(--ui-radius-xs);
     font-family: var(--ui-mono);
     font-size: 9px;
     line-height: 14px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--ui-accent);
-    background: var(--ui-accent-wash);
+    color: var(--ui-accent-text);
+    background: var(--ui-selected);
   }
 
   .meta {
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-3);
+    font-family: var(--ui-mono);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-tertiary);
   }
 
   .legal summary {
@@ -299,24 +315,21 @@
 
   .legal-links a {
     padding: 3px 0;
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-3);
+    font-size: var(--ui-type-label);
+    color: var(--ui-text-tertiary);
     text-decoration: none;
   }
 
   .legal-links a:hover {
-    color: var(--ui-ink);
-  }
-
-  .foot {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ui-space-4);
-    margin-top: auto;
+    color: var(--ui-text);
   }
 
   .foot {
     position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-2);
+    margin-top: auto;
   }
 
   .menu {
@@ -329,9 +342,15 @@
     flex-direction: column;
     gap: 1px;
     padding: var(--ui-space-1);
-    background: var(--ui-bg);
-    box-shadow: 0 0 0 1px var(--ui-line), 0 12px 32px rgb(0 0 0 / 0.12);
-    animation: menu-in 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
+    color: var(--ui-text);
+    animation: menu-in var(--ui-dur) var(--ui-ease);
+  }
+
+  .menu .row {
+    min-height: var(--ui-row);
   }
 
   .menu[hidden] {
@@ -351,6 +370,13 @@
     }
   }
 
+  @media (pointer: coarse) {
+    .row,
+    .menu .row {
+      min-height: 44px;
+    }
+  }
+
   .account {
     display: flex;
     align-items: center;
@@ -359,33 +385,42 @@
     min-height: 44px;
     padding: var(--ui-space-1) var(--ui-space-2);
     border: 0;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
     color: inherit;
     font: inherit;
     text-align: left;
     cursor: pointer;
+    transition: background var(--ui-dur-fast) var(--ui-ease);
   }
 
   .account:hover,
   .account[aria-expanded='true'] {
-    background: var(--ui-hover);
-  }
-
-  .account:focus-visible {
-    outline: none;
-    box-shadow: inset 0 0 0 1px var(--ui-accent);
+    background: var(--ui-wash);
   }
 
   .email {
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-size: var(--ui-text-xs);
-    color: var(--ui-ink-3);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-tertiary);
   }
 
   .workspace {
     padding: 0 var(--ui-space-2);
+  }
+
+  .workspace select {
+    width: 100%;
+    height: var(--ui-row);
+    padding: 0 var(--ui-space-2);
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font: inherit;
+    font-size: var(--ui-type-label);
   }
 
   .avatar {
@@ -395,12 +430,12 @@
     flex: 0 0 auto;
     width: 28px;
     height: 28px;
-    border-radius: 9999px;
+    border-radius: var(--ui-radius-full);
     overflow: hidden;
-    background: var(--ui-surface);
-    color: var(--ui-ink-2);
-    font-size: var(--ui-text-xs);
-    font-weight: 600;
+    background: var(--ui-input);
+    color: var(--ui-text-secondary);
+    font-size: var(--ui-type-caption);
+    font-weight: var(--ui-weight-semibold);
   }
 
   .avatar img {
@@ -421,21 +456,8 @@
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
-    font-size: var(--ui-text-sm);
-    font-weight: 500;
-    color: var(--ui-ink);
-  }
-
-
-  .who select {
-    font-size: var(--ui-text-xs);
-    color: var(--ui-ink-3);
-  }
-
-  .who select {
-    max-width: 100%;
-    padding: 0;
-    border: 0;
-    background: transparent;
+    font-size: var(--ui-type-label);
+    font-weight: var(--ui-weight-medium);
+    color: var(--ui-text);
   }
 </style>

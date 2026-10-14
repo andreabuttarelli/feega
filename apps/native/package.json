@@ -1,0 +1,19 @@
+{
+  "name": "feega-native",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:mac": "tauri build --bundles app",
+    "ios:init": "tauri ios init",
+    "ios:dev": "tauri ios dev",
+    "android:init": "tauri android init",
+    "android:dev": "tauri android dev",
+    "test": "cargo test --manifest-path src-tauri/Cargo.toml"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.2"
+  }
+}

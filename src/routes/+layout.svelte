@@ -19,9 +19,18 @@
   } from '$lib/analytics';
   import { initConsent } from '$lib/consent';
   import { onMount } from 'svelte';
+  import { perfHudFromLocation } from '$lib/perf/perf-hud-switch';
   let { children, data } = $props();
 
   onMount(() => document.documentElement.removeAttribute('data-hydrating'));
+
+  let perfHud = $state<typeof import('$lib/components/PerfHud.svelte').default | null>(null);
+  onMount(() => {
+    if (!perfHudFromLocation()) {
+      return;
+    }
+    import('$lib/components/PerfHud.svelte').then((module) => (perfHud = module.default));
+  });
 
   // Guard "chi sta guardando": il server ha già deciso (root +layout.server.ts), qui arriva solo il
   // booleano. Impostato SUBITO, fuori da un $effect: CookieBanner è un figlio e il suo onMount gira
@@ -164,6 +173,7 @@
 {/if}
 
 {@render children()}
+{#if perfHud}{@const PerfHud = perfHud}<PerfHud />{/if}
 {#if !isBlog}<CookieBanner />{/if}
 {#if !isBlog && data?.session}<TermsUpdateNotice version={data.termsNoticeVersion ?? null} />{/if}
 {#if data?.session && tourShowsOn($page.url.pathname)}<HowFeegaWorks tour={data.tour ?? TourState.Seen} />{/if}

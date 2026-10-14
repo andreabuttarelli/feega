@@ -20,3 +20,29 @@ export function placeBeside(sources: Rect[], size: { w: number; h: number }, occ
     spot.y = blocker.y + blocker.h + PLACEMENT_GAP;
   }
 }
+
+const RING_LIMIT = 12;
+
+export function placeNear(centre: { x: number; y: number }, size: { w: number; h: number }, occupied: Rect[]): { x: number; y: number } {
+  const origin = { x: centre.x - size.w / 2, y: centre.y - size.h / 2 };
+  const step = { x: size.w + PLACEMENT_GAP, y: size.h + PLACEMENT_GAP };
+
+  for (let ring = 0; ring <= RING_LIMIT; ring++) {
+    for (let dy = -ring; dy <= ring; dy++) {
+      for (let dx = -ring; dx <= ring; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) {
+          continue;
+        }
+        const spot: Rect = { x: origin.x + dx * step.x, y: origin.y + dy * step.y, ...size };
+        if (!occupied.some((o) => overlaps(spot, o))) {
+          return { x: spot.x, y: spot.y };
+        }
+      }
+    }
+  }
+  return origin;
+}
+
+export function offCentre(centre: { x: number; y: number }, spot: { x: number; y: number }, size: { w: number; h: number }): boolean {
+  return spot.x !== centre.x - size.w / 2 || spot.y !== centre.y - size.h / 2;
+}

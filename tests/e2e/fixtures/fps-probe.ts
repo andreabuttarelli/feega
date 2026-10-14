@@ -15,7 +15,7 @@ const PHOTO = 'data:image/svg+xml;base64,' + btoa('<svg xmlns="http://www.w3.org
 
 export type FpsRun = { error: string | null; diffs: number[] };
 
-function splitHeadline() {
+export function splitHeadline() {
   let n = 0;
   const placed = insertTemplate({ ...newMotionDoc(MotionFormat.Landscape), fps: FPS, durationInFrames: 8 * FPS }, SPLIT_HEADLINE_TEMPLATE, { from: 0, newId: () => `f${++n}` });
   if (!placed.ok) {

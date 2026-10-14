@@ -48,6 +48,9 @@ export enum Command {
   ToggleTimeline = 'toggle-timeline',
   Help = 'help',
   Precompose = 'precompose',
+  AutoLayout = 'auto-layout',
+  UseAsMask = 'use-as-mask',
+  RemoveMask = 'remove-mask',
   ToolSelect = 'tool-select',
   ToolText = 'tool-text',
   ToolRectangle = 'tool-rectangle',
@@ -73,9 +76,9 @@ export enum ShortcutGroup {
   View = 'View'
 }
 
-export type KeyPress = { key: string; code?: string; mod: boolean; shift: boolean; alt?: boolean };
+export type KeyPress = { key: string; code?: string; mod: boolean; shift: boolean; alt?: boolean; ctrlCmd?: boolean };
 
-type Binding = { key: string; mod?: boolean; shift?: boolean; alt?: boolean; mode?: EditMode; command: Command; label: string; does: string; group: ShortcutGroup };
+type Binding = { key: string; mod?: boolean; shift?: boolean; alt?: boolean; ctrlCmd?: boolean; mode?: EditMode; command: Command; label: string; does: string; group: ShortcutGroup };
 
 export const SHORTCUTS: readonly Binding[] = [
   { key: ' ', command: Command.TogglePlay, label: 'Space', does: 'Play / pause', group: ShortcutGroup.Playback },
@@ -111,6 +114,8 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'd', mod: true, shift: true, command: Command.Split, label: '⇧⌘D', does: 'Split at the playhead', group: ShortcutGroup.Editing },
   { key: 'z', mod: true, command: Command.Undo, label: '⌘Z', does: 'Undo', group: ShortcutGroup.Editing },
   { key: 'z', mod: true, shift: true, command: Command.Redo, label: '⇧⌘Z', does: 'Redo', group: ShortcutGroup.Editing },
+  { key: 'a', shift: true, command: Command.AutoLayout, label: '⇧A', does: 'Add auto layout to the selection', group: ShortcutGroup.Layers },
+  { key: 'm', mod: true, ctrlCmd: true, command: Command.UseAsMask, label: '⌃⌘M', does: 'Use the bottom-most selected layer as mask', group: ShortcutGroup.Layers },
   { key: 'c', mod: true, shift: true, command: Command.Precompose, label: '⇧⌘C', does: 'Precompose the selection', group: ShortcutGroup.Layers },
   { key: 'c', mod: true, command: Command.Copy, label: '⌘C', does: 'Copy keyframes', group: ShortcutGroup.Editing },
   { key: 'v', mod: true, command: Command.Paste, label: '⌘V', does: 'Paste keyframes', group: ShortcutGroup.Editing },
@@ -169,7 +174,7 @@ function keyOf(press: KeyPress): string {
 
 export function commandFor(press: KeyPress, mode: EditMode = EditMode.Motion): Command | null {
   const key = keyOf(press);
-  const hit = SHORTCUTS.find((b) => b.key === key && Boolean(b.mod) === press.mod && Boolean(b.shift) === press.shift && Boolean(b.alt) === Boolean(press.alt) && (b.mode ?? mode) === mode);
+  const hit = SHORTCUTS.find((b) => b.key === key && Boolean(b.mod) === press.mod && Boolean(b.shift) === press.shift && Boolean(b.alt) === Boolean(press.alt) && Boolean(b.ctrlCmd) === Boolean(press.ctrlCmd) && (b.mode ?? mode) === mode);
   return hit?.command ?? null;
 }
 

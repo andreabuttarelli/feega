@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { FORMATS, MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { BUILTIN_TEMPLATES, builtinTemplate } from './builtins';
 import { PROMPT_TEMPLATE_ID } from './prompt-input/template';
-import { ComponentKind, POSTER_FORMATS, catalogue, componentKind, matching, posterShelf, previewOf, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
+import { SectionRole } from './card';
+import { ComponentKind, FORMATS_OF_MODE, POSTER_FORMATS, byShape, catalogue, libraryFormat, componentKind, matching, metaLine, posterShelf, previewOf, rolesIn, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
 import { DocMode } from '$lib/motion/still';
 import PREVIEWED from './previews.json';
 
@@ -120,5 +121,75 @@ describe('the library previews in the format of the video it inserts into', () =
   it('keeps a starter format and falls back to landscape for any other', () => {
     expect(starterFormatOf(newMotionDoc(MotionFormat.Vertical))).toBe(MotionFormat.Vertical);
     expect(starterFormatOf({ width: 1080, height: 1350 })).toBe(MotionFormat.Landscape);
+  });
+
+  it('a poster is listed in its own 4:5, not collapsed to landscape', () => {
+    const poster = catalogue(BUILTIN_TEMPLATES).find((i) => i.id === 'builtin:poster-type-grid')!;
+
+    expect(poster.format).toBe(MotionFormat.Portrait);
+  });
+
+  it('a still offers the print formats, a video the screen ones', () => {
+    expect(FORMATS_OF_MODE[DocMode.Still]).toEqual(POSTER_FORMATS);
+    expect(FORMATS_OF_MODE[DocMode.Video]).toEqual(STARTER_FORMATS);
+  });
+
+  it('opens a poster in its own format when the target asks for one stills do not have', () => {
+    const poster = catalogue(BUILTIN_TEMPLATES).find((i) => i.id === 'builtin:poster-type-grid')!;
+
+    expect(libraryFormat(poster, MotionFormat.Landscape)).toBe(MotionFormat.Portrait);
+    expect(libraryFormat(poster, MotionFormat.Vertical)).toBe(MotionFormat.Vertical);
+  });
+});
+
+describe('frame templates show each one in its real format', () => {
+  const items = catalogue(BUILTIN_TEMPLATES);
+
+  it('shows a 4:5 poster as a still in its own format', () => {
+    const poster = items.find((i) => i.id === 'builtin:poster-type-grid')!;
+
+    expect(poster.format).toBe(MotionFormat.Portrait);
+    expect(metaLine(poster)).toBe('4:5 · still');
+  });
+
+  it('says format and length of a video in one line', () => {
+    const prompt = items.find((i) => i.id === PROMPT_TEMPLATE_ID)!;
+
+    expect(metaLine(prompt)).toMatch(/^16:9 · \d+(\.\d)?s$/);
+  });
+
+  it('groups by shape, wide first, every item in exactly one group', () => {
+    const groups = byShape(items);
+
+    expect(groups[0].format).toBe(MotionFormat.Landscape);
+    expect(groups.flatMap((g) => g.items).length).toBe(items.length);
+    expect(groups.every((g) => g.items.every((i) => i.format === g.format))).toBe(true);
+  });
+});
+
+describe('frame templates filter by role', () => {
+  const items = catalogue(BUILTIN_TEMPLATES);
+
+  it('carries the roles of its card, none when it has no card', () => {
+    expect(items.find((i) => i.id === 'builtin:launch-word-burst')?.roles).toContain(SectionRole.Opener);
+    expect(items.every((i) => Array.isArray(i.roles))).toBe(true);
+  });
+
+  it('lists only the roles some template has, in a fixed order', () => {
+    const roles = rolesIn(items);
+
+    expect(roles).toContain(SectionRole.Opener);
+    expect(roles).toEqual(Object.values(SectionRole).filter((r) => roles.includes(r)));
+  });
+
+  it('narrows to one role, together with still or video', () => {
+    const openers = matching(items, '', null, DocMode.Video, SectionRole.Opener);
+
+    expect(openers.length).toBeGreaterThan(0);
+    expect(openers.every((i) => i.roles.includes(SectionRole.Opener) && i.mode === DocMode.Video)).toBe(true);
+  });
+
+  it('finds a template by one of its roles typed in the search', () => {
+    expect(matching(items, 'opener', null).map((i) => i.id)).toContain('builtin:launch-word-burst');
   });
 });

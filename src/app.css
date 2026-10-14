@@ -140,21 +140,21 @@
   --sidebar-bg: var(--paper);
   /* Same as the rest of the app borders */
   --sidebar-line: var(--line);
-  --ui-bg: #ffffff;
-  --ui-surface: #f7f7f7;
-  --ui-hover: #efefef;
-  --ui-line: #e8e8e8;
-  --ui-line-strong: #d6d6d6;
-  --ui-ink: #111111;
-  --ui-ink-2: #4a4a4a;
-  --ui-ink-3: #5f5f5f;
+  --ui-bg: var(--ui-panel);
+  --ui-surface: var(--ui-panel-sunken);
+  --ui-hover: var(--ui-wash);
+  --ui-line: var(--ui-divider);
+  --ui-line-strong: var(--ui-divider-strong);
+  --ui-ink: var(--ui-text);
+  --ui-ink-2: var(--ui-text-secondary);
+  --ui-ink-3: var(--ui-text-tertiary);
   --ui-text-2: color-mix(in srgb, var(--ui-ink) 60%, transparent);
   --ui-text-3: color-mix(in srgb, var(--ui-ink) 40%, transparent);
-  --ui-field: #f0f0f0;
-  --ui-raised: #ffffff;
-  --ui-grid: #e8e8e8;
-  --canvas-bg: #e6e6e6;
-  --canvas-dot: #c8c8c8;
+  --ui-field: var(--ui-input);
+  --ui-raised: var(--ui-panel-raised);
+  --ui-grid: var(--ui-divider);
+  --canvas-bg: var(--ui-canvas);
+  --canvas-dot: var(--ui-canvas-dot);
   --ui-hit: 32px;
   --ui-hit-gap: 8px;
   --ui-accent: #0099ff;
@@ -190,11 +190,84 @@
   --ui-icon: 16px;
   --ui-icon-sm: 14px;
   --ui-focus: 0 0 0 2px var(--ui-bg), 0 0 0 3px var(--ui-accent);
+  --grey-0: #ffffff;
+  --grey-1: #f9f9f9;
+  --grey-2: #f2f2f2;
+  --grey-3: #ebebeb;
+  --grey-4: #e1e1e1;
+  --grey-5: #d2d2d2;
+  --grey-6: #bcbcbc;
+  --grey-7: #a0a0a0;
+  --grey-8: #828282;
+  --grey-9: #666666;
+  --grey-10: #4d4d4d;
+  --grey-11: #2e2e2e;
+  --grey-12: #141414;
+  --ui-app: var(--grey-2);
+  --ui-canvas: var(--grey-3);
+  --ui-canvas-dot: var(--grey-5);
+  --ui-panel: var(--grey-0);
+  --ui-panel-sunken: var(--grey-1);
+  --ui-panel-raised: var(--grey-0);
+  --ui-input: var(--grey-2);
+  --ui-input-hover: var(--grey-3);
+  --ui-wash: var(--grey-2);
+  --ui-pressed: var(--grey-4);
+  --ui-divider: var(--grey-3);
+  --ui-divider-strong: var(--grey-5);
+  --ui-text: var(--grey-12);
+  --ui-text-secondary: var(--grey-10);
+  --ui-text-tertiary: var(--grey-9);
+  --ui-text-disabled: var(--grey-7);
+  --ui-icon-ink: var(--grey-10);
+  --ui-accent-solid: #0b6bcb;
+  --ui-accent-text: #0b6bcb;
+  --ui-on-accent: #ffffff;
+  --ui-selected: color-mix(in srgb, var(--ui-accent) 12%, transparent);
+  --ui-shadow-raised: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px -6px rgb(0 0 0 / 0.14);
+  --ui-shadow-float: 0 0 0 1px rgb(0 0 0 / 0.06), 0 2px 6px rgb(0 0 0 / 0.06), 0 12px 32px -8px rgb(0 0 0 / 0.18);
+  --ui-ring: 0 0 0 2px var(--ui-accent);
+  --ui-radius-none: 0px;
+  --ui-radius-xs: 2px;
+  --ui-radius-sm: 4px;
+  --ui-radius-md: 6px;
+  --ui-radius-lg: 10px;
+  --ui-radius-full: 9999px;
+  --ui-type-title: 13px;
+  --ui-type-body: 13px;
+  --ui-type-label: 12px;
+  --ui-type-value: 11px;
+  --ui-type-section: 10.5px;
+  --ui-type-caption: 11px;
+  --ui-weight-regular: 400;
+  --ui-weight-medium: 500;
+  --ui-weight-semibold: 600;
+  --ui-tracking-caps: 0.06em;
+  --ui-tracking-title: -0.01em;
+  --ui-leading-tight: 1.2;
+  --ui-leading: 1.45;
+  --ui-control-h: 28px;
+  --ui-row-sm: 28px;
+  --ui-row: 32px;
+  --ui-row-lg: 36px;
+  --ui-header-h: 48px;
+  --ui-icon-xs: 12px;
+  --ui-icon-lg: 20px;
+  --ui-dur-fast: 120ms;
+  --ui-dur: 200ms;
+  --ui-dur-slow: 320ms;
+  --ui-ease: var(--ease-expo-out);
+  --ui-tooltip: var(--grey-12);
+  --ui-tooltip-ink: var(--grey-0);
+  --ui-type-frame: var(--ui-accent-text);
+  --ui-type-text: #7c4dce;
+  --ui-type-media: #1f8a5b;
 }
 
 @media (pointer: coarse) {
   :root {
     --ui-hit: 44px;
+    --ui-control-h: 44px;
   }
 }
 
@@ -226,22 +299,47 @@
   /* Inverse of light: deep gray with a hint of violet */
   --sidebar-bg: var(--paper);
   --sidebar-line: var(--line);
-  --ui-bg: #000000;
-  --ui-surface: #0a0a0a;
-  --ui-hover: #171717;
-  --ui-line: #1a1a1a;
-  --ui-line-strong: #2a2a2a;
-  --ui-ink: #ededed;
-  --ui-ink-2: #a3a3a3;
-  --ui-ink-3: #8a8a8a;
-  --ui-field: #161616;
-  --ui-raised: #0a0a0a;
-  --ui-grid: #1f1f1f;
-  --canvas-bg: #1c1c1c;
-  --canvas-dot: #333333;
   --ui-ok: #30a46c;
   --ui-warn: #f0a83a;
   --ui-danger: #ff5a5f;
+  --grey-0: #0c0c0c;
+  --grey-1: #121212;
+  --grey-2: #181818;
+  --grey-3: #1f1f1f;
+  --grey-4: #272727;
+  --grey-5: #313131;
+  --grey-6: #3e3e3e;
+  --grey-7: #545454;
+  --grey-8: #6e6e6e;
+  --grey-9: #8f8f8f;
+  --grey-10: #b0b0b0;
+  --grey-11: #d6d6d6;
+  --grey-12: #f2f2f2;
+  --ui-app: var(--grey-0);
+  --ui-canvas: var(--grey-1);
+  --ui-canvas-dot: var(--grey-5);
+  --ui-panel: var(--grey-3);
+  --ui-panel-sunken: var(--grey-2);
+  --ui-panel-raised: var(--grey-4);
+  --ui-input: var(--grey-4);
+  --ui-input-hover: var(--grey-5);
+  --ui-wash: var(--grey-4);
+  --ui-pressed: var(--grey-6);
+  --ui-divider: var(--grey-5);
+  --ui-divider-strong: var(--grey-6);
+  --ui-text: var(--grey-12);
+  --ui-text-secondary: var(--grey-10);
+  --ui-text-tertiary: var(--grey-9);
+  --ui-text-disabled: var(--grey-7);
+  --ui-icon-ink: var(--grey-10);
+  --ui-accent-text: #3ab0ff;
+  --ui-selected: color-mix(in srgb, var(--ui-accent) 22%, transparent);
+  --ui-shadow-raised: 0 0 0 1px rgb(255 255 255 / 0.06), 0 8px 24px -6px rgb(0 0 0 / 0.6);
+  --ui-shadow-float: 0 0 0 1px rgb(255 255 255 / 0.08), 0 12px 32px -8px rgb(0 0 0 / 0.7);
+  --ui-tooltip: var(--grey-6);
+  --ui-tooltip-ink: var(--grey-12);
+  --ui-type-text: #b48cff;
+  --ui-type-media: #4cc38a;
 }
 
 @layer base {
@@ -287,6 +385,12 @@ body {
   background: var(--paper-2);
   letter-spacing: -0.05em;
   line-height: 1.5;
+}
+@media (display-mode: standalone) {
+  body {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
 }
 ::selection { background: rgba(var(--accent-rgb),0.16); }
 a { color: inherit; text-decoration: none; }

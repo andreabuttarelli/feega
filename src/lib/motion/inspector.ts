@@ -1,5 +1,7 @@
 import { PartKind, parsePart, partKind } from './poster-parts';
 import { withModifierParam } from './shape/model';
+import { fillReplaces } from './fill/elements';
+import { strokeReplaces } from './stroke/elements';
 import { modifierOfKey, shapeFieldShown, type Modifier, type ShapeKind } from './shape/schema';
 import { z } from 'zod';
 import { AssetKind, COMPONENTS, Control, Group, type ComponentId } from './components';
@@ -126,6 +128,10 @@ export function customFields(schema: PropsSchema): Field[] {
 }
 
 export function clipFieldGroups(doc: MotionDoc, clip: MotionClip): { group: Group; fields: Field[] }[] {
+  return componentGroups(doc, clip).map((g) => ({ ...g, fields: g.fields.filter((f) => !fillReplaces(clip.component, f.key) && !strokeReplaces(clip.component, f.key)) }));
+}
+
+function componentGroups(doc: MotionDoc, clip: MotionClip): { group: Group; fields: Field[] }[] {
   if (clip.component === 'Shape') {
     const kind = clip.props.shape as ShapeKind;
     return fieldGroups('Shape').map((g) => ({ ...g, fields: g.fields.filter((f) => shapeFieldShown(kind, f.key)) }));
@@ -176,21 +182,29 @@ export function partFieldKeys(doc: MotionDoc, clip: MotionClip, field: string): 
 
 enum PartField {
   Shown = 'shown',
-  Own = 'own'
+  Own = 'own',
+  Alone = 'alone'
 }
+
+const PHOTO_KEY = /^photo/;
 
 const PART_FIELD: Record<PartKind, PartField> = {
   [PartKind.Text]: PartField.Shown,
   [PartKind.Other]: PartField.Shown,
   [PartKind.Line]: PartField.Own,
-  [PartKind.Photo]: PartField.Own,
+  [PartKind.Photo]: PartField.Alone,
   [PartKind.Arrow]: PartField.Own
 };
 
 export function partFocus(doc: MotionDoc, clip: MotionClip, part: string): string[] {
   const { field } = parsePart(part);
   const keys = [...new Set(partFieldKeys(doc, clip, field))];
-  return PART_FIELD[partKind(doc, clip, part)] === PartField.Shown ? keys : keys.filter((k) => k !== field);
+  const scope = PART_FIELD[partKind(doc, clip, part)];
+  if (scope === PartField.Alone) {
+    const all = clipFieldGroups(doc, clip).flatMap((g) => g.fields.map((f) => f.key));
+    return [...new Set([...ownFields(all, String(clip.props.name), field), ...all.filter((k) => PHOTO_KEY.test(k))])];
+  }
+  return scope === PartField.Shown ? keys : keys.filter((k) => k !== field);
 }
 
 const SECONDS_PRECISION = 100;

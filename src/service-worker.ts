@@ -3,7 +3,45 @@
 /// <reference lib="esnext" />
 /// <reference lib="webworker" />
 
+import { build, version } from '$service-worker';
+import { cacheable } from '$lib/pwa/shell-cache';
+
 const sw = self as unknown as ServiceWorkerGlobalScope;
+
+const SHELL_CACHE = `shell-${version}`;
+const SHELL_ICONS = ['/site.webmanifest', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/fonts/dm-sans-latin.woff2'];
+const SHELL = new Set([...build, ...SHELL_ICONS]);
+
+sw.addEventListener('install', (event) => {
+  event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL_ICONS)));
+});
+
+sw.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) => Promise.all(keys.filter((key) => key !== SHELL_CACHE).map((key) => caches.delete(key))))
+  );
+});
+
+sw.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  if (!cacheable(event.request.method, url, sw.location.origin, SHELL)) {
+    return;
+  }
+  event.respondWith(fromShell(event.request));
+});
+
+async function fromShell(request: Request): Promise<Response> {
+  const cache = await caches.open(SHELL_CACHE);
+  const hit = await cache.match(request);
+  if (hit) {
+    return hit;
+  }
+  const response = await fetch(request);
+  if (response.ok) {
+    await cache.put(request, response.clone());
+  }
+  return response;
+}
 
 function toAbsoluteUrl(url: string): string {
 	try {

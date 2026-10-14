@@ -2,10 +2,10 @@ import type { ChangelogEntry } from './index';
 
 export default {
   date: '2026-10-14',
-  title: 'Layers shows every frame',
+  title: 'Layers shows every frame, unfolded',
   items: [
-    'Layers lists the contents of every frame, not only the open one; click one to open its frame on it.',
-    'Hovering a layer outlines it on the canvas.',
-    'Clicking on the canvas or in Layers now always selects one thing; shift or ⌘ adds.'
+    'Every frame in Layers lists its tracks and clips, even when nothing is selected.',
+    'Posters list their lines, photos and arrows in Layers without opening them.',
+    'Fold a frame in Layers with its arrow; it stays folded when you come back.'
   ]
 } satisfies ChangelogEntry;

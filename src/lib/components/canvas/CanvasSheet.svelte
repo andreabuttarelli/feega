@@ -111,9 +111,11 @@
       height: auto !important;
       width: auto !important;
       max-width: none !important;
-      border-radius: 0 !important;
-      border: 1px solid var(--line-2, #d2d2d7) !important;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+      border-radius: var(--ui-radius-lg) !important;
+      border: 0 !important;
+      background: var(--ui-panel) !important;
+      box-shadow: var(--ui-shadow-float);
+      overflow: hidden;
       padding: 0 !important;
       gap: 0 !important;
     }
@@ -142,18 +144,18 @@
   .settings-switcher {
     flex: 0 0 200px;
     overflow-y: auto;
-    border-right: 1px solid var(--line, #ededef);
-    padding: 40px 10px 16px;
+    background: var(--ui-panel-sunken);
+    padding: 24px 8px 16px;
   }
 
   .switcher-group {
-    margin: 14px 0 4px;
-    padding: 0 6px;
-    font-size: 11px;
-    font-weight: 700;
+    margin: 16px 0 4px;
+    padding: 0 8px;
+    font-size: var(--ui-type-section);
+    font-weight: var(--ui-weight-semibold);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--ink-faint, #9a9a9e);
+    letter-spacing: var(--ui-tracking-caps);
+    color: var(--ui-text-tertiary);
   }
   .switcher-group:first-child {
     margin-top: 0;
@@ -166,22 +168,27 @@
     appearance: none;
     border: 0;
     background: transparent;
-    padding: 6px;
+    height: var(--ui-row);
+    padding: 0 8px;
+    border-radius: var(--ui-radius-sm);
     font: inherit;
-    font-size: 13px;
-    color: var(--ink, #1d1d1f);
+    font-size: var(--ui-type-body);
+    color: var(--ui-text-secondary);
     cursor: pointer;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease);
   }
   .switcher-item:hover {
-    background: var(--paper-2, #f9f9f9);
+    background: var(--ui-wash);
+    color: var(--ui-text);
   }
   .switcher-item.is-active {
-    background: var(--paper-3);
-    font-weight: 600;
+    background: var(--ui-selected);
+    color: var(--ui-accent-text);
+    font-weight: var(--ui-weight-medium);
   }
   .switcher-item:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   .settings-body {

@@ -193,3 +193,40 @@ export function checkGesture(
   }
   return { outcome: 'ok', writes: gesture.items.map(inverseOf) };
 }
+
+export function parseUndoItem(raw: unknown): UndoItem | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+  const item = raw as Record<string, unknown>;
+
+  if (item.kind === 'node.create' && typeof item.nodeId === 'string') {
+    return { kind: 'node.create', nodeId: item.nodeId, after: (item.after as Record<string, unknown>) ?? {} };
+  }
+  if (item.kind === 'node.delete' && typeof item.nodeId === 'string') {
+    return { kind: 'node.delete', nodeId: item.nodeId, before: (item.before as Record<string, unknown>) ?? {} };
+  }
+  if (
+    item.kind === 'node.update' &&
+    typeof item.nodeId === 'string' &&
+    Number.isInteger(item.expectedVersion)
+  ) {
+    return {
+      kind: 'node.update',
+      nodeId: item.nodeId,
+      before: (item.before as Record<string, unknown>) ?? {},
+      after: (item.after as Record<string, unknown>) ?? {},
+      expectedVersion: item.expectedVersion as number
+    };
+  }
+  if (item.kind === 'edge.create' && typeof item.edgeId === 'string' && typeof item.sourceNodeId === 'string' && typeof item.targetNodeId === 'string') {
+    return { kind: 'edge.create', edgeId: item.edgeId, sourceNodeId: item.sourceNodeId, targetNodeId: item.targetNodeId };
+  }
+  if (item.kind === 'edge.delete' && typeof item.edgeId === 'string' && typeof item.sourceNodeId === 'string' && typeof item.targetNodeId === 'string') {
+    return { kind: 'edge.delete', edgeId: item.edgeId, sourceNodeId: item.sourceNodeId, targetNodeId: item.targetNodeId };
+  }
+  if (item.kind === 'doc.revision' && typeof item.nodeId === 'string' && Number.isInteger(item.before) && Number.isInteger(item.after)) {
+    return { kind: 'doc.revision', nodeId: item.nodeId, before: item.before as number, after: item.after as number };
+  }
+  return null;
+}

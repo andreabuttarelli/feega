@@ -1,4 +1,6 @@
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
+import { fillsSchema } from '$lib/motion/fill/model';
+import { strokesSchema } from '$lib/motion/stroke/model';
 import { THREE_GUIDANCE } from './three-guidance';
 import { GUIDES, guidesFor, type GuideTopic } from './guides';
 import { lintAdvice } from '$lib/motion/custom/lint';
@@ -21,6 +23,7 @@ import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
+import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
 import { AXES, EDGES, alignSpace, distributeSpace, moveBy, propBoxes, type Axis, type Edge } from '$lib/motion/space';
@@ -88,6 +91,9 @@ import { DEVICE_PRESETS, PRESET as DEVICE_PRESET, addDeviceRow, applyDevicePrese
 import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCameraKeyframes, setClipDepth } from '$lib/motion/camera-ops';
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
+import { releaseMask, useAsMask } from '$lib/motion/mask-group';
+import { leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout } from '$lib/motion/layout/ops';
+import { autoLayoutPatchSchema, layoutItemPatchSchema } from '$lib/motion/layout/model';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
 import { INTERACTIVE_PRESETS, PRESET, applyInteractivePreset, setInteractive } from '$lib/motion/interactive/presets';
@@ -317,11 +323,14 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         mask: c.mask && shownMask(c.component, c.mask, doc),
         maskStack: c.maskStack.map((m) => shownMask(c.component, m, doc)),
         matte: c.matte,
+        matteFrom: c.matteFrom ?? null,
         keyframes: inSeconds(shownKeyframes(c.component, c.keyframes, doc)),
         depth: c.depth,
         space: c.space,
         parent: c.parent,
         parentOpacity: c.parentOpacity,
+        autoLayout: c.autoLayout ?? null,
+        layoutItem: c.layoutItem ?? null,
         expressions: c.expressions,
         effects: c.effects,
         shaders: c.shaders,
@@ -332,6 +341,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         hidden: c.hidden ?? false,
         locked: c.locked ?? false,
         bleed: c.bleed ?? false,
+        clipContent: c.clipContent ?? false,
         markers: (c.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
         physics: c.physics ? shownRecord(c.component, c.physics, doc) : null,
         path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map((t) => ({ time: secs(t.frame), in: shownOffset(c.component, t.in, doc), out: shownOffset(c.component, t.out, doc) })), problem: pathProblem(c) } : null
@@ -787,7 +797,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_props: tool({
-      description: 'Change some props of a clip; the rest are kept. Validated against the component.',
+      description: 'Change some props of a clip; the rest are kept. Validated against the component. A Shape and text (Title, Text, Kicker, Caption) take fills (see add_shape; fills replaces a text colour, colours may carry alpha as #rrggbbaa); a poster photo slot in a media list ({assetId, kind}) takes fills too, the same layer stack. The same Shape and text clips take strokes (see add_shape); text draws its first visible stroke.',
       inputSchema: z.object({ clip_id: z.string(), props: z.record(z.string(), z.unknown()) }),
       execute: async (input) => {
         if (!assetKnown(input.props.assetId)) {
@@ -855,10 +865,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_visibility: tool({
-      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it.',
-      inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional(), bleed: z.boolean().optional() }),
+      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it. clip_content true on a clip crops its children (set_parent) to its box at rest, like a Figma frame.',
+      inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional(), bleed: z.boolean().optional(), clip_content: z.boolean().optional() }),
       execute: async (input) => {
-        const flags = { ...(input.hidden === undefined ? {} : { hidden: input.hidden }), ...(input.locked === undefined ? {} : { locked: input.locked }), ...(input.bleed === undefined || !input.clip_id ? {} : { bleed: input.bleed }) };
+        const flags = { ...(input.hidden === undefined ? {} : { hidden: input.hidden }), ...(input.locked === undefined ? {} : { locked: input.locked }), ...(input.bleed === undefined || !input.clip_id ? {} : { bleed: input.bleed }), ...(input.clip_content === undefined || !input.clip_id ? {} : { clipContent: input.clip_content }) };
         const result = input.clip_id ? setClipFlags(session.doc, input.clip_id, flags) : input.track_id ? setTrackFlags(session.doc, input.track_id, flags) : { ok: false as const, error: 'give a track_id or a clip_id' };
         return apply(result, 'changed visibility');
       }
@@ -883,6 +893,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => apply(shortened(removeClips(session.doc, input.clip_ids)), `removed ${input.clip_ids.length} clip(s)`)
     }),
 
+    split_clip: tool({
+      description: 'Split clips in two at a frame, like the editor Split: the first part ends at frame, the second starts there with its own id.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), frame: z.number().int().min(0) }),
+      execute: async (input) => apply(runClipOp(ClipOp.Split, { doc: session.doc, selection: input.clip_ids, frame: input.frame, parent: null, newId: deps.newId }), `split ${input.clip_ids.length} clip(s) at ${input.frame}`)
+    }),
+
+    duplicate_clip: tool({
+      description: 'Duplicate clips, like the editor Duplicate: each copy starts where its original ends, on the same track. Returns the copy ids.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
+      execute: async (input) => {
+        const done = runClipOp(ClipOp.Duplicate, { doc: session.doc, selection: input.clip_ids, frame: 0, parent: null, newId: deps.newId });
+        const applied = apply(done, `duplicated ${input.clip_ids.length} clip(s)`);
+        return done.ok && applied.ok ? { ...applied, clip_ids: done.selection } : applied;
+      }
+    }),
+
     fit_duration: tool({
       description: 'Fit the video length to its content: it ends where the last content ends plus the style hold (the last frame stays on screen), and backgrounds and music past that end are trimmed. Use it whenever the gate names an empty tail.',
       inputSchema: z.object({}),
@@ -890,7 +916,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_transform: tool({
-      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot inside the clip box (0..1), blur in px.`,
+      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot inside the clip box (0..1), blur in px. A negative scaleX or scaleY flips the clip on that axis (-100 = mirrored).`,
       inputSchema: z.object({ clip_id: z.string(), transform: transformInput }),
       execute: async (input) => {
         const shrunk = uiShrink(session.doc, input.clip_id, input.transform.scale as number | undefined);
@@ -1082,6 +1108,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         'Use the clip directly above (on the track above, overlapping in time) as a matte for this clip. The matte is that clip as rendered, frame by frame: any kind (text, shape, picture, video, 3D, custom) with its keyframes and animation. alpha shows this clip where the matte is drawn, luma where it is bright; alpha-inverted and luma-inverted the opposite. The matte clip itself is hidden. none turns it off. Animated text over a video: Title on the upper track, Video below with matte alpha.',
       inputSchema: z.object({ clip_id: z.string(), matte: z.enum(MATTES) }),
       execute: async (input) => apply(setTrackMatte(session.doc, input.clip_id, input.matte), `matte ${input.matte} on ${input.clip_id}`)
+    }),
+
+    use_as_mask: tool({
+      description:
+        'Figma "Use as mask": of clip_ids, the bottom-most clip (lowest track) becomes the mask of the others, which must sit on tracks above it. The mask is drawn nowhere; its alpha as rendered cuts every masked clip: a Shape rect, ellipse or path with its corner radius and smoothing, a gradient fill fading to transparent gives a soft mask, its keyframes move the mask. Hide the mask clip (set_visibility) to turn masking off; release_mask removes it.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(2) }),
+      execute: async (input) => apply(useAsMask(session.doc, input.clip_ids), `masked ${input.clip_ids.length - 1} clip(s)`)
+    }),
+
+    release_mask: tool({
+      description: 'Undo use_as_mask: every clip masked by mask_id draws whole again, and the mask clip paints as itself.',
+      inputSchema: z.object({ mask_id: z.string() }),
+      execute: async (input) => apply(releaseMask(session.doc, input.mask_id), `released the mask ${input.mask_id}`)
     }),
 
     set_camera: tool({
@@ -1392,6 +1431,43 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
+    add_auto_layout: tool({
+      description: 'Auto layout (Figma-style flexbox). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (its fill is the frame background, set_props to colour it) on a track below them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1).optional(), clip_id: z.string().optional() }),
+      execute: async (input) => {
+        if (input.clip_id) {
+          return apply(setAutoLayout(session.doc, input.clip_id, {}), `auto layout on ${input.clip_id}`);
+        }
+        const id = deps.newId();
+        const out = apply(wrapInAutoLayout(session.doc, input.clip_ids ?? [], id, deps.newId()), `wrapped ${input.clip_ids?.length ?? 0} clip(s) in an auto layout`);
+        return out.ok ? { ...out, container_id: id } : out;
+      }
+    }),
+
+    set_auto_layout: tool({
+      description: 'Change an auto layout container: direction horizontal|vertical, wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, padding {top,right,bottom,left} px, justify start|center|end|space-between on the main axis, align start|center|end on the cross axis, order (child ids, first to last). Only the fields given change. off true removes the auto layout (children keep their parent).',
+      inputSchema: autoLayoutPatchSchema.extend({ clip_id: z.string(), off: z.boolean().optional() }),
+      execute: async ({ clip_id, off, ...patch }) => apply(setAutoLayout(session.doc, clip_id, off ? null : patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
+    }),
+
+    set_layout_item: tool({
+      description: 'How a clip sizes inside its auto layout, per axis: fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; only inside a container). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this.',
+      inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string() }),
+      execute: async ({ clip_id, ...patch }) => apply(setLayoutItem(session.doc, clip_id, patch), `sized ${clip_id} in its auto layout`)
+    }),
+
+    reorder_auto_layout: tool({
+      description: 'Move a child of an auto layout to position index (0 = first) in its container.',
+      inputSchema: z.object({ container_id: z.string(), clip_id: z.string(), index: z.number().int().min(0) }),
+      execute: async (input) => apply(reorderChild(session.doc, input.container_id, input.clip_id, input.index), `moved ${input.clip_id} to ${input.index}`)
+    }),
+
+    leave_auto_layout: tool({
+      description: 'Take a clip out of its auto layout: it is unparented and keeps the box it was laid out in.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(leaveAutoLayout(session.doc, input.clip_id), `took ${input.clip_id} out of its auto layout`)
+    }),
+
     set_expression: tool({
       description: `Drive one number property with an expression evaluated at every frame, on top of its keyframes (value is the keyframed value). ${EXPRESSION_GUIDE} camera true targets the camera (props: ${CAMERA_KEYS.join(', ')}). expression null removes it.`,
       inputSchema: z.object({ clip_id: z.string().optional(), camera: z.boolean().optional(), prop: z.string(), expression: z.string().nullable() }),
@@ -1455,12 +1531,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_shape: tool({
-      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. A rect rounds its corners with roundness (0..0.5 of the short side) or one radius per corner with corners [topLeft, topRight, bottomRight, bottomLeft] (unset ones follow roundness); set_props changes them later. Fill: fillKind solid/linear/radial/none with fill, fill2 (gradient end) and gradientAngle; stroke: strokeKind none/solid/gradient, stroke, strokeWidth/dash/gap in px, cap, join. Other props as add_clip; a soft glow is effects [{kind: gaussian-blur}]. ${PLACEMENT_HELP} Returns the clip id.`,
-      inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
+      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. A rect rounds its corners with roundness (0..0.5 of the short side) or one radius per corner with corners [topLeft, topRight, bottomRight, bottomLeft] (unset ones follow roundness), and smoothing 0..1 softens them toward a squircle (0 = circular); set_props changes them later. Fill: fills is a stack of layers painted bottom to top (first = bottom), each {type: solid {color} | linear-gradient {stops [{color, pos 0..1}], angle} | radial-gradient {stops, center {x,y} 0..1, radius (1 = half the long side)} | image {assetId, fit cover/contain/fill/tile, focus {x,y} 0..1, scale}, opacity 0..1, visible, blend (css blend mode)}; e.g. a photo with a dark overlay is [{type: image, assetId}, {type: solid, color: #000000, opacity: 0.4}]. fills replaces the older fillKind/fill/fill2/gradientAngle (still read when fills is absent); set_props {fills} changes the whole stack. Stroke: strokes is a stack painted bottom to top over the fills, each {paint (a fills layer, never image), width, dash, gap (all fractions of the frame's short side, 0..0.2; dash 0 = solid), align inside/center/outside, sides [top, right, bottom, left] widths (rect only), cap butt/round/square, join miter/round/bevel, visible}; e.g. a 4px outside ring on a 1080 frame is [{paint: {type: solid, color: #ffffff}, width: 0.0037, align: outside}]. strokes replaces the older strokeKind/stroke/strokeWidth/dash/gap/cap/join (still read when strokes is absent; set_props {strokes} changes the whole stack). Other props as add_clip; a soft glow is effects [{kind: gaussian-blur}]. ${PLACEMENT_HELP} Returns the clip id.`,
+      inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), fills: fillsSchema.optional(), strokes: strokesSchema.optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
       execute: async (input) => {
         const id = deps.newId();
         const outlined = input.props?.stroke !== undefined && input.props?.strokeKind === undefined ? { strokeKind: StrokeKind.Solid } : {};
-        const props = { ...propsIn('Shape', { ...outlined, ...input.props }), shape: input.kind, ...(input.path ? { path: input.path } : {}) };
+        const props = { ...propsIn('Shape', { ...outlined, ...input.props }), shape: input.kind, ...(input.path ? { path: input.path } : {}), ...(input.fills ? { fills: input.fills } : {}), ...(input.strokes ? { strokes: input.strokes } : {}) };
         const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
         return created(apply(withEffects(shape, [id], input.effects), `added ${input.kind} shape`), id);
       }
@@ -2422,6 +2498,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const saved = await deps.templates.save({ doc: session.doc, compId: input.comp ?? null, meta: { name: input.name, description: input.description ?? '' }, posterFrame: 0 });
         return saved.ok ? { ok: true, template_id: saved.entry.id } : saved;
+      }
+    }),
+
+    delete_template: tool({
+      description: 'Delete a team template this org saved (id from list_templates). Built-in templates cannot be deleted.',
+      inputSchema: z.object({ template_id: z.string() }),
+      execute: async (input) => {
+        if (!deps.templates) {
+          return { ok: false, error: 'the template library is not available here' };
+        }
+        return (await deps.templates.remove(input.template_id)) ? { ok: true } : { ok: false, error: 'not_removable' };
       }
     }),
 

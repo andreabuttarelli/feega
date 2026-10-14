@@ -33,6 +33,9 @@
   import { SPRINGS } from '$lib/motion/spring';
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
   import { nullFromSelection } from '$lib/motion/parent-ops';
+  import { addAutoLayout } from '$lib/motion/layout/ops';
+  import { releaseMasks, useAsMask } from '$lib/motion/mask-group';
+  import { withAutoLayout } from '$lib/motion/layout/resolve';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import ZoomStage from '$lib/components/motion/ZoomStage.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
@@ -58,6 +61,7 @@
   import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
   import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
@@ -79,12 +83,12 @@
   import { carryEdits, insertTemplate, isLockedComp, type Inserted, type Instance, type TemplateEntry } from '$lib/motion/template/library';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
-  import { catalogue, starterDoc, starterFormatOf, type StarterFormat } from '$lib/motion/template/catalogue';
+  import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
-  import { findClip, type MotionDoc } from '$lib/motion/doc';
+  import { findClip, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import {
     ClipEdge,
     Direction,
@@ -122,7 +126,7 @@
   import { ATTACH_PARAM, BRIEF_PARAM } from '$lib/motion/video-brief';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
-  import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, Zoom, timelineFits } from '$lib/motion/editor-mount';
+  import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, ToolsPlace, Zoom, timelineFits } from '$lib/motion/editor-mount';
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
@@ -130,13 +134,16 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHover } from '$lib/canvas/layers';
   import { DrawTool } from '$lib/motion/draw-tool';
+  import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
   import { EDIT_MODE_KEY, EditMode, nextMode, readMode } from '$lib/motion/edit-mode';
   import DrawOverlay from './DrawOverlay.svelte';
   import DrawTools from './DrawTools.svelte';
-  import { PART_SEP } from '$lib/motion/poster-parts';
+  import { PART_SEP, PartAction, runPart } from '$lib/motion/poster-parts';
   import { PropertiesView, propertiesFor } from '$lib/motion/properties-view';
   import { partFocus } from '$lib/motion/inspector';
   import PosterPartPanel from './PosterPartPanel.svelte';
+  import MultiInspector from './MultiInspector.svelte';
+  import FamilyIcon from './FamilyIcon.svelte';
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 
@@ -212,6 +219,7 @@
   let viewportH = $state(0);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
+  let redraws = $state(0);
   let zoomStage = $state<ZoomStage | null>(null);
   let reveal = $state(Reveal.Animated);
   let helpOpen = $state(false);
@@ -266,6 +274,9 @@
           },
           get parts() {
             return partsByClip;
+          },
+          get mode() {
+            return editMode;
           },
           get part() {
             return selection.length === 1 && selectedPart ? `${selection[0]}${PART_SEP}${selectedPart}` : null;
@@ -416,7 +427,7 @@
   const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
-  const view = $derived(propertiesFor({ clip: selected?.id ?? null, part: selectedPart }));
+  const view = $derived(propertiesFor({ count: selection.length, clip: selected?.id ?? null, part: selectedPart }));
   const agent = $derived(agentBusy || draft ? Agent.Working : Agent.Idle);
   const blank = $derived(!path.length && showsStart(doc, agentBusy ? Agent.Working : Agent.Idle));
 
@@ -843,11 +854,33 @@
 
   const newId = () => crypto.randomUUID().slice(0, 8);
 
-  let tool = $state(DrawTool.Select);
+  const timelineHidden = $derived(layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design);
+  $effect(() => (rules.tools === ToolsPlace.CanvasBar ? frameBar.attach({ act: (action) => FRAME_ACTS[action]() }) : undefined));
+  let timelineShownPx = $state(0);
+  let timelineEl = $state<HTMLElement | null>(null);
+  $effect(() => {
+    if (rules.tools === ToolsPlace.CanvasBar) {
+      frameBar.timeline = timelineHidden ? null : timelineEl;
+    }
+  });
+  $effect(() => {
+    if (rules.tools === ToolsPlace.CanvasBar) {
+      frameBar.sidePx = docked && sideOpen ? sideWidth(layout.sidePx, width) : 0;
+    }
+  });
+
+  const dialogOpen = $derived(Boolean(publishing || sounding || menuOpen || helpOpen || exporting || browsing || componentsOpen || templating));
+  $effect(() => {
+    if (rules.tools === ToolsPlace.CanvasBar) {
+      frameBar.covered = dialogOpen;
+    }
+  });
+
+  const FRAME_ACTS: Record<FrameAction, () => void> = { [FrameAction.Image]: () => add('Image'), [FrameAction.Library]: () => (templating = true) };
 
   function drawn(id: string) {
     selection = [id];
-    tool = DrawTool.Select;
+    frameBar.tool = DrawTool.Select;
   }
 
   const ADD: Partial<Record<ComponentId, (id: string) => OpResult>> = {
@@ -873,7 +906,20 @@
     selection = [id];
   }
 
-  function componentDraft(id: string, format: StarterFormat): Instance | null {
+  function autoLayoutSelection() {
+    if (!selection.length) {
+      return;
+    }
+    const { result, containerId } = addAutoLayout(doc, selection, newId);
+    if (!result.ok) {
+      notice = result.error;
+      return;
+    }
+    edit(result.doc, 'Added auto layout');
+    selection = [containerId];
+  }
+
+  function componentDraft(id: string, format: MotionFormat): Instance | null {
     const entry = templates.find((t) => t.id === id);
     const made = entry ? starterDoc(entry, format, newId) : null;
     return made?.ok ? { doc: made.doc, clipId: made.clipId } : null;
@@ -1012,6 +1058,12 @@
     if (keySelection.length) {
       apply(deleteKeyframes(doc, keySelection), 'Deleted keyframes');
       keySelection = [];
+      return;
+    }
+    const part = selected && selectedPart ? runPart(doc, selected, selectedPart, PartAction.Delete) : null;
+    if (part?.ok) {
+      apply(part, 'Deleted element');
+      selectedPart = null;
       return;
     }
     if (!selection.length) {
@@ -1219,11 +1271,11 @@
 
   const COMMANDS: Record<Command, () => void> = {
     [Command.TogglePlay]: () => (playing = !playing),
-    [Command.ToolSelect]: () => (tool = DrawTool.Select),
-    [Command.ToolText]: () => (tool = DrawTool.Text),
-    [Command.ToolRectangle]: () => (tool = DrawTool.Rectangle),
-    [Command.ToolEllipse]: () => (tool = DrawTool.Ellipse),
-    [Command.ToolPen]: () => (tool = DrawTool.Pen),
+    [Command.ToolSelect]: () => (frameBar.tool = DrawTool.Select),
+    [Command.ToolText]: () => (frameBar.tool = DrawTool.Text),
+    [Command.ToolRectangle]: () => (frameBar.tool = DrawTool.Rectangle),
+    [Command.ToolEllipse]: () => (frameBar.tool = DrawTool.Ellipse),
+    [Command.ToolPen]: () => (frameBar.tool = DrawTool.Pen),
     [Command.ToggleEditMode]: () => setMode(nextMode(editMode)),
     [Command.MoveLeft]: () => nudgeBy(-NUDGE_PX, 0),
     [Command.MoveRight]: () => nudgeBy(NUDGE_PX, 0),
@@ -1283,7 +1335,10 @@
     [Command.ToggleInspector]: toggleInspector,
     [Command.ToggleTimeline]: () => relayout(toggleTimeline(layout)),
     [Command.Help]: () => (helpOpen = !helpOpen),
-    [Command.Precompose]: precomposeSelection
+    [Command.Precompose]: precomposeSelection,
+    [Command.AutoLayout]: autoLayoutSelection,
+    [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
+    [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask')
   };
 
   const TOOL_RUN: Partial<Record<ActionId, () => void>> = {
@@ -1295,7 +1350,7 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
@@ -1411,7 +1466,7 @@
     if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
       return;
     }
-    const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, editMode);
+    const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey, ctrlCmd: e.metaKey && e.ctrlKey }, editMode);
     if (!command) {
       return;
     }
@@ -1429,6 +1484,11 @@
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
       <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
       <span class="save-dot" data-tone={SAVE_TONE[saveState]} role="status" aria-label={`${saveState} · v${version}`}></span>
+      <div class="mode-switch" role="radiogroup" aria-label="Edit mode" data-testid="edit-mode" title="Design edits the base, Motion keys at the playhead (E)">
+        {#each [EditMode.Design, EditMode.Motion] as m (m)}
+          <button type="button" role="radio" aria-checked={editMode === m} class:on={editMode === m} data-mode={m} onclick={() => setMode(m)}>{m === EditMode.Design ? 'Design' : 'Motion'}</button>
+        {/each}
+      </div>
     </div>
 
     <div class="group transport" {...dockOf(Part.Transport)} role="group" aria-label="Transport">
@@ -1453,11 +1513,6 @@
     </div>
 
     <div class="group trail" {...dockOf(Part.Bar)} data-testid="bar-trail">
-      <div class="mode-switch" role="radiogroup" aria-label="Edit mode" data-testid="edit-mode" title="Design edits the base, Motion keys at the playhead (E)">
-        {#each [EditMode.Design, EditMode.Motion] as m (m)}
-          <button type="button" role="radio" aria-checked={editMode === m} class:on={editMode === m} data-mode={m} onclick={() => setMode(m)}>{m === EditMode.Design ? 'Design' : 'Motion'}</button>
-        {/each}
-      </div>
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
       <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
       <div class="popover-anchor">
@@ -1604,16 +1659,17 @@
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
     <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
-      <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
+      <MotionPreview bind:this={preview} bind:redraws {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
-        {#if presence}<FramePeers {doc} {frame} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
-        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
+        {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
+        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
-        {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={selected} onchange={edit} />{/if}
+        {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={findClip(withAutoLayout(doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
+        {#if selected?.autoLayout && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<AutoLayoutOverlay {doc} clip={{ ...selected, autoLayout: selected.autoLayout }} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
-        {#if tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} {tool} onchange={apply} oncreated={drawn} />{/if}
+        {#if frameBar.tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} tool={frameBar.tool} onchange={apply} oncreated={drawn} />{/if}
       </MotionPreview>
       {/snippet}
       {#if rules.zoom === Zoom.Stage}
@@ -1621,7 +1677,7 @@
       {:else}
         {@render player()}
       {/if}
-      <DrawTools bind:tool />
+      {#if rules.tools === ToolsPlace.Stage}<DrawTools bind:tool={frameBar.tool} />{/if}
       {#if liveScene.length}<span class="live-badge" data-testid="live-badge" title={`${liveScene.join(', ')} ${liveScene.length === 1 ? 'runs' : 'run'} live: different on every view, a still in the video`}>live</span>{/if}
       <div class="live-bar">
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
@@ -1651,16 +1707,19 @@
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
         <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
-        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} onchange={edit} />{/if}{/snippet}
+        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart ? partFocus(doc, selected, selectedPart) : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
+      {:else if view === PropertiesView.Multiple}
+        <MultiInspector {doc} ids={selection} {frame} mode={editMode} onchange={edit} />
       {:else}
+        <header class="frame-head" data-testid="selection-head"><FamilyIcon /><span>Frame</span></header>
         <DocFields {doc} {assets} onchange={edit} />
         <div class="composition" data-testid="composition-inspector">
-          <header class="composition-head"><span>Composition</span>{#if selection.length > 1}<em>{selection.length} clips selected</em>{/if}</header>
+          <header class="composition-head"><span>Frame</span></header>
           <CompositionSettings {doc} onchange={apply} />
         </div>
       {/if}
@@ -1675,7 +1734,7 @@
     {/snippet}
     </SideColumn>
 
-    <section class="timeline-area" {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
+    <section class="timeline-area" bind:this={timelineEl} bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
 
       {#if clipBarShown}
@@ -1699,8 +1758,8 @@
                   <button type="button" role="menuitem" onclick={() => startTemplate(id)}>{AD_TEMPLATES[id].label}</button>
                 {/each}
                 <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
-                <span class="menu-head">Components</span>
-                <button type="button" role="menuitem" data-testid="open-components" onclick={() => ((adding = false), (componentsOpen = true))}>Browse components…</button>
+                <span class="menu-head">Frame templates</span>
+                <button type="button" role="menuitem" data-testid="open-components" onclick={() => ((adding = false), (componentsOpen = true))}>Browse frame templates…</button>
                 <span class="menu-head">Templates</span>
                 <button type="button" role="menuitem" data-testid="open-templates" onclick={() => ((adding = false), (browseFirst = null), (browsing = true))}>Browse templates…</button>
                 <span class="menu-head">Audio</span>
@@ -1834,7 +1893,7 @@
     height: auto;
     background: transparent;
     pointer-events: auto;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .editor[data-mount='canvas'] .bar.in-canvas-bar > :global(*) {
@@ -1891,6 +1950,8 @@
   }
 
   .bar {
+    --ui-hit: var(--ui-control-h);
+    --ui-hit-gap: 4px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: stretch;
@@ -1962,8 +2023,10 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    height: var(--ui-hit);
     margin-left: var(--ui-space-2);
-    padding: 4px 6px;
+    padding: 0 8px;
+    border-radius: var(--ui-radius-sm);
     color: var(--ui-text-3);
     font-family: var(--ui-mono);
     font-variant-numeric: tabular-nums;
@@ -1993,19 +2056,30 @@
   .secondary,
   .render {
     height: var(--ui-hit);
-    padding: 0 var(--ui-space-4);
-    font-size: var(--ui-text-sm);
-    font-weight: 600;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    font-size: var(--ui-type-body);
+    font-weight: var(--ui-weight-medium);
     white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease);
   }
 
   .secondary {
-    background: var(--ui-field);
-    color: var(--ui-ink);
+    background: transparent;
+    color: var(--ui-text-secondary);
   }
 
   .secondary:hover {
-    background: var(--ui-hover);
+    background: var(--ui-wash);
+    color: var(--ui-text);
+  }
+
+  .secondary:focus-visible,
+  .render:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   .storyboard {
@@ -2015,12 +2089,22 @@
   }
 
   .render {
-    background: var(--ui-accent);
-    color: var(--ui-accent-ink);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font-weight: var(--ui-weight-semibold);
   }
 
   .render:hover {
-    background: color-mix(in srgb, var(--ui-accent) 88%, #000);
+    background: var(--ui-input-hover);
+  }
+
+  .editor[data-mount='page'] .render {
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
+  }
+
+  .editor[data-mount='page'] .render:hover {
+    background: color-mix(in srgb, var(--ui-accent-solid) 88%, #000);
   }
 
   .body {
@@ -2036,16 +2120,17 @@
 
   .mode-switch {
     display: flex;
+    height: var(--ui-hit);
     padding: 2px;
-    background: var(--ui-field);
-    border-radius: 9999px;
+    background: var(--ui-input);
+    border-radius: var(--ui-radius-md);
   }
 
   .mode-switch button {
-    height: 26px;
+    height: 100%;
     padding: 0 10px;
     border: 0;
-    border-radius: 9999px;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
     color: var(--ui-text-2);
     font-size: var(--ui-text-sm);
@@ -2053,8 +2138,10 @@
   }
 
   .mode-switch button.on {
-    background: var(--ui-bg);
-    color: var(--ui-ink);
+    background: var(--ui-panel-raised);
+    color: var(--ui-text);
+    font-weight: var(--ui-weight-medium);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
   }
 
   .body.no-timeline {
@@ -2135,7 +2222,7 @@
     top: var(--ui-space-3);
     left: var(--ui-space-3);
     padding: 2px var(--ui-space-2);
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
     font-size: 11px;
     letter-spacing: 0.04em;
@@ -2189,27 +2276,35 @@
   .composition-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    height: 40px;
-    margin-bottom: var(--ui-space-2);
+    height: 36px;
     font-size: var(--ui-text-xs);
-    font-weight: 500;
-    color: var(--ui-text-3);
+    font-weight: 600;
+    color: var(--ui-ink);
   }
 
-  .composition-head em {
-    font-style: normal;
-    font-family: var(--ui-mono);
-    font-size: 10px;
-    font-weight: 400;
-    color: var(--ui-ink-3);
+  .frame-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 var(--ui-space-4);
+    border-bottom: 1px solid var(--ui-line);
+    color: var(--ui-ink-2);
+    font-size: var(--ui-text-sm);
+  }
+
+  .frame-head span {
+    color: var(--ui-ink);
+    font-weight: 600;
   }
 
   .props {
     grid-column: 2;
-    grid-row: 1;
+    grid-row: 1 / 3;
     min-height: 0;
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
   }
 
   .chat {
@@ -2248,7 +2343,7 @@
   }
 
   .timeline-area {
-    grid-column: 1 / 3;
+    grid-column: 1;
     grid-row: 2;
     position: relative;
     display: flex;
@@ -2296,13 +2391,16 @@
   }
 
   .toolbar {
+    --ui-hit: var(--ui-control-h);
+    --ui-hit-gap: 4px;
     display: flex;
     align-items: center;
     gap: var(--ui-hit-gap);
-    height: calc(var(--ui-hit) + var(--ui-space-3));
-    padding: 0 var(--ui-space-3);
+    height: var(--ui-header-h);
+    padding: 0 var(--ui-space-2);
     background: var(--ui-bg);
-    font-size: var(--ui-text-sm);
+    border-bottom: 1px solid var(--ui-divider);
+    font-size: var(--ui-type-body);
     flex-shrink: 0;
   }
 
@@ -2313,17 +2411,25 @@
     gap: 4px;
     min-width: var(--ui-hit);
     height: var(--ui-hit);
-    color: var(--ui-ink-2);
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-icon-ink);
+    transition: background-color var(--ui-dur-fast) var(--ui-ease);
   }
 
   .tool.text {
-    padding: 0 var(--ui-space-2);
-    color: var(--ui-ink);
+    padding: 0 10px;
+    color: var(--ui-text);
+    font-weight: var(--ui-weight-medium);
   }
 
   .tool:hover:not(:disabled) {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
+    background: var(--ui-wash);
+    color: var(--ui-text);
+  }
+
+  .tool:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   .tool:disabled {
@@ -2349,9 +2455,10 @@
     gap: 4px;
     max-height: calc(100vh - 120px);
     overflow: auto;
-    padding: var(--ui-space-2);
-    background: var(--ui-raised);
-    box-shadow: 0 12px 32px rgb(0 0 0 / 0.14);
+    padding: 4px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   .menu.more {
@@ -2382,7 +2489,7 @@
   }
 
   .menu [aria-checked='true'] {
-    color: var(--ui-accent);
+    color: var(--ui-accent-text);
   }
 
   @media (pointer: coarse) {
@@ -2407,18 +2514,26 @@
 
   .menu button {
     text-align: left;
-    min-height: var(--ui-hit);
-    padding: 0 var(--ui-space-3);
+    min-height: var(--ui-row);
+    padding: 0 8px;
+    border-radius: var(--ui-radius-sm);
+    font-size: var(--ui-type-body);
+    color: var(--ui-text);
   }
 
-  .menu button:hover {
-    background: var(--ui-hover);
+  .menu button:hover,
+  .menu button:focus-visible {
+    background: var(--ui-wash);
+    outline: none;
   }
 
   .menu-head {
-    padding: var(--ui-space-3) var(--ui-space-3) var(--ui-space-1);
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-3);
+    padding: 8px 8px 4px;
+    font-size: var(--ui-type-section);
+    font-weight: var(--ui-weight-semibold);
+    letter-spacing: var(--ui-tracking-caps);
+    text-transform: uppercase;
+    color: var(--ui-text-tertiary);
   }
 
   .notice {
@@ -2514,7 +2629,7 @@
 
   [data-viewport='phone'] {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr) auto auto;
     grid-template-areas: 'lead trail' 'body body' 'transport transport' 'tabs tabs';
   }
@@ -2532,7 +2647,19 @@
   [data-viewport='phone'] .trail {
     grid-area: trail;
     height: 56px;
+    min-width: 0;
     padding-right: var(--ui-space-2);
+    justify-content: safe flex-end;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  [data-viewport='phone'] .trail > :global([data-testid='inline-close']) {
+    position: sticky;
+    right: 0;
+    flex-shrink: 0;
+    background: var(--ui-bg);
+    box-shadow: -16px 0 12px var(--ui-bg);
   }
 
   [data-viewport='phone'] .transport {

@@ -26,7 +26,7 @@
 		avoidCollisions
 		sticky="always"
 		class={cn(
-			"z-80 flex max-h-(--bits-floating-available-height) w-80 max-w-[calc(100vw-1rem)] flex-col overflow-hidden border border-line-2 bg-popover font-sans text-popover-foreground shadow-md outline-none",
+			"z-80 flex max-h-(--bits-floating-available-height) w-80 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-md bg-ui-raised font-sans text-ui-text shadow-ui-float outline-none",
 			className
 		)}
 		{...restProps}

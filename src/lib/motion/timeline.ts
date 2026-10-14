@@ -529,5 +529,5 @@ export function setTrackMatte(doc: MotionDoc, clipId: string, matte: Matte): OpR
       return fail('no clip above this one, on the track above and overlapping it in time, to use as matte');
     }
   }
-  return editClip(doc, clipId, (clip) => ({ ...clip, matte }));
+  return editClip(doc, clipId, (clip) => ({ ...clip, matte, matteFrom: matte === Matte.None ? null : clip.matteFrom }));
 }

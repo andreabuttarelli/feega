@@ -42,12 +42,14 @@
     position: absolute;
     z-index: 12;
     right: var(--mobile-bar-inset);
-    bottom: calc(var(--mobile-bar-inset) + env(safe-area-inset-bottom, 0px));
+    bottom: var(--mobile-switch-bottom, calc(var(--mobile-bar-inset) + env(safe-area-inset-bottom, 0px)));
     display: flex;
+    gap: 2px;
     padding: var(--mobile-bar-pad);
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    box-shadow: var(--mobile-bar-shadow);
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
+    transition: bottom var(--chrome-move) var(--ease-expo);
   }
 
   .segment {
@@ -58,19 +60,24 @@
     height: var(--touch-target);
     appearance: none;
     border: 0;
+    border-radius: var(--ui-radius-full);
     background: transparent;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-icon-ink);
     -webkit-tap-highlight-color: transparent;
   }
   .segment[aria-pressed='true'] {
-    background: var(--ink, #1d1d1f);
-    color: var(--paper, #fff);
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
   }
   .segment:active {
-    background: var(--paper-3, #f4f4f4);
+    background: var(--ui-pressed);
   }
   .segment[aria-pressed='true']:active {
-    background: var(--ink, #1d1d1f);
+    background: var(--ui-accent-solid);
+  }
+  .segment:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   .badge {

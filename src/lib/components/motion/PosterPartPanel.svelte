@@ -3,23 +3,20 @@
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { AssetKind } from '$lib/motion/components';
   import { setProps, type OpResult } from '$lib/motion/timeline';
-  import { PartKind, parsePart, partKind, partLabel, partText, writePartText } from '$lib/motion/poster-parts';
-  import { LineEdit, editLines, lineRows, markedPoster, photoAt, setPhoto, setPhotoLook, type PhotoFit, type PhotoLook } from '$lib/motion/poster-lines';
+  import Trash from '@lucide/svelte/icons/trash-2';
+  import { PartAction, PartKind, parsePart, partKind, partLabel, partText, runPart, writePartText } from '$lib/motion/poster-parts';
+  import { markedPoster, photoStack, setPhotoFills } from '$lib/motion/poster-lines';
+  import FillStack from './FillStack.svelte';
+  import type { BrandTokens } from '$lib/motion/brand';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
 
-  let { doc, clip, part, assets, onchange }: { doc: MotionDoc; clip: MotionClip; part: string; assets: Asset[]; onchange: (doc: MotionDoc, summary: string) => void } = $props();
-
-  const IMAGE = 'image';
-  const FITS: PhotoFit[] = ['cover', 'contain'];
-  const CENTRE = 0.5;
+  let { doc, clip, part, assets, tokens, onchange }: { doc: MotionDoc; clip: MotionClip; part: string; assets: Asset[]; tokens: BrandTokens; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const kind = $derived(partKind(doc, clip, part));
   const index = $derived(parsePart(part).index ?? 0);
   const poster = $derived(markedPoster(String(clip.props.name)));
   const media = $derived(poster ? clip.props[poster.media] : undefined);
-  const photo = $derived(photoAt(media, index));
-  const row = $derived(poster ? lineRows(String(clip.props[poster.lines] ?? ''))[index] : undefined);
 
   function apply(result: OpResult, summary: string) {
     if (result.ok) {
@@ -28,55 +25,32 @@
   }
 
   const writeMedia = (next: unknown, summary: string) => poster && apply(setProps(doc, clip.id, { [poster.media]: next }), summary);
-  const look = (patch: PhotoLook) => writeMedia(setPhotoLook(media, index, patch), 'Adjust photo');
 
   const BODY: Record<PartKind, Snippet | null> = { [PartKind.Line]: lineBody, [PartKind.Photo]: photoBody, [PartKind.Arrow]: arrowBody, [PartKind.Text]: null, [PartKind.Other]: null };
   const body = $derived(BODY[kind]);
+  const PART_KIND_LABEL: Record<PartKind, string> = { [PartKind.Line]: 'Line', [PartKind.Photo]: 'Photo', [PartKind.Arrow]: 'Arrow', [PartKind.Text]: 'Text', [PartKind.Other]: 'Part' };
 
-  function line(edit: LineEdit) {
-    if (!poster) {
-      return;
-    }
-    const next = editLines({ lines: String(clip.props[poster.lines]), media }, index, edit);
-    apply(setProps(doc, clip.id, { [poster.lines]: next.lines, [poster.media]: next.media }), 'Edit line');
-  }
+  const remove = () => apply(runPart(doc, clip, part, PartAction.Delete), `Delete ${partLabel(doc, clip, part)}`);
 </script>
 
 {#snippet lineBody()}
   <input type="text" class="one" data-testid="part-text" aria-label={partLabel(doc, clip, part)} value={partText(clip, part)} onchange={(e) => apply(writePartText(doc, clip.id, part, e.currentTarget.value), 'Edit text')} />
-  {#if row}
-    <div class="tools">
-      <button type="button" onclick={() => line(LineEdit.AddPhoto)}>+ Photo</button>
-      {#if row.photos.length}<button type="button" onclick={() => line(LineEdit.RemovePhoto)}>− Photo</button>{/if}
-      <button type="button" class:on={row.arrow} aria-pressed={row.arrow} onclick={() => line(LineEdit.Arrow)}>Arrow</button>
-    </div>
-  {/if}
 {/snippet}
 
 {#snippet photoBody()}
-  <div class="assets" data-testid="part-photo">
-    {#each assets.filter((a) => a.kind === IMAGE) as asset (asset.id)}
-      <button type="button" class="asset" class:on={photo.assetId === asset.id} title={asset.label} onclick={() => writeMedia(setPhoto(media, index, asset.id), 'Replace photo')}><img src={asset.previewUrl} alt={asset.label} /></button>
-    {:else}
-      <span class="empty">No images on this canvas yet.</span>
-    {/each}
+  <div data-testid="part-photo">
+    <FillStack title="Fill" fills={photoStack(media, index)} {assets} {tokens} onchange={(fills, summary) => writeMedia(setPhotoFills(media, index, fills), summary)} />
   </div>
-  <label class="field">Fit
-    <select value={photo.fit ?? FITS[0]} onchange={(e) => look({ fit: e.currentTarget.value as PhotoFit })}>
-      {#each FITS as fit (fit)}<option value={fit}>{fit}</option>{/each}
-    </select>
-  </label>
-  <label class="field">Focus X <input type="range" min="0" max="1" step="0.01" value={photo.focusX ?? CENTRE} onchange={(e) => look({ focusX: Number(e.currentTarget.value) })} /></label>
-  <label class="field">Focus Y <input type="range" min="0" max="1" step="0.01" value={photo.focusY ?? CENTRE} onchange={(e) => look({ focusY: Number(e.currentTarget.value) })} /></label>
+  <button type="button" class="delete" data-testid="part-delete" onclick={remove}><Trash size={12} /> Delete photo</button>
 {/snippet}
 
 {#snippet arrowBody()}
-  <label class="field">Show arrow <input type="checkbox" checked onchange={() => line(LineEdit.Arrow)} /></label>
+  <label class="field">Show arrow <input type="checkbox" checked onchange={remove} /></label>
 {/snippet}
 
 {#if body}
   <section class="part" data-testid="poster-part" data-kind={kind}>
-    <h3>{partLabel(doc, clip, part)}</h3>
+    <h3><span class="part-kind">{PART_KIND_LABEL[kind]}</span>{partLabel(doc, clip, part)}</h3>
     {@render body()}
   </section>
 {/if}
@@ -85,16 +59,24 @@
   .part {
     display: grid;
     gap: 6px;
-    padding: 0 var(--ui-space-4) var(--ui-space-3);
+    padding: var(--ui-space-3) var(--ui-space-4) var(--ui-space-4);
+    border-bottom: 1px solid var(--ui-line);
   }
+
+  .part-kind {
+    margin-right: 6px;
+    color: var(--ui-ink-3);
+    font-weight: 400;
+  }
+
   input[type='text'],
   select {
     width: 100%;
-    height: 24px;
-    padding: 0 6px;
+    height: 28px;
+    padding: 0 8px;
     border: 1px solid transparent;
-    border-radius: 0;
-    background: var(--ui-field);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
     color: var(--ui-ink);
     font: inherit;
   }
@@ -108,27 +90,32 @@
 
   h3 {
     margin: 0;
-    font-size: var(--ui-text-md, 12px);
+    font-size: var(--ui-text-xs);
     font-weight: 600;
   }
 
 
-  .tools {
-    display: flex;
+  .delete {
+    display: inline-flex;
+    align-items: center;
     gap: 4px;
+    justify-self: start;
   }
 
   button {
-    font-size: var(--ui-text-sm, 11px);
-    padding: 2px 6px;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-surface);
-    border-radius: 0;
+    height: 28px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
   }
 
-  button.on {
-    background: var(--ui-accent);
-    color: var(--ui-on-accent, #fff);
+  button:hover {
+    background: var(--ui-hover);
   }
 
   .assets {
@@ -163,14 +150,13 @@
   .field {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    font-size: var(--ui-text-sm, 11px);
+    gap: 8px;
+    font-size: var(--ui-text-xs);
     color: var(--ui-ink-2);
   }
 
-  .field select,
-  .field input[type='range'] {
-    width: 60%;
+  .field span {
+    flex-shrink: 0;
+    width: 88px;
   }
 </style>

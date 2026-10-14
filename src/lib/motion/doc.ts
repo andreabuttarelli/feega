@@ -28,6 +28,7 @@ import { physicsSchema } from './physics/model';
 import { MOTION_STYLES } from './style-model';
 import { referenceLookSchema } from './reference-look-model';
 import { stillSchema } from './still-model';
+import { autoLayoutSchema, layoutItemSchema } from './layout/model';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -88,6 +89,7 @@ const clipSchema = z.object({
   mask: maskSchema.nullable().default(null),
   maskStack: maskStackSchema.default([]),
   matte: z.enum(MATTES).default(Matte.None),
+  matteFrom: z.string().min(1).nullable().optional(),
   depth: depthSchema.default(DEPTH.fallback),
   space: z.enum(SPACES).default(Space.World),
   parent: z.string().min(1).nullable().default(null),
@@ -104,7 +106,10 @@ const clipSchema = z.object({
   hidden: z.boolean().optional(),
   locked: z.boolean().optional(),
   bleed: z.boolean().optional(),
-  markers: z.array(markerSchema).max(MAX_MARKERS).optional()
+  clipContent: z.boolean().optional(),
+  markers: z.array(markerSchema).max(MAX_MARKERS).optional(),
+  autoLayout: autoLayoutSchema.nullable().optional(),
+  layoutItem: layoutItemSchema.optional()
 });
 
 const trackSchema = z.object({

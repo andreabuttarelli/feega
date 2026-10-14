@@ -32,4 +32,14 @@ describe('inlineMedia', () => {
     expect(plain.style['background-image']).toBeUndefined();
     expect(done.src).toBe('data:image/png;base64,AA');
   });
+
+  it('a layered background keeps every layer and inlines each picture in it', async () => {
+    const text = el('SPAN', { bg: 'linear-gradient(rgb(0, 0, 0), rgb(0, 0, 0)), url("https://cdn/a.png"), url("https://cdn/bb.png")' });
+    const root = { querySelectorAll: () => [text] } as unknown as Element;
+    vi.stubGlobal('getComputedStyle', (e: FakeEl) => ({ backgroundImage: e.bg }));
+
+    await inlineMedia(root, async (url) => `data:${url.length}`, new Map());
+
+    expect(text.style['background-image']).toBe('linear-gradient(rgb(0, 0, 0), rgb(0, 0, 0)), url("data:17"), url("data:18")');
+  });
 });

@@ -17,21 +17,21 @@
 	} = $props();
 </script>
 
-<section data-slot="panel" class={cn("mb-4 border border-border bg-background", className)}>
+<section data-slot="panel" class={cn("mb-4 overflow-hidden rounded-md bg-ui-sunken text-ui-text", className)}>
 	{#if title || actions}
-		<header class="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+		<header class="flex items-center justify-between gap-3 px-5 pt-4 pb-1">
 			<div class="flex min-w-0 flex-col gap-0.5">
 				{#if title}
-					<h2 class="m-0 text-sm font-semibold tracking-tight text-foreground">{title}</h2>
+					<h2 class="m-0 text-ui-title font-semibold tracking-[var(--ui-tracking-title)] text-ui-text">{title}</h2>
 				{/if}
 				{#if description}
-					<p class="m-0 text-[0.8125rem] text-muted-foreground">{description}</p>
+					<p class="m-0 text-ui-label text-ui-text-3">{description}</p>
 				{/if}
 			</div>
 			{@render actions?.()}
 		</header>
 	{/if}
-	<div class="divide-y divide-border [&>*]:px-5 [&>*]:py-4">
+	<div class="divide-y divide-ui-divider [&>*]:px-5 [&>*]:py-4">
 		{@render children?.()}
 	</div>
 </section>

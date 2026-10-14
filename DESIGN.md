@@ -11,14 +11,84 @@ the tokens and component rules it names live in `docs/design/app-ui.md` and `src
 
 | Rule | Value |
 |---|---|
-| Shapes | **a sharp rectangle or a perfect circle, nothing in between.** Pages, panels, menus, nodes, cards, inputs: 0px (`--radius: 0`). Icon buttons, avatars, status dots and a button pill may be fully round (`rounded-full`). Never an intermediate radius (`rounded-md`, `8px`). |
-| Dark background | **`#000`**, pure. Surfaces step up in small increments (`#0a0a0a`, `#111`, `#161616`). |
-| Light background | `#ffffff`, one secondary surface `#f7f7f7`. |
-| Greyscale | **chrome is pure grey**, no tint: bars, panels, fields and text are neutral greys (`--ui-*` in `src/app.css`), separated by surface steps. Text greys read at WCAG AA on every ground (`src/lib/greyscale-tokens.test.ts`). Colour is only the accent, on selection and the primary action. |
-| Canvas | a mid-light grey of its own, `--canvas-bg` `#e6e6e6` with a `--canvas-dot` `#c8c8c8` grid (dark: `#1c1c1c` / `#333333`), so white nodes and the bars around it stand apart without lines. |
-| Accent | one: `#0099ff` (`--ui-accent`). Selection, focus, primary action. Nothing else is blue. |
+| Shapes | **a radius scale, one role per step** (`--ui-radius-*`): `none` 0 for frames and nodes' content, full-bleed panels and bars; `xs` 2px for kbd, checkboxes, swatches; `sm` 4px for buttons, inputs, rows, segments; `md` 6px for menus, popovers, segmented tracks, cards; `lg` 10px for dialogs, sheets and floating bars; `full` for avatars, dots, pills. Pick the step by role, never a free value. |
+| Greyscale | **a 13-step pure-grey ramp** (`--grey-0…12`, light and dark) and **semantic roles on top** (`--ui-app`, `--ui-canvas`, `--ui-panel`, `--ui-panel-sunken`, `--ui-panel-raised`, `--ui-input`, `--ui-wash`, `--ui-pressed`, `--ui-divider`, `--ui-text*`, `--ui-icon-ink`). Components use roles, never a ramp step and never a hex. Every text role reads at WCAG AA on every surface role (`src/lib/greyscale-tokens.test.ts`). |
+| Elevation | the canvas is the lowest plane in both themes; panels sit one clear step above it; menus, popovers and floating bars sit above panels with `--ui-shadow-float`. Light: canvas `#ebebeb`, panels white. Dark: canvas `#121212`, panels `#1f1f1f`, raised `#272727`. |
+| Canvas | `--ui-canvas` with a `--ui-canvas-dot` grid. |
+| Accent | one hue. `--ui-accent` `#0099ff` for selection outlines, focus rings and pressed tools; `--ui-accent-solid` `#0b6bcb` under white text (primary buttons, AA); `--ui-accent-text` for accent-coloured text (AA on panels). Nothing else is blue. |
 | Borders | **almost none.** Separate with space and a slightly different surface, not lines. A hairline only where a boundary is functional (inputs, the timeline grid). |
 | Density | super minimal: small, clean type, generous space, one primary action per view. |
+
+### the shell system
+
+The tokens live in `src/app.css`; Tailwind exposes the roles as `bg-ui-panel`, `text-ui-text-2`,
+`rounded-sm`, `text-ui-label`, `shadow-ui-float`… (`src/lib/styles/tailwind.css`). The primitives
+live in `src/lib/components/ui/shell/` and every bar and panel is built from them:
+
+| Primitive | Use |
+|---|---|
+| `Panel` (`surface` panel / sunken / raised) | a side panel, a docked bar, a floating card |
+| `PanelHeader` | the one title of a panel (13px semibold) plus its icon actions, 40px, divider below |
+| `Section` (`fold` fixed / open / closed) | a group inside a panel, caps label (10.5px, 600, +0.06em, tertiary) |
+| `Row` | a list row (Layers, assets): 28px, indent 12px per level, hover wash, selection = accent wash + accent text, trailing actions revealed on hover (always on touch) |
+| `Field` + `FIELD_INPUT` | label (12px secondary) left, control right; inputs filled `--ui-input`, no border, 28px |
+| `IconButton` (`size` sm 24 / md 28 / lg 32, `tone` ghost / filled / accent) | every icon action; always a tooltip with its name and shortcut |
+| `SegmentedControl` | 2–5 exclusive options: a sunken track, the chosen one raised |
+| `Toolbar` (`placement` inline / floating) + `ToolbarDivider` | a row of tools; floating = raised, `lg` radius, float shadow |
+| `Hint` + `Kbd` | tooltip with the shortcut in platform glyphs (`⌘⇧Z` / `Ctrl+Shift+Z`) |
+| `Menu`, `MenuContent`, `MenuItem`, `MenuLabel`, `MenuSeparator` | every dropdown and context menu: icon · label · shortcut, 28px rows, danger tone in red |
+
+Sizes: 4px grid (`--ui-space-*`); rows 28 / 32 / 36 (`--ui-row-sm/row/row-lg`), 44 on touch;
+icons 12 / 14 / 16 / 20 (`--ui-icon-xs/sm/—/lg`). Motion: 120 / 200 / 320 ms on `--ui-ease`
+(expo out). Focus: `--ui-ring`, a 2px accent ring, on every focusable element via `focus-visible`.
+
+| Type role | Size / weight | Token |
+|---|---|---|
+| Panel title | 13px / 600, -0.01em | `text-ui-title` |
+| Section title | 13px / 600, sentence case | `SECTION_TITLE` |
+| Menu group label | 10.5px / 600, caps, +0.06em, tertiary | `SECTION_LABEL` |
+| Body, menu item | 13px / 400 | `text-ui-body` |
+| Label, row | 12px / 400–500 | `text-ui-label` |
+| Value, timecode, shortcut | 11px Fragment Mono, tabular | `text-ui-caption` + `--ui-mono` |
+| Caption, hint | 11px / 400, tertiary | `text-ui-caption` |
+
+### panels and inspector (reference: a pro design editor, dark first)
+
+These rules apply to every panel, including the Properties inspector:
+
+- **Elevation reads at a glance:** canvas darkest, side panels one step lighter, inputs one more
+  step (`--ui-canvas` < `--ui-panel` < `--ui-input`). Never a border where a step will do.
+- **Generous targets:** rows 32px (`--ui-row`), inputs 32px, panel header 48px; 44px on touch.
+- **Panel tabs:** a `SegmentedControl` at the top of a panel switches its views (right panel:
+  Chat / Properties). No underlined tabs.
+- **Sections:** bold sentence-case title (13px semibold, `Section`), a `+` `IconButton` at the
+  right when the section can add something (Layout, Effects, Fill…). No caps headers inside
+  the inspector; caps stay for menu group labels.
+- **Rows:** label left (secondary, 12–13px), control right (`Field`). Values in filled
+  inputs with `md` radius (`FIELD_INPUT`), mono tabular numbers.
+- **Controls:** inline dropdowns for modes (Fixed / Fit), segmented Yes / No for booleans, number
+  + slider for opacity, a swatch + value row for Fill / Border / Shadows with an `Add…` empty state.
+- **Action rows:** a row of icon actions (align, distribute) sits at the top of Properties, each
+  an `IconButton` with a tooltip and shortcut.
+- **Tree selection:** the selected row is a solid accent row with white text; the rows inside it
+  are tinted with the accent wash. Each type has its icon.
+- **Floating toolbar:** round tool buttons (`full` radius) in a pill bar, the zoom at the end.
+- **Collaborators:** cursors carry a coloured name pill; avatars sit in the top bar, right.
+- **Type colours:** layer icons use `--ui-type-frame` / `--ui-type-text` / `--ui-type-media`.
+- **Top bar** (canvas and inline frame editor, 48px, one row):
+
+  | Zone | Browsing | Frame open |
+  |---|---|---|
+  | Left | menu · project / canvas | menu · project / canvas · frame name + save dot · Design / Motion |
+  | Centre | canvas title | playback: start · step · play · step · end · timeline · timecode |
+  | Right | avatars · credits · **Share** · chat | undo · redo · history · more · Export · Full screen · close ‖ avatars · credits · **Share** · chat |
+
+  Every control is **28px tall** (`--ui-control-h`; 44px on touch). One style per role: icon
+  actions are ghost squares (`sm` radius, wash on hover, accent wash when pressed); text actions
+  are ghost (`Full screen`, `Storyboard`) or filled secondary (`Export`); **Share is the only
+  primary** (solid accent). Inside a zone 4px apart; zones 16px apart. One status dot only: the
+  frame's save dot replaces the canvas connection dot while a frame is open. An e2e check
+  (`tests/e2e/top-bar-rhythm.spec.ts`) holds the heights and the shared centre line.
 
 ### type
 
@@ -51,9 +121,23 @@ between the two is the point.
   proportions), sliders for ranges. Every list has an empty state with a way out.
 - Every UI works at 390px and on touch: targets of at least 44px, no hover-only features.
 
+### properties panel
+
+The right panel reads like Figma's: a head with the selection's icon, name and kind, then
+sections in one fixed order — Layout, Layer, Fill, Stroke, Effects, Text, Animation (Motion mode
+only). Which sections a selection gets is one table (`src/lib/motion/properties-view.ts`); which
+section a field lands in is another (`src/lib/motion/inspector-sections.ts`).
+
+- Rows are 28px, labels in English on the left (88px), never a glyph alone; numbers carry their
+  unit and scrub when the label is dragged. Short numbers pair up in two columns.
+- A colour is one field: swatch, hex, and a popover with the picker, brand and recent colours.
+- Two to three exclusive options are a segmented toggle (align, fit), not a dropdown.
+- Several layers show their shared value, or an empty field reading `Mixed`.
+- The panel runs the editor's full height and scrolls on its own.
+
 ### states
 
-Hover is a wash (`--ui-hover`), focus an accent ring, selection an accent wash with accent text.
+Hover is a wash (`--ui-wash`), pressed a deeper grey (`--ui-pressed`), focus an accent ring, selection an accent wash with accent text.
 Hovering a Layers row outlines what it names on the canvas in `--ui-hover-outline` (violet
 `#b14cff`), never the accent: hover and selection must read apart at a glance.
 Panels that open or fold (the timeline in Design mode) move on `--ease-expo-out`, 320 ms.

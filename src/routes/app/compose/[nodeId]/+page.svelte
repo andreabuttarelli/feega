@@ -410,23 +410,24 @@
     align-items: center;
     gap: 12px;
     padding: 8px 12px;
-    border: 1px solid var(--line);
-    background: var(--paper);
+    border: 1px solid var(--ui-divider);
+    background: var(--ui-panel);
+    border-radius: var(--ui-radius-md);
   }
 
   .back {
     font-size: 12.5px;
-    color: var(--ink-soft);
+    color: var(--ui-text-secondary);
     text-decoration: none;
   }
 
   .back:hover {
-    color: var(--ink);
+    color: var(--ui-text);
   }
 
   .save {
     font-size: 12px;
-    color: var(--ink-faint);
+    color: var(--ui-text-tertiary);
   }
 
   .actions {
@@ -442,22 +443,23 @@
     gap: 6px;
     height: 32px;
     padding: 0 12px;
-    border: 1px solid var(--line-2);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-divider-strong);
+    background: var(--ui-panel);
+    color: var(--ui-text);
     font-size: 13px;
     text-decoration: none;
     cursor: pointer;
+    border-radius: var(--ui-radius-sm);
   }
 
   .button:hover {
-    border-color: var(--ink);
+    border-color: var(--ui-text);
   }
 
   .button.primary {
-    border-color: var(--ink);
-    background: var(--ink);
-    color: var(--paper);
+    border-color: var(--ui-text);
+    background: var(--ui-text);
+    color: var(--ui-panel);
     font-weight: 600;
   }
 
@@ -475,8 +477,9 @@
     flex-direction: column;
     gap: 8px;
     padding: 12px;
-    border: 1px solid var(--line);
-    background: var(--paper-3);
+    border: 1px solid var(--ui-divider);
+    background: var(--ui-input);
+    border-radius: var(--ui-radius-md);
   }
 
   .preview {
@@ -503,15 +506,16 @@
     justify-content: center;
     width: 32px;
     height: 32px;
-    border: 1px solid var(--line-2);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-divider-strong);
+    background: var(--ui-panel);
+    color: var(--ui-text);
     cursor: pointer;
+    border-radius: var(--ui-radius-md);
   }
 
   .time {
     font-size: 12px;
-    color: var(--ink-soft);
+    color: var(--ui-text-secondary);
     font-variant-numeric: tabular-nums;
   }
 
@@ -524,8 +528,9 @@
   .panel {
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--line);
-    background: var(--paper);
+    border: 1px solid var(--ui-divider);
+    background: var(--ui-panel);
+    border-radius: var(--ui-radius-md);
   }
 
   .group {
@@ -536,7 +541,7 @@
   }
 
   .group + .group {
-    border-top: 1px solid var(--line);
+    border-top: 1px solid var(--ui-divider);
   }
 
   h3 {
@@ -548,12 +553,12 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--ink);
+    color: var(--ui-text);
   }
 
   .count {
     font-weight: 400;
-    color: var(--ink-faint);
+    color: var(--ui-text-tertiary);
     text-transform: none;
     letter-spacing: 0;
   }
@@ -561,7 +566,7 @@
   .muted {
     margin: 0;
     font-size: 12px;
-    color: var(--ink-soft);
+    color: var(--ui-text-secondary);
   }
 
   .design {
@@ -573,9 +578,10 @@
     flex: 1;
     min-width: 0;
     padding: 6px 8px;
-    border: 1px solid var(--line, #ededef);
+    border: 1px solid var(--ui-divider, #ededef);
     background: transparent;
     font: inherit;
+    border-radius: var(--ui-radius-sm);
   }
   .chips {
     display: flex;
@@ -586,17 +592,18 @@
   .chips button {
     height: 28px;
     padding: 0 10px;
-    border: 1px solid var(--line-2);
-    background: var(--paper);
-    color: var(--ink-soft);
+    border: 1px solid var(--ui-divider-strong);
+    background: var(--ui-panel);
+    color: var(--ui-text-secondary);
     font-size: 12px;
     cursor: pointer;
+    border-radius: var(--ui-radius-sm);
   }
 
   .chips button.on {
-    border-color: var(--ink);
-    background: var(--ink);
-    color: var(--paper);
+    border-color: var(--ui-text);
+    background: var(--ui-text);
+    color: var(--ui-panel);
   }
 
   .drop {
@@ -606,16 +613,17 @@
     justify-content: center;
     gap: 8px;
     min-height: 56px;
-    border: 1px dashed var(--line-2);
-    color: var(--ink-soft);
+    border: 1px dashed var(--ui-divider-strong);
+    color: var(--ui-text-secondary);
     font-size: 12.5px;
     cursor: pointer;
+    border-radius: var(--ui-radius-md);
   }
 
   .drop.dragging,
   .drop:hover {
-    border-color: var(--ink);
-    color: var(--ink);
+    border-color: var(--ui-text);
+    color: var(--ui-text);
   }
 
   .drop input {
@@ -642,10 +650,11 @@
     width: 100%;
     aspect-ratio: 1;
     padding: 0;
-    border: 1px solid var(--line);
-    background: var(--paper-3);
+    border: 1px solid var(--ui-divider);
+    background: var(--ui-input);
     overflow: hidden;
     cursor: pointer;
+    border-radius: var(--ui-radius-md);
   }
 
   .tile img,
@@ -657,7 +666,7 @@
   }
 
   .tile.on {
-    outline: 2px solid var(--ink);
+    outline: 2px solid var(--ui-text);
     outline-offset: -2px;
   }
 
@@ -678,8 +687,8 @@
     min-width: 18px;
     height: 18px;
     padding: 0 4px;
-    background: var(--ink);
-    color: var(--paper);
+    background: var(--ui-text);
+    color: var(--ui-panel);
     font-size: 11px;
     line-height: 18px;
     text-align: center;
@@ -693,7 +702,7 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--ink-soft);
+    color: var(--ui-text-secondary);
     font-size: 12px;
     cursor: pointer;
   }
@@ -701,12 +710,13 @@
   textarea {
     width: 100%;
     padding: 6px 8px;
-    border: 1px solid var(--line-2);
-    background: var(--paper);
-    color: var(--ink);
+    border: 1px solid var(--ui-divider-strong);
+    background: var(--ui-panel);
+    color: var(--ui-text);
     font: inherit;
     font-size: 13px;
     resize: vertical;
+    border-radius: var(--ui-radius-sm);
   }
 
   .swatches {
@@ -717,12 +727,13 @@
   .swatch {
     width: 24px;
     height: 24px;
-    border: 1px solid var(--line-2);
+    border: 1px solid var(--ui-divider-strong);
     cursor: pointer;
+    border-radius: var(--ui-radius-md);
   }
 
   .swatch.on {
-    outline: 2px solid var(--ink);
+    outline: 2px solid var(--ui-text);
     outline-offset: 1px;
   }
 

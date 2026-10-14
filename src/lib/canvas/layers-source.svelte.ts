@@ -1,4 +1,5 @@
 import type { MotionDoc } from '$lib/motion/doc';
+import type { EditMode } from '$lib/motion/edit-mode';
 import type { OpResult } from '$lib/motion/timeline';
 import type { CanvasLayer, LayerHover } from './layers';
 
@@ -6,6 +7,7 @@ export type CanvasSide = {
   readonly nodes: readonly CanvasLayer[];
   readonly selected: readonly string[];
   readonly outlinesUrl: string;
+  previewUrl(nodeId: string): string;
   select(ids: string[]): void;
 };
 
@@ -15,6 +17,7 @@ export type VideoSide = {
   readonly selection: readonly string[];
   readonly parts: Record<string, readonly string[]>;
   readonly part: string | null;
+  readonly mode: EditMode;
   select(ids: string[]): void;
   selectPart(clipId: string, part: string): void;
   edit(result: OpResult, summary: string): void;

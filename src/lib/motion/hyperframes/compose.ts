@@ -1,3 +1,4 @@
+import { withAutoLayout } from '../layout/resolve';
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
 import { EASE_NAME, easeName } from '../keyframes';
@@ -35,6 +36,8 @@ import { Composite, cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { shapeScript, shapeStudy, type ShapeBake } from './shapes';
+import { photoFills } from '../fill/model';
+import { resolveFills } from '../fill/render';
 import type { Extent } from '../shape/render';
 import { TEXT_PATH_CSS, textPathBake, textPathScript, textPathTemplate, type TextPathBake } from './text-path';
 import { particleBake, particleScript } from './particles';
@@ -53,7 +56,7 @@ import { bakePhysics } from '../physics/simulate';
 import { withoutHidden } from '../organize';
 import { JUNCTION, Span, junctionHalves, junctionPairs, withJunctions, type JunctionPair, type Move } from '../junctions';
 import { paintArea, placedBox } from '../effects/paint-area';
-import { EFFECT_CSS, adjustmentLayer, adjustmentTimeline, effectLayer, effectScript, effectTimeline, type EffectSet } from '../effects/render';
+import { BEHIND_CSS, EFFECT_CSS, seesBehind, adjustmentLayer, adjustmentTimeline, effectLayer, effectScript, effectTimeline, type EffectSet } from '../effects/render';
 import { flattenComps, type GroupProps } from '../precomp';
 import { blendStyle } from '../blend';
 import { HELD, holdScript } from './blur';
@@ -237,11 +240,26 @@ enum Visibility {
 
 type Placed = { layer: number; trackIndex: number; matte: MattePair | null; visibility: Visibility; transform?: string; chain: MotionClip[]; held: boolean; group?: string; extent?: Extent | null };
 
+const PX_DIGITS = 1000;
+const pxOf = (n: number) => `${Math.round(n * PX_DIGITS) / PX_DIGITS}px`;
+
+function cropOf(chain: readonly MotionClip[], frame: { width: number; height: number }): string | undefined {
+  const boxes = chain.filter((c) => c.clipContent).map((c) => placedBox(c.props as Record<string, number>, frame));
+  if (!boxes.length || boxes.some((b) => !b)) {
+    return undefined;
+  }
+  const left = Math.max(...boxes.map((b) => b!.left));
+  const top = Math.max(...boxes.map((b) => b!.top));
+  const right = Math.min(...boxes.map((b) => b!.left + b!.width));
+  const bottom = Math.min(...boxes.map((b) => b!.top + b!.height));
+  return `inset(${pxOf(top)} ${pxOf(frame.width - right)} ${pxOf(frame.height - bottom)} ${pxOf(left)})`;
+}
+
 function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Placed, content: string): string {
   const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
   const inner = matted(placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, effectLayer(clip, ctx, ctx.color, ownMask(clip, ctx, content), paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null)))));
-  const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
-  const style = css({ zIndex: placed.layer, transform: placed.transform, mixBlendMode: blendStyle(clip.blend) });
+  const fx = `<div class="${seesBehind(clip) ? 'fx bd' : 'fx'}" id="fx-${clip.id}">${inner}</div>`;
+  const style = css({ zIndex: placed.layer, transform: placed.transform, mixBlendMode: blendStyle(clip.blend), clipPath: cropOf(placed.chain, ctx) });
   const blur = (placed.held ? ` ${HELD}` : '') + (placed.group ? ` data-group="${esc(placed.group)}"` : '');
   const layer =
     template.timing === Timing.Media
@@ -417,6 +435,7 @@ const BASE_CSS = [
   '#root{position:relative;width:100%;height:100%;overflow:hidden;isolation:isolate}',
   '.layer{position:absolute;inset:0}',
   '.fx{position:absolute;inset:0;will-change:transform,opacity}',
+  BEHIND_CSS,
   '.cc{position:absolute;inset:0;overflow:hidden}',
   '.li{display:block;will-change:transform}',
   ANIMATE_CSS,
@@ -427,13 +446,18 @@ const BASE_CSS = [
   '.font-probe{position:absolute;left:0;top:0;opacity:0;pointer-events:none}'
 ].join('');
 
-type MediaSlot = { assetId: string; kind: string; fit?: string; focusX?: number; focusY?: number };
+type MediaSlot = { assetId: string; kind: string; fit?: string; focusX?: number; focusY?: number; fills?: unknown };
 
-export function resolveMedia(value: unknown, asset: (id: string | null) => string | null): unknown {
+const SAME_COLOR = (c: string) => c;
+
+export function resolveMedia(value: unknown, asset: (id: string | null) => string | null, color: (value: string) => string = SAME_COLOR): unknown {
   if (!Array.isArray(value)) {
     return value;
   }
-  return (value as MediaSlot[]).map(({ assetId, ...rest }) => ({ src: (assetId && asset(assetId)) || '', ...rest }));
+  return (value as MediaSlot[]).map((slot) => {
+    const { assetId, ...rest } = slot;
+    return { src: (assetId && asset(assetId)) || '', ...rest, fills: resolveFills(photoFills(slot), color, asset) };
+  });
 }
 
 type ValueResolver = (value: unknown, ctx: TemplateCtx<ComponentId>) => unknown;
@@ -443,7 +467,7 @@ const RESOLVE: Record<PropFormat, ValueResolver> = {
   [PropFormat.Asset]: (v, ctx) => ctx.asset(typeof v === 'string' ? v : null),
   [PropFormat.Textarea]: (v) => v,
   [PropFormat.Font]: (v, ctx) => ctx.font(String(v)),
-  [PropFormat.Media]: (v, ctx) => resolveMedia(v, ctx.asset)
+  [PropFormat.Media]: (v, ctx) => resolveMedia(v, ctx.asset, ctx.color)
 };
 
 const ENV_LOAD: Record<Target, EnvLoad> = { [Target.Video]: EnvLoad.Wait, [Target.Screen]: EnvLoad.Swap };
@@ -601,7 +625,7 @@ function zoomed(doc: MotionDoc, scale: number): string {
 }
 
 export function composeHtml(raw: ComposeInput): string {
-  const shown = withoutHidden(boundDoc(withVars(raw.doc, raw.vars)));
+  const shown = withAutoLayout(withoutHidden(boundDoc(withVars(raw.doc, raw.vars))));
   const junctions = junctionTweens(shown, junctionPairs(shown));
   const prepared = bakePaths(withoutBackdrop(flattenComps(withJunctions(shown))));
   const input = { ...raw, doc: bakePhysics(bakeExpressions(prepared, raw.analyses)) };

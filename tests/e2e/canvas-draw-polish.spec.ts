@@ -60,6 +60,7 @@ test.describe('draw polish inside a frame @real', () => {
 
     await rect(at(0.2, 0.3), at(0.7, 0.6), 1);
     await page.getByRole('tab', { name: 'Properties' }).click();
+    await page.getByTestId('radius-per-corner').click();
     const corners = page.getByTestId('corners');
     await expect(corners).toBeVisible({ timeout: 10_000 });
     await corners.locator('[data-corner="0"]').fill('30');

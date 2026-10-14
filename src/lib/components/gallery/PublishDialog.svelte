@@ -124,10 +124,11 @@
     flex-direction: column;
     gap: 12px;
     padding: 16px;
-    background: var(--ui-bg);
-    color: var(--ui-ink);
-    border: 1px solid var(--ui-line);
+    background: var(--ui-panel);
+    color: var(--ui-text);
+    border: 1px solid var(--ui-divider);
     font-size: 13px;
+    border-radius: var(--ui-radius-md);
   }
 
   header {
@@ -140,23 +141,25 @@
     align-self: center;
     height: 240px;
     max-width: 100%;
-    background: var(--ui-surface);
+    background: var(--ui-panel-sunken);
+    border-radius: var(--ui-radius-md);
   }
 
   label {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
   }
 
   input,
   textarea {
     padding: 6px 8px;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-bg);
-    color: var(--ui-ink);
+    border: 1px solid var(--ui-divider);
+    background: var(--ui-panel);
+    color: var(--ui-text);
     font: inherit;
+    border-radius: var(--ui-radius-sm);
   }
 
   a {
@@ -167,7 +170,7 @@
   }
 
   .muted {
-    color: var(--ui-ink-3);
+    color: var(--ui-text-tertiary);
     font-size: 12px;
   }
 
@@ -184,14 +187,15 @@
   }
 
   .primary {
-    background: var(--ui-ink);
-    color: var(--ui-bg);
+    background: var(--ui-text);
+    color: var(--ui-panel);
   }
 
   .secondary {
-    background: var(--ui-surface);
-    color: var(--ui-ink);
-    border: 1px solid var(--ui-line);
+    background: var(--ui-panel-sunken);
+    color: var(--ui-text);
+    border: 1px solid var(--ui-divider);
+    border-radius: var(--ui-radius-md);
   }
 
   .primary:disabled,

@@ -6,7 +6,8 @@ import { findProjectById, listProjects } from '$lib/server/repos/projects';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { setStill } from '$lib/motion/still';
+import { DocMode, docMode, setStill } from '$lib/motion/still';
+import { liftSoleClip } from '$lib/motion/precomp';
 import type { TemplateEntry } from '$lib/motion/template/library';
 import { composedTemplate } from '$lib/canvas/composition-template';
 import type { UpstreamCard } from '$lib/canvas/composition-node';
@@ -63,16 +64,17 @@ export async function startFromTemplate(db: Db, deps: FromTemplateDeps, input: I
 
   const composed = composedTemplate(entry, { format: input.format, values: input.values ?? {} }, input.wired ?? [], newId);
   const placed = composed.ok && input.still !== undefined ? setStill(composed.doc, input.still) : composed;
-  if (!placed.ok) {
-    return { outcome: FromTemplate.Invalid, error: placed.error };
+  const flat = placed.ok && docMode(placed.doc) === DocMode.Still ? { ...placed, doc: liftSoleClip(placed.doc) } : placed;
+  if (!flat.ok) {
+    return { outcome: FromTemplate.Invalid, error: flat.error };
   }
 
-  const start = await startMotion(db, deps, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId ?? null, userId: input.userId, name: entry.template.name, format: input.format, at: input.at, actor, pick: input.pick });
+  const start = await startMotion(db, deps, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId ?? null, userId: input.userId, name: entry.template.name, format: input.format, at: input.at, picture: flat.doc, actor, pick: input.pick });
   if (!start) {
     return { outcome: FromTemplate.NoCanvas };
   }
 
-  const write = await deps.save(db, { orgId: input.orgId, nodeId: start.nodeId, expectedVersion: 0, doc: placed.doc, actor, summary: `Started from ${entry.template.name}` });
+  const write = await deps.save(db, { orgId: input.orgId, nodeId: start.nodeId, expectedVersion: 0, doc: flat.doc, actor, summary: `Started from ${entry.template.name}` });
   if (write.outcome !== RevisionOutcome.Written) {
     return { outcome: FromTemplate.Invalid, error: write.outcome === RevisionOutcome.Invalid ? write.error : 'conflict' };
   }

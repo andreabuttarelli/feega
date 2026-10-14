@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type { Browser, Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { test, expect, REAL_STACK, gotoHydrated, signInE2e, type E2eSession } from './fixtures/session';
+import { test, expect, ON_PRODUCTION, REAL_STACK, gotoHydrated, signInE2e, type E2eSession } from './fixtures/session';
+import { expectOutlined, settleLate } from './fixtures/outline';
 import doc from './fixtures/motion-doc.json' with { type: 'json' };
 
 const DESKTOP = { width: 1280, height: 860 };
@@ -62,6 +63,7 @@ const opacityIn = (head: typeof twoTitles, clipId: string) => {
 
 test.describe('two people in one frame @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
+  test.skip(ON_PRODUCTION, 'serve un secondo utente: su produzione non se ne creano');
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(120_000);
 
@@ -175,6 +177,9 @@ test.describe('two people in one frame @real', () => {
       const outline = (await page.getByTestId('peer-selection').boundingBox())!;
       const area = (await page.getByTestId('frame-peers').boundingBox())!;
       expect(outline.x >= area.x && outline.y >= area.y && outline.x + outline.width <= area.x + area.width && outline.y + outline.height <= area.y + area.height, 'the outline is drawn on the stage').toBe(true);
+      await expectOutlined(page, page.getByTestId('peer-selection'), 'Bo', 'the peer outline');
+      await settleLate(page, 'Bo');
+      await expectOutlined(page, page.getByTestId('peer-selection'), 'Bo', 'the peer outline, after the drawing settles late');
       await bo.context().close();
     } finally {
       await admin.auth.admin.deleteUser(mate.userId);

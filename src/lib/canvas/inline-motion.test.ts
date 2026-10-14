@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AddBar, CanvasState, Reframe, addBarOf, reframesOn, NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, inlineMotionTarget, nodeLayers, openingOf } from './inline-motion';
+import { Reframe, reframesOn, NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, dismissedAfterClick, inlineMotionTarget, nodeLayers, openingOf, ownPlayer } from './inline-motion';
 import { Viewport } from '$lib/motion/editor-layout';
 
 const rows = [
@@ -49,6 +49,16 @@ describe('the node picture while the editor opens', () => {
   });
 });
 
+describe('the node player while the editor opens', () => {
+  it('a frame playing or capturing its first frame keeps that picture until the editor draws, not a black stage', () => {
+    expect(ownPlayer(NodeMode.Edit, Paint.Pending, true)).toBe(true);
+    expect(ownPlayer(NodeMode.Edit, Paint.Shown, true)).toBe(true);
+    expect(ownPlayer(NodeMode.Edit, Paint.Swapped, true)).toBe(false);
+    expect(ownPlayer(NodeMode.Preview, Paint.Pending, true)).toBe(true);
+    expect(ownPlayer(NodeMode.Edit, Paint.Pending, false)).toBe(false);
+  });
+});
+
 describe('the other nodes while a frame is edited on a phone', () => {
   it('stay on the canvas, at most slightly dimmed; only their labels and ports go, which clipped at the edge', () => {
     expect(NEIGHBOUR_WHILE_EDITING[Part.Body]).toBeGreaterThanOrEqual(0.75);
@@ -64,9 +74,15 @@ describe('the canvas around an opening editor', () => {
     expect(reframesOn(Viewport.Tablet)).toBe(Reframe.Frame);
     expect(reframesOn(Viewport.Phone)).toBe(Reframe.Frame);
   });
+});
 
-  it('the add bar leaves while a frame is edited and comes back after', () => {
-    expect(addBarOf(CanvasState.Browsing)).toBe(AddBar.Shown);
-    expect(addBarOf(CanvasState.Editing)).toBe(AddBar.Away);
+describe('a frame closed and clicked again', () => {
+  it('opens again: the click undoes the close, even though the frame never left the selection', () => {
+    const dismissed = dismissedAfterClick('m1', 'm1');
+    expect(inlineMotionTarget(['m1'], [{ id: 'm1', type: 'motion' }], dismissed, Opening.OnSelect)).toBe('m1');
+  });
+
+  it('a click on another node leaves the closed frame closed', () => {
+    expect(dismissedAfterClick('m1', 'other')).toBe('m1');
   });
 });

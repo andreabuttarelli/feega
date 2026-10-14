@@ -49,3 +49,22 @@ describe('il prompt dichiara lo scope, non un brand obbligatorio', () => {
     expect(prompt.toLowerCase()).not.toContain('select a brand');
   });
 });
+
+describe('the canvas the user is looking at', () => {
+  const project = { id: 'p1', name: 'Launch' };
+  const canvases = [
+    { id: 'c1', name: 'launch campaign' },
+    { id: 'c2', name: 'Prima tela' }
+  ];
+
+  it('is named as the default place for anything new, so a new frame never lands on another canvas', () => {
+    const prompt = projectAgentPrompt({ project, canvases, brand: null, openCanvasId: 'c2' });
+
+    expect(prompt).toContain('The user has canvas "Prima tela" (c2) open');
+  });
+
+  it('with no canvas open, the prompt claims none', () => {
+    expect(projectAgentPrompt({ project, canvases, brand: null, openCanvasId: null })).not.toContain('open:');
+    expect(projectAgentPrompt({ project, canvases, brand: null, openCanvasId: null })).not.toContain('has canvas');
+  });
+});

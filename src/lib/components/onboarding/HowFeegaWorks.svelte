@@ -123,8 +123,8 @@
     width: min(1360px, 100%);
     height: min(880px, 100%);
     overflow: hidden;
-    background: var(--ui-bg, #fff);
-    color: var(--ui-ink, #111);
+    background: var(--ui-panel, #fff);
+    color: var(--ui-text, #111);
     font-family: var(--ui-sans, 'DM Sans', system-ui, sans-serif);
     outline: none;
     box-shadow: 0 60px 120px -40px rgba(0, 0, 0, 0.6);
@@ -139,10 +139,10 @@
     min-height: 44px;
     padding: 0 20px;
     border: 0;
-    border-radius: 9999px;
-    background: color-mix(in srgb, var(--ui-bg, #fff) 80%, transparent);
+    border-radius: var(--ui-radius-full);
+    background: color-mix(in srgb, var(--ui-panel, #fff) 80%, transparent);
     backdrop-filter: blur(8px);
-    color: var(--ui-ink-2, #5c5c58);
+    color: var(--ui-text-secondary, #5c5c58);
     font: inherit;
     font-size: 13px;
     font-weight: 500;
@@ -150,7 +150,7 @@
   }
 
   .skip:hover {
-    color: var(--ui-ink, #111);
+    color: var(--ui-text, #111);
   }
 
   .panel {
@@ -182,7 +182,7 @@
     margin: 0;
     font-size: 17px;
     line-height: 1.45;
-    color: var(--ui-ink-2, #5c5c58);
+    color: var(--ui-text-secondary, #5c5c58);
   }
 
   .controls {
@@ -212,7 +212,7 @@
     height: 8px;
     margin: auto;
     border-radius: 50%;
-    background: color-mix(in srgb, var(--ui-ink, #111) 20%, transparent);
+    background: color-mix(in srgb, var(--ui-text, #111) 20%, transparent);
     transition: transform 400ms cubic-bezier(0.16, 1, 0.3, 1), background 200ms;
   }
 
@@ -239,7 +239,7 @@
     min-height: 48px;
     padding: 0 26px;
     border: 0;
-    border-radius: 9999px;
+    border-radius: var(--ui-radius-full);
     font: inherit;
     font-size: 14px;
     font-weight: 600;
@@ -254,13 +254,13 @@
   }
 
   .secondary {
-    background: var(--ui-hover, #f2f2ef);
-    color: var(--ui-ink, #111);
+    background: var(--ui-wash, #f2f2ef);
+    color: var(--ui-text, #111);
   }
 
   .ghost {
     background: transparent;
-    color: var(--ui-ink-2, #5c5c58);
+    color: var(--ui-text-secondary, #5c5c58);
   }
 
   .primary:focus-visible,
@@ -269,7 +269,7 @@
   .dot:focus-visible,
   .skip:focus-visible {
     outline: none;
-    box-shadow: var(--ui-focus, 0 0 0 2px #0099ff);
+    box-shadow: var(--ui-ring, 0 0 0 2px #0099ff);
   }
 
   @keyframes fade {

@@ -10,7 +10,7 @@
   import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
   import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
   import { CAPTURE_PROFILES, CaptureProfile } from '$lib/motion/export/capture-profile';
-  import { MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import { REDRAWN, MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
   import { INPUT_MESSAGE } from '$lib/motion/interactive/runtime';
   import type { VarValues } from '$lib/motion/interactive/var-model';
@@ -35,8 +35,9 @@
     loop = false,
     live = null,
     vars = null,
+    redraws = $bindable(0),
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; children?: Snippet } = $props();
 
   let pointer = $state<InputValues>({});
 
@@ -70,6 +71,12 @@
     player.setAttribute('srcdoc', next);
   }
 
+  function redrawn(e: MessageEvent) {
+    if (e.source === player?.iframeElement?.contentWindow && e.data?.type === REDRAWN) {
+      redraws++;
+    }
+  }
+
   onMount(() => {
     let disposed = false;
     let crisp = () => {};
@@ -87,8 +94,8 @@
       el.loop = loop;
       el.addEventListener('ready', () => {
         crisp();
-        const frame = el.iframeElement;
-        crisp = frame ? crispFor(engineOf(navigator.userAgent), frame) : () => {};
+        const shown = el.iframeElement;
+        crisp = shown ? crispFor(engineOf(navigator.userAgent), shown) : () => {};
         ready = true;
         driver.seek(frame / fps);
         driver.ready();
@@ -188,7 +195,14 @@
 
   export function still(time: number, captureWidth = CAPTURE_WIDTH): Promise<string> {
     const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
-    return driver.exclusive(async () => (await shoot(time, request)).url ?? '');
+    return driver.exclusive(async () => {
+      await driver.whenLive();
+      try {
+        return (await shoot(time, request)).url ?? '';
+      } finally {
+        driver.seek(frame / fps);
+      }
+    });
   }
 
   export function measure(): Promise<Record<string, MeasuredBox>> {
@@ -265,6 +279,8 @@
     driver.playback(playing ? Playback.Playing : Playback.Paused);
   });
 </script>
+
+<svelte:window onmessage={redrawn} />
 
 <div class="stage" style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview">
   <div class="host" bind:this={host}></div>

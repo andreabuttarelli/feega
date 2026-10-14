@@ -48,8 +48,8 @@
 <style>
   .desktop-pagebar {
     flex: 0 0 auto;
-    border-bottom: 1px solid var(--line);
-    background: var(--paper);
+    border-bottom: 1px solid var(--ui-divider);
+    background: var(--ui-panel);
   }
 
   .pagebar-row {
@@ -68,13 +68,13 @@
     padding: 0 8px;
     font-size: 13px;
     font-weight: 500;
-    color: var(--ink-soft);
+    color: var(--ui-text-secondary);
     text-decoration: none;
   }
 
   .back:hover {
-    color: var(--ink);
-    background: var(--paper-2);
+    color: var(--ui-text);
+    background: var(--ui-wash);
   }
 
   .back:focus-visible,
@@ -86,7 +86,7 @@
   .divider {
     width: 1px;
     height: 16px;
-    background: var(--line);
+    background: var(--ui-divider);
   }
 
   .title {
@@ -99,7 +99,7 @@
     font-size: 15px;
     font-weight: 600;
     letter-spacing: -0.01em;
-    color: var(--ink);
+    color: var(--ui-text);
   }
 
   .actions {
@@ -116,13 +116,13 @@
     font-size: 13px;
     font-weight: 600;
     text-decoration: none;
-    color: var(--ink);
+    color: var(--ui-text);
   }
 
   .subtitle {
     margin: 0;
     padding: 0 16px 12px;
     font-size: 13px;
-    color: var(--ink-soft);
+    color: var(--ui-text-secondary);
   }
 </style>

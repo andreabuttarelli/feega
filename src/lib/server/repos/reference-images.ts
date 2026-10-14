@@ -5,6 +5,9 @@ import { signThumbnailUrls, type ThumbnailPreset } from '$lib/server/media-thumb
 export const REFERENCE_IMAGES_BUCKET = 'reference-images';
 
 const SIGNED_URL_SECONDS = 60 * 60;
+const REDIRECT_SHARE_OF_TTL = 2;
+export const REFERENCE_REDIRECT_MAX_AGE_S = SIGNED_URL_SECONDS / REDIRECT_SHARE_OF_TTL;
+const LAZY_ROUTE = '/reference-images';
 
 const COLUMNS = 'id, org_id, name, storage_path, mime_type, width, height, sort_order';
 
@@ -78,8 +81,12 @@ export async function signReferenceImages(db: Db, paths: string[], preset?: Thum
 
 export type CatalogueImage = { id: string; name: string; url: string | null };
 
+export function referenceImageUrl(storagePath: string, preset: ThumbnailPreset): string {
+  const encoded = storagePath.split('/').map(encodeURIComponent).join('/');
+  return `${LAZY_ROUTE}/${encoded}?preset=${preset}`;
+}
+
 export async function listCatalogueImages(db: Db, preset: ThumbnailPreset = 'pickerTile'): Promise<CatalogueImage[]> {
   const images = await listReferenceImages(db);
-  const signed = await signReferenceImages(db, images.map((image) => image.storagePath), preset);
-  return images.map((image) => ({ id: image.id, name: image.name, url: signed.get(image.storagePath) ?? null }));
+  return images.map((image) => ({ id: image.id, name: image.name, url: referenceImageUrl(image.storagePath, preset) }));
 }

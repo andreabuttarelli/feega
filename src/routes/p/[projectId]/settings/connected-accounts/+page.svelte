@@ -163,7 +163,7 @@
   }
   .nm .s {
     font-size: 12px;
-    color: var(--ink-soft);
+    color: var(--ui-text-secondary);
   }
   .status {
     display: inline-flex;

@@ -44,15 +44,15 @@
     margin: 0 auto;
     padding: 32px 16px 64px;
     min-height: 100vh;
-    color: var(--ink, #1d1d1f);
-    background: var(--paper, #fff);
+    color: var(--ui-text, #1d1d1f);
+    background: var(--ui-panel, #fff);
     font-size: 14px;
     line-height: 1.5;
   }
   .mark {
     font-size: 12px;
     font-weight: 600;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary, #9a9a9e);
     text-decoration: none;
   }
   h1 {
@@ -63,8 +63,8 @@
     padding: 12px 20px;
     font: inherit;
     font-weight: 600;
-    color: var(--paper, #fff);
-    background: var(--ink, #1d1d1f);
+    color: var(--ui-panel, #fff);
+    background: var(--ui-text, #1d1d1f);
     border: 0;
     border-radius: 0;
     cursor: pointer;

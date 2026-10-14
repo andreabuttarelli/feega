@@ -16,6 +16,19 @@ function setup() {
 }
 
 describe('motion agent effect tools', () => {
+  it('add_effect takes inner shadow and background blur, and set_effect hides one like the eye', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Shape', start: 0, duration: 3 });
+
+    expect(await run('add_effect', { clip_id: 'id1', kind: 'inner-shadow', params: { distance: 6, color: '#112233', opacity: 0.4 } })).toMatchObject({ ok: true, effect_id: 'id2' });
+    expect(await run('add_effect', { clip_id: 'id1', kind: 'background-blur', params: { radius: 20 } })).toMatchObject({ ok: true, effect_id: 'id3' });
+    expect((await run('set_effect', { clip_id: 'id1', effect_id: 'id3', enabled: false })).ok).toBe(true);
+    expect(findClip(session.doc, 'id1')!.clip.effects.map((e) => [e.kind, e.enabled])).toEqual([
+      ['inner-shadow', true],
+      ['background-blur', false]
+    ]);
+  });
+
   it('add_effect returns its id and the keys to animate; set_effect edits, reorders and toggles; remove_effect drops it', async () => {
     const { session, run } = setup();
     await run('add_clip', { component: 'Shape', start: 0, duration: 3 });

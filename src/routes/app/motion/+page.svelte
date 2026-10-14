@@ -79,18 +79,19 @@
     margin: 0 0 12px;
     font-size: 15px;
     font-weight: 600;
-    color: var(--ui-ink);
+    color: var(--ui-text);
   }
 
   .muted {
     font-size: 12px;
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
   }
 
   .new {
     padding: 16px;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-bg);
+    border: 0;
+    background: var(--ui-panel-sunken);
+    border-radius: var(--ui-radius-md);
   }
 
   .new-form {
@@ -105,7 +106,7 @@
     flex-direction: column;
     gap: 4px;
     font-size: 12px;
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
   }
 
   .new-form .grow {
@@ -116,10 +117,11 @@
   .new-form input {
     height: 32px;
     padding: 0 8px;
-    border: 1px solid var(--ui-line-strong);
-    background: var(--ui-bg);
-    color: var(--ui-ink);
+    border: 0;
+    background: var(--ui-input);
+    color: var(--ui-text);
     font-size: 13px;
+    border-radius: var(--ui-radius-sm);
   }
 
   .primary {
@@ -128,12 +130,13 @@
     gap: 6px;
     height: 32px;
     padding: 0 12px;
-    border: 1px solid var(--ui-ink);
-    background: var(--ui-accent);
-    color: var(--ui-accent-ink);
+    border: 0;
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
+    border-radius: var(--ui-radius-sm);
   }
 
   .error {
@@ -156,14 +159,15 @@
     flex-direction: column;
     gap: 4px;
     padding-bottom: 10px;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-bg);
-    color: var(--ui-ink);
+    border: 0;
+    background: var(--ui-panel-sunken);
+    color: var(--ui-text);
     text-decoration: none;
+    border-radius: var(--ui-radius-md);
   }
 
   .video:hover {
-    border-color: var(--ui-ink);
+    background: var(--ui-wash);
   }
 
   .poster {
@@ -171,9 +175,10 @@
     align-items: center;
     justify-content: center;
     aspect-ratio: 9 / 12;
-    background: var(--ui-hover);
-    color: var(--ui-ink-3);
+    background: var(--ui-wash);
+    color: var(--ui-text-tertiary);
     overflow: hidden;
+    border-radius: var(--ui-radius-md);
   }
 
   .poster img {

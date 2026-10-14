@@ -33,11 +33,6 @@ describe('lo switcher elenca le tele del progetto corrente e gli altri progetti'
     expect(rowRule?.[1]).toMatch(/min-height:\s*var\(--touch-target/);
   });
 
-  it('nessun border-radius, angoli quadrati come il resto della shell mobile', () => {
-    expect(switcher).not.toMatch(/border-radius/);
-    expect(switcher).not.toMatch(/rounded-/);
-  });
-
   it('naviga per href reale, non un handler che reimplementa il routing', () => {
     expect(switcher).toMatch(/<a href={canvas\.href}/);
     expect(switcher).toMatch(/<a href={project\.href}/);

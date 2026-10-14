@@ -8,6 +8,7 @@
   import InfluencersPanel from './InfluencersPanel.svelte';
   import LayersPanel from './LayersPanel.svelte';
   import X from '@lucide/svelte/icons/x';
+  import { IconButton, IconSize, SegmentedControl, Side } from '$lib/components/ui/shell';
   import { PANEL_WIDTHS } from '$lib/shell-nav';
 
   /**
@@ -23,13 +24,21 @@
     projectId,
     kind,
     labelKey,
-    onclose
+    onclose,
+    onkind
   }: {
     projectId: string;
     kind: LeftPanelKind;
     labelKey: string;
     onclose: () => void;
+    onkind?: (kind: LeftPanelKind) => void;
   } = $props();
+
+  const TABS: { value: LeftPanelKind; labelKey: string }[] = [
+    { value: 'layers', labelKey: 'app.nav2.layers' },
+    { value: 'assets', labelKey: 'app.nav2.materials' }
+  ];
+  const tabbed = $derived(!!onkind && TABS.some((tab) => tab.value === kind));
 
   const panelWidth = $derived(PANEL_WIDTHS[kind] ?? PANEL_WIDTHS.assets);
 </script>
@@ -41,10 +50,14 @@
 {:else}
   <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 84px));`}>
     <div class="left-panel-head">
-      <h3>{$_(labelKey)}</h3>
-      <button type="button" class="close" onclick={onclose} aria-label={$_('app.shell.closePanel')}>
-        <X size={14} />
-      </button>
+      {#if tabbed && onkind}
+        <SegmentedControl label={$_('app.shell.rail')} value={kind} onchange={(value) => onkind(value as LeftPanelKind)} options={TABS.map((tab) => ({ value: tab.value, label: $_(tab.labelKey) }))} />
+      {:else}
+        <h3>{$_(labelKey)}</h3>
+      {/if}
+      <IconButton label={$_('app.shell.closePanel')} shortcut="Escape" size={IconSize.Md} side={Side.Bottom} onclick={onclose}>
+        <X />
+      </IconButton>
     </div>
     <div class="left-panel-body">
       {#if kind === 'layers'}
@@ -63,7 +76,7 @@
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: var(--ui-bg);
+    background: var(--ui-panel);
   }
 
   .left-panel-head {
@@ -71,36 +84,22 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 10px 8px 12px;
-    border-bottom: 1px solid var(--line, #ededef);
+    height: var(--ui-header-h);
+    padding: 0 6px 0 12px;
+    border-bottom: 1px solid var(--ui-divider);
   }
   .left-panel-head h3 {
     margin: 0;
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--ink, #1d1d1f);
-  }
-
-  .close {
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    appearance: none;
-    border: 0;
-    background: transparent;
-    color: var(--ink-soft, #6e6e73);
-    cursor: pointer;
-  }
-  .close:hover {
-    background: var(--paper-2, #f9f9f9);
-    color: var(--ink, #1d1d1f);
+    font-size: var(--ui-type-title);
+    font-weight: var(--ui-weight-semibold);
+    letter-spacing: var(--ui-tracking-title);
+    color: var(--ui-text);
   }
 
   .left-panel-body {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 8px 10px;
+    padding: 6px;
   }
 </style>

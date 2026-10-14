@@ -129,11 +129,14 @@ const clampRadius = (v: number) => Math.min(Math.max(v, 0), MAX_ROUNDNESS);
 export const withCorner = (roundness: number, corners: readonly number[], index: number, value: number): Corners =>
   cornerRadii(roundness, corners).map((v, i) => (i === index ? clampRadius(value) : v)) as Corners;
 
-export function rectOutline(radii: number | Corners, size: Size = UNIT): Outline {
+export function rectOutline(radii: number | Corners, size: Size = UNIT, smoothing = 0): Outline {
   const { w, h } = size;
   const [tl, tr, br, bl] = (typeof radii === 'number' ? cornerRadii(radii, []) : radii).map((v) => clampRadius(v) * Math.min(w, h));
   if (tl + tr + br + bl === 0) {
     return [polyline([[0, 0], [w, 0], [w, h], [0, h]], true)];
+  }
+  if (smoothing > 0) {
+    return [smoothRect([tl, tr, br, bl], size, smoothing)];
   }
   const quarter = Math.PI / 2;
   const corners: [Pt, number, number][] = [
@@ -143,6 +146,29 @@ export function rectOutline(radii: number | Corners, size: Size = UNIT): Outline
     [[tl, tl], Math.PI, tl]
   ];
   return [{ vertices: merged(corners.flatMap(([c, a, r]) => arcCorner(c, [r, r], a))), closed: true }];
+}
+
+type SmoothCorner = { at: Pt; into: Pt; out: Pt; r: number };
+
+function smoothRect([tl, tr, br, bl]: number[], { w, h }: Size, smoothing: number): Outline[number] {
+  const reach = Math.min(w, h) / 2;
+  const corners: SmoothCorner[] = [
+    { at: [w, 0], into: [1, 0], out: [0, 1], r: tr },
+    { at: [w, h], into: [0, 1], out: [-1, 0], r: br },
+    { at: [0, h], into: [-1, 0], out: [0, -1], r: bl },
+    { at: [0, 0], into: [0, -1], out: [1, 0], r: tl }
+  ];
+  const vertices = corners.flatMap(({ at, into, out, r }) => {
+    const start = Math.min(reach, r * (1 + smoothing));
+    const handle = r * (1 - KAPPA) * (1 - smoothing);
+    const a = sub(at, times(into, start));
+    const b = add(at, times(out, start));
+    return [
+      { p: a, in: a, out: sub(at, times(into, handle)) },
+      { p: b, in: add(at, times(out, handle)), out: b }
+    ];
+  });
+  return { vertices: merged(vertices), closed: true };
 }
 
 function merged(vertices: Vertex[]): Vertex[] {
