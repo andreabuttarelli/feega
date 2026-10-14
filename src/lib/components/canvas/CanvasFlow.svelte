@@ -29,7 +29,8 @@
    * che si colora e il menù dei versi, e tre copie diverrebbero diverse al primo caso nuovo.
    */
   import { untrack } from 'svelte';
-  import { SvelteFlow, Background, type Node } from '@xyflow/svelte';
+  import { SvelteFlow, type Node } from '@xyflow/svelte';
+  import CanvasDots from './CanvasDots.svelte';
   import '@xyflow/svelte/dist/style.css';
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
@@ -526,6 +527,7 @@
    * riquadro a ogni cambio — la barra stessa vive fuori, sotto, perché non ha bisogno del contesto
    * della libreria, solo di coordinate già pronte.
    */
+  let moving = $state(false);
   let selection = $state<{ ids: string[]; box: { x: number; y: number; width: number; height: number } | null; zoom: number }>({
     ids: [],
     box: null,
@@ -721,6 +723,7 @@
      tela, non l'unico modo di creare un nodo: chi non trascina usa la barra o la tastiera. -->
 <div
   class="wrap"
+  class:moving
   bind:this={wrap}
   ondragover={onDragOver}
   ondrop={onDrop}
@@ -758,6 +761,8 @@
     {isValidConnection}
     onconnectend={() => (refusal = null)}
     {...spec.flow}
+    onmovestart={() => (moving = true)}
+    onmoveend={() => (moving = false)}
     fitView
     fitViewOptions={{ padding: FIT_PADDING, maxZoom: READABLE_ZOOM }}
     proOptions={ATTRIBUTION_IN_CREDITS_PAGE}
@@ -785,7 +790,7 @@
       }}
     />
     <CanvasImageTiers board={tierBoard} />
-    <Background gap={24} />
+    <CanvasDots />
   </SvelteFlow>
 
   {#if refusal}
@@ -906,6 +911,10 @@
 
     --xy-edge-stroke: color-mix(in srgb, var(--ink-soft, #6e6e73) 45%, var(--paper, #fff));
     --xy-edge-stroke-selected: var(--accent, #7c5cff);
+  }
+
+  .wrap.moving :global(.svelte-flow__viewport) {
+    will-change: transform;
   }
 
   .wrap :global(.svelte-flow__node.has-settings) {
