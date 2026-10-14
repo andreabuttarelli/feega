@@ -31,8 +31,9 @@
   import { engineOf } from '$lib/motion/engine';
   import { viewportOf } from '$lib/motion/editor-layout';
   import { track } from '$lib/analytics';
+  import type { MoveOut } from '$lib/canvas/canvas-drop';
 
-  let { projectId, canvasId, nodeId, onclose, onframe }: { projectId: string; canvasId: string; nodeId: string; onclose: () => void; onframe: (free: Insets) => void } = $props();
+  let { projectId, canvasId, nodeId, onclose, onframe, onmoveout = null }: { projectId: string; canvasId: string; nodeId: string; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null } = $props();
 
   const SETTLE_MS = 150;
   const OPEN_EVENT = 'frame_open_timing';
@@ -108,7 +109,7 @@
 </script>
 
 {#if session}
-  <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} />
+  <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} />
 {:else if failed}
   <p class="inline-status" role="status">This video could not be opened here. <a href={editorPath}>Open the editor</a></p>
 {:else}

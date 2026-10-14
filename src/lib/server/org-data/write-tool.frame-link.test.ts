@@ -22,7 +22,7 @@ describe('insert_row on nodes_connections into a Frame', () => {
 
     const out = await tools.insertRow({ table: 'nodes_connections', values: { canvas_id: 'c1', source_node_id: 'gen', target_node_id: 'f1' } });
 
-    expect(out.error).toBeUndefined();
+    expect('error' in out).toBe(false);
     expect(linkFrame).toHaveBeenCalledWith(expect.anything(), { sourceNodeId: 'gen', frameNodeId: 'f1' });
   });
 });

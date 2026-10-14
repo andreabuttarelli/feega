@@ -17,6 +17,13 @@ export type Element = { clip: MotionClip; fps: number; size: Size; stillAt: numb
 
 export type Placement = { at: Point; frame?: number };
 
+export enum DropOn {
+  Frame = 'frame',
+  Canvas = 'canvas'
+}
+
+export type Drop = { on: DropOn.Frame; nodeId: string; at: Point; frame?: number } | { on: DropOn.Canvas; x: number; y: number };
+
 export type NewId = () => string;
 
 export enum OutputKind {

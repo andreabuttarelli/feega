@@ -181,11 +181,12 @@
   class="motion"
   class:editing={!previewing}
   data-testid="motion-node"
+  data-motion-node={node.id}
   data-mode={mode}
   style={`--bar-h: ${MOTION_NODE_BAR_H}px;`}
   bind:this={root}
 >
-  <div class="stage" data-testid="motion-node-stage">
+  <div class="stage" data-testid="motion-node-stage" data-frame-stage>
     {#if layers.own}
       {#if mounted && preview}
         <MotionPreview bind:this={player} html={preview.html} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} />
@@ -235,6 +236,10 @@
 </div>
 
 <style>
+  :global(.motion.is-frame-drop) {
+    outline: 2px solid var(--accent, #0a84ff);
+    outline-offset: 2px;
+  }
   .motion {
     display: flex;
     flex-direction: column;

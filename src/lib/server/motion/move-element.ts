@@ -9,7 +9,7 @@ import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
 import { saveMotionDoc } from './editor';
 import { DocMode, docMode } from '$lib/motion/still';
-import { OutputKind, frameOf, liftElement, linkOutput, mediaElement, placeElement, type Box, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
+import { DropOn, OutputKind, frameOf, liftElement, linkOutput, mediaElement, placeElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 
@@ -23,12 +23,7 @@ export enum MoveOutcome {
   Invalid = 'invalid'
 }
 
-export enum DropOn {
-  Frame = 'frame',
-  Canvas = 'canvas'
-}
-
-export type Drop = { on: DropOn.Frame; nodeId: string; at: Point; frame?: number } | { on: DropOn.Canvas; x: number; y: number };
+export { DropOn, type Drop };
 
 const fraction = z.number().min(0).max(1);
 
@@ -37,7 +32,7 @@ export const dropSchema = z.discriminatedUnion('on', [
   z.object({ on: z.literal(DropOn.Canvas), x: z.number().finite(), y: z.number().finite() }).strict()
 ]);
 
-export const boxSchema = z.object({ left: z.number(), top: z.number(), width: fraction.positive(), height: fraction.positive() }).strict();
+export const boxSchema = z.object({ left: z.number().finite(), top: z.number().finite(), width: z.number().positive(), height: z.number().positive() }).strict();
 
 export const versionsSchema = z.record(z.string(), z.number().int().min(0));
 

@@ -47,7 +47,7 @@
   import { reportHref } from '$lib/reports/report-link';
   import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
-  import { CANVAS_DRAG_FILLED_NODE, parseFilledNodeDrag, type FilledNodeDrag } from '$lib/canvas/drag-payload';
+  import { CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_OUTPUT, parseFilledNodeDrag, type FilledNodeDrag } from '$lib/canvas/drag-payload';
   import { syncNodes } from '$lib/canvas/tile-sync';
   import { ColumnAxis, withSettingsColumn } from '$lib/canvas/settings-column';
   import { MOBILE_QUERY } from '$lib/breakpoints';
@@ -118,6 +118,8 @@
     onMoveEnd,
     onTileDragOver,
     onTileDrop,
+    onDropOutput,
+    onFlow,
     onResize,
     onConnect,
     onDelete,
@@ -195,6 +197,8 @@
      * primo.
      */
     onCreateFilled?: (drag: FilledNodeDrag, at: { x: number; y: number }) => void;
+    onDropOutput?: (nodeId: string, client: PointerPoint, at: { x: number; y: number }) => void;
+    onFlow?: (toFlow: (p: { x: number; y: number }) => { x: number; y: number }) => void;
     /** Un file scelto dalla barra: la tela non lo carica da sé, lo passa a chi la monta. */
     onUpload?: (file: File) => void;
     /** ⌘D: duplica la selezione, con gli id come SvelteFlow li conosce. */
@@ -635,7 +639,7 @@
    */
   function onDragOver(e: DragEvent) {
     const types = e.dataTransfer?.types ?? [];
-    if (!types.includes(CANVAS_DRAG_FILLED_NODE) && !types.includes(CANVAS_DRAG_MEDIUM)) return;
+    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT].some((type) => types.includes(type))) return;
     e.preventDefault();
     e.dataTransfer!.dropEffect = 'copy';
   }
@@ -648,6 +652,13 @@
    */
   function onDrop(e: DragEvent) {
     if (!toFlow) return;
+
+    const output = e.dataTransfer?.getData(CANVAS_DRAG_OUTPUT);
+    if (output) {
+      e.preventDefault();
+      onDropOutput?.(output, { x: e.clientX, y: e.clientY }, toFlow({ x: e.clientX, y: e.clientY }));
+      return;
+    }
 
     const filledRaw = e.dataTransfer?.getData(CANVAS_DRAG_FILLED_NODE);
     if (filledRaw) {
@@ -740,7 +751,7 @@
     proOptions={ATTRIBUTION_IN_CREDITS_PAGE}
     multiSelectionKey={['Meta', 'Control', 'Shift']}
   >
-    <CanvasPointer onready={(fn) => (toFlow = fn)} />
+    <CanvasPointer onready={(fn) => { toFlow = fn; onFlow?.(fn); }} />
     <CanvasFocus {focus} />
     {#if spec.chrome}
     <CanvasKeys

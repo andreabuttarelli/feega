@@ -91,7 +91,8 @@
   import { calendarBrand, calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
   import { calendarError, type CalendarBrand, type CalendarPost } from '$lib/canvas/calendar-posts';
   import { plannedInstant } from '$lib/calendar/period-grid';
-  import { DropVerdict, dayUnderPointer, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, dayUnderPointer, frameUnderPointer, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DropOn, type Drop } from '$lib/motion/move-element';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
@@ -327,6 +328,54 @@
     const answer = await send('schedule_post', { post_id: post.id });
     patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
     await loadCalendar(calendar);
+  }
+
+  const FRAME_DROP_CLASS = 'is-frame-drop';
+
+  let toFlow: ((p: PointerPoint) => PointerPoint) | null = null;
+
+  function markFrame(at: PointerPoint | null, exceptId: string | null) {
+    const target = at ? frameUnderPointer(at, exceptId) : null;
+    for (const el of document.querySelectorAll<HTMLElement>(`.${FRAME_DROP_CLASS}`)) {
+      if (el.dataset.motionNode !== target?.frameId) { el.classList.remove(FRAME_DROP_CLASS); }
+    }
+    if (target) { document.querySelector(`[data-motion-node="${target.frameId}"]`)?.classList.add(FRAME_DROP_CLASS); }
+  }
+
+  function dropAt(client: PointerPoint, exceptId: string | null): Drop | null {
+    const frame = frameUnderPointer(client, exceptId);
+    if (frame) {
+      return { on: DropOn.Frame, nodeId: frame.frameId, at: frame.at };
+    }
+    const at = toFlow?.(client);
+    return at ? { on: DropOn.Canvas, x: at.x, y: at.y } : null;
+  }
+
+  function landed(res: Record<string, unknown> | null): boolean {
+    if (res?.outcome !== 'done') {
+      return false;
+    }
+    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+    void refresh();
+    return true;
+  }
+
+  async function moveOut(out: ElementOut, phase: DragPhase, version: number): Promise<number | null> {
+    const source = inlineMotion;
+    markFrame(phase === DragPhase.Over ? out.client : null, source);
+    const drop = phase === DragPhase.Drop && source ? dropAt(out.client, source) : null;
+    if (!source || !drop) {
+      return null;
+    }
+    const res = await post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), versions: JSON.stringify({ [source]: version }), ...(out.box ? { box: JSON.stringify(out.box) } : {}) });
+    return landed(res) ? ((res?.versions as Record<string, number>)[source] ?? null) : null;
+  }
+
+  async function dropOutput(nodeId: string, client: PointerPoint) {
+    const drop = dropAt(client, null);
+    if (drop) {
+      landed(await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
+    }
   }
 
   function highlightDay(ids: string[], at: PointerPoint) {
@@ -1932,8 +1981,9 @@
     }
 
     edges = [...edges.filter((edge) => edge.id !== created.id), toEdge(created)];
+    const linked = (res?.linked as { undo?: UndoItem[] } | null)?.undo ?? [];
     pushGesture({
-      items: [{ kind: 'edge.create', edgeId: created.id, sourceNodeId: created.sourceNodeId, targetNodeId: created.targetNodeId }]
+      items: [{ kind: 'edge.create', edgeId: created.id, sourceNodeId: created.sourceNodeId, targetNodeId: created.targetNodeId }, ...linked]
     });
     askToPlan(created.sourceNodeId, created.targetNodeId);
   }
@@ -2647,6 +2697,8 @@
     onEdgeModeChange={setEdgeMode}
     onCreate={create}
     onCreateFilled={createFilled}
+    onDropOutput={dropOutput}
+    onFlow={(fn) => (toFlow = fn)}
     onUpload={upload}
     onDuplicate={duplicate}
     onPromote={handlePromote}
@@ -2901,7 +2953,7 @@
   </CanvasFlow>
   {#if inlineMotion}
     {#key inlineMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => focusOn([inlineMotion], free)} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => focusOn([inlineMotion], free)} onmoveout={moveOut} />
     {/key}
   {/if}
 

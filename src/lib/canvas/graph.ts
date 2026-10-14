@@ -94,7 +94,10 @@ type NodeSpec = {
   requires: readonly Medium[];
   requiresOneOf?: readonly Medium[];
   sources?: readonly string[];
+  sourcesWhy?: string;
 };
+
+const FRAME_SOURCES: readonly NodeKind[] = ['image', 'video', 'text', 'media'];
 
 export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   // Un testo si scrive, ma si genera anche da un altro testo — quello a monte è il prompt quando
@@ -146,7 +149,7 @@ export const CANVAS_NODE_SPECS: Record<NodeKind, NodeSpec> = {
   audio: { medium: 'audio', generated: true, accepts: ['text', 'audio', 'video'], requires: [] },
   model3d: { medium: 'model3d', generated: true, accepts: ['image', 'text'], requires: [], requiresOneOf: ['image', 'text'] },
   calendar: { medium: null, generated: true, accepts: ['text', 'image', 'video', 'audio'], requires: [] },
-  motion: { medium: 'motion', generated: true, accepts: ['image', 'video', 'text'], requires: [] },
+  motion: { medium: 'motion', generated: true, accepts: ['image', 'video', 'text'], requires: [], sources: FRAME_SOURCES, sourcesWhy: 'A Frame takes generated images, videos and text' },
   studio_batch: { medium: 'image', generated: false, accepts: [], requires: [] }
 };
 
@@ -189,7 +192,7 @@ export function canConnect(from: CanvasNode, to: CanvasNode, fromMedium: Medium 
     return { ok: false, why: 'Uncensored models take no reference: switch model to connect inputs' };
   }
   if (target.sources && !target.sources.includes(from.kind)) {
-    return { ok: false, why: `A ${to.kind} node takes a list, products or a social feed` };
+    return { ok: false, why: target.sourcesWhy ?? `A ${to.kind} node takes a list, products or a social feed` };
   }
   const medium = fromMedium;
   if (!acceptsOf(to).includes(medium)) {

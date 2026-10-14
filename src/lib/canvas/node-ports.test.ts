@@ -61,6 +61,7 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
       expect(canConnect({ id: kind, kind, model: null, uncensored: false }, frame)).toEqual({ ok: true });
     }
     expect(canConnect({ id: 'a', kind: 'audio', model: null, uncensored: false }, frame).ok).toBe(false);
+    expect(canConnect({ id: 'c', kind: 'composition', model: null, uncensored: false }, frame)).toEqual({ ok: false, why: 'A Frame takes generated images, videos and text' });
   });
 
   it('a 3D model takes an image or a text, whatever its model reads, and feeds nothing downstream', () => {
