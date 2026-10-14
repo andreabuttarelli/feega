@@ -34,6 +34,28 @@ describe('inline stage', () => {
     anchor.destroy();
   });
 
+  it('follows the canvas in the same frame it moves, not the frame after: a lag of one frame is a picture sliding off its node', async () => {
+    const viewport = document.createElement('div');
+    const node = document.createElement('div');
+    const body = document.createElement('div');
+    const stage = document.createElement('div');
+    stage.style.position = 'fixed';
+    viewport.append(node);
+    node.append(body);
+    document.body.append(viewport, stage);
+    let at = { left: 100, top: 100, width: 400, height: 225 };
+    body.getBoundingClientRect = () => ({ ...at, right: at.left + at.width, bottom: at.top + at.height, x: at.left, y: at.top, toJSON: () => ({}) }) as DOMRect;
+    const anchor = anchoredTo(stage, body);
+    anchor.place();
+
+    at = { left: 40, top: 30, width: 800, height: 450 };
+    viewport.style.transform = 'translate(-60px, -70px) scale(2)';
+    await Promise.resolve();
+
+    expect([stage.style.left, stage.style.top, stage.style.width, stage.style.height]).toEqual(['40px', '30px', '800px', '450px']);
+    anchor.destroy();
+  });
+
   it('hides the stage while there is no node body to cover', () => {
     const stage = document.createElement('div');
     document.body.append(stage);

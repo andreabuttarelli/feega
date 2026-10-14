@@ -16,6 +16,7 @@
   import Volume2 from '@lucide/svelte/icons/volume-2';
   import VolumeX from '@lucide/svelte/icons/volume-x';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
+  import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, type MotionNode } from '$lib/canvas/motion-node';
   import { NodeMode } from '$lib/canvas/inline-motion';
@@ -50,6 +51,7 @@
   const last = $derived(Math.max(0, (preview?.durationInFrames ?? 1) - 1));
 
   onMount(() => {
+    whenIdle(() => void warmPlayer(location.origin));
     const watcher = new IntersectionObserver(([entry]) => {
       sight = entry?.isIntersecting ? Sight.InView : Sight.OutOfView;
     });

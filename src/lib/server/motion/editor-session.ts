@@ -29,7 +29,7 @@ export async function loadEditorSession(locals: App.Locals, params: EditorParams
     motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }),
     listNodeRuns(scope.db, nodeScope),
     farm ? motionRenderStorage().limit().catch(() => null) : null,
-    libraryOf(scope).list(),
+    libraryOf(scope).own(),
     editorGallery(scope.db, nodeScope),
     briefIds.length ? loadAttachments(scope.db, { orgId: scope.orgId, projectId: params.projectId, ids: briefIds }) : []
   ]);

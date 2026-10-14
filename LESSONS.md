@@ -2873,3 +2873,15 @@ finishes before an in-out position curve starts moving, so the visible motion is
 middle. Move: measure the word's sub-pixel centroid per frame against its opacity; the position
 curve must be out-shaped, moving during the fade and reaching zero speed at rest
 (`word-entrance.test.ts`).
+
+### A local production build never shows the motion player
+Signal: `vite preview` opens the editor but the frame stays blank; the opaque player frame's fetch of `/motion-libs` fails CORS. Dev server and Vercel send the header, preview did not. Move: preview must send it too (`scripts/motion-libs.ts`); measure perf on a build, not dev.
+
+### A layer placed by its own rAF lags a transform written in the same frame
+Signal: an overlay slides off its node while the canvas animates (70 px on a phone). Cause: the overlay's requestAnimationFrame ran before the canvas wrote its transform, so every frame painted the old position. Move: re-place on ancestor style/size change (MutationObserver/ResizeObserver, microtask before paint), not by polling rAF.
+
+### A perf budget on server TTFB flakes
+Signal: the open-frame budget swings by 2 s between runs with no code change. Move: budget what the client controls - payload size, mount after response, picture after mount.
+
+### A video on iPhone shows a black, zoomed-in corner of the frame
+Signal: on iOS Safari the editor player is black with a few specks while the node poster is fine; desktop WebKit (Playwright `iPhone 15`) renders the same doc correctly. Cause: CSS `zoom` on the player iframe (sharpness fix for Chromium) shrinks the box but iOS lays the frame's document out unzoomed, so only the top-left ~1/6 of the 1920 px composition shows. Move: scale the player iframe by `zoom` only where it is proven (`crispFor` in `crisp-scale.ts`, Chromium); WebKit keeps the player's transform. Emulated WebKit is not iOS: verify iframe/zoom fixes on a device.

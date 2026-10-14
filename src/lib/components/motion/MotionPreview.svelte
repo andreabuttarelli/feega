@@ -4,7 +4,7 @@
   import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
   import { CAPTURE_TIMEOUT_MS, Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
-  import { keepCrisp } from '$lib/motion/hyperframes/crisp-scale';
+  import { crispFor } from '$lib/motion/hyperframes/crisp-scale';
   import { laneVisibility, shootInLanes } from '$lib/motion/export/lanes';
   import { engineOf } from '$lib/motion/engine';
   import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
@@ -88,7 +88,7 @@
       el.addEventListener('ready', () => {
         crisp();
         const frame = el.iframeElement;
-        crisp = frame ? keepCrisp(frame) : () => {};
+        crisp = frame ? crispFor(engineOf(navigator.userAgent), frame) : () => {};
         ready = true;
         driver.seek(frame / fps);
         driver.ready();

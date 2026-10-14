@@ -72,6 +72,7 @@
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
   import { carryEdits, insertTemplate, isLockedComp, type Inserted, type Instance, type TemplateEntry } from '$lib/motion/template/library';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
+  import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { catalogue, starterDoc, starterFormatOf, type StarterFormat } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
@@ -160,7 +161,7 @@
   let listed = $state(data.gallery.listed);
   let brandAsk = $state<ChatPrefill | null>(null);
   let browsing = $state(false);
-  let templates = $state<TemplateEntry[]>(data.templates);
+  let templates = $state<TemplateEntry[]>([...BUILTIN_TEMPLATES, ...data.templates]);
   let browseFirst = $state<string | null>(null);
   let componentsOpen = $state(false);
   const components = $derived(catalogue(templates));
