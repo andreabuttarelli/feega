@@ -1,5 +1,7 @@
-import { motionScope as scopeFor } from './editor-scope';
-import { headOrNew, motionAssets, motionTokens } from './editor';
+import { canvasScope, motionOrThrow, nodeLookup } from './editor-scope';
+import { motionAssets, motionTokens, newHead } from './editor';
+import { readHead } from '$lib/server/repos/motion-revisions';
+import { serverTiming, type Phases } from '$lib/server/server-timing';
 import { knownRenderLimit, motionRenderFarm } from './renderer';
 import { batchView, renderView } from './render-run';
 import { serverRenderOpen } from '$lib/motion/server-render';
@@ -18,21 +20,25 @@ export type MotionEditorData = Awaited<ReturnType<typeof loadEditorSession>>;
 
 export const libraryOf = (scope: { db: Db; orgId: string; userId: string }) => templateLibrary(scope.db, { orgId: scope.orgId, actor: { kind: 'user', id: scope.userId } });
 
-export async function loadEditorSession(locals: App.Locals, params: EditorParams, url: URL) {
-  const scope = await scopeFor(locals, params);
+export async function loadEditorSession(locals: App.Locals, params: EditorParams, url: URL, phases: Phases = serverTiming()) {
+  const canvas = await phases.time('scope', canvasScope(locals, params));
+  const { db, userId, found } = canvas;
   const briefIds = briefAttachmentIds(url);
-  const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
+  const nodeScope = { orgId: found.orgId, nodeId: params.nodeId };
   const farm = motionRenderFarm();
   const uploadLimit = farm ? knownRenderLimit() : null;
-  const [head, tokens, assets, runs, templates, gallery, briefAttachments] = await Promise.all([
-    headOrNew(scope.db, nodeScope, scope.motion.node),
-    motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
-    motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }),
-    listNodeRuns(scope.db, nodeScope),
-    libraryOf(scope).own(),
-    editorGallery(scope.db, nodeScope),
-    briefIds.length ? loadAttachments(scope.db, { orgId: scope.orgId, projectId: params.projectId, ids: briefIds }) : []
+  const [lookup, savedHead, tokens, assets, runs, templates, gallery, briefAttachments] = await Promise.all([
+    phases.time('node', nodeLookup(canvas, params.nodeId)),
+    phases.time('head', readHead(db, nodeScope)),
+    phases.time('tokens', motionTokens(db, { orgId: found.orgId, brandId: found.projectBrandId })),
+    phases.time('assets', motionAssets({ db, orgId: found.orgId, projectId: params.projectId, canvasId: found.canvas.id })),
+    phases.time('runs', listNodeRuns(db, nodeScope)),
+    phases.time('templates', libraryOf({ db, orgId: found.orgId, userId }).own()),
+    phases.time('gallery', editorGallery(db, nodeScope)),
+    briefIds.length ? phases.time('brief', loadAttachments(db, { orgId: found.orgId, projectId: params.projectId, ids: briefIds })) : []
   ]);
+  const scope = motionOrThrow(canvas, lookup);
+  const head = savedHead ?? newHead(scope.motion.node);
 
   return {
     projectId: params.projectId,

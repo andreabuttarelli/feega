@@ -104,6 +104,14 @@ istanza fredda). Segnale: negli `edge_logs` di Supabase una raffica di `POST 413
 tra la sessione e la prima chiamata della chat. Mossa: rifare il giro e2e col dev server lanciato
 con `VERCEL=1`; un dato accessorio non blocca mai il caricamento (`knownUploadLimit`).
 
+### Una richiesta lenta in produzione per colpa di un'altra: il teardown di un eval
+Segnale: negli `edge_logs` il p50 di `response.origin_time` di TUTTE le chiamate `/rest/` sale a
+secondi nello stesso intervallo, e poco prima c'è un `DELETE /rest/v1/orgs` (IP locale, service
+role) con `origin_time` > 8 s finito `500`/`statement timeout`. Il cascade di un'org tocca tabelle
+con foreign key senza indice e ferma il progetto. Mossa: query a bucket di 5 s su `origin_time`
+prima di accusare il codice della richiesta lenta; niente teardown di eval sul database di
+produzione mentre qualcuno lo usa.
+
 ### Un render server riesce e il salvataggio fallisce con `EntityTooLarge`
 Storage del progetto accetta al massimo 50 MB per file (limite globale, non del bucket): un
 ProRes, un 4K o un PNG lungo esce dal farm e muore all'upload con `413`. La dimensione dipende

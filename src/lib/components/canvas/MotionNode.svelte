@@ -196,7 +196,7 @@
       {/if}
     {/if}
     {#if !previewing}<div class="host nodrag nopan" data-testid="motion-node-editing" bind:this={host}></div>{/if}
-    {#if previewing}<a class="open nodrag" {href} data-testid="open-motion-editor" onclick={open}>Open editor</a>{/if}
+    {#if previewing}<a class="open nodrag" {href} data-testid="open-motion-editor" data-sveltekit-preload-data={onopen ? 'off' : 'hover'} onclick={open}>Open editor</a>{/if}
   </div>
 
   {#if previewing}
