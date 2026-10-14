@@ -4,6 +4,14 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### In Safari l'anteprima gira a 30 fps mentre la pagina è a 60
+Segnale: `editor-scrub-budget.spec.ts` in WebKit dà host 60 fps e iframe 30 (play e scrub, ogni
+via di seek). WebKit limita il rAF degli iframe cross-origin mai toccati dall'utente a 30 fps
+(`NonInteractedCrossOriginFrame`, changeset 215070); il player è `sandbox-origin="opaque"`, quindi
+cross-origin, e i clic li prendono i nostri overlay, non l'iframe. Mossa: misurare il rAF dentro
+l'iframe (sonda nello srcdoc), mai solo quello dell'host; togliere il limite vuol dire un iframe
+same-origin o un'interazione vera dentro il frame — scelta di sicurezza, non di performance.
+
 ### Il contorno di selezione è spostato o piccolo rispetto al disegno
 Segnale: il box blu non copre l'elemento, ma `measure()` restituisce frazioni giuste. Prima di
 sospettare zoom/scala, confronta `hyperframes-player.currentTime` con il timecode: se differiscono,
