@@ -1336,6 +1336,14 @@
     width: 124px;
     flex-shrink: 0;
   }
+  @media (pointer: coarse) {
+    .layer-look {
+      flex-wrap: wrap;
+    }
+    .opacity-number {
+      flex: 1 0 100%;
+    }
+  }
   .split {
     border: 0;
     background: none;

@@ -120,6 +120,7 @@
 
   .docked {
     position: relative;
+    isolation: isolate;
     display: flex;
     flex-direction: column;
     min-height: 0;
