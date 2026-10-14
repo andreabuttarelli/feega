@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { contourLength, ellipseOutline, flatten, parsePath, pathData, polygonOutline, rectOutline, starOutline, trimContour } from './geometry';
+import { contourLength, cornerRadii, withCorner, ellipseOutline, flatten, parsePath, pathData, polygonOutline, rectOutline, starOutline, trimContour } from './geometry';
 
 const close = (a: number, b: number, digits = 3) => expect(a).toBeCloseTo(b, digits);
 
@@ -64,6 +64,27 @@ describe('parametric shapes fill the unit box', () => {
   it('roundness cuts the corners into arcs, half roundness is a circle-ish pill', () => {
     const [c] = rectOutline(0.5);
     close(contourLength(c), Math.PI, 2);
+  });
+
+  it('each corner takes its own radius: one round corner, three sharp', () => {
+    const [c] = rectOutline([0.5, 0, 0, 0]);
+    close(contourLength(c), 4 - 1 + Math.PI / 4, 2);
+    expect(c.vertices.map((v) => v.p)).toContainEqual([1, 0]);
+    expect(c.vertices.map((v) => v.p)).not.toContainEqual([0, 0]);
+  });
+
+  it('equal corners draw the same rectangle as roundness', () => {
+    expect(rectOutline([0.2, 0.2, 0.2, 0.2])).toEqual(rectOutline(0.2));
+  });
+
+  it('setting one corner pins the others where they were', () => {
+    expect(withCorner(0.1, [], 2, 0.4)).toEqual([0.1, 0.1, 0.4, 0.1]);
+    expect(withCorner(0.1, [0, 0.2, 0, 0], 0, 0.9)).toEqual([0.5, 0.2, 0, 0]);
+  });
+
+  it('a corner left unset follows roundness', () => {
+    expect(cornerRadii(0.1, [])).toEqual([0.1, 0.1, 0.1, 0.1]);
+    expect(cornerRadii(0.1, [0.3, 0])).toEqual([0.3, 0, 0.1, 0.1]);
   });
 
   it('an ellipse is a circle of the right length', () => {

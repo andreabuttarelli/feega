@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, addTrack, setKeyframe, setTransform, type OpResult } from './timeline';
 import { setParent } from './parent-ops';
 import { TrackKind } from './components';
-import { Grip, Modifier, PickMode, aabb, pickModeAt, dragPatch, handlesOf, pick, quadOf, readout, remeasured, snapMove, stackAt, writePatch, type Boxes } from './scene-select';
+import { Grip, Modifier, PickMode, aabb, pickModeAt, dragPatch, handlesOf, pick, quadOf, readout, remeasured, snapMove, spacing, stackAt, writePatch, type Boxes } from './scene-select';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -261,5 +261,37 @@ describe('remeasured', () => {
   it('a real measure replaces them', () => {
     const next: Boxes = { b: { left: 5, top: 6, width: 7, height: 8 } };
     expect(remeasured(kept, next)).toBe(next);
+  });
+});
+
+describe('smart guides while resizing', () => {
+  it('a dragged corner snaps its edge to a sibling edge and shows the guide', () => {
+    const { patch, guides } = dragPatch({ doc: base, clipId: 'back', frame: 0, box: boxes.back, grip: Grip.Scale, handle: 2, from: [1152, 648], to: [1340, 648], shift: false, snapTargets: [{ left: 1344, top: 0, right: 1500, bottom: 100 }], snapPx: 8 });
+
+    expect(patch.scaleX).toBeCloseTo(2, 5);
+    expect(guides).toContainEqual({ axis: 'x', at: 1344 });
+  });
+
+  it('without snapping the edge follows the pointer', () => {
+    expect(drag(base, Grip.Scale, [1152, 648], [1340, 648]).patch.scaleX).toBeCloseTo((1340 - 960) / 192, 5);
+  });
+});
+
+describe('distance labels', () => {
+  const frame = { width: W, height: H };
+
+  it('measure to the nearest neighbour on each side, or to the frame edge', () => {
+    const gaps = spacing({ left: 100, top: 100, right: 200, bottom: 200 }, [{ left: 260, top: 120, right: 300, bottom: 180 }], frame);
+
+    expect(gaps).toContainEqual({ axis: 'x', from: 200, to: 260, at: 150 });
+    expect(gaps).toContainEqual({ axis: 'x', from: 0, to: 100, at: 150 });
+    expect(gaps).toContainEqual({ axis: 'y', from: 0, to: 100, at: 150 });
+    expect(gaps).toContainEqual({ axis: 'y', from: 200, to: H, at: 150 });
+  });
+
+  it('a sibling that does not face the box is not a neighbour', () => {
+    const gaps = spacing({ left: 100, top: 100, right: 200, bottom: 200 }, [{ left: 260, top: 400, right: 300, bottom: 500 }], frame);
+
+    expect(gaps).toContainEqual({ axis: 'x', from: 200, to: W, at: 150 });
   });
 });

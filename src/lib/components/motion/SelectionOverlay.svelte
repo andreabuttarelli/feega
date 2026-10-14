@@ -7,7 +7,7 @@
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_SEP, PartEdit, editablePart, partAt, partBoxes, partText, writePartText } from '$lib/motion/poster-parts';
-  import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, stackAt, writePatch, type Boxes, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
+  import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
     doc,
@@ -19,6 +19,7 @@
     pickAt = null,
     part = $bindable(null),
     onparts = () => {},
+    onboxes = () => {},
     outlined = null,
     onhover = () => {},
     ondragout = null
@@ -32,6 +33,7 @@
     pickAt?: Pt | null;
     part?: string | null;
     onparts?: (parts: Record<string, string[]>) => void;
+    onboxes?: (boxes: Boxes) => void;
     outlined?: string | null;
     onhover?: (id: string | null) => void;
     ondragout?: ((out: ElementOut, phase: DragPhase) => void) | null;
@@ -59,7 +61,7 @@
   let boxes = $state<Boxes>({});
   let hover = $state<string | null>(null);
   let grab = $state<Grab | null>(null);
-  let live = $state<{ doc: MotionDoc; patch: Transform; guides: Guide[] } | null>(null);
+  let live = $state<{ doc: MotionDoc; patch: Transform; guides: Guide[]; gaps: Gap[] } | null>(null);
 
   const shown = $derived(live?.doc ?? doc);
   const selected = $derived(selection.length === 1 ? selection[0] : null);
@@ -92,6 +94,7 @@
 
   $effect(() => {
     if (Object.keys(boxes).length) {
+      onboxes(boxes);
       onparts(Object.fromEntries(Object.entries(split.parts).map(([id, list]) => [id, list.map((p) => p.part)])));
     }
   });
@@ -244,7 +247,8 @@
     if (!result.ok) {
       return;
     }
-    live = { doc: result.doc, patch, guides };
+    const moved = aabb(quadOf(result.doc, grab.clipId, frame, box));
+    live = { doc: result.doc, patch, guides, gaps: grab.grip === Grip.Rotate ? [] : spacing(moved, others(grab.clipId), { width: doc.width, height: doc.height }) };
     onpreview(result.doc);
   }
 
@@ -281,10 +285,16 @@
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} />{/if}
     {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}
     {#if quad}<polygon class="box" points={points(quad)} data-testid="selection-box" />{/if}
+    {#each live?.gaps ?? [] as g (g.axis + g.from + g.to)}
+      {#if g.axis === 'x'}<line class="gap" x1={g.from} y1={g.at} x2={g.to} y2={g.at} />{:else}<line class="gap" x1={g.at} y1={g.from} x2={g.at} y2={g.to} />{/if}
+    {/each}
     {#each live?.guides ?? [] as g (g.axis + g.at)}
       {#if g.axis === 'x'}<line class="guide" x1={g.at} y1="0" x2={g.at} y2={doc.height} />{:else}<line class="guide" x1="0" y1={g.at} x2={doc.width} y2={g.at} />{/if}
     {/each}
   </svg>
+  {#each live?.gaps ?? [] as g (g.axis + g.from + g.to)}
+    <span class="gap-label" data-testid="gap-label" style={pct(g.axis === 'x' ? [(g.from + g.to) / 2, g.at] : [g.at, (g.from + g.to) / 2])}>{Math.round(g.to - g.from)}</span>
+  {/each}
   {#if outlinedPart}
     <div class="outlined-part" data-testid="layer-hover-part" style={boxStyle(outlinedPart)}></div>
   {/if}
@@ -379,6 +389,25 @@
   .guide {
     stroke: #ff3d7f;
     stroke-width: 1px;
+  }
+
+  .gap {
+    stroke: #ff3d7f;
+    stroke-width: 1px;
+    stroke-dasharray: 3 2;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .gap-label {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    padding: 0 3px;
+    background: #ff3d7f;
+    color: #fff;
+    font-size: 10px;
+    line-height: 14px;
+    pointer-events: none;
+    white-space: nowrap;
   }
 
   .target {

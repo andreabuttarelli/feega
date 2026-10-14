@@ -35,6 +35,10 @@ import ArrowLeftFromLine from '@lucide/svelte/icons/arrow-left-from-line';
 import MoveLeft from '@lucide/svelte/icons/move-left';
 import MoveRight from '@lucide/svelte/icons/move-right';
 import Move from '@lucide/svelte/icons/move';
+import MoveUp from '@lucide/svelte/icons/move-up';
+import MoveDown from '@lucide/svelte/icons/move-down';
+import ChevronsUp from '@lucide/svelte/icons/chevrons-up';
+import ChevronsDown from '@lucide/svelte/icons/chevrons-down';
 import Maximize2 from '@lucide/svelte/icons/maximize-2';
 import RotateCw from '@lucide/svelte/icons/rotate-cw';
 import Blend from '@lucide/svelte/icons/blend';
@@ -154,6 +158,7 @@ type ActionSpec = { name: string; icon: Component; group?: GuideGroup; place?: P
 
 const PINCH = 'Pinch the timeline';
 const DRAG_PLAYHEAD = 'Drag the playhead';
+const DRAG_IN_FRAME = 'Drag it in the frame';
 const PINCH_PREVIEW = 'Pinch the preview';
 const DOUBLE_TAP_PREVIEW = 'Double-tap around the preview';
 
@@ -190,6 +195,14 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.NudgeForward]: { name: 'Nudge 1 frame later', icon: MoveRight, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },
   [Command.NudgeBackMore]: { name: 'Nudge 10 frames earlier', icon: ChevronsLeft, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },
   [Command.NudgeForwardMore]: { name: 'Nudge 10 frames later', icon: ChevronsRight, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },
+  [Command.MoveLeft]: { name: 'Move left 1 px', icon: MoveLeft, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveRight]: { name: 'Move right 1 px', icon: MoveRight, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveUp]: { name: 'Move up 1 px', icon: MoveUp, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveDown]: { name: 'Move down 1 px', icon: MoveDown, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveLeftMore]: { name: 'Move left 10 px', icon: ChevronsLeft, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveRightMore]: { name: 'Move right 10 px', icon: ChevronsRight, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveUpMore]: { name: 'Move up 10 px', icon: ChevronsUp, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveDownMore]: { name: 'Move down 10 px', icon: ChevronsDown, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
   [Tool.CopyEase]: { name: 'Copy ease', icon: ClipboardCopy, group: GuideGroup.Edit, place: Place.Graph },
   [Tool.PasteEase]: { name: 'Paste ease', icon: ClipboardPaste, group: GuideGroup.Edit, place: Place.Graph },
 
