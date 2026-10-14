@@ -29,5 +29,13 @@ frame is open, where the transport takes the centre), collaborators' avatars on 
 Chat / Guide and Properties / Chat tabs are segmented controls. Cursor name pills: semibold,
 raised.
 
+**Editor chrome.** Timeline header controls at `--ui-control-h` with a 48px header; editor
+menus and `OverflowMenu` are raised `md` panels with 28px rows and caps group labels; the
+Properties header is 48px with a hue-tinted type icon and a title-role name, its Properties /
+Code tabs a segmented control; editor dialogs (Export, Still, Sound, Template, Shortcuts) share
+the raised `lg` chrome; the settings overlay over the canvas is a raised `lg` sheet with a sunken
+switcher. The inline frame bar no longer clips its menus (`overflow: visible`): History, More and
+the clock menu opened invisible before. Checked in `top-bar-rhythm.spec.ts`.
+
 **Not done here.** The Properties panel content belongs to the inspector redesign; the timeline
 and chat panel follow the tokens only. Behaviour is unchanged.

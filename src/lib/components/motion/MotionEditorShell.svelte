@@ -1890,7 +1890,7 @@
     height: auto;
     background: transparent;
     pointer-events: auto;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .editor[data-mount='canvas'] .bar.in-canvas-bar > :global(*) {
@@ -2388,13 +2388,16 @@
   }
 
   .toolbar {
+    --ui-hit: var(--ui-control-h);
+    --ui-hit-gap: 4px;
     display: flex;
     align-items: center;
     gap: var(--ui-hit-gap);
-    height: calc(var(--ui-hit) + var(--ui-space-3));
-    padding: 0 var(--ui-space-3);
+    height: var(--ui-header-h);
+    padding: 0 var(--ui-space-2);
     background: var(--ui-bg);
-    font-size: var(--ui-text-sm);
+    border-bottom: 1px solid var(--ui-divider);
+    font-size: var(--ui-type-body);
     flex-shrink: 0;
   }
 
@@ -2405,17 +2408,25 @@
     gap: 4px;
     min-width: var(--ui-hit);
     height: var(--ui-hit);
-    color: var(--ui-ink-2);
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-icon-ink);
+    transition: background-color var(--ui-dur-fast) var(--ui-ease);
   }
 
   .tool.text {
-    padding: 0 var(--ui-space-2);
-    color: var(--ui-ink);
+    padding: 0 10px;
+    color: var(--ui-text);
+    font-weight: var(--ui-weight-medium);
   }
 
   .tool:hover:not(:disabled) {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
+    background: var(--ui-wash);
+    color: var(--ui-text);
+  }
+
+  .tool:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   .tool:disabled {
@@ -2441,9 +2452,10 @@
     gap: 4px;
     max-height: calc(100vh - 120px);
     overflow: auto;
-    padding: var(--ui-space-2);
-    background: var(--ui-raised);
-    box-shadow: 0 12px 32px rgb(0 0 0 / 0.14);
+    padding: 4px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   .menu.more {
@@ -2474,7 +2486,7 @@
   }
 
   .menu [aria-checked='true'] {
-    color: var(--ui-accent);
+    color: var(--ui-accent-text);
   }
 
   @media (pointer: coarse) {
@@ -2499,18 +2511,26 @@
 
   .menu button {
     text-align: left;
-    min-height: var(--ui-hit);
-    padding: 0 var(--ui-space-3);
+    min-height: var(--ui-row);
+    padding: 0 8px;
+    border-radius: var(--ui-radius-sm);
+    font-size: var(--ui-type-body);
+    color: var(--ui-text);
   }
 
-  .menu button:hover {
-    background: var(--ui-hover);
+  .menu button:hover,
+  .menu button:focus-visible {
+    background: var(--ui-wash);
+    outline: none;
   }
 
   .menu-head {
-    padding: var(--ui-space-3) var(--ui-space-3) var(--ui-space-1);
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-3);
+    padding: 8px 8px 4px;
+    font-size: var(--ui-type-section);
+    font-weight: var(--ui-weight-semibold);
+    letter-spacing: var(--ui-tracking-caps);
+    text-transform: uppercase;
+    color: var(--ui-text-tertiary);
   }
 
   .notice {

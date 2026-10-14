@@ -71,3 +71,58 @@ test.describe('the top bar keeps one rhythm @real', () => {
     }
   });
 });
+
+async function heightsIn(page: Page, selector: string): Promise<string[]> {
+  return page.evaluate((sel) => {
+    const root = document.querySelector(sel);
+    if (!root) {
+      return ['missing ' + sel];
+    }
+    return [...root.querySelectorAll<HTMLElement>(':scope > button, :scope > * > button, :scope > .popover-anchor > button')]
+      .map((el) => ({ el, box: el.getBoundingClientRect() }))
+      .filter(({ box }) => box.width > 1)
+      .map(({ el, box }) => `${el.getAttribute('aria-label') || el.textContent?.trim()}: ${Math.round(box.height)}px`);
+  }, selector);
+}
+
+test.describe('the editor chrome keeps the same rhythm @real', () => {
+  test.skip(!REAL_STACK, 'richiede uno stack reale: E2E_REAL_STACK=1');
+
+  test('timeline header controls are one size, and menus are raised rounded panels', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const node = await seedNode({ type: 'motion', x: 80, y: 80, data: LANDSCAPE });
+    await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: motion, actor_kind: 'user', actor_id: session.userId });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
+    await expect(page.locator('section[aria-label="Timeline"]')).toBeVisible({ timeout: 15_000 });
+    await page.waitForTimeout(800);
+
+    const off = (await heightsIn(page, 'section[aria-label="Timeline"] .toolbar')).filter((h) => !h.endsWith(`: ${CONTROL_PX}px`));
+    expect(off, `timeline header controls are ${CONTROL_PX}px`).toEqual([]);
+
+    await page.getByTestId('more-actions').click();
+    const menu = page.locator('[data-testid="editor-bar"] .menu.more').first();
+    await expect(menu).toBeVisible();
+    const radius = await menu.evaluate((el) => parseFloat(getComputedStyle(el).borderTopLeftRadius));
+    expect(radius, 'a menu uses the md radius').toBe(6);
+    const reachable = await menu.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      return !!hit && el.contains(hit);
+    });
+    expect(reachable, 'the open menu is on top and not clipped by the bar').toBe(true);
+    if (SHOTS) {
+      await page.screenshot({ path: `${SHOTS}/editor-${TAG}-menu-1440-light.png` });
+    }
+    await page.keyboard.press('Escape');
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
+    await expect(page.getByTestId('editor-bar')).toBeVisible({ timeout: 15_000 });
+    await page.waitForTimeout(1000);
+    if (SHOTS) {
+      await page.screenshot({ path: `${SHOTS}/editor-${TAG}-fullscreen-1440-light.png` });
+    }
+    await expectRhythm(page);
+  });
+});
