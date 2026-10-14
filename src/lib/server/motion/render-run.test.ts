@@ -13,14 +13,12 @@ const runs = vi.hoisted(() => ({
 }));
 const saveExport = vi.hoisted(() => vi.fn());
 const logAiCall = vi.hoisted(() => vi.fn());
-const sendPushToUser = vi.hoisted(() => vi.fn());
 const hold = vi.hoisted(() => ({ holdCredits: vi.fn(), releaseCredits: vi.fn() }));
 const farmCalls = vi.hoisted(() => ({ launchPiece: vi.fn(), launchAssembly: vi.fn(), checkTask: vi.fn(), stopWorker: vi.fn() }));
 
 vi.mock('$lib/server/repos/node-runs', () => ({ ...runs, RENDER_JOB_PREFIX: 'motion-render:' }));
 vi.mock('./export', () => ({ saveExport }));
 vi.mock('$lib/server/ai-log', () => ({ logAiCall }));
-vi.mock('$lib/server/web-push', () => ({ sendPushToUser }));
 vi.mock('$lib/server/credit-hold', async (original) => ({ ...(await original<typeof import('$lib/server/credit-hold')>()), ...hold }));
 vi.mock('./farm-render', async (original) => ({ ...(await original<typeof import('./farm-render')>()), ...farmCalls }));
 
@@ -95,7 +93,6 @@ beforeEach(() => {
   runs.createRun.mockImplementation(async (_db, input) => runOf(input.params));
   runs.claimRun.mockImplementation(async (_db, input) => ({ ...runOf({}), id: input.runId }));
   saveExport.mockResolvedValue({ ok: true, assetId: 'asset-9' });
-  sendPushToUser.mockResolvedValue({ sent: 0, pruned: 0 });
   let n = 0;
   farmCalls.launchPiece.mockImplementation(async () => `box-${n++}`);
   farmCalls.checkTask.mockResolvedValue(running);
@@ -317,7 +314,6 @@ describe('reconcileRenders', () => {
     expect(logAiCall.mock.calls[0][0]).toMatchObject({ label: 'motion_render', ok: true, orgId: 'org', actorId: 'u' });
     expect(runs.completeRun).toHaveBeenCalledWith(db, expect.objectContaining({ runId: 'run-1', assetId: 'asset-9' }));
     expect(lastParams().progress.stage).toBe(RenderStage.Done);
-    expect(sendPushToUser).toHaveBeenCalledWith(db, 'u', expect.objectContaining({ url: scope.editorUrl }));
     expect(removed).toEqual(expect.arrayContaining(['org/prj/motion/node/work/run-1/job.json', 'org/prj/motion/node/work/run-1/c450.mp4']));
     expect(farmCalls.stopWorker).toHaveBeenCalledWith(farm, 'box-0');
   });

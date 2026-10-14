@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, Zoom, timelineFits } from './editor-mount';
+import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, ToolsPlace, Zoom, timelineFits } from './editor-mount';
 import { Viewport } from './editor-layout';
 import { Dock } from '$lib/canvas/free-area';
 import { MotionFormat, newMotionDoc } from './doc';
 
 describe('editor mount', () => {
   it('the page owns the tab title, its stage and its zoom; never closes', () => {
-    expect(MOUNT[Mount.Page]).toEqual({ ownsTitle: true, closes: false, stage: Stage.Own, zoom: Zoom.Stage, measure: Measure.Window });
+    expect(MOUNT[Mount.Page]).toEqual({ ownsTitle: true, closes: false, stage: Stage.Own, zoom: Zoom.Stage, measure: Measure.Window, tools: ToolsPlace.Stage });
   });
 
   it('on the canvas the preview plays in the node, the canvas zooms it, and the layout follows the room the canvas leaves, not the window', () => {
-    expect(MOUNT[Mount.Canvas]).toEqual({ ownsTitle: false, closes: true, stage: Stage.Node, zoom: Zoom.Canvas, measure: Measure.Host });
+    expect(MOUNT[Mount.Canvas]).toEqual({ ownsTitle: false, closes: true, stage: Stage.Node, zoom: Zoom.Canvas, measure: Measure.Host, tools: ToolsPlace.CanvasBar });
   });
 
   it('a video has a timeline, a single-frame still does not', () => {

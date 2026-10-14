@@ -122,7 +122,7 @@
   import { ATTACH_PARAM, BRIEF_PARAM } from '$lib/motion/video-brief';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
-  import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, Zoom, timelineFits } from '$lib/motion/editor-mount';
+  import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, ToolsPlace, Zoom, timelineFits } from '$lib/motion/editor-mount';
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
@@ -130,10 +130,11 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHover } from '$lib/canvas/layers';
   import { DrawTool } from '$lib/motion/draw-tool';
+  import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
   import { EDIT_MODE_KEY, EditMode, nextMode, readMode } from '$lib/motion/edit-mode';
   import DrawOverlay from './DrawOverlay.svelte';
   import DrawTools from './DrawTools.svelte';
-  import { PART_SEP } from '$lib/motion/poster-parts';
+  import { PART_SEP, PartAction, runPart } from '$lib/motion/poster-parts';
   import { PropertiesView, propertiesFor } from '$lib/motion/properties-view';
   import { partFocus } from '$lib/motion/inspector';
   import PosterPartPanel from './PosterPartPanel.svelte';
@@ -846,11 +847,20 @@
 
   const newId = () => crypto.randomUUID().slice(0, 8);
 
-  let tool = $state(DrawTool.Select);
+  const timelineHidden = $derived(layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design);
+  $effect(() => (rules.tools === ToolsPlace.CanvasBar ? frameBar.attach({ act: (action) => FRAME_ACTS[action]() }) : undefined));
+  let timelineShownPx = $state(0);
+  $effect(() => {
+    if (rules.tools === ToolsPlace.CanvasBar) {
+      frameBar.timelinePx = timelineHidden ? 0 : timelineShownPx;
+    }
+  });
+
+  const FRAME_ACTS: Record<FrameAction, () => void> = { [FrameAction.Image]: () => add('Image'), [FrameAction.Library]: () => (templating = true) };
 
   function drawn(id: string) {
     selection = [id];
-    tool = DrawTool.Select;
+    frameBar.tool = DrawTool.Select;
   }
 
   const ADD: Partial<Record<ComponentId, (id: string) => OpResult>> = {
@@ -1015,6 +1025,12 @@
     if (keySelection.length) {
       apply(deleteKeyframes(doc, keySelection), 'Deleted keyframes');
       keySelection = [];
+      return;
+    }
+    const part = selected && selectedPart ? runPart(doc, selected, selectedPart, PartAction.Delete) : null;
+    if (part?.ok) {
+      apply(part, 'Deleted element');
+      selectedPart = null;
       return;
     }
     if (!selection.length) {
@@ -1222,11 +1238,11 @@
 
   const COMMANDS: Record<Command, () => void> = {
     [Command.TogglePlay]: () => (playing = !playing),
-    [Command.ToolSelect]: () => (tool = DrawTool.Select),
-    [Command.ToolText]: () => (tool = DrawTool.Text),
-    [Command.ToolRectangle]: () => (tool = DrawTool.Rectangle),
-    [Command.ToolEllipse]: () => (tool = DrawTool.Ellipse),
-    [Command.ToolPen]: () => (tool = DrawTool.Pen),
+    [Command.ToolSelect]: () => (frameBar.tool = DrawTool.Select),
+    [Command.ToolText]: () => (frameBar.tool = DrawTool.Text),
+    [Command.ToolRectangle]: () => (frameBar.tool = DrawTool.Rectangle),
+    [Command.ToolEllipse]: () => (frameBar.tool = DrawTool.Ellipse),
+    [Command.ToolPen]: () => (frameBar.tool = DrawTool.Pen),
     [Command.ToggleEditMode]: () => setMode(nextMode(editMode)),
     [Command.MoveLeft]: () => nudgeBy(-NUDGE_PX, 0),
     [Command.MoveRight]: () => nudgeBy(NUDGE_PX, 0),
@@ -1616,7 +1632,7 @@
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
-        {#if tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} {tool} onchange={apply} oncreated={drawn} />{/if}
+        {#if frameBar.tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} tool={frameBar.tool} onchange={apply} oncreated={drawn} />{/if}
       </MotionPreview>
       {/snippet}
       {#if rules.zoom === Zoom.Stage}
@@ -1624,7 +1640,7 @@
       {:else}
         {@render player()}
       {/if}
-      <DrawTools bind:tool />
+      {#if rules.tools === ToolsPlace.Stage}<DrawTools bind:tool={frameBar.tool} />{/if}
       {#if liveScene.length}<span class="live-badge" data-testid="live-badge" title={`${liveScene.join(', ')} ${liveScene.length === 1 ? 'runs' : 'run'} live: different on every view, a still in the video`}>live</span>{/if}
       <div class="live-bar">
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
@@ -1681,7 +1697,7 @@
     {/snippet}
     </SideColumn>
 
-    <section class="timeline-area" {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
+    <section class="timeline-area" bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
 
       {#if clipBarShown}

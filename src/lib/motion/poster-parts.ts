@@ -2,7 +2,7 @@ import { findClip, type MotionClip, type MotionDoc } from './doc';
 import { PropFormat } from './custom/component';
 import { setProps, type OpResult } from './timeline';
 import type { MeasuredBox } from './hyperframes/measure';
-import { LineEdit, editLines, markedPoster, wordsOf } from './poster-lines';
+import { LineEdit, editLines, lineRows, markedPoster, removePhoto, wordsOf } from './poster-lines';
 
 export const PART_SEP = '#';
 
@@ -123,7 +123,42 @@ export function partKind(doc: MotionDoc, clip: MotionClip, part: string): PartKi
   return index === null ? PartKind.Text : PartKind.Line;
 }
 
-export const partLabel = (doc: MotionDoc, clip: MotionClip, part: string): string => PART_LOOK[partKind(doc, clip, part)].label(doc, clip, part);
+export enum PartAction {
+  InsertPhoto = 'insert-photo',
+  Delete = 'delete'
+}
+
+export const PART_ACTION_LOOK: Record<PartAction, { label: string; keepsPart: boolean }> = {
+  [PartAction.InsertPhoto]: { label: 'Insert photo after', keepsPart: true },
+  [PartAction.Delete]: { label: 'Delete', keepsPart: false }
+};
+
+type Marked = { lines: string; media: unknown };
+type PartOp = (current: Marked, index: number) => { lines: string; media: unknown };
+
+const withoutArrow: PartOp = (current, i) => (lineRows(current.lines)[i]?.arrow ? editLines(current, i, LineEdit.Arrow) : current);
+
+const PART_OPS: Record<PartKind, Partial<Record<PartAction, PartOp>>> = {
+  [PartKind.Line]: { [PartAction.InsertPhoto]: (current, i) => editLines(current, i, LineEdit.AddPhoto) },
+  [PartKind.Photo]: { [PartAction.Delete]: removePhoto },
+  [PartKind.Arrow]: { [PartAction.Delete]: withoutArrow },
+  [PartKind.Text]: {},
+  [PartKind.Other]: {}
+};
+
+export const PART_ACTIONS = Object.fromEntries(Object.entries(PART_OPS).map(([kind, ops]) => [kind, Object.keys(ops)])) as Record<PartKind, PartAction[]>;
+
+export function runPart(doc: MotionDoc, clip: MotionClip, part: string, action: PartAction): OpResult {
+  const op = PART_OPS[partKind(doc, clip, part)][action];
+  const poster = markedPoster(String(clip.props.name));
+  if (!op || !poster) {
+    return { ok: false, error: `${part} cannot ${action}` };
+  }
+  const next = op({ lines: String(clip.props[poster.lines] ?? ''), media: clip.props[poster.media] }, parsePart(part).index ?? 0);
+  return setProps(doc, clip.id, { [poster.lines]: next.lines, [poster.media]: next.media });
+}
+
+export const partLabel =(doc: MotionDoc, clip: MotionClip, part: string): string => PART_LOOK[partKind(doc, clip, part)].label(doc, clip, part);
 
 export const partIcon = (doc: MotionDoc, clip: MotionClip, part: string): string => PART_LOOK[partKind(doc, clip, part)].icon;
 
