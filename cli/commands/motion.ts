@@ -279,6 +279,11 @@ export async function toolAndReport(bearer: string, nodeId: string, tool: string
   console.log(ran.saved ? `Saved as revision ${ran.version}.` : `Nothing changed: revision ${ran.version}.`);
 }
 
+export async function cmdMotionOp(nodeId: string, op: string, opts: { input?: string; org?: string }) {
+  const input = opts.input ? (JSON.parse(opts.input) as Record<string, unknown>) : {};
+  console.log(JSON.stringify(await motionApi.editorOp(await token(), nodeId, { op, input }, opts.org), null, 2));
+}
+
 export async function cmdMotionTools(name: string | undefined, opts: { org?: string }) {
   console.log(JSON.stringify(await motionApi.tools(await token(), name, opts.org), null, 2));
 }

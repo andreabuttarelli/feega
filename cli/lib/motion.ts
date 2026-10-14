@@ -107,6 +107,8 @@ export const motionApi = {
     request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}/storyboard`, org), token, { method: 'PATCH', body: JSON.stringify({ card_id: cardId, text }) }),
   tools: (token: string, name?: string, org?: string) => request<Record<string, unknown>>(withQuery('/api/v1/motion/tools', { name, org }), token),
   runTool: (token: string, nodeId: string, ask: ToolAsk, org?: string) => request<ToolRun>(withOrg(`/api/v1/motion/${id(nodeId)}/tools`, org), token, { method: 'POST', body: JSON.stringify(ask) }),
+  editorOp: (token: string, nodeId: string, call: { op: string; input?: Record<string, unknown> }, org?: string) =>
+    request<Record<string, unknown>>(withOrg(`/api/v1/motion/${id(nodeId)}/ops`, org), token, { method: 'POST', body: JSON.stringify({ op: call.op, input: call.input ?? {} }) }),
   bundle: (token: string, nodeId: string, org?: string) => download(withOrg(`/api/v1/motion/${id(nodeId)}/embed/bundle`, org), token)
 };
 

@@ -7,6 +7,9 @@ import { MAX_ATTACHMENTS } from '../../lib/attachments.ts';
 const MAX_FRAMES = 6;
 const MAX_FRAME_WIDTH = 960;
 
+const EDITOR_READS = 'read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render)';
+const EDITOR_WRITES = 'save_doc {version,doc,summary?} (whole doc; 409 answers the head), apply_ops {version,ops,summary?} (doc ops, rebased on newer edits)';
+
 const org = z.string().optional().describe('Which org, if you belong to more than one.');
 
 const attachment = z.union([
@@ -250,6 +253,20 @@ export function registerMotionTools(server: McpServer) {
         }
         return motionApi.runTool(token, node_id, { tool, ...(input ? { input } : {}), ...(version === undefined ? {} : { version }) }, org);
       })
+  );
+
+  server.registerTool(
+    'motion_editor_op',
+    {
+      title: 'Run a frame editor action',
+      description:
+        'The actions the frame editor page runs on a `motion` node (`node_id`), same answers as the page, with `input` in camelCase. ' +
+        `Reads: ${EDITOR_READS}. Writes: ${EDITOR_WRITES}. ` +
+        'Unknown op answers the list; bad input answers the issues; a stale `version` answers 409.',
+      inputSchema: z.object({ org, node_id: z.string(), op: z.string(), input: z.record(z.string(), z.unknown()).optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: true }
+    },
+    async ({ org, node_id, op, input }) => withAuth((token) => motionApi.editorOp(token, node_id, { op, input }, org))
   );
 
   server.registerTool(

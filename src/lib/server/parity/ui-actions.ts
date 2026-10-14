@@ -6,12 +6,14 @@ import { ClipOp } from '$lib/motion/clip-ops';
 import { EmptyAction } from '$lib/canvas/empty-canvas';
 import type { SelectionActionId } from '$lib/canvas/selection-actions';
 import type { CanvasOpName } from '$lib/server/canvas/canvas-ops';
+import type { EditorOpName } from '$lib/server/frame-editor/editor-ops';
 
-export type Route = { canvas: CanvasOpName } | { motion: string } | { tool: string };
+export type Route = { canvas: CanvasOpName } | { editor: EditorOpName } | { motion: string } | { tool: string };
 
 export type Parity = { route: Route } | { uiOnly: string } | { gap: string };
 
 const canvas = (op: CanvasOpName): Parity => ({ route: { canvas: op } });
+const editor = (op: EditorOpName): Parity => ({ route: { editor: op } });
 const motion = (name: string): Parity => ({ route: { motion: name } });
 const tool = (name: string): Parity => ({ route: { tool: name } });
 const uiOnly = (reason: string): Parity => ({ uiOnly: reason });
@@ -76,9 +78,9 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
 };
 
 export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
-  save: tool('motion_tool'),
-  ops: tool('motion_tool'),
-  head: tool('get_motion_summary'),
+  save: editor('save_doc'),
+  ops: editor('apply_ops'),
+  head: editor('read_head'),
   revisions: tool('list_motion_revisions'),
   restore: tool('restore_motion_revision'),
   exported: tool('render_video'),
@@ -94,9 +96,9 @@ export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
   publishGallery: tool('publish_to_gallery'),
   withdrawGallery: canvas('withdraw_from_gallery'),
   deleteTemplate: motion('delete_template'),
-  batchStatus: tool('get_render'),
+  batchStatus: editor('batch_status'),
   cancelRender: canvas('cancel_render'),
-  renderStatus: tool('get_render')
+  renderStatus: editor('render_status')
 };
 
 export const EDITOR_ACTIONS: Record<ActionId, Parity> = {

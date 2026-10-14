@@ -258,6 +258,7 @@ list. Returns how many combinations it actually stopped.
 | `restore_motion_revision` | `feega motion revisions <nodeId> --restore <version>` |
 | `list_motion_templates` | `feega motion templates` |
 | `new_motion_from_template` | `feega motion new --template <id> [--format 16:9, 9:16, 1:1, 4:5 or "A poster"] [--still s] [--project id]` |
+| `motion_editor_op` | `feega motion op <nodeId> <op> [--input json]` |
 | `motion_tool` | `feega motion tools [name]`, `feega motion tool <nodeId> <tool> [--input json] [--version n]`, `feega motion still <nodeId> [--format png] [--scale 2] [--out file]` |
 | `canvas_tool` `move_frame_element` / `place_in_frame` | `feega motion move <frameId> <elementId> [--to frameId] [--x f] [--y f]`, `feega motion place <nodeId> [--to frameId]` |
 | `add_motion_template` | `feega motion add-template <nodeId> <templateId> [--at s] [--var k=v] [--no-sound]` |
@@ -315,6 +316,13 @@ saved, output }`, the input checked by the tool's own schema (400), screened lik
 (422), saved as a revision by the agent; a stale `version` is 409, an unknown tool 404. Tools that
 need a chat turn answer `ok: false`. `export_image` `{ format: png|jpg|webp, scale: 1|2, time? }`
 draws the still frame (or `time`) at full size and returns `{ asset_id, url, width, height }`.
+
+`motion_editor_op({ org, node_id, op, input })` runs one action of the frame editor page on the
+video, through the same server function, with the same status and body:
+`POST /api/v1/motion/{node_id}/ops` `{ op, input }`. Reads: `read_head`, `render_status`,
+`batch_status`. Writes (a read-only key is 403): `save_doc {version, doc, summary?}` (409 with the
+head when stale), `apply_ops {version, ops, summary?}`. A canvas the caller cannot open, or an
+uncensored workspace still locked, is 404. Unknown op 400 with the list.
 
 CLI `motion move` / `motion place`:
 `POST /api/v1/motion/elements` `{ frame_id?, element_id?, node_id?, to_frame_id?, x?, y?, canvas_x?, canvas_y? }` → `{ outcome, frame_id, element_id, new_frame, revisions }`. `frame_id` +

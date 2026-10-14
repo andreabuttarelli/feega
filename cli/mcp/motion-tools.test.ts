@@ -289,7 +289,7 @@ describe('the motion agent over MCP', () => {
     await rpc('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'motion', version: '0.0.1' } });
     const names = ((await rpc('tools/list', {})).result?.tools ?? []).map((t) => t.name);
 
-    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['add_motion_template', 'ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_templates', 'list_motion_videos', 'motion_budget', 'motion_tool', 'new_motion_from_template', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
+    expect(names.filter((n) => n.includes('motion')).sort()).toEqual(['add_motion_template', 'ask_motion_agent', 'get_motion_embed', 'get_motion_run', 'get_motion_summary', 'list_motion_revisions', 'list_motion_templates', 'list_motion_videos', 'motion_budget', 'motion_editor_op', 'motion_tool', 'new_motion_from_template', 'publish_motion_embed', 'restore_motion_revision', 'view_motion_frames']);
     expect(names).toContain('render_video');
     expect(names).toContain('get_render');
     expect(names).not.toContain('add_clip');

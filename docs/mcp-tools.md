@@ -3,13 +3,13 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**49 tool** — 19 in lettura, 25 in scrittura, 5 che distruggono.
-Il payload di `tools/list` pesa **47.124 caratteri**, circa **11.781 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+**50 tool** — 19 in lettura, 25 in scrittura, 6 che distruggono.
+Il payload di `tools/list` pesa **48.755 caratteri**, circa **12.189 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
 | Altro | 19 |
-| Video motion | 14 |
+| Video motion | 15 |
 | Accesso diretto al database | 5 |
 | Ads | 4 |
 | Nodi e generazione | 4 |
@@ -354,6 +354,19 @@ What a motion video has spent on AI across all its agent turns (`spent_usd`) and
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
 | `action`? | `read` \| `raise` |  |
+
+### `motion_editor_op` · D
+
+*Run a frame editor action*
+
+The actions the frame editor page runs on a `motion` node (`node_id`), same answers as the page, with `input` in camelCase. Reads: read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render). Writes: save_doc {version,doc,summary?} (whole doc; 409 answers the head), apply_ops {version,ops,summary?} (doc ops, rebased on newer edits). Unknown op answers the list; bad input answers the issues; a stale `version` answers 409.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `node_id` | string |  |
+| `op` | string |  |
+| `input`? | object |  |
 
 ### `motion_tool` · W
 
