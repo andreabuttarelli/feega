@@ -49,7 +49,7 @@
     align-items: flex-end;
     gap: 6px;
     font-size: 12px;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-text);
   }
 
   .bar {
@@ -61,7 +61,7 @@
     font: inherit;
     padding: 4px 10px;
     border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
-    background: var(--paper, #fff);
+    background: var(--ui-panel);
     color: inherit;
     cursor: pointer;
   }
@@ -74,7 +74,7 @@
     max-height: 260px;
     overflow-y: auto;
     border: 1px solid var(--line, rgba(0, 0, 0, 0.12));
-    background: var(--paper, #fff);
+    background: var(--ui-panel);
   }
 
   li {

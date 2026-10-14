@@ -2032,7 +2032,7 @@
   }
 
   .render {
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
   }
 
@@ -2152,7 +2152,7 @@
     top: var(--ui-space-3);
     left: var(--ui-space-3);
     padding: 2px var(--ui-space-2);
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
     font-size: 11px;
     letter-spacing: 0.04em;

@@ -118,7 +118,7 @@
 
   .primary {
     padding: 8px 12px;
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
     font-size: 12px;
     text-align: center;

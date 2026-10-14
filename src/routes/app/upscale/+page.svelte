@@ -327,7 +327,7 @@
   .cost { font-size: var(--ui-text-xl); font-weight: 600; letter-spacing: -0.02em; }
 
   .primary, .ghost { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; font-size: var(--ui-text-md); font-weight: 600; border: 0; border-radius: 9999px; cursor: pointer; text-decoration: none; }
-  .primary { background: var(--ui-accent); color: var(--ui-accent-ink); }
+  .primary { background: var(--ui-accent-solid); color: var(--ui-accent-ink); }
   .ghost { background: var(--ui-surface); color: var(--ui-ink); }
   .ghost:hover { background: var(--ui-hover); }
   .primary:disabled, .ghost:disabled { opacity: 0.4; cursor: not-allowed; }

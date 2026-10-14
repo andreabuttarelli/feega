@@ -82,11 +82,12 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    height: 30px;
+    height: 28px;
     flex-shrink: 0;
     appearance: none;
-    border: 1px solid var(--ui-accent);
-    background: var(--ui-accent);
+    border-radius: var(--ui-radius-sm);
+    border: 1px solid var(--ui-accent-solid);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
     padding: 0 10px;
     font: inherit;
@@ -95,7 +96,7 @@
     cursor: pointer;
   }
   .share-btn:hover {
-    background: var(--ink-soft, #333);
+    background: var(--ui-text-secondary);
   }
 
   .share-pop {
@@ -108,8 +109,8 @@
     gap: 10px;
     width: 300px;
     padding: 12px;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
+    background: var(--ui-panel);
+    border: 1px solid var(--ui-divider-strong);
     box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
     font-size: 12px;
   }
@@ -131,18 +132,18 @@
     min-width: 0;
     height: 28px;
     padding: 0 6px;
-    border: 1px solid var(--line, #ededef);
+    border: 1px solid var(--ui-divider);
     font: inherit;
     font-size: 11px;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-text-secondary);
   }
   .share-link button,
   .share-reset {
     height: 28px;
     padding: 0 10px;
     appearance: none;
-    border: 1px solid var(--line, #ededef);
-    background: var(--paper, #fff);
+    border: 1px solid var(--ui-divider);
+    background: var(--ui-panel);
     font: inherit;
     font-size: 11px;
     font-weight: 600;
@@ -150,7 +151,7 @@
   }
   .share-reset {
     align-self: flex-start;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-text-secondary);
   }
 
   @media (max-width: 480px) {

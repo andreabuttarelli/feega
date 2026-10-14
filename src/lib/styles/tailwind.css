@@ -24,25 +24,25 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 :root {
-  --sh-background: var(--paper);
-  --sh-foreground: var(--ink);
-  --sh-card: var(--paper-2);
-  --sh-card-foreground: var(--ink);
-  --sh-popover: var(--paper-2);
-  --sh-popover-foreground: var(--ink);
-  --sh-primary: var(--ui-accent);
+  --sh-background: var(--ui-panel);
+  --sh-foreground: var(--ui-text);
+  --sh-card: var(--ui-panel-raised);
+  --sh-card-foreground: var(--ui-text);
+  --sh-popover: var(--ui-panel-raised);
+  --sh-popover-foreground: var(--ui-text);
+  --sh-primary: var(--ui-accent-solid);
   --sh-primary-foreground: var(--ui-accent-ink);
-  --sh-secondary: var(--paper-3);
-  --sh-secondary-foreground: var(--ink);
-  --sh-muted: var(--paper-2);
-  --sh-muted-foreground: var(--ink-soft);
-  --sh-accent: var(--paper-3); /* shadcn's subtle hover bg, NOT the brand pink */
-  --sh-accent-foreground: var(--ink);
+  --sh-secondary: var(--ui-input);
+  --sh-secondary-foreground: var(--ui-text);
+  --sh-muted: var(--ui-wash);
+  --sh-muted-foreground: var(--ui-text-secondary);
+  --sh-accent: var(--ui-wash);
+  --sh-accent-foreground: var(--ui-text);
   --sh-destructive: #c0392b;
   --sh-destructive-foreground: #fff;
   --sh-success: #1f8a4c;
   --sh-border: var(--ui-line);
-  --sh-input: var(--line);
+  --sh-input: var(--ui-divider-strong);
   --sh-ring: var(--ui-accent);
   --radius: var(--ui-radius-md);
   --mobile-topbar-h: 48px;
@@ -55,12 +55,12 @@
   --page-gutter: 16px;
   /* App shell sidebar — light tint toward brand accent-2 (see --sidebar-bg in app.css). */
   --sh-sidebar: var(--sidebar-bg);
-  --sh-sidebar-foreground: var(--ink);
+  --sh-sidebar-foreground: var(--ui-text);
   --sh-sidebar-primary: var(--accent);
   --sh-sidebar-primary-foreground: #fff;
   /* Soft hover wash (not a solid dark fill). */
   --sh-sidebar-accent: color-mix(in srgb, var(--accent) 10%, transparent);
-  --sh-sidebar-accent-foreground: var(--ink);
+  --sh-sidebar-accent-foreground: var(--ui-text);
   --sh-sidebar-border: var(--sidebar-line, var(--line));
   --sh-sidebar-ring: var(--accent);
 }

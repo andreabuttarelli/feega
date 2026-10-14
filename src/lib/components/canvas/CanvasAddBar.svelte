@@ -243,27 +243,26 @@
     transition: bottom var(--chrome-move) var(--ease-expo);
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
     padding: 4px;
-    border-radius: 0;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   .group {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 2px;
     animation: bar-in 240ms var(--ease-expo-out);
   }
 
   .draw {
     display: inline-flex;
-    gap: 3px;
-    padding-right: 3px;
-    margin-right: 3px;
-    border-right: 1px solid var(--line-2, #d2d2d7);
+    gap: 2px;
+    padding-right: 4px;
+    margin-right: 4px;
+    border-right: 1px solid var(--ui-divider);
   }
 
   .pick {
@@ -271,8 +270,8 @@
   }
 
   .pick.on {
-    color: var(--accent, #0071e3);
-    background: var(--paper-3, #f4f4f4);
+    color: var(--ui-accent-text);
+    background: var(--ui-selected);
   }
 
   @keyframes bar-in {
@@ -300,17 +299,24 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 8px;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
     font: inherit;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-icon-ink);
     background: none;
     border: none;
-    border-radius: 0;
+    border-radius: var(--ui-radius-sm);
     cursor: grab;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease), color var(--ui-dur-fast) var(--ui-ease);
   }
-  button:hover,
+  button:hover {
+    background: var(--ui-wash);
+    color: var(--ui-text);
+  }
   button:focus-visible {
-    background: var(--paper-2, #f9f9f9);
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
   button:active {
     cursor: grabbing;
@@ -334,7 +340,7 @@
     }
     button:active,
     .keys-toggle[aria-expanded='true'] {
-      background: var(--paper-3, #f4f4f4);
+      background: var(--ui-wash);
     }
     .add-tip {
       display: none;
@@ -353,7 +359,7 @@
 
   .keys-toggle {
     cursor: pointer;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-text-secondary);
   }
 
   .add-tip {
@@ -364,12 +370,12 @@
     transform: translateX(-50%);
     padding: 4px 8px;
     white-space: nowrap;
-    font-size: 11px;
-    color: var(--ink, #1d1d1f);
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    border-radius: 0;
-    box-shadow: 0 4px 14px rgb(0 0 0 / 0.1);
+    font-size: var(--ui-type-label);
+    font-weight: var(--ui-weight-medium);
+    color: var(--ui-tooltip-ink);
+    background: var(--ui-tooltip);
+    border-radius: var(--ui-radius-sm);
+    box-shadow: var(--ui-shadow-raised);
     opacity: 0;
     pointer-events: none;
     transition: opacity 120ms ease;
@@ -406,16 +412,18 @@
     grid-template-columns: repeat(3, 96px);
     gap: 4px;
     padding: 6px;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
   .more-item {
     display: grid;
     justify-items: center;
     gap: 6px;
     padding: 12px 6px;
-    font-size: 11.5px;
+    height: auto;
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-secondary);
     text-align: center;
   }
 </style>

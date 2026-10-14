@@ -187,23 +187,26 @@
   .layers {
     display: flex;
     flex-direction: column;
+    gap: 1px;
     outline: none;
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-type-label);
   }
 
   .row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    height: 28px;
+    gap: 8px;
+    height: var(--ui-row);
     padding-right: 4px;
-    color: var(--ui-ink);
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text);
     cursor: default;
     user-select: none;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease);
   }
 
   .row:hover {
-    background: var(--ui-hover);
+    background: var(--ui-wash);
   }
 
   .row.hovered {
@@ -211,22 +214,26 @@
   }
 
   .row.picked {
-    background: color-mix(in srgb, var(--ui-accent) 12%, transparent);
-    color: var(--ui-accent);
+    background: var(--ui-selected);
+    color: var(--ui-accent-text);
+  }
+
+  .row.picked .icon {
+    color: var(--ui-accent-text);
   }
 
   .row.muted .name {
-    opacity: 0.45;
+    color: var(--ui-text-disabled);
   }
 
   .row[data-kind='track'] {
-    font-weight: 600;
+    font-weight: var(--ui-weight-medium);
   }
 
   .icon {
     display: grid;
     place-items: center;
-    color: var(--ui-text-3);
+    color: var(--ui-icon-ink);
   }
 
   .name {
@@ -241,8 +248,14 @@
     flex: 1;
     min-width: 0;
     height: 22px;
-    border-radius: 0;
+    padding: 0 6px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-panel);
+    box-shadow: var(--ui-ring);
+    color: var(--ui-text);
     font: inherit;
+    outline: none;
   }
 
   .flag {
@@ -251,18 +264,39 @@
     width: 22px;
     height: 22px;
     border: 0;
-    border-radius: 9999px;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
-    color: var(--ui-text-3);
+    color: var(--ui-text-tertiary);
+    opacity: 0;
+    transition: opacity var(--ui-dur-fast) var(--ui-ease);
+  }
+
+  .row:hover .flag,
+  .row:focus-within .flag,
+  .flag[aria-pressed='true'] {
+    opacity: 1;
   }
 
   .flag:hover {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
+    background: var(--ui-pressed);
+    color: var(--ui-text);
+  }
+
+  .flag:focus-visible {
+    opacity: 1;
+    outline: none;
+    box-shadow: var(--ui-ring);
+  }
+
+  @media (pointer: coarse) {
+    .flag {
+      opacity: 1;
+    }
   }
 
   .empty {
     margin: 12px 8px;
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-tertiary);
   }
 </style>
