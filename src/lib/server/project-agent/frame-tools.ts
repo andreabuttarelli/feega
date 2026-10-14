@@ -66,8 +66,9 @@ export function createFrameTools(deps: FrameToolDeps): Record<string, Tool> {
   const run = tool({
     description: [
       'Run one frame (motion video or still) tool on a frame of THIS project: the same tools the frame editor has, saved as a new revision the user can undo.',
-      `node_id defaults to the frame open in the editor. ${LIST_FRAME_TOOLS} names them, ${DESCRIBE_FRAME_TOOL} gives one input schema: read it before the first call to a tool.`,
-      `${VIEW_FRAMES} returns the rendered frames as images.`
+      `node_id defaults to the frame open in the editor. ${DESCRIBE_FRAME_TOOL} gives one input schema: read it before the first call to a tool. ${LIST_FRAME_TOOLS} adds one line on each, only when a name is not enough.`,
+      `${VIEW_FRAMES} returns the rendered frames as images.`,
+      `Tools: ${motionToolList().map((t) => t.name).join(', ')}.`
     ].join(' '),
     inputSchema: z.object({ node_id: z.string().optional(), tool: z.string().min(1), input: z.record(z.string(), z.unknown()).default({}) }).strict(),
     execute: async (input: { node_id?: string; tool: string; input: Record<string, unknown> }, { toolCallId }) => {

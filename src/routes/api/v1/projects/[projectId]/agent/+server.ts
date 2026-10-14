@@ -4,6 +4,8 @@ import { json } from '@sveltejs/kit';
 import { createUIMessageStream, createUIMessageStreamResponse, streamText, type ModelMessage } from 'ai';
 import type { Db } from '$lib/server/db/client';
 import { llmLanguageModel } from '$lib/server/llm';
+import { PromptCache } from '$lib/server/prompt-cache';
+import { turnModel } from '$lib/server/project-agent/model-route';
 import { offeredChatModels, reasoningProviderOptions, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { extractSdkUsage, logAiCall, withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
@@ -103,7 +105,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   if (!resolved.ok) {
     return json({ error: resolved.error }, { status: 400 });
   }
-  const { model, reasoning } = resolved.choice;
+  const { model, reasoning } = turnModel(resolved.choice, text);
 
   const screening = screenModelInput(db, {
     profile: ModerationProfile.Standard,
@@ -188,7 +190,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const billedScope = <T>(fn: () => T): T => (brand ? withBrandContext(brand.id, fn) : withOrgContext(orgId, fn));
 
   const result = billedScope(() => streamText({
-    model: llmLanguageModel(model),
+    model: llmLanguageModel(model, PromptCache.On),
     system: projectAgentPrompt({
       project: { id: project.id, name: project.name },
       canvases: canvases.map((c) => ({ id: c.id, name: c.name })),

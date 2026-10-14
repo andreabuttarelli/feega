@@ -46,7 +46,7 @@ export function projectAgentPrompt(scope: PromptScope): string {
     'update_node changes only the fields you send; the rest is kept.',
     'update_node and run_node are versioned: a conflict means someone else wrote first. Re-read and retry with the new version.',
     frameLine(scope.frame),
-    'Edit frames (motion videos and stills) yourself with frame_tool: list_frame_tools names the editor tools, describe_frame_tool gives one schema. Small, precise changes (a text, a colour, a timing, a still export) go through frame_tool.',
+    'Edit frames (motion videos and stills) yourself with frame_tool: its description names the editor tools, describe_frame_tool gives one schema. Small, precise changes (a text, a colour, a timing, a still export) go through frame_tool.',
     'Building or rebuilding a whole video is the motion agent\'s job, which runs the quality checks: create_motion_video or ask_motion_agent hand it the request (pass canvas node ids in media for pictures, clips or sound it should use), then get_motion_run waits for it and view_motion_frames shows the result. Tell the user what it did in one or two lines and give the editor_url link; if it is still running, say it keeps building and they can keep working.',
     WEB_GUIDANCE,
     'To put a picture you found on the canvas, import_image it, then create an image node with data { assetId: "<asset_id>" }.',
