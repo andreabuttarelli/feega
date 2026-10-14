@@ -95,6 +95,7 @@ import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
+import { MOVE_STATUS, MoveOutcome, frameStore, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -118,6 +119,26 @@ type Scope = { db: Db; orgId: string; canvasId: string; canvas: Canvas; userId: 
 /** Ogni gesto della tela che passa da qui è di una persona, mai un `system` muto: `canvas_events` deve saperlo. */
 function userActor(scope: { userId: string }): Actor {
   return { kind: 'user', id: scope.userId };
+}
+
+function jsonField(fd: FormData, key: string): unknown {
+  const raw = fd.get(key);
+  if (typeof raw !== 'string' || !raw) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function canvasFrames(scope: Scope) {
+  return frameStore(scope.db, { orgId: scope.orgId, actor: userActor(scope), projectId: scope.canvas.projectId });
+}
+
+function movedAnswer(moved: Moved) {
+  return moved.outcome === MoveOutcome.Done ? moved : fail(MOVE_STATUS[moved.outcome], { error: moved.outcome, detail: moved.detail });
 }
 
 async function scopeFor(locals: App.Locals, canvasId: string): Promise<Scope> {
@@ -384,6 +405,9 @@ function parseUndoItem(raw: unknown): UndoItem | null {
   }
   if (item.kind === 'edge.delete' && typeof item.edgeId === 'string' && typeof item.sourceNodeId === 'string' && typeof item.targetNodeId === 'string') {
     return { kind: 'edge.delete', edgeId: item.edgeId, sourceNodeId: item.sourceNodeId, targetNodeId: item.targetNodeId };
+  }
+  if (item.kind === 'doc.revision' && typeof item.nodeId === 'string' && Number.isInteger(item.before) && Number.isInteger(item.after)) {
+    return { kind: 'doc.revision', nodeId: item.nodeId, before: item.before as number, after: item.after as number };
   }
   return null;
 }
@@ -1426,7 +1450,28 @@ export const actions: Actions = {
       actor: userActor(scope)
     });
 
-    return { connection };
+    const linked = targetNode?.type === 'motion' ? await linkFrame(canvasFrames(scope), { sourceNodeId, frameNodeId: targetNodeId }) : null;
+    return { connection, linked: linked?.outcome === MoveOutcome.Done ? linked : null };
+  },
+
+  moveElement: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = moveAskSchema.safeParse({ sourceNodeId: fd.get('source'), clipId: fd.get('clip'), drop: jsonField(fd, 'drop'), box: jsonField(fd, 'box'), versions: jsonField(fd, 'versions') });
+    if (!ask.success) {
+      return fail(400, { error: 'spostamento non valido' });
+    }
+    return movedAnswer(await moveElement(canvasFrames(scope), ask.data));
+  },
+
+  placeOutput: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = outputAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop') });
+    if (!ask.success) {
+      return fail(400, { error: 'rilascio non valido' });
+    }
+    return movedAnswer(await placeOutput(canvasFrames(scope), ask.data));
   },
 
   disconnect: async ({ request, params, locals }) => {

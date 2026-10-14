@@ -1,4 +1,6 @@
 import type { Db } from '$lib/server/db/client';
+import { readHead, readRevision } from '$lib/server/repos/motion-revisions';
+import { saveMotionDoc } from '$lib/server/motion/editor';
 import type { Actor } from '$lib/server/repos/actor';
 import {
   deleteConnection,
@@ -38,6 +40,8 @@ function redoItemOf(item: UndoItem): UndoItem {
       return { kind: 'edge.delete', edgeId: item.edgeId, sourceNodeId: item.sourceNodeId, targetNodeId: item.targetNodeId };
     case 'edge.delete':
       return { kind: 'edge.create', edgeId: item.edgeId, sourceNodeId: item.sourceNodeId, targetNodeId: item.targetNodeId };
+    case 'doc.revision':
+      return { kind: 'doc.revision', nodeId: item.nodeId, before: item.after, after: item.after + 1 };
   }
 }
 
@@ -117,7 +121,20 @@ async function applyWrite(db: Db, orgId: string, canvasId: string, write: Invers
     case 'restore_edge':
       await restoreConnection(db, { orgId, connectionId: write.edgeId, actor });
       return;
+    case 'restore_doc': {
+      const old = await readRevision(db, { orgId, nodeId: write.nodeId, version: write.version });
+      if (old) {
+        await saveMotionDoc(db, { orgId, nodeId: write.nodeId, expectedVersion: write.expectedVersion, doc: old.doc, actor, summary: `Undid back to version ${write.version}` });
+      }
+      return;
+    }
   }
+}
+
+async function currentDocState(db: Db, orgId: string, nodeId: string): Promise<CurrentNodeState> {
+  const node = await findNode(db, { orgId, nodeId });
+  const head = node ? await readHead(db, { orgId, nodeId }) : null;
+  return node ? { exists: true, version: head?.version ?? 0, connectedBy: [] } : { exists: false };
 }
 
 export async function undoGesture(
@@ -132,6 +149,10 @@ export async function undoGesture(
   for (const item of input.gesture.items) {
     if (item.kind === 'edge.create' || item.kind === 'edge.delete') {
       currentOf.set(item, { edge: await currentEdgeState(db, input.orgId, input.canvasId, item.edgeId) });
+      continue;
+    }
+    if (item.kind === 'doc.revision') {
+      currentOf.set(item, { node: await currentDocState(db, input.orgId, item.nodeId) });
       continue;
     }
     currentOf.set(item, { node: await currentNodeState(db, input.orgId, item.nodeId, ownEdgeIds) });

@@ -241,6 +241,7 @@ list. Returns how many combinations it actually stopped.
 | `list_motion_templates` | `feega motion templates` |
 | `new_motion_from_template` | `feega motion new --template <id> [--format 16:9, 9:16, 1:1, 4:5 or "A poster"] [--still s] [--project id]` |
 | `motion_tool` | `feega motion tools [name]`, `feega motion tool <nodeId> <tool> [--input json] [--version n]`, `feega motion still <nodeId> [--format png] [--scale 2] [--out file]` |
+| `canvas_tool` `move_frame_element` / `place_in_frame` | `feega motion move <frameId> <elementId> [--to frameId] [--x f] [--y f]`, `feega motion place <nodeId> [--to frameId]` |
 | `add_motion_template` | `feega motion add-template <nodeId> <templateId> [--at s] [--var k=v] [--no-sound]` |
 | `get_storyboard` | `feega motion storyboard <nodeId>` |
 | `write_storyboard` | `feega motion storyboard <nodeId> --write beats.json` |
@@ -296,6 +297,13 @@ saved, output }`, the input checked by the tool's own schema (400), screened lik
 (422), saved as a revision by the agent; a stale `version` is 409, an unknown tool 404. Tools that
 need a chat turn answer `ok: false`. `export_image` `{ format: png|jpg|webp, scale: 1|2, time? }`
 draws the still frame (or `time`) at full size and returns `{ asset_id, url, width, height }`.
+
+CLI `motion move` / `motion place`:
+`POST /api/v1/motion/elements` `{ frame_id?, element_id?, node_id?, to_frame_id?, x?, y?, canvas_x?, canvas_y? }` → `{ outcome, frame_id, element_id, new_frame, revisions }`. `frame_id` +
+`element_id` moves a clip into `to_frame_id` (props, style, keyframes kept, re-timed to its fps); `node_id`
+puts a generative image/video/text node's output in as an element, the node unchanged. No
+`to_frame_id`: a new frame at `canvas_x`/`canvas_y`. `x`/`y` 0..1 of the target frame. Stale frame 409,
+same frame 400, nothing generated yet 409. Free.
 
 ## Gallery
 

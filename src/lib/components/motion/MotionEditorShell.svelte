@@ -93,6 +93,8 @@
     type KeyRef,
     type OpResult
   } from '$lib/motion/timeline';
+  import { DragPhase, type ElementOut, type MoveOut } from '$lib/canvas/canvas-drop';
+  import { liftElement } from '$lib/motion/move-element';
   import { adoptHead, amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
   import { Reveal, Snap, clampZoom } from '$lib/motion/timeline-view';
   import { InspectorTab } from '$lib/motion/inspector';
@@ -142,7 +144,7 @@
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
-  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {} }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void } = $props();
+  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null } = $props();
   const rules = $derived(MOUNT[mount]);
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
@@ -553,6 +555,25 @@
     }
     edit(registered.doc, `Uploaded the font ${familyOf(file.name)}`);
     return null;
+  }
+
+  async function moveOut(out: ElementOut, phase: DragPhase) {
+    if (!onmoveout || phase !== DragPhase.Drop) {
+      void onmoveout?.(out, phase, version);
+      return;
+    }
+    if (saveState === SaveState.Pending) {
+      clearTimeout(saveTimer ?? undefined);
+      await save();
+    }
+    const landed = await onmoveout(out, phase, version);
+    const lifted = landed === null ? null : liftElement(history.present, out.clipId);
+    if (!lifted?.ok || landed === null) {
+      return;
+    }
+    history = adoptHead(history, lifted.doc, version);
+    version = landed;
+    selection = selection.filter((id) => id !== out.clipId);
   }
 
   async function pullExternalEdit() {
@@ -1454,7 +1475,7 @@
       {#snippet player()}
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
-        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} />{/if}
+        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}

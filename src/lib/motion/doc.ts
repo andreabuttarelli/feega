@@ -170,7 +170,8 @@ export const motionDocSchema = z
     style: z.enum(MOTION_STYLES).optional(),
     script: scriptSchema.optional(),
     referenceLook: referenceLookSchema.optional(),
-    still: stillSchema.optional()
+    still: stillSchema.optional(),
+    links: z.record(z.string().min(1), z.string().min(1)).optional()
   })
   .refine((d) => Math.min(d.width, d.height) <= MAX_SHORT_SIDE || (d.width === d.height && d.width <= LARGE_SQUARE), 'resolution above 1080p (a 1440 square is the one exception)')
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] })

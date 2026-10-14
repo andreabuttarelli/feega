@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
+  import { DragPhase, isOutside, type ElementOut } from '$lib/canvas/canvas-drop';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { selectionView } from '$lib/motion/selection-context';
   import type { ComponentId } from '$lib/motion/components';
@@ -19,7 +20,8 @@
     part = $bindable(null),
     onparts = () => {},
     outlined = null,
-    onhover = () => {}
+    onhover = () => {},
+    ondragout = null
   }: {
     doc: MotionDoc;
     frame: number;
@@ -32,6 +34,7 @@
     onparts?: (parts: Record<string, string[]>) => void;
     outlined?: string | null;
     onhover?: (id: string | null) => void;
+    ondragout?: ((out: ElementOut, phase: DragPhase) => void) | null;
   } = $props();
 
   const shared = selectionView()!;
@@ -205,9 +208,30 @@
       .map((id) => aabb(quadOf(doc, id, frame, boxes[id])));
   }
 
+  let out = false;
+
+  function leaving(e: PointerEvent): ElementOut | null {
+    if (!ondragout || grab?.grip !== Grip.Move || !isOutside(host!.getBoundingClientRect(), { x: e.clientX, y: e.clientY })) {
+      return null;
+    }
+    const b = boxes[grab.clipId];
+    const box = b ? { left: b.left / doc.width, top: b.top / doc.height, width: b.width / doc.width, height: b.height / doc.height } : null;
+    return { clipId: grab.clipId, client: { x: e.clientX, y: e.clientY }, box };
+  }
+
   function move(e: PointerEvent) {
     if (!grab) {
       hover = e.pointerType === 'mouse' ? (stackAt(doc, frame, boxes, local(e))[0] ?? null) : null;
+      return;
+    }
+    const outside = leaving(e);
+    if (outside || out) {
+      ondragout?.(outside ?? { clipId: grab.clipId, client: { x: e.clientX, y: e.clientY }, box: null }, outside ? DragPhase.Over : DragPhase.Back);
+      out = outside !== null;
+    }
+    if (outside) {
+      live = null;
+      onpreview(null);
       return;
     }
     const box = boxes[grab.clipId];
@@ -223,12 +247,18 @@
     onpreview(result.doc);
   }
 
-  function end() {
+  function end(e: PointerEvent | null) {
     const done = live;
     const grip = grab?.grip;
+    const outside = grab && e ? leaving(e) : null;
+    out = false;
     grab = null;
     live = null;
     onpreview(null);
+    if (outside) {
+      ondragout?.(outside, DragPhase.Drop);
+      return;
+    }
     if (done && grip) {
       onchange(done.doc, SUMMARY[grip]);
     }
@@ -245,7 +275,7 @@
   }
 </script>
 
-<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={editPart} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={end} onpointerleave={() => (hover = null)}>
+<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={editPart} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} />{/if}
     {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}

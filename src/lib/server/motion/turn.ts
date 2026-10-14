@@ -69,6 +69,7 @@ import { Preset, settingsOf, type Quality } from '$lib/motion/export-formats';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import type { MotionNode } from '$lib/canvas/motion-node';
 import { createRenderLink } from './render-link';
+import { frameMover } from './move-element';
 import { exportStill } from './still-export';
 import { renderPagePath } from '$lib/motion/render-link';
 import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
@@ -382,6 +383,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
     storyboard,
     exportStill: (doc, spec) => exportStill(db, { orgId, projectId: project.id, nodeId: motion.record.id }, doc, spec, { tokens, assets }),
+    moveOut: frameMover(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, projectId: project.id }, motion.record.id),
     copywrite: async (script) => {
       const ask = async (prompt: string) => ({ answer: await llmStructured({ prompt, schema: COPY_SCHEMA, model: roleModel(StudioRole.Copywriter, model), temperature: 0.4, label: STUDIO_ROSTER[StudioRole.Copywriter].label }), usd: billedUsdInScope() ?? 0 });
       const out = await withOrgContext(orgId, () => copywrite({ ask }, script));

@@ -28,3 +28,38 @@ export function dayUnderPointer(at: PointerPoint, draggedIds: string[]): DayTarg
   }
   return null;
 }
+
+export type StageRect = { left: number; top: number; width: number; height: number };
+
+const unit = (value: number) => Math.min(1, Math.max(0, value));
+
+export function fractionIn(stage: StageRect, at: PointerPoint): PointerPoint {
+  return { x: unit((at.x - stage.left) / Math.max(stage.width, 1)), y: unit((at.y - stage.top) / Math.max(stage.height, 1)) };
+}
+
+export type FrameTarget = { frameId: string; at: PointerPoint };
+
+export function frameUnderPointer(at: PointerPoint, exceptId: string | null = null): FrameTarget | null {
+  for (const element of document.elementsFromPoint(at.x, at.y)) {
+    const frame = (element as HTMLElement).closest<HTMLElement>('[data-motion-node]');
+    const frameId = frame?.dataset.motionNode;
+    const stage = frame?.querySelector<HTMLElement>('[data-frame-stage]');
+    if (!frameId || !stage || frameId === exceptId) {
+      continue;
+    }
+    return { frameId, at: fractionIn(stage.getBoundingClientRect(), at) };
+  }
+  return null;
+}
+
+export const isOutside = (stage: StageRect, at: PointerPoint) => at.x < stage.left || at.y < stage.top || at.x > stage.left + stage.width || at.y > stage.top + stage.height;
+
+export enum DragPhase {
+  Over = 'over',
+  Back = 'back',
+  Drop = 'drop'
+}
+
+export type ElementOut = { clipId: string; client: PointerPoint; box: StageRect | null };
+
+export type MoveOut = (out: ElementOut, phase: DragPhase, version: number) => Promise<number | null>;
