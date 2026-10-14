@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AddBar, CanvasState, Reframe, addBarOf, reframesOn, NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, inlineMotionTarget, nodeLayers, openingOf } from './inline-motion';
+import { AddBar, CanvasState, Reframe, addBarOf, reframesOn, NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, inlineMotionTarget, nodeLayers, openingOf, ownPlayer } from './inline-motion';
 import { Viewport } from '$lib/motion/editor-layout';
 
 const rows = [
@@ -46,6 +46,16 @@ describe('the node picture while the editor opens', () => {
     expect(nodeLayers(NodeMode.Edit, Paint.Pending)).toEqual({ own: true, editor: false });
     expect(nodeLayers(NodeMode.Edit, Paint.Shown)).toEqual({ own: true, editor: true });
     expect(nodeLayers(NodeMode.Edit, Paint.Swapped)).toEqual({ own: false, editor: true });
+  });
+});
+
+describe('the node player while the editor opens', () => {
+  it('a frame playing or capturing its first frame keeps that picture until the editor draws, not a black stage', () => {
+    expect(ownPlayer(NodeMode.Edit, Paint.Pending, true)).toBe(true);
+    expect(ownPlayer(NodeMode.Edit, Paint.Shown, true)).toBe(true);
+    expect(ownPlayer(NodeMode.Edit, Paint.Swapped, true)).toBe(false);
+    expect(ownPlayer(NodeMode.Preview, Paint.Pending, true)).toBe(true);
+    expect(ownPlayer(NodeMode.Edit, Paint.Pending, false)).toBe(false);
   });
 });
 
