@@ -100,6 +100,8 @@
   --pixel-blue:   #00B2FF;
   --pixel-orange: #FF5A00;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-expo: cubic-bezier(0.87, 0, 0.13, 1);
+  --chrome-move: 360ms;
   --sans: "DM Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display",
           "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
   /* Token reale per il codice in chat & co. — prima ogni file usava var(--mono, fallback)

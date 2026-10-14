@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, SIDE_DEFAULT_PX, SIDE_MIN_PX, Side, TIMELINE_MIN_PX, Transport, Viewport, flip, readLayout, sheetFloor, sideWidth, timelineHeight, toggleSide, toggleTimeline, transportOf, viewportOf, writeLayout } from './editor-layout';
+import { defaultTimelinePx, CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, SIDE_DEFAULT_PX, SIDE_MIN_PX, Side, TIMELINE_MIN_PX, Transport, Viewport, flip, readLayout, sheetFloor, sideWidth, timelineHeight, toggleSide, toggleTimeline, transportOf, viewportOf, writeLayout } from './editor-layout';
 import { Detent } from './sheet-detents';
 
 function memory() {
@@ -113,5 +113,22 @@ describe('transport bar', () => {
   it('lowers the sheet floor to the tabs when hidden', () => {
     expect(sheetFloor(Transport.Shown)).toBe(120);
     expect(sheetFloor(Transport.Hidden)).toBe(56);
+  });
+});
+
+describe('the timeline height an editor opens with', () => {
+  it('is about three tracks, lower on smaller screens, at most 30% of a phone', () => {
+    expect(defaultTimelinePx(Viewport.Desktop, 900)).toBeLessThanOrEqual(220);
+    expect(defaultTimelinePx(Viewport.Desktop, 900)).toBeGreaterThanOrEqual(200);
+    expect(defaultTimelinePx(Viewport.Tablet, 1180)).toBe(180);
+    expect(defaultTimelinePx(Viewport.Phone, 844)).toBeLessThanOrEqual(844 * 0.3);
+    expect(defaultTimelinePx(Viewport.Phone, 500)).toBeGreaterThanOrEqual(TIMELINE_MIN_PX);
+  });
+
+  it('a size the user dragged wins over the default', () => {
+    const store = memory();
+    writeLayout(store, { ...DEFAULT_LAYOUT, timelinePx: 420 });
+    expect(readLayout(store, { ...DEFAULT_LAYOUT, timelinePx: 180 }).timelinePx).toBe(420);
+    expect(readLayout(memory(), { ...DEFAULT_LAYOUT, timelinePx: 180 }).timelinePx).toBe(180);
   });
 });

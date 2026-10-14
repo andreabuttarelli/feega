@@ -2913,3 +2913,6 @@ produzione mostra il banner cookie: la spec mette il cookie di consenso, o il lo
 
 ### Every motion e2e fails at once after a run was killed
 Signal: a batch of `@real` motion specs fails together (`motion-editor` never appears), each passes alone. Cause: a killed playwright run left `reuseExistingServer` on a dying dev server. Move: rerun on a clean server before judging a spec.
+
+### A seeded e2e on production stalls production
+Signal: `@real` specs create and tear down orgs on the production Supabase project; a teardown froze production for 30 s. Move: run seeded e2e only against a non-production database; until one exists, unit and route tests with fakes.

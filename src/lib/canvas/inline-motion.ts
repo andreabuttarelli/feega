@@ -68,3 +68,33 @@ export const NEIGHBOUR_WHILE_EDITING: Record<Part, number> = {
 };
 
 export const neighbourStyle = () => Object.entries(NEIGHBOUR_WHILE_EDITING).map(([part, opacity]) => `--neighbour-${part}: ${opacity}`).join('; ');
+
+export enum Reframe {
+  Stay = 'stay',
+  Frame = 'frame'
+}
+
+const REFRAME: Record<Viewport, Reframe> = {
+  [Viewport.Desktop]: Reframe.Stay,
+  [Viewport.Tablet]: Reframe.Frame,
+  [Viewport.Phone]: Reframe.Frame
+};
+
+export const reframesOn = (viewport: Viewport): Reframe => REFRAME[viewport];
+
+export enum CanvasState {
+  Browsing = 'browsing',
+  Editing = 'editing'
+}
+
+export enum AddBar {
+  Shown = 'shown',
+  Away = 'away'
+}
+
+const ADD_BAR: Record<CanvasState, AddBar> = {
+  [CanvasState.Browsing]: AddBar.Shown,
+  [CanvasState.Editing]: AddBar.Away
+};
+
+export const addBarOf = (state: CanvasState): AddBar => ADD_BAR[state];

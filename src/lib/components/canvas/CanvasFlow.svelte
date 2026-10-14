@@ -34,6 +34,7 @@
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
   import CanvasAddBar from './CanvasAddBar.svelte';
+  import type { AddBar } from '$lib/canvas/inline-motion';
   import CanvasKeys from './CanvasKeys.svelte';
   import CanvasSelectionBridge from './CanvasSelectionBridge.svelte';
   import CanvasImageTiers from './CanvasImageTiers.svelte';
@@ -132,6 +133,8 @@
     onCopy,
     onPaste,
     onTemplate,
+    onFrameTemplates,
+    addBar,
     onUndo,
     onRedo,
     onConnectNew,
@@ -204,6 +207,8 @@
     /** ⌘V: incolla, al centro di quel che si sta guardando adesso. */
     onPaste?: (at: { x: number; y: number }) => void;
     onTemplate?: (id: string, at: { x: number; y: number }) => void;
+    onFrameTemplates?: (at: { x: number; y: number }) => void;
+    addBar?: AddBar;
     /** ⌘Z: annulla l'ultimo gesto di questa scheda. */
     onUndo?: () => void;
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
@@ -689,6 +694,13 @@
     }
   }
 
+  function framesAtCentre() {
+    const at = viewCentre();
+    if (at) {
+      onFrameTemplates?.(at);
+    }
+  }
+
   let wrap = $state<HTMLDivElement | null>(null);
 
   const tierBoard = provideTierBoard();
@@ -776,7 +788,7 @@
   {/if}
 
   {#if spec.chrome && onCreate}
-    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} ontemplate={onTemplate ? templateAtCentre : undefined} />
+    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} ontemplate={onTemplate ? templateAtCentre : undefined} onframes={onFrameTemplates ? framesAtCentre : undefined} shown={addBar} />
   {/if}
 
   {#if spec.chrome}
