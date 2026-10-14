@@ -20,5 +20,14 @@ still read flat.
 - Every solid accent under white text (`share`, `render`, export…) uses `--ui-accent-solid`, AA.
 - `cn` knows `text-ui-*` sizes are not colours (they were dropped next to a text colour).
 
+**Second pass (pro-editor reference).** Left panel: Layers / Assets segmented tabs (the rail
+still toggles; brands and influencers keep their title), a search field that keeps a match's
+parents (`searchRows`), type icons in `--ui-type-frame/text/media`. Bottom bar: zoom % on the
+canvas, centred on the stage left visible beside the editor's side column (`barShift`, e2e
+`canvas-bar-centred.spec.ts`). Top bar: canvas title centred while browsing (inline while a
+frame is open, where the transport takes the centre), collaborators' avatars on the right.
+Chat / Guide and Properties / Chat tabs are segmented controls. Cursor name pills: semibold,
+raised.
+
 **Not done here.** The Properties panel content belongs to the inspector redesign; the timeline
 and chat panel follow the tokens only. Behaviour is unchanged.

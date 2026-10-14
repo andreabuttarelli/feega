@@ -234,6 +234,7 @@
             kind={leftPanel}
             labelKey={NAV_ENTRIES.find((entry) => entry.id === leftPanel)?.labelKey ?? ''}
             onclose={() => (leftPanel = null)}
+            onkind={(kind) => (leftPanel = kind)}
           />
         {/await}
       {/if}

@@ -29,6 +29,7 @@
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { matching, needsSearch, recentFirst } from '$lib/canvas/switcher-list';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { Capability, modeAllows, modeOf, ProjectMode } from '$lib/project-mode';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string; mode?: string };
@@ -206,6 +207,7 @@
     </DropdownMenu.Root>
     {/if}
 
+    <div class="canvas-title" class:centred={!inlineStage.editing} data-testid="canvas-title">
     <span class="sep">/</span>
 
     {#if renaming}
@@ -292,6 +294,7 @@
       </DropdownMenu.Content>
     </DropdownMenu.Root>
     {/if}
+    </div>
   </div>
 
   {#snippet projectRow(project: ProjectRow)}
@@ -332,6 +335,7 @@
 
   <div class="top-slot" data-top-slot></div>
   <div class="top-box right">
+    <div class="top-peers" data-top-peers></div>
     {#if $canvasLink}
       <ConnectionDot state={$canvasLink} />
     {/if}
@@ -398,6 +402,39 @@
 
   .sep {
     color: var(--ui-text-disabled);
+  }
+
+  .top-peers:empty {
+    display: none;
+  }
+
+  .canvas-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .canvas-title.centred {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+  }
+
+  .canvas-title.centred .sep {
+    display: none;
+  }
+
+  @media (max-width: 767px) {
+    .canvas-title.centred {
+      position: static;
+      transform: none;
+    }
+    .canvas-title.centred .sep {
+      display: inline;
+    }
   }
 
   :global(.switcher-btn) {

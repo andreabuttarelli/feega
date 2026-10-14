@@ -215,3 +215,20 @@ export function rowsInside<R extends { key: string; depth: number }>(rows: reado
   }
   return inside;
 }
+
+export function searchRows<R extends { depth: number; label: string }>(rows: readonly R[], query: string): R[] {
+  const needle = query.trim().toLowerCase();
+  if (!needle) {
+    return [...rows];
+  }
+  const kept = new Set<number>();
+  const trail: number[] = [];
+  rows.forEach((row, i) => {
+    trail.length = row.depth;
+    trail[row.depth] = i;
+    if (row.label.toLowerCase().includes(needle)) {
+      trail.forEach((at) => kept.add(at));
+    }
+  });
+  return rows.filter((_, i) => kept.has(i));
+}

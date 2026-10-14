@@ -23,8 +23,11 @@
     onupload,
     ontemplate,
     onframes,
-    context = BarContext.Canvas
-  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; context?: BarContext } = $props();
+    context = BarContext.Canvas,
+    zoom
+  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; context?: BarContext; zoom?: number } = $props();
+
+  const PERCENT = 100;
 
   let showMore = $state(false);
   let showTemplates = $state(false);
@@ -200,6 +203,9 @@
       {#each BAR_SLOTS[context] as s (s)}{@render SLOT[s]()}{/each}
     </div>
   {/key}
+  {#if zoom !== undefined && context === BarContext.Canvas}
+    <span class="zoom" data-testid="canvas-zoom" title="Zoom · 0 fits the canvas">{Math.round(zoom * PERCENT)}%</span>
+  {/if}
   <input
     bind:this={fileInput}
     type="file"
@@ -267,6 +273,25 @@
 
   .pick {
     cursor: pointer;
+  }
+
+  .zoom {
+    display: inline-flex;
+    align-items: center;
+    height: 36px;
+    margin-left: 4px;
+    padding: 0 12px 0 10px;
+    border-left: 1px solid var(--ui-divider);
+    font-family: var(--ui-mono);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 767px) {
+    .zoom {
+      display: none;
+    }
   }
 
   .pick.on {

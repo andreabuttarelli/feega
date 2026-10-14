@@ -17,7 +17,7 @@
   import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import PartsProbe from './PartsProbe.svelte';
-  import { LayerAction, LayerKind, Pick, dropLayer, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { LayerAction, LayerKind, Pick, dropLayer, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const INDENT_PX = 14;
@@ -89,6 +89,9 @@
   const ROW_ICON: Record<string, typeof Square> = { motion: Clapperboard, image: ImageIcon, text: TypeIcon, arrow: ArrowRight };
   const isPicked = (row: LayerRow) => rowPicked(row, selection);
   const inside = $derived(rowsInside(rows, isPicked));
+  let query = $state('');
+  const shown = $derived(searchRows(rows, query));
+  const ROW_HUE: Record<string, string> = { motion: 'var(--ui-type-frame)', image: 'var(--ui-type-media)', video: 'var(--ui-type-media)', text: 'var(--ui-type-text)' };
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
 
   const pickOf = (e: MouseEvent | KeyboardEvent): Pick => pickFor({ shift: e.shiftKey, mod: e.metaKey || e.ctrlKey });
@@ -169,9 +172,11 @@
   {/key}
 {/if}
 
+<input class="search" type="search" placeholder="Search layers…" aria-label="Search layers" data-testid="layers-search" bind:value={query} />
+
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" onkeydown={onKey}>
-  {#each rows as row (`${row.nodeId}/${row.key}`)}
+  {#each shown as row (`${row.nodeId}/${row.key}`)}
     {@const RowIcon = ROW_ICON[row.type] ?? Square}
     <div
       class="row"
@@ -201,7 +206,7 @@
           {#if folds.has(row.id)}<ChevronRight size={ICON} />{:else}<ChevronDown size={ICON} />{/if}
         </button>
       {/if}
-      <span class="icon"><RowIcon size={ICON} /></span>
+      <span class="icon" style:--hue={ROW_HUE[row.type]}><RowIcon size={ICON} /></span>
       {#if renaming === row.id}
         <!-- svelte-ignore a11y_autofocus -->
         <input class="name-input" value={row.label} autofocus aria-label="Track name" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
@@ -218,11 +223,37 @@
       {/if}
     </div>
   {:else}
-    <p class="empty">Nothing on this canvas yet</p>
+    <p class="empty">{query.trim() ? 'No layer matches' : 'Nothing on this canvas yet'}</p>
   {/each}
 </div>
 
 <style>
+  .search {
+    width: 100%;
+    height: var(--ui-row);
+    margin-bottom: 8px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font: inherit;
+    font-size: var(--ui-type-body);
+    outline: none;
+  }
+
+  .search::placeholder {
+    color: var(--ui-text-tertiary);
+  }
+
+  .search:hover {
+    background: var(--ui-input-hover);
+  }
+
+  .search:focus-visible {
+    box-shadow: var(--ui-ring);
+  }
+
   .layers {
     display: flex;
     flex-direction: column;
@@ -283,7 +314,7 @@
   .icon {
     display: grid;
     place-items: center;
-    color: var(--ui-icon-ink);
+    color: var(--hue, var(--ui-icon-ink));
   }
 
   .name {

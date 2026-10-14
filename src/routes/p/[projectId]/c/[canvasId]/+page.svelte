@@ -32,6 +32,7 @@
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
+  import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
   import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
@@ -873,6 +874,10 @@
   let failed = $state<string | null>(null);
   let failedIsCreditsExhausted = $state(false);
   let peers = $state<PresencePeer[]>([]);
+  let topPeers = $state<HTMLElement | null>(null);
+  $effect(() => {
+    topPeers = document.querySelector<HTMLElement>('[data-top-peers]');
+  });
   const frames = frameHub({ userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
   provideFramePresence(frames.port);
   let pending = 0;
@@ -2600,7 +2605,11 @@
 
 <div class="canvas" class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
   {#if peers.length}
-    <div class="peers"><PeerAvatars {peers} /></div>
+    {#if topPeers}
+      <Portal to={topPeers}><PeerAvatars {peers} /></Portal>
+    {:else}
+      <div class="peers"><PeerAvatars {peers} /></div>
+    {/if}
   {/if}
   <p class="save-status" role="status" data-status={saveStatus}>{SAVE_LABEL[saveStatus]}</p>
   {#if failed}

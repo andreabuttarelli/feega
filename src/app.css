@@ -258,6 +258,9 @@
   --ui-ease: var(--ease-expo-out);
   --ui-tooltip: var(--grey-12);
   --ui-tooltip-ink: var(--grey-0);
+  --ui-type-frame: var(--ui-accent-text);
+  --ui-type-text: #7c4dce;
+  --ui-type-media: #1f8a5b;
 }
 
 @media (pointer: coarse) {
@@ -333,6 +336,8 @@
   --ui-shadow-float: 0 0 0 1px rgb(255 255 255 / 0.08), 0 12px 32px -8px rgb(0 0 0 / 0.7);
   --ui-tooltip: var(--grey-6);
   --ui-tooltip-ink: var(--grey-12);
+  --ui-type-text: #b48cff;
+  --ui-type-media: #4cc38a;
 }
 
 @layer base {

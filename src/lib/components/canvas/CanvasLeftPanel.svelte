@@ -8,7 +8,7 @@
   import InfluencersPanel from './InfluencersPanel.svelte';
   import LayersPanel from './LayersPanel.svelte';
   import X from '@lucide/svelte/icons/x';
-  import { IconButton, IconSize, Side } from '$lib/components/ui/shell';
+  import { IconButton, IconSize, SegmentedControl, Side } from '$lib/components/ui/shell';
   import { PANEL_WIDTHS } from '$lib/shell-nav';
 
   /**
@@ -24,13 +24,21 @@
     projectId,
     kind,
     labelKey,
-    onclose
+    onclose,
+    onkind
   }: {
     projectId: string;
     kind: LeftPanelKind;
     labelKey: string;
     onclose: () => void;
+    onkind?: (kind: LeftPanelKind) => void;
   } = $props();
+
+  const TABS: { value: LeftPanelKind; labelKey: string }[] = [
+    { value: 'layers', labelKey: 'app.nav2.layers' },
+    { value: 'assets', labelKey: 'app.nav2.materials' }
+  ];
+  const tabbed = $derived(!!onkind && TABS.some((tab) => tab.value === kind));
 
   const panelWidth = $derived(PANEL_WIDTHS[kind] ?? PANEL_WIDTHS.assets);
 </script>
@@ -42,7 +50,11 @@
 {:else}
   <div class="left-panel" style={`width: min(${panelWidth}px, calc(100vw - 84px));`}>
     <div class="left-panel-head">
-      <h3>{$_(labelKey)}</h3>
+      {#if tabbed && onkind}
+        <SegmentedControl label={$_('app.shell.rail')} value={kind} onchange={(value) => onkind(value as LeftPanelKind)} options={TABS.map((tab) => ({ value: tab.value, label: $_(tab.labelKey) }))} />
+      {:else}
+        <h3>{$_(labelKey)}</h3>
+      {/if}
       <IconButton label={$_('app.shell.closePanel')} shortcut="Escape" size={IconSize.Md} side={Side.Bottom} onclick={onclose}>
         <X />
       </IconButton>

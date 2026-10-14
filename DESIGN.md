@@ -73,7 +73,9 @@ These rules apply to every panel, including the Properties inspector:
 - **Tree selection:** the selected row is a solid accent row with white text; the rows inside it
   are tinted with the accent wash. Each type has its icon.
 - **Floating toolbar:** round tool buttons (`full` radius) in a pill bar, the zoom at the end.
-- **Collaborators:** cursors carry a coloured name pill.
+- **Collaborators:** cursors carry a coloured name pill; avatars sit in the top bar, right.
+- **Type colours:** layer icons use `--ui-type-frame` / `--ui-type-text` / `--ui-type-media`.
+- **Top bar:** project switcher left, canvas title centred, avatars · credits · Share · chat right.
 
 ### type
 

@@ -145,21 +145,25 @@
 
   .chat-tabs {
     flex: 0 0 auto;
+    align-self: flex-start;
     display: flex;
-    gap: 16px;
-    height: 44px;
-    padding: 0 16px;
-    border-bottom: 1px solid var(--ui-divider);
+    gap: 2px;
+    margin: 8px 12px 4px;
+    padding: 2px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
   }
 
   .chat-tab {
     position: relative;
-    padding: 0;
+    height: 28px;
+    padding: 0 12px;
     border: 0;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
     font: inherit;
-    font-size: 13px;
-    font-weight: 500;
+    font-size: var(--ui-type-body);
+    font-weight: var(--ui-weight-medium);
     color: var(--ui-text-secondary);
     cursor: pointer;
   }
@@ -167,21 +171,14 @@
     color: var(--ui-text);
   }
   .chat-tab.is-active {
+    background: var(--ui-panel-raised);
     color: var(--ui-text);
-    font-weight: 600;
-  }
-  .chat-tab.is-active::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -1px;
-    height: 2px;
-    background: var(--ui-text);
+    font-weight: var(--ui-weight-semibold);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
   }
   .chat-tab:focus-visible {
-    outline: 2px solid var(--accent, #c485fe);
-    outline-offset: 2px;
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   .chat-body {
