@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { ACTIONS } from '$lib/motion/actions';
 import { SELECTION_ACTIONS } from '$lib/canvas/selection-actions';
 import { isCanvasOp } from '$lib/server/canvas/canvas-ops';
+import { isEditorOp } from '$lib/server/frame-editor/editor-ops';
 import { motionToolList } from '$lib/server/motion/tool-run';
 import { CANVAS_PAGE_ACTIONS, EDITOR_ACTIONS, FRAME_PAGE_ACTIONS, PARITY_TABLES, SELECTION_TOOLBAR, type Parity, type Route } from './ui-actions';
 
@@ -24,6 +25,7 @@ const motionTools = new Set(motionToolList().map((t) => t.name));
 
 const ROUTE_EXISTS: Record<string, (route: Route) => boolean> = {
   canvas: (route) => 'canvas' in route && isCanvasOp(route.canvas),
+  editor: (route) => 'editor' in route && isEditorOp(route.editor),
   motion: (route) => 'motion' in route && motionTools.has(route.motion),
   tool: (route) => 'tool' in route && mcpTools.has(route.tool)
 };

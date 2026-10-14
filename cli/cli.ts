@@ -259,6 +259,16 @@ motion
   });
 
 motion
+  .command('op <nodeId> <op>')
+  .description('Run a frame editor action on a video, e.g. read_head, save_doc, apply_ops (unknown op lists them all)')
+  .option('--input <json>', 'The op input as JSON')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, op: string, opts) => {
+    const { cmdMotionOp } = await import('./commands/motion.ts');
+    await cmdMotionOp(nodeId, op, opts);
+  });
+
+motion
   .command('tools [name]')
   .description('List the motion editor tools, or describe one with its input schema')
   .option('--org <id>', 'Which org, if you belong to more than one')
