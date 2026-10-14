@@ -16,6 +16,8 @@
   import { DEFAULT_LAYOUT_ITEM, type AutoLayout, type LayoutItem, type Padding } from '$lib/motion/layout/model';
   import { hasBox, layoutParent, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
   import { childrenInOrder } from '$lib/motion/layout/resolve';
+  import { Answer, YES_NO, answerOf } from '$lib/motion/segments';
+  import SegmentedField from './SegmentedField.svelte';
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
 
@@ -34,13 +36,16 @@
     [Flow.Wrap]: { direction: Direction.Horizontal, wrap: true }
   };
 
-  const SIZING_LABEL: Record<Sizing, string> = { [Sizing.Fixed]: 'Fixed', [Sizing.Hug]: 'Hug', [Sizing.Fill]: 'Fill' };
+  const SIZING_LABEL: Record<Sizing, string> = { [Sizing.Fixed]: 'Fixed', [Sizing.Hug]: 'Fit', [Sizing.Fill]: 'Fill' };
   const SIDES: (keyof Padding)[] = ['top', 'right', 'bottom', 'left'];
   const SIDE_LABEL: Record<keyof Padding, string> = { top: 'T', right: 'R', bottom: 'B', left: 'L' };
   const SPOTS = [Align.Start, Align.Center, Align.End] as const;
   const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End };
 
   const layout = $derived(clip.autoLayout ?? null);
+  let splitPadding = $state(false);
+  const evenPadding = $derived(!!layout && SIDES.every((side) => layout.padding[side] === layout.padding.top));
+  const perSide = $derived(splitPadding || !evenPadding);
   const parent = $derived(layoutParent(doc, clip));
   const item = $derived(clip.layoutItem ?? DEFAULT_LAYOUT_ITEM);
   const flow = $derived(layout?.wrap ? Flow.Wrap : layout?.direction === Direction.Vertical ? Flow.Column : Flow.Row);
@@ -97,9 +102,14 @@
         {/if}
       </Field>
       <Field label="Padding">
-        {#each SIDES as side (side)}
-          <input aria-label={`Padding ${side}`} title={SIDE_LABEL[side]} class={cn(FIELD_INPUT, 'w-full px-1')} type="number" min="0" value={layout.padding[side]} data-testid={`auto-layout-padding-${side}`} onchange={(e) => set({ padding: { ...layout.padding, [side]: px(e.currentTarget.value) } }, 'Changed the padding')} />
-        {/each}
+        {#if perSide}
+          {#each SIDES as side (side)}
+            <input aria-label={`Padding ${side}`} title={SIDE_LABEL[side]} class={cn(FIELD_INPUT, 'w-full px-1')} type="number" min="0" value={layout.padding[side]} data-testid={`auto-layout-padding-${side}`} onchange={(e) => set({ padding: { ...layout.padding, [side]: px(e.currentTarget.value) } }, 'Changed the padding')} />
+          {/each}
+        {:else}
+          <input aria-label="Padding" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.padding.top} data-testid="auto-layout-padding" onchange={(e) => set({ padding: { top: px(e.currentTarget.value), right: px(e.currentTarget.value), bottom: px(e.currentTarget.value), left: px(e.currentTarget.value) } }, 'Changed the padding')} />
+          <button type="button" class={cn('shrink-0 rounded-sm px-1.5 text-ui-label text-ui-text-2 hover:bg-ui-wash', FOCUS_RING)} data-testid="auto-layout-padding-sides" onclick={() => (splitPadding = true)}>Per side</button>
+        {/if}
       </Field>
     {/if}
 
@@ -122,7 +132,7 @@
 
     {#if parent}
       <Field label="In layout">
-        <label class="flex items-center gap-1.5 text-ui-label text-ui-text-2"><input type="checkbox" checked={item.absolute} data-testid="auto-layout-absolute" onchange={(e) => size({ absolute: e.currentTarget.checked }, 'Changed absolute position')} /> Absolute</label>
+        <div class="flex min-w-0 flex-1" data-testid="auto-layout-absolute"><SegmentedField name="Absolute" options={YES_NO} value={answerOf(item.absolute)} onchange={(v) => size({ absolute: v === Answer.Yes }, 'Changed absolute position')} /></div>
         <IconButton label="Move earlier" size={IconSize.Sm} disabled={place <= 0} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place - 1), 'Reordered in the auto layout')}><ChevronUp /></IconButton>
         <IconButton label="Move later" size={IconSize.Sm} disabled={place < 0 || place >= siblings.length - 1} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place + 1), 'Reordered in the auto layout')}><ChevronDown /></IconButton>
         <IconButton label="Take out of the auto layout" size={IconSize.Sm} data-testid="auto-layout-leave" onclick={() => commit(leaveAutoLayout(doc, clip.id), 'Took the clip out of the auto layout')}><LogOut /></IconButton>

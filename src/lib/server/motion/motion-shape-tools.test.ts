@@ -79,6 +79,17 @@ describe('motion agent shape tools', () => {
     expect(String((tools.set_props as Tool).description)).toContain('strokes');
   });
 
+  it('set_visibility clips a parent to its box; add_shape names corner smoothing and set_transform names flipping', async () => {
+    const { session, run } = setup();
+    await run('add_shape', { kind: 'rect', start: 0, props: { smoothing: 0.6 } });
+    expect(findClip(session.doc, 'id1')!.clip.props.smoothing).toBe(0.6);
+    expect((await run('set_visibility', { clip_id: 'id1', clip_content: true })).ok).toBe(true);
+    expect(findClip(session.doc, 'id1')!.clip.clipContent).toBe(true);
+    const tools = createMotionTools({ session, assets: [], newId: () => 'x', voiceover: vi.fn(), frames: vi.fn(), check: vi.fn() });
+    expect(String((tools.add_shape as Tool).description)).toContain('smoothing');
+    expect(String((tools.set_transform as Tool).description)).toContain('flip');
+  });
+
   it('the shape tool tells the agent about fill stacks', () => {
     const { session } = setup();
     const tools = createMotionTools({ session, assets: [], newId: () => 'x', voiceover: vi.fn(), frames: vi.fn(), check: vi.fn() });

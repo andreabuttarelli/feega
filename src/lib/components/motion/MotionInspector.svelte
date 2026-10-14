@@ -26,7 +26,11 @@
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
   import { DIAL_KEYS, Part, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
-  import { clipName as layerName } from '$lib/motion/organize';
+  import { clipName as layerName, setClipFlags } from '$lib/motion/organize';
+  import { Flip, flipPatch } from '$lib/motion/layer-props';
+  import { YES_NO, Answer, answerOf } from '$lib/motion/segments';
+  import FlipHorizontal from '@lucide/svelte/icons/flip-horizontal-2';
+  import FlipVertical from '@lucide/svelte/icons/flip-vertical-2';
   import ColorField from './ColorField.svelte';
   import Plus from '@lucide/svelte/icons/plus';
   import Eye from '@lucide/svelte/icons/eye';
@@ -172,7 +176,10 @@
   const transformProps = $derived(focus ? [] : ANIMATABLE[clip.component].filter((p) => p.source === Source.Transform && p.key !== 'anchorX' && p.key !== 'anchorY'));
   const layoutProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Layout));
   const threeDProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.ThreeD));
-  const layerProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Layer));
+  const layerProps = $derived(transformProps.filter((p) => transformSection(p.key) === Section.Layer && p.key !== 'opacity'));
+  const opacityProp = $derived(transformProps.find((p) => p.key === 'opacity') ?? null);
+  const hasChildren = $derived(doc.tracks.some((t) => t.clips.some((c) => c.parent === clip.id)));
+  const flip = (axis: Flip) => commit(setTransform(doc, clip.id, flipPatch({ scaleX: Number(shown('scaleX') ?? 1), scaleY: Number(shown('scaleY') ?? 1) }, axis)), 'Flipped the layer');
   const dialProps = $derived(transformProps.filter((p) => DIAL_KEYS.has(p.key)));
   const fieldsIn = (section: Section) => fields.filter((f) => fieldSection(f, typed) === section);
   const sceneProps = $derived(ANIMATABLE[clip.component].filter((p) => p.source === Source.Scene));
@@ -537,7 +544,7 @@
             {#each field.options ?? [] as option (option)}<option value={option}>{option}</option>{/each}
           </select>
         {:else if field.control === Control.Toggle}
-          <input id={`f-${field.key}`} class="toggle" type="checkbox" checked={value(field) === true} onchange={(e) => setProp(field, e.currentTarget.checked)} />
+          <SegmentedField name={field.label} options={YES_NO} value={answerOf(value(field))} onchange={(v) => setProp(field, v === Answer.Yes)} />
         {:else if field.control === Control.Color}
           <ColorField id={`f-${field.key}`} name={field.label} value={value(field)} {tokens} onchange={(v) => setProp(field, v)} />
         {:else if field.control === Control.Asset}
@@ -562,11 +569,15 @@
           </div>
         {:else if field.control === Control.Corners}
           {@const radii = cornerRadii(Number(clip.props.roundness ?? 0), (value(field) as number[] | undefined) ?? [])}
-          <div class="corners" data-testid="corners">
-            {#each CORNER_NAMES as name, i (name)}
-              <input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={CORNER_PERCENT_MAX} step="1" value={Math.round(radii[i] * PERCENT)} onchange={(e) => setProp(field, withCorner(Number(clip.props.roundness ?? 0), radii, i, Number(e.currentTarget.value) / PERCENT))} />
-            {/each}
-          </div>
+          {@const split = ((value(field) as number[] | undefined) ?? []).length > 0}
+          {#if split}
+            <div class="corners" data-testid="corners">
+              {#each CORNER_NAMES as name, i (name)}
+                <input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={CORNER_PERCENT_MAX} step="1" value={Math.round(radii[i] * PERCENT)} onchange={(e) => setProp(field, withCorner(Number(clip.props.roundness ?? 0), radii, i, Number(e.currentTarget.value) / PERCENT))} />
+              {/each}
+            </div>
+          {/if}
+          <button type="button" class="split" data-testid="radius-per-corner" aria-pressed={split} onclick={() => setProp(field, split ? [] : radii)}>{split ? 'One radius' : 'Per corner'}</button>
         {:else if field.control === Control.Managed}
           <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
         {/if}
@@ -631,17 +642,36 @@
 {/snippet}
 
 {#snippet layerBody()}
-  {#if layerProps.length}<div class="stackable" data-testid="layer-transform">{@render animGrid(layerProps)}</div>{/if}
-  {@render groupFields(Section.Layer)}
   {#if visual && !focus}
-    <div class="line" data-testid="blend-section">
-      <label class="label" for="blend-mode">Blend</label>
+    <div class="line layer-look" data-testid="layer-look">
       <select id="blend-mode" aria-label="Blend mode" data-testid="blend-select" value={clip.blend} onchange={(e) => commit(setBlendMode(doc, clip.id, e.currentTarget.value as BlendMode), 'Changed the blend mode')}>
         {#each BLEND_MODES as mode (mode)}<option value={mode}>{blendLabel(mode)}</option>{/each}
       </select>
+      {#if opacityProp}
+        <input class="opacity-slider" type="range" min="0" max="100" step="1" data-testid="opacity-slider" aria-label="Opacity slider" value={numberShown(opacityProp)} onchange={(e) => animate('opacity', stored('opacity', Number(e.currentTarget.value)))} />
+        <div class="opacity-number">{@render animField(opacityProp)}</div>
+      {/if}
     </div>
+  {/if}
+  {#if layerProps.length}<div class="stackable" data-testid="layer-transform">{@render animGrid(layerProps)}</div>{/if}
+  {@render groupFields(Section.Layer)}
+  {#if visual && !focus}
+    <div class="line" data-testid="flip-section">
+      <span class="label">Flip</span>
+      <ShellIconButton label="Flip horizontal" data-testid="flip-horizontal" onclick={() => flip(Flip.Horizontal)}><FlipHorizontal /></ShellIconButton>
+      <ShellIconButton label="Flip vertical" data-testid="flip-vertical" onclick={() => flip(Flip.Vertical)}><FlipVertical /></ShellIconButton>
+    </div>
+    {#if hasChildren}
+      <div class="line" data-prop="clipContent">
+        <span class="label">Clip content</span>
+        <SegmentedField name="Clip content" options={YES_NO} value={answerOf(clip.clipContent)} onchange={(v) => commit(setClipFlags(doc, clip.id, { clipContent: v === Answer.Yes }), 'Changed clip content')} />
+      </div>
+    {/if}
     {#if doc.motionBlur.enabled}
-      <label class="check" data-testid="clip-blur-section"><input type="checkbox" data-testid="clip-blur" checked={clip.motionBlur} onchange={(e) => commit(setClipsBlur(doc, [clip.id], e.currentTarget.checked), 'Changed motion blur')} /> Motion blur</label>
+      <div class="line" data-testid="clip-blur-section">
+        <span class="label">Motion blur</span>
+        <SegmentedField name="Motion blur" options={YES_NO} value={answerOf(clip.motionBlur)} onchange={(v) => commit(setClipsBlur(doc, [clip.id], v === Answer.Yes), 'Changed motion blur')} />
+      </div>
     {/if}
   {/if}
 {/snippet}
@@ -1270,6 +1300,30 @@
     gap: 6px;
     align-items: center;
     font-weight: 600;
+  }
+  .layer-look {
+    gap: 6px;
+  }
+  .layer-look select {
+    flex: 1;
+    min-width: 0;
+  }
+  .opacity-slider {
+    width: 56px;
+    flex-shrink: 0;
+    accent-color: var(--ui-accent);
+  }
+  .opacity-number {
+    width: 124px;
+    flex-shrink: 0;
+  }
+  .split {
+    border: 0;
+    background: none;
+    color: var(--ui-text-2);
+    font: inherit;
+    cursor: pointer;
+    white-space: nowrap;
   }
   .effect-open {
     min-width: 0;

@@ -78,6 +78,7 @@ const CLIP: Record<string, Access> = {
   hidden: { write: ['set_visibility'], read: 'hidden' },
   locked: { write: ['set_visibility'], read: 'locked' },
   bleed: { write: ['set_visibility'], read: 'bleed' },
+  clipContent: { write: ['set_visibility'], read: 'clipContent' },
   markers: { write: ['set_marker', 'remove_marker'], read: 'markers' }
 };
 

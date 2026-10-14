@@ -62,7 +62,7 @@ export function loopFrame(doc: MotionDoc, frame: number): number {
 }
 
 type Flags = { hidden?: boolean; locked?: boolean };
-type ClipFlags = Flags & { bleed?: boolean };
+type ClipFlags = Flags & { bleed?: boolean; clipContent?: boolean };
 
 export function setTrackFlags(doc: MotionDoc, trackId: string, flags: Flags): OpResult {
   return doc.tracks.some((t) => t.id === trackId) ? ok({ ...doc, tracks: doc.tracks.map((t) => (t.id === trackId ? { ...t, ...flags } : t)) }) : fail(`no track ${trackId}`);
