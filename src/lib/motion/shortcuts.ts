@@ -46,7 +46,12 @@ export enum Command {
   ToggleInspector = 'toggle-inspector',
   ToggleTimeline = 'toggle-timeline',
   Help = 'help',
-  Precompose = 'precompose'
+  Precompose = 'precompose',
+  ToolSelect = 'tool-select',
+  ToolText = 'tool-text',
+  ToolRectangle = 'tool-rectangle',
+  ToolEllipse = 'tool-ellipse',
+  ToolPen = 'tool-pen'
 }
 
 export enum ShortcutGroup {
@@ -54,6 +59,7 @@ export enum ShortcutGroup {
   Time = 'Time',
   Editing = 'Editing',
   Layers = 'Layers',
+  Draw = 'Draw',
   View = 'View'
 }
 
@@ -119,6 +125,11 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'b', mod: true, command: Command.ToggleChat, label: '⌘B', does: 'Show / hide the agent', group: ShortcutGroup.View },
   { key: 'b', mod: true, alt: true, command: Command.ToggleInspector, label: '⌥⌘B', does: 'Show / hide properties', group: ShortcutGroup.View },
   { key: 'j', mod: true, command: Command.ToggleTimeline, label: '⌘J', does: 'Show / hide the timeline', group: ShortcutGroup.View },
+  { key: 'v', command: Command.ToolSelect, label: 'V', does: 'Select tool', group: ShortcutGroup.Draw },
+  { key: 't', shift: true, command: Command.ToolText, label: '⇧T', does: 'Text tool: drag in the frame', group: ShortcutGroup.Draw },
+  { key: 'r', shift: true, command: Command.ToolRectangle, label: '⇧R', does: 'Rectangle tool', group: ShortcutGroup.Draw },
+  { key: 'o', shift: true, command: Command.ToolEllipse, label: '⇧O', does: 'Ellipse tool', group: ShortcutGroup.Draw },
+  { key: 'p', shift: true, command: Command.ToolPen, label: '⇧P', does: 'Pen tool: click points, drag for curves', group: ShortcutGroup.Draw },
   { key: '?', shift: true, command: Command.Help, label: '?', does: 'Keyboard & gestures', group: ShortcutGroup.View }
 ];
 
