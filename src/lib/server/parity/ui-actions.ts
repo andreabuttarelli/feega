@@ -19,7 +19,6 @@ const gap = (reason: string): Parity => ({ gap: reason });
 
 const VIEW = uiOnly('view state (playhead, zoom, panels, selection): nothing is saved');
 const CLIPBOARD = uiOnly('browser clipboard; the paste lands through a saved tool');
-const ONBOARDING = uiOnly('first-run coach for a person');
 const NAVIGATION = uiOnly('navigation between screens');
 
 
@@ -68,11 +67,11 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   remove: canvas('delete_node'),
   duplicate: canvas('duplicate_nodes'),
   paste: canvas('paste_nodes'),
-  demo_run: ONBOARDING,
-  onboarding_end: ONBOARDING,
+  demo_run: canvas('run_demo'),
+  onboarding_end: canvas('end_onboarding'),
   frame_template: canvas('add_frame_from_template'),
   template: canvas('insert_template'),
-  undo: uiOnly('replays the browser gesture stack; an agent reverses its own write with the inverse op or restore_motion_revision'),
+  undo: canvas('undo_gesture'),
   suggestNextStep: uiOnly('suggestion chips for a person')
 };
 

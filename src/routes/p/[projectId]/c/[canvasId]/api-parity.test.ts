@@ -153,4 +153,39 @@ describe('the canvas page action and its /api/v1 op answer the same', () => {
 
     expect(endpoint.data.error).toBe('canvas_not_found');
   });
+
+  const gesture = [{ kind: 'node.create', nodeId: NODE, after: { prompt: 'a', status: 'idle' } }];
+
+  it('undo and undo_gesture', async () => {
+    const action = await viaAction('undo', { items: JSON.stringify(gesture) });
+    const endpoint = await viaEndpoint('undo_gesture', { canvasId: CANVAS, items: gesture });
+
+    expect(action.status).toBe(200);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('undo refuses an unknown gesture through both doors', async () => {
+    const bad = [{ kind: 'node.explode' }];
+    const action = await viaAction('undo', { items: JSON.stringify(bad) });
+    const endpoint = await viaEndpoint('undo_gesture', { canvasId: CANVAS, items: bad });
+
+    expect(action.status).toBe(400);
+    expect(endpoint.data.error).toBe('invalid_gesture');
+  });
+
+  it('demo_run and run_demo refuse an incomplete chain alike', async () => {
+    const action = await viaAction('demo_run', {});
+    const endpoint = await viaEndpoint('run_demo', { canvasId: CANVAS });
+
+    expect(action).toEqual({ status: 400, data: { error: 'chain_incomplete' } });
+    expect(endpoint.data.error).toBe('chain_incomplete');
+  });
+
+  it('onboarding_end and end_onboarding', async () => {
+    const action = await viaAction('onboarding_end', { status: 'dismissed' });
+    const endpoint = await viaEndpoint('end_onboarding', { status: 'dismissed' });
+
+    expect(action.status).toBe(200);
+    expect(endpoint).toEqual(action);
+  });
 });

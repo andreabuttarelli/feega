@@ -187,7 +187,7 @@ and its session. Free.
 through the same code: `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `list_connections`, `list_runs`,
 `list_templates`, `create_node`, `update_node`, `move_node`, `resize_node`, `duplicate_nodes`,
 `write_nodes`, `paste_nodes`,
-`connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `delete_node`, `create_canvas`,
+`connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `undo_gesture`, `run_demo`, `end_onboarding`, `delete_node`, `create_canvas`,
 `rename_canvas`, `delete_canvas`, `rename_project`, `share_canvas`, `share_doc`,
 `insert_template`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,
 `show_run`, `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
