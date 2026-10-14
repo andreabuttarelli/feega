@@ -88,6 +88,8 @@ import { DEVICE_PRESETS, PRESET as DEVICE_PRESET, addDeviceRow, applyDevicePrese
 import { CAMERA_PRESETS, PRESETS, applyPreset, removeCamera, setCamera, setCameraKeyframes, setClipDepth } from '$lib/motion/camera-ops';
 import { ParentOpacity } from '$lib/motion/parent';
 import { addNull, nullFromSelection, setParent, setParentOpacity } from '$lib/motion/parent-ops';
+import { leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout } from '$lib/motion/layout/ops';
+import { autoLayoutPatchSchema, layoutItemPatchSchema } from '$lib/motion/layout/model';
 import { setCameraExpression, setExpression } from '$lib/motion/expression/ops';
 import { EXPRESSION_GUIDE } from '$lib/motion/expression/guide';
 import { INTERACTIVE_PRESETS, PRESET, applyInteractivePreset, setInteractive } from '$lib/motion/interactive/presets';
@@ -322,6 +324,8 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         space: c.space,
         parent: c.parent,
         parentOpacity: c.parentOpacity,
+        autoLayout: c.autoLayout ?? null,
+        layoutItem: c.layoutItem ?? null,
         expressions: c.expressions,
         effects: c.effects,
         shaders: c.shaders,
@@ -1390,6 +1394,43 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const out = apply(nullFromSelection(session.doc, input.clip_ids, Math.min(...input.clip_ids.map((c) => findClip(session.doc, c)?.clip.from ?? 0)), id), `grouped ${input.clip_ids.length} clip(s) under a null`);
         return out.ok ? { ...out, null_id: id } : out;
       }
+    }),
+
+    add_auto_layout: tool({
+      description: 'Auto layout (Figma-style flexbox). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (its fill is the frame background, set_props to colour it) on a track below them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1).optional(), clip_id: z.string().optional() }),
+      execute: async (input) => {
+        if (input.clip_id) {
+          return apply(setAutoLayout(session.doc, input.clip_id, {}), `auto layout on ${input.clip_id}`);
+        }
+        const id = deps.newId();
+        const out = apply(wrapInAutoLayout(session.doc, input.clip_ids ?? [], id, deps.newId()), `wrapped ${input.clip_ids?.length ?? 0} clip(s) in an auto layout`);
+        return out.ok ? { ...out, container_id: id } : out;
+      }
+    }),
+
+    set_auto_layout: tool({
+      description: 'Change an auto layout container: direction horizontal|vertical, wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, padding {top,right,bottom,left} px, justify start|center|end|space-between on the main axis, align start|center|end on the cross axis, order (child ids, first to last). Only the fields given change. off true removes the auto layout (children keep their parent).',
+      inputSchema: autoLayoutPatchSchema.extend({ clip_id: z.string(), off: z.boolean().optional() }),
+      execute: async ({ clip_id, off, ...patch }) => apply(setAutoLayout(session.doc, clip_id, off ? null : patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
+    }),
+
+    set_layout_item: tool({
+      description: 'How a clip sizes inside its auto layout, per axis: fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; only inside a container). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this.',
+      inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string() }),
+      execute: async ({ clip_id, ...patch }) => apply(setLayoutItem(session.doc, clip_id, patch), `sized ${clip_id} in its auto layout`)
+    }),
+
+    reorder_auto_layout: tool({
+      description: 'Move a child of an auto layout to position index (0 = first) in its container.',
+      inputSchema: z.object({ container_id: z.string(), clip_id: z.string(), index: z.number().int().min(0) }),
+      execute: async (input) => apply(reorderChild(session.doc, input.container_id, input.clip_id, input.index), `moved ${input.clip_id} to ${input.index}`)
+    }),
+
+    leave_auto_layout: tool({
+      description: 'Take a clip out of its auto layout: it is unparented and keeps the box it was laid out in.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(leaveAutoLayout(session.doc, input.clip_id), `took ${input.clip_id} out of its auto layout`)
     }),
 
     set_expression: tool({
