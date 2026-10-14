@@ -81,6 +81,7 @@ async function open(page: Page, stage: Locator, touch: boolean) {
   const position = { x: (left + Math.min(box.x + box.width, view.width)) / 2 - box.x, y: (top + Math.min(box.y + box.height, view.height)) / 2 - box.y };
   if (touch) {
     await stage.tap({ position });
+    await stage.getByTestId('open-motion-editor').dispatchEvent('click');
     return;
   }
   await stage.click({ position });

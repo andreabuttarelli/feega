@@ -9,7 +9,7 @@ import { CONSENT_COOKIE, CONSENT_VERSION, encodeConsent } from '../../src/lib/co
 type Seed = { x: number; y: number; format: string; doc: unknown; poster: Buffer };
 type Live = { players: number; offscreen: number; iframes: number; webgl: number };
 type Motion = { fpsAvg: number; fpsP5: number; longTasks: number; longTaskMs: number; peakPlayers: number; peakOffscreen: number };
-type Report = { loadMs: number; afterLoad: Live; pan: Motion; zoom: Motion; heapMb: number; dom: number };
+type Report = { loadMs: number; afterLoad: Live; pan: Motion; zoom: Motion; zoomSweep: Motion; heapMb: number; dom: number };
 
 const COLUMNS = 4;
 const STEP = { x: 520, y: 640 };
@@ -148,6 +148,29 @@ async function zoom(page: Page, until: number) {
   await page.keyboard.up('Control');
 }
 
+async function zoomSweep(page: Page, until: number) {
+  const size = page.viewportSize()!;
+  await page.mouse.move(size.width / 2, size.height / 2);
+  await page.keyboard.down('Control');
+  for (let i = 0; Date.now() < until - SAMPLE_MS; i++) {
+    await page.mouse.wheel(0, Math.floor(i / 6) % 2 ? 250 : -250);
+  }
+  await page.keyboard.up('Control');
+}
+
+async function pinchSweep(page: Page, cdp: CDPSession, until: number) {
+  const size = page.viewportSize()!;
+  const centre = { x: size.width / 2, y: size.height / 2 };
+  for (let round = 0; Date.now() < until - SAMPLE_MS; round++) {
+    const steps = Array.from({ length: 6 }, (_, s) => 10 + (round % 2 ? 5 - s : s) * 34);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: centre.x - steps[0], y: centre.y, id: 1 }, { x: centre.x + steps[0], y: centre.y, id: 2 }] });
+    for (const d of steps.slice(1)) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: centre.x - d, y: centre.y, id: 1 }, { x: centre.x + d, y: centre.y, id: 2 }] });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+}
+
 async function touch(cdp: CDPSession, points: { x: number; y: number }[]) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [points[0]] });
   for (const point of points.slice(1)) {
@@ -225,12 +248,14 @@ test.describe('a heavy canvas of motion nodes stays smooth @real', () => {
     const afterLoad = await live(page);
     const pan = await during(page, PAN_MS, (until) => sweep(page, until));
     const zoomed = await during(page, ZOOM_MS, (until) => zoom(page, until));
-    report('desktop', { loadMs, afterLoad, pan, zoom: zoomed, ...(await heapAndDom(cdp)) });
+    const swept = await during(page, ZOOM_MS, (until) => zoomSweep(page, until));
+    report('desktop', { loadMs, afterLoad, pan, zoom: zoomed, zoomSweep: swept, ...(await heapAndDom(cdp)) });
 
     expect(afterLoad.players).toBe(0);
     expect(afterLoad.webgl).toBe(0);
     expect(pan.peakPlayers).toBe(0);
     expect(pan.fpsAvg).toBeGreaterThanOrEqual(DESKTOP_MIN_FPS);
+    expect(swept.peakPlayers).toBe(0);
 
     await open(page, cdp, `/p/${session.projectId}/c/${session.canvasId}`, 1);
     const node = page.getByTestId('motion-node').first();
@@ -251,9 +276,10 @@ test.describe('a heavy canvas of motion nodes stays smooth @real', () => {
     const afterLoad = await live(page);
     const pan = await during(page, PAN_MS, (until) => swipe(page, cdp, until));
     const zoomed = await during(page, ZOOM_MS, (until) => pinch(page, cdp, until));
+    const swept = await during(page, ZOOM_MS, (until) => pinchSweep(page, cdp, until));
     const memory = await heapAndDom(cdp);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
-    report('phone', { loadMs, afterLoad, pan, zoom: zoomed, ...memory });
+    report('phone', { loadMs, afterLoad, pan, zoom: zoomed, zoomSweep: swept, ...memory });
 
     expect(afterLoad.players).toBe(0);
     expect(pan.peakPlayers).toBe(0);

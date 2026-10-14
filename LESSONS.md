@@ -2902,3 +2902,6 @@ Un `pointerenter` (o un tocco) che monta un player lo fa a ogni nodo attraversat
 dopo; il player del nodo parte solo da Play (`motion-preview.ts`). Il pan su telefono va misurato
 senza tap: un tap apre l'editor inline, che ha il suo player e sporca i numeri. Il build di
 produzione mostra il banner cookie: la spec mette il cookie di consenso, o il login non clicca.
+
+### Every motion e2e fails at once after a run was killed
+Signal: a batch of `@real` motion specs fails together (`motion-editor` never appears), each passes alone. Cause: a killed playwright run left `reuseExistingServer` on a dying dev server. Move: rerun on a clean server before judging a spec.
