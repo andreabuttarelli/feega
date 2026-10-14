@@ -336,7 +336,7 @@
   <div class="top-slot" data-top-slot></div>
   <div class="top-box right">
     <div class="top-peers" data-top-peers></div>
-    {#if $canvasLink}
+    {#if $canvasLink && !inlineStage.editing}
       <ConnectionDot state={$canvasLink} />
     {/if}
     <a href={BILLING_PATH} class="credits">
@@ -445,7 +445,7 @@
     appearance: none;
     border: 0;
     background: transparent;
-    height: 28px;
+    height: var(--ui-control-h);
     padding: 0 8px;
     border-radius: var(--ui-radius-sm);
     font: inherit;
@@ -500,8 +500,8 @@
   .chat-toggle {
     display: grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
+    width: var(--ui-control-h);
+    height: var(--ui-control-h);
     flex-shrink: 0;
     appearance: none;
     border: 0;
@@ -546,8 +546,8 @@
     display: inline-flex;
     flex-shrink: 0;
     align-items: center;
-    height: 24px;
-    padding: 0 8px;
+    height: var(--ui-control-h);
+    padding: 0 10px;
     border-radius: var(--ui-radius-full);
     font-family: var(--ui-mono);
     font-size: var(--ui-type-caption);

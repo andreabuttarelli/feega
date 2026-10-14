@@ -246,6 +246,7 @@
   --ui-tracking-title: -0.01em;
   --ui-leading-tight: 1.2;
   --ui-leading: 1.45;
+  --ui-control-h: 28px;
   --ui-row-sm: 28px;
   --ui-row: 32px;
   --ui-row-lg: 36px;
@@ -266,6 +267,7 @@
 @media (pointer: coarse) {
   :root {
     --ui-hit: 44px;
+    --ui-control-h: 44px;
   }
 }
 

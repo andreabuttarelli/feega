@@ -263,13 +263,19 @@
   :global(.burger-btn) {
     display: grid;
     place-items: center;
-    width: 30px;
-    height: 30px;
+    width: var(--ui-control-h);
+    height: var(--ui-control-h);
     appearance: none;
     border: 0;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
-    color: var(--ui-text-secondary);
+    color: var(--ui-icon-ink);
     cursor: pointer;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease);
+  }
+  :global(.burger-btn:focus-visible) {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
   :global(.burger-btn:hover) {
     background: var(--ui-wash);
@@ -279,9 +285,10 @@
   :global([data-slot='dropdown-menu-content'].canvas-menu) {
     width: 260px !important;
     padding: 6px;
-    background: var(--ui-panel);
-    border: 1px solid var(--ui-divider-strong);
-    box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    border: 0;
+    box-shadow: var(--ui-shadow-float);
   }
 
   .menu-header {

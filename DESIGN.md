@@ -75,7 +75,20 @@ These rules apply to every panel, including the Properties inspector:
 - **Floating toolbar:** round tool buttons (`full` radius) in a pill bar, the zoom at the end.
 - **Collaborators:** cursors carry a coloured name pill; avatars sit in the top bar, right.
 - **Type colours:** layer icons use `--ui-type-frame` / `--ui-type-text` / `--ui-type-media`.
-- **Top bar:** project switcher left, canvas title centred, avatars · credits · Share · chat right.
+- **Top bar** (canvas and inline frame editor, 48px, one row):
+
+  | Zone | Browsing | Frame open |
+  |---|---|---|
+  | Left | menu · project / canvas | menu · project / canvas · frame name + save dot · Design / Motion |
+  | Centre | canvas title | playback: start · step · play · step · end · timeline · timecode |
+  | Right | avatars · credits · **Share** · chat | undo · redo · history · more · Export · Full screen · close ‖ avatars · credits · **Share** · chat |
+
+  Every control is **28px tall** (`--ui-control-h`; 44px on touch). One style per role: icon
+  actions are ghost squares (`sm` radius, wash on hover, accent wash when pressed); text actions
+  are ghost (`Full screen`, `Storyboard`) or filled secondary (`Export`); **Share is the only
+  primary** (solid accent). Inside a zone 4px apart; zones 16px apart. One status dot only: the
+  frame's save dot replaces the canvas connection dot while a frame is open. An e2e check
+  (`tests/e2e/top-bar-rhythm.spec.ts`) holds the heights and the shared centre line.
 
 ### type
 

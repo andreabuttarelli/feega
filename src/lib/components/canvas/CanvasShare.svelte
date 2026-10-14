@@ -82,7 +82,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    height: 28px;
+    height: var(--ui-control-h);
     flex-shrink: 0;
     appearance: none;
     border-radius: var(--ui-radius-sm);

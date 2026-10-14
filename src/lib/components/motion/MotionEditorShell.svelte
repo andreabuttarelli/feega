@@ -1454,6 +1454,11 @@
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
       <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
       <span class="save-dot" data-tone={SAVE_TONE[saveState]} role="status" aria-label={`${saveState} · v${version}`}></span>
+      <div class="mode-switch" role="radiogroup" aria-label="Edit mode" data-testid="edit-mode" title="Design edits the base, Motion keys at the playhead (E)">
+        {#each [EditMode.Design, EditMode.Motion] as m (m)}
+          <button type="button" role="radio" aria-checked={editMode === m} class:on={editMode === m} data-mode={m} onclick={() => setMode(m)}>{m === EditMode.Design ? 'Design' : 'Motion'}</button>
+        {/each}
+      </div>
     </div>
 
     <div class="group transport" {...dockOf(Part.Transport)} role="group" aria-label="Transport">
@@ -1478,11 +1483,6 @@
     </div>
 
     <div class="group trail" {...dockOf(Part.Bar)} data-testid="bar-trail">
-      <div class="mode-switch" role="radiogroup" aria-label="Edit mode" data-testid="edit-mode" title="Design edits the base, Motion keys at the playhead (E)">
-        {#each [EditMode.Design, EditMode.Motion] as m (m)}
-          <button type="button" role="radio" aria-checked={editMode === m} class:on={editMode === m} data-mode={m} onclick={() => setMode(m)}>{m === EditMode.Design ? 'Design' : 'Motion'}</button>
-        {/each}
-      </div>
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
       <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
       <div class="popover-anchor">
@@ -1919,6 +1919,8 @@
   }
 
   .bar {
+    --ui-hit: var(--ui-control-h);
+    --ui-hit-gap: 4px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: stretch;
@@ -1990,8 +1992,10 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    height: var(--ui-hit);
     margin-left: var(--ui-space-2);
-    padding: 4px 6px;
+    padding: 0 8px;
+    border-radius: var(--ui-radius-sm);
     color: var(--ui-text-3);
     font-family: var(--ui-mono);
     font-variant-numeric: tabular-nums;
@@ -2021,19 +2025,30 @@
   .secondary,
   .render {
     height: var(--ui-hit);
-    padding: 0 var(--ui-space-4);
-    font-size: var(--ui-text-sm);
-    font-weight: 600;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    font-size: var(--ui-type-body);
+    font-weight: var(--ui-weight-medium);
     white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease);
   }
 
   .secondary {
-    background: var(--ui-field);
-    color: var(--ui-ink);
+    background: transparent;
+    color: var(--ui-text-secondary);
   }
 
   .secondary:hover {
-    background: var(--ui-hover);
+    background: var(--ui-wash);
+    color: var(--ui-text);
+  }
+
+  .secondary:focus-visible,
+  .render:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   .storyboard {
@@ -2043,12 +2058,22 @@
   }
 
   .render {
-    background: var(--ui-accent-solid);
-    color: var(--ui-accent-ink);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font-weight: var(--ui-weight-semibold);
   }
 
   .render:hover {
-    background: color-mix(in srgb, var(--ui-accent) 88%, #000);
+    background: var(--ui-input-hover);
+  }
+
+  .editor[data-mount='page'] .render {
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
+  }
+
+  .editor[data-mount='page'] .render:hover {
+    background: color-mix(in srgb, var(--ui-accent-solid) 88%, #000);
   }
 
   .body {
@@ -2064,16 +2089,17 @@
 
   .mode-switch {
     display: flex;
+    height: var(--ui-hit);
     padding: 2px;
-    background: var(--ui-field);
-    border-radius: 9999px;
+    background: var(--ui-input);
+    border-radius: var(--ui-radius-md);
   }
 
   .mode-switch button {
-    height: 26px;
+    height: 100%;
     padding: 0 10px;
     border: 0;
-    border-radius: 9999px;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
     color: var(--ui-text-2);
     font-size: var(--ui-text-sm);
@@ -2081,8 +2107,10 @@
   }
 
   .mode-switch button.on {
-    background: var(--ui-bg);
-    color: var(--ui-ink);
+    background: var(--ui-panel-raised);
+    color: var(--ui-text);
+    font-weight: var(--ui-weight-medium);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
   }
 
   .body.no-timeline {
@@ -2580,6 +2608,7 @@
     right: 0;
     flex-shrink: 0;
     background: var(--ui-bg);
+    box-shadow: -16px 0 12px var(--ui-bg);
   }
 
   [data-viewport='phone'] .transport {

@@ -39,9 +39,9 @@
     height: var(--ib-size, var(--ui-hit));
     padding: 0;
     border: 0;
-    border-radius: 9999px;
+    border-radius: var(--ui-radius-sm);
     background: none;
-    color: var(--ui-ink-2);
+    color: var(--ui-icon-ink);
     cursor: pointer;
     font: inherit;
     font-size: var(--ui-text-sm);
