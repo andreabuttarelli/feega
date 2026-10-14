@@ -95,7 +95,8 @@
   } from '$lib/motion/timeline';
   import { DragPhase, type ElementOut, type MoveOut } from '$lib/canvas/canvas-drop';
   import { liftElement } from '$lib/motion/move-element';
-  import { adoptHead, amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
+  import { adoptHead, amend, canRedo, canUndo, followHead, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
+  import { landed, outgoing, remote, type Synced } from '$lib/motion/frame-sync';
   import { Reveal, Snap, clampZoom } from '$lib/motion/timeline-view';
   import { InspectorTab } from '$lib/motion/inspector';
   import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
@@ -149,6 +150,9 @@
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
   let version = $state(data.head.version);
+  let baseDoc = data.head.doc as MotionDoc;
+  let saving = false;
+  let resave = false;
   let selection = $state<string[]>([]);
   let path = $state<{ comp: string; frame: number }[]>([]);
   let cameraOpen = $state(false);
@@ -502,29 +506,54 @@
     saveTimer = setTimeout(() => void save(), SAVE_DEBOUNCE_MS);
   }
 
+  function follow(next: Synced) {
+    baseDoc = next.base.doc;
+    version = next.base.version;
+    if (next.present === history.present) {
+      return;
+    }
+    history = followHead(history, next.present);
+    selection = selection.filter((id) => findClip(next.present, id));
+  }
+
+  function adopt(head: { version: number; doc: MotionDoc }) {
+    history = adoptHead(history, head.doc, version);
+    baseDoc = head.doc;
+    version = head.version;
+  }
+
   async function save() {
+    if (saving) {
+      resave = true;
+      return;
+    }
+    saving = true;
     saveState = SaveState.Saving;
+    const sent = history.present;
     const form = new FormData();
-    form.set('doc', JSON.stringify(history.present));
+    form.set('ops', JSON.stringify(outgoing({ version, doc: baseDoc }, sent)));
     form.set('version', String(version));
     form.set('summary', unsavedSummary);
-    const res = await fetch(`${editorUrl}?/save`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+    const res = await fetch(`${editorUrl}?/ops`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
     const result = deserialize(await res.text());
+    saving = false;
 
     if (result.type === 'success') {
-      version = Number(result.data?.version ?? version);
+      follow(landed({ version, doc: baseDoc }, sent, history.present, { version: Number(result.data?.version), doc: result.data?.doc as MotionDoc }));
       saveState = SaveState.Saved;
+    } else {
+      saveState = SaveState.Failed;
+      notice = result.type === 'failure' ? String(result.data?.error ?? '') : '';
+    }
+    if (resave) {
+      resave = false;
+      await save();
       return;
     }
-    if (result.type === 'failure' && result.data?.error === 'conflict') {
-      const head = result.data.head as { version: number; doc: MotionDoc };
-      history = adoptHead(history, head.doc, version);
-      version = head.version;
-      saveState = SaveState.Conflict;
-      return;
+    if (missedRemote) {
+      missedRemote = false;
+      await pullExternalEdit();
     }
-    saveState = SaveState.Failed;
-    notice = result.type === 'failure' ? String(result.data?.error ?? '') : '';
   }
 
   const FONT_EXTENSION = /\.(ttf|otf|woff2?)$/i;
@@ -571,24 +600,39 @@
     if (!lifted?.ok || landed === null) {
       return;
     }
-    history = adoptHead(history, lifted.doc, version);
-    version = landed;
+    adopt({ version: landed, doc: lifted.doc });
     selection = selection.filter((id) => id !== out.clipId);
+  }
+
+  type SavedHead = { version: number; doc: MotionDoc; actorKind?: string };
+
+  async function fetchHead(): Promise<SavedHead | null> {
+    const result = await editorAction('head');
+    return result.type === 'success' ? (result.data as SavedHead) : null;
+  }
+
+  let missedRemote = false;
+
+  function takeRemote(head: SavedHead | null): boolean {
+    if (saving) {
+      missedRemote = true;
+      return false;
+    }
+    const next = head ? remote({ version, doc: baseDoc }, history.present, head) : null;
+    if (next) {
+      follow(next);
+    }
+    return next !== null;
   }
 
   async function pullExternalEdit() {
     if (agentBusy) {
       return;
     }
-    const res = await fetch(agentUrl);
-    const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc; actorKind: string } } | null;
-    if (!body?.head || body.head.version <= version || body.head.actorKind !== 'agent') {
-      return;
+    const head = await fetchHead();
+    if (takeRemote(head) && head?.actorKind === 'agent') {
+      chatReload++;
     }
-    history = adoptHead(history, body.head.doc, version);
-    version = body.head.version;
-    selection = selection.filter((id) => findClip(body.head!.doc, id));
-    chatReload++;
   }
 
   function peekChat() {
@@ -645,12 +689,7 @@
 
   async function pullHead(): Promise<Head> {
     for (let i = 0; i < HEAD_POLL_TRIES; i++) {
-      const res = await fetch(agentUrl);
-      const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc } } | null;
-      if (body?.head && body.head.version > version) {
-        history = adoptHead(history, body.head.doc, version);
-        version = body.head.version;
-        selection = selection.filter((id) => findClip(body.head!.doc, id));
+      if (takeRemote(await fetchHead())) {
         return Head.Newer;
       }
       await new Promise((r) => setTimeout(r, HEAD_POLL_MS));
@@ -955,8 +994,7 @@
       return;
     }
     const head = result.data?.head as { version: number; doc: MotionDoc };
-    history = adoptHead(history, head.doc, version);
-    version = head.version;
+    adopt(head);
     selection = selection.filter((id) => findClip(head.doc, id));
     notice = `Restored version ${target}. ⌘Z to undo.`;
   }
