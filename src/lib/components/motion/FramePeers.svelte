@@ -7,12 +7,14 @@
   let {
     doc,
     frame,
+    redraws,
     peers,
     measure,
     onpointer
   }: {
     doc: MotionDoc;
     frame: number;
+    redraws: number;
     peers: FramePeer[];
     measure: () => Promise<Record<string, MeasuredBox>>;
     onpointer: (cursor: FrameCursor | null) => void;
@@ -31,6 +33,7 @@
   $effect(() => {
     void doc;
     void frame;
+    void redraws;
     if (!wanted) {
       return;
     }
