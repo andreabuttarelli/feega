@@ -5,7 +5,7 @@ import PageTitle from './PageTitle.svelte';
 import { TitleSize } from './page-title';
 
 const VIEWS = [
-  'src/routes/app/+page.svelte',
+  'src/lib/components/app/HomeHero.svelte',
   'src/routes/gallery/+page.svelte',
   'src/routes/gallery/[id]/+page.svelte',
   'src/routes/app/motion/+page.svelte',
