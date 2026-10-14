@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { colourLabel, parseColour, readRecent, remember, RECENT_MAX } from './colour-field';
+import { ColourFormat, channelsOf, colourLabel, fromChannels, parseColour, readRecent, remember, RECENT_MAX } from './colour-field';
 
 function memory() {
   const items = new Map<string, string>();
@@ -41,5 +41,23 @@ describe('colour field', () => {
   it('a broken store gives an empty list instead of throwing', () => {
     expect(readRecent({ getItem: () => '{nope', setItem: () => {} })).toEqual([]);
     expect(readRecent(null)).toEqual([]);
+  });
+
+  it('shows a colour as editable channels in HEX, RGB or HSL', () => {
+    expect(channelsOf('#ff0000', ColourFormat.Rgb)).toEqual([255, 0, 0]);
+    expect(channelsOf('#ff0000', ColourFormat.Hsl)).toEqual([0, 100, 50]);
+    expect(channelsOf('#336699', ColourFormat.Hex)).toEqual(['336699'.toUpperCase()]);
+  });
+
+  it('writes edited channels back as a hex, clamping each to its range', () => {
+    expect(fromChannels(ColourFormat.Rgb, [0, 128, 300])).toBe('#0080ff');
+    expect(fromChannels(ColourFormat.Hsl, [120, 100, 50])).toBe('#00ff00');
+    expect(fromChannels(ColourFormat.Hex, ['abc'])).toBe('#aabbcc');
+    expect(fromChannels(ColourFormat.Hex, ['nope'])).toBeNull();
+  });
+
+  it('round-trips a colour through HSL', () => {
+    const hex = '#4f5a00';
+    expect(fromChannels(ColourFormat.Hsl, channelsOf(hex, ColourFormat.Hsl) as number[])).toBe(hex);
   });
 });

@@ -24,7 +24,7 @@
   import InspectorSection from './InspectorSection.svelte';
   import { onMount, type Snippet } from 'svelte';
   import { FieldKind, clockText, parseClock } from '$lib/motion/number-field';
-  import { DIAL_KEYS, Part, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, transformSection, type SectionState } from '$lib/motion/inspector-sections';
+  import { DIAL_KEYS, Part, SECTION_TITLE, Section, Typed, fieldLook, fieldSection, flipSection, isOpen as sectionOpen, readSections, sectionSummary, shadowed, shows, uiHidden, transformSection, type SectionState } from '$lib/motion/inspector-sections';
   import { PropertiesView, sectionsFor } from '$lib/motion/properties-view';
   import { clipName as layerName } from '$lib/motion/organize';
   import ColorField from './ColorField.svelte';
@@ -151,6 +151,7 @@
   const fields = $derived(
     clipFieldGroups(doc, clip)
       .flatMap((g) => g.fields)
+      .filter((f) => !uiHidden(f.key))
       .filter((f) => !focus || focus.includes(f.key))
       .filter((f) => !shadowed(f.key, (clip.props as Record<string, unknown>)[f.key], f.fallback, transformKeys))
   );
@@ -1270,8 +1271,8 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 18px;
-    height: 22px;
+    width: 16px;
+    height: 26px;
     border: 0;
     background: none;
     cursor: pointer;
@@ -1279,10 +1280,17 @@
 
   .key::before {
     content: '';
-    width: 7px;
-    height: 7px;
+    width: 5px;
+    height: 5px;
     transform: rotate(45deg);
-    border: 1.5px solid var(--ui-ink-3);
+    border: 1px solid var(--ui-ink-3);
+    opacity: 0.5;
+  }
+
+  .line:hover .key::before,
+  .key[data-mark='here']::before,
+  .key[data-mark='animated']::before {
+    opacity: 1;
   }
 
   .key[data-mark='here']::before {
