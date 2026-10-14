@@ -1,3 +1,5 @@
+import { Engine } from '$lib/motion/engine';
+
 const SCALE = /scale\(([\d.]+)\)/;
 
 type Size = { width: number; height: number };
@@ -28,3 +30,10 @@ export function keepCrisp(frame: HTMLElement): () => void {
   watcher.observe(frame, { attributes: true, attributeFilter: ['style'] });
   return () => watcher.disconnect();
 }
+
+const SCALED_BY: Record<Engine, (frame: HTMLElement) => () => void> = {
+  [Engine.WebKit]: () => () => {},
+  [Engine.Other]: keepCrisp
+};
+
+export const crispFor = (engine: Engine, frame: HTMLElement): (() => void) => SCALED_BY[engine](frame);

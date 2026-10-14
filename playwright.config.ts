@@ -22,7 +22,10 @@ export default defineConfig({
     baseURL: BASE_URL,
     trace: 'on-first-retry'
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    ...(process.env.E2E_REAL_STACK === '1' ? [{ name: 'webkit-iphone', testMatch: /canvas-motion-webgl/, use: { ...devices['iPhone 15'] } }] : [])
+  ],
   webServer: {
     command: `npx vite dev --port ${E2E_PORT} --strictPort`,
     url: BASE_URL,

@@ -1,0 +1,96 @@
+{
+  "fps": 30,
+  "look": null,
+  "comps": {},
+  "fonts": [],
+  "width": 1920,
+  "assets": [],
+  "camera": null,
+  "fields": [],
+  "height": 1080,
+  "tracks": [
+    {
+      "id": "v1",
+      "kind": "visual",
+      "name": "Video 1",
+      "clips": [
+        {
+          "id": "planet",
+          "from": 0,
+          "mask": null,
+          "path": null,
+          "blend": "normal",
+          "depth": 0,
+          "matte": "none",
+          "props": {
+            "name": "Planet"
+          },
+          "space": "world",
+          "parent": null,
+          "effects": [],
+          "shaders": [],
+          "textPath": null,
+          "animators": [],
+          "component": "Custom",
+          "keyframes": {},
+          "maskStack": [],
+          "transform": {
+            "x": 0,
+            "y": 0
+          },
+          "trimStart": 0,
+          "motionBlur": false,
+          "expressions": {},
+          "transitionIn": {
+            "kind": "none",
+            "durationInFrames": 0
+          },
+          "parentOpacity": "inherit",
+          "transitionOut": {
+            "kind": "none",
+            "durationInFrames": 0
+          },
+          "durationInFrames": 90
+        }
+      ]
+    },
+    {
+      "id": "a1",
+      "kind": "audio",
+      "name": "Audio 1",
+      "clips": []
+    }
+  ],
+  "shaders": {},
+  "version": 5,
+  "background": "brand",
+  "components": {
+    "Planet": {
+      "source": {
+        "js": "const W = root.clientWidth || 1920, H = root.clientHeight || 1080;\nconst canvas = document.createElement(\"canvas\");\ncanvas.width = W;\ncanvas.height = H;\ncanvas.style.cssText = \"position:absolute;inset:0;width:100%;height:100%\";\nroot.appendChild(canvas);\nconst renderer = new THREE.WebGLRenderer({ canvas, preserveDrawingBuffer: true });\nrenderer.setPixelRatio(1);\nrenderer.setSize(W, H, false);\nconst scene = new THREE.Scene();\nscene.background = new THREE.Color(0x000000);\nconst camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);\ncamera.position.z = 1;\nconst corners = [[-0.6, 0.6], [0.6, 0.6], [-0.6, -0.6], [0.6, -0.6]].map(([x, y]) => {\n  const tile = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.6), new THREE.MeshBasicMaterial({ color: 0xffd27a }));\n  tile.position.set(x, y, 0);\n  scene.add(tile);\n  return tile;\n});\nconst draw = (t) => { corners.forEach((c) => (c.rotation.z = t * 0.1)); renderer.render(scene, camera); };\ntl.to({}, { duration, ease: \"none\", onUpdate() { draw(this.time()); } }, 0);\ndraw(0);",
+        "css": ":scope{background:#000;overflow:hidden}",
+        "html": ""
+      },
+      "version": 1,
+      "propsSchema": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  "motionBlur": {
+    "enabled": false,
+    "samples": 8,
+    "shutterAngle": 180,
+    "shutterPhase": -90
+  },
+  "interactive": {
+    "loop": false,
+    "vars": [],
+    "outside": "fallback",
+    "bindings": [],
+    "playback": "scrub",
+    "scrollLength": 3
+  },
+  "durationInFrames": 90
+}
