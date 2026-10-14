@@ -138,7 +138,7 @@ export function clipFieldGroups(doc: MotionDoc, clip: MotionClip): { group: Grou
 }
 
 const PART_SHARED_GROUPS = [Group.Style, Group.Layout];
-const PART_FIELD_SUFFIXES = ['Color', 'Colour', 'Font', 'Size', 'Weight', 'X', 'Y', 'Leading'];
+const PART_FIELD_SUFFIXES = ['Color', 'Colour', 'TextColor', 'BgColor', 'BorderColor', 'TagColor', 'Font', 'Size', 'Weight', 'Height', 'X', 'Y', 'Leading'];
 
 export const PART_FIELDS_BY_POSTER: Record<string, Record<string, readonly string[]>> = {
   BlockTitlePoster: { title: ['fontWeight', 'leading', 'fill', 'overlap'] },
