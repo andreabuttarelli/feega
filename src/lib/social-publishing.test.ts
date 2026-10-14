@@ -24,13 +24,9 @@ describe('social publishing flag', () => {
     ['/p/[projectId]/settings/connect/[platform]', ''],
     ['/p/[projectId]/settings/facebook', ''],
     ['/(public)/docs/api/posts', ''],
-    ['/api/v1/org/posts/[id]/deliveries', ''],
     ['/api/v1/brands/[slug]/social/connect', ''],
     ['/api/v1/brands/[slug]/publishing', ''],
     ['/api/v1/health/accounts/tick', ''],
-    ['/p/[projectId]/c/[canvasId]', '?/create_post'],
-    ['/p/[projectId]/c/[canvasId]', '?/calendar_posts'],
-    ['/p/[projectId]/c/[canvasId]', '?/schedule_post'],
     ['/app/studio/[batchId]', '?/calendar']
   ])('con il flag spento rifiuta %s%s', (routeId, search) => {
     expect(routeRefused(SocialPublishing.Off, routeId, search)).toBe(true);

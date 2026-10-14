@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { publishes } from '$lib/social-publishing';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
   import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
@@ -19,7 +18,6 @@
   import { onCanvasReveal } from '$lib/canvas/canvas-reveal';
   import { DROPPED_EDIT_NOTICE, Trigger, VERDICT_NOTICE, Verdict, carryNotice, changedElsewhere, judge, takeNotice, type RemoteState } from '$lib/canvas/staleness';
   import { keepSame } from '$lib/canvas/snapshot-keep';
-  import { CANVAS_POLLS } from '$lib/canvas/idle-reads';
   import { AssetSize, sized } from '$lib/canvas/asset-url';
   import TieredImage from '$lib/components/canvas/TieredImage.svelte';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
@@ -81,7 +79,6 @@
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
   import { FEEGA_TOKENS } from '$lib/motion/brand';
   import { AssetKind } from '$lib/motion/components';
-  import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { frameNodeSize, motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
@@ -94,10 +91,8 @@
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
-  import { calendarBrand, calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
-  import { calendarError, type CalendarBrand, type CalendarPost } from '$lib/canvas/calendar-posts';
-  import { plannedInstant } from '$lib/calendar/period-grid';
-  import { DragPhase, DropVerdict, dayUnderPointer, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { canvasSelection } from '$lib/canvas/promote-sheet';
   import { DropOn, type Drop } from '$lib/motion/move-element';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
@@ -182,8 +177,6 @@
   import type { CanvasNodeRecord, Connection } from '$lib/server/repos/canvas';
   import type { Product } from '$lib/server/repos/products';
   import type { SocialPost } from '$lib/server/repos/social-posts';
-  import { openSheet } from '$lib/canvas/sheet-nav';
-  import { promotePath, canvasSelection } from '$lib/canvas/promote-sheet';
   import { BILLING_PATH } from '$lib/billing-path';
 
   let { data } = $props();
@@ -253,91 +246,6 @@
     return { ok: false, message: detail.message ?? saveMessage(failureOf(result), detail) };
   }
 
-  function handlePromote(ids: string[]) {
-    void openSheet(data.projectId, promotePath(ids));
-  }
-
-  type CalendarPlan = { nodeIds: string[]; dayKey: string };
-  type CalendarState = { posts: CalendarPost[] | null; brands: CalendarBrand[]; error: string | null; busy: boolean; plan: CalendarPlan | null };
-  const CALENDAR_REFRESH_MS = CANVAS_POLLS.calendar.everyMs;
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  let calendars = $state<Record<string, CalendarState>>({});
-
-  function calendarStateOf(id: string): CalendarState {
-    return calendars[id] ?? { posts: null, brands: [], error: null, busy: false, plan: null };
-  }
-
-  function patchCalendar(id: string, patch: Partial<CalendarState>) {
-    calendars = { ...calendars, [id]: { ...calendarStateOf(id), ...patch } };
-  }
-
-  function answerError(answer: ActionAnswer): string {
-    const detail = (answer.data ?? {}) as { error?: unknown; message?: string; deliveries?: { error?: string }[] };
-    const reasons = (detail.deliveries ?? []).map((d) => d.error).filter(Boolean).join(', ');
-    return calendarError(detail.error, reasons || undefined);
-  }
-
-  function brandOfCalendar(calendar: CalendarNodeState): string | null {
-    return calendarBrand(calendar, data.projectBrandId);
-  }
-
-  async function loadCalendar(calendar: CalendarNodeState) {
-    const answer = await send('calendar_posts', { scope: calendar.scope, brand_id: brandOfCalendar(calendar) ?? '' });
-    if (answer.type !== 'success') {
-      patchCalendar(calendar.id, { posts: [], error: answerError(answer) });
-      return;
-    }
-    const result = answer.data as { posts: CalendarPost[]; brands: CalendarBrand[] };
-    patchCalendar(calendar.id, { posts: result.posts, brands: result.brands, error: null });
-  }
-
-  function calendarNodes(): CalendarNodeState[] {
-    if (!publishes(data.socialPublishing)) {
-      return [];
-    }
-    return nodes.map((n) => calendarOf(n)).filter((c): c is CalendarNodeState => c !== null);
-  }
-
-  function refreshCalendars() {
-    for (const calendar of calendarNodes()) {
-      void loadCalendar(calendar);
-    }
-  }
-
-  const calendarQueries = $derived(calendarNodes().map((c) => `${c.id}:${c.scope}:${c.brandId ?? ''}`).join('|'));
-
-  $effect(() => {
-    void calendarQueries;
-    untrack(refreshCalendars);
-  });
-
-  $effect(() => {
-    const timer = setInterval(refreshCalendars, CALENDAR_REFRESH_MS);
-    window.addEventListener('focus', refreshCalendars);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener('focus', refreshCalendars);
-    };
-  });
-
-  async function moveDraft(calendar: CalendarNodeState, post: CalendarPost, dayKey: string) {
-    patchCalendar(calendar.id, { busy: true });
-    const answer = await send('plan_post', {
-      post_id: post.id,
-      planned_for: plannedInstant(dayKey, timeZone, post.plannedFor),
-      expected_updated_at: post.updatedAt
-    });
-    patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
-    await loadCalendar(calendar);
-  }
-
-  async function scheduleDraft(calendar: CalendarNodeState, post: CalendarPost) {
-    patchCalendar(calendar.id, { busy: true });
-    const answer = await send('schedule_post', { post_id: post.id });
-    patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
-    await loadCalendar(calendar);
-  }
-
   const FRAME_DROP_CLASS = 'is-frame-drop';
 
   let toFlow: ((p: PointerPoint) => PointerPoint) | null = null;
@@ -392,52 +300,6 @@
     if (drop) {
       landed(await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
     }
-  }
-
-  function highlightDay(ids: string[], at: PointerPoint) {
-    const target = dayUnderPointer(at, ids);
-    for (const el of document.querySelectorAll('.is-node-drop')) {
-      if (el !== target?.element) { el.classList.remove('is-node-drop'); }
-    }
-    target?.element.classList.add('is-node-drop');
-  }
-
-  function dropOnDay(ids: string[], at: PointerPoint): DropVerdict {
-    const target = dayUnderPointer(at, ids);
-    for (const el of document.querySelectorAll('.is-node-drop')) { el.classList.remove('is-node-drop'); }
-    const calendar = target ? calendarNodes().find((c) => c.id === target.calendarId) : null;
-    if (!target || !calendar) {
-      return DropVerdict.Ignored;
-    }
-    const brandId = brandOfCalendar(calendar);
-    if (!brandId) {
-      patchCalendar(calendar.id, { plan: { nodeIds: ids, dayKey: target.dayKey } });
-      return DropVerdict.Taken;
-    }
-    void draftOnDay(calendar, ids, target.dayKey, brandId);
-    return DropVerdict.Taken;
-  }
-
-  async function draftOnDay(calendar: CalendarNodeState, ids: string[], dayKey: string, brandId: string) {
-    patchCalendar(calendar.id, { busy: true, plan: null });
-    if (!calendar.brandId && brandId !== data.projectBrandId) {
-      void write(calendar.id, calendarData({ ...calendar, brandId }));
-    }
-    const answer = await send('create_post', {
-      brand_id: brandId,
-      node_id: ids,
-      planned_for: plannedInstant(dayKey, timeZone, null)
-    });
-    patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
-    await loadCalendar(calendar);
-  }
-
-  function askToPlan(sourceId: string, targetId: string) {
-    const calendar = calendarNodes().find((c) => c.id === targetId);
-    if (!calendar) {
-      return;
-    }
-    patchCalendar(calendar.id, { plan: { nodeIds: [sourceId], dayKey: calendar.anchor } });
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -2072,7 +1934,6 @@
     pushGesture({
       items: [{ kind: 'edge.create', edgeId: created.id, sourceNodeId: created.sourceNodeId, targetNodeId: created.targetNodeId }, ...linked]
     });
-    askToPlan(created.sourceNodeId, created.targetNodeId);
   }
 
   /**
@@ -2791,8 +2652,6 @@
     {edges}
     onMove={move}
     onMoveEnd={moveEnd}
-    onTileDragOver={highlightDay}
-    onTileDrop={dropOnDay}
     onResize={resize}
     onConnect={connect}
     onDelete={remove}
@@ -2804,7 +2663,6 @@
     onFlow={(fn) => (toFlow = fn)}
     onUpload={upload}
     onDuplicate={duplicate}
-    onPromote={handlePromote}
     onCopy={copy}
     onPaste={paste}
     onTemplate={insertTemplate}
@@ -2839,7 +2697,6 @@
         {@const select = selectOf(row)}
         {@const effects = effectsOf(row)}
         {@const composition = compositionOf(row)}
-        {@const calendar = calendarOf(row)}
         {@const motion = motionOf(row)}
         {@const studioBatch = studioBatchOf(row)}
         {@const estimateRevision = textEstimateRevision(id)}
@@ -3034,26 +2891,6 @@
           <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
-        {:else if calendar && publishes(data.socialPublishing)}
-          {@const calState = calendarStateOf(id)}
-          <CalendarNode
-            node={calendar}
-            brandId={brandOfCalendar(calendar)}
-            plan={calState.plan}
-            posts={calState.posts}
-            brands={calState.brands}
-            error={calState.error}
-            busy={calState.busy}
-            {timeZone}
-            mediaUrl={(assetId) => assetUrl(assetId)}
-            onchange={(patch) => write(id, calendarData({ ...calendar, ...patch }))}
-            onmove={(post, dayKey) => moveDraft(calendar, post, dayKey)}
-            onschedule={(post) => scheduleDraft(calendar, post)}
-            onedit={(post) => handlePromote(post.sourceNodeIds)}
-            onrefresh={() => loadCalendar(calendar)}
-            onplan={(dayKey, brandId) => calState.plan && draftOnDay(calendar, calState.plan.nodeIds, dayKey, brandId)}
-            oncancelplan={() => patchCalendar(id, { plan: null })}
-          />
         {:else if isNodeType(row.type)}
           <EmptyNode type={row.type} />
         {/if}
