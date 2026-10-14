@@ -1,5 +1,7 @@
 <script lang="ts">
   import { publishes } from '$lib/social-publishing';
+  import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
+  import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
   import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
   /**
    * LA TELA.
@@ -2609,6 +2611,19 @@
    * il testo è l'intero listino del gateway, immagine e video portano i limiti del modello.
    * «Genera» resta spento finché non c'è chi esegue il giro (fase 3).
    */
+
+  const EMPTY_ORIGIN = { x: 0, y: 0 };
+  const CHAT_INPUT = 'chat-composer-input';
+
+  const EMPTY_STARTS: Record<EmptyAction, () => void> = {
+    [EmptyAction.Chat]: () => {
+      requestChat();
+      requestAnimationFrame(() => document.getElementById(CHAT_INPUT)?.focus());
+    },
+    [EmptyAction.Frame]: () => (frameLibraryAt = EMPTY_ORIGIN),
+    [EmptyAction.Image]: () => void create('image', EMPTY_ORIGIN),
+    [EmptyAction.Video]: () => void create('video', EMPTY_ORIGIN)
+  };
 </script>
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
@@ -2930,6 +2945,9 @@
       {/if}
     {/snippet}
   </CanvasFlow>
+  {#if showsEmptyState(nodes.length, inlineMotion)}
+    <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
+  {/if}
   {#if inlineMotion}
     {#key inlineMotion}
       <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => reframe(inlineMotion, free)} />
