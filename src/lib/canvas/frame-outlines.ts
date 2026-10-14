@@ -1,6 +1,25 @@
+import { z } from 'zod';
+import { CUSTOM_CLIP, partBoxes } from '$lib/motion/poster-parts';
+import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
 import type { FrameOutlines, LayerRow } from './layers';
 
 export const HEADS_PARAM = 'heads';
+export const PARTS_PARAM = 'parts';
+const MAX_PARTS = 200;
+
+export type ClipParts = Record<string, readonly string[]>;
+export type FrameParts = Record<string, ClipParts>;
+
+const framePartsSchema = z.record(z.string(), z.record(z.string(), z.array(z.string().max(MAX_PARTS)).max(MAX_PARTS)));
+
+export function parseParts(raw: string): FrameParts {
+  try {
+    const parsed = framePartsSchema.safeParse(JSON.parse(raw));
+    return parsed.success ? parsed.data : {};
+  } catch {
+    return {};
+  }
+}
 export const MAX_HEADS = 200;
 
 export type FrameHead = { nodeId: string; version: number };
@@ -43,3 +62,11 @@ export function frameHead(type: string, data: Record<string, unknown>): number |
 }
 
 export const canvasHeads = (nodes: readonly { id: string; head?: number | null }[]): FrameHead[] => nodes.flatMap((n) => (n.head ? [{ nodeId: n.id, version: n.head }] : []));
+
+export const posterHeads = (heads: readonly FrameHead[], cache: OutlineCache, probed: ReadonlySet<string>, openNodeId: string | null) =>
+  heads.filter((h) => h.nodeId !== openNodeId && !probed.has(headKey(h)) && (cache[headKey(h)] ?? []).some((r) => r.type === CUSTOM_CLIP));
+
+export const partIds = (boxes: Record<string, MeasuredBox>): ClipParts =>
+  Object.fromEntries(Object.entries(partBoxes(boxes).parts).map(([clip, list]) => [clip, list.map((p) => p.part)]));
+
+export const partsParam = (nodeId: string, parts: ClipParts) => JSON.stringify({ [nodeId]: parts });

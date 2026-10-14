@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '../_shims/env-private';
+import { refuseAdminWrites, targetOf } from '../e2e/target';
 import { runGenNode } from '$lib/server/canvas/generate';
 import { GPT_IMAGE_25_FLARE_MODEL } from '$lib/image-models';
 
@@ -19,6 +20,7 @@ import { GPT_IMAGE_25_FLARE_MODEL } from '$lib/image-models';
  * vedi il commento in `$lib/image-models.ts`): questo giro spende soldi veri.
  */
 const url = env.PUBLIC_SUPABASE_URL!;
+refuseAdminWrites(targetOf(url));
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
 const admin = createClient(url, env.SUPABASE_SERVICE_ROLE_KEY!, options);
 const BUCKET = 'brand-knowledge';

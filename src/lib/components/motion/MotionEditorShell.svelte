@@ -79,12 +79,12 @@
   import { carryEdits, insertTemplate, isLockedComp, type Inserted, type Instance, type TemplateEntry } from '$lib/motion/template/library';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
-  import { catalogue, starterDoc, starterFormatOf, type StarterFormat } from '$lib/motion/template/catalogue';
+  import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
-  import { findClip, type MotionDoc } from '$lib/motion/doc';
+  import { findClip, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import {
     ClipEdge,
     Direction,
@@ -122,7 +122,7 @@
   import { ATTACH_PARAM, BRIEF_PARAM } from '$lib/motion/video-brief';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
-  import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, Zoom, timelineFits } from '$lib/motion/editor-mount';
+  import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, ToolsPlace, Zoom, timelineFits } from '$lib/motion/editor-mount';
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
@@ -130,13 +130,16 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHover } from '$lib/canvas/layers';
   import { DrawTool } from '$lib/motion/draw-tool';
+  import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
   import { EDIT_MODE_KEY, EditMode, nextMode, readMode } from '$lib/motion/edit-mode';
   import DrawOverlay from './DrawOverlay.svelte';
   import DrawTools from './DrawTools.svelte';
-  import { PART_SEP } from '$lib/motion/poster-parts';
+  import { PART_SEP, PartAction, runPart } from '$lib/motion/poster-parts';
   import { PropertiesView, propertiesFor } from '$lib/motion/properties-view';
   import { partFocus } from '$lib/motion/inspector';
   import PosterPartPanel from './PosterPartPanel.svelte';
+  import MultiInspector from './MultiInspector.svelte';
+  import FamilyIcon from './FamilyIcon.svelte';
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 
@@ -417,7 +420,7 @@
   const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
-  const view = $derived(propertiesFor({ clip: selected?.id ?? null, part: selectedPart }));
+  const view = $derived(propertiesFor({ count: selection.length, clip: selected?.id ?? null, part: selectedPart }));
   const agent = $derived(agentBusy || draft ? Agent.Working : Agent.Idle);
   const blank = $derived(!path.length && showsStart(doc, agentBusy ? Agent.Working : Agent.Idle));
 
@@ -844,11 +847,20 @@
 
   const newId = () => crypto.randomUUID().slice(0, 8);
 
-  let tool = $state(DrawTool.Select);
+  const timelineHidden = $derived(layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design);
+  $effect(() => (rules.tools === ToolsPlace.CanvasBar ? frameBar.attach({ act: (action) => FRAME_ACTS[action]() }) : undefined));
+  let timelineShownPx = $state(0);
+  $effect(() => {
+    if (rules.tools === ToolsPlace.CanvasBar) {
+      frameBar.timelinePx = timelineHidden ? 0 : timelineShownPx;
+    }
+  });
+
+  const FRAME_ACTS: Record<FrameAction, () => void> = { [FrameAction.Image]: () => add('Image'), [FrameAction.Library]: () => (templating = true) };
 
   function drawn(id: string) {
     selection = [id];
-    tool = DrawTool.Select;
+    frameBar.tool = DrawTool.Select;
   }
 
   const ADD: Partial<Record<ComponentId, (id: string) => OpResult>> = {
@@ -874,7 +886,7 @@
     selection = [id];
   }
 
-  function componentDraft(id: string, format: StarterFormat): Instance | null {
+  function componentDraft(id: string, format: MotionFormat): Instance | null {
     const entry = templates.find((t) => t.id === id);
     const made = entry ? starterDoc(entry, format, newId) : null;
     return made?.ok ? { doc: made.doc, clipId: made.clipId } : null;
@@ -1013,6 +1025,12 @@
     if (keySelection.length) {
       apply(deleteKeyframes(doc, keySelection), 'Deleted keyframes');
       keySelection = [];
+      return;
+    }
+    const part = selected && selectedPart ? runPart(doc, selected, selectedPart, PartAction.Delete) : null;
+    if (part?.ok) {
+      apply(part, 'Deleted element');
+      selectedPart = null;
       return;
     }
     if (!selection.length) {
@@ -1220,11 +1238,11 @@
 
   const COMMANDS: Record<Command, () => void> = {
     [Command.TogglePlay]: () => (playing = !playing),
-    [Command.ToolSelect]: () => (tool = DrawTool.Select),
-    [Command.ToolText]: () => (tool = DrawTool.Text),
-    [Command.ToolRectangle]: () => (tool = DrawTool.Rectangle),
-    [Command.ToolEllipse]: () => (tool = DrawTool.Ellipse),
-    [Command.ToolPen]: () => (tool = DrawTool.Pen),
+    [Command.ToolSelect]: () => (frameBar.tool = DrawTool.Select),
+    [Command.ToolText]: () => (frameBar.tool = DrawTool.Text),
+    [Command.ToolRectangle]: () => (frameBar.tool = DrawTool.Rectangle),
+    [Command.ToolEllipse]: () => (frameBar.tool = DrawTool.Ellipse),
+    [Command.ToolPen]: () => (frameBar.tool = DrawTool.Pen),
     [Command.ToggleEditMode]: () => setMode(nextMode(editMode)),
     [Command.MoveLeft]: () => nudgeBy(-NUDGE_PX, 0),
     [Command.MoveRight]: () => nudgeBy(NUDGE_PX, 0),
@@ -1614,7 +1632,7 @@
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
-        {#if tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} {tool} onchange={apply} oncreated={drawn} />{/if}
+        {#if frameBar.tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} tool={frameBar.tool} onchange={apply} oncreated={drawn} />{/if}
       </MotionPreview>
       {/snippet}
       {#if rules.zoom === Zoom.Stage}
@@ -1622,7 +1640,7 @@
       {:else}
         {@render player()}
       {/if}
-      <DrawTools bind:tool />
+      {#if rules.tools === ToolsPlace.Stage}<DrawTools bind:tool={frameBar.tool} />{/if}
       {#if liveScene.length}<span class="live-badge" data-testid="live-badge" title={`${liveScene.join(', ')} ${liveScene.length === 1 ? 'runs' : 'run'} live: different on every view, a still in the video`}>live</span>{/if}
       <div class="live-bar">
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
@@ -1658,10 +1676,13 @@
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
+      {:else if view === PropertiesView.Multiple}
+        <MultiInspector {doc} ids={selection} {frame} mode={editMode} onchange={edit} />
       {:else}
+        <header class="frame-head" data-testid="selection-head"><FamilyIcon /><span>Frame</span></header>
         <DocFields {doc} {assets} onchange={edit} />
         <div class="composition" data-testid="composition-inspector">
-          <header class="composition-head"><span>Composition</span>{#if selection.length > 1}<em>{selection.length} clips selected</em>{/if}</header>
+          <header class="composition-head"><span>Frame</span></header>
           <CompositionSettings {doc} onchange={apply} />
         </div>
       {/if}
@@ -1676,7 +1697,7 @@
     {/snippet}
     </SideColumn>
 
-    <section class="timeline-area" {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
+    <section class="timeline-area" bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
 
       {#if clipBarShown}
@@ -2190,27 +2211,35 @@
   .composition-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    height: 40px;
-    margin-bottom: var(--ui-space-2);
+    height: 36px;
     font-size: var(--ui-text-xs);
-    font-weight: 500;
-    color: var(--ui-text-3);
+    font-weight: 600;
+    color: var(--ui-ink);
   }
 
-  .composition-head em {
-    font-style: normal;
-    font-family: var(--ui-mono);
-    font-size: 10px;
-    font-weight: 400;
-    color: var(--ui-ink-3);
+  .frame-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 var(--ui-space-4);
+    border-bottom: 1px solid var(--ui-line);
+    color: var(--ui-ink-2);
+    font-size: var(--ui-text-sm);
+  }
+
+  .frame-head span {
+    color: var(--ui-ink);
+    font-weight: 600;
   }
 
   .props {
     grid-column: 2;
-    grid-row: 1;
+    grid-row: 1 / 3;
     min-height: 0;
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
   }
 
   .chat {
@@ -2249,7 +2278,7 @@
   }
 
   .timeline-area {
-    grid-column: 1 / 3;
+    grid-column: 1;
     grid-row: 2;
     position: relative;
     display: flex;

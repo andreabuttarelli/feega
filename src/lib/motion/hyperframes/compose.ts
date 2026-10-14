@@ -1,3 +1,4 @@
+import { withAutoLayout } from '../layout/resolve';
 import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
 import { EASE_NAME, easeName } from '../keyframes';
@@ -601,7 +602,7 @@ function zoomed(doc: MotionDoc, scale: number): string {
 }
 
 export function composeHtml(raw: ComposeInput): string {
-  const shown = withoutHidden(boundDoc(withVars(raw.doc, raw.vars)));
+  const shown = withAutoLayout(withoutHidden(boundDoc(withVars(raw.doc, raw.vars))));
   const junctions = junctionTweens(shown, junctionPairs(shown));
   const prepared = bakePaths(withoutBackdrop(flattenComps(withJunctions(shown))));
   const input = { ...raw, doc: bakePhysics(bakeExpressions(prepared, raw.analyses)) };

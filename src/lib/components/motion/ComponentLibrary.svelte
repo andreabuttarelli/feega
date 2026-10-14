@@ -11,7 +11,7 @@
   import { Dismiss, dismissFrom, spatialStep } from '$lib/motion/template/browser';
   import { DocMode } from '$lib/motion/still';
   import type { SectionRole } from '$lib/motion/template/card';
-  import { ADD_TARGET, AddTarget, byShape, matching, metaLine, rolesIn, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
+  import { ADD_TARGET, AddTarget, byShape, matching, metaLine, rolesIn, type CatalogueItem } from '$lib/motion/template/catalogue';
   import type { Instance } from '$lib/motion/template/library';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
@@ -27,8 +27,8 @@
     onclose
   }: {
     items: CatalogueItem[];
-    format: StarterFormat;
-    draftOf: (id: string, format: StarterFormat) => Instance | null;
+    format: MotionFormat;
+    draftOf: (id: string, format: MotionFormat) => Instance | null;
     compose?: ((doc: Instance['doc']) => string) | null;
     assets?: Asset[];
     target?: AddTarget;
@@ -221,9 +221,9 @@
     {/if}
 
     <div class="flex min-h-0 flex-1 flex-col gap-8 overflow-auto px-3 pt-4 pb-8" bind:this={grid} data-testid="component-grid">
-      {#each groups as g (g.native)}
-        <section data-shape={FORMATS[g.native].label} aria-label={FORMATS[g.native].label}>
-          <ul class={cn('grid list-none grid-cols-[repeat(auto-fill,minmax(min(var(--card-min),100%),1fr))] gap-x-3 gap-y-5 p-0', PHONE_COLUMNS[g.native])} style:--card-min={`${CARD_MIN_PX[g.native]}px`}>
+      {#each groups as g (g.format)}
+        <section data-shape={FORMATS[g.format].label} aria-label={FORMATS[g.format].label}>
+          <ul class={cn('grid list-none grid-cols-[repeat(auto-fill,minmax(min(var(--card-min),100%),1fr))] gap-x-3 gap-y-5 p-0', PHONE_COLUMNS[g.format])} style:--card-min={`${CARD_MIN_PX[g.format]}px`}>
             {#each g.items as item (item.id)}
               {@const at = ordered.indexOf(item)}
               <li class="group relative">
@@ -242,7 +242,7 @@
                 >
                   <span
                     class={cn('thumb relative block w-full overflow-hidden rounded-md bg-ui-sunken', item.id === openId && 'shadow-[var(--ui-ring)]', (!item.preview || loaded.has(item.id)) && 'ready')}
-                    style:aspect-ratio={`${FORMATS[item.native].width} / ${FORMATS[item.native].height}`}
+                    style:aspect-ratio={`${FORMATS[item.format].width} / ${FORMATS[item.format].height}`}
                   >
                     {#if item.preview}
                       <img src={item.preview.poster} alt="" loading="lazy" decoding="async" use:ready={item.id} class="absolute inset-0 size-full object-cover opacity-0 transition-opacity duration-(--ui-dur-base) [.ready>&]:opacity-100" />

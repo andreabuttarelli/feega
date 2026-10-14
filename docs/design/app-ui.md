@@ -1,7 +1,9 @@
 # App UI system
 
 Dashboard (`/app`), tool pages, canvas chrome and the motion editor share one set of tokens,
-defined in `src/app.css` (`--ui-*`). A shape is a sharp rectangle (`--radius: 0`) or a perfect circle (`rounded-full`, for icon buttons, avatars, dots, a button pill); never an intermediate radius.
+defined in `src/app.css` (`--ui-*`). The greyscale ramp (`--grey-0…12`), its semantic roles, the
+radius scale (`--ui-radius-*`), the type roles and the shell primitives
+(`src/lib/components/ui/shell/`) are described in `DESIGN.md` § the shell system.
 
 ## Surfaces and colour
 

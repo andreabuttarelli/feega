@@ -4,7 +4,7 @@ import { FORMATS, MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { BUILTIN_TEMPLATES, builtinTemplate } from './builtins';
 import { PROMPT_TEMPLATE_ID } from './prompt-input/template';
 import { SectionRole } from './card';
-import { ComponentKind, POSTER_FORMATS, byShape, catalogue, componentKind, matching, metaLine, posterShelf, rolesIn, previewOf, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
+import { ComponentKind, FORMATS_OF_MODE, POSTER_FORMATS, byShape, catalogue, libraryFormat, componentKind, matching, metaLine, posterShelf, previewOf, rolesIn, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
 import { DocMode } from '$lib/motion/still';
 import PREVIEWED from './previews.json';
 
@@ -122,15 +122,33 @@ describe('the library previews in the format of the video it inserts into', () =
     expect(starterFormatOf(newMotionDoc(MotionFormat.Vertical))).toBe(MotionFormat.Vertical);
     expect(starterFormatOf({ width: 1080, height: 1350 })).toBe(MotionFormat.Landscape);
   });
+
+  it('a poster is listed in its own 4:5, not collapsed to landscape', () => {
+    const poster = catalogue(BUILTIN_TEMPLATES).find((i) => i.id === 'builtin:poster-type-grid')!;
+
+    expect(poster.format).toBe(MotionFormat.Portrait);
+  });
+
+  it('a still offers the print formats, a video the screen ones', () => {
+    expect(FORMATS_OF_MODE[DocMode.Still]).toEqual(POSTER_FORMATS);
+    expect(FORMATS_OF_MODE[DocMode.Video]).toEqual(STARTER_FORMATS);
+  });
+
+  it('opens a poster in its own format when the target asks for one stills do not have', () => {
+    const poster = catalogue(BUILTIN_TEMPLATES).find((i) => i.id === 'builtin:poster-type-grid')!;
+
+    expect(libraryFormat(poster, MotionFormat.Landscape)).toBe(MotionFormat.Portrait);
+    expect(libraryFormat(poster, MotionFormat.Vertical)).toBe(MotionFormat.Vertical);
+  });
 });
 
 describe('frame templates show each one in its real format', () => {
   const items = catalogue(BUILTIN_TEMPLATES);
 
-  it('keeps the native format of a 4:5 poster instead of the landscape it would insert as', () => {
+  it('shows a 4:5 poster as a still in its own format', () => {
     const poster = items.find((i) => i.id === 'builtin:poster-type-grid')!;
 
-    expect(poster.native).toBe(MotionFormat.Portrait);
+    expect(poster.format).toBe(MotionFormat.Portrait);
     expect(metaLine(poster)).toBe('4:5 · still');
   });
 
@@ -143,9 +161,9 @@ describe('frame templates show each one in its real format', () => {
   it('groups by shape, wide first, every item in exactly one group', () => {
     const groups = byShape(items);
 
-    expect(groups[0].native).toBe(MotionFormat.Landscape);
+    expect(groups[0].format).toBe(MotionFormat.Landscape);
     expect(groups.flatMap((g) => g.items).length).toBe(items.length);
-    expect(groups.every((g) => g.items.every((i) => i.native === g.native))).toBe(true);
+    expect(groups.every((g) => g.items.every((i) => i.format === g.format))).toBe(true);
   });
 });
 

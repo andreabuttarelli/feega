@@ -1,10 +1,12 @@
 <script lang="ts">
+  import NumberField from './NumberField.svelte';
   import type { Snippet } from 'svelte';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { AssetKind } from '$lib/motion/components';
   import { setProps, type OpResult } from '$lib/motion/timeline';
-  import { PartKind, parsePart, partKind, partLabel, partText, writePartText } from '$lib/motion/poster-parts';
-  import { LineEdit, editLines, lineRows, markedPoster, photoAt, setPhoto, setPhotoLook, type PhotoFit, type PhotoLook } from '$lib/motion/poster-lines';
+  import Trash from '@lucide/svelte/icons/trash-2';
+  import { PartAction, PartKind, parsePart, partKind, partLabel, partText, runPart, writePartText } from '$lib/motion/poster-parts';
+  import { markedPoster, photoAt, setPhoto, setPhotoLook, type PhotoFit, type PhotoLook } from '$lib/motion/poster-lines';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
 
@@ -13,13 +15,15 @@
   const IMAGE = 'image';
   const FITS: PhotoFit[] = ['cover', 'contain'];
   const CENTRE = 0.5;
+  const PERCENT = 100;
+  const FOCUS_RANGE = { min: 0, max: 100, step: 1 };
+  const FIT_LABEL: Record<PhotoFit, string> = { cover: 'Cover', contain: 'Contain' };
 
   const kind = $derived(partKind(doc, clip, part));
   const index = $derived(parsePart(part).index ?? 0);
   const poster = $derived(markedPoster(String(clip.props.name)));
   const media = $derived(poster ? clip.props[poster.media] : undefined);
   const photo = $derived(photoAt(media, index));
-  const row = $derived(poster ? lineRows(String(clip.props[poster.lines] ?? ''))[index] : undefined);
 
   function apply(result: OpResult, summary: string) {
     if (result.ok) {
@@ -32,25 +36,13 @@
 
   const BODY: Record<PartKind, Snippet | null> = { [PartKind.Line]: lineBody, [PartKind.Photo]: photoBody, [PartKind.Arrow]: arrowBody, [PartKind.Text]: null, [PartKind.Other]: null };
   const body = $derived(BODY[kind]);
+  const PART_KIND_LABEL: Record<PartKind, string> = { [PartKind.Line]: 'Line', [PartKind.Photo]: 'Photo', [PartKind.Arrow]: 'Arrow', [PartKind.Text]: 'Text', [PartKind.Other]: 'Part' };
 
-  function line(edit: LineEdit) {
-    if (!poster) {
-      return;
-    }
-    const next = editLines({ lines: String(clip.props[poster.lines]), media }, index, edit);
-    apply(setProps(doc, clip.id, { [poster.lines]: next.lines, [poster.media]: next.media }), 'Edit line');
-  }
+  const remove = () => apply(runPart(doc, clip, part, PartAction.Delete), `Delete ${partLabel(doc, clip, part)}`);
 </script>
 
 {#snippet lineBody()}
   <input type="text" class="one" data-testid="part-text" aria-label={partLabel(doc, clip, part)} value={partText(clip, part)} onchange={(e) => apply(writePartText(doc, clip.id, part, e.currentTarget.value), 'Edit text')} />
-  {#if row}
-    <div class="tools">
-      <button type="button" onclick={() => line(LineEdit.AddPhoto)}>+ Photo</button>
-      {#if row.photos.length}<button type="button" onclick={() => line(LineEdit.RemovePhoto)}>− Photo</button>{/if}
-      <button type="button" class:on={row.arrow} aria-pressed={row.arrow} onclick={() => line(LineEdit.Arrow)}>Arrow</button>
-    </div>
-  {/if}
 {/snippet}
 
 {#snippet photoBody()}
@@ -61,22 +53,25 @@
       <span class="empty">No images on this canvas yet.</span>
     {/each}
   </div>
-  <label class="field">Fit
+  <label class="field"><span>Fit</span>
     <select value={photo.fit ?? FITS[0]} onchange={(e) => look({ fit: e.currentTarget.value as PhotoFit })}>
-      {#each FITS as fit (fit)}<option value={fit}>{fit}</option>{/each}
+      {#each FITS as fit (fit)}<option value={fit}>{FIT_LABEL[fit]}</option>{/each}
     </select>
   </label>
-  <label class="field">Focus X <input type="range" min="0" max="1" step="0.01" value={photo.focusX ?? CENTRE} onchange={(e) => look({ focusX: Number(e.currentTarget.value) })} /></label>
-  <label class="field">Focus Y <input type="range" min="0" max="1" step="0.01" value={photo.focusY ?? CENTRE} onchange={(e) => look({ focusY: Number(e.currentTarget.value) })} /></label>
+  <div class="focus">
+    <NumberField label="Focus X" name="Focus X" value={Math.round((photo.focusX ?? CENTRE) * PERCENT)} range={FOCUS_RANGE} unit="%" onchange={(v) => look({ focusX: v / PERCENT })} />
+    <NumberField label="Focus Y" name="Focus Y" value={Math.round((photo.focusY ?? CENTRE) * PERCENT)} range={FOCUS_RANGE} unit="%" onchange={(v) => look({ focusY: v / PERCENT })} />
+  </div>
+  <button type="button" class="delete" data-testid="part-delete" onclick={remove}><Trash size={12} /> Delete photo</button>
 {/snippet}
 
 {#snippet arrowBody()}
-  <label class="field">Show arrow <input type="checkbox" checked onchange={() => line(LineEdit.Arrow)} /></label>
+  <label class="field">Show arrow <input type="checkbox" checked onchange={remove} /></label>
 {/snippet}
 
 {#if body}
   <section class="part" data-testid="poster-part" data-kind={kind}>
-    <h3>{partLabel(doc, clip, part)}</h3>
+    <h3><span class="part-kind">{PART_KIND_LABEL[kind]}</span>{partLabel(doc, clip, part)}</h3>
     {@render body()}
   </section>
 {/if}
@@ -85,13 +80,26 @@
   .part {
     display: grid;
     gap: 6px;
-    padding: 0 var(--ui-space-4) var(--ui-space-3);
+    padding: var(--ui-space-3) var(--ui-space-4) var(--ui-space-4);
+    border-bottom: 1px solid var(--ui-line);
+  }
+
+  .part-kind {
+    margin-right: 6px;
+    color: var(--ui-ink-3);
+    font-weight: 400;
+  }
+
+  .focus {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 6px;
   }
   input[type='text'],
   select {
     width: 100%;
-    height: 24px;
-    padding: 0 6px;
+    height: 28px;
+    padding: 0 8px;
     border: 1px solid transparent;
     border-radius: 0;
     background: var(--ui-field);
@@ -108,27 +116,32 @@
 
   h3 {
     margin: 0;
-    font-size: var(--ui-text-md, 12px);
+    font-size: var(--ui-text-xs);
     font-weight: 600;
   }
 
 
-  .tools {
-    display: flex;
+  .delete {
+    display: inline-flex;
+    align-items: center;
     gap: 4px;
+    justify-self: start;
   }
 
   button {
-    font-size: var(--ui-text-sm, 11px);
-    padding: 2px 6px;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-surface);
+    height: 28px;
+    padding: 0 8px;
+    border: 0;
     border-radius: 0;
+    background: var(--ui-field);
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
   }
 
-  button.on {
-    background: var(--ui-accent);
-    color: var(--ui-on-accent, #fff);
+  button:hover {
+    background: var(--ui-hover);
   }
 
   .assets {
@@ -163,14 +176,13 @@
   .field {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    font-size: var(--ui-text-sm, 11px);
+    gap: 8px;
+    font-size: var(--ui-text-xs);
     color: var(--ui-ink-2);
   }
 
-  .field select,
-  .field input[type='range'] {
-    width: 60%;
+  .field span {
+    flex-shrink: 0;
+    width: 88px;
   }
 </style>

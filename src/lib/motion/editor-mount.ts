@@ -27,11 +27,16 @@ export enum MenuPlace {
   More = 'more'
 }
 
-type MountRules = { ownsTitle: boolean; closes: boolean; stage: Stage; zoom: Zoom; measure: Measure };
+export enum ToolsPlace {
+  Stage = 'stage',
+  CanvasBar = 'canvas-bar'
+}
+
+type MountRules = { ownsTitle: boolean; closes: boolean; stage: Stage; zoom: Zoom; measure: Measure; tools: ToolsPlace };
 
 export const MOUNT: Record<Mount, MountRules> = {
-  [Mount.Page]: { ownsTitle: true, closes: false, stage: Stage.Own, zoom: Zoom.Stage, measure: Measure.Window },
-  [Mount.Canvas]: { ownsTitle: false, closes: true, stage: Stage.Node, zoom: Zoom.Canvas, measure: Measure.Host }
+  [Mount.Page]: { ownsTitle: true, closes: false, stage: Stage.Own, zoom: Zoom.Stage, measure: Measure.Window, tools: ToolsPlace.Stage },
+  [Mount.Canvas]: { ownsTitle: false, closes: true, stage: Stage.Node, zoom: Zoom.Canvas, measure: Measure.Host, tools: ToolsPlace.CanvasBar }
 };
 
 const STILL_FRAMES = 1;

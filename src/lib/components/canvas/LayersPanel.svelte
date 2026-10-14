@@ -8,22 +8,48 @@
   import ImageIcon from '@lucide/svelte/icons/image';
   import TypeIcon from '@lucide/svelte/icons/type';
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import { readFolds, toggleFold } from '$lib/canvas/layer-folds';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { untrack } from 'svelte';
   import { PART_SEP } from '$lib/motion/poster-parts';
-  import { HEADS_PARAM, cacheOutlines, canvasHeads, headsParam, missingHeads, outlinesFor, type OutlineCache } from '$lib/canvas/frame-outlines';
+  import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
+  import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import PartsProbe from './PartsProbe.svelte';
   import { LayerAction, LayerKind, Pick, dropLayer, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const INDENT_PX = 14;
+  const FOLD_GUTTER = 24;
 
   const canvas = $derived(layersSource.canvas);
   const video = $derived(layersSource.video);
   const heads = $derived(canvasHeads(canvas?.nodes ?? []));
   let outlines = $state.raw<OutlineCache>({});
   let opening = $state<{ nodeId: string; id: string } | null>(null);
+  let folds = $state.raw<Set<string>>(typeof localStorage === 'undefined' ? new Set() : readFolds(localStorage));
 
-  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts } : null, outlinesFor(heads, outlines)));
+  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts } : null, outlinesFor(heads, outlines), folds));
+  const frames = $derived(new Set([...heads.map((h) => h.nodeId), ...(video ? [video.nodeId] : [])]));
+  const fold = (nodeId: string) => (folds = toggleFold(localStorage, folds, nodeId));
+
+  let probed = $state.raw<ReadonlySet<string>>(new Set());
+  const probing = $derived(canvas ? (posterHeads(heads, outlines, probed, video?.nodeId ?? null)[0] ?? null) : null);
+
+  function measured(head: FrameHead, boxes: Record<string, MeasuredBox>) {
+    probed = new Set([...probed, headKey(head)]);
+    const parts = partIds(boxes);
+    const url = canvas?.outlinesUrl;
+    if (!url || !Object.keys(parts).length) {
+      return;
+    }
+    const query = `${HEADS_PARAM}=${encodeURIComponent(headsParam([head]))}&${PARTS_PARAM}=${encodeURIComponent(partsParam(head.nodeId, parts))}`;
+    void fetch(`${url}?${query}`)
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((answer) => (outlines = cacheOutlines(outlines, [head], answer)))
+      .catch(() => {});
+  }
 
   $effect(() => {
     const url = canvas?.outlinesUrl;
@@ -136,9 +162,15 @@
   }
 </script>
 
+{#if probing && canvas}
+  {#key headKey(probing)}
+    <PartsProbe url={`${canvas.previewUrl(probing.nodeId)}?revision=${probing.version}`} onmeasured={(boxes) => measured(probing, boxes)} />
+  {/key}
+{/if}
+
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" onkeydown={onKey}>
-  {#each rows as row (row.nodeId + row.id)}
+  {#each rows as row (`${row.nodeId}/${row.key}`)}
     {@const RowIcon = ROW_ICON[row.type] ?? Square}
     <div
       class="row"
@@ -150,7 +182,7 @@
       tabindex="-1"
       data-layer={row.id}
       data-kind={row.kind}
-      style={`padding-left: ${8 + row.depth * INDENT_PX}px`}
+      style={`padding-left: ${FOLD_GUTTER + row.depth * INDENT_PX}px`}
       draggable={editable(row)}
       class:hovered={layersSource.hovered?.id === row.id && layersSource.hovered?.nodeId === row.nodeId}
       onclick={(e) => choose(row, e)}
@@ -162,6 +194,11 @@
       ondragover={(e) => row.kind === LayerKind.Track && e.preventDefault()}
       ondrop={() => drop(row)}
     >
+      {#if row.kind === LayerKind.Node && frames.has(row.id)}
+        <button type="button" class="fold" aria-label={folds.has(row.id) ? 'Unfold' : 'Fold'} aria-expanded={!folds.has(row.id)} data-testid="layer-fold" onclick={(e) => (e.stopPropagation(), fold(row.id))}>
+          {#if folds.has(row.id)}<ChevronRight size={ICON} />{:else}<ChevronDown size={ICON} />{/if}
+        </button>
+      {/if}
       <span class="icon"><RowIcon size={ICON} /></span>
       {#if renaming === row.id}
         <!-- svelte-ignore a11y_autofocus -->
@@ -243,6 +280,23 @@
     height: 22px;
     border-radius: 0;
     font: inherit;
+  }
+
+  .fold {
+    display: grid;
+    place-items: center;
+    width: 16px;
+    height: 16px;
+    margin-left: -22px;
+    padding: 0;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--ui-text-3);
+  }
+
+  .fold:hover {
+    color: var(--ui-ink);
   }
 
   .flag {
