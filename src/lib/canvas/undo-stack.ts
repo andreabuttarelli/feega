@@ -27,6 +27,7 @@
 export type UndoStack<T> = {
   push: (entry: T) => void;
   popUndo: () => T | null;
+  nextUndo: () => T | null;
   popRedo: () => T | null;
   pushRedo: (entry: T) => void;
   pushUndo: (entry: T) => void;
@@ -44,6 +45,7 @@ export function createUndoStack<T>(): UndoStack<T> {
       redo.length = 0;
     },
     popUndo: () => undo.pop() ?? null,
+    nextUndo: () => undo.at(-1) ?? null,
     popRedo: () => redo.pop() ?? null,
     pushRedo: (entry: T) => redo.push(entry),
     pushUndo: (entry: T) => undo.push(entry),

@@ -25,7 +25,7 @@
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actionKind, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
-  import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
+  import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { canvasLink } from '$lib/realtime/canvas-link';
@@ -91,7 +91,7 @@
   import { calendarBrand, calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
   import { calendarError, type CalendarBrand, type CalendarPost } from '$lib/canvas/calendar-posts';
   import { plannedInstant } from '$lib/calendar/period-grid';
-  import { DragPhase, DropVerdict, dayUnderPointer, frameUnderPointer, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, dayUnderPointer, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { DropOn, type Drop } from '$lib/motion/move-element';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
@@ -372,6 +372,14 @@
     const res = await post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), versions: JSON.stringify({ [source]: version }), ...(out.box ? { box: JSON.stringify(out.box) } : {}) });
     return landed(res) ? ((res?.versions as Record<string, number>)[source] ?? null) : null;
   }
+
+  const canvasundo: CanvasUndo = {
+    owns: (nodeId, version) => {
+      const next = undoStack.nextUndo();
+      return next?.source === 'server' && writesFrameAt(next.gesture, nodeId, version);
+    },
+    run: () => undo()
+  };
 
   async function dropOutput(nodeId: string, client: PointerPoint) {
     const drop = dropAt(client, null);
@@ -3021,7 +3029,7 @@
   </CanvasFlow>
   {#if inlineMotion}
     {#key inlineMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => reframe(inlineMotion, free)} onmoveout={moveOut} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => reframe(inlineMotion, free)} onmoveout={moveOut} {canvasundo} />
     {/key}
   {/if}
 

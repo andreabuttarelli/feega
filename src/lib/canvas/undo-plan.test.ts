@@ -3,6 +3,7 @@ import {
   inverseOf,
   checkPrecondition,
   checkGesture,
+  writesFrameAt,
   type UndoItem,
   type Gesture,
   type CurrentNodeState,
@@ -217,6 +218,14 @@ describe('doc.revision: a frame doc written by a move', () => {
 
   it('is undone by restoring the revision before, expecting the one it wrote', () => {
     expect(inverseOf(item)).toEqual({ op: 'restore_doc', nodeId: NODE, version: 4, expectedVersion: 5 });
+  });
+
+  it('a gesture owns the frame head it wrote, and no other version', () => {
+    const gesture: Gesture = { items: [item, { kind: 'doc.revision', nodeId: OTHER_NODE, before: 1, after: 2 }] };
+
+    expect(writesFrameAt(gesture, NODE, 5)).toBe(true);
+    expect(writesFrameAt(gesture, NODE, 6)).toBe(false);
+    expect(writesFrameAt({ items: [] }, NODE, 5)).toBe(false);
   });
 
   it('a frame written again since is stale, never overwritten', () => {

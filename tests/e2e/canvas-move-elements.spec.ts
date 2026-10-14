@@ -3,6 +3,7 @@ import type { Page, Locator } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
+const BAR_H = 44;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const PNG_1X1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
@@ -95,6 +96,29 @@ test.describe('moving elements between frames @real', () => {
     const { data: frames } = await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).eq('type', 'motion').is('deleted_at', null).neq('id', a);
     expect(frames).toHaveLength(1);
     expect(clipIds(await head(admin, frames![0].id))).toEqual(['Text:txt']);
+
+    const made = (await head(admin, frames![0].id)) as Doc & { width: number; height: number };
+    const { data: node } = await admin.from('nodes').select('width, height').eq('id', frames![0].id).single();
+    expect(made.width / made.height, 'the new frame takes the element shape').toBeGreaterThan(16 / 9 + 0.5);
+    expect(Math.abs(Number(node!.height) - BAR_H - (Number(node!.width) * made.height) / made.width), 'the node is the shape of its frame, no letterbox').toBeLessThanOrEqual(1);
+  });
+
+  test('cmd+Z in the open editor after a move to another frame undoes both frames', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const a = await frame(admin, seedNode, session, { x: 80, y: 80 }, withText);
+    const b = await frame(admin, seedNode, session, { x: 700, y: 80 }, blank);
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const from = await openAndGrab(page, a);
+    const moved = page.waitForResponse((r) => r.url().includes('?/moveElement'));
+    await dragTo(page, from, await centre(stageOf(page, b)));
+    await moved;
+    await expect.poll(async () => clipIds(await head(admin, b)), { timeout: 10_000 }).toEqual(['Text:txt']);
+    await expect.poll(async () => clipIds(await head(admin, a)), { timeout: 10_000 }).toEqual([]);
+
+    await page.keyboard.press('Meta+z');
+    await expect.poll(async () => clipIds(await head(admin, a)), { timeout: 10_000 }).toEqual(['Text:txt']);
+    await expect.poll(async () => clipIds(await head(admin, b)), { timeout: 10_000 }).toEqual([]);
   });
 
   for (const type of ['image', 'video'] as const) {
