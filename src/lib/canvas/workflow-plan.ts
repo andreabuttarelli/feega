@@ -6,7 +6,7 @@ export type WorkflowPlanResult =
   | { ok: true; steps: WorkflowStep[] }
   | { ok: false; reason: string };
 
-const GENERATIVE_TYPES = new Set(['text', 'image', 'video']);
+export const GENERATIVE_TYPES = new Set(['text', 'image', 'video']);
 
 function adjacency(selectedIds: string[], edges: WorkflowEdge[]) {
   const selected = new Set(selectedIds);

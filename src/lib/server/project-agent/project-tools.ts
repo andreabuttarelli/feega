@@ -101,6 +101,20 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
       execute: (input: z.infer<typeof CANVAS_OPS.connect_nodes.input>) => CANVAS_OPS.connect_nodes.run(ctx, input)
     }),
 
+    move_frame_element: tool({
+      description:
+        'Move one element (a clip: text, image, video, shape, component) out of a Frame into another Frame of THIS project, or onto the empty canvas as a new Frame holding only it. Props, style and keyframes are kept and re-timed to the target frame rate; x/y (0..1 of the target frame) is where its centre lands. Never turns an element into a generative node. Both frames are saved as revisions.',
+      inputSchema: CANVAS_OPS.move_frame_element.input,
+      execute: (input: z.infer<typeof CANVAS_OPS.move_frame_element.input>) => CANVAS_OPS.move_frame_element.run(ctx, input)
+    }),
+
+    place_in_frame: tool({
+      description:
+        "Put the generated output of an image, video or text node of THIS project into a Frame as an element (image, video at the frame's start, or text), centred at x/y (0..1). Omit toFrameId to make a new Frame on the canvas holding only it. The generative node is not changed. To keep the element following the node's next generations, connect_nodes the node to the Frame instead.",
+      inputSchema: CANVAS_OPS.place_in_frame.input,
+      execute: (input: z.infer<typeof CANVAS_OPS.place_in_frame.input>) => CANVAS_OPS.place_in_frame.run(ctx, input)
+    }),
+
     delete_node: tool({
       description: 'Soft-delete a node on THIS project. The node disappears from list_nodes; undo can bring it back.',
       inputSchema: CANVAS_OPS.delete_node.input,
@@ -254,6 +268,18 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
       description: 'Stop the queued combinations of a node loop that have not started yet. Finished results stay.',
       inputSchema: CANVAS_OPS.cancel_node_loop.input,
       execute: (input: z.infer<typeof CANVAS_OPS.cancel_node_loop.input>) => CANVAS_OPS.cancel_node_loop.run(ctx, input)
+    }),
+
+    preview_run_graph: tool({
+      description: 'Plan a graph run on THIS project without spending: graph "downstream" (nodeId, then every node it feeds, in dependency order) or "stale" (on canvasId, every result older than its inputs; nodeIds narrows it). Returns the ordered steps and the credits. Free: always call it and tell the user the cost before run_graph.',
+      inputSchema: CANVAS_OPS.preview_run_graph.input,
+      execute: (input: z.infer<typeof CANVAS_OPS.preview_run_graph.input>) => CANVAS_OPS.preview_run_graph.run(ctx, input)
+    }),
+
+    run_graph: tool({
+      description: 'Queue the steps preview_run_graph planned, same input; a cron runs each after the ones it depends on, a failed step stops what depends on it. Costs credits: only when the user agreed to the quoted cost. Cycles are refused.',
+      inputSchema: CANVAS_OPS.run_graph.input,
+      execute: (input: z.infer<typeof CANVAS_OPS.run_graph.input>) => CANVAS_OPS.run_graph.run(ctx, input)
     }),
 
     search_gallery: tool({

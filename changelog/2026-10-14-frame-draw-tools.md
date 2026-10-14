@@ -26,5 +26,5 @@ AI parity: no new tool. The chat agent and MCP `motion_tool` already create the 
 
 Not done: per-corner radius (`rectOutline` takes one roundness; four radii is a schema change),
 an on-canvas radius handle, adding a point on a segment, arrow-key nudging (arrows step frames
-today; it belongs to Design mode). The e2e `canvas-draw-tools.spec.ts` ran green once against the
-real stack, before seeded e2e on production was stopped; not re-run since.
+today; it belongs to Design mode). The e2e `canvas-draw-tools.spec.ts` runs green against the real
+stack; the toolbar sits bottom-left so it never covers the pen overlay's own buttons.

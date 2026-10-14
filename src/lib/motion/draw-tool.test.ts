@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Corner, closesOnFirst, dragRect, nudge, resizeFromCorner, roundnessFromInset } from './draw-tool';
+import { Corner, closesOnFirst, cornerAt, cornerInset, dragRect, nudge, resizeFromCorner, roundnessFromInset } from './draw-tool';
 
 describe('dragging a box to create an element inside a frame', () => {
   it('centers the box between the two drag points', () => {
@@ -80,5 +80,27 @@ describe('closing a pen path on its first point', () => {
   it('two points or an already closed path never close', () => {
     expect(closesOnFirst([{ closed: false, vertices: open[0].vertices.slice(0, 2) }], [10, 10], 6)).toBe(false);
     expect(closesOnFirst([{ ...open[0], closed: true }], [10, 10], 6)).toBe(false);
+  });
+});
+
+describe('corner radius handles', () => {
+  const box = { left: 100, top: 50, width: 200, height: 100 };
+
+  it('sit on each corner, top-left first, clockwise', () => {
+    expect([0, 1, 2, 3].map((i) => cornerAt(box, i))).toEqual([
+      [100, 50],
+      [300, 50],
+      [300, 150],
+      [100, 150]
+    ]);
+  });
+
+  it('dragging a handle inward along the diagonal is the inset of that corner', () => {
+    expect(cornerInset(box, 0, [120, 70])).toBe(20);
+    expect(cornerInset(box, 2, [270, 120])).toBe(30);
+  });
+
+  it('dragging outward is no inset', () => {
+    expect(cornerInset(box, 1, [320, 30])).toBe(0);
   });
 });

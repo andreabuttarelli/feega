@@ -204,6 +204,26 @@ describe('motion agent timeline organisation', () => {
     expect(['id1', 'id2', 'id3'].map((id) => findClip(session.doc, id)!.clip.from)).toEqual([0, 6, 12]);
   });
 
+  it('arrange_space lines shapes up on the left and spreads them evenly; move nudges in px', async () => {
+    const t = setup();
+    await t.run('add_shape', { kind: 'rect', start: 0, props: { x: 200, y: 300, width: 100, height: 100 } });
+    await t.run('add_shape', { kind: 'rect', start: 0, props: { x: 500, y: 500, width: 200, height: 100 } });
+    await t.run('add_shape', { kind: 'rect', start: 0, props: { x: 900, y: 700, width: 100, height: 100 } });
+    const x = (id: string) => findClip(t.session.doc, id)!.clip.transform.x ?? 0;
+
+    expect((await t.run('arrange_space', { clip_ids: ['id1', 'id2'], op: 'align_left' })).ok).toBe(true);
+    expect(x('id2')).toBeLessThan(0);
+    expect((await t.run('arrange_space', { clip_ids: ['id1', 'id2', 'id3'], op: 'distribute_x' })).ok).toBe(true);
+    expect((await t.run('arrange_space', { clip_ids: ['id3'], op: 'move', dx: 10 })).ok).toBe(true);
+    expect((await t.run('arrange_space', { clip_ids: ['id1', 'id2'], op: 'distribute_y' })).ok).toBe(false);
+  });
+
+  it('add_shape takes a radius per corner', async () => {
+    const t = setup();
+    expect((await t.run('add_shape', { kind: 'rect', start: 0, props: { roundness: 0.1, corners: [0.5, 0, 0.5, 0] } })).ok).toBe(true);
+    expect(findClip(t.session.doc, 'id1')!.clip.props.corners).toEqual([0.5, 0, 0.5, 0]);
+  });
+
   it('set_visibility hides a clip and the work area is shown in get_motion_doc', async () => {
     const { session, run } = await three();
     await run('set_visibility', { clip_id: 'id1', hidden: true });

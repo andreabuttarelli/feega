@@ -20,6 +20,7 @@ import { logAiCall } from '$lib/server/ai-log';
 import type { OrgQueryAuthority } from './query-tool';
 import { announcePresence } from './presence';
 import type { Actor } from '$lib/server/repos/actor';
+import { MoveOutcome, frameStore, linkFrame } from '$lib/server/motion/move-element';
 import { validateNewNodeData, validateNodeDataUpdate } from '$lib/canvas/node-data';
 import { mergeNodeData, type NodeData } from '$lib/canvas/node-patch';
 import { nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
@@ -243,6 +244,12 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
     );
   };
 
+  const linkFramesOf = async (rows: Array<Record<string, unknown>>) => {
+    const store = frameStore(supabase as unknown as Db, { orgId, actor: actor ?? { kind: 'system', id: null } });
+    const moved = await Promise.all(rows.map((r) => linkFrame(store, { sourceNodeId: String(r.source_node_id ?? ''), frameNodeId: String(r.target_node_id ?? '') }).catch(() => null)));
+    return moved.flatMap((m) => (m?.outcome === MoveOutcome.Done ? [{ frame_id: m.frameId, element_id: m.clipId }] : []));
+  };
+
   const insertRow = async (input: InsertInput) => {
     const t0 = Date.now();
     const values = input.values ?? {};
@@ -311,8 +318,9 @@ export function createOrgWriteTools({ authority, orgId, userId, threadId, actor,
 
     const rows = (data ?? []) as Array<Record<string, unknown>>;
     await canvasAnnounce(table, rows);
+    const linked = table === NODES_CONNECTIONS_TABLE ? await linkFramesOf(rows) : [];
     return finish(
-      { table, row: rows[0], inserted: rows.length },
+      { table, row: rows[0], inserted: rows.length, ...(linked.length ? { placed_in_frame: linked } : {}) },
       `org_db_write:${table}:insert:cols=${Object.keys(values).length}`,
       t0
     );

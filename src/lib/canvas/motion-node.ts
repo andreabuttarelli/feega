@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$lib/motion/doc';
 import { NodeMode } from './inline-motion';
 
 export type MotionNode = {
@@ -64,6 +64,11 @@ export function motionNodeSize(format: MotionFormat = MotionFormat.Vertical): { 
 export function frameNodeSize(width: number, picture: { width: number; height: number }, mode: NodeMode = NodeMode.Preview): { w: number; h: number } {
   const w = Math.round(width);
   return { w, h: Math.round((w * picture.height) / picture.width) + BAR_H[mode] };
+}
+
+export function frameNodeOf(picture: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
+  const format = docFormat(picture);
+  return { data: newMotionData(format), ...frameNodeSize(MOTION_STAGE_WIDTH[format], picture) };
 }
 
 export function newMotionData(format: MotionFormat = MotionFormat.Vertical): Record<string, unknown> {

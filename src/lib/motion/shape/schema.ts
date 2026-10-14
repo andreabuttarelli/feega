@@ -32,10 +32,10 @@ export const CAPS = ['butt', 'round', 'square'] as const;
 export const JOINS = ['miter', 'round', 'bevel'] as const;
 export const FILL_RULES = ['nonzero', 'evenodd'] as const;
 
-const GEOMETRY = ['roundness', 'sides', 'points', 'innerRadius'] as const;
+const GEOMETRY = ['roundness', 'corners', 'sides', 'points', 'innerRadius'] as const;
 
 export const GEOMETRY_OF: Record<ShapeKind, readonly (typeof GEOMETRY)[number][]> = {
-  [ShapeKind.Rect]: ['roundness'],
+  [ShapeKind.Rect]: ['roundness', 'corners'],
   [ShapeKind.Line]: [],
   [ShapeKind.Circle]: [],
   [ShapeKind.Ellipse]: [],

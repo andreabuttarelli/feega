@@ -229,6 +229,13 @@ video pinned to one frame: `set_canvas` `{ format: "A poster", still: 2 }`, then
 `{ format: "png", scale: 2 }` returns the image `url`. CLI: `feega motion tool <nodeId> <tool>
 --input '{...}'`, `feega motion tools [name]`, `feega motion still <nodeId> --scale 2 --out poster.png`.
 
+Frames hold graphic elements; image, video and text nodes generate. `canvas_tool` op
+`move_frame_element` moves an element into another frame (or a new one) keeping props and
+keyframes; op `place_in_frame` puts a generative node's output into a frame as an element; the
+motion `motion_tool` `move_to_frame` does the same from inside a video. Connecting a generative node to a frame
+(`insert_row` on `nodes_connections`) keeps one element following its next generations. CLI:
+`feega motion move <frameId> <elementId> --to <frameId>`, `feega motion place <nodeId> --to <frameId>`.
+
 A launch film's script is also laid out as a storyboard canvas linked to the video: one card per
 beat, story order left to right, stronger emotion higher. `get_storyboard` reads it (the user's
 edits included, and the clips each card plays), `write_storyboard` writes it from beats,

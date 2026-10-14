@@ -1,6 +1,7 @@
 import type { RealtimeChannel, RealtimePostgresChangesPayload, SupabaseClient } from '@supabase/supabase-js';
 import { dedupePresence, type PresencePeer } from './presence-peers';
 import { ChannelStatus, createLink, type LinkPort, type LinkState } from './connection-link';
+import { FRAME_EVENT, type FrameLine } from './frame-presence';
 
 export type CanvasChange = RealtimePostgresChangesPayload<Record<string, unknown>>;
 
@@ -18,6 +19,7 @@ type CanvasConnection = {
 	onReconnect: () => void;
 	onCanvasList: () => void;
 	onLink: (state: LinkState) => void;
+	frames?: FrameLine;
 	environment?: LinkEnvironment;
 };
 
@@ -96,6 +98,12 @@ export function connectCanvas(options: CanvasConnection): () => void {
 			}
 		});
 
+		joined.on('broadcast', { event: FRAME_EVENT }, (message) => {
+			if (!closed && channel === joined) {
+				options.frames?.receive(message.payload);
+			}
+		});
+
 		joined.on('presence', { event: 'sync' }, () => {
 			if (!closed && channel === joined) {
 				onPeers(dedupePresence(joined.presenceState<Partial<PresencePeer>>(), peer.userId, peer));
@@ -109,6 +117,7 @@ export function connectCanvas(options: CanvasConnection): () => void {
 			const status = String(raw) as ChannelStatus;
 			if (status === ChannelStatus.Subscribed) {
 				void joined.track(peer).catch(() => {});
+				options.frames?.attach((mark) => void joined.send({ type: 'broadcast', event: FRAME_EVENT, payload: mark }).catch(() => {}));
 			}
 			link.channel(status);
 		});
@@ -116,6 +125,7 @@ export function connectCanvas(options: CanvasConnection): () => void {
 
 	function leave() {
 		onPeers([]);
+		options.frames?.attach(null);
 		const dead = channel;
 		channel = null;
 		if (dead) {

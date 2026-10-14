@@ -1,3 +1,4 @@
+import { EditMode } from './edit-mode';
 export enum Command {
   TogglePlay = 'toggle-play',
   Play = 'play',
@@ -51,7 +52,16 @@ export enum Command {
   ToolText = 'tool-text',
   ToolRectangle = 'tool-rectangle',
   ToolEllipse = 'tool-ellipse',
-  ToolPen = 'tool-pen'
+  ToolPen = 'tool-pen',
+  ToggleEditMode = 'toggle-edit-mode',
+  MoveLeft = 'move-left',
+  MoveRight = 'move-right',
+  MoveUp = 'move-up',
+  MoveDown = 'move-down',
+  MoveLeftMore = 'move-left-more',
+  MoveRightMore = 'move-right-more',
+  MoveUpMore = 'move-up-more',
+  MoveDownMore = 'move-down-more'
 }
 
 export enum ShortcutGroup {
@@ -65,7 +75,7 @@ export enum ShortcutGroup {
 
 export type KeyPress = { key: string; code?: string; mod: boolean; shift: boolean; alt?: boolean };
 
-type Binding = { key: string; mod?: boolean; shift?: boolean; alt?: boolean; command: Command; label: string; does: string; group: ShortcutGroup };
+type Binding = { key: string; mod?: boolean; shift?: boolean; alt?: boolean; mode?: EditMode; command: Command; label: string; does: string; group: ShortcutGroup };
 
 export const SHORTCUTS: readonly Binding[] = [
   { key: ' ', command: Command.TogglePlay, label: 'Space', does: 'Play / pause', group: ShortcutGroup.Playback },
@@ -75,10 +85,18 @@ export const SHORTCUTS: readonly Binding[] = [
 
   { key: 'Home', command: Command.GoStart, label: 'Home', does: 'Go to the start', group: ShortcutGroup.Time },
   { key: 'End', command: Command.GoEnd, label: 'End', does: 'Go to the end', group: ShortcutGroup.Time },
-  { key: 'ArrowLeft', command: Command.StepBack, label: '←', does: 'Previous frame', group: ShortcutGroup.Time },
-  { key: 'ArrowRight', command: Command.StepForward, label: '→', does: 'Next frame', group: ShortcutGroup.Time },
-  { key: 'ArrowLeft', shift: true, command: Command.StepBackMore, label: '⇧←', does: 'Back 10 frames', group: ShortcutGroup.Time },
-  { key: 'ArrowRight', shift: true, command: Command.StepForwardMore, label: '⇧→', does: 'Forward 10 frames', group: ShortcutGroup.Time },
+  { key: 'ArrowLeft', mode: EditMode.Motion, command: Command.StepBack, label: '←', does: 'Previous frame (Motion)', group: ShortcutGroup.Time },
+  { key: 'ArrowRight', mode: EditMode.Motion, command: Command.StepForward, label: '→', does: 'Next frame (Motion)', group: ShortcutGroup.Time },
+  { key: 'ArrowLeft', shift: true, mode: EditMode.Motion, command: Command.StepBackMore, label: '⇧←', does: 'Back 10 frames (Motion)', group: ShortcutGroup.Time },
+  { key: 'ArrowRight', shift: true, mode: EditMode.Motion, command: Command.StepForwardMore, label: '⇧→', does: 'Forward 10 frames (Motion)', group: ShortcutGroup.Time },
+  { key: 'ArrowLeft', mode: EditMode.Design, command: Command.MoveLeft, label: '←', does: 'Move the selection 1 px (Design)', group: ShortcutGroup.Layers },
+  { key: 'ArrowRight', mode: EditMode.Design, command: Command.MoveRight, label: '→', does: 'Move the selection 1 px (Design)', group: ShortcutGroup.Layers },
+  { key: 'ArrowUp', mode: EditMode.Design, command: Command.MoveUp, label: '↑', does: 'Move the selection 1 px (Design)', group: ShortcutGroup.Layers },
+  { key: 'ArrowDown', mode: EditMode.Design, command: Command.MoveDown, label: '↓', does: 'Move the selection 1 px (Design)', group: ShortcutGroup.Layers },
+  { key: 'ArrowLeft', shift: true, mode: EditMode.Design, command: Command.MoveLeftMore, label: '⇧←', does: 'Move the selection 10 px (Design)', group: ShortcutGroup.Layers },
+  { key: 'ArrowRight', shift: true, mode: EditMode.Design, command: Command.MoveRightMore, label: '⇧→', does: 'Move the selection 10 px (Design)', group: ShortcutGroup.Layers },
+  { key: 'ArrowUp', shift: true, mode: EditMode.Design, command: Command.MoveUpMore, label: '⇧↑', does: 'Move the selection 10 px (Design)', group: ShortcutGroup.Layers },
+  { key: 'ArrowDown', shift: true, mode: EditMode.Design, command: Command.MoveDownMore, label: '⇧↓', does: 'Move the selection 10 px (Design)', group: ShortcutGroup.Layers },
   { key: 'j', shift: true, command: Command.PrevKeyframe, label: '⇧J', does: 'Previous keyframe', group: ShortcutGroup.Time },
   { key: 'k', shift: true, command: Command.NextKeyframe, label: '⇧K', does: 'Next keyframe', group: ShortcutGroup.Time },
   { key: 'i', command: Command.WorkIn, label: 'I', does: 'Work area starts here', group: ShortcutGroup.Time },
@@ -130,6 +148,7 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'r', shift: true, command: Command.ToolRectangle, label: '⇧R', does: 'Rectangle tool', group: ShortcutGroup.Draw },
   { key: 'o', shift: true, command: Command.ToolEllipse, label: '⇧O', does: 'Ellipse tool', group: ShortcutGroup.Draw },
   { key: 'p', shift: true, command: Command.ToolPen, label: '⇧P', does: 'Pen tool: click points, drag for curves', group: ShortcutGroup.Draw },
+  { key: 'e', command: Command.ToggleEditMode, label: 'E', does: 'Design / Motion: edit the base or key at the playhead', group: ShortcutGroup.View },
   { key: '?', shift: true, command: Command.Help, label: '?', does: 'Keyboard & gestures', group: ShortcutGroup.View }
 ];
 
@@ -148,9 +167,9 @@ function keyOf(press: KeyPress): string {
   return press.key.length === 1 ? press.key.toLowerCase() : press.key;
 }
 
-export function commandFor(press: KeyPress): Command | null {
+export function commandFor(press: KeyPress, mode: EditMode = EditMode.Motion): Command | null {
   const key = keyOf(press);
-  const hit = SHORTCUTS.find((b) => b.key === key && Boolean(b.mod) === press.mod && Boolean(b.shift) === press.shift && Boolean(b.alt) === Boolean(press.alt));
+  const hit = SHORTCUTS.find((b) => b.key === key && Boolean(b.mod) === press.mod && Boolean(b.shift) === press.shift && Boolean(b.alt) === Boolean(press.alt) && (b.mode ?? mode) === mode);
   return hit?.command ?? null;
 }
 

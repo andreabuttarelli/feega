@@ -14,6 +14,15 @@ describe('shape markup', () => {
     expect(svg).toContain('stroke:none');
   });
 
+  it('a rectangle from before per-corner radii has none and stays square', () => {
+    expect(look({}).corners).toEqual([]);
+  });
+
+  it('one rounded corner rounds only that corner', () => {
+    const svg = shapeMarkup(look({ fill: '#ff0000', corners: [0, 0, 0.5, 0] }), paint);
+    expect(svg).toContain('<path d="M200 0L200 50C200 77.6142 177.6142 100 150 100L0 100L0 0Z"/>');
+  });
+
   it('a linear gradient fill points along its angle, colours resolved', () => {
     const svg = shapeMarkup(look({ fillKind: 'linear', gradientAngle: 0, fill: 'brand.accent', fill2: '#000000' }), paint);
     expect(svg).toContain('<linearGradient id="sg-a" gradientUnits="userSpaceOnUse" x1="0" y1="50" x2="200" y2="50">');

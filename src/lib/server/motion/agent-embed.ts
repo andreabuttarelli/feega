@@ -1,7 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import { findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findProjectById, type Project } from '$lib/server/repos/projects';
-import { motionOf } from '$lib/canvas/motion-node';
+import { motionOf, type MotionNode } from '$lib/canvas/motion-node';
 import { embedUrl, interactiveBundle, BUNDLE_FILE } from '$lib/motion/interactive/bundle';
 import { embedSnippets } from '$lib/motion/interactive/loader';
 import type { MotionDoc } from '$lib/motion/doc';
@@ -18,7 +18,7 @@ export enum EmbedFailure {
 
 export type EmbedAnswer = { ok: true; body: Record<string, unknown> } | { ok: false; failure: EmbedFailure; body: Record<string, unknown> };
 
-type Saved = { record: CanvasNodeRecord; project: Project; version: number; doc: MotionDoc };
+type Saved = { record: CanvasNodeRecord; node: MotionNode; project: Project; version: number; doc: MotionDoc };
 type Scope = { orgId: string; nodeId: string };
 type PublishScope = Scope & { sign?: AssetSigner };
 
@@ -34,7 +34,7 @@ export async function savedMotion(db: Db, scope: Scope): Promise<Saved | null> {
     return null;
   }
   const head = await headOrNew(db, scope, node);
-  return { record, project, version: head.version, doc: head.doc };
+  return { record, node, project, version: head.version, doc: head.doc };
 }
 
 async function bundleInput(db: Db, scope: PublishScope, saved: Saved) {

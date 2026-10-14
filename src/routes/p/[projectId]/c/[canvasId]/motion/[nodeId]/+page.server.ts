@@ -4,6 +4,8 @@ import { libraryOf, loadEditorSession } from '$lib/server/motion/editor-session'
 import { motionScope as scopeFor } from '$lib/server/motion/editor-scope';
 import { Restore, assetUrls, headOrNew, motionAssets, motionTokens, restoreRevision, saveMotionDoc } from '$lib/server/motion/editor';
 import { RevisionOutcome, listRevisions } from '$lib/server/repos/motion-revisions';
+import { OpsOutcome, commitOps } from '$lib/server/motion/frame-ops';
+import { parseOps } from '$lib/motion/doc-ops';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
 import { batchView, cancelRender, renderView } from '$lib/server/motion/render-run';
 import { startFarmBatch, startFarmRender } from '$lib/server/motion/render-start';
@@ -80,6 +82,38 @@ export const actions: Actions = {
       return fail(HTTP_BAD_REQUEST, { error: write.error });
     }
     return { version: write.head.version };
+  },
+
+  ops: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const form = await request.formData();
+    const ops = parseOps(parsedJson(String(form.get('ops') ?? '')));
+    if (!ops) {
+      return fail(HTTP_BAD_REQUEST, { error: 'invalid_ops' });
+    }
+
+    const commit = await commitOps(scope.db, {
+      orgId: scope.orgId,
+      nodeId: scope.motion.record.id,
+      node: scope.motion.node,
+      baseVersion: Number(form.get('version')),
+      ops,
+      actor: { kind: 'user', id: scope.userId },
+      summary: String(form.get('summary') ?? '') || null
+    });
+    if (commit.outcome === OpsOutcome.Invalid) {
+      return fail(HTTP_BAD_REQUEST, { error: commit.error });
+    }
+    if (commit.outcome === OpsOutcome.Busy) {
+      return fail(HTTP_CONFLICT, { error: 'busy' });
+    }
+    return { version: commit.head.version, doc: commit.head.doc, rebased: commit.rebased };
+  },
+
+  head: async ({ locals, params }) => {
+    const scope = await scopeFor(locals, params);
+    const head = await headOrNew(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id }, scope.motion.node);
+    return { version: head.version, doc: head.doc, actorKind: head.actorKind };
   },
 
   revisions: async ({ locals, params }) => {

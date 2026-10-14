@@ -19,6 +19,8 @@ import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { cancelLoop, enqueueLoop, planLoop } from '$lib/server/canvas/loop';
+import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
+import { MoveOutcome, dropFor, frameAnswer, frameStore, linkFrame, moveElement, placeOutput } from '$lib/server/motion/move-element';
 
 export type CanvasDeps = {
   db: Db;
@@ -108,6 +110,18 @@ const moveNodeInput = z
     z: z.number().optional().describe('Stacking order. Omit to leave it unchanged.')
   })
   .strict();
+const frameTarget = {
+  toFrameId: z.string().optional().describe('the Frame to put it in; omit to make a new Frame on the canvas'),
+  x: z.number().min(0).max(1).default(0.5),
+  y: z.number().min(0).max(1).default(0.5),
+  canvasX: z.number().optional().describe('canvas position of a new Frame'),
+  canvasY: z.number().optional()
+};
+const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame node the element is in'), elementId: z.string().describe('the clip id inside that frame'), ...frameTarget }).strict();
+const placeInFrameInput = z.object({ nodeId: z.string().describe('the generative image, video or text node'), ...frameTarget }).strict();
+
+const framesOf = (ctx: CanvasCtx) => frameStore(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, projectId: ctx.projectId });
+
 const connectNodesInput = z
   .object({
     canvasId: z.string(),
@@ -135,6 +149,25 @@ const runLoopInput = z
     confirm: z.boolean().optional().describe('Required true above 50 combinations, after the user agreed to the cost.')
   })
   .strict();
+
+const runGraphInput = z
+  .object({
+    graph: z.enum(GraphScope).describe('downstream: nodeId and every node it feeds, in order. stale: results older than their inputs.'),
+    nodeId: z.string().optional().describe('downstream: the node to start from.'),
+    canvasId: z.string().optional().describe('stale: the canvas.'),
+    nodeIds: z.array(z.string()).optional().describe('stale: only these nodes. Omit for the whole canvas.')
+  })
+  .strict();
+
+const NO_CANVAS = { error: 'canvas_required', message: 'downstream needs nodeId; stale needs canvasId.' };
+
+async function graphCanvas(ctx: CanvasCtx, input: z.infer<typeof runGraphInput>): Promise<string | null> {
+  if (input.graph === GraphScope.Stale) {
+    return input.canvasId ?? null;
+  }
+  const node = input.nodeId ? await findNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId }) : null;
+  return node?.canvasId ?? null;
+}
 
 export const CANVAS_OPS = {
   list_canvases: op({
@@ -239,8 +272,21 @@ export const CANVAS_OPS = {
         targetHandle: input.targetHandle ?? null,
         actor: ctx.actor
       });
-      return { connection };
+      const linked = await linkFrame(framesOf(ctx), { sourceNodeId: input.sourceNodeId, frameNodeId: input.targetNodeId });
+      return { connection, ...(linked.outcome === MoveOutcome.Done ? { placed_in_frame: { clip_id: linked.clipId, revision: linked.versions[linked.frameId] } } : {}) };
     }
+  }),
+
+  move_frame_element: op({
+    access: Access.Write,
+    input: moveFrameElementInput,
+    run: async (ctx, input) => frameAnswer(await moveElement(framesOf(ctx), { sourceNodeId: input.frameId, clipId: input.elementId, drop: dropFor(input) }))
+  }),
+
+  place_in_frame: op({
+    access: Access.Write,
+    input: placeInFrameInput,
+    run: async (ctx, input) => frameAnswer(await placeOutput(framesOf(ctx), { sourceNodeId: input.nodeId, drop: dropFor(input) }))
   }),
 
   delete_node: op({
@@ -329,6 +375,36 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: nodeIdInput,
     run: async (ctx, input) => cancelLoop(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId })
+  }),
+
+  preview_run_graph: op({
+    access: Access.Read,
+    input: runGraphInput,
+    run: async (ctx, input) => {
+      const canvasId = await graphCanvas(ctx, input);
+      if (!canvasId) {
+        return NO_CANVAS;
+      }
+      const { plan, credits } = await planGraph(ctx.db, { orgId: ctx.orgId, canvasId, ...input });
+      return plan.ok ? { steps: plan.steps, credits } : { outcome: 'refused', error: plan.reason };
+    }
+  }),
+
+  run_graph: op({
+    access: Access.Spend,
+    input: runGraphInput,
+    run: async (ctx, input) => {
+      const canvasId = await graphCanvas(ctx, input);
+      if (!canvasId) {
+        return NO_CANVAS;
+      }
+      const out = await ctx.billed(() =>
+        enqueueGraph(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, actor: ctx.actor, canvasId, ...input })
+      );
+      return out.kind === 'enqueued'
+        ? { outcome: 'queued', workflowId: out.workflowId, steps: out.steps, runIdByNodeId: out.runIdByNodeId, credits: out.credits }
+        : { outcome: 'refused', error: out.error };
+    }
   })
 };
 

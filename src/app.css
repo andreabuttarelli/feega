@@ -161,6 +161,7 @@
   --ui-accent-ink: #ffffff;
   --ui-accent-wash: color-mix(in srgb, var(--ui-accent) 10%, transparent);
   --ui-hover-outline: #b14cff;
+  --ease-expo-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ui-ok: #1f9d55;
   --ui-warn: #d98e04;
   --ui-danger: #e5484d;
