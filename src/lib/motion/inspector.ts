@@ -137,6 +137,15 @@ export function clipFieldGroups(doc: MotionDoc, clip: MotionClip): { group: Grou
   return GROUP_ORDER.map((group) => ({ group, fields: fields.filter((f) => f.group === group) })).filter((g) => g.fields.length > 0);
 }
 
+const PART_SHARED_GROUPS = [Group.Style, Group.Layout];
+
+export function partFieldKeys(doc: MotionDoc, clip: MotionClip, field: string): string[] {
+  const shared = clipFieldGroups(doc, clip)
+    .filter((g) => PART_SHARED_GROUPS.includes(g.group))
+    .flatMap((g) => g.fields.map((f) => f.key));
+  return [field, ...shared];
+}
+
 const SECONDS_PRECISION = 100;
 
 export function secondsLabel(frames: number, fps: number = FPS): string {

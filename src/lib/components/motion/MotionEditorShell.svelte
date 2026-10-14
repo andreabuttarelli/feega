@@ -121,6 +121,7 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { PART_SEP, parsePart } from '$lib/motion/poster-parts';
   import { PropertiesView, propertiesFor } from '$lib/motion/properties-view';
+  import { partFieldKeys } from '$lib/motion/inspector';
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 
@@ -1457,7 +1458,7 @@
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
         <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
-        <MotionInspector {doc} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart ? parsePart(selectedPart).field : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        <MotionInspector {doc} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart && selected ? partFieldKeys(doc, selected, parsePart(selectedPart).field) : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}

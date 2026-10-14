@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from './components';
 import { Ease } from './design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt } from './inspector';
+import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, partFieldKeys, secondsLabel, toggleKey, valueAt } from './inspector';
 import { addClip, setKeyframes, setTransform, type OpResult } from './timeline';
 import { writeComponent } from './custom/ops';
 import { PropFormat } from './custom/component';
@@ -188,6 +188,38 @@ describe('properties of a custom clip come from its props schema', () => {
     ]);
     expect(fields[0].label).toBe('Month');
     expect(fields.find((f) => f.key === 'posts')).toMatchObject({ min: 0, max: 30, step: 1 });
+  });
+});
+
+describe('fields shown for a selected poster part', () => {
+  function posterClip() {
+    const doc = must(
+      writeComponent(newMotionDoc(MotionFormat.Landscape), 'Poster', {
+        source: { html: '', css: '', js: '' },
+        propsSchema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', title: 'Title', default: 'Title', group: 'Content' },
+            caption: { type: 'string', title: 'Caption', default: 'Caption', group: 'Content' },
+            font: { type: 'string', title: 'Font', default: 'Inter', group: 'Style' },
+            ink: { type: 'string', title: 'Ink', format: PropFormat.Color, default: '#000', group: 'Style' },
+            margin: { type: 'number', title: 'Margin', default: 4, group: 'Layout' }
+          }
+        }
+      })
+    );
+    const withClip = must(addClip(doc, { component: 'Custom', from: 0, props: { name: 'Poster' } }, 'k'));
+    return { doc: withClip, clip: findClip(withClip, 'k')!.clip };
+  }
+
+  it('its own text field plus every poster-wide style and layout field', () => {
+    const { doc, clip } = posterClip();
+    expect(partFieldKeys(doc, clip, 'title')).toEqual(['title', 'font', 'ink', 'margin']);
+  });
+
+  it("never another part's own text field", () => {
+    const { doc, clip } = posterClip();
+    expect(partFieldKeys(doc, clip, 'title')).not.toContain('caption');
   });
 });
 
