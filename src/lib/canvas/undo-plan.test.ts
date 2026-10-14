@@ -211,3 +211,17 @@ describe('checkGesture: il cambio di modello che sgancia connessioni si annulla 
     expect(result).toEqual({ outcome: 'ok', writes: [{ op: 'delete_node', nodeId: NODE }] });
   });
 });
+
+describe('doc.revision: a frame doc written by a move', () => {
+  const item: UndoItem = { kind: 'doc.revision', nodeId: NODE, before: 4, after: 5 };
+
+  it('is undone by restoring the revision before, expecting the one it wrote', () => {
+    expect(inverseOf(item)).toEqual({ op: 'restore_doc', nodeId: NODE, version: 4, expectedVersion: 5 });
+  });
+
+  it('a frame written again since is stale, never overwritten', () => {
+    expect(checkPrecondition(item, { node: { exists: true, version: 6, connectedBy: [] } })).toEqual({ outcome: 'stale', reason: 'node_changed_by_peer' });
+    expect(checkPrecondition(item, { node: { exists: true, version: 5, connectedBy: [] } })).toEqual({ outcome: 'ok' });
+    expect(checkPrecondition(item, { node: { exists: false } })).toEqual({ outcome: 'stale', reason: 'node_deleted_by_peer' });
+  });
+});

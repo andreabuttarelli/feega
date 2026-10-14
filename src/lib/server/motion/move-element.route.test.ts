@@ -1,0 +1,119 @@
+import { describe, expect, it } from 'vitest';
+import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server';
+import { fakeDb } from '$lib/server/db/fake-db';
+import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
+import { addClip } from '$lib/motion/timeline';
+
+const SOURCE = '44444444-4444-4444-4444-444444444444';
+const TARGET = '66666666-6666-6666-6666-666666666666';
+const GEN = '77777777-7777-4777-8777-777777777777';
+const ASSET = '88888888-8888-4888-8888-888888888888';
+
+function withText(): MotionDoc {
+  const added = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Text', from: 0, durationInFrames: 60, props: { text: 'move me' } }, 'txt');
+  if (!added.ok) {
+    throw new Error(added.error);
+  }
+  return added.doc;
+}
+
+const frameRow = (id: string) => ({ id, org_id: 'org', canvas_id: 'canvas', project_id: 'project', type: 'motion', display_name: 'Frame', x: 0, y: 0, z: 0, width: null, height: null, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null }, version: 1 });
+
+const revisionRow = (nodeId: string, version: number, doc: MotionDoc) => ({ org_id: 'org', node_id: nodeId, version, doc, summary: null, actor_kind: 'user' });
+
+function event(fields: Record<string, string>, rows: Record<string, unknown[]> = {}) {
+  const fake = fakeDb(
+    {
+      orgs_members: [{ user_id: 'user', org_id: 'org', role: 'owner', orgs: { id: 'org', name: 'Org', slug: 'org' } }],
+      canvases: [{ id: 'canvas', org_id: 'org', project_id: 'project', name: 'Canvas', viewport: null }],
+      projects: [{ id: 'project', org_id: 'org', name: 'P', slug: 'p', brand_id: null, archived_at: null, updated_at: '', mode: 'standard' }],
+      nodes: [frameRow(SOURCE), frameRow(TARGET)],
+      nodes_connections: [],
+      motion_revisions: [revisionRow(SOURCE, 1, withText()), revisionRow(TARGET, 1, newMotionDoc(MotionFormat.Vertical))],
+      ...rows
+    },
+    { filter: true, newId: () => '99999999-9999-4999-8999-999999999999' }
+  );
+  const body = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    body.set(key, value);
+  }
+  return {
+    ...fake,
+    request: new Request('http://localhost/c/canvas', { method: 'POST', body }),
+    params: { canvasId: 'canvas', projectId: 'project' },
+    locals: { safeGetSession: async () => ({ session: {}, user: { id: 'user' } }), db: async () => fake.db }
+  };
+}
+
+const written = (input: ReturnType<typeof event>, nodeId: string) =>
+  input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert' && (c.payload as { node_id: string }).node_id === nodeId).map((c) => c.payload as { version: number; doc: MotionDoc });
+
+const clipIds = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips).map((c) => c.id);
+
+describe('moveElement action', () => {
+  it('a text element dragged from frame A to frame B is saved in both revisions', async () => {
+    const input = event({ source: SOURCE, clip: 'txt', drop: JSON.stringify({ on: 'frame', nodeId: TARGET, at: { x: 0.5, y: 0.25 } }) });
+
+    const result = await actions.moveElement(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', frameId: TARGET, clipId: 'txt' });
+    expect(written(input, TARGET).map((r) => [r.version, clipIds(r.doc)])).toEqual([[2, ['txt']]]);
+    expect(written(input, SOURCE).map((r) => [r.version, clipIds(r.doc)])).toEqual([[2, []]]);
+  });
+
+  it('dropped on the empty canvas it makes a new frame holding the element', async () => {
+    const input = event({ source: SOURCE, clip: 'txt', drop: JSON.stringify({ on: 'canvas', x: 900, y: 40 }) });
+
+    const result = await actions.moveElement(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', created: true });
+    expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'insert' && (c.payload as { type: string }).type === 'motion')).toBe(true);
+    const revisions = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => c.payload as { version: number; doc: MotionDoc });
+    expect(revisions.map((r) => [r.version, clipIds(r.doc)])).toEqual([
+      [1, ['txt']],
+      [2, []]
+    ]);
+  });
+
+  it('an unreadable drop is a 400, nothing written', async () => {
+    const input = event({ source: SOURCE, clip: 'txt', drop: 'nope' });
+
+    expect(await actions.moveElement(input as never)).toMatchObject({ status: 400 });
+    expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
+  });
+});
+
+describe('placeOutput action', () => {
+  it('a generated image dropped into a frame becomes an image element; the generative node is not written', async () => {
+    const input = event(
+      { source: GEN, drop: JSON.stringify({ on: 'frame', nodeId: TARGET, at: { x: 0.5, y: 0.5 } }) },
+      {
+        nodes: [frameRow(TARGET), { ...frameRow(GEN), type: 'image', data: { prompt: 'a cat', refId: ASSET } }],
+        assets: [{ id: ASSET, org_id: 'org', project_id: 'project', type: 'image', url: 'x.png', content: null, mime_type: 'image/png', bytes: 1, width: 512, height: 512, duration_s: null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' }]
+      }
+    );
+
+    const result = await actions.placeOutput(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', frameId: TARGET });
+    const doc = written(input, TARGET)[0].doc;
+    expect(doc.tracks[0].clips[0]).toMatchObject({ component: 'Image', props: { assetId: ASSET } });
+    expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'update' && c.filters.some(([k, v]) => k === 'id' && v === GEN))).toBe(false);
+  });
+});
+
+describe('undo of a move', () => {
+  it('restores the frame doc that was there before, as a new revision', async () => {
+    const before = withText();
+    const input = event(
+      { items: JSON.stringify([{ kind: 'doc.revision', nodeId: SOURCE, before: 1, after: 2 }]) },
+      { motion_revisions: [revisionRow(SOURCE, 2, newMotionDoc(MotionFormat.Landscape)), revisionRow(SOURCE, 1, before)] }
+    );
+
+    const result = await actions.undo(input as never);
+
+    expect(result).toMatchObject({ outcome: 'undone', redo: { items: [{ kind: 'doc.revision', nodeId: SOURCE, before: 2, after: 3 }] } });
+    expect(written(input, SOURCE).map((r) => [r.version, clipIds(r.doc)])).toEqual([[3, ['txt']]]);
+  });
+});
