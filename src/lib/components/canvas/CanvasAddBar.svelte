@@ -194,7 +194,7 @@
   </span>
 {/snippet}
 
-<div class="add-bar" data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, frameBar.timelinePx)}px`}>
+<div class="add-bar" class:covered={frameBar.covered} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, frameBar.timelinePx)}px`}>
   {#key context}
     <div class="group" data-testid={`bar-${context}`}>
       {#each BAR_SLOTS[context] as s (s)}{@render SLOT[s]()}{/each}
@@ -234,6 +234,10 @@
 </div>
 
 <style>
+  .add-bar.covered {
+    visibility: hidden;
+  }
+
   .add-bar {
     position: absolute;
     z-index: 61;
