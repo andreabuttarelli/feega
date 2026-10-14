@@ -4,7 +4,7 @@
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
 **49 tool** — 19 in lettura, 25 in scrittura, 5 che distruggono.
-Il payload di `tools/list` pesa **45.223 caratteri**, circa **11.306 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+Il payload di `tools/list` pesa **45.452 caratteri**, circa **11.363 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
@@ -326,7 +326,7 @@ Every saved revision of a motion video, newest first: `version`, who saved it (`
 
 *List frame templates*
 
-Ready-made pieces to drop into a motion video (built-in and saved by the org), e.g. builtin:prompt-input, a prompt field that types, presses send and thinks. Each with `id`, `seconds` and its `fields`: key, type (text, number min..max, color #rrggbb, boolean, select options), group and default. Reads only, free.
+Ready-made pieces to drop into a motion video (built-in and saved by the org), e.g. builtin:prompt-input, a prompt field that types, presses send and thinks. Each with `id`, `seconds`, its `card` (roles such as opener/feature/proof/closer, energy, loops, onScreen beat by beat with seconds, edges start→end with a suggested transition, goodFor) and its `fields`: key, type (text, number min..max, color #rrggbb, boolean, select options), group and default. Plan a video as sections and pick one template per section by card. Reads only, free.
 
 | campo | tipo | |
 |---|---|---|
