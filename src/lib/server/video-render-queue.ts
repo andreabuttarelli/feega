@@ -66,95 +66,140 @@ export type VideoRenderRow = {
 	error: string | null;
 };
 
-/** Write the handle down. Everything after this can happen in another process, later. */
-export async function enqueueVideoRender(
-	admin: SupabaseClient,
-	opts: {
-		brandId: string | null;
-		/** Chi paga quando non c'è un brand. `video_renders_one_payer` esige esattamente uno dei due. */
-		orgId?: string | null;
-		userId: string;
-		postId?: string | null;
-		threadId?: string | null;
-		submitted: SubmittedVideoRender;
-	}
-): Promise<string | null> {
-	const { submitted } = opts;
-	const { data, error } = await admin
-		.from('video_renders')
-		.insert({
-			brand_id: opts.brandId,
-			org_id: opts.brandId ? null : (opts.orgId ?? null),
-			user_id: opts.userId,
-			post_id: opts.postId ?? null,
-			thread_id: opts.threadId ?? null,
-			task_id: submitted.taskId,
-			model: submitted.model,
-			prompt: submitted.prompt,
-			duration_seconds: submitted.durationSeconds,
-			resolution: submitted.resolution,
-			cover_url: submitted.coverUrl ?? null,
-			persist_opts: submitted.persistOpts,
-			submitted_at: new Date(submitted.submittedAt).toISOString()
-		})
-		.select('id')
-		.maybeSingle();
+export const PENDING_TASK_PREFIX = 'pending:';
+export const RECORD_RETRY_DELAYS_MS = [250, 1_000, 3_000];
 
-	if (error) {
-		console.error('[video-render] enqueue failed:', error.message);
-		return null;
+type DbResult = { error: { message: string } | null };
+
+async function retrying<T extends DbResult>(
+	attempt: () => PromiseLike<T>,
+	delaysMs: number[]
+): Promise<T> {
+	let result = await attempt();
+	for (const delay of delaysMs) {
+		if (!result.error) {
+			return result;
+		}
+		await new Promise((resolve) => setTimeout(resolve, delay));
+		result = await attempt();
 	}
-	return (data?.id as string) ?? null;
+	return result;
 }
 
-/**
- * Submit a clip and record the handle in one step — the pair every caller needs, kept together so
- * nobody can do the first without the second. A submitted render whose id was never written down
- * is the exact failure this whole table exists to prevent: the provider renders it, charges for it, and no
- * process on our side knows it happened.
- *
- * Returns the submission so the caller can write duration/resolution onto its own row, or null if
- * the provider refused the job — in which case the caller falls back to shipping the cover, as before.
- */
-export async function submitAndTrackVideoRender(opts: {
-	admin: SupabaseClient;
+type RenderOwner = {
 	brandId: string | null;
 	orgId?: string | null;
 	userId: string;
 	postId?: string | null;
 	threadId?: string | null;
-	imagePrompt: string;
-	render: RenderVideoOpts;
-	/** Il motivo di un rifiuto del fornitore, se ne arriva uno: passa dritto a chi ha chiamato. */
-	onSubmitError?: (reason: string) => void;
-}): Promise<SubmittedVideoRender | null> {
+};
+
+async function reserveVideoRender(
+	admin: SupabaseClient,
+	owner: RenderOwner,
+	model: string,
+	delaysMs: number[]
+): Promise<string | null> {
+	const { data, error } = await retrying(
+		() =>
+			admin
+				.from('video_renders')
+				.insert({
+					brand_id: owner.brandId,
+					org_id: owner.brandId ? null : (owner.orgId ?? null),
+					user_id: owner.userId,
+					post_id: owner.postId ?? null,
+					thread_id: owner.threadId ?? null,
+					task_id: `${PENDING_TASK_PREFIX}${crypto.randomUUID()}`,
+					model
+				})
+				.select('id')
+				.maybeSingle(),
+		delaysMs
+	);
+	if (error) {
+		console.error('[video-render] reserve failed, not submitting:', error.message);
+		return null;
+	}
+	return (data?.id as string) ?? null;
+}
+
+async function attachTask(
+	admin: SupabaseClient,
+	jobId: string,
+	submitted: SubmittedVideoRender,
+	delaysMs: number[]
+): Promise<boolean> {
+	const { error } = await retrying(
+		() =>
+			admin
+				.from('video_renders')
+				.update({
+					task_id: submitted.taskId,
+					model: submitted.model,
+					prompt: submitted.prompt,
+					duration_seconds: submitted.durationSeconds,
+					resolution: submitted.resolution,
+					cover_url: submitted.coverUrl ?? null,
+					persist_opts: submitted.persistOpts,
+					submitted_at: new Date(submitted.submittedAt).toISOString()
+				})
+				.eq('id', jobId),
+		delaysMs
+	);
+	if (error) {
+		console.error(
+			`[video-render] PAID TASK UNRECORDED job=${jobId} task=${submitted.taskId}:`,
+			error.message
+		);
+		return false;
+	}
+	return true;
+}
+
+export type TrackedVideoRender = SubmittedVideoRender & { jobId: string };
+
+export async function submitAndTrackVideoRender(
+	opts: RenderOwner & {
+		admin: SupabaseClient;
+		imagePrompt: string;
+		render: RenderVideoOpts;
+		onSubmitError?: (reason: string) => void;
+		retryDelaysMs?: number[];
+	}
+): Promise<TrackedVideoRender | null> {
+	const delays = opts.retryDelaysMs ?? RECORD_RETRY_DELAYS_MS;
+	const jobId = await reserveVideoRender(opts.admin, opts, opts.render.model ?? 'unknown', delays);
+	if (!jobId) {
+		return null;
+	}
+
 	const { submitVideoRender } = await import('$lib/server/video');
 	const submitted = await submitVideoRender(opts.imagePrompt, {
 		...opts.render,
 		onSubmitError: opts.onSubmitError
 	}).catch((e) => {
-		// CreditsExhaustedError must reach the caller — it is a message for the user, not a failure
-		// to swallow into a silent photo fallback.
-		if (e instanceof Error && e.name === 'CreditsExhaustedError') throw e;
+		if (e instanceof Error && e.name === 'CreditsExhaustedError') {
+			throw e;
+		}
 		console.error('[video-render] submit failed:', e instanceof Error ? e.message : e);
 		return undefined;
 	});
-	if (!submitted) return null;
 
-	const id = await enqueueVideoRender(opts.admin, {
-		brandId: opts.brandId,
-		orgId: opts.orgId,
-		userId: opts.userId,
-		postId: opts.postId ?? null,
-		threadId: opts.threadId ?? null,
-		submitted
-	});
-	if (!id) {
-		// The provider is rendering something nobody will collect. Say so loudly: it is billable work lost.
-		console.error(`[video-render] submitted task ${submitted.taskId} but could not record it`);
+	if (!submitted) {
+		await opts.admin
+			.from('video_renders')
+			.update({ status: 'failed', error: 'provider refused', finished_at: new Date().toISOString() })
+			.eq('id', jobId)
+			.then(undefined, () => {});
 		return null;
 	}
-	return submitted;
+
+	const recorded = await attachTask(opts.admin, jobId, submitted, delays);
+	if (!recorded) {
+		return null;
+	}
+	return { ...submitted, jobId };
 }
 
 /**
@@ -217,6 +262,16 @@ async function releaseStaleClaims(admin: SupabaseClient): Promise<void> {
 		.update({ status: 'rendering', claimed_at: null })
 		.eq('status', 'finishing')
 		.lt('claimed_at', new Date(Date.now() - VIDEO_RENDER_CLAIM_STALE_MS).toISOString())
+		.then(undefined, () => {});
+}
+
+async function expireUnsubmitted(admin: SupabaseClient): Promise<void> {
+	await admin
+		.from('video_renders')
+		.update({ status: 'expired', error: 'never submitted', finished_at: new Date().toISOString() })
+		.eq('status', 'rendering')
+		.like('task_id', `${PENDING_TASK_PREFIX}%`)
+		.lt('submitted_at', new Date(Date.now() - VIDEO_RENDER_MAX_AGE_MS).toISOString())
 		.then(undefined, () => {});
 }
 
@@ -310,6 +365,7 @@ export async function reconcileVideoRenders(
 	opts: { limit?: number } = {}
 ): Promise<{ checked: number; done: number; failed: number; expired: number }> {
 	await releaseStaleClaims(admin);
+	await expireUnsubmitted(admin);
 
 	const { data: rows } = await admin
 		.from('video_renders')
@@ -317,6 +373,7 @@ export async function reconcileVideoRenders(
 			'id, brand_id, org_id, user_id, post_id, thread_id, task_id, model, status, duration_seconds, resolution, cover_url, prompt, persist_opts, submitted_at, attempts, error'
 		)
 		.eq('status', 'rendering')
+		.not('task_id', 'like', `${PENDING_TASK_PREFIX}%`)
 		.order('submitted_at', { ascending: true })
 		.limit(opts.limit ?? 20);
 

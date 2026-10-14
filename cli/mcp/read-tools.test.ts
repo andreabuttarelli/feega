@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { handleMcpFetch } from './http-app.ts';
-import { MCP_INSTRUCTIONS, mcpInstructions } from './server.ts';
-import { assumeSocialPublishing, SocialPublishing } from './features.ts';
+import { MCP_INSTRUCTIONS } from './server.ts';
 
 /**
  * IL LEDGER DEL RITIRO. La superficie MCP passa da decine di tool brand-scoped (piano editoriale,
@@ -134,27 +133,13 @@ describe('la superficie MCP è le quaranta dichiarate', () => {
 
 const PUBLISHING = ['list_posts', 'create_post', 'set_post_status'];
 
-describe('i tool dei post seguono il flag social_publishing', () => {
-  test('con il flag spento non sono in tools/list né nelle istruzioni', async () => {
+describe('i tool dei post non esistono più', () => {
+  test('non sono in tools/list né nelle istruzioni', async () => {
     const names = (await tools()).map((t) => t.name);
 
     for (const name of PUBLISHING) {
       expect(names, name).not.toContain(name);
       expect(MCP_INSTRUCTIONS, name).not.toContain(name);
-    }
-  });
-
-  test('con il flag acceso tornano come prima', async () => {
-    assumeSocialPublishing(SocialPublishing.On);
-    try {
-      const names = (await tools()).map((t) => t.name);
-
-      for (const name of PUBLISHING) {
-        expect(names, name).toContain(name);
-        expect(mcpInstructions(SocialPublishing.On), name).toContain(name);
-      }
-    } finally {
-      assumeSocialPublishing(SocialPublishing.Off);
     }
   });
 });

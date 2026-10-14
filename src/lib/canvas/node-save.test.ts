@@ -10,7 +10,9 @@ describe('failureOf: every server answer has one reason', () => {
     [{ type: 'redirect', status: 303, location: '/login' }, SaveFailure.Auth],
     [{ type: 'error', status: 500, error: { message: 'boom' } }, SaveFailure.Server],
     [{ type: 'failure', status: 403, data: {} }, SaveFailure.Auth],
-    [{ type: 'network' }, SaveFailure.Network]
+    [{ type: 'network' }, SaveFailure.Network],
+    [{ type: 'error', status: 500, error: { message: 'db_busy' } }, SaveFailure.Busy],
+    [{ type: 'failure', status: 400, data: { error: 'canceling statement due to statement timeout' } }, SaveFailure.Busy]
   ])('%j → %s', (result, reason) => {
     expect(failureOf(result)).toBe(reason);
   });
@@ -117,6 +119,24 @@ describe('isOwnEcho: realtime does not refetch what this tab just wrote', () => 
   });
 });
 
+describe('writeWithRetry: a busy database gets one more try', () => {
+  it('resends the same patch once after a statement timeout', async () => {
+    const send = vi
+      .fn()
+      .mockResolvedValueOnce({ type: 'error', status: 500, error: { message: 'db_busy' } })
+      .mockResolvedValueOnce({ type: 'success', status: 200, data: { node: { id: 'a', version: 2, data: { prompt: 'mine' } } } });
+
+    const out = await writeWithRetry({ send, reread: vi.fn(), patch: { prompt: 'mine' }, base: { prompt: 'old' } });
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(out.ok).toBe(true);
+  });
+
+  it('says the database was busy, not that the canvas refused', () => {
+    expect(saveBanner('write', { type: 'error', status: 500, error: { message: 'db_busy' } } as never)).toMatch(/busy/i);
+  });
+});
+
 describe('writeWithRetry: a conflict reapplies the edit on the fresh row', () => {
   it('rereads, takes the fresh values as base, and sends the same patch once more', async () => {
     const send = vi
@@ -211,7 +231,7 @@ describe('saveBanner: a failed read never claims a save failed', () => {
   });
 
   it('every read action stays silent on a server error', () => {
-    for (const action of ['snapshot', 'revision', 'estimate_text_cost', 'calendar_posts', 'audio_voices']) {
+    for (const action of ['snapshot', 'revision', 'estimate_text_cost', 'audio_voices']) {
       expect(actionKind(action)).toBe(ActionKind.Read);
       expect(saveBanner(action, { type: 'error', status: 500 })).toBeNull();
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Dismiss, dismissFrom, gridStep } from './browser';
+import { Dismiss, dismissFrom, spatialStep } from './browser';
 
 describe('Escape in the component library', () => {
   it('closes the open component first, keeping the grid', () => {
@@ -11,29 +11,35 @@ describe('Escape in the component library', () => {
   });
 });
 
-describe('arrow keys move across the grid', () => {
-  const grid = { count: 7, columns: 3 };
+describe('arrow keys move to the nearest card on screen', () => {
+  const rect = (x: number, y: number, width = 100, height = 60) => ({ x, y, width, height });
+  const wide = [rect(0, 0), rect(110, 0), rect(220, 0), rect(0, 70)];
+  const tall = [rect(0, 160, 50, 90), rect(60, 160, 50, 90), rect(120, 160, 50, 90)];
+  const cards = [...wide, ...tall];
 
-  it('moves one card sideways and one row up or down', () => {
-    expect(gridStep(1, 'ArrowRight', grid)).toBe(2);
-    expect(gridStep(1, 'ArrowLeft', grid)).toBe(0);
-    expect(gridStep(1, 'ArrowDown', grid)).toBe(4);
-    expect(gridStep(4, 'ArrowUp', grid)).toBe(1);
+  it('moves one card sideways along a row', () => {
+    expect(spatialStep(cards, 1, 'ArrowRight')).toBe(2);
+    expect(spatialStep(cards, 1, 'ArrowLeft')).toBe(0);
   });
 
-  it('stays inside the grid at its edges', () => {
-    expect(gridStep(0, 'ArrowLeft', grid)).toBe(0);
-    expect(gridStep(6, 'ArrowRight', grid)).toBe(6);
-    expect(gridStep(5, 'ArrowDown', grid)).toBe(6);
-    expect(gridStep(1, 'ArrowUp', grid)).toBe(1);
+  it('moves down into the next row, and from a wide group into a tall one below', () => {
+    expect(spatialStep(cards, 0, 'ArrowDown')).toBe(3);
+    expect(spatialStep(cards, 3, 'ArrowDown')).toBe(4);
+    expect(spatialStep(cards, 5, 'ArrowUp')).toBe(3);
+  });
+
+  it('stays put at an edge', () => {
+    expect(spatialStep(cards, 0, 'ArrowLeft')).toBe(0);
+    expect(spatialStep(cards, 2, 'ArrowUp')).toBe(2);
+    expect(spatialStep(cards, 6, 'ArrowDown')).toBe(6);
   });
 
   it('jumps to the ends with Home and End', () => {
-    expect(gridStep(3, 'Home', grid)).toBe(0);
-    expect(gridStep(3, 'End', grid)).toBe(6);
+    expect(spatialStep(cards, 3, 'Home')).toBe(0);
+    expect(spatialStep(cards, 3, 'End')).toBe(cards.length - 1);
   });
 
   it('ignores any other key', () => {
-    expect(gridStep(3, 'a', grid)).toBeNull();
+    expect(spatialStep(cards, 3, 'a')).toBeNull();
   });
 });

@@ -236,6 +236,7 @@ async function gateScopedCredits(): Promise<void> {
 }
 
 export type RenderVideoOpts = {
+  onSubmitError?: (reason: string) => void;
   // Desired clip length in seconds. Clamped into the CHOSEN model's supported window.
   duration?: number;
   // Social video is vertical-first, so we default to 9:16 (Reels/TikTok/Shorts).

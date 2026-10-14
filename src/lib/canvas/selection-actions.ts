@@ -14,14 +14,13 @@
  * (se ne ha una — non tutte, "Connetti a…" resta senza perché ha bisogno di un secondo clic).
  */
 
-import { postCompositionFor, type PostCompositionNode } from './post-composition';
+import type { PostCompositionNode } from './post-composition';
 import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-plan';
 
 export type SelectionActionId =
   | 'duplicate'
   | 'connect-new'
   | 'connect-existing'
-  | 'promote'
   | 'run-workflow'
   | 'run-downstream'
   | 'run-stale'
@@ -46,7 +45,6 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'connect-new', label: 'Connect to new…', group: 'secondary', minNodes: 1 },
   { id: 'connect-existing', label: 'Connect to…', group: 'secondary', minNodes: 1 },
   { id: 'duplicate', label: 'Duplicate', group: 'secondary', minNodes: 1, keys: ['mod', 'D'] },
-  { id: 'promote', label: 'Promote', group: 'secondary', minNodes: 1 },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
   { id: 'report', label: 'Report content', group: 'overflow', minNodes: 1 },
   { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, keys: ['⌫'] }
@@ -63,13 +61,6 @@ type GateInput = { nodeSummaries: PostCompositionNode[]; edges: WorkflowEdge[]; 
 const ALWAYS: Gate = { enabled: true };
 
 const GATES: Partial<Record<SelectionActionId, (input: GateInput) => Gate>> = {
-  promote: ({ nodeSummaries }) => {
-    const composition = postCompositionFor(nodeSummaries);
-    return {
-      enabled: composition.enabled,
-      reason: composition.enabled ? undefined : 'Select at least one media or text node'
-    };
-  },
   'run-workflow': ({ nodeSummaries, edges }) => {
     const nodeTypesById = new Map(nodeSummaries.map((n) => [n.id, n.type]));
     const plan = planWorkflow(

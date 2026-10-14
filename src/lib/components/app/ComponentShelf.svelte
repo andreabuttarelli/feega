@@ -16,7 +16,7 @@
 
 <section class="shelf" aria-labelledby="components-heading" data-testid="home-components">
   <div class="head">
-    <h2 id="components-heading">start from a component</h2>
+    <h2 id="components-heading">video</h2>
     <div class="formats" role="radiogroup" aria-label="Format">
       {#each STARTER_FORMATS as f (f)}
         <button type="button" role="radio" aria-checked={format === f} class:on={format === f} data-format={f} onclick={() => (format = f)}>{FORMATS[f].label}</button>
