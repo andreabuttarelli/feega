@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from './doc';
-import { HISTORY_LIMIT, UNSAVED_VERSION, adoptHead, amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo } from './history';
+import { HISTORY_LIMIT, UNSAVED_VERSION, adoptHead, amend, canRedo, canUndo, followHead, previousSource, record, redo, startHistory, undo } from './history';
 import { Agent } from './start-prompt';
 import { setCanvas } from './timeline';
 
@@ -36,7 +36,7 @@ describe('undo and redo', () => {
   it('amend replaces the present without a new undo step, so a slider drag undoes in one go', () => {
     const h = amend(record(startHistory(base), longer), { ...base, durationInFrames: 700 });
 
-    expect(h.past).toEqual([base]);
+    expect(h.past).toHaveLength(1);
     expect(undo(h).present).toBe(base);
   });
 
@@ -83,5 +83,44 @@ describe('undo while the agent works or before anything was saved', () => {
 
     expect(undo(h).present).toBe(longer);
     expect(undo(undo(h)).present).toBe(base);
+  });
+});
+
+describe('undo is mine only when others edit the same frame', () => {
+  it('undo reverts my edit and keeps a remote edit that landed after it', () => {
+    const mine = record(startHistory(base), longer);
+    const withRemote = followHead(mine, { ...longer, background: 'transparent' as typeof base.background });
+
+    const undone = undo(withRemote);
+
+    expect(undone.present.durationInFrames).toBe(base.durationInFrames);
+    expect(undone.present.background).toBe('transparent');
+  });
+
+  it('redo puts my edit back on top of what others did meanwhile', () => {
+    const undone = undo(record(startHistory(base), longer));
+    const withRemote = followHead(undone, { ...base, background: 'transparent' as typeof base.background });
+
+    const redone = redo(withRemote);
+
+    expect(redone.present.durationInFrames).toBe(600);
+    expect(redone.present.background).toBe('transparent');
+  });
+
+  it('a remote edit is not a step of my undo', () => {
+    const h = followHead(startHistory(base), longer);
+
+    expect(canUndo(h)).toBe(false);
+  });
+
+  it('a drag that continues after a remote edit does not fold the remote edit into my step', () => {
+    const dragging = record(startHistory(base), longer);
+    const withRemote = followHead(dragging, { ...longer, background: 'transparent' as typeof base.background });
+    const dragged = amend(withRemote, { ...withRemote.present, durationInFrames: 700 });
+
+    const undone = undo(dragged);
+
+    expect(undone.present.background).toBe('transparent');
+    expect(undone.present.durationInFrames).toBe(600);
   });
 });

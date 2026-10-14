@@ -118,4 +118,33 @@ test.describe('two people in one frame @real', () => {
     await expect(await opacityOf(page, 'a')).toHaveValue(/^40/);
     await expect(page.getByText(CONFLICT_NOTICE)).toHaveCount(0);
   });
+
+  test('undo takes back my edit only, never the other person’s', async ({ page, browser, session, admin, seedNode }) => {
+    const node = await seedNode({ type: 'motion', data: FRAME_DATA });
+    expect((await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: twoTitles, actor_kind: 'user', actor_id: session.userId })).error).toBeNull();
+    const mate = await teammate(admin, session);
+    const path = `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`;
+
+    try {
+      const bo = await secondPage(browser, mate);
+      await gotoHydrated(page, path);
+      await gotoHydrated(bo, path);
+
+      await setOpacity(page, 'a', '40');
+      await expect.poll(async () => opacityIn(await headOf(admin, node.id), 'a'), { timeout: 20_000 }).toBe(0.4);
+      await setOpacity(bo, 'b', '60');
+      await expect(await opacityOf(page, 'b')).toHaveValue(/^60/, { timeout: 15_000 });
+
+      await page.getByRole('button', { name: 'Undo', exact: true }).click();
+
+      await expect.poll(async () => {
+        const head = await headOf(admin, node.id);
+        return [opacityIn(head, 'a'), opacityIn(head, 'b')];
+      }, { timeout: 20_000 }).toEqual([1, 0.6]);
+      await expect(await opacityOf(bo, 'a')).toHaveValue(/^100/, { timeout: 15_000 });
+      await bo.context().close();
+    } finally {
+      await admin.auth.admin.deleteUser(mate.userId);
+    }
+  });
 });
