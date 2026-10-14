@@ -319,7 +319,8 @@ draws the still frame (or `time`) at full size and returns `{ asset_id, url, wid
 
 `motion_editor_op({ org, node_id, op, input })` runs one action of the frame editor page on the
 video, through the same server function, with the same status and body:
-`POST /api/v1/motion/{node_id}/ops` `{ op, input }`. Reads: `read_head`, `render_status`,
+`POST /api/v1/motion/{node_id}/ops` `{ op, input }`. Reads: `editor_session {briefIds?}` (the
+whole page load), `read_head`, `render_status`,
 `batch_status`. Writes (a read-only key is 403): `save_doc {version, doc, summary?}` (409 with the
 head when stale), `apply_ops {version, ops, summary?}`, `record_export {path, width, height,
 seconds}` and `upload_font {path}` (files the Supabase session already put in storage),
