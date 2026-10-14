@@ -71,6 +71,23 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(html).toContain('object-position:100% 0%');
   });
 
+  it('a box with a fill stack composes gradient, picture and overlay, the same page every time', () => {
+    const fills = [
+      { type: 'linear-gradient', stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] },
+      { type: 'image', assetId: 'a', fit: 'cover', focus: { x: 0.3, y: 0.6 } },
+      { type: 'solid', color: '#ff0000', opacity: 0.35 }
+    ];
+    const box = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect', width: 0.5, height: 0.5, fills } }, 'box'));
+
+    const html = compose(box, { a: 'https://x/a.png' });
+
+    expect(html).toContain('<linearGradient id="sg-box-f0"');
+    expect(html).toContain('src="https://x/a.png"');
+    expect(html).toContain('object-position:30% 60%');
+    expect(html).toMatch(/fill:#ff0000;fill-rule:nonzero;stroke:none" opacity="0.35"/);
+    expect(compose(box, { a: 'https://x/a.png' })).toBe(html);
+  });
+
   it('registers one paused timeline under the composition id', () => {
     expect(compose(doc)).toContain('window.__timelines["main"]=tl');
   });

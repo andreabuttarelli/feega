@@ -144,6 +144,15 @@ describe('every editable part of a motion video has an agent path', () => {
     expect(['analyze_site', 'use_brand', 'import_asset'].filter((t) => !tools[t])).toEqual([]);
   });
 
+  it('a fill stack the Properties panel edits, the agent writes and reads back', async () => {
+    const { run } = setup();
+    const fills = [{ type: 'image', assetId: '' }, { type: 'solid', color: '#000000', opacity: 0.4 }];
+    expect((await run('add_shape', { kind: 'rect', start: 0, fills })).ok).toBe(true);
+    const doc = (await run('get_motion_doc', {})) as { tracks: { clips: { props: Record<string, unknown> }[] }[] };
+
+    expect(doc.tracks[0].clips[0].props.fills).toMatchObject(fills);
+  });
+
   it('get_motion_doc shows every writable field of the doc, its tracks, clips and camera', async () => {
     const { run } = setup();
     await run('add_clip', { component: 'Shape', start: 0, duration: 2 });

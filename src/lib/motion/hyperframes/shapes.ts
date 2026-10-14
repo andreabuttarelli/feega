@@ -9,7 +9,7 @@ import { seekDriver } from './stage';
 import { hotScope, hotSeek } from './hot';
 
 export type ShapeBake = { id: string; from: number; index: number[]; frames: string[] };
-type Env = { width: number; height: number; unit: number; fps: number; color: (value: string) => string };
+type Env = { width: number; height: number; unit: number; fps: number; color: (value: string) => string; asset?: (id: string | null) => string | null };
 
 const SHAPE_TIMELINE = 'feegaShapes';
 const svgId = (id: string) => `sv-${id}`;
@@ -43,7 +43,7 @@ function sizeOf(clip: MotionClip, env: Env): Size {
 }
 
 function drawingAt(id: string, env: Env, frame: number, size: Size, look: ShapeLook) {
-  return shapeDrawing(look, { id, size, unit: env.unit, time: frame / env.fps, color: env.color });
+  return shapeDrawing(look, { id, size, unit: env.unit, time: frame / env.fps, color: env.color, asset: env.asset });
 }
 
 const markupAt = (id: string, env: Env, frame: number, size: Size, look: ShapeLook) => drawingAt(id, env, frame, size, look).markup;

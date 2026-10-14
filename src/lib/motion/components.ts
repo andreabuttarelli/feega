@@ -16,6 +16,7 @@ import { GLASS_NUMBERS, GLASS_NUMBER_KEYS, GLASS_TINT, GlassSection } from './gl
 import { BLOB_NUMBERS, BLOB_NUMBER_KEYS, BLOB_TINT, BlobSection } from './blob/model';
 import { SEEKABLE_EFFECTS, SHADER_EFFECT_IDS, ShaderEffectId } from './shader-effects/catalogue';
 import { effectProblem } from './shader-effects/preset';
+import { fillsSchema } from './fill/model';
 import { CAPS, FILL_KINDS, FILL_RULES, FillKind, JOINS, MAX_MODIFIERS, MAX_MORPHS, SHAPE_KINDS, STROKE_KINDS, ShapeKind, StrokeKind, modifierSchema, pathString } from './shape/schema';
 
 export enum Control {
@@ -29,7 +30,8 @@ export enum Control {
   Managed = 'managed',
   Font = 'font',
   Comp = 'comp',
-  Corners = 'corners'
+  Corners = 'corners',
+  Fills = 'fills'
 }
 
 export enum AssetKind {
@@ -337,6 +339,7 @@ export const COMPONENTS = {
         morph: range(0, MAX_MORPHS, 0.01, 0, 'Morph', Group.Content),
         morphStart: range(0, 1, 0.01, 0, 'Morph start point', Group.Content),
         modifiers: z.array(modifierSchema).max(MAX_MODIFIERS).default([]).meta(managed('Modifiers')),
+        fills: fillsSchema.optional().meta({ control: Control.Fills, label: 'Fill', group: Group.Style }),
         fillKind: choice(FILL_KINDS, FillKind.Solid, 'Fill type', Group.Style),
         fill: color('brand.accent', 'Fill'),
         fill2: color('brand.primary', 'Gradient end'),

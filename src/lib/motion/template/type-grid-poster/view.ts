@@ -1,4 +1,5 @@
 import { NOISE_DATA_URI } from '../poster-kit';
+import { fillLayersHtml } from '../../fill/render';
 
 export const TYPE_GRID_VIEW = String.raw`
 const NOISE = ${JSON.stringify(`url("${NOISE_DATA_URI}")`)};
@@ -12,10 +13,11 @@ const KEPT_AIR = 0.25;
 const ARROW_SVG = '<svg viewBox="0 0 105 62" fill="none" stroke="currentColor" stroke-width="9"><path d="M0 31h98M70 3l29 28-29 28"/></svg>';
 
 const listOf = (raw) => String(raw || '').split(',').map((s) => s.trim()).filter(Boolean);
-const slotOf = (m) => ({ src: m.kind === 'video' ? '' : m.src, fit: m.fit, focusX: m.focusX, focusY: m.focusY });
-const mediaList = (raw) => (Array.isArray(raw) ? raw.map(slotOf) : listOf(raw).map((id) => ({ src: LINK.test(id) ? id : assets[id] })));
-const PERCENT = 100;
-const CENTRE = 0.5;
+const fillLayersHtml = (${fillLayersHtml.toString()});
+const pictureLayer = (src) => ({ type: 'image', src, fit: 'cover', focus: { x: 0.5, y: 0.5 }, scale: 1, opacity: 1, visible: true, blend: 'normal' });
+const slotOf = (m) => ({ fills: m.kind === 'video' ? [] : m.fills || [] });
+const pictureSlot = (src) => ({ fills: src ? [pictureLayer(src)] : [] });
+const mediaList = (raw) => (Array.isArray(raw) ? raw.map(slotOf) : listOf(raw).map((id) => pictureSlot(LINK.test(id) ? id : assets[id])));
 const fontOf = (p) => (String(p.font).includes(',') ? p.font : '"' + p.font + '", system-ui, sans-serif');
 const escaped = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -32,12 +34,10 @@ const marks = root.querySelector('.tg-extra');
 
 let cache = { key: '' };
 
-const lookOf = (slot) => 'object-fit:' + (slot.fit === 'contain' ? 'contain' : 'cover') + ';object-position:' + (slot.focusX ?? CENTRE) * PERCENT + '% ' + (slot.focusY ?? CENTRE) * PERCENT + '%';
-
 const photoHtml = (pictures, n) => {
-  const slot = pictures[n] || {};
+  const fills = (pictures[n] || {}).fills || [];
   const tag = ' data-part="photos:' + n + '"';
-  return slot.src ? '<span class="tg-photo"' + tag + '><img decoding="sync" draggable="false" style="' + lookOf(slot) + '" src="' + escaped(slot.src) + '"></span>' : '<span class="tg-photo tg-shape-' + (n % SHAPES) + '"' + tag + '></span>';
+  return fills.length ? '<span class="tg-photo"' + tag + '>' + fillLayersHtml(fills) + '</span>' : '<span class="tg-photo tg-shape-' + (n % SHAPES) + '"' + tag + '></span>';
 };
 
 const arrowHtml = (i) => '<span class="tg-arrow" data-part="arrow:' + i + '">' + ARROW_SVG + '</span>';

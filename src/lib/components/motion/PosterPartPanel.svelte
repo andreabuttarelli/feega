@@ -5,21 +5,18 @@
   import { setProps, type OpResult } from '$lib/motion/timeline';
   import Trash from '@lucide/svelte/icons/trash-2';
   import { PartAction, PartKind, parsePart, partKind, partLabel, partText, runPart, writePartText } from '$lib/motion/poster-parts';
-  import { markedPoster, photoAt, setPhoto, setPhotoLook, type PhotoFit, type PhotoLook } from '$lib/motion/poster-lines';
+  import { markedPoster, photoStack, setPhotoFills } from '$lib/motion/poster-lines';
+  import FillStack from './FillStack.svelte';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
 
   let { doc, clip, part, assets, onchange }: { doc: MotionDoc; clip: MotionClip; part: string; assets: Asset[]; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
-  const IMAGE = 'image';
-  const FITS: PhotoFit[] = ['cover', 'contain'];
-  const CENTRE = 0.5;
 
   const kind = $derived(partKind(doc, clip, part));
   const index = $derived(parsePart(part).index ?? 0);
   const poster = $derived(markedPoster(String(clip.props.name)));
   const media = $derived(poster ? clip.props[poster.media] : undefined);
-  const photo = $derived(photoAt(media, index));
 
   function apply(result: OpResult, summary: string) {
     if (result.ok) {
@@ -28,7 +25,6 @@
   }
 
   const writeMedia = (next: unknown, summary: string) => poster && apply(setProps(doc, clip.id, { [poster.media]: next }), summary);
-  const look = (patch: PhotoLook) => writeMedia(setPhotoLook(media, index, patch), 'Adjust photo');
 
   const BODY: Record<PartKind, Snippet | null> = { [PartKind.Line]: lineBody, [PartKind.Photo]: photoBody, [PartKind.Arrow]: arrowBody, [PartKind.Text]: null, [PartKind.Other]: null };
   const body = $derived(BODY[kind]);
@@ -41,20 +37,9 @@
 {/snippet}
 
 {#snippet photoBody()}
-  <div class="assets" data-testid="part-photo">
-    {#each assets.filter((a) => a.kind === IMAGE) as asset (asset.id)}
-      <button type="button" class="asset" class:on={photo.assetId === asset.id} title={asset.label} onclick={() => writeMedia(setPhoto(media, index, asset.id), 'Replace photo')}><img src={asset.previewUrl} alt={asset.label} /></button>
-    {:else}
-      <span class="empty">No images on this canvas yet.</span>
-    {/each}
+  <div data-testid="part-photo">
+    <FillStack fills={photoStack(media, index)} {assets} color={(v) => v} onchange={(fills, summary) => writeMedia(setPhotoFills(media, index, fills), summary)} />
   </div>
-  <label class="field">Fit
-    <select value={photo.fit ?? FITS[0]} onchange={(e) => look({ fit: e.currentTarget.value as PhotoFit })}>
-      {#each FITS as fit (fit)}<option value={fit}>{fit}</option>{/each}
-    </select>
-  </label>
-  <label class="field">Focus X <input type="range" min="0" max="1" step="0.01" value={photo.focusX ?? CENTRE} onchange={(e) => look({ focusX: Number(e.currentTarget.value) })} /></label>
-  <label class="field">Focus Y <input type="range" min="0" max="1" step="0.01" value={photo.focusY ?? CENTRE} onchange={(e) => look({ focusY: Number(e.currentTarget.value) })} /></label>
   <button type="button" class="delete" data-testid="part-delete" onclick={remove}><Trash size={12} /> Delete photo</button>
 {/snippet}
 

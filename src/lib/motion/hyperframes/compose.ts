@@ -35,6 +35,8 @@ import { Composite, cameraMath, stageSpec } from '../camera';
 import { sampleTrack } from '../keyframes';
 import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { shapeScript, shapeStudy, type ShapeBake } from './shapes';
+import { photoFills } from '../fill/model';
+import { resolveFills } from '../fill/render';
 import type { Extent } from '../shape/render';
 import { TEXT_PATH_CSS, textPathBake, textPathScript, textPathTemplate, type TextPathBake } from './text-path';
 import { particleBake, particleScript } from './particles';
@@ -427,13 +429,18 @@ const BASE_CSS = [
   '.font-probe{position:absolute;left:0;top:0;opacity:0;pointer-events:none}'
 ].join('');
 
-type MediaSlot = { assetId: string; kind: string; fit?: string; focusX?: number; focusY?: number };
+type MediaSlot = { assetId: string; kind: string; fit?: string; focusX?: number; focusY?: number; fills?: unknown };
 
-export function resolveMedia(value: unknown, asset: (id: string | null) => string | null): unknown {
+const SAME_COLOR = (c: string) => c;
+
+export function resolveMedia(value: unknown, asset: (id: string | null) => string | null, color: (value: string) => string = SAME_COLOR): unknown {
   if (!Array.isArray(value)) {
     return value;
   }
-  return (value as MediaSlot[]).map(({ assetId, ...rest }) => ({ src: (assetId && asset(assetId)) || '', ...rest }));
+  return (value as MediaSlot[]).map((slot) => {
+    const { assetId, ...rest } = slot;
+    return { src: (assetId && asset(assetId)) || '', ...rest, fills: resolveFills(photoFills(slot), color, asset) };
+  });
 }
 
 type ValueResolver = (value: unknown, ctx: TemplateCtx<ComponentId>) => unknown;
@@ -443,7 +450,7 @@ const RESOLVE: Record<PropFormat, ValueResolver> = {
   [PropFormat.Asset]: (v, ctx) => ctx.asset(typeof v === 'string' ? v : null),
   [PropFormat.Textarea]: (v) => v,
   [PropFormat.Font]: (v, ctx) => ctx.font(String(v)),
-  [PropFormat.Media]: (v, ctx) => resolveMedia(v, ctx.asset)
+  [PropFormat.Media]: (v, ctx) => resolveMedia(v, ctx.asset, ctx.color)
 };
 
 const ENV_LOAD: Record<Target, EnvLoad> = { [Target.Video]: EnvLoad.Wait, [Target.Screen]: EnvLoad.Swap };

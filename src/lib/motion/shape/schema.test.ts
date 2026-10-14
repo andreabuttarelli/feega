@@ -22,7 +22,15 @@ describe('the inspector shows only the geometry a shape kind uses', () => {
     expect(keysFor('polygon')).toContain('sides');
     expect(keysFor('polygon')).not.toContain('points');
     expect(keysFor('ellipse')).not.toContain('roundness');
-    expect(keysFor('ellipse')).toContain('fill');
+    expect(keysFor('ellipse')).toContain('fills');
+  });
+
+  it('the fill stack replaces the single-colour fill fields', () => {
+    expect(keysFor('rect')).toContain('fills');
+    expect(keysFor('rect')).not.toEqual(expect.arrayContaining(['fillKind']));
+    for (const legacy of ['fillKind', 'fill', 'fill2', 'gradientAngle']) {
+      expect(keysFor('ellipse')).not.toContain(legacy);
+    }
   });
 
   it('a rectangle has a field per corner, a star does not', () => {
