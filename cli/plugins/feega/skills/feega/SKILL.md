@@ -229,6 +229,10 @@ video pinned to one frame: `set_canvas` `{ format: "A poster", still: 2 }`, then
 `{ format: "png", scale: 2 }` returns the image `url`. CLI: `feega motion tool <nodeId> <tool>
 --input '{...}'`, `feega motion tools [name]`, `feega motion still <nodeId> --scale 2 --out poster.png`.
 
+The frame editor page's own actions (read the head, save the whole doc, apply doc ops, render and
+batch status) run through `motion_editor_op` `{ node_id, op, input }` with the same answers as
+the page. CLI: `feega motion op <nodeId> <op> --input '{...}'`.
+
 Frames hold graphic elements; image, video and text nodes generate. `canvas_tool` op
 `move_frame_element` moves an element into another frame (or a new one) keeping props and
 keyframes; op `place_in_frame` puts a generative node's output into a frame as an element; the
