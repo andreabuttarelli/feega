@@ -1,19 +1,17 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { libraryOf, loadEditorSession } from '$lib/server/motion/editor-session';
-import { motionScope as scopeFor } from '$lib/server/motion/editor-scope';
-import { Restore, assetUrls, headOrNew, motionAssets, motionTokens, restoreRevision, saveMotionDoc } from '$lib/server/motion/editor';
-import { RevisionOutcome, listRevisions } from '$lib/server/repos/motion-revisions';
-import { OpsOutcome, commitOps } from '$lib/server/motion/frame-ops';
-import { parseOps } from '$lib/motion/doc-ops';
+import { motionScope as scopeFor, type MotionEditorScope } from '$lib/server/motion/editor-scope';
+import { runEditorOp, type EditorAnswer, type EditorCtx } from '$lib/server/frame-editor/editor-ops';
+import { Restore, assetUrls, headOrNew, motionAssets, motionTokens, restoreRevision } from '$lib/server/motion/editor';
+import { listRevisions } from '$lib/server/repos/motion-revisions';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
-import { batchView, cancelRender, renderView } from '$lib/server/motion/render-run';
+import { cancelRender } from '$lib/server/motion/render-run';
 import { startFarmBatch, startFarmRender } from '$lib/server/motion/render-start';
 import { serverRenderOpen } from '$lib/motion/server-render';
 import { batchInput, rowRequests } from '$lib/server/motion/batch-input';
 import { renderQueue } from '$lib/server/motion/render-queue';
 import { parseSettings } from '$lib/motion/export-formats';
-import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { saveExport } from '$lib/server/motion/export';
@@ -50,71 +48,40 @@ const HTTP_NOT_FOUND = 404;
 
 export const load: PageServerLoad = ({ locals, params, url }) => loadEditorSession(locals, params, url);
 
+const editorCtx = (scope: MotionEditorScope): EditorCtx => ({
+  ...scope,
+  actor: { kind: 'user', id: scope.userId },
+  gate: async () => {
+    const denied = await gateOrgAiActionForForm(scope.orgId);
+    return denied ? { status: denied.status, body: denied.data } : null;
+  }
+});
+
+const answered = (answer: EditorAnswer) => (answer.status >= HTTP_BAD_REQUEST ? fail(answer.status, answer.body) : answer.body);
+
 const galleryScope = (scope: { db: Db; orgId: string; userId: string }) => ({ db: scope.db, orgId: scope.orgId, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } });
 
 export const actions: Actions = {
   save: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const version = Number(form.get('version'));
-    const summary = String(form.get('summary') ?? '') || null;
     let doc: unknown;
     try {
       doc = JSON.parse(String(form.get('doc') ?? ''));
     } catch {
       return fail(HTTP_BAD_REQUEST, { error: 'invalid_doc' });
     }
-
-    const write = await saveMotionDoc(scope.db, {
-      orgId: scope.orgId,
-      nodeId: scope.motion.record.id,
-      expectedVersion: Number.isInteger(version) ? version : -1,
-      doc,
-      actor: { kind: 'user', id: scope.userId },
-      summary
-    });
-
-    if (write.outcome === RevisionOutcome.Conflict) {
-      const head = await headOrNew(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id }, scope.motion.node);
-      return fail(HTTP_CONFLICT, { error: 'conflict', head: { version: head.version, doc: head.doc } });
-    }
-    if (write.outcome === RevisionOutcome.Invalid) {
-      return fail(HTTP_BAD_REQUEST, { error: write.error });
-    }
-    return { version: write.head.version };
+    return answered(await runEditorOp('save_doc', editorCtx(scope), { version: Number(form.get('version')), doc, summary: String(form.get('summary') ?? '') }));
   },
 
   ops: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const ops = parseOps(parsedJson(String(form.get('ops') ?? '')));
-    if (!ops) {
-      return fail(HTTP_BAD_REQUEST, { error: 'invalid_ops' });
-    }
-
-    const commit = await commitOps(scope.db, {
-      orgId: scope.orgId,
-      nodeId: scope.motion.record.id,
-      node: scope.motion.node,
-      baseVersion: Number(form.get('version')),
-      ops,
-      actor: { kind: 'user', id: scope.userId },
-      summary: String(form.get('summary') ?? '') || null
-    });
-    if (commit.outcome === OpsOutcome.Invalid) {
-      return fail(HTTP_BAD_REQUEST, { error: commit.error });
-    }
-    if (commit.outcome === OpsOutcome.Busy) {
-      return fail(HTTP_CONFLICT, { error: 'busy' });
-    }
-    return { version: commit.head.version, doc: commit.head.doc, rebased: commit.rebased };
+    const input = { version: Number(form.get('version')), ops: parsedJson(String(form.get('ops') ?? '')), summary: String(form.get('summary') ?? '') };
+    return answered(await runEditorOp('apply_ops', editorCtx(scope), input));
   },
 
-  head: async ({ locals, params }) => {
-    const scope = await scopeFor(locals, params);
-    const head = await headOrNew(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id }, scope.motion.node);
-    return { version: head.version, doc: head.doc, actorKind: head.actorKind };
-  },
+  head: async ({ locals, params }) => answered(await runEditorOp('read_head', editorCtx(await scopeFor(locals, params)), {})),
 
   revisions: async ({ locals, params }) => {
     const scope = await scopeFor(locals, params);
@@ -317,11 +284,7 @@ export const actions: Actions = {
     return removed ? { removed: true } : fail(HTTP_BAD_REQUEST, { error: 'not_removable' });
   },
 
-  batchStatus: async ({ locals, params }) => {
-    const scope = await scopeFor(locals, params);
-    const runs = await listNodeRuns(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id });
-    return { batch: batchView(runs) };
-  },
+  batchStatus: async ({ locals, params }) => answered(await runEditorOp('batch_status', editorCtx(await scopeFor(locals, params)), {})),
 
   cancelRender: async ({ locals, params }) => {
     const scope = await scopeFor(locals, params);
@@ -333,9 +296,5 @@ export const actions: Actions = {
     return cancelled.ok ? { cancelled: true } : fail(HTTP_CONFLICT, { error: 'nothing_to_cancel' });
   },
 
-  renderStatus: async ({ locals, params }) => {
-    const scope = await scopeFor(locals, params);
-    const runs = await listNodeRuns(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id });
-    return { render: renderView(runs) };
-  }
+  renderStatus: async ({ locals, params }) => answered(await runEditorOp('render_status', editorCtx(await scopeFor(locals, params)), {}))
 };
