@@ -24,4 +24,9 @@ describe('the inspector shows only the geometry a shape kind uses', () => {
     expect(keysFor('ellipse')).not.toContain('roundness');
     expect(keysFor('ellipse')).toContain('fill');
   });
+
+  it('a rectangle has a field per corner, a star does not', () => {
+    expect(keysFor('rect')).toContain('corners');
+    expect(keysFor('star')).not.toContain('corners');
+  });
 });

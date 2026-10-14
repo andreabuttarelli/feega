@@ -55,6 +55,28 @@ export function roundnessFromInset(box: Pick<DrawBox, 'width' | 'height'>, inset
   return Math.min(Math.max(insetNormalized / short, 0), 0.5);
 }
 
+type Frame = { left: number; top: number; width: number; height: number };
+
+const INWARD: readonly Pt[] = [
+  [1, 1],
+  [-1, 1],
+  [-1, -1],
+  [1, -1]
+];
+
+export function cornerAt(box: Frame, index: number): Pt {
+  const [sx, sy] = INWARD[index];
+  return [sx > 0 ? box.left : box.left + box.width, sy > 0 ? box.top : box.top + box.height];
+}
+
+export function cornerInset(box: Frame, index: number, p: Pt): number {
+  const [cx, cy] = cornerAt(box, index);
+  const [sx, sy] = INWARD[index];
+  return Math.max(0, ((p[0] - cx) * sx + (p[1] - cy) * sy) / 2);
+}
+
+export const cornerInward = (index: number): Pt => INWARD[index];
+
 export function nudge(box: DrawBox, dx: number, dy: number): DrawBox {
   return { ...box, x: box.x + dx, y: box.y + dy };
 }

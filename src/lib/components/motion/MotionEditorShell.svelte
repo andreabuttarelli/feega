@@ -53,6 +53,10 @@
   import { THREE_D_COMPONENTS } from '$lib/motion/components';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
+  import CornerOverlay from '$lib/components/motion/CornerOverlay.svelte';
+  import AlignBar from '$lib/components/motion/AlignBar.svelte';
+  import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
+  import type { Boxes } from '$lib/motion/scene-select';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
@@ -188,6 +192,7 @@
   let stageEl = $state<HTMLElement | null>(null);
   let selectedPart = $state<string | null>(null);
   let partsByClip = $state.raw<Record<string, string[]>>({});
+  let stageBoxes = $state.raw<Boxes>({});
   let viewportH = $state(0);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
@@ -1065,6 +1070,13 @@
     distribute: { label: 'Distribute in time', run: () => distributeClips(doc, selection) }
   };
 
+  const NUDGE_PX = 1;
+  const NUDGE_MORE_PX = 10;
+  const spaceBoxes = () => ({ ...propBoxes(doc), ...stageBoxes });
+  const nudgeBy = (dx: number, dy: number) => selection.length && apply(moveBy(doc, selection, frame, [dx, dy], editMode), 'Moved with the arrows');
+  const alignTo = (edge: Edge) => apply(alignSpace(doc, selection, frame, spaceBoxes(), edge, editMode), `Aligned ${edge}`);
+  const distribute = (axis: Axis) => apply(distributeSpace(doc, selection, frame, spaceBoxes(), axis, editMode), `Distributed along ${axis}`);
+
   function arrange(id: string) {
     const op = ARRANGE[id];
     if (op && selection.length > 1) {
@@ -1103,6 +1115,14 @@
     [Command.ToolEllipse]: () => (tool = DrawTool.Ellipse),
     [Command.ToolPen]: () => (tool = DrawTool.Pen),
     [Command.ToggleEditMode]: () => setMode(nextMode(editMode)),
+    [Command.MoveLeft]: () => nudgeBy(-NUDGE_PX, 0),
+    [Command.MoveRight]: () => nudgeBy(NUDGE_PX, 0),
+    [Command.MoveUp]: () => nudgeBy(0, -NUDGE_PX),
+    [Command.MoveDown]: () => nudgeBy(0, NUDGE_PX),
+    [Command.MoveLeftMore]: () => nudgeBy(-NUDGE_MORE_PX, 0),
+    [Command.MoveRightMore]: () => nudgeBy(NUDGE_MORE_PX, 0),
+    [Command.MoveUpMore]: () => nudgeBy(0, -NUDGE_MORE_PX),
+    [Command.MoveDownMore]: () => nudgeBy(0, NUDGE_MORE_PX),
     [Command.Delete]: remove,
     [Command.Split]: split,
     [Command.Duplicate]: duplicate,
@@ -1165,11 +1185,12 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
     ...(selection.length > 1 ? [{ section: 'Arrange', items: Object.entries(ARRANGE).map(([id, op]) => ({ label: op.label, run: () => arrange(id) })) }] : []),
+    ...(selection.length ? [{ section: 'Align', items: [...Object.values(Edge).map((edge) => ({ label: `Align ${edge}`, run: () => alignTo(edge) })), ...(selection.length > 2 ? Object.values(Axis).map((axis) => ({ label: `Distribute along ${axis}`, run: () => distribute(axis) })) : [])] }] : []),
     ...menuSections().map(({ section, ids }) => ({
       section,
       items: ids
@@ -1280,7 +1301,7 @@
     if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
       return;
     }
-    const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey });
+    const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, editMode);
     if (!command) {
       return;
     }
@@ -1475,9 +1496,10 @@
       {#snippet player()}
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
-        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
+        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
+        {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
         {#if tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} {tool} onchange={apply} oncreated={drawn} />{/if}
@@ -1511,6 +1533,7 @@
     <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       {#if panelsDue}
+      {#if selection.length}<AlignBar count={selection.length} onalign={alignTo} ondistribute={distribute} />{/if}
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector {doc} onchange={edit} />
