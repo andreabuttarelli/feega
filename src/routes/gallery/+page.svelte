@@ -89,13 +89,13 @@
     display: flex;
     flex-direction: column;
     gap: var(--ui-space-6);
-    font-size: var(--ui-text-md);
+    font-size: var(--ui-type-body);
   }
 
   .gx-head p {
     margin: var(--ui-space-3) 0 0;
     line-height: 20px;
-    color: var(--ui-ink-3);
+    color: var(--ui-text-tertiary);
   }
 
   .gx-tools {
@@ -131,15 +131,15 @@
     gap: 6px;
     height: 28px;
     padding: 0 var(--ui-space-2);
-    color: var(--ui-ink-3);
-    font-size: var(--ui-text-sm);
+    color: var(--ui-text-tertiary);
+    font-size: var(--ui-type-label);
     line-height: 1;
     transition: color 120ms ease, background-color 120ms ease;
   }
 
   .gx-filter:hover {
-    color: var(--ui-ink);
-    background: var(--ui-hover);
+    color: var(--ui-text);
+    background: var(--ui-wash);
   }
 
   .gx-filter:focus-visible,
@@ -147,17 +147,17 @@
   .gx-chip:focus-visible,
   .gx-card:focus-visible {
     outline: none;
-    box-shadow: var(--ui-focus);
+    box-shadow: var(--ui-ring);
   }
 
   .gx-filter.on {
-    color: var(--ui-ink);
-    background: var(--ui-surface);
+    color: var(--ui-text);
+    background: var(--ui-panel-sunken);
     font-weight: 500;
   }
 
   .gx-filter:active {
-    background: var(--ui-line);
+    background: var(--ui-divider);
   }
 
   .gx-search input {
@@ -165,19 +165,20 @@
     height: 28px;
     padding: 0 var(--ui-space-2);
     border: 0;
-    background: var(--ui-surface);
-    color: var(--ui-ink);
-    font-size: var(--ui-text-sm);
+    background: var(--ui-panel-sunken);
+    color: var(--ui-text);
+    font-size: var(--ui-type-label);
     transition: background-color 120ms ease;
+    border-radius: var(--ui-radius-sm);
   }
 
   .gx-search input:hover {
-    background: var(--ui-hover);
+    background: var(--ui-wash);
   }
 
   .gx-search input:focus {
     outline: none;
-    box-shadow: var(--ui-focus);
+    box-shadow: var(--ui-ring);
   }
 
   .gx-status {
@@ -186,8 +187,8 @@
     gap: var(--ui-space-3);
     min-height: 20px;
     margin-top: calc(-1 * var(--ui-space-2));
-    font-size: var(--ui-text-xs);
-    color: var(--ui-ink-3);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-tertiary);
     font-variant-numeric: tabular-nums;
   }
 
@@ -195,17 +196,17 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    color: var(--ui-ink);
+    color: var(--ui-text);
   }
 
   .gx-reset {
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
     text-decoration: underline;
     text-underline-offset: 3px;
   }
 
   .gx-reset:hover {
-    color: var(--ui-ink);
+    color: var(--ui-text);
   }
 
   .gx-grid {
@@ -242,7 +243,7 @@
   }
 
   .gx-title {
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-type-label);
     font-weight: 500;
     line-height: 18px;
     overflow: hidden;
@@ -255,13 +256,13 @@
     align-items: center;
     height: 18px;
     gap: var(--ui-space-2);
-    color: var(--ui-ink-3);
+    color: var(--ui-text-tertiary);
   }
 
   .gx-author {
-    font-size: var(--ui-text-xs);
+    font-size: var(--ui-type-caption);
     line-height: 16px;
-    color: var(--ui-ink-3);
+    color: var(--ui-text-tertiary);
   }
 
   .gx-empty {
@@ -270,7 +271,7 @@
     align-items: flex-start;
     gap: var(--ui-space-2);
     padding: var(--ui-space-8) 0;
-    color: var(--ui-ink-3);
+    color: var(--ui-text-tertiary);
   }
 
   .gx-empty p {
