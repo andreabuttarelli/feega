@@ -240,11 +240,26 @@ enum Visibility {
 
 type Placed = { layer: number; trackIndex: number; matte: MattePair | null; visibility: Visibility; transform?: string; chain: MotionClip[]; held: boolean; group?: string; extent?: Extent | null };
 
+const PX_DIGITS = 1000;
+const pxOf = (n: number) => `${Math.round(n * PX_DIGITS) / PX_DIGITS}px`;
+
+function cropOf(chain: readonly MotionClip[], frame: { width: number; height: number }): string | undefined {
+  const boxes = chain.filter((c) => c.clipContent).map((c) => placedBox(c.props as Record<string, number>, frame));
+  if (!boxes.length || boxes.some((b) => !b)) {
+    return undefined;
+  }
+  const left = Math.max(...boxes.map((b) => b!.left));
+  const top = Math.max(...boxes.map((b) => b!.top));
+  const right = Math.min(...boxes.map((b) => b!.left + b!.width));
+  const bottom = Math.min(...boxes.map((b) => b!.top + b!.height));
+  return `inset(${pxOf(top)} ${pxOf(frame.width - right)} ${pxOf(frame.height - bottom)} ${pxOf(left)})`;
+}
+
 function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Placed, content: string): string {
   const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
   const inner = matted(placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, effectLayer(clip, ctx, ctx.color, ownMask(clip, ctx, content), paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null)))));
   const fx = `<div class="${seesBehind(clip) ? 'fx bd' : 'fx'}" id="fx-${clip.id}">${inner}</div>`;
-  const style = css({ zIndex: placed.layer, transform: placed.transform, mixBlendMode: blendStyle(clip.blend) });
+  const style = css({ zIndex: placed.layer, transform: placed.transform, mixBlendMode: blendStyle(clip.blend), clipPath: cropOf(placed.chain, ctx) });
   const blur = (placed.held ? ` ${HELD}` : '') + (placed.group ? ` data-group="${esc(placed.group)}"` : '');
   const layer =
     template.timing === Timing.Media

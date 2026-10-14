@@ -11,6 +11,7 @@ export type ShapeLook = {
   shape: ShapeKind;
   path: string;
   roundness: number;
+  smoothing?: number;
   corners?: number[];
   sides: number;
   points: number;
@@ -46,7 +47,7 @@ export function pathOutline(d: string, size: Size): Outline {
 }
 
 const OUTLINE: Record<ShapeKind, (p: ShapeLook, size: Size) => Outline> = {
-  [ShapeKind.Rect]: (p, size) => rectOutline(cornerRadii(p.roundness, p.corners ?? []), size),
+  [ShapeKind.Rect]: (p, size) => rectOutline(cornerRadii(p.roundness, p.corners ?? []), size, p.smoothing ?? 0),
   [ShapeKind.Line]: (_p, size) => rectOutline(0, size),
   [ShapeKind.Circle]: (_p, size) => ellipseOutline(size),
   [ShapeKind.Ellipse]: (_p, size) => ellipseOutline(size),

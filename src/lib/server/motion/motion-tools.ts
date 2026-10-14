@@ -339,6 +339,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         hidden: c.hidden ?? false,
         locked: c.locked ?? false,
         bleed: c.bleed ?? false,
+        clipContent: c.clipContent ?? false,
         markers: (c.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
         physics: c.physics ? shownRecord(c.component, c.physics, doc) : null,
         path: c.path ? { autoOrient: c.path.autoOrient, tangents: c.path.tangents.map((t) => ({ time: secs(t.frame), in: shownOffset(c.component, t.in, doc), out: shownOffset(c.component, t.out, doc) })), problem: pathProblem(c) } : null
@@ -862,10 +863,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_visibility: tool({
-      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it.',
-      inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional(), bleed: z.boolean().optional() }),
+      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it. clip_content true on a clip crops its children (set_parent) to its box at rest, like a Figma frame.',
+      inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional(), bleed: z.boolean().optional(), clip_content: z.boolean().optional() }),
       execute: async (input) => {
-        const flags = { ...(input.hidden === undefined ? {} : { hidden: input.hidden }), ...(input.locked === undefined ? {} : { locked: input.locked }), ...(input.bleed === undefined || !input.clip_id ? {} : { bleed: input.bleed }) };
+        const flags = { ...(input.hidden === undefined ? {} : { hidden: input.hidden }), ...(input.locked === undefined ? {} : { locked: input.locked }), ...(input.bleed === undefined || !input.clip_id ? {} : { bleed: input.bleed }), ...(input.clip_content === undefined || !input.clip_id ? {} : { clipContent: input.clip_content }) };
         const result = input.clip_id ? setClipFlags(session.doc, input.clip_id, flags) : input.track_id ? setTrackFlags(session.doc, input.track_id, flags) : { ok: false as const, error: 'give a track_id or a clip_id' };
         return apply(result, 'changed visibility');
       }
@@ -913,7 +914,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_transform: tool({
-      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot inside the clip box (0..1), blur in px.`,
+      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot inside the clip box (0..1), blur in px. A negative scaleX or scaleY flips the clip on that axis (-100 = mirrored).`,
       inputSchema: z.object({ clip_id: z.string(), transform: transformInput }),
       execute: async (input) => {
         const shrunk = uiShrink(session.doc, input.clip_id, input.transform.scale as number | undefined);
@@ -1515,7 +1516,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_shape: tool({
-      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. A rect rounds its corners with roundness (0..0.5 of the short side) or one radius per corner with corners [topLeft, topRight, bottomRight, bottomLeft] (unset ones follow roundness); set_props changes them later. Fill: fills is a stack of layers painted bottom to top (first = bottom), each {type: solid {color} | linear-gradient {stops [{color, pos 0..1}], angle} | radial-gradient {stops, center {x,y} 0..1, radius (1 = half the long side)} | image {assetId, fit cover/contain/fill/tile, focus {x,y} 0..1, scale}, opacity 0..1, visible, blend (css blend mode)}; e.g. a photo with a dark overlay is [{type: image, assetId}, {type: solid, color: #000000, opacity: 0.4}]. fills replaces the older fillKind/fill/fill2/gradientAngle (still read when fills is absent); set_props {fills} changes the whole stack. Stroke: strokes is a stack painted bottom to top over the fills, each {paint (a fills layer, never image), width, dash, gap (all fractions of the frame's short side, 0..0.2; dash 0 = solid), align inside/center/outside, sides [top, right, bottom, left] widths (rect only), cap butt/round/square, join miter/round/bevel, visible}; e.g. a 4px outside ring on a 1080 frame is [{paint: {type: solid, color: #ffffff}, width: 0.0037, align: outside}]. strokes replaces the older strokeKind/stroke/strokeWidth/dash/gap/cap/join (still read when strokes is absent; set_props {strokes} changes the whole stack). Other props as add_clip; a soft glow is effects [{kind: gaussian-blur}]. ${PLACEMENT_HELP} Returns the clip id.`,
+      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. A rect rounds its corners with roundness (0..0.5 of the short side) or one radius per corner with corners [topLeft, topRight, bottomRight, bottomLeft] (unset ones follow roundness), and smoothing 0..1 softens them toward a squircle (0 = circular); set_props changes them later. Fill: fills is a stack of layers painted bottom to top (first = bottom), each {type: solid {color} | linear-gradient {stops [{color, pos 0..1}], angle} | radial-gradient {stops, center {x,y} 0..1, radius (1 = half the long side)} | image {assetId, fit cover/contain/fill/tile, focus {x,y} 0..1, scale}, opacity 0..1, visible, blend (css blend mode)}; e.g. a photo with a dark overlay is [{type: image, assetId}, {type: solid, color: #000000, opacity: 0.4}]. fills replaces the older fillKind/fill/fill2/gradientAngle (still read when fills is absent); set_props {fills} changes the whole stack. Stroke: strokes is a stack painted bottom to top over the fills, each {paint (a fills layer, never image), width, dash, gap (all fractions of the frame's short side, 0..0.2; dash 0 = solid), align inside/center/outside, sides [top, right, bottom, left] widths (rect only), cap butt/round/square, join miter/round/bevel, visible}; e.g. a 4px outside ring on a 1080 frame is [{paint: {type: solid, color: #ffffff}, width: 0.0037, align: outside}]. strokes replaces the older strokeKind/stroke/strokeWidth/dash/gap/cap/join (still read when strokes is absent; set_props {strokes} changes the whole stack). Other props as add_clip; a soft glow is effects [{kind: gaussian-blur}]. ${PLACEMENT_HELP} Returns the clip id.`,
       inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), fills: fillsSchema.optional(), strokes: strokesSchema.optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
       execute: async (input) => {
         const id = deps.newId();

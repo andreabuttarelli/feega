@@ -126,6 +126,7 @@ const KEY_SECTION: Record<string, Section> = {
   opacity: Section.Layer,
   roundness: Section.Layer,
   corners: Section.Layer,
+  smoothing: Section.Layer,
   fillKind: Section.Fill,
   fill2: Section.Fill,
   gradientAngle: Section.Fill,

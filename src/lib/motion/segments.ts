@@ -29,3 +29,15 @@ export function segmentsOf(key: string, options: readonly string[]): Segment[] {
   const known = SEGMENTS[key] ?? {};
   return options.map((value) => ({ value, label: known[value]?.label ?? value, icon: known[value]?.icon ?? null }));
 }
+
+export enum Answer {
+  Yes = 'yes',
+  No = 'no'
+}
+
+export const YES_NO: Segment[] = [
+  { value: Answer.Yes, label: 'Yes', icon: null },
+  { value: Answer.No, label: 'No', icon: null }
+];
+
+export const answerOf = (value: unknown): Answer => (value === true ? Answer.Yes : Answer.No);

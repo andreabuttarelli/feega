@@ -28,7 +28,7 @@ const html = (doc: MotionDoc, id: string) => render(AutoLayoutSection, { props: 
 describe('the auto layout section', () => {
   it('a container shows direction, alignment, gap and padding, and can be removed', () => {
     const body = html(row, 'box');
-    for (const id of ['auto-layout-align', 'auto-layout-gap', 'auto-layout-padding-top', 'auto-layout-remove']) {
+    for (const id of ['auto-layout-align', 'auto-layout-gap', 'auto-layout-padding', 'auto-layout-remove']) {
       expect(body).toContain(`data-testid="${id}"`);
     }
     expect(body).toMatch(/aria-label="Horizontal"[^>]*aria-checked="true"|aria-checked="true"[^>]*aria-label="Horizontal"/);
@@ -47,6 +47,25 @@ describe('the auto layout section', () => {
       expect(body).toContain(`data-testid="${id}"`);
     }
     expect(body).not.toContain('auto-layout-gap');
+  });
+
+  it('sizes read Fixed, Fit and Fill, as in Framer', () => {
+    const body = html(row, 'a');
+    expect(body).toContain('>Fit<');
+    expect(body).not.toContain('>Hug<');
+  });
+
+  it('padding is one value until it differs per side', () => {
+    const even = html(row, 'box');
+    expect(even).toContain('data-testid="auto-layout-padding-sides"');
+    expect(even).not.toContain('data-testid="auto-layout-padding-top"');
+    const uneven = html(must(setAutoLayout(row, 'box', { padding: { top: 8, right: 0, bottom: 0, left: 0 } })), 'box');
+    expect(uneven).toContain('data-testid="auto-layout-padding-top"');
+    expect(uneven).not.toContain('data-testid="auto-layout-padding"');
+  });
+
+  it('absolute is a Yes / No', () => {
+    expect(html(row, 'a')).toMatch(/data-segmented="Absolute"[\s\S]*?>Yes<[\s\S]*?>No</);
   });
 
   it('a plain rectangle only offers to add auto layout', () => {
