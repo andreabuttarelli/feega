@@ -4,6 +4,13 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Una modifica al frame sulla tela fa sparire selezione e stage
+Segnale: dopo un cambio di proprietà nel frame aperto sulla tela la stage torna all'immagine
+vecchia e i box di selezione spariscono finché non si riseleziona. Due cause: un `$effect` che legge
+`node.id` da una prop si riesegue a ogni nuovo oggetto `node` (qui `inlineStage.offer` riazzerava il
+paint); e una misura vuota mentre la preview ricarica sovrascriveva i box. Mossa: leggere il campo
+da un `$derived`, e non sostituire i box con una misura vuota (`remeasured`).
+
 ### Un template a 60 fps che va al doppio e diventa nero a metà
 Ogni frame di un doc (clip, keyframe, comp) è nell'fps del doc: un pezzo che arriva da un doc con
 un altro fps va convertito tutto, comps comprese. Segnale: template da 12 s che finisce a 6 s, o

@@ -62,6 +62,8 @@ function boxPoint(box: Box, [u, v]: Pt): Pt {
   return [box.left + u * box.width, box.top + v * box.height];
 }
 
+export const remeasured = (previous: Boxes, measured: Boxes): Boxes => (Object.keys(measured).length ? measured : previous);
+
 export function quadOf(doc: MotionDoc, clipId: string, frame: number, box: Box): Quad {
   const world = worldAt(doc, clipId, frame, sizeOf(doc));
   return UNIT_CORNERS.map((c) => apply2d(world, boxPoint(box, c))) as Quad;
