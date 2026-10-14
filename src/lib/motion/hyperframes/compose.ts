@@ -427,6 +427,15 @@ const BASE_CSS = [
   '.font-probe{position:absolute;left:0;top:0;opacity:0;pointer-events:none}'
 ].join('');
 
+type MediaSlot = { assetId: string; kind: string; fit?: string; focusX?: number; focusY?: number };
+
+export function resolveMedia(value: unknown, asset: (id: string | null) => string | null): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+  return (value as MediaSlot[]).map(({ assetId, ...rest }) => ({ src: (assetId && asset(assetId)) || '', ...rest }));
+}
+
 type ValueResolver = (value: unknown, ctx: TemplateCtx<ComponentId>) => unknown;
 
 const RESOLVE: Record<PropFormat, ValueResolver> = {
@@ -434,7 +443,7 @@ const RESOLVE: Record<PropFormat, ValueResolver> = {
   [PropFormat.Asset]: (v, ctx) => ctx.asset(typeof v === 'string' ? v : null),
   [PropFormat.Textarea]: (v) => v,
   [PropFormat.Font]: (v, ctx) => ctx.font(String(v)),
-  [PropFormat.Media]: (v, ctx) => (Array.isArray(v) ? v.map((m) => ({ src: ctx.asset(m.assetId), kind: m.kind })).filter((m) => m.src) : v)
+  [PropFormat.Media]: (v, ctx) => resolveMedia(v, ctx.asset)
 };
 
 const ENV_LOAD: Record<Target, EnvLoad> = { [Target.Video]: EnvLoad.Wait, [Target.Screen]: EnvLoad.Swap };

@@ -3,7 +3,7 @@ import { COMPONENTS, type ComponentId } from '$lib/motion/components';
 import { moveClip, moveTrack, renameTrack, type OpResult } from '$lib/motion/timeline';
 import { setClipFlags, setTrackFlags } from '$lib/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
-import { PART_SEP, parsePart } from '$lib/motion/poster-parts';
+import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '$lib/motion/poster-parts';
 import { NODE_KIND_LABEL } from './node-label';
 import type { NodeType } from './node-data';
 
@@ -50,7 +50,7 @@ type Clip = Track['clips'][number];
 const NODE_DEPTH = 0;
 const TRACK_DEPTH = 1;
 
-const clipLabel = (clip: Clip) => COMPONENTS[clip.component as ComponentId]?.label ?? clip.component;
+const clipLabel = (clip: Clip) => (clip.component === CUSTOM_CLIP ? componentLabel(String(clip.props.name)) : (COMPONENTS[clip.component as ComponentId]?.label ?? clip.component));
 
 function trackRows(doc: MotionDoc, tracks: readonly Track[], nodeId: string, depth: number, nested: boolean, parts: Parts = {}): LayerRow[] {
   return tracks.flatMap((track) => [
@@ -74,17 +74,12 @@ function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nes
     nested
   };
   const inside = comp && !template ? (doc.comps[comp]?.tracks ?? []) : [];
-  const own = (parts[clip.id] ?? []).map((part) => partRow(clip, part, nodeId, depth + 1));
+  const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1));
   return [row, ...own, ...trackRows(doc, inside, nodeId, depth + 1, true)];
 }
 
-function partLabel(part: string): string {
-  const { field, index } = parsePart(part);
-  return index === null ? field : `${field} ${index + 1}`;
-}
-
-function partRow(clip: Clip, part: string, nodeId: string, depth: number): LayerRow {
-  return { id: `${clip.id}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(part), type: 'part', nodeId, hidden: false, locked: false, nested: true };
+function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth: number): LayerRow {
+  return { id: `${clip.id}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(doc, clip, part), type: partIcon(doc, clip, part), nodeId, hidden: false, locked: false, nested: true };
 }
 
 export const frameRows = (doc: MotionDoc, nodeId: string): LayerRow[] => trackRows(doc, doc.tracks, nodeId, TRACK_DEPTH, false);

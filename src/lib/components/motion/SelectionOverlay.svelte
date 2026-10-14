@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clipChrome } from '$lib/canvas/selection-chrome';
   import { untrack } from 'svelte';
   import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
   import { DragPhase, isOutside, type ElementOut } from '$lib/canvas/canvas-drop';
@@ -55,6 +56,7 @@
     [Grip.Anchor]: 'Moved the anchor point'
   };
 
+  const chrome = $derived(clipChrome(part));
   type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; pointer: number };
 
   let host = $state<HTMLDivElement | null>(null);
@@ -284,7 +286,7 @@
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} />{/if}
     {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}
-    {#if quad}<polygon class="box" points={points(quad)} data-testid="selection-box" />{/if}
+    {#if quad}<polygon class="box" class:passive={!chrome.handles} points={points(quad)} data-testid="selection-box" data-ring={chrome.ring} />{/if}
     {#each live?.gaps ?? [] as g (g.axis + g.from + g.to)}
       {#if g.axis === 'x'}<line class="gap" x1={g.from} y1={g.at} x2={g.to} y2={g.at} />{:else}<line class="gap" x1={g.at} y1={g.from} x2={g.at} y2={g.to} />{/if}
     {/each}
@@ -299,14 +301,14 @@
     <div class="outlined-part" data-testid="layer-hover-part" style={boxStyle(outlinedPart)}></div>
   {/if}
   {#if quad && clip}
-    {@const handles = handlesOf(quad)}
+    {@const handles = chrome.handles ? handlesOf(quad) : []}
     {#each handles.slice(0, 4) as h, i (i)}
       <button type="button" class="target rotate" aria-label="Rotate" style={outward(quad, h.at)} onpointerdown={(e) => begin(e, Grip.Rotate, i, clip.id)}></button>
     {/each}
     {#each handles as h, i (i)}
       <button type="button" class="target scale" aria-label="Scale" data-handle={i} style={pct(h.at)} onpointerdown={(e) => begin(e, Grip.Scale, i, clip.id)}><span></span></button>
     {/each}
-    {#if anchor}
+    {#if anchor && chrome.handles}
       <button type="button" class="target anchor" aria-label="Anchor point" data-testid="selection-anchor" style={pct(anchor)} onpointerdown={(e) => begin(e, Grip.Anchor, 0, clip.id)}><span></span></button>
     {/if}
     {#if partBox && part}
@@ -367,6 +369,12 @@
   .box {
     stroke: var(--ui-accent);
     stroke-width: 1.5px;
+  }
+
+  .box.passive {
+    stroke-width: 1px;
+    stroke-dasharray: 4 3;
+    opacity: 0.6;
   }
 
   .hover {

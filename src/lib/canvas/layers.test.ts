@@ -3,6 +3,7 @@ import { LayerAction, LayerKind, Pick, dropLayer, frameHover, frameRows, rowPick
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
+import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from '$lib/motion/template/type-grid-poster/template';
 
 const NODES = [
   { id: 'n1', type: 'text', name: 'Hook' },
@@ -79,8 +80,21 @@ describe('poster parts in layers', () => {
     const clip = rows.findIndex((r) => r.id === 't1');
 
     expect(rows.slice(clip + 1, clip + 3).map((r) => [r.id, r.kind, r.depth, r.label])).toEqual([
-      ['t1#lines:0', LayerKind.Part, 3, 'lines 1'],
-      ['t1#footer1', LayerKind.Part, 3, 'footer1']
+      ['t1#lines:0', LayerKind.Part, 3, 'Line 1'],
+      ['t1#footer1', LayerKind.Part, 3, 'Footer1']
+    ]);
+  });
+
+  it('names a poster and its parts as people read them, photos typed as images', () => {
+    const doc = TYPE_GRID_POSTER_TEMPLATE.template.doc;
+    const rows = layerRows(NODES, { nodeId: 'm1', doc, parts: { [TYPE_GRID_CLIP]: ['lines:1', 'photos:0', 'arrow:4'] } });
+    const at = rows.findIndex((r) => r.id === TYPE_GRID_CLIP);
+
+    expect(rows[at].label).toBe('Type grid poster');
+    expect(rows.slice(at + 1, at + 4).map((r) => [r.label, r.type])).toEqual([
+      ['NAME', 'text'],
+      ['Photo 1', 'image'],
+      ['Arrow', 'arrow']
     ]);
   });
 });

@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from './components';
 import { Ease } from './design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, partFieldKeys, secondsLabel, toggleKey, valueAt } from './inspector';
+import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, partFieldKeys, partFocus, secondsLabel, toggleKey, valueAt } from './inspector';
 import { addClip, setKeyframes, setTransform, type OpResult } from './timeline';
 import { writeComponent } from './custom/ops';
 import { PropFormat } from './custom/component';
+import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from './template/type-grid-poster/template';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -277,5 +278,25 @@ describe('seconds at another frame rate', () => {
   it('reads frames at the doc rate', () => {
     expect(secondsLabel(25, 25)).toBe('1');
     expect(secondsLabel(30, 60)).toBe('0.5');
+  });
+});
+
+describe('a selected poster part shows only its own fields', () => {
+  const doc = TYPE_GRID_POSTER_TEMPLATE.template.doc;
+  const clip = findClip(doc, TYPE_GRID_CLIP)!.clip;
+
+  it('a marked line leaves the raw multi-line field out: its text has its own field', () => {
+    expect(partFocus(doc, clip, 'lines:1')).not.toContain('lines');
+    expect(partFocus(doc, clip, 'lines:1')).toContain('ink');
+  });
+
+  it('a whole text field keeps its own field', () => {
+    expect(partFocus(doc, clip, 'footer1')[0]).toBe('footer1');
+  });
+
+  it('a photo and an arrow show their style, never the lines', () => {
+    expect(partFocus(doc, clip, 'photos:0')).toEqual(expect.arrayContaining(['photoTint', 'photoGrain']));
+    expect(partFocus(doc, clip, 'photos:0')).not.toContain('lines');
+    expect(partFocus(doc, clip, 'arrow:4')[0]).toBe('arrowColor');
   });
 });

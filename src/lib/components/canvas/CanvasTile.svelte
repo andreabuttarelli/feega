@@ -1,5 +1,6 @@
 <script lang="ts">
   import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
   import { tileHovered } from '$lib/canvas/layers';
   /**
    * UN NODO DELLA TELA, e nient'altro.
@@ -85,6 +86,7 @@
   // stesso `CONNECTOR_STYLE` che colora la porta stessa: un nodo testo si seleziona blu, un'
   // immagine verde, un nodo senza uscita (iframe, prodotti, un feed social) prende l'accento, non
   // un colore che non gli appartiene.
+  const chrome = $derived(nodeChrome(tile.id, selected, layersSource.video));
   const selectionColor = $derived(tile.output ? CONNECTOR_STYLE[tile.output].color : 'var(--accent, #7c5cff)');
 </script>
 
@@ -109,7 +111,7 @@
 {/if}
 
 {#if label && LabelIcon}
-  <div class="node-label" class:is-chosen={selected}>
+  <div class="node-label" class:is-chosen={chrome.ring === NodeChrome.Selected}>
     <LabelIcon size={12} strokeWidth={1.8} />
     <span>{label}</span>
     {#if tile.inPost}
@@ -122,11 +124,11 @@
   <div class="tile-hover" data-testid="tile-hover" aria-hidden="true"></div>
 {/if}
 
-{#if selected}
-  <div class="tile-selection" style={`outline-color:${selectionColor}`} aria-hidden="true"></div>
+{#if chrome.ring !== NodeChrome.None}
+  <div class={`tile-selection ring-${chrome.ring}`} data-testid="tile-selection" data-ring={chrome.ring} style={`outline-color:${selectionColor}`} aria-hidden="true"></div>
 {/if}
 
-{#if selected && resize() && tile.minW != null && tile.minH != null}
+{#if chrome.handles && resize() && tile.minW != null && tile.minH != null}
   <NodeResizer
     nodeId={tile.id}
     minWidth={tile.minW + growth.w}
@@ -198,6 +200,11 @@
     pointer-events: none;
     outline: 2px solid;
     outline-offset: 1px;
+  }
+
+  .tile-selection.ring-editing {
+    outline: 1px dashed;
+    opacity: 0.5;
   }
 
   :global(.svelte-flow__handle) {
