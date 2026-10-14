@@ -225,7 +225,29 @@ function ratio(now: Pt, start: Pt, axis: Pt): number {
   return Math.abs(base) < TINY ? 1 : dot(now, axis) / base;
 }
 
+const FRAME_BOUNDS = (size: Size): Bounds => ({ left: 0, top: 0, right: size.width, bottom: size.height });
+
+function snapHandle(c: Context): { to: Pt; guides: Guide[] } {
+  if (c.snapPx <= 0) {
+    return { to: c.to, guides: [] };
+  }
+  const handle = handlesOf(quadOf(c.doc, c.clipId, c.frame, c.box))[c.handle];
+  const [hx, hy] = [c.to[0] + handle.at[0] - c.from[0], c.to[1] + handle.at[1] - c.from[1]];
+  const targets = [FRAME_BOUNDS(c.size), ...c.snapTargets].map(linesOf);
+  const sx = handle.unit[0] === 0.5 ? null : nearest([hx], targets.flatMap((t) => t.x), c.snapPx);
+  const sy = handle.unit[1] === 0.5 ? null : nearest([hy], targets.flatMap((t) => t.y), c.snapPx);
+  return {
+    to: [c.to[0] + (sx?.shift ?? 0), c.to[1] + (sy?.shift ?? 0)],
+    guides: [...(sx ? [{ axis: 'x' as const, at: sx.at }] : []), ...(sy ? [{ axis: 'y' as const, at: sy.at }] : [])]
+  };
+}
+
 function scaled(c: Context): DragResult {
+  const snapped = snapHandle(c);
+  return { patch: scalePatch({ ...c, to: snapped.to }), guides: snapped.guides };
+}
+
+function scalePatch(c: Context): Transform {
   const unit = handlesOf(UNIT_CORNERS as Quad)[c.handle].unit;
   const [q0, q1, , q3] = UNIT_CORNERS.map((p) => apply2d(c.world, boxPoint(c.box, p)));
   const u = sub(q1, q0);
@@ -244,7 +266,7 @@ function scaled(c: Context): DragResult {
   if (alongV || c.shift) {
     patch.scaleY = c.value('scaleY') * fv;
   }
-  return { patch, guides: [] };
+  return patch;
 }
 
 function rotated(c: Context): DragResult {
@@ -329,4 +351,25 @@ export function readout(component: ComponentId, patch: Transform, frame: Size): 
   return Object.entries(patch)
     .map(([key, value]) => `${key} ${Math.round(toShown(owner, key, value as number, frame) * READOUT_PRECISION) / READOUT_PRECISION}${unitOf(owner, key) ? ` ${unitOf(owner, key)}` : ''}`)
     .join(' · ');
+}
+
+export type Gap = { axis: 'x' | 'y'; from: number; to: number; at: number };
+
+const overlaps = (a0: number, a1: number, b0: number, b1: number) => Math.min(a1, b1) > Math.max(a0, b0);
+
+export function spacing(moving: Bounds, others: Bounds[], frame: Size): Gap[] {
+  const midX = (moving.left + moving.right) / 2;
+  const midY = (moving.top + moving.bottom) / 2;
+  const facingX = others.filter((o) => overlaps(o.top, o.bottom, moving.top, moving.bottom));
+  const facingY = others.filter((o) => overlaps(o.left, o.right, moving.left, moving.right));
+  const left = Math.max(0, ...facingX.filter((o) => o.right <= moving.left).map((o) => o.right));
+  const right = Math.min(frame.width, ...facingX.filter((o) => o.left >= moving.right).map((o) => o.left));
+  const top = Math.max(0, ...facingY.filter((o) => o.bottom <= moving.top).map((o) => o.bottom));
+  const bottom = Math.min(frame.height, ...facingY.filter((o) => o.top >= moving.bottom).map((o) => o.top));
+  return [
+    { axis: 'x' as const, from: left, to: moving.left, at: midY },
+    { axis: 'x' as const, from: moving.right, to: right, at: midY },
+    { axis: 'y' as const, from: top, to: moving.top, at: midX },
+    { axis: 'y' as const, from: moving.bottom, to: bottom, at: midX }
+  ].filter((g) => g.to > g.from);
 }

@@ -4,7 +4,7 @@
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
 **49 tool** — 19 in lettura, 25 in scrittura, 5 che distruggono.
-Il payload di `tools/list` pesa **45.452 caratteri**, circa **11.363 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+Il payload di `tools/list` pesa **45.367 caratteri**, circa **11.342 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|

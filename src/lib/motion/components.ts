@@ -28,7 +28,8 @@ export enum Control {
   Asset = 'asset',
   Managed = 'managed',
   Font = 'font',
-  Comp = 'comp'
+  Comp = 'comp',
+  Corners = 'corners'
 }
 
 export enum AssetKind {
@@ -328,6 +329,7 @@ export const COMPONENTS = {
         shape: choice(SHAPES_2D, ShapeKind.Line, 'Shape', Group.Content),
         path: pathString.default('').meta(managed('Path')),
         roundness: range(0, 0.5, 0.01, 0, 'Roundness', Group.Content),
+        corners: z.array(z.number().min(0).max(0.5)).max(4).default([]).meta({ control: Control.Corners, label: 'Corners', group: Group.Content }),
         sides: range(3, 64, 1, 6, 'Sides', Group.Content),
         points: range(3, 64, 1, 5, 'Points', Group.Content),
         innerRadius: range(0.05, 1, 0.01, 0.5, 'Inner radius', Group.Content),
