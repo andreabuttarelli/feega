@@ -120,11 +120,10 @@ test.describe('composition node on a library component @real', () => {
 
     await page.getByTestId('pick-component').click();
     await page.getByTestId('component-search').fill('photo strip');
-    await page.locator('[data-component="builtin:photo-strip"]').click();
     if (SHOTS) {
       await page.screenshot({ path: `${SHOTS}/1-library.png` });
     }
-    await page.getByTestId('insert-component').click();
+    await page.locator('[data-component="builtin:photo-strip"]').click();
 
     await expect(page.getByTestId('composition-template')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('composition-fields')).toBeVisible();
@@ -139,8 +138,9 @@ test.describe('composition node on a library component @real', () => {
     };
     await expect.poll(loadedImages, { timeout: 20_000 }).toBeGreaterThanOrEqual(SWATCHES.length);
 
-    const saved = await admin.from('nodes').select('data').eq('id', composition.id).single();
-    expect(saved.data?.data).toMatchObject({ template: { id: 'builtin:photo-strip' } });
+    await expect
+      .poll(async () => (await admin.from('nodes').select('data').eq('id', composition.id).single()).data?.data, { message: 'the picked template is saved' })
+      .toMatchObject({ template: { id: 'builtin:photo-strip' } });
     if (SHOTS) {
       await page.waitForTimeout(1500);
       await page.screenshot({ path: `${SHOTS}/2-canvas.png` });

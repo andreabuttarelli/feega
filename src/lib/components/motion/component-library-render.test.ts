@@ -24,28 +24,45 @@ const detail = () =>
     props: { item: items.find((i) => i.id === PROMPT_TEMPLATE_ID)!, format: MotionFormat.Landscape, draftOf, compose: null, assets: [], onadd: () => {}, onclose: () => {} }
   }).body;
 
-describe('the component library', () => {
-  it('opens on one surface: category tabs, search and a grid of cards with a one-line description', () => {
+describe('the frame templates picker', () => {
+  it('is called Frame templates, with one search field and Video / Still', () => {
     const body = library();
 
-    expect(body).toContain('role="tablist"');
-    expect(body).toContain('data-testid="component-search"');
-    expect(body).toContain(`data-component="${PROMPT_TEMPLATE_ID}"`);
-    expect(body).toContain('A prompt box types a request');
+    expect(body).toContain('aria-label="Frame templates"');
+    expect(body).toMatch(/<h2[^>]*>Frame templates<\/h2>/);
+    expect(body).toContain('placeholder="Search frame templates"');
+    expect(body).toMatch(/role="radiogroup"[^>]*aria-label="Video or still"/);
+    expect(body).toMatch(/role="radio"[^>]*>\s*Video\s*</);
+    expect(body).toMatch(/role="radio"[^>]*>\s*Still\s*</);
+    expect(body).not.toMatch(/components/i);
+  });
+
+  it('offers the roles of the template cards as chips', () => {
+    expect(library()).toContain('data-role="opener"');
+  });
+
+  it('shows each template in its real format, grouped by shape, with a one-line meta', () => {
+    const body = library();
+
+    expect(body).toContain('data-shape="16:9"');
+    expect(body).toContain('data-shape="4:5"');
+    expect(body).toMatch(/data-component="builtin:poster-type-grid"[^>]*data-mode="still"/);
+    expect(body).toContain('4:5 · still');
+  });
+
+  it('opens quiet: posters only, lazy, no player and no description text', () => {
+    const body = library();
+
+    expect(body).toContain('loading="lazy"');
+    expect(body).not.toContain('<video');
+    expect(body).not.toContain('A prompt box types a request');
     expect(body).not.toContain('data-testid="component-detail"');
   });
 
-  it('filters videos and stills, and marks a still card as one', () => {
-    const body = library();
+  it('says so when nothing is listed', () => {
+    const empty = render(ComponentLibrary, { props: { items: [], format: MotionFormat.Landscape, draftOf, onpick: () => {}, onclose: () => {} } }).body;
 
-    expect(body).toContain('data-mode-tab="video"');
-    expect(body).toContain('data-mode-tab="still"');
-    expect(body).toMatch(/data-component="builtin:poster-type-grid"[^>]*data-mode="still"/);
-  });
-
-  it('has no Back button: a component opens beside the grid and closes in place', () => {
-    expect(library()).not.toMatch(/>\s*Back\s*</);
-    expect(detail()).toContain('data-testid="close-detail"');
+    expect(empty).toContain('data-testid="frame-templates-empty"');
   });
 });
 

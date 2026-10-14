@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { LayerAction, LayerKind, Pick, dropLayer, frameHover, frameRows, rowPicked, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { LayerAction, LayerKind, NodeIcon, Pick, nodeIcon, dropLayer, frameHover, frameRows, rowPicked, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
+import { EditMode } from '$lib/motion/edit-mode';
+import { CUSTOM_CLIP } from '$lib/motion/poster-parts';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from '$lib/motion/template/type-grid-poster/template';
 
 const NODES = [
@@ -28,7 +30,7 @@ const ok = (r: ReturnType<typeof layerEdit>) => {
 };
 
 describe('layer rows', () => {
-  it('list every canvas node at the top level, named, and only the open video unfolds into tracks and clips', () => {
+  it('list every canvas node at the top level, named, and only the open video unfolds into its clips', () => {
     const doc = video();
     const rows = layerRows(NODES, { nodeId: 'm1', doc });
 
@@ -37,9 +39,8 @@ describe('layer rows', () => {
       ['m1', LayerKind.Node, 'Teaser'],
       ['m2', LayerKind.Node, 'Frame']
     ]);
-    const inside = rows.filter((r) => r.nodeId === 'm1' && r.depth > 0);
-    expect(inside.map((r) => r.kind)).toEqual([...doc.tracks.flatMap((t) => [LayerKind.Track, ...t.clips.map(() => LayerKind.Clip)])]);
-    expect(rows.find((r) => r.id === 't1')).toMatchObject({ kind: LayerKind.Clip, depth: 2, label: 'Title' });
+    expect(rows.filter((r) => r.nodeId === 'm1' && r.depth > 0).map((r) => [r.id, r.kind])).toEqual([['t1', LayerKind.Clip]]);
+    expect(rows.find((r) => r.id === 't1')).toMatchObject({ depth: 1, label: 'Title' });
     expect(rows.some((r) => r.nodeId === 'm2' && r.depth > 0)).toBe(false);
   });
 
@@ -105,8 +106,8 @@ describe('poster parts in layers', () => {
     const clip = rows.findIndex((r) => r.id === 't1');
 
     expect(rows.slice(clip + 1, clip + 3).map((r) => [r.id, r.kind, r.depth, r.label])).toEqual([
-      ['t1#lines:0', LayerKind.Part, 3, 'Line 1'],
-      ['t1#footer1', LayerKind.Part, 3, 'Footer1']
+      ['t1#lines:0', LayerKind.Part, 2, 'Line 1'],
+      ['t1#footer1', LayerKind.Part, 2, 'Footer1']
     ]);
   });
 
@@ -243,5 +244,96 @@ describe('hovering a layer row', () => {
     expect(frameHover({ nodeId: 'm1', id: 'poster#title' }, 'm1')).toBe('poster#title');
     expect(frameHover({ nodeId: 'm1', id: 'm1' }, 'm1')).toBeNull();
     expect(frameHover({ nodeId: 'm2', id: 't1' }, 'm1')).toBeNull();
+  });
+});
+
+const clipOf = (doc: MotionDoc, id: string, from: number) => ({ ...doc.tracks.flatMap((t) => t.clips)[0], id, from });
+
+function sequence(): MotionDoc {
+  const doc = video();
+  return {
+    ...doc,
+    tracks: [
+      { id: 'v2', kind: TrackKind.Visual, name: 'Video 2', clips: [clipOf(doc, 'a', 0), clipOf(doc, 'b', 60)] },
+      { id: 'v1', kind: TrackKind.Visual, name: 'Video 1', clips: [clipOf(doc, 'c', 0)] },
+      { id: 'a1', kind: TrackKind.Audio, name: 'Audio 1', clips: [] }
+    ]
+  };
+}
+
+const inside = (rows: ReturnType<typeof layerRows>) => rows.filter((r) => r.nodeId === 'm1' && r.depth > 0).map((r) => [r.id, r.kind, r.depth]);
+
+describe('a frame lists elements, not timeline tracks', () => {
+  it('never shows an empty track', () => {
+    expect(layerRows(NODES, { nodeId: 'm1', doc: video() }).some((r) => r.kind === LayerKind.Track)).toBe(false);
+  });
+
+  it('lists clips straight under the frame, top track first', () => {
+    expect(inside(layerRows(NODES, { nodeId: 'm1', doc: sequence(), mode: EditMode.Design }))).toEqual([
+      ['a', LayerKind.Clip, 1],
+      ['b', LayerKind.Clip, 1],
+      ['c', LayerKind.Clip, 1]
+    ]);
+  });
+
+  it('in Motion mode a track holding clips in sequence becomes a group named by its content', () => {
+    const rows = layerRows(NODES, { nodeId: 'm1', doc: sequence(), mode: EditMode.Motion });
+
+    expect(inside(rows)).toEqual([
+      ['v2', LayerKind.Track, 1],
+      ['a', LayerKind.Clip, 2],
+      ['b', LayerKind.Clip, 2],
+      ['c', LayerKind.Clip, 1]
+    ]);
+    expect(rows.find((r) => r.id === 'v2')!.label).toBe('Title');
+  });
+
+  it('a group keeps a name its owner gave the track, and falls back to its place when unnamed', () => {
+    const doc = sequence();
+    const named: MotionDoc = { ...doc, tracks: doc.tracks.map((t) => (t.id === 'v2' ? { ...t, name: 'Captions' } : t)) };
+    const blank: MotionDoc = { ...doc, tracks: doc.tracks.map((t) => (t.id === 'v2' ? { ...t, name: '', clips: t.clips.map((c) => ({ ...c, component: CUSTOM_CLIP, props: { name: '' } })) } : t)) };
+
+    expect(layerRows(NODES, { nodeId: 'm1', doc: named, mode: EditMode.Motion }).find((r) => r.id === 'v2')!.label).toBe('Captions');
+    expect(layerRows(NODES, { nodeId: 'm1', doc: blank, mode: EditMode.Motion }).find((r) => r.id === 'v2')!.label).toBe('Track 1');
+  });
+
+  it('a stored outline of a closed frame is never grouped by track', () => {
+    expect(frameRows(sequence(), 'm2').some((r) => r.kind === LayerKind.Track)).toBe(false);
+  });
+
+  it('an audio clip is a row of its own only when it exists', () => {
+    const doc = sequence();
+    const audio = clipOf(doc, 'snd', 0);
+    const withAudio: MotionDoc = { ...doc, tracks: doc.tracks.map((t) => (t.id === 'a1' ? { ...t, clips: [{ ...audio, component: 'Audio' }] } : t)) };
+
+    expect(layerRows(NODES, { nodeId: 'm1', doc: withAudio }).find((r) => r.id === 'snd')).toMatchObject({ kind: LayerKind.Clip, type: 'Audio', depth: 1 });
+  });
+
+  it('a template poster is a group row holding its parts', () => {
+    const doc = TYPE_GRID_POSTER_TEMPLATE.template.doc;
+    const rows = layerRows(NODES, { nodeId: 'm1', doc, parts: { [TYPE_GRID_CLIP]: ['lines:1'] } });
+    const group = rows.find((r) => r.id === TYPE_GRID_CLIP)!;
+
+    expect(group).toMatchObject({ kind: LayerKind.Group, type: CUSTOM_CLIP, label: 'Type grid poster', depth: 1 });
+    expect(rows.find((r) => r.id === `${TYPE_GRID_CLIP}#lines:1`)!.depth).toBe(2);
+    expect(rows.some((r) => r.kind === LayerKind.Track)).toBe(false);
+  });
+});
+
+describe('a frame row shows what the frame looks like', () => {
+  it('carries the stored poster as its thumbnail', () => {
+    const rows = layerRows([{ id: 'm1', type: 'motion', name: null, poster: '/p/x/c/y/assets/a1' }], null);
+
+    expect(rows[0].thumb).toBe('/p/x/c/y/assets/a1');
+  });
+
+  it('has no thumbnail when nothing was stored', () => {
+    expect(layerRows(NODES, null)[1].thumb).toBeNull();
+  });
+
+  it('types a still frame apart from a video', () => {
+    expect(nodeIcon({ type: 'motion', still: true })).toBe(NodeIcon.Still);
+    expect(nodeIcon({ type: 'motion', still: false })).toBe(NodeIcon.Video);
+    expect(nodeIcon({ type: 'text' })).toBe('text');
   });
 });

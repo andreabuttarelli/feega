@@ -2948,3 +2948,6 @@ by path, never by an id that can repeat.
 
 ### A worktree dev server breaks with `reading 'call'` after a restart
 Signal: `@real` specs time out on a click ("element is not visible", "<span> intercepts pointer events"); the page logs `pageerror: Cannot read properties of undefined (reading 'call')`. Cause: `node_modules` symlinked to the main checkout shares `node_modules/.vite`; another worktree's server re-optimized the deps under yours. Move: start your server with its own `cacheDir` (a scratch vite config that spreads `vite.config.ts`), never `rm` the shared cache.
+
+### Canvas smooth in Chromium, choppy zoom in Safari
+Signal: WebKit zoom p5 ~10 fps while Chromium holds 60/60 and per-frame JS stays under 5 ms. WebKit re-rasterizes whatever changes scale each frame: an SVG `<pattern>` background, every `<img>` inside the viewport. Move: measure in Playwright `webkit` with a rAF probe (`canvas-frame-budget.spec.ts`), bisect by injecting `display:none`/`visibility:hidden` CSS per suspect; draw the grid on a 2D canvas and set `will-change: transform` on the viewport only during the gesture. The bisection must use real tile sizes: an undersized harness hid the image cost.

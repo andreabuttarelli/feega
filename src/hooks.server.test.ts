@@ -253,14 +253,14 @@ describe('la pubblicazione social dietro il flag', () => {
 		await expect(hit('/api/v1/health/accounts/tick', '/api/v1/health/accounts/tick')).rejects.toMatchObject({ status: 404 });
 	});
 
-	it('con il flag spento la tela rifiuta di creare un post', async () => {
+	it('con il flag spento lo studio rifiuta il calendario', async () => {
 		publishingFlag = 'off';
-		await expect(hit('/p/[projectId]/c/[canvasId]', '/p/p1/c/c1?/create_post')).rejects.toMatchObject({ status: 404 });
+		await expect(hit('/app/studio/[batchId]', '/app/studio/b1?/calendar')).rejects.toMatchObject({ status: 404 });
 	});
 
 	it('con il flag acceso tutto passa come prima', async () => {
 		publishingFlag = 'on';
 		expect((await hit('/api/v1/health/accounts/tick', '/api/v1/health/accounts/tick')).status).toBe(200);
-		expect((await hit('/p/[projectId]/c/[canvasId]', '/p/p1/c/c1?/create_post')).status).toBe(200);
+		expect((await hit('/app/studio/[batchId]', '/app/studio/b1?/calendar')).status).toBe(200);
 	});
 });

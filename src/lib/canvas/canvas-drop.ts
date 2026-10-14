@@ -14,21 +14,6 @@ export function pointOf(event: MouseEvent | TouchEvent): PointerPoint {
   return { x: mouse.clientX, y: mouse.clientY };
 }
 
-export type DayTarget = { calendarId: string; dayKey: string; element: HTMLElement };
-
-export function dayUnderPointer(at: PointerPoint, draggedIds: string[]): DayTarget | null {
-  for (const element of document.elementsFromPoint(at.x, at.y)) {
-    const day = (element as HTMLElement).closest<HTMLElement>('[data-calendar-day]');
-    const calendar = day?.closest<HTMLElement>('[data-calendar-node]');
-    const calendarId = calendar?.dataset.calendarNode;
-    if (!day || !calendarId || draggedIds.includes(calendarId)) {
-      continue;
-    }
-    return { calendarId, dayKey: day.dataset.calendarDay ?? '', element: day };
-  }
-  return null;
-}
-
 export type StageRect = { left: number; top: number; width: number; height: number };
 
 const unit = (value: number) => Math.min(1, Math.max(0, value));
