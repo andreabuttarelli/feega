@@ -41,19 +41,18 @@ test.describe('motion node on the canvas @real', () => {
   test('play in the node advances the frame without selecting or moving it', async ({ page, session }) => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const stage = page.getByTestId('motion-node-stage');
-    await stage.hover();
+    await expect(page.locator('hyperframes-player')).toHaveCount(0, { timeout: 15_000 });
     const play = page.getByRole('button', { name: 'Play', exact: true });
-    await expect(play).toBeVisible({ timeout: 15_000 });
-    await page.waitForTimeout(1500);
 
     const node = page.locator('.svelte-flow__node').filter({ has: stage });
     const before = await node.boundingBox();
-    const timecode = page.getByTestId('motion-node-timecode');
-    const start = await timecode.textContent();
     const still = await stage.screenshot();
     await shoot(page, 'paused');
 
     await play.click();
+    const timecode = page.getByTestId('motion-node-timecode');
+    await expect(timecode).toBeVisible({ timeout: 15_000 });
+    const start = await timecode.textContent();
     await expect(timecode).not.toHaveText(start ?? '', { timeout: 5000 });
     await page.waitForTimeout(600);
     await shoot(page, 'playing');
@@ -64,6 +63,6 @@ test.describe('motion node on the canvas @real', () => {
     expect(await node.boundingBox()).toEqual(before);
 
     await page.getByRole('button', { name: 'Go to start', exact: true }).click();
-    await expect(timecode).toHaveText(start ?? '');
+    await expect(timecode).toHaveText(/^00:00:00 \//);
   });
 });
