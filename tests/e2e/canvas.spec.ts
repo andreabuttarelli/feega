@@ -97,6 +97,23 @@ test.describe('canvas @real', () => {
     await expect(prompt).toHaveValue('Mine and still typing');
   });
 
+  test('offline shows a red dot, back online it reconnects and catches up on what changed meanwhile', async ({ page, context, session, seedNode, admin }) => {
+    const edited = await seedNode({ type: 'doc', x: 0, y: 0, data: { content: 'Before offline', public: false } });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const dot = page.locator('.connection-dot');
+    await expect(dot).toHaveAttribute('data-link', 'connected', { timeout: 15_000 });
+
+    await context.setOffline(true);
+    await expect(dot).toHaveAttribute('data-link', 'offline');
+    const { error } = await admin.from('nodes').update({ data: { content: 'Written while away', public: false } }).eq('id', edited.id);
+    expect(error).toBeNull();
+
+    await context.setOffline(false);
+    await expect(dot).toHaveAttribute('data-link', 'connected', { timeout: 15_000 });
+    await expect(page.locator(`.svelte-flow__node[data-id="${edited.id}"]`)).toContainText('Written while away', { timeout: 10_000 });
+    await expect(page.getByText(/tempo reale|connection lost/i)).toHaveCount(0);
+  });
+
   test('a zero-credit org sees a readable message, not a generic save failure', async ({ page }) => {
     const session = await createE2eSession({ withCredits: false });
     try {

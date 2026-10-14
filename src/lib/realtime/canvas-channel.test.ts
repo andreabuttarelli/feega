@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { connectCanvas } from './canvas-channel';
+import { connectCanvas, type LinkEnvironment } from './canvas-channel';
+import { LinkState } from './connection-link';
 
 function socket() {
 	const listeners: Array<{ kind: string; filter: Record<string, string>; callback: (value?: any) => void }> = [];
@@ -22,13 +23,33 @@ function socket() {
 
 const peer = { userId: 'me', name: 'Me', avatar: null, path: '/p/proj/c/canvas', threadId: null };
 
-function open(connection: ReturnType<typeof socket>) {
+function environment() {
+	const retries: Array<() => void> = [];
+	let watchers: { online: () => void; offline: () => void; visible: () => void } | null = null;
+	let online = true;
+	const env: LinkEnvironment = {
+		online: () => online,
+		random: () => 1,
+		schedule: (run) => { retries.push(run); return () => { retries.splice(retries.indexOf(run), 1); }; },
+		watch: (on) => { watchers = on; return () => { watchers = null; }; }
+	};
+	return {
+		env,
+		retry: () => retries.splice(0).forEach((run) => run()),
+		goOffline: () => { online = false; watchers?.offline(); },
+		goOnline: () => { online = true; watchers?.online(); },
+		watching: () => watchers !== null
+	};
+}
+
+function open(connection: ReturnType<typeof socket>, env = environment()) {
 	const onChange = vi.fn();
+	const onLink = vi.fn();
 	const onPeers = vi.fn();
 	const onReconnect = vi.fn();
 	const onCanvasList = vi.fn();
-	const close = connectCanvas({ client: connection.client as unknown as SupabaseClient, canvasId: 'canvas', projectId: 'proj', peer, onChange, onPeers, onReconnect, onCanvasList });
-	return { close, onChange, onPeers, onReconnect, onCanvasList };
+	const close = connectCanvas({ client: connection.client as unknown as SupabaseClient, canvasId: 'canvas', projectId: 'proj', peer, onChange, onPeers, onReconnect, onCanvasList, onLink, environment: env.env });
+	return { close, onChange, onPeers, onReconnect, onCanvasList, onLink, env };
 }
 
 describe('canvas collaboration', () => {
@@ -105,19 +126,45 @@ describe('canvas collaboration', () => {
 	});
 
 
-	it('a channel that closed or timed out while the tab slept is opened again, and the rejoin refreshes', async () => {
-		for (const dead of ['CLOSED', 'TIMED_OUT']) {
+	it('a channel that errored, closed or timed out is opened again after a backoff, and the rejoin resyncs', async () => {
+		for (const dead of ['CHANNEL_ERROR', 'CLOSED', 'TIMED_OUT']) {
 			const connection = socket();
 			const callbacks = open(connection);
 			await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(1));
+			connection.status('SUBSCRIBED');
 
 			connection.status(dead);
 			expect(connection.client.removeChannel).toHaveBeenCalledWith(connection.channel);
-			await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(2));
+			expect(callbacks.onLink).toHaveBeenLastCalledWith(LinkState.Reconnecting);
+			expect(connection.channel.subscribe).toHaveBeenCalledTimes(1);
 
+			callbacks.env.retry();
+			await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(2));
 			connection.status('SUBSCRIBED');
-			expect(callbacks.onReconnect).toHaveBeenCalledTimes(1);
+			expect(callbacks.onReconnect).toHaveBeenCalledTimes(2);
+			expect(callbacks.onLink).toHaveBeenLastCalledWith(LinkState.Connected);
 			callbacks.close();
 		}
+	});
+
+	it('the browser going offline shows offline; back online it rejoins at once and resyncs', async () => {
+		const connection = socket();
+		const callbacks = open(connection);
+		await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(1));
+		connection.status('SUBSCRIBED');
+
+		callbacks.env.goOffline();
+		expect(callbacks.onLink).toHaveBeenLastCalledWith(LinkState.Offline);
+		connection.status('CLOSED');
+		expect(callbacks.onLink).toHaveBeenLastCalledWith(LinkState.Offline);
+
+		callbacks.env.goOnline();
+		expect(callbacks.onLink).toHaveBeenLastCalledWith(LinkState.Reconnecting);
+		await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(2));
+		connection.status('SUBSCRIBED');
+		expect(callbacks.onReconnect).toHaveBeenCalledTimes(2);
+
+		callbacks.close();
+		expect(callbacks.env.watching()).toBe(false);
 	});
 });

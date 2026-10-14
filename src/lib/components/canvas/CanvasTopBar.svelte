@@ -8,6 +8,8 @@
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import CanvasMenu from './CanvasMenu.svelte';
   import CanvasShare from './CanvasShare.svelte';
+  import ConnectionDot from './ConnectionDot.svelte';
+  import { canvasLink } from '$lib/realtime/canvas-link';
   import type { ShareState } from '$lib/canvas/shared-view';
   import { openSheet } from '$lib/canvas/sheet-nav';
   import { BILLING_PATH } from '$lib/billing-path';
@@ -330,6 +332,9 @@
 
   <div class="top-slot" data-top-slot></div>
   <div class="top-box right">
+    {#if $canvasLink}
+      <ConnectionDot state={$canvasLink} />
+    {/if}
     <a href={BILLING_PATH} class="credits">
       <CreditAmount amount={creditBalance} />
     </a>

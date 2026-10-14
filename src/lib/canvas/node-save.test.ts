@@ -5,7 +5,7 @@ describe('failureOf: every server answer has one reason', () => {
   it.each([
     [{ type: 'failure', status: 409, data: { conflict: true } }, SaveFailure.Conflict],
     [{ type: 'failure', status: 400, data: { error: 'contenuto non valido' } }, SaveFailure.Invalid],
-    [{ type: 'failure', status: 404, data: { error: 'nodo non trovato' } }, SaveFailure.Gone],
+    [{ type: 'failure', status: 404, data: { error: 'node not found' } }, SaveFailure.Gone],
     [{ type: 'failure', status: 402, data: { error: 'credits_exhausted', message: 'Out' } }, SaveFailure.Credits],
     [{ type: 'redirect', status: 303, location: '/login' }, SaveFailure.Auth],
     [{ type: 'error', status: 500, error: { message: 'boom' } }, SaveFailure.Server],
