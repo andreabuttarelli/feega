@@ -150,7 +150,24 @@ export function editLines(current: { lines: string; media: unknown }, i: number,
   return LINE_OPS[edit](lines, i, lineRows(current.lines), mediaItems(current.media), text);
 }
 
-const padded = (media: MediaItem[], n: number) => (media.length > n ? media : [...media, ...Array.from({ length: n + 1 - media.length }, () => EMPTY_SLOT)]);
+function withoutNthPhoto(line: string, nth: number): string {
+  const bits = bitsOf(line);
+  const at = bits.map((b, i) => (b === PHOTO_MARK ? i : -1)).filter((i) => i >= 0)[nth];
+  return bits.filter((_, i) => i !== at).join(' ');
+}
+
+export function removePhoto(current: { lines: string; media: unknown }, n: number): Lines {
+  const media = mediaItems(current.media);
+  const lines = current.lines.split(LINE_BREAK);
+  const owner = lineRows(current.lines).findIndex((r) => r.photos.includes(n));
+  if (owner < 0) {
+    return { lines: current.lines, media };
+  }
+  const nth = lineRows(current.lines)[owner].photos.indexOf(n);
+  return { lines: join(replaced(lines, owner, withoutNthPhoto(lines[owner], nth))), media: without(media, [n]) };
+}
+
+const padded =(media: MediaItem[], n: number) => (media.length > n ? media : [...media, ...Array.from({ length: n + 1 - media.length }, () => EMPTY_SLOT)]);
 
 export const photoAt = (media: unknown, n: number): MediaItem => mediaItems(media)[n] ?? EMPTY_SLOT;
 

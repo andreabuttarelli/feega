@@ -24,7 +24,7 @@ test.describe('the canvas around the inline editor on desktop @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
   test.setTimeout(90_000);
 
-  test('the canvas stays put, the add bar leaves and returns, the timeline is low', async ({ page, session, admin, seedNode }) => {
+  test('the canvas stays put, the bar turns into frame tools and back, the timeline is low', async ({ page, session, admin, seedNode }) => {
     const node = await seedNode({ type: 'motion', x: 80, y: 120, data: LANDSCAPE });
     const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
     expect(error).toBeNull();
@@ -32,7 +32,7 @@ test.describe('the canvas around the inline editor on desktop @real', () => {
 
     const transform = await viewportTransform(page);
     const addBar = page.getByTestId('add-bar');
-    await expect(addBar).toHaveAttribute('data-shown', 'shown');
+    await expect(addBar).toHaveAttribute('data-context', 'canvas');
     const barBox = (await addBar.boundingBox())!;
     expect(Math.abs(barBox.y + barBox.height - DESKTOP.height), 'the add bar sits flush on the bottom edge').toBeLessThanOrEqual(2);
     await shoot(page, 'desktop-closed');
@@ -44,15 +44,16 @@ test.describe('the canvas around the inline editor on desktop @real', () => {
     await shoot(page, 'desktop-open');
 
     expect(await viewportTransform(page), 'desktop does not zoom or pan the canvas on open').toBe(transform);
-    await expect(addBar, 'the add bar leaves while a frame is edited').toHaveAttribute('data-shown', 'away');
-    expect((await addBar.boundingBox())?.y ?? DESKTOP.height, 'out of view').toBeGreaterThanOrEqual(DESKTOP.height);
+    await expect(addBar, 'the bar turns into the frame tools while a frame is edited').toHaveAttribute('data-context', 'frame');
 
     const timeline = (await page.getByRole('region', { name: 'Timeline', exact: true }).boundingBox())!;
     expect(timeline.height, 'the timeline opens low, about three tracks').toBeLessThanOrEqual(TIMELINE_MAX_PX);
+    const frameBar = (await addBar.boundingBox())!;
+    expect(Math.abs(frameBar.y + frameBar.height - timeline.y), 'the bar rides on the timeline').toBeLessThanOrEqual(2);
 
     await page.getByTestId('inline-close').click();
     await expect(page.getByTestId('motion-editor')).toHaveCount(0);
-    await expect(addBar).toHaveAttribute('data-shown', 'shown');
+    await expect(addBar).toHaveAttribute('data-context', 'canvas');
     await page.waitForTimeout(SETTLE_MS);
     await expect(addBar).toBeInViewport();
     await shoot(page, 'desktop-closed-again');
