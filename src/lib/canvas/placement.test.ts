@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PLACEMENT_GAP, placeBeside, placeNear, type Rect } from './placement';
+import { PLACEMENT_GAP, placeBeside, placeNear, offCentre, type Rect } from './placement';
 
 const text: Rect = { x: 0, y: 0, w: 360, h: 220 };
 const size = { w: 360, h: 460 };
@@ -40,5 +40,18 @@ describe('a node added at the centre of the view lands on free canvas', () => {
     expect(overlaps(first, there)).toBe(false);
     expect(overlaps(second, there)).toBe(false);
     expect(overlaps(second, first)).toBe(false);
+  });
+});
+
+describe('a node pushed off the centre of the view is brought into sight', () => {
+  const centre = { x: 1000, y: 500 };
+
+  it('centred on the view, the view stays where it is', () => {
+    expect(offCentre(centre, placeNear(centre, size, []), size)).toBe(false);
+  });
+
+  it('moved aside by what was there, the view follows it', () => {
+    const there: Rect = { x: 800, y: 300, w: 400, h: 400 };
+    expect(offCentre(centre, placeNear(centre, size, [there]), size)).toBe(true);
   });
 });
