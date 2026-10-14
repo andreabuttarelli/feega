@@ -66,6 +66,7 @@
   import type { RunQuote } from '$lib/canvas/run-quote';
   import { GraphScope } from '$lib/canvas/run-graph';
   import { DropVerdict, pointOf, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { ReportChange, reportChange } from '$lib/canvas/selection-report';
 
   /**
    * Dove sta una tile e quanto è grande, in unità di tela — le stesse di `brand_canvas_items`.
@@ -787,9 +788,15 @@
     {/if}
     <CanvasSelectionBridge
       onchange={(next) => {
+        const change = reportChange(selection, next);
+        if (change === ReportChange.None) {
+          return;
+        }
         selection = next;
-        settleSettingsColumns();
-        onSelectionChange?.(next.ids);
+        if (change === ReportChange.Ids) {
+          settleSettingsColumns();
+          onSelectionChange?.(next.ids);
+        }
       }}
     />
     <CanvasImageTiers board={tierBoard} />

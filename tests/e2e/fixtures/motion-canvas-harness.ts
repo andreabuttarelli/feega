@@ -6,6 +6,7 @@ export type HarnessNode = { id: string; x: number; y: number; format: string; po
 declare global {
   interface Window {
     motionCanvas: { mount: (nodes: HarnessNode[]) => void };
+    selectionEmits?: number;
   }
 }
 
