@@ -34,6 +34,10 @@ import { pasteNodes } from '$lib/server/canvas/paste';
 import { canvasSnapshot } from '$lib/server/canvas/snapshot';
 import { canvasRevision } from '$lib/server/canvas/revision';
 import { listMemberships } from '$lib/server/repos/orgs';
+import { undoGesture } from '$lib/server/canvas/undo';
+import { parseUndoItem, type UndoItem } from '$lib/canvas/undo-plan';
+import { endOnboarding, runDemo } from '$lib/server/onboarding/first-run';
+import { OnboardingStatus } from '$lib/onboarding/coach';
 import { setCanvasShare } from '$lib/server/canvas/canvas-share';
 import { ShareState } from '$lib/canvas/shared-view';
 import { CANVAS_TEMPLATES } from '$lib/canvas/templates';
@@ -255,6 +259,12 @@ const pasteNodesInput = z
       .default([])
   })
   .strict();
+const undoGestureInput = z
+  .object({ canvasId: z.string(), items: z.array(z.unknown()).min(1).describe('the gesture items the canvas recorded, newest write first') })
+  .strict();
+const endOnboardingInput = z.object({ status: z.enum([OnboardingStatus.Dismissed, OnboardingStatus.Completed]) }).strict();
+const INVALID_GESTURE = { error: 'invalid_gesture' };
+const CHAIN_INCOMPLETE = { error: 'chain_incomplete' };
 const galleryItemInput = z.object({ itemId: z.string() }).strict();
 
 const MAX_VOICE_NAME = 100;
@@ -451,6 +461,40 @@ export const CANVAS_OPS = {
       const out = await pasteNodes(ctx.db, { ...input, orgId: ctx.orgId, projectId: ctx.projectId, actor: ctx.actor });
       return 'refused' in out ? { error: 'invalid_data', message: out.refused } : out;
     }
+  }),
+
+  undo_gesture: op({
+    access: Access.Write,
+    input: undoGestureInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const items = input.items.map(parseUndoItem);
+      if (items.some((item) => item === null)) {
+        return INVALID_GESTURE;
+      }
+      const result = await undoGesture(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, gesture: { items: items as UndoItem[] }, actor: ctx.actor });
+      return result.outcome === 'refused' ? { outcome: 'refused', reason: result.reason } : { outcome: 'undone', redo: result.redo };
+    }
+  }),
+
+  run_demo: op({
+    access: Access.Write,
+    input: canvasIdInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const nodes = await runDemo(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, actor: ctx.actor });
+      return nodes ? { nodes } : CHAIN_INCOMPLETE;
+    }
+  }),
+
+  end_onboarding: op({
+    access: Access.Write,
+    input: endOnboardingInput,
+    run: async (ctx, input) => ({ ended: await endOnboarding(ctx.db, ctx.userId, input.status) })
   }),
 
   connect_nodes: op({
