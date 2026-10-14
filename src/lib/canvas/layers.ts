@@ -1,6 +1,6 @@
 import { findClip, type MotionDoc } from '$lib/motion/doc';
 import { COMPONENTS, type ComponentId } from '$lib/motion/components';
-import { moveClip, moveTrack, renameTrack, type OpResult } from '$lib/motion/timeline';
+import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '$lib/motion/timeline';
 import { setClipFlags, setTrackFlags } from '$lib/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
 import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '$lib/motion/poster-parts';
@@ -161,6 +161,65 @@ function moveClipAlong(doc: MotionDoc, clipId: string, step: typeof ABOVE | type
   return next ? moveClip(doc, clipId, { from: found.clip.from, trackId: next.id }) : fail('no track of the same kind that way');
 }
 
+export enum Place {
+  Above = 'above',
+  Below = 'below',
+  Into = 'into'
+}
+
+type NewId = () => string;
+
+const newTrackId: NewId = () => crypto.randomUUID().slice(0, 8);
+
+function topTrack(doc: MotionDoc, id: string): { track: Track; index: number } | null {
+  const index = doc.tracks.findIndex((t) => t.id === id || t.clips.some((c) => c.id === id));
+  return index < 0 ? null : { track: doc.tracks[index], index };
+}
+
+const then = (result: OpResult, next: (doc: MotionDoc) => OpResult): OpResult => (result.ok ? next(result.doc) : result);
+
+function intoTrack(doc: MotionDoc, dragged: string, target: Track): OpResult {
+  const clip = findClip(doc, dragged)?.clip;
+  if (!clip || target.id === dragged) {
+    return fail('drop a clip into a group');
+  }
+  return moveClip(doc, dragged, { from: clip.from, trackId: target.id });
+}
+
+export function restack(doc: MotionDoc, dragged: string, target: string, place: Place, newId: NewId = newTrackId): OpResult {
+  const from = topTrack(doc, dragged);
+  const to = topTrack(doc, target);
+  if (!from || !to || dragged === target) {
+    return fail(`cannot move ${dragged} onto ${target}`);
+  }
+  if (from.track.kind !== to.track.kind) {
+    return fail('a layer moves only among layers of its kind');
+  }
+  if (place === Place.Into) {
+    return intoTrack(doc, dragged, to.track);
+  }
+
+  const wholeTrack = from.track.id === dragged || from.track.clips.length === 1;
+  const slot = to.index + (place === Place.Below ? 1 : 0);
+  if (wholeTrack) {
+    return moveTrack(doc, from.track.id, slot - (from.index < to.index ? 1 : 0));
+  }
+  const clip = findClip(doc, dragged)!.clip;
+  const id = newId();
+  return then(
+    then(addTrack(doc, from.track.kind as TrackKind, id), (d) => moveTrack(d, id, slot)),
+    (d) => moveClip(d, dragged, { from: clip.from, trackId: id })
+  );
+}
+
+const EDGE = 0.25;
+const HALF = 0.5;
+
+const GROUP_DROP = (at: number) => (at < EDGE ? Place.Above : at > 1 - EDGE ? Place.Below : Place.Into);
+const ROW_DROP = (at: number) => (at < HALF ? Place.Above : Place.Below);
+
+export const dropPlace = (kind: LayerKind, at: number): Place => (kind === LayerKind.Track ? GROUP_DROP : ROW_DROP)(at);
+
 const TRACK_EDIT: Record<LayerAction, (doc: MotionDoc, track: Track, index: number, name?: string) => OpResult> = {
   [LayerAction.Up]: (doc, track, index) => (index > 0 ? moveTrack(doc, track.id, index - 1) : fail('already the top track')),
   [LayerAction.Down]: (doc, track, index) => (index < doc.tracks.length - 1 ? moveTrack(doc, track.id, index + 1) : fail('already the bottom track')),
@@ -169,15 +228,24 @@ const TRACK_EDIT: Record<LayerAction, (doc: MotionDoc, track: Track, index: numb
   [LayerAction.Rename]: (doc, track, _index, name) => renameTrack(doc, track.id, (name ?? '').trim().slice(0, 60))
 };
 
-const CLIP_EDIT: Record<LayerAction, (doc: MotionDoc, clip: Clip) => OpResult> = {
-  [LayerAction.Up]: (doc, clip) => moveClipAlong(doc, clip.id, ABOVE),
-  [LayerAction.Down]: (doc, clip) => moveClipAlong(doc, clip.id, BELOW),
+function stepClip(doc: MotionDoc, clip: Clip, step: typeof ABOVE | typeof BELOW, newId: NewId): OpResult {
+  const along = moveClipAlong(doc, clip.id, step);
+  if (along.ok) {
+    return along;
+  }
+  const at = topTrack(doc, clip.id)!;
+  return restack(doc, clip.id, at.track.id, step === ABOVE ? Place.Above : Place.Below, newId);
+}
+
+const CLIP_EDIT: Record<LayerAction, (doc: MotionDoc, clip: Clip, newId: NewId) => OpResult> = {
+  [LayerAction.Up]: (doc, clip, newId) => stepClip(doc, clip, ABOVE, newId),
+  [LayerAction.Down]: (doc, clip, newId) => stepClip(doc, clip, BELOW, newId),
   [LayerAction.Hide]: (doc, clip) => setClipFlags(doc, clip.id, { hidden: !clip.hidden }),
   [LayerAction.Lock]: (doc, clip) => setClipFlags(doc, clip.id, { locked: !clip.locked }),
   [LayerAction.Rename]: () => fail('clips have no name of their own: rename the track')
 };
 
-export function layerEdit(doc: MotionDoc, id: string, action: LayerAction, name?: string): OpResult {
+export function layerEdit(doc: MotionDoc, id: string, action: LayerAction, name?: string, newId: NewId = newTrackId): OpResult {
   const index = doc.tracks.findIndex((t) => t.id === id);
   if (index >= 0) {
     return TRACK_EDIT[action](doc, doc.tracks[index], index, name);
@@ -186,22 +254,7 @@ export function layerEdit(doc: MotionDoc, id: string, action: LayerAction, name?
   if (!found || !doc.tracks.some((t) => t.id === found.track.id)) {
     return fail(`no layer ${id} at the top level of this video`);
   }
-  return CLIP_EDIT[action](doc, found.clip);
-}
-
-export function dropLayer(doc: MotionDoc, dragged: string, onto: string): OpResult {
-  const target = doc.tracks.findIndex((t) => t.id === onto);
-  if (target < 0) {
-    return fail('drop a layer on a track');
-  }
-  if (doc.tracks.some((t) => t.id === dragged)) {
-    return moveTrack(doc, dragged, target);
-  }
-  const found = findClip(doc, dragged);
-  if (!found || found.track.kind !== doc.tracks[target].kind) {
-    return fail('a clip moves only onto a track of its kind');
-  }
-  return moveClip(doc, dragged, { from: found.clip.from, trackId: onto });
+  return CLIP_EDIT[action](doc, found.clip, newId);
 }
 
 type KeyPress = { key: string; mod: boolean };
