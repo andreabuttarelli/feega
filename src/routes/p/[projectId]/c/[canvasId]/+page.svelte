@@ -83,6 +83,7 @@
   import { viewportOf } from '$lib/motion/editor-layout';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { frameHead } from '$lib/canvas/frame-outlines';
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
@@ -1949,8 +1950,9 @@
   $effect(() =>
     layersSource.publishCanvas({
       get nodes() {
-        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null }));
+        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data) }));
       },
+      outlinesUrl: `/p/${data.projectId}/c/${data.canvas.id}/frame-outlines`,
       get selected() {
         return selectedIds;
       },
