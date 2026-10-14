@@ -176,6 +176,18 @@ Free.
 (login url, email, session expiry; never the password). `forget_app_account` (`{ project_id }`) deletes it
 and its session. Free.
 
+## Canvas ops
+
+| MCP | CLI |
+|-----|-----|
+| `canvas_tool` | `feega canvas <projectId> <op> --input <json>` |
+
+`canvas_tool({ org, project_id, op, input })` runs one op of the project chat on that project,
+through the same code: `list_canvases`, `list_nodes`, `list_runs`, `create_node`, `update_node`,
+`move_node`, `connect_nodes`, `delete_node`, `run_node`, `preview_node_loop`, `run_node_loop`,
+`cancel_node_loop`. Reads are free; writes need a write key; `run_node` and `run_node_loop`
+spend credits. Bad input answers the schema issues; an unknown op answers the list.
+
 ## Node loops
 
 | MCP | CLI |
