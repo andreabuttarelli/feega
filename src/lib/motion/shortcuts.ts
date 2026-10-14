@@ -51,7 +51,8 @@ export enum Command {
   ToolText = 'tool-text',
   ToolRectangle = 'tool-rectangle',
   ToolEllipse = 'tool-ellipse',
-  ToolPen = 'tool-pen'
+  ToolPen = 'tool-pen',
+  ToggleEditMode = 'toggle-edit-mode'
 }
 
 export enum ShortcutGroup {
@@ -130,6 +131,7 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'r', shift: true, command: Command.ToolRectangle, label: '⇧R', does: 'Rectangle tool', group: ShortcutGroup.Draw },
   { key: 'o', shift: true, command: Command.ToolEllipse, label: '⇧O', does: 'Ellipse tool', group: ShortcutGroup.Draw },
   { key: 'p', shift: true, command: Command.ToolPen, label: '⇧P', does: 'Pen tool: click points, drag for curves', group: ShortcutGroup.Draw },
+  { key: 'e', command: Command.ToggleEditMode, label: 'E', does: 'Design / Motion: edit the base or key at the playhead', group: ShortcutGroup.View },
   { key: '?', shift: true, command: Command.Help, label: '?', does: 'Keyboard & gestures', group: ShortcutGroup.View }
 ];
 
