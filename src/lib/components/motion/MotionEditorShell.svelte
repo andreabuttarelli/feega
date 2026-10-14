@@ -855,6 +855,11 @@
       frameBar.timelinePx = timelineHidden ? 0 : timelineShownPx;
     }
   });
+  $effect(() => {
+    if (rules.tools === ToolsPlace.CanvasBar) {
+      frameBar.sidePx = docked && sideOpen ? sideWidth(layout.sidePx, width) : 0;
+    }
+  });
 
   const FRAME_ACTS: Record<FrameAction, () => void> = { [FrameAction.Image]: () => add('Image'), [FrameAction.Library]: () => (templating = true) };
 

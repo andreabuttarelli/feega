@@ -5,7 +5,7 @@
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
-  import { BAR_SLOTS, BarContext, BarSlot, barKeys, barLift } from '$lib/canvas/bottom-bar';
+  import { BAR_SLOTS, BarContext, BarSlot, barKeys, barLift, barShift } from '$lib/canvas/bottom-bar';
   import { KEY_REGION_ATTR } from '$lib/canvas/key-region.svelte';
   import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -194,7 +194,7 @@
   </span>
 {/snippet}
 
-<div class="add-bar" data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, frameBar.timelinePx)}px`}>
+<div class="add-bar" data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, frameBar.timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
   {#key context}
     <div class="group" data-testid={`bar-${context}`}>
       {#each BAR_SLOTS[context] as s (s)}{@render SLOT[s]()}{/each}
@@ -238,9 +238,9 @@
     position: absolute;
     z-index: 61;
     bottom: var(--lift, 0px);
-    left: 50%;
+    left: calc(50% - var(--shift, 0px));
     transform: translateX(-50%);
-    transition: bottom var(--chrome-move) var(--ease-expo);
+    transition: bottom var(--chrome-move) var(--ease-expo), left var(--chrome-move) var(--ease-expo);
     display: flex;
     align-items: center;
     gap: 2px;
