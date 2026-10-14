@@ -388,9 +388,31 @@ function extractCodeQueries() {
 // ─────────────────────────────────────────────────────────────────────────────
 // Lettura delle migration: cosa ognuna introduce (e cosa una successiva ha tolto).
 // ─────────────────────────────────────────────────────────────────────────────
+const MIGRATION_DIRS = ['supabase/migrations', 'supabase/canvas-migrations'];
+const TIMESTAMP_DIGITS = 14;
+const DAY_DIGITS = 8;
+
+const migrationOrder = (f) => {
+	const stamp = /^\d+/.exec(f)?.[0] ?? '';
+	const padded = stamp.length === DAY_DIGITS ? stamp.padEnd(TIMESTAMP_DIGITS, '0') : stamp;
+	return `${padded}_${f}`;
+};
+
+function listMigrations() {
+	const all = MIGRATION_DIRS.flatMap((d) =>
+		readdirSync(join(ROOT, d))
+			.filter((f) => f.endsWith('.sql'))
+			.map((f) => ({ f, path: join(ROOT, d, f), rel: `${d}/${f}` }))
+	);
+	return all.sort((a, b) => migrationOrder(a.f).localeCompare(migrationOrder(b.f)));
+}
+
+const KNOWN = JSON.parse(readFileSync(join(ROOT, 'scripts/schema-drift-known.json'), 'utf8'));
+
 function readMigrations() {
-	const dir = join(ROOT, 'supabase/migrations');
-	const files = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort();
+	const ordered = listMigrations();
+	const files = ordered.map((m) => m.f);
+	const pathOf = new Map(ordered.map((m) => [m.f, m]));
 	const introduced = new Map(); // "table.col" | "table" -> migration file
 	const dropped = new Set();
 	const checks = new Map(); // "table.col" -> { values:Set, file }
@@ -398,7 +420,7 @@ function readMigrations() {
 	const widenings = [];
 
 	for (const f of files) {
-		const raw = readFileSync(join(dir, f), 'utf8');
+		const raw = readFileSync(pathOf.get(f).path, 'utf8');
 		const sql = stripSql(raw).toLowerCase();
 		let touched = false;
 
@@ -487,7 +509,7 @@ function readMigrations() {
 		introduced.delete(k);
 		if (!k.includes('.')) for (const j of [...introduced.keys()]) if (j.startsWith(`${k}.`)) introduced.delete(j);
 	}
-	return { files, introduced, checks, constraintOnly, widenings };
+	return { files, introduced, checks, constraintOnly, widenings, relOf: (f) => pathOf.get(f)?.rel ?? f };
 }
 
 /** Il testo dentro la parentesi che si apre in s[i]. */
@@ -566,7 +588,7 @@ async function main() {
 	}
 
 	const { probes, literals, unverifiable } = extractCodeQueries();
-	const { files: migFiles, introduced, checks, constraintOnly, widenings } = readMigrations();
+	const { files: migFiles, introduced, checks, constraintOnly, widenings, relOf } = readMigrations();
 
 	// A + B insieme: un solo insieme di nomi da sondare.
 	const wanted = new Map(); // "table::expr" -> { table, expr, sites:[] , fromMigration }
@@ -657,11 +679,29 @@ async function main() {
 		badValues.push({ ...l, allowed: [...c.values], from: c.file });
 	}
 
+	const retired = (mig) => mig != null && mig in KNOWN.retiredMigrations;
+	const knownDrift = [];
+	const isNews = (name, mig, sites) => {
+		if (KNOWN.knownCodeDrift[name]) {
+			knownDrift.push({ name, reason: KNOWN.knownCodeDrift[name] });
+			return false;
+		}
+		return !(retired(mig) && !sites.length);
+	};
+	for (const [t, v] of [...badTables]) {
+		if (!isNews(t, v.migration, v.sites)) badTables.delete(t);
+	}
+	const badColsLive = badColsReal.filter((c) => isNews(`${c.table}.${c.expr}`, c.migration, c.sites));
+	badColsReal.splice(0, badColsReal.length, ...badColsLive);
+	for (const [f] of [...unapplied]) {
+		if (retired(f)) unapplied.delete(f);
+	}
+
 	const codeOnly = badColsReal.filter((c) => !c.migration && c.sites.length);
 	const grave = badTables.size + badColsReal.length + badEmbeds.length + badValues.length;
 
 	if (JSON_OUT) {
-		console.log(JSON.stringify({ grave, badTables: [...badTables.keys()], badCols: badColsReal.map(short), badEmbeds: badEmbeds.map(short), unapplied: [...unapplied].map(([f, v]) => ({ file: f, names: [...v.names] })), badValues, unverifiable: unverifiable.length, reference: st.reference }, null, 2));
+		console.log(JSON.stringify({ grave, badTables: [...badTables.keys()], badCols: badColsReal.map(short), badEmbeds: badEmbeds.map(short), unapplied: [...unapplied].map(([f, v]) => ({ file: relOf(f), names: [...v.names] })), badValues, knownDrift: knownDrift.length, retiredMigrations: Object.keys(KNOWN.retiredMigrations).length, unverifiable: unverifiable.length, reference: st.reference }, null, 2));
 		process.exit(grave ? 1 : 0);
 	}
 
@@ -673,7 +713,7 @@ async function main() {
 	if (unapplied.size) {
 		console.log(`\nMIGRATION SCRITTE MA NON APPLICATE (${unapplied.size}) — le applica una persona, non questo script`);
 		for (const [file, v] of [...unapplied].sort()) {
-			console.log(`  supabase/migrations/${file}`);
+			console.log(`  ${relOf(file)}`);
 			console.log(`    assenti nel database: ${[...v.names].join(', ')}`);
 			for (const s of dedupeSites(v.sites).slice(0, 4)) console.log(`    usata da ${s}`);
 			if (v.sites.length > 4) console.log(`    …e altri ${dedupeSites(v.sites).length - 4} punti`);
@@ -687,7 +727,7 @@ async function main() {
 		for (const [t, v] of badTablesUsed) {
 			console.log(`  ${t}`);
 			for (const s of dedupeSites(v.sites).slice(0, 5)) console.log(`    ${s}`);
-			console.log(`    → ${v.migration ? `APPLICA supabase/migrations/${v.migration}` : 'CORREGGI IL CODICE (nessuna migration crea questa tabella)'}`);
+			console.log(`    → ${v.migration ? `APPLICA ${relOf(v.migration)}` : 'CORREGGI IL CODICE (nessuna migration crea questa tabella)'}`);
 		}
 	}
 
@@ -719,6 +759,11 @@ async function main() {
 			console.log(`    sintomo: la scrittura fallisce con 23514; se l'errore non è letto, l'utente riceve un successo finto`);
 			console.log(`    → CORREGGI IL CODICE, oppure allarga il check con una migration nuova`);
 		}
+	}
+
+	if (knownDrift.length) {
+		console.log(`\nNOTI, NON FATALI (${knownDrift.length}) — scripts/schema-drift-known.json; ${Object.keys(KNOWN.retiredMigrations).length} migration del vecchio prodotto ritirate`);
+		for (const k of knownDrift) console.log(`  ${k.name}   ${k.reason}`);
 	}
 
 	if (network.length)
