@@ -65,9 +65,11 @@
 
   h2 {
     margin: 0;
-    font-size: var(--ui-text-md);
-    font-weight: 500;
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-section);
+    font-weight: var(--ui-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--ui-tracking-caps);
+    color: var(--ui-text-tertiary);
   }
 
   .formats,
@@ -84,18 +86,18 @@
     height: 28px;
     padding: 0 12px;
     border: 0;
-    border-radius: 9999px;
+    border-radius: var(--ui-radius-full);
     background: transparent;
-    color: var(--ui-text-3);
+    color: var(--ui-text-tertiary);
     font: inherit;
-    font-size: var(--ui-text-xs);
+    font-size: var(--ui-type-caption);
     cursor: pointer;
   }
 
   .formats button.on,
   .kinds button.on {
-    background: var(--ui-field);
-    color: var(--ui-ink);
+    background: var(--ui-input);
+    color: var(--ui-text);
   }
 
   ul {
@@ -114,6 +116,10 @@
     scroll-snap-type: x proximity;
   }
 
+  .strip li :global(:is(.preview, video, img)) {
+    border-radius: var(--ui-radius-md);
+  }
+
   .strip li {
     scroll-snap-align: start;
     max-width: 280px;
@@ -127,14 +133,14 @@
 
   .name {
     margin-top: var(--ui-space-2);
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-type-label);
     font-weight: 500;
   }
 
   .meta {
     overflow: hidden;
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-tertiary);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -145,16 +151,16 @@
     margin-top: var(--ui-space-2);
     padding: 0 var(--ui-space-4);
     border: 0;
-    border-radius: 9999px;
-    background: var(--ui-field);
-    color: var(--ui-ink);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-text);
     font: inherit;
-    font-size: var(--ui-text-xs);
+    font-size: var(--ui-type-caption);
     cursor: pointer;
   }
 
   .use:hover:not(:disabled) {
-    background: var(--ui-hover);
+    background: var(--ui-wash);
   }
 
   .use:disabled {

@@ -1,6 +1,6 @@
 <script lang="ts">
   import Shuffle from '@lucide/svelte/icons/shuffle';
-  import PageTitle from '$lib/components/PageTitle.svelte';
+  import PageHeader from '$lib/components/app/PageHeader.svelte';
   import { TOOL_ICONS } from '$lib/components/app/tool-icons';
   import { toolEntries } from '$lib/tools-page';
 
@@ -16,7 +16,7 @@
 <svelte:head><title>Tools · feega</title></svelte:head>
 
 <div class="tools">
-  <PageTitle text="tools" />
+  <PageHeader title="tools" />
 
   <ul data-testid="tools-list">
     {#each entries as entry (entry.id)}
@@ -39,7 +39,7 @@
     gap: 48px;
     max-width: 720px;
     margin: 0 auto;
-    color: var(--ui-ink);
+    color: var(--ui-text);
   }
 
   ul {
@@ -56,17 +56,19 @@
     align-items: center;
     padding: var(--ui-space-3) var(--ui-space-2);
     margin: 0 calc(-1 * var(--ui-space-2));
+    border-radius: var(--ui-radius-md);
     color: inherit;
+    transition: background var(--ui-dur-fast) var(--ui-ease);
     text-decoration: none;
   }
 
   .tool:hover {
-    background: var(--ui-hover);
+    background: var(--ui-wash);
   }
 
   .tool:focus-visible {
     outline: none;
-    box-shadow: var(--ui-focus);
+    box-shadow: var(--ui-ring);
   }
 
   .icon {
@@ -75,24 +77,25 @@
     place-items: center;
     width: 40px;
     height: 40px;
-    border-radius: 9999px;
-    background: var(--ui-field);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
+    color: var(--ui-icon-ink);
   }
 
   .name {
-    font-size: var(--ui-text-md);
-    font-weight: 500;
+    font-size: var(--ui-type-body);
+    font-weight: var(--ui-weight-medium);
   }
 
   .badge {
     margin-left: var(--ui-space-2);
     font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-tertiary);
   }
 
   .description {
-    font-size: var(--ui-text-sm);
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-label);
+    color: var(--ui-text-tertiary);
   }
 </style>

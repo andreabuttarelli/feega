@@ -1,5 +1,5 @@
 <script lang="ts">
-  import PageTitle from '$lib/components/PageTitle.svelte';
+  import PageHeader from '$lib/components/app/PageHeader.svelte';
   import ComponentShelf from '$lib/components/app/ComponentShelf.svelte';
   import PosterShelf from '$lib/components/app/PosterShelf.svelte';
   import { GALLERY_PATH, byline, itemPath } from '$lib/gallery/model';
@@ -10,10 +10,7 @@
 <svelte:head><title>Templates · feega</title></svelte:head>
 
 <div class="templates">
-  <header>
-    <PageTitle text="templates" />
-    <p>each one opens a new canvas with the frame already in it.</p>
-  </header>
+  <PageHeader title="templates" lede="each one opens a new canvas with the frame already in it." />
 
   <ComponentShelf items={data.components} projectId={data.attachProjectId} />
 
@@ -49,19 +46,7 @@
     display: flex;
     flex-direction: column;
     gap: 64px;
-    color: var(--ui-ink);
-  }
-
-  header {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ui-space-3);
-  }
-
-  header p {
-    margin: 0;
-    font-size: var(--ui-text-md);
-    color: var(--ui-text-3);
+    color: var(--ui-text);
   }
 
   .shelf {
@@ -79,24 +64,26 @@
 
   h2 {
     margin: 0;
-    font-size: var(--ui-text-md);
-    font-weight: 500;
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-section);
+    font-weight: var(--ui-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--ui-tracking-caps);
+    color: var(--ui-text-tertiary);
   }
 
   .quiet {
     height: 32px;
     padding: 0 var(--ui-space-3);
-    border-radius: 9999px;
-    color: var(--ui-text-3);
-    font-size: var(--ui-text-sm);
+    border-radius: var(--ui-radius-sm);
+    color: var(--ui-text-tertiary);
+    font-size: var(--ui-type-label);
     line-height: 32px;
     text-decoration: none;
   }
 
   .quiet:hover {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
+    background: var(--ui-wash);
+    color: var(--ui-text);
   }
 
   ul {
@@ -118,7 +105,7 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    color: var(--ui-ink);
+    color: var(--ui-text);
     text-decoration: none;
   }
 
@@ -127,7 +114,8 @@
     aspect-ratio: 16 / 9;
     margin-bottom: var(--ui-space-2);
     overflow: hidden;
-    background: var(--ui-surface);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-sunken);
   }
 
   .poster img {
@@ -138,15 +126,15 @@
 
   .title {
     overflow: hidden;
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-type-label);
     font-weight: 500;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .meta {
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-tertiary);
   }
 
   @media (max-width: 640px) {
