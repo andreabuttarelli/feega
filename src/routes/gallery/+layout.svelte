@@ -25,8 +25,8 @@
 <style>
   .public {
     min-height: 100dvh;
-    background: var(--ui-bg);
-    color: var(--ui-ink);
+    background: var(--ui-panel);
+    color: var(--ui-text);
   }
 
   .bar {
@@ -35,7 +35,7 @@
     gap: var(--ui-space-4);
     height: var(--ui-bar-h);
     padding: 0 var(--ui-space-4);
-    font-size: var(--ui-text-md);
+    font-size: var(--ui-type-body);
   }
 
   .wordmark {
@@ -45,12 +45,12 @@
 
   .section,
   .link {
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
   }
 
   .link:hover,
   .section:hover {
-    color: var(--ui-ink);
+    color: var(--ui-text);
   }
 
   .spacer {

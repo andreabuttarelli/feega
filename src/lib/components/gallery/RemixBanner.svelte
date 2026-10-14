@@ -24,22 +24,23 @@
     align-items: center;
     gap: 6px;
     padding: 8px 12px;
-    background: var(--ui-surface);
-    border-bottom: 1px solid var(--ui-line);
-    color: var(--ui-ink-2);
+    background: var(--ui-panel-sunken);
+    border-bottom: 1px solid var(--ui-divider);
+    color: var(--ui-text-secondary);
     font-size: 12px;
+    border-radius: var(--ui-radius-md);
   }
 
   a {
-    color: var(--ui-ink);
+    color: var(--ui-text);
     text-decoration: underline;
   }
 
   .brand {
     padding: 2px 8px;
     border: 0;
-    background: var(--ui-ink);
-    color: var(--ui-bg);
+    background: var(--ui-text);
+    color: var(--ui-panel);
     font-size: 12px;
     font-weight: 600;
   }
@@ -48,6 +49,6 @@
     margin-left: auto;
     border: 0;
     background: transparent;
-    color: var(--ui-ink-3);
+    color: var(--ui-text-tertiary);
   }
 </style>

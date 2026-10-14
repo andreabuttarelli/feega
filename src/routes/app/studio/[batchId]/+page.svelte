@@ -228,7 +228,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--ui-space-4);
-    color: var(--ui-ink);
+    color: var(--ui-text);
   }
   header {
     display: flex;
@@ -245,8 +245,8 @@
     display: inline-flex;
     align-items: center;
     gap: var(--ui-space-1);
-    color: var(--ui-ink-2);
-    font-size: var(--ui-text-sm);
+    color: var(--ui-text-secondary);
+    font-size: var(--ui-type-label);
   }
   .quiet {
     margin-left: auto;
@@ -260,9 +260,10 @@
     align-items: flex-start;
     gap: var(--ui-space-2);
     padding: var(--ui-space-4);
-    border: 1px solid var(--ui-line);
-    background: var(--ui-surface);
-    font-size: var(--ui-text-md);
+    border: 1px solid var(--ui-divider);
+    background: var(--ui-panel-sunken);
+    font-size: var(--ui-type-body);
+    border-radius: var(--ui-radius-md);
   }
   .unmade {
     border-color: var(--ui-danger);
@@ -270,21 +271,22 @@
   section p,
   .hint {
     margin: 0;
-    font-size: var(--ui-text-md);
+    font-size: var(--ui-type-body);
   }
   .hint {
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
   }
   .bar {
     width: 100%;
     height: 6px;
-    background: var(--ui-line);
+    background: var(--ui-divider);
   }
   .bar span {
     display: block;
     height: 100%;
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     transition: width 0.4s ease;
+    border-radius: var(--ui-radius-md);
   }
   .grid {
     display: grid;
@@ -300,8 +302,9 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--ui-line-strong);
-    background: var(--ui-bg);
+    border: 1px solid var(--ui-divider-strong);
+    background: var(--ui-panel);
+    border-radius: var(--ui-radius-md);
   }
   .cell.picked {
     border-color: var(--ui-accent);
@@ -327,9 +330,10 @@
   .slot {
     display: grid;
     place-items: center;
-    background: var(--ui-surface);
-    color: var(--ui-ink-3);
-    font-size: var(--ui-text-sm);
+    background: var(--ui-panel-sunken);
+    color: var(--ui-text-tertiary);
+    font-size: var(--ui-type-label);
+    border-radius: var(--ui-radius-md);
   }
   .making {
     animation: pulse 1.2s ease-in-out infinite;
@@ -347,12 +351,13 @@
     place-items: center;
     width: 28px;
     height: 28px;
-    border: 1px solid var(--ui-line-strong);
-    background: var(--ui-bg);
+    border: 1px solid var(--ui-divider-strong);
+    background: var(--ui-panel);
     color: transparent;
+    border-radius: var(--ui-radius-md);
   }
   .tick.on {
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     border-color: var(--ui-accent);
     color: var(--ui-accent-ink);
   }
@@ -362,8 +367,8 @@
     justify-content: space-between;
     gap: var(--ui-space-1);
     padding: var(--ui-space-1) var(--ui-space-2);
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-2);
+    font-size: var(--ui-type-label);
+    color: var(--ui-text-secondary);
   }
   figcaption > span:first-child {
     min-width: 0;
@@ -382,12 +387,12 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
     cursor: pointer;
   }
   .icon:hover {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
+    background: var(--ui-wash);
+    color: var(--ui-text);
   }
   button,
   .button,
@@ -395,11 +400,12 @@
   input {
     min-height: 36px;
     padding: 0 var(--ui-space-3);
-    border: 1px solid var(--ui-line-strong);
-    background: var(--ui-bg);
-    color: var(--ui-ink);
-    font-size: var(--ui-text-md);
+    border: 1px solid var(--ui-divider-strong);
+    background: var(--ui-panel);
+    color: var(--ui-text);
+    font-size: var(--ui-type-body);
     font-family: inherit;
+    border-radius: var(--ui-radius-sm);
   }
   button,
   .button {
@@ -411,9 +417,10 @@
     cursor: pointer;
   }
   .primary {
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     border-color: var(--ui-accent);
     color: var(--ui-accent-ink);
+    border-radius: var(--ui-radius-sm);
   }
   button:disabled,
   .button.disabled {
@@ -426,7 +433,7 @@
     padding: 0;
     border: 0;
     background: none;
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
     font-weight: 400;
     text-decoration: underline;
   }
@@ -435,11 +442,11 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--ui-space-2);
-    font-size: var(--ui-text-md);
+    font-size: var(--ui-type-body);
   }
   .muted {
-    color: var(--ui-ink-3);
-    font-size: var(--ui-text-sm);
+    color: var(--ui-text-tertiary);
+    font-size: var(--ui-type-label);
   }
   .actions {
     position: fixed;
@@ -453,11 +460,11 @@
     justify-content: center;
     gap: var(--ui-space-2) var(--ui-space-4);
     padding: var(--ui-space-3) var(--ui-space-4);
-    border-top: 1px solid var(--ui-line);
-    background: var(--ui-bg);
+    border-top: 1px solid var(--ui-divider);
+    background: var(--ui-panel);
   }
   .count {
-    font-size: var(--ui-text-md);
+    font-size: var(--ui-type-body);
     font-weight: 600;
   }
   .downloads {
@@ -465,7 +472,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--ui-space-1);
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
   }
   .calendar form {
     display: flex;
@@ -477,13 +484,13 @@
     display: flex;
     flex-direction: column;
     gap: var(--ui-space-1);
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-2);
+    font-size: var(--ui-type-label);
+    color: var(--ui-text-secondary);
   }
   .error {
     margin: 0;
     color: var(--ui-danger);
-    font-size: var(--ui-text-md);
+    font-size: var(--ui-type-body);
   }
   .compare {
     position: fixed;
@@ -491,7 +498,7 @@
     z-index: 20;
     display: flex;
     flex-direction: column;
-    background: var(--ui-bg);
+    background: var(--ui-panel);
   }
   .compare-bar {
     display: flex;
@@ -499,7 +506,7 @@
     justify-content: space-between;
     gap: var(--ui-space-2);
     padding: var(--ui-space-2) var(--ui-space-4);
-    font-size: var(--ui-text-md);
+    font-size: var(--ui-type-body);
   }
   .pair {
     flex: 1;
@@ -521,11 +528,12 @@
     display: flex;
     flex-direction: column;
     gap: var(--ui-space-1);
-    background: var(--ui-surface);
+    background: var(--ui-panel-sunken);
+    border-radius: var(--ui-radius-md);
   }
   .pair figcaption {
     font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
+    font-size: var(--ui-type-caption);
     text-transform: uppercase;
   }
   .pair img,

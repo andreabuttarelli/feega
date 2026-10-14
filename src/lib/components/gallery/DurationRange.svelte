@@ -42,8 +42,8 @@
     display: inline-flex;
     align-items: center;
     gap: var(--ui-space-3);
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-3);
+    font-size: var(--ui-type-label);
+    color: var(--ui-text-tertiary);
   }
 
   .track {
@@ -63,11 +63,11 @@
   .rail {
     left: 0;
     right: 0;
-    background: var(--ui-line-strong);
+    background: var(--ui-divider-strong);
   }
 
   .fill {
-    background: var(--ui-ink);
+    background: var(--ui-text);
   }
 
   input {
@@ -85,7 +85,7 @@
     width: 12px;
     height: 12px;
     border: 0;
-    background: var(--ui-ink);
+    background: var(--ui-text);
     pointer-events: auto;
     cursor: grab;
     -webkit-appearance: none;
@@ -97,7 +97,7 @@
     height: 12px;
     border: 0;
     border-radius: 0;
-    background: var(--ui-ink);
+    background: var(--ui-text);
     pointer-events: auto;
     cursor: grab;
   }
@@ -112,12 +112,12 @@
   }
 
   input:focus-visible::-webkit-slider-thumb {
-    box-shadow: var(--ui-focus);
+    box-shadow: var(--ui-ring);
   }
 
   .value {
     min-width: 52px;
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
     font-variant-numeric: tabular-nums;
   }
 
