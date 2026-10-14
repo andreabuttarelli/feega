@@ -1,10 +1,11 @@
 import { z } from 'zod';
 import { formatOf, type MotionDoc } from '$lib/motion/doc';
 import type { Db } from '$lib/server/db/client';
-import { createNode, deleteNode, findNode, listConnections, resizeNode } from '$lib/server/repos/canvas';
+import { createNode, deleteNode, findNode, listConnections } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
-import { frameNodeOf, motionNodeSize } from '$lib/canvas/motion-node';
+import { motionNodeSize } from '$lib/canvas/motion-node';
+import { frameShape } from './start';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
 import { saveMotionDoc } from './editor';
@@ -304,9 +305,7 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor; project
     },
     write: (nodeId, expectedVersion, doc, summary) => saveMotionDoc(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
     create: async (at, doc) => {
-      const shaped = frameNodeOf(doc);
-      const node = await createNode(db, { orgId, projectId: at.projectId, canvasId: at.canvasId, type: 'motion', x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, data: shaped.data, actor });
-      await resizeNode(db, { orgId, nodeId: node.id, width: shaped.w, height: shaped.h });
+      const node = await createNode(db, { orgId, projectId: at.projectId, canvasId: at.canvasId, type: 'motion', x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...frameShape(doc), actor });
       await saveMotionDoc(db, { orgId, nodeId: node.id, expectedVersion: 0, doc, actor, summary: SUMMARY.movedIn });
       return node.id;
     },

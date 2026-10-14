@@ -79,12 +79,12 @@
   import { carryEdits, insertTemplate, isLockedComp, type Inserted, type Instance, type TemplateEntry } from '$lib/motion/template/library';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
-  import { catalogue, starterDoc, starterFormatOf, type StarterFormat } from '$lib/motion/template/catalogue';
+  import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
-  import { findClip, type MotionDoc } from '$lib/motion/doc';
+  import { findClip, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import {
     ClipEdge,
     Direction,
@@ -884,7 +884,7 @@
     selection = [id];
   }
 
-  function componentDraft(id: string, format: StarterFormat): Instance | null {
+  function componentDraft(id: string, format: MotionFormat): Instance | null {
     const entry = templates.find((t) => t.id === id);
     const made = entry ? starterDoc(entry, format, newId) : null;
     return made?.ok ? { doc: made.doc, clipId: made.clipId } : null;

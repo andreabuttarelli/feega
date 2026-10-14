@@ -1,9 +1,9 @@
 <script lang="ts">
   import type { AssetKind } from '$lib/motion/components';
-  import { FORMATS } from '$lib/motion/doc';
+  import { FORMATS, type MotionFormat } from '$lib/motion/doc';
   import { Action } from '$lib/motion/actions';
   import { interactiveOf } from '$lib/motion/interactive/settings';
-  import { ADD_TARGET, AddTarget, Edits, STARTER_FORMATS, draftToAdd, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
+  import { ADD_TARGET, AddTarget, Edits, FORMATS_OF_MODE, draftToAdd, libraryFormat, type CatalogueItem } from '$lib/motion/template/catalogue';
   import { carryEdits, keyFieldsOf, setTemplateValues, templateFields, type Instance, type TemplateFieldValue } from '$lib/motion/template/library';
   import { FieldLayout, splitFields } from '$lib/motion/template/key-fields';
   import ComponentPreview from './ComponentPreview.svelte';
@@ -24,8 +24,8 @@
     onclose
   }: {
     item: CatalogueItem;
-    format: StarterFormat;
-    draftOf: (id: string, format: StarterFormat) => Instance | null;
+    format: MotionFormat;
+    draftOf: (id: string, format: MotionFormat) => Instance | null;
     compose: ((doc: Instance['doc']) => string) | null;
     assets: Asset[];
     target?: AddTarget;
@@ -35,8 +35,9 @@
 
   const LANDSCAPE = 16 / 9;
 
-  let format = $state<StarterFormat>(initial);
-  let draft = $state<Instance | null>(draftOf(item.id, initial));
+  const opened = libraryFormat(item, initial);
+  let format = $state<MotionFormat>(opened);
+  let draft = $state<Instance | null>(draftOf(item.id, format));
   let touched = $state(false);
   let sounds = $state(true);
   let playing = $state(true);
@@ -57,7 +58,7 @@
     }
   }
 
-  function reformat(next: StarterFormat) {
+  function reformat(next: MotionFormat) {
     const fresh = draftOf(item.id, next);
     if (!fresh || !draft) {
       return;
@@ -83,7 +84,7 @@
   </div>
 
   <div class="formats" role="radiogroup" aria-label="Preview format">
-    {#each STARTER_FORMATS as f (f)}
+    {#each FORMATS_OF_MODE[item.mode] as f (f)}
       <button type="button" role="radio" aria-checked={format === f} class:on={format === f} data-format={FORMATS[f].label} onclick={() => reformat(f)}>{FORMATS[f].label}</button>
     {/each}
   </div>
@@ -115,7 +116,7 @@
     {#if ADD_TARGET[target].sounds}
       <label class="sounds"><input type="checkbox" bind:checked={sounds} data-testid="add-sounds" /> Add sounds</label>
     {/if}
-    <button type="button" class="primary" data-testid="insert-component" onclick={() => onadd(sounds, draftToAdd(draft, touched ? Edits.Some : Edits.None, format, initial))}>{ADD_TARGET[target].label}</button>
+    <button type="button" class="primary" data-testid="insert-component" onclick={() => onadd(sounds, draftToAdd(draft, touched ? Edits.Some : Edits.None, format, opened))}>{ADD_TARGET[target].label}</button>
   </footer>
 </aside>
 

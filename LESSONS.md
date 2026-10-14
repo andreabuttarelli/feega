@@ -2945,3 +2945,6 @@ Signal: a keyed `{#each}` shows the top rows and nothing below, no error on scre
 the network response. Cause: `each_key_duplicate` in the console (a composition reused by two
 clips repeats ids). Move: listen to `pageerror` in Playwright on a canvas with real docs; key rows
 by path, never by an id that can repeat.
+
+### A worktree dev server breaks with `reading 'call'` after a restart
+Signal: `@real` specs time out on a click ("element is not visible", "<span> intercepts pointer events"); the page logs `pageerror: Cannot read properties of undefined (reading 'call')`. Cause: `node_modules` symlinked to the main checkout shares `node_modules/.vite`; another worktree's server re-optimized the deps under yours. Move: start your server with its own `cacheDir` (a scratch vite config that spreads `vite.config.ts`), never `rm` the shared cache.
