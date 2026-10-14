@@ -15,8 +15,8 @@ vi.mock('$lib/server/repos/motion-revisions', () => ({ readHeads: (...a: unknown
 
 const { GET } = await import('./+server');
 
-const call = (canvasId: string, heads: string, user: unknown = { id: 'u-1' }) => {
-  const url = new URL(`https://feega.test/p/p-1/c/${canvasId}/frame-outlines?heads=${heads}`);
+const call = (canvasId: string, heads: string, user: unknown = { id: 'u-1' }, parts = '') => {
+  const url = new URL(`https://feega.test/p/p-1/c/${canvasId}/frame-outlines?heads=${heads}${parts ? `&parts=${encodeURIComponent(parts)}` : ''}`);
   const locals = { safeGetSession: async () => ({ user }), db: async () => ({}) };
   return GET({ locals, params: { projectId: 'p-1', canvasId }, url } as never);
 };
@@ -35,6 +35,18 @@ describe('frame outlines', () => {
     expect(read.mock.calls[0][1]).toEqual({ orgId: ORG, heads: [{ nodeId: 'm1', version: 4 }, { nodeId: 'm2', version: 7 }] });
     expect(body.m1.find((r: { id: string }) => r.id === 't1')).toMatchObject({ kind: LayerKind.Clip, nodeId: 'm1' });
     expect(body.m2).toBeUndefined();
+  });
+
+  it('lists the measured parts of a closed poster under their clip', async () => {
+    const body = await (await call('c-1', 'm1:4', undefined, JSON.stringify({ m1: { t1: ['lines:0'] } }))).json();
+
+    expect(body.m1.find((r: { id: string }) => r.id === 't1#lines:0')).toMatchObject({ kind: LayerKind.Part, nodeId: 'm1' });
+  });
+
+  it('ignores parts it cannot read', async () => {
+    const body = await (await call('c-1', 'm1:4', undefined, '{oops')).json();
+
+    expect(body.m1.some((r: { kind: string }) => r.kind === LayerKind.Part)).toBe(false);
   });
 
   it('refuses a stranger and a canvas that is not theirs', async () => {

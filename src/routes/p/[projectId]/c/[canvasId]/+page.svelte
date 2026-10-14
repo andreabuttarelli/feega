@@ -2086,6 +2086,7 @@
         return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data) }));
       },
       outlinesUrl: `/p/${data.projectId}/c/${data.canvas.id}/frame-outlines`,
+      previewUrl: (nodeId) => motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId }),
       get selected() {
         return selectedIds;
       },

@@ -34,6 +34,7 @@ type Parts = Record<string, readonly string[]>;
 
 export type LayerRow = {
   id: string;
+  key: string;
   kind: LayerKind;
   depth: number;
   label: string;
@@ -52,18 +53,22 @@ const TRACK_DEPTH = 1;
 
 const clipLabel = (clip: Clip) => (clip.component === CUSTOM_CLIP ? componentLabel(String(clip.props.name)) : (COMPONENTS[clip.component as ComponentId]?.label ?? clip.component));
 
-function trackRows(doc: MotionDoc, tracks: readonly Track[], nodeId: string, depth: number, nested: boolean, parts: Parts = {}): LayerRow[] {
+const KEY_SEP = '/';
+
+function trackRows(doc: MotionDoc, tracks: readonly Track[], nodeId: string, depth: number, nested: boolean, parts: Parts = {}, path = ''): LayerRow[] {
   return tracks.flatMap((track) => [
-    { id: track.id, kind: LayerKind.Track, depth, label: track.name || track.id, type: track.kind, nodeId, hidden: !!track.hidden, locked: !!track.locked, nested },
-    ...track.clips.flatMap((clip) => clipRows(doc, clip, nodeId, depth + 1, nested, parts))
+    { id: track.id, key: `${path}${track.id}`, kind: LayerKind.Track, depth, label: track.name || track.id, type: track.kind, nodeId, hidden: !!track.hidden, locked: !!track.locked, nested },
+    ...track.clips.flatMap((clip) => clipRows(doc, clip, nodeId, depth + 1, nested, parts, path))
   ]);
 }
 
-function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nested: boolean, parts: Parts): LayerRow[] {
+function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nested: boolean, parts: Parts, path: string): LayerRow[] {
   const comp = clip.component === 'Precomp' ? String((clip.props as { comp?: string }).comp ?? '') : '';
   const template = comp !== '' && isLockedComp(doc, comp);
+  const key = `${path}${clip.id}`;
   const row: LayerRow = {
     id: clip.id,
+    key,
     kind: template ? LayerKind.Group : LayerKind.Clip,
     depth,
     label: template ? (doc.comps[comp]?.name ?? clipLabel(clip)) : clipLabel(clip),
@@ -74,15 +79,15 @@ function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nes
     nested
   };
   const inside = comp && !template ? (doc.comps[comp]?.tracks ?? []) : [];
-  const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1));
-  return [row, ...own, ...trackRows(doc, inside, nodeId, depth + 1, true)];
+  const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1, key));
+  return [row, ...own, ...trackRows(doc, inside, nodeId, depth + 1, true, {}, `${key}${KEY_SEP}`)];
 }
 
-function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth: number): LayerRow {
-  return { id: `${clip.id}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(doc, clip, part), type: partIcon(doc, clip, part), nodeId, hidden: false, locked: false, nested: true };
+function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth: number, clipKey: string): LayerRow {
+  return { id: `${clip.id}${PART_SEP}${part}`, key: `${clipKey}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(doc, clip, part), type: partIcon(doc, clip, part), nodeId, hidden: false, locked: false, nested: true };
 }
 
-export const frameRows = (doc: MotionDoc, nodeId: string): LayerRow[] => trackRows(doc, doc.tracks, nodeId, TRACK_DEPTH, false);
+export const frameRows = (doc: MotionDoc, nodeId: string, parts: Parts = {}): LayerRow[] => trackRows(doc, doc.tracks, nodeId, TRACK_DEPTH, false, parts);
 
 export type FrameOutlines = Record<string, readonly LayerRow[]>;
 
@@ -93,10 +98,10 @@ function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlin
   return (outlines[nodeId] ?? []).map((row) => ({ ...row, nested: true }));
 }
 
-export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}): LayerRow[] {
+export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
-    const row: LayerRow = { id: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.type, nodeId: node.id, hidden: false, locked: false, nested: false };
-    return [row, ...childRows(node.id, open, outlines)];
+    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.type, nodeId: node.id, hidden: false, locked: false, nested: false };
+    return folded.has(node.id) ? [row] : [row, ...childRows(node.id, open, outlines)];
   });
 }
 
