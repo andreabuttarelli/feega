@@ -22,6 +22,7 @@ import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
+import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
 import { AXES, EDGES, alignSpace, distributeSpace, moveBy, propBoxes, type Axis, type Edge } from '$lib/motion/space';
@@ -882,6 +883,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Remove one or more clips. When the content then ends earlier, the video is fitted to it (fit_duration).',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
       execute: async (input) => apply(shortened(removeClips(session.doc, input.clip_ids)), `removed ${input.clip_ids.length} clip(s)`)
+    }),
+
+    split_clip: tool({
+      description: 'Split clips in two at a frame, like the editor Split: the first part ends at frame, the second starts there with its own id.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), frame: z.number().int().min(0) }),
+      execute: async (input) => apply(runClipOp(ClipOp.Split, { doc: session.doc, selection: input.clip_ids, frame: input.frame, parent: null, newId: deps.newId }), `split ${input.clip_ids.length} clip(s) at ${input.frame}`)
+    }),
+
+    duplicate_clip: tool({
+      description: 'Duplicate clips, like the editor Duplicate: each copy starts where its original ends, on the same track. Returns the copy ids.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
+      execute: async (input) => {
+        const done = runClipOp(ClipOp.Duplicate, { doc: session.doc, selection: input.clip_ids, frame: 0, parent: null, newId: deps.newId });
+        const applied = apply(done, `duplicated ${input.clip_ids.length} clip(s)`);
+        return done.ok && applied.ok ? { ...applied, clip_ids: done.selection } : applied;
+      }
     }),
 
     fit_duration: tool({
@@ -2423,6 +2440,17 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const saved = await deps.templates.save({ doc: session.doc, compId: input.comp ?? null, meta: { name: input.name, description: input.description ?? '' }, posterFrame: 0 });
         return saved.ok ? { ok: true, template_id: saved.entry.id } : saved;
+      }
+    }),
+
+    delete_template: tool({
+      description: 'Delete a team template this org saved (id from list_templates). Built-in templates cannot be deleted.',
+      inputSchema: z.object({ template_id: z.string() }),
+      execute: async (input) => {
+        if (!deps.templates) {
+          return { ok: false, error: 'the template library is not available here' };
+        }
+        return (await deps.templates.remove(input.template_id)) ? { ok: true } : { ok: false, error: 'not_removable' };
       }
     }),
 

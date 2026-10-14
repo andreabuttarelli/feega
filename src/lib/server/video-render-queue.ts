@@ -18,7 +18,6 @@ import {
 	type VideoPersistOpts
 } from '$lib/server/video';
 import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
-import { projectIdOfBrand } from '$lib/server/tenancy/brand-slug';
 
 /** Il nome del trasporto nei messaggi di resa: chi apre il registro deve sapere dove guardare. */
 const VIDEO_TRANSPORT = 'openrouter';
@@ -301,27 +300,6 @@ async function landClip(
 }
 
 /**
- * Dire a chi l'ha chiesto che la clip è arrivata: una push sul post, che è dove la card la mostra.
- */
-async function notifyThread(admin: SupabaseClient, row: VideoRenderRow, outcome: string) {
-	if (!row.thread_id || !row.brand_id) return;
-	try {
-		const projectId = await projectIdOfBrand(admin, row.brand_id);
-
-		const { sendPushToUser } = await import('$lib/server/web-push');
-		await sendPushToUser(admin, row.user_id, {
-			title: 'feega',
-			body: `Video: ${outcome}`,
-			url: projectId && row.post_id ? `/p/${projectId}/calendar?post=${row.post_id}` : '/',
-			tag: `video-render-${row.id}`,
-			skipIfFocused: true
-		});
-	} catch (e) {
-		console.error('[video-render] thread notify failed:', e);
-	}
-}
-
-/**
  * One pass: check every outstanding render once and finish whichever the provider has completed.
  *
  * No loop, no sleep, no per-render budget — a tick is a handful of HTTP calls, which is exactly
@@ -362,9 +340,6 @@ export async function reconcileVideoRenders(
 					.eq('id', raw.post_id)
 					.then(undefined, () => {});
 			}
-			// Told, like every other outcome. This is the slowest one to detect — up to an hour —
-			// so silence here is the longest a user can be left expecting a clip that is not coming.
-			await notifyThread(admin, raw, `it did not complete — ${why}`);
 			expired += 1;
 			continue;
 		}
@@ -410,7 +385,6 @@ export async function reconcileVideoRenders(
 						.eq('id', raw.post_id)
 						.then(undefined, () => {});
 				}
-				await notifyThread(admin, raw, `it failed (${outcome.error})`);
 				failed += 1;
 				continue;
 			}
@@ -435,13 +409,6 @@ export async function reconcileVideoRenders(
 				continue;
 			}
 			await settle(admin, raw, { status: 'done', media_url: outcome.url });
-			await notifyThread(
-				admin,
-				raw,
-				raw.post_id
-					? 'the clip is ready and attached to the post'
-					: 'the clip is ready and filed in the media library'
-			);
 			done += 1;
 		} catch (e) {
 			// Unknown failure: give the row back rather than burying it. The age check above is what

@@ -50,6 +50,7 @@ import {
   completeRun,
   failRun,
   runningRuns,
+  listNodeRuns,
   type NodeRun
 } from '$lib/server/repos/node-runs';
 import { planCombinations, loopSafety, type LoopCombine, type PlannedCombination, type LoopSafety } from '$lib/canvas/loop-plan';
@@ -629,4 +630,23 @@ export async function retryLoopCombination(db: Db, input: RetryComboInput): Prom
     status: 'failed'
   });
   return { combination: input.combination, outcome: 'failed', error: result.error };
+}
+
+export type RetryComboAsk = Omit<RetryComboInput, 'combination'> & { label: string; runId: string | null };
+
+type ComboTicket = { loop?: { outputListNodeId?: string; label?: string; values?: Record<string, string> } };
+
+export async function retryLoopCombo(db: Db, ask: RetryComboAsk): Promise<LoopComboOutcome> {
+  const runs = await listNodeRuns(db, { orgId: ask.orgId, nodeId: ask.nodeId });
+  const ticket = runs.find((run) => {
+    const loop = (run.params as ComboTicket).loop;
+    if (!loop || loop.outputListNodeId !== ask.outputListNodeId) {
+      return false;
+    }
+    return ask.runId ? run.id === ask.runId : loop.label === ask.label;
+  });
+  const values = (ticket?.params as ComboTicket | undefined)?.loop?.values ?? {};
+
+  const { label, runId: _runId, ...input } = ask;
+  return retryLoopCombination(db, { ...input, combination: { label, values } });
 }

@@ -1,0 +1,290 @@
+import { Command } from '$lib/motion/shortcuts';
+import { Tool, type ActionId } from '$lib/motion/actions';
+import { LayerAction } from '$lib/canvas/layers';
+import { CanvasAction } from '$lib/canvas/canvas-list';
+import { ClipOp } from '$lib/motion/clip-ops';
+import { EmptyAction } from '$lib/canvas/empty-canvas';
+import type { SelectionActionId } from '$lib/canvas/selection-actions';
+import type { CanvasOpName } from '$lib/server/canvas/canvas-ops';
+
+export type Route = { canvas: CanvasOpName } | { motion: string } | { tool: string };
+
+export type Parity = { route: Route } | { uiOnly: string } | { gap: string };
+
+const canvas = (op: CanvasOpName): Parity => ({ route: { canvas: op } });
+const motion = (name: string): Parity => ({ route: { motion: name } });
+const tool = (name: string): Parity => ({ route: { tool: name } });
+const uiOnly = (reason: string): Parity => ({ uiOnly: reason });
+const gap = (reason: string): Parity => ({ gap: reason });
+
+const VIEW = uiOnly('view state (playhead, zoom, panels, selection): nothing is saved');
+const CLIPBOARD = uiOnly('browser clipboard; the paste lands through a saved tool');
+const ONBOARDING = uiOnly('first-run coach for a person');
+const NAVIGATION = uiOnly('navigation between screens');
+
+const VOICES = 'custom voices (ElevenLabs design/clone/library) have no API route yet';
+const POSTS = 'posts and calendar are being retired with the focus on motion';
+
+export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
+  new_canvas: canvas('create_canvas'),
+  rename_canvas: canvas('rename_canvas'),
+  delete_canvas: canvas('delete_canvas'),
+  rename_project: canvas('rename_project'),
+  audio_voices: tool('describe_node_types'),
+  voice_library: gap(VOICES),
+  voice_use_library: gap(VOICES),
+  voice_design: gap(VOICES),
+  voice_save: gap(VOICES),
+  voice_clone: gap(VOICES),
+  voice_delete: gap(VOICES),
+  estimate_text_cost: uiOnly('cost hint under the prompt; agents read credits from preview_run_graph and preview_node_loop'),
+  upload: gap('binary upload into a canvas node; agents can only attach files to ask_motion_agent or import_asset into a frame'),
+  snapshot: canvas('list_nodes'),
+  revision: uiOnly('realtime freshness poll of the open canvas'),
+  run: canvas('run_node'),
+  loop_plan: canvas('preview_node_loop'),
+  run_loop: canvas('run_node_loop'),
+  cancel_loop: canvas('cancel_node_loop'),
+  retry_loop_combo: canvas('retry_loop_combination'),
+  workflow_plan: canvas('preview_workflow'),
+  run_workflow: canvas('run_workflow'),
+  graph_plan: canvas('preview_run_graph'),
+  run_graph: canvas('run_graph'),
+  cancel_workflow: canvas('cancel_workflow'),
+  sync: canvas('sync_node'),
+  restore: canvas('show_run'),
+  create: canvas('create_node'),
+  move: canvas('move_node'),
+  resize: canvas('resize_node'),
+  write: canvas('update_node'),
+  apply_effects: tool('apply_effects'),
+  effects_pair: tool('make_effects_pair'),
+  batchWrite: canvas('update_node'),
+  share: canvas('share_doc'),
+  share_canvas: canvas('share_canvas'),
+  connect: canvas('connect_nodes'),
+  moveElement: canvas('move_frame_element'),
+  placeOutput: canvas('place_in_frame'),
+  disconnect: canvas('disconnect_nodes'),
+  set_edge_mode: canvas('set_edge_mode'),
+  remove: canvas('delete_node'),
+  duplicate: canvas('duplicate_nodes'),
+  paste: canvas('create_node'),
+  demo_run: ONBOARDING,
+  onboarding_end: ONBOARDING,
+  frame_template: canvas('add_frame_from_template'),
+  template: canvas('insert_template'),
+  undo: uiOnly('replays the browser gesture stack; an agent reverses its own write with the inverse op or restore_motion_revision'),
+  suggestNextStep: uiOnly('suggestion chips for a person'),
+  create_post: gap(POSTS),
+  calendar_posts: gap(POSTS),
+  plan_post: gap(POSTS),
+  schedule_post: gap(POSTS)
+};
+
+export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
+  save: tool('motion_tool'),
+  ops: tool('motion_tool'),
+  head: tool('get_motion_summary'),
+  revisions: tool('list_motion_revisions'),
+  restore: tool('restore_motion_revision'),
+  exported: tool('render_video'),
+  poster: uiOnly('thumbnail the browser captures after a save; export_image makes stills for agents'),
+  still: motion('export_image'),
+  uploadFont: motion('register_font'),
+  analyze: motion('analyze_audio'),
+  sound: tool('ask_motion_agent'),
+  render: gap('server (farm) render: render_video refuses mode "server" over the API'),
+  renderBatch: tool('ask_motion_agent'),
+  templateSounds: motion('add_template'),
+  saveTemplate: motion('save_template'),
+  publishGallery: tool('publish_to_gallery'),
+  withdrawGallery: canvas('withdraw_from_gallery'),
+  deleteTemplate: motion('delete_template'),
+  batchStatus: tool('get_render'),
+  cancelRender: canvas('cancel_render'),
+  renderStatus: tool('get_render')
+};
+
+export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
+  [Command.TogglePlay]: VIEW,
+  [Command.Play]: VIEW,
+  [Command.Pause]: VIEW,
+  [Command.Rewind]: VIEW,
+  [Command.GoStart]: VIEW,
+  [Command.GoEnd]: VIEW,
+  [Command.StepBack]: VIEW,
+  [Command.StepForward]: VIEW,
+  [Command.StepBackMore]: VIEW,
+  [Command.StepForwardMore]: VIEW,
+  [Command.PrevKeyframe]: VIEW,
+  [Command.NextKeyframe]: VIEW,
+  [Command.WorkIn]: motion('set_work_area'),
+  [Command.WorkOut]: motion('set_work_area'),
+  [Command.AddMarker]: motion('set_marker'),
+  [Command.Delete]: motion('remove_clip'),
+  [Command.Split]: motion('split_clip'),
+  [Command.Duplicate]: motion('duplicate_clip'),
+  [Command.Undo]: tool('restore_motion_revision'),
+  [Command.Redo]: tool('restore_motion_revision'),
+  [Command.Copy]: CLIPBOARD,
+  [Command.Paste]: motion('set_keyframes'),
+  [Command.SelectAll]: VIEW,
+  [Command.Deselect]: VIEW,
+  [Command.StartHere]: motion('set_timing'),
+  [Command.EndHere]: motion('set_timing'),
+  [Command.TrimIn]: motion('trim_clip'),
+  [Command.TrimOut]: motion('trim_clip'),
+  [Command.NudgeBack]: motion('set_timing'),
+  [Command.NudgeForward]: motion('set_timing'),
+  [Command.NudgeBackMore]: motion('set_timing'),
+  [Command.NudgeForwardMore]: motion('set_timing'),
+  [Command.RevealPosition]: VIEW,
+  [Command.RevealScale]: VIEW,
+  [Command.RevealRotation]: VIEW,
+  [Command.RevealOpacity]: VIEW,
+  [Command.RevealAnimated]: VIEW,
+  [Command.ZoomIn]: VIEW,
+  [Command.ZoomOut]: VIEW,
+  [Command.PreviewZoomIn]: VIEW,
+  [Command.PreviewZoomOut]: VIEW,
+  [Command.PreviewFit]: VIEW,
+  [Command.PreviewActual]: VIEW,
+  [Command.ToggleChat]: VIEW,
+  [Command.ToggleInspector]: VIEW,
+  [Command.ToggleTimeline]: VIEW,
+  [Command.Help]: VIEW,
+  [Command.Precompose]: motion('precompose'),
+  [Command.ToolSelect]: VIEW,
+  [Command.ToolText]: motion('add_clip'),
+  [Command.ToolRectangle]: motion('add_shape'),
+  [Command.ToolEllipse]: motion('add_shape'),
+  [Command.ToolPen]: motion('set_path'),
+  [Command.ToggleEditMode]: uiOnly('Design writes the base value (set_props, set_transform), Motion writes a keyframe (set_keyframes): the mode picks the tool, it is not saved'),
+  [Command.MoveLeft]: motion('set_transform'),
+  [Command.MoveRight]: motion('set_transform'),
+  [Command.MoveUp]: motion('set_transform'),
+  [Command.MoveDown]: motion('set_transform'),
+  [Command.MoveLeftMore]: motion('set_transform'),
+  [Command.MoveRightMore]: motion('set_transform'),
+  [Command.MoveUpMore]: motion('set_transform'),
+  [Command.MoveDownMore]: motion('set_transform'),
+  [Tool.Back]: NAVIGATION,
+  [Tool.Menu]: VIEW,
+  [Tool.More]: VIEW,
+  [Tool.Close]: VIEW,
+  [Tool.Attach]: tool('ask_motion_agent'),
+  [Tool.Snap]: VIEW,
+  [Tool.NullFromSelection]: motion('add_null'),
+  [Tool.ClearWorkArea]: motion('set_work_area'),
+  [Tool.CopyEase]: CLIPBOARD,
+  [Tool.PasteEase]: motion('set_ease_handles'),
+  [Tool.FitGraph]: VIEW,
+  [Tool.HideShy]: VIEW,
+  [Tool.HideTrack]: motion('set_visibility'),
+  [Tool.ShowTrack]: motion('set_visibility'),
+  [Tool.LockTrack]: motion('set_visibility'),
+  [Tool.UnlockTrack]: motion('set_visibility'),
+  [Tool.SoloTrack]: VIEW,
+  [Tool.ShyTrack]: VIEW,
+  [Tool.TrackUp]: motion('set_track'),
+  [Tool.TrackDown]: motion('set_track'),
+  [Tool.ParentWhip]: motion('set_parent'),
+  [Tool.HideLayer]: motion('set_visibility'),
+  [Tool.ShowLayer]: motion('set_visibility'),
+  [Tool.LockLayer]: motion('set_visibility'),
+  [Tool.UnlockLayer]: motion('set_visibility'),
+  [Tool.ItemUp]: motion('set_effect'),
+  [Tool.ItemDown]: motion('set_effect'),
+  [Tool.Remove]: motion('remove_effect'),
+  [Tool.Shuffle]: motion('set_text_animator'),
+  [Tool.InOrder]: motion('set_text_animator'),
+  [Tool.GraphMode]: VIEW,
+  [Tool.MarkBeats]: motion('mark_beats'),
+  [Tool.CutToBeat]: motion('cut_to_beat'),
+  [Tool.OpenComp]: NAVIGATION,
+  [Tool.ParentTo]: motion('set_parent'),
+  [Tool.SelectSeveral]: VIEW,
+  [Tool.ClipProperties]: VIEW
+};
+
+export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
+  duplicate: canvas('duplicate_nodes'),
+  'connect-new': canvas('connect_nodes'),
+  'connect-existing': canvas('connect_nodes'),
+  promote: gap(POSTS),
+  'run-workflow': canvas('run_workflow'),
+  'run-downstream': canvas('run_graph'),
+  'run-stale': canvas('run_graph'),
+  'copy-id': CLIPBOARD,
+  report: uiOnly('a person reports abuse to us; not an edit'),
+  delete: canvas('delete_node')
+};
+
+export const LAYER_PANEL: Record<LayerAction, Parity> = {
+  [LayerAction.Up]: motion('set_track'),
+  [LayerAction.Down]: motion('set_track'),
+  [LayerAction.Hide]: motion('set_visibility'),
+  [LayerAction.Lock]: motion('set_visibility'),
+  [LayerAction.Rename]: motion('set_track')
+};
+
+export const CANVAS_LIST: Record<CanvasAction, Parity> = {
+  [CanvasAction.New]: canvas('create_canvas'),
+  [CanvasAction.Rename]: canvas('rename_canvas'),
+  [CanvasAction.Delete]: canvas('delete_canvas')
+};
+
+export const CLIP_BUTTONS: Record<ClipOp, Parity> = {
+  [ClipOp.Split]: motion('split_clip'),
+  [ClipOp.Duplicate]: motion('duplicate_clip'),
+  [ClipOp.Delete]: motion('remove_clip'),
+  [ClipOp.Parent]: motion('set_parent')
+};
+
+export const EMPTY_CANVAS: Record<EmptyAction, Parity> = {
+  [EmptyAction.Chat]: uiOnly('opens the project chat'),
+  [EmptyAction.Frame]: canvas('create_node'),
+  [EmptyAction.Image]: canvas('create_node'),
+  [EmptyAction.Video]: canvas('create_node')
+};
+
+export const FRAME_CONTENT: Record<string, Parity> = {
+  'add text': motion('add_clip'),
+  'add shape': motion('add_shape'),
+  'move, resize, rotate an element': motion('set_transform'),
+  'edit text': motion('set_props'),
+  'fill, stroke, corner radius (also per corner)': motion('set_props'),
+  'font family and weight': motion('set_font'),
+  'pen path points and handles': motion('set_path'),
+  'align and distribute': motion('arrange_space'),
+  'reorder layers': motion('set_track'),
+  'poster line text, lines added or removed': motion('set_props'),
+  'poster photo replace, fit, focus': motion('set_props'),
+  'poster arrow shown, colour': motion('set_props'),
+  'insert photo into a poster': motion('add_clip'),
+  'still or video, format, duration, fps, background': motion('set_canvas'),
+  'add or move a keyframe': motion('set_keyframes'),
+  'keyframe ease': motion('set_ease_handles'),
+  'remove a keyframe': motion('remove_keyframes'),
+  'element to another frame or a new frame': canvas('move_frame_element'),
+  'generative output into a frame': canvas('place_in_frame'),
+  'connect a generative node to a frame': canvas('connect_nodes'),
+  'export PNG': motion('export_image'),
+  'export MP4': tool('render_video'),
+  'restore a revision': tool('restore_motion_revision'),
+  'insert a motion template': motion('add_template'),
+  'set template fields': motion('set_template_fields')
+};
+
+export const PARITY_TABLES = {
+  CANVAS_PAGE_ACTIONS,
+  FRAME_PAGE_ACTIONS,
+  EDITOR_ACTIONS,
+  SELECTION_TOOLBAR,
+  LAYER_PANEL,
+  CANVAS_LIST,
+  CLIP_BUTTONS,
+  EMPTY_CANVAS,
+  FRAME_CONTENT
+} as const;
