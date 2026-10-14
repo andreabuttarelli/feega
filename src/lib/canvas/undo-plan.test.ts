@@ -4,6 +4,7 @@ import {
   checkPrecondition,
   checkGesture,
   writesFrameAt,
+  parseUndoItem,
   type UndoItem,
   type Gesture,
   type CurrentNodeState,
@@ -232,5 +233,23 @@ describe('doc.revision: a frame doc written by a move', () => {
     expect(checkPrecondition(item, { node: { exists: true, version: 6, connectedBy: [] } })).toEqual({ outcome: 'stale', reason: 'node_changed_by_peer' });
     expect(checkPrecondition(item, { node: { exists: true, version: 5, connectedBy: [] } })).toEqual({ outcome: 'ok' });
     expect(checkPrecondition(item, { node: { exists: false } })).toEqual({ outcome: 'stale', reason: 'node_deleted_by_peer' });
+  });
+});
+
+describe('parseUndoItem: a gesture as the client sent it', () => {
+  it('keeps a known kind with the ids it needs', () => {
+    expect(parseUndoItem({ kind: 'edge.create', edgeId: EDGE, sourceNodeId: NODE, targetNodeId: OTHER_NODE })).toEqual({
+      kind: 'edge.create',
+      edgeId: EDGE,
+      sourceNodeId: NODE,
+      targetNodeId: OTHER_NODE
+    });
+    expect(parseUndoItem({ kind: 'node.update', nodeId: NODE, expectedVersion: 3 })).toEqual({ kind: 'node.update', nodeId: NODE, before: {}, after: {}, expectedVersion: 3 });
+  });
+
+  it('drops an unknown kind or a missing id', () => {
+    expect(parseUndoItem({ kind: 'node.explode', nodeId: NODE })).toBeNull();
+    expect(parseUndoItem({ kind: 'node.update', nodeId: NODE, expectedVersion: 1.5 })).toBeNull();
+    expect(parseUndoItem(null)).toBeNull();
   });
 });

@@ -57,7 +57,7 @@ import { OnboardingStatus } from '$lib/onboarding/coach';
 import { undoGesture } from '$lib/server/canvas/undo';
 import { writeNodesBatch, type BatchItem } from '$lib/server/canvas/batch-write';
 import { pasteNodes, type PastedEdge, type PastedNode } from '$lib/server/canvas/paste';
-import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
+import { parseUndoItem, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { canvasSnapshot, loadDownloaded, loadGenRuns } from '$lib/server/canvas/snapshot';
 import { listSourcesForNodes } from '$lib/server/repos/posts';
@@ -259,50 +259,6 @@ function coord(value: FormDataEntryValue | null): number | null {
   }
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
-}
-
-/**
- * UN `UndoItem` COSÌ COM'È ARRIVATO DAL CLIENT: nessuna validazione di forma oltre "ha un kind che
- * conosciamo e gli id/record che quel kind richiede". Il client l'ha costruito da quello che il
- * server gli aveva già restituito (`inverseOf` legge `before`/`after` di scritture già avvenute),
- * quindi qui non si rivalida `data` come farebbe `create` — è `checkGesture` a decidere se vale
- * ancora applicarlo, guardando lo stato fresco, non la forma del payload.
- */
-function parseUndoItem(raw: unknown): UndoItem | null {
-  if (!raw || typeof raw !== 'object') {
-    return null;
-  }
-  const item = raw as Record<string, unknown>;
-
-  if (item.kind === 'node.create' && typeof item.nodeId === 'string') {
-    return { kind: 'node.create', nodeId: item.nodeId, after: (item.after as Record<string, unknown>) ?? {} };
-  }
-  if (item.kind === 'node.delete' && typeof item.nodeId === 'string') {
-    return { kind: 'node.delete', nodeId: item.nodeId, before: (item.before as Record<string, unknown>) ?? {} };
-  }
-  if (
-    item.kind === 'node.update' &&
-    typeof item.nodeId === 'string' &&
-    Number.isInteger(item.expectedVersion)
-  ) {
-    return {
-      kind: 'node.update',
-      nodeId: item.nodeId,
-      before: (item.before as Record<string, unknown>) ?? {},
-      after: (item.after as Record<string, unknown>) ?? {},
-      expectedVersion: item.expectedVersion as number
-    };
-  }
-  if (item.kind === 'edge.create' && typeof item.edgeId === 'string' && typeof item.sourceNodeId === 'string' && typeof item.targetNodeId === 'string') {
-    return { kind: 'edge.create', edgeId: item.edgeId, sourceNodeId: item.sourceNodeId, targetNodeId: item.targetNodeId };
-  }
-  if (item.kind === 'edge.delete' && typeof item.edgeId === 'string' && typeof item.sourceNodeId === 'string' && typeof item.targetNodeId === 'string') {
-    return { kind: 'edge.delete', edgeId: item.edgeId, sourceNodeId: item.sourceNodeId, targetNodeId: item.targetNodeId };
-  }
-  if (item.kind === 'doc.revision' && typeof item.nodeId === 'string' && Number.isInteger(item.before) && Number.isInteger(item.after)) {
-    return { kind: 'doc.revision', nodeId: item.nodeId, before: item.before as number, after: item.after as number };
-  }
-  return null;
 }
 
 const SHOW_RUN_ANSWERS: { [K in ShowRun]: (shown: Extract<RunShown, { outcome: K }>) => unknown } = {
