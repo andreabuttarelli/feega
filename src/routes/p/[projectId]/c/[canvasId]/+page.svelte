@@ -69,7 +69,7 @@
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
-  import { AddTarget, catalogue as componentCatalogue, type StarterFormat } from '$lib/motion/template/catalogue';
+  import { AddTarget, catalogue as componentCatalogue, starterFormatOf, type StarterFormat } from '$lib/motion/template/catalogue';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
@@ -78,8 +78,8 @@
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { frameNodeSize, motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
-  import { FORMATS } from '$lib/motion/doc';
-  import { NodeMode, Opening, inlineMotionTarget, neighbourStyle, openingOf } from '$lib/canvas/inline-motion';
+  import { FORMATS, MotionFormat } from '$lib/motion/doc';
+  import { CanvasState, NodeMode, Opening, Reframe, addBarOf, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
   import { viewportOf } from '$lib/motion/editor-layout';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -1033,6 +1033,12 @@
     }
   });
 
+  function reframe(id: string | null, free: Insets) {
+    if (id && reframesOn(viewportOf(pageWidth)) === Reframe.Frame) {
+      focusOn([id], free);
+    }
+  }
+
   function requestMotion(id: string) {
     dismissedMotion = null;
     requestedMotion = id;
@@ -1342,6 +1348,28 @@
     const entry = data.componentTemplates.find((t) => t.id === templateId);
     const made = entry ? composedTemplate(entry, { format, values: {} }, compositionCards(nodeId, edges, nodes), sequentialIds()) : null;
     return made?.ok ? made : null;
+  }
+
+  let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
+
+  function frameDraft(templateId: string, format: StarterFormat): Instance | null {
+    const entry = data.componentTemplates.find((t) => t.id === templateId);
+    const made = entry ? composedTemplate(entry, { format, values: {} }, [], sequentialIds()) : null;
+    return made?.ok ? made : null;
+  }
+
+  async function addFrame(templateId: string, draft: Instance | null) {
+    const at = frameLibraryAt;
+    frameLibraryAt = null;
+    if (!at) {
+      return;
+    }
+    const format = draft ? starterFormatOf(draft.doc) : (componentItems.find((i) => i.id === templateId)?.format ?? MotionFormat.Landscape);
+    const result = await post('frame_template', { template: templateId, format, x: at.x, y: at.y });
+    const node = result?.node as CanvasNodeRecord | undefined;
+    if (node && !nodes.some((n) => n.id === node.id)) {
+      nodes = [...nodes, toTile(node)];
+    }
   }
 
   function pickComponent(nodeId: string, templateId: string, draft: Instance | null) {
@@ -2646,6 +2674,8 @@
     onCopy={copy}
     onPaste={paste}
     onTemplate={insertTemplate}
+    onFrameTemplates={(at) => (frameLibraryAt = at)}
+    addBar={addBarOf(inlineMotion ? CanvasState.Editing : CanvasState.Browsing)}
     onUndo={undo}
     onRedo={redo}
     onConnectNew={connectNew}
@@ -2894,7 +2924,7 @@
   </CanvasFlow>
   {#if inlineMotion}
     {#key inlineMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => focusOn([inlineMotion], free)} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => reframe(inlineMotion, free)} />
     {/key}
   {/if}
 
@@ -2911,6 +2941,18 @@
       target={AddTarget.Composition}
       onpick={(templateId, _sounds, draft) => pickComponent(pickingId, templateId, draft)}
       onclose={() => (componentPickFor = null)}
+    />
+  {/if}
+
+  {#if frameLibraryAt}
+    <ComponentLibrary
+      items={componentItems}
+      format={MotionFormat.Landscape}
+      draftOf={frameDraft}
+      compose={(doc) => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })}
+      target={AddTarget.Canvas}
+      onpick={(templateId, _sounds, draft) => void addFrame(templateId, draft)}
+      onclose={() => (frameLibraryAt = null)}
     />
   {/if}
 

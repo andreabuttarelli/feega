@@ -50,7 +50,7 @@ export const fromTemplateBody = z.object({
   still: z.number().min(0).optional()
 });
 
-type Input = { orgId: string; projectId: string; canvasId?: string | null; userId: string; templateId: string; format: MotionFormat; still?: number; values?: Record<string, string>; wired?: UpstreamCard[]; actor?: Actor };
+type Input = { orgId: string; projectId: string; canvasId?: string | null; userId: string; templateId: string; format: MotionFormat; still?: number; values?: Record<string, string>; wired?: UpstreamCard[]; at?: { x: number; y: number }; actor?: Actor };
 
 const newId = () => crypto.randomUUID().slice(0, ID_LENGTH);
 
@@ -67,7 +67,7 @@ export async function startFromTemplate(db: Db, deps: FromTemplateDeps, input: I
     return { outcome: FromTemplate.Invalid, error: placed.error };
   }
 
-  const start = await startMotion(db, deps, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId ?? null, userId: input.userId, name: entry.template.name, format: input.format, actor });
+  const start = await startMotion(db, deps, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId ?? null, userId: input.userId, name: entry.template.name, format: input.format, at: input.at, actor });
   if (!start) {
     return { outcome: FromTemplate.NoCanvas };
   }

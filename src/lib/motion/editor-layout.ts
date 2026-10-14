@@ -21,16 +21,16 @@ const SIDE_MAX_SHARE = 0.5;
 const PREVIEW_MIN_PX = 160;
 const STORAGE_KEY = 'motion-editor-layout';
 
-export const DEFAULT_LAYOUT: EditorLayout = { chat: Panel.Open, inspector: Panel.Open, timeline: Panel.Open, timelinePx: 360, side: Side.Chat, sidePx: SIDE_DEFAULT_PX };
+export const DEFAULT_LAYOUT: EditorLayout = { chat: Panel.Open, inspector: Panel.Open, timeline: Panel.Open, timelinePx: 210, side: Side.Chat, sidePx: SIDE_DEFAULT_PX };
 
 const layoutSchema = z.object({ chat: z.enum(Panel), inspector: z.enum(Panel), timeline: z.enum(Panel).default(Panel.Open), timelinePx: z.number().finite(), side: z.enum(Side), sidePx: z.number().finite() });
 
-export function readLayout(store: LayoutStore | null): EditorLayout {
+export function readLayout(store: LayoutStore | null, fallback: EditorLayout = DEFAULT_LAYOUT): EditorLayout {
   try {
     const parsed = layoutSchema.safeParse(JSON.parse(store?.getItem(STORAGE_KEY) ?? 'null'));
-    return parsed.success ? parsed.data : DEFAULT_LAYOUT;
+    return parsed.success ? parsed.data : fallback;
   } catch {
-    return DEFAULT_LAYOUT;
+    return fallback;
   }
 }
 
@@ -71,6 +71,21 @@ const VIEWPORT_FROM_PX: readonly (readonly [Viewport, number])[] = [
   [Viewport.Tablet, 760],
   [Viewport.Phone, 0]
 ];
+
+const TIMELINE_DEFAULT_PX: Record<Viewport, number> = {
+  [Viewport.Desktop]: 210,
+  [Viewport.Tablet]: 180,
+  [Viewport.Phone]: 180
+};
+
+const TIMELINE_SCREEN_SHARE: Record<Viewport, number> = {
+  [Viewport.Desktop]: 1,
+  [Viewport.Tablet]: 1,
+  [Viewport.Phone]: 0.3
+};
+
+export const defaultTimelinePx = (viewport: Viewport, screenPx: number): number =>
+  Math.max(TIMELINE_MIN_PX, Math.min(TIMELINE_DEFAULT_PX[viewport], Math.floor(screenPx * TIMELINE_SCREEN_SHARE[viewport])));
 
 export const viewportOf = (width: number): Viewport => VIEWPORT_FROM_PX.find(([, from]) => width >= from)![0];
 
