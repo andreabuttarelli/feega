@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '../_shims/env-private';
-import { connectCanvas, type CanvasChange } from '$lib/realtime/canvas-channel';
+import { browserEnvironment, connectCanvas, type CanvasChange, type LinkEnvironment } from '$lib/realtime/canvas-channel';
+import { LinkState } from '$lib/realtime/connection-link';
 import type { PresencePeer } from '$lib/realtime/presence-peers';
 
 const WAIT_MS = 15_000;
+const nodeEnvironment: LinkEnvironment = { ...browserEnvironment, online: () => true, watch: () => () => {} };
 const POLL_MS = 50;
 const url = env.PUBLIC_SUPABASE_URL!;
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
@@ -86,11 +88,14 @@ try {
     cleanups.push(connectCanvas({
       client: member.client,
       canvasId,
+      projectId,
+      environment: nodeEnvironment,
       peer: { userId: member.userId, name: 'Canvas eval', avatar: null, path: `/app/c/${canvasId}`, threadId: null },
       onChange: (event) => { if (member === second) { events.push(event); } },
       onPeers: (value) => { if (member === second) { peers = value; } },
       onReconnect: () => { connected.add(member.userId); },
-      onError: (error) => { channelError = error; }
+      onCanvasList: () => {},
+      onLink: (state) => { if (state === LinkState.Reconnecting) { channelError = state; } }
     }));
   }
   await until(() => connected.size === 2 || !!channelError, 'member subscriptions');

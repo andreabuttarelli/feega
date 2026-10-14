@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from './components';
 import { Ease } from './design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt } from './inspector';
+import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, partFieldKeys, secondsLabel, toggleKey, valueAt } from './inspector';
 import { addClip, setKeyframes, setTransform, type OpResult } from './timeline';
 import { writeComponent } from './custom/ops';
 import { PropFormat } from './custom/component';
@@ -188,6 +188,68 @@ describe('properties of a custom clip come from its props schema', () => {
     ]);
     expect(fields[0].label).toBe('Month');
     expect(fields.find((f) => f.key === 'posts')).toMatchObject({ min: 0, max: 30, step: 1 });
+  });
+});
+
+describe('fields shown for a selected poster part', () => {
+  function posterClip() {
+    const doc = must(
+      writeComponent(newMotionDoc(MotionFormat.Landscape), 'Poster', {
+        source: { html: '', css: '', js: '' },
+        propsSchema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', title: 'Title', default: 'Title', group: 'Content' },
+            caption: { type: 'string', title: 'Caption', default: 'Caption', group: 'Content' },
+            font: { type: 'string', title: 'Font', default: 'Inter', group: 'Style' },
+            ink: { type: 'string', title: 'Ink', format: PropFormat.Color, default: '#000', group: 'Style' },
+            margin: { type: 'number', title: 'Margin', default: 4, group: 'Layout' },
+            titleSize: { type: 'number', title: 'Title size', default: 8, group: 'Layout' },
+            titleColour: { type: 'string', title: 'Title colour', format: PropFormat.Color, default: '#f00', group: 'Style' },
+            titleX: { type: 'number', title: 'Title x', default: 0, group: 'Layout' },
+            captionSize: { type: 'number', title: 'Caption size', default: 3, group: 'Layout' },
+            captionWeight: { type: 'number', title: 'Caption weight', default: 400, group: 'Style' }
+          }
+        }
+      })
+    );
+    const withClip = must(addClip(doc, { component: 'Custom', from: 0, props: { name: 'Poster' } }, 'k'));
+    return { doc: withClip, clip: findClip(withClip, 'k')!.clip };
+  }
+
+  it('its own text field plus every poster-wide style and layout field', () => {
+    const { doc, clip } = posterClip();
+    expect(partFieldKeys(doc, clip, 'title')).toEqual(['title', 'titleColour', 'titleSize', 'titleX', 'font', 'ink', 'margin']);
+  });
+
+  it("never another part's own size or weight", () => {
+    const { doc, clip } = posterClip();
+    expect(partFieldKeys(doc, clip, 'title')).not.toContain('captionSize');
+    expect(partFieldKeys(doc, clip, 'caption')).toEqual(['caption', 'captionWeight', 'captionSize', 'font', 'ink', 'margin']);
+  });
+
+  it('a poster whose field names break the convention claims them through its table row', () => {
+    const doc = must(
+      writeComponent(newMotionDoc(MotionFormat.Landscape), 'CircleEventPoster', {
+        source: { html: '', css: '', js: '' },
+        propsSchema: {
+          type: 'object',
+          properties: {
+            heading: { type: 'string', title: 'Name', default: 'A', group: 'Content' },
+            nameSize: { type: 'number', title: 'Name size', default: 8, group: 'Layout' },
+            ink: { type: 'string', title: 'Ink', format: PropFormat.Color, default: '#000', group: 'Style' }
+          }
+        }
+      })
+    );
+    const withClip = must(addClip(doc, { component: 'Custom', from: 0, props: { name: 'CircleEventPoster' } }, 'k'));
+    const clip = findClip(withClip, 'k')!.clip;
+    expect(partFieldKeys(withClip, clip, 'heading')).toEqual(['heading', 'nameSize', 'ink']);
+  });
+
+  it("never another part's own text field", () => {
+    const { doc, clip } = posterClip();
+    expect(partFieldKeys(doc, clip, 'title')).not.toContain('caption');
   });
 });
 

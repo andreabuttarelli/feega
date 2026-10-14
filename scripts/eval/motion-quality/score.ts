@@ -16,6 +16,7 @@ export type Facts = {
   recreatedUi: number | null;
   kitUi: number | null;
   beatAlignment: number | null;
+  libraryTemplates: number | null;
   gateBlockingLeft: number | null;
   toolErrors: number | null;
   pageErrors: number | null;
@@ -83,6 +84,12 @@ export function uiLayers(doc: Doc, kitNames: ReadonlySet<string>) {
   const kit = ui.filter((c) => kitNames.has(String(c.props?.name))).length;
   const recreated = ui.filter((c) => VECTOR_TOKEN.test(doc.components?.[String(c.props?.name)]?.source.js ?? '')).length;
   return { recreated, kit };
+}
+
+type CompsDoc = { comps?: Record<string, { template?: { id: string } }> };
+
+export function libraryTemplates(doc: CompsDoc): number {
+  return new Set(Object.values(doc.comps ?? {}).flatMap((c) => (c.template ? [c.template.id] : []))).size;
 }
 
 const callsOf = (messages: readonly Message[]) => messages.flatMap((m) => m.tool_calls ?? []);

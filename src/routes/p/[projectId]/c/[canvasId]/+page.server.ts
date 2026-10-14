@@ -353,7 +353,7 @@ const PATCH_ANSWERS: { [K in PatchWrite['outcome']]: (written: Extract<PatchWrit
   written: (written) => ({ node: written.node }),
   conflict: (written) => fail(HTTP_CONFLICT, { conflict: true, keys: written.keys }),
   invalid: (written) => fail(HTTP_BAD_REQUEST, { error: written.error }),
-  gone: () => fail(HTTP_NOT_FOUND, { error: 'nodo non trovato' })
+  gone: () => fail(HTTP_NOT_FOUND, { error: 'node not found' })
 };
 
 /** Un numero che arriva da un form: finito, o la riga nasce con `NaN` dentro una colonna numerica. */
@@ -645,7 +645,7 @@ export const actions: Actions = {
     const userPrompt = String(fd.get('prompt') ?? '');
     const model = String(fd.get('model') ?? '') || null;
     if (!nodeId) {
-      return fail(400, { error: 'nodo non trovato' });
+      return fail(400, { error: 'node not found' });
     }
 
     const upstream = await upstreamInputsFor(scope.db, {
@@ -678,7 +678,7 @@ export const actions: Actions = {
     const mimeType = String(fd.get('mime_type') ?? '');
     const bytes = coord(fd.get('bytes'));
     if (!path || !fileName || !mimeType || bytes === null) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'invalid request' });
     }
 
     try {
@@ -731,14 +731,14 @@ export const actions: Actions = {
     const model = String(fd.get('model') ?? '') || null;
     const version = Number(fd.get('version'));
     if (!nodeId || !isNodeType(medium) || !Number.isInteger(version)) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'invalid request' });
     }
 
     let paramsIn: Record<string, unknown> = {};
     try {
       paramsIn = JSON.parse(String(fd.get('params') ?? '{}')) as Record<string, unknown>;
     } catch {
-      return fail(400, { error: 'parametri non leggibili' });
+      return fail(400, { error: 'unreadable parameters' });
     }
 
     const denied = await gateOrgAiActionForForm(scope.orgId);
@@ -774,7 +774,7 @@ export const actions: Actions = {
 
     const nodeId = String(fd.get('node_id') ?? '');
     if (!nodeId) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'invalid request' });
     }
 
     try {
@@ -797,7 +797,7 @@ export const actions: Actions = {
 
     const nodeId = String(fd.get('node_id') ?? '');
     if (!nodeId) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'invalid request' });
     }
 
     const denied = await gateOrgAiActionForForm(scope.orgId);
@@ -828,7 +828,7 @@ export const actions: Actions = {
 
     const nodeId = String(fd.get('node_id') ?? '');
     if (!nodeId) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'invalid request' });
     }
 
     return await cancelLoop(scope.db, { orgId: scope.orgId, nodeId });
@@ -850,7 +850,7 @@ export const actions: Actions = {
     const label = String(fd.get('label') ?? '');
     const runId = fd.get('run_id');
     if (!nodeId || !outputListNodeId) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'invalid request' });
     }
 
     const denied = await gateOrgAiActionForForm(scope.orgId);
@@ -890,7 +890,7 @@ export const actions: Actions = {
 
     const nodeIds = fd.getAll('node_id').map(String).filter(Boolean);
     if (nodeIds.length < 2) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'invalid request' });
     }
 
     const plan = await planWorkflowDryRun(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds });
@@ -920,7 +920,7 @@ export const actions: Actions = {
 
     const nodeIds = fd.getAll('node_id').map(String).filter(Boolean);
     if (nodeIds.length < 2) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'invalid request' });
     }
 
     const denied = await gateOrgAiActionForForm(scope.orgId);
@@ -961,7 +961,7 @@ export const actions: Actions = {
 
     const workflowId = String(fd.get('workflow_id') ?? '');
     if (!workflowId) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'invalid request' });
     }
 
     return await cancelWorkflow(scope.db, { orgId: scope.orgId, workflowId });
@@ -984,12 +984,12 @@ export const actions: Actions = {
     const nodeId = String(fd.get('node_id') ?? '');
     const version = coord(fd.get('version'));
     if (!nodeId || version === null || !Number.isInteger(version) || version < 1) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'invalid request' });
     }
 
     const node = await findNode(scope.db, { orgId: scope.orgId, nodeId });
     if (!node || (node.type !== 'products' && node.type !== 'social_account_feed')) {
-      return fail(404, { error: 'nodo non trovato' });
+      return fail(404, { error: 'node not found' });
     }
 
     const running = await writeNodeData(scope.db, {
@@ -1034,17 +1034,17 @@ export const actions: Actions = {
     const nodeId = String(fd.get('node_id') ?? '');
     const runId = String(fd.get('run_id') ?? '');
     if (!nodeId || !runId) {
-      return fail(400, { error: 'richiesta non valida' });
+      return fail(400, { error: 'invalid request' });
     }
 
     const node = await findNode(scope.db, { orgId: scope.orgId, nodeId });
     if (!node || node.type !== 'text' && node.type !== 'image' && node.type !== 'video') {
-      return fail(404, { error: 'nodo non trovato' });
+      return fail(404, { error: 'node not found' });
     }
 
     const run = (await runsOf(scope.db, { orgId: scope.orgId, nodeId })).find((r) => r.id === runId);
     if (!run?.outputAssetId) {
-      return fail(404, { error: 'generazione non trovata' });
+      return fail(404, { error: 'generation not found' });
     }
 
     const shown = await writeNodeData(scope.db, {
@@ -1074,17 +1074,17 @@ export const actions: Actions = {
     const x = coord(fd.get('x'));
     const y = coord(fd.get('y'));
     if (!isNodeType(type) || x === null || y === null) {
-      return fail(400, { error: 'nodo non valido' });
+      return fail(400, { error: 'invalid node' });
     }
 
     let data: Record<string, unknown> = {};
     try {
       data = JSON.parse(String(fd.get('data') ?? '{}')) as Record<string, unknown>;
       if (!data || typeof data !== 'object' || Array.isArray(data)) {
-        return fail(400, { error: 'contenuto non valido' });
+        return fail(400, { error: 'invalid content' });
       }
     } catch {
-      return fail(400, { error: 'contenuto non leggibile' });
+      return fail(400, { error: 'unreadable content' });
     }
 
     // Un nodo trascinato dalla libreria degli asset o dai brand arriva con `data` già scritto
@@ -1123,16 +1123,16 @@ export const actions: Actions = {
     const x = coord(fd.get('x'));
     const y = coord(fd.get('y'));
     if (!nodeId || x === null || y === null) {
-      return fail(400, { error: 'spostamento non valido' });
+      return fail(400, { error: 'invalid move' });
     }
 
     if (!(await listNodes(scope.db, scope)).some((node) => node.id === nodeId)) {
-      return fail(404, { error: 'nodo non trovato' });
+      return fail(404, { error: 'node not found' });
     }
 
     const node = await moveNode(scope.db, { orgId: scope.orgId, nodeId, x, y, actor: userActor(scope) });
     if (!node) {
-      return fail(404, { error: 'nodo non trovato' });
+      return fail(404, { error: 'node not found' });
     }
 
     return { moved: true };
@@ -1153,12 +1153,12 @@ export const actions: Actions = {
     const width = coord(fd.get('width'));
     const height = coord(fd.get('height'));
     if (!nodeId || width === null || height === null) {
-      return fail(400, { error: 'ridimensionamento non valido' });
+      return fail(400, { error: 'invalid resize' });
     }
 
     const existing = (await listNodes(scope.db, scope)).find((node) => node.id === nodeId);
     if (!existing) {
-      return fail(404, { error: 'nodo non trovato' });
+      return fail(404, { error: 'node not found' });
     }
 
     const min = nodeSize(existing.type, existing.data);
@@ -1184,7 +1184,7 @@ export const actions: Actions = {
     const patch = jsonObject(fd.get('patch'));
     const base = jsonObject(fd.get('base'));
     if (!nodeId || !patch || !base) {
-      return fail(HTTP_BAD_REQUEST, { error: 'scrittura non valida' });
+      return fail(HTTP_BAD_REQUEST, { error: 'invalid write' });
     }
 
     if (!(await listNodes(scope.db, scope)).some((node) => node.id === nodeId)) {
@@ -1208,7 +1208,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const nodeId = String(fd.get('node_id') ?? '');
     if (!nodeId) {
-      return fail(400, { error: 'nodo mancante' });
+      return fail(400, { error: 'missing node' });
     }
 
     const outcome = await applyEffectsNode(scope.db, {
@@ -1232,7 +1232,7 @@ export const actions: Actions = {
     const fd = await request.formData();
     const nodeId = String(fd.get('node_id') ?? '');
     if (!nodeId) {
-      return fail(400, { error: 'nodo mancante' });
+      return fail(400, { error: 'missing node' });
     }
 
     const outcome = await makeEffectsPair(scope.db, { orgId: scope.orgId, nodeId, actor: userActor(scope) });
@@ -1264,10 +1264,10 @@ export const actions: Actions = {
     try {
       items = JSON.parse(String(fd.get('items') ?? '[]'));
       if (!Array.isArray(items) || !items.length) {
-        return fail(400, { error: 'niente da scrivere' });
+        return fail(400, { error: 'nothing to write' });
       }
     } catch {
-      return fail(400, { error: 'contenuto non leggibile' });
+      return fail(400, { error: 'unreadable content' });
     }
 
     const known = new Map((await listNodes(scope.db, scope)).map((node) => [node.id, node]));
@@ -1309,12 +1309,12 @@ export const actions: Actions = {
     const nodeId = String(fd.get('node_id') ?? '');
     const on = fd.get('on') === 'true';
     if (!nodeId) {
-      return fail(400, { error: 'documento non valido' });
+      return fail(400, { error: 'invalid document' });
     }
 
     const node = (await listNodes(scope.db, scope)).find((row) => row.id === nodeId);
     if (!node || node.type !== 'doc') {
-      return fail(404, { error: 'documento non trovato' });
+      return fail(404, { error: 'document not found' });
     }
 
     const data = docData({
@@ -1346,7 +1346,7 @@ export const actions: Actions = {
 
     const state = String(fd.get('state') ?? '');
     if (!isShareState(state)) {
-      return fail(400, { error: 'stato di condivisione non valido' });
+      return fail(400, { error: 'invalid sharing state' });
     }
 
     const shareToken = await setCanvasShare(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, state });
@@ -1363,7 +1363,7 @@ export const actions: Actions = {
     const targetHandle = fd.get('target_handle');
     const outputHandle = fd.get('source_handle');
     if (!sourceNodeId || !targetNodeId || !isCanvasEdgeKind(kind)) {
-      return fail(400, { error: 'collegamento non valido' });
+      return fail(400, { error: 'invalid connection' });
     }
 
     // Il verso viaggia sull'attacco: `nodes_connections` non ha una colonna `kind`, e perderlo
@@ -1371,7 +1371,7 @@ export const actions: Actions = {
     const canvasNodes = await listNodes(scope.db, scope);
     const nodeIds = new Set(canvasNodes.map((node) => node.id));
     if (sourceNodeId === targetNodeId || !nodeIds.has(sourceNodeId) || !nodeIds.has(targetNodeId)) {
-      return fail(400, { error: 'collegamento non valido' });
+      return fail(400, { error: 'invalid connection' });
     }
 
     const sourceNode = canvasNodes.find((node) => node.id === sourceNodeId);
@@ -1382,7 +1382,7 @@ export const actions: Actions = {
       targetHandle: edge.targetHandle
     }));
     if (!nodeAcceptsConnection(existing, targetNodeId, targetNode?.type ?? '')) {
-      return fail(400, { error: 'un nodo effetti prende un solo media' });
+      return fail(400, { error: 'an effects node takes a single media' });
     }
 
     const refusal = connectVerdict(sourceNode ?? null, targetNode ?? null);
@@ -1433,11 +1433,11 @@ export const actions: Actions = {
 
     const connectionId = String(fd.get('connection_id') ?? '');
     if (!connectionId) {
-      return fail(400, { error: 'linea non valida' });
+      return fail(400, { error: 'invalid line' });
     }
 
     if (!(await listConnections(scope.db, scope)).some((edge) => edge.id === connectionId)) {
-      return fail(404, { error: 'linea non trovata' });
+      return fail(404, { error: 'line not found' });
     }
     await deleteConnection(scope.db, { orgId: scope.orgId, connectionId, actor: userActor(scope) });
 
@@ -1455,12 +1455,12 @@ export const actions: Actions = {
     const connectionId = String(fd.get('connection_id') ?? '');
     const mode = String(fd.get('mode') ?? '');
     if (!connectionId || !isWireMode(mode)) {
-      return fail(400, { error: 'modo non valido' });
+      return fail(400, { error: 'invalid mode' });
     }
 
     const connection = await setConnectionMode(scope.db, { orgId: scope.orgId, connectionId, mode });
     if (!connection) {
-      return fail(404, { error: 'linea non trovata' });
+      return fail(404, { error: 'line not found' });
     }
 
     return { connection };
@@ -1480,12 +1480,12 @@ export const actions: Actions = {
       .map((id) => id.trim())
       .filter(Boolean);
     if (!nodeIds.length) {
-      return fail(400, { error: 'niente da cancellare' });
+      return fail(400, { error: 'nothing to delete' });
     }
 
     const canvasNodes = new Set((await listNodes(scope.db, scope)).map((node) => node.id));
     if (nodeIds.some((id) => !canvasNodes.has(id))) {
-      return fail(404, { error: 'nodo non trovato' });
+      return fail(404, { error: 'node not found' });
     }
     const connectionIds = (await listConnections(scope.db, scope))
       .filter((edge) => nodeIds.includes(edge.sourceNodeId) || nodeIds.includes(edge.targetNodeId))
@@ -1518,7 +1518,7 @@ export const actions: Actions = {
       .map((id) => id.trim())
       .filter(Boolean);
     if (!nodeIds.length) {
-      return fail(400, { error: 'niente da duplicare' });
+      return fail(400, { error: 'nothing to duplicate' });
     }
 
     const out = await duplicateNodes(scope.db, {
@@ -1542,13 +1542,13 @@ export const actions: Actions = {
       pasted = JSON.parse(String(fd.get('nodes') ?? '[]'));
       edges = JSON.parse(String(fd.get('edges') ?? '[]'));
       if (!Array.isArray(pasted) || !Array.isArray(edges)) {
-        return fail(400, { error: 'contenuto non valido' });
+        return fail(400, { error: 'invalid content' });
       }
     } catch {
-      return fail(400, { error: 'contenuto non leggibile' });
+      return fail(400, { error: 'unreadable content' });
     }
     if (!pasted.length) {
-      return fail(400, { error: 'niente da incollare' });
+      return fail(400, { error: 'nothing to paste' });
     }
 
     const nodes: Awaited<ReturnType<typeof createNode>>[] = [];
@@ -1608,7 +1608,7 @@ export const actions: Actions = {
     const scope = await scopeFor(locals, params.canvasId);
     const to = String((await request.formData()).get('status') ?? '');
     if (to !== OnboardingStatus.Dismissed && to !== OnboardingStatus.Completed) {
-      return fail(HTTP_BAD_REQUEST, { error: 'stato non valido' });
+      return fail(HTTP_BAD_REQUEST, { error: 'invalid state' });
     }
 
     return { ended: await endOnboarding(scope.db, scope.userId, to) };
@@ -1620,7 +1620,7 @@ export const actions: Actions = {
 
     const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
     if (!Number.isFinite(at.x) || !Number.isFinite(at.y)) {
-      return fail(400, { error: 'posizione non valida' });
+      return fail(400, { error: 'invalid position' });
     }
 
     const out = await insertTemplate(scope.db, {
@@ -1632,7 +1632,7 @@ export const actions: Actions = {
       actor: userActor(scope)
     });
     if (!out) {
-      return fail(400, { error: 'template sconosciuto' });
+      return fail(400, { error: 'unknown template' });
     }
 
     return out;
@@ -1657,15 +1657,15 @@ export const actions: Actions = {
     try {
       raw = JSON.parse(String(fd.get('items') ?? '[]'));
       if (!Array.isArray(raw) || !raw.length) {
-        return fail(400, { error: 'niente da annullare' });
+        return fail(400, { error: 'nothing to undo' });
       }
     } catch {
-      return fail(400, { error: 'contenuto non leggibile' });
+      return fail(400, { error: 'unreadable content' });
     }
 
     const items = raw.map(parseUndoItem);
     if (items.some((item) => item === null)) {
-      return fail(400, { error: 'gesto non valido' });
+      return fail(400, { error: 'invalid gesture' });
     }
 
     const gesture: Gesture = { items: items as UndoItem[] };
@@ -1695,7 +1695,7 @@ export const actions: Actions = {
     const nodeId = String(fd.get('node_id') ?? '');
     const node = (await listNodes(scope.db, scope)).find((n) => n.id === nodeId);
     if (!node) {
-      return fail(404, { error: 'nodo non trovato' });
+      return fail(404, { error: 'node not found' });
     }
 
     const frequency = await actionFrequencyFor(scope.db, scope.orgId, node.type);

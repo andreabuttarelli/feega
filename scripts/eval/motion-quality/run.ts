@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { chromium, type Page } from 'playwright';
@@ -12,7 +12,7 @@ import { billedUsdInScope, withOrgContext } from '$lib/server/ai-log';
 import { judge } from './judge';
 import { AccountGiven, Teardowns, accountAfter, asksUser, serverEnv, claimPort, cutAnswerFor, replyTo, turnSettled, type AgentState, type TestAccount } from './drive';
 import { contactSheet, cuts, duration, grayFrames, judgeFrames, monoSamples, PROBE_SIZE } from './media';
-import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, spentUsd, textMinShare, toolErrors, uiLayers, TASTE_AXES, type CaseResult, type Facts } from './score';
+import { beatAlignment, compareRuns, docCuts, edgeDensity, emptyShare, gateBlockingLeft, holdStats, libraryTemplates, spentUsd, textMinShare, toolErrors, uiLayers, TASTE_AXES, type CaseResult, type Facts } from './score';
 
 enum AccountSource {
   None = 'none',
@@ -24,8 +24,17 @@ const CASES = [
   { name: 'linear', prompt: 'launch video for linear.app', account: AccountSource.None },
   { name: 'stripe', prompt: 'promo for stripe.com payments', account: AccountSource.None },
   { name: 'shop', prompt: 'product video for the snowboards at hydrogen.shop', account: AccountSource.None },
-  { name: 'app', prompt: 'promo video for the Things mobile app, culturedcode.com/things', account: AccountSource.None }
+  { name: 'app', prompt: 'promo video for the Things mobile app, culturedcode.com/things', account: AccountSource.None },
+  { name: 'sections', prompt: 'a 20 second product video for linear.app: what it is, three features, a call to action', account: AccountSource.None, minTemplates: 2 }
 ];
+
+const meetsMinimum = (name: string, facts: Facts | null) => {
+  const min = CASES.find((c) => c.name === name)?.minTemplates;
+  if (min === undefined || facts?.libraryTemplates == null) {
+    return null;
+  }
+  return facts.libraryTemplates >= min ? `pass (≥${min})` : `FAIL (needs ≥${min})`;
+};
 
 const EST_CASE_USD = 2.5;
 const DEFAULT_CAP_USD = 20;
@@ -35,6 +44,7 @@ const TURN_CAP_MS = 40 * 60_000;
 const EXPORT_TIMEOUT_MS = 45 * 60_000;
 const POLL_MS = 10_000;
 const MAX_REPLIES = 3;
+const MAX_FAILED_POLLS = 3;
 const PICK_COUNT = 3;
 const FPS = 30;
 const OUT_ROOT = join(process.env.HOME!, 'Documents/feega-videos/evals');
@@ -86,6 +96,7 @@ async function drive(page: Page, agentUrl: string, account: TestAccount | null):
   let cutsAnswered = 0;
   let given = AccountGiven.No;
   let before: AgentState | null = null;
+  let failedPolls = 0;
   while (Date.now() - start < TURN_CAP_MS) {
     await page.waitForTimeout(POLL_MS);
     const answered = await answerCard(page, cutsAnswered);
@@ -96,6 +107,10 @@ async function drive(page: Page, agentUrl: string, account: TestAccount | null):
       continue;
     }
     const r = await page.request.get(agentUrl);
+    failedPolls = r.ok() ? 0 : failedPolls + 1;
+    if (failedPolls >= MAX_FAILED_POLLS) {
+      throw new Error(`agent poll answered ${r.status()} ${failedPolls} times in a row: see server.log`);
+    }
     const now: AgentState = r.ok() ? await r.json() : { running: true, messages: [] };
     const settled = turnSettled(before, now);
     before = now;
@@ -129,6 +144,14 @@ async function exportMp4(page: Page, file: string): Promise<void> {
   await ev.saveAs(file);
 }
 
+async function saveTranscript(orgId: string, dir: string): Promise<void> {
+  const msgs = (await admin.from('chat_messages').select('*').eq('org_id', orgId).order('seq')).data ?? [];
+  writeFileSync(join(dir, 'chat_messages.json'), JSON.stringify(msgs, null, 1));
+  const calls = (await admin.from('ai_calls').select('*').eq('org_id', orgId)).data ?? [];
+  writeFileSync(join(dir, 'ai_calls.json'), JSON.stringify(calls, null, 1));
+  say(`  saved ${msgs.length} messages, ${calls.length} ai calls, $${spentUsd(calls).toFixed(2)}`);
+}
+
 async function saveAssets(orgId: string, dir: string): Promise<void> {
   const assets = await admin.from('assets').select('*').eq('org_id', orgId);
   writeFileSync(join(dir, 'assets.json'), JSON.stringify(assets.data, null, 1));
@@ -159,7 +182,8 @@ function videoFacts(video: string, doc: unknown) {
     textMinShare: doc ? textMinShare(doc as never) : null,
     recreatedUi: ui?.recreated ?? null,
     kitUi: ui?.kit ?? null,
-    beatAlignment: beatAlignment(cutTimes, beats)
+    beatAlignment: beatAlignment(cutTimes, beats),
+    libraryTemplates: doc ? libraryTemplates(doc as never) : null
   };
 }
 
@@ -187,7 +211,11 @@ async function runCase(c: (typeof CASES)[number], out: string, browserPage: () =
     await input.fill(c.prompt);
     await input.press('Enter');
     say(`  sent; node ${nodeId}`);
-    await drive(page, `/api/v1/projects/${session.projectId}/motion/${nodeId}/agent`, accountFor(c.account, session));
+    await drive(page, `/api/v1/projects/${session.projectId}/motion/${nodeId}/agent`, accountFor(c.account, session)).catch(async (e) => {
+      await saveTranscript(session.orgId, dir);
+      await page.screenshot({ path: join(dir, 'stalled.png') });
+      throw e;
+    });
     const wallS = (Date.now() - t0) / 1000;
     await page.reload();
     await page.waitForLoadState('networkidle');
@@ -210,7 +238,7 @@ async function runCase(c: (typeof CASES)[number], out: string, browserPage: () =
     writeFileSync(join(dir, 'page-errors.txt'), pageErrors.join('\n'));
     const base = { gateBlockingLeft: gateBlockingLeft(msgs), toolErrors: toolErrors(msgs), pageErrors: pageErrors.length, costUsd: spentUsd(calls), wallS };
     if (!existsSync(video)) {
-      const facts: Facts = { exists: false, duration: null, scenes: null, meanHold: null, maxHold: null, emptyShare: null, textMinShare: null, recreatedUi: null, kitUi: null, beatAlignment: null, ...base };
+      const facts: Facts = { exists: false, duration: null, scenes: null, meanHold: null, maxHold: null, emptyShare: null, textMinShare: null, recreatedUi: null, kitUi: null, beatAlignment: null, libraryTemplates: doc ? libraryTemplates(doc as never) : null, ...base };
       return { name: c.name, prompt: c.prompt, unrun: null, facts, taste: null, judgeUsd };
     }
     const facts: Facts = { exists: true, ...videoFacts(video, doc), ...base };
@@ -245,6 +273,10 @@ function report(stamp: string, results: CaseResult[], previous: CaseResult[] | n
     for (const [k, v] of Object.entries(r.facts ?? {})) {
       lines.push(`| ${k} | ${fmt(v)}${signed(deltas[r.name]?.[k as keyof Facts])} |`);
     }
+    const minimum = meetsMinimum(r.name, r.facts);
+    if (minimum) {
+      lines.push(`| library sections | ${minimum} |`);
+    }
     lines.push('', '| taste | score | reason |', '|---|---|---|');
     for (const axis of TASTE_AXES) {
       lines.push(`| ${axis} | ${r.taste ? r.taste[axis].score : '—'} | ${r.taste?.[axis].reason ?? 'judge unrun'} |`);
@@ -258,12 +290,12 @@ async function serverUp(): Promise<boolean> {
   return fetch(BASE_URL).then(() => true, () => false);
 }
 
-async function startServer(): Promise<ChildProcess | null> {
+async function startServer(log: string): Promise<ChildProcess | null> {
   if (await serverUp()) {
     return null;
   }
   const env = { ...process.env, ...serverEnv(BASE_URL, chromium.executablePath()) };
-  const child = spawn('npx', ['vite', 'dev', '--port', String(port), '--strictPort'], { stdio: 'ignore', detached: true, env });
+  const child = spawn('npx', ['vite', 'dev', '--port', String(port), '--strictPort'], { stdio: ['ignore', openSync(log, 'a'), openSync(log, 'a')], detached: true, env });
   for (let i = 0; i < 90 && !(await serverUp()); i++) {
     await new Promise((r) => setTimeout(r, 1000));
   }
@@ -304,7 +336,8 @@ async function main() {
   mkdirSync(out, { recursive: true });
 
   const release = claimPort(port, tmpdir());
-  const server = await startServer();
+  mkdirSync(out, { recursive: true });
+  const server = await startServer(join(out, 'server.log'));
   const browser = await chromium.launch({ channel: 'chrome', headless: true });
   const results: CaseResult[] = [];
   let total = 0;

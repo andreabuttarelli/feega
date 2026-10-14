@@ -83,7 +83,7 @@
     onchange: (doc: MotionDoc, summary: string) => void;
     onuploadfont?: (file: File) => Promise<string | null>;
     onopen?: (comp: string) => void;
-    focus?: string | null;
+    focus?: readonly string[] | null;
   } = $props();
 
   const ANCHOR_STOPS = [0, 0.5, 1] as const;
@@ -127,7 +127,7 @@
     commit(duckUnder(doc, clip.id, voiceId, analyses[assetId]?.speech ?? null), 'Ducked the music');
   }
 
-  const groups = $derived(clipFieldGroups(doc, clip).map((g) => ({ ...g, fields: g.fields.filter((f) => !focus || f.key === focus) })).filter((g) => g.fields.length));
+  const groups = $derived(clipFieldGroups(doc, clip).map((g) => ({ ...g, fields: g.fields.filter((f) => !focus || focus.includes(f.key)) })).filter((g) => g.fields.length));
   const animated = $derived(withParams(doc, clip));
   const customName = $derived(clip.component === 'Custom' ? String(clip.props.name) : null);
   const spec = $derived(COMPONENTS[clip.component]);
@@ -377,7 +377,7 @@
     <CodeEditor {doc} name={customName} previous={previousSource(customName)} {onchange} />
   {:else}
     {#each SECTION_ORDER.filter((s) => has[s]) as section (section)}
-      <InspectorSection title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section)} ontoggle={() => toggleSection(section)}>
+      <InspectorSection title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section) || (!!focus && groupsIn(section).length > 0)} ontoggle={() => toggleSection(section)}>
         {@render BODIES[section]()}
       </InspectorSection>
     {/each}

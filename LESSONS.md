@@ -104,6 +104,14 @@ istanza fredda). Segnale: negli `edge_logs` di Supabase una raffica di `POST 413
 tra la sessione e la prima chiamata della chat. Mossa: rifare il giro e2e col dev server lanciato
 con `VERCEL=1`; un dato accessorio non blocca mai il caricamento (`knownUploadLimit`).
 
+### Una richiesta lenta in produzione per colpa di un'altra: il teardown di un eval
+Segnale: negli `edge_logs` il p50 di `response.origin_time` di TUTTE le chiamate `/rest/` sale a
+secondi nello stesso intervallo, e poco prima c'è un `DELETE /rest/v1/orgs` (IP locale, service
+role) con `origin_time` > 8 s finito `500`/`statement timeout`. Il cascade di un'org tocca tabelle
+con foreign key senza indice e ferma il progetto. Mossa: query a bucket di 5 s su `origin_time`
+prima di accusare il codice della richiesta lenta; niente teardown di eval sul database di
+produzione mentre qualcuno lo usa.
+
 ### Un render server riesce e il salvataggio fallisce con `EntityTooLarge`
 Storage del progetto accetta al massimo 50 MB per file (limite globale, non del bucket): un
 ProRes, un 4K o un PNG lungo esce dal farm e muore all'upload con `413`. La dimensione dipende
@@ -2893,6 +2901,15 @@ Signal: the open-frame budget swings by 2 s between runs with no code change. Mo
 
 ### A video on iPhone shows a black, zoomed-in corner of the frame
 Signal: on iOS Safari the editor player is black with a few specks while the node poster is fine; desktop WebKit (Playwright `iPhone 15`) renders the same doc correctly. Cause: CSS `zoom` on the player iframe (sharpness fix for Chromium) shrinks the box but iOS lays the frame's document out unzoomed, so only the top-left ~1/6 of the 1920 px composition shows. Move: scale the player iframe by `zoom` only where it is proven (`crispFor` in `crisp-scale.ts`, Chromium); WebKit keeps the player's transform. Emulated WebKit is not iOS: verify iframe/zoom fixes on a device.
+
+### Una tela lenta con pochi nodi: i player montati al passaggio del puntatore
+Segnale: pan/zoom a scatti (p5 < 20 fps, secondi di long task in 10 s) su una tela con DOM statico
+piccolo e zero player dopo il load; durante il pan compaiono `hyperframes-player` dentro i nodi.
+Un `pointerenter` (o un tocco) che monta un player lo fa a ogni nodo attraversato. Mossa: contare
+`[data-testid="motion-node"] hyperframes-player` durante il gesto (`canvas-perf.spec.ts`), non
+dopo; il player del nodo parte solo da Play (`motion-preview.ts`). Il pan su telefono va misurato
+senza tap: un tap apre l'editor inline, che ha il suo player e sporca i numeri. Il build di
+produzione mostra il banner cookie: la spec mette il cookie di consenso, o il login non clicca.
 
 ### Every motion e2e fails at once after a run was killed
 Signal: a batch of `@real` motion specs fails together (`motion-editor` never appears), each passes alone. Cause: a killed playwright run left `reuseExistingServer` on a dying dev server. Move: rerun on a clean server before judging a spec.

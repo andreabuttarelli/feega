@@ -149,22 +149,24 @@ function shotCrews(script: LaunchScript): Crew[] {
     .map((acts) => ({ acts: acts.map((a) => a.act), from: acts[0].start, to: acts.at(-1)!.end }));
 }
 
-const ADD_SHOT = 'add_shot';
+const PLACES_AT = ['add_shot', 'add_template'] as const;
 
-function crewTools<T extends Record<string, Tool>>(all: T, crew: Crew): T {
-  const add = all[ADD_SHOT];
-  if (!add?.execute) {
-    return all;
-  }
-  const guarded: Tool = {
-    ...add,
-    execute: async (input: { at: number; seconds?: number }, options) =>
-      input.at < crew.from || input.at >= crew.to ? { ok: false, error: `a shot at ${input.at} s is outside your range ${crew.from} s to ${crew.to} s: the other crew builds that part` } : add.execute!(input, options)
+type Placing = { at: number };
+
+function inRange(tool: Tool, crew: Crew): Tool {
+  return {
+    ...tool,
+    execute: async (input: Placing, options) =>
+      input.at < crew.from || input.at >= crew.to ? { ok: false, error: `${input.at} s is outside your range ${crew.from} s to ${crew.to} s: the other crew builds that part` } : tool.execute!(input, options)
   } as Tool;
-  return { ...all, [ADD_SHOT]: guarded };
 }
 
-const crewBrief = (crew: Crew) => `Shot crew: build only the ${crew.acts.join(', ')} acts of the script, from ${crew.from} s to ${crew.to} s, with library shots placed inside that range. Another crew builds the rest at the same time: never place, move or remove anything outside your range, and leave music to the sound pass.`;
+export function crewTools<T extends Record<string, Tool>>(all: T, crew: Crew): T {
+  const guarded = PLACES_AT.filter((name) => all[name]?.execute).map((name) => [name, inRange(all[name], crew)]);
+  return { ...all, ...Object.fromEntries(guarded) };
+}
+
+export const crewBrief = (crew: Crew) => `Shot crew: build only the ${crew.acts.join(', ')} acts of the script, from ${crew.from} s to ${crew.to} s. Each section starts from a library template (list_templates by role, add_template inside your range, set_template_fields from the script lines); library shots only for the beats no template covers. Another crew builds the rest at the same time: never place, move or remove anything outside your range, and leave music to the sound pass.`;
 
 const RESEARCH_DONE = 'Research is done: the facts, captures and references are in the conversation above. Now write the script and the storyboard from them.';
 const SOUND_PASS = 'Sound pass: lay the music under the whole video if there is none, mark its beats and cut the shots onto them. Change nothing else.';

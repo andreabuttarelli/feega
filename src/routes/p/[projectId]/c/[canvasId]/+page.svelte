@@ -28,6 +28,7 @@
   import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
+  import { canvasLink } from '$lib/realtime/canvas-link';
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
@@ -83,6 +84,7 @@
   import { viewportOf } from '$lib/motion/editor-layout';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { frameHead } from '$lib/canvas/frame-outlines';
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
@@ -1126,11 +1128,11 @@
     }
     const user = data.session?.user;
     if (!user) { return; }
-    return connectCanvas({
+    const disconnect = connectCanvas({
       client: createSupabaseBrowserClient(),
       canvasId: data.canvas.id,
       projectId: data.projectId,
-      peer: { userId: user.id, name: user.email ?? 'Utente', avatar: null,
+      peer: { userId: user.id, name: user.email ?? 'User', avatar: null,
         path: `/p/${data.projectId}/c/${data.canvas.id}`, threadId: null },
       onChange: (change) => {
         if (!isOwnEcho(change, nodes)) { refreshSoon(); }
@@ -1138,8 +1140,12 @@
       onReconnect: () => { void checkStale(Trigger.Reconnect); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
       onPeers: (value) => { peers = value; },
-      onError: () => { failed = 'Connessione in tempo reale interrotta'; }
+      onLink: (state) => { canvasLink.set(state); }
     });
+    return () => {
+      disconnect();
+      canvasLink.set(null);
+    };
   }
 
   $effect(() => onCanvasReveal((trigger) => { void checkStale(trigger); }));
@@ -1557,7 +1563,7 @@
 
     const safety = plan.safety as { verdict: 'run' | 'confirm' | 'refuse'; count: number } | undefined;
     if (!safety || safety.verdict === 'refuse') {
-      failed = `troppe combinazioni: dividi il loop`;
+      failed = 'Too many combinations: split the loop';
       return;
     }
 
@@ -1949,8 +1955,9 @@
   $effect(() =>
     layersSource.publishCanvas({
       get nodes() {
-        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null }));
+        return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data) }));
       },
+      outlinesUrl: `/p/${data.projectId}/c/${data.canvas.id}/frame-outlines`,
       get selected() {
         return selectedIds;
       },
@@ -2003,7 +2010,7 @@
       }
     }
     if (plan.rejected.length) {
-      failed = `Non collegato: ${plan.rejected.map((r) => r.why).join('; ')}`;
+      failed = `Not connected: ${plan.rejected.map((r) => r.why).join('; ')}`;
     }
     pushGesture({ items });
     focusOn([...ids, node.id]);
@@ -2016,7 +2023,7 @@
   async function connectExisting(ids: string[], targetId: string) {
     const target = nodes.find((n) => n.id === targetId);
     if (!target || (target.type !== 'text' && target.type !== 'image' && target.type !== 'video')) {
-      failed = 'Questo nodo non riceve collegamenti';
+      failed = 'This node takes no connections';
       return;
     }
 
@@ -2045,7 +2052,7 @@
       }
     }
     if (plan.rejected.length) {
-      failed = `Non collegato: ${plan.rejected.map((r) => r.why).join('; ')}`;
+      failed = `Not connected: ${plan.rejected.map((r) => r.why).join('; ')}`;
     }
     if (items.length) { pushGesture({ items }); }
   }
@@ -2183,7 +2190,7 @@
         return orphanedByModelChange(wired, nextConnectors);
       });
 
-      if (orphaned.length && !uncensoredTargets.length && !confirm(`${orphaned.length} collegamento/i cadranno con questo modello. Continuare?`)) {
+      if (orphaned.length && !uncensoredTargets.length && !confirm(`${orphaned.length} connection(s) will be dropped with this model. Continue?`)) {
         return;
       }
       for (const drop of orphaned) {
@@ -2272,7 +2279,7 @@
     const results = (result?.results ?? []) as { nodeId: string; outcome: string; node?: CanvasNodeRecord }[];
     const conflicts = results.filter((r) => r.outcome === 'conflict');
     if (conflicts.length) {
-      failed = `${conflicts.length} nodo/i non salvati: modificati da qualcun altro nel frattempo`;
+      failed = `${conflicts.length} node(s) not saved: changed by someone else meanwhile`;
     }
 
     const written = results.filter((r) => r.outcome === 'written' && r.node).map((r) => r.node as CanvasNodeRecord);
@@ -2483,12 +2490,12 @@
   async function applyUndo(gesture: Gesture, onAccepted: (redo: Gesture) => void) {
     const result = await post('undo', { items: JSON.stringify(gesture.items) });
     if (!result) {
-      failed = 'Annullamento non riuscito: riprova';
+      failed = 'Undo failed: try again';
       return;
     }
     if (result.outcome !== 'undone') {
-      const reason = typeof result.reason === 'string' ? result.reason : 'un altro ha già cambiato questo nodo';
-      failed = `Annullamento saltato: ${reason}`;
+      const reason = typeof result.reason === 'string' ? result.reason : 'someone else already changed this node';
+      failed = `Undo skipped: ${reason}`;
       return;
     }
     await refresh();
@@ -2513,7 +2520,7 @@
 
     const check = checkMoveGesture(gesture, currentOf);
     if (check.outcome === 'stale') {
-      failed = `Annullamento saltato: ${check.reason}`;
+      failed = `Undo skipped: ${check.reason}`;
       return;
     }
 
@@ -2581,7 +2588,7 @@
 
 <div class="canvas" class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
   {#if peers.length}
-    <div class="peers" aria-label="Persone sulla tela">{peers.map((peer) => peer.name).join(', ')}</div>
+    <div class="peers" aria-label="People on this canvas">{peers.map((peer) => peer.name).join(', ')}</div>
   {/if}
   <p class="save-status" role="status" data-status={saveStatus}>{SAVE_LABEL[saveStatus]}</p>
   {#if failed}
@@ -2602,8 +2609,8 @@
   {/if}
   {#if workflowRunning}
     <div class="workflow-chip" role="status">
-      Flusso in corso
-      <button type="button" onclick={stopWorkflow}>Ferma</button>
+      Workflow running
+      <button type="button" onclick={stopWorkflow}>Stop</button>
     </div>
   {/if}
 

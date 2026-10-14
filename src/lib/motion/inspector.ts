@@ -137,6 +137,42 @@ export function clipFieldGroups(doc: MotionDoc, clip: MotionClip): { group: Grou
   return GROUP_ORDER.map((group) => ({ group, fields: fields.filter((f) => f.group === group) })).filter((g) => g.fields.length > 0);
 }
 
+const PART_SHARED_GROUPS = [Group.Style, Group.Layout];
+const PART_FIELD_SUFFIXES = ['Color', 'Colour', 'Font', 'Size', 'Weight', 'X', 'Y', 'Leading'];
+
+export const PART_FIELDS_BY_POSTER: Record<string, Record<string, readonly string[]>> = {
+  BlockTitlePoster: { title: ['fontWeight', 'leading', 'fill', 'overlap'] },
+  BoxedTypePoster: { word: ['wordLeft'], note: ['noteLine'] },
+  CircleEventPoster: { heading: ['nameSize'], marker: ['circleSize', 'circleX', 'circleY'] },
+  IsoBlocksPoster: { lineup: ['blockTextSize', 'blockFont'] },
+  OverlayGridPoster: { overlay: ['overlayLeading'], overlayLow: ['lowX', 'lowY'] },
+  RedNumberPoster: { photos: ['photoSize', 'tint'] },
+  RepeatLineupPoster: { lineup: ['nameSize', 'repeatSize'] },
+  ScatteredTypePoster: { blocks: ['textSize'] },
+  SlicedPhotoPoster: { phrases: ['phraseSize'], photos: ['photoSize'] },
+  SquareWordsPoster: { words: ['wordSize'], body: ['square', 'squareX', 'squareY', 'squareW', 'squareH'], dotLabel: ['dot', 'dotSize', 'dotY'] },
+  VerticalTypePoster: { words: ['wordSize'] },
+  WideFilmstripPoster: { title: ['titleWeight'] }
+};
+
+function ownFields(keys: readonly string[], poster: string, field: string): string[] {
+  const listed = PART_FIELDS_BY_POSTER[poster]?.[field] ?? [];
+  return keys.filter((k) => listed.includes(k) || PART_FIELD_SUFFIXES.some((suffix) => k === field + suffix));
+}
+
+export function partFieldKeys(doc: MotionDoc, clip: MotionClip, field: string): string[] {
+  const poster = String(clip.props.name);
+  const groups = clipFieldGroups(doc, clip);
+  const keys = groups.flatMap((g) => g.fields.map((f) => f.key));
+  const parts = groups.filter((g) => g.group === Group.Content).flatMap((g) => g.fields.map((f) => f.key));
+  const claimed = new Set(parts.flatMap((part) => ownFields(keys, poster, part)));
+  const shared = groups
+    .filter((g) => PART_SHARED_GROUPS.includes(g.group))
+    .flatMap((g) => g.fields.map((f) => f.key))
+    .filter((k) => !claimed.has(k));
+  return [field, ...ownFields(keys, poster, field), ...shared];
+}
+
 const SECONDS_PRECISION = 100;
 
 export function secondsLabel(frames: number, fps: number = FPS): string {

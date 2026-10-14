@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { tileHovered } from '$lib/canvas/layers';
   /**
    * UN NODO DELLA TELA, e nient'altro.
    *
@@ -116,6 +118,10 @@
   </div>
 {/if}
 
+{#if !selected && tileHovered(layersSource.hovered, tile.id, layersSource.video?.nodeId ?? null)}
+  <div class="tile-hover" data-testid="tile-hover" aria-hidden="true"></div>
+{/if}
+
 {#if selected}
   <div class="tile-selection" style={`outline-color:${selectionColor}`} aria-hidden="true"></div>
 {/if}
@@ -176,6 +182,15 @@
    *
    * ANGOLI QUADRATI: nessun `border-radius`, la regola vale anche qui.
    */
+  .tile-hover {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    outline: 2px solid var(--ui-hover-outline);
+    outline-offset: 1px;
+  }
+
   .tile-selection {
     position: absolute;
     inset: 0;
