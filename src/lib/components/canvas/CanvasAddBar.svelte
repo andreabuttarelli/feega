@@ -1,31 +1,16 @@
 <script lang="ts">
-  /**
-   * COSA SI PUÒ METTERE SULLA TELA, RESO VISIBILE.
-   *
-   * Il doppio clic fa la stessa cosa, ma non si scopre: niente sulla tela dice che esiste, e una
-   * scorciatoia che nessuno trova vale quanto una funzione che non c'è.
-   *
-   * DUE GESTI, UNA SOLA CREAZIONE. Il clic dice «mettilo dove capita» e il trascinamento «mettilo
-   * QUI» — su una tela il punto conta, ed è la ragione per cui non basta il bottone. Ma la tile la
-   * costruisce una funzione sola, in `CanvasFlow`: due strade che se la fabbricano per conto loro
-   * divergono al primo campo aggiunto, e il difetto si vede solo su una delle due.
-   *
-   * E ACCANTO, LA SCHEDA DELLE SCORCIATOIE. Sta qui e non in un ascoltatore suo perché questa è
-   * già la barra che rende visibile quel che la tela sa fare: una scorciatoia che nessuno trova
-   * vale quanto una funzione che non c'è, e le sole due strade per incontrarla sono il numero nel
-   * `title` di ogni voce e questa scheda. Non prende il tasto `?`, che è della scheda globale del
-   * prodotto: due ascoltatori sullo stesso tasto aprirebbero due pannelli sovrapposti.
-   *
-   * COSA SI STA TRASCINANDO VIAGGIA NEL `dataTransfer`, non in una variabile di modulo: durante un
-   * trascinamento il puntatore può uscire dalla finestra e rientrare, e uno stato appeso fuori
-   * dall'evento sopravvive a un trascinamento annullato — il nodo successivo nascerebbe del tipo
-   * sbagliato.
-   */
+  import type { Snippet } from 'svelte';
   import Upload from '@lucide/svelte/icons/upload';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
-  import { AddBar } from '$lib/canvas/inline-motion';
+  import ImagePlus from '@lucide/svelte/icons/image-plus';
+  import { BAR_SLOTS, BarContext, BarSlot, barKeys, barLift } from '$lib/canvas/bottom-bar';
+  import { KEY_REGION_ATTR } from '$lib/canvas/key-region.svelte';
+  import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
+  import { DrawTool } from '$lib/motion/draw-tool';
+  import { Command } from '$lib/motion/shortcuts';
+  import { ACTIONS, tipText } from '$lib/motion/actions';
   import CanvasTemplateGallery from './CanvasTemplateGallery.svelte';
   import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
@@ -38,11 +23,17 @@
     onupload,
     ontemplate,
     onframes,
-    shown = AddBar.Shown
-  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; shown?: AddBar } = $props();
+    context = BarContext.Canvas
+  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; context?: BarContext } = $props();
 
   let showMore = $state(false);
   let showTemplates = $state(false);
+
+  $effect(() => {
+    void context;
+    showMore = false;
+    showTemplates = false;
+  });
 
   function pickTemplate(id: string) {
     showTemplates = false;
@@ -67,23 +58,42 @@
     if (file) { onupload?.(file); }
     input.value = '';
   }
+
+  const TOOL_COMMAND: Record<DrawTool, Command> = {
+    [DrawTool.Select]: Command.ToolSelect,
+    [DrawTool.Text]: Command.ToolText,
+    [DrawTool.Rectangle]: Command.ToolRectangle,
+    [DrawTool.Ellipse]: Command.ToolEllipse,
+    [DrawTool.Pen]: Command.ToolPen
+  };
+
+  const DRAW_TOOLS = Object.values(DrawTool).map((tool) => {
+    const tip = tipText(TOOL_COMMAND[tool]);
+    return { tool, name: tip.name, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[TOOL_COMMAND[tool]].icon };
+  });
+
+  const SLOT: Record<BarSlot, Snippet> = {
+    [BarSlot.Upload]: uploadSlot,
+    [BarSlot.Nodes]: nodesSlot,
+    [BarSlot.More]: moreSlot,
+    [BarSlot.Templates]: templatesSlot,
+    [BarSlot.FrameTemplates]: frameTemplatesSlot,
+    [BarSlot.Draw]: drawSlot,
+    [BarSlot.Image]: imageSlot,
+    [BarSlot.FrameLibrary]: frameLibrarySlot
+  };
 </script>
 
-<div class="add-bar" data-testid="add-bar" data-shown={shown} data-dock={shown === AddBar.Shown ? 'timeline' : undefined} inert={shown === AddBar.Away}>
+{#snippet uploadSlot()}
   <span class="tool">
     <button type="button" title="Upload file" aria-label="Upload file" onclick={pickFile}>
       <Upload size={17} strokeWidth={1.7} />
     </button>
     <span class="add-tip" role="tooltip">Upload file</span>
   </span>
-  <input
-    bind:this={fileInput}
-    type="file"
-    class="sr-only"
-    accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,text/html,text/csv,text/plain,text/markdown,.xml,.rss,.atom,.ipynb"
-    onchange={fileChosen}
-  />
+{/snippet}
 
+{#snippet nodesSlot()}
   {#each CANVAS_BAR_MAIN as what (what)}
     {@const Icon = ADDABLE_ICON[what]}
     <span class="tool">
@@ -100,7 +110,9 @@
       <span class="add-tip" role="tooltip">{ADDABLE_LABEL[what]}</span>
     </span>
   {/each}
+{/snippet}
 
+{#snippet moreSlot()}
   <span class="tool">
     <button
       type="button"
@@ -117,7 +129,9 @@
     </button>
     <span class="add-tip" role="tooltip">More nodes</span>
   </span>
+{/snippet}
 
+{#snippet templatesSlot()}
   {#if ontemplate}
     <span class="tool">
       <button
@@ -136,7 +150,9 @@
       <span class="add-tip" role="tooltip">Templates</span>
     </span>
   {/if}
+{/snippet}
 
+{#snippet frameTemplatesSlot()}
   {#if onframes}
     <span class="tool">
       <button type="button" class="keys-toggle" title="Frame templates" aria-label="Frame templates" data-testid="frame-templates" onclick={onframes}>
@@ -145,6 +161,52 @@
       <span class="add-tip" role="tooltip">Frame templates</span>
     </span>
   {/if}
+{/snippet}
+
+{#snippet drawSlot()}
+  <span class="draw" role="toolbar" aria-label="Draw" data-testid="draw-tools">
+    {#each DRAW_TOOLS as t (t.tool)}
+      <span class="tool">
+        <button type="button" class="pick" class:on={frameBar.tool === t.tool} aria-pressed={frameBar.tool === t.tool} aria-label={t.label} title={t.label} data-tool={t.tool} onclick={() => (frameBar.tool = t.tool)}>
+          <t.icon size={17} strokeWidth={1.7} />
+        </button>
+        <span class="add-tip" role="tooltip">{t.label}</span>
+      </span>
+    {/each}
+  </span>
+{/snippet}
+
+{#snippet imageSlot()}
+  <span class="tool">
+    <button type="button" class="keys-toggle" title="Insert image" aria-label="Insert image" data-testid="frame-image" onclick={() => frameBar.host?.act(FrameAction.Image)}>
+      <ImagePlus size={17} strokeWidth={1.7} />
+    </button>
+    <span class="add-tip" role="tooltip">Insert image</span>
+  </span>
+{/snippet}
+
+{#snippet frameLibrarySlot()}
+  <span class="tool">
+    <button type="button" class="keys-toggle" title="Frame templates" aria-label="Frame templates" data-testid="frame-library" onclick={() => frameBar.host?.act(FrameAction.Library)}>
+      <LayoutTemplate size={17} strokeWidth={1.7} />
+    </button>
+    <span class="add-tip" role="tooltip">Frame templates</span>
+  </span>
+{/snippet}
+
+<div class="add-bar" data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, frameBar.timelinePx)}px`}>
+  {#key context}
+    <div class="group" data-testid={`bar-${context}`}>
+      {#each BAR_SLOTS[context] as s (s)}{@render SLOT[s]()}{/each}
+    </div>
+  {/key}
+  <input
+    bind:this={fileInput}
+    type="file"
+    class="sr-only"
+    accept="image/png,image/jpeg,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,text/html,text/csv,text/plain,text/markdown,.xml,.rss,.atom,.ipynb"
+    onchange={fileChosen}
+  />
 
   {#if ontemplate}
     <CanvasTemplateGallery bind:open={showTemplates} onpick={pickTemplate} />
@@ -174,11 +236,11 @@
 <style>
   .add-bar {
     position: absolute;
-    z-index: 12;
-    bottom: 0;
+    z-index: 61;
+    bottom: var(--lift, 0px);
     left: 50%;
     transform: translateX(-50%);
-    transition: transform var(--chrome-move) var(--ease-expo);
+    transition: bottom var(--chrome-move) var(--ease-expo);
     display: flex;
     align-items: center;
     gap: 3px;
@@ -189,13 +251,43 @@
     box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
   }
 
-  .add-bar[data-shown='away'] {
-    transform: translate(-50%, calc(100% + 24px));
+  .group {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    animation: bar-in 240ms var(--ease-expo-out);
+  }
+
+  .draw {
+    display: inline-flex;
+    gap: 3px;
+    padding-right: 3px;
+    margin-right: 3px;
+    border-right: 1px solid var(--line-2, #d2d2d7);
+  }
+
+  .pick {
+    cursor: pointer;
+  }
+
+  .pick.on {
+    color: var(--accent, #0071e3);
+    background: var(--paper-3, #f4f4f4);
+  }
+
+  @keyframes bar-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
     .add-bar {
       transition: none;
+    }
+    .group {
+      animation: none;
     }
   }
 
@@ -226,7 +318,7 @@
 
   @media (max-width: 767px) {
     .add-bar {
-      bottom: env(safe-area-inset-bottom, 0px);
+      bottom: calc(env(safe-area-inset-bottom, 0px) + var(--lift, 0px));
       gap: 0;
       padding: var(--mobile-bar-pad);
       box-shadow: var(--mobile-bar-shadow);

@@ -3,8 +3,9 @@
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { AssetKind } from '$lib/motion/components';
   import { setProps, type OpResult } from '$lib/motion/timeline';
-  import { PartKind, parsePart, partKind, partLabel, partText, writePartText } from '$lib/motion/poster-parts';
-  import { LineEdit, editLines, lineRows, markedPoster, photoAt, setPhoto, setPhotoLook, type PhotoFit, type PhotoLook } from '$lib/motion/poster-lines';
+  import Trash from '@lucide/svelte/icons/trash-2';
+  import { PartAction, PartKind, parsePart, partKind, partLabel, partText, runPart, writePartText } from '$lib/motion/poster-parts';
+  import { markedPoster, photoAt, setPhoto, setPhotoLook, type PhotoFit, type PhotoLook } from '$lib/motion/poster-lines';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
 
@@ -19,7 +20,6 @@
   const poster = $derived(markedPoster(String(clip.props.name)));
   const media = $derived(poster ? clip.props[poster.media] : undefined);
   const photo = $derived(photoAt(media, index));
-  const row = $derived(poster ? lineRows(String(clip.props[poster.lines] ?? ''))[index] : undefined);
 
   function apply(result: OpResult, summary: string) {
     if (result.ok) {
@@ -33,24 +33,11 @@
   const BODY: Record<PartKind, Snippet | null> = { [PartKind.Line]: lineBody, [PartKind.Photo]: photoBody, [PartKind.Arrow]: arrowBody, [PartKind.Text]: null, [PartKind.Other]: null };
   const body = $derived(BODY[kind]);
 
-  function line(edit: LineEdit) {
-    if (!poster) {
-      return;
-    }
-    const next = editLines({ lines: String(clip.props[poster.lines]), media }, index, edit);
-    apply(setProps(doc, clip.id, { [poster.lines]: next.lines, [poster.media]: next.media }), 'Edit line');
-  }
+  const remove = () => apply(runPart(doc, clip, part, PartAction.Delete), `Delete ${partLabel(doc, clip, part)}`);
 </script>
 
 {#snippet lineBody()}
   <input type="text" class="one" data-testid="part-text" aria-label={partLabel(doc, clip, part)} value={partText(clip, part)} onchange={(e) => apply(writePartText(doc, clip.id, part, e.currentTarget.value), 'Edit text')} />
-  {#if row}
-    <div class="tools">
-      <button type="button" onclick={() => line(LineEdit.AddPhoto)}>+ Photo</button>
-      {#if row.photos.length}<button type="button" onclick={() => line(LineEdit.RemovePhoto)}>− Photo</button>{/if}
-      <button type="button" class:on={row.arrow} aria-pressed={row.arrow} onclick={() => line(LineEdit.Arrow)}>Arrow</button>
-    </div>
-  {/if}
 {/snippet}
 
 {#snippet photoBody()}
@@ -68,10 +55,11 @@
   </label>
   <label class="field">Focus X <input type="range" min="0" max="1" step="0.01" value={photo.focusX ?? CENTRE} onchange={(e) => look({ focusX: Number(e.currentTarget.value) })} /></label>
   <label class="field">Focus Y <input type="range" min="0" max="1" step="0.01" value={photo.focusY ?? CENTRE} onchange={(e) => look({ focusY: Number(e.currentTarget.value) })} /></label>
+  <button type="button" class="delete" data-testid="part-delete" onclick={remove}><Trash size={12} /> Delete photo</button>
 {/snippet}
 
 {#snippet arrowBody()}
-  <label class="field">Show arrow <input type="checkbox" checked onchange={() => line(LineEdit.Arrow)} /></label>
+  <label class="field">Show arrow <input type="checkbox" checked onchange={remove} /></label>
 {/snippet}
 
 {#if body}
@@ -113,9 +101,11 @@
   }
 
 
-  .tools {
-    display: flex;
+  .delete {
+    display: inline-flex;
+    align-items: center;
     gap: 4px;
+    justify-self: start;
   }
 
   button {
@@ -124,11 +114,6 @@
     border: 1px solid var(--ui-line);
     background: var(--ui-surface);
     border-radius: 0;
-  }
-
-  button.on {
-    background: var(--ui-accent);
-    color: var(--ui-on-accent, #fff);
   }
 
   .assets {

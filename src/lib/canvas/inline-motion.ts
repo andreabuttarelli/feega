@@ -86,15 +86,3 @@ export enum CanvasState {
   Browsing = 'browsing',
   Editing = 'editing'
 }
-
-export enum AddBar {
-  Shown = 'shown',
-  Away = 'away'
-}
-
-const ADD_BAR: Record<CanvasState, AddBar> = {
-  [CanvasState.Browsing]: AddBar.Shown,
-  [CanvasState.Editing]: AddBar.Away
-};
-
-export const addBarOf = (state: CanvasState): AddBar => ADD_BAR[state];

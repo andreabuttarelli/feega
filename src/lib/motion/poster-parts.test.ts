@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLIP_TEXT, PartEdit, PartKind, componentLabel, editablePart, partAt, partBoxes, partKind, partLabel, partText, writePartText } from './poster-parts';
+import { CLIP_TEXT, PART_ACTIONS, PartAction, PartEdit, PartKind, runPart, componentLabel, editablePart, partAt, partBoxes, partKind, partLabel, partText, writePartText } from './poster-parts';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from './template/type-grid-poster/template';
 import { MotionFormat, findClip, newMotionDoc } from './doc';
 import { addClip } from './timeline';
@@ -114,5 +114,37 @@ describe('a drawn text clip edits in place like a poster part', () => {
     const made = addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0 }, 's1');
     const doc = made.ok ? made.doc : newMotionDoc(MotionFormat.Landscape);
     expect(editablePart(doc, findClip(doc, 's1')!.clip, CLIP_TEXT)).toBe(PartEdit.None);
+  });
+});
+
+describe('what a part can do', () => {
+  const linesOf = (result: { ok: boolean; doc?: typeof doc }) => String(findClip(result.ok && result.doc ? result.doc : doc, TYPE_GRID_CLIP)!.clip.props.lines).split('\n');
+  const before = String(clip.props.lines).split('\n');
+
+  it('a line inserts a photo after it; a photo and an arrow delete themselves', () => {
+    expect(PART_ACTIONS[PartKind.Line]).toEqual([PartAction.InsertPhoto]);
+    expect(PART_ACTIONS[PartKind.Photo]).toEqual([PartAction.Delete]);
+    expect(PART_ACTIONS[PartKind.Arrow]).toEqual([PartAction.Delete]);
+    expect(PART_ACTIONS[PartKind.Text]).toEqual([]);
+  });
+
+  it('deleting a photo drops its slot from its line', () => {
+    const line = before.findIndex((l) => l.includes('[photo]'));
+    const result = runPart(doc, clip, 'photos:0', PartAction.Delete);
+    expect(result.ok).toBe(true);
+    expect(linesOf(result)[line]).toBe(before[line].replace('[photo]', '').replace(/\s+/g, ' ').trim());
+  });
+
+  it('inserting a photo after a line adds a slot to that line', () => {
+    expect(linesOf(runPart(doc, clip, 'lines:0', PartAction.InsertPhoto))[0]).toBe(`${before[0]} [photo]`);
+  });
+
+  it('deleting an arrow hides it on its line', () => {
+    const at = before.findIndex((l) => l.includes('->'));
+    expect(linesOf(runPart(doc, clip, `arrow:${at}`, PartAction.Delete))[at]).not.toContain('->');
+  });
+
+  it('an action a part does not offer is refused', () => {
+    expect(runPart(doc, clip, 'lines:0', PartAction.Delete).ok).toBe(false);
   });
 });

@@ -2927,3 +2927,6 @@ Signal: a batch of `@real` motion specs fails together (`motion-editor` never ap
 
 ### A seeded e2e on production stalls production
 Signal: `@real` specs create and tear down orgs on the production Supabase project; a teardown froze production for 30 s. Move: run seeded e2e only against a non-production database; until one exists, unit and route tests with fakes.
+
+### An e2e keeps seeing the old component after an edit
+Signal: a `@real` spec reads a style or behaviour you already changed (a computed `z-index` still the old value) on a long-running `vite dev` in a worktree. Move: restart the dev server before believing the red; HMR does not always reach a component mounted inside the canvas.

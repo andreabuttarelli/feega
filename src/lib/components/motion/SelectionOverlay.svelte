@@ -7,7 +7,7 @@
   import { selectionView } from '$lib/motion/selection-context';
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
-  import { CLIP_TEXT, PART_SEP, PartEdit, editablePart, partAt, partBoxes, partText, writePartText } from '$lib/motion/poster-parts';
+  import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
@@ -125,7 +125,32 @@
     }
   }
 
-  const boxStyle = (b: { left: number; top: number; width: number; height: number }) =>
+  let menu = $state<{ at: Pt; part: string; actions: PartAction[] } | null>(null);
+
+  function openMenu(e: MouseEvent) {
+    const at = local(e as PointerEvent);
+    const hit = partHit(at) ?? part;
+    const actions = clip && hit ? PART_ACTIONS[partKind(doc, clip, hit)] : [];
+    if (!hit || !actions.length) {
+      return;
+    }
+    e.preventDefault();
+    part = hit;
+    menu = { at, part: hit, actions };
+  }
+
+  function runMenu(action: PartAction) {
+    const was = menu;
+    menu = null;
+    const result = was && clip ? runPart(doc, clip, was.part, action) : null;
+    if (!result?.ok) {
+      return;
+    }
+    onchange(result.doc, PART_ACTION_LOOK[action].label);
+    part = PART_ACTION_LOOK[action].keepsPart ? was!.part : null;
+  }
+
+  const boxStyle = (b:{ left: number; top: number; width: number; height: number }) =>
     `left: ${(b.left / doc.width) * 100}%; top: ${(b.top / doc.height) * 100}%; width: ${(b.width / doc.width) * 100}%; height: ${(b.height / doc.height) * 100}%;`;
 
   let asked = 0;
@@ -188,6 +213,7 @@
   let lastPress: Pt | null = null;
 
   function press(e: PointerEvent) {
+    menu = null;
     const p = local(e);
     const hit = partHit(p);
     if (hit) {
@@ -282,7 +308,7 @@
   }
 </script>
 
-<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={editPart} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
+<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={editPart} oncontextmenu={openMenu} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} />{/if}
     {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}
@@ -314,6 +340,13 @@
     {#if partBox && part}
       <div class="part-box" data-testid="part-box" data-part={part} style={boxStyle(partBox)}>
         {#each [0, 1, 2, 3] as corner (corner)}<span class="part-handle" data-corner={corner}></span>{/each}
+      </div>
+    {/if}
+    {#if menu}
+      <div class="part-menu" role="menu" data-testid="part-menu" style={pct(menu.at)} onpointerdown={(e) => e.stopPropagation()}>
+        {#each menu.actions as action (action)}
+          <button type="button" role="menuitem" onclick={() => runMenu(action)}>{PART_ACTION_LOOK[action].label}</button>
+        {/each}
       </div>
     {/if}
     {#if editing && editBox}
@@ -492,6 +525,33 @@
   .part-handle[data-corner='3'] {
     left: 0;
     top: 100%;
+  }
+
+  .part-menu {
+    position: absolute;
+    z-index: 3;
+    display: grid;
+    min-width: 140px;
+    padding: 4px;
+    background: var(--ui-bg);
+    border: 1px solid var(--ui-line);
+    box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+    pointer-events: auto;
+  }
+
+  .part-menu button {
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-sm);
+    text-align: left;
+  }
+
+  .part-menu button:hover {
+    background: var(--ui-hover);
   }
 
   .part-edit {

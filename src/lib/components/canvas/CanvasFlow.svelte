@@ -34,7 +34,7 @@
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
   import CanvasAddBar from './CanvasAddBar.svelte';
-  import type { AddBar } from '$lib/canvas/inline-motion';
+  import type { BarContext } from '$lib/canvas/bottom-bar';
   import CanvasKeys from './CanvasKeys.svelte';
   import CanvasSelectionBridge from './CanvasSelectionBridge.svelte';
   import CanvasImageTiers from './CanvasImageTiers.svelte';
@@ -137,7 +137,7 @@
     onPaste,
     onTemplate,
     onFrameTemplates,
-    addBar,
+    barContext,
     onUndo,
     onRedo,
     onConnectNew,
@@ -215,7 +215,7 @@
     onPaste?: (at: { x: number; y: number }) => void;
     onTemplate?: (id: string, at: { x: number; y: number }) => void;
     onFrameTemplates?: (at: { x: number; y: number }) => void;
-    addBar?: AddBar;
+    barContext?: BarContext;
     /** ⌘Z: annulla l'ultimo gesto di questa scheda. */
     onUndo?: () => void;
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
@@ -806,7 +806,7 @@
   {/if}
 
   {#if spec.chrome && onCreate}
-    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} ontemplate={onTemplate ? templateAtCentre : undefined} onframes={onFrameTemplates ? framesAtCentre : undefined} shown={addBar} />
+    <CanvasAddBar onpick={addAtCentre} onupload={onUpload} ontemplate={onTemplate ? templateAtCentre : undefined} onframes={onFrameTemplates ? framesAtCentre : undefined} context={barContext} />
   {/if}
 
   {#if spec.chrome}
