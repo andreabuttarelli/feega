@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MOTION_CANVAS_NAME, startMotion, type MotionStartDeps } from './start';
 import { frameNodeOf, newMotionData } from '$lib/canvas/motion-node';
 import { MotionFormat } from '$lib/motion/doc';
+import { nodeSize } from '$lib/canvas/node-size';
 import type { Db } from '$lib/server/db/client';
 
 const db = {} as Db;
@@ -94,5 +95,20 @@ describe('a frame started from a known picture is shaped by it', () => {
     await startMotion(db, d, { ...input, canvasId: 'c1', format: MotionFormat.Square });
 
     expect(vi.mocked(d.createNode).mock.calls[0][1]).not.toHaveProperty('width');
+  });
+});
+
+describe('a frame the agent places beside the nodes it is about', () => {
+  it('never lands on a node that has no stored size, nor on the nodes beside it', async () => {
+    const brief = { ...node(0, null), id: 'brief', type: 'doc' };
+    const beside = { ...node(500, null), id: 'poster' };
+    const d = deps({ listNodes: vi.fn(async () => [brief, beside]) });
+    await startMotion(db, d, { ...input, canvasId: 'c1', near: ['brief'] });
+
+    const placed = vi.mocked(d.createNode).mock.calls[0][1] as { x: number; y: number };
+    const rects = [brief, beside].map((n) => ({ x: n.position.x, y: n.position.y, ...nodeSize(n.type) }));
+    const mine = { x: placed.x, y: placed.y, ...nodeSize('motion', newMotionData()) };
+    const overlaps = (a: typeof mine, b: typeof mine) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    expect(rects.some((r) => overlaps(mine, r))).toBe(false);
   });
 });
