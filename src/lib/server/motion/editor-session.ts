@@ -1,4 +1,4 @@
-import { canvasScope, motionOrThrow, nodeLookup } from './editor-scope';
+import { canvasScope, motionOrThrow, nodeLookup, type CanvasScope } from './editor-scope';
 import { motionAssets, motionTokens, newHead } from './editor';
 import { readHead } from '$lib/server/repos/motion-revisions';
 import { serverTiming, type Phases } from '$lib/server/server-timing';
@@ -15,15 +15,20 @@ import { storyboardPath } from '$lib/canvas/motion-node';
 import { editorGallery } from '$lib/server/gallery/editor';
 
 type EditorParams = { projectId: string; canvasId: string; nodeId: string };
+type SessionAsk = { projectId: string; nodeId: string; briefIds: string[] };
 
-export type MotionEditorData = Awaited<ReturnType<typeof loadEditorSession>>;
+export type MotionEditorData = Awaited<ReturnType<typeof editorSession>>;
 
 export const libraryOf = (scope: { db: Db; orgId: string; userId: string }) => templateLibrary(scope.db, { orgId: scope.orgId, actor: { kind: 'user', id: scope.userId } });
 
 export async function loadEditorSession(locals: App.Locals, params: EditorParams, url: URL, phases: Phases = serverTiming()) {
   const canvas = await phases.time('scope', canvasScope(locals, params));
+  return editorSession(canvas, { projectId: params.projectId, nodeId: params.nodeId, briefIds: briefAttachmentIds(url) }, phases);
+}
+
+export async function editorSession(canvas: CanvasScope, params: SessionAsk, phases: Phases = serverTiming()) {
   const { db, userId, found } = canvas;
-  const briefIds = briefAttachmentIds(url);
+  const { briefIds } = params;
   const nodeScope = { orgId: found.orgId, nodeId: params.nodeId };
   const farm = motionRenderFarm();
   const uploadLimit = farm ? knownRenderLimit() : null;

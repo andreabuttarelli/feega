@@ -7,7 +7,7 @@ import type { Db } from '$lib/server/db/client';
 import { findMotionNode } from './editor';
 
 type Params = { projectId: string; canvasId: string; nodeId: string };
-type CanvasScope = { db: Db; userId: string; found: OpenCanvas };
+export type CanvasScope = { db: Db; userId: string; found: OpenCanvas };
 type FoundMotion = Awaited<ReturnType<typeof findMotionNode>>;
 
 export async function canvasScope(locals: App.Locals, params: Params): Promise<CanvasScope> {
