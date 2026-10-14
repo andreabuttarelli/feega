@@ -76,7 +76,7 @@
 
 {#snippet colour(name: string, value: string, write: (next: string) => void)}
   {@const { base, alpha } = colourAlpha(value)}
-  <ColorField {name} value={base} {tokens} onchange={(next) => write(recolour(next, alpha))} />
+  <ColorField {name} value={base} {tokens} {alpha} onchange={(next) => write(recolour(next, alpha))} onalpha={(next) => write(recolour(base, next))} />
 {/snippet}
 
 <div class="flex flex-col gap-0.5" data-testid="stroke-stack">

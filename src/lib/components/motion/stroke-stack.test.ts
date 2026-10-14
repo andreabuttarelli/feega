@@ -85,6 +85,13 @@ describe('the stroke stack in Properties', () => {
     expect(sent(onchange)[0].join).toBe('bevel');
   });
 
+  it('a stroke colour carries its own alpha', () => {
+    const onchange = show(TWO);
+    click(rows()[1]);
+    change(document.querySelector<HTMLInputElement>('[aria-label="Stroke colour opacity"]')!, '50%');
+    expect(sent(onchange)[0].paint).toMatchObject({ color: '#11111180' });
+  });
+
   it('the paint switches to a gradient keeping its colour', () => {
     const onchange = show(TWO);
     click(rows()[1]);
