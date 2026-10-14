@@ -45,16 +45,16 @@ test.describe('drawing inside a frame @real', () => {
       await page.mouse.up();
     }
 
-    await drag('rectangle', at(0.1, 0.55), at(0.45, 0.75));
+    await drag('rectangle', at(0.3, 0.5), at(0.6, 0.7));
     await expect.poll(() => shapes('rect'), { timeout: 10_000 }).toBe(1);
     await expect(page.getByTestId('draw-tools').locator('[data-tool="select"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('editor-stage'), 'the frame keeps showing the live editor after a save').toHaveAttribute('data-shown', 'true');
     await shoot(page, '20-draw-rectangle');
 
-    await drag('ellipse', at(0.55, 0.55), at(0.9, 0.75));
+    await drag('ellipse', at(0.65, 0.5), at(0.95, 0.7));
     await expect.poll(() => shapes('ellipse'), { timeout: 10_000 }).toBe(1);
 
-    await drag('text', at(0.1, 0.8), at(0.6, 0.9));
+    await drag('text', at(0.4, 0.75), at(0.9, 0.85));
     await expect.poll(async () => (await clips()).filter((c) => c.component === 'Text').length, { timeout: 10_000 }).toBe(1);
 
     await page.getByTestId('draw-tools').locator('[data-tool="pen"]').click();
@@ -73,5 +73,12 @@ test.describe('drawing inside a frame @real', () => {
     expect(String(path.props.path)).toMatch(/Z$/i);
     await expect(page.getByTestId('editor-stage'), 'saves never hand the frame back to its stale picture').toHaveAttribute('data-shown', 'true');
     await shoot(page, '21-draw-pen');
+
+    await page.getByTestId('edit-mode').locator('[data-mode="design"]').click();
+    await expect(page.getByTestId('edit-mode').locator('[data-mode="design"]')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.locator('section[aria-label="Timeline"]')).toHaveAttribute('inert', '');
+    await shoot(page, '22-design-mode');
+    await page.keyboard.press('e');
+    await expect(page.getByTestId('edit-mode').locator('[data-mode="motion"]')).toHaveAttribute('aria-checked', 'true');
   });
 });

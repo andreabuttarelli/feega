@@ -5,6 +5,7 @@ import TypeIcon from '@lucide/svelte/icons/type';
 import SquareIcon from '@lucide/svelte/icons/square';
 import CircleIcon from '@lucide/svelte/icons/circle';
 import PenTool from '@lucide/svelte/icons/pen-tool';
+import PencilRuler from '@lucide/svelte/icons/pencil-ruler';
 import Pause from '@lucide/svelte/icons/pause';
 import Rewind from '@lucide/svelte/icons/rewind';
 import SkipBack from '@lucide/svelte/icons/skip-back';
@@ -232,6 +233,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToggleInspector]: { name: 'Properties panel', icon: PanelRight, group: GuideGroup.View, place: Place.Bar },
   [Command.ToggleTimeline]: { name: 'Timeline', icon: PanelBottom, group: GuideGroup.View, place: Place.Transport },
   [Command.ToggleChat]: { name: 'Agent panel', icon: BotMessageSquare, group: GuideGroup.View, place: Place.Bar },
+  [Command.ToggleEditMode]: { name: 'Design / Motion', icon: PencilRuler, group: GuideGroup.View, place: Place.Bar },
   [Command.Help]: { name: 'Keyboard & gestures', icon: Keyboard, group: GuideGroup.View, place: Place.Drawer },
   [Tool.Menu]: { name: 'Menu', icon: Menu, group: GuideGroup.View, place: Place.Bar },
   [Tool.Back]: { name: 'Back to the canvas', icon: ArrowLeft },

@@ -158,3 +158,9 @@ describe('drawing tool keys', () => {
     expect(press('t')).toBe(Command.RevealOpacity);
   });
 });
+
+describe('the Design and Motion switch', () => {
+  it('E flips between Design and Motion', () => {
+    expect(press('e')).toBe(Command.ToggleEditMode);
+  });
+});

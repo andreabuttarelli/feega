@@ -32,11 +32,10 @@
 <style>
   .draw-tools {
     position: absolute;
-    top: 8px;
+    bottom: 8px;
     left: 8px;
     z-index: 5;
     display: flex;
-    flex-direction: column;
     gap: 2px;
     padding: 2px;
     background: var(--ui-bg);

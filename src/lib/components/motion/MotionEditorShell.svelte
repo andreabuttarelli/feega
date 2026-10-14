@@ -121,6 +121,7 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHover } from '$lib/canvas/layers';
   import { DrawTool } from '$lib/motion/draw-tool';
+  import { EDIT_MODE_KEY, EditMode, nextMode, readMode } from '$lib/motion/edit-mode';
   import DrawOverlay from './DrawOverlay.svelte';
   import DrawTools from './DrawTools.svelte';
   import { PART_SEP, parsePart } from '$lib/motion/poster-parts';
@@ -214,6 +215,17 @@
       return localStorage;
     } catch {
       return null;
+    }
+  }
+
+  let editMode = $state(readMode(browserStore()?.getItem(EDIT_MODE_KEY) ?? null));
+
+  function setMode(next: EditMode) {
+    editMode = next;
+    try {
+      browserStore()?.setItem(EDIT_MODE_KEY, next);
+    } catch {
+      return;
     }
   }
 
@@ -1069,6 +1081,7 @@
     [Command.ToolRectangle]: () => (tool = DrawTool.Rectangle),
     [Command.ToolEllipse]: () => (tool = DrawTool.Ellipse),
     [Command.ToolPen]: () => (tool = DrawTool.Pen),
+    [Command.ToggleEditMode]: () => setMode(nextMode(editMode)),
     [Command.Delete]: remove,
     [Command.Split]: split,
     [Command.Duplicate]: duplicate,
@@ -1288,6 +1301,11 @@
     </div>
 
     <div class="group trail" {...dockOf(Part.Bar)} data-testid="bar-trail">
+      <div class="mode-switch" role="radiogroup" aria-label="Edit mode" data-testid="edit-mode" title="Design edits the base, Motion keys at the playhead (E)">
+        {#each [EditMode.Design, EditMode.Motion] as m (m)}
+          <button type="button" role="radio" aria-checked={editMode === m} class:on={editMode === m} data-mode={m} onclick={() => setMode(m)}>{m === EditMode.Design ? 'Design' : 'Motion'}</button>
+        {/each}
+      </div>
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
       <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
       <div class="popover-anchor">
@@ -1431,7 +1449,7 @@
     />
   {/if}
 
-  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc)}>
+  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
     <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
@@ -1478,7 +1496,7 @@
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
         <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
-        <MotionInspector {doc} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart && selected ? partFieldKeys(doc, selected, parsePart(selectedPart).field) : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        <MotionInspector {doc} mode={editMode} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart && selected ? partFieldKeys(doc, selected, parsePart(selectedPart).field) : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
@@ -1501,7 +1519,7 @@
     {/snippet}
     </SideColumn>
 
-    <section class="timeline-area" {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc)}>
+    <section class="timeline-area" {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
 
       {#if clipBarShown}
@@ -1857,7 +1875,30 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) var(--props-w) var(--chat-w);
     grid-template-rows: minmax(0, 1fr) var(--tl-h);
-    transition: grid-template-rows 180ms ease-out;
+    transition: grid-template-rows 320ms var(--ease-expo-out);
+  }
+
+  .mode-switch {
+    display: flex;
+    padding: 2px;
+    background: var(--ui-field);
+    border-radius: 9999px;
+  }
+
+  .mode-switch button {
+    height: 26px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
+    transition: background 320ms var(--ease-expo-out), color 320ms var(--ease-expo-out);
+  }
+
+  .mode-switch button.on {
+    background: var(--ui-bg);
+    color: var(--ui-ink);
   }
 
   .body.no-timeline {
@@ -1867,7 +1908,7 @@
   .body.no-timeline .timeline-area {
     visibility: hidden;
     overflow: hidden;
-    transition: visibility 0s 180ms;
+    transition: visibility 0s 320ms;
   }
 
   @media (prefers-reduced-motion: reduce) {

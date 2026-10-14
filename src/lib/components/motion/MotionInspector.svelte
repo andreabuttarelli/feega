@@ -14,7 +14,8 @@
   import { TRANSITION_KINDS, type Edge } from '$lib/motion/design';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { InspectorTab, clipFieldGroups, editAt, keyAt, keyedField, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
+  import { EditMode, designWarning, editIn } from '$lib/motion/edit-mode';
+  import { InspectorTab, clipFieldGroups, keyAt, keyedField, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
   import { setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
   import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '$lib/motion/mask';
   import { ANIMATABLE, Source, isAnimatable, TRANSFORM, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
@@ -69,7 +70,8 @@
     onchange,
     onuploadfont,
     onopen,
-    focus = null
+    focus = null,
+    mode = EditMode.Motion
   }: {
     doc: MotionDoc;
     analyses?: Record<string, AudioAnalysis>;
@@ -84,6 +86,7 @@
     onuploadfont?: (file: File) => Promise<string | null>;
     onopen?: (comp: string) => void;
     focus?: readonly string[] | null;
+    mode?: EditMode;
   } = $props();
 
   const ANCHOR_STOPS = [0, 0.5, 1] as const;
@@ -190,8 +193,10 @@
   }
 
   function animate(key: string, value: KeyValue) {
-    commit(editAt(doc, clip, key, value, frame), `Edited ${key}`);
+    commit(editIn(mode, doc, clip, key, value, frame), `Edited ${key}`);
   }
+
+  const warning = $derived(designWarning(mode, clip));
 
   function applyPhysicsOf(select: HTMLSelectElement) {
     const preset = select.value as PhysicsPreset;
@@ -365,6 +370,8 @@
     <span class="kind">{customName ?? spec.label}</span>
     <span class="id">{clip.id}</span>
   </header>
+
+  {#if warning}<p class="mode-warning" role="status" data-testid="design-animated-warning">{warning}</p>{/if}
 
   {#if customName}
     <div class="tabs" role="tablist">
@@ -1308,5 +1315,11 @@
   .error {
     margin: 8px 12px;
     color: var(--ui-danger);
+  }
+
+  .mode-warning {
+    margin: 8px 12px;
+    color: var(--ui-warn);
+    font-size: var(--ui-text-sm);
   }
 </style>
