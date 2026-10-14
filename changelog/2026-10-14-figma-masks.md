@@ -3,7 +3,7 @@
 Frames had per-clip AE masks and track mattes, but not Figma's gesture:
 draw a shape, select it with the layers above, use it as mask.
 
-Model (ADR 0009): a track matte with a named source. New optional clip
+Model (ADR 0010): a track matte with a named source. New optional clip
 field `matteFrom`; when set, `matteSource` returns that clip instead of
 the clip on the track above. No new renderer: the matte runtime already
 snapshots the source as drawn, so radius, smoothing, paths, gradient
