@@ -43,8 +43,30 @@ test.describe('poster parts on the canvas @real', () => {
     await shoot(page, '8-poster-part');
 
     await page.getByRole('button', { name: 'Layers', exact: true }).click();
-    await expect(page.getByTestId('layers').locator(`[data-layer="poster#${TITLE_LINE}"]`)).toHaveAttribute('aria-selected', 'true');
+    const layerRow = page.getByTestId('layers').locator(`[data-layer="poster#${TITLE_LINE}"]`);
+    await expect(layerRow).toHaveAttribute('aria-selected', 'true');
 
+    const inspector = page.getByTestId('motion-inspector');
+    await expect(inspector.locator('#f-lines')).toBeVisible();
+    await expect(inspector.locator('#f-ink')).toBeVisible();
+    await expect(inspector.locator('[data-prop="fill"]')).toBeVisible();
+    await shoot(page, '8b-poster-part-properties');
+
+    const ink = '#ff00aa';
+    await inspector.locator('#f-ink').evaluate((el: HTMLInputElement, value: string) => {
+      el.value = value;
+      el.dispatchEvent(new Event('change'));
+    }, ink);
+
+    await expect
+      .poll(async () => {
+        const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1);
+        const doc = data?.[0]?.doc as { tracks: { clips: { id: string; props: { ink?: string } }[] }[] } | undefined;
+        return doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'poster')?.props.ink;
+      }, { timeout: 10_000 })
+      .toBe(ink);
+
+    await layerRow.click();
     await overlay.dblclick({ position: title });
     const field = page.getByTestId('part-edit');
     await expect(field).toBeVisible();
