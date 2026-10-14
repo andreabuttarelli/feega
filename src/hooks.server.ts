@@ -1,6 +1,7 @@
 import {sequence} from '@sveltejs/kit/hooks';
 import { error, json, redirect, text } from '@sveltejs/kit';
 import * as Sentry from '@sentry/sveltekit';
+import { busyAnswer } from '$lib/db-busy';
 import { seedMetaClickCookies } from '$lib/server/meta-click-cookies';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { markRlsScoped } from '$lib/server/rls-client';
@@ -247,7 +248,7 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
   }
   return inTool(doResolve);
 });
-export const handleError = Sentry.handleErrorWithSentry();
+export const handleError = Sentry.handleErrorWithSentry(({ error }) => busyAnswer(error));
 
 async function themePrefFor(event: RequestEvent): Promise<ThemePref> {
   const cookie = event.cookies.get(THEME_COOKIE);
