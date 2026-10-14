@@ -5,6 +5,7 @@
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import { FILL_TYPES, FillType, IMAGE_FITS, addFill, addStop, colourAlpha, moveFill, removeFill, removeStop, retypeFill, setFill, withAlpha, type Fill, type FillOf, type FillPatch, type Stop } from '$lib/motion/fill/model';
   import ColorField from './ColorField.svelte';
+  import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
 
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
 
@@ -27,6 +28,8 @@
   let adding = $state(false);
   let stopAt = $state(0);
   let dragged = $state<number | null>(null);
+  let root = $state<HTMLDivElement | null>(null);
+  let rowEls = $state<HTMLElement[]>([]);
 
   const topFirst = $derived(fills.map((fill, index) => ({ fill, index })).reverse());
   const pct = (n: number) => Math.round(n * PERCENT);
@@ -42,6 +45,9 @@
       return preview ? `center / cover no-repeat url("${preview}")` : 'var(--ui-input)';
     }
   };
+
+  const HEX_DIGITS = /^#/;
+  const rowLabel = (f: Fill) => (f.type === FillType.Solid ? colourAlpha(f.color).base.replace(HEX_DIGITS, '').toUpperCase() : TYPE_LABEL[f.type]);
 
   const patch = (i: number, p: FillPatch, summary: string) => onchange(setFill(fills, i, p), summary);
   const percentOf = (e: Event) => Math.max(0, Math.min(PERCENT, Number((e.currentTarget as HTMLInputElement).value))) / PERCENT;
@@ -115,7 +121,7 @@
   </div>
 {/snippet}
 
-<div class="flex flex-col gap-0.5" data-testid="fill-stack">
+<div class="flex flex-col gap-0.5" data-testid="fill-stack" bind:this={root}>
   <div class="relative flex h-(--ui-row) items-center justify-between">
     <span class={SECTION_LABEL}>{title}</span>
     <button type="button" class={ICON} data-testid="fill-add" aria-label="Add fill" aria-expanded={adding} onclick={() => (adding = !adding)}>+</button>
@@ -130,12 +136,14 @@
 
   {#each topFirst as { fill, index } (index)}
     <div
-      class={cn('grid grid-cols-[10px_18px_minmax(0,1fr)_48px_24px_24px] items-center gap-1 rounded-sm px-0.5', open === index && 'bg-ui-wash', !fill.visible && '[&>.dim]:opacity-40')}
+      bind:this={rowEls[index]}
+      class={cn('grid grid-cols-[10px_18px_minmax(0,1fr)_48px_24px_24px] items-center gap-1 rounded-sm px-0.5', open === index && 'bg-ui-selected', !fill.visible && '[&>.dim]:opacity-40')}
       role="button"
       tabindex="0"
       draggable="true"
       data-testid="fill-row"
       data-index={index}
+      data-open={open === index ? 'true' : undefined}
       onclick={() => toggle(index)}
       onkeydown={(e) => e.key === 'Enter' && toggle(index)}
       ondragstart={() => (dragged = index)}
@@ -158,9 +166,7 @@
           toggle(index);
         }}
       ></button>
-      <select class={cn(FIELD_INPUT, 'dim')} data-testid="fill-type" aria-label="Fill type" value={fill.type} onclick={(e) => e.stopPropagation()} onchange={(e) => onchange(retypeFill(fills, index, e.currentTarget.value as FillType), 'Change fill type')}>
-        {#each FILL_TYPES as type (type)}<option value={type}>{TYPE_LABEL[type]}</option>{/each}
-      </select>
+      <span class={cn(LABEL, 'dim truncate')} data-testid="fill-label">{rowLabel(fill)}</span>
       <input class={cn(FIELD_INPUT, 'dim')} type="number" min="0" max="100" step="1" data-testid="fill-opacity" aria-label="Layer opacity" title="Layer opacity %" value={pct(fill.opacity)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { opacity: percentOf(e) }, 'Fill opacity')} />
       <button
         type="button"
@@ -184,8 +190,15 @@
       >
     </div>
 
-    {#if open === index}
-      <div class="flex flex-col gap-1.5 py-1.5 pl-4" data-testid="fill-editor">
+    {#if open === index && rowEls[index]}
+      <SidePopover anchor={rowEls[index]} within={root} key={String(index)} title={TYPE_LABEL[fill.type]} label={`${TYPE_LABEL[fill.type]} fill`} swatch={SWATCH[fill.type](fill)} onclose={() => (open = null)}>
+      <div class="flex flex-col gap-1.5" data-testid="fill-editor">
+        <label class={FIELD_ROW}
+          ><span class={LABEL}>Type</span>
+          <select class={cn(FIELD_INPUT, 'w-28')} data-testid="fill-type" aria-label="Fill type" value={fill.type} onchange={(e) => onchange(retypeFill(fills, index, e.currentTarget.value as FillType), 'Change fill type')}>
+            {#each FILL_TYPES as type (type)}<option value={type}>{TYPE_LABEL[type]}</option>{/each}
+          </select>
+        </label>
         {#if fill.type === FillType.Solid}
           {@render colour('Fill colour', fill.color, (next) => patch(index, { color: next }, 'Fill colour'))}
         {:else if fill.type === FillType.Linear || fill.type === FillType.Radial}
@@ -256,6 +269,7 @@
           </select>
         </label>
       </div>
+      </SidePopover>
     {/if}
   {:else}
     <span class="text-ui-caption text-ui-text-3">No fill. + adds one.</span>

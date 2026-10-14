@@ -51,9 +51,11 @@ export enum MenuTone {
 
 export const FOCUS_RING = 'outline-none focus-visible:shadow-[var(--ui-ring)]';
 
-export const SECTION_LABEL = 'text-ui-section font-semibold uppercase tracking-[var(--ui-tracking-caps)] text-ui-text-3';
+export const SECTION_TITLE = 'text-ui-title font-semibold tracking-[var(--ui-tracking-title)] text-ui-text';
 
-export const FIELD_INPUT = `h-(--ui-row) pointer-coarse:h-11 min-w-0 rounded-sm bg-ui-input px-2 text-ui-label text-ui-text tabular-nums placeholder:text-ui-text-3 transition-colors duration-(--ui-dur-fast) hover:bg-ui-input-hover focus-visible:bg-ui-panel disabled:text-ui-text-off ${FOCUS_RING}`;
+export const SECTION_LABEL ='text-ui-section font-semibold uppercase tracking-[var(--ui-tracking-caps)] text-ui-text-3';
+
+export const FIELD_INPUT = `h-(--ui-row) pointer-coarse:h-11 min-w-0 rounded-md bg-ui-input px-2.5 text-ui-label text-ui-text tabular-nums placeholder:text-ui-text-3 transition-colors duration-(--ui-dur-fast) hover:bg-ui-input-hover focus-visible:bg-ui-panel disabled:text-ui-text-off ${FOCUS_RING}`;
 
 export const SURFACE: Record<Surface, string> = {
   [Surface.Panel]: 'bg-ui-panel',
@@ -62,9 +64,9 @@ export const SURFACE: Record<Surface, string> = {
 };
 
 export const ICON_SIZE: Record<IconSize, string> = {
-  [IconSize.Sm]: 'size-6 [&_svg]:size-(--ui-icon-xs)',
-  [IconSize.Md]: 'size-7 [&_svg]:size-(--ui-icon-sm)',
-  [IconSize.Lg]: 'size-8 [&_svg]:size-(--ui-icon)'
+  [IconSize.Sm]: 'size-7 [&_svg]:size-(--ui-icon-sm)',
+  [IconSize.Md]: 'size-8 [&_svg]:size-(--ui-icon)',
+  [IconSize.Lg]: 'size-10 [&_svg]:size-(--ui-icon-lg)'
 };
 
 export const TONE: Record<Tone, string> = {
@@ -75,7 +77,7 @@ export const TONE: Record<Tone, string> = {
 
 export const MENU_CONTENT = 'z-50 min-w-48 overflow-hidden rounded-md bg-ui-raised p-1 text-ui-text shadow-ui-float outline-none';
 
-export const MENU_ITEM = `flex h-(--ui-row) pointer-coarse:h-11 w-full cursor-default select-none items-center gap-2 rounded-sm px-2 text-left text-ui-body text-ui-text outline-none data-highlighted:bg-ui-wash hover:bg-ui-wash focus-visible:bg-ui-wash data-disabled:pointer-events-none data-disabled:text-ui-text-off [&_svg]:size-(--ui-icon-sm) [&_svg]:shrink-0 [&_svg]:text-ui-icon`;
+export const MENU_ITEM = `flex h-(--ui-row) pointer-coarse:h-11 w-full cursor-default select-none items-center gap-2 rounded-md px-2 text-left text-ui-body text-ui-text outline-none data-highlighted:bg-ui-wash hover:bg-ui-wash focus-visible:bg-ui-wash data-disabled:pointer-events-none data-disabled:text-ui-text-off [&_svg]:size-(--ui-icon-sm) [&_svg]:shrink-0 [&_svg]:text-ui-icon`;
 
 export const MENU_TONE: Record<MenuTone, string> = {
   [MenuTone.Default]: '',

@@ -18,6 +18,8 @@ import { ShapeKind } from '../shape/schema';
 import type { ShapeLook } from '../shape/render';
 import { elementFills } from '../fill/elements';
 import { textPaint } from '../fill/render';
+import { elementStrokes } from '../stroke/elements';
+import { textStroke } from '../stroke/render';
 
 export type PropsOf<K extends ComponentId> = z.output<(typeof COMPONENTS)[K]['schema']>;
 
@@ -114,6 +116,7 @@ const zoomed = (url: string, p: Framing & { zoom: number }) => {
 type GlyphCtx = { p: Record<string, unknown>; color: (v: string) => string; asset: (id: string | null) => string | null };
 
 const glyphPaint = (ctx: GlyphCtx, component: string) => textPaint(elementFills(component, ctx.p), ctx.color, ctx.asset);
+const glyphStroke = (ctx: GlyphCtx & { unit: number }, component: string) => textStroke(elementStrokes(component, ctx.p), ctx.unit, ctx.color);
 const glyphStyle = (paint: Record<string, string>) => (paint.backgroundImage ? ` style="${css(paint)}"` : '');
 const glyphWrap = (paint: Record<string, string>, html: string) => (paint.backgroundImage ? `<span${glyphStyle(paint)}>${html}</span>` : html);
 
@@ -127,7 +130,7 @@ const Title: Template<'Title'> = {
       .lines(ctx.p.text)
       .map((line, i) => `<div style="${css({ overflow: 'hidden', paddingBottom: DESCENDER, marginBottom: `-${DESCENDER}` })}"><div class="li" id="li-${ctx.id}-${i}"${glyphStyle(paint)}>${line || '&nbsp;'}</div></div>`)
       .join('');
-    const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, ...ctx.text.vars });
+    const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, ...glyphStroke(ctx, 'Title'), ...ctx.text.vars });
     return placed(ctx, ctx.p, `<div${hostId(ctx)} data-fit="${size}" style="${style}">${ctx.text.style}${lines}</div>`, false, box);
   },
   tweens: (ctx) =>
@@ -146,7 +149,7 @@ const Text: Template<'Text'> = {
   html: (ctx) => {
     const size = typeSize(ctx);
     const paint = glyphPaint(ctx, 'Text');
-    const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, whiteSpace: 'pre-wrap', ...ctx.text.vars });
+    const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: 'pre-wrap', ...ctx.text.vars });
     return placed(ctx, ctx.p, `<div id="tx-${ctx.id}" data-fit="${size}" style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${ctx.text.lines(ctx.p.text).join('\n')}</span></div>`);
   },
   tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]
@@ -158,7 +161,7 @@ const Kicker: Template<'Kicker'> = {
     placed(
       ctx,
       ctx.p,
-      `<div${hostId(ctx)} data-fit="${typeSize(ctx)}" style="${css({ ...typeStyle(ctx, ctx.p, typeSize(ctx)), ...glyphPaint(ctx, 'Kicker'), textTransform: 'uppercase', ...ctx.text.vars })}">${ctx.text.style}${ctx.text.lines(ctx.p.text).join('\n')}</div>`
+      `<div${hostId(ctx)} data-fit="${typeSize(ctx)}" style="${css({ ...typeStyle(ctx, ctx.p, typeSize(ctx)), ...glyphPaint(ctx, 'Kicker'), ...glyphStroke(ctx, 'Kicker'), textTransform: 'uppercase', ...ctx.text.vars })}">${ctx.text.style}${ctx.text.lines(ctx.p.text).join('\n')}</div>`
     )
 };
 
@@ -170,6 +173,7 @@ const Caption: Template<'Caption'> = {
     const style = css({
       ...typeStyle(ctx, ctx.p, size),
       color: paint.color,
+      ...glyphStroke(ctx, 'Caption'),
       background: ctx.color(ctx.p.background),
       padding: '0.25em 0.5em',
       ...ctx.text.vars

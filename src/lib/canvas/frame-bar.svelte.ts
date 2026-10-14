@@ -9,16 +9,20 @@ type Host = { act: (action: FrameAction) => void };
 
 class FrameBar {
   tool = $state(DrawTool.Select);
-  timelinePx = $state(0);
+  timeline = $state.raw<HTMLElement | null>(null);
+  sidePx = $state(0);
   host = $state<Host | null>(null);
+  covered = $state(false);
 
   attach(host: Host) {
     this.host = host;
     return () => {
       if (this.host === host) {
         this.host = null;
-        this.timelinePx = 0;
+        this.timeline = null;
+        this.sidePx = 0;
         this.tool = DrawTool.Select;
+        this.covered = false;
       }
     };
   }

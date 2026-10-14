@@ -14,12 +14,14 @@ import MenuContent from './MenuContent.svelte';
 import MenuItem from './MenuItem.svelte';
 import MenuLabel from './MenuLabel.svelte';
 import MenuSeparator from './MenuSeparator.svelte';
+import SidePopover from './SidePopover.svelte';
 
 const Menu = DropdownMenu.Root;
 const MenuTrigger = DropdownMenu.Trigger;
 
 export * from './styles';
 export * from './shortcut';
+export * from './side-popover';
 export {
   Panel,
   PanelHeader,
@@ -38,5 +40,6 @@ export {
   MenuContent,
   MenuItem,
   MenuLabel,
+  SidePopover,
   MenuSeparator
 };

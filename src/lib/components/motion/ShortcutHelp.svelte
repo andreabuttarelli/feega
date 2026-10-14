@@ -56,10 +56,12 @@
     flex-direction: column;
     gap: var(--ui-space-2);
     padding: var(--ui-space-3) var(--ui-space-4) var(--ui-space-4);
-    background: var(--ui-raised);
     color: var(--ui-ink);
-    box-shadow: 0 16px 48px rgb(0 0 0 / 0.2);
     font-size: var(--ui-text-sm);
+    border: 0;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   header {

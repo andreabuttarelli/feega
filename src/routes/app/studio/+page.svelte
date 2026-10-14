@@ -637,7 +637,7 @@
     padding: 0 var(--ui-space-6);
     font-size: var(--ui-type-body);
     font-weight: 600;
-    border: 1px solid var(--ui-accent);
+    border: 1px solid var(--ui-accent-solid);
     background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
     text-decoration: none;

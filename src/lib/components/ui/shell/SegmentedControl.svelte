@@ -40,7 +40,7 @@
   }
 
   const ITEM = cn(
-    'inline-flex h-6 min-w-6 flex-1 items-center justify-center gap-1.5 rounded-sm px-2 text-ui-label font-medium text-ui-text-2 transition-colors duration-(--ui-dur-fast) pointer-coarse:h-10 hover:text-ui-text aria-checked:bg-ui-raised aria-checked:text-ui-text aria-checked:shadow-[0_1px_2px_rgb(0_0_0/0.14)] [&_svg]:size-(--ui-icon-sm)',
+    'inline-flex h-7 min-w-7 flex-1 items-center justify-center gap-1.5 rounded-sm px-2.5 text-ui-label font-medium text-ui-text-2 transition-colors duration-(--ui-dur-fast) pointer-coarse:h-10 hover:text-ui-text aria-checked:bg-ui-raised aria-checked:text-ui-text aria-checked:shadow-[0_1px_2px_rgb(0_0_0/0.14)] [&_svg]:size-(--ui-icon-sm)',
     FOCUS_RING
   );
 </script>

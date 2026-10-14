@@ -40,6 +40,9 @@
   import MarkedLines from './MarkedLines.svelte';
   import FillStack from './FillStack.svelte';
   import { elementFills } from '$lib/motion/fill/elements';
+  import StrokeStack from './StrokeStack.svelte';
+  import { elementStrokes } from '$lib/motion/stroke/elements';
+  import { sidesShown } from '$lib/motion/stroke/model';
   import { MarkedField, markedField } from '$lib/motion/poster-lines';
   import { componentLabel } from '$lib/motion/poster-parts';
   import FontPicker from './FontPicker.svelte';
@@ -395,7 +398,7 @@
   });
 </script>
 
-<div class="inspector" data-testid="motion-inspector" style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
+<div class="inspector" data-testid="motion-inspector" data-side-edge style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
   <header class="head" title={clip.id} data-testid="selection-head">
     <span class="icon"><FamilyIcon {family} /></span>
     <span class="name">{customName ? componentLabel(customName) : layerName(clip)}</span>
@@ -503,6 +506,8 @@
     {#if keyed}{@render exprEditor(field.key)}{/if}
   {:else if field.control === Control.Fills}
     <div class="stack" data-prop={field.key}><FillStack fills={elementFills(clip.component, clip.props)} {assets} {tokens} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
+  {:else if field.control === Control.Strokes}
+    <div class="stack" data-prop={field.key}><StrokeStack strokes={elementStrokes(clip.component, clip.props)} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
   {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
@@ -901,15 +906,20 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    height: 44px;
+    height: var(--ui-header-h);
     flex-shrink: 0;
-    padding: 0 var(--ui-space-4);
-    border-bottom: 1px solid var(--ui-line);
+    padding: 0 12px;
+    border-bottom: 1px solid var(--ui-divider);
   }
 
   .icon {
-    display: inline-flex;
-    color: var(--ui-ink-2);
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: var(--ui-radius-sm);
+    background: color-mix(in srgb, var(--hue) 16%, transparent);
+    color: var(--hue, var(--ui-icon-ink));
   }
 
   .name {
@@ -918,8 +928,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-weight: 600;
-    font-size: var(--ui-text-sm);
+    font-weight: var(--ui-weight-semibold);
+    font-size: var(--ui-type-title);
+    letter-spacing: var(--ui-tracking-title);
   }
 
   .kind {
@@ -929,25 +940,30 @@
 
   .tabs {
     display: flex;
-    gap: var(--ui-space-4);
-    padding: 0 var(--ui-space-4);
-    border-bottom: 1px solid var(--ui-line);
+    gap: 2px;
+    margin: 8px 12px 0;
+    padding: 2px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
   }
 
   .tabs button {
-    min-height: 32px;
+    flex: 1;
+    height: 24px;
     border: 0;
-    border-bottom: 2px solid transparent;
+    border-radius: var(--ui-radius-sm);
     background: none;
     font: inherit;
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-label);
+    font-weight: var(--ui-weight-medium);
+    color: var(--ui-text-secondary);
     cursor: pointer;
   }
 
   .tabs button.on {
-    color: var(--ui-ink);
-    border-bottom-color: var(--ui-ink);
+    background: var(--ui-panel-raised);
+    color: var(--ui-text);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
   }
 
   .grid2 {

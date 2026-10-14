@@ -45,8 +45,8 @@ describe('the shell primitives', () => {
     expect(html).toContain('00:02');
   });
 
-  it('a section header is a caps label; a foldable one is a button that says whether it is open', () => {
-    expect(render(Section, { props: { title: 'Layout', children: body } }).body).toMatch(/<h3[^>]*uppercase[^>]*>Layout<\/h3>/);
+  it('a section header is a bold title; a foldable one is a button that says whether it is open', () => {
+    expect(render(Section, { props: { title: 'Layout', children: body } }).body).toMatch(/<h3[^>]*font-semibold[^>]*>Layout<\/h3>/);
     const closed = render(Section, { props: { title: 'Effects', fold: Fold.Closed, children: body } }).body;
     expect(closed).toContain('aria-expanded="false"');
     expect(closed).not.toContain('<p>body</p>');

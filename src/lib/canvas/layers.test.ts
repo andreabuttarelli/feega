@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropPlace, nodeIcon, frameHover, frameRows, rowPicked, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
+import { LayerAction, LayerKind, NodeIcon, Pick, Place, restack, dropPlace, nodeIcon, frameHover, frameRows, rowPicked, rowsInside, searchRows, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
@@ -369,5 +369,36 @@ describe('where a drop lands on a row', () => {
     expect(dropPlace(LayerKind.Track, 0.5)).toBe(Place.Into);
     expect(dropPlace(LayerKind.Track, 0.1)).toBe(Place.Above);
     expect(dropPlace(LayerKind.Track, 0.9)).toBe(Place.Below);
+  });
+});
+
+describe('the rows inside a picked row are tinted with it', () => {
+  const row = (key: string, depth: number) => ({ key, depth });
+
+  it('every deeper row right after a picked row is inside it, up to the next sibling', () => {
+    const rows = [row('a', 0), row('b', 1), row('c', 2), row('d', 1), row('e', 0)];
+    expect([...rowsInside(rows, (r) => r.key === 'b')]).toEqual(['c']);
+    expect([...rowsInside(rows, (r) => r.key === 'a')]).toEqual(['b', 'c', 'd']);
+  });
+
+  it('nothing is inside when nothing is picked', () => {
+    expect(rowsInside([row('a', 0), row('b', 1)], () => false).size).toBe(0);
+  });
+});
+
+describe('searching the layers keeps a match where it lives', () => {
+  const row = (key: string, depth: number, label: string) => ({ key, depth, label });
+  const rows = [row('f', 0, 'Frame'), row('v', 1, 'Video 1'), row('t', 2, 'Title'), row('a', 1, 'Audio 1'), row('x', 0, 'Text')];
+
+  it('a match brings its parents with it, so it is never shown out of place', () => {
+    expect(searchRows(rows, 'title').map((r) => r.key)).toEqual(['f', 'v', 't']);
+  });
+
+  it('matching ignores case and spaces around the query', () => {
+    expect(searchRows(rows, '  AUDIO ').map((r) => r.key)).toEqual(['f', 'a']);
+  });
+
+  it('an empty query shows every row', () => {
+    expect(searchRows(rows, ' ')).toHaveLength(rows.length);
   });
 });

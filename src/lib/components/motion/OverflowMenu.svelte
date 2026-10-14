@@ -68,34 +68,41 @@
     width: 280px;
     max-height: min(var(--room, 70vh), 640px);
     overflow-y: auto;
-    padding: var(--ui-space-2);
-    background: var(--ui-raised);
-    box-shadow: 0 12px 32px rgb(0 0 0 / 0.14);
+    padding: 4px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   .head {
-    padding: var(--ui-space-3) var(--ui-space-3) var(--ui-space-1);
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-3);
+    padding: 8px 8px 4px;
+    font-size: var(--ui-type-section);
+    font-weight: var(--ui-weight-semibold);
+    letter-spacing: var(--ui-tracking-caps);
+    text-transform: uppercase;
+    color: var(--ui-text-tertiary);
   }
 
   button {
     display: flex;
     align-items: center;
     gap: var(--ui-space-2);
-    min-height: var(--ui-hit);
-    padding: 0 var(--ui-space-3);
+    min-height: var(--ui-row);
+    padding: 0 8px;
     border: 0;
+    border-radius: var(--ui-radius-sm);
     background: none;
-    color: var(--ui-ink);
+    color: var(--ui-text);
     font: inherit;
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-type-body);
     text-align: left;
     cursor: pointer;
   }
 
-  button:hover:not(:disabled) {
-    background: var(--ui-hover);
+  button:hover:not(:disabled),
+  button:focus-visible {
+    background: var(--ui-wash);
+    outline: none;
   }
 
   button:disabled {
@@ -104,7 +111,7 @@
   }
 
   button[aria-checked='true'] {
-    color: var(--ui-accent);
+    color: var(--ui-accent-text);
   }
 
   i {

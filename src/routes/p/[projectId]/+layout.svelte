@@ -155,7 +155,7 @@
   }
 
   const viewSwitch = $derived(
-    onCanvasRoute ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView } : null
+    onCanvasRoute && !inlineStage.editing ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView } : null
   );
 </script>
 
@@ -234,6 +234,7 @@
             kind={leftPanel}
             labelKey={NAV_ENTRIES.find((entry) => entry.id === leftPanel)?.labelKey ?? ''}
             onclose={() => (leftPanel = null)}
+            onkind={(kind) => (leftPanel = kind)}
           />
         {/await}
       {/if}
@@ -311,6 +312,14 @@
   }
   .mobile-main.is-canvas {
     overflow: hidden;
+  }
+  .project-shell.is-editing .mobile-main :global(.runs),
+  .project-shell.is-editing .mobile-main :global(.save-status) {
+    display: none;
+  }
+  .mobile-main.is-canvas:has(.mobile-view:not(.is-hidden) :global([data-testid='add-bar'])) {
+    --mobile-switch-bottom: calc(var(--mobile-bar-clearance) + var(--mobile-stack-gap));
+    --mobile-stack-top: calc(var(--mobile-switch-bottom) + var(--mobile-bar-h) + var(--mobile-stack-gap));
   }
   .mobile-main.is-canvas .mobile-view {
     height: 100%;

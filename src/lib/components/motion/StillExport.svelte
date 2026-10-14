@@ -3,7 +3,7 @@
   import { Action } from '$lib/motion/actions';
   import { deserialize } from '$app/forms';
   import type { MotionDoc } from '$lib/motion/doc';
-  import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport } from '$lib/motion/still-model';
+  import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, attachmentUrl, stillExport } from '$lib/motion/still-model';
 
   type Made = { url: string; width: number; height: number };
 
@@ -55,7 +55,7 @@
   {#if !saved}<p class="note">Saving… the image is drawn from the saved version.</p>{/if}
   {#if error}<p class="warn" role="alert">{error}</p>{/if}
   {#if made}
-    <a class="primary" href={made.url} download={`${fileName}.${stillExport(format, scale).ext}`} target="_blank" rel="noopener" data-testid="still-export-file">Download {made.width}×{made.height}</a>
+    <a class="primary" href={attachmentUrl(made.url, `${fileName}.${stillExport(format, scale).ext}`)} download={`${fileName}.${stillExport(format, scale).ext}`} data-testid="still-export-file">Download {made.width}×{made.height}</a>
   {/if}
   <button type="button" class="primary" disabled={working || !saved} onclick={exportImage} data-testid="still-export-go">{working ? 'Drawing…' : 'Export'}</button>
 </div>
@@ -79,11 +79,12 @@
     flex-direction: column;
     gap: 12px;
     padding: 16px;
-    background: var(--ui-bg);
     color: var(--ui-ink);
-    border: 1px solid var(--ui-line);
-    box-shadow: 0 16px 48px rgb(0 0 0 / 0.2);
     font-size: 13px;
+    border: 0;
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   header {
@@ -118,7 +119,7 @@
 
   .primary {
     padding: 8px 12px;
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
     font-size: 12px;
     text-align: center;

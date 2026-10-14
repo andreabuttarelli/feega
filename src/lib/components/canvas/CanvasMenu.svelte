@@ -263,25 +263,32 @@
   :global(.burger-btn) {
     display: grid;
     place-items: center;
-    width: 30px;
-    height: 30px;
+    width: var(--ui-control-h);
+    height: var(--ui-control-h);
     appearance: none;
     border: 0;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-icon-ink);
     cursor: pointer;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease);
+  }
+  :global(.burger-btn:focus-visible) {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
   :global(.burger-btn:hover) {
-    background: var(--paper-2, #f9f9f9);
-    color: var(--ink, #1d1d1f);
+    background: var(--ui-wash);
+    color: var(--ui-text);
   }
 
   :global([data-slot='dropdown-menu-content'].canvas-menu) {
     width: 260px !important;
     padding: 6px;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    border: 0;
+    box-shadow: var(--ui-shadow-float);
   }
 
   .menu-header {
@@ -298,8 +305,8 @@
     width: 32px;
     height: 32px;
     overflow: hidden;
-    background: var(--paper-3, #f4f4f4);
-    color: var(--ink-soft, #6e6e73);
+    background: var(--ui-wash);
+    color: var(--ui-text-secondary);
     font-size: 12px;
     font-weight: 600;
   }
@@ -322,7 +329,7 @@
     display: block;
     width: 100%;
     overflow: hidden;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-text);
     font-size: 13px;
     font-weight: 600;
     text-overflow: ellipsis;
@@ -333,7 +340,7 @@
     display: block;
     width: 100%;
     overflow: hidden;
-    color: var(--ink-faint, #86868b);
+    color: var(--ui-text-tertiary);
     font-size: 11.5px;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -341,7 +348,7 @@
 
   :global(.menu-heading) {
     padding: 6px 6px 4px;
-    color: var(--ink-faint, #86868b);
+    color: var(--ui-text-tertiary);
     font-size: 10.5px;
     font-weight: 600;
     text-transform: uppercase;
@@ -399,13 +406,13 @@
 
   .menu-balance {
     margin-left: auto;
-    color: var(--ink-faint, #86868b);
+    color: var(--ui-text-tertiary);
     font-size: 12px;
   }
 
   :global(.menu-row.is-danger a),
   :global(.menu-row.is-danger button) {
-    color: var(--ink-faint, #86868b);
+    color: var(--ui-text-tertiary);
   }
   :global(.menu-row.is-danger:hover a),
   :global(.menu-row.is-danger:hover button) {
@@ -468,8 +475,8 @@
     max-height: 60vh;
     padding: 4px;
     overflow-y: auto;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
+    background: var(--ui-panel);
+    border: 1px solid var(--ui-divider-strong);
     box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
   }
   .legal-row {
@@ -478,11 +485,11 @@
     height: 34px;
     padding: 0 8px;
     font-size: 13px;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-text);
     text-decoration: none;
   }
   .legal-row:hover {
-    background: var(--paper-2, #f9f9f9);
+    background: var(--ui-wash);
   }
   @media (max-width: 767px) {
     .legal-row {
@@ -504,7 +511,7 @@
   }
   .keys-label {
     font-size: 12.5px;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-text);
   }
   .combo {
     display: inline-flex;
@@ -518,10 +525,10 @@
     min-width: 18px;
     height: 18px;
     padding: 0 4px;
-    border: 1px solid var(--line, #e5e5e5);
-    background: var(--paper-2, #f9f9f9);
+    border: 1px solid var(--ui-divider);
+    background: var(--ui-wash);
     font-family: inherit;
     font-size: 11px;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-text-secondary);
   }
 </style>
