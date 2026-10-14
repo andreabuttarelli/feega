@@ -8,7 +8,7 @@ import { batchView, renderView } from '$lib/server/motion/render-run';
 import type { MotionEditorScope } from '$lib/server/motion/editor-scope';
 import { saveExport } from '$lib/server/motion/export';
 import { saveFontUpload } from '$lib/server/motion/font-upload';
-import { headOrNew, motionAssets, saveMotionDoc } from '$lib/server/motion/editor';
+import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { withTemplateSounds } from '$lib/server/motion/template-sounds';
@@ -16,6 +16,12 @@ import { laySfx } from '$lib/server/motion/sfx';
 import { withOrgContext } from '$lib/server/ai-log';
 import { parseMotionDoc } from '$lib/motion/doc';
 import type { Sfx } from '$lib/motion/sfx';
+import { Sound, generateSound } from '$lib/server/motion/voiceover';
+import { rowRequests, rowsFrom } from '$lib/server/motion/batch-input';
+import { startFarmBatch } from '$lib/server/motion/render-start';
+import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
+import { settingsFrom } from '$lib/motion/export-formats';
+import { motionEditorPath } from '$lib/canvas/motion-node';
 
 export enum EditorAccess {
   Read = 'read',
@@ -158,6 +164,57 @@ export const EDITOR_OPS = {
         posterFrame: input.posterFrame || 0
       });
       return saved.ok ? ok({ entry: saved.entry }) : refused(HTTP_BAD_REQUEST, { error: saved.error });
+    }
+  }),
+
+  generate_sound: op({
+    access: EditorAccess.Write,
+    input: z.object({ sound: z.string(), text: z.string(), seconds: z.number().optional() }),
+    run: async (ctx, input) => {
+      const sound = input.sound as Sound;
+      const text = input.text.trim();
+      if (!Object.values(Sound).includes(sound) || !text) {
+        return refused(HTTP_BAD_REQUEST, { error: 'invalid_sound' });
+      }
+      const denied = await ctx.gate();
+      if (denied) {
+        return denied;
+      }
+      const made = await withOrgContext(ctx.orgId, () => generateSound(ctx.db, soundScope(ctx), sound, { text, seconds: input.seconds || undefined }));
+      return made.ok ? ok({ assetId: made.assetId, seconds: made.seconds, url: made.url }) : refused(HTTP_UNAVAILABLE, { error: made.error });
+    }
+  }),
+
+  render_batch: op({
+    access: EditorAccess.Write,
+    input: z.object({ version: z.number(), settings: z.unknown().optional(), rows: z.unknown() }),
+    run: async (ctx, input) => {
+      const settings = settingsFrom(input.settings);
+      const rowsIn = rowsFrom(input.rows);
+      if (!settings.ok) {
+        return refused(HTTP_BAD_REQUEST, { error: settings.error });
+      }
+      if (!rowsIn.ok) {
+        return refused(HTTP_BAD_REQUEST, { error: rowsIn.error });
+      }
+      const head = await headOrNew(ctx.db, nodeScope(ctx), ctx.motion.node);
+      if (head.version !== input.version) {
+        return refused(HTTP_CONFLICT, { error: 'save_first' });
+      }
+      const denied = await ctx.gate();
+      if (denied) {
+        return denied;
+      }
+
+      const [assets, tokens] = await Promise.all([motionAssets(placeOf(ctx), SIGNED_URL_TTL_S.render), motionTokens(ctx.db, { orgId: ctx.orgId, brandId: ctx.projectBrandId })]);
+      const rows = rowRequests(head, rowsIn.rows, { tokens, assets: assetUrls(assets) }, settings.settings);
+      if (!rows.ok) {
+        return refused(HTTP_BAD_REQUEST, { error: 'invalid_row', detail: rows.error });
+      }
+
+      const editorUrl = motionEditorPath({ projectId: ctx.canvas.projectId, canvasId: ctx.canvas.id, nodeId: ctx.motion.record.id });
+      const started = await startFarmBatch(ctx.db, { ...nodeScope(ctx), projectId: ctx.canvas.projectId, userId: ctx.userId, editorUrl }, rows.rows);
+      return started.ok ? ok(started) : refused(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
     }
   }),
 

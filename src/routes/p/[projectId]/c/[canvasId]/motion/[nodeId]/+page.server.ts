@@ -3,13 +3,12 @@ import type { Actions, PageServerLoad } from './$types';
 import { libraryOf, loadEditorSession } from '$lib/server/motion/editor-session';
 import { motionScope as scopeFor, type MotionEditorScope } from '$lib/server/motion/editor-scope';
 import { runEditorOp, type EditorAnswer, type EditorCtx } from '$lib/server/frame-editor/editor-ops';
-import { Restore, assetUrls, headOrNew, motionAssets, motionTokens, restoreRevision } from '$lib/server/motion/editor';
+import { Restore, headOrNew, motionAssets, motionTokens, restoreRevision } from '$lib/server/motion/editor';
 import { listRevisions } from '$lib/server/repos/motion-revisions';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
 import { cancelRender } from '$lib/server/motion/render-run';
-import { startFarmBatch, startFarmRender } from '$lib/server/motion/render-start';
+import { startFarmRender } from '$lib/server/motion/render-start';
 import { serverRenderOpen } from '$lib/motion/server-render';
-import { batchInput, rowRequests } from '$lib/server/motion/batch-input';
 import { renderQueue } from '$lib/server/motion/render-queue';
 import { parseSettings } from '$lib/motion/export-formats';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
@@ -17,8 +16,6 @@ import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { savePoster } from '$lib/server/motion/poster';
 import { exportStill } from '$lib/server/motion/still-export';
 import { stillAskSchema, stillExport } from '$lib/motion/still-model';
-import { Sound, generateSound } from '$lib/server/motion/voiceover';
-import { withOrgContext } from '$lib/server/ai-log';
 import { clipsOf } from '$lib/motion/doc';
 import { templateLibrary } from '$lib/server/motion/templates';
 import type { Db } from '$lib/server/db/client';
@@ -139,20 +136,8 @@ export const actions: Actions = {
   sound: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const sound = String(form.get('sound')) as Sound;
-    const text = String(form.get('text') ?? '').trim();
-    if (!Object.values(Sound).includes(sound) || !text) {
-      return fail(HTTP_BAD_REQUEST, { error: 'invalid_sound' });
-    }
-
-    const denied = await gateOrgAiActionForForm(scope.orgId);
-    if (denied) {
-      return fail(denied.status, denied.data);
-    }
-
-    const soundScope = { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } };
-    const made = await withOrgContext(scope.orgId, () => generateSound(scope.db, soundScope, sound, { text, seconds: Number(form.get('seconds')) || undefined }));
-    return made.ok ? { assetId: made.assetId, seconds: made.seconds, url: made.url } : fail(HTTP_UNAVAILABLE, { error: made.error });
+    const input = { sound: String(form.get('sound')), text: String(form.get('text') ?? ''), seconds: Number(form.get('seconds')) || undefined };
+    return answered(await runEditorOp('generate_sound', editorCtx(scope), input));
   },
 
   render: async ({ locals, params, request }) => {
@@ -182,38 +167,9 @@ export const actions: Actions = {
   renderBatch: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const settings = parseSettings(form.get('settings') as string | null);
-    const input = batchInput(form.get('rows') as string | null);
-    if (!settings.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: settings.error });
-    }
-    if (!input.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: input.error });
-    }
-    const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
-    const head = await headOrNew(scope.db, nodeScope, scope.motion.node);
-    if (head.version !== Number(form.get('version'))) {
-      return fail(HTTP_CONFLICT, { error: 'save_first' });
-    }
-
-    const denied = await gateOrgAiActionForForm(scope.orgId);
-    if (denied) {
-      return fail(denied.status, denied.data);
-    }
-
-    const [assets, tokens] = await Promise.all([
-      motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }, SIGNED_URL_TTL_S.render),
-      motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId })
-    ]);
-    const rows = rowRequests(head, input.rows, { tokens, assets: assetUrls(assets) }, settings.settings);
-    if (!rows.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: 'invalid_row', detail: rows.error });
-    }
-
-    const editorUrl = `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
-    const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };
-    const started = await startFarmBatch(scope.db, renderScope, rows.rows);
-    return started.ok ? started : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
+    const settings = form.get('settings') ? parsedJson(String(form.get('settings'))) : undefined;
+    const input = { version: Number(form.get('version')), settings, rows: parsedJson(String(form.get('rows') ?? '')) };
+    return answered(await runEditorOp('render_batch', editorCtx(scope), input));
   },
 
   templateSounds: async ({ locals, params, request }) => {
