@@ -72,3 +72,28 @@ describe('app sidebar', () => {
     expect(html({ projectId: null, projects: [] })).toContain('href="/app/credits"');
   });
 });
+
+describe('account menu at the foot of the sidebar', () => {
+  const menu = (body: string) => body.slice(body.indexOf('data-testid="account-menu"'));
+
+  it('the foot shows avatar, name and email, and opens a closed menu', () => {
+    const body = html();
+    expect(body).toContain('ada@example.com');
+    expect(body).toMatch(/data-testid="account-toggle"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*data-testid="account-toggle"/);
+    expect(body).toMatch(/<div[^>]*data-testid="account-menu"[^>]*hidden/);
+  });
+
+  it('every account entry lives in the menu, after the projects', () => {
+    const body = html();
+    const inside = menu(body);
+    for (const needle of ['href="/p/p1/settings/project"', 'href="/app/credits"', 'href="/changelog"', 'href="/report"', 'data-testid="open-tour"', 'href="https://feega.app/terms"', 'data-testid="theme-switch"', 'action="/auth/signout"']) {
+      expect(inside).toContain(needle);
+    }
+    expect(body.indexOf('New project')).toBeLessThan(body.indexOf('data-testid="account-menu"'));
+  });
+
+  it('billing in the menu shows the credit balance', () => {
+    const inside = menu(html({ creditBalance: 995618 }));
+    expect(inside.slice(inside.indexOf('href="/app/credits"'), inside.indexOf('href="/changelog"'))).toMatch(/9[,.]?956/);
+  });
+});

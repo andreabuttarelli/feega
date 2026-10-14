@@ -5,10 +5,10 @@ import { APP_NAV, NavKind, NavSection, isNavActive, navHref, visibleNav } from '
 const PROJECT = 'p1';
 
 describe('app sidebar table', () => {
-  it('opens with New video, then home, motion and the gallery', () => {
+  it('opens with home, then templates, motion and the gallery', () => {
     const main = APP_NAV.filter((item) => item.section === NavSection.Main);
-    expect(main.map((item) => item.id)).toEqual(['new-video', 'home', 'tool:motion', 'gallery']);
-    expect(navHref(main[0], null)).toBe('/app#video-brief');
+    expect(main.map((item) => item.id)).toEqual(['home', 'templates', 'tool:motion', 'gallery']);
+    expect(navHref(main[1], null)).toBe('/app/templates');
   });
 
   it('lists every supporting tool of tools.ts, in order', () => {

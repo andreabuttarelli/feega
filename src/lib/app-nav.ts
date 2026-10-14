@@ -1,6 +1,6 @@
 import type { Component } from 'svelte';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-import Plus from '@lucide/svelte/icons/plus';
+import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 import Settings from '@lucide/svelte/icons/settings';
 import CreditCard from '@lucide/svelte/icons/credit-card';
 import Sparkles from '@lucide/svelte/icons/sparkles';
@@ -61,7 +61,7 @@ export type NavItem = {
 };
 
 const DASHBOARD_PATH = '/app';
-const NEW_VIDEO_PATH = `${DASHBOARD_PATH}#video-brief`;
+const TEMPLATES_PATH = `${DASHBOARD_PATH}/templates`;
 
 const none = () => null;
 
@@ -95,8 +95,8 @@ const toolRow = (tool: (typeof TOOLS)[number]) =>
 const toolsOf = (role: ToolRole) => TOOLS.filter((tool) => tool.role === role).map(toolRow);
 
 export const APP_NAV: readonly NavItem[] = [
-  row({ id: 'new-video', section: NavSection.Main, kind: NavKind.Link, label: { text: 'New video' }, icon: Plus, href: () => NEW_VIDEO_PATH }),
   row({ id: 'home', section: NavSection.Main, kind: NavKind.Link, label: { key: 'app.shell.menu.home' }, icon: LayoutGrid, href: () => DASHBOARD_PATH }),
+  row({ id: 'templates', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Templates' }, icon: LayoutTemplate, href: () => TEMPLATES_PATH }),
   ...toolsOf(ToolRole.Lead),
   row({ id: 'gallery', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Gallery' }, icon: Shuffle, load: NavLoad.Document, href: () => GALLERY_PATH }),
   ...toolsOf(ToolRole.Support),
