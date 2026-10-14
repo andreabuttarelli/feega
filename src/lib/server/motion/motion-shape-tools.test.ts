@@ -61,6 +61,24 @@ describe('motion agent shape tools', () => {
     expect((await run('set_props', { clip_id: 'id1', props: { fills: [{ type: 'solid', color: '#00ff00', opacity: 3 }] } })).ok).toBe(false);
   });
 
+  it('add_shape and set_props take a stroke stack and refuse a picture stroke', async () => {
+    const { session, run } = setup();
+    const strokes = [{ paint: { type: 'solid', color: '#ff0000' }, width: 0.01, align: 'outside', sides: [0.01, 0, 0.02, 0] }];
+    expect(await run('add_shape', { kind: 'rect', start: 0, strokes })).toMatchObject({ ok: true, clip_id: 'id1' });
+    expect(findClip(session.doc, 'id1')!.clip.props.strokes).toMatchObject(strokes);
+
+    expect((await run('set_props', { clip_id: 'id1', props: { strokes: [{ paint: { type: 'solid', color: '#00ff00' }, align: 'inside' }] } })).ok).toBe(true);
+    expect(findClip(session.doc, 'id1')!.clip.props.strokes).toMatchObject([{ align: 'inside', visible: true }]);
+    expect((await run('set_props', { clip_id: 'id1', props: { strokes: [{ paint: { type: 'image', assetId: 'x' } }] } })).ok).toBe(false);
+  });
+
+  it('the shape and props tools tell the agent about stroke stacks', () => {
+    const { session } = setup();
+    const tools = createMotionTools({ session, assets: [], newId: () => 'x', voiceover: vi.fn(), frames: vi.fn(), check: vi.fn() });
+    expect(String((tools.add_shape as Tool).description)).toContain('strokes');
+    expect(String((tools.set_props as Tool).description)).toContain('strokes');
+  });
+
   it('the shape tool tells the agent about fill stacks', () => {
     const { session } = setup();
     const tools = createMotionTools({ session, assets: [], newId: () => 'x', voiceover: vi.fn(), frames: vi.fn(), check: vi.fn() });

@@ -47,6 +47,23 @@ describe('shape markup', () => {
     expect(svg).toContain('stroke:#111111;stroke-width:10;stroke-linecap:round;stroke-linejoin:bevel;stroke-dasharray:20 10');
   });
 
+  it('a legacy gradient stroke still runs between the old fill colours, as a stroke layer', () => {
+    const svg = shapeMarkup(look({ strokeKind: 'gradient', fill: '#ff0000', fill2: '#0000ff', gradientAngle: 0 }), paint);
+    expect(svg).toContain('<linearGradient id="sg-a-s-f0" gradientUnits="userSpaceOnUse" x1="0" y1="50" x2="200" y2="50"><stop offset="0" style="stop-color:#ff0000"/><stop offset="1" style="stop-color:#0000ff"/>');
+    expect(svg).toContain('stroke:url(#sg-a-s-f0)');
+  });
+
+  it('a stroke stack paints over the fills and replaces the legacy stroke', () => {
+    const svg = shapeMarkup(look({ strokeKind: 'solid', stroke: '#999999', strokes: [{ paint: { type: 'solid', color: '#111111' } }, { paint: { type: 'solid', color: '#222222' }, align: 'outside' }] }), paint);
+    expect(svg).not.toContain('#999999');
+    expect(svg.indexOf('#111111')).toBeLessThan(svg.indexOf('stroke:#222222'));
+    expect(svg).toContain('mask="url(#sk-a-s1)"');
+  });
+
+  it('per-side widths frame a rectangle', () => {
+    expect(shapeMarkup(look({ strokes: [{ paint: { type: 'solid', color: '#111111' }, align: 'inside', sides: [0.01, 0, 0, 0] }] }), paint)).toContain('fill-rule:evenodd');
+  });
+
   it('a path shape scales its 0..1 data to the box', () => {
     expect(shapeMarkup(look({ shape: 'path', path: 'M0 0L1 1' }), paint)).toContain('d="M0 0L200 100"');
   });

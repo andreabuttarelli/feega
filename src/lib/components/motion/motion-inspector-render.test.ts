@@ -68,6 +68,15 @@ describe('Properties for one clip', () => {
     }
   });
 
+  it('a title and a shape stroke with a layer stack, never the single stroke fields', () => {
+    for (const component of ['Title', 'Shape'] as const) {
+      const html = inspect(component);
+      expect(html).toContain('data-testid="stroke-stack"');
+      expect(html).not.toContain('id="f-strokeKind"');
+      expect(html).not.toContain('id="f-strokeWidth"');
+    }
+  });
+
   it('a shape adds stroke and its path, and no text', () => {
     const list = sections(inspect('Shape'));
 

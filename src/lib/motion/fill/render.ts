@@ -181,8 +181,10 @@ const PAINTED: Record<Exclude<FillType, FillType.Image>, (f: never, paint: FillP
   [FillType.Radial]: radial
 };
 
-const opacityAttr = (f: Fill) => (f.opacity < 1 ? ` opacity="${round(f.opacity)}"` : '');
-const blendStyle = (f: Fill) => (f.blend === BlendMode.Normal ? '' : `;mix-blend-mode:${f.blend}`);
+export const svgPaint = (f: Exclude<Fill, FillOf<FillType.Image>>, paint: FillPaint, i: number): SvgLayer => PAINTED[f.type](f as never, paint, i);
+
+export const opacityAttr = (f: Fill) => (f.opacity < 1 ? ` opacity="${round(f.opacity)}"` : '');
+export const blendStyle = (f: Fill) => (f.blend === BlendMode.Normal ? '' : `;mix-blend-mode:${f.blend}`);
 
 function imageLayer(f: FillOf<FillType.Image>, paint: FillPaint, paths: string, rule: string, i: number): { def: string; body: string } {
   const [resolved] = resolveFills([{ ...f, opacity: 1, blend: BlendMode.Normal }], paint.color, paint.asset);

@@ -40,6 +40,9 @@
   import MarkedLines from './MarkedLines.svelte';
   import FillStack from './FillStack.svelte';
   import { elementFills } from '$lib/motion/fill/elements';
+  import StrokeStack from './StrokeStack.svelte';
+  import { elementStrokes } from '$lib/motion/stroke/elements';
+  import { sidesShown } from '$lib/motion/stroke/model';
   import { MarkedField, markedField } from '$lib/motion/poster-lines';
   import { componentLabel } from '$lib/motion/poster-parts';
   import FontPicker from './FontPicker.svelte';
@@ -503,6 +506,8 @@
     {#if keyed}{@render exprEditor(field.key)}{/if}
   {:else if field.control === Control.Fills}
     <div class="stack" data-prop={field.key}><FillStack fills={elementFills(clip.component, clip.props)} {assets} {tokens} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
+  {:else if field.control === Control.Strokes}
+    <div class="stack" data-prop={field.key}><StrokeStack strokes={elementStrokes(clip.component, clip.props)} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
   {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
