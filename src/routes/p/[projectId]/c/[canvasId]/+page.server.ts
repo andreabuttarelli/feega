@@ -59,9 +59,7 @@ import { writeNodesBatch, type BatchItem } from '$lib/server/canvas/batch-write'
 import { pasteNodes, type PastedEdge, type PastedNode } from '$lib/server/canvas/paste';
 import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
-import { listNodeProducts } from '$lib/server/repos/products';
-import { listNodeSocialPosts } from '$lib/server/repos/social-posts';
-import { getInfluencer, listInfluencerViewsByIds, signInfluencerViewFiles } from '$lib/server/repos/influencers';
+import { canvasSnapshot, loadDownloaded, loadGenRuns } from '$lib/server/canvas/snapshot';
 import { listSourcesForNodes } from '$lib/server/repos/posts';
 import { suggestNextSteps } from '$lib/canvas/suggest-next-steps';
 import { actionFrequencyFor } from '$lib/server/next-step-stats';
@@ -184,90 +182,6 @@ async function spendOnVoice<T>(
     return fail(denied.status, denied.data);
   }
   return work(deps, await import('$lib/server/voices/custom-voices'));
-}
-
-/** La storia dei giri, per nodo: quello che la striscia sotto il risultato deve poter mostrare. */
-async function loadGenRuns(
-  db: Db,
-  scope: { orgId: string; nodes: Awaited<ReturnType<typeof listNodes>> }
-): Promise<Record<string, unknown[]>> {
-  const entries = await Promise.all(
-    scope.nodes.map(async (node) => [node.id, await runsOf(db, { orgId: scope.orgId, nodeId: node.id })] as const)
-  );
-  return Object.fromEntries(entries);
-}
-
-/**
- * IL CATALOGO E IL FEED SCARICATI, per nodo: `products`/`social_account_feed` non portano il
- * contenuto in `data` — vive in `products`/`social_posts` — quindi la pagina lo legge qui, come
- * `loadGenRuns` legge `node_runs` per il nodo che produce.
- */
-async function loadDownloaded(
-  db: Db,
-  scope: { orgId: string; canvasId: string; nodes: Awaited<ReturnType<typeof listNodes>> }
-): Promise<{
-  products: Record<string, unknown[]>;
-  socialPosts: Record<string, unknown[]>;
-  influencers: Record<string, { name: string; views: { id: string; label: string; url: string | null }[] }>;
-}> {
-  const influencers: Record<string, { name: string; views: { id: string; label: string; url: string | null }[] }> = {};
-  const nodesOfType = (type: string) => scope.nodes.filter((node) => node.type === type);
-
-  const [products, socialPosts] = await Promise.all([
-    perNode(nodesOfType('products'), (nodeId) => listNodeProducts(db, { orgId: scope.orgId, nodeId })),
-    perNode(nodesOfType('social_account_feed'), (nodeId) => listNodeSocialPosts(db, { orgId: scope.orgId, nodeId })),
-    loadInfluencerViews(db, scope.nodes, influencers)
-  ]);
-
-  return { products, socialPosts, influencers };
-}
-
-async function perNode(nodes: { id: string }[], read: (nodeId: string) => Promise<unknown[]>): Promise<Record<string, unknown[]>> {
-  const entries = await Promise.all(nodes.map(async (node) => [node.id, await read(node.id)] as const));
-  return Object.fromEntries(entries);
-}
-
-/**
- * LE VISTE DI OGNI NODO `influencer`, firmate in un colpo solo — non una per nodo: una tela con
- * dieci volti firmerebbe settanta URL a chiamate separate senza questo. `influencer_id` porta a
- * `influencer_views` (mai a `nodes.data`, vedi `influencer-node.ts`); un influencer cancellato o
- * di un'org che non è più questa non compare — `getInfluencer` applica la stessa RLS di ogni
- * altra lettura, senza un controllo qui in più.
- */
-async function loadInfluencerViews(
-  db: Db,
-  nodes: Awaited<ReturnType<typeof listNodes>>,
-  out: Record<string, { name: string; views: { id: string; label: string; url: string | null }[] }>
-): Promise<void> {
-  const influencerNodes = nodes.filter((n) => n.type === 'influencer');
-  if (!influencerNodes.length) {
-    return;
-  }
-
-  const influencerIds = influencerNodes
-    .map((n) => (typeof n.data.influencer_id === 'string' ? n.data.influencer_id : null))
-    .filter((id): id is string => Boolean(id));
-
-  const [viewsByInfluencer, influencerRows] = await Promise.all([
-    listInfluencerViewsByIds(db, influencerIds),
-    Promise.all(influencerIds.map((id) => getInfluencer(db, id)))
-  ]);
-
-  const allPaths = [...viewsByInfluencer.values()].flatMap((views) => views.map((v) => v.storagePath));
-  const signed = await signInfluencerViewFiles(db, allPaths, 'canvas512');
-
-  const nameById = new Map(influencerRows.filter((r) => r !== null).map((r) => [r.id, r.name]));
-
-  for (const node of influencerNodes) {
-    const influencerId = typeof node.data.influencer_id === 'string' ? node.data.influencer_id : null;
-    if (!influencerId) continue;
-
-    const views = viewsByInfluencer.get(influencerId) ?? [];
-    out[node.id] = {
-      name: nameById.get(influencerId) ?? 'Influencer',
-      views: views.map((v) => ({ id: v.id, label: v.label, url: signed.get(v.storagePath) ?? null }))
-    };
-  }
 }
 
 export const load: PageServerLoad = async ({ params, locals, url }) => {
@@ -634,14 +548,7 @@ export const actions: Actions = {
   },
   snapshot: async ({ params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
-    const [nodes, connections] = await Promise.all([
-      listNodes(scope.db, scope), listConnections(scope.db, scope)
-    ]);
-    const [runs, { products, socialPosts, influencers }] = await Promise.all([
-      loadGenRuns(scope.db, { orgId: scope.orgId, nodes }),
-      loadDownloaded(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodes })
-    ]);
-    return { nodes, connections, runs, products, socialPosts, influencers, revision: recordsRevision(nodes, connections) };
+    return canvasSnapshot(scope.db, scope);
   },
 
   revision: async ({ params, locals }) => {

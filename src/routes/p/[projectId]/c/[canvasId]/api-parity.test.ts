@@ -2,12 +2,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
 import type { Db } from '$lib/server/db/client';
 
+const ORG_ID = '11111111-1111-1111-1111-111111111111';
 const resolveOrgCaller = vi.fn();
 const findCanvasForUser = vi.fn();
 
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: (...a: unknown[]) => resolveOrgCaller(...a) }));
 vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiAction: async () => undefined, gateOrgAiActionForForm: async () => undefined }));
-vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [] }));
+vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [{ org: { id: ORG_ID }, role: 'owner' }] }));
+vi.mock('$lib/server/projects/lookup', () => ({ findProjectForUser: async () => null }));
 vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: (...a: unknown[]) => findCanvasForUser(...a) }));
 
 import { actions } from './+page.server';
@@ -126,6 +128,28 @@ describe('the canvas page action and its /api/v1 op answer the same', () => {
 
   it('paste_nodes refuses a canvas outside the project', async () => {
     const endpoint = await viaEndpoint('paste_nodes', { canvasId: 'elsewhere', ...pasted });
+
+    expect(endpoint.data.error).toBe('canvas_not_found');
+  });
+
+  it('snapshot and canvas_snapshot', async () => {
+    const action = await viaAction('snapshot', {});
+    const endpoint = await viaEndpoint('canvas_snapshot', { canvasId: CANVAS });
+
+    expect(action.status).toBe(200);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('revision and canvas_revision', async () => {
+    const action = await viaAction('revision', {});
+    const endpoint = await viaEndpoint('canvas_revision', { canvasId: CANVAS });
+
+    expect(action.data.kind).toBe('live');
+    expect(endpoint).toEqual(action);
+  });
+
+  it('canvas_snapshot refuses a canvas outside the project', async () => {
+    const endpoint = await viaEndpoint('canvas_snapshot', { canvasId: 'elsewhere' });
 
     expect(endpoint.data.error).toBe('canvas_not_found');
   });
