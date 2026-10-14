@@ -5,7 +5,7 @@
   import { selectionView } from '$lib/motion/selection-context';
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
-  import { PART_SEP, PartEdit, editablePart, partAt, partBoxes, partText, writePartText } from '$lib/motion/poster-parts';
+  import { CLIP_TEXT, PART_SEP, PartEdit, editablePart, partAt, partBoxes, partText, writePartText } from '$lib/motion/poster-parts';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, stackAt, writePatch, type Boxes, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
@@ -76,6 +76,7 @@
   const ownParts = $derived(selected ? (split.parts[selected] ?? []) : []);
   const partBox = $derived(part ? (ownParts.find((p) => p.part === part)?.box ?? null) : null);
   let editing = $state<{ part: string; text: string } | null>(null);
+  const editBox = $derived(part ? partBox : clip ? (boxes[clip.id] ?? null) : null);
   let partOf = '';
 
   $effect(() => {
@@ -97,10 +98,11 @@
   }
 
   function editPart() {
-    if (!clip || !part || editablePart(doc, clip, part) !== PartEdit.Text) {
+    const target = part ?? CLIP_TEXT;
+    if (!clip || editablePart(doc, clip, target) !== PartEdit.Text) {
       return;
     }
-    editing = { part, text: partText(clip, part) };
+    editing = { part: target, text: partText(clip, target) };
   }
 
   function commitPart(text: string) {
@@ -271,13 +273,13 @@
         {#each [0, 1, 2, 3] as corner (corner)}<span class="part-handle" data-corner={corner}></span>{/each}
       </div>
     {/if}
-    {#if editing && partBox}
+    {#if editing && editBox}
       <!-- svelte-ignore a11y_autofocus -->
       <textarea
         class="part-edit"
         data-testid="part-edit"
         aria-label="Edit text"
-        style={boxStyle(partBox)}
+        style={boxStyle(editBox)}
         value={editing.text}
         autofocus
         onpointerdown={(e) => e.stopPropagation()}

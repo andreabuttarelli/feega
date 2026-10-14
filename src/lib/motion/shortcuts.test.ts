@@ -147,3 +147,14 @@ describe('preview zoom keys', () => {
   });
 });
 
+
+describe('drawing tool keys', () => {
+  it('V selects; shift with T, R, O, P picks text, rectangle, ellipse, pen, leaving the plain keys to the timeline', () => {
+    expect(press('v')).toBe(Command.ToolSelect);
+    expect(press('T', { shift: true, code: 'KeyT' })).toBe(Command.ToolText);
+    expect(press('R', { shift: true, code: 'KeyR' })).toBe(Command.ToolRectangle);
+    expect(press('O', { shift: true, code: 'KeyO' })).toBe(Command.ToolEllipse);
+    expect(press('P', { shift: true, code: 'KeyP' })).toBe(Command.ToolPen);
+    expect(press('t')).toBe(Command.RevealOpacity);
+  });
+});

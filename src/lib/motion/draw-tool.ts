@@ -1,3 +1,5 @@
+import type { Outline, Pt } from './shape/geometry';
+
 export enum DrawTool {
   Select = 'select',
   Text = 'text',
@@ -55,4 +57,15 @@ export function roundnessFromInset(box: Pick<DrawBox, 'width' | 'height'>, inset
 
 export function nudge(box: DrawBox, dx: number, dy: number): DrawBox {
   return { ...box, x: box.x + dx, y: box.y + dy };
+}
+
+const MIN_CLOSING_POINTS = 3;
+
+export function closesOnFirst(outline: Outline, at: Pt, reach: number): boolean {
+  const last = outline[outline.length - 1];
+  if (!last || last.closed || last.vertices.length < MIN_CLOSING_POINTS) {
+    return false;
+  }
+  const [x, y] = last.vertices[0].p;
+  return Math.hypot(at[0] - x, at[1] - y) <= reach;
 }

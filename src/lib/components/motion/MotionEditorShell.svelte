@@ -120,6 +120,9 @@
   import { NodeMode, nodeLayers } from '$lib/canvas/inline-motion';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHover } from '$lib/canvas/layers';
+  import { DrawTool } from '$lib/motion/draw-tool';
+  import DrawOverlay from './DrawOverlay.svelte';
+  import DrawTools from './DrawTools.svelte';
   import { PART_SEP, parsePart } from '$lib/motion/poster-parts';
   import { PropertiesView, propertiesFor } from '$lib/motion/properties-view';
   import { partFieldKeys } from '$lib/motion/inspector';
@@ -707,6 +710,13 @@
 
   const newId = () => crypto.randomUUID().slice(0, 8);
 
+  let tool = $state(DrawTool.Select);
+
+  function drawn(id: string) {
+    selection = [id];
+    tool = DrawTool.Select;
+  }
+
   const ADD: Partial<Record<ComponentId, (id: string) => OpResult>> = {
     Adjustment: (id) => addAdjustment(doc, { from: frame }, { clip: id, track: newId() }),
     LiquidGlass: (id) => addLens(doc, Lens.Glass, { from: frame, durationInFrames: COMPONENTS.LiquidGlass.durationInFrames, props: {}, path: [], spring: SPRINGS.soft, fadeIn: 0, fadeOut: 0 }, { clip: id, track: newId() }),
@@ -1052,6 +1062,11 @@
 
   const COMMANDS: Record<Command, () => void> = {
     [Command.TogglePlay]: () => (playing = !playing),
+    [Command.ToolSelect]: () => (tool = DrawTool.Select),
+    [Command.ToolText]: () => (tool = DrawTool.Text),
+    [Command.ToolRectangle]: () => (tool = DrawTool.Rectangle),
+    [Command.ToolEllipse]: () => (tool = DrawTool.Ellipse),
+    [Command.ToolPen]: () => (tool = DrawTool.Pen),
     [Command.Delete]: remove,
     [Command.Split]: split,
     [Command.Duplicate]: duplicate,
@@ -1424,6 +1439,7 @@
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
+        {#if tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} {tool} onchange={apply} oncreated={drawn} />{/if}
       </MotionPreview>
       {/snippet}
       {#if rules.zoom === Zoom.Stage}
@@ -1431,6 +1447,7 @@
       {:else}
         {@render player()}
       {/if}
+      <DrawTools bind:tool />
       {#if liveScene.length}<span class="live-badge" data-testid="live-badge" title={`${liveScene.join(', ')} ${liveScene.length === 1 ? 'runs' : 'run'} live: different on every view, a still in the video`}>live</span>{/if}
       <div class="live-bar">
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />

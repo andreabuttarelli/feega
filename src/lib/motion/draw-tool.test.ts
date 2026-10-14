@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Corner, dragRect, nudge, resizeFromCorner, roundnessFromInset } from './draw-tool';
+import { Corner, closesOnFirst, dragRect, nudge, resizeFromCorner, roundnessFromInset } from './draw-tool';
 
 describe('dragging a box to create an element inside a frame', () => {
   it('centers the box between the two drag points', () => {
@@ -65,5 +65,20 @@ describe('corner radius from an on-canvas inset drag', () => {
 describe('nudging a selection with the arrow keys', () => {
   it('moves the box without changing its size', () => {
     expect(nudge({ x: 0.5, y: 0.5, width: 0.1, height: 0.1 }, 0.01, -0.01)).toEqual({ x: 0.51, y: 0.49, width: 0.1, height: 0.1 });
+  });
+});
+
+describe('closing a pen path on its first point', () => {
+  const corner = (x: number, y: number) => ({ p: [x, y] as const, in: [x, y] as const, out: [x, y] as const });
+  const open = [{ closed: false, vertices: [corner(10, 10), corner(100, 10), corner(100, 80)] }];
+
+  it('a click within reach of the first point closes an open path of three or more points', () => {
+    expect(closesOnFirst(open, [12, 9], 6)).toBe(true);
+    expect(closesOnFirst(open, [30, 30], 6)).toBe(false);
+  });
+
+  it('two points or an already closed path never close', () => {
+    expect(closesOnFirst([{ closed: false, vertices: open[0].vertices.slice(0, 2) }], [10, 10], 6)).toBe(false);
+    expect(closesOnFirst([{ ...open[0], closed: true }], [10, 10], 6)).toBe(false);
   });
 });
