@@ -186,6 +186,7 @@ and its session. Free.
 `canvas_tool({ org, project_id, op, input })` runs one op of the project chat on that project,
 through the same code: `list_canvases`, `list_nodes`, `list_connections`, `list_runs`,
 `list_templates`, `create_node`, `update_node`, `move_node`, `resize_node`, `duplicate_nodes`,
+`write_nodes`, `paste_nodes`,
 `connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `delete_node`, `create_canvas`,
 `rename_canvas`, `delete_canvas`, `rename_project`, `share_canvas`, `share_doc`,
 `insert_template`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,

@@ -29,6 +29,8 @@ import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canv
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { insertTemplate } from '$lib/server/canvas/templates';
+import { writeNodesBatch } from '$lib/server/canvas/batch-write';
+import { pasteNodes } from '$lib/server/canvas/paste';
 import { setCanvasShare } from '$lib/server/canvas/canvas-share';
 import { ShareState } from '$lib/canvas/shared-view';
 import { CANVAS_TEMPLATES } from '$lib/canvas/templates';
@@ -224,6 +226,32 @@ const showRunInput = z.object({ nodeId: z.string(), runId: z.string().describe('
 const retryComboInput = z.object({ nodeId: z.string(), outputListNodeId: z.string(), label: z.string(), runId: z.string().optional() }).strict();
 const workflowIdInput = z.object({ workflowId: z.string() }).strict();
 const workflowInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2) }).strict();
+const writeNodesInput = z
+  .object({
+    canvasId: z.string(),
+    items: z
+      .array(z.object({ node_id: z.string(), version: z.number().int().describe('the version read'), patch: z.record(z.string(), z.unknown()) }).strict())
+      .min(1)
+  })
+  .strict();
+const pasteNodesInput = z
+  .object({
+    canvasId: z.string(),
+    nodes: z.array(z.object({ type: z.string(), data: z.record(z.string(), z.unknown()), x: z.number(), y: z.number() }).strict()).min(1),
+    edges: z
+      .array(
+        z
+          .object({
+            sourceIndex: z.number().int().describe('index in nodes'),
+            targetIndex: z.number().int(),
+            sourceHandle: z.string().nullable().default(null),
+            targetHandle: z.string().nullable().default(null)
+          })
+          .strict()
+      )
+      .default([])
+  })
+  .strict();
 const galleryItemInput = z.object({ itemId: z.string() }).strict();
 
 const MAX_VOICE_NAME = 100;
@@ -383,6 +411,27 @@ export const CANVAS_OPS = {
         return NODE_NOT_FOUND;
       }
       return { node };
+    }
+  }),
+
+  write_nodes: op({
+    access: Access.Write,
+    input: writeNodesInput,
+    run: async (ctx, input) =>
+      (await inProject(ctx, input.canvasId))
+        ? { results: await writeNodesBatch(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, items: input.items, actor: ctx.actor }) }
+        : NOT_IN_PROJECT
+  }),
+
+  paste_nodes: op({
+    access: Access.Write,
+    input: pasteNodesInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const out = await pasteNodes(ctx.db, { ...input, orgId: ctx.orgId, projectId: ctx.projectId, actor: ctx.actor });
+      return 'refused' in out ? { error: 'invalid_data', message: out.refused } : out;
     }
   }),
 
