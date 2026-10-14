@@ -26,7 +26,7 @@
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import { Detent, nearestDetent, nextDetent, sheetHeight } from '$lib/motion/sheet-detents';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
-  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, defaultTimelinePx, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import { Lens, addLens } from '$lib/motion/glass/ops';
@@ -53,7 +53,13 @@
   import { THREE_D_COMPONENTS } from '$lib/motion/components';
   import MaskOverlay from '$lib/components/motion/MaskOverlay.svelte';
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
+  import CornerOverlay from '$lib/components/motion/CornerOverlay.svelte';
+  import AlignBar from '$lib/components/motion/AlignBar.svelte';
+  import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
+  import type { Boxes } from '$lib/motion/scene-select';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import FramePeers from '$lib/components/motion/FramePeers.svelte';
+  import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
@@ -93,7 +99,10 @@
     type KeyRef,
     type OpResult
   } from '$lib/motion/timeline';
-  import { adoptHead, amend, canRedo, canUndo, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
+  import { DragPhase, UndoRoute, type CanvasUndo, type ElementOut, type MoveOut } from '$lib/canvas/canvas-drop';
+  import { liftElement } from '$lib/motion/move-element';
+  import { adoptHead, amend, canRedo, canUndo, followHead, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
+  import { landed, outgoing, remote, type Synced } from '$lib/motion/frame-sync';
   import { Reveal, Snap, clampZoom } from '$lib/motion/timeline-view';
   import { InspectorTab } from '$lib/motion/inspector';
   import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
@@ -120,6 +129,10 @@
   import { NodeMode, nodeLayers } from '$lib/canvas/inline-motion';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHover } from '$lib/canvas/layers';
+  import { DrawTool } from '$lib/motion/draw-tool';
+  import { EDIT_MODE_KEY, EditMode, nextMode, readMode } from '$lib/motion/edit-mode';
+  import DrawOverlay from './DrawOverlay.svelte';
+  import DrawTools from './DrawTools.svelte';
   import { PART_SEP, parsePart } from '$lib/motion/poster-parts';
   import { PropertiesView, propertiesFor } from '$lib/motion/properties-view';
   import { partFieldKeys } from '$lib/motion/inspector';
@@ -130,6 +143,8 @@
   const CHECK_WIDTH = 480;
   const CHECK_DEBOUNCE_MS = 900;
   const COALESCE_MS = 800;
+  const CURSOR_SEND_MS = 60;
+  const PRESENCE_BEAT_MS = 3000;
   const HEAD_POLL_TRIES = 6;
   const HEAD_POLL_MS = 500;
   const ZOOM_STEP = 1.25;
@@ -138,11 +153,14 @@
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
-  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {} }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void } = $props();
+  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, canvasundo = null }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null } = $props();
   const rules = $derived(MOUNT[mount]);
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
   let version = $state(data.head.version);
+  let baseDoc = data.head.doc as MotionDoc;
+  let saving = false;
+  let resave = false;
   let selection = $state<string[]>([]);
   let path = $state<{ comp: string; frame: number }[]>([]);
   let cameraOpen = $state(false);
@@ -154,6 +172,13 @@
   let snap = $state(Snap.On);
   let graphOpen = $state(false);
   let saveState = $state<SaveState>(SaveState.Saved);
+  const presence = framePresence();
+  let marks = $state(new Map<string, FrameMark>());
+  let clock = $state(Date.now());
+  let cursor: FrameCursor | null = null;
+  let cursorSentAt = 0;
+  let cursorTimer: ReturnType<typeof setTimeout> | null = null;
+  const peers = $derived(presence ? peersIn(marks, data.node.id, presence.self.userId, clock) : []);
   let notice = $state('');
   const supabase = createSupabaseBrowserClient();
   const UPLOAD_WEIGHT = 400;
@@ -182,6 +207,7 @@
   let stageEl = $state<HTMLElement | null>(null);
   let selectedPart = $state<string | null>(null);
   let partsByClip = $state.raw<Record<string, string[]>>({});
+  let stageBoxes = $state.raw<Boxes>({});
   let viewportH = $state(0);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
@@ -211,6 +237,17 @@
       return localStorage;
     } catch {
       return null;
+    }
+  }
+
+  let editMode = $state(readMode(browserStore()?.getItem(EDIT_MODE_KEY) ?? null));
+
+  function setMode(next: EditMode) {
+    editMode = next;
+    try {
+      browserStore()?.setItem(EDIT_MODE_KEY, next);
+    } catch {
+      return;
     }
   }
 
@@ -268,12 +305,14 @@
     return () => el.removeEventListener('ready', ready, true);
   });
 
+  const firstLayout = (): EditorLayout => ({ ...DEFAULT_LAYOUT, timelinePx: defaultTimelinePx(viewportOf(innerWidth), innerHeight) });
+
   onMount(() => {
     const at = clipSeek(doc, location.search);
     if (at !== null) {
       seekTo(at);
     }
-    layout = readLayout(browserStore());
+    layout = readLayout(browserStore(), firstLayout());
     const url = new URL(window.location.href);
     if (url.searchParams.has(BRAND_PARAM)) {
       void askBrand();
@@ -308,6 +347,45 @@
   function revealLanes(next: Reveal) {
     reveal = reveal === next ? Reveal.Animated : next;
   }
+
+  function sendMark() {
+    cursorSentAt = Date.now();
+    presence?.send({ nodeId: data.node.id, cursor, selection: [...selection] });
+  }
+
+  function pointAt(next: FrameCursor | null) {
+    cursor = next;
+    if (cursorTimer) {
+      return;
+    }
+    const wait = Math.max(0, cursorSentAt + CURSOR_SEND_MS - Date.now());
+    cursorTimer = setTimeout(() => {
+      cursorTimer = null;
+      sendMark();
+    }, wait);
+  }
+
+  onMount(() => {
+    if (!presence) {
+      return;
+    }
+    const stop = presence.listen((mark) => (marks = keepMark(marks, mark)));
+    const beat = setInterval(() => {
+      clock = Date.now();
+      sendMark();
+    }, PRESENCE_BEAT_MS);
+    return () => {
+      stop();
+      clearInterval(beat);
+      clearTimeout(cursorTimer ?? undefined);
+      presence.send({ nodeId: null, cursor: null, selection: [] });
+    };
+  });
+
+  $effect(() => {
+    void selection.join();
+    untrack(sendMark);
+  });
 
   let lastEdit = { summary: '', at: 0 };
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -483,29 +561,54 @@
     saveTimer = setTimeout(() => void save(), SAVE_DEBOUNCE_MS);
   }
 
+  function follow(next: Synced) {
+    baseDoc = next.base.doc;
+    version = next.base.version;
+    if (next.present === history.present) {
+      return;
+    }
+    history = followHead(history, next.present);
+    selection = selection.filter((id) => findClip(next.present, id));
+  }
+
+  function adopt(head: { version: number; doc: MotionDoc }) {
+    history = adoptHead(history, head.doc, version);
+    baseDoc = head.doc;
+    version = head.version;
+  }
+
   async function save() {
+    if (saving) {
+      resave = true;
+      return;
+    }
+    saving = true;
     saveState = SaveState.Saving;
+    const sent = history.present;
     const form = new FormData();
-    form.set('doc', JSON.stringify(history.present));
+    form.set('ops', JSON.stringify(outgoing({ version, doc: baseDoc }, sent)));
     form.set('version', String(version));
     form.set('summary', unsavedSummary);
-    const res = await fetch(`${editorUrl}?/save`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+    const res = await fetch(`${editorUrl}?/ops`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
     const result = deserialize(await res.text());
+    saving = false;
 
     if (result.type === 'success') {
-      version = Number(result.data?.version ?? version);
+      follow(landed({ version, doc: baseDoc }, sent, history.present, { version: Number(result.data?.version), doc: result.data?.doc as MotionDoc }));
       saveState = SaveState.Saved;
+    } else {
+      saveState = SaveState.Failed;
+      notice = result.type === 'failure' ? String(result.data?.error ?? '') : '';
+    }
+    if (resave) {
+      resave = false;
+      await save();
       return;
     }
-    if (result.type === 'failure' && result.data?.error === 'conflict') {
-      const head = result.data.head as { version: number; doc: MotionDoc };
-      history = adoptHead(history, head.doc, version);
-      version = head.version;
-      saveState = SaveState.Conflict;
-      return;
+    if (missedRemote) {
+      missedRemote = false;
+      await pullExternalEdit();
     }
-    saveState = SaveState.Failed;
-    notice = result.type === 'failure' ? String(result.data?.error ?? '') : '';
   }
 
   const FONT_EXTENSION = /\.(ttf|otf|woff2?)$/i;
@@ -538,19 +641,53 @@
     return null;
   }
 
+  async function moveOut(out: ElementOut, phase: DragPhase) {
+    if (!onmoveout || phase !== DragPhase.Drop) {
+      void onmoveout?.(out, phase, version);
+      return;
+    }
+    if (saveState === SaveState.Pending) {
+      clearTimeout(saveTimer ?? undefined);
+      await save();
+    }
+    const landed = await onmoveout(out, phase, version);
+    const lifted = landed === null ? null : liftElement(history.present, out.clipId);
+    if (!lifted?.ok || landed === null) {
+      return;
+    }
+    adopt({ version: landed, doc: lifted.doc });
+    selection = selection.filter((id) => id !== out.clipId);
+  }
+
+  type SavedHead = { version: number; doc: MotionDoc; actorKind?: string };
+
+  async function fetchHead(): Promise<SavedHead | null> {
+    const result = await editorAction('head');
+    return result.type === 'success' ? (result.data as SavedHead) : null;
+  }
+
+  let missedRemote = false;
+
+  function takeRemote(head: SavedHead | null): boolean {
+    if (saving) {
+      missedRemote = true;
+      return false;
+    }
+    const next = head ? remote({ version, doc: baseDoc }, history.present, head) : null;
+    if (next) {
+      follow(next);
+    }
+    return next !== null;
+  }
+
   async function pullExternalEdit() {
     if (agentBusy) {
       return;
     }
-    const res = await fetch(agentUrl);
-    const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc; actorKind: string } } | null;
-    if (!body?.head || body.head.version <= version || body.head.actorKind !== 'agent') {
-      return;
+    const head = await fetchHead();
+    if (takeRemote(head) && head?.actorKind === 'agent') {
+      chatReload++;
     }
-    history = adoptHead(history, body.head.doc, version);
-    version = body.head.version;
-    selection = selection.filter((id) => findClip(body.head!.doc, id));
-    chatReload++;
   }
 
   function peekChat() {
@@ -607,12 +744,7 @@
 
   async function pullHead(): Promise<Head> {
     for (let i = 0; i < HEAD_POLL_TRIES; i++) {
-      const res = await fetch(agentUrl);
-      const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc } } | null;
-      if (body?.head && body.head.version > version) {
-        history = adoptHead(history, body.head.doc, version);
-        version = body.head.version;
-        selection = selection.filter((id) => findClip(body.head!.doc, id));
+      if (takeRemote(await fetchHead())) {
         return Head.Newer;
       }
       await new Promise((r) => setTimeout(r, HEAD_POLL_MS));
@@ -706,6 +838,13 @@
   }
 
   const newId = () => crypto.randomUUID().slice(0, 8);
+
+  let tool = $state(DrawTool.Select);
+
+  function drawn(id: string) {
+    selection = [id];
+    tool = DrawTool.Select;
+  }
 
   const ADD: Partial<Record<ComponentId, (id: string) => OpResult>> = {
     Adjustment: (id) => addAdjustment(doc, { from: frame }, { clip: id, track: newId() }),
@@ -910,19 +1049,36 @@
       return;
     }
     const head = result.data?.head as { version: number; doc: MotionDoc };
-    history = adoptHead(history, head.doc, version);
-    version = head.version;
+    adopt(head);
     selection = selection.filter((id) => findClip(head.doc, id));
     notice = `Restored version ${target}. ⌘Z to undo.`;
   }
 
-  function undoEdit() {
+  function undoHere() {
     if (!canUndo(history, agent)) {
       return;
     }
     history = undo(history);
     scheduleSave('Undo');
   }
+
+  async function undoOnCanvas() {
+    await canvasundo?.run();
+    const res = await fetch(agentUrl);
+    const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc } } | null;
+    if (!body?.head) {
+      return;
+    }
+    history = startHistory(body.head.doc);
+    version = body.head.version;
+  }
+
+  const UNDO: Record<UndoRoute, () => void> = {
+    [UndoRoute.Here]: undoHere,
+    [UndoRoute.Canvas]: () => void undoOnCanvas()
+  };
+
+  const undoEdit = () => UNDO[saveState === SaveState.Saved && canvasundo?.owns(data.node.id, version) ? UndoRoute.Canvas : UndoRoute.Here]();
 
   function redoEdit() {
     if (!canRedo(history, agent)) {
@@ -1020,6 +1176,13 @@
     distribute: { label: 'Distribute in time', run: () => distributeClips(doc, selection) }
   };
 
+  const NUDGE_PX = 1;
+  const NUDGE_MORE_PX = 10;
+  const spaceBoxes = () => ({ ...propBoxes(doc), ...stageBoxes });
+  const nudgeBy = (dx: number, dy: number) => selection.length && apply(moveBy(doc, selection, frame, [dx, dy], editMode), 'Moved with the arrows');
+  const alignTo = (edge: Edge) => apply(alignSpace(doc, selection, frame, spaceBoxes(), edge, editMode), `Aligned ${edge}`);
+  const distribute = (axis: Axis) => apply(distributeSpace(doc, selection, frame, spaceBoxes(), axis, editMode), `Distributed along ${axis}`);
+
   function arrange(id: string) {
     const op = ARRANGE[id];
     if (op && selection.length > 1) {
@@ -1052,6 +1215,20 @@
 
   const COMMANDS: Record<Command, () => void> = {
     [Command.TogglePlay]: () => (playing = !playing),
+    [Command.ToolSelect]: () => (tool = DrawTool.Select),
+    [Command.ToolText]: () => (tool = DrawTool.Text),
+    [Command.ToolRectangle]: () => (tool = DrawTool.Rectangle),
+    [Command.ToolEllipse]: () => (tool = DrawTool.Ellipse),
+    [Command.ToolPen]: () => (tool = DrawTool.Pen),
+    [Command.ToggleEditMode]: () => setMode(nextMode(editMode)),
+    [Command.MoveLeft]: () => nudgeBy(-NUDGE_PX, 0),
+    [Command.MoveRight]: () => nudgeBy(NUDGE_PX, 0),
+    [Command.MoveUp]: () => nudgeBy(0, -NUDGE_PX),
+    [Command.MoveDown]: () => nudgeBy(0, NUDGE_PX),
+    [Command.MoveLeftMore]: () => nudgeBy(-NUDGE_MORE_PX, 0),
+    [Command.MoveRightMore]: () => nudgeBy(NUDGE_MORE_PX, 0),
+    [Command.MoveUpMore]: () => nudgeBy(0, -NUDGE_MORE_PX),
+    [Command.MoveDownMore]: () => nudgeBy(0, NUDGE_MORE_PX),
     [Command.Delete]: remove,
     [Command.Split]: split,
     [Command.Duplicate]: duplicate,
@@ -1114,11 +1291,12 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
     ...(selection.length > 1 ? [{ section: 'Arrange', items: Object.entries(ARRANGE).map(([id, op]) => ({ label: op.label, run: () => arrange(id) })) }] : []),
+    ...(selection.length ? [{ section: 'Align', items: [...Object.values(Edge).map((edge) => ({ label: `Align ${edge}`, run: () => alignTo(edge) })), ...(selection.length > 2 ? Object.values(Axis).map((axis) => ({ label: `Distribute along ${axis}`, run: () => distribute(axis) })) : [])] }] : []),
     ...menuSections().map(({ section, ids }) => ({
       section,
       items: ids
@@ -1229,7 +1407,7 @@
     if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
       return;
     }
-    const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey });
+    const command = commandFor({ key: e.key, code: e.code, mod: e.metaKey || e.ctrlKey, shift: e.shiftKey, alt: e.altKey }, editMode);
     if (!command) {
       return;
     }
@@ -1271,6 +1449,11 @@
     </div>
 
     <div class="group trail" {...dockOf(Part.Bar)} data-testid="bar-trail">
+      <div class="mode-switch" role="radiogroup" aria-label="Edit mode" data-testid="edit-mode" title="Design edits the base, Motion keys at the playhead (E)">
+        {#each [EditMode.Design, EditMode.Motion] as m (m)}
+          <button type="button" role="radio" aria-checked={editMode === m} class:on={editMode === m} data-mode={m} onclick={() => setMode(m)}>{m === EditMode.Design ? 'Design' : 'Motion'}</button>
+        {/each}
+      </div>
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
       <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
       <div class="popover-anchor">
@@ -1414,16 +1597,19 @@
     />
   {/if}
 
-  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc)}>
+  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
     <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
       <MotionPreview bind:this={preview} {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
-        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} />{/if}
+        {#if presence}<FramePeers {doc} {frame} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
+        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
+        {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
+        {#if tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} {tool} onchange={apply} oncreated={drawn} />{/if}
       </MotionPreview>
       {/snippet}
       {#if rules.zoom === Zoom.Stage}
@@ -1431,6 +1617,7 @@
       {:else}
         {@render player()}
       {/if}
+      <DrawTools bind:tool />
       {#if liveScene.length}<span class="live-badge" data-testid="live-badge" title={`${liveScene.join(', ')} ${liveScene.length === 1 ? 'runs' : 'run'} live: different on every view, a still in the video`}>live</span>{/if}
       <div class="live-bar">
         <InteractivePanel bind:active={interactive} bind:tiltX bind:tiltY clipId={selected?.id ?? null} onpreset={(preset) => apply(applyInteractivePreset(doc, preset, selected?.id ?? null), preset)} />
@@ -1453,13 +1640,14 @@
     <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       {#if panelsDue}
+      {#if selection.length}<AlignBar count={selection.length} onalign={alignTo} ondistribute={distribute} />{/if}
       {#if cameraOpen && !selection.length}
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector {doc} onchange={edit} />
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
         <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
-        <MotionInspector {doc} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart && selected ? partFieldKeys(doc, selected, parsePart(selectedPart).field) : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        <MotionInspector {doc} mode={editMode} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart && selected ? partFieldKeys(doc, selected, parsePart(selectedPart).field) : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
@@ -1482,8 +1670,8 @@
     {/snippet}
     </SideColumn>
 
-    <section class="timeline-area" {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc)}>
-      <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: DEFAULT_LAYOUT.timelinePx })}></div>
+    <section class="timeline-area" {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
+      <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
 
       {#if clipBarShown}
         <ClipBar {doc} {selection} pick={pickMode} onrun={runFromBar} ondone={() => (pickMode = PickMode.One)} />
@@ -1838,7 +2026,30 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) var(--props-w) var(--chat-w);
     grid-template-rows: minmax(0, 1fr) var(--tl-h);
-    transition: grid-template-rows 180ms ease-out;
+    transition: grid-template-rows 320ms var(--ease-expo-out);
+  }
+
+  .mode-switch {
+    display: flex;
+    padding: 2px;
+    background: var(--ui-field);
+    border-radius: 9999px;
+  }
+
+  .mode-switch button {
+    height: 26px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 9999px;
+    background: transparent;
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
+    transition: background 320ms var(--ease-expo-out), color 320ms var(--ease-expo-out);
+  }
+
+  .mode-switch button.on {
+    background: var(--ui-bg);
+    color: var(--ui-ink);
   }
 
   .body.no-timeline {
@@ -1848,7 +2059,7 @@
   .body.no-timeline .timeline-area {
     visibility: hidden;
     overflow: hidden;
-    transition: visibility 0s 180ms;
+    transition: visibility 0s 320ms;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -2013,6 +2224,22 @@
   [data-mode='still'] .transport,
   [data-mode='still'] .timeline-area {
     display: none;
+  }
+
+  .editor[data-mount='canvas'] .timeline-area {
+    animation: rise var(--chrome-move) var(--ease-expo) both;
+  }
+
+  @keyframes rise {
+    from {
+      transform: translateY(100%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .editor[data-mount='canvas'] .timeline-area {
+      animation: none;
+    }
   }
 
   .timeline-area {

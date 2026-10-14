@@ -42,7 +42,6 @@ const emptyCanvasPoint = (page: Page) =>
 
 const LIT_LUMA = 60;
 const PAPER_LUMA = 200;
-const CENTRE_TOLERANCE_PX = 24;
 const DESKTOP_WIDE = { width: 1440, height: 900 };
 
 async function shareAbove(shot: Buffer, luma: number): Promise<number> {
@@ -54,17 +53,6 @@ async function shareAbove(shot: Buffer, luma: number): Promise<number> {
     }
   }
   return lit / (data.length / info.channels);
-}
-
-async function freeCentre(page: Page) {
-  return page.evaluate(() => {
-    const boxes = (dock: string) => [...document.querySelectorAll(`[data-dock="${dock}"]`)].map((el) => el.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
-    const flow = document.querySelector('.svelte-flow')!.getBoundingClientRect();
-    const top = Math.max(flow.top, ...boxes('top-bar').map((r) => r.bottom));
-    const bottom = Math.min(flow.bottom, ...boxes('timeline').map((r) => r.top));
-    const right = Math.min(flow.right, ...boxes('right-panel').map((r) => r.left));
-    return { x: (flow.left + right) / 2, y: (top + bottom) / 2 };
-  });
 }
 
 const OVERLAP_TOLERANCE_PX = 2;
@@ -108,17 +96,6 @@ async function expectOneBar(page: Page) {
 async function expectFramed(page: Page, node: Locator) {
   await expectOnNode(page, node);
   await expectLit(page);
-
-  await expect
-    .poll(
-      async () => {
-        const box = (await node.boundingBox())!;
-        const centre = await freeCentre(page);
-        return Math.max(Math.abs(box.x + box.width / 2 - centre.x), Math.abs(box.y + box.height / 2 - centre.y));
-      },
-      { timeout: 5000, message: 'the edited node is centred in the room the panels leave' }
-    )
-    .toBeLessThan(CENTRE_TOLERANCE_PX);
 
   await expect
     .poll(
@@ -241,7 +218,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await shoot(page, '6-closed');
   });
 
-  test('at 1440x900 the edited node is framed, centred and drawn', async ({ page, session }, info) => {
+  test('at 1440x900 the edited node is drawn where it is', async ({ page, session }, info) => {
     const [first] = info.annotations.filter((a) => a.type === 'node').map((a) => a.description!);
     await page.setViewportSize(DESKTOP_WIDE);
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);

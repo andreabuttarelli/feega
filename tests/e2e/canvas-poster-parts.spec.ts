@@ -65,6 +65,8 @@ test.describe('poster parts on the canvas @real', () => {
         return doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'poster')?.props.ink;
       }, { timeout: 10_000 })
       .toBe(ink);
+    await expect(page.getByTestId('editor-stage'), 'an edit never hides the stage behind the old picture').toHaveAttribute('data-shown', 'true');
+    await expect(part, 'an edit keeps the part selected while the preview reloads').toHaveAttribute('data-part', TITLE_LINE, { timeout: 500 });
 
     await layerRow.click();
     await overlay.dblclick({ position: title });

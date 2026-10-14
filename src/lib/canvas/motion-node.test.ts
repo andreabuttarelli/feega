@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { MOTION_NODE_BAR_H, frameNodeSize, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { MOTION_NODE_BAR_H, frameNodeOf, frameNodeSize, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
 import { NodeMode } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -72,6 +72,13 @@ describe('a frame node follows the shape of its graphic', () => {
   it('keeps its width and takes the height of the picture plus the bar', () => {
     expect(frameNodeSize(400, { width: 1080, height: 1350 })).toEqual({ w: 400, h: 500 + MOTION_NODE_BAR_H });
     expect(frameNodeSize(420, { width: 1920, height: 1080 })).toEqual({ w: 420, h: 236 + MOTION_NODE_BAR_H });
+  });
+
+  it('a new frame made from an element takes the element shape, not a 16:9 box', () => {
+    const made = frameNodeOf({ width: 1536, height: 432 });
+
+    expect(made.data.format).toBe('16:9');
+    expect(made.h - MOTION_NODE_BAR_H).toBe(Math.round((made.w * 432) / 1536));
   });
 
   it('a resize keeps the width the hand chose and fixes the height to the picture', () => {

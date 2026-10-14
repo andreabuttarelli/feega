@@ -25,11 +25,13 @@
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actionKind, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
-  import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
+  import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { PresencePeer } from '$lib/realtime/presence-peers';
+  import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
+  import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
   import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
@@ -70,7 +72,7 @@
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
-  import { AddTarget, catalogue as componentCatalogue, type StarterFormat } from '$lib/motion/template/catalogue';
+  import { AddTarget, catalogue as componentCatalogue, starterFormatOf, type StarterFormat } from '$lib/motion/template/catalogue';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
@@ -79,8 +81,8 @@
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { frameNodeSize, motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
-  import { FORMATS } from '$lib/motion/doc';
-  import { NodeMode, Opening, inlineMotionTarget, neighbourStyle, openingOf } from '$lib/canvas/inline-motion';
+  import { FORMATS, MotionFormat } from '$lib/motion/doc';
+  import { CanvasState, NodeMode, Opening, Reframe, addBarOf, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
   import { viewportOf } from '$lib/motion/editor-layout';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -91,7 +93,8 @@
   import { calendarBrand, calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
   import { calendarError, type CalendarBrand, type CalendarPost } from '$lib/canvas/calendar-posts';
   import { plannedInstant } from '$lib/calendar/period-grid';
-  import { DropVerdict, dayUnderPointer, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, dayUnderPointer, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DropOn, type Drop } from '$lib/motion/move-element';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
   import type { EffectStep } from '$lib/canvas/effects';
@@ -142,6 +145,8 @@
   import { portsOf } from '$lib/canvas/node-ports';
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
+  import { GraphScope, nodeOutputs, recentRuns, staleIds } from '$lib/canvas/run-graph';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
   import {
     docData,
@@ -327,6 +332,62 @@
     const answer = await send('schedule_post', { post_id: post.id });
     patchCalendar(calendar.id, { busy: false, error: answer.type === 'success' ? null : answerError(answer) });
     await loadCalendar(calendar);
+  }
+
+  const FRAME_DROP_CLASS = 'is-frame-drop';
+
+  let toFlow: ((p: PointerPoint) => PointerPoint) | null = null;
+
+  function markFrame(at: PointerPoint | null, exceptId: string | null) {
+    const target = at ? frameUnderPointer(at, exceptId) : null;
+    for (const el of document.querySelectorAll<HTMLElement>(`.${FRAME_DROP_CLASS}`)) {
+      if (el.dataset.motionNode !== target?.frameId) { el.classList.remove(FRAME_DROP_CLASS); }
+    }
+    if (target) { document.querySelector(`[data-motion-node="${target.frameId}"]`)?.classList.add(FRAME_DROP_CLASS); }
+  }
+
+  function dropAt(client: PointerPoint, exceptId: string | null): Drop | null {
+    const frame = frameUnderPointer(client, exceptId);
+    if (frame) {
+      return { on: DropOn.Frame, nodeId: frame.frameId, at: frame.at };
+    }
+    const at = toFlow?.(client);
+    return at ? { on: DropOn.Canvas, x: at.x, y: at.y } : null;
+  }
+
+  function landed(res: Record<string, unknown> | null): boolean {
+    if (res?.outcome !== 'done') {
+      return false;
+    }
+    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+    void refresh();
+    return true;
+  }
+
+  async function moveOut(out: ElementOut, phase: DragPhase, version: number): Promise<number | null> {
+    const source = inlineMotion;
+    markFrame(phase === DragPhase.Over ? out.client : null, source);
+    const drop = phase === DragPhase.Drop && source ? dropAt(out.client, source) : null;
+    if (!source || !drop) {
+      return null;
+    }
+    const res = await post('moveElement', { source, clip: out.clipId, drop: JSON.stringify(drop), versions: JSON.stringify({ [source]: version }), ...(out.box ? { box: JSON.stringify(out.box) } : {}) });
+    return landed(res) ? ((res?.versions as Record<string, number>)[source] ?? null) : null;
+  }
+
+  const canvasundo: CanvasUndo = {
+    owns: (nodeId, version) => {
+      const next = undoStack.nextUndo();
+      return next?.source === 'server' && writesFrameAt(next.gesture, nodeId, version);
+    },
+    run: () => undo()
+  };
+
+  async function dropOutput(nodeId: string, client: PointerPoint) {
+    const drop = dropAt(client, null);
+    if (drop) {
+      landed(await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
+    }
   }
 
   function highlightDay(ids: string[], at: PointerPoint) {
@@ -946,6 +1007,8 @@
   let failed = $state<string | null>(null);
   let failedIsCreditsExhausted = $state(false);
   let peers = $state<PresencePeer[]>([]);
+  const frames = frameHub({ userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
+  provideFramePresence(frames.port);
   let pending = 0;
   let snapshotMissed = false;
   let snapshotVersion = 0;
@@ -1035,6 +1098,12 @@
     }
   });
 
+  function reframe(id: string | null, free: Insets) {
+    if (id && reframesOn(viewportOf(pageWidth)) === Reframe.Frame) {
+      focusOn([id], free);
+    }
+  }
+
   function requestMotion(id: string) {
     dismissedMotion = null;
     requestedMotion = id;
@@ -1082,7 +1151,7 @@
     return changedElsewhere(before, nodes);
   }
 
-  function leave(path: string, notice: string) {
+  function leave(path: string, notice: string | null) {
     carryNotice(notice);
     void goto(path, { invalidateAll: true });
   }
@@ -1090,8 +1159,9 @@
   const REACTIONS: Record<Verdict, () => Promise<void> | void> = {
     [Verdict.Resync]: async () => {
       void invalidate(CANVAS_LIST_DEPENDENCY);
-      if (await refresh()) {
-        failed = VERDICT_NOTICE[Verdict.Resync];
+      const notice = VERDICT_NOTICE[Verdict.Resync];
+      if (await refresh() && notice) {
+        failed = notice;
       }
     },
     [Verdict.LeaveCanvas]: () => leave(`/p/${data.projectId}`, VERDICT_NOTICE[Verdict.LeaveCanvas]),
@@ -1140,7 +1210,8 @@
       onReconnect: () => { void checkStale(Trigger.Reconnect); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
       onPeers: (value) => { peers = value; },
-      onLink: (state) => { canvasLink.set(state); }
+      onLink: (state) => { canvasLink.set(state); },
+      frames: frames.line
     });
     return () => {
       disconnect();
@@ -1348,6 +1419,28 @@
     const entry = data.componentTemplates.find((t) => t.id === templateId);
     const made = entry ? composedTemplate(entry, { format, values: {} }, compositionCards(nodeId, edges, nodes), sequentialIds()) : null;
     return made?.ok ? made : null;
+  }
+
+  let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
+
+  function frameDraft(templateId: string, format: StarterFormat): Instance | null {
+    const entry = data.componentTemplates.find((t) => t.id === templateId);
+    const made = entry ? composedTemplate(entry, { format, values: {} }, [], sequentialIds()) : null;
+    return made?.ok ? made : null;
+  }
+
+  async function addFrame(templateId: string, draft: Instance | null) {
+    const at = frameLibraryAt;
+    frameLibraryAt = null;
+    if (!at) {
+      return;
+    }
+    const format = draft ? starterFormatOf(draft.doc) : (componentItems.find((i) => i.id === templateId)?.format ?? MotionFormat.Landscape);
+    const result = await post('frame_template', { template: templateId, format, x: at.x, y: at.y });
+    const node = result?.node as CanvasNodeRecord | undefined;
+    if (node && !nodes.some((n) => n.id === node.id)) {
+      nodes = [...nodes, toTile(node)];
+    }
   }
 
   function pickComponent(nodeId: string, templateId: string, draft: Instance | null) {
@@ -1628,6 +1721,37 @@
     await refresh();
     void invalidate('app:credits');
     return true;
+  }
+
+  const RECENT_RUNS = 20;
+
+  type GraphRunRows = Parameters<typeof nodeOutputs>[1];
+
+  const graphEdges = $derived(edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target })));
+  const staleNodeIds = $derived(staleIds(nodeOutputs(nodes, runs as GraphRunRows), graphEdges));
+  const runListing = $derived(recentRuns(runs as GraphRunRows, new Map(nodes.map((n) => [n.id, n.displayName ?? n.type])), RECENT_RUNS));
+
+  const GRAPH_FIELDS: Record<GraphScope, (ids: string[]) => Record<string, string | string[]>> = {
+    [GraphScope.Downstream]: (ids) => ({ graph: GraphScope.Downstream, node_id: ids[0] }),
+    [GraphScope.Stale]: (ids) => ({ graph: GraphScope.Stale, node_ids: ids })
+  };
+
+  async function runGraph(graph: GraphScope, ids: string[]): Promise<void> {
+    const fields = GRAPH_FIELDS[graph](ids);
+    const plan = await post('graph_plan', fields);
+    if (!plan) return;
+
+    const steps = plan.steps as { nodeId: string }[];
+    if (!confirm(`${steps.length} runs, about ${formatCredits(plan.credits as number)} credits. Start?`)) return;
+
+    const result = await post('run_graph', fields);
+    if (!result) return;
+
+    workflowId = result.workflowId as string;
+    workflowNodeIds = steps.map((step) => step.nodeId);
+    noteFirstGeneration();
+    await refresh();
+    void invalidate('app:credits');
   }
 
   const workflowRunning = $derived(
@@ -1932,8 +2056,9 @@
     }
 
     edges = [...edges.filter((edge) => edge.id !== created.id), toEdge(created)];
+    const linked = (res?.linked as { undo?: UndoItem[] } | null)?.undo ?? [];
     pushGesture({
-      items: [{ kind: 'edge.create', edgeId: created.id, sourceNodeId: created.sourceNodeId, targetNodeId: created.targetNodeId }]
+      items: [{ kind: 'edge.create', edgeId: created.id, sourceNodeId: created.sourceNodeId, targetNodeId: created.targetNodeId }, ...linked]
     });
     askToPlan(created.sourceNodeId, created.targetNodeId);
   }
@@ -2588,7 +2713,7 @@
 
 <div class="canvas" class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
   {#if peers.length}
-    <div class="peers" aria-label="People on this canvas">{peers.map((peer) => peer.name).join(', ')}</div>
+    <div class="peers"><PeerAvatars {peers} /></div>
   {/if}
   <p class="save-status" role="status" data-status={saveStatus}>{SAVE_LABEL[saveStatus]}</p>
   {#if failed}
@@ -2613,6 +2738,8 @@
       <button type="button" onclick={stopWorkflow}>Stop</button>
     </div>
   {/if}
+
+  <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />
 
   <ConfirmDialog
     bind:open={confirmingUncensoredSwitch}
@@ -2647,18 +2774,24 @@
     onEdgeModeChange={setEdgeMode}
     onCreate={create}
     onCreateFilled={createFilled}
+    onDropOutput={dropOutput}
+    onFlow={(fn) => (toFlow = fn)}
     onUpload={upload}
     onDuplicate={duplicate}
     onPromote={handlePromote}
     onCopy={copy}
     onPaste={paste}
     onTemplate={insertTemplate}
+    onFrameTemplates={(at) => (frameLibraryAt = at)}
+    addBar={addBarOf(inlineMotion ? CanvasState.Editing : CanvasState.Browsing)}
     onUndo={undo}
     onRedo={redo}
     onConnectNew={connectNew}
     {focus}
     onConnectExisting={connectExisting}
     onRunWorkflow={runWorkflow}
+    onRunGraph={runGraph}
+    stale={staleNodeIds}
     {runQuoteFor}
     onRunNode={runNode}
     {nodeSummaries}
@@ -2901,7 +3034,7 @@
   </CanvasFlow>
   {#if inlineMotion}
     {#key inlineMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => focusOn([inlineMotion], free)} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => reframe(inlineMotion, free)} onmoveout={moveOut} {canvasundo} />
     {/key}
   {/if}
 
@@ -2918,6 +3051,18 @@
       target={AddTarget.Composition}
       onpick={(templateId, _sounds, draft) => pickComponent(pickingId, templateId, draft)}
       onclose={() => (componentPickFor = null)}
+    />
+  {/if}
+
+  {#if frameLibraryAt}
+    <ComponentLibrary
+      items={componentItems}
+      format={MotionFormat.Landscape}
+      draftOf={frameDraft}
+      compose={(doc) => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })}
+      target={AddTarget.Canvas}
+      onpick={(templateId, _sounds, draft) => void addFrame(templateId, draft)}
+      onclose={() => (frameLibraryAt = null)}
     />
   {/if}
 

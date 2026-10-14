@@ -43,8 +43,15 @@ export function parsePart(part: string): { field: string; index: number | null }
   return { field, index: index === undefined ? null : Number(index) };
 }
 
+export const CLIP_TEXT = 'text';
+
+const CUSTOM = 'Custom';
+
 export function editablePart(doc: MotionDoc, clip: MotionClip, part: string): PartEdit {
   const { field } = parsePart(part);
+  if (clip.component !== CUSTOM) {
+    return field === CLIP_TEXT && typeof clip.props[field] === 'string' ? PartEdit.Text : PartEdit.None;
+  }
   const spec = doc.components[String(clip.props.name)]?.propsSchema.properties?.[field];
   return spec?.type === 'string' && TEXT_FORMATS.has(spec.format) && typeof clip.props[field] === 'string' ? PartEdit.Text : PartEdit.None;
 }

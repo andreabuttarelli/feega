@@ -1,3 +1,4 @@
+import { EditMode } from './edit-mode';
 import { describe, expect, it } from 'vitest';
 import { Command, SHORTCUTS, ShortcutGroup, commandFor, isTyping, shortcutHelp } from './shortcuts';
 
@@ -102,7 +103,7 @@ describe('view keys', () => {
 
 describe('the table', () => {
   it('binds every key combination once', () => {
-    const combos = SHORTCUTS.map((b) => `${b.key}|${Boolean(b.mod)}|${Boolean(b.shift)}|${Boolean(b.alt)}`);
+    const combos = SHORTCUTS.map((b) => `${b.key}|${Boolean(b.mod)}|${Boolean(b.shift)}|${Boolean(b.alt)}|${b.mode ?? 'any'}`);
     expect(new Set(combos).size).toBe(combos.length);
   });
 
@@ -147,3 +148,41 @@ describe('preview zoom keys', () => {
   });
 });
 
+
+describe('drawing tool keys', () => {
+  it('V selects; shift with T, R, O, P picks text, rectangle, ellipse, pen, leaving the plain keys to the timeline', () => {
+    expect(press('v')).toBe(Command.ToolSelect);
+    expect(press('T', { shift: true, code: 'KeyT' })).toBe(Command.ToolText);
+    expect(press('R', { shift: true, code: 'KeyR' })).toBe(Command.ToolRectangle);
+    expect(press('O', { shift: true, code: 'KeyO' })).toBe(Command.ToolEllipse);
+    expect(press('P', { shift: true, code: 'KeyP' })).toBe(Command.ToolPen);
+    expect(press('t')).toBe(Command.RevealOpacity);
+  });
+});
+
+describe('the Design and Motion switch', () => {
+  it('E flips between Design and Motion', () => {
+    expect(press('e')).toBe(Command.ToggleEditMode);
+  });
+});
+
+describe('arrows by edit mode', () => {
+  const inMode = (mode: EditMode, key: string, shift = false) => commandFor({ key, mod: false, shift }, mode);
+
+  it('in Motion the arrows step frames, as before', () => {
+    expect(inMode(EditMode.Motion, 'ArrowLeft')).toBe(Command.StepBack);
+    expect(inMode(EditMode.Motion, 'ArrowRight', true)).toBe(Command.StepForwardMore);
+    expect(inMode(EditMode.Motion, 'ArrowUp')).toBeNull();
+  });
+
+  it('in Design the arrows move the selection, shift by ten', () => {
+    expect(inMode(EditMode.Design, 'ArrowLeft')).toBe(Command.MoveLeft);
+    expect(inMode(EditMode.Design, 'ArrowRight')).toBe(Command.MoveRight);
+    expect(inMode(EditMode.Design, 'ArrowUp')).toBe(Command.MoveUp);
+    expect(inMode(EditMode.Design, 'ArrowDown', true)).toBe(Command.MoveDownMore);
+  });
+
+  it('a binding without a mode works in both', () => {
+    expect(inMode(EditMode.Design, ' ')).toBe(Command.TogglePlay);
+  });
+});

@@ -24,7 +24,7 @@ export enum CanvasPick {
   New = 'new'
 }
 
-type StartInput = { orgId: string; projectId: string; canvasId: string | null; userId: string; name: string; format?: MotionFormat; near?: string[]; actor?: Actor; pick?: CanvasPick };
+type StartInput = { orgId: string; projectId: string; canvasId: string | null; userId: string; name: string; format?: MotionFormat; near?: string[]; at?: { x: number; y: number }; actor?: Actor; pick?: CanvasPick };
 
 async function motionCanvasId(db: Db, deps: MotionStartDeps, input: StartInput): Promise<string | null> {
   if (!input.canvasId && input.pick === CanvasPick.New) {
@@ -68,7 +68,7 @@ export async function startMotion(db: Db, deps: MotionStartDeps, input: StartInp
     projectId: input.projectId,
     canvasId,
     type: 'motion',
-    ...spotFor(nodes, input.near),
+    ...(input.at ?? spotFor(nodes, input.near)),
     displayName: input.name,
     data: newMotionData(input.format),
     actor: input.actor ?? { kind: 'user', id: input.userId }

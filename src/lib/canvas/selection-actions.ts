@@ -15,7 +15,7 @@
  */
 
 import { postCompositionFor, type PostCompositionNode } from './post-composition';
-import { planWorkflow, type WorkflowEdge } from './workflow-plan';
+import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-plan';
 
 export type SelectionActionId =
   | 'duplicate'
@@ -23,6 +23,8 @@ export type SelectionActionId =
   | 'connect-existing'
   | 'promote'
   | 'run-workflow'
+  | 'run-downstream'
+  | 'run-stale'
   | 'copy-id'
   | 'report'
   | 'delete';
@@ -39,6 +41,8 @@ export type SelectionAction = {
 
 export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'run-workflow', label: 'Run flow', group: 'primary', minNodes: 2 },
+  { id: 'run-downstream', label: 'Run from here', group: 'secondary', minNodes: 1 },
+  { id: 'run-stale', label: 'Re-run out of date', group: 'secondary', minNodes: 1 },
   { id: 'connect-new', label: 'Connect to new…', group: 'secondary', minNodes: 1 },
   { id: 'connect-existing', label: 'Connect to…', group: 'secondary', minNodes: 1 },
   { id: 'duplicate', label: 'Duplicate', group: 'secondary', minNodes: 1, keys: ['mod', 'D'] },
@@ -52,20 +56,21 @@ export function actionsIn(group: SelectionActionGroup, count: number): Selection
   return SELECTION_ACTIONS.filter((a) => a.group === group && count >= a.minNodes);
 }
 
-export function enabledFor(
-  id: SelectionActionId,
-  nodeSummaries: PostCompositionNode[],
-  edges: WorkflowEdge[] = []
-): { enabled: boolean; reason?: string } {
-  if (id === 'promote') {
+type Gate = { enabled: boolean; reason?: string };
+
+type GateInput = { nodeSummaries: PostCompositionNode[]; edges: WorkflowEdge[]; stale: string[] };
+
+const ALWAYS: Gate = { enabled: true };
+
+const GATES: Partial<Record<SelectionActionId, (input: GateInput) => Gate>> = {
+  promote: ({ nodeSummaries }) => {
     const composition = postCompositionFor(nodeSummaries);
     return {
       enabled: composition.enabled,
       reason: composition.enabled ? undefined : 'Select at least one media or text node'
     };
-  }
-
-  if (id === 'run-workflow') {
+  },
+  'run-workflow': ({ nodeSummaries, edges }) => {
     const nodeTypesById = new Map(nodeSummaries.map((n) => [n.id, n.type]));
     const plan = planWorkflow(
       nodeSummaries.map((n) => n.id),
@@ -73,7 +78,21 @@ export function enabledFor(
       nodeTypesById
     );
     return { enabled: plan.ok, reason: plan.ok ? undefined : plan.reason };
-  }
+  },
+  'run-downstream': ({ nodeSummaries, edges }) => {
+    const [only] = nodeSummaries;
+    const runs = nodeSummaries.length === 1 && (GENERATIVE_TYPES.has(only.type) || edges.some((e) => e.sourceNodeId === only.id));
+    return runs ? ALWAYS : { enabled: false, reason: 'Nothing runs from here' };
+  },
+  'run-stale': ({ nodeSummaries, stale }) =>
+    nodeSummaries.some((n) => stale.includes(n.id)) ? ALWAYS : { enabled: false, reason: 'Nothing here is out of date' }
+};
 
-  return { enabled: true };
+export function enabledFor(
+  id: SelectionActionId,
+  nodeSummaries: PostCompositionNode[],
+  edges: WorkflowEdge[] = [],
+  stale: string[] = []
+): Gate {
+  return GATES[id]?.({ nodeSummaries, edges, stale }) ?? ALWAYS;
 }

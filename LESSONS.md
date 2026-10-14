@@ -4,6 +4,13 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Una modifica al frame sulla tela fa sparire selezione e stage
+Segnale: dopo un cambio di proprietà nel frame aperto sulla tela la stage torna all'immagine
+vecchia e i box di selezione spariscono finché non si riseleziona. Due cause: un `$effect` che legge
+`node.id` da una prop si riesegue a ogni nuovo oggetto `node` (qui `inlineStage.offer` riazzerava il
+paint); e una misura vuota mentre la preview ricarica sovrascriveva i box. Mossa: leggere il campo
+da un `$derived`, e non sostituire i box con una misura vuota (`remeasured`).
+
 ### Un template a 60 fps che va al doppio e diventa nero a metà
 Ogni frame di un doc (clip, keyframe, comp) è nell'fps del doc: un pezzo che arriva da un doc con
 un altro fps va convertito tutto, comps comprese. Segnale: template da 12 s che finisce a 6 s, o
@@ -110,7 +117,8 @@ secondi nello stesso intervallo, e poco prima c'è un `DELETE /rest/v1/orgs` (IP
 role) con `origin_time` > 8 s finito `500`/`statement timeout`. Il cascade di un'org tocca tabelle
 con foreign key senza indice e ferma il progetto. Mossa: query a bucket di 5 s su `origin_time`
 prima di accusare il codice della richiesta lenta; niente teardown di eval sul database di
-produzione mentre qualcuno lo usa.
+produzione mentre qualcuno lo usa. Ogni nuova foreign key nasce con il suo indice nella stessa
+migration: il lint `unindexed_foreign_keys` dell'advisor deve restare a zero in `public`.
 
 ### Un render server riesce e il salvataggio fallisce con `EntityTooLarge`
 Storage del progetto accetta al massimo 50 MB per file (limite globale, non del bucket): un
@@ -405,6 +413,9 @@ Un eval o un test lanciato da un worktree misura un ibrido: `$lib` punta alla co
 
 ### Il worktree DENTRO la repo dir: la pagina è viva ma non risponde (403 su `entry.js`)
 Un worktree creato dentro la cartella della repo (`dazero/dazero-wt/<slug>`) risolve `@sveltejs/kit` dal `node_modules` del checkout padre: vite lo serve via `/@fs/...` **fuori dalla root del worktree** e risponde 403 — il bundle client non parte, la hydratazione non arriva, e ogni click "riuscito" dell'automazione browser non cambia nulla (SSR morto senza errori in console). Segnale: `performance.getEntriesByType('resource')` mostra `entry.js` con `responseStatus: 403`, i click vanno a un DOM senza handler. Mossa: il worktree sta **fuori** dalla repo (`../dazero-wt/<slug>`, come da docs/e2e-testing.md §1) con `npm ci` proprio.
+
+### Node 25: l'editor motion dà 500 in SSR con `browserStore(...)?.getItem is not a function`
+Node ≥ 25 ha un `localStorage` globale anche sul server, senza metodi se manca `--localstorage-file`: un `typeof localStorage !== 'undefined'` passa e `getItem` esplode in SSR. Segnale: la spec Playwright `@real` resta appesa sulla pagina "Something broke on our side", e il log del webServer mostra quello stack su `MotionEditorShell.svelte`. Mossa: `NODE_OPTIONS=--no-experimental-webstorage` per il dev server dei test (`node -v` prima di sospettare il tuo diff).
 
 ### Verifica il `workdir` prima di ogni Edit
 Con più worktree aperti (feature + verifica), un edit fatto nel checkout sbagliato tocca dev. È successo: `live.ts` modificato nel checkout principale per un secondo, poi `git checkout --` e riapplicato nel posto giusto. Il tool Edit non ti proteggere — proteggiti tu: guarda il percorso del file che stai per toccare, sempre.
@@ -2913,3 +2924,6 @@ produzione mostra il banner cookie: la spec mette il cookie di consenso, o il lo
 
 ### Every motion e2e fails at once after a run was killed
 Signal: a batch of `@real` motion specs fails together (`motion-editor` never appears), each passes alone. Cause: a killed playwright run left `reuseExistingServer` on a dying dev server. Move: rerun on a clean server before judging a spec.
+
+### A seeded e2e on production stalls production
+Signal: `@real` specs create and tear down orgs on the production Supabase project; a teardown froze production for 30 s. Move: run seeded e2e only against a non-production database; until one exists, unit and route tests with fakes.

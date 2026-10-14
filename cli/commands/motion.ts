@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { loadSession } from '../lib/auth.ts';
-import { awaitRun, motionApi, type MotionRun, type RenderStart } from '../lib/motion.ts';
+import { awaitRun, motionApi, type FrameElementMoved, type MotionRun, type RenderStart } from '../lib/motion.ts';
 import { attachmentSource } from '../lib/attachments.ts';
 
 type AskOpts = { org?: string; wait?: boolean; attach?: string[]; follow?: string[]; avoid?: string[]; note?: string; reject?: string | boolean; avoidAll?: boolean };
@@ -236,6 +236,29 @@ export async function cmdMotionStoryboard(nodeId: string, opts: { org?: string; 
   for (const c of board.cards) {
     console.log(`\n[${c.node_id}]${c.clip_ids.length ? ` clips ${c.clip_ids.join(',')}` : ''}\n${c.text}`);
   }
+}
+
+type FrameOpts = { org?: string; to?: string; x?: string; y?: string; canvasX?: string; canvasY?: string };
+
+function frameTarget(opts: FrameOpts) {
+  const num = (v?: string) => (v === undefined ? undefined : Number(v));
+  return { to_frame_id: opts.to, x: num(opts.x), y: num(opts.y), canvas_x: num(opts.canvasX), canvas_y: num(opts.canvasY) };
+}
+
+function printMoved(moved: FrameElementMoved) {
+  if (moved.outcome !== 'done') {
+    console.error(`${moved.outcome}: ${moved.message ?? ''}`);
+    process.exit(1);
+  }
+  console.log(`${moved.new_frame ? 'new frame' : 'frame'} ${moved.frame_id}: element ${moved.element_id}`);
+}
+
+export async function cmdMotionMove(frameId: string, elementId: string, opts: FrameOpts) {
+  printMoved(await motionApi.frameElement(await token(), { frame_id: frameId, element_id: elementId, ...frameTarget(opts) }, opts.org));
+}
+
+export async function cmdMotionPlace(nodeId: string, opts: FrameOpts) {
+  printMoved(await motionApi.frameElement(await token(), { node_id: nodeId, ...frameTarget(opts) }, opts.org));
 }
 
 export async function cmdMotionBudget(nodeId: string, opts: { org?: string; raise?: boolean }) {

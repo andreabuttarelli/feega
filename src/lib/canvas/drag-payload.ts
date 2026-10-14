@@ -98,6 +98,7 @@ export function influencerNodeSize(): { w: number; h: number } {
  * sbaglio, che sarebbe peggio di un trascinamento che non funziona ancora.
  */
 export const CANVAS_DRAG_FILLED_NODE = 'application/x-feega-filled-node';
+export const CANVAS_DRAG_OUTPUT = 'application/x-feega-node-output';
 
 export type FilledNodeDrag = {
   type: 'image' | 'video' | 'text' | 'doc' | 'influencer' | 'social_account_feed' | 'products' | 'iframe';

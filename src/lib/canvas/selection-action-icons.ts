@@ -8,6 +8,8 @@ import Workflow from '@lucide/svelte/icons/workflow';
 import Link2 from '@lucide/svelte/icons/link-2';
 import Megaphone from '@lucide/svelte/icons/megaphone';
 import Play from '@lucide/svelte/icons/play';
+import ListEnd from '@lucide/svelte/icons/list-end';
+import RefreshCw from '@lucide/svelte/icons/refresh-cw';
 import Trash2 from '@lucide/svelte/icons/trash-2';
 import Hash from '@lucide/svelte/icons/hash';
 import Flag from '@lucide/svelte/icons/flag';
@@ -20,6 +22,8 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'connect-existing': Link2,
   promote: Megaphone,
   'run-workflow': Play,
+  'run-downstream': ListEnd,
+  'run-stale': RefreshCw,
   'copy-id': Hash,
   report: Flag,
   delete: Trash2

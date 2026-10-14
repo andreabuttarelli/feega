@@ -100,6 +100,8 @@
   --pixel-blue:   #00B2FF;
   --pixel-orange: #FF5A00;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-expo: cubic-bezier(0.87, 0, 0.13, 1);
+  --chrome-move: 360ms;
   --sans: "DM Sans", -apple-system, BlinkMacSystemFont, "SF Pro Display",
           "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
   /* Token reale per il codice in chat & co. — prima ogni file usava var(--mono, fallback)
@@ -159,6 +161,7 @@
   --ui-accent-ink: #ffffff;
   --ui-accent-wash: color-mix(in srgb, var(--ui-accent) 10%, transparent);
   --ui-hover-outline: #b14cff;
+  --ease-expo-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ui-ok: #1f9d55;
   --ui-warn: #d98e04;
   --ui-danger: #e5484d;

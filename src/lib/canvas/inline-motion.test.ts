@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, inlineMotionTarget, nodeLayers, openingOf } from './inline-motion';
+import { AddBar, CanvasState, Reframe, addBarOf, reframesOn, NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, inlineMotionTarget, nodeLayers, openingOf } from './inline-motion';
 import { Viewport } from '$lib/motion/editor-layout';
 
 const rows = [
@@ -55,5 +55,18 @@ describe('the other nodes while a frame is edited on a phone', () => {
     expect(NEIGHBOUR_WHILE_EDITING[Part.Edges]).toBeGreaterThanOrEqual(0.75);
     expect(NEIGHBOUR_WHILE_EDITING[Part.Label]).toBe(0);
     expect(NEIGHBOUR_WHILE_EDITING[Part.Ports]).toBe(0);
+  });
+});
+
+describe('the canvas around an opening editor', () => {
+  it('stays put on desktop; a phone or tablet frames the node in the room the panels leave', () => {
+    expect(reframesOn(Viewport.Desktop)).toBe(Reframe.Stay);
+    expect(reframesOn(Viewport.Tablet)).toBe(Reframe.Frame);
+    expect(reframesOn(Viewport.Phone)).toBe(Reframe.Frame);
+  });
+
+  it('the add bar leaves while a frame is edited and comes back after', () => {
+    expect(addBarOf(CanvasState.Browsing)).toBe(AddBar.Shown);
+    expect(addBarOf(CanvasState.Editing)).toBe(AddBar.Away);
   });
 });
