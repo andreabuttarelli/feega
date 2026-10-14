@@ -3,7 +3,9 @@ import { extendTailwindMerge } from 'tailwind-merge';
 
 const UI_TYPE_ROLES = ['ui-section', 'ui-caption', 'ui-label', 'ui-body', 'ui-title'];
 
-const twMerge = extendTailwindMerge({ extend: { theme: { text: UI_TYPE_ROLES } } });
+export const TW_MERGE_CONFIG = { extend: { theme: { text: UI_TYPE_ROLES } } };
+
+const twMerge = extendTailwindMerge(TW_MERGE_CONFIG);
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
