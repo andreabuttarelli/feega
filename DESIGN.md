@@ -46,6 +46,8 @@ between the two is the point.
 ### states
 
 Hover is a wash (`--ui-hover`), focus an accent ring, selection an accent wash with accent text.
+Hovering a Layers row outlines what it names on the canvas in `--ui-hover-outline` (violet
+`#b14cff`), never the accent: hover and selection must read apart at a glance.
 Loading shows skeletons, never spinners in the middle of a page. Errors say what happened and
 what to do.
 

@@ -377,7 +377,7 @@
     <CodeEditor {doc} name={customName} previous={previousSource(customName)} {onchange} />
   {:else}
     {#each SECTION_ORDER.filter((s) => has[s]) as section (section)}
-      <InspectorSection title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section)} ontoggle={() => toggleSection(section)}>
+      <InspectorSection title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section) || (!!focus && groupsIn(section).length > 0)} ontoggle={() => toggleSection(section)}>
         {@render BODIES[section]()}
       </InspectorSection>
     {/each}

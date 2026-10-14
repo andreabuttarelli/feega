@@ -1,10 +1,11 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { selectionView } from '$lib/motion/selection-context';
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
-  import { PartEdit, editablePart, partAt, partBoxes, partText, writePartText } from '$lib/motion/poster-parts';
+  import { PART_SEP, PartEdit, editablePart, partAt, partBoxes, partText, writePartText } from '$lib/motion/poster-parts';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, stackAt, writePatch, type Boxes, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
@@ -16,7 +17,9 @@
     onchange,
     pickAt = null,
     part = $bindable(null),
-    onparts = () => {}
+    onparts = () => {},
+    outlined = null,
+    onhover = () => {}
   }: {
     doc: MotionDoc;
     frame: number;
@@ -27,6 +30,8 @@
     pickAt?: Pt | null;
     part?: string | null;
     onparts?: (parts: Record<string, string[]>) => void;
+    outlined?: string | null;
+    onhover?: (id: string | null) => void;
   } = $props();
 
   const shared = selectionView()!;
@@ -60,6 +65,13 @@
   const quad = $derived(clip && boxes[clip.id] && onFrame(clip) ? quadOf(shown, clip.id, frame, boxes[clip.id]) : null);
   const hoverQuad = $derived(hover && hover !== selected && boxes[hover] ? quadOf(shown, hover, frame, boxes[hover]) : null);
   const anchor = $derived(quad && clip ? anchorOf(shown, clip.id, frame) : null);
+  const outlinedPart = $derived(outlined?.includes(PART_SEP) ? (boxes[outlined] ?? null) : null);
+  const outlinedQuad = $derived(outlined && !outlinedPart && boxes[outlined] && findClip(shown, outlined) ? quadOf(shown, outlined, frame, boxes[outlined]) : null);
+
+  $effect(() => {
+    const id = hover;
+    untrack(() => onhover(id));
+  });
   const split = $derived(partBoxes(boxes));
   const ownParts = $derived(selected ? (split.parts[selected] ?? []) : []);
   const partBox = $derived(part ? (ownParts.find((p) => p.part === part)?.box ?? null) : null);
@@ -234,11 +246,15 @@
 <div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={editPart} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={end} onpointerleave={() => (hover = null)}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} />{/if}
+    {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}
     {#if quad}<polygon class="box" points={points(quad)} data-testid="selection-box" />{/if}
     {#each live?.guides ?? [] as g (g.axis + g.at)}
       {#if g.axis === 'x'}<line class="guide" x1={g.at} y1="0" x2={g.at} y2={doc.height} />{:else}<line class="guide" x1="0" y1={g.at} x2={doc.width} y2={g.at} />{/if}
     {/each}
   </svg>
+  {#if outlinedPart}
+    <div class="outlined-part" data-testid="layer-hover-part" style={boxStyle(outlinedPart)}></div>
+  {/if}
   {#if quad && clip}
     {@const handles = handlesOf(quad)}
     {#each handles.slice(0, 4) as h, i (i)}
@@ -299,6 +315,7 @@
 
   .box,
   .hover,
+  .outlined,
   .guide {
     fill: none;
     vector-effect: non-scaling-stroke;
@@ -313,6 +330,17 @@
     stroke: var(--ui-accent);
     stroke-width: 1px;
     opacity: 0.5;
+  }
+
+  .outlined {
+    stroke: var(--ui-hover-outline);
+    stroke-width: 1.5px;
+  }
+
+  .outlined-part {
+    position: absolute;
+    pointer-events: none;
+    border: 1.5px solid var(--ui-hover-outline);
   }
 
   .guide {

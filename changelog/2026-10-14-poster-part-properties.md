@@ -7,28 +7,24 @@ appeared, even though the editing code path and the selection itself were wired 
 report calling this "selecting a part doesn't work" was really this: selection worked, Properties
 showed almost nothing once it did.
 
-Posters are built from `CustomComponent.propsSchema`, and every `PropSpec` already carries a
-`group: 'Content' | 'Style' | 'Layout' | 'Motion' | 'Camera'` (see `poster-kit.ts`'s `colourProp`,
-`fontProp`, `numberProp`). In every poster template, `Style`/`Layout` fields (ink, paper, font,
-fontWeight, fill, leading, margin, per-block sizes…) are poster-wide controls, not per-part; only
-`Content` fields are one-per-part (title, byline, caption…). So "the fields of a part" has a
-general answer that needs no per-poster table: the part's own field, plus every `Style`/`Layout`
-field of the component. `partFieldKeys(doc, clip, field)` in `inspector.ts` does exactly that,
-reusing `clipFieldGroups` instead of introducing a second schema.
+Which fields belong to a part is decided by `partFieldKeys(doc, clip, field)` in
+`inspector.ts`, in one place:
 
-`focus` on `MotionInspector` changed from a single `string | null` to `readonly string[] | null`;
-the field filter changed from `f.key === focus` to `focus.includes(f.key)`. Nothing else in the
-selection path needed touching — `LayersPanel`'s `video.selectPart` and `MotionEditorShell`'s
-`layersSource.publishVideo` already set `selectedPart` correctly.
+- **its own fields by name**: `<part>` plus `<part>Color|Colour|Font|Size|Weight|X|Y|Leading`
+  (`titleSize`, `overlayX`, `numberColour`…);
+- **a table row where a poster names them otherwise**: `PART_FIELDS_BY_POSTER`, e.g.
+  `CircleEventPoster.heading → nameSize`, `OverlayGridPoster.overlayLow → lowX, lowY`. A test in
+  `posters.test.ts` fails if a row names a part or field the poster does not have;
+- **every Style/Layout field no part claims** (`ink`, `font`, `paper`…): poster-wide, shown with
+  every part.
 
-Discarded: a naming-convention guess (`titleColor`, `titleFont`, `titleX`…). Checked three
-templates (`block-title-poster`, `type-grid-poster`, plus `scatter-title`'s doc); none name
-colour/font per part — they're shared poster-wide, which a convention guess would have missed or
-guessed wrong silently. The `group` field already encodes the real design intent and needed no
-rewriting.
+So selecting the title shows the title's size but not the caption's. The first cut (this
+branch, before review) showed every Style/Layout field for every part; on posters with per-part
+sizes that listed the sizes of every other part too.
 
-Not done in this change, called out so it isn't mistaken for finished: the Layers tree not
-listing a closed frame's children, hover highlighting between Layers and canvas, and the Layers
-vs canvas dual-selection bug (select a row, then click a different canvas node — both stay
-selected) are each a separate, real issue that deserves its own failing test and its own PR
-rather than a drive-by fix bundled into this one.
+`MotionInspector` opens the sections that hold a focused field: they were collapsed, so the
+colour and size were in the DOM but out of sight. `focus` went from `string | null` to
+`readonly string[] | null`.
+
+Not done: per-part visibility. No poster has a per-part show/hide prop today; hiding a part is
+emptying its text.
