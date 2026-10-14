@@ -14,6 +14,7 @@
     doc,
     frame,
     html,
+    redraws,
     measure,
     onpreview,
     onchange,
@@ -28,6 +29,7 @@
     doc: MotionDoc;
     frame: number;
     html: string;
+    redraws: number;
     measure: () => Promise<Record<string, MeasuredBox>>;
     onpreview: (doc: MotionDoc | null) => void;
     onchange: (doc: MotionDoc, summary: string) => void;
@@ -160,6 +162,7 @@
   $effect(() => {
     void html;
     void frame;
+    void redraws;
     void remeasure();
     const later = setTimeout(() => void remeasure(), SETTLE_MS);
     return () => clearTimeout(later);

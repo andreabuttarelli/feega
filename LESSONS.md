@@ -4,6 +4,15 @@ Lezioni imparate lavorando a questo repo: problemi veri, il segnale che li fa ri
 
 ## Motion editor
 
+### Il contorno di selezione è spostato o piccolo rispetto al disegno
+Segnale: il box blu non copre l'elemento, ma `measure()` restituisce frazioni giuste. Prima di
+sospettare zoom/scala, confronta `hyperframes-player.currentTime` con il timecode: se differiscono,
+qualcuno ha spostato il player (lo `still()` del poster lo lasciava al 40%) e il contorno è
+calcolato al frame dell'editor sopra un disegno di un altro istante. Mossa: chi fa seek per uno
+scatto torna a `frame / fps`; il disegno che cambia da solo arriva come `REDRAWN` e fa rimisurare.
+L'oracolo nei test è il Range del testo dentro l'iframe scalato sul rect dell'iframe, mai il
+`boundingBox()` di Playwright su un elemento dentro un iframe con `zoom` (sbaglia di 2×).
+
 ### Una modifica al frame sulla tela fa sparire selezione e stage
 Segnale: dopo un cambio di proprietà nel frame aperto sulla tela la stage torna all'immagine
 vecchia e i box di selezione spariscono finché non si riseleziona. Due cause: un `$effect` che legge
