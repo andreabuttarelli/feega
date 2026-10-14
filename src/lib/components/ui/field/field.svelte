@@ -1,5 +1,6 @@
 <script lang="ts" module>
 	import { tv } from "tailwind-variants";
+	import { TW_MERGE_CONFIG } from "$lib/utils.js";
 
 	export const FieldLayout = { Stack: "stack", Row: "row" } as const;
 	export type FieldLayout = (typeof FieldLayout)[keyof typeof FieldLayout];
@@ -8,9 +9,9 @@
 		slots: {
 			root: "flex min-w-0 gap-2",
 			text: "flex min-w-0 flex-col gap-1",
-			label: "text-sm font-semibold text-foreground",
-			hint: "max-w-[60ch] text-[0.8125rem] leading-snug text-muted-foreground",
-			error: "text-[0.8125rem] text-destructive",
+			label: "text-ui-body font-medium text-ui-text",
+			hint: "max-w-[60ch] text-ui-label leading-snug text-ui-text-3",
+			error: "text-ui-label text-ui-danger",
 			control: "flex min-w-0 flex-col gap-2",
 		},
 		variants: {
@@ -20,7 +21,7 @@
 			},
 		},
 		defaultVariants: { layout: "stack" },
-	});
+	}, { twMergeConfig: TW_MERGE_CONFIG });
 </script>
 
 <script lang="ts">

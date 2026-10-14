@@ -1,5 +1,6 @@
 <script lang="ts">
-  import PageTitle from '$lib/components/PageTitle.svelte';
+  import PageHeader from '$lib/components/app/PageHeader.svelte';
+  import { Button } from '$lib/components/ui/button/index.js';
   import CanvasRows from '$lib/components/app/CanvasRows.svelte';
 
   let { data } = $props();
@@ -8,12 +9,13 @@
 <svelte:head><title>Canvases · feega</title></svelte:head>
 
 <div class="canvases">
-  <div class="head">
-    <PageTitle text="canvases" />
-    <form method="POST" action="/app?/project">
-      <button type="submit" class="primary" data-testid="new-canvas">new canvas</button>
-    </form>
-  </div>
+  <PageHeader title="canvases">
+    {#snippet actions()}
+      <form method="POST" action="/app?/project">
+        <Button type="submit" data-testid="new-canvas">new canvas</Button>
+      </form>
+    {/snippet}
+  </PageHeader>
 
   {#if data.canvases.length}
     <CanvasRows canvases={data.canvases} testid="canvases-list" />
@@ -26,39 +28,15 @@
   .canvases {
     display: flex;
     flex-direction: column;
-    gap: 48px;
+    gap: var(--ui-space-8);
     max-width: 720px;
     margin: 0 auto;
-    color: var(--ui-ink);
-  }
-
-  .head {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: var(--ui-space-4);
-  }
-
-  .primary {
-    height: 36px;
-    padding: 0 var(--ui-space-4);
-    border: 0;
-    border-radius: 9999px;
-    background: var(--ui-accent);
-    color: #fff;
-    font: inherit;
-    font-size: var(--ui-text-sm);
-    cursor: pointer;
-  }
-
-  .primary:focus-visible {
-    outline: none;
-    box-shadow: var(--ui-focus);
+    color: var(--ui-text);
   }
 
   .empty {
     margin: 0;
-    font-size: var(--ui-text-md);
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-body);
+    color: var(--ui-text-tertiary);
   }
 </style>

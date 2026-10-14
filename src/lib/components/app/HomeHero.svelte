@@ -73,6 +73,7 @@
     min-height: 280px;
     padding: var(--ui-space-8);
     overflow: hidden;
+    border-radius: var(--ui-radius-md);
     background: #000;
     color: #fff;
     isolation: isolate;

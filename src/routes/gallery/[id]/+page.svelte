@@ -77,22 +77,23 @@
     display: flex;
     flex-direction: column;
     gap: var(--ui-space-6);
-    font-size: var(--ui-text-md);
+    font-size: var(--ui-type-body);
   }
 
   .gx-back {
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-3);
+    font-size: var(--ui-type-label);
+    color: var(--ui-text-tertiary);
   }
 
   .gx-back:hover {
-    color: var(--ui-ink);
+    color: var(--ui-text);
   }
 
   .gx-stage {
     display: flex;
     justify-content: center;
-    background: var(--ui-surface);
+    background: var(--ui-panel-sunken);
+    border-radius: var(--ui-radius-md);
   }
 
   .gx-stage :global(.player) {
@@ -119,16 +120,16 @@
 
   .gx-byline {
     margin: 0;
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-3);
+    font-size: var(--ui-type-label);
+    color: var(--ui-text-tertiary);
   }
 
   .gx-facts {
     display: flex;
     gap: var(--ui-space-4);
     margin: var(--ui-space-1) 0 0;
-    font-size: var(--ui-text-xs);
-    color: var(--ui-ink-3);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-tertiary);
   }
 
   .gx-facts span {
@@ -143,16 +144,16 @@
 
   .gx-primary:focus-visible {
     outline: none;
-    box-shadow: var(--ui-focus);
+    box-shadow: var(--ui-ring);
   }
 
   .gx-byline a {
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
   }
 
   .gx-description {
     margin: var(--ui-space-2) 0 0;
-    color: var(--ui-ink-2);
+    color: var(--ui-text-secondary);
     line-height: 1.5;
   }
 
@@ -165,8 +166,9 @@
     height: 40px;
     padding: 0 var(--ui-space-2);
     border: 0;
-    background: var(--ui-surface);
-    color: var(--ui-ink);
+    background: var(--ui-panel-sunken);
+    color: var(--ui-text);
+    border-radius: var(--ui-radius-sm);
   }
 
   .gx-primary {
@@ -175,9 +177,9 @@
     min-width: 140px;
     padding: 0 var(--ui-space-6);
     border: 0;
-    background: var(--ui-ink);
-    color: var(--ui-bg);
-    font-size: var(--ui-text-md);
+    background: var(--ui-text);
+    color: var(--ui-panel);
+    font-size: var(--ui-type-body);
     font-weight: 600;
     cursor: pointer;
   }
@@ -189,7 +191,7 @@
   .gx-error {
     margin: 0;
     color: var(--ui-danger);
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-type-label);
   }
 
   @media (max-width: 640px) {

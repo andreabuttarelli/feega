@@ -40,7 +40,7 @@
 
     <form method="POST" action="?/createBrand" use:enhance={withBusy} class="flex flex-col gap-2 sm:flex-row sm:items-end">
       <Field label="New brand name" for="new-brand-name" class="flex-1">
-        <Input id="new-brand-name" name="name" type="text" placeholder="Acme Coffee" required class="h-9" />
+        <Input id="new-brand-name" name="name" type="text" placeholder="Acme Coffee" required />
       </Field>
       <Button variant="secondary" type="submit" disabled={busy}>Create brand</Button>
     </form>
@@ -76,16 +76,16 @@
 
     <form method="POST" action="?/update" use:enhance={withBusy} class="flex flex-col gap-4">
       <Field label="Name" for="brand-name">
-        <Input id="brand-name" name="name" type="text" value={data.brand.name} required class="h-9" />
+        <Input id="brand-name" name="name" type="text" value={data.brand.name} required />
       </Field>
       <Field label="Slug" for="brand-slug">
-        <Input id="brand-slug" type="text" value={data.brand.slug} disabled class="h-9" />
+        <Input id="brand-slug" type="text" value={data.brand.slug} disabled />
       </Field>
       <Field label="Website" for="brand-website">
-        <Input id="brand-website" name="website" type="url" inputmode="url" value={data.brand.website ?? ''} placeholder="https://example.com" class="h-9" />
+        <Input id="brand-website" name="website" type="url" inputmode="url" value={data.brand.website ?? ''} placeholder="https://example.com" />
       </Field>
       <Field label="Short description" for="brand-short">
-        <Input id="brand-short" name="short_description" type="text" value={data.brand.shortDescription ?? ''} placeholder="One line about the brand" class="h-9" />
+        <Input id="brand-short" name="short_description" type="text" value={data.brand.shortDescription ?? ''} placeholder="One line about the brand" />
       </Field>
       <Field label="Content" for="brand-content">
         <Textarea id="brand-content" name="content" rows={8} placeholder="Anything else worth knowing about the brand" value={data.brand.content ?? ''} />
@@ -101,16 +101,16 @@
   .logo-slot {
     width: 64px;
     height: 64px;
-    border: 1px solid var(--line);
-    background: var(--paper-2);
+    background: var(--ui-input);
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
     flex: none;
+    border-radius: var(--ui-radius-md);
   }
   .logo-slot.empty {
-    color: var(--ink-faint);
+    color: var(--ui-text-tertiary);
   }
   .logo-slot img {
     max-width: 80%;

@@ -56,8 +56,8 @@
 <style>
   .app-shell {
     min-height: 100dvh;
-    background: var(--ui-bg);
-    color: var(--ui-ink);
+    background: var(--ui-panel);
+    color: var(--ui-text);
   }
 
   .app-side {
@@ -73,34 +73,36 @@
     gap: var(--ui-space-2);
     height: var(--ui-bar-h);
     padding: 0 var(--ui-space-2);
-    background: var(--ui-bg);
+    background: var(--ui-panel);
   }
 
   .app-bar :global(.burger) {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     border: 0;
+    border-radius: var(--ui-radius-full);
     background: transparent;
-    color: var(--ui-ink);
+    color: var(--ui-icon-ink);
   }
 
   .app-bar :global(.burger:hover) {
-    background: var(--ui-hover);
+    background: var(--ui-wash);
+    color: var(--ui-text);
   }
 
   .app-bar :global(.burger:focus-visible) {
     outline: none;
-    box-shadow: var(--ui-focus);
+    box-shadow: var(--ui-ring);
   }
 
   .wordmark {
     font-size: var(--ui-text-lg);
     font-weight: 600;
     letter-spacing: -0.02em;
-    color: var(--ui-ink);
+    color: var(--ui-text);
     text-decoration: none;
   }
 
@@ -114,8 +116,8 @@
     padding: 0;
     gap: 0;
     border: 0 !important;
-    background: var(--ui-bg) !important;
-    color: var(--ui-ink);
+    background: var(--ui-panel-sunken) !important;
+    color: var(--ui-text);
   }
 
   .app-main {
@@ -134,7 +136,7 @@
       position: sticky;
       top: 0;
       height: 100dvh;
-      background: var(--ui-surface);
+      background: var(--ui-panel-sunken);
     }
 
     .app-bar {
