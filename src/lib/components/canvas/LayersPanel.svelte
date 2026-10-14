@@ -10,6 +10,9 @@
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Music from '@lucide/svelte/icons/music';
+  import Component from '@lucide/svelte/icons/component';
+  import Rows3 from '@lucide/svelte/icons/rows-3';
   import { readFolds, toggleFold } from '$lib/canvas/layer-folds';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { untrack } from 'svelte';
@@ -17,9 +20,10 @@
   import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import PartsProbe from './PartsProbe.svelte';
-  import { LayerAction, LayerKind, Pick, dropLayer, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { LayerAction, LayerKind, NodeIcon, Pick, dropLayer, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
+  const PRECOMP = 'Precomp';
   const INDENT_PX = 14;
   const FOLD_GUTTER = 24;
 
@@ -30,7 +34,7 @@
   let opening = $state<{ nodeId: string; id: string } | null>(null);
   let folds = $state.raw<Set<string>>(typeof localStorage === 'undefined' ? new Set() : readFolds(localStorage));
 
-  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts } : null, outlinesFor(heads, outlines), folds));
+  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts, mode: video.mode } : null, outlinesFor(heads, outlines), folds));
   const frames = $derived(new Set([...heads.map((h) => h.nodeId), ...(video ? [video.nodeId] : [])]));
   const fold = (nodeId: string) => (folds = toggleFold(localStorage, folds, nodeId));
 
@@ -86,7 +90,8 @@
   let renaming = $state<string | null>(null);
   let dragged = $state<string | null>(null);
 
-  const ROW_ICON: Record<string, typeof Square> = { motion: Clapperboard, image: ImageIcon, text: TypeIcon, arrow: ArrowRight };
+  const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, Audio: Music };
+  const KIND_ICON: Partial<Record<LayerKind, typeof Square>> = { [LayerKind.Group]: Component, [LayerKind.Track]: Rows3 };
   const isPicked = (row: LayerRow) => rowPicked(row, selection);
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
 
@@ -171,7 +176,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" onkeydown={onKey}>
   {#each rows as row (`${row.nodeId}/${row.key}`)}
-    {@const RowIcon = ROW_ICON[row.type] ?? Square}
+    {@const RowIcon = KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square}
     <div
       class="row"
       class:picked={isPicked(row)}
@@ -199,6 +204,9 @@
           {#if folds.has(row.id)}<ChevronRight size={ICON} />{:else}<ChevronDown size={ICON} />{/if}
         </button>
       {/if}
+      {#if row.thumb}
+        <img class="thumb" src={row.thumb} alt="" loading="lazy" decoding="async" data-testid="layer-thumb" />
+      {/if}
       <span class="icon"><RowIcon size={ICON} /></span>
       {#if renaming === row.id}
         <!-- svelte-ignore a11y_autofocus -->
@@ -210,7 +218,7 @@
         <button type="button" class="flag" aria-label={row.hidden ? 'Show' : 'Hide'} aria-pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
           {#if row.hidden}<EyeOff size={ICON} />{:else}<Eye size={ICON} />{/if}
         </button>
-        <button type="button" class="flag" aria-label={row.locked ? 'Unlock' : 'Lock'} aria-pressed={row.locked} disabled={row.kind === LayerKind.Group} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Lock, SUMMARY[LayerAction.Lock]))}>
+        <button type="button" class="flag" aria-label={row.locked ? 'Unlock' : 'Lock'} aria-pressed={row.locked} disabled={row.kind === LayerKind.Group && row.type === PRECOMP} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Lock, SUMMARY[LayerAction.Lock]))}>
           {#if row.locked}<Lock size={ICON} />{:else}<LockOpen size={ICON} />{/if}
         </button>
       {/if}
@@ -264,6 +272,13 @@
     display: grid;
     place-items: center;
     color: var(--ui-text-3);
+  }
+
+  .thumb {
+    width: 20px;
+    height: 20px;
+    object-fit: cover;
+    background: var(--ui-hover);
   }
 
   .name {

@@ -281,11 +281,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await clip.click();
     await expect(clip).toHaveAttribute('aria-selected', 'true');
 
-    await layers.locator('[data-layer="v1"]').click();
-    await page.keyboard.press('ControlOrMeta+BracketLeft');
-    await expect
-      .poll(async () => ((await admin.from('motion_revisions').select('doc').eq('node_id', first).order('version', { ascending: false }).limit(1)).data?.[0]?.doc as { tracks: { id: string }[] } | undefined)?.tracks.map((t) => t.id), { timeout: 10_000 })
-      .toEqual(['a1', 'v1']);
+    await expect(layers.locator('[data-kind="track"]'), 'a track holding one clip is not a row').toHaveCount(0);
     await page.waitForTimeout(800);
     await shoot(page, '7-layers');
   });
