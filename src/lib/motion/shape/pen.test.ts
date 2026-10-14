@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parsePath, pathData, type Outline } from './geometry';
-import { Handle, Mirror, addPoint, deletePoint, dragHandle, movePoint, toggleClosed } from './pen';
+import { Handle, Mirror, addPoint, insertPoint, segmentHit, deletePoint, dragHandle, movePoint, toggleClosed } from './pen';
 
 const read = (d: string): Outline => {
   const o = parsePath(d);
@@ -38,5 +38,44 @@ describe('pen tool', () => {
   it('a contour closes and opens', () => {
     expect(pathData(toggleClosed(read('M0 0L1 0L1 1'), 0))).toBe('M0 0L1 0L1 1Z');
     expect(pathData(toggleClosed(read('M0 0L1 0L1 1Z'), 0))).toBe('M0 0L1 0L1 1');
+  });
+});
+
+describe('adding a point on a segment', () => {
+  it('a click near a straight segment finds it and where along it', () => {
+    const hit = segmentHit(read('M0 0L1 0L1 1'), [0.5, 0.01], 0.05);
+    expect(hit?.contour).toBe(0);
+    expect(hit?.index).toBe(0);
+    expect(hit?.t).toBeCloseTo(0.5, 1);
+  });
+
+  it('a click far from every segment is no hit', () => {
+    expect(segmentHit(read('M0 0L1 0'), [0.5, 0.5], 0.05)).toBeNull();
+  });
+
+  it('the closing segment of a closed contour is a segment too', () => {
+    expect(segmentHit(read('M0 0L1 0L1 1Z'), [0.5, 0.5], 0.05)?.index).toBe(2);
+  });
+
+  it('inserting splits a straight segment without changing its shape', () => {
+    const { outline, ref } = insertPoint(read('M0 0L1 0L1 1'), { contour: 0, index: 0, t: 0.5 });
+    expect(pathData(outline)).toBe('M0 0L0.5 0L1 0L1 1');
+    expect(ref).toEqual({ contour: 0, index: 1 });
+  });
+
+  it('inserting on a curve keeps the curve: both halves meet at the split point', () => {
+    const { outline } = insertPoint(read('M0 0C0 1 1 1 1 0'), { contour: 0, index: 0, t: 0.5 });
+    const v = outline[0].vertices;
+    expect(v).toHaveLength(3);
+    expect(v[1].p[0]).toBeCloseTo(0.5, 4);
+    expect(v[1].p[1]).toBeCloseTo(0.75, 4);
+    expect(v[0].out).toEqual([0, 0.5]);
+    expect(v[2].in).toEqual([1, 0.5]);
+  });
+
+  it('inserting on the closing segment appends the point at the end', () => {
+    const { outline, ref } = insertPoint(read('M0 0L1 0L1 1Z'), { contour: 0, index: 2, t: 0.5 });
+    expect(ref).toEqual({ contour: 0, index: 3 });
+    expect(outline[0].vertices[3].p).toEqual([0.5, 0.5]);
   });
 });

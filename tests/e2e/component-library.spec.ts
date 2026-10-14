@@ -12,10 +12,10 @@ test.describe('component library @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
   for (const viewport of VIEWPORTS) {
-    test(`${viewport.name}: dashboard → use in new video → the editor shows the component`, async ({ page }) => {
+    test(`${viewport.name}: templates → use in new video → the editor shows the component`, async ({ page }) => {
       test.setTimeout(120_000);
       await page.setViewportSize(viewport);
-      await gotoHydrated(page, '/app');
+      await gotoHydrated(page, '/app/templates');
 
       const shelf = page.getByTestId('home-components');
       await shelf.scrollIntoViewIfNeeded();

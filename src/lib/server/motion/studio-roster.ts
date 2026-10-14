@@ -75,6 +75,10 @@ const SOUND_TOOLS: ReadonlySet<string> = new Set(['get_motion_doc', 'add_music',
 
 const SHOT_TOOLS: ReadonlySet<string> = new Set([
   ...STORY_TOOLS,
+  'list_templates',
+  'get_template',
+  'add_template',
+  'set_template_fields',
   'list_shots',
   'add_shot',
   'set_props',

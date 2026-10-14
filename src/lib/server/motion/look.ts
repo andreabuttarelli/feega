@@ -20,6 +20,7 @@ const READS: ReadonlySet<string> = new Set([
   'list_fonts',
   'list_shots',
   'list_templates',
+  'get_template',
   'list_revisions',
   'read_storyboard',
   'read_component'

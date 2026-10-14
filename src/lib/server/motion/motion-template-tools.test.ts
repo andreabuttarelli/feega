@@ -7,6 +7,8 @@ import { createMotionTools, type MotionToolDeps, type MotionSession } from './mo
 import { TrackKind } from '$lib/motion/components';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 
+const LIST_CHARS_PER_TEMPLATE = 400;
+
 type Exec = (input: unknown, options: { toolCallId: string }) => Promise<Record<string, unknown>>;
 
 function setup() {
@@ -80,12 +82,42 @@ function withLibrary(sfx?: MotionToolDeps['sfx']) {
 }
 
 describe('motion agent template library tools', () => {
-  it('list_templates names each template with its typed fields', async () => {
+  it('list_templates names each template with its card in one line and the fields a user edits first', async () => {
     const { run } = withLibrary();
 
-    const listed = (await run('list_templates', {})) as unknown as { templates: { id: string; fields: { key: string }[] }[] };
+    const listed = (await run('list_templates', {})) as unknown as { templates: { id: string; card: string; key_fields: string[] }[] };
+    const lower = listed.templates.find((t) => t.id === 'builtin:lower-third');
 
-    expect(listed.templates.find((t) => t.id === 'builtin:lower-third')?.fields.map((f) => f.key)).toEqual(['name', 'role', 'accent']);
+    expect(lower?.key_fields).toEqual(['name', 'role', 'accent']);
+    expect(lower?.card).toMatch(/0–0\.4s an accent bar wipes in/);
+  });
+
+  it('list_templates narrows to one section role, so a plan picks an opener among openers', async () => {
+    const { run } = withLibrary();
+
+    const listed = (await run('list_templates', { role: 'closer' })) as unknown as { templates: { id: string; card: string }[] };
+
+    expect(listed.templates.map((t) => t.id)).toContain('builtin:scene-logo-end-card');
+    expect(listed.templates.every((t) => t.card.split(' · ')[0].includes('closer'))).toBe(true);
+  });
+
+  it('get_template returns the full card, beat by beat, and every typed field', async () => {
+    const { run } = withLibrary();
+
+    const got = (await run('get_template', { id: 'builtin:image-globe' })) as unknown as { card: { onScreen: string[]; edges: { start: string } }; fields: { key: string }[] };
+
+    expect(got.card.onScreen[0]).toMatch(/^0–2s pictures assemble/);
+    expect(got.card.edges.start).toBe('dark');
+    expect(got.fields.map((f) => f.key)).toContain('title');
+    expect(await run('get_template', { id: 'builtin:nope' })).toMatchObject({ ok: false });
+  });
+
+  it('a whole template list stays small enough to read every turn', async () => {
+    const { run } = withLibrary();
+
+    const listed = (await run('list_templates', {})) as unknown as { templates: unknown[] };
+
+    expect(JSON.stringify(listed).length).toBeLessThan(LIST_CHARS_PER_TEMPLATE * listed.templates.length);
   });
 
   it('add_template places a locked precomp; set_template_fields fills it, checked against its schema', async () => {

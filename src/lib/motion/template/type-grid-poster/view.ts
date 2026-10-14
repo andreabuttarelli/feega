@@ -9,10 +9,13 @@ const PROBE_PX = 100;
 const SHAPES = 3;
 const FOOTER_ROWS = 2.6;
 const KEPT_AIR = 0.25;
-const ARROW_SVG = '<svg class="tg-arrow" viewBox="0 0 105 62" fill="none" stroke="currentColor" stroke-width="9"><path d="M0 31h98M70 3l29 28-29 28"/></svg>';
+const ARROW_SVG = '<svg viewBox="0 0 105 62" fill="none" stroke="currentColor" stroke-width="9"><path d="M0 31h98M70 3l29 28-29 28"/></svg>';
 
 const listOf = (raw) => String(raw || '').split(',').map((s) => s.trim()).filter(Boolean);
-const mediaList = (raw) => (Array.isArray(raw) ? raw.filter((m) => m.kind !== 'video').map((m) => m.src) : listOf(raw).map((id) => (LINK.test(id) ? id : assets[id]))).filter(Boolean);
+const slotOf = (m) => ({ src: m.kind === 'video' ? '' : m.src, fit: m.fit, focusX: m.focusX, focusY: m.focusY });
+const mediaList = (raw) => (Array.isArray(raw) ? raw.map(slotOf) : listOf(raw).map((id) => ({ src: LINK.test(id) ? id : assets[id] })));
+const PERCENT = 100;
+const CENTRE = 0.5;
 const fontOf = (p) => (String(p.font).includes(',') ? p.font : '"' + p.font + '", system-ui, sans-serif');
 const escaped = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
@@ -29,10 +32,15 @@ const marks = root.querySelector('.tg-extra');
 
 let cache = { key: '' };
 
+const lookOf = (slot) => 'object-fit:' + (slot.fit === 'contain' ? 'contain' : 'cover') + ';object-position:' + (slot.focusX ?? CENTRE) * PERCENT + '% ' + (slot.focusY ?? CENTRE) * PERCENT + '%';
+
 const photoHtml = (pictures, n) => {
-  const src = pictures[n];
-  return src ? '<span class="tg-photo"><img decoding="sync" draggable="false" src="' + escaped(src) + '"></span>' : '<span class="tg-photo tg-shape-' + (n % SHAPES) + '"></span>';
+  const slot = pictures[n] || {};
+  const tag = ' data-part="photos:' + n + '"';
+  return slot.src ? '<span class="tg-photo"' + tag + '><img decoding="sync" draggable="false" style="' + lookOf(slot) + '" src="' + escaped(slot.src) + '"></span>' : '<span class="tg-photo tg-shape-' + (n % SHAPES) + '"' + tag + '></span>';
 };
+
+const arrowHtml = (i) => '<span class="tg-arrow" data-part="arrow:' + i + '">' + ARROW_SVG + '</span>';
 
 const lineHtml = (line, pictures, counter, i) =>
   '<div class="tg-line" data-part="lines:' + i + '">' +
@@ -41,7 +49,7 @@ const lineHtml = (line, pictures, counter, i) =>
       if (part === PHOTO_MARK) {
         return photoHtml(pictures, counter.n++);
       }
-      return part === ARROW_MARK ? ARROW_SVG : '<span class="tg-word">' + escaped(part) + '</span>';
+      return part === ARROW_MARK ? arrowHtml(i) : '<span class="tg-word">' + escaped(part) + '</span>';
     })
     .join('') +
   '</div>';
@@ -68,6 +76,7 @@ const draw = () => {
   const footPx = (p.footerSize * width) / 100;
   s.setProperty('--tg-paper', p.paper);
   s.setProperty('--tg-ink', p.ink);
+  s.setProperty('--tg-arrow', p.arrowColor || p.ink);
   s.setProperty('--tg-tint', p.photoTint);
   s.setProperty('--tg-font', fontOf(p));
   s.setProperty('--tg-weight', String(p.fontWeight));

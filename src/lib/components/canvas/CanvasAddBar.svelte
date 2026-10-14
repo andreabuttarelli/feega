@@ -24,6 +24,8 @@
   import Upload from '@lucide/svelte/icons/upload';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
+  import Clapperboard from '@lucide/svelte/icons/clapperboard';
+  import { AddBar } from '$lib/canvas/inline-motion';
   import CanvasTemplateGallery from './CanvasTemplateGallery.svelte';
   import { CANVAS_ADD_BAR, CANVAS_BAR_MAIN, CANVAS_BAR_MORE, ADDABLE_LABEL, type Addable } from '$lib/canvas/addable';
   import { ADDABLE_ICON } from '$lib/canvas/addable-icons';
@@ -34,8 +36,10 @@
   let {
     onpick,
     onupload,
-    ontemplate
-  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void } = $props();
+    ontemplate,
+    onframes,
+    shown = AddBar.Shown
+  }: { onpick?: (what: Addable) => void; onupload?: (file: File) => void; ontemplate?: (id: string) => void; onframes?: () => void; shown?: AddBar } = $props();
 
   let showMore = $state(false);
   let showTemplates = $state(false);
@@ -65,7 +69,7 @@
   }
 </script>
 
-<div class="add-bar" data-dock="timeline">
+<div class="add-bar" data-testid="add-bar" data-shown={shown} data-dock={shown === AddBar.Shown ? 'timeline' : undefined} inert={shown === AddBar.Away}>
   <span class="tool">
     <button type="button" title="Upload file" aria-label="Upload file" onclick={pickFile}>
       <Upload size={17} strokeWidth={1.7} />
@@ -133,6 +137,15 @@
     </span>
   {/if}
 
+  {#if onframes}
+    <span class="tool">
+      <button type="button" class="keys-toggle" title="Frame templates" aria-label="Frame templates" data-testid="frame-templates" onclick={onframes}>
+        <Clapperboard size={17} strokeWidth={1.7} />
+      </button>
+      <span class="add-tip" role="tooltip">Frame templates</span>
+    </span>
+  {/if}
+
   {#if ontemplate}
     <CanvasTemplateGallery bind:open={showTemplates} onpick={pickTemplate} />
   {/if}
@@ -162,9 +175,10 @@
   .add-bar {
     position: absolute;
     z-index: 12;
-    bottom: 8px;
+    bottom: 0;
     left: 50%;
     transform: translateX(-50%);
+    transition: transform var(--chrome-move) var(--ease-expo);
     display: flex;
     align-items: center;
     gap: 3px;
@@ -173,6 +187,16 @@
     background: var(--paper, #fff);
     border: 1px solid var(--line-2, #d2d2d7);
     box-shadow: 0 4px 18px rgb(0 0 0 / 0.1);
+  }
+
+  .add-bar[data-shown='away'] {
+    transform: translate(-50%, calc(100% + 24px));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .add-bar {
+      transition: none;
+    }
   }
 
   .tool {
@@ -202,9 +226,7 @@
 
   @media (max-width: 767px) {
     .add-bar {
-      left: var(--mobile-bar-inset);
-      bottom: calc(var(--mobile-bar-inset) + env(safe-area-inset-bottom, 0px));
-      transform: none;
+      bottom: env(safe-area-inset-bottom, 0px);
       gap: 0;
       padding: var(--mobile-bar-pad);
       box-shadow: var(--mobile-bar-shadow);
@@ -226,8 +248,8 @@
       display: none;
     }
     .add-bar .more {
-      left: calc(-1 * var(--mobile-bar-pad) - 1px);
-      transform: none;
+      left: 50%;
+      transform: translateX(-50%);
       grid-template-columns: repeat(3, minmax(88px, 1fr));
       max-width: calc(100vw - 2 * var(--mobile-bar-inset));
     }

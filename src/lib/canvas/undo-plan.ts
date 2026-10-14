@@ -21,7 +21,7 @@
  * altro, e mai un no-op muto che l'utente scambia per "ha funzionato".
  */
 
-export type GestureKind = 'node.create' | 'node.update' | 'node.delete' | 'edge.create' | 'edge.delete';
+export type GestureKind = 'node.create' | 'node.update' | 'node.delete' | 'edge.create' | 'edge.delete' | 'doc.revision';
 
 export type ActorKind = 'user' | 'agent' | 'system';
 
@@ -36,7 +36,8 @@ export type UndoItem =
   | { kind: 'node.update'; nodeId: string; before: Record<string, unknown>; after: Record<string, unknown>; expectedVersion: number }
   | { kind: 'node.delete'; nodeId: string; before: Record<string, unknown> }
   | { kind: 'edge.create'; edgeId: string; sourceNodeId: string; targetNodeId: string }
-  | { kind: 'edge.delete'; edgeId: string; sourceNodeId: string; targetNodeId: string };
+  | { kind: 'edge.delete'; edgeId: string; sourceNodeId: string; targetNodeId: string }
+  | { kind: 'doc.revision'; nodeId: string; before: number; after: number };
 
 /**
  * UN GESTO: uno o più `UndoItem` che un solo Ctrl+Z tratta come un'unità. Il cambio di modello
@@ -47,12 +48,16 @@ export type UndoItem =
  */
 export type Gesture = { items: UndoItem[] };
 
+export const writesFrameAt = (gesture: Gesture, nodeId: string, version: number): boolean =>
+  gesture.items.some((item) => item.kind === 'doc.revision' && item.nodeId === nodeId && item.after === version);
+
 export type InverseWrite =
   | { op: 'delete_node'; nodeId: string }
   | { op: 'restore_node'; nodeId: string; data: Record<string, unknown> }
   | { op: 'write_node_data'; nodeId: string; data: Record<string, unknown>; expectedVersion: number }
   | { op: 'delete_edge'; edgeId: string }
-  | { op: 'restore_edge'; edgeId: string };
+  | { op: 'restore_edge'; edgeId: string }
+  | { op: 'restore_doc'; nodeId: string; version: number; expectedVersion: number };
 
 /**
  * OGNI RIGA È L'INVERSA DI UN `kind`, IN UN POSTO SOLO — la tabella che CLAUDE.md chiede invece
@@ -72,6 +77,8 @@ export function inverseOf(item: UndoItem): InverseWrite {
       return { op: 'delete_edge', edgeId: item.edgeId };
     case 'edge.delete':
       return { op: 'restore_edge', edgeId: item.edgeId };
+    case 'doc.revision':
+      return { op: 'restore_doc', nodeId: item.nodeId, version: item.before, expectedVersion: item.after };
   }
 }
 
@@ -153,6 +160,13 @@ export function checkPrecondition(
         return { outcome: 'stale', reason: 'edge_already_gone' };
       }
       return { outcome: 'ok' };
+    }
+    case 'doc.revision': {
+      const node = current.node;
+      if (!node || !node.exists) {
+        return { outcome: 'stale', reason: 'node_deleted_by_peer' };
+      }
+      return node.version === item.after ? { outcome: 'ok' } : { outcome: 'stale', reason: 'node_changed_by_peer' };
     }
   }
 }

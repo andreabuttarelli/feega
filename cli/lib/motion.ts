@@ -63,14 +63,20 @@ const id = encodeURIComponent;
 export type ShaderEffect = { id: string; category: string; source: string; live: boolean; about: string; knobs: Record<string, { label: string; min: number; max: number; default: number; keyframes: boolean }>; colours: Record<string, string> };
 
 export type MotionTemplateField = { key: string; label: string; type: string; group?: string; min?: number; max?: number; options?: string[]; default?: unknown };
-export type MotionTemplate = { id: string; name: string; description: string; seconds: number; fields: MotionTemplateField[] };
+export type MotionTemplateCard = { roles: string[]; energy: string; loops: boolean; onScreen: string[]; edges: { start: string; end: string; transition: string }; goodFor: string[] };
+export type MotionTemplate = { id: string; name: string; description: string; seconds: number; card?: MotionTemplateCard; fields: MotionTemplateField[] };
 export type FromTemplate = { template: string; format?: string; project?: string; still?: number };
 export type ToolRun = { tool: string; version: number; saved: boolean; output: Record<string, unknown> };
 export type ToolAsk = { tool: string; input?: unknown; version?: number };
 export type FromTemplateMade = { node_id: string; project_id: string; canvas_id: string; version: number; editor_url: string };
 export type AddTemplate = { id: string; at?: number; vars?: Record<string, string | number | boolean>; sound?: boolean };
 
+export type FrameElementAsk = { frame_id?: string; element_id?: string; node_id?: string; to_frame_id?: string; x?: number; y?: number; canvas_x?: number; canvas_y?: number };
+export type FrameElementMoved = { outcome: string; frame_id?: string; element_id?: string; new_frame?: boolean; revisions?: Record<string, number>; message?: string };
+
 export const motionApi = {
+  frameElement: (token: string, body: FrameElementAsk, org?: string) =>
+    request<FrameElementMoved>(withOrg('/api/v1/motion/elements', org), token, { method: 'POST', body: JSON.stringify(body) }),
   ask: (token: string, nodeId: string, prompt: string, org?: string, attachments: AttachmentSource[] = [], pick?: ReferencePickReply) =>
     request<MotionRun>(withOrg(`/api/v1/motion/${id(nodeId)}/ask`, org), token, { method: 'POST', body: JSON.stringify({ prompt, ...(attachments.length ? { attachments } : {}), ...(pick ? { reference_pick: pick } : {}) }) }),
   run: (token: string, runId: string, org?: string) => request<MotionRun>(withOrg(`/api/v1/motion/runs/${id(runId)}`, org), token),

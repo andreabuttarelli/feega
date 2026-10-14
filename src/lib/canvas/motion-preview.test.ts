@@ -1,11 +1,46 @@
 import { describe, expect, it } from 'vitest';
-import { Engagement, PreviewMode, Sight, previewClock, previewMode, scrubFrame } from './motion-preview';
+import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop, type Slots } from './motion-preview';
+
+const IDLE: Slots = { playing: null, capturing: null };
 
 describe('motion preview in the node', () => {
-  it('mounts the player only for a node in sight that someone is engaging', () => {
-    expect(previewMode(Sight.InView, Engagement.Engaged)).toBe(PreviewMode.Live);
-    expect(previewMode(Sight.InView, Engagement.Idle)).toBe(PreviewMode.Poster);
-    expect(previewMode(Sight.OutOfView, Engagement.Engaged)).toBe(PreviewMode.Poster);
+  it.each([
+    [Sight.InView, Intent.Play, Still.Ready, PreviewMode.Live],
+    [Sight.InView, Intent.Play, Still.Missing, PreviewMode.Live],
+    [Sight.InView, Intent.Rest, Still.Ready, PreviewMode.Poster],
+    [Sight.InView, Intent.Rest, Still.Missing, PreviewMode.Capture],
+    [Sight.OutOfView, Intent.Play, Still.Ready, PreviewMode.Poster],
+    [Sight.OutOfView, Intent.Play, Still.Missing, PreviewMode.Poster],
+    [Sight.OutOfView, Intent.Rest, Still.Ready, PreviewMode.Poster],
+    [Sight.OutOfView, Intent.Rest, Still.Missing, PreviewMode.Poster]
+  ])('%s, %s, still %s → %s', (sight, intent, still, mode) => {
+    expect(previewMode(sight, intent, still)).toBe(mode);
+  });
+
+  it('nothing plays until play is pressed', () => {
+    expect(intentOf(IDLE, 'a')).toBe(Intent.Rest);
+    expect(intentOf(play(IDLE, 'a'), 'a')).toBe(Intent.Play);
+  });
+
+  it('pressing play on a second node stops the first: one live player at most', () => {
+    const both = play(play(IDLE, 'a'), 'b');
+    expect(intentOf(both, 'a')).toBe(Intent.Rest);
+    expect(intentOf(both, 'b')).toBe(Intent.Play);
+  });
+
+  it('stopping a node that is not playing leaves the playing one alone', () => {
+    const playing = play(IDLE, 'b');
+    expect(stop(playing, 'a')).toEqual(playing);
+    expect(intentOf(stop(playing, 'b'), 'b')).toBe(Intent.Rest);
+  });
+
+  it('first frames are captured one node at a time', () => {
+    const first = claimCapture(IDLE, 'a');
+    expect(first.capturing).toBe('a');
+    expect(claimCapture(first, 'b')).toEqual(first);
+    expect(captureFree(first)).toBe(false);
+    expect(releaseCapture(first, 'b')).toEqual(first);
+    expect(captureFree(releaseCapture(first, 'a'))).toBe(true);
   });
 
   it('a scrub lands on a frame inside the video', () => {

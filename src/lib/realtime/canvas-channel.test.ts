@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { connectCanvas } from './canvas-channel';
+import { connectCanvas, type LinkEnvironment } from './canvas-channel';
+import { LinkState } from './connection-link';
+import { FRAME_EVENT, frameHub, type FrameMark } from './frame-presence';
 
 function socket() {
 	const listeners: Array<{ kind: string; filter: Record<string, string>; callback: (value?: any) => void }> = [];
@@ -9,7 +11,8 @@ function socket() {
 		on: vi.fn((kind, filter, callback) => { listeners.push({ kind, filter, callback }); return channel; }),
 		subscribe: vi.fn((callback) => { status = callback; return channel; }),
 		track: vi.fn().mockResolvedValue('ok'),
-		presenceState: vi.fn().mockReturnValue({})
+		presenceState: vi.fn().mockReturnValue({}),
+		send: vi.fn().mockResolvedValue('ok')
 	};
 	const client = {
 		auth: { getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'token' } } }) },
@@ -22,13 +25,33 @@ function socket() {
 
 const peer = { userId: 'me', name: 'Me', avatar: null, path: '/p/proj/c/canvas', threadId: null };
 
-function open(connection: ReturnType<typeof socket>) {
+function environment() {
+	const retries: Array<() => void> = [];
+	let watchers: { online: () => void; offline: () => void; visible: () => void } | null = null;
+	let online = true;
+	const env: LinkEnvironment = {
+		online: () => online,
+		random: () => 1,
+		schedule: (run) => { retries.push(run); return () => { retries.splice(retries.indexOf(run), 1); }; },
+		watch: (on) => { watchers = on; return () => { watchers = null; }; }
+	};
+	return {
+		env,
+		retry: () => retries.splice(0).forEach((run) => run()),
+		goOffline: () => { online = false; watchers?.offline(); },
+		goOnline: () => { online = true; watchers?.online(); },
+		watching: () => watchers !== null
+	};
+}
+
+function open(connection: ReturnType<typeof socket>, env = environment(), frames = frameHub({ userId: 'me', name: 'Me' }, () => 7).line) {
 	const onChange = vi.fn();
+	const onLink = vi.fn();
 	const onPeers = vi.fn();
 	const onReconnect = vi.fn();
 	const onCanvasList = vi.fn();
-	const close = connectCanvas({ client: connection.client as unknown as SupabaseClient, canvasId: 'canvas', projectId: 'proj', peer, onChange, onPeers, onReconnect, onCanvasList });
-	return { close, onChange, onPeers, onReconnect, onCanvasList };
+	const close = connectCanvas({ client: connection.client as unknown as SupabaseClient, canvasId: 'canvas', projectId: 'proj', peer, onChange, onPeers, onReconnect, onCanvasList, onLink, frames, environment: env.env });
+	return { close, onChange, onPeers, onReconnect, onCanvasList, onLink, env };
 }
 
 describe('canvas collaboration', () => {
@@ -105,19 +128,69 @@ describe('canvas collaboration', () => {
 	});
 
 
-	it('a channel that closed or timed out while the tab slept is opened again, and the rejoin refreshes', async () => {
-		for (const dead of ['CLOSED', 'TIMED_OUT']) {
+	it('a channel that errored, closed or timed out is opened again after a backoff, and the rejoin resyncs', async () => {
+		for (const dead of ['CHANNEL_ERROR', 'CLOSED', 'TIMED_OUT']) {
 			const connection = socket();
 			const callbacks = open(connection);
 			await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(1));
+			connection.status('SUBSCRIBED');
 
 			connection.status(dead);
 			expect(connection.client.removeChannel).toHaveBeenCalledWith(connection.channel);
-			await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(2));
+			expect(callbacks.onLink).toHaveBeenLastCalledWith(LinkState.Reconnecting);
+			expect(connection.channel.subscribe).toHaveBeenCalledTimes(1);
 
+			callbacks.env.retry();
+			await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(2));
 			connection.status('SUBSCRIBED');
-			expect(callbacks.onReconnect).toHaveBeenCalledTimes(1);
+			expect(callbacks.onReconnect).toHaveBeenCalledTimes(2);
+			expect(callbacks.onLink).toHaveBeenLastCalledWith(LinkState.Connected);
 			callbacks.close();
 		}
+	});
+
+	it('the browser going offline shows offline; back online it rejoins at once and resyncs', async () => {
+		const connection = socket();
+		const callbacks = open(connection);
+		await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(1));
+		connection.status('SUBSCRIBED');
+
+		callbacks.env.goOffline();
+		expect(callbacks.onLink).toHaveBeenLastCalledWith(LinkState.Offline);
+		connection.status('CLOSED');
+		expect(callbacks.onLink).toHaveBeenLastCalledWith(LinkState.Offline);
+
+		callbacks.env.goOnline();
+		expect(callbacks.onLink).toHaveBeenLastCalledWith(LinkState.Reconnecting);
+		await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalledTimes(2));
+		connection.status('SUBSCRIBED');
+		expect(callbacks.onReconnect).toHaveBeenCalledTimes(2);
+
+		callbacks.close();
+		expect(callbacks.env.watching()).toBe(false);
+	});
+
+	it('carries frame cursors and selections on the canvas channel, only while joined', async () => {
+		const connection = socket();
+		const hub = frameHub({ userId: 'me', name: 'Me' }, () => 7);
+		const heard: FrameMark[] = [];
+		hub.port.listen((m) => heard.push(m));
+		const callbacks = open(connection, environment(), hub.line);
+		await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalled());
+
+		hub.port.send({ nodeId: 'n1', cursor: null, selection: [] });
+		expect(connection.channel.send).not.toHaveBeenCalled();
+
+		connection.status('SUBSCRIBED');
+		hub.port.send({ nodeId: 'n1', cursor: { x: 0.1, y: 0.2 }, selection: ['a'] });
+		expect(connection.channel.send).toHaveBeenCalledWith({ type: 'broadcast', event: FRAME_EVENT, payload: { userId: 'me', name: 'Me', nodeId: 'n1', cursor: { x: 0.1, y: 0.2 }, selection: ['a'], at: 7 } });
+
+		const incoming = connection.listeners.find(({ kind, filter }) => kind === 'broadcast' && filter.event === FRAME_EVENT);
+		incoming?.callback({ payload: { userId: 'bo', name: 'Bo', nodeId: 'n1', cursor: null, selection: ['b'], at: 9 } });
+		expect(heard.map((m) => m.userId)).toEqual(['bo']);
+
+		callbacks.close();
+		hub.port.send({ nodeId: null, cursor: null, selection: [] });
+		expect(connection.channel.send).toHaveBeenCalledTimes(1);
 	});
 });

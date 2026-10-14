@@ -14,7 +14,8 @@
   import { TRANSITION_KINDS, type Edge } from '$lib/motion/design';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { InspectorTab, clipFieldGroups, editAt, keyAt, keyedField, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
+  import { EditMode, designWarning, editIn } from '$lib/motion/edit-mode';
+  import { InspectorTab, clipFieldGroups, keyAt, keyedField, toggleKey, valueAt, type Field } from '$lib/motion/inspector';
   import { setMask, setProps, setTiming, setTrackMatte, setTransform, setTransition, Side, type OpResult } from '$lib/motion/timeline';
   import { MASK_KINDS, MASK_KIND_IDS, MATTES, MaskKind, Matte, Needs, newMask, type Mask } from '$lib/motion/mask';
   import { ANIMATABLE, Source, isAnimatable, TRANSFORM, ValueKind, type AnimProp, type KeyValue } from '$lib/motion/keyframes';
@@ -28,6 +29,9 @@
   import { KeyMark } from '$lib/motion/timeline-layers';
   import type { LayoutStore } from '$lib/motion/editor-layout';
   import CodeEditor from './CodeEditor.svelte';
+  import MarkedLines from './MarkedLines.svelte';
+  import { MarkedField, markedField } from '$lib/motion/poster-lines';
+  import { componentLabel } from '$lib/motion/poster-parts';
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
   import TextPathSection from './TextPathSection.svelte';
@@ -43,6 +47,7 @@
   import { addModifier, morphHere, removeModifier, setModifier, setPath, shapePath, type ShapeParams } from '$lib/motion/shape/ops';
   import { PRESET as SHAPE_PRESET, SHAPE_PRESETS, applyShapePreset, type ShapePreset } from '$lib/motion/shape/presets';
   import { SHAPE_KINDS, ShapeKind, modifierKey, type Modifier } from '$lib/motion/shape/schema';
+  import { cornerRadii, withCorner } from '$lib/motion/shape/geometry';
   import { SELECTOR_SHAPES, animatorKey, type SelectorShape } from '$lib/motion/text-animators/model';
   import { TEXT_COMPONENTS, TEXT_PRESETS, applyPreset as applyTextPreset, removeAnimator, setAnimator, type TextPreset } from '$lib/motion/text-animators/ops';
   import { BLEND_MODES, type BlendMode } from '$lib/motion/blend';
@@ -69,7 +74,9 @@
     onchange,
     onuploadfont,
     onopen,
-    focus = null
+    focus = null,
+    lead,
+    mode = EditMode.Motion
   }: {
     doc: MotionDoc;
     analyses?: Record<string, AudioAnalysis>;
@@ -83,10 +90,15 @@
     onchange: (doc: MotionDoc, summary: string) => void;
     onuploadfont?: (file: File) => Promise<string | null>;
     onopen?: (comp: string) => void;
-    focus?: string | null;
+    focus?: readonly string[] | null;
+    lead?: Snippet;
+    mode?: EditMode;
   } = $props();
 
   const ANCHOR_STOPS = [0, 0.5, 1] as const;
+  const CORNER_NAMES = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left'] as const;
+  const PERCENT = 100;
+  const CORNER_PERCENT_MAX = 50;
   const KEY_STATE = { On: 'on', Lane: 'lane', None: 'none' } as const;
   const MARK: Record<(typeof KEY_STATE)[keyof typeof KEY_STATE], KeyMark> = { [KEY_STATE.On]: KeyMark.Here, [KEY_STATE.Lane]: KeyMark.Animated, [KEY_STATE.None]: KeyMark.None };
   const EDGE_GLYPH: Record<Side, string> = { [Side.In]: '↗', [Side.Out]: '↘' };
@@ -127,7 +139,7 @@
     commit(duckUnder(doc, clip.id, voiceId, analyses[assetId]?.speech ?? null), 'Ducked the music');
   }
 
-  const groups = $derived(clipFieldGroups(doc, clip).map((g) => ({ ...g, fields: g.fields.filter((f) => !focus || f.key === focus) })).filter((g) => g.fields.length));
+  const groups = $derived(clipFieldGroups(doc, clip).map((g) => ({ ...g, fields: g.fields.filter((f) => !focus || focus.includes(f.key)) })).filter((g) => g.fields.length));
   const animated = $derived(withParams(doc, clip));
   const customName = $derived(clip.component === 'Custom' ? String(clip.props.name) : null);
   const spec = $derived(COMPONENTS[clip.component]);
@@ -190,8 +202,10 @@
   }
 
   function animate(key: string, value: KeyValue) {
-    commit(editAt(doc, clip, key, value, frame), `Edited ${key}`);
+    commit(editIn(mode, doc, clip, key, value, frame), `Edited ${key}`);
   }
+
+  const warning = $derived(designWarning(mode, clip));
 
   function applyPhysicsOf(select: HTMLSelectElement) {
     const preset = select.value as PhysicsPreset;
@@ -362,9 +376,13 @@
 <div class="inspector" data-testid="motion-inspector" style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
   <header>
     <span class="swatch-bar" aria-hidden="true"></span>
-    <span class="kind">{customName ?? spec.label}</span>
+    <span class="kind">{customName ? componentLabel(customName) : spec.label}</span>
     <span class="id">{clip.id}</span>
   </header>
+
+  {@render lead?.()}
+
+  {#if warning}<p class="mode-warning" role="status" data-testid="design-animated-warning">{warning}</p>{/if}
 
   {#if customName}
     <div class="tabs" role="tablist">
@@ -377,7 +395,7 @@
     <CodeEditor {doc} name={customName} previous={previousSource(customName)} {onchange} />
   {:else}
     {#each SECTION_ORDER.filter((s) => has[s]) as section (section)}
-      <InspectorSection title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section)} ontoggle={() => toggleSection(section)}>
+      <InspectorSection title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section) || (!!focus && groupsIn(section).length > 0)} ontoggle={() => toggleSection(section)}>
         {@render BODIES[section]()}
       </InspectorSection>
     {/each}
@@ -461,6 +479,9 @@
   {#if field.control === Control.Range}
     <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
+  {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
+  {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
+    <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
   {:else if field.control === Control.Textarea}
     <div class="stack">
       <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
@@ -503,6 +524,13 @@
               {#each Object.entries(doc.comps) as [id, comp] (id)}<option value={id}>{comp.name}</option>{/each}
             </select>
             <button type="button" data-testid="open-comp" disabled={!doc.comps[String(value(field))]} onclick={() => onopen?.(String(value(field)))}>Open</button>
+          </div>
+        {:else if field.control === Control.Corners}
+          {@const radii = cornerRadii(Number(clip.props.roundness ?? 0), (value(field) as number[] | undefined) ?? [])}
+          <div class="corners" data-testid="corners">
+            {#each CORNER_NAMES as name, i (name)}
+              <input type="number" aria-label={`${name} radius`} data-corner={i} min="0" max={CORNER_PERCENT_MAX} step="1" value={Math.round(radii[i] * PERCENT)} onchange={(e) => setProp(field, withCorner(Number(clip.props.roundness ?? 0), radii, i, Number(e.currentTarget.value) / PERCENT))} />
+            {/each}
           </div>
         {:else if field.control === Control.Managed}
           <span class="managed">{managedSummary(value(field))}{#if composeHref} · <a href={composeHref}>Edit in Compositions</a>{/if}</span>
@@ -1096,6 +1124,16 @@
     gap: 4px;
   }
 
+  .corners {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--ui-space-1);
+  }
+
+  .corners input {
+    min-width: 0;
+  }
+
   .managed {
     color: var(--ui-ink-2);
   }
@@ -1308,5 +1346,11 @@
   .error {
     margin: 8px 12px;
     color: var(--ui-danger);
+  }
+
+  .mode-warning {
+    margin: 8px 12px;
+    color: var(--ui-warn);
+    font-size: var(--ui-text-sm);
   }
 </style>

@@ -35,8 +35,16 @@ between the two is the point.
 
 - `/app` and its tools live in one shell: a **220px sidebar always open from 1024px**, a drawer
   behind a hamburger below. Its entries are one table, `src/lib/app-nav.ts`.
-- Motion comes first: the home leads with **create a video** (a URL or a description), then the
-  gallery and templates. The canvas supports motion as the place where assets are made.
+- The home holds three things and nothing else: a **hero** (mega slogan + one small subline over a
+  dark, low-opacity backdrop cut from our own library, poster first, clip on idle, still under
+  reduced motion), **recents** as a compact list (thumb · name · project · time), and **one prompt
+  dock** anchored at the bottom with three suggestions. Top right: `new canvas` (the one accent
+  button) and `import`. Catalogues live on their own page (templates), never as rows on the home.
+- The account entries (settings, billing, changelog, theme, sign out…) sit in a menu behind the
+  avatar at the foot of the sidebar, not in the sidebar itself.
+- The sidebar nav is four plain entries (home, canvases, templates, tools) and the projects. Tools
+  and the gallery live on the tools page; no badges in the nav.
+- A list that sits above a docked composer scrolls in its own area: nothing passes behind the dock.
 - Cards: a large preview, a small title and author underneath, no frame. Previews play on hover
   (on touch, when in view).
 - Filters are light: text or chips, icons that show what they mean (a format chip draws its real
@@ -46,6 +54,9 @@ between the two is the point.
 ### states
 
 Hover is a wash (`--ui-hover`), focus an accent ring, selection an accent wash with accent text.
+Hovering a Layers row outlines what it names on the canvas in `--ui-hover-outline` (violet
+`#b14cff`), never the accent: hover and selection must read apart at a glance.
+Panels that open or fold (the timeline in Design mode) move on `--ease-expo-out`, 320 ms.
 Loading shows skeletons, never spinners in the middle of a page. Errors say what happened and
 what to do.
 

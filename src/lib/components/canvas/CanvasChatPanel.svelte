@@ -1,3 +1,7 @@
+<script lang="ts" module>
+  const taken: { last: unknown } = { last: null };
+</script>
+
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import { CHROME_LOADERS } from '$lib/canvas/chrome-loaders';
@@ -7,6 +11,9 @@
   import { readChatPanelPx, writeChatPanelPx, readChatTab, writeChatTab, CHAT_PANEL, type ChatTab } from '$lib/shell-prefs';
   import { guideOpenRequest } from '$lib/canvas/guide-open';
   import CanvasGuideTab from './CanvasGuideTab.svelte';
+  import { replaceState } from '$app/navigation';
+  import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
+  import { handoffOf, withoutHandoff, type ChatHandoff } from '$lib/canvas/chat-handoff';
 
   let {
     projectId,
@@ -28,6 +35,19 @@
 
   $effect(() => {
     if ($guideOpenRequest) selectTab('guide');
+  });
+
+  let prefill = $state<ChatPrefill | null>(null);
+
+  $effect(() => {
+    const handoff = $page.data.handoff as ChatHandoff | null | undefined;
+    if (!browser || !handoff || handoff === taken.last || !handoffOf($page.url)) {
+      return;
+    }
+    taken.last = handoff;
+    selectTab('chat');
+    prefill = briefPrefill(handoff.text, handoff.attachments, Date.now());
+    replaceState(withoutHandoff($page.url), $page.state);
   });
 
   function onResizeStart(e: PointerEvent) {
@@ -78,7 +98,7 @@
           <CanvasGuideTab initialSlug={$guideOpenRequest} onopened={() => guideOpenRequest.set(null)} />
         {:else if browser}
           {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
-            <ChatPanel {projectId} context={() => ({ canvasId: get(page).params.canvasId ?? null })} />
+            <ChatPanel {projectId} {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null })} />
           {/await}
         {/if}
       </div>

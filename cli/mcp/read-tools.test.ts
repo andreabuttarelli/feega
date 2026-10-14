@@ -71,6 +71,7 @@ const RESTANO = [
   'run_node_loop',
   'preview_node_loop',
   'cancel_node_loop',
+  'canvas_tool',
   'get_media',
   'ask_motion_agent',
   'get_motion_run',

@@ -26,7 +26,8 @@ import { drawFrames, firstFrames } from '$lib/server/motion/server-frames';
 import { chromiumFrames, chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
-import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
+import { assetUrls, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
+import { commitDoc, revisionWriteOf } from '$lib/server/motion/frame-ops';
 import { fitNewVideo } from '$lib/motion/fit-duration';
 import { AGENT_SELF_SAVE_MS } from '$lib/server/project-agent/limits';
 import { Reserve, VIDEO_BUDGET, budgetCard, budgetNote, budgetSpent, readVideoBudget, turnBudgetUsd, videoBudget, type BudgetCard } from '$lib/server/motion/video-budget';
@@ -69,6 +70,7 @@ import { Preset, settingsOf, type Quality } from '$lib/motion/export-formats';
 import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import type { MotionNode } from '$lib/canvas/motion-node';
 import { createRenderLink } from './render-link';
+import { frameMover } from './move-element';
 import { exportStill } from './still-export';
 import { renderPagePath } from '$lib/motion/render-link';
 import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
@@ -114,7 +116,6 @@ enum Round {
 type Stop = ReturnType<typeof agentStopWhen>;
 
 const CLOSING_RESERVE_MS = 60_000;
-const SAVE_ATTEMPTS = 4;
 
 export type TurnTiming = { landingMs: number; stopPollMs: number };
 
@@ -148,22 +149,24 @@ function shotCrews(script: LaunchScript): Crew[] {
     .map((acts) => ({ acts: acts.map((a) => a.act), from: acts[0].start, to: acts.at(-1)!.end }));
 }
 
-const ADD_SHOT = 'add_shot';
+const PLACES_AT = ['add_shot', 'add_template'] as const;
 
-function crewTools<T extends Record<string, Tool>>(all: T, crew: Crew): T {
-  const add = all[ADD_SHOT];
-  if (!add?.execute) {
-    return all;
-  }
-  const guarded: Tool = {
-    ...add,
-    execute: async (input: { at: number; seconds?: number }, options) =>
-      input.at < crew.from || input.at >= crew.to ? { ok: false, error: `a shot at ${input.at} s is outside your range ${crew.from} s to ${crew.to} s: the other crew builds that part` } : add.execute!(input, options)
+type Placing = { at: number };
+
+function inRange(tool: Tool, crew: Crew): Tool {
+  return {
+    ...tool,
+    execute: async (input: Placing, options) =>
+      input.at < crew.from || input.at >= crew.to ? { ok: false, error: `${input.at} s is outside your range ${crew.from} s to ${crew.to} s: the other crew builds that part` } : tool.execute!(input, options)
   } as Tool;
-  return { ...all, [ADD_SHOT]: guarded };
 }
 
-const crewBrief = (crew: Crew) => `Shot crew: build only the ${crew.acts.join(', ')} acts of the script, from ${crew.from} s to ${crew.to} s, with library shots placed inside that range. Another crew builds the rest at the same time: never place, move or remove anything outside your range, and leave music to the sound pass.`;
+export function crewTools<T extends Record<string, Tool>>(all: T, crew: Crew): T {
+  const guarded = PLACES_AT.filter((name) => all[name]?.execute).map((name) => [name, inRange(all[name], crew)]);
+  return { ...all, ...Object.fromEntries(guarded) };
+}
+
+export const crewBrief = (crew: Crew) => `Shot crew: build only the ${crew.acts.join(', ')} acts of the script, from ${crew.from} s to ${crew.to} s. Each section starts from a library template (list_templates by role, add_template inside your range, set_template_fields from the script lines); library shots only for the beats no template covers. Another crew builds the rest at the same time: never place, move or remove anything outside your range, and leave music to the sound pass.`;
 
 const RESEARCH_DONE = 'Research is done: the facts, captures and references are in the conversation above. Now write the script and the storyboard from them.';
 const SOUND_PASS = 'Sound pass: lay the music under the whole video if there is none, mark its beats and cut the shots onto them. Change nothing else.';
@@ -380,6 +383,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     effects: effectStore({ db, orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, gl: serverFramesOpen() ? chromiumGl : null }),
     storyboard,
     exportStill: (doc, spec) => exportStill(db, { orgId, projectId: project.id, nodeId: motion.record.id }, doc, spec, { tokens, assets }),
+    moveOut: frameMover(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY }, projectId: project.id }, motion.record.id),
     copywrite: async (script) => {
       const ask = async (prompt: string) => ({ answer: await llmStructured({ prompt, schema: COPY_SCHEMA, model: roleModel(StudioRole.Copywriter, model), temperature: 0.4, label: STUDIO_ROSTER[StudioRole.Copywriter].label }), usd: billedUsdInScope() ?? 0 });
       const out = await withOrgContext(orgId, () => copywrite({ ask }, script));
@@ -698,13 +702,8 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   });
 
   async function saveAgentDoc() {
-    const save = (expectedVersion: number) => saveMotionDoc(db, { orgId, nodeId: motion.record.id, expectedVersion, doc: session.doc, actor, summary: session.edits.join(', ') });
-    let write = await save(session.baseVersion);
-    for (let attempt = 1; attempt < SAVE_ATTEMPTS && write.outcome === RevisionOutcome.Conflict; attempt++) {
-      const latest = await headOrNew(db, nodeScope, motion.node);
-      write = await save(latest.version);
-    }
-    return write;
+    const commit = await commitDoc(db, { ...nodeScope, node: motion.node, base: { version: head.version, doc: head.doc }, doc: session.doc, actor, summary: session.edits.join(', ') });
+    return revisionWriteOf(commit);
   }
 
   const roleLabel = STUDIO_ROSTER[role].label;

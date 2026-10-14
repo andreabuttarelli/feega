@@ -95,18 +95,19 @@ describe('/app is the dashboard for a returning user', () => {
     expect(redirected).toMatchObject({ status: 303, location: '/p/p-new/c/c-new' });
   });
 
-  it('a brief starts a motion video on the Motion canvas and opens the chat with it', async () => {
+  it('a prompt opens a new canvas of its own and hands the words to the canvas chat', async () => {
     const brief = 'https://acme.com';
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief }) } as never));
 
-    expect(createNode).toHaveBeenCalledWith({}, expect.objectContaining({ orgId: 'org-a', projectId: 'p1', canvasId: 'c-motion', type: 'motion', displayName: 'acme.com' }));
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new?brief=Make+a+launch+film+of+https%3A%2F%2Facme.com' });
+    expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', name: 'acme.com' });
+    expect(createNode).not.toHaveBeenCalled();
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=Make+a+launch+film+of+https%3A%2F%2Facme.com' });
   });
 
-  it('a described video opens the chat with the words as typed', async () => {
+  it('a described idea reaches the chat with the words as typed', async () => {
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'A logo reveal' }) } as never));
 
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new?brief=A+logo+reveal' });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=A+logo+reveal' });
   });
 
   it('attachments uploaded on the home ride with the brief into the first turn', async () => {
@@ -119,7 +120,7 @@ describe('/app is the dashboard for a returning user', () => {
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request } as never));
 
     expect(loadAttachments).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', ids: ['a1', 'stranger', 'a2'] });
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new?brief=A+logo+reveal&attach=a1%2Ca2' });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=A+logo+reveal&attach=a1%2Ca2' });
   });
 
   it('files alone are a brief', async () => {
@@ -144,50 +145,41 @@ describe('/app is the dashboard for a returning user', () => {
     expect(createNode).not.toHaveBeenCalled();
   });
 
-  it('the home shows the gallery to remix and the brief templates', async () => {
-    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as { gallery: { id: string }[]; templates: { id: string }[] };
+  it('the home loads the brief suggestions and no catalogue: templates live on their own page', async () => {
+    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as Record<string, unknown> & { templates: unknown[] };
 
-    expect(data.gallery.map((g) => g.id)).toEqual(['g1']);
     expect(data.templates.length).toBeGreaterThan(0);
+    expect(data).not.toHaveProperty('components');
+    expect(data).not.toHaveProperty('posters');
+    expect(data).not.toHaveProperty('gallery');
+    expect(listGallery).not.toHaveBeenCalled();
   });
 
-  it('the home lists every built-in component, with its kind and preview', async () => {
-    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as { components: { id: string; kind: string }[] };
-
-    expect(data.components.map((c) => c.id)).toContain('builtin:prompt-input');
-    expect(data.components.find((c) => c.id === 'builtin:prompt-input')?.kind).toBe('component');
-  });
-
-  it('the home lists the posters row: stills only', async () => {
-    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as { posters: { id: string; mode: string }[] };
-
-    expect(data.posters.map((c) => c.id)).toContain('builtin:poster-photo-grid');
-    expect(data.posters.every((c) => c.mode === 'still')).toBe(true);
-  });
-
-  it('a poster from the row opens the editor on a 4:5 still that holds it', async () => {
+  it('a poster template opens a new canvas on a 4:5 still that holds it', async () => {
     const redirected = await thrown(() => actions.fromTemplate({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ template: 'builtin:poster-white-shapes', format: '4:5' }) } as never));
 
     const doc = (appendRevision.mock.calls[0][1] as { doc: { comps: Record<string, { template?: { id: string } }>; height: number; width: number; still?: unknown } }).doc;
     expect(Object.values(doc.comps).some((c) => c.template?.id === 'builtin:poster-white-shapes')).toBe(true);
     expect(doc).toMatchObject({ width: 1080, height: 1350, still: expect.anything() });
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new' });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new/motion/m-new' });
   });
 
-  it('use in new video opens the editor on a video that already holds the component', async () => {
+  it('a video template opens a new canvas whose frame already holds it', async () => {
     const redirected = await thrown(() => actions.fromTemplate({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ template: 'builtin:prompt-input', format: '9:16' }) } as never));
 
-    expect(createNode).toHaveBeenCalledWith({}, expect.objectContaining({ canvasId: 'c-motion', type: 'motion', displayName: 'Prompt input' }));
+    expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', name: 'Prompt input' });
+    expect(createNode).toHaveBeenCalledWith({}, expect.objectContaining({ canvasId: 'c-new', type: 'motion', displayName: 'Prompt input' }));
     const doc = (appendRevision.mock.calls[0][1] as { doc: { comps: Record<string, { template?: { id: string } }>; height: number; width: number } }).doc;
     expect(Object.values(doc.comps).some((c) => c.template?.id === 'builtin:prompt-input')).toBe(true);
     expect(doc.height).toBeGreaterThan(doc.width);
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-motion/motion/m-new' });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new/motion/m-new' });
   });
 
   it('an unknown component creates nothing', async () => {
     const refused = (await actions.fromTemplate({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ template: 'builtin:nope' }) } as never)) as { status: number };
 
     expect(refused.status).toBe(404);
+    expect(createCanvas).not.toHaveBeenCalled();
     expect(createNode).not.toHaveBeenCalled();
   });
 

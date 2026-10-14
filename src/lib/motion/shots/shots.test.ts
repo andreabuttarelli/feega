@@ -153,6 +153,20 @@ describe('add_shot', () => {
     expect(made.ok ? '' : made.error).toMatch(/cut the words/);
   });
 
+  it('a refused length names the seconds to pass instead (eval: six kinetic-title refusals in one turn)', () => {
+    const made = addShot(withUi(), { shot: ShotId.KineticTitle, slots: { text: 'Meet Linear' }, at: 0, seconds: 6 }, 'c1');
+
+    expect(made.ok ? '' : made.error).toMatch(/seconds 2–4, best 2.5/);
+  });
+
+  it('a wrong slot key names the slot it should be and which slots are required (eval: title for text, tagline on logo-resolve)', () => {
+    const made = addShot(withUi(), { shot: ShotId.KineticTitle, slots: { title: 'Meet Linear' }, at: 0 }, 'c1');
+    const error = made.ok ? '' : made.error;
+
+    expect(error).toMatch(/text \(required\)/);
+    expect(error).toMatch(/title is not a slot/);
+  });
+
   it('starts and ends on the beat grid when the music has beats marked', () => {
     let doc = withUi();
     for (const [i, s] of [0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4].entries()) {

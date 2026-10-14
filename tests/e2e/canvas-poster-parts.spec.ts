@@ -43,8 +43,33 @@ test.describe('poster parts on the canvas @real', () => {
     await shoot(page, '8-poster-part');
 
     await page.getByRole('button', { name: 'Layers', exact: true }).click();
-    await expect(page.getByTestId('layers').locator(`[data-layer="poster#${TITLE_LINE}"]`)).toHaveAttribute('aria-selected', 'true');
+    const layerRow = page.getByTestId('layers').locator(`[data-layer="poster#${TITLE_LINE}"]`);
+    await expect(layerRow).toHaveAttribute('aria-selected', 'true');
 
+    const inspector = page.getByTestId('motion-inspector');
+    await expect(page.getByTestId('part-text'), 'a line shows only its own text').toHaveValue('STUDIO');
+    await expect(inspector.locator('#f-lines'), 'never the raw lines with their markers').toHaveCount(0);
+    await expect(inspector.locator('#f-ink')).toBeVisible();
+    await expect(inspector.locator('[data-prop="fill"]')).toBeVisible();
+    await shoot(page, '8b-poster-part-properties');
+
+    const ink = '#ff00aa';
+    await inspector.locator('#f-ink').evaluate((el: HTMLInputElement, value: string) => {
+      el.value = value;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, ink);
+
+    await expect
+      .poll(async () => {
+        const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1);
+        const doc = data?.[0]?.doc as { tracks: { clips: { id: string; props: { ink?: string } }[] }[] } | undefined;
+        return doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'poster')?.props.ink;
+      }, { timeout: 10_000 })
+      .toBe(ink);
+    await expect(page.getByTestId('editor-stage'), 'an edit never hides the stage behind the old picture').toHaveAttribute('data-shown', 'true');
+    await expect(part, 'an edit keeps the part selected while the preview reloads').toHaveAttribute('data-part', TITLE_LINE, { timeout: 500 });
+
+    await layerRow.click();
     await overlay.dblclick({ position: title });
     const field = page.getByTestId('part-edit');
     await expect(field).toBeVisible();
@@ -59,5 +84,93 @@ test.describe('poster parts on the canvas @real', () => {
         return doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'poster')?.props.lines?.split('\n')[0];
       }, { timeout: 10_000 })
       .toBe(TYPED);
+  });
+
+  test('one selection level; a line is its own text; a photo is its own part', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const node = await seedNode({ type: 'motion', x: 80, y: 80, data: PORTRAIT });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: poster, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
+    await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mode', 'still', { timeout: 15_000 });
+    const tile = page.locator(`.svelte-flow__node[data-id="${node.id}"]`);
+
+    await page.getByRole('button', { name: 'Layers', exact: true }).click();
+    const layers = page.getByTestId('layers');
+    await expect(layers.locator('[data-layer="poster"]')).toContainText('Type grid poster', { timeout: 15_000 });
+    const nameRow = layers.locator('[data-layer="poster#lines:1"]');
+    await expect(nameRow).toContainText('NAME', { timeout: 15_000 });
+    await shoot(page, '14-poster-human-names');
+
+    await nameRow.click();
+    await expect(page.getByTestId('motion-inspector')).toContainText('Type grid poster');
+    await expect(tile.getByTestId('tile-selection')).toHaveAttribute('data-ring', 'editing');
+    await expect(tile.locator('.svelte-flow__resize-control'), 'the frame has no handles while a part is the selection').toHaveCount(0);
+    await expect(page.getByTestId('part-text')).toHaveValue('NAME');
+    await expect(page.getByTestId('motion-inspector').locator('#f-lines')).toHaveCount(0);
+    await shoot(page, '15-line-selected-one-level');
+
+    const photoRow = layers.locator('[data-layer="poster#photos:0"]');
+    await expect(photoRow).toContainText('Photo 1');
+    await photoRow.click();
+    await expect(page.getByTestId('poster-part')).toHaveAttribute('data-kind', 'photo');
+    await expect(page.getByTestId('part-photo')).toBeVisible();
+    await page.getByTestId('poster-part').getByRole('combobox').selectOption('contain');
+    await shoot(page, '16-photo-part');
+
+    await expect
+      .poll(async () => {
+        const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1);
+        const doc = data?.[0]?.doc as { tracks: { clips: { id: string; props: { media?: { fit?: string }[] } }[] }[] } | undefined;
+        return doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'poster')?.props.media?.[0]?.fit;
+      }, { timeout: 10_000 })
+      .toBe('contain');
+
+    await layers.locator('[data-layer="poster"]').click();
+    const lines = page.getByTestId('marked-lines');
+    await expect(lines, 'the whole poster edits its lines as a list, never the marker syntax').toBeVisible();
+    await expect(lines.getByRole('textbox', { name: 'Line 2' })).toHaveValue('NAME');
+    await expect(page.getByTestId('motion-inspector')).not.toContainText('[photo]');
+    await shoot(page, '17-poster-lines-editor');
+  });
+
+  test('layers lists every frame, hover outlines, one selection with the canvas, a closed child opens its frame', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const first = await seedNode({ type: 'motion', x: 80, y: 80, data: PORTRAIT });
+    const second = await seedNode({ type: 'motion', x: 520, y: 80, data: PORTRAIT });
+    for (const node of [first, second]) {
+      const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: poster, actor_kind: 'user', actor_id: session.userId });
+      expect(error).toBeNull();
+    }
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.getByRole('button', { name: 'Layers', exact: true }).click();
+    const layers = page.getByTestId('layers');
+    await expect(layers.locator('[data-layer="poster"]')).toHaveCount(2, { timeout: 15_000 });
+
+    await layers.locator('[data-layer="poster"]').first().hover();
+    await expect(page.getByTestId('tile-hover')).toHaveCount(1);
+    await shoot(page, '10-layers-hover-closed-frame');
+
+    const firstRow = layers.locator(`[data-layer="${first.id}"]`);
+    const secondRow = layers.locator(`[data-layer="${second.id}"]`);
+    await firstRow.click();
+    await expect(firstRow).toHaveAttribute('aria-selected', 'true');
+    await page.locator(`.svelte-flow__node[data-id="${second.id}"]`).getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
+    await expect(secondRow).toHaveAttribute('aria-selected', 'true');
+    await expect(firstRow).toHaveAttribute('aria-selected', 'false');
+    await shoot(page, '11-layers-one-selection');
+
+    await page.keyboard.press('Escape');
+    await layers.locator('[data-layer="poster"]').first().click();
+    await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 15_000 });
+    await shoot(page, '12-layers-closed-child-opens');
+
+    await layers.locator('[data-layer="poster#lines:1"]').hover();
+    await expect(page.getByTestId('layer-hover-part')).toBeVisible();
+    await shoot(page, '13-layers-hover-part');
   });
 });

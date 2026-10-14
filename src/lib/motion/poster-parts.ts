@@ -2,6 +2,7 @@ import { findClip, type MotionClip, type MotionDoc } from './doc';
 import { PropFormat } from './custom/component';
 import { setProps, type OpResult } from './timeline';
 import type { MeasuredBox } from './hyperframes/measure';
+import { LineEdit, editLines, markedPoster, wordsOf } from './poster-lines';
 
 export const PART_SEP = '#';
 
@@ -43,16 +44,26 @@ export function parsePart(part: string): { field: string; index: number | null }
   return { field, index: index === undefined ? null : Number(index) };
 }
 
+export const CLIP_TEXT = 'text';
+
+export const CUSTOM_CLIP = 'Custom';
+
 export function editablePart(doc: MotionDoc, clip: MotionClip, part: string): PartEdit {
   const { field } = parsePart(part);
+  if (clip.component !== CUSTOM_CLIP) {
+    return field === CLIP_TEXT && typeof clip.props[field] === 'string' ? PartEdit.Text : PartEdit.None;
+  }
   const spec = doc.components[String(clip.props.name)]?.propsSchema.properties?.[field];
   return spec?.type === 'string' && TEXT_FORMATS.has(spec.format) && typeof clip.props[field] === 'string' ? PartEdit.Text : PartEdit.None;
 }
 
+const isMarkedLines = (clip: MotionClip, field: string) => clip.component === CUSTOM_CLIP && markedPoster(String(clip.props.name))?.lines === field;
+
 export function partText(clip: MotionClip, part: string): string {
   const { field, index } = parsePart(part);
   const value = String(clip.props[field] ?? '');
-  return index === null ? value : (value.split(LINE_BREAK)[index] ?? '');
+  const line = index === null ? value : (value.split(LINE_BREAK)[index] ?? '');
+  return isMarkedLines(clip, field) ? wordsOf(line) : line;
 }
 
 export function writePartText(doc: MotionDoc, clipId: string, part: string, text: string): OpResult {
@@ -61,7 +72,59 @@ export function writePartText(doc: MotionDoc, clipId: string, part: string, text
     return { ok: false, error: `${part} is not a text part of ${clipId}` };
   }
   const { field, index } = parsePart(part);
+  if (index !== null && isMarkedLines(clip, field)) {
+    const poster = markedPoster(String(clip.props.name))!;
+    return setProps(doc, clipId, editLines({ lines: String(clip.props[field]), media: clip.props[poster.media] }, index, LineEdit.Text, text));
+  }
   const lines = String(clip.props[field]).split(LINE_BREAK);
   const next = index === null ? text : lines.map((line, i) => (i === index ? text.replaceAll(LINE_BREAK, ' ') : line)).join(LINE_BREAK);
   return setProps(doc, clipId, { [field]: next });
 }
+
+export enum PartKind {
+  Text = 'text',
+  Line = 'line',
+  Photo = 'photo',
+  Arrow = 'arrow',
+  Other = 'other'
+}
+
+export const PHOTO_PART = 'photos';
+export const ARROW_PART = 'arrow';
+const LABEL_MAX = 21;
+const ELLIPSIS = '…';
+
+type PartLook = { label: (doc: MotionDoc, clip: MotionClip, part: string) => string; icon: string };
+
+const indexOf = (part: string) => (parsePart(part).index ?? 0) + 1;
+const cut = (text: string) => (text.length > LABEL_MAX ? text.slice(0, LABEL_MAX).trimEnd() + ELLIPSIS : text);
+const capital = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const fieldTitle = (doc: MotionDoc, clip: MotionClip, field: string) => doc.components[String(clip.props.name)]?.propsSchema.properties?.[field]?.title ?? capital(field);
+
+const PART_LOOK: Record<PartKind, PartLook> = {
+  [PartKind.Line]: { label: (_doc, clip, part) => cut(partText(clip, part).trim()) || `Line ${indexOf(part)}`, icon: 'text' },
+  [PartKind.Text]: { label: (doc, clip, part) => fieldTitle(doc, clip, parsePart(part).field), icon: 'text' },
+  [PartKind.Photo]: { label: (_doc, _clip, part) => `Photo ${indexOf(part)}`, icon: 'image' },
+  [PartKind.Arrow]: { label: () => 'Arrow', icon: 'arrow' },
+  [PartKind.Other]: { label: (doc, clip, part) => (parsePart(part).index === null ? fieldTitle(doc, clip, parsePart(part).field) : `Line ${indexOf(part)}`), icon: 'part' }
+};
+
+const MARKED_KIND: Record<string, PartKind> = { [PHOTO_PART]: PartKind.Photo, [ARROW_PART]: PartKind.Arrow };
+
+export function partKind(doc: MotionDoc, clip: MotionClip, part: string): PartKind {
+  const { field, index } = parsePart(part);
+  const marked = clip.component === CUSTOM_CLIP && markedPoster(String(clip.props.name));
+  if (marked && MARKED_KIND[field]) {
+    return MARKED_KIND[field];
+  }
+  if (editablePart(doc, clip, part) !== PartEdit.Text) {
+    return PartKind.Other;
+  }
+  return index === null ? PartKind.Text : PartKind.Line;
+}
+
+export const partLabel = (doc: MotionDoc, clip: MotionClip, part: string): string => PART_LOOK[partKind(doc, clip, part)].label(doc, clip, part);
+
+export const partIcon = (doc: MotionDoc, clip: MotionClip, part: string): string => PART_LOOK[partKind(doc, clip, part)].icon;
+
+export const componentLabel = (name: string): string => capital(name.replace(/(?<=[a-z0-9])([A-Z])/g, ' $1').toLowerCase());

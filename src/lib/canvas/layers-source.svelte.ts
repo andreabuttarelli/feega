@@ -1,10 +1,11 @@
 import type { MotionDoc } from '$lib/motion/doc';
 import type { OpResult } from '$lib/motion/timeline';
-import type { CanvasLayer } from './layers';
+import type { CanvasLayer, LayerHover } from './layers';
 
 export type CanvasSide = {
   readonly nodes: readonly CanvasLayer[];
   readonly selected: readonly string[];
+  readonly outlinesUrl: string;
   select(ids: string[]): void;
 };
 
@@ -21,6 +22,7 @@ export type VideoSide = {
 
 let canvas = $state.raw<CanvasSide | null>(null);
 let video = $state.raw<VideoSide | null>(null);
+let hovered = $state.raw<LayerHover>(null);
 
 function publisher<T>(set: (side: T | null) => void, current: () => T | null) {
   return (side: T) => {
@@ -39,6 +41,14 @@ export const layersSource = {
   },
   get video() {
     return video;
+  },
+  get hovered() {
+    return hovered;
+  },
+  hover(target: LayerHover) {
+    if (target?.nodeId !== hovered?.nodeId || target?.id !== hovered?.id) {
+      hovered = target;
+    }
   },
   publishCanvas: publisher<CanvasSide>(
     (side) => (canvas = side),

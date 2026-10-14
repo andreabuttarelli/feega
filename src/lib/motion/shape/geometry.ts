@@ -116,20 +116,33 @@ function arcCorner(center: Pt, r: Pt, startAngle: number): Vertex[] {
   ];
 }
 
-export function rectOutline(roundness: number, size: Size = UNIT): Outline {
+export type Corners = [topLeft: number, topRight: number, bottomRight: number, bottomLeft: number];
+
+const CORNER_COUNT = 4;
+const MAX_ROUNDNESS = 0.5;
+
+export const cornerRadii = (roundness: number, corners: readonly number[]): Corners =>
+  Array.from({ length: CORNER_COUNT }, (_, i) => corners[i] ?? roundness) as Corners;
+
+const clampRadius = (v: number) => Math.min(Math.max(v, 0), MAX_ROUNDNESS);
+
+export const withCorner = (roundness: number, corners: readonly number[], index: number, value: number): Corners =>
+  cornerRadii(roundness, corners).map((v, i) => (i === index ? clampRadius(value) : v)) as Corners;
+
+export function rectOutline(radii: number | Corners, size: Size = UNIT): Outline {
   const { w, h } = size;
-  const r = Math.min(Math.max(roundness, 0), 0.5) * Math.min(w, h);
-  if (r === 0) {
+  const [tl, tr, br, bl] = (typeof radii === 'number' ? cornerRadii(radii, []) : radii).map((v) => clampRadius(v) * Math.min(w, h));
+  if (tl + tr + br + bl === 0) {
     return [polyline([[0, 0], [w, 0], [w, h], [0, h]], true)];
   }
   const quarter = Math.PI / 2;
-  const corners: [Pt, number][] = [
-    [[w - r, r], -quarter],
-    [[w - r, h - r], 0],
-    [[r, h - r], quarter],
-    [[r, r], Math.PI]
+  const corners: [Pt, number, number][] = [
+    [[w - tr, tr], -quarter, tr],
+    [[w - br, h - br], 0, br],
+    [[bl, h - bl], quarter, bl],
+    [[tl, tl], Math.PI, tl]
   ];
-  return [{ vertices: merged(corners.flatMap(([c, a]) => arcCorner(c, [r, r], a))), closed: true }];
+  return [{ vertices: merged(corners.flatMap(([c, a, r]) => arcCorner(c, [r, r], a))), closed: true }];
 }
 
 function merged(vertices: Vertex[]): Vertex[] {

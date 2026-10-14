@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { APP_NAV, isNavActive, navHref, visibleNav } from '$lib/app-nav';
+import { toolEntries } from '$lib/tools-page';
 
 const shell = vi.hoisted(() => ({ profile: { name: 'Ada' }, org: { id: 'o' }, projects: [], workspaces: [], creditBalance: 0 }));
 vi.mock('$lib/server/dashboard/app-shell', () => ({ appShell: async () => shell }));
@@ -17,13 +18,10 @@ describe('the gallery and the app navigation', () => {
     expect(await load(event(null))).toEqual({ shell: null });
   });
 
-  it('the sidebar has Gallery for everyone, active on the gallery and its items', () => {
-    const gallery = APP_NAV.find((item) => item.id === 'gallery')!;
-    expect(visibleNav(null)).toContain(gallery);
-    const href = navHref(gallery, null)!;
-    expect(href).toBe('/gallery');
-    expect(isNavActive(href, '/gallery')).toBe(true);
-    expect(isNavActive(href, '/gallery/abc')).toBe(true);
-    expect(isNavActive(href, '/app')).toBe(false);
+  it('the gallery is one of the tools behind the sidebar Tools entry, for everyone', () => {
+    const tools = APP_NAV.find((item) => item.id === 'tools')!;
+    expect(visibleNav(null)).toContain(tools);
+    expect(toolEntries(null).find((t) => t.id === 'gallery')?.href).toBe('/gallery');
+    expect(isNavActive(navHref(tools, null)!, '/app/tools')).toBe(true);
   });
 });

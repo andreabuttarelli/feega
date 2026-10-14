@@ -1,3 +1,4 @@
+import { PartKind, parsePart, partKind } from './poster-parts';
 import { withModifierParam } from './shape/model';
 import { modifierOfKey, shapeFieldShown, type Modifier, type ShapeKind } from './shape/schema';
 import { z } from 'zod';
@@ -135,6 +136,61 @@ export function clipFieldGroups(doc: MotionDoc, clip: MotionClip): { group: Grou
   const component = doc.components[String(clip.props.name)];
   const fields = component ? customFields(component.propsSchema) : [];
   return GROUP_ORDER.map((group) => ({ group, fields: fields.filter((f) => f.group === group) })).filter((g) => g.fields.length > 0);
+}
+
+const PART_SHARED_GROUPS = [Group.Style, Group.Layout];
+const PART_FIELD_SUFFIXES = ['Color', 'Colour', 'TextColor', 'BgColor', 'BorderColor', 'TagColor', 'Font', 'Size', 'Weight', 'Height', 'X', 'Y', 'Leading'];
+
+export const PART_FIELDS_BY_POSTER: Record<string, Record<string, readonly string[]>> = {
+  BlockTitlePoster: { title: ['fontWeight', 'leading', 'fill', 'overlap'] },
+  BoxedTypePoster: { word: ['wordLeft'], note: ['noteLine'] },
+  CircleEventPoster: { heading: ['nameSize'], marker: ['circleSize', 'circleX', 'circleY'] },
+  IsoBlocksPoster: { lineup: ['blockTextSize', 'blockFont'] },
+  OverlayGridPoster: { overlay: ['overlayLeading'], overlayLow: ['lowX', 'lowY'] },
+  RedNumberPoster: { photos: ['photoSize', 'tint'] },
+  RepeatLineupPoster: { lineup: ['nameSize', 'repeatSize'] },
+  ScatteredTypePoster: { blocks: ['textSize'] },
+  SlicedPhotoPoster: { phrases: ['phraseSize'], photos: ['photoSize'] },
+  SquareWordsPoster: { words: ['wordSize'], body: ['square', 'squareX', 'squareY', 'squareW', 'squareH'], dotLabel: ['dot', 'dotSize', 'dotY'] },
+  VerticalTypePoster: { words: ['wordSize'] },
+  WideFilmstripPoster: { title: ['titleWeight'] }
+};
+
+function ownFields(keys: readonly string[], poster: string, field: string): string[] {
+  const listed = PART_FIELDS_BY_POSTER[poster]?.[field] ?? [];
+  return keys.filter((k) => listed.includes(k) || PART_FIELD_SUFFIXES.some((suffix) => k === field + suffix));
+}
+
+export function partFieldKeys(doc: MotionDoc, clip: MotionClip, field: string): string[] {
+  const poster = String(clip.props.name);
+  const groups = clipFieldGroups(doc, clip);
+  const keys = groups.flatMap((g) => g.fields.map((f) => f.key));
+  const parts = groups.filter((g) => g.group === Group.Content).flatMap((g) => g.fields.map((f) => f.key));
+  const claimed = new Set(parts.flatMap((part) => ownFields(keys, poster, part)));
+  const shared = groups
+    .filter((g) => PART_SHARED_GROUPS.includes(g.group))
+    .flatMap((g) => g.fields.map((f) => f.key))
+    .filter((k) => !claimed.has(k));
+  return [field, ...ownFields(keys, poster, field), ...shared];
+}
+
+enum PartField {
+  Shown = 'shown',
+  Own = 'own'
+}
+
+const PART_FIELD: Record<PartKind, PartField> = {
+  [PartKind.Text]: PartField.Shown,
+  [PartKind.Other]: PartField.Shown,
+  [PartKind.Line]: PartField.Own,
+  [PartKind.Photo]: PartField.Own,
+  [PartKind.Arrow]: PartField.Own
+};
+
+export function partFocus(doc: MotionDoc, clip: MotionClip, part: string): string[] {
+  const { field } = parsePart(part);
+  const keys = [...new Set(partFieldKeys(doc, clip, field))];
+  return PART_FIELD[partKind(doc, clip, part)] === PartField.Shown ? keys : keys.filter((k) => k !== field);
 }
 
 const SECONDS_PRECISION = 100;

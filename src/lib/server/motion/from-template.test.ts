@@ -40,6 +40,13 @@ describe('a video started from a component', () => {
     expect(doc.height).toBeGreaterThan(doc.width);
   });
 
+  it('picked from the canvas add bar, it lands where the canvas is looking', async () => {
+    const d = deps();
+    await startFromTemplate(db, d, { ...input, canvasId: 'c-motion', at: { x: 12, y: 34 } });
+
+    expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ x: 12, y: 34 }));
+  });
+
   it('creates nothing for a component that does not exist', async () => {
     const d = deps();
     expect(await startFromTemplate(db, d, { ...input, templateId: 'builtin:nope' })).toEqual({ outcome: FromTemplate.Unknown });

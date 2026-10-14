@@ -3,6 +3,8 @@
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import CanvasMenu from './CanvasMenu.svelte';
   import CanvasShare from './CanvasShare.svelte';
+  import ConnectionDot from './ConnectionDot.svelte';
+  import { canvasLink } from '$lib/realtime/canvas-link';
   import CanvasMobileSwitcher from './CanvasMobileSwitcher.svelte';
   import { pageMeta, pageTopActions } from '$lib/stores/page-meta';
   import type { ShareState } from '$lib/canvas/shared-view';
@@ -86,6 +88,9 @@
   {/if}
   {#if share}
     <CanvasShare shareToken={share.shareToken} onShare={share.onShare} />
+  {/if}
+  {#if $canvasLink}
+    <ConnectionDot state={$canvasLink} />
   {/if}
   <a href={BILLING_PATH} class="credits">
     <CreditAmount amount={creditBalance} />

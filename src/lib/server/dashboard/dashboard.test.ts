@@ -51,6 +51,14 @@ describe('the dashboard: projects, tool outputs, one org', () => {
     expect(a.thumbs).toEqual(['https://signed/i1', 'https://signed/i2', 'https://signed/i3', 'https://signed/i4']);
   });
 
+  it('recents are canvases, newest first, each with its frames’ posters, opening the canvas, never an uncensored one', async () => {
+    const { canvases } = await dashboardFor(db, deps(), 'org');
+    expect(canvases).toEqual([
+      { id: 'c1', name: 'Launch', projectName: 'Project a', updatedAt: '2026-10-03', href: '/p/a/c/c1', thumbs: ['https://signed/poster-1'] },
+      { id: 'c2', name: 'Ideas', projectName: 'Project a', updatedAt: '2026-10-02', href: '/p/a/c/c2', thumbs: [] }
+    ]);
+  });
+
   it('studio batches open their standalone page and never leak an uncensored project', async () => {
     const { batches } = await dashboardFor(db, deps(), 'org');
     expect(batches).toEqual([{ id: 'b1', name: 'Autumn', status: 'running', createdAt: '2026-10-03', projectName: 'Project b', href: '/app/studio/b1' }]);

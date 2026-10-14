@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from './components';
 import { Ease } from './design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, secondsLabel, toggleKey, valueAt } from './inspector';
+import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, partFieldKeys, partFocus, secondsLabel, toggleKey, valueAt } from './inspector';
 import { addClip, setKeyframes, setTransform, type OpResult } from './timeline';
 import { writeComponent } from './custom/ops';
 import { PropFormat } from './custom/component';
+import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from './template/type-grid-poster/template';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -191,9 +192,111 @@ describe('properties of a custom clip come from its props schema', () => {
   });
 });
 
+describe('fields shown for a selected poster part', () => {
+  function posterClip() {
+    const doc = must(
+      writeComponent(newMotionDoc(MotionFormat.Landscape), 'Poster', {
+        source: { html: '', css: '', js: '' },
+        propsSchema: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', title: 'Title', default: 'Title', group: 'Content' },
+            caption: { type: 'string', title: 'Caption', default: 'Caption', group: 'Content' },
+            font: { type: 'string', title: 'Font', default: 'Inter', group: 'Style' },
+            ink: { type: 'string', title: 'Ink', format: PropFormat.Color, default: '#000', group: 'Style' },
+            margin: { type: 'number', title: 'Margin', default: 4, group: 'Layout' },
+            titleSize: { type: 'number', title: 'Title size', default: 8, group: 'Layout' },
+            titleColour: { type: 'string', title: 'Title colour', format: PropFormat.Color, default: '#f00', group: 'Style' },
+            titleX: { type: 'number', title: 'Title x', default: 0, group: 'Layout' },
+            captionSize: { type: 'number', title: 'Caption size', default: 3, group: 'Layout' },
+            captionWeight: { type: 'number', title: 'Caption weight', default: 400, group: 'Style' }
+          }
+        }
+      })
+    );
+    const withClip = must(addClip(doc, { component: 'Custom', from: 0, props: { name: 'Poster' } }, 'k'));
+    return { doc: withClip, clip: findClip(withClip, 'k')!.clip };
+  }
+
+  it('its own text field plus every poster-wide style and layout field', () => {
+    const { doc, clip } = posterClip();
+    expect(partFieldKeys(doc, clip, 'title')).toEqual(['title', 'titleColour', 'titleSize', 'titleX', 'font', 'ink', 'margin']);
+  });
+
+  it("never another part's own size or weight", () => {
+    const { doc, clip } = posterClip();
+    expect(partFieldKeys(doc, clip, 'title')).not.toContain('captionSize');
+    expect(partFieldKeys(doc, clip, 'caption')).toEqual(['caption', 'captionWeight', 'captionSize', 'font', 'ink', 'margin']);
+  });
+
+  it('a part also claims its text, background, border and tag colours and its height', () => {
+    const doc = must(
+      writeComponent(newMotionDoc(MotionFormat.Landscape), 'Pills', {
+        source: { html: '', css: '', js: '' },
+        propsSchema: {
+          type: 'object',
+          properties: {
+            pills: { type: 'string', title: 'Pills', default: 'A', group: 'Content' },
+            pillsTextColor: { type: 'string', title: 'Text', format: PropFormat.Color, default: '#000', group: 'Style' },
+            pillsBgColor: { type: 'string', title: 'Bg', format: PropFormat.Color, default: '#000', group: 'Style' },
+            pillsHeight: { type: 'number', title: 'Height', default: 3, group: 'Layout' },
+            paper: { type: 'string', title: 'Paper', format: PropFormat.Color, default: '#fff', group: 'Style' }
+          }
+        }
+      })
+    );
+    const withClip = must(addClip(doc, { component: 'Custom', from: 0, props: { name: 'Pills' } }, 'k'));
+    expect(partFieldKeys(withClip, findClip(withClip, 'k')!.clip, 'pills')).toEqual(['pills', 'pillsTextColor', 'pillsBgColor', 'pillsHeight', 'paper']);
+  });
+
+  it('a poster whose field names break the convention claims them through its table row', () => {
+    const doc = must(
+      writeComponent(newMotionDoc(MotionFormat.Landscape), 'CircleEventPoster', {
+        source: { html: '', css: '', js: '' },
+        propsSchema: {
+          type: 'object',
+          properties: {
+            heading: { type: 'string', title: 'Name', default: 'A', group: 'Content' },
+            nameSize: { type: 'number', title: 'Name size', default: 8, group: 'Layout' },
+            ink: { type: 'string', title: 'Ink', format: PropFormat.Color, default: '#000', group: 'Style' }
+          }
+        }
+      })
+    );
+    const withClip = must(addClip(doc, { component: 'Custom', from: 0, props: { name: 'CircleEventPoster' } }, 'k'));
+    const clip = findClip(withClip, 'k')!.clip;
+    expect(partFieldKeys(withClip, clip, 'heading')).toEqual(['heading', 'nameSize', 'ink']);
+  });
+
+  it("never another part's own text field", () => {
+    const { doc, clip } = posterClip();
+    expect(partFieldKeys(doc, clip, 'title')).not.toContain('caption');
+  });
+});
+
 describe('seconds at another frame rate', () => {
   it('reads frames at the doc rate', () => {
     expect(secondsLabel(25, 25)).toBe('1');
     expect(secondsLabel(30, 60)).toBe('0.5');
+  });
+});
+
+describe('a selected poster part shows only its own fields', () => {
+  const doc = TYPE_GRID_POSTER_TEMPLATE.template.doc;
+  const clip = findClip(doc, TYPE_GRID_CLIP)!.clip;
+
+  it('a marked line leaves the raw multi-line field out: its text has its own field', () => {
+    expect(partFocus(doc, clip, 'lines:1')).not.toContain('lines');
+    expect(partFocus(doc, clip, 'lines:1')).toContain('ink');
+  });
+
+  it('a whole text field keeps its own field', () => {
+    expect(partFocus(doc, clip, 'footer1')[0]).toBe('footer1');
+  });
+
+  it('a photo and an arrow show their style, never the lines', () => {
+    expect(partFocus(doc, clip, 'photos:0')).toEqual(expect.arrayContaining(['photoTint', 'photoGrain']));
+    expect(partFocus(doc, clip, 'photos:0')).not.toContain('lines');
+    expect(partFocus(doc, clip, 'arrow:4')[0]).toBe('arrowColor');
   });
 });

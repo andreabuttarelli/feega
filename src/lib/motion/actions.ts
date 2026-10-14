@@ -1,5 +1,11 @@
 import type { Component } from 'svelte';
 import Play from '@lucide/svelte/icons/play';
+import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
+import TypeIcon from '@lucide/svelte/icons/type';
+import SquareIcon from '@lucide/svelte/icons/square';
+import CircleIcon from '@lucide/svelte/icons/circle';
+import PenTool from '@lucide/svelte/icons/pen-tool';
+import PencilRuler from '@lucide/svelte/icons/pencil-ruler';
 import Pause from '@lucide/svelte/icons/pause';
 import Rewind from '@lucide/svelte/icons/rewind';
 import SkipBack from '@lucide/svelte/icons/skip-back';
@@ -29,6 +35,10 @@ import ArrowLeftFromLine from '@lucide/svelte/icons/arrow-left-from-line';
 import MoveLeft from '@lucide/svelte/icons/move-left';
 import MoveRight from '@lucide/svelte/icons/move-right';
 import Move from '@lucide/svelte/icons/move';
+import MoveUp from '@lucide/svelte/icons/move-up';
+import MoveDown from '@lucide/svelte/icons/move-down';
+import ChevronsUp from '@lucide/svelte/icons/chevrons-up';
+import ChevronsDown from '@lucide/svelte/icons/chevrons-down';
 import Maximize2 from '@lucide/svelte/icons/maximize-2';
 import RotateCw from '@lucide/svelte/icons/rotate-cw';
 import Blend from '@lucide/svelte/icons/blend';
@@ -133,7 +143,8 @@ export enum Place {
   Graph = 'the graph editor',
   Menu = 'the ⋯ menu',
   Clip = 'the clip bar or a long press on the clip',
-  Drawer = 'the menu'
+  Drawer = 'the menu',
+  Draw = 'the draw tools in the frame'
 }
 
 export enum MenuSection {
@@ -147,6 +158,7 @@ type ActionSpec = { name: string; icon: Component; group?: GuideGroup; place?: P
 
 const PINCH = 'Pinch the timeline';
 const DRAG_PLAYHEAD = 'Drag the playhead';
+const DRAG_IN_FRAME = 'Drag it in the frame';
 const PINCH_PREVIEW = 'Pinch the preview';
 const DOUBLE_TAP_PREVIEW = 'Double-tap around the preview';
 
@@ -183,6 +195,14 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.NudgeForward]: { name: 'Nudge 1 frame later', icon: MoveRight, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },
   [Command.NudgeBackMore]: { name: 'Nudge 10 frames earlier', icon: ChevronsLeft, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },
   [Command.NudgeForwardMore]: { name: 'Nudge 10 frames later', icon: ChevronsRight, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },
+  [Command.MoveLeft]: { name: 'Move left 1 px', icon: MoveLeft, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveRight]: { name: 'Move right 1 px', icon: MoveRight, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveUp]: { name: 'Move up 1 px', icon: MoveUp, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveDown]: { name: 'Move down 1 px', icon: MoveDown, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveLeftMore]: { name: 'Move left 10 px', icon: ChevronsLeft, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveRightMore]: { name: 'Move right 10 px', icon: ChevronsRight, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveUpMore]: { name: 'Move up 10 px', icon: ChevronsUp, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
+  [Command.MoveDownMore]: { name: 'Move down 10 px', icon: ChevronsDown, group: GuideGroup.Edit, gesture: DRAG_IN_FRAME, menu: MenuSection.Layer },
   [Tool.CopyEase]: { name: 'Copy ease', icon: ClipboardCopy, group: GuideGroup.Edit, place: Place.Graph },
   [Tool.PasteEase]: { name: 'Paste ease', icon: ClipboardPaste, group: GuideGroup.Edit, place: Place.Graph },
 
@@ -212,6 +232,11 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Tool.ShowLayer]: { name: 'Show layer', icon: EyeOff, place: Place.Layer },
   [Tool.LockLayer]: { name: 'Lock layer', icon: LockOpen, group: GuideGroup.Timeline, place: Place.Layer },
   [Tool.UnlockLayer]: { name: 'Unlock layer', icon: Lock, place: Place.Layer },
+  [Command.ToolSelect]: { name: 'Select tool', icon: MousePointer2, group: GuideGroup.Edit, place: Place.Draw },
+  [Command.ToolText]: { name: 'Text tool', icon: TypeIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolRectangle]: { name: 'Rectangle tool', icon: SquareIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolEllipse]: { name: 'Ellipse tool', icon: CircleIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolPen]: { name: 'Pen tool', icon: PenTool, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Tap points, tap the first to close' },
   [Tool.FitGraph]: { name: 'Fit curves to view', icon: Maximize, group: GuideGroup.Timeline, place: Place.Graph },
 
   [Command.PreviewZoomIn]: { name: 'Zoom preview in', icon: ZoomIn, group: GuideGroup.View, menu: MenuSection.View, gesture: PINCH_PREVIEW },
@@ -221,6 +246,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToggleInspector]: { name: 'Properties panel', icon: PanelRight, group: GuideGroup.View, place: Place.Bar },
   [Command.ToggleTimeline]: { name: 'Timeline', icon: PanelBottom, group: GuideGroup.View, place: Place.Transport },
   [Command.ToggleChat]: { name: 'Agent panel', icon: BotMessageSquare, group: GuideGroup.View, place: Place.Bar },
+  [Command.ToggleEditMode]: { name: 'Design / Motion', icon: PencilRuler, group: GuideGroup.View, place: Place.Bar },
   [Command.Help]: { name: 'Keyboard & gestures', icon: Keyboard, group: GuideGroup.View, place: Place.Drawer },
   [Tool.Menu]: { name: 'Menu', icon: Menu, group: GuideGroup.View, place: Place.Bar },
   [Tool.Back]: { name: 'Back to the canvas', icon: ArrowLeft },

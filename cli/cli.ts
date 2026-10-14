@@ -176,6 +176,34 @@ motion
   });
 
 motion
+  .command('move <frameId> <elementId>')
+  .description('Move an element out of a frame into another frame (--to), or into a new frame on the canvas')
+  .option('--to <frameId>', 'The frame to move it into; omit for a new frame')
+  .option('--x <fraction>', 'Where its centre lands across the target frame, 0..1')
+  .option('--y <fraction>', 'Where its centre lands down the target frame, 0..1')
+  .option('--canvas-x <n>', 'Canvas position of a new frame')
+  .option('--canvas-y <n>', 'Canvas position of a new frame')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (frameId: string, elementId: string, opts) => {
+    const { cmdMotionMove } = await import('./commands/motion.ts');
+    await cmdMotionMove(frameId, elementId, opts);
+  });
+
+motion
+  .command('place <nodeId>')
+  .description("Put a generative image, video or text node's output into a frame (--to), or into a new frame")
+  .option('--to <frameId>', 'The frame to place it in; omit for a new frame')
+  .option('--x <fraction>', 'Where its centre lands across the target frame, 0..1')
+  .option('--y <fraction>', 'Where its centre lands down the target frame, 0..1')
+  .option('--canvas-x <n>', 'Canvas position of a new frame')
+  .option('--canvas-y <n>', 'Canvas position of a new frame')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, opts) => {
+    const { cmdMotionPlace } = await import('./commands/motion.ts');
+    await cmdMotionPlace(nodeId, opts);
+  });
+
+motion
   .command('budget <nodeId>')
   .description('Show what the video spent on AI across all its turns, and its cap')
   .option('--raise', 'Let the agent spend more on this video, then ask it to continue')
@@ -337,6 +365,16 @@ gallery
   .action(async (itemId: string, opts) => {
     const { cmdGalleryWithdraw } = await import('./commands/gallery.ts');
     await cmdGalleryWithdraw(itemId, opts);
+  });
+
+program
+  .command('canvas <projectId> <op>')
+  .description('Run a canvas op on a project: list_canvases, list_nodes, create_node, update_node, move_node, connect_nodes, delete_node, run_node, list_runs, preview_node_loop, run_node_loop, cancel_node_loop, preview_run_graph, run_graph')
+  .option('--input <json>', 'The op input as JSON, e.g. \'{"canvasId":"..."}\'')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, op: string, opts) => {
+    const { cmdCanvas } = await import('./commands/canvas.ts');
+    await cmdCanvas(projectId, op, opts);
   });
 
 const effects = program

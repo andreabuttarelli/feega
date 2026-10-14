@@ -3,115 +3,82 @@ import { render } from 'svelte/server';
 import '$lib/i18n';
 import Page from './+page.svelte';
 
-const motion = { id: 'm1', name: 'acme.com', projectName: 'Launch', updatedAt: '2026-10-03', format: '9:16', poster: 'https://signed/poster.jpg', preview: null, href: '/p/p1/c/c1/motion/m1' };
+const canvas = { id: 'c1', name: 'Spring teaser', projectName: 'Launch', updatedAt: '2026-10-03', href: '/p/p1/c/c1', thumbs: ['https://signed/poster.jpg'] };
 const project = { id: 'p1', name: 'Launch', href: '/p/p1', updatedAt: '2026-10-03', canvases: [], thumbs: [], videoCount: 1, posters: ['https://signed/poster.jpg'] };
-const card = { id: 'g1', title: 'Gallery film', authorName: 'Feega', kind: 'motion', format: 'landscape', durationS: 8, tags: [], posterUrl: null, previewUrl: null, remixCount: 0, remixedFrom: null };
-const component = { id: 'builtin:prompt-input', name: 'Prompt input', description: 'A prompt that types', seconds: 9, kind: 'component', fields: [], preview: { poster: '/component-previews/builtin-prompt-input.jpg', video: '/component-previews/builtin-prompt-input.mp4' } };
-const poster = { id: 'builtin:poster-iso-blocks', name: 'Poster iso blocks', description: 'A club night poster', seconds: 2, kind: 'component', mode: 'still', fields: [], preview: { poster: '/component-previews/builtin-poster-iso-blocks.jpg', video: null } };
-const PLACEHOLDER = 'Paste your website or describe the video you want…';
+const PLACEHOLDER = 'Describe what you want to make, or paste your website…';
 
-function page(motions: (typeof motion)[] = [motion], projects: (typeof project)[] = [project], moreVideos: string | null = null) {
-  const data = { dashboard: { projects, batches: [], motions, moreVideos }, gallery: [card], components: [component], posters: [poster], templates: [{ id: 't', name: 'Logo reveal', brief: 'A logo reveal' }], tools: [], attachProjectId: 'p1' };
+function page(canvases: (typeof canvas)[] = [canvas]) {
+  const data = { dashboard: { canvases, projects: [project], batches: [], motions: [], moreVideos: null }, templates: [{ id: 't', name: 'A poster series', brief: 'A poster series' }], tools: [], attachProjectId: 'p1' };
   return render(Page, { props: { data, form: null } as never }).body;
 }
 
-describe('the /app dashboard puts the one prompt before everything', () => {
-  it('reads prompt, then the videos grid, then the projects grid, then the gallery row', () => {
+describe('the /app home: a hero, the recents, one prompt', () => {
+  it('reads create actions, hero, recents, then the prompt', () => {
     const body = page();
     const at = (needle: string) => body.indexOf(needle);
 
-    expect(at('data-testid="video-brief"')).toBeGreaterThan(-1);
-    expect(at('data-testid="video-brief"')).toBeLessThan(at('data-testid="home-videos"'));
-    expect(at('data-testid="home-videos"')).toBeLessThan(at('data-testid="home-projects"'));
-    expect(at('data-testid="home-projects"')).toBeLessThan(at('data-testid="home-gallery"'));
+    expect(at('data-testid="home-create"')).toBeGreaterThan(-1);
+    expect(at('data-testid="home-create"')).toBeLessThan(at('data-page-title'));
+    expect(at('data-page-title')).toBeLessThan(at('data-testid="home-recents"'));
+    expect(at('data-testid="home-recents"')).toBeLessThan(at('data-testid="video-brief"'));
   });
 
-  it('the components row starts a new video from one, with its stored preview', () => {
+  it('the hero says the slogan and the subline, over a still poster that never waits on video', () => {
     const body = page();
-    const row = body.slice(body.indexOf('data-testid="home-components"'), body.indexOf('data-testid="home-projects"'));
+    const hero = body.slice(body.indexOf('data-testid="home-hero"'), body.indexOf('data-testid="home-recents"'));
 
-    expect(body.indexOf('data-testid="home-videos"')).toBeLessThan(body.indexOf('data-testid="home-components"'));
-    expect(row).toContain('action="/app?/fromTemplate"');
-    expect(row).toContain('name="template" value="builtin:prompt-input"');
-    expect(row).toContain('name="format" value="16:9"');
-    expect(row).toContain('src="/component-previews/builtin-prompt-input.jpg"');
-    expect(row).toContain('use in new video');
+    expect(hero).toContain('design that moves.');
+    expect(hero).toContain('an ai canvas for interaction design');
+    expect(hero).toContain('src="/home/hero-flow.jpg"');
+    expect(hero).not.toContain('<video');
   });
 
-  it('the posters row starts a still from one, in 4:5, with its picture', () => {
+  it('creates only a new canvas and imports: no catalogue rows on the home', () => {
     const body = page();
-    const row = body.slice(body.indexOf('data-testid="home-posters"'), body.indexOf('data-testid="home-projects"'));
+    const create = body.slice(body.indexOf('data-testid="home-create"'), body.indexOf('data-page-title'));
 
-    expect(body.indexOf('data-testid="home-components"')).toBeLessThan(body.indexOf('data-testid="home-posters"'));
-    expect(row).toContain('action="/app?/fromTemplate"');
-    expect(row).toContain('name="template" value="builtin:poster-iso-blocks"');
-    expect(row).toContain('name="format" value="4:5"');
-    expect(row).toContain('src="/component-previews/builtin-poster-iso-blocks.jpg"');
-    expect(row).toContain('use in new poster');
+    expect(create).toContain('action="?/project"');
+    expect(create).toContain('data-testid="new-canvas"');
+    expect(create).toContain('data-testid="home-import"');
+    expect(body).not.toContain('home-components');
+    expect(body).not.toContain('home-posters');
+    expect(body).not.toContain('home-gallery');
   });
 
-  it('the hero points down at the videos', () => {
+  it('a recent is a canvas: a sized lazy thumbnail, its name, its project, and it opens the canvas', () => {
     const body = page();
-    expect(body.indexOf('data-testid="home-peek"')).toBeLessThan(body.indexOf('data-testid="home-videos"'));
-    expect(body).toMatch(/href="#videos-heading"[^>]*data-testid="home-peek"|data-testid="home-peek"[^>]*href="#videos-heading"/);
+    const recents = body.slice(body.indexOf('data-testid="home-recents"'), body.indexOf('data-testid="video-brief"'));
+
+    expect(recents).toContain('href="/p/p1/c/c1"');
+    expect(recents).toMatch(/<img src="https:\/\/signed\/poster.jpg"[^>]*loading="lazy"[^>]*width="\d+" height="\d+"/);
+    expect(recents).toContain('Spring teaser');
+    expect(recents).toContain('Launch');
   });
 
-  it('a video card has a sized lazy poster, its project, its format and opens the editor', () => {
-    const body = page();
-    const card = body.slice(body.indexOf('data-testid="home-videos"'), body.indexOf('data-testid="home-projects"'));
+  it('a canvas with several frames shows them side by side; one with none shows its initial', () => {
+    const many = page([{ ...canvas, thumbs: ['https://signed/a.jpg', 'https://signed/b.jpg'] }]);
+    const none = page([{ ...canvas, thumbs: [] }]);
 
-    expect(card).toContain('href="/p/p1/c/c1/motion/m1"');
-    expect(card).toMatch(/<img src="https:\/\/signed\/poster.jpg"[^>]*loading="lazy"[^>]*width="\d+" height="\d+"/);
-    expect(card).toContain('Launch');
-    expect(card).toContain('title="9:16"');
+    expect(many).toContain('https://signed/b.jpg');
+    expect(none).toMatch(/class="initial[^"]*"[^>]*>s</);
   });
 
-  it('a project card shows its posters, its video count and opens the project', () => {
-    const body = page();
-    const grid = body.slice(body.indexOf('data-testid="home-projects"'));
+  it('a new user sees an empty state that points at the prompt and the new canvas', () => {
+    const body = page([]);
 
-    expect(grid).toContain('href="/p/p1"');
-    expect(grid).toContain('1 video');
-    expect(grid).toContain('https://signed/poster.jpg');
-    expect(body).toContain('data-testid="new-project"');
-  });
-
-  it('offers more videos only when the server said there are', () => {
-    expect(page()).not.toContain('data-testid="more-videos"');
-    expect(page([motion], [project], '2026-10-01')).toContain('data-testid="more-videos"');
-  });
-
-  it('with nothing made yet, both grids say so gently and the prompt stays the way in', () => {
-    const body = page([], []);
-
-    expect(body).toContain('data-testid="home-videos-empty"');
-    expect(body).toContain('data-testid="home-projects-empty"');
+    expect(body).toContain('data-testid="home-empty"');
+    expect(body).not.toContain('data-testid="home-recents"');
     expect(body).toContain('href="#video-brief"');
   });
 
-  it('the hero holds title, composer, examples and helper, in that order', () => {
+  it('the prompt sends to the video action, with three suggestions above it', () => {
     const body = page();
-    const hero = body.slice(body.indexOf('data-testid="home-hero"'), body.indexOf('data-testid="home-peek"'));
-    const at = (needle: string) => hero.indexOf(needle);
+    const chips = body.slice(body.indexOf('data-testid="brief-examples"'), body.indexOf('data-testid="video-brief"'));
 
-    expect(at('make a video.')).toBeGreaterThan(-1);
-    expect(at('make a video.')).toBeLessThan(at('data-testid="video-brief"'));
-    expect(at('data-testid="video-brief"')).toBeLessThan(at('data-testid="chat-attach"'));
-    expect(at('data-testid="chat-attach"')).toBeLessThan(at('data-testid="brief-send"'));
-    expect(at('data-testid="brief-send"')).toBeLessThan(at('data-testid="brief-examples"'));
-    expect(at('data-testid="brief-examples"')).toBeLessThan(at('data-testid="brief-helper"'));
-  });
-
-  it('the prompt is a multi-line textarea that reads as a prompt', () => {
-    const body = page([]);
-
+    expect(body).toMatch(/<form[^>]*action="\?\/video"/);
     expect(body).toMatch(/<textarea[^>]*data-testid="video-brief"/);
     expect(body).toContain(`placeholder="${PLACEHOLDER}"`);
-  });
-
-  it('an example chip is a button that fills, not a form submit', () => {
-    const body = page();
-
-    expect(body).toMatch(/<button type="button"[^>]*data-brief="A logo reveal"/);
+    expect(chips).toMatch(/<button type="button"[^>]*data-brief="A poster series"/);
+    expect(body.indexOf('data-testid="video-brief"')).toBeLessThan(body.indexOf('data-testid="brief-send"'));
   });
 });

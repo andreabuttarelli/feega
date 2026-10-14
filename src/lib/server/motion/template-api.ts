@@ -5,6 +5,8 @@ import { findNode } from '$lib/server/repos/canvas';
 import { agentActor } from '$lib/server/repos/actor';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { motionOf } from '$lib/canvas/motion-node';
+import { cardDetail } from '$lib/motion/template/card';
+import { templateCard } from '$lib/motion/template/cards';
 import { insertTemplate, setTemplateValues, templateFields } from '$lib/motion/template/library';
 import { headOrNew, saveMotionDoc } from './editor';
 import { templateLibrary } from './templates';
@@ -30,6 +32,11 @@ type NodeScope = Scope & { nodeId: string };
 const newId = () => crypto.randomUUID().slice(0, ID_LENGTH);
 const refuse = (error: string, status = HTTP_BAD_REQUEST) => json({ error }, { status });
 
+const withCard = (id: string) => {
+  const card = templateCard(id);
+  return card ? { card: cardDetail(card) } : {};
+};
+
 export async function listTemplates(db: Db, scope: Scope): Promise<Record<string, unknown>> {
   const entries = await templateLibrary(db, { orgId: scope.orgId, actor: agentActor(scope.userId, API_AGENT_KEY) }).list();
   return {
@@ -38,6 +45,7 @@ export async function listTemplates(db: Db, scope: Scope): Promise<Record<string
       name: e.template.name,
       description: e.template.description,
       seconds: e.template.doc.durationInFrames / e.template.doc.fps,
+      ...withCard(e.id),
       fields: e.template.doc.fields.map((f) => ({ key: f.key, label: f.label, type: f.type, group: f.group, min: f.min, max: f.max, options: f.options, default: f.default }))
     }))
   };

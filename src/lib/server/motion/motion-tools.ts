@@ -23,7 +23,20 @@ import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
+import { AXES, EDGES, alignSpace, distributeSpace, moveBy, propBoxes, type Axis, type Edge } from '$lib/motion/space';
+import { EditMode } from '$lib/motion/edit-mode';
+import type { Pt } from '$lib/motion/scene-select';
 import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '$lib/motion/organize';
+
+const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) => `distribute_${a}` as const), 'move'] as const;
+
+type SpaceInput = { doc: MotionDoc; ids: string[]; frame: number; by: Pt; mode: EditMode };
+
+const SPACE: Record<(typeof SPACE_OPS)[number], (i: SpaceInput) => OpResult> = {
+  ...(Object.fromEntries(EDGES.map((edge) => [`align_${edge}`, (i: SpaceInput) => alignSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), edge, i.mode)])) as Record<`align_${Edge}`, (i: SpaceInput) => OpResult>),
+  ...(Object.fromEntries(AXES.map((axis) => [`distribute_${axis}`, (i: SpaceInput) => distributeSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), axis, i.mode)])) as Record<`distribute_${Axis}`, (i: SpaceInput) => OpResult>),
+  move: (i) => moveBy(i.doc, i.ids, i.frame, i.by, i.mode)
+};
 
 const ARRANGE_OPS = ['nudge', 'sequence', 'stagger', 'align_start', 'align_end', 'distribute'] as const;
 
@@ -120,6 +133,9 @@ import { applyValues, exposeField, fieldValues, removeField } from '$lib/motion/
 import { FIELD_TYPES, MAX_LINKED, type ExposedField } from '$lib/motion/template/field-model';
 import { detachTemplate, insertTemplate, isLockedComp, setTemplateValues, templateFields } from '$lib/motion/template/library';
 import type { TemplateLibrary } from './templates';
+import { ROLE_MEANING, SECTION_ROLES, cardDetail, cardLine } from '$lib/motion/template/card';
+import { templateCard } from '$lib/motion/template/cards';
+import { splitFields } from '$lib/motion/template/key-fields';
 import { templateCues } from './template-sounds';
 import { createWebTools, type WebToolDeps } from '$lib/server/web/web-tools';
 import { DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName } from '$lib/motion/template/batch';
@@ -131,6 +147,8 @@ import { MOTION_STYLES } from '$lib/motion/style-model';
 import { SPAWN_AGENT, type ModelOffer, type SpawnInput, type SpawnResult } from '$lib/server/agents/spawn';
 import { spawnAgentTool } from '$lib/server/agents/spawn-agent';
 import { setStill } from '$lib/motion/still';
+import { liftElement, type Element } from '$lib/motion/move-element';
+import { MoveOutcome, type FrameTarget, type Moved } from './move-element';
 import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '$lib/motion/still-model';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
@@ -182,6 +200,7 @@ export type MotionToolDeps = {
   storyboard?: StoryboardPort;
   copywrite?: (script: LaunchScript) => Promise<LaunchScript>;
   exportStill?: (doc: MotionDoc, spec: StillExport) => Promise<StillMade>;
+  moveOut?: (element: Element, target: FrameTarget) => Promise<Moved>;
 };
 
 export type StillMade = { ok: true; asset_id: string; url: string; width: number; height: number } | { ok: false; error: string };
@@ -851,6 +870,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async (input) => apply(ARRANGE[input.op](session.doc, input.clip_ids, frames(Math.abs(input.seconds ?? 0)) * Math.sign(input.seconds ?? 0)), `${input.op} ${input.clip_ids.length} clips`)
     }),
 
+    arrange_space: tool({
+      description: `Arrange clips in the frame, like a design tool: align_left/center/right/top/middle/bottom lines up several clips on the edge of their joint box (one clip aligns to the frame); distribute_x/distribute_y spreads 3+ clips so the gaps between them are equal; move shifts them by dx/dy px. at (seconds, default 0) is the moment measured. mode design (default) moves animated positions whole, every keyframe; motion keys the change at that moment. Locked clips are refused.`,
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum(SPACE_OPS), dx: z.number().optional(), dy: z.number().optional(), at: z.number().min(0).optional(), mode: z.enum(EditMode).optional() }),
+      execute: async (input) =>
+        apply(SPACE[input.op]({ doc: session.doc, ids: input.clip_ids, frame: frames(input.at ?? 0), by: [input.dx ?? 0, input.dy ?? 0], mode: input.mode ?? EditMode.Design }), `${input.op} ${input.clip_ids.length} clip(s)`)
+    }),
+
     remove_clip: tool({
       description: 'Remove one or more clips. When the content then ends earlier, the video is fitted to it (fit_duration).',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1) }),
@@ -1429,7 +1455,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_shape: tool({
-      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. Fill: fillKind solid/linear/radial/none with fill, fill2 (gradient end) and gradientAngle; stroke: strokeKind none/solid/gradient, stroke, strokeWidth/dash/gap in px, cap, join. Other props as add_clip; a soft glow is effects [{kind: gaussian-blur}]. ${PLACEMENT_HELP} Returns the clip id.`,
+      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. A rect rounds its corners with roundness (0..0.5 of the short side) or one radius per corner with corners [topLeft, topRight, bottomRight, bottomLeft] (unset ones follow roundness); set_props changes them later. Fill: fillKind solid/linear/radial/none with fill, fill2 (gradient end) and gradientAngle; stroke: strokeKind none/solid/gradient, stroke, strokeWidth/dash/gap in px, cap, join. Other props as add_clip; a soft glow is effects [{kind: gaussian-blur}]. ${PLACEMENT_HELP} Returns the clip id.`,
       inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
       execute: async (input) => {
         const id = deps.newId();
@@ -1841,6 +1867,27 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         return apply(pinned, 'changed the canvas');
+      }
+    }),
+
+    move_to_frame: tool({
+      description:
+        'Move one clip of this video into another Frame on the canvas (frame_id, a motion node id), or, without frame_id, into a new Frame next to this one that holds only it. Props, style and keyframes go with it, re-timed to that frame; x/y (0..1 of the target frame) is where its centre lands, at_seconds where it starts in a video frame. It leaves this video.',
+      inputSchema: z.object({ clip_id: z.string(), frame_id: z.string().optional(), x: z.number().min(0).max(1).default(0.5), y: z.number().min(0).max(1).default(0.5), at_seconds: z.number().min(0).optional() }),
+      execute: async (input) => {
+        if (!deps.moveOut) {
+          return UNREADABLE('moving to another frame');
+        }
+        const lifted = liftElement(session.doc, input.clip_id);
+        if (!lifted.ok) {
+          return lifted;
+        }
+        const target: FrameTarget = { ...(input.frame_id ? { frameId: input.frame_id } : {}), at: { x: input.x, y: input.y }, ...(input.at_seconds === undefined ? {} : { frame: Math.round(input.at_seconds * session.doc.fps) }) };
+        const moved = await deps.moveOut(lifted.element, target);
+        if (moved.outcome !== MoveOutcome.Done) {
+          return { ok: false, error: moved.detail ?? moved.outcome };
+        }
+        return { ...apply({ ok: true, doc: lifted.doc }, `moved ${input.clip_id} to frame ${moved.frameId}`), frame_id: moved.frameId, element_id: moved.clipId, new_frame: moved.created };
       }
     }),
 
@@ -2300,16 +2347,36 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     list_templates: tool({
-      description: 'List the motion templates (built-in and saved by the team): fixed designs customised only through their fields — text, colours, media slots (aspect = width/height of the crop), numbers (min..max, unit), choices (options).',
-      inputSchema: z.object({}).strict(),
-      execute: async () => {
+      description: `List the motion templates (built-in and saved by the team), each with its key_fields (the ones a user edits first; get_template lists all) and its card in one line: roles · energy · loops · edges start→end and suggested transition · media count and aspect · text amount · what is on screen, second by second · good for. role narrows to one section role: ${SECTION_ROLES.map((r) => `${r} (${ROLE_MEANING[r]})`).join(', ')}. get_template gives one in full with its typed fields.`,
+      inputSchema: z.object({ role: z.enum(SECTION_ROLES).optional() }).strict(),
+      execute: async (input) => {
         const entries = (await deps.templates?.list()) ?? [];
-        return { templates: entries.map((e) => ({ id: e.id, name: e.template.name, description: e.template.description, seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), fields: e.template.doc.fields.map(fieldSpec) })) };
+        const role = input.role;
+        const picked = role ? entries.filter((e) => templateCard(e.id)?.roles.includes(role)) : entries;
+        return {
+          templates: picked.map((e) => {
+            const card = templateCard(e.id);
+            return { id: e.id, name: e.template.name, seconds: secondsAt(e.template.doc.durationInFrames, e.template.doc.fps), card: card ? cardLine(card) : e.template.description, key_fields: splitFields(e.template.doc.fields, e.template.keyFields).key.map((f) => f.key) };
+          })
+        };
+      }
+    }),
+
+    get_template: tool({
+      description: 'One template in full: its card (onScreen beat by beat with seconds, roles, energy, loops, needs, best formats, edges, good for) and every field with type, min..max, unit, options and media aspect (width/height of the crop).',
+      inputSchema: z.object({ id: z.string() }).strict(),
+      execute: async (input) => {
+        const entry = ((await deps.templates?.list()) ?? []).find((e) => e.id === input.id);
+        if (!entry) {
+          return { ok: false, error: `no template ${input.id}: call list_templates` };
+        }
+        const card = templateCard(entry.id);
+        return { id: entry.id, name: entry.template.name, description: entry.template.description, seconds: secondsAt(entry.template.doc.durationInFrames, entry.template.doc.fps), ...(card ? { card: cardDetail(card) } : {}), fields: entry.template.doc.fields.map(fieldSpec) };
       }
     }),
 
     add_template: tool({
-      description: 'Insert a template (id from list_templates) as one locked Precomp clip on a new top track at `at` seconds, with its fields filled from vars (keys as in list_templates, checked like set_template_fields). sound (default true) lays its key taps and clicks on the SFX track. Its structure stays fixed unless detach_template.',
+      description: 'Insert a template (id from list_templates) as one locked Precomp clip on a new top track at `at` seconds, with its fields filled from vars (keys as in get_template, checked like set_template_fields). sound (default true) lays its key taps and clicks on the SFX track. Its structure stays fixed unless detach_template.',
       inputSchema: z.object({ id: z.string(), at: z.number().min(0).default(0), vars: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).default({}), sound: z.boolean().default(true) }),
       execute: async (input) => {
         const entry = ((await deps.templates?.list()) ?? []).find((e) => e.id === input.id);
@@ -2332,7 +2399,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_template_fields: tool({
-      description: 'Set fields of an inserted template (clip_id of its Precomp clip; keys as in list_templates). Each value is checked against the field type: text, #rrggbb colour, asset id, number in range, one of the options, comma-separated asset ids for a media list.',
+      description: 'Set fields of an inserted template (clip_id of its Precomp clip; keys as in get_template). Each value is checked against the field type: text, #rrggbb colour, asset id, number in range, one of the options, comma-separated asset ids for a media list.',
       inputSchema: z.object({ clip_id: z.string(), values: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])) }),
       execute: async (input) => {
         const values = Object.fromEntries(Object.entries(input.values).map(([k, v]) => [k, String(v)]));

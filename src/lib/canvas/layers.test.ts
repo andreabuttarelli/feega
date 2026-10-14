@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { LayerAction, LayerKind, Pick, dropLayer, layerEdit, layerKey, layerRows, pickLayers } from './layers';
+import { LayerAction, LayerKind, Pick, dropLayer, frameHover, frameRows, rowPicked, tileHovered, layerEdit, layerKey, layerRows, pickFor, pickLayers, selectedLayers } from './layers';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip, addTrack } from '$lib/motion/timeline';
 import { TrackKind } from '$lib/motion/components';
+import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from '$lib/motion/template/type-grid-poster/template';
 
 const NODES = [
   { id: 'n1', type: 'text', name: 'Hook' },
@@ -54,6 +55,24 @@ describe('layer rows', () => {
   });
 });
 
+describe('every frame lists its children, open or not', () => {
+  it('a closed frame unfolds from its stored outline, read-only', () => {
+    const doc = video();
+    const rows = layerRows(NODES, { nodeId: 'm1', doc }, { m2: frameRows(doc, 'm2') });
+    const closed = rows.filter((r) => r.nodeId === 'm2' && r.depth > 0);
+
+    expect(closed.map((r) => r.id)).toEqual(rows.filter((r) => r.nodeId === 'm1' && r.depth > 0).map((r) => r.id));
+    expect(closed.every((r) => r.nested)).toBe(true);
+  });
+
+  it('the open frame reads its live doc, never the stored outline', () => {
+    const doc = video();
+    const rows = layerRows(NODES, { nodeId: 'm1', doc }, { m1: [] });
+
+    expect(rows.find((r) => r.id === 't1' && r.nodeId === 'm1')).toMatchObject({ nested: false });
+  });
+});
+
 describe('poster parts in layers', () => {
   it('lists the tagged parts of a clip under it, one level deeper, as part rows', () => {
     const doc = video();
@@ -61,8 +80,21 @@ describe('poster parts in layers', () => {
     const clip = rows.findIndex((r) => r.id === 't1');
 
     expect(rows.slice(clip + 1, clip + 3).map((r) => [r.id, r.kind, r.depth, r.label])).toEqual([
-      ['t1#lines:0', LayerKind.Part, 3, 'lines 1'],
-      ['t1#footer1', LayerKind.Part, 3, 'footer1']
+      ['t1#lines:0', LayerKind.Part, 3, 'Line 1'],
+      ['t1#footer1', LayerKind.Part, 3, 'Footer1']
+    ]);
+  });
+
+  it('names a poster and its parts as people read them, photos typed as images', () => {
+    const doc = TYPE_GRID_POSTER_TEMPLATE.template.doc;
+    const rows = layerRows(NODES, { nodeId: 'm1', doc, parts: { [TYPE_GRID_CLIP]: ['lines:1', 'photos:0', 'arrow:4'] } });
+    const at = rows.findIndex((r) => r.id === TYPE_GRID_CLIP);
+
+    expect(rows[at].label).toBe('Type grid poster');
+    expect(rows.slice(at + 1, at + 4).map((r) => [r.label, r.type])).toEqual([
+      ['NAME', 'text'],
+      ['Photo 1', 'image'],
+      ['Arrow', 'arrow']
     ]);
   });
 });
@@ -141,12 +173,50 @@ describe('layer keys and selection', () => {
     expect(layerKey({ key: 'a', mod: true })).toBeNull();
   });
 
-  it('click picks one, ⌘ toggles, shift extends the range in list order', () => {
-    const order = ['a', 'b', 'c', 'd'];
+  it('click picks one, shift or ⌘ adds and removes, as on the canvas', () => {
+    expect(pickFor({ shift: false, mod: false })).toBe(Pick.One);
+    expect(pickFor({ shift: true, mod: false })).toBe(Pick.Toggle);
+    expect(pickFor({ shift: false, mod: true })).toBe(Pick.Toggle);
+    expect(pickLayers(['a'], 'c', Pick.One)).toEqual(['c']);
+    expect(pickLayers(['a'], 'c', Pick.Toggle)).toEqual(['a', 'c']);
+    expect(pickLayers(['a', 'c'], 'a', Pick.Toggle)).toEqual(['c']);
+  });
 
-    expect(pickLayers(['a'], 'c', Pick.One, order)).toEqual(['c']);
-    expect(pickLayers(['a'], 'c', Pick.Toggle, order)).toEqual(['a', 'c']);
-    expect(pickLayers(['a', 'c'], 'a', Pick.Toggle, order)).toEqual(['c']);
-    expect(pickLayers(['b'], 'd', Pick.Range, order)).toEqual(['b', 'c', 'd']);
+  it('a row picked in Layers is no longer selected once the canvas selects another node', () => {
+    expect(selectedLayers({ canvas: ['n1'], video: null })).toEqual(['n1']);
+    expect(selectedLayers({ canvas: ['m1'], video: null })).toEqual(['m1']);
+  });
+
+  it('inside an open frame the picked clips stand in for the frame, and a part for its clip', () => {
+    expect(selectedLayers({ canvas: ['m1'], video: { nodeId: 'm1', selection: [], part: null } })).toEqual(['m1']);
+    expect(selectedLayers({ canvas: ['m1'], video: { nodeId: 'm1', selection: ['t1', 't2'], part: null } })).toEqual(['t1', 't2']);
+    expect(selectedLayers({ canvas: ['m1'], video: { nodeId: 'm1', selection: ['poster'], part: 'poster#title' } })).toEqual(['poster#title']);
+  });
+});
+
+describe('a picked row belongs to one frame', () => {
+  it('a clip picked in the open frame does not light up the same clip id in a closed frame', () => {
+    const doc = video();
+    const rows = layerRows(NODES, { nodeId: 'm1', doc }, { m2: frameRows(doc, 'm2') });
+    const selection = { canvas: ['m1'], video: { nodeId: 'm1', selection: ['t1'], part: null } };
+
+    expect(rows.filter((r) => rowPicked(r, selection)).map((r) => [r.nodeId, r.id])).toEqual([['m1', 't1']]);
+  });
+});
+
+describe('hovering a layer row', () => {
+  it('outlines the node itself, or a closed frame for any of its children', () => {
+    expect(tileHovered({ nodeId: 'n1', id: 'n1' }, 'n1', null)).toBe(true);
+    expect(tileHovered({ nodeId: 'm2', id: 't1' }, 'm2', 'm1')).toBe(true);
+    expect(tileHovered({ nodeId: 'm1', id: 't1' }, 'm1', 'm1')).toBe(false);
+    expect(tileHovered({ nodeId: 'n1', id: 'n1' }, 'm1', null)).toBe(false);
+    expect(tileHovered(null, 'n1', null)).toBe(false);
+  });
+
+  it('inside the open frame outlines the child or part, never the frame', () => {
+    expect(frameHover({ nodeId: 'm1', id: 't1' }, 'm1')).toBe('t1');
+    expect(frameHover({ nodeId: 'm1', id: 'poster#title' }, 'm1')).toBe('poster#title');
+    expect(frameHover({ nodeId: 'm1', id: 'm1' }, 'm1')).toBeNull();
+    expect(frameHover({ nodeId: 'm2', id: 't1' }, 'm1')).toBeNull();
   });
 });

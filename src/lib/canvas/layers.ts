@@ -3,7 +3,7 @@ import { COMPONENTS, type ComponentId } from '$lib/motion/components';
 import { moveClip, moveTrack, renameTrack, type OpResult } from '$lib/motion/timeline';
 import { setClipFlags, setTrackFlags } from '$lib/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
-import { PART_SEP, parsePart } from '$lib/motion/poster-parts';
+import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '$lib/motion/poster-parts';
 import { NODE_KIND_LABEL } from './node-label';
 import type { NodeType } from './node-data';
 
@@ -25,11 +25,10 @@ export enum LayerAction {
 
 export enum Pick {
   One = 'one',
-  Toggle = 'toggle',
-  Range = 'range'
+  Toggle = 'toggle'
 }
 
-export type CanvasLayer = { id: string; type: string; name: string | null };
+export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null };
 export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string, readonly string[]> };
 type Parts = Record<string, readonly string[]>;
 
@@ -51,7 +50,7 @@ type Clip = Track['clips'][number];
 const NODE_DEPTH = 0;
 const TRACK_DEPTH = 1;
 
-const clipLabel = (clip: Clip) => COMPONENTS[clip.component as ComponentId]?.label ?? clip.component;
+const clipLabel = (clip: Clip) => (clip.component === CUSTOM_CLIP ? componentLabel(String(clip.props.name)) : (COMPONENTS[clip.component as ComponentId]?.label ?? clip.component));
 
 function trackRows(doc: MotionDoc, tracks: readonly Track[], nodeId: string, depth: number, nested: boolean, parts: Parts = {}): LayerRow[] {
   return tracks.flatMap((track) => [
@@ -75,23 +74,29 @@ function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nes
     nested
   };
   const inside = comp && !template ? (doc.comps[comp]?.tracks ?? []) : [];
-  const own = (parts[clip.id] ?? []).map((part) => partRow(clip, part, nodeId, depth + 1));
+  const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1));
   return [row, ...own, ...trackRows(doc, inside, nodeId, depth + 1, true)];
 }
 
-function partLabel(part: string): string {
-  const { field, index } = parsePart(part);
-  return index === null ? field : `${field} ${index + 1}`;
+function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth: number): LayerRow {
+  return { id: `${clip.id}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(doc, clip, part), type: partIcon(doc, clip, part), nodeId, hidden: false, locked: false, nested: true };
 }
 
-function partRow(clip: Clip, part: string, nodeId: string, depth: number): LayerRow {
-  return { id: `${clip.id}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(part), type: 'part', nodeId, hidden: false, locked: false, nested: true };
+export const frameRows = (doc: MotionDoc, nodeId: string): LayerRow[] => trackRows(doc, doc.tracks, nodeId, TRACK_DEPTH, false);
+
+export type FrameOutlines = Record<string, readonly LayerRow[]>;
+
+function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlines): LayerRow[] {
+  if (open?.nodeId === nodeId) {
+    return trackRows(open.doc, open.doc.tracks, nodeId, TRACK_DEPTH, false, open.parts);
+  }
+  return (outlines[nodeId] ?? []).map((row) => ({ ...row, nested: true }));
 }
 
-export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null): LayerRow[] {
+export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}): LayerRow[] {
   return nodes.flatMap((node) => {
     const row: LayerRow = { id: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.type, nodeId: node.id, hidden: false, locked: false, nested: false };
-    return open?.nodeId === node.id ? [row, ...trackRows(open.doc, open.doc.tracks, node.id, TRACK_DEPTH, false, open.parts)] : [row];
+    return [row, ...childRows(node.id, open, outlines)];
   });
 }
 
@@ -163,14 +168,32 @@ const LAYER_KEYS: readonly (KeyPress & { action: LayerAction })[] = [
 
 export const layerKey = (press: KeyPress): LayerAction | null => LAYER_KEYS.find((k) => k.key === press.key && k.mod === press.mod)?.action ?? null;
 
-const PICK: Record<Pick, (current: readonly string[], id: string, order: readonly string[]) => string[]> = {
+const PICK: Record<Pick, (current: readonly string[], id: string) => string[]> = {
   [Pick.One]: (_current, id) => [id],
-  [Pick.Toggle]: (current, id) => (current.includes(id) ? current.filter((c) => c !== id) : [...current, id]),
-  [Pick.Range]: (current, id, order) => {
-    const anchor = order.indexOf(current[0] ?? id);
-    const end = order.indexOf(id);
-    return order.slice(Math.min(anchor, end), Math.max(anchor, end) + 1);
-  }
+  [Pick.Toggle]: (current, id) => (current.includes(id) ? current.filter((c) => c !== id) : [...current, id])
 };
 
-export const pickLayers = (current: readonly string[], id: string, pick: Pick, order: readonly string[]) => PICK[pick](current, id, order);
+export const pickLayers = (current: readonly string[], id: string, pick: Pick) => PICK[pick](current, id);
+
+export const pickFor = (press: { shift: boolean; mod: boolean }): Pick => (press.shift || press.mod ? Pick.Toggle : Pick.One);
+
+export type LayerSelection = {
+  canvas: readonly string[];
+  video: { nodeId: string; selection: readonly string[]; part: string | null } | null;
+};
+
+export function selectedLayers({ canvas, video }: LayerSelection): readonly string[] {
+  if (video?.part) {
+    return [video.part];
+  }
+  return video?.selection.length ? video.selection : canvas;
+}
+
+export const rowPicked = (row: LayerRow, selection: LayerSelection): boolean =>
+  selectedLayers(selection).includes(row.id) && (row.kind === LayerKind.Node || row.nodeId === selection.video?.nodeId);
+
+export type LayerHover = { nodeId: string; id: string } | null;
+
+export const tileHovered = (hover: LayerHover, nodeId: string, openNodeId: string | null): boolean => !!hover && hover.nodeId === nodeId && (hover.id === nodeId || openNodeId !== nodeId);
+
+export const frameHover = (hover: LayerHover, openNodeId: string | null): string | null => (hover && hover.nodeId === openNodeId && hover.id !== openNodeId ? hover.id : null);

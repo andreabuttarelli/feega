@@ -22,13 +22,18 @@ describe('app sidebar', () => {
     expect(html()).toMatch(/class="wordmark[^"]*"[^>]*>feega<\/a>/);
   });
 
-  it('lists every tool from tools.ts with its link and a beta badge', () => {
+  it('is a simple nav: home, canvases, templates, tools, then the projects; no tool rows, no badges', () => {
     const body = html();
+    const at = (needle: string) => body.indexOf(needle);
+
+    expect(at('href="/app"')).toBeLessThan(at('href="/app/canvases"'));
+    expect(at('href="/app/canvases"')).toBeLessThan(at('href="/app/templates"'));
+    expect(at('href="/app/templates"')).toBeLessThan(at('href="/app/tools"'));
+    expect(at('href="/app/tools"')).toBeLessThan(at('>Projects<'));
     for (const tool of TOOLS) {
-      expect(body).toContain(`href="${tool.route}?project=p1"`);
-      expect(body).toContain(tool.name);
+      expect(body).not.toContain(tool.name);
     }
-    expect(body.match(/class="badge[^"]*"/g)?.length).toBe(TOOLS.filter((t) => t.status === 'beta').length);
+    expect(body).not.toMatch(/class="badge[^"]*"/);
   });
 
   it('ends the projects section with a light New project entry', () => {
@@ -48,9 +53,9 @@ describe('app sidebar', () => {
   });
 
   it('marks only the current page as active', () => {
-    const body = html({ pathname: '/app/motion' });
+    const body = html({ pathname: '/app/templates' });
     expect(body.match(/aria-current="page"/g)?.length).toBe(1);
-    expect(body).toMatch(/href="\/app\/motion\?project=p1"[^>]*aria-current="page"/);
+    expect(body).toMatch(/href="\/app\/templates"[^>]*aria-current="page"/);
   });
 
   it('keeps account entries: settings, billing, changelog, report, legal, theme, sign out', () => {
@@ -70,5 +75,30 @@ describe('app sidebar', () => {
 
   it('keeps credits without a project', () => {
     expect(html({ projectId: null, projects: [] })).toContain('href="/app/credits"');
+  });
+});
+
+describe('account menu at the foot of the sidebar', () => {
+  const menu = (body: string) => body.slice(body.indexOf('data-testid="account-menu"'));
+
+  it('the foot shows avatar, name and email, and opens a closed menu', () => {
+    const body = html();
+    expect(body).toContain('ada@example.com');
+    expect(body).toMatch(/data-testid="account-toggle"[^>]*aria-expanded="false"|aria-expanded="false"[^>]*data-testid="account-toggle"/);
+    expect(body).toMatch(/<div[^>]*data-testid="account-menu"[^>]*hidden/);
+  });
+
+  it('every account entry lives in the menu, after the projects', () => {
+    const body = html();
+    const inside = menu(body);
+    for (const needle of ['href="/p/p1/settings/project"', 'href="/app/credits"', 'href="/changelog"', 'href="/report"', 'data-testid="open-tour"', 'href="https://feega.app/terms"', 'data-testid="theme-switch"', 'action="/auth/signout"']) {
+      expect(inside).toContain(needle);
+    }
+    expect(body.indexOf('New project')).toBeLessThan(body.indexOf('data-testid="account-menu"'));
+  });
+
+  it('billing in the menu shows the credit balance', () => {
+    const inside = menu(html({ creditBalance: 995618 }));
+    expect(inside.slice(inside.indexOf('href="/app/credits"'), inside.indexOf('href="/changelog"'))).toMatch(/9[,.]?956/);
   });
 });
