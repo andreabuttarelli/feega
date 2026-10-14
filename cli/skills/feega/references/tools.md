@@ -325,7 +325,9 @@ head when stale), `apply_ops {version, ops, summary?}`, `record_export {path, wi
 seconds}` and `upload_font {path}` (files the Supabase session already put in storage),
 `analyze_sounds {assetIds}`, `template_sounds {doc, clipId}`, `save_template {doc, name,
 description, compId?, posterFrame?}`. A canvas the caller cannot open, or an uncensored workspace
-still locked, is 404. Unknown op 400 with the list. The editor poster (a JPEG up to 1 MB) is
+still locked, is 404. Spending credits (402 when none are left): `generate_sound {sound: voice|music, text,
+seconds?}` and `render_batch {version, rows: [{name, values}], settings?}` (409 `save_first` when
+`version` is not the head). Unknown op 400 with the list. The editor poster (a JPEG up to 1 MB) is
 `POST /api/v1/motion/{node_id}/poster` multipart `file`, `width`, `height` → `{ assetId }`.
 
 CLI `motion move` / `motion place`:

@@ -13,10 +13,20 @@ const USER = '55555555-5555-5555-5555-555555555555';
 
 const resolveOrgCaller = vi.fn();
 const reachable = vi.fn(async () => true);
-const gate = vi.fn(async () => undefined as unknown);
 
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: (...a: unknown[]) => resolveOrgCaller(...a) }));
-vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiAction: async () => gate(), gateOrgAiActionForForm: async () => gate() }));
+const gated = { value: false };
+vi.mock('$lib/server/credits', async (real) => {
+  const actual = await real<typeof import('$lib/server/credits')>();
+  return {
+    ...actual,
+    gateOrgCredits: async () => {
+      if (gated.value) {
+        throw new actual.CreditsExhaustedError({} as never);
+      }
+    }
+  };
+});
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [{ org: { id: ORG }, role: 'owner' }] }));
 vi.mock('$lib/server/canvas/lookup', () => ({
   findCanvasForUser: async () => ({ orgId: ORG, canvas: { id: CANVAS, projectId: PROJECT, name: 'C', viewport: null }, mode: 'standard', projectBrandId: null })
@@ -87,7 +97,7 @@ async function viaEndpoint(op: string, input: Record<string, unknown>, writeAllo
 beforeEach(() => {
   vi.clearAllMocks();
   reachable.mockResolvedValue(true);
-  gate.mockResolvedValue(undefined);
+  gated.value = false;
 });
 
 describe('the frame editor action and its /api/v1 op answer the same', () => {
@@ -237,6 +247,64 @@ describe('the poster action and POST /api/v1/motion/[nodeId]/poster answer the s
     const endpoint = await viaPosterEndpoint(new FormData(), false);
 
     expect(endpoint).toEqual({ status: 403, data: { error: 'api_key_read_only' } });
+  });
+});
+
+describe('the frame editor spending actions answer like their ops', () => {
+  const rows = [{ name: 'one', values: {} }];
+
+  it('sound and generate_sound refuse an unknown sound', async () => {
+    const action = await viaAction('sound', { sound: 'nope', text: 'hi' });
+    const endpoint = await viaEndpoint('generate_sound', { sound: 'nope', text: 'hi' });
+
+    expect(action).toEqual({ status: 400, data: { error: 'invalid_sound' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('sound and generate_sound stop at the credit gate', async () => {
+    gated.value = true;
+
+    const action = await viaAction('sound', { sound: 'music', text: 'calm piano' });
+    const endpoint = await viaEndpoint('generate_sound', { sound: 'music', text: 'calm piano' });
+
+    expect(action.status).toBe(402);
+    expect(action.data.error).toBe('credits_exhausted');
+    expect(endpoint).toEqual(action);
+  });
+
+  it('renderBatch and render_batch refuse bad settings', async () => {
+    const action = await viaAction('renderBatch', { version: '1', settings: '{"fps":"x"}', rows: JSON.stringify(rows) });
+    const endpoint = await viaEndpoint('render_batch', { version: 1, settings: { fps: 'x' }, rows });
+
+    expect(action).toEqual({ status: 400, data: { error: 'invalid_settings' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('renderBatch and render_batch refuse rows that are no list', async () => {
+    const action = await viaAction('renderBatch', { version: '1', rows: '{}' });
+    const endpoint = await viaEndpoint('render_batch', { version: 1, rows: {} });
+
+    expect(action.status).toBe(400);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('renderBatch and render_batch ask to save first on a stale version', async () => {
+    const action = await viaAction('renderBatch', { version: '9', rows: JSON.stringify(rows) });
+    const endpoint = await viaEndpoint('render_batch', { version: 9, rows });
+
+    expect(action).toEqual({ status: 409, data: { error: 'save_first' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('renderBatch and render_batch stop at the credit gate', async () => {
+    gated.value = true;
+
+    const action = await viaAction('renderBatch', { version: '1', rows: JSON.stringify(rows) });
+    const endpoint = await viaEndpoint('render_batch', { version: 1, rows });
+
+    expect(action.status).toBe(402);
+    expect(action.data.error).toBe('credits_exhausted');
+    expect(endpoint).toEqual(action);
   });
 });
 
