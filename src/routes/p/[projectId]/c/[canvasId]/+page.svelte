@@ -79,10 +79,11 @@
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { frameNodeSize, motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
   import { FORMATS } from '$lib/motion/doc';
-  import { NodeMode, inlineMotionTarget } from '$lib/canvas/inline-motion';
+  import { NodeMode, Opening, inlineMotionTarget, neighbourStyle, openingOf } from '$lib/canvas/inline-motion';
+  import { viewportOf } from '$lib/motion/editor-layout';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
-  import InlineMotionEditor from '$lib/components/canvas/InlineMotionEditor.svelte';
+  import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import { calendarBrand, calendarData, calendarOf, CalendarScope, type CalendarNode as CalendarNodeState } from '$lib/canvas/calendar-node';
@@ -892,6 +893,9 @@
    * lascia passare tutto.
    */
   function tileHeight(n: Tile): number {
+    if (n.id === inlineMotion) {
+      return frameFit(n.id, n.w, NodeMode.Edit)?.h ?? n.h;
+    }
     if (n.type !== 'text' || !(n.id in grownHeights)) return n.h;
     return grownTextNodeHeight(grownHeights[n.id], n.userHeight);
   }
@@ -1008,13 +1012,31 @@
   }
 
   let dismissedMotion = $state<string | null>(null);
-  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion));
+  let requestedMotion = $state<string | null>(null);
+  let pageWidth = $state(0);
+  const opening = $derived(openingOf(viewportOf(pageWidth)));
+  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, opening, requestedMotion));
 
   $effect(() => {
     if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => dismissedMotion)) {
       dismissedMotion = null;
     }
+    if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => requestedMotion)) {
+      requestedMotion = null;
+    }
   });
+
+  $effect(() => {
+    const [id] = selectedIds;
+    if (selectedIds.length === 1 && untrack(() => nodes.find((n) => n.id === id))?.type === 'motion') {
+      prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
+    }
+  });
+
+  function requestMotion(id: string) {
+    dismissedMotion = null;
+    requestedMotion = id;
+  }
 
   $effect(() => {
     canvasSelection.set(selectedIds);
@@ -1711,13 +1733,13 @@
    */
   const FIT_SLACK_PX = 1;
 
-  function frameFit(id: string, w: number): { w: number; h: number } | null {
+  function frameFit(id: string, w: number, mode: NodeMode = NodeMode.Preview): { w: number; h: number } | null {
     const motion = motionOf(nodes.find((node) => node.id === id) ?? { id, type: '', data: {} });
     if (!motion) {
       return null;
     }
     const open = layersSource.video;
-    return frameNodeSize(w, open?.nodeId === id ? open.doc : FORMATS[motion.format]);
+    return frameNodeSize(w, open?.nodeId === id ? open.doc : FORMATS[motion.format], mode);
   }
 
   $effect(() => {
@@ -2555,7 +2577,9 @@
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
 
-<div class="canvas" class:editing={inlineMotion !== null}>
+<svelte:window bind:innerWidth={pageWidth} />
+
+<div class="canvas" class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
   {#if peers.length}
     <div class="peers" aria-label="Persone sulla tela">{peers.map((peer) => peer.name).join(', ')}</div>
   {/if}
@@ -2839,7 +2863,7 @@
           />
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} />
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if calendar && publishes(data.socialPublishing)}
@@ -2922,10 +2946,20 @@
   }
 
   @media (max-width: 767px) {
-    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing']))),
+    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing']))) {
+      opacity: var(--neighbour-body);
+    }
+
     .canvas.editing :global(.svelte-flow__edge) {
-      opacity: 0;
-      pointer-events: none;
+      opacity: var(--neighbour-edges);
+    }
+
+    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing'])) .node-label) {
+      opacity: var(--neighbour-label);
+    }
+
+    .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing'])) .svelte-flow__handle) {
+      opacity: var(--neighbour-ports);
     }
   }
 

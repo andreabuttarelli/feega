@@ -19,11 +19,11 @@
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, type MotionNode } from '$lib/canvas/motion-node';
-  import { NodeMode } from '$lib/canvas/inline-motion';
+  import { NodeMode, nodeLayers } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { Engagement, PreviewMode, Sight, previewClock, previewMode, scrubFrame, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
-  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode } = $props();
+  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
 
@@ -49,6 +49,8 @@
   const posterKey = $derived(`${node.id}:${node.docHeadRevision}`);
   const poster = $derived(posterUrl ?? posters.get(posterKey) ?? null);
   const last = $derived(Math.max(0, (preview?.durationInFrames ?? 1) - 1));
+  const layers = $derived(nodeLayers(nodeMode, inlineStage.paintOf(node.id)));
+  const previewing = $derived(nodeMode === NodeMode.Preview);
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));
@@ -62,7 +64,7 @@
   });
 
   $effect(() => {
-    if (mode !== PreviewMode.Live) {
+    if (mode !== PreviewMode.Live || !previewing) {
       playing = false;
       return;
     }
@@ -142,12 +144,20 @@
   function isolate(e: Event) {
     e.stopPropagation();
   }
+
+  function open(e: MouseEvent) {
+    if (!onopen) {
+      return;
+    }
+    e.preventDefault();
+    onopen();
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="motion"
-  class:editing={nodeMode === NodeMode.Edit}
+  class:editing={!previewing}
   data-testid="motion-node"
   data-mode={mode}
   style={`--bar-h: ${MOTION_NODE_BAR_H}px;`}
@@ -158,38 +168,39 @@
   onfocusout={() => (hovered = false)}
 >
   <div class="stage" data-testid="motion-node-stage">
-    {#if nodeMode === NodeMode.Edit}
-      <div class="host nodrag nopan" data-testid="motion-node-editing" bind:this={host}></div>
-    {:else if mode === PreviewMode.Live && preview}
-      <MotionPreview bind:this={player} html={preview.html} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} />
-      <span class="clock" data-testid="motion-node-timecode">{previewClock(frame, preview.fps, preview.durationInFrames)}</span>
-      <input
-        class="scrub nodrag nopan"
-        type="range"
-        min="0"
-        max="1"
-        step="any"
-        aria-label="Seek"
-        value={frame / Math.max(1, preview.durationInFrames)}
-        oninput={scrub}
-        onpointerdown={isolate}
-        onclick={isolate}
-      />
-    {:else if poster}
-      <img class="poster" src={poster} alt="" draggable="false" />
-    {:else}
-      <div class="empty">
-        <Clapperboard size={28} />
-        <span class="format">{size.label}</span>
-      </div>
+    {#if layers.own}
+      {#if mode === PreviewMode.Live && preview}
+        <MotionPreview bind:this={player} html={preview.html} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} />
+        {#if previewing}
+          <span class="clock" data-testid="motion-node-timecode">{previewClock(frame, preview.fps, preview.durationInFrames)}</span>
+          <input
+            class="scrub nodrag nopan"
+            type="range"
+            min="0"
+            max="1"
+            step="any"
+            aria-label="Seek"
+            value={frame / Math.max(1, preview.durationInFrames)}
+            oninput={scrub}
+            onpointerdown={isolate}
+            onclick={isolate}
+          />
+        {/if}
+      {:else if poster}
+        <img class="poster" src={poster} alt="" draggable="false" data-testid="motion-node-poster" />
+      {:else}
+        <div class="empty">
+          <Clapperboard size={28} />
+          <span class="format">{size.label}</span>
+        </div>
+      {/if}
     {/if}
-    {#if nodeMode === NodeMode.Preview}<a class="open nodrag" {href} data-testid="open-motion-editor">Open editor</a>{/if}
+    {#if !previewing}<div class="host nodrag nopan" data-testid="motion-node-editing" bind:this={host}></div>{/if}
+    {#if previewing}<a class="open nodrag" {href} data-testid="open-motion-editor" onclick={open}>Open editor</a>{/if}
   </div>
 
+  {#if previewing}
   <div class="bar nodrag nopan" onpointerdown={isolate} onclick={isolate} ondblclick={isolate}>
-    {#if nodeMode === NodeMode.Edit}
-    <span class="editing-label" data-testid="motion-node-editing-label">Editing</span>
-    {:else}
     <button type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={toggle}>
       {#if playing}<Pause size={ICON} />{:else}<Play size={ICON} />{/if}
     </button>
@@ -200,9 +211,9 @@
     <button type="button" aria-label={muted ? 'Unmute' : 'Mute'} aria-pressed={muted} onclick={() => (muted = !muted)}>
       {#if muted}<VolumeX size={ICON} />{:else}<Volume2 size={ICON} />{/if}
     </button>
-    {/if}
     <span class="rev">{node.docHeadRevision ? `Rev ${node.docHeadRevision}` : 'Empty'}</span>
   </div>
+  {/if}
 </div>
 
 <style>
@@ -233,12 +244,6 @@
   .host {
     position: absolute;
     inset: 0;
-  }
-
-  .editing-label {
-    padding: 0 8px;
-    font-size: var(--ui-text-xs);
-    color: var(--ui-accent);
   }
 
   .poster {
