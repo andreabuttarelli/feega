@@ -2,6 +2,7 @@
   import { parseDecimal } from '$lib/motion/inspector';
   import { KeyMark } from '$lib/motion/timeline-layers';
   import { FieldFill, FieldKind, Nudge, fillShare, formatValue, nudged, precisionOf, scrubbed, type Range } from '$lib/motion/number-field';
+  import { MIXED, type Shared } from '$lib/motion/mixed';
 
   let {
     label,
@@ -20,7 +21,7 @@
   }: {
     label: string;
     name: string;
-    value: number;
+    value: Shared<number>;
     range: Range;
     unit?: string;
     fill?: FieldFill;
@@ -32,6 +33,10 @@
     onkey?: () => void;
     onexpression?: () => void;
   } = $props();
+
+  const MIXED_TEXT = 'Mixed';
+  const known = $derived(value === MIXED ? Math.min(range.max, Math.max(range.min, 0)) : value);
+  const text = $derived(value === MIXED ? '' : formatValue(value, range.step));
 
   const NUDGE_KEYS: Record<string, Nudge> = { ArrowUp: Nudge.Up, ArrowDown: Nudge.Down };
   const LONG_PRESS_MS = 550;
@@ -68,7 +73,7 @@
     }
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    scrub = { x: e.clientX, start: value };
+    scrub = { x: e.clientX, start: known };
   }
 
   function moveScrub(e: PointerEvent) {
@@ -76,7 +81,7 @@
       return;
     }
     const next = scrubbed(scrub.start, e.clientX - scrub.x, range, precisionOf(e));
-    if (next !== value) {
+    if (next !== known) {
       onchange(next);
     }
   }
@@ -84,7 +89,7 @@
   function commit(text: string) {
     const parsed = parseDecimal(text);
     if (parsed === null) {
-      input!.value = formatValue(value, range.step);
+      input!.value = text;
       return;
     }
     onchange(Math.min(range.max, Math.max(range.min, parsed)));
@@ -94,7 +99,7 @@
     const direction = NUDGE_KEYS[e.key];
     if (direction) {
       e.preventDefault();
-      onchange(nudged(value, direction, precisionOf(e), range));
+      onchange(nudged(known, direction, precisionOf(e), range));
       return;
     }
     if (e.key === 'Enter') {
@@ -102,7 +107,7 @@
       return;
     }
     if (e.key === 'Escape') {
-      input!.value = formatValue(value, range.step);
+      input!.value = text;
       input?.blur();
     }
   }
@@ -116,9 +121,9 @@
   }
 </script>
 
-<div class="field {kind}" class:disabled class:expression data-field={name} style={fill === FieldFill.Range ? `--fill: ${fillShare(value, range) * 100}%;` : ''} oncontextmenu={onContext} onpointerdowncapture={startPress} onpointermovecapture={movePress} onpointerupcapture={endPress} onpointercancelcapture={endPress} role="group" aria-label={name}>
+<div class="field {kind}" class:disabled class:expression data-field={name} class:mixed={value === MIXED} style={fill === FieldFill.Range && value !== MIXED ? `--fill: ${fillShare(value, range) * 100}%;` : ''} oncontextmenu={onContext} onpointerdowncapture={startPress} onpointermovecapture={movePress} onpointerupcapture={endPress} onpointercancelcapture={endPress} role="group" aria-label={name}>
   <span class="label" title={`${name} · drag to scrub (Shift ×10, Alt ×0.1)`} onpointerdown={startScrub} onpointermove={moveScrub} onpointerup={() => (scrub = null)} onlostpointercapture={() => (scrub = null)} aria-hidden="true">{label}</span>
-  <input bind:this={input} class="num" type="text" inputmode="decimal" aria-label={name} {disabled} value={formatValue(value, range.step)} onchange={(e) => commit(e.currentTarget.value)} onkeydown={onKeydown} />
+  <input bind:this={input} class="num" type="text" inputmode="decimal" aria-label={name} {disabled} value={text} placeholder={value === MIXED ? MIXED_TEXT : undefined} onchange={(e) => commit(e.currentTarget.value)} onkeydown={onKeydown} />
   {#if unit}<span class="unit" aria-hidden="true">{unit}</span>{/if}
   {#if mark}
     <button type="button" class="mark" data-mark={mark} title={mark === KeyMark.Here ? 'Remove the keyframe here' : 'Add a keyframe here'} aria-label={`Keyframe ${name}`} aria-pressed={mark === KeyMark.Here} {disabled} onclick={onkey}></button>
@@ -130,9 +135,9 @@
     position: relative;
     display: flex;
     align-items: center;
-    height: 24px;
+    height: 28px;
     min-width: 0;
-    background: var(--ui-surface);
+    background: var(--ui-field);
     border: 1px solid transparent;
   }
 
@@ -162,11 +167,13 @@
   .label {
     position: relative;
     flex-shrink: 0;
-    width: 22px;
-    text-align: center;
-    font-family: var(--ui-mono);
-    font-size: 10px;
+    min-width: 22px;
+    max-width: 64px;
+    padding: 0 6px 0 8px;
+    text-align: left;
+    font-size: var(--ui-text-xs);
     color: var(--ui-ink-3);
+    text-overflow: ellipsis;
     cursor: ew-resize;
     touch-action: none;
     white-space: nowrap;
@@ -179,7 +186,7 @@
     }
 
     .label {
-      width: 32px;
+      min-width: 32px;
     }
 
     .mark {
@@ -188,14 +195,26 @@
     }
   }
 
+  .named {
+    background: linear-gradient(90deg, transparent var(--named-label), var(--ui-field) var(--named-label));
+    border-color: transparent;
+    --named-label: 96px;
+  }
+
+  .named:hover,
+  .named:focus-within {
+    border-color: transparent;
+  }
+
+  .named .num:focus-visible {
+    box-shadow: inset 0 -1px var(--ui-accent);
+  }
+
   .named .label {
-    width: 84px;
-    padding-left: 6px;
-    text-align: left;
-    font-family: inherit;
-    font-size: 11px;
+    width: var(--named-label);
+    max-width: none;
+    padding-left: 0;
     color: var(--ui-ink-2);
-    text-overflow: ellipsis;
   }
 
   .label:hover {
@@ -212,10 +231,14 @@
     border-radius: 0;
     background: transparent;
     color: var(--ui-ink);
-    font-family: var(--ui-mono);
-    font-size: 11px;
+    font: inherit;
+    font-size: var(--ui-text-xs);
     font-variant-numeric: tabular-nums;
     outline: none;
+  }
+
+  .num::placeholder {
+    color: var(--ui-ink-3);
   }
 
   .expression .num {
@@ -229,8 +252,8 @@
   .unit {
     position: relative;
     flex-shrink: 0;
-    padding-right: 4px;
-    font-size: 10px;
+    padding-right: 6px;
+    font-size: var(--ui-text-xs);
     color: var(--ui-ink-3);
   }
 
@@ -240,8 +263,8 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 18px;
-    height: 22px;
+    width: 20px;
+    height: 26px;
     border: 0;
     border-radius: 0;
     background: none;

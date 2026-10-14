@@ -138,6 +138,8 @@
   import { PropertiesView, propertiesFor } from '$lib/motion/properties-view';
   import { partFocus } from '$lib/motion/inspector';
   import PosterPartPanel from './PosterPartPanel.svelte';
+  import MultiInspector from './MultiInspector.svelte';
+  import FamilyIcon from './FamilyIcon.svelte';
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 
@@ -418,7 +420,7 @@
   const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
-  const view = $derived(propertiesFor({ clip: selected?.id ?? null, part: selectedPart }));
+  const view = $derived(propertiesFor({ count: selection.length, clip: selected?.id ?? null, part: selectedPart }));
   const agent = $derived(agentBusy || draft ? Agent.Working : Agent.Idle);
   const blank = $derived(!path.length && showsStart(doc, agentBusy ? Agent.Working : Agent.Idle));
 
@@ -1674,10 +1676,13 @@
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if THREE_D_COMPONENTS.includes(selected.component)}<LookInspector {doc} onchange={edit} />{/if}
+      {:else if view === PropertiesView.Multiple}
+        <MultiInspector {doc} ids={selection} {frame} mode={editMode} onchange={edit} />
       {:else}
+        <header class="frame-head" data-testid="selection-head"><FamilyIcon /><span>Frame</span></header>
         <DocFields {doc} {assets} onchange={edit} />
         <div class="composition" data-testid="composition-inspector">
-          <header class="composition-head"><span>Composition</span>{#if selection.length > 1}<em>{selection.length} clips selected</em>{/if}</header>
+          <header class="composition-head"><span>Frame</span></header>
           <CompositionSettings {doc} onchange={apply} />
         </div>
       {/if}
@@ -2206,27 +2211,35 @@
   .composition-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    height: 40px;
-    margin-bottom: var(--ui-space-2);
+    height: 36px;
     font-size: var(--ui-text-xs);
-    font-weight: 500;
-    color: var(--ui-text-3);
+    font-weight: 600;
+    color: var(--ui-ink);
   }
 
-  .composition-head em {
-    font-style: normal;
-    font-family: var(--ui-mono);
-    font-size: 10px;
-    font-weight: 400;
-    color: var(--ui-ink-3);
+  .frame-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 44px;
+    padding: 0 var(--ui-space-4);
+    border-bottom: 1px solid var(--ui-line);
+    color: var(--ui-ink-2);
+    font-size: var(--ui-text-sm);
+  }
+
+  .frame-head span {
+    color: var(--ui-ink);
+    font-weight: 600;
   }
 
   .props {
     grid-column: 2;
-    grid-row: 1;
+    grid-row: 1 / 3;
     min-height: 0;
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
   }
 
   .chat {
@@ -2265,7 +2278,7 @@
   }
 
   .timeline-area {
-    grid-column: 1 / 3;
+    grid-column: 1;
     grid-row: 2;
     position: relative;
     display: flex;
