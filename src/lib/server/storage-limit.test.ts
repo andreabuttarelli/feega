@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { probeUploadLimit } from './storage-limit';
+import { probeUploadLimit, uploadLimits } from './storage-limit';
 
 const HTTP_TOO_LARGE = 413;
 const HTTP_FORBIDDEN = 403;
@@ -32,5 +32,26 @@ describe('probeUploadLimit', () => {
     const fetcher = vi.fn(async () => new Response(null, { status: 500 }));
 
     await expect(probeUploadLimit({ url: 'https://p.supabase.co', apiKey: 'anon', bucket: 'b' }, fetcher)).rejects.toThrow(/500/);
+  });
+});
+
+describe('uploadLimits', () => {
+  const target = { url: 'https://p.supabase.co', apiKey: 'anon', bucket: 'canvas-assets' };
+
+  it('the editor never waits on the probe: unknown while it runs', () => {
+    const fetcher = vi.fn(() => new Promise<Response>(() => {}));
+
+    expect(uploadLimits(fetcher).known(target)).toBeNull();
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it('once probed, the limit is known without asking storage again', async () => {
+    const fetcher = storageWithLimit(50 * 1024 * 1024);
+    const limits = uploadLimits(fetcher);
+
+    expect(await limits.limit(target)).toBe(50 * 1024 * 1024);
+    const asked = fetcher.mock.calls.length;
+    expect(limits.known(target)).toBe(50 * 1024 * 1024);
+    expect(fetcher.mock.calls.length).toBe(asked);
   });
 });

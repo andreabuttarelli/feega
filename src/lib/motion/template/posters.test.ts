@@ -29,6 +29,20 @@ import { WHITE_SHAPES_COMPONENT } from './white-shapes-poster/component';
 import { WHITE_SHAPES_POSTER_TEMPLATE, WHITE_SHAPES_TEMPLATE_ID } from './white-shapes-poster/template';
 import { VERTICAL_TYPE_COMPONENT } from './vertical-type-poster/component';
 import { VERTICAL_TYPE_POSTER_TEMPLATE, VERTICAL_TYPE_TEMPLATE_ID } from './vertical-type-poster/template';
+import { CURATED_BOARD_COMPONENT } from './curated-board-poster/component';
+import { CURATED_BOARD_POSTER_TEMPLATE, CURATED_BOARD_TEMPLATE_ID } from './curated-board-poster/template';
+import { REPEAT_LINEUP_COMPONENT } from './repeat-lineup-poster/component';
+import { REPEAT_LINEUP_POSTER_TEMPLATE, REPEAT_LINEUP_TEMPLATE_ID } from './repeat-lineup-poster/template';
+import { FESTIVAL_GRID_COMPONENT } from './festival-grid-poster/component';
+import { FESTIVAL_GRID_POSTER_TEMPLATE, FESTIVAL_GRID_TEMPLATE_ID } from './festival-grid-poster/template';
+import { WIDE_FILMSTRIP_COMPONENT } from './wide-filmstrip-poster/component';
+import { WIDE_FILMSTRIP_POSTER_TEMPLATE, WIDE_FILMSTRIP_TEMPLATE_ID } from './wide-filmstrip-poster/template';
+import { SCATTERED_TYPE_COMPONENT } from './scattered-type-poster/component';
+import { SCATTERED_TYPE_POSTER_TEMPLATE, SCATTERED_TYPE_TEMPLATE_ID } from './scattered-type-poster/template';
+import { SLICED_PHOTO_COMPONENT } from './sliced-photo-poster/component';
+import { SLICED_PHOTO_POSTER_TEMPLATE, SLICED_PHOTO_TEMPLATE_ID } from './sliced-photo-poster/template';
+import { RED_NUMBER_COMPONENT } from './red-number-poster/component';
+import { RED_NUMBER_POSTER_TEMPLATE, RED_NUMBER_TEMPLATE_ID } from './red-number-poster/template';
 
 const POSTERS: [string, TemplateEntry, string][] = [
   [TYPE_GRID_TEMPLATE_ID, TYPE_GRID_POSTER_TEMPLATE, TYPE_GRID_COMPONENT],
@@ -44,12 +58,19 @@ const PART_TAGGED: [string, TemplateEntry, string][] = [
   [ISO_BLOCKS_TEMPLATE_ID, ISO_BLOCKS_POSTER_TEMPLATE, ISO_BLOCKS_COMPONENT],
   [PHOTO_GRID_TEMPLATE_ID, PHOTO_GRID_POSTER_TEMPLATE, PHOTO_GRID_COMPONENT],
   [WHITE_SHAPES_TEMPLATE_ID, WHITE_SHAPES_POSTER_TEMPLATE, WHITE_SHAPES_COMPONENT],
-  [VERTICAL_TYPE_TEMPLATE_ID, VERTICAL_TYPE_POSTER_TEMPLATE, VERTICAL_TYPE_COMPONENT]
+  [VERTICAL_TYPE_TEMPLATE_ID, VERTICAL_TYPE_POSTER_TEMPLATE, VERTICAL_TYPE_COMPONENT],
+  [CURATED_BOARD_TEMPLATE_ID, CURATED_BOARD_POSTER_TEMPLATE, CURATED_BOARD_COMPONENT],
+  [REPEAT_LINEUP_TEMPLATE_ID, REPEAT_LINEUP_POSTER_TEMPLATE, REPEAT_LINEUP_COMPONENT],
+  [FESTIVAL_GRID_TEMPLATE_ID, FESTIVAL_GRID_POSTER_TEMPLATE, FESTIVAL_GRID_COMPONENT],
+  [WIDE_FILMSTRIP_TEMPLATE_ID, WIDE_FILMSTRIP_POSTER_TEMPLATE, WIDE_FILMSTRIP_COMPONENT],
+  [SCATTERED_TYPE_TEMPLATE_ID, SCATTERED_TYPE_POSTER_TEMPLATE, SCATTERED_TYPE_COMPONENT],
+  [SLICED_PHOTO_TEMPLATE_ID, SLICED_PHOTO_POSTER_TEMPLATE, SLICED_PHOTO_COMPONENT],
+  [RED_NUMBER_TEMPLATE_ID, RED_NUMBER_POSTER_TEMPLATE, RED_NUMBER_COMPONENT]
 ];
 
 const NOT_A_PART: (string | undefined)[] = [PropFormat.Color, PropFormat.Font, PropFormat.Media];
 
-const REFERENCE_WORDS = /cosmic|aoxomoxoa|aachen|myspace|smets|sibel|thorwart|tomek|kennedy|tomorrow|marvels|new york|paju|isang|moving sites|wine|cheese and|galeria|azur|berlin|karl|marx|ferran|adri|interbrand|wooster|soho|intef|darmstadt|doda|fassbender|guadagnino|cholovdenko|malek|laverne|tenderness|ui\/ux/i;
+const REFERENCE_WORDS = /cosmic|aoxomoxoa|aachen|myspace|smets|sibel|thorwart|tomek|kennedy|tomorrow|marvels|new york|paju|isang|moving sites|wine|cheese and|galeria|azur|berlin|karl|marx|ferran|adri|interbrand|wooster|soho|intef|darmstadt|doda|fassbender|guadagnino|cholovdenko|malek|laverne|tenderness|ui\/ux|inspo|6tm|radioactive|afrodeutsche|sybil|brighton|marine parade|hullabaloo|figueres|moritz|escapism|zemun|kapetanija|gligorijevi|sonnenstub|woolloo|firstdraft|more club|makes no sense|sensations with|stage of life|figured out/i;
 
 describe.each([...POSTERS, ...PART_TAGGED])('the %s still template', (id, entry, name) => {
   const doc = entry.template.doc;
