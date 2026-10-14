@@ -83,6 +83,15 @@ describe('the canvas chat edits a frame with the same tools as the frame editor'
     expect(spec.input_schema.properties).toHaveProperty('still');
   });
 
+  it('frame_tool names every editor tool, so a turn does not spend a step listing them', async () => {
+    const { motionToolList } = await import('$lib/server/motion/tool-run');
+    const description = String(tools()[FRAME_TOOL].description);
+
+    for (const { name } of motionToolList()) {
+      expect(description).toContain(name);
+    }
+  });
+
   it('two calls in one turn share the session: describe_frames reads what view_frames saw', async () => {
     const editor: EditorFrames = async (_callId, times) => times.map((time) => ({ time, bytes: Buffer.from('jpeg') }));
     const t = tools({ editor });
