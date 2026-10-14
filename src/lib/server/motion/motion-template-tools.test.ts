@@ -73,7 +73,7 @@ function withLibrary(sfx?: MotionToolDeps['sfx']) {
   let n = 0;
   const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
   const save = vi.fn(async () => ({ ok: true as const, entry: { id: 'saved-1', template: BUILTIN_TEMPLATES[0].template } }));
-  const templates = { list: async () => BUILTIN_TEMPLATES, save, remove: async () => false };
+  const templates = { list: async () => BUILTIN_TEMPLATES, own: async () => [], save, remove: async () => false };
   const tools = createMotionTools({ session, assets: [], newId: () => `id${++n}`, voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), templates, sfx });
   const run = (name: string, input: unknown) => (tools[name] as Tool & { execute: Exec }).execute(input, { toolCallId: 'c' });
   return { session, run, save };

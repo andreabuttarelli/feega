@@ -35,6 +35,16 @@ describe('the motion template library of an org', () => {
     expect((await library.list()).at(-1)).toMatchObject({ id: 't1', template: { name: 'Promo' } });
   });
 
+  it('own lists only what the org saved, not the built-ins the editor already ships', async () => {
+    const { db } = templatesDb();
+    const library = templateLibrary(db, scope);
+    expect(await library.own()).toEqual([]);
+
+    await library.save({ doc: withField(), compId: null, meta: { name: 'Promo' }, posterFrame: 0 });
+
+    expect((await library.own()).map((e) => e.id)).toEqual(['t1']);
+  });
+
   it('another org does not see it', async () => {
     const { db } = templatesDb();
     await templateLibrary(db, scope).save({ doc: withField(), compId: null, meta: { name: 'Promo' }, posterFrame: 0 });
