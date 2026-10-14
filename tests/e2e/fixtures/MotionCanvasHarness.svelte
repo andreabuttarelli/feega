@@ -7,7 +7,7 @@
 
   const tiles: Tile[] = nodes.map((node) => {
     const size = nodeSize('motion', { format: node.format });
-    return { id: node.id, x: node.x, y: node.y, w: size.w, h: size.h, kind: 'motion' };
+    return { id: node.id, x: node.x, y: node.y, w: size.w, h: size.h, kind: 'motion', poster: node.poster };
   });
   const posterOf = new Map(nodes.map((node) => [node.id, node.poster]));
 </script>

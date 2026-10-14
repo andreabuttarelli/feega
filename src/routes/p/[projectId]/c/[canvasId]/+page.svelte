@@ -846,6 +846,7 @@
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
+      poster: frameLook(n).poster ?? undefined,
       minW: nodeSize(n.type, n.data).w,
       minH: nodeSize(n.type, n.data).h,
       node: n.type === 'effects'
