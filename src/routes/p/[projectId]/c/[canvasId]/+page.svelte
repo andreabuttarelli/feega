@@ -1088,7 +1088,7 @@
     return changedElsewhere(before, nodes);
   }
 
-  function leave(path: string, notice: string) {
+  function leave(path: string, notice: string | null) {
     carryNotice(notice);
     void goto(path, { invalidateAll: true });
   }
@@ -1096,8 +1096,9 @@
   const REACTIONS: Record<Verdict, () => Promise<void> | void> = {
     [Verdict.Resync]: async () => {
       void invalidate(CANVAS_LIST_DEPENDENCY);
-      if (await refresh()) {
-        failed = VERDICT_NOTICE[Verdict.Resync];
+      const notice = VERDICT_NOTICE[Verdict.Resync];
+      if (await refresh() && notice) {
+        failed = notice;
       }
     },
     [Verdict.LeaveCanvas]: () => leave(`/p/${data.projectId}`, VERDICT_NOTICE[Verdict.LeaveCanvas]),
