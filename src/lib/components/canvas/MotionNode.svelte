@@ -30,8 +30,9 @@
   let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
+  const nodeId = $derived(node.id);
 
-  $effect(() => (host ? inlineStage.offer(node.id, host) : undefined));
+  $effect(() => (host ? inlineStage.offer(nodeId, host) : undefined));
 
   const ICON = 16;
   const FIRST_FRAME = 0;

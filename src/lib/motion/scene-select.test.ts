@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, addTrack, setKeyframe, setTransform, type OpResult } from './timeline';
 import { setParent } from './parent-ops';
 import { TrackKind } from './components';
-import { Grip, Modifier, PickMode, aabb, pickModeAt, dragPatch, handlesOf, pick, quadOf, readout, snapMove, stackAt, writePatch, type Boxes } from './scene-select';
+import { Grip, Modifier, PickMode, aabb, pickModeAt, dragPatch, handlesOf, pick, quadOf, readout, remeasured, snapMove, stackAt, writePatch, type Boxes } from './scene-select';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -248,5 +248,18 @@ describe('writing a drag', () => {
 describe('the readout speaks the editor units', () => {
   it('x in px of the frame, rotation in degrees, scale in %', () => {
     expect(readout('Shape', { x: 0.1, rotateZ: 45, scaleX: 1.5 }, { width: W, height: H })).toBe('x 192 px · rotateZ 45 ° · scaleX 150 %');
+  });
+});
+
+describe('remeasured', () => {
+  const kept: Boxes = { a: { left: 1, top: 2, width: 3, height: 4 } };
+
+  it('a preview still reloading after an edit keeps the boxes it had', () => {
+    expect(remeasured(kept, {})).toBe(kept);
+  });
+
+  it('a real measure replaces them', () => {
+    const next: Boxes = { b: { left: 5, top: 6, width: 7, height: 8 } };
+    expect(remeasured(kept, next)).toBe(next);
   });
 });
