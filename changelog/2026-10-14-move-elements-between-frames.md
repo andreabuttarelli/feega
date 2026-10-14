@@ -10,7 +10,7 @@ runs it on revisions through a `FrameStore` port (`frameStore` is the db adapter
 `placeOutput`, `linkFrame`, `refreshLinks`, `landElement`. Callers: canvas actions `moveElement`,
 `placeOutput`, `connect`; canvas chat tools `move_frame_element`, `place_in_frame`,
 `connect_nodes`; motion agent tool `move_to_frame` (also MCP `motion_tool`);
-`POST /api/v1/motion/elements` (MCP `place_in_frame`, CLI `motion move` / `motion place`);
+`POST /api/v1/motion/elements` (CLI `motion move` / `motion place`); MCP `canvas_tool` ops `move_frame_element`, `place_in_frame` (`canvas-ops.ts`);
 MCP `insert_row` on `nodes_connections`; a finished generation (`showRunState`).
 
 **Placement.** Props, style and keyframes travel; timing goes through `retimer` (the

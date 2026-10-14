@@ -48,6 +48,7 @@ import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from '$lib/s
 import { runGenNode, runsOf } from '$lib/server/canvas/generate';
 import { planLoop, enqueueLoop, cancelLoop, retryLoopCombination } from '$lib/server/canvas/loop';
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, estimateWorkflowCredits } from '$lib/server/canvas/workflow';
+import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
 import { insertTemplate } from '$lib/server/canvas/templates';
@@ -486,6 +487,23 @@ const PLATFORM_LABELS: Record<string, string> = {
 
 function isShareState(value: string): value is ShareState {
   return (Object.values(ShareState) as string[]).includes(value);
+}
+
+const GRAPH_SCOPES = new Set<string>(Object.values(GraphScope));
+
+function graphInputOf(fd: FormData, scope: Scope): GraphInput | null {
+  const graph = String(fd.get('graph') ?? '');
+  if (!GRAPH_SCOPES.has(graph)) {
+    return null;
+  }
+  const nodeIds = fd.getAll('node_ids').map(String).filter(Boolean);
+  return {
+    orgId: scope.orgId,
+    canvasId: scope.canvasId,
+    graph: graph as GraphScope,
+    nodeId: String(fd.get('node_id') ?? '') || undefined,
+    nodeIds: nodeIds.length ? nodeIds : undefined
+  };
 }
 
 export const actions: Actions = {
@@ -951,6 +969,33 @@ export const actions: Actions = {
       }));
 
     return { workflowId: out.workflowId, steps: out.steps, estimatedCredits: estimateWorkflowCredits(stepsCost) };
+  },
+
+  graph_plan: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const graph = graphInputOf(await request.formData(), scope);
+    if (!graph) {
+      return fail(400, { error: 'richiesta non valida' });
+    }
+
+    const { plan, credits } = await planGraph(scope.db, graph);
+    return plan.ok ? { steps: plan.steps, credits } : fail(400, { error: plan.reason });
+  },
+
+  run_graph: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const graph = graphInputOf(await request.formData(), scope);
+    if (!graph) {
+      return fail(400, { error: 'richiesta non valida' });
+    }
+
+    const denied = await gateOrgAiActionForForm(scope.orgId);
+    if (denied) {
+      return fail(denied.status, denied.data);
+    }
+
+    const out = await enqueueGraph(scope.db, { ...graph, projectId: scope.canvas.projectId, userId: scope.userId });
+    return out.kind === 'enqueued' ? { workflowId: out.workflowId, steps: out.steps, credits: out.credits } : fail(400, { error: out.error });
   },
 
   /**

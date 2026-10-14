@@ -101,10 +101,19 @@ export async function enqueueWorkflow(db: Db, input: WorkflowEnqueueInput): Prom
     return { kind: 'refused', error: plan.reason };
   }
 
+  return enqueueSteps(db, input, plan.steps, nodesById);
+}
+
+export async function enqueueSteps(
+  db: Db,
+  input: Omit<WorkflowEnqueueInput, 'nodeIds'>,
+  steps: WorkflowStep[],
+  nodesById: Map<string, CanvasNodeRecord>
+): Promise<Extract<WorkflowEnqueueOutcome, { kind: 'enqueued' }>> {
   const workflowId = randomUUID();
   const runIdByNodeId: Record<string, string> = {};
 
-  for (const step of plan.steps) {
+  for (const step of steps) {
     const node = nodesById.get(step.nodeId);
     const dependsOnRunIds = step.dependsOn.map((depNodeId) => runIdByNodeId[depNodeId]).filter((id): id is string => Boolean(id));
 
@@ -131,7 +140,7 @@ export async function enqueueWorkflow(db: Db, input: WorkflowEnqueueInput): Prom
     await setRunning(db, { orgId: input.orgId, nodeId: step.nodeId, running: true, actor: input.actor });
   }
 
-  return { kind: 'enqueued', workflowId, steps: plan.steps, runIdByNodeId };
+  return { kind: 'enqueued', workflowId, steps, runIdByNodeId };
 }
 
 const BLOCKED_MESSAGE = (nodeName: string) => `Fermato: ${nodeName} non è riuscito`;

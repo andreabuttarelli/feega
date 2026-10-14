@@ -176,6 +176,24 @@ Free.
 (login url, email, session expiry; never the password). `forget_app_account` (`{ project_id }`) deletes it
 and its session. Free.
 
+## Canvas ops
+
+| MCP | CLI |
+|-----|-----|
+| `canvas_tool` | `feega canvas <projectId> <op> --input <json>` |
+
+`canvas_tool({ org, project_id, op, input })` runs one op of the project chat on that project,
+through the same code: `list_canvases`, `list_nodes`, `list_runs`, `create_node`, `update_node`,
+`move_node`, `connect_nodes`, `delete_node`, `run_node`, `preview_node_loop`, `run_node_loop`,
+`cancel_node_loop`, `preview_run_graph`, `run_graph`. Reads are free; writes need a write key;
+`run_node`, `run_node_loop` and `run_graph` spend credits.
+
+`preview_run_graph` / `run_graph` take `{ graph: "downstream", nodeId }` (the node, then every
+node it feeds, in dependency order) or `{ graph: "stale", canvasId, nodeIds? }` (every result
+older than its inputs). The preview returns the ordered steps and credits without spending: show
+the cost, then `run_graph` with the same input queues the steps; a tick runs each after its
+inputs, a failed step stops what depends on it, and a cycle is refused. Bad input answers the schema issues; an unknown op answers the list.
+
 ## Node loops
 
 | MCP | CLI |
@@ -223,7 +241,7 @@ list. Returns how many combinations it actually stopped.
 | `list_motion_templates` | `feega motion templates` |
 | `new_motion_from_template` | `feega motion new --template <id> [--format 16:9, 9:16, 1:1, 4:5 or "A poster"] [--still s] [--project id]` |
 | `motion_tool` | `feega motion tools [name]`, `feega motion tool <nodeId> <tool> [--input json] [--version n]`, `feega motion still <nodeId> [--format png] [--scale 2] [--out file]` |
-| `place_in_frame` | `feega motion move <frameId> <elementId> [--to frameId] [--x f] [--y f]`, `feega motion place <nodeId> [--to frameId]` |
+| `canvas_tool` `move_frame_element` / `place_in_frame` | `feega motion move <frameId> <elementId> [--to frameId] [--x f] [--y f]`, `feega motion place <nodeId> [--to frameId]` |
 | `add_motion_template` | `feega motion add-template <nodeId> <templateId> [--at s] [--var k=v] [--no-sound]` |
 | `get_storyboard` | `feega motion storyboard <nodeId>` |
 | `write_storyboard` | `feega motion storyboard <nodeId> --write beats.json` |
@@ -280,8 +298,8 @@ saved, output }`, the input checked by the tool's own schema (400), screened lik
 need a chat turn answer `ok: false`. `export_image` `{ format: png|jpg|webp, scale: 1|2, time? }`
 draws the still frame (or `time`) at full size and returns `{ asset_id, url, width, height }`.
 
-`place_in_frame({ org, frame_id?, element_id?, node_id?, to_frame_id?, x?, y?, canvas_x?, canvas_y? })`:
-`POST /api/v1/motion/elements` → `{ outcome, frame_id, element_id, new_frame, revisions }`. `frame_id` +
+CLI `motion move` / `motion place`:
+`POST /api/v1/motion/elements` `{ frame_id?, element_id?, node_id?, to_frame_id?, x?, y?, canvas_x?, canvas_y? }` → `{ outcome, frame_id, element_id, new_frame, revisions }`. `frame_id` +
 `element_id` moves a clip into `to_frame_id` (props, style, keyframes kept, re-timed to its fps); `node_id`
 puts a generative image/video/text node's output in as an element, the node unchanged. No
 `to_frame_id`: a new frame at `canvas_x`/`canvas_y`. `x`/`y` 0..1 of the target frame. Stale frame 409,

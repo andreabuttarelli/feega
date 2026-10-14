@@ -50,8 +50,8 @@ export function judge(check: StaleCheck): Verdict[] {
   return verdicts;
 }
 
-export const VERDICT_NOTICE: Record<Verdict, string> = {
-  [Verdict.Resync]: 'This canvas was updated elsewhere — refreshed.',
+export const VERDICT_NOTICE: Record<Verdict, string | null> = {
+  [Verdict.Resync]: null,
   [Verdict.LeaveCanvas]: 'This canvas was deleted elsewhere. You are on another canvas of the project.',
   [Verdict.LeaveProject]: 'This project was deleted elsewhere. You are back to your projects.',
   [Verdict.OfferReload]: 'A new version of feega is available.'
@@ -73,7 +73,7 @@ export function changedElsewhere(before: Placed[], after: Placed[]): boolean {
 
 let carried: string | null = null;
 
-export function carryNotice(notice: string) {
+export function carryNotice(notice: string | null) {
   carried = notice;
 }
 

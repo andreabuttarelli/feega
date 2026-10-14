@@ -1,5 +1,11 @@
 import type { Component } from 'svelte';
 import Play from '@lucide/svelte/icons/play';
+import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
+import TypeIcon from '@lucide/svelte/icons/type';
+import SquareIcon from '@lucide/svelte/icons/square';
+import CircleIcon from '@lucide/svelte/icons/circle';
+import PenTool from '@lucide/svelte/icons/pen-tool';
+import PencilRuler from '@lucide/svelte/icons/pencil-ruler';
 import Pause from '@lucide/svelte/icons/pause';
 import Rewind from '@lucide/svelte/icons/rewind';
 import SkipBack from '@lucide/svelte/icons/skip-back';
@@ -133,7 +139,8 @@ export enum Place {
   Graph = 'the graph editor',
   Menu = 'the ⋯ menu',
   Clip = 'the clip bar or a long press on the clip',
-  Drawer = 'the menu'
+  Drawer = 'the menu',
+  Draw = 'the draw tools in the frame'
 }
 
 export enum MenuSection {
@@ -212,6 +219,11 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Tool.ShowLayer]: { name: 'Show layer', icon: EyeOff, place: Place.Layer },
   [Tool.LockLayer]: { name: 'Lock layer', icon: LockOpen, group: GuideGroup.Timeline, place: Place.Layer },
   [Tool.UnlockLayer]: { name: 'Unlock layer', icon: Lock, place: Place.Layer },
+  [Command.ToolSelect]: { name: 'Select tool', icon: MousePointer2, group: GuideGroup.Edit, place: Place.Draw },
+  [Command.ToolText]: { name: 'Text tool', icon: TypeIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolRectangle]: { name: 'Rectangle tool', icon: SquareIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolEllipse]: { name: 'Ellipse tool', icon: CircleIcon, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Drag in the frame' },
+  [Command.ToolPen]: { name: 'Pen tool', icon: PenTool, group: GuideGroup.Edit, place: Place.Draw, gesture: 'Tap points, tap the first to close' },
   [Tool.FitGraph]: { name: 'Fit curves to view', icon: Maximize, group: GuideGroup.Timeline, place: Place.Graph },
 
   [Command.PreviewZoomIn]: { name: 'Zoom preview in', icon: ZoomIn, group: GuideGroup.View, menu: MenuSection.View, gesture: PINCH_PREVIEW },
@@ -221,6 +233,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.ToggleInspector]: { name: 'Properties panel', icon: PanelRight, group: GuideGroup.View, place: Place.Bar },
   [Command.ToggleTimeline]: { name: 'Timeline', icon: PanelBottom, group: GuideGroup.View, place: Place.Transport },
   [Command.ToggleChat]: { name: 'Agent panel', icon: BotMessageSquare, group: GuideGroup.View, place: Place.Bar },
+  [Command.ToggleEditMode]: { name: 'Design / Motion', icon: PencilRuler, group: GuideGroup.View, place: Place.Bar },
   [Command.Help]: { name: 'Keyboard & gestures', icon: Keyboard, group: GuideGroup.View, place: Place.Drawer },
   [Tool.Menu]: { name: 'Menu', icon: Menu, group: GuideGroup.View, place: Place.Bar },
   [Tool.Back]: { name: 'Back to the canvas', icon: ArrowLeft },

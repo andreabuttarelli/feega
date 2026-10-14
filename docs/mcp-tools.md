@@ -3,8 +3,8 @@
 > Generato da `node scripts/mcp-inventory.mjs --write`, leggendo `tools/list` dal server vero.
 > Non si modifica a mano: il prossimo che rigenera cancella le correzioni.
 
-**49 tool** — 19 in lettura, 26 in scrittura, 4 che distruggono.
-Il payload di `tools/list` pesa **45.159 caratteri**, circa **11.290 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
+**49 tool** — 19 in lettura, 25 in scrittura, 5 che distruggono.
+Il payload di `tools/list` pesa **45.452 caratteri**, circa **11.363 token**, ed e' il costo che ogni sessione paga prima di dire una parola.
 
 | gruppo | tool |
 |---|---:|
@@ -30,6 +30,19 @@ Applies one effect or a chain (`list_effects`) and lands the result as a new ass
 | `org`? | string | Which org, if you belong to more than one. |
 | `node_id` | string |  |
 | `effects`? | object[] |  |
+
+### `canvas_tool` · D
+
+*Work a project canvas*
+
+The canvas ops of the project chat, on one project (`project_id`), with `input` in camelCase. Reads: list_canvases {}, list_nodes {canvasId}, list_runs {nodeId}, preview_node_loop {nodeId}, preview_run_graph {graph:"downstream",nodeId} | {graph:"stale",canvasId,nodeIds?} (ordered steps + credits: quote before run_graph). Writes, free: create_node {canvasId,type,x,y,displayName?,data?} (data per describe_node_types), update_node {nodeId,data} (only changed fields, null removes), move_node {nodeId,x,y,z?}, connect_nodes {canvasId,sourceNodeId,targetNodeId,sourceHandle?,targetHandle?}, delete_node {nodeId} (soft), cancel_node_loop {nodeId}. Spends credits: run_node {nodeId,medium,prompt?,model?,params?,expectedVersion}, run_node_loop {nodeId,confirm?}, run_graph (same input as preview_run_graph; queued, each step after its inputs; cycles refused). Unknown op answers the list; bad input answers the issues.
+
+| campo | tipo | |
+|---|---|---|
+| `org`? | string | Which org, if you belong to more than one. |
+| `project_id` | string |  |
+| `op` | string |  |
+| `input`? | object |  |
 
 ### `edit_storyboard_card` · W
 
@@ -180,24 +193,6 @@ Replaces the spec of a custom layout at its `version` (`list_layouts`); a stale 
 | `version` | integer |  |
 | `spec` | object |  |
 
-### `place_in_frame` · W
-
-*Move an element or a generated output into a frame*
-
-Frames hold graphic elements; image, video and text nodes generate. With `frame_id` + `element_id` (a clip id from `get_motion_summary`): moves that element out of its frame into `to_frame_id`, keeping props, style and keyframes (re-timed to the target). With `node_id` (a generative image, video or text node): puts its generated output into `to_frame_id` as an image, video or text element; the node is not changed. Without `to_frame_id`: a new frame at `canvas_x`/`canvas_y` holding only it. `x`/`y` (0..1 of the target frame) is where the centre lands. Both frames are saved as revisions. To keep an element following a node's next generations, connect the node to the frame (`insert_row` on `nodes_connections`). Free.
-
-| campo | tipo | |
-|---|---|---|
-| `org`? | string | Which org, if you belong to more than one. |
-| `frame_id`? | string |  |
-| `element_id`? | string |  |
-| `node_id`? | string |  |
-| `to_frame_id`? | string |  |
-| `x`? | number |  |
-| `y`? | number |  |
-| `canvas_x`? | number |  |
-| `canvas_y`? | number |  |
-
 ### `render_video` · W
 
 *Render a frame*
@@ -331,7 +326,7 @@ Every saved revision of a motion video, newest first: `version`, who saved it (`
 
 *List frame templates*
 
-Ready-made pieces to drop into a motion video (built-in and saved by the org), e.g. builtin:prompt-input, a prompt field that types, presses send and thinks. Each with `id`, `seconds` and its `fields`: key, type (text, number min..max, color #rrggbb, boolean, select options), group and default. Reads only, free.
+Ready-made pieces to drop into a motion video (built-in and saved by the org), e.g. builtin:prompt-input, a prompt field that types, presses send and thinks. Each with `id`, `seconds`, its `card` (roles such as opener/feature/proof/closer, energy, loops, onScreen beat by beat with seconds, edges start→end with a suggested transition, goodFor) and its `fields`: key, type (text, number min..max, color #rrggbb, boolean, select options), group and default. Plan a video as sections and pick one template per section by card. Reads only, free.
 
 | campo | tipo | |
 |---|---|---|

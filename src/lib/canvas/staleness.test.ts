@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Remote, Trigger, Verdict, changedElsewhere, judge } from './staleness';
+import { Remote, Trigger, VERDICT_NOTICE, Verdict, changedElsewhere, judge } from './staleness';
 
 const live = (revision: string) => ({ kind: Remote.Live, revision }) as const;
 
@@ -50,5 +50,16 @@ describe('changedElsewhere', () => {
     expect(changedElsewhere([tile('a', 1)], [tile('a', 1), tile('b', 1)])).toBe(true);
     expect(changedElsewhere([tile('a', 1), tile('b', 1)], [tile('a', 1)])).toBe(true);
     expect(changedElsewhere([tile('a', 1)], [tile('a', 1, 10, 0)])).toBe(true);
+  });
+});
+
+describe('VERDICT_NOTICE', () => {
+  it('un resync dopo la riconnessione non mostra banner: lo dice il pallino di connessione', () => {
+    expect(VERDICT_NOTICE[Verdict.Resync]).toBeNull();
+  });
+
+  it('canvas o progetto cancellati altrove mostrano ancora il banner', () => {
+    expect(VERDICT_NOTICE[Verdict.LeaveCanvas]).toBeTruthy();
+    expect(VERDICT_NOTICE[Verdict.LeaveProject]).toBeTruthy();
   });
 });

@@ -143,6 +143,8 @@
   import { portsOf } from '$lib/canvas/node-ports';
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
+  import { GraphScope, nodeOutputs, recentRuns, staleIds } from '$lib/canvas/run-graph';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
   import {
     docData,
@@ -1137,7 +1139,7 @@
     return changedElsewhere(before, nodes);
   }
 
-  function leave(path: string, notice: string) {
+  function leave(path: string, notice: string | null) {
     carryNotice(notice);
     void goto(path, { invalidateAll: true });
   }
@@ -1145,8 +1147,9 @@
   const REACTIONS: Record<Verdict, () => Promise<void> | void> = {
     [Verdict.Resync]: async () => {
       void invalidate(CANVAS_LIST_DEPENDENCY);
-      if (await refresh()) {
-        failed = VERDICT_NOTICE[Verdict.Resync];
+      const notice = VERDICT_NOTICE[Verdict.Resync];
+      if (await refresh() && notice) {
+        failed = notice;
       }
     },
     [Verdict.LeaveCanvas]: () => leave(`/p/${data.projectId}`, VERDICT_NOTICE[Verdict.LeaveCanvas]),
@@ -1705,6 +1708,37 @@
     await refresh();
     void invalidate('app:credits');
     return true;
+  }
+
+  const RECENT_RUNS = 20;
+
+  type GraphRunRows = Parameters<typeof nodeOutputs>[1];
+
+  const graphEdges = $derived(edges.map((e) => ({ sourceNodeId: e.source, targetNodeId: e.target })));
+  const staleNodeIds = $derived(staleIds(nodeOutputs(nodes, runs as GraphRunRows), graphEdges));
+  const runListing = $derived(recentRuns(runs as GraphRunRows, new Map(nodes.map((n) => [n.id, n.displayName ?? n.type])), RECENT_RUNS));
+
+  const GRAPH_FIELDS: Record<GraphScope, (ids: string[]) => Record<string, string | string[]>> = {
+    [GraphScope.Downstream]: (ids) => ({ graph: GraphScope.Downstream, node_id: ids[0] }),
+    [GraphScope.Stale]: (ids) => ({ graph: GraphScope.Stale, node_ids: ids })
+  };
+
+  async function runGraph(graph: GraphScope, ids: string[]): Promise<void> {
+    const fields = GRAPH_FIELDS[graph](ids);
+    const plan = await post('graph_plan', fields);
+    if (!plan) return;
+
+    const steps = plan.steps as { nodeId: string }[];
+    if (!confirm(`${steps.length} runs, about ${formatCredits(plan.credits as number)} credits. Start?`)) return;
+
+    const result = await post('run_graph', fields);
+    if (!result) return;
+
+    workflowId = result.workflowId as string;
+    workflowNodeIds = steps.map((step) => step.nodeId);
+    noteFirstGeneration();
+    await refresh();
+    void invalidate('app:credits');
   }
 
   const workflowRunning = $derived(
@@ -2692,6 +2726,8 @@
     </div>
   {/if}
 
+  <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />
+
   <ConfirmDialog
     bind:open={confirmingUncensoredSwitch}
     title="Uncensored model"
@@ -2741,6 +2777,8 @@
     {focus}
     onConnectExisting={connectExisting}
     onRunWorkflow={runWorkflow}
+    onRunGraph={runGraph}
+    stale={staleNodeIds}
     {runQuoteFor}
     onRunNode={runNode}
     {nodeSummaries}

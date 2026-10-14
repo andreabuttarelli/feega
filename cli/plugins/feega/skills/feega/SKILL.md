@@ -148,6 +148,14 @@ workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists
 
 Test app account: the project chat logs in to the user's own app with a TEST account the user gives it in chat, and photographs its screens. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
 
+## Work a canvas with the chat's checks
+
+`canvas_tool` runs the project chat's own canvas ops on one `project_id`: `op` names it, `input`
+carries its fields in camelCase. List canvases, nodes and runs; create, update, move, connect and
+delete nodes; run a node; preview, queue or cancel a loop. Unlike `insert_row`/`update_row`, each
+write passes the checks the chat applies (node schema, model, uncensored targets, edge media).
+An unknown `op` answers the list of ops.
+
 ## Loop a node over many combinations
 
 `run_node_loop` queues every combination from a node's `iterate` wires (or a plain "repeat N")
@@ -221,10 +229,10 @@ video pinned to one frame: `set_canvas` `{ format: "A poster", still: 2 }`, then
 `{ format: "png", scale: 2 }` returns the image `url`. CLI: `feega motion tool <nodeId> <tool>
 --input '{...}'`, `feega motion tools [name]`, `feega motion still <nodeId> --scale 2 --out poster.png`.
 
-Frames hold graphic elements; image, video and text nodes generate. `place_in_frame` moves an
-element (`frame_id` + `element_id`) into another frame (`to_frame_id`) keeping props and keyframes,
-or puts a generative node's output (`node_id`) into a frame as an image, video or text element;
-without `to_frame_id` it makes a new frame holding only it. Connecting a generative node to a frame
+Frames hold graphic elements; image, video and text nodes generate. `canvas_tool` op
+`move_frame_element` moves an element into another frame (or a new one) keeping props and
+keyframes; op `place_in_frame` puts a generative node's output into a frame as an element; the
+motion `motion_tool` `move_to_frame` does the same from inside a video. Connecting a generative node to a frame
 (`insert_row` on `nodes_connections`) keeps one element following its next generations. CLI:
 `feega motion move <frameId> <elementId> --to <frameId>`, `feega motion place <nodeId> --to <frameId>`.
 

@@ -63,6 +63,7 @@
   import type { CanvasNode } from '$lib/canvas/graph';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import type { RunQuote } from '$lib/canvas/run-quote';
+  import { GraphScope } from '$lib/canvas/run-graph';
   import { DropVerdict, pointOf, type PointerPoint } from '$lib/canvas/canvas-drop';
 
   /**
@@ -142,6 +143,8 @@
     onConnectNew,
     onConnectExisting,
     onRunWorkflow,
+    onRunGraph,
+    stale = [],
     runQuoteFor,
     onRunNode,
     nodeSummaries = [],
@@ -223,6 +226,8 @@
     onConnectExisting?: (ids: string[], targetId: string) => void;
     /** "Esegui flusso": gli id scelti, così com'è per `onDelete`/`onPromote`. */
     onRunWorkflow?: (ids: string[]) => void;
+    onRunGraph?: (graph: GraphScope, ids: string[]) => void;
+    stale?: string[];
     runQuoteFor?: (ids: string[]) => RunQuote | null;
     onRunNode?: (id: string) => void;
     /** `type`/`data` di ogni tile — la forma grezza che `commonPropertiesOf` legge, non `Tile`. */
@@ -570,6 +575,8 @@
     },
     promote: (ids) => onPromote?.(ids),
     'run-workflow': (ids) => onRunWorkflow?.(ids),
+    'run-downstream': (ids) => onRunGraph?.(GraphScope.Downstream, ids),
+    'run-stale': (ids) => onRunGraph?.(GraphScope.Stale, ids),
     'copy-id': (ids) => {
       void navigator.clipboard?.writeText(ids.join('\n'));
     },
@@ -809,6 +816,7 @@
     count={selection.ids.length}
     nodeSummaries={selectedSummaries}
     edges={selectionEdges}
+    {stale}
     choicesFor={modelChoicesFor}
     catalogueSynced={selectionMedium && catalogueSyncedFor ? catalogueSyncedFor(selectionMedium) : true}
     runQuote={runQuoteFor?.(selection.ids) ?? null}
