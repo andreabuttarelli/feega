@@ -1,14 +1,17 @@
 <script lang="ts">
-  import type { MotionFormat } from '$lib/motion/doc';
-  import { tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+  import X from '@lucide/svelte/icons/x';
   import type { AssetKind } from '$lib/motion/components';
-  import IconButton from './IconButton.svelte';
-  import ComponentPreview from './ComponentPreview.svelte';
+  import { FIELD_INPUT, FOCUS_RING, IconButton, IconSize, Kbd, Panel, PanelHeader, SegmentedControl, Surface, Tone, type SegmentOption } from '$lib/components/ui/shell';
+  import { cn } from '$lib/utils.js';
   import ComponentDetail from './ComponentDetail.svelte';
-  import { Action } from '$lib/motion/actions';
-  import { Dismiss, dismissFrom, gridStep } from '$lib/motion/template/browser';
+  import { FORMATS, MotionFormat } from '$lib/motion/doc';
+  import { Dismiss, dismissFrom, spatialStep } from '$lib/motion/template/browser';
   import { DocMode } from '$lib/motion/still';
-  import { AddTarget, ComponentKind, KIND_LABEL, matching, type CatalogueItem } from '$lib/motion/template/catalogue';
+  import type { SectionRole } from '$lib/motion/template/card';
+  import { ADD_TARGET, AddTarget, byShape, matching, metaLine, rolesIn, type CatalogueItem } from '$lib/motion/template/catalogue';
   import type { Instance } from '$lib/motion/template/library';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
@@ -33,35 +36,102 @@
     onclose: () => void;
   } = $props();
 
-  const KINDS = Object.values(ComponentKind).filter((k) => items.some((i) => i.kind === k));
+  const ALL = 'all';
+  const MODES: SegmentOption[] = [
+    { value: ALL, label: 'All' },
+    { value: DocMode.Video, label: 'Video' },
+    { value: DocMode.Still, label: 'Still' }
+  ];
+
+  const CARD_MIN_PX: Record<MotionFormat, number> = {
+    [MotionFormat.Landscape]: 280,
+    [MotionFormat.Vertical]: 150,
+    [MotionFormat.Portrait]: 180,
+    [MotionFormat.Poster]: 170,
+    [MotionFormat.Square]: 200,
+    [MotionFormat.SquareLarge]: 200
+  };
+
+  const PHONE_COLUMNS: Record<MotionFormat, string> = {
+    [MotionFormat.Landscape]: 'max-sm:grid-cols-1',
+    [MotionFormat.Vertical]: 'max-sm:grid-cols-2',
+    [MotionFormat.Portrait]: 'max-sm:grid-cols-2',
+    [MotionFormat.Poster]: 'max-sm:grid-cols-2',
+    [MotionFormat.Square]: 'max-sm:grid-cols-2',
+    [MotionFormat.SquareLarge]: 'max-sm:grid-cols-2'
+  };
+
+  const HOVER = '(hover: hover)';
 
   let query = $state('');
-  let kind = $state<ComponentKind | null>(null);
   let mode = $state<DocMode | null>(null);
-  const MODE_LABEL: Record<DocMode, string> = { [DocMode.Video]: 'Videos', [DocMode.Still]: 'Stills' };
+  let role = $state<SectionRole | null>(null);
   let openId = $state<string | null>(null);
-  let grid = $state<HTMLUListElement | null>(null);
+  let playing = $state<string | null>(null);
+  let grid = $state<HTMLDivElement | null>(null);
+  let search = $state<HTMLInputElement | null>(null);
+  const loaded = new SvelteSet<string>();
 
-  const shown = $derived(matching(items, query, kind, mode));
+  const roles = $derived(rolesIn(matching(items, '', null, mode)));
+  const shown = $derived(matching(items, query, null, mode, role));
+  const groups = $derived(byShape(shown));
+  const ordered = $derived(groups.flatMap((g) => g.items));
   const open = $derived(items.find((i) => i.id === openId) ?? null);
+  const filtered = $derived(Boolean(query.trim() || mode || role));
+
+  onMount(() => {
+    if (matchMedia(HOVER).matches) {
+      search?.focus();
+    }
+  });
 
   const cards = () => [...(grid?.querySelectorAll<HTMLButtonElement>('[data-component]') ?? [])];
-  const columns = () => {
-    const [first, ...rest] = cards();
-    return first ? 1 + rest.filter((c) => c.offsetTop === first.offsetTop).length : 1;
-  };
+
+  function pick(item: CatalogueItem) {
+    onpick(item.id, ADD_TARGET[target].sounds, null);
+  }
+
+  function setMode(value: string) {
+    const next = value === ALL ? null : (value as DocMode);
+    mode = next;
+    if (role && !rolesIn(matching(items, '', null, next)).includes(role)) {
+      role = null;
+    }
+  }
+
+  function clearFilters() {
+    query = '';
+    mode = null;
+    role = null;
+    search?.focus();
+  }
+
+  function preview(id: string) {
+    if (matchMedia(HOVER).matches) {
+      playing = id;
+    }
+  }
+
+  function rest(id: string) {
+    if (playing === id) {
+      playing = null;
+    }
+  }
+
+  function ready(img: HTMLImageElement, id: string) {
+    const done = () => loaded.add(id);
+    if (img.complete && img.naturalWidth) {
+      done();
+      return;
+    }
+    img.addEventListener('load', done, { once: true });
+  }
 
   async function closeDetail() {
     const id = openId;
     openId = null;
     await tick();
     cards().find((c) => c.dataset.component === id)?.focus();
-  }
-
-  function outside(e: MouseEvent) {
-    if (open && e.target === e.currentTarget) {
-      void closeDetail();
-    }
   }
 
   function onkeydown(e: KeyboardEvent) {
@@ -76,238 +146,191 @@
     onclose();
   }
 
+  function fromSearch(e: KeyboardEvent) {
+    if (e.key !== 'ArrowDown') {
+      return;
+    }
+    e.preventDefault();
+    cards()[0]?.focus();
+  }
+
   function move(e: KeyboardEvent, at: number) {
-    const next = gridStep(at, e.key, { count: shown.length, columns: columns() });
+    const all = cards();
+    const next = spatialStep(
+      all.map((c) => c.getBoundingClientRect()),
+      at,
+      e.key
+    );
     if (next === null) {
       return;
     }
     e.preventDefault();
-    cards()[next]?.focus();
+    all[next]?.focus();
   }
 </script>
 
 <svelte:window {onkeydown} />
 
-<div class="scrim" role="presentation" onclick={onclose}></div>
-<div class="dialog" class:open={Boolean(open)} role="dialog" aria-modal="true" aria-label="Components" data-testid="component-library">
-  <div class="browse" role="presentation" onclick={outside}>
-    <header>
-      <h2>components</h2>
-      <input type="search" placeholder="Search components" aria-label="Search components" bind:value={query} data-testid="component-search" />
-      <IconButton action={Action.Close} onclick={onclose} />
-    </header>
+<div class="fixed inset-0 z-70 bg-black/40" role="presentation" onclick={onclose}></div>
+<Panel
+  surface={Surface.Raised}
+  role="dialog"
+  aria-modal="true"
+  aria-label="Frame templates"
+  data-testid="component-library"
+  class={cn(
+    'fixed inset-0 z-71 grid grid-cols-[minmax(0,1fr)] overflow-hidden sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-[min(860px,calc(100dvh-48px))] sm:w-[min(1240px,calc(100vw-48px))] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg',
+    open && 'sm:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]'
+  )}
+>
+  <div class="flex min-h-0 flex-col">
+    <PanelHeader title="Frame templates">
+      {#snippet actions()}
+        <IconButton label="Close" shortcut="Escape" size={IconSize.Lg} onclick={onclose}><X /></IconButton>
+      {/snippet}
+    </PanelHeader>
 
-    <div class="kinds" role="tablist" aria-label="Video or still">
-      <button type="button" role="tab" aria-selected={mode === null} class:on={mode === null} onclick={() => (mode = null)}>Both</button>
-      {#each Object.values(DocMode) as m (m)}
-        <button type="button" role="tab" aria-selected={mode === m} class:on={mode === m} data-mode-tab={m} onclick={() => (mode = m)}>{MODE_LABEL[m]}</button>
-      {/each}
+    <div class="flex flex-col gap-2 px-3 pt-3 sm:flex-row sm:items-center">
+      <input
+        bind:this={search}
+        type="search"
+        placeholder="Search frame templates"
+        aria-label="Search frame templates"
+        bind:value={query}
+        onkeydown={fromSearch}
+        data-testid="component-search"
+        class={cn(FIELD_INPUT, 'h-8 flex-1 text-base sm:text-ui-body')}
+      />
+      <SegmentedControl label="Video or still" options={MODES} value={mode ?? ALL} onchange={setMode} class="sm:w-56" />
     </div>
 
-    <div class="kinds" role="tablist" aria-label="Category">
-      <button type="button" role="tab" aria-selected={kind === null} class:on={kind === null} onclick={() => (kind = null)}>All</button>
-      {#each KINDS as k (k)}
-        <button type="button" role="tab" aria-selected={kind === k} class:on={kind === k} data-kind={k} onclick={() => (kind = k)}>{KIND_LABEL[k]}</button>
-      {/each}
-    </div>
-
-    <ul class="grid" bind:this={grid} role="presentation" onclick={outside} data-testid="component-grid">
-      {#each shown as item, i (item.id)}
-        <li>
-          <button type="button" class="card" class:on={item.id === openId} aria-pressed={item.id === openId} data-component={item.id} data-mode={item.mode} onclick={() => (openId = item.id)} onkeydown={(e) => move(e, i)}>
-            <ComponentPreview preview={item.preview} name={item.name} />
-            <span class="name">{item.name}</span>
-            {#if item.description}<span class="line">{item.description}</span>{/if}
+    {#if roles.length}
+      <div class="-mx-0.5 flex gap-1 overflow-x-auto px-3 pt-2 [scrollbar-width:none]" role="group" aria-label="Role">
+        {#each roles as r (r)}
+          <button
+            type="button"
+            aria-pressed={role === r}
+            data-role={r}
+            onclick={() => (role = role === r ? null : r)}
+            class={cn('h-6 shrink-0 rounded-full px-2.5 text-ui-label text-ui-text-2 transition-colors duration-(--ui-dur-fast) hover:bg-ui-wash hover:text-ui-text aria-pressed:bg-ui-selected aria-pressed:text-ui-accent-text pointer-coarse:h-9', FOCUS_RING)}
+          >
+            {r}
           </button>
-        </li>
+        {/each}
+      </div>
+    {/if}
+
+    <div class="flex min-h-0 flex-1 flex-col gap-8 overflow-auto px-3 pt-4 pb-8" bind:this={grid} data-testid="component-grid">
+      {#each groups as g (g.format)}
+        <section data-shape={FORMATS[g.format].label} aria-label={FORMATS[g.format].label}>
+          <ul class={cn('grid list-none grid-cols-[repeat(auto-fill,minmax(min(var(--card-min),100%),1fr))] gap-x-3 gap-y-5 p-0', PHONE_COLUMNS[g.format])} style:--card-min={`${CARD_MIN_PX[g.format]}px`}>
+            {#each g.items as item (item.id)}
+              {@const at = ordered.indexOf(item)}
+              <li class="group relative">
+                <button
+                  type="button"
+                  class="flex w-full cursor-pointer flex-col text-left outline-none"
+                  aria-label={`Add ${item.name}`}
+                  data-component={item.id}
+                  data-mode={item.mode}
+                  onclick={() => pick(item)}
+                  onkeydown={(e) => move(e, at)}
+                  onpointerenter={() => preview(item.id)}
+                  onpointerleave={() => rest(item.id)}
+                  onfocus={() => preview(item.id)}
+                  onblur={() => rest(item.id)}
+                >
+                  <span
+                    class={cn('thumb relative block w-full overflow-hidden rounded-md bg-ui-sunken', item.id === openId && 'shadow-[var(--ui-ring)]', (!item.preview || loaded.has(item.id)) && 'ready')}
+                    style:aspect-ratio={`${FORMATS[item.format].width} / ${FORMATS[item.format].height}`}
+                  >
+                    {#if item.preview}
+                      <img src={item.preview.poster} alt="" loading="lazy" decoding="async" use:ready={item.id} class="absolute inset-0 size-full object-cover opacity-0 transition-opacity duration-(--ui-dur-base) [.ready>&]:opacity-100" />
+                      {#if playing === item.id && item.preview.video}<video src={item.preview.video} poster={item.preview.poster} muted loop playsinline autoplay preload="auto" class="absolute inset-0 size-full object-cover"></video>{/if}
+                    {:else}
+                      <span class="grid size-full place-items-center p-2 text-center text-ui-caption text-ui-text-3">{item.name}</span>
+                    {/if}
+                  </span>
+                  <span class="mt-2 truncate text-ui-body font-medium text-ui-text">{item.name}</span>
+                  <span class="mt-0.5 font-(family-name:--ui-mono) text-ui-caption text-ui-text-3 tabular-nums">{metaLine(item)}</span>
+                </button>
+                <IconButton
+                  label={`Customise ${item.name}`}
+                  tone={Tone.Filled}
+                  size={IconSize.Md}
+                  data-testid="template-details"
+                  onclick={() => (openId = item.id)}
+                  class="absolute top-2 right-2 opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 pointer-coarse:opacity-100"
+                >
+                  <SlidersHorizontal />
+                </IconButton>
+              </li>
+            {/each}
+          </ul>
+        </section>
       {:else}
-        <li class="none">No component matches.</li>
+        <div class="flex flex-col items-start gap-3 py-8" data-testid="frame-templates-empty">
+          {#if filtered}
+            <p class="text-ui-body text-ui-text-2">No frame template matches.</p>
+            <button type="button" onclick={clearFilters} class={cn('h-7 rounded-sm bg-ui-input px-3 text-ui-label text-ui-text hover:bg-ui-input-hover pointer-coarse:h-11', FOCUS_RING)}>Clear filters</button>
+          {:else}
+            <p class="text-ui-body text-ui-text-2">No frame templates yet.</p>
+          {/if}
+        </div>
       {/each}
-    </ul>
+    </div>
+
+    <footer class="hidden shrink-0 items-center gap-4 border-t border-ui-divider px-3 py-2 text-ui-caption text-ui-text-3 pointer-fine:flex">
+      <span class="flex items-center gap-1.5"><Kbd shortcut="ArrowUp" /><Kbd shortcut="ArrowDown" /><Kbd shortcut="ArrowLeft" /><Kbd shortcut="ArrowRight" /> move</span>
+      <span class="flex items-center gap-1.5"><Kbd shortcut="Enter" /> add</span>
+      <span class="flex items-center gap-1.5"><Kbd shortcut="Escape" /> close</span>
+    </footer>
   </div>
 
   {#if open}
-    <div class="sheet-scrim" role="presentation" onclick={closeDetail}></div>
+    <div class="absolute inset-0 z-1 bg-black/40 sm:hidden" role="presentation" onclick={closeDetail}></div>
     {#key open.id}
       <ComponentDetail item={open} {format} {draftOf} {compose} {assets} {target} onadd={(sounds, draft) => onpick(open.id, sounds, draft)} onclose={closeDetail} />
     {/key}
   {/if}
-</div>
+</Panel>
 
 <style>
-  .scrim {
-    position: fixed;
+  .thumb:not(:global(.ready))::after {
+    content: '';
+    position: absolute;
     inset: 0;
-    z-index: 40;
-    background: rgb(0 0 0 / 0.4);
+    background: linear-gradient(90deg, transparent, var(--ui-wash), transparent);
+    animation: shimmer 1.2s ease-in-out infinite;
   }
 
-  .dialog {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: min(1180px, calc(100vw - 32px));
-    height: min(760px, calc(100dvh - 32px));
-    z-index: 41;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    background: var(--ui-bg);
-    color: var(--ui-ink);
-    border: 1px solid var(--ui-line);
-  }
-
-  .dialog.open {
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
-  }
-
-  .browse {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    min-height: 0;
-    padding: 16px;
-  }
-
-  header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
-  h2 {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 600;
-    letter-spacing: -0.04em;
-  }
-
-  header input {
-    flex: 1;
-    min-width: 0;
-    height: 32px;
-    padding: 0 10px;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-surface);
-    color: inherit;
-    font: inherit;
-    font-size: 16px;
-  }
-
-  .kinds {
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .kinds button {
-    flex: none;
-    height: 30px;
-    padding: 0 14px;
-    border: 1px solid var(--ui-line);
-    border-radius: 9999px;
-    background: none;
-    color: var(--ui-ink-2);
-    font: inherit;
-    font-size: 13px;
-  }
-
-  .kinds button.on {
-    background: var(--ui-ink);
-    color: var(--ui-bg);
-    border-color: var(--ui-ink);
-  }
-
-  .grid {
-    list-style: none;
-    margin: 0;
-    padding: 2px;
-    flex: 1;
-    overflow: auto;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 20px 14px;
-    align-content: start;
-  }
-
-  .card {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: 100%;
-    padding: 0;
-    border: 0;
-    background: none;
-    color: inherit;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .card:focus-visible {
-    outline: 2px solid var(--ui-ink);
-    outline-offset: 2px;
-  }
-
-  .card.on :global(.preview) {
-    outline: 2px solid var(--ui-ink);
-  }
-
-  .name {
-    margin-top: 8px;
-    font-size: 14px;
-    font-weight: 500;
-  }
-
-  .line {
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    font-size: 12px;
-    color: var(--ui-ink-2);
-  }
-
-  .none {
-    color: var(--ui-ink-2);
-  }
-
-  .sheet-scrim {
-    display: none;
-  }
-
-  @media (max-width: 640px) {
-    .dialog,
-    .dialog.open {
-      inset: 0;
-      transform: none;
-      width: 100vw;
-      height: 100dvh;
-      border: 0;
-      grid-template-columns: minmax(0, 1fr);
+  @keyframes shimmer {
+    from {
+      transform: translateX(-100%);
     }
-
-    .grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+    to {
+      transform: translateX(100%);
     }
+  }
 
-    .sheet-scrim {
-      display: block;
-      position: absolute;
-      inset: 0;
-      z-index: 1;
-      background: rgb(0 0 0 / 0.4);
+  @media (prefers-reduced-motion: reduce) {
+    .thumb::after {
+      animation: none;
     }
+  }
 
-    .dialog > :global(.detail) {
+  button:focus-visible .thumb {
+    box-shadow: var(--ui-ring);
+  }
+
+  @media (max-width: 639px) {
+    :global([data-testid='component-library']) > :global(.detail) {
       position: absolute;
       left: 0;
       right: 0;
       bottom: 0;
       z-index: 2;
       max-height: 88dvh;
-      border-left: 0;
-      border-top: 1px solid var(--ui-line);
     }
   }
 </style>

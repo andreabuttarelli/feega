@@ -7,11 +7,11 @@
   let { data } = $props();
 </script>
 
-<svelte:head><title>Templates · feega</title></svelte:head>
+<svelte:head><title>Frame templates · feega</title></svelte:head>
 
 <div class="templates">
   <header>
-    <PageTitle text="templates" />
+    <PageTitle text="frame templates" />
     <p>each one opens a new canvas with the frame already in it.</p>
   </header>
 

@@ -16,7 +16,7 @@ test.describe('motion template @real', () => {
     await page.getByTestId('open-components').click();
     const library = page.getByTestId('component-library');
     await library.getByTestId('component-search').fill('prompt');
-    await library.locator('[data-component="builtin:prompt-input"]').click();
+    await library.locator('li:has([data-component="builtin:prompt-input"])').getByTestId('template-details').click();
     await expect(library.getByTestId('component-detail')).toContainText('Prompt input');
     await page.waitForTimeout(1500);
     if (SHOTS) {
