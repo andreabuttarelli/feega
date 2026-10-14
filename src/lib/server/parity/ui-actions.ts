@@ -149,6 +149,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleTimeline]: VIEW,
   [Command.Help]: VIEW,
   [Command.Precompose]: motion('precompose'),
+  [Command.AutoLayout]: motion('add_auto_layout'),
   [Command.ToolSelect]: VIEW,
   [Command.ToolText]: motion('add_clip'),
   [Command.ToolRectangle]: motion('add_shape'),
@@ -199,7 +200,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Tool.OpenComp]: NAVIGATION,
   [Tool.ParentTo]: motion('set_parent'),
   [Tool.SelectSeveral]: VIEW,
-  [Tool.ClipProperties]: VIEW
+  [Tool.ClipProperties]: VIEW,
+  [Tool.SampleColour]: motion('set_props')
 };
 
 export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {

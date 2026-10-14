@@ -10,6 +10,9 @@
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import ChevronRight from '@lucide/svelte/icons/chevron-right';
+  import Music from '@lucide/svelte/icons/music';
+  import Component from '@lucide/svelte/icons/component';
+  import Rows3 from '@lucide/svelte/icons/rows-3';
   import { readFolds, toggleFold } from '$lib/canvas/layer-folds';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { untrack } from 'svelte';
@@ -17,9 +20,11 @@
   import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import PartsProbe from './PartsProbe.svelte';
-  import { LayerAction, LayerKind, Pick, dropLayer, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { IconButton, IconSize } from '$lib/components/ui/shell';
+  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropPlace, restack, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
+  const PRECOMP = 'Precomp';
   const INDENT_PX = 14;
   const FOLD_GUTTER = 24;
 
@@ -30,7 +35,7 @@
   let opening = $state<{ nodeId: string; id: string } | null>(null);
   let folds = $state.raw<Set<string>>(typeof localStorage === 'undefined' ? new Set() : readFolds(localStorage));
 
-  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts } : null, outlinesFor(heads, outlines), folds));
+  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts, mode: video.mode } : null, outlinesFor(heads, outlines), folds));
   const frames = $derived(new Set([...heads.map((h) => h.nodeId), ...(video ? [video.nodeId] : [])]));
   const fold = (nodeId: string) => (folds = toggleFold(localStorage, folds, nodeId));
 
@@ -85,8 +90,20 @@
 
   let renaming = $state<string | null>(null);
   let dragged = $state<string | null>(null);
+  let landing = $state<{ key: string; place: Place } | null>(null);
 
-  const ROW_ICON: Record<string, typeof Square> = { motion: Clapperboard, image: ImageIcon, text: TypeIcon, arrow: ArrowRight };
+  function over(row: LayerRow, e: DragEvent) {
+    if (!dragged || !editable(row) || row.id === dragged) {
+      landing = null;
+      return;
+    }
+    e.preventDefault();
+    const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    landing = { key: row.key, place: dropPlace(row.kind, (e.clientY - box.top) / box.height) };
+  }
+
+  const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, Audio: Music };
+  const KIND_ICON: Partial<Record<LayerKind, typeof Square>> = { [LayerKind.Group]: Component, [LayerKind.Track]: Rows3 };
   const isPicked = (row: LayerRow) => rowPicked(row, selection);
   const inside = $derived(rowsInside(rows, isPicked));
   let query = $state('');
@@ -158,11 +175,13 @@
 
   function drop(row: LayerRow) {
     const from = dragged;
+    const place = landing?.place;
     dragged = null;
-    if (!video || !from || from === row.id) {
+    landing = null;
+    if (!video || !from || !place || from === row.id) {
       return;
     }
-    video.edit(dropLayer(video.doc, from, row.id), 'Moved a layer');
+    video.edit(restack(video.doc, from, row.id, place), 'Moved a layer');
   }
 </script>
 
@@ -177,7 +196,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" onkeydown={onKey}>
   {#each shown as row (`${row.nodeId}/${row.key}`)}
-    {@const RowIcon = ROW_ICON[row.type] ?? Square}
+    {@const RowIcon = KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square}
     <div
       class="row"
       class:picked={isPicked(row)}
@@ -197,14 +216,20 @@
       onpointerleave={() => layersSource.hover(null)}
       onkeydown={(e) => e.key === 'Enter' && choose(row, e as unknown as MouseEvent)}
       ondblclick={() => row.kind === LayerKind.Track && !row.nested && (renaming = row.id)}
-      ondragstart={() => (dragged = row.id)}
-      ondragover={(e) => row.kind === LayerKind.Track && e.preventDefault()}
+      ondragstart={(e) => ((dragged = row.id), e.dataTransfer?.setData('text/plain', row.id))}
+      data-drop={landing?.key === row.key ? landing.place : undefined}
+      ondragover={(e) => over(row, e)}
+      ondragleave={() => landing?.key === row.key && (landing = null)}
+      ondragend={() => ((dragged = null), (landing = null))}
       ondrop={() => drop(row)}
     >
       {#if row.kind === LayerKind.Node && frames.has(row.id)}
         <button type="button" class="fold" aria-label={folds.has(row.id) ? 'Unfold' : 'Fold'} aria-expanded={!folds.has(row.id)} data-testid="layer-fold" onclick={(e) => (e.stopPropagation(), fold(row.id))}>
           {#if folds.has(row.id)}<ChevronRight size={ICON} />{:else}<ChevronDown size={ICON} />{/if}
         </button>
+      {/if}
+      {#if row.thumb}
+        <img class="thumb" src={row.thumb} alt="" loading="lazy" decoding="async" data-testid="layer-thumb" />
       {/if}
       <span class="icon" style:--hue={ROW_HUE[row.type]}><RowIcon size={ICON} /></span>
       {#if renaming === row.id}
@@ -214,12 +239,12 @@
         <span class="name">{row.label}</span>
       {/if}
       {#if editable(row)}
-        <button type="button" class="flag" aria-label={row.hidden ? 'Show' : 'Hide'} aria-pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
-          {#if row.hidden}<EyeOff size={ICON} />{:else}<Eye size={ICON} />{/if}
-        </button>
-        <button type="button" class="flag" aria-label={row.locked ? 'Unlock' : 'Lock'} aria-pressed={row.locked} disabled={row.kind === LayerKind.Group} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Lock, SUMMARY[LayerAction.Lock]))}>
-          {#if row.locked}<Lock size={ICON} />{:else}<LockOpen size={ICON} />{/if}
-        </button>
+        <IconButton size={IconSize.Sm} label={row.hidden ? 'Show' : 'Hide'} pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
+          {#if row.hidden}<EyeOff />{:else}<Eye />{/if}
+        </IconButton>
+        <IconButton size={IconSize.Sm} label={row.locked ? 'Unlock' : 'Lock'} pressed={row.locked} disabled={row.kind === LayerKind.Group && row.type === PRECOMP} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Lock, SUMMARY[LayerAction.Lock]))}>
+          {#if row.locked}<Lock />{:else}<LockOpen />{/if}
+        </IconButton>
       {/if}
     </div>
   {:else}
@@ -279,6 +304,18 @@
     background: var(--ui-wash);
   }
 
+  .row[data-drop='above'] {
+    box-shadow: inset 0 2px 0 var(--ui-accent);
+  }
+
+  .row[data-drop='below'] {
+    box-shadow: inset 0 -2px 0 var(--ui-accent);
+  }
+
+  .row[data-drop='into'] {
+    box-shadow: inset 0 0 0 2px var(--ui-accent);
+  }
+
   .row.hovered {
     box-shadow: inset 0 0 0 1px var(--ui-hover-outline);
   }
@@ -315,6 +352,14 @@
     display: grid;
     place-items: center;
     color: var(--hue, var(--ui-icon-ink));
+  }
+
+  .thumb {
+    width: 20px;
+    height: 20px;
+    object-fit: cover;
+    border-radius: var(--ui-radius-xs);
+    background: var(--ui-hover);
   }
 
   .name {
@@ -354,42 +399,6 @@
 
   .fold:hover {
     color: var(--ui-ink);
-  }
-
-  .flag {
-    display: grid;
-    place-items: center;
-    width: 22px;
-    height: 22px;
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: transparent;
-    color: var(--ui-text-tertiary);
-    opacity: 0;
-    transition: opacity var(--ui-dur-fast) var(--ui-ease);
-  }
-
-  .row:hover .flag,
-  .row:focus-within .flag,
-  .flag[aria-pressed='true'] {
-    opacity: 1;
-  }
-
-  .flag:hover {
-    background: var(--ui-pressed);
-    color: var(--ui-text);
-  }
-
-  .flag:focus-visible {
-    opacity: 1;
-    outline: none;
-    box-shadow: var(--ui-ring);
-  }
-
-  @media (pointer: coarse) {
-    .flag {
-      opacity: 1;
-    }
   }
 
   .empty {

@@ -1,9 +1,11 @@
 import { findClip, type MotionDoc } from '$lib/motion/doc';
 import { COMPONENTS, type ComponentId } from '$lib/motion/components';
-import { moveClip, moveTrack, renameTrack, type OpResult } from '$lib/motion/timeline';
+import { addTrack, moveClip, moveTrack, renameTrack, type OpResult } from '$lib/motion/timeline';
 import { setClipFlags, setTrackFlags } from '$lib/motion/organize';
 import { isLockedComp } from '$lib/motion/template/library';
 import { CUSTOM_CLIP, PART_SEP, componentLabel, partIcon, partLabel } from '$lib/motion/poster-parts';
+import { EditMode } from '$lib/motion/edit-mode';
+import { TrackKind } from '$lib/motion/components';
 import { NODE_KIND_LABEL } from './node-label';
 import type { NodeType } from './node-data';
 
@@ -28,8 +30,17 @@ export enum Pick {
   Toggle = 'toggle'
 }
 
-export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null };
-export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string, readonly string[]> };
+export enum NodeIcon {
+  Still = 'still',
+  Video = 'video'
+}
+
+export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean };
+export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string, readonly string[]>; mode?: EditMode };
+
+const FRAME_TYPE = 'motion';
+
+export const nodeIcon = (node: { type: string; still?: boolean }): string => (node.type === FRAME_TYPE ? (node.still ? NodeIcon.Still : NodeIcon.Video) : node.type);
 type Parts = Record<string, readonly string[]>;
 
 export type LayerRow = {
@@ -43,6 +54,7 @@ export type LayerRow = {
   hidden: boolean;
   locked: boolean;
   nested: boolean;
+  thumb?: string | null;
 };
 
 type Track = MotionDoc['tracks'][number];
@@ -55,21 +67,47 @@ const clipLabel = (clip: Clip) => (clip.component === CUSTOM_CLIP ? componentLab
 
 const KEY_SEP = '/';
 
-function trackRows(doc: MotionDoc, tracks: readonly Track[], nodeId: string, depth: number, nested: boolean, parts: Parts = {}, path = ''): LayerRow[] {
-  return tracks.flatMap((track) => [
-    { id: track.id, key: `${path}${track.id}`, kind: LayerKind.Track, depth, label: track.name || track.id, type: track.kind, nodeId, hidden: !!track.hidden, locked: !!track.locked, nested },
-    ...track.clips.flatMap((clip) => clipRows(doc, clip, nodeId, depth + 1, nested, parts, path))
-  ]);
+const DEFAULT_TRACK_NAME: Record<TrackKind, RegExp> = {
+  [TrackKind.Visual]: /^Video \d+$/,
+  [TrackKind.Audio]: /^Audio \d+$/
+};
+
+const MAX_NAMED_CLIPS = 2;
+const NAME_JOIN = ' · ';
+
+function groupLabel(track: Track, index: number): string {
+  if (track.name && !DEFAULT_TRACK_NAME[track.kind].test(track.name)) {
+    return track.name;
+  }
+  const known = [...new Set(track.clips.map(clipLabel).filter(Boolean))];
+  return known.length ? known.slice(0, MAX_NAMED_CLIPS).join(NAME_JOIN) : `Track ${index + 1}`;
 }
 
-function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nested: boolean, parts: Parts, path: string): LayerRow[] {
+type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode };
+
+const groupsTrack = (track: Track, mode: EditMode) => mode === EditMode.Motion && track.clips.length > 1;
+
+function trackRows(walk: Walk, tracks: readonly Track[], depth: number): LayerRow[] {
+  return tracks.flatMap((track, index) => {
+    if (!groupsTrack(track, walk.mode)) {
+      return track.clips.flatMap((clip) => clipRows(walk, clip, depth));
+    }
+    const group: LayerRow = { id: track.id, key: `${walk.path}${track.id}`, kind: LayerKind.Track, depth, label: groupLabel(track, index), type: track.kind, nodeId: walk.nodeId, hidden: !!track.hidden, locked: !!track.locked, nested: walk.nested };
+    return [group, ...track.clips.flatMap((clip) => clipRows(walk, clip, depth + 1))];
+  });
+}
+
+const isComponent = (clip: Clip, template: boolean, parts: Parts) => template || clip.component === CUSTOM_CLIP || (parts[clip.id]?.length ?? 0) > 0;
+
+function clipRows(walk: Walk, clip: Clip, depth: number): LayerRow[] {
+  const { doc, nodeId, nested, parts, path } = walk;
   const comp = clip.component === 'Precomp' ? String((clip.props as { comp?: string }).comp ?? '') : '';
   const template = comp !== '' && isLockedComp(doc, comp);
   const key = `${path}${clip.id}`;
   const row: LayerRow = {
     id: clip.id,
     key,
-    kind: template ? LayerKind.Group : LayerKind.Clip,
+    kind: isComponent(clip, template, parts) ? LayerKind.Group : LayerKind.Clip,
     depth,
     label: template ? (doc.comps[comp]?.name ?? clipLabel(clip)) : clipLabel(clip),
     type: clip.component,
@@ -80,27 +118,29 @@ function clipRows(doc: MotionDoc, clip: Clip, nodeId: string, depth: number, nes
   };
   const inside = comp && !template ? (doc.comps[comp]?.tracks ?? []) : [];
   const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1, key));
-  return [row, ...own, ...trackRows(doc, inside, nodeId, depth + 1, true, {}, `${key}${KEY_SEP}`)];
+  return [row, ...own, ...trackRows({ ...walk, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1)];
 }
 
 function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth: number, clipKey: string): LayerRow {
   return { id: `${clip.id}${PART_SEP}${part}`, key: `${clipKey}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(doc, clip, part), type: partIcon(doc, clip, part), nodeId, hidden: false, locked: false, nested: true };
 }
 
-export const frameRows = (doc: MotionDoc, nodeId: string, parts: Parts = {}): LayerRow[] => trackRows(doc, doc.tracks, nodeId, TRACK_DEPTH, false, parts);
+const frameWalk = (doc: MotionDoc, nodeId: string, parts: Parts, mode: EditMode): Walk => ({ doc, nodeId, nested: false, parts, path: '', mode });
+
+export const frameRows = (doc: MotionDoc, nodeId: string, parts: Parts = {}): LayerRow[] => trackRows(frameWalk(doc, nodeId, parts, EditMode.Design), doc.tracks, TRACK_DEPTH);
 
 export type FrameOutlines = Record<string, readonly LayerRow[]>;
 
 function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlines): LayerRow[] {
   if (open?.nodeId === nodeId) {
-    return trackRows(open.doc, open.doc.tracks, nodeId, TRACK_DEPTH, false, open.parts);
+    return trackRows(frameWalk(open.doc, nodeId, open.parts ?? {}, open.mode ?? EditMode.Design), open.doc.tracks, TRACK_DEPTH);
   }
   return (outlines[nodeId] ?? []).map((row) => ({ ...row, nested: true }));
 }
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
-    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: node.type, nodeId: node.id, hidden: false, locked: false, nested: false };
+    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null };
     return folded.has(node.id) ? [row] : [row, ...childRows(node.id, open, outlines)];
   });
 }
@@ -121,6 +161,65 @@ function moveClipAlong(doc: MotionDoc, clipId: string, step: typeof ABOVE | type
   return next ? moveClip(doc, clipId, { from: found.clip.from, trackId: next.id }) : fail('no track of the same kind that way');
 }
 
+export enum Place {
+  Above = 'above',
+  Below = 'below',
+  Into = 'into'
+}
+
+type NewId = () => string;
+
+const newTrackId: NewId = () => crypto.randomUUID().slice(0, 8);
+
+function topTrack(doc: MotionDoc, id: string): { track: Track; index: number } | null {
+  const index = doc.tracks.findIndex((t) => t.id === id || t.clips.some((c) => c.id === id));
+  return index < 0 ? null : { track: doc.tracks[index], index };
+}
+
+const then = (result: OpResult, next: (doc: MotionDoc) => OpResult): OpResult => (result.ok ? next(result.doc) : result);
+
+function intoTrack(doc: MotionDoc, dragged: string, target: Track): OpResult {
+  const clip = findClip(doc, dragged)?.clip;
+  if (!clip || target.id === dragged) {
+    return fail('drop a clip into a group');
+  }
+  return moveClip(doc, dragged, { from: clip.from, trackId: target.id });
+}
+
+export function restack(doc: MotionDoc, dragged: string, target: string, place: Place, newId: NewId = newTrackId): OpResult {
+  const from = topTrack(doc, dragged);
+  const to = topTrack(doc, target);
+  if (!from || !to || dragged === target) {
+    return fail(`cannot move ${dragged} onto ${target}`);
+  }
+  if (from.track.kind !== to.track.kind) {
+    return fail('a layer moves only among layers of its kind');
+  }
+  if (place === Place.Into) {
+    return intoTrack(doc, dragged, to.track);
+  }
+
+  const wholeTrack = from.track.id === dragged || from.track.clips.length === 1;
+  const slot = to.index + (place === Place.Below ? 1 : 0);
+  if (wholeTrack) {
+    return moveTrack(doc, from.track.id, slot - (from.index < to.index ? 1 : 0));
+  }
+  const clip = findClip(doc, dragged)!.clip;
+  const id = newId();
+  return then(
+    then(addTrack(doc, from.track.kind as TrackKind, id), (d) => moveTrack(d, id, slot)),
+    (d) => moveClip(d, dragged, { from: clip.from, trackId: id })
+  );
+}
+
+const EDGE = 0.25;
+const HALF = 0.5;
+
+const GROUP_DROP = (at: number) => (at < EDGE ? Place.Above : at > 1 - EDGE ? Place.Below : Place.Into);
+const ROW_DROP = (at: number) => (at < HALF ? Place.Above : Place.Below);
+
+export const dropPlace = (kind: LayerKind, at: number): Place => (kind === LayerKind.Track ? GROUP_DROP : ROW_DROP)(at);
+
 const TRACK_EDIT: Record<LayerAction, (doc: MotionDoc, track: Track, index: number, name?: string) => OpResult> = {
   [LayerAction.Up]: (doc, track, index) => (index > 0 ? moveTrack(doc, track.id, index - 1) : fail('already the top track')),
   [LayerAction.Down]: (doc, track, index) => (index < doc.tracks.length - 1 ? moveTrack(doc, track.id, index + 1) : fail('already the bottom track')),
@@ -129,15 +228,24 @@ const TRACK_EDIT: Record<LayerAction, (doc: MotionDoc, track: Track, index: numb
   [LayerAction.Rename]: (doc, track, _index, name) => renameTrack(doc, track.id, (name ?? '').trim().slice(0, 60))
 };
 
-const CLIP_EDIT: Record<LayerAction, (doc: MotionDoc, clip: Clip) => OpResult> = {
-  [LayerAction.Up]: (doc, clip) => moveClipAlong(doc, clip.id, ABOVE),
-  [LayerAction.Down]: (doc, clip) => moveClipAlong(doc, clip.id, BELOW),
+function stepClip(doc: MotionDoc, clip: Clip, step: typeof ABOVE | typeof BELOW, newId: NewId): OpResult {
+  const along = moveClipAlong(doc, clip.id, step);
+  if (along.ok) {
+    return along;
+  }
+  const at = topTrack(doc, clip.id)!;
+  return restack(doc, clip.id, at.track.id, step === ABOVE ? Place.Above : Place.Below, newId);
+}
+
+const CLIP_EDIT: Record<LayerAction, (doc: MotionDoc, clip: Clip, newId: NewId) => OpResult> = {
+  [LayerAction.Up]: (doc, clip, newId) => stepClip(doc, clip, ABOVE, newId),
+  [LayerAction.Down]: (doc, clip, newId) => stepClip(doc, clip, BELOW, newId),
   [LayerAction.Hide]: (doc, clip) => setClipFlags(doc, clip.id, { hidden: !clip.hidden }),
   [LayerAction.Lock]: (doc, clip) => setClipFlags(doc, clip.id, { locked: !clip.locked }),
   [LayerAction.Rename]: () => fail('clips have no name of their own: rename the track')
 };
 
-export function layerEdit(doc: MotionDoc, id: string, action: LayerAction, name?: string): OpResult {
+export function layerEdit(doc: MotionDoc, id: string, action: LayerAction, name?: string, newId: NewId = newTrackId): OpResult {
   const index = doc.tracks.findIndex((t) => t.id === id);
   if (index >= 0) {
     return TRACK_EDIT[action](doc, doc.tracks[index], index, name);
@@ -146,22 +254,7 @@ export function layerEdit(doc: MotionDoc, id: string, action: LayerAction, name?
   if (!found || !doc.tracks.some((t) => t.id === found.track.id)) {
     return fail(`no layer ${id} at the top level of this video`);
   }
-  return CLIP_EDIT[action](doc, found.clip);
-}
-
-export function dropLayer(doc: MotionDoc, dragged: string, onto: string): OpResult {
-  const target = doc.tracks.findIndex((t) => t.id === onto);
-  if (target < 0) {
-    return fail('drop a layer on a track');
-  }
-  if (doc.tracks.some((t) => t.id === dragged)) {
-    return moveTrack(doc, dragged, target);
-  }
-  const found = findClip(doc, dragged);
-  if (!found || found.track.kind !== doc.tracks[target].kind) {
-    return fail('a clip moves only onto a track of its kind');
-  }
-  return moveClip(doc, dragged, { from: found.clip.from, trackId: onto });
+  return CLIP_EDIT[action](doc, found.clip, newId);
 }
 
 type KeyPress = { key: string; mod: boolean };

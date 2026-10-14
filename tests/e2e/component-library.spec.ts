@@ -50,7 +50,7 @@ test.describe('component library @real', () => {
         await page.waitForTimeout(1500);
         await page.screenshot({ path: `${SHOTS}/${viewport.name}-3-library.png` });
       }
-      await library.locator(`[data-component="${PROMPT}"]`).click();
+      await library.locator(`li:has([data-component="${PROMPT}"])`).getByTestId('template-details').click();
       const detail = library.getByTestId('component-detail');
       await expect(detail).toContainText('Prompt input');
       await expect(library.getByTestId('component-grid')).toBeVisible();
@@ -66,6 +66,7 @@ test.describe('component library @real', () => {
       await expect(library).toBeVisible();
       await expect(library.locator(`[data-component="${PROMPT}"]`)).toBeFocused();
 
+      await page.keyboard.press('Tab');
       await page.keyboard.press('Enter');
       await detail.getByTestId('key-fields').getByRole('textbox').first().fill('Zqx from the library');
       await detail.getByTestId('key-fields').getByRole('textbox').first().blur();
@@ -95,7 +96,7 @@ test.describe('component library @real', () => {
     await page.getByTestId('open-components').click();
     const library = page.getByTestId('component-library');
     await library.getByTestId('component-search').fill('prompt');
-    await library.locator(`[data-component="${PROMPT}"]`).click();
+    await library.locator(`li:has([data-component="${PROMPT}"])`).getByTestId('template-details').click();
     if (SHOTS) {
       await page.waitForTimeout(1500);
       await page.screenshot({ path: `${SHOTS}/mobile-3-library-detail.png` });

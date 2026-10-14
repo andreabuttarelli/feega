@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { Nudge, Precision, clockText, fillShare, formatValue, nudged, parseClock, precisionOf, scrubbed } from './number-field';
+import { Gesture, Nudge, Precision, clockText, gestureOf, fillShare, formatValue, nudged, parseClock, precisionOf, scrubbed } from './number-field';
 
 const opacity = { min: 0, max: 1, step: 0.01 };
 const rotation = { min: -1080, max: 1080, step: 1 };
 
 describe('number field', () => {
+  it('a press on the value that moves past 3px scrubs; one that stays put is a click to type', () => {
+    expect(gestureOf(0)).toBe(Gesture.Click);
+    expect(gestureOf(3)).toBe(Gesture.Click);
+    expect(gestureOf(4)).toBe(Gesture.Scrub);
+    expect(gestureOf(-6)).toBe(Gesture.Scrub);
+  });
+
   it('scrubs one step per pixel, ten with Shift, a tenth with Alt', () => {
     expect(scrubbed(0, 12, rotation, Precision.Normal)).toBe(12);
     expect(scrubbed(0, 12, rotation, Precision.Coarse)).toBe(120);

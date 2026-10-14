@@ -5,6 +5,8 @@
   import { DragPhase, isOutside, type ElementOut } from '$lib/canvas/canvas-drop';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { selectionView } from '$lib/motion/selection-context';
+  import { reorderAt } from '$lib/motion/layout/guides';
+  import { withAutoLayout } from '$lib/motion/layout/resolve';
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
@@ -67,7 +69,8 @@
   let grab = $state<Grab | null>(null);
   let live = $state<{ doc: MotionDoc; patch: Transform; guides: Guide[]; gaps: Gap[] } | null>(null);
 
-  const shown = $derived(live?.doc ?? doc);
+  const laid = $derived(withAutoLayout(doc));
+  const shown = $derived(live ? withAutoLayout(live.doc) : laid);
   const selected = $derived(selection.length === 1 ? selection[0] : null);
   const clip = $derived<MotionClip | null>(selected ? (findClip(shown, selected)?.clip ?? null) : null);
   const onFrame = (c: MotionClip) => frame >= c.from && frame < c.from + c.durationInFrames;
@@ -179,7 +182,7 @@
     if (!pendingPick || !Object.keys(boxes).length) {
       return;
     }
-    const next = stackAt(doc, frame, boxes, pendingPick)[0];
+    const next = stackAt(laid, frame, boxes, pendingPick)[0];
     pendingPick = null;
     onselect(next ? [next] : []);
   }
@@ -226,7 +229,7 @@
     part = null;
     const mode = pickModeAt(lastPress, p, e.altKey ? Modifier.Alt : Modifier.None);
     lastPress = p;
-    const next = pick(stackAt(doc, frame, boxes, p), selected, mode);
+    const next = pick(stackAt(laid, frame, boxes, p), selected, mode);
     if (!next) {
       onselect([]);
       return;
@@ -240,7 +243,7 @@
   function others(clipId: string) {
     return Object.keys(boxes)
       .filter((id) => id !== clipId && findClip(doc, id) && onFrame(findClip(doc, id)!.clip))
-      .map((id) => aabb(quadOf(doc, id, frame, boxes[id])));
+      .map((id) => aabb(quadOf(laid, id, frame, boxes[id])));
   }
 
   let out = false;
@@ -256,7 +259,7 @@
 
   function move(e: PointerEvent) {
     if (!grab) {
-      hover = e.pointerType === 'mouse' ? (stackAt(doc, frame, boxes, local(e))[0] ?? null) : null;
+      hover = e.pointerType === 'mouse' ? (stackAt(laid, frame, boxes, local(e))[0] ?? null) : null;
       return;
     }
     const outside = leaving(e);
@@ -273,12 +276,12 @@
     if (!box) {
       return;
     }
-    const { patch, guides } = dragPatch({ doc, clipId: grab.clipId, frame, box, grip: grab.grip, handle: grab.handle, from: grab.from, to: local(e), shift: e.shiftKey, snapTargets: others(grab.clipId), snapPx: snapReach() });
+    const { patch, guides } = dragPatch({ doc: laid, clipId: grab.clipId, frame, box, grip: grab.grip, handle: grab.handle, from: grab.from, to: local(e), shift: e.shiftKey, snapTargets: others(grab.clipId), snapPx: snapReach() });
     const result = writePatch(doc, grab.clipId, frame, patch);
     if (!result.ok) {
       return;
     }
-    const moved = aabb(quadOf(result.doc, grab.clipId, frame, box));
+    const moved = aabb(quadOf(withAutoLayout(result.doc), grab.clipId, frame, box));
     live = { doc: result.doc, patch, guides, gaps: grab.grip === Grip.Rotate ? [] : spacing(moved, others(grab.clipId), { width: doc.width, height: doc.height }) };
     onpreview(result.doc);
   }
@@ -286,6 +289,7 @@
   function end(e: PointerEvent | null) {
     const done = live;
     const grip = grab?.grip;
+    const reordered = done && grip === Grip.Move && grab && e ? reorderAt(doc, grab.clipId, local(e)) : null;
     const outside = grab && e ? leaving(e) : null;
     out = false;
     grab = null;
@@ -293,6 +297,10 @@
     onpreview(null);
     if (outside) {
       ondragout?.(outside, DragPhase.Drop);
+      return;
+    }
+    if (reordered?.ok) {
+      onchange(reordered.doc, 'Reordered in the auto layout');
       return;
     }
     if (done && grip) {

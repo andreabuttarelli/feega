@@ -39,3 +39,9 @@ export const stillAskSchema = z.object({
 export function stillExport(format: ImageFormat, scale: ImageScale): StillExport {
   return { format, scale, ...IMAGE[format], size: (doc) => ({ width: doc.width * scale, height: doc.height * scale }) };
 }
+
+export function attachmentUrl(signed: string, fileName: string): string {
+  const url = new URL(signed);
+  url.searchParams.set('download', fileName);
+  return url.toString();
+}

@@ -1,29 +1,22 @@
 <script lang="ts">
-  import NumberField from './NumberField.svelte';
   import type { Snippet } from 'svelte';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { AssetKind } from '$lib/motion/components';
   import { setProps, type OpResult } from '$lib/motion/timeline';
   import Trash from '@lucide/svelte/icons/trash-2';
   import { PartAction, PartKind, parsePart, partKind, partLabel, partText, runPart, writePartText } from '$lib/motion/poster-parts';
-  import { markedPoster, photoAt, setPhoto, setPhotoLook, type PhotoFit, type PhotoLook } from '$lib/motion/poster-lines';
+  import { markedPoster, photoStack, setPhotoFills } from '$lib/motion/poster-lines';
+  import FillStack from './FillStack.svelte';
+  import type { BrandTokens } from '$lib/motion/brand';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
 
-  let { doc, clip, part, assets, onchange }: { doc: MotionDoc; clip: MotionClip; part: string; assets: Asset[]; onchange: (doc: MotionDoc, summary: string) => void } = $props();
-
-  const IMAGE = 'image';
-  const FITS: PhotoFit[] = ['cover', 'contain'];
-  const CENTRE = 0.5;
-  const PERCENT = 100;
-  const FOCUS_RANGE = { min: 0, max: 100, step: 1 };
-  const FIT_LABEL: Record<PhotoFit, string> = { cover: 'Cover', contain: 'Contain' };
+  let { doc, clip, part, assets, tokens, onchange }: { doc: MotionDoc; clip: MotionClip; part: string; assets: Asset[]; tokens: BrandTokens; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const kind = $derived(partKind(doc, clip, part));
   const index = $derived(parsePart(part).index ?? 0);
   const poster = $derived(markedPoster(String(clip.props.name)));
   const media = $derived(poster ? clip.props[poster.media] : undefined);
-  const photo = $derived(photoAt(media, index));
 
   function apply(result: OpResult, summary: string) {
     if (result.ok) {
@@ -32,7 +25,6 @@
   }
 
   const writeMedia = (next: unknown, summary: string) => poster && apply(setProps(doc, clip.id, { [poster.media]: next }), summary);
-  const look = (patch: PhotoLook) => writeMedia(setPhotoLook(media, index, patch), 'Adjust photo');
 
   const BODY: Record<PartKind, Snippet | null> = { [PartKind.Line]: lineBody, [PartKind.Photo]: photoBody, [PartKind.Arrow]: arrowBody, [PartKind.Text]: null, [PartKind.Other]: null };
   const body = $derived(BODY[kind]);
@@ -46,21 +38,8 @@
 {/snippet}
 
 {#snippet photoBody()}
-  <div class="assets" data-testid="part-photo">
-    {#each assets.filter((a) => a.kind === IMAGE) as asset (asset.id)}
-      <button type="button" class="asset" class:on={photo.assetId === asset.id} title={asset.label} onclick={() => writeMedia(setPhoto(media, index, asset.id), 'Replace photo')}><img src={asset.previewUrl} alt={asset.label} /></button>
-    {:else}
-      <span class="empty">No images on this canvas yet.</span>
-    {/each}
-  </div>
-  <label class="field"><span>Fit</span>
-    <select value={photo.fit ?? FITS[0]} onchange={(e) => look({ fit: e.currentTarget.value as PhotoFit })}>
-      {#each FITS as fit (fit)}<option value={fit}>{FIT_LABEL[fit]}</option>{/each}
-    </select>
-  </label>
-  <div class="focus">
-    <NumberField label="Focus X" name="Focus X" value={Math.round((photo.focusX ?? CENTRE) * PERCENT)} range={FOCUS_RANGE} unit="%" onchange={(v) => look({ focusX: v / PERCENT })} />
-    <NumberField label="Focus Y" name="Focus Y" value={Math.round((photo.focusY ?? CENTRE) * PERCENT)} range={FOCUS_RANGE} unit="%" onchange={(v) => look({ focusY: v / PERCENT })} />
+  <div data-testid="part-photo">
+    <FillStack title="Fill" fills={photoStack(media, index)} {assets} {tokens} onchange={(fills, summary) => writeMedia(setPhotoFills(media, index, fills), summary)} />
   </div>
   <button type="button" class="delete" data-testid="part-delete" onclick={remove}><Trash size={12} /> Delete photo</button>
 {/snippet}
@@ -90,19 +69,14 @@
     font-weight: 400;
   }
 
-  .focus {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 6px;
-  }
   input[type='text'],
   select {
     width: 100%;
     height: 28px;
     padding: 0 8px;
     border: 1px solid transparent;
-    border-radius: 0;
-    background: var(--ui-field);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
     color: var(--ui-ink);
     font: inherit;
   }
@@ -132,8 +106,8 @@
     height: 28px;
     padding: 0 8px;
     border: 0;
-    border-radius: 0;
-    background: var(--ui-field);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
     color: var(--ui-ink);
     font: inherit;
     font-size: var(--ui-text-xs);

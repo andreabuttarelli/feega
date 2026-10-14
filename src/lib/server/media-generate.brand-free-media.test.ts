@@ -114,7 +114,8 @@ beforeEach(() => {
   );
   imagePartFor.mockResolvedValue({ ok: true, part: { inlineData: { mimeType: 'image/png', data: 'AAAA' } } });
   submitAndTrackVideoRender.mockResolvedValue({
-    taskId: 'job-1',
+    taskId: 'task-1',
+    jobId: 'job-1',
     model: 'bytedance/seedance-2-5',
     durationSeconds: 8
   });

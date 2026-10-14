@@ -1,7 +1,7 @@
 <script lang="ts">
   import { parseDecimal } from '$lib/motion/inspector';
   import { KeyMark } from '$lib/motion/timeline-layers';
-  import { FieldFill, FieldKind, Nudge, fillShare, formatValue, nudged, precisionOf, scrubbed, type Range } from '$lib/motion/number-field';
+  import { FieldFill, FieldKind, Gesture, Nudge, fillShare, gestureOf, formatValue, nudged, precisionOf, scrubbed, type Range } from '$lib/motion/number-field';
   import { MIXED, type Shared } from '$lib/motion/mixed';
 
   let {
@@ -86,6 +86,50 @@
     }
   }
 
+  let drag: { dx: number; start: number; gesture: Gesture } | null = null;
+
+  function pressValue(e: PointerEvent) {
+    if (disabled || e.button !== 0 || e.pointerType === 'touch' || document.activeElement === input) {
+      return;
+    }
+    e.preventDefault();
+    input?.setPointerCapture(e.pointerId);
+    drag = { dx: 0, start: known, gesture: Gesture.Click };
+  }
+
+  function dragValue(e: PointerEvent) {
+    if (!drag) {
+      return;
+    }
+    drag.dx += e.movementX;
+    if (drag.gesture === Gesture.Click && gestureOf(drag.dx) === Gesture.Scrub) {
+      drag.gesture = Gesture.Scrub;
+      input?.requestPointerLock?.();
+    }
+    if (drag.gesture !== Gesture.Scrub) {
+      return;
+    }
+    const next = scrubbed(drag.start, drag.dx, range, precisionOf(e));
+    if (next !== known) {
+      onchange(next);
+    }
+  }
+
+  function releaseValue() {
+    if (!drag) {
+      return;
+    }
+    const gesture = drag.gesture;
+    drag = null;
+    if (document.pointerLockElement === input) {
+      document.exitPointerLock();
+    }
+    if (gesture === Gesture.Click) {
+      input?.focus();
+      input?.select();
+    }
+  }
+
   function commit(text: string) {
     const parsed = parseDecimal(text);
     if (parsed === null) {
@@ -123,7 +167,7 @@
 
 <div class="field {kind}" class:disabled class:expression data-field={name} class:mixed={value === MIXED} style={fill === FieldFill.Range && value !== MIXED ? `--fill: ${fillShare(value, range) * 100}%;` : ''} oncontextmenu={onContext} onpointerdowncapture={startPress} onpointermovecapture={movePress} onpointerupcapture={endPress} onpointercancelcapture={endPress} role="group" aria-label={name}>
   <span class="label" title={`${name} · drag to scrub (Shift ×10, Alt ×0.1)`} onpointerdown={startScrub} onpointermove={moveScrub} onpointerup={() => (scrub = null)} onlostpointercapture={() => (scrub = null)} aria-hidden="true">{label}</span>
-  <input bind:this={input} class="num" type="text" inputmode="decimal" aria-label={name} {disabled} value={text} placeholder={value === MIXED ? MIXED_TEXT : undefined} onchange={(e) => commit(e.currentTarget.value)} onkeydown={onKeydown} />
+  <input bind:this={input} class="num" type="text" inputmode="decimal" aria-label={name} {disabled} value={text} placeholder={value === MIXED ? MIXED_TEXT : undefined} onpointerdown={pressValue} onpointermove={dragValue} onpointerup={releaseValue} onpointercancel={releaseValue} onchange={(e) => commit(e.currentTarget.value)} onkeydown={onKeydown} />
   {#if unit}<span class="unit" aria-hidden="true">{unit}</span>{/if}
   {#if mark}
     <button type="button" class="mark" data-mark={mark} title={mark === KeyMark.Here ? 'Remove the keyframe here' : 'Add a keyframe here'} aria-label={`Keyframe ${name}`} aria-pressed={mark === KeyMark.Here} {disabled} onclick={onkey}></button>
@@ -135,9 +179,10 @@
     position: relative;
     display: flex;
     align-items: center;
-    height: 28px;
+    height: var(--ui-row);
     min-width: 0;
-    background: var(--ui-field);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
     border: 1px solid transparent;
   }
 
@@ -196,7 +241,7 @@
   }
 
   .named {
-    background: linear-gradient(90deg, transparent var(--named-label), var(--ui-field) var(--named-label));
+    background: linear-gradient(90deg, transparent var(--named-label), var(--ui-input) var(--named-label));
     border-color: transparent;
     --named-label: 96px;
   }
@@ -228,13 +273,18 @@
     height: 100%;
     padding: 0 2px;
     border: 0;
-    border-radius: 0;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
     color: var(--ui-ink);
     font: inherit;
     font-size: var(--ui-text-xs);
     font-variant-numeric: tabular-nums;
     outline: none;
+    cursor: ew-resize;
+  }
+
+  .num:focus {
+    cursor: text;
   }
 
   .num::placeholder {
@@ -263,20 +313,27 @@
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 20px;
+    width: 16px;
     height: 26px;
     border: 0;
-    border-radius: 0;
+    border-radius: var(--ui-radius-sm);
     background: none;
     cursor: pointer;
   }
 
   .mark::before {
     content: '';
-    width: 7px;
-    height: 7px;
+    width: 5px;
+    height: 5px;
     transform: rotate(45deg);
-    border: 1.5px solid var(--ui-ink-3);
+    border: 1px solid var(--ui-ink-3);
+    opacity: 0.5;
+  }
+
+  .field:hover .mark::before,
+  .mark[data-mark='here']::before,
+  .mark[data-mark='animated']::before {
+    opacity: 1;
   }
 
   .mark:hover::before {

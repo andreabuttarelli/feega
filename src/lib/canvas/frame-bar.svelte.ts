@@ -12,6 +12,7 @@ class FrameBar {
   timeline = $state.raw<HTMLElement | null>(null);
   sidePx = $state(0);
   host = $state<Host | null>(null);
+  covered = $state(false);
 
   attach(host: Host) {
     this.host = host;
@@ -21,6 +22,7 @@ class FrameBar {
         this.timeline = null;
         this.sidePx = 0;
         this.tool = DrawTool.Select;
+        this.covered = false;
       }
     };
   }

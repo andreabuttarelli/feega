@@ -219,7 +219,7 @@
   </span>
 {/snippet}
 
-<div bind:this={barEl} class="add-bar" data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
+<div bind:this={barEl} class="add-bar" class:covered={frameBar.covered} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
   {#key context}
     <div class="group" data-testid={`bar-${context}`}>
       {#each BAR_SLOTS[context] as s (s)}{@render SLOT[s]()}{/each}
@@ -262,6 +262,10 @@
 </div>
 
 <style>
+  .add-bar.covered {
+    visibility: hidden;
+  }
+
   .add-bar {
     position: absolute;
     z-index: 61;

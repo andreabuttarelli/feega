@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from './components';
+import { COMPONENTS, COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from './components';
 import { Ease } from './design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, partFieldKeys, partFocus, secondsLabel, toggleKey, valueAt } from './inspector';
@@ -18,7 +18,8 @@ function must(r: OpResult): MotionDoc {
 describe('properties inspector from the component schema', () => {
   it('every component describes every prop it takes', () => {
     for (const id of COMPONENT_IDS) {
-      expect(fieldsOf(id).map((f) => f.key).sort()).toEqual(Object.keys(defaultProps(id)).sort());
+      const optional = Object.entries(COMPONENTS[id].schema.shape).filter(([, field]) => field.safeParse(undefined).success && field.safeParse(undefined).data === undefined).map(([key]) => key);
+      expect(fieldsOf(id).map((f) => f.key).sort()).toEqual([...new Set([...Object.keys(defaultProps(id)), ...optional])].sort());
     }
   });
 
@@ -298,5 +299,15 @@ describe('a selected poster part shows only its own fields', () => {
     expect(partFocus(doc, clip, 'photos:0')).toEqual(expect.arrayContaining(['photoTint', 'photoGrain']));
     expect(partFocus(doc, clip, 'photos:0')).not.toContain('lines');
     expect(partFocus(doc, clip, 'arrow:4')[0]).toBe('arrowColor');
+  });
+
+  it('a photo shows only its own fields, never the whole poster style', () => {
+    const focus = partFocus(doc, clip, 'photos:0');
+
+    expect(focus).toEqual(expect.arrayContaining(['photoTint', 'photoGrain']));
+    expect(focus).not.toContain('ink');
+    expect(focus).not.toContain('paper');
+    expect(focus).not.toContain('font');
+    expect(focus).not.toContain('margin');
   });
 });

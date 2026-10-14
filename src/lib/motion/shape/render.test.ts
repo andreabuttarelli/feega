@@ -25,14 +25,43 @@ describe('shape markup', () => {
 
   it('a linear gradient fill points along its angle, colours resolved', () => {
     const svg = shapeMarkup(look({ fillKind: 'linear', gradientAngle: 0, fill: 'brand.accent', fill2: '#000000' }), paint);
-    expect(svg).toContain('<linearGradient id="sg-a" gradientUnits="userSpaceOnUse" x1="0" y1="50" x2="200" y2="50">');
+    expect(svg).toContain('<linearGradient id="sg-a-f0" gradientUnits="userSpaceOnUse" x1="0" y1="50" x2="200" y2="50">');
     expect(svg).toContain('stop-color:resolved(brand.accent)');
-    expect(svg).toContain('fill:url(#sg-a)');
+    expect(svg).toContain('fill:url(#sg-a-f0)');
+  });
+
+  it('a fill stack paints bottom to top under the stroke, the legacy colour ignored', () => {
+    const svg = shapeMarkup(look({ fill: '#ff0000', strokeKind: 'solid', stroke: '#111111', fills: [{ type: 'solid', color: '#00ff00' }, { type: 'solid', color: '#0000ff', opacity: 0.5 }] }), paint);
+    expect(svg).not.toContain('#ff0000');
+    expect(svg.indexOf('#00ff00')).toBeLessThan(svg.indexOf('#0000ff'));
+    expect(svg.indexOf('#0000ff')).toBeLessThan(svg.indexOf('stroke:#111111'));
+  });
+
+  it('an image fill resolves its asset through the paint', () => {
+    const svg = shapeMarkup(look({ fills: [{ type: 'image', assetId: 'pic' }] }), { ...paint, asset: (id) => `https://cdn/${id}.png` });
+    expect(svg).toContain('src="https://cdn/pic.png"');
   });
 
   it('a stroke carries width, dash, caps and joins in frame units', () => {
     const svg = shapeMarkup(look({ fillKind: 'none', strokeKind: 'solid', stroke: '#111111', strokeWidth: 0.01, dash: 0.02, gap: 0.01, cap: 'round', join: 'bevel' }), paint);
     expect(svg).toContain('stroke:#111111;stroke-width:10;stroke-linecap:round;stroke-linejoin:bevel;stroke-dasharray:20 10');
+  });
+
+  it('a legacy gradient stroke still runs between the old fill colours, as a stroke layer', () => {
+    const svg = shapeMarkup(look({ strokeKind: 'gradient', fill: '#ff0000', fill2: '#0000ff', gradientAngle: 0 }), paint);
+    expect(svg).toContain('<linearGradient id="sg-a-s-f0" gradientUnits="userSpaceOnUse" x1="0" y1="50" x2="200" y2="50"><stop offset="0" style="stop-color:#ff0000"/><stop offset="1" style="stop-color:#0000ff"/>');
+    expect(svg).toContain('stroke:url(#sg-a-s-f0)');
+  });
+
+  it('a stroke stack paints over the fills and replaces the legacy stroke', () => {
+    const svg = shapeMarkup(look({ strokeKind: 'solid', stroke: '#999999', strokes: [{ paint: { type: 'solid', color: '#111111' } }, { paint: { type: 'solid', color: '#222222' }, align: 'outside' }] }), paint);
+    expect(svg).not.toContain('#999999');
+    expect(svg.indexOf('#111111')).toBeLessThan(svg.indexOf('stroke:#222222'));
+    expect(svg).toContain('mask="url(#sk-a-s1)"');
+  });
+
+  it('per-side widths frame a rectangle', () => {
+    expect(shapeMarkup(look({ strokes: [{ paint: { type: 'solid', color: '#111111' }, align: 'inside', sides: [0.01, 0, 0, 0] }] }), paint)).toContain('fill-rule:evenodd');
   });
 
   it('a path shape scales its 0..1 data to the box', () => {

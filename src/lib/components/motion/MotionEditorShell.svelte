@@ -33,6 +33,8 @@
   import { SPRINGS } from '$lib/motion/spring';
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
   import { nullFromSelection } from '$lib/motion/parent-ops';
+  import { addAutoLayout } from '$lib/motion/layout/ops';
+  import { withAutoLayout } from '$lib/motion/layout/resolve';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import ZoomStage from '$lib/components/motion/ZoomStage.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
@@ -58,6 +60,7 @@
   import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
   import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
@@ -270,6 +273,9 @@
           },
           get parts() {
             return partsByClip;
+          },
+          get mode() {
+            return editMode;
           },
           get part() {
             return selection.length === 1 && selectedPart ? `${selection[0]}${PART_SEP}${selectedPart}` : null;
@@ -862,6 +868,13 @@
     }
   });
 
+  const dialogOpen = $derived(Boolean(publishing || sounding || menuOpen || helpOpen || exporting || browsing || componentsOpen || templating));
+  $effect(() => {
+    if (rules.tools === ToolsPlace.CanvasBar) {
+      frameBar.covered = dialogOpen;
+    }
+  });
+
   const FRAME_ACTS: Record<FrameAction, () => void> = { [FrameAction.Image]: () => add('Image'), [FrameAction.Library]: () => (templating = true) };
 
   function drawn(id: string) {
@@ -890,6 +903,19 @@
     const count = Object.keys(history.present.comps).length + 1;
     apply(precompose(doc, selection, { comp: newId(), clip: id }, `Comp ${count}`), 'Precomposed');
     selection = [id];
+  }
+
+  function autoLayoutSelection() {
+    if (!selection.length) {
+      return;
+    }
+    const { result, containerId } = addAutoLayout(doc, selection, newId);
+    if (!result.ok) {
+      notice = result.error;
+      return;
+    }
+    edit(result.doc, 'Added auto layout');
+    selection = [containerId];
   }
 
   function componentDraft(id: string, format: MotionFormat): Instance | null {
@@ -1308,7 +1334,8 @@
     [Command.ToggleInspector]: toggleInspector,
     [Command.ToggleTimeline]: () => relayout(toggleTimeline(layout)),
     [Command.Help]: () => (helpOpen = !helpOpen),
-    [Command.Precompose]: precomposeSelection
+    [Command.Precompose]: precomposeSelection,
+    [Command.AutoLayout]: autoLayoutSelection
   };
 
   const TOOL_RUN: Partial<Record<ActionId, () => void>> = {
@@ -1320,7 +1347,7 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
@@ -1635,7 +1662,8 @@
         {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
-        {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={selected} onchange={edit} />{/if}
+        {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={findClip(withAutoLayout(doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
+        {#if selected?.autoLayout && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<AutoLayoutOverlay {doc} clip={{ ...selected, autoLayout: selected.autoLayout }} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
         {#if frameBar.tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} tool={frameBar.tool} onchange={apply} oncreated={drawn} />{/if}
@@ -1676,7 +1704,7 @@
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
         <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
-        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} onchange={edit} />{/if}{/snippet}
+        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart ? partFocus(doc, selected, selectedPart) : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -1727,8 +1755,8 @@
                   <button type="button" role="menuitem" onclick={() => startTemplate(id)}>{AD_TEMPLATES[id].label}</button>
                 {/each}
                 <button type="button" role="menuitem" onclick={startTrailer}>feega trailer template</button>
-                <span class="menu-head">Components</span>
-                <button type="button" role="menuitem" data-testid="open-components" onclick={() => ((adding = false), (componentsOpen = true))}>Browse components…</button>
+                <span class="menu-head">Frame templates</span>
+                <button type="button" role="menuitem" data-testid="open-components" onclick={() => ((adding = false), (componentsOpen = true))}>Browse frame templates…</button>
                 <span class="menu-head">Templates</span>
                 <button type="button" role="menuitem" data-testid="open-templates" onclick={() => ((adding = false), (browseFirst = null), (browsing = true))}>Browse templates…</button>
                 <span class="menu-head">Audio</span>

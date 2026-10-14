@@ -42,6 +42,7 @@ const withoutDefaults = <T extends z.ZodRawShape>(shape: T) =>
 export const autoLayoutPatchSchema = withoutDefaults(autoLayoutSchema.shape);
 export const layoutItemPatchSchema = withoutDefaults(layoutItemSchema.shape);
 
+export type Padding = z.infer<typeof paddingSchema>;
 export type AutoLayout = z.infer<typeof autoLayoutSchema>;
 export type LayoutItem = z.infer<typeof layoutItemSchema>;
 

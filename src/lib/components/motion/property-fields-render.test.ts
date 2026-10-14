@@ -31,6 +31,16 @@ describe('colour field', () => {
   });
 });
 
+describe('colour field opacity', () => {
+  it('shows an opacity percentage only where the caller stores one', () => {
+    const plain = render(ColorField, { props: { name: 'Ink', value: '#000000', tokens: FEEGA_TOKENS, onchange: () => {} } }).body;
+    const layered = render(ColorField, { props: { name: 'Fill', value: '#000000', alpha: 0.4, tokens: FEEGA_TOKENS, onchange: () => {}, onalpha: () => {} } }).body;
+
+    expect(plain).not.toContain('aria-label="Ink opacity"');
+    expect(layered).toMatch(/aria-label="Fill opacity"[^>]*value="40%"/);
+  });
+});
+
 describe('number field', () => {
   const range = { min: 0, max: 100, step: 1 };
 

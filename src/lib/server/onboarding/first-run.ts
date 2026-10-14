@@ -20,11 +20,11 @@ export type FirstRun = { visible: boolean; started: boolean; hasGenerated: boole
 
 export async function firstRunFor(
   db: Db,
-  who: { userId: string; orgId: string; nodeCount: number },
+  who: { userId: string; orgId: string; nodeCount: number; accountCreatedAt: string },
   deps: FirstRunDeps = FIRST_RUN_DEPS
 ): Promise<FirstRun> {
   const [profile, hasGenerated] = await Promise.all([deps.readFirstRun(db, who.userId), deps.hasAnyRun(db, who.orgId)]);
-  const eligibility = { status: profile.onboardingStatus, signupCampaign: profile.signupCampaign, nodeCount: who.nodeCount, hasGenerated };
+  const eligibility = { status: profile.onboardingStatus, signupCampaign: profile.signupCampaign, nodeCount: who.nodeCount, hasGenerated, accountCreatedAt: who.accountCreatedAt };
 
   if (shouldStart(eligibility)) {
     const started = await deps.moveOnboarding(db, who.userId, { from: null, to: OnboardingStatus.Active });

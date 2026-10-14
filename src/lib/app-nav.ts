@@ -78,7 +78,7 @@ const inProject = (path: string) => (projectId: string | null) => (projectId ? `
 export const APP_NAV: readonly NavItem[] = [
   row({ id: 'home', section: NavSection.Main, kind: NavKind.Link, label: { key: 'app.shell.menu.home' }, icon: LayoutGrid, href: () => DASHBOARD_PATH }),
   row({ id: 'canvases', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Canvases' }, icon: Shapes, href: () => CANVASES_PATH }),
-  row({ id: 'templates', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Templates' }, icon: LayoutTemplate, href: () => TEMPLATES_PATH }),
+  row({ id: 'templates', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Frame templates' }, icon: LayoutTemplate, href: () => TEMPLATES_PATH }),
   row({ id: 'tools', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Tools' }, icon: Wrench, href: () => TOOLS_PATH }),
   row({ id: 'settings', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.settings' }, icon: Settings, needs: NavNeeds.Project, href: inProject('/settings/project') }),
   row({ id: 'billing', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.billing' }, icon: CreditCard, meta: NavMeta.Credits, href: () => BILLING_PATH }),

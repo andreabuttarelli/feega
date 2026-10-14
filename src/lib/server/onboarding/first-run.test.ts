@@ -26,7 +26,7 @@ describe('the coach state lives on the profile', () => {
   it('a fresh user on an empty canvas starts it, once', async () => {
     const d = deps();
 
-    const run = await firstRunFor(db, { userId: 'u1', orgId: 'o1', nodeCount: 0 }, d);
+    const run = await firstRunFor(db, { userId: 'u1', orgId: 'o1', accountCreatedAt: '2026-10-12T00:00:00Z', nodeCount: 0 }, d);
 
     expect(run).toEqual({ visible: true, started: true, hasGenerated: false });
     expect(d.moveOnboarding).toHaveBeenCalledWith(db, 'u1', { from: null, to: OnboardingStatus.Active });
@@ -35,7 +35,7 @@ describe('the coach state lives on the profile', () => {
   it('a user who came with a campaign never sees it', async () => {
     const d = deps({ readFirstRun: vi.fn(async () => ({ signupCampaign: 'claymation-ai', onboardingStatus: null })) });
 
-    expect(await firstRunFor(db, { userId: 'u1', orgId: 'o1', nodeCount: 3 }, d)).toEqual({ visible: false, started: false, hasGenerated: false });
+    expect(await firstRunFor(db, { userId: 'u1', orgId: 'o1', accountCreatedAt: '2026-10-12T00:00:00Z', nodeCount: 3 }, d)).toEqual({ visible: false, started: false, hasGenerated: false });
     expect(d.moveOnboarding).not.toHaveBeenCalled();
   });
 
@@ -45,7 +45,7 @@ describe('the coach state lives on the profile', () => {
       hasAnyRun: vi.fn(async () => true)
     });
 
-    expect(await firstRunFor(db, { userId: 'u1', orgId: 'o1', nodeCount: 3 }, d)).toEqual({ visible: false, started: false, hasGenerated: true });
+    expect(await firstRunFor(db, { userId: 'u1', orgId: 'o1', accountCreatedAt: '2026-10-12T00:00:00Z', nodeCount: 3 }, d)).toEqual({ visible: false, started: false, hasGenerated: true });
     expect(d.moveOnboarding).toHaveBeenCalledWith(db, 'u1', { from: OnboardingStatus.Active, to: OnboardingStatus.Completed });
   });
 });

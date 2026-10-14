@@ -77,3 +77,12 @@ export function parseClock(text: string, fps: number): number | null {
   const seconds = parseDecimal(trimmed);
   return seconds === null ? null : Math.round(seconds * fps);
 }
+
+export enum Gesture {
+  Click = 'click',
+  Scrub = 'scrub'
+}
+
+const DRAG_THRESHOLD_PX = 3;
+
+export const gestureOf = (dx: number): Gesture => (Math.abs(dx) > DRAG_THRESHOLD_PX ? Gesture.Scrub : Gesture.Click);

@@ -24,7 +24,7 @@ const VISUAL = [Section.Content, Section.Layout, Section.Layer, Section.Fill, Se
 const PICTURE = [Section.Content, Section.Layout, Section.Layer, Section.Effects, Section.Timing, Section.Animate, Section.ThreeD, Section.Parent];
 
 const FAMILY_SECTIONS: Record<ClipFamily, readonly Section[]> = {
-  [ClipFamily.Text]: [...VISUAL, Section.Text],
+  [ClipFamily.Text]: [...VISUAL, Section.Stroke, Section.Text],
   [ClipFamily.Image]: PICTURE,
   [ClipFamily.Video]: PICTURE,
   [ClipFamily.Audio]: [Section.Content, Section.Timing, Section.Animate],

@@ -1,3 +1,5 @@
+import { firstImage, photoFills, type Fill } from './fill/model';
+
 export const PHOTO_MARK = '[photo]';
 export const ARROW_MARK = '->';
 const MARKS = /(\[photo\]|->)/;
@@ -30,6 +32,7 @@ export type PhotoLook = { fit?: PhotoFit; focusX?: number; focusY?: number };
 export type MediaItem = {
   assetId: string;
   kind: 'image' | 'video';
+  fills?: Fill[];
 } & PhotoLook;
 export type LineRow = { text: string; photos: number[]; arrow: boolean };
 
@@ -172,5 +175,9 @@ const padded =(media: MediaItem[], n: number) => (media.length > n ? media : [..
 export const photoAt = (media: unknown, n: number): MediaItem => mediaItems(media)[n] ?? EMPTY_SLOT;
 
 export const setPhoto = (media: unknown, n: number, assetId: string): MediaItem[] => padded(mediaItems(media), n).map((m, at) => (at === n ? { ...m, assetId, kind: IMAGE } : m));
+
+export const photoStack = (media: unknown, n: number): Fill[] => photoFills(photoAt(media, n));
+
+export const setPhotoFills = (media: unknown, n: number, fills: Fill[]): MediaItem[] => padded(mediaItems(media), n).map((m, at) => (at === n ? { assetId: firstImage(fills)?.assetId ?? '', kind: IMAGE, fills } : m));
 
 export const setPhotoLook = (media: unknown, n: number, look: PhotoLook): MediaItem[] => padded(mediaItems(media), n).map((m, at) => (at === n ? { ...m, ...look } : m));

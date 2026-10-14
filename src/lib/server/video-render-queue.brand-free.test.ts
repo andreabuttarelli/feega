@@ -17,11 +17,21 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 type Row = Record<string, any>;
 
 const finishVideoRender = vi.fn();
+const submittedFake = {
+  taskId: 'kie-task-9',
+  model: 'bytedance/seedance-2-5',
+  prompt: 'un gatto',
+  durationSeconds: 8,
+  resolution: '720p',
+  persistOpts: { captions: false, tighten: false },
+  submittedAt: Date.now()
+};
 const withBrandContext = vi.fn();
 const withOrgContext = vi.fn();
 const saveRenderedVideoToLibrary = vi.fn();
 
 vi.mock('$lib/server/video', () => ({
+  submitVideoRender: async () => submittedFake,
   finishVideoRender: (...args: unknown[]) => finishVideoRender(...args)
 }));
 vi.mock('$lib/server/ai-log', () => ({
@@ -57,6 +67,8 @@ function makeDb(seed: Record<string, Row[]>) {
       eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), api),
       is: (c: string, v: unknown) => (filters.push((r) => (r[c] ?? null) === v), api),
       in: (c: string, v: unknown[]) => (filters.push((r) => v.includes(r[c])), api),
+      not: (c: string, _op: string, p: string) => (filters.push((r) => !String(r[c]).startsWith(p.replace('%', ''))), api),
+      like: (c: string, p: string) => (filters.push((r) => String(r[c]).startsWith(p.replace('%', ''))), api),
       lt: (c: string, v: string) => (filters.push((r) => r[c] != null && r[c] < v), api),
       order: () => api,
       limit: (n: number) => ((limit = n), api),
@@ -199,33 +211,31 @@ describe('con un brand, niente è cambiato', () => {
   });
 });
 
-describe('enqueueVideoRender', () => {
-  const submitted = {
-    taskId: 'kie-task-9',
-    model: 'bytedance/seedance-2-5',
-    prompt: 'un gatto',
-    durationSeconds: 8,
-    resolution: '720p',
-    persistOpts: { captions: false, tighten: false },
-    submittedAt: Date.now()
-  };
+describe('submitAndTrackVideoRender', () => {
+  async function track(client: unknown, owner: { brandId: string | null; orgId?: string }) {
+    const { submitAndTrackVideoRender } = await import('./video-render-queue');
+    return submitAndTrackVideoRender({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      admin: client as any,
+      ...owner,
+      userId: 'user-1',
+      imagePrompt: 'un gatto',
+      render: {}
+    });
+  }
 
   it('scrive l organizzazione e lascia il brand vuoto', async () => {
     const { tables, client } = makeDb({ video_renders: [] });
-    const { enqueueVideoRender } = await import('./video-render-queue');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await enqueueVideoRender(client as any, { brandId: null, orgId: 'org-1', userId: 'user-1', submitted });
+    await track(client, { brandId: null, orgId: 'org-1' });
 
-    expect(tables.video_renders[0]).toMatchObject({ brand_id: null, org_id: 'org-1' });
+    expect(tables.video_renders[0]).toMatchObject({ brand_id: null, org_id: 'org-1', task_id: 'kie-task-9' });
   });
 
   it('col brand continua a scrivere il brand, e nessuna organizzazione', async () => {
     const { tables, client } = makeDb({ video_renders: [] });
-    const { enqueueVideoRender } = await import('./video-render-queue');
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await enqueueVideoRender(client as any, { brandId: 'brand-1', userId: 'user-1', submitted });
+    await track(client, { brandId: 'brand-1' });
 
     expect(tables.video_renders[0]).toMatchObject({ brand_id: 'brand-1', org_id: null });
   });

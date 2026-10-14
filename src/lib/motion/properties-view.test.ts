@@ -23,11 +23,10 @@ describe('what Properties shows for the selection', () => {
 });
 
 describe('which sections each selection kind gets', () => {
-  it('a text layer: layout, layer, fill and text, never stroke or path', () => {
+  it('a text layer: layout, layer, fill, stroke and text, never a path', () => {
     const sections = sectionsFor(ClipFamily.Text, PropertiesView.Clip, EditMode.Motion);
 
-    expect(sections).toEqual(expect.arrayContaining([Section.Layout, Section.Layer, Section.Fill, Section.Text]));
-    expect(sections).not.toContain(Section.Stroke);
+    expect(sections).toEqual(expect.arrayContaining([Section.Layout, Section.Layer, Section.Fill, Section.Stroke, Section.Text]));
     expect(sections).not.toContain(Section.Shape);
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ClipFamily } from './track-style';
-import { Part, SECTION_ORDER, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection } from './inspector-sections';
+import { Part, SECTION_ORDER, uiHidden, Section, Typed, fieldLook, fieldSection, sectionSummary, flipSection, isOpen, readSections, shadowed, shows, transformSection } from './inspector-sections';
 import { Control, Group } from './components';
 import { FieldFill } from './number-field';
 import { Source } from './keyframes';
@@ -98,5 +98,10 @@ describe('inspector sections', () => {
     expect(shadowed('opacity', 0.5, 1, transform)).toBe(false);
     expect(shadowed('opacity', 1, 1, new Set())).toBe(false);
     expect(shadowed('width', 0.8, 0.8, transform)).toBe(false);
+  });
+
+  it('never shows a field that only wires the runtime, like the variable prefix', () => {
+    expect(uiHidden('varPrefix')).toBe(true);
+    expect(uiHidden('ink')).toBe(false);
   });
 });
