@@ -184,7 +184,8 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     system: projectAgentPrompt({
       project: { id: project.id, name: project.name },
       canvases: canvases.map((c) => ({ id: c.id, name: c.name })),
-      brand: brand ? { name: brand.name, slug: brand.slug } : null
+      brand: brand ? { name: brand.name, slug: brand.slug } : null,
+      openCanvasId: canvasId
     }),
     allowSystemInMessages: true,
     messages: [...history, { role: 'user', content: opening }] as ModelMessage[],

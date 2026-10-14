@@ -11,12 +11,15 @@ export type PromptScope = {
   project: { id: string; name: string };
   canvases: Array<{ id: string; name: string }>;
   brand: { name: string; slug: string } | null;
+  openCanvasId?: string | null;
 };
 
 export function projectAgentPrompt(scope: PromptScope): string {
   const canvasLine = scope.canvases.length
     ? `Canvases in this project: ${scope.canvases.map((c) => `"${c.name}" (${c.id})`).join(', ')}.`
     : 'This project has no canvases yet.';
+  const open = scope.canvases.find((c) => c.id === scope.openCanvasId);
+  const openLine = open ? `The user has canvas "${open.name}" (${open.id}) open: put anything new there unless they name another canvas.` : '';
 
   const brandLine = scope.brand
     ? `Brand in scope: "${scope.brand.name}" (slug: ${scope.brand.slug}). Brand and publishing tools are available; pass slug "${scope.brand.slug}" to every brand tool that takes one. Never ask which brand the user means.`
@@ -25,6 +28,7 @@ export function projectAgentPrompt(scope: PromptScope): string {
   return [
     `You work inside project "${scope.project.name}" (id: ${scope.project.id}).`,
     canvasLine,
+    ...(openLine ? [openLine] : []),
     brandLine,
     '',
     'Project and canvas tools act on THIS project only. They never reach other projects or brands.',
