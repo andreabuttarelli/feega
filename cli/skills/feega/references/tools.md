@@ -321,8 +321,12 @@ draws the still frame (or `time`) at full size and returns `{ asset_id, url, wid
 video, through the same server function, with the same status and body:
 `POST /api/v1/motion/{node_id}/ops` `{ op, input }`. Reads: `read_head`, `render_status`,
 `batch_status`. Writes (a read-only key is 403): `save_doc {version, doc, summary?}` (409 with the
-head when stale), `apply_ops {version, ops, summary?}`. A canvas the caller cannot open, or an
-uncensored workspace still locked, is 404. Unknown op 400 with the list.
+head when stale), `apply_ops {version, ops, summary?}`, `record_export {path, width, height,
+seconds}` and `upload_font {path}` (files the Supabase session already put in storage),
+`analyze_sounds {assetIds}`, `template_sounds {doc, clipId}`, `save_template {doc, name,
+description, compId?, posterFrame?}`. A canvas the caller cannot open, or an uncensored workspace
+still locked, is 404. Unknown op 400 with the list. The editor poster (a JPEG up to 1 MB) is
+`POST /api/v1/motion/{node_id}/poster` multipart `file`, `width`, `height` → `{ assetId }`.
 
 CLI `motion move` / `motion place`:
 `POST /api/v1/motion/elements` `{ frame_id?, element_id?, node_id?, to_frame_id?, x?, y?, canvas_x?, canvas_y? }` → `{ outcome, frame_id, element_id, new_frame, revisions }`. `frame_id` +
