@@ -1,5 +1,9 @@
 import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import { extendTailwindMerge } from 'tailwind-merge';
+
+const UI_TYPE_ROLES = ['ui-section', 'ui-caption', 'ui-label', 'ui-body', 'ui-title'];
+
+const twMerge = extendTailwindMerge({ extend: { theme: { text: UI_TYPE_ROLES } } });
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

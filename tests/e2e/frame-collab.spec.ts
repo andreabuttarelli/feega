@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Browser, Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { test, expect, REAL_STACK, gotoHydrated, signInE2e, type E2eSession } from './fixtures/session';
+import { test, expect, ON_PRODUCTION, REAL_STACK, gotoHydrated, signInE2e, type E2eSession } from './fixtures/session';
 import { expectOutlined, settleLate } from './fixtures/outline';
 import doc from './fixtures/motion-doc.json' with { type: 'json' };
 
@@ -63,6 +63,7 @@ const opacityIn = (head: typeof twoTitles, clipId: string) => {
 
 test.describe('two people in one frame @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
+  test.skip(ON_PRODUCTION, 'serve un secondo utente: su produzione non se ne creano');
   test.describe.configure({ mode: 'serial' });
   test.setTimeout(120_000);
 

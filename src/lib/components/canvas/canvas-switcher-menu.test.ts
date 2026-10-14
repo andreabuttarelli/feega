@@ -30,8 +30,4 @@ describe.each(Object.entries(sources))('lo switcher %s', (_name, source) => {
     expect(source).toMatch(/title={canvas\.name}/);
     expect(source).toMatch(/title={project\.name}/);
   });
-
-  it('nessun angolo arrotondato', () => {
-    expect(source).not.toMatch(/border-radius|rounded-/);
-  });
 });

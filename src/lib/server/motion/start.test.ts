@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { MOTION_CANVAS_NAME, startMotion, type MotionStartDeps } from './start';
-import { newMotionData } from '$lib/canvas/motion-node';
+import { frameNodeOf, newMotionData } from '$lib/canvas/motion-node';
+import { MotionFormat } from '$lib/motion/doc';
 import type { Db } from '$lib/server/db/client';
 
 const db = {} as Db;
@@ -66,5 +67,32 @@ describe('a frame started from the canvas add bar', () => {
     await startMotion(db, d, { ...input, canvasId: 'c1', at: { x: 30, y: -40 } });
 
     expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ x: 30, y: -40 }));
+  });
+
+  it('placed at a point, it does not read the canvas nodes it will not use', async () => {
+    const d = deps();
+    await startMotion(db, d, { ...input, canvasId: 'c1', at: { x: 0, y: 0 } });
+
+    expect(d.listNodes).not.toHaveBeenCalled();
+  });
+});
+
+describe('a frame started from a known picture is shaped by it', () => {
+  const poster = { width: 1080, height: 1350 };
+
+  it('takes the picture format and a size of the same aspect, in the one insert', async () => {
+    const d = deps();
+    await startMotion(db, d, { ...input, canvasId: 'c1', picture: poster });
+
+    const shaped = frameNodeOf(poster);
+    expect(shaped.data.format).toBe(MotionFormat.Portrait);
+    expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ data: shaped.data, width: shaped.w, height: shaped.h }));
+  });
+
+  it('without a picture leaves the size to the format, as before', async () => {
+    const d = deps();
+    await startMotion(db, d, { ...input, canvasId: 'c1', format: MotionFormat.Square });
+
+    expect(vi.mocked(d.createNode).mock.calls[0][1]).not.toHaveProperty('width');
   });
 });

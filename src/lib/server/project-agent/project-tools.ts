@@ -4,7 +4,7 @@ import type { Db } from '$lib/server/db/client';
 import { findNode, patchNodeData, DataCheck } from '$lib/server/repos/canvas';
 import { listProjectAssets } from '$lib/server/repos/assets';
 import { SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
-import { AGENT_PATCH_ANSWERS, CANVAS_OPS, NODE_NOT_FOUND, canvasCtx, type CanvasDeps } from '$lib/server/canvas/canvas-ops';
+import { AGENT_PATCH_ANSWERS, Access, CANVAS_OPS, NODE_NOT_FOUND, canvasCtx, chatSendsOp, type CanvasCtx, type CanvasDeps, type CanvasOpName } from '$lib/server/canvas/canvas-ops';
 import { audioDescription } from '$lib/server/canvas/audio-description';
 import { applyEffectsTo, makeEffectsPair } from '$lib/server/canvas/effects-actions';
 import { effectsCatalogue } from '$lib/canvas/effects/catalogue';
@@ -31,6 +31,82 @@ import { FORMAT_OF_ASPECT, composedTemplate, sequentialIds } from '$lib/canvas/c
  */
 export type ProjectToolDeps = CanvasDeps;
 
+const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
+  list_canvases:
+    'List the canvases of THIS project. One project only — never other projects, never a brand.',
+  list_nodes:
+    'List live nodes on one canvas of THIS project (id, type, position, data, version). Read this before update_node or run_node: the version is required and the data is what you must resend.',
+  create_node:
+    [
+      'Create a node on a canvas of THIS project. data must match the type exactly (describe_node_types): unknown fields and missing required fields are refused.',
+      'To put written text on the canvas (copy, hooks, notes, a script) use type "doc" with data { content: "<markdown>", public: false } — the canvas shows content as it is.',
+      'A "text" node is a generator: data { prompt } is the instruction, and its visible body appears only after run_node.'
+    ].join(' '),
+  update_node:
+    'Change some fields of a node\'s data on THIS project. Send only the fields to change: the rest is kept, and a field set to null is removed. `params` and `filters` merge one level down; arrays replace whole. Returns { outcome: "invalid" } when the merged data breaks the node schema.',
+  move_node:
+    'Move a node on its canvas. Position only: last-write-wins, does not touch node data or version.',
+  connect_nodes:
+    'Connect two nodes on one canvas of THIS project. The edge is directed: source feeds target. Refused when the target node uses an uncensored model — those take no inputs of any kind, ever: switch the model first. Also refused when the source medium does not feed the target — an audio node only takes what its current operation needs (describe_node_types type "audio" lists them).',
+  move_frame_element:
+    'Move one element (a clip: text, image, video, shape, component) out of a Frame into another Frame of THIS project, or onto the empty canvas as a new Frame holding only it. Props, style and keyframes are kept and re-timed to the target frame rate; x/y (0..1 of the target frame) is where its centre lands. Never turns an element into a generative node. Both frames are saved as revisions.',
+  place_in_frame:
+    "Put the generated output of an image, video or text node of THIS project into a Frame as an element (image, video at the frame's start, or text), centred at x/y (0..1). Omit toFrameId to make a new Frame on the canvas holding only it. The generative node is not changed. To keep the element following the node's next generations, connect_nodes the node to the Frame instead.",
+  delete_node:
+    'Soft-delete a node on THIS project. The node disappears from list_nodes; undo can bring it back.',
+  run_node:
+    'Generate on a producing node of THIS project (text, image, video, audio or model3d — a model3d node turns one connected image, or its prompt via a generated product shot, into a GLB and is always queued). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video or an audio dubbing may come back queued; poll with list_runs. An audio node runs params.operation (describe_node_types type "audio" lists operations and voices).',
+  list_runs:
+    'Generation history of one node on THIS project, oldest first, with status, cost and the produced text when there is one.',
+  preview_node_loop:
+    'How many combinations run_node_loop would queue on a node of THIS project, and what they would cost. Free, reads only: call it first when the count is unknown.',
+  run_node_loop:
+    'Queue every combination of a node\'s inputs (iterate wires, lists) as separate generations into a results list node; a cron runs them in the next minutes. Costs credits for the whole loop: only when the user asked. Above 50 combinations it answers needs_confirmation until confirm: true; above 1000 it is refused.',
+  cancel_node_loop:
+    'Stop the queued combinations of a node loop that have not started yet. Finished results stay.',
+  preview_run_graph:
+    'Plan a graph run on THIS project without spending: graph "downstream" (nodeId, then every node it feeds, in dependency order) or "stale" (on canvasId, every result older than its inputs; nodeIds narrows it). Returns the ordered steps and the credits. Free: always call it and tell the user the cost before run_graph.',
+  run_graph:
+    'Queue the steps preview_run_graph planned, same input; a cron runs each after the ones it depends on, a failed step stops what depends on it. Costs credits: only when the user agreed to the quoted cost. Cycles are refused.'
+};
+
+const OP_NAMES = Object.keys(CANVAS_OPS) as CanvasOpName[];
+const GENERIC_OPS = OP_NAMES.filter((name) => chatSendsOp(name) && !(name in CHAT_TOOL_OPS));
+
+function fieldsOf(schema: z.ZodType): string {
+  const shape = schema instanceof z.ZodObject ? (schema.shape as Record<string, z.ZodType>) : {};
+  return Object.entries(shape)
+    .map(([key, field]) => (field.safeParse(undefined).success ? `${key}?` : key))
+    .join(',');
+}
+
+const GENERIC_DESCRIPTION = [
+  'Every other canvas op of THIS project, the same ones the API and MCP run: op and its input in camelCase.',
+  `Spend credits, only when the user asked: ${GENERIC_OPS.filter((name) => CANVAS_OPS[name].access === Access.Spend).join(', ')}.`,
+  `Ops: ${GENERIC_OPS.map((name) => `${name} {${fieldsOf(CANVAS_OPS[name].input)}}`).join('; ')}.`
+].join(' ');
+
+function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
+  const own = Object.entries(CHAT_TOOL_OPS).map(([name, description]) => {
+    const op = CANVAS_OPS[name as CanvasOpName];
+    return [name, tool({ description, inputSchema: op.input, execute: (input: unknown) => op.run(ctx, input as never) })];
+  });
+
+  const generic = tool({
+    description: GENERIC_DESCRIPTION,
+    inputSchema: z.object({ op: z.enum(GENERIC_OPS as [CanvasOpName, ...CanvasOpName[]]), input: z.record(z.string(), z.unknown()).default({}) }).strict(),
+    execute: async ({ op, input }: { op: CanvasOpName; input?: Record<string, unknown> }) => {
+      const parsed = CANVAS_OPS[op].input.safeParse(input ?? {});
+      if (!parsed.success) {
+        return { error: 'invalid_input', issues: parsed.error.issues };
+      }
+      return CANVAS_OPS[op].run(ctx, parsed.data as never);
+    }
+  });
+
+  return { ...Object.fromEntries(own), canvas_tool: generic };
+}
+
 const NOT_A_COMPOSITION = { outcome: 'invalid', message: 'That node is not a composition.' };
 
 export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> {
@@ -42,19 +118,7 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
   const components = () => templateLibrary(deps.db, { orgId: deps.orgId, actor }).list();
 
   return {
-    list_canvases: tool({
-      description:
-        'List the canvases of THIS project. One project only — never other projects, never a brand.',
-      inputSchema: CANVAS_OPS.list_canvases.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.list_canvases.input>) => CANVAS_OPS.list_canvases.run(ctx, input)
-    }),
-
-    list_nodes: tool({
-      description:
-        'List live nodes on one canvas of THIS project (id, type, position, data, version). Read this before update_node or run_node: the version is required and the data is what you must resend.',
-      inputSchema: CANVAS_OPS.list_nodes.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.list_nodes.input>) => CANVAS_OPS.list_nodes.run(ctx, input)
-    }),
+    ...canvasOpTools(ctx),
 
     describe_node_types: tool({
       description: 'The JSON schema of `data` for one node type, or for every type when type is omitted. Read it before create_node or update_node on a type you have not written yet.',
@@ -71,56 +135,6 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
       }
     }),
 
-    create_node: tool({
-      description: [
-        'Create a node on a canvas of THIS project. data must match the type exactly (describe_node_types): unknown fields and missing required fields are refused.',
-        'To put written text on the canvas (copy, hooks, notes, a script) use type "doc" with data { content: "<markdown>", public: false } — the canvas shows content as it is.',
-        'A "text" node is a generator: data { prompt } is the instruction, and its visible body appears only after run_node.'
-      ].join(' '),
-      inputSchema: CANVAS_OPS.create_node.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.create_node.input>) => CANVAS_OPS.create_node.run(ctx, input)
-    }),
-
-    update_node: tool({
-      description:
-        'Change some fields of a node\'s data on THIS project. Send only the fields to change: the rest is kept, and a field set to null is removed. `params` and `filters` merge one level down; arrays replace whole. Returns { outcome: "invalid" } when the merged data breaks the node schema.',
-      inputSchema: CANVAS_OPS.update_node.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.update_node.input>) => CANVAS_OPS.update_node.run(ctx, input)
-    }),
-
-    move_node: tool({
-      description: 'Move a node on its canvas. Position only: last-write-wins, does not touch node data or version.',
-      inputSchema: CANVAS_OPS.move_node.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.move_node.input>) => CANVAS_OPS.move_node.run(ctx, input)
-    }),
-
-    connect_nodes: tool({
-      description:
-        'Connect two nodes on one canvas of THIS project. The edge is directed: source feeds target. Refused when the target node uses an uncensored model — those take no inputs of any kind, ever: switch the model first. Also refused when the source medium does not feed the target — an audio node only takes what its current operation needs (describe_node_types type "audio" lists them).',
-      inputSchema: CANVAS_OPS.connect_nodes.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.connect_nodes.input>) => CANVAS_OPS.connect_nodes.run(ctx, input)
-    }),
-
-    move_frame_element: tool({
-      description:
-        'Move one element (a clip: text, image, video, shape, component) out of a Frame into another Frame of THIS project, or onto the empty canvas as a new Frame holding only it. Props, style and keyframes are kept and re-timed to the target frame rate; x/y (0..1 of the target frame) is where its centre lands. Never turns an element into a generative node. Both frames are saved as revisions.',
-      inputSchema: CANVAS_OPS.move_frame_element.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.move_frame_element.input>) => CANVAS_OPS.move_frame_element.run(ctx, input)
-    }),
-
-    place_in_frame: tool({
-      description:
-        "Put the generated output of an image, video or text node of THIS project into a Frame as an element (image, video at the frame's start, or text), centred at x/y (0..1). Omit toFrameId to make a new Frame on the canvas holding only it. The generative node is not changed. To keep the element following the node's next generations, connect_nodes the node to the Frame instead.",
-      inputSchema: CANVAS_OPS.place_in_frame.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.place_in_frame.input>) => CANVAS_OPS.place_in_frame.run(ctx, input)
-    }),
-
-    delete_node: tool({
-      description: 'Soft-delete a node on THIS project. The node disappears from list_nodes; undo can bring it back.',
-      inputSchema: CANVAS_OPS.delete_node.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.delete_node.input>) => CANVAS_OPS.delete_node.run(ctx, input)
-    }),
-
     list_assets: tool({
       description:
         'List assets of THIS project — what its nodes produced and what was uploaded into it. Text lives in `content`; images and video in `url`.',
@@ -129,13 +143,6 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
         const assets = await listProjectAssets(deps.db, { orgId: deps.orgId, projectId: deps.projectId });
         return { assets };
       }
-    }),
-
-    run_node: tool({
-      description:
-        'Generate on a producing node of THIS project (text, image, video, audio or model3d — a model3d node turns one connected image, or its prompt via a generated product shot, into a GLB and is always queued). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video or an audio dubbing may come back queued; poll with list_runs. An audio node runs params.operation (describe_node_types type "audio" lists operations and voices).',
-      inputSchema: CANVAS_OPS.run_node.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.run_node.input>) => CANVAS_OPS.run_node.run(ctx, input)
     }),
 
     list_components: tool({
@@ -246,41 +253,6 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
       execute: async (input: { nodeId: string }) => makeEffectsPair(deps.db, { orgId: deps.orgId, nodeId: input.nodeId, actor })
     }),
 
-    list_runs: tool({
-      description: 'Generation history of one node on THIS project, oldest first, with status, cost and the produced text when there is one.',
-      inputSchema: CANVAS_OPS.list_runs.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.list_runs.input>) => CANVAS_OPS.list_runs.run(ctx, input)
-    }),
-
-    preview_node_loop: tool({
-      description: 'How many combinations run_node_loop would queue on a node of THIS project, and what they would cost. Free, reads only: call it first when the count is unknown.',
-      inputSchema: CANVAS_OPS.preview_node_loop.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.preview_node_loop.input>) => CANVAS_OPS.preview_node_loop.run(ctx, input)
-    }),
-
-    run_node_loop: tool({
-      description: 'Queue every combination of a node\'s inputs (iterate wires, lists) as separate generations into a results list node; a cron runs them in the next minutes. Costs credits for the whole loop: only when the user asked. Above 50 combinations it answers needs_confirmation until confirm: true; above 1000 it is refused.',
-      inputSchema: CANVAS_OPS.run_node_loop.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.run_node_loop.input>) => CANVAS_OPS.run_node_loop.run(ctx, input)
-    }),
-
-    cancel_node_loop: tool({
-      description: 'Stop the queued combinations of a node loop that have not started yet. Finished results stay.',
-      inputSchema: CANVAS_OPS.cancel_node_loop.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.cancel_node_loop.input>) => CANVAS_OPS.cancel_node_loop.run(ctx, input)
-    }),
-
-    preview_run_graph: tool({
-      description: 'Plan a graph run on THIS project without spending: graph "downstream" (nodeId, then every node it feeds, in dependency order) or "stale" (on canvasId, every result older than its inputs; nodeIds narrows it). Returns the ordered steps and the credits. Free: always call it and tell the user the cost before run_graph.',
-      inputSchema: CANVAS_OPS.preview_run_graph.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.preview_run_graph.input>) => CANVAS_OPS.preview_run_graph.run(ctx, input)
-    }),
-
-    run_graph: tool({
-      description: 'Queue the steps preview_run_graph planned, same input; a cron runs each after the ones it depends on, a failed step stops what depends on it. Costs credits: only when the user agreed to the quoted cost. Cycles are refused.',
-      inputSchema: CANVAS_OPS.run_graph.input,
-      execute: (input: z.infer<typeof CANVAS_OPS.run_graph.input>) => CANVAS_OPS.run_graph.run(ctx, input)
-    }),
 
     search_gallery: tool({
       description:

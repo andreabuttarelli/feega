@@ -7,6 +7,8 @@ const DESKTOP = { width: 1440, height: 900 };
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const TIMELINE_MAX_PX = 230;
 const SETTLE_MS = 700;
+const FRAME_VISIBLE_MS = 3_000;
+const PORTRAIT = 4 / 5;
 const SHOTS = process.env.CANVAS_MOTION_SHOTS;
 
 test.use({ viewport: DESKTOP, video: SHOTS ? { mode: 'on', size: DESKTOP } : 'off' });
@@ -65,9 +67,15 @@ test.describe('the canvas around the inline editor on desktop @real', () => {
     await page.locator('[data-mode-tab="still"]').click();
     await shoot(page, 'desktop-frame-templates');
     await page.locator('[data-mode="still"][data-component]').first().click();
+    const clicked = Date.now();
     await page.getByTestId('insert-component').click();
 
+    await expect(page.locator('[data-testid=motion-node-pending], [data-testid=motion-node]').first()).toBeVisible({ timeout: FRAME_VISIBLE_MS });
+    expect(Date.now() - clicked, 'the frame shows up at once').toBeLessThan(FRAME_VISIBLE_MS);
     await expect(page.locator('[data-testid=motion-node]')).toHaveCount(1, { timeout: 15_000 });
+    const stage = (await page.getByTestId('motion-node-stage').boundingBox())!;
+    expect(stage.width / stage.height, 'a 4:5 poster makes a 4:5 frame').toBeCloseTo(PORTRAIT, 1);
+
     await expect
       .poll(async () => (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).eq('type', 'motion').is('deleted_at', null)).data?.length ?? 0, { message: 'the frame is saved' })
       .toBe(1);

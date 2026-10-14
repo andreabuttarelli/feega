@@ -74,7 +74,8 @@
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
-  import { AddTarget, catalogue as componentCatalogue, starterFormatOf, type StarterFormat } from '$lib/motion/template/catalogue';
+  import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
+  import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
@@ -83,7 +84,7 @@
   import CalendarNode from '$lib/components/canvas/CalendarNode.svelte';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { frameNodeSize, motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
-  import { FORMATS, MotionFormat } from '$lib/motion/doc';
+  import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { barContextOf } from '$lib/canvas/bottom-bar';
   import { CanvasState, NodeMode, Opening, Reframe, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
   import { viewportOf } from '$lib/motion/editor-layout';
@@ -1418,7 +1419,7 @@
     return row ? compositionOf(row) : null;
   });
 
-  function componentDraft(nodeId: string, templateId: string, format: StarterFormat): Instance | null {
+  function componentDraft(nodeId: string, templateId: string, format: MotionFormat): Instance | null {
     const entry = data.componentTemplates.find((t) => t.id === templateId);
     const made = entry ? composedTemplate(entry, { format, values: {} }, compositionCards(nodeId, edges, nodes), sequentialIds()) : null;
     return made?.ok ? made : null;
@@ -1426,7 +1427,7 @@
 
   let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
 
-  function frameDraft(templateId: string, format: StarterFormat): Instance | null {
+  function frameDraft(templateId: string, format: MotionFormat): Instance | null {
     const entry = data.componentTemplates.find((t) => t.id === templateId);
     const made = entry ? composedTemplate(entry, { format, values: {} }, [], sequentialIds()) : null;
     return made?.ok ? made : null;
@@ -1438,9 +1439,17 @@
     if (!at) {
       return;
     }
-    const format = draft ? starterFormatOf(draft.doc) : (componentItems.find((i) => i.id === templateId)?.format ?? MotionFormat.Landscape);
-    const result = await post('frame_template', { template: templateId, format, x: at.x, y: at.y });
+    const item = componentItems.find((i) => i.id === templateId);
+    const doc = (draft ?? (item ? frameDraft(templateId, libraryFormat(item, MotionFormat.Landscape)) : null))?.doc;
+    if (!doc) {
+      return;
+    }
+
+    const shown = pendingFrame(at, doc);
+    nodes = [...nodes, toTile(shown)];
+    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: at.x, y: at.y });
     const node = result?.node as CanvasNodeRecord | undefined;
+    nodes = nodes.filter((n) => n.id !== shown.id);
     if (node && !nodes.some((n) => n.id === node.id)) {
       nodes = [...nodes, toTile(node)];
     }
@@ -3023,6 +3032,8 @@
             onpatch={(patch) => write(id, patch, SaveTiming.Now)}
             onpickcomponent={() => (componentPickFor = id)}
           />
+        {:else if row.type === PENDING_FRAME_TYPE}
+          <div class="pending-frame" data-testid="motion-node-pending" aria-busy="true"></div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
           <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} />
@@ -3137,6 +3148,19 @@
 
     .canvas.editing :global(.svelte-flow__node:not(:has([data-testid='motion-node-editing'])) .svelte-flow__handle) {
       opacity: var(--neighbour-ports);
+    }
+  }
+
+  .pending-frame {
+    width: 100%;
+    height: 100%;
+    background: var(--muted);
+    animation: pending-pulse 1.2s ease-in-out infinite alternate;
+  }
+
+  @keyframes pending-pulse {
+    to {
+      opacity: 0.5;
     }
   }
 

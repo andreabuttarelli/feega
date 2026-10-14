@@ -40,7 +40,7 @@ export async function startComposition(db: Db, deps: ComposeDeps, input: StartIn
     return { ok: false, error: doc.error };
   }
 
-  const start = await startMotion(db, deps, input);
+  const start = await startMotion(db, deps, { ...input, picture: doc.doc });
   if (!start) {
     return { ok: false, error: 'canvas_not_found' };
   }
