@@ -135,7 +135,7 @@ test.describe('the canvas spends frames only on motion @perf', () => {
       const compact = nodes.map((n) => ({ ...n, poster: String(posters.indexOf(n.poster)) }));
       const mount = async () => {
         await page.evaluate(({ list, art }) => window.motionCanvas.mount(list.map((n) => ({ ...n, poster: art[Number(n.poster)] }))), { list: compact, art: posters });
-        await expect(page.getByTestId('motion-node').first()).toBeVisible();
+        await expect(page.locator('.svelte-flow__node').first()).toBeVisible();
         await page.waitForTimeout(SETTLE_MS);
       };
       await mount();

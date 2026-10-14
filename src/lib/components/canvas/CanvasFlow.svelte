@@ -31,6 +31,8 @@
   import { untrack } from 'svelte';
   import { SvelteFlow, type Node } from '@xyflow/svelte';
   import CanvasDots from './CanvasDots.svelte';
+  import CanvasPosterLayer from './CanvasPosterLayer.svelte';
+  import { POSTER_CLASS } from '$lib/canvas/poster-lod';
   import '@xyflow/svelte/dist/style.css';
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
@@ -112,6 +114,7 @@
      *  seleziona; un inserimento realtime da un altro utente non la porta mai. */
     select?: boolean;
     settings?: boolean;
+    poster?: string;
   };
 
   let {
@@ -297,7 +300,7 @@
       minH: t.minH
     },
     type: 'tile',
-    class: t.settings ? 'has-settings' : undefined,
+    class: [t.settings && 'has-settings', t.poster && POSTER_CLASS].filter(Boolean).join(' ') || undefined,
     style: `width:${t.w}px;height:${t.h}px`
   });
 
@@ -721,6 +724,7 @@
   let wrap = $state<HTMLDivElement | null>(null);
 
   const tierBoard = provideTierBoard();
+  const posters = $derived(new Map(tiles.flatMap((t) => (t.poster ? [[t.id, t.poster] as const] : []))));
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -- il trascinamento è una scorciatoia sulla
@@ -801,6 +805,7 @@
     />
     <CanvasImageTiers board={tierBoard} />
     <CanvasDots />
+    <CanvasPosterLayer {posters} />
   </SvelteFlow>
 
   {#if refusal}
@@ -921,6 +926,10 @@
 
     --xy-edge-stroke: color-mix(in srgb, var(--ink-soft, #6e6e73) 45%, var(--paper, #fff));
     --xy-edge-stroke-selected: var(--accent, #7c5cff);
+  }
+
+  .wrap :global(.poster-lod .svelte-flow__node.has-poster:not(.selected) > *) {
+    visibility: hidden;
   }
 
   .wrap.moving :global(.svelte-flow__viewport) {
