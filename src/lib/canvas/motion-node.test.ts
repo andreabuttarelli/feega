@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import { MOTION_NODE_BAR_H, frameNodeSize, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { NodeMode } from './inline-motion';
 import { nodeSize } from './node-size';
 
 describe('motion node', () => {
@@ -75,5 +76,10 @@ describe('a frame node follows the shape of its graphic', () => {
 
   it('a resize keeps the width the hand chose and fixes the height to the picture', () => {
     expect(frameNodeSize(300.4, { width: 1080, height: 1920 })).toEqual({ w: 300, h: 533 + MOTION_NODE_BAR_H });
+  });
+
+  it('while edited it is only the picture: no bar under it', () => {
+    expect(frameNodeSize(420, { width: 1920, height: 1080 }, NodeMode.Edit)).toEqual({ w: 420, h: 236 });
+    expect(frameNodeSize(420, { width: 1920, height: 1080 }, NodeMode.Preview)).toEqual({ w: 420, h: 236 + MOTION_NODE_BAR_H });
   });
 });

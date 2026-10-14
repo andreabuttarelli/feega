@@ -161,6 +161,14 @@ async function expectTimelineFits(page: Page) {
   return { timeline, head };
 }
 
+async function openOnPhone(page: Page) {
+  const stage = page.getByTestId('motion-node-stage').first();
+  await stage.click({ position: { x: 60, y: 10 } });
+  await stage.getByTestId('open-motion-editor').click();
+}
+
+const NEIGHBOUR_MIN_OPACITY = 0.75;
+
 const viewportTransform = (page: Page) => page.locator('.svelte-flow__viewport').evaluate((el) => getComputedStyle(el).transform);
 
 test.use({ video: SHOTS ? 'on' : 'off' });
@@ -308,7 +316,7 @@ test.describe('motion editor inside the canvas @real', () => {
   test('on a phone the title in the node is drawn sharp, at the size it is shown', async ({ page, session }) => {
     await page.setViewportSize(PHONE);
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.getByTestId('motion-node-stage').first().click({ position: { x: 60, y: 10 } });
+    await openOnPhone(page);
     await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
     await page.waitForTimeout(2500);
 
@@ -321,7 +329,11 @@ test.describe('motion editor inside the canvas @real', () => {
     test(`on a ${name} the node is the player and the panels fit`, async ({ page, session }) => {
       await page.setViewportSize(size);
       await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-      await page.getByTestId('motion-node-stage').first().click({ position: { x: 60, y: 10 } });
+      if (name === 'phone') {
+        await openOnPhone(page);
+      } else {
+        await page.getByTestId('motion-node-stage').first().click({ position: { x: 60, y: 10 } });
+      }
 
       const editor = page.getByTestId('motion-editor');
       await expect(editor).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
@@ -335,8 +347,8 @@ test.describe('motion editor inside the canvas @real', () => {
       if (name === 'phone') {
         expect(head.width, 'layer names take a narrow column on a phone').toBeLessThanOrEqual(timeline.width * PHONE_HEAD_SHARE);
         await expect(page.locator('.mobile-topbar'), 'one bar on top while editing').toBeHidden();
-        const shown = await page.locator('.svelte-flow__node').evaluateAll((nodes) => nodes.filter((n) => Number(getComputedStyle(n).opacity) > 0).length);
-        expect(shown, 'no clipped neighbour around the edited node').toBe(1);
+        const opacities = await page.locator('.svelte-flow__node').evaluateAll((nodes) => nodes.map((n) => Number(getComputedStyle(n).opacity)));
+        expect(Math.min(...opacities), 'the other nodes stay on the canvas while a frame is edited').toBeGreaterThanOrEqual(NEIGHBOUR_MIN_OPACITY);
       }
 
       await OPEN_AGENT[(await editor.getAttribute('data-viewport')) ?? 'desktop'](page);

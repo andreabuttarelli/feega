@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { NodeMode } from './inline-motion';
 
 export type MotionNode = {
   id: string;
@@ -40,6 +41,11 @@ export function storyboardOf(data: Record<string, unknown>): StoryboardLink | nu
 
 export const MOTION_NODE_BAR_H = 44;
 
+const BAR_H: Record<NodeMode, number> = {
+  [NodeMode.Preview]: MOTION_NODE_BAR_H,
+  [NodeMode.Edit]: 0
+};
+
 const MOTION_STAGE_WIDTH: Record<MotionFormat, number> = {
   [MotionFormat.Landscape]: 420,
   [MotionFormat.Vertical]: 288,
@@ -55,9 +61,9 @@ export function motionNodeSize(format: MotionFormat = MotionFormat.Vertical): { 
   return { w, h: Math.round((w * height) / width) + MOTION_NODE_BAR_H };
 }
 
-export function frameNodeSize(width: number, picture: { width: number; height: number }): { w: number; h: number } {
+export function frameNodeSize(width: number, picture: { width: number; height: number }, mode: NodeMode = NodeMode.Preview): { w: number; h: number } {
   const w = Math.round(width);
-  return { w, h: Math.round((w * picture.height) / picture.width) + MOTION_NODE_BAR_H };
+  return { w, h: Math.round((w * picture.height) / picture.width) + BAR_H[mode] };
 }
 
 export function newMotionData(format: MotionFormat = MotionFormat.Vertical): Record<string, unknown> {

@@ -1,8 +1,32 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { anchoredTo, inlineStage } from './inline-stage.svelte';
+import { Paint } from './inline-motion';
 
 describe('inline stage', () => {
+  it('the editor shows only once its player has drawn, and the node keeps its picture a beat longer', async () => {
+    vi.useFakeTimers();
+    const take = inlineStage.offer('m1', document.createElement('div'));
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Pending);
+
+    inlineStage.ready('m2');
+    inlineStage.ready('m1');
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Pending);
+
+    await vi.advanceTimersByTimeAsync(40);
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Shown);
+
+    await vi.runAllTimersAsync();
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Swapped);
+    expect(inlineStage.paintOf('m2')).toBe(Paint.Pending);
+
+    take();
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Pending);
+    inlineStage.offer('m1', document.createElement('div'))();
+    expect(inlineStage.paintOf('m1'), 'a reopened editor waits for its own first frame').toBe(Paint.Pending);
+    vi.useRealTimers();
+  });
+
   it('a node offers its body as the stage of its own editor only, and takes it back', () => {
     const body = document.createElement('div');
     const take = inlineStage.offer('m1', body);
