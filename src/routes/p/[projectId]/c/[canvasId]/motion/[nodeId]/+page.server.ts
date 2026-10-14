@@ -14,19 +14,13 @@ import { renderQueue } from '$lib/server/motion/render-queue';
 import { parseSettings } from '$lib/motion/export-formats';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
-import { saveExport } from '$lib/server/motion/export';
 import { savePoster } from '$lib/server/motion/poster';
 import { exportStill } from '$lib/server/motion/still-export';
 import { stillAskSchema, stillExport } from '$lib/motion/still-model';
 import { Sound, generateSound } from '$lib/server/motion/voiceover';
 import { withOrgContext } from '$lib/server/ai-log';
-import { saveFontUpload } from '$lib/server/motion/font-upload';
-import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
-import { clipsOf, parseMotionDoc } from '$lib/motion/doc';
+import { clipsOf } from '$lib/motion/doc';
 import { templateLibrary } from '$lib/server/motion/templates';
-import { withTemplateSounds } from '$lib/server/motion/template-sounds';
-import { laySfx } from '$lib/server/motion/sfx';
-import type { Sfx } from '$lib/motion/sfx';
 import type { Db } from '$lib/server/db/client';
 import { loadAttachments } from '$lib/server/chat-attachments/register';
 import { briefAttachmentIds } from '$lib/motion/video-brief';
@@ -104,17 +98,8 @@ export const actions: Actions = {
   exported: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const saved = await saveExport(scope.db, {
-      orgId: scope.orgId,
-      projectId: params.projectId,
-      nodeId: scope.motion.record.id,
-      actor: { kind: 'user', id: scope.userId },
-      path: String(form.get('path') ?? ''),
-      width: Number(form.get('width')),
-      height: Number(form.get('height')),
-      seconds: Number(form.get('seconds'))
-    });
-    return saved.ok ? { assetId: saved.assetId } : fail(HTTP_BAD_REQUEST, { error: saved.error });
+    const input = { path: String(form.get('path') ?? ''), width: Number(form.get('width')), height: Number(form.get('height')), seconds: Number(form.get('seconds')) };
+    return answered(await runEditorOp('record_export', editorCtx(scope), input));
   },
 
   poster: async ({ locals, params, request }) => {
@@ -142,20 +127,13 @@ export const actions: Actions = {
   uploadFont: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const saved = await saveFontUpload(scope.db, { orgId: scope.orgId, projectId: params.projectId, path: String(form.get('path') ?? '') });
-    if (!saved.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: saved.error });
-    }
-    const assets = await motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id });
-    return { asset: assets.find((a) => a.id === saved.assetId) ?? null };
+    return answered(await runEditorOp('upload_font', editorCtx(scope), { path: String(form.get('path') ?? '') }));
   },
 
   analyze: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const ids = form.getAll('assetId').map(String);
-    const assets = await motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id });
-    return { analyses: await analyzeSounds(storageAnalysis(scope.db), { orgId: scope.orgId, projectId: params.projectId }, assets, ids) };
+    return answered(await runEditorOp('analyze_sounds', editorCtx(scope), { assetIds: form.getAll('assetId').map(String) }));
   },
 
   sound: async ({ locals, params, request }) => {
@@ -241,30 +219,20 @@ export const actions: Actions = {
   templateSounds: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const parsed = parseMotionDoc(parsedJson(String(form.get('doc') ?? '')));
-    if (!parsed.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: parsed.error });
-    }
-    const soundScope = { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } };
-    const make = (sfx: Sfx) => withOrgContext(scope.orgId, () => laySfx(scope.db, soundScope, sfx));
-    const laid = await withTemplateSounds(parsed.doc, String(form.get('clipId') ?? ''), make, () => crypto.randomUUID().slice(0, 8));
-    return laid.ok ? { doc: laid.doc } : fail(HTTP_UNAVAILABLE, { error: laid.error });
+    return answered(await runEditorOp('template_sounds', editorCtx(scope), { doc: parsedJson(String(form.get('doc') ?? '')), clipId: String(form.get('clipId') ?? '') }));
   },
 
   saveTemplate: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const parsed = parseMotionDoc(parsedJson(String(form.get('doc') ?? '')));
-    if (!parsed.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: parsed.error });
-    }
-    const saved = await libraryOf(scope).save({
-      doc: parsed.doc,
+    const input = {
+      doc: parsedJson(String(form.get('doc') ?? '')),
       compId: String(form.get('compId') ?? '') || null,
-      meta: { name: String(form.get('name') ?? ''), description: String(form.get('description') ?? '') },
+      name: String(form.get('name') ?? ''),
+      description: String(form.get('description') ?? ''),
       posterFrame: Number(form.get('posterFrame')) || 0
-    });
-    return saved.ok ? { entry: saved.entry } : fail(HTTP_BAD_REQUEST, { error: saved.error });
+    };
+    return answered(await runEditorOp('save_template', editorCtx(scope), input));
   },
 
   publishGallery: async ({ locals, params, request }) => {

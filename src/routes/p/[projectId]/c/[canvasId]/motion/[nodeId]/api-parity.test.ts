@@ -21,10 +21,12 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [{ org: 
 vi.mock('$lib/server/canvas/lookup', () => ({
   findCanvasForUser: async () => ({ orgId: ORG, canvas: { id: CANVAS, projectId: PROJECT, name: 'C', viewport: null }, mode: 'standard', projectBrandId: null })
 }));
+vi.mock('$lib/server/canvas/sign-media', async (real) => ({ ...(await real<object>()), createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: () => reachable() }));
 
 const { actions } = await import('./+page.server');
 const { POST } = await import('../../../../../../api/v1/motion/[nodeId]/ops/+server');
+const { POST: POST_POSTER } = await import('../../../../../../api/v1/motion/[nodeId]/poster/+server');
 
 const nodeRow = { id: NODE, org_id: ORG, project_id: PROJECT, canvas_id: CANVAS, type: 'motion', display_name: 'V', x: 0, y: 0, z: 0, width: null, height: null, data: {}, version: 1, deleted_at: null };
 
@@ -147,6 +149,94 @@ describe('the frame editor action and its /api/v1 op answer the same', () => {
 
     expect(action).toEqual({ status: 200, data: { batch: null } });
     expect(endpoint).toEqual(action);
+  });
+});
+
+describe('the frame editor file and template actions answer like their ops', () => {
+  it('exported and record_export refuse a path outside the export folder', async () => {
+    const action = await viaAction('exported', { path: 'elsewhere/x.mp4', width: '1920', height: '1080', seconds: '3' });
+    const endpoint = await viaEndpoint('record_export', { path: 'elsewhere/x.mp4', width: 1920, height: 1080, seconds: 3 });
+
+    expect(action).toEqual({ status: 400, data: { error: 'invalid_path' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('uploadFont and upload_font refuse a path that is not an upload', async () => {
+    const action = await viaAction('uploadFont', { path: 'elsewhere/f.woff2' });
+    const endpoint = await viaEndpoint('upload_font', { path: 'elsewhere/f.woff2' });
+
+    expect(action.status).toBe(400);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('analyze and analyze_sounds', async () => {
+    const action = await viaAction('analyze', { assetId: [] });
+    const endpoint = await viaEndpoint('analyze_sounds', { assetIds: [] });
+
+    expect(action).toEqual({ status: 200, data: { analyses: {} } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('saveTemplate and save_template refuse what is not a motion doc', async () => {
+    const action = await viaAction('saveTemplate', { doc: '"nope"', name: 'T', description: '', posterFrame: '0' });
+    const endpoint = await viaEndpoint('save_template', { doc: 'nope', name: 'T', description: '', posterFrame: 0 });
+
+    expect(action.status).toBe(400);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('saveTemplate and save_template refuse a video with no exposed field', async () => {
+    const action = await viaAction('saveTemplate', { doc: JSON.stringify(start()), name: 'T', description: '', posterFrame: '0' });
+    const endpoint = await viaEndpoint('save_template', { doc: start(), name: 'T', description: '', posterFrame: 0 });
+
+    expect(action.status).toBe(400);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('templateSounds and template_sounds refuse what is not a motion doc', async () => {
+    const action = await viaAction('templateSounds', { doc: '"nope"', clipId: 'a' });
+    const endpoint = await viaEndpoint('template_sounds', { doc: 'nope', clipId: 'a' });
+
+    expect(action.status).toBe(400);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('templateSounds and template_sounds on a clip that is no template', async () => {
+    const action = await viaAction('templateSounds', { doc: JSON.stringify(start()), clipId: 'a' });
+    const endpoint = await viaEndpoint('template_sounds', { doc: start(), clipId: 'a' });
+
+    expect(endpoint).toEqual(action);
+  });
+});
+
+async function viaPosterEndpoint(form: FormData, writeAllowed = true) {
+  const db = seed();
+  resolveOrgCaller.mockResolvedValue({ caller: { db, orgId: ORG, userId: USER, writeAllowed, apiKeyId: 'key-1' } });
+  const url = new URL(`https://feega.test/api/v1/motion/${NODE}/poster`);
+  const res = await (POST_POSTER as (event: unknown) => Promise<Response>)({
+    request: new Request(url, { method: 'POST', headers: { authorization: 'Bearer t' }, body: form }),
+    params: { nodeId: NODE },
+    url
+  });
+  return { status: res.status, data: JSON.parse(JSON.stringify(await res.json())) };
+}
+
+describe('the poster action and POST /api/v1/motion/[nodeId]/poster answer the same', () => {
+  it('both refuse a poster that is not a jpeg', async () => {
+    const form = new FormData();
+    form.set('file', new File(['x'], 'p.png', { type: 'image/png' }));
+
+    const action = await viaAction('poster', { width: '10', height: '10' });
+    const endpoint = await viaPosterEndpoint(form);
+
+    expect(action).toEqual({ status: 400, data: { error: 'invalid_poster' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('refuses a read-only key', async () => {
+    const endpoint = await viaPosterEndpoint(new FormData(), false);
+
+    expect(endpoint).toEqual({ status: 403, data: { error: 'api_key_read_only' } });
   });
 });
 
