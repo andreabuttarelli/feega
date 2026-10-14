@@ -1,16 +1,11 @@
 <script lang="ts">
-  import PageTitle from '$lib/components/PageTitle.svelte';
+  import HomeHero from '$lib/components/app/HomeHero.svelte';
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { enhance } from '$app/forms';
   import { preloadCode } from '$app/navigation';
   import { BriefPhase, briefPhaseAfter, briefProgress } from '$lib/motion/brief-progress';
-  import VideoCard from '$lib/components/app/VideoCard.svelte';
-  import ProjectCard from '$lib/components/app/ProjectCard.svelte';
-  import ComponentShelf from '$lib/components/app/ComponentShelf.svelte';
-  import PosterShelf from '$lib/components/app/PosterShelf.svelte';
-  import type { VideoPage } from '$lib/server/dashboard/dashboard';
-  import { GALLERY_PATH, byline, itemPath } from '$lib/gallery/model';
+  import CanvasRows from '$lib/components/app/CanvasRows.svelte';
   import { BRIEF_MAX } from '$lib/motion/video-brief';
   import { ComposerKey, composerKey, rotateTemplates } from '$lib/motion/brief-composer';
   import { composerHeight } from '$lib/components/brand-agent/composer-height';
@@ -22,10 +17,9 @@
 
   let { data, form } = $props();
 
-  const PLACEHOLDER = 'Paste your website or describe the video you want…';
+  const PLACEHOLDER = 'Describe what you want to make, or paste your website…';
   const EXAMPLES_SHOWN = 3;
   const EXAMPLE_TURN_MS = 6000;
-  const SKELETONS = 5;
   const EDITOR_ROUTE = '/p/_/c/_/motion/_';
 
   let phase = $state(BriefPhase.Idle);
@@ -36,9 +30,7 @@
   let field = $state<HTMLTextAreaElement | null>(null);
   let composer = $state<HTMLFormElement | null>(null);
   let picker = $state<HTMLInputElement | null>(null);
-  let videos = $state(data.dashboard.motions);
-  let more = $state(data.dashboard.moreVideos);
-  let loadingMore = $state(false);
+  const recents = $derived(data.dashboard.canvases);
 
   const uploads = $derived(data.attachProjectId ? new ChatUploads(data.attachProjectId) : null);
   const ready = $derived(uploads?.ready ?? []);
@@ -61,25 +53,6 @@
     field.style.height = 'auto';
     field.style.height = composerHeight(field.scrollHeight);
   });
-
-  async function loadMore() {
-    if (!more || loadingMore) {
-      return;
-    }
-    loadingMore = true;
-    try {
-      const response = await fetch(`/app/videos?before=${encodeURIComponent(more)}`);
-      if (!response.ok) {
-        return;
-      }
-      const page: VideoPage = await response.json();
-      const seen = new Set(videos.map((v) => v.id));
-      videos = [...videos, ...page.videos.filter((v) => !seen.has(v.id))];
-      more = page.more;
-    } finally {
-      loadingMore = false;
-    }
-  }
 
   function preloadEditor() {
     void preloadCode(EDITOR_ROUTE);
@@ -104,6 +77,7 @@
     const input = e.currentTarget as HTMLInputElement;
     uploads?.add([...(input.files ?? [])]);
     input.value = '';
+    field?.focus();
   }
 
   function pasted(e: ClipboardEvent) {
@@ -146,191 +120,257 @@
   };
 </script>
 
-<svelte:head><title>Make a video · feega</title></svelte:head>
+<svelte:head><title>Home · feega</title></svelte:head>
 
 <div class="home">
-  <section class="hero" aria-labelledby="create-heading" data-testid="home-hero">
-    <div class="center">
-      <PageTitle id="create-heading" text="make a video." />
+  <div class="create" data-testid="home-create">
+    {#if uploads}
+      <button type="button" class="pill" data-testid="home-import" onclick={() => picker?.click()}>import</button>
+      <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
+    {/if}
+    <form method="POST" action="?/project">
+      <button type="submit" class="pill primary" data-testid="new-canvas">new canvas</button>
+    </form>
+  </div>
 
-      <form
-        method="POST"
-        action="?/video"
-        class="composer"
-        class:dragging
-        aria-busy={sending}
-        bind:this={composer}
-        use:enhance={submit}
-        ondragover={dragged}
-        ondragleave={() => (dragging = false)}
-        ondrop={dropped}
-      >
-        {#if uploads?.items.length}
-          <ChatAttachments items={uploads.items} onremove={(id) => uploads?.remove(id)} />
-        {/if}
-        {#if dragging}
-          <p class="drop-hint" aria-hidden="true">{$_('chat.panel.attach.drop')}</p>
-        {/if}
-        <textarea
-          name="brief"
-          id="video-brief"
-          data-testid="video-brief"
-          placeholder={PLACEHOLDER}
-          aria-label={PLACEHOLDER}
-          maxlength={BRIEF_MAX}
-          rows="2"
-          enterkeyhint="send"
-          bind:value={brief}
-          bind:this={field}
-          onkeydown={keyed}
-          onpaste={pasted}
-          onfocus={preloadEditor}
-          readonly={sending}
-        ></textarea>
-        {#if data.attachProjectId}<input type="hidden" name="projectId" value={data.attachProjectId} />{/if}
-        {#each ready as attachment (attachment.assetId)}<input type="hidden" name="attachment" value={attachment.assetId} />{/each}
-        <div class="row">
-          {#if uploads}
-            <span class="attach">
-              <IconButton action={Tool.Attach} label={$_('chat.panel.attach.button')} data-testid="chat-attach" onclick={() => picker?.click()} />
-              <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
-            </span>
-          {/if}
-          {#if sending}<span class="progress" role="status" data-testid="brief-progress">{briefProgress(phase)}</span>{/if}
-          <button type="submit" class="send" class:busy={sending} data-testid="brief-send" disabled={!canSend} aria-label="Make the video" title="Make the video">
-            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" /></svg>
-          </button>
-        </div>
-      </form>
-      {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
+  <div class="scroll" data-testid="home-scroll">
+    <HomeHero />
 
-      <div class="examples" data-testid="brief-examples" aria-label="Example prompts">
-        {#each examples as template (template.id)}
-          <button type="button" data-brief={template.brief} onclick={() => fill(template.brief)}>{template.name}</button>
-        {/each}
-      </div>
-
-      <p class="helper" data-testid="brief-helper">feega reads your site and makes a launch video · or describe any motion</p>
-    </div>
-  </section>
-
-  <a class="peek" href="#videos-heading" data-testid="home-peek">your videos <span aria-hidden="true">↓</span></a>
-
-  <section class="shelf" aria-labelledby="videos-heading">
-    <h2 id="videos-heading">your videos</h2>
-    {#if videos.length}
-      <ul class="grid" data-testid="home-videos">
-        {#each videos as video (video.id)}
-          <li><VideoCard {video} /></li>
-        {/each}
-        {#if loadingMore}
-          {#each { length: SKELETONS } as _, i (i)}
-            <li class="skeleton" aria-hidden="true"><span></span><i></i><i></i></li>
-          {/each}
-        {/if}
-      </ul>
-      {#if more}
-        <button type="button" class="quiet more-videos" data-testid="more-videos" disabled={loadingMore} onclick={loadMore}>show more</button>
+    <div class="column">
+      {#if recents.length}
+        <section class="recents" aria-labelledby="recents-heading">
+          <h2 id="recents-heading">recents</h2>
+          <CanvasRows canvases={recents} testid="home-recents" />
+        </section>
+      {:else}
+        <p class="empty" data-testid="home-empty">
+          nothing here yet. <a href="#video-brief">describe what you want</a> and feega opens a canvas for it, or start a blank one with new canvas.
+        </p>
       {/if}
-    {:else}
-      <p class="empty" data-testid="home-videos-empty">nothing here yet. <a href="#video-brief">describe your first video</a> and it lands here.</p>
-    {/if}
-  </section>
-
-  <ComponentShelf items={data.components} projectId={data.attachProjectId} />
-
-  {#if data.posters.length}<PosterShelf items={data.posters} projectId={data.attachProjectId} />{/if}
-
-  <section class="shelf" aria-labelledby="projects-heading">
-    <div class="head">
-      <h2 id="projects-heading">projects</h2>
-      <form method="POST" action="?/project">
-        <button type="submit" class="quiet" data-testid="new-project">+ new project</button>
-      </form>
     </div>
-    {#if data.dashboard.projects.length}
-      <ul class="grid" data-testid="home-projects">
-        {#each data.dashboard.projects as project (project.id)}
-          <li><ProjectCard {project} /></li>
-        {/each}
-      </ul>
-    {:else}
-      <p class="empty" data-testid="home-projects-empty">no projects yet. every video you make opens one.</p>
-    {/if}
-  </section>
+  </div>
 
-  {#if data.gallery.length}
-    <section class="shelf" aria-labelledby="gallery-heading">
-      <div class="head">
-        <h2 id="gallery-heading">remix from the gallery</h2>
-        <a class="quiet" href={GALLERY_PATH} data-sveltekit-reload>see all</a>
+  <div class="dock">
+    <div class="examples" data-testid="brief-examples" aria-label="Suggestions">
+      {#each examples as template (template.id)}
+        <button type="button" data-brief={template.brief} onclick={() => fill(template.brief)}>{template.name}</button>
+      {/each}
+    </div>
+
+    <form
+      method="POST"
+      action="?/video"
+      class="composer"
+      class:dragging
+      aria-busy={sending}
+      bind:this={composer}
+      use:enhance={submit}
+      ondragover={dragged}
+      ondragleave={() => (dragging = false)}
+      ondrop={dropped}
+    >
+      {#if uploads?.items.length}
+        <ChatAttachments items={uploads.items} onremove={(id) => uploads?.remove(id)} />
+      {/if}
+      {#if dragging}
+        <p class="drop-hint" aria-hidden="true">{$_('chat.panel.attach.drop')}</p>
+      {/if}
+      <textarea
+        name="brief"
+        id="video-brief"
+        data-testid="video-brief"
+        placeholder={PLACEHOLDER}
+        aria-label={PLACEHOLDER}
+        maxlength={BRIEF_MAX}
+        rows="2"
+        enterkeyhint="send"
+        bind:value={brief}
+        bind:this={field}
+        onkeydown={keyed}
+        onpaste={pasted}
+        onfocus={preloadEditor}
+        readonly={sending}
+      ></textarea>
+      {#if data.attachProjectId}<input type="hidden" name="projectId" value={data.attachProjectId} />{/if}
+      {#each ready as attachment (attachment.assetId)}<input type="hidden" name="attachment" value={attachment.assetId} />{/each}
+      <div class="row">
+        {#if uploads}
+          <IconButton action={Tool.Attach} label={$_('chat.panel.attach.button')} data-testid="chat-attach" onclick={() => picker?.click()} />
+        {/if}
+        {#if sending}<span class="progress" role="status" data-testid="brief-progress">{briefProgress(phase)}</span>{/if}
+        <button type="submit" class="send" class:busy={sending} data-testid="brief-send" disabled={!canSend} aria-label="Start" title="Start">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="square" /></svg>
+        </button>
       </div>
-      <ul class="row-strip" data-testid="home-gallery">
-        {#each data.gallery as card (card.id)}
-          <li>
-            <a href={itemPath(card.id)} class="strip-card" data-sveltekit-reload>
-              <span class="strip-poster">
-                {#if card.posterUrl}<img src={card.posterUrl} alt="" loading="lazy" decoding="async" width="240" height="135" />{/if}
-              </span>
-              <span class="strip-title">{card.title}</span>
-              <span class="strip-meta">{byline(card)}</span>
-            </a>
-          </li>
-        {/each}
-      </ul>
-    </section>
-  {/if}
+    </form>
+    {#if form?.error}<p class="error" role="alert">{form.error}</p>{/if}
+  </div>
 </div>
 
 <style>
   .home {
-    max-width: 1200px;
-    margin: 0 auto;
+    --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
     display: flex;
     flex-direction: column;
-    gap: 64px;
+    height: calc(100svh - var(--ui-bar-h) - var(--content-pad-top) - var(--content-pad-bottom));
     color: var(--ui-ink);
   }
 
-  .hero {
-    --hero-chrome: calc(var(--ui-bar-h) + var(--content-pad-top));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    --peek: 260px;
-    min-height: calc(100svh - var(--hero-chrome) - var(--peek));
-    padding-top: calc(var(--peek) / 2);
-    text-align: center;
+  .scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
   }
 
-  .center {
+  .create {
+    display: flex;
+    margin-bottom: var(--ui-space-4);
+    justify-content: flex-end;
+    gap: var(--ui-space-2);
+  }
+
+  .pill {
+    height: 36px;
+    padding: 0 var(--ui-space-4);
+    border: 0;
+    border-radius: 9999px;
+    background: var(--ui-field);
+    color: var(--ui-ink);
+    font: inherit;
+    font-size: var(--ui-text-sm);
+    cursor: pointer;
+    transition: background 0.2s var(--ease-expo);
+  }
+
+  .pill:hover {
+    background: var(--ui-hover);
+  }
+
+  .pill.primary {
+    background: var(--ui-accent);
+    color: #fff;
+  }
+
+  .pill.primary:hover {
+    opacity: 0.9;
+  }
+
+  .pill:focus-visible,
+  .send:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-focus);
+  }
+
+  .column {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: var(--ui-space-4);
+    gap: 48px;
     width: 100%;
     max-width: 720px;
+    margin: 48px auto 0;
+    animation: rise 0.6s var(--ease-expo) both;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+
+  .recents {
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-3);
+  }
+
+  h2 {
+    margin: 0;
+    font-family: var(--ui-mono);
+    font-size: var(--ui-text-xs);
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    color: var(--ui-text-3);
+  }
+
+  @keyframes breathe {
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+
+
+
+  .empty {
+    margin: 0;
+    max-width: 44ch;
+    font-size: var(--ui-text-md);
+    line-height: 1.5;
+    color: var(--ui-text-3);
+  }
+
+  .empty a {
+    color: var(--ui-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--ui-text-3);
+    text-underline-offset: 3px;
+  }
+
+  .dock {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--ui-space-3);
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding-top: var(--ui-space-4);
+  }
+
+  .examples {
+    display: flex;
+    gap: var(--ui-space-2);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .examples button {
+    flex: none;
+    height: 32px;
+    padding: 0 var(--ui-space-3);
+    border: 0;
+    border-radius: 9999px;
+    background: var(--ui-field);
+    color: var(--ui-ink-2);
+    font: inherit;
+    font-size: var(--ui-text-sm);
+    cursor: pointer;
+    transition: background 0.2s var(--ease-expo);
+  }
+
+  .examples button:hover {
+    background: var(--ui-hover);
+    color: var(--ui-ink);
   }
 
   .composer {
     display: flex;
     flex-direction: column;
     gap: var(--ui-space-2);
-    width: 100%;
-    margin-top: var(--ui-space-6);
     padding: var(--ui-space-4) var(--ui-space-4) var(--ui-space-3);
     background: var(--ui-bg);
     border: 1px solid var(--ui-line-strong);
-    text-align: left;
-    transition: border-color 0.14s ease;
+    transition: border-color 0.2s var(--ease-expo);
   }
 
-  .composer:focus-within {
+  .composer:focus-within,
+  .composer.dragging {
     border-color: var(--ui-accent);
   }
 
   .composer.dragging {
-    border-color: var(--ui-accent);
     border-style: dashed;
   }
 
@@ -342,7 +382,7 @@
 
   textarea {
     width: 100%;
-    min-height: 56px;
+    min-height: 48px;
     max-height: 200px;
     padding: 0;
     border: 0;
@@ -368,23 +408,18 @@
     gap: var(--ui-space-2);
   }
 
-  .attach {
-    flex: 0 0 auto;
-  }
-
   .send {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     margin-left: auto;
     border: 0;
     border-radius: 9999px;
     background: var(--ui-accent);
     color: #fff;
     cursor: pointer;
-    transition: opacity 0.14s ease;
   }
 
   .send:disabled {
@@ -406,24 +441,7 @@
   .send.busy:disabled {
     background: var(--ui-accent);
     color: #fff;
-    animation: send-busy 1s ease-in-out infinite;
-  }
-
-  @keyframes send-busy {
-    50% {
-      opacity: 0.55;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .send.busy:disabled {
-      animation: none;
-    }
-  }
-
-  .send:focus-visible {
-    outline: none;
-    box-shadow: var(--ui-focus);
+    animation: breathe 1s ease-in-out infinite;
   }
 
   .sr-only {
@@ -441,238 +459,21 @@
     color: var(--ui-danger);
   }
 
-  .examples {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--ui-space-2);
-  }
-
-  .examples button {
-    height: 32px;
-    padding: 0 var(--ui-space-3);
-    border: 1px solid var(--ui-line);
-    border-radius: 9999px;
-    background: transparent;
-    color: var(--ui-ink-2);
-    font-size: var(--ui-text-sm);
-    cursor: pointer;
-  }
-
-  .examples button:hover {
-    border-color: var(--ui-ink-3);
-    color: var(--ui-ink);
-  }
-
-  .helper {
-    margin: 0;
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-3);
-  }
-
-  .home .peek {
-    align-self: center;
-    margin: calc(-1 * var(--ui-space-8) - var(--ui-space-6)) 0 calc(-1 * var(--ui-space-8));
-    padding: var(--ui-space-2) var(--ui-space-3);
-    font-size: var(--ui-text-sm);
-    color: var(--ui-text-3);
-    text-decoration: none;
-    transition: color 0.14s ease;
-  }
-
-  .home .peek:hover {
-    color: var(--ui-ink);
-  }
-
-  .shelf {
-    display: flex;
-    flex-direction: column;
-    gap: var(--ui-space-6);
-    scroll-margin-top: var(--ui-space-8);
-  }
-
-  .head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-height: 32px;
-  }
-
-  h2 {
-    margin: 0;
-    font-size: var(--ui-text-md);
-    font-weight: 500;
-    color: var(--ui-text-3);
-  }
-
-  .quiet {
-    height: 32px;
-    padding: 0 var(--ui-space-3);
-    border: 0;
-    border-radius: 9999px;
-    background: transparent;
-    color: var(--ui-text-3);
-    font: inherit;
-    font-size: var(--ui-text-sm);
-    line-height: 32px;
-    text-decoration: none;
-    cursor: pointer;
-    transition:
-      background 0.14s ease,
-      color 0.14s ease;
-  }
-
-  .quiet:hover {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
-  }
-
-  .more-videos {
-    align-self: center;
-    background: var(--ui-field);
-    color: var(--ui-ink);
-    padding: 0 var(--ui-space-6);
-  }
-
-  .more-videos:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
-
-  .empty {
-    margin: 0;
-    padding: var(--ui-space-8) 0;
-    font-size: var(--ui-text-md);
-    color: var(--ui-text-3);
-  }
-
-  .empty a {
-    color: var(--ui-ink);
-    text-decoration: underline;
-    text-decoration-color: var(--ui-text-3);
-    text-underline-offset: 3px;
-  }
-
-  ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--ui-space-6) var(--ui-space-3);
-  }
-
-  .skeleton span {
-    display: block;
-    aspect-ratio: 16 / 9;
-    margin-bottom: var(--ui-space-3);
-    background: var(--ui-surface);
-    animation: breathe 1.4s ease-in-out infinite;
-  }
-
-  .skeleton i {
-    display: block;
-    width: 70%;
-    height: 12px;
-    margin-top: 6px;
-    background: var(--ui-surface);
-    animation: breathe 1.4s ease-in-out infinite;
-  }
-
-  .skeleton i + i {
-    width: 45%;
-  }
-
-  @keyframes breathe {
-    50% {
-      opacity: 0.5;
-    }
-  }
-
-  .row-strip {
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(160px, 1fr);
-    gap: var(--ui-space-3);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .strip-card {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    color: var(--ui-ink);
-    text-decoration: none;
-  }
-
-  .strip-poster {
-    display: block;
-    aspect-ratio: 16 / 9;
-    margin-bottom: var(--ui-space-2);
-    overflow: hidden;
-    background: var(--ui-surface);
-  }
-
-  .strip-poster img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    transition: opacity 200ms ease;
-  }
-
-  .strip-card:hover img {
-    opacity: 0.88;
-  }
-
-  .strip-title {
-    overflow: hidden;
-    font-size: var(--ui-text-sm);
-    font-weight: 500;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .strip-meta {
-    font-size: var(--ui-text-xs);
-    color: var(--ui-text-3);
-  }
-
-  @media (min-width: 641px) {
-    .grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: var(--ui-space-8) var(--ui-space-4);
-    }
-  }
-
-  @media (min-width: 1280px) {
-    .grid {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-    }
-  }
-
-  @media (min-width: 1600px) {
-    .grid {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .hero {
-      --hero-chrome: var(--ui-space-8);
+  @media (prefers-reduced-motion: reduce) {
+    .column,
+    .send.busy:disabled {
+      animation: none;
     }
   }
 
   @media (max-width: 640px) {
-    .home {
-      gap: 48px;
+    .column {
+      gap: 32px;
+      margin-top: 32px;
     }
 
-    .hero {
-      --hero-chrome: calc(var(--ui-bar-h) + var(--ui-space-2));
+    .dock {
+      padding-top: var(--ui-space-3);
     }
 
     textarea {

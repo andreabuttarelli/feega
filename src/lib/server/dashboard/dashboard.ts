@@ -51,7 +51,9 @@ export type DashboardMotion = {
   href: string;
 };
 
-export type Dashboard = { projects: DashboardProject[]; batches: DashboardBatch[]; motions: DashboardMotion[]; moreVideos: string | null };
+export type DashboardCanvas = { id: string; name: string; projectName: string; updatedAt: string; href: string; thumbs: string[] };
+
+export type Dashboard = { canvases: DashboardCanvas[]; projects: DashboardProject[]; batches: DashboardBatch[]; motions: DashboardMotion[]; moreVideos: string | null };
 
 export type VideoPage = { videos: DashboardMotion[]; more: string | null };
 
@@ -65,18 +67,23 @@ const IMAGE_SCAN = 120;
 const OUTPUT_LIMIT = 8;
 const MOTION_SCAN = 200;
 const POSTERS_PER_PROJECT = 4;
+const RECENT_CANVASES = 12;
+const THUMBS_PER_CANVAS = 3;
 const UNTITLED_VIDEO = 'Untitled video';
 
-function firstPerProject<T extends { projectId: string }>(rows: T[], perProject: number): Map<string, T[]> {
+function firstPer<T>(rows: T[], keyOf: (row: T) => string, limit: number): Map<string, T[]> {
   const grouped = new Map<string, T[]>();
   for (const row of rows) {
-    const list = grouped.get(row.projectId) ?? [];
-    if (list.length < perProject) {
-      grouped.set(row.projectId, [...list, row]);
+    const list = grouped.get(keyOf(row)) ?? [];
+    if (list.length < limit) {
+      grouped.set(keyOf(row), [...list, row]);
     }
   }
   return grouped;
 }
+
+const byProject = (row: { projectId: string }) => row.projectId;
+const byCanvas = (row: { canvasId: string }) => row.canvasId;
 
 type Signed = Record<string, string | null>;
 
@@ -129,19 +136,29 @@ export async function dashboardFor(db: Db, deps: DashboardDeps, orgId: string): 
   const names = new Map(projects.map((p) => [p.id, p.name]));
   const visible = <T extends { projectId: string }>(rows: T[]) => rows.filter((r) => names.has(r.projectId)).slice(0, OUTPUT_LIMIT);
 
-  const canvasesOf = firstPerProject(canvases, CANVASES_PER_PROJECT);
-  const imagesOf = firstPerProject(images.filter((i) => names.has(i.projectId)), THUMBS_PER_PROJECT);
+  const canvasesOf = firstPer(canvases, byProject, CANVASES_PER_PROJECT);
+  const imagesOf = firstPer(images.filter((i) => names.has(i.projectId)), byProject, THUMBS_PER_PROJECT);
   const ownMotions = motionNodes.filter((n) => names.has(n.projectId));
   const { page, more } = pageOf(motionNodes);
   const motions = page.filter((n) => names.has(n.projectId));
-  const postersOf = firstPerProject(ownMotions.filter((n) => posterIdOf(n)), POSTERS_PER_PROJECT);
-  const posterIds = [...motions, ...[...postersOf.values()].flat()].map(posterIdOf).filter(present);
+  const postersOf = firstPer(ownMotions.filter((n) => posterIdOf(n)), byProject, POSTERS_PER_PROJECT);
+  const recentCanvases = canvases.filter((c) => names.has(c.projectId)).slice(0, RECENT_CANVASES);
+  const framesOf = firstPer(ownMotions.filter((n) => posterIdOf(n)), byCanvas, THUMBS_PER_CANVAS);
+  const posterIds = [...motions, ...[...postersOf.values()].flat(), ...[...framesOf.values()].flat()].map(posterIdOf).filter(present);
   const [urls, videos] = await Promise.all([
     deps.signImages(db, orgId, [...new Set([...[...imagesOf.values()].flat().map((i) => i.id), ...posterIds])]),
     deps.signVideos(db, orgId, motions.map(renderIdOf).filter(present))
   ]);
 
   return {
+    canvases: recentCanvases.map((c) => ({
+      id: c.id,
+      name: c.name,
+      projectName: names.get(c.projectId)!,
+      updatedAt: c.updatedAt,
+      href: canvasPath(c.projectId, c.id),
+      thumbs: (framesOf.get(c.id) ?? []).map((n) => urls[posterIdOf(n)!]).filter(present)
+    })),
     projects: projects.map((p) => ({
       id: p.id,
       name: p.name,

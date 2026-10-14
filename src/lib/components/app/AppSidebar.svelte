@@ -32,7 +32,25 @@
   const items = $derived(visibleNav(projectId));
   const inSection = (section: NavSection) => items.filter((item) => item.section === section);
 
-  const labelOf = (label: NavLabel) => ('key' in label ? $_(label.key) : label.text);
+  let menuOpen = $state(false);
+  let foot = $state<HTMLElement | null>(null);
+
+  function escaped(e: KeyboardEvent) {
+    if (e.key !== 'Escape' || !menuOpen) {
+      return;
+    }
+    menuOpen = false;
+    foot?.querySelector<HTMLElement>('[data-testid="account-toggle"]')?.focus();
+  }
+
+  function left(e: FocusEvent) {
+    if (foot?.contains(e.relatedTarget as Node | null)) {
+      return;
+    }
+    menuOpen = false;
+  }
+
+  const labelOf =(label: NavLabel) => ('key' in label ? $_(label.key) : label.text);
 
   const initials = $derived(
     (profile.name ?? '')
@@ -107,15 +125,8 @@
     {/each}
   </div>
 
-  <div class="group" data-testid="app-sidebar-tools">
-    <span class="heading">Tools</span>
-    {#each inSection(NavSection.Tools) as item (item.id)}
-      {@render entry(item)}
-    {/each}
-  </div>
-
   <div class="group" data-testid="app-sidebar-canvas">
-    <span class="heading">Assets &amp; canvas</span>
+    <span class="heading">Projects</span>
     {#each projects as project (project.id)}
       <a class="row" href="/p/{project.id}">
         <Folder size={ICON} strokeWidth={STROKE} />
@@ -130,20 +141,25 @@
     </form>
   </div>
 
-  <div class="foot">
-    <div class="group">
+  <div class="foot" bind:this={foot} onfocusout={left}>
+    <div class="menu" id="account-menu" data-testid="account-menu" hidden={!menuOpen}>
       {#each inSection(NavSection.Account) as item (item.id)}
         {@render entry(item)}
       {/each}
     </div>
 
-    <div class="account">
+    <button type="button" class="account" data-testid="account-toggle" aria-expanded={menuOpen} aria-controls="account-menu" onclick={() => (menuOpen = !menuOpen)}>
       <span class="avatar" aria-hidden="true">
         {#if profile.avatarUrl}<img src={profile.avatarUrl} alt="" />{:else}{initials}{/if}
       </span>
       <span class="who">
         <span class="name">{profile.name ?? profile.email}</span>
-        {#if workspaces.length > 1}
+        <span class="email">{profile.email}</span>
+      </span>
+    </button>
+
+    {#if workspaces.length > 1}
+      <div class="workspace">
           <form method="POST" action="/app?/workspace">
             <label class="sr-only" for="workspace-select">Workspace</label>
             <select id="workspace-select" name="orgId" value={org.id} onchange={(e) => e.currentTarget.form?.requestSubmit()}>
@@ -152,14 +168,13 @@
               {/each}
             </select>
           </form>
-        {:else}
-          <span class="org">{org.name}</span>
-        {/if}
-      </span>
-      {#if !projectId}<span class="meta"><CreditAmount amount={creditBalance} /></span>{/if}
-    </div>
+      </div>
+    {/if}
   </div>
 </nav>
+
+<svelte:window onkeydown={escaped} />
+
 
 <style>
   .app-sidebar {
@@ -300,10 +315,76 @@
     margin-top: auto;
   }
 
+  .foot {
+    position: relative;
+  }
+
+  .menu {
+    position: absolute;
+    bottom: calc(100% + var(--ui-space-1));
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    padding: var(--ui-space-1);
+    background: var(--ui-bg);
+    box-shadow: 0 0 0 1px var(--ui-line), 0 12px 32px rgb(0 0 0 / 0.12);
+    animation: menu-in 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .menu[hidden] {
+    display: none;
+  }
+
+  @keyframes menu-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .menu {
+      animation: none;
+    }
+  }
+
   .account {
     display: flex;
     align-items: center;
     gap: var(--ui-space-2);
+    width: 100%;
+    min-height: 44px;
+    padding: var(--ui-space-1) var(--ui-space-2);
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .account:hover,
+  .account[aria-expanded='true'] {
+    background: var(--ui-hover);
+  }
+
+  .account:focus-visible {
+    outline: none;
+    box-shadow: inset 0 0 0 1px var(--ui-accent);
+  }
+
+  .email {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: var(--ui-text-xs);
+    color: var(--ui-ink-3);
+  }
+
+  .workspace {
     padding: 0 var(--ui-space-2);
   }
 
@@ -312,8 +393,9 @@
     align-items: center;
     justify-content: center;
     flex: 0 0 auto;
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
+    border-radius: 9999px;
     overflow: hidden;
     background: var(--ui-surface);
     color: var(--ui-ink-2);
@@ -344,7 +426,7 @@
     color: var(--ui-ink);
   }
 
-  .org,
+
   .who select {
     font-size: var(--ui-text-xs);
     color: var(--ui-ink-3);

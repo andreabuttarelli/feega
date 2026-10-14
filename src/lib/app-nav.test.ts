@@ -1,19 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { TOOLS, ToolRole } from '$lib/tools';
 import { APP_NAV, NavKind, NavSection, isNavActive, navHref, visibleNav } from './app-nav';
 
 const PROJECT = 'p1';
 
 describe('app sidebar table', () => {
-  it('opens with New video, then home, motion and the gallery', () => {
+  it('is four plain entries: home, canvases, templates, tools — no badges', () => {
     const main = APP_NAV.filter((item) => item.section === NavSection.Main);
-    expect(main.map((item) => item.id)).toEqual(['new-video', 'home', 'tool:motion', 'gallery']);
-    expect(navHref(main[0], null)).toBe('/app#video-brief');
+    expect(main.map((item) => item.id)).toEqual(['home', 'canvases', 'templates', 'tools']);
+    expect(main.map((item) => navHref(item, null))).toEqual(['/app', '/app/canvases', '/app/templates', '/app/tools']);
+    expect(main.every((item) => item.badge === null)).toBe(true);
   });
 
-  it('lists every supporting tool of tools.ts, in order', () => {
-    const tools = APP_NAV.filter((item) => item.section === NavSection.Tools);
-    expect(tools.map((item) => item.id)).toEqual(TOOLS.filter((tool) => tool.role === ToolRole.Support).map((tool) => `tool:${tool.id}`));
+  it('every tool and the gallery live behind the one tools entry, not in the sidebar', () => {
+    const ids = APP_NAV.map((item) => item.id);
+    expect(ids.some((id) => id.startsWith('tool:'))).toBe(false);
+    expect(ids).not.toContain('gallery');
   });
 
   it('keeps every entry the old burger menu had in /app', () => {
@@ -25,12 +26,6 @@ describe('app sidebar table', () => {
     const ids = visibleNav(null).map((item) => item.id);
     expect(ids).not.toContain('settings');
     expect(ids).toContain('billing');
-  });
-
-  it('links tools to the most recent project', () => {
-    const studio = APP_NAV.find((item) => item.id === 'tool:studio')!;
-    expect(navHref(studio, PROJECT)).toBe('/app/studio?project=p1');
-    expect(navHref(studio, null)).toBe('/app/studio');
   });
 
   it('links credits to the workspace page, with or without a project', () => {

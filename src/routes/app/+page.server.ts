@@ -10,21 +10,17 @@ import { createProject } from '$lib/server/repos/projects';
 import { createCanvas } from '$lib/server/repos/canvas';
 import { SUPPORT_TOOLS } from '$lib/tools';
 import { toolScope } from '$lib/server/dashboard/tool-scope';
-import { MOTION_START_DEPS, startMotion } from '$lib/server/motion/start';
-import { listGallery } from '$lib/server/repos/gallery';
-import { gallerySearchSchema } from '$lib/gallery/model';
+import { CanvasPick } from '$lib/server/motion/start';
+import { handoffPath } from '$lib/canvas/chat-handoff';
 import { loadAttachments } from '$lib/server/chat-attachments/register';
 import { parseAttachments } from '$lib/chat-attachments';
 import { FROM_TEMPLATE_DEPS, FROM_TEMPLATE_ERROR, FROM_TEMPLATE_STATUS, FromTemplate, fromTemplateBody, startFromTemplate } from '$lib/server/motion/from-template';
-import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
-import { catalogue, posterShelf } from '$lib/motion/template/catalogue';
 import { motionEditorPath } from '$lib/canvas/motion-node';
-import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefEditorPath, briefMessage, briefName } from '$lib/motion/video-brief';
+import { BRIEF_MAX, BRIEF_TEMPLATES, FILES_ONLY_BRIEF, briefMessage, briefName } from '$lib/motion/video-brief';
 
 const HTTP_SEE_OTHER = 303;
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
-const HOME_GALLERY_SIZE = 8;
 const ORG_COOKIE_MAX_AGE_S = 60 * 60 * 24 * 365;
 const SLUG_BYTES = 4;
 
@@ -37,13 +33,8 @@ export const load: PageServerLoad = async (event) => {
   }
 
   const { org } = await event.parent();
-  const [dashboard, gallery, attachProjectId] = await Promise.all([
-    dashboardFor(db, DASHBOARD_DEPS, org.id),
-    listGallery(db, gallerySearchSchema.parse({ limit: HOME_GALLERY_SIZE })),
-    toolScope(event).then((scope) => scope.projectId, () => null)
-  ]);
-  const components = catalogue(BUILTIN_TEMPLATES);
-  return { dashboard, gallery, components, posters: posterShelf(components), templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
+  const [dashboard, attachProjectId] = await Promise.all([dashboardFor(db, DASHBOARD_DEPS, org.id), toolScope(event).then((scope) => scope.projectId, () => null)]);
+  return { dashboard, templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
 };
 
 function projectSlug(): string {
@@ -63,12 +54,9 @@ export const actions: Actions = {
     const brief = typed || FILES_ONLY_BRIEF;
     const scope = await toolScope(event, String(form.get('projectId') ?? '') || null);
     const attachments = attachmentIds.length ? await loadAttachments(scope.db, { orgId: scope.orgId, projectId: scope.projectId, ids: attachmentIds }) : [];
-    const started = await startMotion(scope.db, MOTION_START_DEPS, { orgId: scope.orgId, projectId: scope.projectId, canvasId: null, userId: scope.userId, name: briefName(brief) });
-    if (!started) {
-      return fail(HTTP_NOT_FOUND, { error: 'No canvas for this video' });
-    }
+    const canvas = await createCanvas(scope.db, { orgId: scope.orgId, projectId: scope.projectId, name: briefName(brief) });
 
-    throw redirect(HTTP_SEE_OTHER, briefEditorPath(started, briefMessage(brief), attachments.map((a) => a.assetId)));
+    throw redirect(HTTP_SEE_OTHER, handoffPath({ projectId: scope.projectId, canvasId: canvas.id }, briefMessage(brief), attachments.map((a) => a.assetId)));
   },
 
   fromTemplate: async (event) => {
@@ -79,7 +67,7 @@ export const actions: Actions = {
     }
 
     const scope = await toolScope(event, body.data.project ?? null);
-    const started = await startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, { orgId: scope.orgId, projectId: scope.projectId, userId: scope.userId, templateId: body.data.template, format: body.data.format });
+    const started = await startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, { orgId: scope.orgId, projectId: scope.projectId, userId: scope.userId, templateId: body.data.template, format: body.data.format, pick: CanvasPick.New });
     if (started.outcome !== FromTemplate.Started) {
       return fail(FROM_TEMPLATE_STATUS[started.outcome], { error: FROM_TEMPLATE_ERROR[started.outcome] });
     }

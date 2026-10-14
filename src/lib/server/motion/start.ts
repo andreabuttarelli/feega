@@ -19,9 +19,18 @@ export const MOTION_START_DEPS: MotionStartDeps = { listCanvases, createCanvas, 
 
 export type MotionStart = { projectId: string; canvasId: string; nodeId: string };
 
-type StartInput = { orgId: string; projectId: string; canvasId: string | null; userId: string; name: string; format?: MotionFormat; near?: string[]; at?: { x: number; y: number }; actor?: Actor };
+export enum CanvasPick {
+  Motion = 'motion',
+  New = 'new'
+}
+
+type StartInput = { orgId: string; projectId: string; canvasId: string | null; userId: string; name: string; format?: MotionFormat; near?: string[]; at?: { x: number; y: number }; actor?: Actor; pick?: CanvasPick };
 
 async function motionCanvasId(db: Db, deps: MotionStartDeps, input: StartInput): Promise<string | null> {
+  if (!input.canvasId && input.pick === CanvasPick.New) {
+    return (await deps.createCanvas(db, { orgId: input.orgId, projectId: input.projectId, name: input.name })).id;
+  }
+
   const canvases = await deps.listCanvases(db, { orgId: input.orgId, projectId: input.projectId });
   if (input.canvasId) {
     return canvases.find((c) => c.id === input.canvasId)?.id ?? null;
