@@ -2,6 +2,8 @@ import { js } from './html';
 
 export const MEASURE_REQUEST = 'feega:measure';
 export const MEASURE_REPLY = 'feega:measured';
+export const REDRAWN = 'feega:redrawn';
+export const REDRAW_QUIET_MS = 150;
 
 export type MeasuredBox = {
   left: number;
@@ -89,6 +91,18 @@ export function measureClips(root: HTMLElement, kinds: Kinds = KINDS): Record<st
   return boxes;
 }
 
+export function watchRedraws(drawing: Node, redrawn: () => void, quietMs: number): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const settle = () => {
+    clearTimeout(timer);
+    timer = setTimeout(redrawn, quietMs);
+  };
+  const watcher = new MutationObserver(settle);
+  watcher.observe(drawing, { subtree: true, attributes: true, childList: true, characterData: true });
+  document.fonts?.addEventListener?.('loadingdone', settle);
+  return () => void watcher.takeRecords();
+}
+
 export function measureScript(): string {
-  return `<script>(function(){var KINDS=${js(KINDS)};var measureClips=${measureClips.toString()};addEventListener('message',function(e){var m=e.data;if(!m||m.type!==${js(MEASURE_REQUEST)}||!e.source){return;}var root=document.getElementById('root');if(!root){return;}e.source.postMessage({type:${js(MEASURE_REPLY)},id:m.id,boxes:measureClips(root,KINDS)},'*');});})();</script>`;
+  return `<script>(function(){var KINDS=${js(KINDS)};var measureClips=${measureClips.toString()};var watchRedraws=${watchRedraws.toString()};var forget=watchRedraws(document.body,function(){parent.postMessage({type:${js(REDRAWN)}},'*');},${REDRAW_QUIET_MS});addEventListener('message',function(e){var m=e.data;if(!m||m.type!==${js(MEASURE_REQUEST)}||!e.source){return;}var root=document.getElementById('root');if(!root){return;}var boxes=measureClips(root,KINDS);forget();e.source.postMessage({type:${js(MEASURE_REPLY)},id:m.id,boxes:boxes},'*');});})();</script>`;
 }

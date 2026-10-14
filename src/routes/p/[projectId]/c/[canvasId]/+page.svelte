@@ -84,7 +84,8 @@
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import { frameNodeSize, motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
   import { FORMATS, MotionFormat } from '$lib/motion/doc';
-  import { CanvasState, NodeMode, Opening, Reframe, addBarOf, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
+  import { barContextOf } from '$lib/canvas/bottom-bar';
+  import { CanvasState, NodeMode, Opening, Reframe, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
   import { viewportOf } from '$lib/motion/editor-layout';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -2798,7 +2799,7 @@
     onPaste={paste}
     onTemplate={insertTemplate}
     onFrameTemplates={(at) => (frameLibraryAt = at)}
-    addBar={addBarOf(inlineMotion ? CanvasState.Editing : CanvasState.Browsing)}
+    barContext={barContextOf(inlineMotion ? CanvasState.Editing : CanvasState.Browsing)}
     onUndo={undo}
     onRedo={redo}
     onConnectNew={connectNew}
