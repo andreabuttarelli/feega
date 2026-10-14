@@ -143,8 +143,8 @@
     align-items: flex-end;
     gap: 16px;
     padding: 16px;
-    border: 1px solid var(--ui-divider);
-    background: var(--ui-panel);
+    border: 0;
+    background: var(--ui-panel-sunken);
     border-radius: var(--ui-radius-sm);
   }
 
@@ -160,8 +160,8 @@
     height: 32px;
     min-width: 200px;
     padding: 0 8px;
-    border: 1px solid var(--ui-divider-strong);
-    background: var(--ui-panel);
+    border: 0;
+    background: var(--ui-input);
     color: var(--ui-text);
     font-size: 13px;
     border-radius: var(--ui-radius-sm);
@@ -169,7 +169,11 @@
 
   .formats {
     display: flex;
-    border: 1px solid var(--ui-divider-strong);
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 2px;
+    background: var(--ui-input);
+    border: 0;
     border-radius: var(--ui-radius-md);
   }
 
@@ -181,8 +185,9 @@
     padding: 0 12px;
     font-size: 12.5px;
     color: var(--ui-text-secondary);
-    background: var(--ui-panel);
-    border-right: 1px solid var(--ui-divider-strong);
+    background: transparent;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
     cursor: pointer;
   }
 
@@ -191,8 +196,9 @@
   }
 
   .formats button.on {
-    background: var(--ui-accent-wash);
-    color: var(--ui-accent-text);
+    background: var(--ui-panel-raised);
+    color: var(--ui-text);
+    box-shadow: var(--ui-shadow-raised);
   }
 
   .ratio-glyph {
@@ -223,8 +229,8 @@
     width: 100%;
     height: 100%;
     padding: 0;
-    border: 1px solid var(--ui-divider);
-    background: var(--ui-panel);
+    border: 0;
+    background: var(--ui-panel-sunken);
     color: var(--ui-text);
     text-align: left;
     cursor: pointer;
@@ -233,7 +239,7 @@
 
   .template-button:hover,
   .template-button:focus-visible {
-    border-color: var(--ui-text);
+    background: var(--ui-wash);
   }
 
   .stage {

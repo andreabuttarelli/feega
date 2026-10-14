@@ -89,8 +89,8 @@
 
   .new {
     padding: 16px;
-    border: 1px solid var(--ui-divider);
-    background: var(--ui-panel);
+    border: 0;
+    background: var(--ui-panel-sunken);
     border-radius: var(--ui-radius-md);
   }
 
@@ -117,8 +117,8 @@
   .new-form input {
     height: 32px;
     padding: 0 8px;
-    border: 1px solid var(--ui-divider-strong);
-    background: var(--ui-panel);
+    border: 0;
+    background: var(--ui-input);
     color: var(--ui-text);
     font-size: 13px;
     border-radius: var(--ui-radius-sm);
@@ -130,9 +130,9 @@
     gap: 6px;
     height: 32px;
     padding: 0 12px;
-    border: 1px solid var(--ui-text);
+    border: 0;
     background: var(--ui-accent-solid);
-    color: var(--ui-accent-ink);
+    color: var(--ui-on-accent);
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
@@ -159,15 +159,15 @@
     flex-direction: column;
     gap: 4px;
     padding-bottom: 10px;
-    border: 1px solid var(--ui-divider);
-    background: var(--ui-panel);
+    border: 0;
+    background: var(--ui-panel-sunken);
     color: var(--ui-text);
     text-decoration: none;
     border-radius: var(--ui-radius-md);
   }
 
   .video:hover {
-    border-color: var(--ui-text);
+    background: var(--ui-wash);
   }
 
   .poster {

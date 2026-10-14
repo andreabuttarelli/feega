@@ -34,14 +34,14 @@
   .catalog { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
   .product { display: flex; flex-direction: column; gap: 8px; }
   .pimg {
-    aspect-ratio: 1; background: var(--ui-panel-sunken); border: 1px solid var(--ui-divider);
+    aspect-ratio: 1; background: var(--ui-input);
     background-size: cover; background-position: center;
     display: flex; align-items: center; justify-content: center;
     border-radius: var(--ui-radius-md);
   }
   .ph { font-size: 24px; font-weight: 700; color: var(--ui-text-tertiary); }
   .pinfo { display: flex; flex-direction: column; gap: 2px; }
-  .ptitle { font-size: 13px; font-weight: 600; color: var(--ui-text); }
-  .pprice { font-size: 12px; color: var(--ui-text-secondary); }
-  .punavailable { font-size: 11px; color: var(--amber); }
+  .ptitle { font-size: var(--ui-type-body); font-weight: var(--ui-weight-medium); color: var(--ui-text); }
+  .pprice { font-size: var(--ui-type-label); color: var(--ui-text-secondary); }
+  .punavailable { font-size: var(--ui-type-caption); color: var(--ui-warn); }
 </style>
