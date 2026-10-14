@@ -148,6 +148,14 @@ workspace, `patch_layout` replaces its spec at a `version`, `list_layouts` lists
 
 Test app account: the project chat logs in to the user's own app with a TEST account the user gives it in chat, and photographs its screens. `get_app_account` shows that account (never the password), `forget_app_account` drops it and its session.
 
+## Work a canvas with the chat's checks
+
+`canvas_tool` runs the project chat's own canvas ops on one `project_id`: `op` names it, `input`
+carries its fields in camelCase. List canvases, nodes and runs; create, update, move, connect and
+delete nodes; run a node; preview, queue or cancel a loop. Unlike `insert_row`/`update_row`, each
+write passes the checks the chat applies (node schema, model, uncensored targets, edge media).
+An unknown `op` answers the list of ops.
+
 ## Loop a node over many combinations
 
 `run_node_loop` queues every combination from a node's `iterate` wires (or a plain "repeat N")
