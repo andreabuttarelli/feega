@@ -313,7 +313,7 @@
 
   .primary {
     padding: 5px 10px;
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
   }
 

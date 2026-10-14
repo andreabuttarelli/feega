@@ -38,18 +38,57 @@ live in `src/lib/components/ui/shell/` and every bar and panel is built from the
 | `Hint` + `Kbd` | tooltip with the shortcut in platform glyphs (`⌘⇧Z` / `Ctrl+Shift+Z`) |
 | `Menu`, `MenuContent`, `MenuItem`, `MenuLabel`, `MenuSeparator` | every dropdown and context menu: icon · label · shortcut, 28px rows, danger tone in red |
 
-Sizes: 4px grid (`--ui-space-*`); rows 24 / 28 / 32 (`--ui-row-sm/row/row-lg`), 44 on touch;
+Sizes: 4px grid (`--ui-space-*`); rows 28 / 32 / 36 (`--ui-row-sm/row/row-lg`), 44 on touch;
 icons 12 / 14 / 16 / 20 (`--ui-icon-xs/sm/—/lg`). Motion: 120 / 200 / 320 ms on `--ui-ease`
 (expo out). Focus: `--ui-ring`, a 2px accent ring, on every focusable element via `focus-visible`.
 
 | Type role | Size / weight | Token |
 |---|---|---|
 | Panel title | 13px / 600, -0.01em | `text-ui-title` |
-| Section header | 10.5px / 600, caps, +0.06em, tertiary | `SECTION_LABEL` |
+| Section title | 13px / 600, sentence case | `SECTION_TITLE` |
+| Menu group label | 10.5px / 600, caps, +0.06em, tertiary | `SECTION_LABEL` |
 | Body, menu item | 13px / 400 | `text-ui-body` |
 | Label, row | 12px / 400–500 | `text-ui-label` |
 | Value, timecode, shortcut | 11px Fragment Mono, tabular | `text-ui-caption` + `--ui-mono` |
 | Caption, hint | 11px / 400, tertiary | `text-ui-caption` |
+
+### panels and inspector (reference: a pro design editor, dark first)
+
+These rules apply to every panel, including the Properties inspector:
+
+- **Elevation reads at a glance:** canvas darkest, side panels one step lighter, inputs one more
+  step (`--ui-canvas` < `--ui-panel` < `--ui-input`). Never a border where a step will do.
+- **Generous targets:** rows 32px (`--ui-row`), inputs 32px, panel header 48px; 44px on touch.
+- **Panel tabs:** a `SegmentedControl` at the top of a panel switches its views (right panel:
+  Chat / Properties). No underlined tabs.
+- **Sections:** bold sentence-case title (13px semibold, `Section`), a `+` `IconButton` at the
+  right when the section can add something (Layout, Effects, Fill…). No caps headers inside
+  the inspector; caps stay for menu group labels.
+- **Rows:** label left (secondary, 12–13px), control right (`Field`). Values in filled
+  inputs with `md` radius (`FIELD_INPUT`), mono tabular numbers.
+- **Controls:** inline dropdowns for modes (Fixed / Fit), segmented Yes / No for booleans, number
+  + slider for opacity, a swatch + value row for Fill / Border / Shadows with an `Add…` empty state.
+- **Action rows:** a row of icon actions (align, distribute) sits at the top of Properties, each
+  an `IconButton` with a tooltip and shortcut.
+- **Tree selection:** the selected row is a solid accent row with white text; the rows inside it
+  are tinted with the accent wash. Each type has its icon.
+- **Floating toolbar:** round tool buttons (`full` radius) in a pill bar, the zoom at the end.
+- **Collaborators:** cursors carry a coloured name pill; avatars sit in the top bar, right.
+- **Type colours:** layer icons use `--ui-type-frame` / `--ui-type-text` / `--ui-type-media`.
+- **Top bar** (canvas and inline frame editor, 48px, one row):
+
+  | Zone | Browsing | Frame open |
+  |---|---|---|
+  | Left | menu · project / canvas | menu · project / canvas · frame name + save dot · Design / Motion |
+  | Centre | canvas title | playback: start · step · play · step · end · timeline · timecode |
+  | Right | avatars · credits · **Share** · chat | undo · redo · history · more · Export · Full screen · close ‖ avatars · credits · **Share** · chat |
+
+  Every control is **28px tall** (`--ui-control-h`; 44px on touch). One style per role: icon
+  actions are ghost squares (`sm` radius, wash on hover, accent wash when pressed); text actions
+  are ghost (`Full screen`, `Storyboard`) or filled secondary (`Export`); **Share is the only
+  primary** (solid accent). Inside a zone 4px apart; zones 16px apart. One status dot only: the
+  frame's save dot replaces the canvas connection dot while a frame is open. An e2e check
+  (`tests/e2e/top-bar-rhythm.spec.ts`) holds the heights and the shared centre line.
 
 ### type
 

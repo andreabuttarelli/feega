@@ -420,7 +420,7 @@
   }
 
   .primary {
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     color: var(--ui-accent-ink);
   }
 

@@ -352,7 +352,7 @@
     color: transparent;
   }
   .tick.on {
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     border-color: var(--ui-accent);
     color: var(--ui-accent-ink);
   }
@@ -411,7 +411,7 @@
     cursor: pointer;
   }
   .primary {
-    background: var(--ui-accent);
+    background: var(--ui-accent-solid);
     border-color: var(--ui-accent);
     color: var(--ui-accent-ink);
   }

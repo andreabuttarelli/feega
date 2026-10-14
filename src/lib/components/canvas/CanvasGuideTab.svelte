@@ -61,7 +61,7 @@
   }
 
   .guide-item:hover {
-    background: color-mix(in srgb, var(--ink, #1d1d1f) 5%, transparent);
+    background: color-mix(in srgb, var(--ui-text) 5%, transparent);
   }
 
   .guide-open {
@@ -76,7 +76,7 @@
     align-self: flex-start;
     border: 0;
     background: transparent;
-    color: var(--accent-ink, var(--accent, #7c5cff));
+    color: var(--ui-accent-text);
     font: inherit;
     cursor: pointer;
     padding: 4px 0;
@@ -106,7 +106,7 @@
 
   .guide-doc :global(th),
   .guide-doc :global(td) {
-    border-bottom: 1px solid color-mix(in srgb, var(--ink, #1d1d1f) 10%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--ui-text) 10%, transparent);
     padding: 4px 6px;
     text-align: left;
   }

@@ -177,26 +177,41 @@
   .segments {
     display: flex;
     flex-shrink: 0;
-    gap: var(--ui-space-4);
-    margin: var(--ui-space-2) var(--ui-space-4) 0;
-    height: var(--ui-hit);
+    align-self: flex-start;
+    gap: 2px;
+    margin: 8px 12px 4px;
+    padding: 2px;
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-input);
   }
 
   .segments button {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    font-size: var(--ui-text-md);
-    font-weight: 500;
-    color: var(--ui-text-3);
+    height: 28px;
+    padding: 0 12px;
+    border-radius: var(--ui-radius-sm);
+    font-size: var(--ui-type-body);
+    font-weight: var(--ui-weight-medium);
+    color: var(--ui-text-secondary);
+    transition: background-color var(--ui-dur-fast) var(--ui-ease), color var(--ui-dur-fast) var(--ui-ease);
   }
 
   .segments button:hover {
-    color: var(--ui-text-2);
+    color: var(--ui-text);
+  }
+
+  .segments button:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   .segments button[aria-selected='true'] {
-    color: var(--ui-ink);
+    background: var(--ui-panel-raised);
+    color: var(--ui-text);
+    font-weight: var(--ui-weight-semibold);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
   }
 
   .segments button:focus-visible {

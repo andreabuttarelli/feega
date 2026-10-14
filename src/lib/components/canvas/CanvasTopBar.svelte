@@ -29,6 +29,7 @@
   import { Badge } from '$lib/components/ui/badge/index.js';
   import { matching, needsSearch, recentFirst } from '$lib/canvas/switcher-list';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { Capability, modeAllows, modeOf, ProjectMode } from '$lib/project-mode';
 
   type ProjectRow = { id: string; name: string; href: string; updatedAt: string; mode?: string };
@@ -206,6 +207,7 @@
     </DropdownMenu.Root>
     {/if}
 
+    <div class="canvas-title" class:centred={!inlineStage.editing} data-testid="canvas-title">
     <span class="sep">/</span>
 
     {#if renaming}
@@ -292,6 +294,7 @@
       </DropdownMenu.Content>
     </DropdownMenu.Root>
     {/if}
+    </div>
   </div>
 
   {#snippet projectRow(project: ProjectRow)}
@@ -332,7 +335,8 @@
 
   <div class="top-slot" data-top-slot></div>
   <div class="top-box right">
-    {#if $canvasLink}
+    <div class="top-peers" data-top-peers></div>
+    {#if $canvasLink && !inlineStage.editing}
       <ConnectionDot state={$canvasLink} />
     {/if}
     <a href={BILLING_PATH} class="credits">
@@ -376,7 +380,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    height: 52px;
+    height: 48px;
     padding: 0 8px;
     background: var(--ui-surface);
   }
@@ -397,7 +401,40 @@
   }
 
   .sep {
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-disabled);
+  }
+
+  .top-peers:empty {
+    display: none;
+  }
+
+  .canvas-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .canvas-title.centred {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: auto;
+  }
+
+  .canvas-title.centred .sep {
+    display: none;
+  }
+
+  @media (max-width: 767px) {
+    .canvas-title.centred {
+      position: static;
+      transform: none;
+    }
+    .canvas-title.centred .sep {
+      display: inline;
+    }
   }
 
   :global(.switcher-btn) {
@@ -408,15 +445,23 @@
     appearance: none;
     border: 0;
     background: transparent;
-    padding: 5px 6px;
+    height: var(--ui-control-h);
+    padding: 0 8px;
+    border-radius: var(--ui-radius-sm);
     font: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--ink, #1d1d1f);
+    font-size: var(--ui-type-body);
+    font-weight: var(--ui-weight-semibold);
+    color: var(--ui-text);
     cursor: pointer;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease);
   }
-  :global(.switcher-btn:hover) {
-    background: var(--paper-2, #f9f9f9);
+  :global(.switcher-btn:hover),
+  :global(.switcher-btn[data-state='open']) {
+    background: var(--ui-wash);
+  }
+  :global(.switcher-btn:focus-visible) {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   .rename-form {
@@ -427,20 +472,26 @@
 
   .rename-input {
     width: 180px;
-    border: 1px solid var(--line, #e5e5e7);
-    padding: 4px 6px;
+    height: 28px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    box-shadow: var(--ui-ring);
+    outline: none;
+    padding: 0 8px;
     font: inherit;
     font-size: 13px;
     font-weight: 600;
-    color: var(--ink, #1d1d1f);
-    background: var(--paper, #fff);
+    color: var(--ui-text);
+    background: var(--ui-panel);
   }
 
   .rename-save {
-    border: 1px solid var(--ui-accent);
-    background: var(--ui-accent);
-    color: var(--ui-accent-ink);
-    padding: 4px 8px;
+    height: 28px;
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
+    padding: 0 10px;
     font: inherit;
     font-size: 12px;
     cursor: pointer;
@@ -449,21 +500,28 @@
   .chat-toggle {
     display: grid;
     place-items: center;
-    width: 30px;
-    height: 30px;
+    width: var(--ui-control-h);
+    height: var(--ui-control-h);
     flex-shrink: 0;
     appearance: none;
-    border: 1px solid var(--line, #ededef);
-    background: var(--paper, #fff);
-    color: var(--ink-soft, #6e6e73);
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: transparent;
+    color: var(--ui-icon-ink);
     cursor: pointer;
+    transition: background-color var(--ui-dur-fast) var(--ui-ease);
   }
   .chat-toggle:hover {
-    background: var(--paper-2, #f9f9f9);
+    background: var(--ui-wash);
+    color: var(--ui-text);
+  }
+  .chat-toggle:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
   .chat-toggle.is-active {
-    background: var(--nav-on, color-mix(in srgb, var(--accent) 12%, transparent));
-    color: var(--accent-ink, var(--accent, #7c5cff));
+    background: var(--ui-selected);
+    color: var(--ui-accent-text);
   }
 
 
@@ -471,32 +529,36 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    height: 30px;
+    height: 28px;
     padding: 0 10px;
     flex-shrink: 0;
-    border: 1px solid var(--ui-line-strong);
-    background: var(--ui-bg);
-    color: var(--ui-ink);
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-text);
     font: inherit;
-    font-size: 12.5px;
-    font-weight: 600;
+    font-size: var(--ui-type-label);
+    font-weight: var(--ui-weight-semibold);
     cursor: pointer;
   }
 
   .credits {
     display: inline-flex;
     flex-shrink: 0;
-    padding: 3px 7px;
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--ink-soft, #6e6e73);
-    background: var(--paper, #fff);
-    border: 1px solid var(--line, #ededef);
+    align-items: center;
+    height: var(--ui-control-h);
+    padding: 0 10px;
+    border-radius: var(--ui-radius-full);
+    font-family: var(--ui-mono);
+    font-size: var(--ui-type-caption);
+    color: var(--ui-text-secondary);
+    background: var(--ui-input);
+    font-variant-numeric: tabular-nums;
     text-decoration: none;
   }
   .credits:hover {
-    color: var(--ink, #1d1d1f);
-    background: var(--paper-2, #f9f9f9);
+    color: var(--ui-text);
+    background: var(--ui-wash);
   }
 
   @media (max-width: 480px) {
@@ -513,13 +575,13 @@
   }
 
   :global(.sw-menu) {
-    --sw-row: 32px;
+    --sw-row: var(--ui-row-lg);
     --sw-icon: 16px;
     max-width: calc(100vw - 16px);
     max-height: min(480px, var(--bits-dropdown-menu-content-available-height, 480px));
     padding: 4px;
     font-size: 13px;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-text);
   }
   :global(.sw-head) {
     display: flex;
@@ -542,11 +604,11 @@
     align-items: center;
     gap: 6px;
     padding: 8px 8px 4px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    font-size: var(--ui-type-section);
+    font-weight: var(--ui-weight-semibold);
+    letter-spacing: var(--ui-tracking-caps);
     text-transform: uppercase;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary);
   }
   :global(.sw-search) {
     position: sticky;
@@ -558,9 +620,9 @@
     height: var(--sw-row);
     margin: -4px -4px 4px;
     padding: 0 12px;
-    background: var(--paper, #fff);
-    border-bottom: 1px solid var(--line, #ededef);
-    color: var(--ink-faint, #9a9a9e);
+    background: var(--ui-panel);
+    border-bottom: 1px solid var(--ui-divider);
+    color: var(--ui-text-tertiary);
   }
   :global(.sw-search input) {
     flex: 1 1 auto;
@@ -569,15 +631,20 @@
     outline: none;
     background: transparent;
     font: inherit;
-    color: var(--ink, #1d1d1f);
+    color: var(--ui-text);
   }
 
   :global(.sw-line) {
     display: flex;
     align-items: center;
+    border-radius: var(--ui-radius-sm);
+  }
+  :global(.sw-line:hover) {
+    background: var(--ui-wash);
   }
   :global(.sw-line.is-current) {
-    background: var(--paper-3, #efeff1);
+    background: var(--ui-selected);
+    color: var(--ui-accent-text);
   }
 
   :global(.sw-row) {
@@ -616,7 +683,7 @@
     flex-shrink: 0;
     font-size: 11px;
     font-weight: 400;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary);
     font-variant-numeric: tabular-nums;
   }
 
@@ -626,7 +693,7 @@
     width: var(--sw-row);
     height: var(--sw-row);
     flex-shrink: 0;
-    color: var(--ink-soft, #6e6e73);
+    color: var(--ui-text-secondary);
     cursor: pointer;
     outline: none;
     opacity: 0;
@@ -639,13 +706,13 @@
   :global(.sw-icon:hover),
   :global(.sw-icon[data-highlighted]),
   :global(.sw-icon[data-state='open']) {
-    background: var(--paper-3, #efeff1);
-    color: var(--ink, #1d1d1f);
+    background: var(--ui-wash);
+    color: var(--ui-text);
   }
 
   :global(.sw-empty) {
     padding: 8px;
     font-size: 12px;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary);
   }
 </style>
