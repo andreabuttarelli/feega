@@ -179,9 +179,10 @@
     position: relative;
     display: flex;
     align-items: center;
-    height: 28px;
+    height: var(--ui-row);
     min-width: 0;
-    background: var(--ui-field);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
     border: 1px solid transparent;
   }
 
@@ -240,7 +241,7 @@
   }
 
   .named {
-    background: linear-gradient(90deg, transparent var(--named-label), var(--ui-field) var(--named-label));
+    background: linear-gradient(90deg, transparent var(--named-label), var(--ui-input) var(--named-label));
     border-color: transparent;
     --named-label: 96px;
   }
@@ -272,7 +273,7 @@
     height: 100%;
     padding: 0 2px;
     border: 0;
-    border-radius: 0;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
     color: var(--ui-ink);
     font: inherit;
@@ -315,7 +316,7 @@
     width: 16px;
     height: 26px;
     border: 0;
-    border-radius: 0;
+    border-radius: var(--ui-radius-sm);
     background: none;
     cursor: pointer;
   }

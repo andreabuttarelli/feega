@@ -152,10 +152,11 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    height: 28px;
+    height: var(--ui-row);
     min-width: 0;
     padding: 0 6px;
-    background: var(--ui-field);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
     border: 1px solid transparent;
   }
 
@@ -173,7 +174,7 @@
     height: 16px;
     padding: 0;
     border: 1px solid var(--ui-line-strong);
-    border-radius: 0;
+    border-radius: var(--ui-radius-sm);
     background: var(--c);
     cursor: pointer;
   }
@@ -184,7 +185,7 @@
     height: 100%;
     padding: 0;
     border: 0;
-    border-radius: 0;
+    border-radius: var(--ui-radius-sm);
     background: transparent;
     color: var(--ui-ink);
     font: inherit;
@@ -218,14 +219,14 @@
     flex: 1;
     padding: 2px;
     gap: 2px;
-    background: var(--ui-field);
+    background: var(--ui-input);
   }
 
   .switch button {
     flex: 1;
     height: 22px;
     border: 0;
-    border-radius: 0;
+    border-radius: var(--ui-radius-sm);
     background: none;
     color: var(--ui-ink-3);
     font: inherit;
@@ -250,7 +251,7 @@
     display: flex;
     align-items: center;
     height: 24px;
-    background: var(--ui-field);
+    background: var(--ui-input);
     color: var(--ui-ink-3);
     font-size: 10px;
   }
@@ -281,9 +282,9 @@
     gap: 6px;
     width: 196px;
     padding: 8px;
-    background: var(--ui-bg);
-    border: 1px solid var(--ui-line-strong);
-    box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+    border-radius: var(--ui-radius-md);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   .wheel {
@@ -291,7 +292,7 @@
     height: 96px;
     padding: 0;
     border: 0;
-    border-radius: 0;
+    border-radius: var(--ui-radius-sm);
     background: none;
     cursor: crosshair;
   }
@@ -312,7 +313,7 @@
     height: 18px;
     padding: 0;
     border: 1px solid var(--ui-line-strong);
-    border-radius: 0;
+    border-radius: var(--ui-radius-sm);
     background: var(--c);
     cursor: pointer;
   }
