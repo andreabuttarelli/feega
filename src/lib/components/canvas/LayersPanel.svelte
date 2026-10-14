@@ -13,6 +13,8 @@
   import Music from '@lucide/svelte/icons/music';
   import Component from '@lucide/svelte/icons/component';
   import Rows3 from '@lucide/svelte/icons/rows-3';
+  import Contrast from '@lucide/svelte/icons/contrast';
+  import { ACTIONS, shortcutOf } from '$lib/motion/actions';
   import { readFolds, toggleFold } from '$lib/canvas/layer-folds';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { untrack } from 'svelte';
@@ -20,8 +22,8 @@
   import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import PartsProbe from './PartsProbe.svelte';
-  import { IconButton, IconSize } from '$lib/components/ui/shell';
-  import { LayerAction, LayerKind, NodeIcon, Pick, type Place, dropPlace, restack, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
+  import { IconButton, IconSize, Kbd, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
+  import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayer, dropPlace, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
   const PRECOMP = 'Precomp';
@@ -103,7 +105,9 @@
   }
 
   const ROW_ICON: Record<string, typeof Square> = { [NodeIcon.Video]: Clapperboard, [NodeIcon.Still]: ImageIcon, image: ImageIcon, text: TypeIcon, arrow: ArrowRight, Audio: Music };
-  const KIND_ICON: Partial<Record<LayerKind, typeof Square>> = { [LayerKind.Group]: Component, [LayerKind.Track]: Rows3 };
+  const KIND_ICON: Partial<Record<LayerKind, typeof Square>> = { [LayerKind.Group]: Component, [LayerKind.Track]: Rows3, [LayerKind.Mask]: Contrast };
+  const EYE_LABEL: Record<'mask' | 'layer', [string, string]> = { mask: ['Turn mask off', 'Turn mask on'], layer: ['Hide', 'Show'] };
+  const eyeLabel = (row: LayerRow) => EYE_LABEL[row.kind === LayerKind.Mask ? 'mask' : 'layer'][row.hidden ? 1 : 0];
   const isPicked = (row: LayerRow) => rowPicked(row, selection);
   const inside = $derived(rowsInside(rows, isPicked));
   let query = $state('');
@@ -181,7 +185,27 @@
     if (!video || !from || !place || from === row.id) {
       return;
     }
-    video.edit(restack(video.doc, from, row.id, place), 'Moved a layer');
+    video.edit(dropLayer(video.doc, from, row.id, place), 'Moved a layer');
+  }
+
+  let menu = $state<{ x: number; y: number } | null>(null);
+
+  function openMenu(row: LayerRow, e: MouseEvent) {
+    if (!video || !editable(row)) {
+      return;
+    }
+    e.preventDefault();
+    if (!video.selection.includes(row.id)) {
+      video.select([row.id]);
+    }
+    menu = { x: e.clientX, y: e.clientY };
+  }
+
+  function runMenu(item: (typeof LAYER_MENU)[number]) {
+    menu = null;
+    if (video) {
+      video.edit(item.op(video.doc, video.selection), item.summary);
+    }
   }
 </script>
 
@@ -222,6 +246,7 @@
       ondragleave={() => landing?.key === row.key && (landing = null)}
       ondragend={() => ((dragged = null), (landing = null))}
       ondrop={() => drop(row)}
+      oncontextmenu={(e) => openMenu(row, e)}
     >
       {#if row.kind === LayerKind.Node && frames.has(row.id)}
         <button type="button" class="fold" aria-label={folds.has(row.id) ? 'Unfold' : 'Fold'} aria-expanded={!folds.has(row.id)} data-testid="layer-fold" onclick={(e) => (e.stopPropagation(), fold(row.id))}>
@@ -239,7 +264,7 @@
         <span class="name">{row.label}</span>
       {/if}
       {#if editable(row)}
-        <IconButton size={IconSize.Sm} label={row.hidden ? 'Show' : 'Hide'} pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
+        <IconButton size={IconSize.Sm} label={eyeLabel(row)} pressed={row.hidden} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Hide, SUMMARY[LayerAction.Hide]))}>
           {#if row.hidden}<EyeOff />{:else}<Eye />{/if}
         </IconButton>
         <IconButton size={IconSize.Sm} label={row.locked ? 'Unlock' : 'Lock'} pressed={row.locked} disabled={row.kind === LayerKind.Group && row.type === PRECOMP} onclick={(e) => (e.stopPropagation(), run([row.id], LayerAction.Lock, SUMMARY[LayerAction.Lock]))}>
@@ -251,6 +276,22 @@
     <p class="empty">{query.trim() ? 'No layer matches' : 'Nothing on this canvas yet'}</p>
   {/each}
 </div>
+
+<svelte:window onpointerdown={(e) => menu && !(e.target as HTMLElement).closest('[data-testid="layer-menu"]') && (menu = null)} onkeydown={(e) => e.key === 'Escape' && (menu = null)} />
+
+{#if menu && video}
+  <div class={MENU_CONTENT} role="menu" data-testid="layer-menu" style={`position: fixed; left: ${menu.x}px; top: ${menu.y}px`}>
+    {#each LAYER_MENU as item (item.command)}
+      {@const Icon = ACTIONS[item.command].icon}
+      {@const allowed = item.op(video.doc, video.selection).ok}
+      <button type="button" role="menuitem" class={MENU_ITEM} disabled={!allowed} data-disabled={allowed ? undefined : ''} onclick={() => runMenu(item)}>
+        <Icon aria-hidden="true" />
+        <span class="min-w-0 flex-1 truncate">{ACTIONS[item.command].name}</span>
+        {#if shortcutOf(item.command)}<Kbd shortcut={shortcutOf(item.command)} class="text-ui-text-3" />{/if}
+      </button>
+    {/each}
+  </div>
+{/if}
 
 <style>
   .search {
