@@ -1,27 +1,9 @@
-import {
-  cornerRadii,
-  ellipseOutline,
-  parsePath,
-  pathData,
-  polygonOutline,
-  rectOutline,
-  scaled,
-  starOutline,
-  type Outline,
-  type Size,
-} from "./geometry";
-import { morphOutline } from "./morph";
-import {
-  IDENTITY,
-  applyModifiers,
-  modifierFilter,
-  modifierReach,
-  type AppliedModifier,
-  type Layer,
-} from "./modifiers";
-import { ShapeKind, StrokeKind, modifierValues, type Modifier } from "./schema";
-import { fillsOf } from "../fill/model";
-import { svgFills } from "../fill/render";
+import { cornerRadii, ellipseOutline, parsePath, pathData, polygonOutline, rectOutline, scaled, starOutline, type Outline, type Size } from './geometry';
+import { morphOutline } from './morph';
+import { IDENTITY, applyModifiers, modifierFilter, modifierReach, type AppliedModifier, type Layer } from './modifiers';
+import { ShapeKind, StrokeKind, modifierValues, type Modifier } from './schema';
+import { fillsOf } from '../fill/model';
+import { svgFills } from '../fill/render';
 
 export type ShapeLook = {
   shape: ShapeKind;
@@ -50,131 +32,74 @@ export type ShapeLook = {
   join: string;
 };
 
-export type Paint = {
-  id: string;
-  size: Size;
-  unit: number;
-  time: number;
-  color: (value: string) => string;
-  asset?: (id: string | null) => string | null;
-};
+export type Paint = { id: string; size: Size; unit: number; time: number; color: (value: string) => string; asset?: (id: string | null) => string | null };
 
 const DIGITS = 1000;
 const round = (n: number) => Math.round(n * DIGITS) / DIGITS;
 
 export function pathOutline(d: string, size: Size): Outline {
   const outline = d ? parsePath(d) : [];
-  return typeof outline === "string" ? [] : scaled(outline, size);
+  return typeof outline === 'string' ? [] : scaled(outline, size);
 }
 
 const OUTLINE: Record<ShapeKind, (p: ShapeLook, size: Size) => Outline> = {
-  [ShapeKind.Rect]: (p, size) =>
-    rectOutline(cornerRadii(p.roundness, p.corners ?? []), size),
+  [ShapeKind.Rect]: (p, size) => rectOutline(cornerRadii(p.roundness, p.corners ?? []), size),
   [ShapeKind.Line]: (_p, size) => rectOutline(0, size),
   [ShapeKind.Circle]: (_p, size) => ellipseOutline(size),
   [ShapeKind.Ellipse]: (_p, size) => ellipseOutline(size),
   [ShapeKind.Polygon]: (p, size) => polygonOutline(p.sides, p.roundness, size),
-  [ShapeKind.Star]: (p, size) =>
-    starOutline(p.points, p.innerRadius, p.roundness, size),
-  [ShapeKind.Path]: (p, size) => pathOutline(p.path, size),
+  [ShapeKind.Star]: (p, size) => starOutline(p.points, p.innerRadius, p.roundness, size),
+  [ShapeKind.Path]: (p, size) => pathOutline(p.path, size)
 };
 
 export function baseOutline(p: ShapeLook, size: Size): Outline {
   return OUTLINE[p.shape](p, size);
 }
 
-const stackOf = (p: ShapeLook): AppliedModifier[] =>
-  p.modifiers
-    .filter((m) => m.enabled)
-    .map((m) => ({ kind: m.kind, values: modifierValues(m) }));
+const stackOf = (p: ShapeLook): AppliedModifier[] => p.modifiers.filter((m) => m.enabled).map((m) => ({ kind: m.kind, values: modifierValues(m) }));
 
 export function shapeLayers(p: ShapeLook, size: Size, time: number): Layer[] {
   const base = baseOutline(p, size);
-  const outline = p.morphs.length
-    ? morphOutline(
-        [base, ...p.morphs.map((d) => pathOutline(d, size))],
-        p.morph,
-        p.morphStart,
-      )
-    : base;
-  return applyModifiers(
-    [{ outline, opacity: 1, matrix: IDENTITY }],
-    stackOf(p),
-    { size, time },
-  );
+  const outline = p.morphs.length ? morphOutline([base, ...p.morphs.map((d) => pathOutline(d, size))], p.morph, p.morphStart) : base;
+  return applyModifiers([{ outline, opacity: 1, matrix: IDENTITY }], stackOf(p), { size, time });
 }
 
 const gradientId = (id: string) => `sg-${id}`;
 const filterId = (id: string) => `sf-${id}`;
 const MITER_REACH = 4;
 
-export type Extent = {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-};
+export type Extent = { left: number; top: number; right: number; bottom: number };
 
 function drawnBounds(layers: Layer[]): Extent | null {
-  const points = layers.flatMap((l) =>
-    l.outline
-      .flatMap((c) => c.vertices.flatMap((v) => [v.p, v.in, v.out]))
-      .map(([x, y]) => [
-        l.matrix[0] * x + l.matrix[2] * y + l.matrix[4],
-        l.matrix[1] * x + l.matrix[3] * y + l.matrix[5],
-      ]),
-  );
+  const points = layers.flatMap((l) => l.outline.flatMap((c) => c.vertices.flatMap((v) => [v.p, v.in, v.out])).map(([x, y]) => [l.matrix[0] * x + l.matrix[2] * y + l.matrix[4], l.matrix[1] * x + l.matrix[3] * y + l.matrix[5]]));
   if (!points.length) {
     return null;
   }
   const xs = points.map((pt) => pt[0]);
   const ys = points.map((pt) => pt[1]);
-  return {
-    left: Math.min(...xs),
-    top: Math.min(...ys),
-    right: Math.max(...xs),
-    bottom: Math.max(...ys),
-  };
+  return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
 }
 
-function paintedExtent(
-  p: ShapeLook,
-  paint: Paint,
-  layers: Layer[],
-): Extent | null {
+function paintedExtent(p: ShapeLook, paint: Paint, layers: Layer[]): Extent | null {
   const drawn = drawnBounds(layers);
   if (!drawn) {
     return null;
   }
-  const reach =
-    modifierReach(stackOf(p), paint.unit) +
-    (p.strokeKind === StrokeKind.None
-      ? 0
-      : (p.strokeWidth * paint.unit * MITER_REACH) / 2);
-  return {
-    left: drawn.left - reach,
-    top: drawn.top - reach,
-    right: drawn.right + reach,
-    bottom: drawn.bottom + reach,
-  };
+  const reach = modifierReach(stackOf(p), paint.unit) + (p.strokeKind === StrokeKind.None ? 0 : (p.strokeWidth * paint.unit * MITER_REACH) / 2);
+  return { left: drawn.left - reach, top: drawn.top - reach, right: drawn.right + reach, bottom: drawn.bottom + reach };
 }
 
 export function unionExtent(a: Extent | null, b: Extent | null): Extent | null {
   if (!a || !b) {
     return a ?? b;
   }
-  return {
-    left: Math.min(a.left, b.left),
-    top: Math.min(a.top, b.top),
-    right: Math.max(a.right, b.right),
-    bottom: Math.max(a.bottom, b.bottom),
-  };
+  return { left: Math.min(a.left, b.left), top: Math.min(a.top, b.top), right: Math.max(a.right, b.right), bottom: Math.max(a.bottom, b.bottom) };
 }
 
 function filterOf(p: ShapeLook, paint: Paint, extent: Extent | null): string {
   const primitives = modifierFilter(stackOf(p), paint.unit);
   if (!primitives || !extent) {
-    return "";
+    return '';
   }
   return `<filter id="${filterId(paint.id)}" filterUnits="userSpaceOnUse" x="${round(extent.left)}" y="${round(extent.top)}" width="${round(extent.right - extent.left)}" height="${round(extent.bottom - extent.top)}" color-interpolation-filters="sRGB">${primitives}</filter>`;
 }
@@ -189,67 +114,37 @@ function strokeGradient(p: ShapeLook, paint: Paint): string {
 }
 
 const STROKE: Record<StrokeKind, (p: ShapeLook, paint: Paint) => string> = {
-  [StrokeKind.None]: () => "none",
+  [StrokeKind.None]: () => 'none',
   [StrokeKind.Solid]: (p, paint) => paint.color(p.stroke),
-  [StrokeKind.Gradient]: (_p, paint) => `url(#${gradientId(paint.id)})`,
+  [StrokeKind.Gradient]: (_p, paint) => `url(#${gradientId(paint.id)})`
 };
 
 function strokeGroup(p: ShapeLook, paint: Paint, paths: string): string {
   if (p.strokeKind === StrokeKind.None) {
-    return "";
+    return '';
   }
-  const dashed =
-    p.dash > 0
-      ? `;stroke-dasharray:${round(p.dash * paint.unit)} ${round((p.gap || p.dash) * paint.unit)}`
-      : "";
+  const dashed = p.dash > 0 ? `;stroke-dasharray:${round(p.dash * paint.unit)} ${round((p.gap || p.dash) * paint.unit)}` : '';
   return `<g style="fill:none;stroke:${STROKE[p.strokeKind](p, paint)};stroke-width:${round(p.strokeWidth * paint.unit)};stroke-linecap:${p.cap};stroke-linejoin:${p.join}${dashed}">${paths}</g>`;
 }
 
 const NO_ASSET = () => null;
 
-const matrixAttr = (m: Layer["matrix"]) =>
-  m.every((n, i) => n === IDENTITY[i])
-    ? ""
-    : ` transform="matrix(${m.map(round).join(" ")})"`;
-const opacityAttr = (o: number) => (o === 1 ? "" : ` opacity="${round(o)}"`);
+const matrixAttr = (m: Layer['matrix']) => (m.every((n, i) => n === IDENTITY[i]) ? '' : ` transform="matrix(${m.map(round).join(' ')})"`);
+const opacityAttr = (o: number) => (o === 1 ? '' : ` opacity="${round(o)}"`);
 
 export function shapeMarkup(p: ShapeLook, paint: Paint): string {
   return shapeDrawing(p, paint).markup;
 }
 
-export function shapeDrawing(
-  p: ShapeLook,
-  paint: Paint,
-): { markup: string; extent: Extent | null } {
-  const layers = shapeLayers(p, paint.size, paint.time).filter(
-    (l) => l.outline.length,
-  );
-  const paths = layers
-    .map(
-      (l) =>
-        `<path d="${pathData(l.outline)}"${matrixAttr(l.matrix)}${opacityAttr(l.opacity)}/>`,
-    )
-    .join("");
+export function shapeDrawing(p: ShapeLook, paint: Paint): { markup: string; extent: Extent | null } {
+  const layers = shapeLayers(p, paint.size, paint.time).filter((l) => l.outline.length);
+  const paths = layers.map((l) => `<path d="${pathData(l.outline)}"${matrixAttr(l.matrix)}${opacityAttr(l.opacity)}/>`).join('');
   const extent = paintedExtent(p, paint, layers);
   const filter = filterOf(p, paint, extent);
-  const fills = svgFills(
-    fillsOf(p),
-    {
-      id: paint.id,
-      size: paint.size,
-      color: paint.color,
-      asset: paint.asset ?? NO_ASSET,
-    },
-    paths,
-    p.fillRule,
-  );
-  const stroked =
-    p.strokeKind === StrokeKind.Gradient ? strokeGradient(p, paint) : "";
+  const fills = svgFills(fillsOf(p), { id: paint.id, size: paint.size, color: paint.color, asset: paint.asset ?? NO_ASSET }, paths, p.fillRule);
+  const stroked = p.strokeKind === StrokeKind.Gradient ? strokeGradient(p, paint) : '';
   const inner = fills.defs + stroked + filter;
-  const defs = inner ? `<defs>${inner}</defs>` : "";
-  const filtered = filter ? ` filter="url(#${filterId(paint.id)})"` : "";
-  return {
-    markup: `${defs}<g${filtered}>${fills.body}${strokeGroup(p, paint, paths)}</g>`,
-    extent,
-  };
+  const defs = inner ? `<defs>${inner}</defs>` : '';
+  const filtered = filter ? ` filter="url(#${filterId(paint.id)})"` : '';
+  return { markup: `${defs}<g${filtered}>${fills.body}${strokeGroup(p, paint, paths)}</g>`, extent };
 }

@@ -1,18 +1,18 @@
-import { z } from "zod";
-import { BLEND_MODES, BlendMode } from "../blend";
+import { z } from 'zod';
+import { BLEND_MODES, BlendMode } from '../blend';
 
 export enum FillType {
-  Solid = "solid",
-  Linear = "linear-gradient",
-  Radial = "radial-gradient",
-  Image = "image",
+  Solid = 'solid',
+  Linear = 'linear-gradient',
+  Radial = 'radial-gradient',
+  Image = 'image'
 }
 
 export enum ImageFit {
-  Cover = "cover",
-  Contain = "contain",
-  Fill = "fill",
-  Tile = "tile",
+  Cover = 'cover',
+  Contain = 'contain',
+  Fill = 'fill',
+  Tile = 'tile'
 }
 
 export const FILL_TYPES = Object.values(FillType) as [FillType, ...FillType[]];
@@ -20,8 +20,8 @@ export const IMAGE_FITS = Object.values(ImageFit) as [ImageFit, ...ImageFit[]];
 export const MAX_FILLS = 8;
 export const MAX_STOPS = 8;
 const CENTRE = 0.5;
-const DEFAULT_COLOR = "#000000";
-const DEFAULT_END = "#ffffff";
+const DEFAULT_COLOR = '#000000';
+const DEFAULT_END = '#ffffff';
 const DEFAULT_ANGLE = 90;
 
 const unit = z.number().min(0).max(1);
@@ -32,37 +32,37 @@ const stops = z.array(stop).min(2).max(MAX_STOPS);
 const base = {
   opacity: unit.default(1),
   visible: z.boolean().default(true),
-  blend: z.enum(BLEND_MODES).default(BlendMode.Normal),
+  blend: z.enum(BLEND_MODES).default(BlendMode.Normal)
 };
 
-export const fillSchema = z.discriminatedUnion("type", [
+export const fillSchema = z.discriminatedUnion('type', [
   z.object({
     type: z.literal(FillType.Solid),
     color: z.string().min(1).max(64),
-    ...base,
+    ...base
   }),
   z.object({
     type: z.literal(FillType.Linear),
     stops,
     angle: z.number().min(-360).max(360).default(DEFAULT_ANGLE),
-    ...base,
+    ...base
   }),
   z.object({
     type: z.literal(FillType.Radial),
     stops,
     center: point.default({ x: CENTRE, y: CENTRE }),
     radius: z.number().min(0.01).max(4).default(1),
-    ...base,
+    ...base
   }),
   z.object({
     type: z.literal(FillType.Image),
-    assetId: z.string().max(200).default(""),
+    assetId: z.string().max(200).default(''),
     src: z.string().max(4000).optional(),
     fit: z.enum(IMAGE_FITS).default(ImageFit.Cover),
     focus: point.default({ x: CENTRE, y: CENTRE }),
     scale: z.number().min(0.1).max(10).default(1),
-    ...base,
-  }),
+    ...base
+  })
 ]);
 
 export const fillsSchema = z.array(fillSchema).max(MAX_FILLS);
@@ -83,22 +83,20 @@ type LegacyShape = {
 
 const twoStops = (p: LegacyShape) => [
   { color: String(p.fill ?? DEFAULT_COLOR), pos: 0 },
-  { color: String(p.fill2 ?? DEFAULT_END), pos: 1 },
+  { color: String(p.fill2 ?? DEFAULT_END), pos: 1 }
 ];
 
 const LEGACY: Record<string, (p: LegacyShape) => unknown[]> = {
-  solid: (p) => [
-    { type: FillType.Solid, color: String(p.fill ?? DEFAULT_COLOR) },
-  ],
+  solid: (p) => [{ type: FillType.Solid, color: String(p.fill ?? DEFAULT_COLOR) }],
   linear: (p) => [
     {
       type: FillType.Linear,
       stops: twoStops(p),
-      angle: Number(p.gradientAngle ?? DEFAULT_ANGLE),
-    },
+      angle: Number(p.gradientAngle ?? DEFAULT_ANGLE)
+    }
   ],
   radial: (p) => [{ type: FillType.Radial, stops: twoStops(p) }],
-  none: () => [],
+  none: () => []
 };
 
 export function fillsOf(props: LegacyShape): Fill[] {
@@ -106,9 +104,7 @@ export function fillsOf(props: LegacyShape): Fill[] {
   if (props.fills !== undefined && stored.success) {
     return stored.data;
   }
-  return parsed(
-    (LEGACY[String(props.fillKind ?? "solid")] ?? LEGACY.solid)(props),
-  );
+  return parsed((LEGACY[String(props.fillKind ?? 'solid')] ?? LEGACY.solid)(props));
 }
 
 type LegacyPhoto = {
@@ -133,15 +129,12 @@ export function photoFills(item: LegacyPhoto): Fill[] {
       type: FillType.Image,
       assetId: item.assetId,
       fit: item.fit,
-      focus: { x: item.focusX ?? CENTRE, y: item.focusY ?? CENTRE },
-    },
+      focus: { x: item.focusX ?? CENTRE, y: item.focusY ?? CENTRE }
+    }
   ]);
 }
 
-export const firstImage = (
-  fills: readonly Fill[],
-): FillOf<FillType.Image> | undefined =>
-  fills.find((f): f is FillOf<FillType.Image> => f.type === FillType.Image);
+export const firstImage = (fills: readonly Fill[]): FillOf<FillType.Image> | undefined => fills.find((f): f is FillOf<FillType.Image> => f.type === FillType.Image);
 
 const colorOf = (fill: Fill | undefined): string => {
   if (!fill) {
@@ -159,33 +152,26 @@ const FRESH: Record<FillType, (color: string) => unknown> = {
     type: FillType.Linear,
     stops: [
       { color, pos: 0 },
-      { color: DEFAULT_END, pos: 1 },
-    ],
+      { color: DEFAULT_END, pos: 1 }
+    ]
   }),
   [FillType.Radial]: (color) => ({
     type: FillType.Radial,
     stops: [
       { color, pos: 0 },
-      { color: DEFAULT_END, pos: 1 },
-    ],
+      { color: DEFAULT_END, pos: 1 }
+    ]
   }),
-  [FillType.Image]: () => ({ type: FillType.Image }),
+  [FillType.Image]: () => ({ type: FillType.Image })
 };
 
-export const newFill = (type: FillType, color = DEFAULT_COLOR): Fill =>
-  fillSchema.parse(FRESH[type](color));
+export const newFill = (type: FillType, color = DEFAULT_COLOR): Fill => fillSchema.parse(FRESH[type](color));
 
-export const addFill = (fills: readonly Fill[], type: FillType): Fill[] =>
-  [...fills, newFill(type)].slice(0, MAX_FILLS);
+export const addFill = (fills: readonly Fill[], type: FillType): Fill[] => [...fills, newFill(type)].slice(0, MAX_FILLS);
 
-export const removeFill = (fills: readonly Fill[], i: number): Fill[] =>
-  fills.filter((_, at) => at !== i);
+export const removeFill = (fills: readonly Fill[], i: number): Fill[] => fills.filter((_, at) => at !== i);
 
-export function moveFill(
-  fills: readonly Fill[],
-  from: number,
-  to: number,
-): Fill[] {
+export function moveFill(fills: readonly Fill[], from: number, to: number): Fill[] {
   const target = Math.max(0, Math.min(fills.length - 1, to));
   const next = fills.filter((_, at) => at !== from);
   next.splice(target, 0, fills[from]);
@@ -194,47 +180,29 @@ export function moveFill(
 
 export type FillPatch = Partial<Record<string, unknown>>;
 
-export function setFill(
-  fills: readonly Fill[],
-  i: number,
-  patch: FillPatch,
-): Fill[] {
-  const opacity =
-    typeof patch.opacity === "number"
-      ? { opacity: Math.max(0, Math.min(1, patch.opacity)) }
-      : {};
-  return fills.map((f, at) =>
-    at === i
-      ? fillSchema.parse({ ...f, ...patch, ...opacity, type: f.type })
-      : f,
-  );
+export function setFill(fills: readonly Fill[], i: number, patch: FillPatch): Fill[] {
+  const opacity = typeof patch.opacity === 'number' ? { opacity: Math.max(0, Math.min(1, patch.opacity)) } : {};
+  return fills.map((f, at) => (at === i ? fillSchema.parse({ ...f, ...patch, ...opacity, type: f.type }) : f));
 }
 
 const MIN_STOPS = 2;
 
 export function addStop(stops: readonly Stop[], pos: number): Stop[] {
-  const before =
-    [...stops].filter((s) => s.pos <= pos).sort((a, b) => b.pos - a.pos)[0] ??
-    stops[0];
+  const before = [...stops].filter((s) => s.pos <= pos).sort((a, b) => b.pos - a.pos)[0] ?? stops[0];
   return [...stops, { color: before.color, pos }].slice(0, MAX_STOPS);
 }
 
-export const removeStop = (stops: readonly Stop[], i: number): Stop[] =>
-  stops.length > MIN_STOPS ? stops.filter((_, at) => at !== i) : [...stops];
+export const removeStop = (stops: readonly Stop[], i: number): Stop[] => (stops.length > MIN_STOPS ? stops.filter((_, at) => at !== i) : [...stops]);
 
-export function retypeFill(
-  fills: readonly Fill[],
-  i: number,
-  type: FillType,
-): Fill[] {
+export function retypeFill(fills: readonly Fill[], i: number, type: FillType): Fill[] {
   return fills.map((f, at) =>
     at === i
       ? {
           ...newFill(type, colorOf(f)),
           opacity: f.opacity,
           visible: f.visible,
-          blend: f.blend,
+          blend: f.blend
         }
-      : f,
+      : f
   );
 }
