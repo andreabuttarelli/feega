@@ -16,11 +16,9 @@ import {
   listNodes,
   moveNode,
   setConnectionMode,
-  writeNodeData,
   patchNodeData,
   DataCheck,
-  type PatchWrite,
-  type CanvasNodeRecord
+  type PatchWrite
 } from '$lib/server/repos/canvas';
 import { nodeSize } from '$lib/canvas/node-size';
 import { isNodeType, influencerOf } from '$lib/canvas-node-data';
@@ -57,6 +55,8 @@ import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
 import { undoGesture } from '$lib/server/canvas/undo';
+import { writeNodesBatch, type BatchItem } from '$lib/server/canvas/batch-write';
+import { pasteNodes, type PastedEdge, type PastedNode } from '$lib/server/canvas/paste';
 import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { listNodeProducts } from '$lib/server/repos/products';
@@ -1130,7 +1130,7 @@ export const actions: Actions = {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
 
-    let items: { node_id: string; version: number; patch: Record<string, unknown> }[];
+    let items: BatchItem[];
     try {
       items = JSON.parse(String(fd.get('items') ?? '[]'));
       if (!Array.isArray(items) || !items.length) {
@@ -1140,31 +1140,7 @@ export const actions: Actions = {
       return fail(400, { error: 'unreadable content' });
     }
 
-    const known = new Map((await listNodes(scope.db, scope)).map((node) => [node.id, node]));
-
-    const results: { nodeId: string; outcome: 'written' | 'conflict' | 'not_found'; node?: CanvasNodeRecord }[] = [];
-    for (const item of items) {
-      const current = known.get(item.node_id);
-      if (!current) {
-        results.push({ nodeId: item.node_id, outcome: 'not_found' });
-        continue;
-      }
-
-      const written = await writeNodeData(scope.db, {
-        orgId: scope.orgId,
-        nodeId: item.node_id,
-        data: { ...current.data, ...item.patch },
-        expectedVersion: item.version,
-        actor: userActor(scope)
-      });
-
-      results.push(
-        written.outcome === 'conflict'
-          ? { nodeId: item.node_id, outcome: 'conflict' }
-          : { nodeId: item.node_id, outcome: 'written', node: written.node }
-      );
-    }
-
+    const results = await writeNodesBatch(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, items, actor: userActor(scope) });
     return { results };
   },
 
@@ -1370,8 +1346,8 @@ export const actions: Actions = {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
 
-    let pasted: { type: string; data: Record<string, unknown>; x: number; y: number }[];
-    let edges: { sourceIndex: number; targetIndex: number; sourceHandle: string | null; targetHandle: string | null }[];
+    let pasted: PastedNode[];
+    let edges: PastedEdge[];
     try {
       pasted = JSON.parse(String(fd.get('nodes') ?? '[]'));
       edges = JSON.parse(String(fd.get('edges') ?? '[]'));
@@ -1385,47 +1361,15 @@ export const actions: Actions = {
       return fail(400, { error: 'nothing to paste' });
     }
 
-    const nodes: Awaited<ReturnType<typeof createNode>>[] = [];
-    for (const p of pasted) {
-      const verdict = validateNodeData(p.type, p.data);
-      if (!verdict.ok) {
-        return fail(400, { error: verdict.error });
-      }
-
-      const node = await createNode(scope.db, {
-        orgId: scope.orgId,
-        projectId: scope.canvas.projectId,
-        canvasId: scope.canvasId,
-        type: p.type,
-        x: p.x,
-        y: p.y,
-        data: verdict.data,
-        actor: userActor(scope)
-      });
-      nodes.push(node);
-    }
-
-    const connections: Awaited<ReturnType<typeof createConnection>>[] = [];
-    for (const e of edges) {
-      const source = nodes[e.sourceIndex];
-      const target = nodes[e.targetIndex];
-      if (!source || !target) {
-        continue;
-      }
-      connections.push(
-        await createConnection(scope.db, {
-          orgId: scope.orgId,
-          canvasId: scope.canvasId,
-          sourceNodeId: source.id,
-          targetNodeId: target.id,
-          sourceHandle: e.sourceHandle,
-          targetHandle: e.targetHandle,
-          actor: userActor(scope)
-        })
-      );
-    }
-
-    return { nodes, connections };
+    const out = await pasteNodes(scope.db, {
+      orgId: scope.orgId,
+      projectId: scope.canvas.projectId,
+      canvasId: scope.canvasId,
+      nodes: pasted,
+      edges,
+      actor: userActor(scope)
+    });
+    return 'refused' in out ? fail(400, { error: out.refused }) : out;
   },
 
   demo_run: async ({ params, locals }) => {
