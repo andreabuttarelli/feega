@@ -137,6 +137,18 @@ describe('the fill stack in Properties', () => {
     expect(document.querySelector('[data-testid="side-popover"]')).toBeNull();
   });
 
+  it('Escape closes only the editor, the editor around it never sees it', () => {
+    show(TWO);
+    click(rows()[0]);
+    const editor = vi.fn();
+    document.body.addEventListener('keydown', editor);
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    flushSync();
+    document.body.removeEventListener('keydown', editor);
+    expect(document.querySelector('[data-testid="side-popover"]')).toBeNull();
+    expect(editor).not.toHaveBeenCalled();
+  });
+
   it('a click outside the stack closes the editor', () => {
     show(TWO);
     click(rows()[0]);

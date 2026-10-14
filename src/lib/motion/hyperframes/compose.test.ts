@@ -122,6 +122,17 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(compose(box)).toContain('mask="url(#sk-box-s0)"');
   });
 
+  it('a layer with a background blur drops the will-change that would hide what is behind it', () => {
+    const blurred = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Shape', from: 0, durationInFrames: 30, props: { shape: 'rect' } }, 'card'));
+    const doc = { ...blurred, tracks: blurred.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, effects: [{ id: 'bg', kind: 'background-blur' as const, enabled: true, params: { radius: 8 } }] })) })) };
+    const plain = compose(blurred);
+    const html = compose(doc);
+
+    expect(html).toContain('<div class="fx bd" id="fx-card">');
+    expect(html).toContain('.fx.bd,.fx.bd .kf,.fx.bd .ks{will-change:transform}');
+    expect(plain).toContain('<div class="fx" id="fx-card">');
+  });
+
   it('registers one paused timeline under the composition id', () => {
     expect(compose(doc)).toContain('window.__timelines["main"]=tl');
   });

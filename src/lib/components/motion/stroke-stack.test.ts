@@ -9,6 +9,12 @@ import StrokeStack from './StrokeStack.svelte';
 const dir = dirname(fileURLToPath(import.meta.url));
 const { flushSync, mount, unmount } = (await import(join(dir, '../../../../node_modules/svelte/src/index-client.js'))) as typeof import('svelte');
 
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
+
 const SHORT = 1000;
 const TWO = strokesSchema.parse([{ paint: { type: 'solid', color: '#111111' } }, { paint: { type: 'solid', color: '#222222' }, width: 0.02 }]);
 
@@ -49,6 +55,26 @@ describe('the stroke stack in Properties', () => {
   it('lists the top stroke first', () => {
     show(TWO);
     expect(rows().map((r) => r.dataset.index)).toEqual(['1', '0']);
+  });
+
+  it('a row opens its stroke in a side popover named for it, the row highlighted', () => {
+    show(TWO);
+    click(rows()[0]);
+    const popover = byId('side-popover');
+    expect(popover.getAttribute('aria-label')).toBe('Solid stroke');
+    expect(byId('side-popover-title').textContent).toBe('Solid');
+    expect(popover.dataset.anchor).toBe('1');
+    expect(popover.querySelector('[data-testid="stroke-editor"]')).not.toBeNull();
+    expect(rows()[0].dataset.open).toBe('true');
+    click(rows()[1]);
+    expect(document.querySelectorAll('[data-testid="side-popover"]')).toHaveLength(1);
+    expect(byId('side-popover').dataset.anchor).toBe('0');
+  });
+
+  it('a collapsed row shows swatch, hex or paint, width, eye and remove', () => {
+    show(TWO);
+    expect(inRow(0, 'stroke-label').textContent).toBe('222222');
+    expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['stroke-swatch', 'stroke-label', 'stroke-width', 'stroke-eye', 'stroke-remove']);
   });
 
   it('+ adds a stroke on top', () => {

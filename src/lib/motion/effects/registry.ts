@@ -10,6 +10,8 @@ export enum EffectKind {
   GaussianBlur = 'gaussian-blur',
   DirectionalBlur = 'directional-blur',
   DropShadow = 'drop-shadow',
+  InnerShadow = 'inner-shadow',
+  BackgroundBlur = 'background-blur',
   Glow = 'glow',
   Stroke = 'stroke',
   Noise = 'noise',
@@ -31,9 +33,9 @@ export type SvgNode = { tag: string; attrs: Record<string, string | number>; chi
 
 export type EffectFrame = { width: number; height: number; frame: number; fps: number };
 
-export type Rendered = { filter: string; nodes: SvgNode[] };
+export type Rendered = { filter: string; nodes: SvgNode[]; backdrop?: string };
 
-type Spec = { label: string; about: string; params: EffectParam[]; varies?: (v: Values) => boolean; reach?: (v: Values) => number; boxed?: (v: Values, filterId: string) => Rendered; render: (v: Values, frame: EffectFrame, filterId: string, lut: CompiledLut | null) => Rendered };
+type Spec = { label: string; about: string; params: EffectParam[]; behind?: true; varies?: (v: Values) => boolean; reach?: (v: Values) => number; boxed?: (v: Values, filterId: string) => Rendered; render: (v: Values, frame: EffectFrame, filterId: string, lut: CompiledLut | null) => Rendered };
 
 const num = (key: string, label: string, min: number, max: number, step: number, fallback: number): EffectParam => ({ key, label, kind: ValueKind.Number, min, max, step, fallback });
 const colour = (key: string, label: string, fallback: string): EffectParam => ({ key, label, kind: ValueKind.Color, min: 0, max: 0, step: 0, fallback });
@@ -210,6 +212,29 @@ export const EFFECTS: Record<EffectKind, Spec> = {
       return css(`drop-shadow(${r(Math.cos(a) * d)}px ${r(Math.sin(a) * d)}px ${r(n(v, 'blur'))}px ${rgba(String(v.color), n(v, 'opacity'))})`);
     }
   },
+  [EffectKind.InnerShadow]: {
+    label: 'Inner shadow',
+    about: 'shadow inside the layer edge at distance px and angle degrees, blur px, colour and opacity',
+    params: [num('distance', 'Distance', 0, 300, 1, 4), num('angle', 'Angle', -180, 180, 1, 90), num('blur', 'Softness', 0, 200, 0.5, 8), colour('color', 'Colour', '#000000'), num('opacity', 'Opacity', 0, 1, 0.01, 0.25)],
+    render: (v, _f, id) => {
+      const a = rad(n(v, 'angle'));
+      return svg(id, [
+        node('feOffset', { in: 'SourceAlpha', dx: r(Math.cos(a) * n(v, 'distance')), dy: r(Math.sin(a) * n(v, 'distance')), result: 'moved' }),
+        node('feGaussianBlur', { in: 'moved', stdDeviation: r(n(v, 'blur') / 2), result: 'soft' }),
+        node('feComposite', { in: 'SourceAlpha', in2: 'soft', operator: 'out', result: 'rim' }),
+        node('feFlood', { 'flood-color': String(v.color), 'flood-opacity': r(n(v, 'opacity')), result: 'ink' }),
+        node('feComposite', { in: 'ink', in2: 'rim', operator: 'in', result: 'shade' }),
+        node('feMerge', {}, [node('feMergeNode', { in: 'SourceGraphic' }), node('feMergeNode', { in: 'shade' })])
+      ]);
+    }
+  },
+  [EffectKind.BackgroundBlur]: {
+    label: 'Background blur',
+    about: 'blurs what is behind the layer box by radius px; the layer itself stays sharp',
+    behind: true,
+    params: [num('radius', 'Radius', 0, 200, 0.5, 4)],
+    render: (v) => ({ filter: '', nodes: [], backdrop: `blur(${r(n(v, 'radius'))}px)` })
+  },
   [EffectKind.Glow]: {
     label: 'Glow',
     about: 'soft light around the layer: radius px, colour, intensity 0..1',
@@ -335,6 +360,14 @@ export const EFFECTS: Record<EffectKind, Spec> = {
     }
   }
 };
+
+export const EFFECT_ALPHA: Partial<Record<EffectKind, { color: string; alpha: string }>> = {
+  [EffectKind.DropShadow]: { color: 'color', alpha: 'opacity' },
+  [EffectKind.InnerShadow]: { color: 'color', alpha: 'opacity' },
+  [EffectKind.Glow]: { color: 'color', alpha: 'intensity' }
+};
+
+export const editedParams = (kind: EffectKind): EffectParam[] => EFFECTS[kind].params.filter((p) => p.key !== EFFECT_ALPHA[kind]?.alpha);
 
 export function defaultValues(kind: EffectKind): Values {
   return Object.fromEntries(EFFECTS[kind].params.map((p) => [p.key, p.fallback]));

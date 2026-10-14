@@ -6,6 +6,7 @@
   import { CAPS, JOINS } from '$lib/motion/shape/schema';
   import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, removeStroke, setStroke, type Stroke, type StrokePatch } from '$lib/motion/stroke/model';
   import ColorField from './ColorField.svelte';
+  import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
 
   let { strokes, tokens, sided = false, short, title = '', onchange }: { strokes: Stroke[]; tokens: BrandTokens; sided?: boolean; short: number; title?: string; onchange: (strokes: Stroke[], summary: string) => void } = $props();
 
@@ -31,6 +32,8 @@
 
   let open = $state<number | null>(null);
   let dragged = $state<number | null>(null);
+  let root = $state<HTMLDivElement | null>(null);
+  let rowEls = $state<HTMLElement[]>([]);
 
   const topFirst = $derived(strokes.map((stroke, index) => ({ stroke, index })).reverse());
   const color = (value: string) => resolveColor(value, tokens);
@@ -38,6 +41,8 @@
   const fromPx = (e: Event) => Math.max(0, Number((e.currentTarget as HTMLInputElement).value)) / short;
   const stopCss = (stops: Stop[]) => [...stops].sort((a, b) => a.pos - b.pos).map((s) => `${color(s.color)} ${Math.round(s.pos * PERCENT)}%`).join(',');
   const swatch = (f: Fill) => (f.type === FillType.Solid ? color(f.color) : f.type === FillType.Image ? 'var(--ui-input)' : `linear-gradient(90deg,${stopCss(f.stops)})`);
+
+  const rowLabel = (f: Fill) => (f.type === FillType.Solid ? colourAlpha(f.color).base.replace('#', '').toUpperCase() : PAINT_LABEL[f.type]);
 
   const patch = (i: number, p: StrokePatch, summary: string) => onchange(setStroke(strokes, i, p), summary);
   const repaint = (i: number, p: Partial<Record<string, unknown>>, summary: string) => patch(i, { paint: { ...strokes[i].paint, ...p } }, summary);
@@ -79,7 +84,7 @@
   <ColorField {name} value={base} {tokens} {alpha} onchange={(next) => write(recolour(next, alpha))} onalpha={(next) => write(recolour(base, next))} />
 {/snippet}
 
-<div class="flex flex-col gap-0.5" data-testid="stroke-stack">
+<div class="flex flex-col gap-0.5" data-testid="stroke-stack" bind:this={root}>
   <div class="flex h-(--ui-row) items-center justify-between">
     <span class={SECTION_LABEL}>{title}</span>
     <button type="button" class={ICON} data-testid="stroke-add" aria-label="Add stroke" onclick={add}>+</button>
@@ -87,12 +92,14 @@
 
   {#each topFirst as { stroke, index } (index)}
     <div
-      class={cn('grid grid-cols-[10px_18px_minmax(0,1fr)_56px_24px_24px] items-center gap-1 rounded-sm px-0.5', open === index && 'bg-ui-wash', !stroke.visible && '[&>.dim]:opacity-40')}
+      bind:this={rowEls[index]}
+      class={cn('grid grid-cols-[10px_18px_minmax(0,1fr)_56px_24px_24px] items-center gap-1 rounded-sm px-0.5', open === index && 'bg-ui-selected', !stroke.visible && '[&>.dim]:opacity-40')}
       role="button"
       tabindex="0"
       draggable="true"
       data-testid="stroke-row"
       data-index={index}
+      data-open={open === index ? 'true' : undefined}
       onclick={() => toggle(index)}
       onkeydown={(e) => e.key === 'Enter' && toggle(index)}
       ondragstart={() => (dragged = index)}
@@ -103,8 +110,8 @@
       }}
     >
       <span class="cursor-grab text-ui-text-3 select-none" aria-hidden="true">⋮</span>
-      <span class="dim size-[18px] rounded-xs border border-ui-divider" style={`background:${swatch(stroke.paint)}`}></span>
-      <span class={cn(LABEL, 'dim truncate')}>{ALIGN_LABEL[stroke.align]}</span>
+      <span class="dim size-[18px] rounded-xs border border-ui-divider" data-testid="stroke-swatch" style={`background:${swatch(stroke.paint)}`}></span>
+      <span class={cn(LABEL, 'dim truncate')} data-testid="stroke-label">{rowLabel(stroke.paint)}</span>
       <input class={cn(FIELD_INPUT, 'dim')} type="number" min="0" step="0.5" data-testid="stroke-width" aria-label="Stroke width px" title="Width px" value={toPx(stroke.width)} onclick={(e) => e.stopPropagation()} onchange={(e) => patch(index, { width: fromPx(e) }, 'Stroke width')} />
       <button
         type="button"
@@ -128,8 +135,9 @@
       >
     </div>
 
-    {#if open === index}
-      <div class="flex flex-col gap-1.5 py-1.5 pl-4" data-testid="stroke-editor">
+    {#if open === index && rowEls[index]}
+      <SidePopover anchor={rowEls[index]} within={root} key={String(index)} title={PAINT_LABEL[stroke.paint.type]} label={`${PAINT_LABEL[stroke.paint.type]} stroke`} swatch={swatch(stroke.paint)} onclose={() => (open = null)}>
+      <div class="flex flex-col gap-1.5" data-testid="stroke-editor">
         <label class={FIELD_ROW}
           ><span class={LABEL}>Paint</span>
           <select class={cn(FIELD_INPUT, 'w-28')} data-testid="stroke-paint" value={stroke.paint.type} onchange={(e) => retype(index, e.currentTarget.value as FillType)}>
@@ -178,6 +186,7 @@
           {/if}
         {/if}
       </div>
+      </SidePopover>
     {/if}
   {:else}
     <span class="text-ui-caption text-ui-text-3">No stroke. + adds one.</span>

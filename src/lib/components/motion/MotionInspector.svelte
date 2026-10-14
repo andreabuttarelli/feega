@@ -29,6 +29,8 @@
   import { clipName as layerName } from '$lib/motion/organize';
   import ColorField from './ColorField.svelte';
   import Plus from '@lucide/svelte/icons/plus';
+  import Eye from '@lucide/svelte/icons/eye';
+  import EyeOff from '@lucide/svelte/icons/eye-off';
   import { IconButton as ShellIconButton, Menu, MenuContent, MenuItem, MenuTrigger } from '$lib/components/ui/shell';
   import { hasSegments, segmentsOf } from '$lib/motion/segments';
   import SegmentedField from './SegmentedField.svelte';
@@ -54,7 +56,8 @@
   import { withParams } from '$lib/motion/custom/params';
   import type { CustomSource } from '$lib/motion/custom/component';
   import { setExpression } from '$lib/motion/expression/ops';
-  import { EFFECTS, EFFECT_KINDS, type EffectKind } from '$lib/motion/effects/registry';
+  import { EFFECTS, EFFECT_ALPHA, EFFECT_KINDS, editedParams, type EffectKind } from '$lib/motion/effects/registry';
+  import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
   import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
   import { effectKey } from '$lib/motion/effects/model';
   import { MODIFIERS, MODIFIER_KINDS, type ModifierKind } from '$lib/motion/shape/modifiers';
@@ -272,6 +275,14 @@
 
   let draggedEffect = $state<string | null>(null);
   const effectParams = (effectId: string) => animated.params.filter((p) => p.source === Source.Effect && p.key.startsWith(`${effectKey(effectId, '')}`));
+  const alphaKeyOf = (effect: { id: string; kind: EffectKind }) => (EFFECT_ALPHA[effect.kind] ? effectKey(effect.id, EFFECT_ALPHA[effect.kind]!.alpha) : null);
+  const effectRows = (effect: { id: string; kind: EffectKind }) => {
+    const edited = new Set(editedParams(effect.kind).map((p) => effectKey(effect.id, p.key)));
+    return effectParams(effect.id).filter((p) => edited.has(p.key));
+  };
+  let openEffect = $state<string | null>(null);
+  let effectHeads = $state<Record<string, HTMLElement>>({});
+  let effectsRoot = $state<HTMLElement | null>(null);
 
   const animatorRows = (id: string) => animated.params.filter((p) => p.source === Source.Animator && p.key.startsWith(animatorKey(id, '')));
   const TEXT_PRESET_SECONDS = 1;
@@ -785,35 +796,46 @@
         <ShellIconButton {...props} label="Add effect" data-testid="add-effect"><Plus /></ShellIconButton>
       {/snippet}
     </MenuTrigger>
-    <MenuContent align="end">
+    <MenuContent align="end" class="max-h-[60vh] overflow-y-auto">
       {#each EFFECT_KINDS as kind (kind)}<MenuItem label={EFFECTS[kind].label} onSelect={() => addEffectOf(kind)} />{/each}
     </MenuContent>
   </Menu>
 {/snippet}
 
 {#snippet effectsBody()}
-  <div class="stackable" data-testid="effects-section">
+  <div class="stackable" data-testid="effects-section" bind:this={effectsRoot}>
     {#each clip.effects as effect, i (effect.id)}
       <div class="effect" class:off={!effect.enabled} role="listitem" draggable="true" data-effect={effect.id} ondragstart={() => (draggedEffect = effect.id)} ondragover={(e) => e.preventDefault()} ondrop={() => dropEffect(i)}>
-        <div class="effect-head">
+        <div class="effect-head" class:open={openEffect === effect.id} data-open={openEffect === effect.id ? 'true' : undefined} bind:this={effectHeads[effect.id]}>
           <span class="grip" aria-hidden="true">⋮⋮</span>
-          <label class="effect-name"><input type="checkbox" checked={effect.enabled} aria-label={`Enable ${EFFECTS[effect.kind].label}`} onchange={(e) => commit(setEffect(doc, clip.id, effect.id, { enabled: e.currentTarget.checked }), 'Toggled an effect')} />{EFFECTS[effect.kind].label}</label>
-          <IconButton action={Action.ItemUp} size={14} label="Move effect up" disabled={i === 0} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i - 1 }), 'Reordered effects')} />
-          <IconButton action={Action.ItemDown} size={14} label="Move effect down" disabled={i === clip.effects.length - 1} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i + 1 }), 'Reordered effects')} />
+          <ShellIconButton label={`${effect.enabled ? 'Hide' : 'Show'} ${EFFECTS[effect.kind].label}`} data-testid="effect-eye" onclick={() => commit(setEffect(doc, clip.id, effect.id, { enabled: !effect.enabled }), effect.enabled ? 'Hid an effect' : 'Showed an effect')}>{#if effect.enabled}<Eye />{:else}<EyeOff />{/if}</ShellIconButton>
+          <button type="button" class="effect-name effect-open" data-testid="effect-open" aria-expanded={openEffect === effect.id} onclick={() => (openEffect = openEffect === effect.id ? null : effect.id)}>{EFFECTS[effect.kind].label}</button>
           <IconButton action={Action.Remove} size={14} label={`Remove ${EFFECTS[effect.kind].label}`} onclick={() => commit(removeEffect(doc, clip.id, effect.id), 'Removed an effect')} />
         </div>
-        {#if effect.kind === 'lut'}<LutPicker {doc} clipId={clip.id} {effect} {onchange} />{/if}
-        {#each effectParams(effect.id) as prop (prop.key)}
-          {#if prop.kind === ValueKind.Color}
-            <div class="line" data-prop={prop.key}>
-              <span class="label">{afterDot(prop)}</span>
-              <div class="control"><ColorField name={prop.label} value={shown(prop.key)} {tokens} onchange={(v) => animate(prop.key, resolve(v))} /></div>
-              {@render diamond(prop.key)}
+        {#if openEffect === effect.id && effectHeads[effect.id]}
+          <SidePopover anchor={effectHeads[effect.id]} within={effectsRoot} key={effect.id} title={EFFECTS[effect.kind].label} onclose={() => (openEffect = null)}>
+            <div class="stackable" data-testid="effect-editor">
+              {#if effect.kind === 'lut'}<LutPicker {doc} clipId={clip.id} {effect} {onchange} />{/if}
+              {#each effectRows(effect) as prop (prop.key)}
+                {#if prop.kind === ValueKind.Color}
+                  {@const alphaKey = alphaKeyOf(effect)}
+                  <div class="line" data-prop={prop.key}>
+                    <span class="label">{afterDot(prop)}</span>
+                    <div class="control"><ColorField name={prop.label} value={shown(prop.key)} {tokens} alpha={alphaKey ? Number(shown(alphaKey)) : null} onalpha={alphaKey ? (a) => animate(alphaKey, a) : undefined} onchange={(v) => animate(prop.key, resolve(v))} /></div>
+                    {@render diamond(prop.key)}
+                  </div>
+                {:else}
+                  {@render animList([prop], afterDot)}
+                {/if}
+              {/each}
+              <div class="line">
+                <span class="label">Order</span>
+                <IconButton action={Action.ItemUp} size={14} label="Move effect up" disabled={i === 0} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i - 1 }), 'Reordered effects')} />
+                <IconButton action={Action.ItemDown} size={14} label="Move effect down" disabled={i === clip.effects.length - 1} onclick={() => commit(setEffect(doc, clip.id, effect.id, { index: i + 1 }), 'Reordered effects')} />
+              </div>
             </div>
-          {:else}
-            {@render animList([prop], afterDot)}
-          {/if}
-        {/each}
+          </SidePopover>
+        {/if}
       </div>
     {/each}
     {#if !clip.effects.length}<p class="hint">No effects. Add one with +.</p>{/if}
@@ -1248,6 +1270,20 @@
     gap: 6px;
     align-items: center;
     font-weight: 600;
+  }
+  .effect-open {
+    min-width: 0;
+    border: 0;
+    background: none;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+    cursor: pointer;
+  }
+  .effect-head.open {
+    background: var(--ui-selected);
   }
 
   .grip {

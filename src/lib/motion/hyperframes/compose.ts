@@ -56,7 +56,7 @@ import { bakePhysics } from '../physics/simulate';
 import { withoutHidden } from '../organize';
 import { JUNCTION, Span, junctionHalves, junctionPairs, withJunctions, type JunctionPair, type Move } from '../junctions';
 import { paintArea, placedBox } from '../effects/paint-area';
-import { EFFECT_CSS, adjustmentLayer, adjustmentTimeline, effectLayer, effectScript, effectTimeline, type EffectSet } from '../effects/render';
+import { BEHIND_CSS, EFFECT_CSS, seesBehind, adjustmentLayer, adjustmentTimeline, effectLayer, effectScript, effectTimeline, type EffectSet } from '../effects/render';
 import { flattenComps, type GroupProps } from '../precomp';
 import { blendStyle } from '../blend';
 import { HELD, holdScript } from './blur';
@@ -243,7 +243,7 @@ type Placed = { layer: number; trackIndex: number; matte: MattePair | null; visi
 function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Placed, content: string): string {
   const template = TEMPLATES[clip.component] as (typeof TEMPLATES)[ComponentId];
   const inner = matted(placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, effectLayer(clip, ctx, ctx.color, ownMask(clip, ctx, content), paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null)))));
-  const fx = `<div class="fx" id="fx-${clip.id}">${inner}</div>`;
+  const fx = `<div class="${seesBehind(clip) ? 'fx bd' : 'fx'}" id="fx-${clip.id}">${inner}</div>`;
   const style = css({ zIndex: placed.layer, transform: placed.transform, mixBlendMode: blendStyle(clip.blend) });
   const blur = (placed.held ? ` ${HELD}` : '') + (placed.group ? ` data-group="${esc(placed.group)}"` : '');
   const layer =
@@ -420,6 +420,7 @@ const BASE_CSS = [
   '#root{position:relative;width:100%;height:100%;overflow:hidden;isolation:isolate}',
   '.layer{position:absolute;inset:0}',
   '.fx{position:absolute;inset:0;will-change:transform,opacity}',
+  BEHIND_CSS,
   '.cc{position:absolute;inset:0;overflow:hidden}',
   '.li{display:block;will-change:transform}',
   ANIMATE_CSS,

@@ -23,6 +23,7 @@ describe('inspector sections', () => {
     expect(isOpen({}, ClipFamily.Text, Section.Content)).toBe(true);
     expect(isOpen({}, ClipFamily.Text, Section.Layout)).toBe(true);
     expect(isOpen({}, ClipFamily.Text, Section.Text)).toBe(true);
+    expect(isOpen({}, ClipFamily.Shape, Section.Effects)).toBe(true);
     expect(isOpen({}, ClipFamily.Text, Section.Timing)).toBe(false);
     expect(isOpen({}, ClipFamily.Text, Section.Animate)).toBe(false);
   });
