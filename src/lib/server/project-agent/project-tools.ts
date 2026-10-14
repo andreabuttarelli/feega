@@ -256,6 +256,18 @@ export function createProjectTools(deps: ProjectToolDeps): Record<string, Tool> 
       execute: (input: z.infer<typeof CANVAS_OPS.cancel_node_loop.input>) => CANVAS_OPS.cancel_node_loop.run(ctx, input)
     }),
 
+    preview_run_graph: tool({
+      description: 'Plan a graph run on THIS project without spending: graph "downstream" (nodeId, then every node it feeds, in dependency order) or "stale" (on canvasId, every result older than its inputs; nodeIds narrows it). Returns the ordered steps and the credits. Free: always call it and tell the user the cost before run_graph.',
+      inputSchema: CANVAS_OPS.preview_run_graph.input,
+      execute: (input: z.infer<typeof CANVAS_OPS.preview_run_graph.input>) => CANVAS_OPS.preview_run_graph.run(ctx, input)
+    }),
+
+    run_graph: tool({
+      description: 'Queue the steps preview_run_graph planned, same input; a cron runs each after the ones it depends on, a failed step stops what depends on it. Costs credits: only when the user agreed to the quoted cost. Cycles are refused.',
+      inputSchema: CANVAS_OPS.run_graph.input,
+      execute: (input: z.infer<typeof CANVAS_OPS.run_graph.input>) => CANVAS_OPS.run_graph.run(ctx, input)
+    }),
+
     search_gallery: tool({
       description:
         'Search the public gallery of free motion videos and compositions anyone can remix (many by Feega). Filters: query (title words), kind, format, duration (short up to 6 s, medium 6 to 15 s, long over 15 s), tag. Returns id, title, author, format, seconds, remixes and url. Free, reads only.',

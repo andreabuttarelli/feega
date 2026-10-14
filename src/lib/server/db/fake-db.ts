@@ -21,7 +21,7 @@ export type Call = {
 
 export type FakeDb = { db: Db; calls: Call[] };
 
-export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean; newId?: () => string; files?: Record<string, Uint8Array> };
+export type FakeOptions = { updateRows?: Record<string, unknown[]>; filter?: boolean; mutate?: boolean; store?: boolean; newId?: () => string; files?: Record<string, Uint8Array> };
 
 export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {}): FakeDb {
   const calls: Call[] = [];
@@ -41,7 +41,21 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
     return all.filter((row) => filters.every((f) => matches(row as Record<string, unknown>, f)));
   };
 
+  const stored = new WeakMap<Call, unknown[]>();
+
+  const store = (call: Call): unknown[] => {
+    const made = stored.get(call) ?? [{ id: options.newId?.() ?? crypto.randomUUID(), ...(call.payload as object) }];
+    if (!stored.has(call)) {
+      stored.set(call, made);
+      rows[call.table] = [...(rows[call.table] ?? []), ...made];
+    }
+    return made;
+  };
+
   const resolved = (call: Call): unknown[] => {
+    if (options.store && call.op === 'insert' && call.payload) {
+      return store(call);
+    }
     const found = rowsFor(call.op, call.table, call.filters);
     if (!options.mutate || call.op !== 'update' || !call.payload) {
       return found;

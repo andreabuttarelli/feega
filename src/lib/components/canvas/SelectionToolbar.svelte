@@ -27,6 +27,7 @@
     count,
     nodeSummaries = [],
     edges = [],
+    stale = [],
     choicesFor,
     catalogueSynced = true,
     runQuote = null,
@@ -39,6 +40,7 @@
     count: number;
     nodeSummaries?: { id: string; type: string; data: Record<string, unknown> }[];
     edges?: WorkflowEdge[];
+    stale?: string[];
     choicesFor?: (type: GenPropertyType) => ModelChoice[];
     catalogueSynced?: boolean;
     runQuote?: RunQuote | null;
@@ -76,7 +78,7 @@
   const danger = $derived(actionsIn('danger', count));
 
   function gateOf(action: SelectionAction) {
-    return enabledFor(action.id, nodeSummaries, edges);
+    return enabledFor(action.id, nodeSummaries, edges, stale);
   }
 </script>
 
