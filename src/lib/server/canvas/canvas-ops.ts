@@ -3,8 +3,10 @@ import type { Db } from '$lib/server/db/client';
 import {
   createConnection,
   createNode,
-  deleteNode,
+  deleteConnection,
   findNode,
+  listConnections,
+  setConnectionMode,
   listCanvases,
   listNodes,
   moveNode,
@@ -18,9 +20,25 @@ import { withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { GEN_MEDIUMS, isGenMedium, type GenParams } from '$lib/canvas/gen-node';
 import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPUTS_ERROR } from '$lib/server/canvas/node-model';
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
-import { cancelLoop, enqueueLoop, planLoop } from '$lib/server/canvas/loop';
+import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
 import { MoveOutcome, dropFor, frameAnswer, frameStore, linkFrame, moveElement, placeOutput } from '$lib/server/motion/move-element';
+import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
+import { renameProject } from '$lib/server/repos/projects';
+import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
+import { syncNode } from '$lib/server/canvas/node-sync';
+import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { insertTemplate } from '$lib/server/canvas/templates';
+import { setCanvasShare } from '$lib/server/canvas/canvas-share';
+import { ShareState } from '$lib/canvas/shared-view';
+import { CANVAS_TEMPLATES } from '$lib/canvas/templates';
+import { WIRE_MODES } from '$lib/canvas-edges';
+import { cancelWorkflow, enqueueWorkflow, planWorkflowDryRun, workflowCredits } from '$lib/server/canvas/workflow';
+import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
+import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { cancelRender } from '$lib/server/motion/render-run';
+import { motionRenderFarm } from '$lib/server/motion/renderer';
+import { withdrawFromGallery } from '$lib/server/gallery/publish';
 
 export type CanvasDeps = {
   db: Db;
@@ -169,6 +187,40 @@ async function graphCanvas(ctx: CanvasCtx, input: z.infer<typeof runGraphInput>)
   return node?.canvasId ?? null;
 }
 
+const canvasIdInput = z.object({ canvasId: z.string() }).strict();
+const renameCanvasInput = z.object({ canvasId: z.string(), name: z.string().min(1) }).strict();
+const renameProjectInput = z.object({ name: z.string().min(1) }).strict();
+const connectionIdInput = z.object({ connectionId: z.string().describe('from list_connections') }).strict();
+const edgeModeInput = z.object({ connectionId: z.string(), mode: z.enum(WIRE_MODES).describe('iterate makes the line a loop axis') }).strict();
+const resizeNodeInput = z.object({ nodeId: z.string(), width: z.number().positive(), height: z.number().positive() }).strict();
+const nodeIdsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1) }).strict();
+const shareCanvasInput = z.object({ canvasId: z.string(), on: z.boolean().describe('true mints a view-only link; false revokes it') }).strict();
+const shareDocInput = z.object({ nodeId: z.string().describe('a doc node'), on: z.boolean() }).strict();
+const insertTemplateInput = z.object({ canvasId: z.string(), templateId: z.string().describe('from list_templates'), x: z.number(), y: z.number() }).strict();
+const addFrameInput = z
+  .object({
+    canvasId: z.string(),
+    templateId: z.string().describe('a motion template id (list_motion_templates)'),
+    format: z.enum(MOTION_FORMATS).default(MotionFormat.Landscape),
+    x: z.number(),
+    y: z.number()
+  })
+  .strict();
+const showRunInput = z.object({ nodeId: z.string(), runId: z.string().describe('from list_runs') }).strict();
+const retryComboInput = z.object({ nodeId: z.string(), outputListNodeId: z.string(), label: z.string(), runId: z.string().optional() }).strict();
+const workflowIdInput = z.object({ workflowId: z.string() }).strict();
+const workflowInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2) }).strict();
+const galleryItemInput = z.object({ itemId: z.string() }).strict();
+
+const NOT_IN_PROJECT = { error: 'canvas_not_found', message: 'No canvas with that id in this project.' };
+const LAST_CANVAS = { error: 'last_canvas', message: 'A project keeps at least one canvas.' };
+const NO_FARM = { error: 'rendering_not_configured' };
+const NOT_SYNCABLE = { error: 'not_syncable', message: 'Only products and social_account_feed nodes sync.' };
+
+async function inProject(ctx: CanvasCtx, canvasId: string): Promise<boolean> {
+  return (await listCanvases(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId })).some((c) => c.id === canvasId);
+}
+
 export const CANVAS_OPS = {
   list_canvases: op({
     access: Access.Read,
@@ -293,7 +345,11 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: nodeIdInput,
     run: async (ctx, input) => {
-      await deleteNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId, actor: ctx.actor });
+      const node = await findNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId });
+      if (!node) {
+        return NODE_NOT_FOUND;
+      }
+      await removeNodes(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, nodeIds: [node.id], actor: ctx.actor });
       return { deleted: true, nodeId: input.nodeId };
     }
   }),
@@ -405,6 +461,220 @@ export const CANVAS_OPS = {
         ? { outcome: 'queued', workflowId: out.workflowId, steps: out.steps, runIdByNodeId: out.runIdByNodeId, credits: out.credits }
         : { outcome: 'refused', error: out.error };
     }
+  }),
+
+  create_canvas: op({
+    access: Access.Write,
+    input: listCanvasesInput,
+    run: async (ctx) => ({ canvas: await openNewCanvas(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId }) })
+  }),
+
+  rename_canvas: op({
+    access: Access.Write,
+    input: renameCanvasInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      return { renamed: await renameCanvasTo(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, name: input.name }) };
+    }
+  }),
+
+  delete_canvas: op({
+    access: Access.Write,
+    input: canvasIdInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const removed = await removeCanvas(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId });
+      return removed.outcome === CanvasRemoval.LastCanvas ? LAST_CANVAS : { deleted: true, nextCanvasId: removed.nextCanvasId };
+    }
+  }),
+
+  rename_project: op({
+    access: Access.Write,
+    input: renameProjectInput,
+    run: async (ctx, input) => {
+      await renameProject(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, name: input.name.trim() });
+      return { renamed: true };
+    }
+  }),
+
+  list_connections: op({
+    access: Access.Read,
+    input: canvasIdInput,
+    run: async (ctx, input) => ({ connections: await listConnections(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) })
+  }),
+
+  disconnect_nodes: op({
+    access: Access.Write,
+    input: connectionIdInput,
+    run: async (ctx, input) => {
+      await deleteConnection(ctx.db, { orgId: ctx.orgId, connectionId: input.connectionId, actor: ctx.actor });
+      return { disconnected: true };
+    }
+  }),
+
+  set_edge_mode: op({
+    access: Access.Write,
+    input: edgeModeInput,
+    run: async (ctx, input) => {
+      const connection = await setConnectionMode(ctx.db, { orgId: ctx.orgId, ...input });
+      return connection ? { connection } : { error: 'connection_not_found' };
+    }
+  }),
+
+  resize_node: op({
+    access: Access.Write,
+    input: resizeNodeInput,
+    run: async (ctx, input) => {
+      const node = await findNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId });
+      if (!node) {
+        return NODE_NOT_FOUND;
+      }
+      await resizeOnCanvas(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input });
+      return { resized: true };
+    }
+  }),
+
+  duplicate_nodes: op({
+    access: Access.Write,
+    input: nodeIdsInput,
+    run: async (ctx, input) => duplicateNodes(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, ...input, actor: ctx.actor })
+  }),
+
+  share_canvas: op({
+    access: Access.Write,
+    input: shareCanvasInput,
+    run: async (ctx, input) => {
+      if (!(await inProject(ctx, input.canvasId))) {
+        return NOT_IN_PROJECT;
+      }
+      const token = await setCanvasShare(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, state: input.on ? ShareState.On : ShareState.Off });
+      return token ? { shared: true, path: `/s/${token}` } : { shared: false };
+    }
+  }),
+
+  share_doc: op({
+    access: Access.Write,
+    input: shareDocInput,
+    run: async (ctx, input) => {
+      const node = await findNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId });
+      const shared = node ? await shareDoc(ctx.db, { orgId: ctx.orgId, canvasId: node.canvasId, ...input }) : null;
+      return shared ?? NODE_NOT_FOUND;
+    }
+  }),
+
+  list_templates: op({
+    access: Access.Read,
+    input: listCanvasesInput,
+    run: async () => ({ templates: CANVAS_TEMPLATES.map((t) => ({ id: t.id, category: t.category, name: t.name, description: t.description })) })
+  }),
+
+  insert_template: op({
+    access: Access.Write,
+    input: insertTemplateInput,
+    run: async (ctx, input) => {
+      const out = await insertTemplate(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: input.canvasId, templateId: input.templateId, at: { x: input.x, y: input.y }, actor: ctx.actor });
+      return out ?? { error: 'unknown_template' };
+    }
+  }),
+
+  add_frame_from_template: op({
+    access: Access.Write,
+    input: addFrameInput,
+    run: async (ctx, input) => {
+      const started = await startFromTemplate(ctx.db, FROM_TEMPLATE_DEPS, {
+        orgId: ctx.orgId,
+        projectId: ctx.projectId,
+        canvasId: input.canvasId,
+        userId: ctx.userId,
+        templateId: input.templateId,
+        format: input.format,
+        at: { x: input.x, y: input.y },
+        actor: ctx.actor
+      });
+      return started.outcome === FromTemplate.Started ? { outcome: 'written', nodeId: started.start.nodeId, version: started.version } : { error: started.outcome };
+    }
+  }),
+
+  show_run: op({
+    access: Access.Write,
+    input: showRunInput,
+    run: async (ctx, input) => showRun(ctx.db, { orgId: ctx.orgId, ...input, actor: ctx.actor })
+  }),
+
+  sync_node: op({
+    access: Access.Write,
+    input: nodeIdInput,
+    run: async (ctx, input) => {
+      const node = await findNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId });
+      if (!node) {
+        return NODE_NOT_FOUND;
+      }
+      const written = await syncNode(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, nodeId: node.id, version: node.version, actor: ctx.actor });
+      return written.outcome === 'not_syncable' ? NOT_SYNCABLE : AGENT_PATCH_ANSWERS[written.outcome](written);
+    }
+  }),
+
+  retry_loop_combination: op({
+    access: Access.Spend,
+    input: retryComboInput,
+    run: async (ctx, input) => {
+      const node = await findNode(ctx.db, { orgId: ctx.orgId, nodeId: input.nodeId });
+      if (!node) {
+        return NODE_NOT_FOUND;
+      }
+      const ask = { orgId: ctx.orgId, projectId: ctx.projectId, canvasId: node.canvasId, userId: ctx.userId, nodeId: node.id, outputListNodeId: input.outputListNodeId, label: input.label, runId: input.runId ?? null, actor: ctx.actor };
+      return ctx.billed(() => retryLoopCombo(ctx.db, ask));
+    }
+  }),
+
+  preview_workflow: op({
+    access: Access.Read,
+    input: workflowInput,
+    run: async (ctx, input) => {
+      const plan = await planWorkflowDryRun(ctx.db, { orgId: ctx.orgId, ...input });
+      if (!plan.ok) {
+        return { outcome: 'refused', error: plan.reason };
+      }
+      return { steps: plan.steps, credits: await workflowCredits(ctx.db, { orgId: ctx.orgId, nodeIds: input.nodeIds }) };
+    }
+  }),
+
+  run_workflow: op({
+    access: Access.Spend,
+    input: workflowInput,
+    run: async (ctx, input) => {
+      const out = await ctx.billed(() => enqueueWorkflow(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, userId: ctx.userId, ...input }));
+      return out.kind === 'refused' ? { outcome: 'refused', error: out.error } : { outcome: 'queued', workflowId: out.workflowId, steps: out.steps };
+    }
+  }),
+
+  cancel_workflow: op({
+    access: Access.Write,
+    input: workflowIdInput,
+    run: async (ctx, input) => cancelWorkflow(ctx.db, { orgId: ctx.orgId, workflowId: input.workflowId })
+  }),
+
+  cancel_render: op({
+    access: Access.Write,
+    input: nodeIdInput,
+    run: async (ctx, input) => {
+      const farm = motionRenderFarm();
+      if (!farm) {
+        return NO_FARM;
+      }
+      const cancelled = await cancelRender(ctx.db, farm, { orgId: ctx.orgId, nodeId: input.nodeId });
+      return cancelled.ok ? { cancelled: true } : { error: 'nothing_to_cancel' };
+    }
+  }),
+
+  withdraw_from_gallery: op({
+    access: Access.Write,
+    input: galleryItemInput,
+    run: async (ctx, input) => ({ withdrawn: await withdrawFromGallery(ctx.db, { orgId: ctx.orgId, itemId: input.itemId }) })
   })
 };
 
