@@ -37,10 +37,14 @@ describe('the coach advances only on what the user actually did', () => {
 });
 
 describe('who sees the coach', () => {
-  const fresh = { status: null, signupCampaign: null, nodeCount: 0, hasGenerated: false };
+  const fresh = { status: null, signupCampaign: null, nodeCount: 0, hasGenerated: false, accountCreatedAt: '2026-10-12T00:00:00Z' };
 
   it('a brand-new user without a campaign starts it', () => {
     expect(shouldStart(fresh)).toBe(true);
+  });
+
+  it('an account the tour already counts as seen never starts it', () => {
+    expect(shouldStart({ ...fresh, accountCreatedAt: '2026-09-21T19:33:50Z' })).toBe(false);
   });
 
   it('a user who came from a landing page gets the template instead', () => {

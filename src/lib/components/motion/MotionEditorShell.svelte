@@ -271,6 +271,9 @@
           get parts() {
             return partsByClip;
           },
+          get mode() {
+            return editMode;
+          },
           get part() {
             return selection.length === 1 && selectedPart ? `${selection[0]}${PART_SEP}${selectedPart}` : null;
           },

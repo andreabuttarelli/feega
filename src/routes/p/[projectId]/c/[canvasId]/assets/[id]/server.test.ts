@@ -58,6 +58,30 @@ describe('GET canvas asset', () => {
     expect(res.headers.get('Cache-Control')).toMatch(/^private, max-age=[1-9]\d*$/);
   });
 
+  it('lo stesso asset chiesto di nuovo dallo stesso utente non rilegge il database né rifirma', async () => {
+    const { listMemberships } = await import('$lib/server/repos/orgs');
+    const row = asset({ id: 'memo-1', source: 'upload', url: 'org-1/p1/memo.png' });
+    vi.mocked(signAssetPaths).mockResolvedValueOnce(new Map([['org-1/p1/memo.png', 'https://signed.example/memo.png?token=1']]));
+    const ask = () => {
+      const { db, calls } = fakeDb({ assets: [row] }, { filter: true });
+      const locals = { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => db };
+      const url = new URL('http://localhost/p/p1/c/c1/assets/memo-1?size=512');
+      return { calls, response: GET({ params: { projectId: 'p1', canvasId: 'c1', id: 'memo-1' }, locals, url } as never) };
+    };
+
+    await ask().response;
+    vi.mocked(listMemberships).mockClear();
+    vi.mocked(signAssetPaths).mockClear();
+    const again = ask();
+    const res = await again.response;
+
+    expect(res.headers.get('Location')).toBe('https://signed.example/memo.png?token=1');
+    expect(res.headers.get('Server-Timing')).toMatch(/memo/);
+    expect(again.calls).toEqual([]);
+    expect(vi.mocked(listMemberships)).not.toHaveBeenCalled();
+    expect(vi.mocked(signAssetPaths)).not.toHaveBeenCalled();
+  });
+
   it('senza size l\'immagine resta intera, per il download e l\'editor', async () => {
     vi.mocked(signAssetPaths).mockClear();
     await Promise.resolve(call(asset({ source: 'upload', url: 'org-1/p1/x.png' }))).catch(() => null);

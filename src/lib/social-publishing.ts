@@ -16,13 +16,11 @@ export const SOCIAL_PUBLISHING_SURFACE = {
     '/p/[projectId]/settings/facebook',
     '/p/[projectId]/settings/linkedin',
     '/(public)/docs/api/posts',
-    '/api/v1/org/posts',
     '/api/v1/brands/[slug]/publishing',
     '/api/v1/brands/[slug]/social',
     '/api/v1/health/accounts/tick'
   ],
   actions: {
-    '/p/[projectId]/c/[canvasId]': ['create_post', 'calendar_posts', 'plan_post', 'schedule_post'],
     '/app/studio/[batchId]': ['calendar']
   } as Record<string, readonly string[]>,
   navEntries: ['calendar', 'ads'],

@@ -1,3 +1,5 @@
+import { predatesOnboarding } from './tour';
+
 export enum OnboardingStatus {
   Active = 'active',
   Dismissed = 'dismissed',
@@ -63,10 +65,16 @@ export function stepOf(graph: CoachGraph): CoachStep {
   return shown ? CoachStep.Generate : CoachStep.Run;
 }
 
-export type Eligibility = { status: string | null; signupCampaign: string | null; nodeCount: number; hasGenerated: boolean };
+export type Eligibility = {
+  status: string | null;
+  signupCampaign: string | null;
+  nodeCount: number;
+  hasGenerated: boolean;
+  accountCreatedAt: string;
+};
 
 export function shouldStart(who: Eligibility): boolean {
-  return who.status === null && who.signupCampaign === null && who.nodeCount === 0 && !who.hasGenerated;
+  return !predatesOnboarding(who.accountCreatedAt) && who.status === null && who.signupCampaign === null && who.nodeCount === 0 && !who.hasGenerated;
 }
 
 export function coachVisible(who: { status: string | null; hasGenerated: boolean }): boolean {

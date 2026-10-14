@@ -25,6 +25,10 @@ const PRESETS: Record<ThumbnailPreset, { tilePx: number; resize: Resize; quality
   canvas2048: canvasTier(AssetSize.Px2048)
 };
 
+export function isThumbnailPreset(value: string | null): value is ThumbnailPreset {
+  return value !== null && Object.hasOwn(PRESETS, value);
+}
+
 export type ImageTransform = { width: number; height: number; resize: Resize; quality: number };
 
 export function thumbnailTransform(preset: ThumbnailPreset): ImageTransform {
