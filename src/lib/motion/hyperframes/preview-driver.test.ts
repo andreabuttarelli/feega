@@ -281,4 +281,18 @@ describe('seeking the preview', () => {
 
     expect(posted).toEqual([EXACT_SEEK, CAPTURE_REQUEST]);
   });
+
+  it('a still asked before the player is ready waits for it instead of failing as not ready', async () => {
+    let mounted = false;
+    const base = slowPlayer(page('poster'));
+    const port: PlayerPort = { ...base, post: (m) => mounted && base.post(m) };
+    const driver = previewDriver(port);
+
+    const shot = driver.whenLive().then(() => driver.shoot(0, REQUEST));
+    await new Promise((r) => setTimeout(r, COMMIT_MS));
+    mounted = true;
+    driver.ready();
+
+    expect((await shot).url).toBe('poster');
+  });
 });
