@@ -10,6 +10,7 @@ import {
   QWEN3_PRO_MODEL,
   openrouterImagesSize,
   imageModelSpec,
+  rendersOnImagesApi,
   imageRefineModelFor,
   isKnownImageModelId,
   imageModelFor,
@@ -201,5 +202,15 @@ describe('nessun modello immagine resta senza trasporto', () => {
     expect(imageModelSpec(SEEDREAM_5_PRO_MODEL)?.openrouterImages).toBe('bytedance-seed/seedream-5-0-pro');
     expect(imageModelSpec(GPT_IMAGE_2_MODEL)?.openrouterImages).toBe('openai/gpt-image-2');
     expect(imageModelSpec(QWEN3_PRO_MODEL)?.openrouterImages).toBe('qwen/qwen-image-3-pro');
+  });
+});
+
+describe('rendersOnImagesApi', () => {
+  it('a model synced from /images/models with no spec of ours renders on the images API, never chat/completions', () => {
+    expect(rendersOnImagesApi('tencent/hy-image-v3.5-preview')).toBe(true);
+  });
+
+  it('a registry model with an images id renders on the images API', () => {
+    expect(rendersOnImagesApi(SEEDREAM_5_PRO_MODEL)).toBe(true);
   });
 });
