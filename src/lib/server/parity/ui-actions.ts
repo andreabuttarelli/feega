@@ -149,6 +149,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleTimeline]: VIEW,
   [Command.Help]: VIEW,
   [Command.Precompose]: motion('precompose'),
+  [Command.AutoLayout]: motion('add_auto_layout'),
   [Command.ToolSelect]: VIEW,
   [Command.ToolText]: motion('add_clip'),
   [Command.ToolRectangle]: motion('add_shape'),

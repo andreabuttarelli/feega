@@ -43,6 +43,7 @@
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
   import TextPathSection from './TextPathSection.svelte';
+  import AutoLayoutSection from './AutoLayoutSection.svelte';
   import { registerFont, setFont } from '$lib/motion/fonts/ops';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
@@ -420,6 +421,7 @@
         {@render BODIES[section]()}
       </InspectorSection>
     {/each}
+    {#if visual}<AutoLayoutSection {doc} {clip} {commit} />{/if}
   {/if}
 
   {#if error}<p class="error" role="alert">{error}</p>{/if}

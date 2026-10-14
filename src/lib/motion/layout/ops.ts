@@ -19,9 +19,9 @@ function withClip(doc: MotionDoc, clipId: string, edit: (clip: MotionClip) => Mo
   return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === clipId ? edit(c as MotionClip) : c)) })) };
 }
 
-const hasBox = (clip: MotionClip) => typeof clip.props.width === 'number' && typeof clip.props.height === 'number';
+export const hasBox = (clip: MotionClip) => typeof clip.props.width === 'number' && typeof clip.props.height === 'number';
 
-function containerOf(doc: MotionDoc, clip: MotionClip): (MotionClip & { autoLayout: AutoLayout }) | null {
+export function layoutParent(doc: MotionDoc, clip: MotionClip): (MotionClip & { autoLayout: AutoLayout }) | null {
   const parent = clip.parent ? findClip(doc, clip.parent)?.clip : undefined;
   return parent?.autoLayout ? (parent as MotionClip & { autoLayout: AutoLayout }) : null;
 }
@@ -54,7 +54,7 @@ export function setLayoutItem(doc: MotionDoc, clipId: string, patch: Partial<Lay
     return fail(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
   }
   const fills = parsed.data.width === Sizing.Fill || parsed.data.height === Sizing.Fill;
-  if (fills && !containerOf(doc, found.clip)) {
+  if (fills && !layoutParent(doc, found.clip)) {
     return fail(`${clipId} is not inside an auto layout: fill needs a container to fill`);
   }
   return { ok: true, doc: withClip(doc, clipId, (c) => ({ ...c, layoutItem: parsed.data })) };
@@ -76,7 +76,7 @@ export function reorderChild(doc: MotionDoc, containerId: string, childId: strin
 
 export function leaveAutoLayout(doc: MotionDoc, clipId: string): OpResult {
   const found = findClip(doc, clipId);
-  const container = found ? containerOf(doc, found.clip) : null;
+  const container = found ? layoutParent(doc, found.clip) : null;
   if (!found || !container) {
     return fail(`${clipId} is not inside an auto layout`);
   }
@@ -139,4 +139,13 @@ export function wrapInAutoLayout(doc: MotionDoc, clipIds: readonly string[], id:
     }
   }
   return result.ok ? setLayoutItem(result.doc, id, HUG) : result;
+}
+
+export function addAutoLayout(doc: MotionDoc, clipIds: readonly string[], newId: () => string): { result: OpResult; containerId: string } {
+  const [lone] = clipIds;
+  if (clipIds.length === 1 && doc.tracks.some((t) => t.clips.some((c) => c.parent === lone))) {
+    return { result: setAutoLayout(doc, lone, {}), containerId: lone };
+  }
+  const containerId = newId();
+  return { result: wrapInAutoLayout(doc, clipIds, containerId, newId()), containerId };
 }

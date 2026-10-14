@@ -1,0 +1,132 @@
+<script lang="ts">
+  import ArrowRight from '@lucide/svelte/icons/arrow-right';
+  import ArrowDown from '@lucide/svelte/icons/arrow-down';
+  import WrapText from '@lucide/svelte/icons/wrap-text';
+  import Plus from '@lucide/svelte/icons/plus';
+  import Minus from '@lucide/svelte/icons/minus';
+  import ChevronUp from '@lucide/svelte/icons/chevron-up';
+  import ChevronDown from '@lucide/svelte/icons/chevron-down';
+  import LogOut from '@lucide/svelte/icons/log-out';
+  import SpaceBetween from '@lucide/svelte/icons/align-horizontal-space-between';
+  import { FIELD_INPUT, FOCUS_RING, Field, IconButton, IconSize, Section, SegmentedControl, type SegmentOption } from '$lib/components/ui/shell';
+  import { cn } from '$lib/utils.js';
+  import type { MotionClip, MotionDoc } from '$lib/motion/doc';
+  import type { OpResult } from '$lib/motion/timeline';
+  import { Align, Direction, Justify, Sizing } from '$lib/motion/layout/auto-layout';
+  import { DEFAULT_LAYOUT_ITEM, type AutoLayout, type LayoutItem, type Padding } from '$lib/motion/layout/model';
+  import { hasBox, layoutParent, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
+  import { childrenInOrder } from '$lib/motion/layout/resolve';
+
+  let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
+
+  const Flow = { Row: 'row', Column: 'column', Wrap: 'wrap' } as const;
+  type Flow = (typeof Flow)[keyof typeof Flow];
+
+  const FLOWS: SegmentOption[] = [
+    { value: Flow.Row, label: 'Horizontal', icon: ArrowRight },
+    { value: Flow.Column, label: 'Vertical', icon: ArrowDown },
+    { value: Flow.Wrap, label: 'Wrap', icon: WrapText }
+  ];
+
+  const FLOW_PATCH: Record<Flow, Partial<AutoLayout>> = {
+    [Flow.Row]: { direction: Direction.Horizontal, wrap: false },
+    [Flow.Column]: { direction: Direction.Vertical, wrap: false },
+    [Flow.Wrap]: { direction: Direction.Horizontal, wrap: true }
+  };
+
+  const SIZING_LABEL: Record<Sizing, string> = { [Sizing.Fixed]: 'Fixed', [Sizing.Hug]: 'Hug', [Sizing.Fill]: 'Fill' };
+  const SIDES: (keyof Padding)[] = ['top', 'right', 'bottom', 'left'];
+  const SIDE_LABEL: Record<keyof Padding, string> = { top: 'T', right: 'R', bottom: 'B', left: 'L' };
+  const SPOTS = [Align.Start, Align.Center, Align.End] as const;
+  const AS_JUSTIFY: Record<Align, Justify> = { [Align.Start]: Justify.Start, [Align.Center]: Justify.Center, [Align.End]: Justify.End };
+
+  const layout = $derived(clip.autoLayout ?? null);
+  const parent = $derived(layoutParent(doc, clip));
+  const item = $derived(clip.layoutItem ?? DEFAULT_LAYOUT_ITEM);
+  const flow = $derived(layout?.wrap ? Flow.Wrap : layout?.direction === Direction.Vertical ? Flow.Column : Flow.Row);
+  const siblings = $derived(parent ? childrenInOrder(doc.tracks.flatMap((t) => t.clips as MotionClip[]), parent).map((c) => c.id) : []);
+  const place = $derived(siblings.indexOf(clip.id));
+  const sizings = $derived((parent ? [Sizing.Fixed, Sizing.Hug, Sizing.Fill] : [Sizing.Fixed, Sizing.Hug]).map((value) => ({ value, label: SIZING_LABEL[value] })));
+
+  const set = (patch: Partial<AutoLayout>, summary: string) => commit(setAutoLayout(doc, clip.id, patch), summary);
+  const size = (patch: Partial<LayoutItem>, summary: string) => commit(setLayoutItem(doc, clip.id, patch), summary);
+  const px = (value: string) => Math.max(0, Math.round(Number(value) || 0));
+  const optionalPx = (value: string) => (value.trim() === '' ? undefined : px(value));
+
+  function spotPressed(layout: AutoLayout, column: Align, row: Align): boolean {
+    const [main, cross] = layout.direction === Direction.Horizontal ? [column, row] : [row, column];
+    return layout.justify === AS_JUSTIFY[main] && layout.align === cross;
+  }
+
+  function pickSpot(layout: AutoLayout, column: Align, row: Align) {
+    const [main, cross] = layout.direction === Direction.Horizontal ? [column, row] : [row, column];
+    set({ justify: AS_JUSTIFY[main], align: cross }, 'Aligned the auto layout');
+  }
+
+  const SPOT = cn('size-4 rounded-full bg-ui-input transition-colors duration-(--ui-dur-fast) hover:bg-ui-input-hover aria-pressed:bg-ui-accent-solid', FOCUS_RING);
+</script>
+
+<div data-testid="auto-layout-section">
+  <Section title="Auto layout">
+    {#snippet actions()}
+      {#if layout}
+        <IconButton label="Remove auto layout" size={IconSize.Sm} data-testid="auto-layout-remove" onclick={() => commit(setAutoLayout(doc, clip.id, null), 'Removed auto layout')}><Minus /></IconButton>
+      {:else if hasBox(clip)}
+        <IconButton label="Add auto layout" shortcut="⇧A" size={IconSize.Sm} data-testid="auto-layout-add" onclick={() => set({}, 'Added auto layout')}><Plus /></IconButton>
+      {/if}
+    {/snippet}
+
+    {#if layout}
+      <Field label="Direction">
+        <SegmentedControl label="Direction" options={FLOWS} value={flow} onchange={(v) => set(FLOW_PATCH[v as Flow], 'Changed the direction')} />
+      </Field>
+      <Field label="Align">
+        <div class="grid grid-cols-3 gap-1 rounded-sm bg-ui-sunken p-1.5" role="group" aria-label="Alignment" data-testid="auto-layout-align">
+          {#each SPOTS as row (row)}
+            {#each SPOTS as column (column)}
+              <button type="button" class={SPOT} aria-label={`Align ${row} ${column}`} aria-pressed={spotPressed(layout, column, row)} onclick={() => pickSpot(layout, column, row)}></button>
+            {/each}
+          {/each}
+        </div>
+        <IconButton label="Space between" size={IconSize.Sm} pressed={layout.justify === Justify.SpaceBetween} data-testid="auto-layout-space-between" onclick={() => set({ justify: layout.justify === Justify.SpaceBetween ? Justify.Start : Justify.SpaceBetween }, 'Changed the spacing')}><SpaceBetween /></IconButton>
+      </Field>
+      <Field label="Gap" id="auto-layout-gap">
+        <input id="auto-layout-gap" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.gap} data-testid="auto-layout-gap" onchange={(e) => set({ gap: px(e.currentTarget.value) }, 'Changed the gap')} />
+        {#if layout.wrap}
+          <input aria-label="Gap between lines" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.crossGap} onchange={(e) => set({ crossGap: px(e.currentTarget.value) }, 'Changed the gap between lines')} />
+        {/if}
+      </Field>
+      <Field label="Padding">
+        {#each SIDES as side (side)}
+          <input aria-label={`Padding ${side}`} title={SIDE_LABEL[side]} class={cn(FIELD_INPUT, 'w-full px-1')} type="number" min="0" value={layout.padding[side]} data-testid={`auto-layout-padding-${side}`} onchange={(e) => set({ padding: { ...layout.padding, [side]: px(e.currentTarget.value) } }, 'Changed the padding')} />
+        {/each}
+      </Field>
+    {/if}
+
+    {#if layout || parent}
+      <Field label="Width">
+        <SegmentedControl label="Width sizing" options={sizings} value={item.width} onchange={(v) => size({ width: v as Sizing }, 'Changed the width sizing')} />
+      </Field>
+      <Field label="Height">
+        <SegmentedControl label="Height sizing" options={sizings} value={item.height} onchange={(v) => size({ height: v as Sizing }, 'Changed the height sizing')} />
+      </Field>
+      <Field label="Min / max W">
+        <input aria-label="Min width" placeholder="min" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.minWidth ?? ''} onchange={(e) => size({ minWidth: optionalPx(e.currentTarget.value) }, 'Changed the min width')} />
+        <input aria-label="Max width" placeholder="max" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.maxWidth ?? ''} onchange={(e) => size({ maxWidth: optionalPx(e.currentTarget.value) }, 'Changed the max width')} />
+      </Field>
+      <Field label="Min / max H">
+        <input aria-label="Min height" placeholder="min" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.minHeight ?? ''} onchange={(e) => size({ minHeight: optionalPx(e.currentTarget.value) }, 'Changed the min height')} />
+        <input aria-label="Max height" placeholder="max" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={item.maxHeight ?? ''} onchange={(e) => size({ maxHeight: optionalPx(e.currentTarget.value) }, 'Changed the max height')} />
+      </Field>
+    {/if}
+
+    {#if parent}
+      <Field label="In layout">
+        <label class="flex items-center gap-1.5 text-ui-label text-ui-text-2"><input type="checkbox" checked={item.absolute} data-testid="auto-layout-absolute" onchange={(e) => size({ absolute: e.currentTarget.checked }, 'Changed absolute position')} /> Absolute</label>
+        <IconButton label="Move earlier" size={IconSize.Sm} disabled={place <= 0} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place - 1), 'Reordered in the auto layout')}><ChevronUp /></IconButton>
+        <IconButton label="Move later" size={IconSize.Sm} disabled={place < 0 || place >= siblings.length - 1} onclick={() => commit(reorderChild(doc, parent.id, clip.id, place + 1), 'Reordered in the auto layout')}><ChevronDown /></IconButton>
+        <IconButton label="Take out of the auto layout" size={IconSize.Sm} data-testid="auto-layout-leave" onclick={() => commit(leaveAutoLayout(doc, clip.id), 'Took the clip out of the auto layout')}><LogOut /></IconButton>
+      </Field>
+    {/if}
+  </Section>
+</div>
