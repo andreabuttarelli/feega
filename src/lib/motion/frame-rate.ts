@@ -37,11 +37,16 @@ const tracksAt = (tracks: MotionTrack[], scale: Scale) => tracks.map((t) => ({ .
 
 const compAt = (comp: MotionComp, scale: Scale): MotionComp => ({ ...comp, durationInFrames: Math.max(1, scale(comp.durationInFrames)), tracks: tracksAt(comp.tracks, scale) });
 
+export function retimer(fromFps: number, toFps: number) {
+  const scale: Scale = (frame) => Math.round((frame * toFps) / fromFps);
+  return { frame: scale, clip: (clip: MotionClip) => retimed(clip, scale), comp: (comp: MotionComp) => compAt(comp, scale) };
+}
+
 export function setFrameRate(doc: MotionDoc, fps: FrameRate): OpResult {
   if (!FRAME_RATES.includes(fps)) {
     return { ok: false, error: `frame rate must be one of ${FRAME_RATES.join(', ')}` };
   }
-  const scale: Scale = (frame) => Math.round((frame * fps) / doc.fps);
+  const scale = retimer(doc.fps, fps).frame;
   const camera = doc.camera ? { ...doc.camera, keyframes: rescaled(doc.camera.keyframes as Keyframes, scale) } : null;
 
   return {
