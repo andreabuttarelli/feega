@@ -55,6 +55,23 @@ describe('layer rows', () => {
   });
 });
 
+describe('a row key is unique across the whole tree', () => {
+  it('two clips playing the same composition list its insides twice under distinct keys', () => {
+    const doc = video();
+    const inner = { id: 'in', kind: TrackKind.Visual, name: 'Inner', clips: [{ ...doc.tracks[0].clips[0], id: 'deep' }] };
+    const shared: MotionDoc = {
+      ...doc,
+      comps: { c1: { id: 'c1', name: 'Scene', width: doc.width, height: doc.height, durationInFrames: 30, tracks: [inner] } as never },
+      tracks: doc.tracks.map((t, i) => (i === 0 ? { ...t, clips: [{ ...t.clips[0], id: 'p1', component: 'Precomp', props: { comp: 'c1' } }, { ...t.clips[0], id: 'p2', component: 'Precomp', props: { comp: 'c1' } }] } : t))
+    };
+    const outline = frameRows(shared, 'm2');
+    const rows = layerRows(NODES, { nodeId: 'm1', doc: shared }, { m2: outline });
+
+    expect(rows.filter((r) => r.id === 'deep')).toHaveLength(4);
+    expect(new Set(rows.map((r) => `${r.nodeId}/${r.key}`)).size).toBe(rows.length);
+  });
+});
+
 describe('every frame lists its children, open or not', () => {
   it('a closed frame unfolds from its stored outline, read-only', () => {
     const doc = video();

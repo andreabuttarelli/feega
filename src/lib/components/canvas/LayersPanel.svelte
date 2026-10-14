@@ -138,7 +138,7 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" onkeydown={onKey}>
-  {#each rows as row (row.nodeId + row.id)}
+  {#each rows as row (`${row.nodeId}/${row.key}`)}
     {@const RowIcon = ROW_ICON[row.type] ?? Square}
     <div
       class="row"
