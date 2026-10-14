@@ -225,6 +225,10 @@ describe('track matte composition', () => {
     expect(html).toContain(JSON.stringify([{ target: 'img', source: 'title', matte: Matte.Alpha }]));
   });
 
+  it('the matted wrapper spans the frame: a matte sized 100% of an empty box hides the clip for good', () => {
+    expect(compose(matted)).toMatch(/\.kt\{[^}]*inset:0/);
+  });
+
   it('an inverted matte shows the clip until the source is drawn', () => {
     expect(compose(must(setTrackMatte(stacked, 'img', Matte.AlphaInverted)))).toContain('<div class="kt" id="kt-img">');
   });

@@ -177,7 +177,7 @@ export function maskLayer(layer: MaskLayer, inner: string): string {
   return `<svg class="kd" aria-hidden="true"><defs>${defs}</defs></svg><div class="${wrapper}" id="${wrapper}-${clipId}" style="${spansRegion};mask:${url};-webkit-mask:${url}${composite}"><div class="kb" style="${framed}">${inner}</div></div>`;
 }
 
-export const MASK_CSS = '.km,.kt,.kb{position:absolute}.kd{position:absolute;width:0;height:0;overflow:hidden}';
+export const MASK_CSS = '.km,.kt,.kb{position:absolute}.kt{inset:0}.kd{position:absolute;width:0;height:0;overflow:hidden}';
 
 export async function freezeMasks(): Promise<() => void> {
   const SVG_NS = 'http://www.w3.org/2000/svg';

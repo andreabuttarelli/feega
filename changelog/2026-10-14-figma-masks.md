@@ -23,6 +23,13 @@ that would drift from how shapes draw), a member list on the mask.
 - Editor: ⌃⌘M (`ctrlCmd` on `KeyPress`), Layer menu entries.
 - Agent/MCP: `use_as_mask`, `release_mask` (`motion_tool`); parity rows.
 
+Bug found on the way: every track matte rendered nothing. The `.kt`
+wrapper was absolute with no box (0×0), so `mask-size:100% 100%`
+covered nothing; markup tests and the fast/exact PSNR spec passed on
+black frames. Now `.kt{inset:0}`. Verified on pixels with
+`bench:export` (mp4 + `--parity --live`: preview and export frames
+equal, mean diff 0). Lesson in LESSONS.md.
+
 Limits: top level of a frame only (not inside a precomp); a mask that
 ends before a member leaves it blank; moving the mask row does not carry
 its members.
