@@ -97,7 +97,7 @@
     type KeyRef,
     type OpResult
   } from '$lib/motion/timeline';
-  import { DragPhase, type ElementOut, type MoveOut } from '$lib/canvas/canvas-drop';
+  import { DragPhase, UndoRoute, type CanvasUndo, type ElementOut, type MoveOut } from '$lib/canvas/canvas-drop';
   import { liftElement } from '$lib/motion/move-element';
   import { adoptHead, amend, canRedo, canUndo, followHead, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
   import { landed, outgoing, remote, type Synced } from '$lib/motion/frame-sync';
@@ -149,7 +149,7 @@
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
-  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null } = $props();
+  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, canvasundo = null }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null } = $props();
   const rules = $derived(MOUNT[mount]);
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
@@ -1004,13 +1004,31 @@
     notice = `Restored version ${target}. ⌘Z to undo.`;
   }
 
-  function undoEdit() {
+  function undoHere() {
     if (!canUndo(history, agent)) {
       return;
     }
     history = undo(history);
     scheduleSave('Undo');
   }
+
+  async function undoOnCanvas() {
+    await canvasundo?.run();
+    const res = await fetch(agentUrl);
+    const body = (await res.json().catch(() => null)) as { head?: { version: number; doc: MotionDoc } } | null;
+    if (!body?.head) {
+      return;
+    }
+    history = startHistory(body.head.doc);
+    version = body.head.version;
+  }
+
+  const UNDO: Record<UndoRoute, () => void> = {
+    [UndoRoute.Here]: undoHere,
+    [UndoRoute.Canvas]: () => void undoOnCanvas()
+  };
+
+  const undoEdit = () => UNDO[saveState === SaveState.Saved && canvasundo?.owns(data.node.id, version) ? UndoRoute.Canvas : UndoRoute.Here]();
 
   function redoEdit() {
     if (!canRedo(history, agent)) {

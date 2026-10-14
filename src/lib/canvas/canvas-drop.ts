@@ -63,3 +63,10 @@ export enum DragPhase {
 export type ElementOut = { clipId: string; client: PointerPoint; box: StageRect | null };
 
 export type MoveOut = (out: ElementOut, phase: DragPhase, version: number) => Promise<number | null>;
+
+export type CanvasUndo = { owns: (nodeId: string, version: number) => boolean; run: () => Promise<void> };
+
+export enum UndoRoute {
+  Here = 'here',
+  Canvas = 'canvas'
+}

@@ -48,6 +48,9 @@ export type UndoItem =
  */
 export type Gesture = { items: UndoItem[] };
 
+export const writesFrameAt = (gesture: Gesture, nodeId: string, version: number): boolean =>
+  gesture.items.some((item) => item.kind === 'doc.revision' && item.nodeId === nodeId && item.after === version);
+
 export type InverseWrite =
   | { op: 'delete_node'; nodeId: string }
   | { op: 'restore_node'; nodeId: string; data: Record<string, unknown> }
