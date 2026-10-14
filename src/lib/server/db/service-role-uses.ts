@@ -90,8 +90,8 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
   },
   {
     path: 'scripts/demo/seed-demo.ts',
-    why: "Uno script lanciato a mano, senza sessione utente: prepara un'org demo di agenzia per l'account passato per email (ritrovato in profiles). Crea l'org (slug fisso derivato dall'utente), la membership owner, tre progetti cliente con tela e frame da template, e porta i crediti dell'org a una soglia. Idempotente: ritrova org, progetti e frame per slug e chiave.",
-    tables: ['profiles', 'orgs', 'orgs_members', 'credit_ledger', 'projects', 'canvases', 'nodes', 'canvas_events', 'motion_revisions']
+    why: "Uno script lanciato a mano, senza sessione utente: semina un set di progetti demo (tre clienti, una tela ciascuno, frame da template) in un'org ESISTENTE di cui l'account passato per email è owner. Non crea né cancella org o utenti: legge profiles e orgs_members solo per trovare l'account e verificare che l'org sia sua. Idempotente: ritrova progetti per slug e frame per nome.",
+    tables: ['profiles', 'orgs_members', 'projects', 'canvases', 'nodes', 'canvas_events', 'motion_revisions', 'motion_templates']
   },
   {
     path: 'scripts/seed-reference-images.ts',

@@ -29,9 +29,9 @@ async function ask(page: Page, text: string) {
 async function generate(page: Page, kind: 'Image' | 'Video', prompt: string): Promise<Locator> {
   await pane(page);
   const before = await nodes(page).count();
-  await page.getByRole('button', { name: kind, exact: true }).click();
+  await page.getByTestId('bar-canvas').getByRole('button', { name: kind, exact: true }).click();
   await expect(nodes(page)).toHaveCount(before + 1);
-  const node = nodes(page).nth(before);
+  const node = page.locator('.svelte-flow__node.selected').last();
   if (kind === 'Video') {
     await page.getByRole('button', { name: 'Model' }).click();
     await page.getByText(CHEAPEST_VIDEO).first().click();
@@ -42,14 +42,11 @@ async function generate(page: Page, kind: 'Image' | 'Video', prompt: string): Pr
   return node;
 }
 
-async function addTemplate(page: Page, tab: 'Stills' | 'Videos', id: string): Promise<string> {
+async function addTemplate(page: Page, id: string): Promise<string> {
   await pane(page);
   const before = await page.getByTestId('motion-node').count();
   await page.getByTestId('frame-templates').click();
-  const library = page.getByTestId('component-library');
-  await library.getByRole('tab', { name: tab, exact: true }).click();
-  await library.locator(`[data-component="${id}"]`).click();
-  await library.getByTestId('insert-component').click();
+  await page.getByTestId('component-library').locator(`[data-component="${id}"]`).click();
   await expect(page.getByTestId('motion-node')).toHaveCount(before + 1);
   return (await page.getByTestId('motion-node').nth(before).getAttribute('data-motion-node'))!;
 }
@@ -73,18 +70,20 @@ test.describe('the demo path @real', () => {
     await page.getByRole('combobox', { name: 'Model' }).last().selectOption(CHAT_MODEL);
     await expect.poll(async () => (await (await page.request.get('/api/v1/chat-models')).json()).choice.model).toBe(CHAT_MODEL);
 
-    await gotoHydrated(page, '/app');
+    await gotoHydrated(page, `/app?project=${session.projectId}`);
     await page.getByTestId('video-brief').fill(BRIEF);
     await page.getByTestId('brief-send').click();
-    await page.waitForURL(/\/p\/[^/]+\/c\/[^/?]+/);
+    await page.waitForURL(new RegExp(`/p/${session.projectId}/c/`));
     await expect(page.getByText(BRIEF).first()).toBeVisible();
     await waitTurn(page);
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
 
     await generate(page, 'Image', 'white sneaker floating on a bright orange background, studio product shot');
     await generate(page, 'Image', 'close-up of a sneaker sole splashing through a puddle, black and white');
     await generate(page, 'Video', 'a sneaker spinning slowly on a turntable, orange studio light');
 
-    const poster = await addTemplate(page, 'Stills', POSTER);
+    const poster = await addTemplate(page, POSTER);
     await expect(page.locator(`[data-motion-node="${poster}"] [data-testid=motion-node-poster]`), 'a new frame shows its picture').toBeVisible({ timeout: 30_000 });
 
     await page.getByTestId('drag-to-frame').first().dragTo(page.locator(`[data-motion-node="${poster}"]`));
@@ -105,11 +104,12 @@ test.describe('the demo path @real', () => {
     await page.getByTestId('export-open').click();
     const png = page.waitForEvent('download');
     await page.getByTestId('still-export-go').click();
+    await page.getByTestId('still-export-file').click({ timeout: IMAGE_MS });
     expect((await png).suggestedFilename()).toMatch(/\.png$/);
     await page.keyboard.press('Escape');
     await page.getByTestId('inline-close').click();
 
-    const motion = await addTemplate(page, 'Videos', MOTION);
+    const motion = await addTemplate(page, MOTION);
     await openFrame(page, motion);
     await page.getByTestId('side-tab-chat').click();
     await ask(page, 'Change the headline of this frame to "run the city" and make the background deep orange #ff5a00');
@@ -119,6 +119,7 @@ test.describe('the demo path @real', () => {
 
     await page.getByTestId('export-open').click();
     const mp4 = page.waitForEvent('download', { timeout: VIDEO_MS });
+    await page.getByTestId('export-mode-video').click();
     await page.getByTestId('export-dialog').getByTestId('export-start').click();
     await page.getByTestId('export-download').first().click({ timeout: VIDEO_MS });
     expect((await mp4).suggestedFilename()).toMatch(/\.mp4$/);
@@ -126,7 +127,7 @@ test.describe('the demo path @real', () => {
     await page.getByTestId('inline-close').click();
 
     await ask(page, 'Create a new frame from the "Phone split" template with the headline "made to move"');
-    await expect(page.getByTestId('motion-node')).toHaveCount(4);
+    await expect(page.getByTestId('motion-node')).toHaveCount(3);
 
     await page.getByRole('button', { name: 'Share' }).click();
     const share = page.getByRole('dialog', { name: 'Share' });
