@@ -87,7 +87,7 @@ function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth
   return { id: `${clip.id}${PART_SEP}${part}`, key: `${clipKey}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(doc, clip, part), type: partIcon(doc, clip, part), nodeId, hidden: false, locked: false, nested: true };
 }
 
-export const frameRows = (doc: MotionDoc, nodeId: string): LayerRow[] => trackRows(doc, doc.tracks, nodeId, TRACK_DEPTH, false);
+export const frameRows = (doc: MotionDoc, nodeId: string, parts: Parts = {}): LayerRow[] => trackRows(doc, doc.tracks, nodeId, TRACK_DEPTH, false, parts);
 
 export type FrameOutlines = Record<string, readonly LayerRow[]>;
 

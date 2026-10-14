@@ -14,7 +14,9 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { untrack } from 'svelte';
   import { PART_SEP } from '$lib/motion/poster-parts';
-  import { HEADS_PARAM, cacheOutlines, canvasHeads, headsParam, missingHeads, outlinesFor, type OutlineCache } from '$lib/canvas/frame-outlines';
+  import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
+  import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import PartsProbe from './PartsProbe.svelte';
   import { LayerAction, LayerKind, Pick, dropLayer, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
   const ICON = 14;
@@ -31,6 +33,23 @@
   const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts } : null, outlinesFor(heads, outlines), folds));
   const frames = $derived(new Set([...heads.map((h) => h.nodeId), ...(video ? [video.nodeId] : [])]));
   const fold = (nodeId: string) => (folds = toggleFold(localStorage, folds, nodeId));
+
+  let probed = $state.raw<ReadonlySet<string>>(new Set());
+  const probing = $derived(canvas ? (posterHeads(heads, outlines, probed, video?.nodeId ?? null)[0] ?? null) : null);
+
+  function measured(head: FrameHead, boxes: Record<string, MeasuredBox>) {
+    probed = new Set([...probed, headKey(head)]);
+    const parts = partIds(boxes);
+    const url = canvas?.outlinesUrl;
+    if (!url || !Object.keys(parts).length) {
+      return;
+    }
+    const query = `${HEADS_PARAM}=${encodeURIComponent(headsParam([head]))}&${PARTS_PARAM}=${encodeURIComponent(partsParam(head.nodeId, parts))}`;
+    void fetch(`${url}?${query}`)
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((answer) => (outlines = cacheOutlines(outlines, [head], answer)))
+      .catch(() => {});
+  }
 
   $effect(() => {
     const url = canvas?.outlinesUrl;
@@ -142,6 +161,12 @@
     video.edit(dropLayer(video.doc, from, row.id), 'Moved a layer');
   }
 </script>
+
+{#if probing && canvas}
+  {#key headKey(probing)}
+    <PartsProbe url={`${canvas.previewUrl(probing.nodeId)}?revision=${probing.version}`} onmeasured={(boxes) => measured(probing, boxes)} />
+  {/key}
+{/if}
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" onkeydown={onKey}>

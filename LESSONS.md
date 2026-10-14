@@ -2939,3 +2939,9 @@ Signal: `@real` specs create and tear down orgs on the production Supabase proje
 
 ### An e2e keeps seeing the old component after an edit
 Signal: a `@real` spec reads a style or behaviour you already changed (a computed `z-index` still the old value) on a long-running `vite dev` in a worktree. Move: restart the dev server before believing the red; HMR does not always reach a component mounted inside the canvas.
+
+### A Svelte list that renders only its first level
+Signal: a keyed `{#each}` shows the top rows and nothing below, no error on screen; the data is in
+the network response. Cause: `each_key_duplicate` in the console (a composition reused by two
+clips repeats ids). Move: listen to `pageerror` in Playwright on a canvas with real docs; key rows
+by path, never by an id that can repeat.
