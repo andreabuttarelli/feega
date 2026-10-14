@@ -57,6 +57,17 @@ describe('a video started from a component', () => {
     expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ data: shaped.data, width: shaped.w, height: shaped.h }));
   });
 
+  it('a poster starts as its own clip, not wrapped in a precomp, so its parts select and edit on the canvas', async () => {
+    const d = deps();
+    await startFromTemplate(db, d, { ...input, templateId: 'builtin:poster-type-grid', format: MotionFormat.Portrait, canvasId: 'c-motion', at: { x: 0, y: 0 } });
+
+    const doc = vi.mocked(d.save).mock.calls[0][1].doc as MotionDoc;
+    const clips = doc.tracks.flatMap((t) => t.clips);
+    expect(parseMotionDoc(doc).ok).toBe(true);
+    expect(clips.map((c) => c.component)).toEqual(['Custom']);
+    expect(clips[0].props).toMatchObject({ lines: expect.any(String) });
+  });
+
   it('creates nothing for a component that does not exist', async () => {
     const d = deps();
     expect(await startFromTemplate(db, d, { ...input, templateId: 'builtin:nope' })).toEqual({ outcome: FromTemplate.Unknown });
