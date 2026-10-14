@@ -1,5 +1,6 @@
 <script lang="ts">
   import HomeHero from '$lib/components/app/HomeHero.svelte';
+  import { Button } from '$lib/components/ui/button/index.js';
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { enhance } from '$app/forms';
@@ -125,11 +126,11 @@
 <div class="home">
   <div class="create" data-testid="home-create">
     {#if uploads}
-      <button type="button" class="pill" data-testid="home-import" onclick={() => picker?.click()}>import</button>
+      <Button variant="secondary" data-testid="home-import" onclick={() => picker?.click()}>import</Button>
       <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
     {/if}
     <form method="POST" action="?/project">
-      <button type="submit" class="pill primary" data-testid="new-canvas">new canvas</button>
+      <Button type="submit" data-testid="new-canvas">new canvas</Button>
     </form>
   </div>
 
@@ -209,11 +210,10 @@
 
 <style>
   .home {
-    --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
     display: flex;
     flex-direction: column;
     height: calc(100svh - var(--ui-bar-h) - var(--content-pad-top) - var(--content-pad-bottom));
-    color: var(--ui-ink);
+    color: var(--ui-text);
   }
 
   .scroll {
@@ -230,46 +230,14 @@
     gap: var(--ui-space-2);
   }
 
-  .pill {
-    height: 36px;
-    padding: 0 var(--ui-space-4);
-    border: 0;
-    border-radius: 9999px;
-    background: var(--ui-field);
-    color: var(--ui-ink);
-    font: inherit;
-    font-size: var(--ui-text-sm);
-    cursor: pointer;
-    transition: background 0.2s var(--ease-expo);
-  }
-
-  .pill:hover {
-    background: var(--ui-hover);
-  }
-
-  .pill.primary {
-    background: var(--ui-accent);
-    color: #fff;
-  }
-
-  .pill.primary:hover {
-    opacity: 0.9;
-  }
-
-  .pill:focus-visible,
-  .send:focus-visible {
-    outline: none;
-    box-shadow: var(--ui-focus);
-  }
-
   .column {
     display: flex;
     flex-direction: column;
-    gap: 48px;
+    gap: var(--ui-space-8);
     width: 100%;
     max-width: 720px;
-    margin: 48px auto 0;
-    animation: rise 0.6s var(--ease-expo) both;
+    margin: var(--ui-space-8) auto 0;
+    animation: rise var(--ui-dur-slow) var(--ui-ease) both;
   }
 
   @keyframes rise {
@@ -282,16 +250,17 @@
   .recents {
     display: flex;
     flex-direction: column;
-    gap: var(--ui-space-3);
+    gap: var(--ui-space-2);
   }
 
   h2 {
     margin: 0;
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
-    font-weight: 400;
-    letter-spacing: 0.04em;
-    color: var(--ui-text-3);
+    font-family: var(--sans);
+    font-size: var(--ui-type-section);
+    font-weight: var(--ui-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: var(--ui-tracking-caps);
+    color: var(--ui-text-tertiary);
   }
 
   @keyframes breathe {
@@ -300,21 +269,18 @@
     }
   }
 
-
-
-
   .empty {
     margin: 0;
     max-width: 44ch;
-    font-size: var(--ui-text-md);
-    line-height: 1.5;
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-body);
+    line-height: var(--ui-leading);
+    color: var(--ui-text-tertiary);
   }
 
   .empty a {
-    color: var(--ui-ink);
+    color: var(--ui-text);
     text-decoration: underline;
-    text-decoration-color: var(--ui-text-3);
+    text-decoration-color: var(--ui-divider-strong);
     text-underline-offset: 3px;
   }
 
@@ -322,7 +288,7 @@
     flex: none;
     display: flex;
     flex-direction: column;
-    gap: var(--ui-space-3);
+    gap: var(--ui-space-2);
     width: 100%;
     max-width: 720px;
     margin: 0 auto;
@@ -331,67 +297,69 @@
 
   .examples {
     display: flex;
-    gap: var(--ui-space-2);
+    gap: var(--ui-space-1);
     overflow-x: auto;
     scrollbar-width: none;
   }
 
   .examples button {
     flex: none;
-    height: 32px;
+    height: var(--ui-row);
     padding: 0 var(--ui-space-3);
     border: 0;
-    border-radius: 9999px;
-    background: var(--ui-field);
-    color: var(--ui-ink-2);
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-input);
+    color: var(--ui-text-secondary);
     font: inherit;
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-type-label);
     cursor: pointer;
-    transition: background 0.2s var(--ease-expo);
+    transition: background var(--ui-dur-fast) var(--ui-ease), color var(--ui-dur-fast) var(--ui-ease);
   }
 
   .examples button:hover {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
+    background: var(--ui-input-hover);
+    color: var(--ui-text);
+  }
+
+  .examples button:focus-visible,
+  .send:focus-visible {
+    outline: none;
+    box-shadow: var(--ui-ring);
   }
 
   .composer {
     display: flex;
     flex-direction: column;
     gap: var(--ui-space-2);
-    padding: var(--ui-space-4) var(--ui-space-4) var(--ui-space-3);
-    background: var(--ui-bg);
-    border: 1px solid var(--ui-line-strong);
-    transition: border-color 0.2s var(--ease-expo);
-  }
-
-  .composer:focus-within,
-  .composer.dragging {
-    border-color: var(--ui-accent);
+    padding: var(--ui-space-3) var(--ui-space-3) var(--ui-space-2) var(--ui-space-4);
+    border-radius: var(--ui-radius-lg);
+    background: var(--ui-panel-raised);
+    box-shadow: var(--ui-shadow-float);
   }
 
   .composer.dragging {
-    border-style: dashed;
+    box-shadow: var(--ui-shadow-float), inset 0 0 0 2px var(--ui-accent);
+    background: var(--ui-selected);
   }
 
   .drop-hint {
     margin: 0;
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-3);
+    font-size: var(--ui-type-label);
+    color: var(--ui-text-secondary);
   }
 
   textarea {
     width: 100%;
     min-height: 48px;
     max-height: 200px;
-    padding: 0;
+    padding: var(--ui-space-1) 0 0;
     border: 0;
     resize: none;
     background: transparent;
-    color: var(--ui-ink);
+    color: var(--ui-text);
     font: inherit;
     font-size: var(--ui-text-lg);
-    line-height: 1.5;
+    line-height: var(--ui-leading);
   }
 
   textarea:focus {
@@ -399,7 +367,7 @@
   }
 
   textarea::placeholder {
-    color: var(--ui-ink-3);
+    color: var(--ui-text-tertiary);
   }
 
   .row {
@@ -412,26 +380,27 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: var(--ui-row-lg);
+    height: var(--ui-row-lg);
     margin-left: auto;
     border: 0;
-    border-radius: 9999px;
-    background: var(--ui-accent);
-    color: #fff;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
     cursor: pointer;
+    transition: background var(--ui-dur-fast) var(--ui-ease);
   }
 
   .send:disabled {
-    background: var(--ui-field);
-    color: var(--ui-ink-3);
+    background: var(--ui-input);
+    color: var(--ui-text-disabled);
     cursor: default;
   }
 
   .progress {
     margin-left: auto;
-    font-size: var(--ui-text-sm);
-    color: var(--ui-ink-2);
+    font-size: var(--ui-type-label);
+    color: var(--ui-text-secondary);
   }
 
   .progress + .send {
@@ -439,8 +408,8 @@
   }
 
   .send.busy:disabled {
-    background: var(--ui-accent);
-    color: #fff;
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
     animation: breathe 1s ease-in-out infinite;
   }
 
@@ -455,7 +424,7 @@
 
   .error {
     margin: 0;
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-type-label);
     color: var(--ui-danger);
   }
 
@@ -466,10 +435,21 @@
     }
   }
 
+  @media (pointer: coarse) {
+    .examples button {
+      height: 44px;
+    }
+
+    .send {
+      width: 44px;
+      height: 44px;
+    }
+  }
+
   @media (max-width: 640px) {
     .column {
-      gap: 32px;
-      margin-top: 32px;
+      gap: var(--ui-space-6);
+      margin-top: var(--ui-space-6);
     }
 
     .dock {

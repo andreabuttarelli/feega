@@ -42,18 +42,23 @@
     min-height: 44px;
     padding: var(--ui-space-2);
     margin: 0 calc(-1 * var(--ui-space-2));
-    color: var(--ui-ink);
+    border-radius: var(--ui-radius-md);
+    color: var(--ui-text);
     text-decoration: none;
-    transition: background 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: background var(--ui-dur-fast) var(--ui-ease);
   }
 
   .recent:hover {
-    background: var(--ui-hover);
+    background: var(--ui-wash);
+  }
+
+  .recent:active {
+    background: var(--ui-pressed);
   }
 
   .recent:focus-visible {
     outline: none;
-    box-shadow: var(--ui-focus);
+    box-shadow: var(--ui-ring);
   }
 
   .thumb {
@@ -61,7 +66,8 @@
     gap: 2px;
     aspect-ratio: 16 / 9;
     overflow: hidden;
-    background: var(--ui-surface);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
   }
 
   .thumb img {
@@ -78,21 +84,21 @@
     font-size: var(--ui-text-lg);
     font-weight: var(--ui-mega-weight);
     letter-spacing: var(--ui-mega-tracking);
-    color: var(--ui-text-3);
+    color: var(--ui-text-tertiary);
   }
 
   .name {
     overflow: hidden;
-    font-size: var(--ui-text-md);
-    font-weight: 500;
+    font-size: var(--ui-type-body);
+    font-weight: var(--ui-weight-medium);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .project,
   .when {
-    font-size: var(--ui-text-sm);
-    color: var(--ui-text-3);
+    font-size: var(--ui-type-label);
+    color: var(--ui-text-tertiary);
     white-space: nowrap;
   }
 
