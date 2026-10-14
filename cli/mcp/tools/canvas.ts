@@ -15,8 +15,12 @@ export function registerCanvasTools(server: McpServer) {
         'Reads: list_canvases {}, list_nodes {canvasId}, list_runs {nodeId}, preview_node_loop {nodeId}, ' +
         'preview_run_graph {graph:"downstream",nodeId} | {graph:"stale",canvasId,nodeIds?} (ordered steps + credits: quote before run_graph). ' +
         'Writes, free: create_node {canvasId,type,x,y,displayName?,data?} (data per describe_node_types), update_node {nodeId,data} (only changed fields, null removes), ' +
-        'move_node {nodeId,x,y,z?}, connect_nodes {canvasId,sourceNodeId,targetNodeId,sourceHandle?,targetHandle?}, delete_node {nodeId} (soft), cancel_node_loop {nodeId}. ' +
-        'Spends credits: run_node {nodeId,medium,prompt?,model?,params?,expectedVersion}, run_node_loop {nodeId,confirm?}, run_graph (same input as preview_run_graph; queued, each step after its inputs; cycles refused). ' +
+        'move_node {nodeId,x,y,z?}, resize_node {nodeId,width,height}, connect_nodes {canvasId,sourceNodeId,targetNodeId,sourceHandle?,targetHandle?}, delete_node {nodeId} (soft, drops its lines), cancel_node_loop {nodeId}, ' +
+        'duplicate_nodes {canvasId,nodeIds}, list_connections {canvasId}, disconnect_nodes {connectionId}, set_edge_mode {connectionId,mode:fixed|iterate}, ' +
+        'create_canvas {}, rename_canvas {canvasId,name}, delete_canvas {canvasId}, rename_project {name}, share_canvas {canvasId,on} (view-only link), share_doc {nodeId,on}, ' +
+        'list_templates {}, insert_template {canvasId,templateId,x,y}, add_frame_from_template {canvasId,templateId,format?,x,y}, move_frame_element {frameId,elementId,toFrameId?,x?,y?,canvasX?,canvasY?}, place_in_frame {nodeId,toFrameId?,x?,y?}, ' +
+        'show_run {nodeId,runId} (show an older result), sync_node {nodeId} (products, social feed), preview_workflow {canvasId,nodeIds}, cancel_workflow {workflowId}, cancel_render {nodeId}, withdraw_from_gallery {itemId}. ' +
+        'Spends credits: run_node {nodeId,medium,prompt?,model?,params?,expectedVersion}, run_node_loop {nodeId,confirm?}, retry_loop_combination {nodeId,outputListNodeId,label,runId?}, run_workflow {canvasId,nodeIds}, run_graph (same input as preview_run_graph; queued, each step after its inputs; cycles refused). ' +
         'Unknown op answers the list; bad input answers the issues.',
       inputSchema: z.object({
         org,

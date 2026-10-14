@@ -183,10 +183,17 @@ and its session. Free.
 | `canvas_tool` | `feega canvas <projectId> <op> --input <json>` |
 
 `canvas_tool({ org, project_id, op, input })` runs one op of the project chat on that project,
-through the same code: `list_canvases`, `list_nodes`, `list_runs`, `create_node`, `update_node`,
-`move_node`, `connect_nodes`, `delete_node`, `run_node`, `preview_node_loop`, `run_node_loop`,
-`cancel_node_loop`, `preview_run_graph`, `run_graph`. Reads are free; writes need a write key;
-`run_node`, `run_node_loop` and `run_graph` spend credits.
+through the same code: `list_canvases`, `list_nodes`, `list_connections`, `list_runs`,
+`list_templates`, `create_node`, `update_node`, `move_node`, `resize_node`, `duplicate_nodes`,
+`connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `delete_node`, `create_canvas`,
+`rename_canvas`, `delete_canvas`, `rename_project`, `share_canvas`, `share_doc`,
+`insert_template`, `add_frame_from_template`, `move_frame_element`, `place_in_frame`,
+`show_run`, `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
+`retry_loop_combination`, `preview_workflow`, `run_workflow`, `cancel_workflow`,
+`preview_run_graph`, `run_graph`, `cancel_render`, `withdraw_from_gallery`. Every write a person
+makes on the canvas has an op here (`src/lib/server/parity/ui-actions.ts` holds the map). Reads
+are free; writes need a write key; `run_node`, `run_node_loop`, `retry_loop_combination`,
+`run_workflow` and `run_graph` spend credits.
 
 `preview_run_graph` / `run_graph` take `{ graph: "downstream", nodeId }` (the node, then every
 node it feeds, in dependency order) or `{ graph: "stale", canvasId, nodeIds? }` (every result
