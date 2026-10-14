@@ -41,7 +41,7 @@
   import { CoachStep, ONBOARDING_EVENT, OnboardingStatus, chainOf, stepOf, type CoachChain } from '$lib/onboarding/coach';
   import { DEMO_PRESET, exampleFor, isDemoMedium } from '$lib/onboarding/demo';
   import OnboardingCoach from '$lib/components/canvas/OnboardingCoach.svelte';
-  import { placeBeside, placeNear, type Rect } from '$lib/canvas/placement';
+  import { offCentre, placeBeside, placeNear, type Rect } from '$lib/canvas/placement';
   import { HOME_PATH } from '$lib/home-path';
   import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
   import { formatCredits } from '$lib/components/credit-amount-format';
@@ -1308,7 +1308,8 @@
     }
 
     const probe = pendingFrame(at, doc);
-    const spot = placeNear(at, { w: probe.size.width ?? 0, h: probe.size.height ?? 0 }, occupiedRects());
+    const frameSize = { w: probe.size.width ?? 0, h: probe.size.height ?? 0 };
+    const spot = placeNear(at, frameSize, occupiedRects());
     const shown = pendingFrame(spot, doc);
     nodes = [...nodes, toTile(shown)];
     const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y });
@@ -1316,6 +1317,9 @@
     nodes = nodes.filter((n) => n.id !== shown.id);
     if (node && !nodes.some((n) => n.id === node.id)) {
       nodes = [...nodes, toTile(node)];
+    }
+    if (node && offCentre(at, spot, frameSize)) {
+      focusOn([node.id]);
     }
   }
 
@@ -1381,7 +1385,8 @@
   }
 
   async function create(what: Addable, at: { x: number; y: number }) {
-    const spot = placeNear(at, sizeForAddable(what), occupiedRects());
+    const size = sizeForAddable(what);
+    const spot = placeNear(at, size, occupiedRects());
 
     const res = await post('create', {
       type: what,
@@ -1397,6 +1402,9 @@
 
     nodes = [...nodes.filter((node) => node.id !== created.id), toTile(created, { select: true })];
     pushGesture(createGesture(created));
+    if (offCentre(at, spot, size)) {
+      focusOn([created.id]);
+    }
     if (created.type === 'influencer') {
       void refresh();
     }

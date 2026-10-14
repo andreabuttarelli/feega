@@ -42,3 +42,7 @@ export function placeNear(centre: { x: number; y: number }, size: { w: number; h
   }
   return origin;
 }
+
+export function offCentre(centre: { x: number; y: number }, spot: { x: number; y: number }, size: { w: number; h: number }): boolean {
+  return spot.x !== centre.x - size.w / 2 || spot.y !== centre.y - size.h / 2;
+}
