@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { MotionFormat } from '$lib/motion/doc';
   import { tick } from 'svelte';
   import type { AssetKind } from '$lib/motion/components';
   import IconButton from './IconButton.svelte';
@@ -7,7 +8,7 @@
   import { Action } from '$lib/motion/actions';
   import { Dismiss, dismissFrom, gridStep } from '$lib/motion/template/browser';
   import { DocMode } from '$lib/motion/still';
-  import { AddTarget, ComponentKind, KIND_LABEL, matching, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
+  import { AddTarget, ComponentKind, KIND_LABEL, matching, type CatalogueItem } from '$lib/motion/template/catalogue';
   import type { Instance } from '$lib/motion/template/library';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
@@ -23,8 +24,8 @@
     onclose
   }: {
     items: CatalogueItem[];
-    format: StarterFormat;
-    draftOf: (id: string, format: StarterFormat) => Instance | null;
+    format: MotionFormat;
+    draftOf: (id: string, format: MotionFormat) => Instance | null;
     compose?: ((doc: Instance['doc']) => string) | null;
     assets?: Asset[];
     target?: AddTarget;

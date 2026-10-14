@@ -52,6 +52,7 @@ import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
+import { serverTiming } from '$lib/server/server-timing';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
@@ -1463,8 +1464,9 @@ export const actions: Actions = {
     return { ended: await endOnboarding(scope.db, scope.userId, to) };
   },
 
-  frame_template: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
+  frame_template: async ({ request, params, locals, setHeaders }) => {
+    const phases = serverTiming();
+    const scope = await phases.time('scope', scopeFor(locals, params.canvasId));
     const fd = await request.formData();
 
     const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
@@ -1474,7 +1476,7 @@ export const actions: Actions = {
     }
 
     const actor = userActor(scope);
-    const started = await startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, {
+    const started = await phases.time('start', startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, {
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
@@ -1483,12 +1485,14 @@ export const actions: Actions = {
       format,
       at,
       actor
-    });
+    }));
     if (started.outcome !== FromTemplate.Started) {
       return fail(400, { error: started.outcome });
     }
 
-    return { node: await findNode(scope.db, { orgId: scope.orgId, nodeId: started.start.nodeId }) };
+    const node = await phases.time('read', findNode(scope.db, { orgId: scope.orgId, nodeId: started.start.nodeId }));
+    setHeaders({ 'server-timing': phases.header() });
+    return { node };
   },
 
   template: async ({ request, params, locals }) => {

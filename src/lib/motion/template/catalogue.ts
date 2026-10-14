@@ -36,7 +36,7 @@ export enum Edits {
   Some = 'some'
 }
 
-export function draftToAdd(draft: Instance | null, edits: Edits, format: StarterFormat, opened: StarterFormat): Instance | null {
+export function draftToAdd(draft: Instance | null, edits: Edits, format: MotionFormat, opened: MotionFormat): Instance | null {
   return edits === Edits.Some || format !== opened ? draft : null;
 }
 
@@ -54,7 +54,7 @@ export type CatalogueItem = {
   seconds: number;
   kind: ComponentKind;
   mode: DocMode;
-  format: StarterFormat;
+  format: MotionFormat;
   fields: { label: string; type: string }[];
   preview: Preview | null;
 };
@@ -101,7 +101,7 @@ export function catalogue(entries: readonly TemplateEntry[]): CatalogueItem[] {
     seconds: e.template.doc.durationInFrames / e.template.doc.fps,
     kind: componentKind(e),
     mode: docMode(e.template.doc),
-    format: starterFormatOf(e.template.doc),
+    format: ownFormat(e.template.doc),
     fields: e.template.doc.fields.map((f) => ({ label: f.label, type: FIELD_TYPE_LABEL[f.type] })),
     preview: previewOf(e.id, docMode(e.template.doc))
   }));
@@ -115,6 +115,21 @@ export function matching(items: readonly CatalogueItem[], query: string, kind: C
 
 export const POSTER_FORMATS = [MotionFormat.Portrait, MotionFormat.Vertical, MotionFormat.Poster] as const;
 export type PosterFormat = (typeof POSTER_FORMATS)[number];
+
+export const FORMATS_OF_MODE: Record<DocMode, readonly MotionFormat[]> = {
+  [DocMode.Video]: STARTER_FORMATS,
+  [DocMode.Still]: POSTER_FORMATS
+};
+
+function ownFormat(doc: MotionDoc): MotionFormat {
+  const offered = FORMATS_OF_MODE[docMode(doc)];
+  const format = formatOf(doc);
+  return offered.includes(format) ? format : offered[0];
+}
+
+export function libraryFormat(item: Pick<CatalogueItem, 'mode' | 'format'>, wanted: MotionFormat): MotionFormat {
+  return FORMATS_OF_MODE[item.mode].includes(wanted) ? wanted : item.format;
+}
 
 export function posterShelf(items: readonly CatalogueItem[]): CatalogueItem[] {
   return matching(items, '', null, DocMode.Still).sort((a, b) => a.name.localeCompare(b.name));

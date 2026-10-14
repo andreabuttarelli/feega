@@ -322,6 +322,8 @@ export async function createNode(
     y: number;
     displayName?: string | null;
     data?: Record<string, unknown>;
+    width?: number;
+    height?: number;
     actor?: Actor;
   }
 ): Promise<CanvasNodeRecord> {
@@ -339,6 +341,8 @@ export async function createNode(
     x: input.x,
     y: input.y,
     data: input.data ?? {},
+    ...(input.width === undefined ? {} : { width: input.width }),
+    ...(input.height === undefined ? {} : { height: input.height }),
     ...actorCols(input.actor)
   } as NodeInsert;
 
