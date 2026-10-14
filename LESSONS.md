@@ -2861,6 +2861,12 @@ node shells still go through layerization every frame, with nothing visible insi
 not the cost. Move: measure with the shells out of layout (`display:none`) before blaming decode;
 under LOD, `.moving` takes unselected poster shells out of layout (`canvas-poster-lod.spec.ts`).
 
+## `/login` answers 500 on a worktree dev server with a symlinked `node_modules`
+
+Signal: `Cannot find module '.../intl-messageformat/lib/src/core'` in the vite log; every
+real-stack e2e times out on the login placeholder. Cause: through the symlink vite SSR loads the
+package's ESM `module` entry. Move: `npm ci` in the worktree before a real-stack run.
+
 ## An export flickers every other frame but a 1-lane render is smooth
 
 Signal: consecutive exported frames alternate between two states (`bench:export --lanes=4` vs

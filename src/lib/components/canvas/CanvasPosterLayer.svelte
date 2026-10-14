@@ -1,9 +1,9 @@
 <script lang="ts">
   import { useNodes, useStore } from '@xyflow/svelte';
   import { onMount } from 'svelte';
-  import { LOD_CLASS, LOD_SETTLE_MS, lodWanted, posterRects, THUMB_WIDTH, type PlacedNode } from '$lib/canvas/poster-lod';
+  import { LOD_CLASS, LOD_SETTLE_MS, lodWanted, oncePerUrl, posterRects, PosterSource, THUMB_WIDTH, type PlacedNode, type Poster } from '$lib/canvas/poster-lod';
 
-  let { posters }: { posters: Map<string, string> } = $props();
+  let { posters }: { posters: Map<string, Poster> } = $props();
 
   const PLACEHOLDER = '#000';
 
@@ -31,18 +31,47 @@
     canvas.closest('.svelte-flow')?.classList.toggle(LOD_CLASS, active);
   });
 
-  function thumbOf(url: string): Promise<HTMLCanvasElement> {
+  const VIDEO_FRAME_S = 0.1;
+
+  function shrink(source: CanvasImageSource, width: number, height: number): HTMLCanvasElement {
+    const thumb = document.createElement('canvas');
+    thumb.width = THUMB_WIDTH;
+    thumb.height = Math.max(1, Math.round((THUMB_WIDTH * height) / width));
+    thumb.getContext('2d')!.drawImage(source, 0, 0, thumb.width, thumb.height);
+    return thumb;
+  }
+
+  async function imageThumb(url: string): Promise<HTMLCanvasElement> {
     const image = new Image();
     image.decoding = 'async';
     image.src = url;
-    return image.decode().then(() => {
-      const thumb = document.createElement('canvas');
-      thumb.width = THUMB_WIDTH;
-      thumb.height = Math.max(1, Math.round((THUMB_WIDTH * image.naturalHeight) / image.naturalWidth));
-      thumb.getContext('2d')!.drawImage(image, 0, 0, thumb.width, thumb.height);
-      return thumb;
-    });
+    await image.decode();
+    return shrink(image, image.naturalWidth, image.naturalHeight);
   }
+
+  async function videoThumb(url: string): Promise<HTMLCanvasElement> {
+    const video = document.createElement('video');
+    video.muted = true;
+    video.preload = 'auto';
+    video.src = url;
+    const seeked = new Promise((resolve, reject) => {
+      video.addEventListener('seeked', resolve, { once: true });
+      video.addEventListener('error', reject, { once: true });
+    });
+    video.addEventListener('loadedmetadata', () => (video.currentTime = Math.min(VIDEO_FRAME_S, video.duration / 2)), { once: true });
+    await seeked;
+    const thumb = shrink(video, video.videoWidth, video.videoHeight);
+    video.removeAttribute('src');
+    video.load();
+    return thumb;
+  }
+
+  const DECODES_AT_ONCE = { image: 8, video: 2 };
+
+  const THUMB_OF: Record<PosterSource, (url: string) => Promise<HTMLCanvasElement>> = {
+    [PosterSource.Image]: oncePerUrl(imageThumb, DECODES_AT_ONCE.image),
+    [PosterSource.VideoFrame]: oncePerUrl(videoThumb, DECODES_AT_ONCE.video)
+  };
 
   function placed(): PlacedNode[] {
     return nodesStore.current.map((node) => ({
@@ -87,11 +116,11 @@
   }
 
   $effect(() => {
-    for (const [id, url] of posters) {
+    for (const [id, poster] of posters) {
       if (thumbs.has(id)) {
         continue;
       }
-      thumbOf(url)
+      THUMB_OF[poster.source](poster.url)
         .then((thumb) => {
           thumbs.set(id, thumb);
           ready += 1;
