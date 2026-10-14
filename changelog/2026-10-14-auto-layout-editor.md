@@ -14,5 +14,9 @@ The editor side of ADR 0008.
 - Dragging a child in the preview reorders it on drop (`reorderAt`): the transform drag still
   previews the move, the drop writes `order` instead of an offset. Absolute children move freely.
 
-Seeded e2e not run: production Supabase was stalling on teardowns, so the run is skipped and
-covered by component tests (section render, overlay mount + drag) and the pure-function tests.
+The editor resolves the layout before it reads a box: the selection quad, the anchor, hit
+testing and the corner handles all use `withAutoLayout(doc)`, or a laid-out container shows
+handles at its stored box.
+
+e2e: `tests/e2e/auto-layout.spec.ts` (⇧A wraps, Properties gap saves, overlay shows) ran in the
+production test-account mode, serial, on a dev server with its own vite `cacheDir`.
