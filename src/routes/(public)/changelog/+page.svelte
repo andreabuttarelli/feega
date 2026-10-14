@@ -64,11 +64,12 @@
     font-weight: 700;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--accent, #7c5cff);
+    color: var(--ui-accent-text);
     margin: 0 0 16px;
     padding: 6px 14px;
-    background: rgba(var(--accent-rgb, 124, 92, 255), 0.07);
+    background: var(--ui-selected);
     border: 1px solid rgba(var(--accent-rgb, 124, 92, 255), 0.12);
+    border-radius: var(--ui-radius-md);
   }
   .cl-title {
     font-family: var(--serif, Georgia, serif);
@@ -78,12 +79,12 @@
     line-height: 1.12;
     margin: 0 auto 12px;
     max-width: 20ch;
-    color: var(--ink, #1a1a1a);
+    color: var(--ui-text, #1a1a1a);
     text-align: center;
   }
   .cl-subtitle {
     font-size: 17px;
-    color: var(--ink-soft, #666);
+    color: var(--ui-text-secondary, #666);
     margin: 0;
     max-width: 520px;
     margin: 0 auto;
@@ -91,7 +92,7 @@
   }
 
   .timeline {
-    border-left: 2px solid var(--line, #e5e5e5);
+    border-left: 2px solid var(--ui-divider, #e5e5e5);
     padding-left: 32px;
     margin-left: 0;
   }
@@ -109,15 +110,15 @@
     top: 4px;
     width: 12px;
     height: 12px;
-    background: var(--accent, #7c5cff);
-    border: 2px solid var(--paper, #fff);
-    box-shadow: 0 0 0 2px var(--accent, #7c5cff);
+    background: var(--ui-accent-solid);
+    border: 2px solid var(--ui-panel, #fff);
+    box-shadow: 0 0 0 2px var(--ui-accent);
   }
   .entry-date {
     display: block;
     font-size: 13px;
     font-weight: 600;
-    color: var(--ink-faint, #999);
+    color: var(--ui-text-tertiary, #999);
     margin-bottom: 8px;
     position: absolute;
     left: 32px;
@@ -132,7 +133,7 @@
     font-size: 20px;
     font-weight: 700;
     margin: 0 0 12px;
-    color: var(--ink, #1a1a1a);
+    color: var(--ui-text, #1a1a1a);
     letter-spacing: -0.01em;
   }
   .entry-content ul {
@@ -146,7 +147,7 @@
   .entry-content li {
     font-size: 15px;
     line-height: 1.6;
-    color: var(--ink-soft, #555);
+    color: var(--ui-text-secondary, #555);
     padding-left: 18px;
     position: relative;
   }
@@ -157,7 +158,7 @@
     top: 9px;
     width: 6px;
     height: 6px;
-    background: var(--line, #ddd);
+    background: var(--ui-divider, #ddd);
   }
 
   :global(:root[data-theme="dark"]) .cl-title { color: #e8e8e8; }

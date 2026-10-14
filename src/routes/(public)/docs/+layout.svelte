@@ -15,7 +15,7 @@
 
   onMount(() => {
     const prev = document.body.style.background;
-    document.body.style.background = 'var(--paper)';
+    document.body.style.background = 'var(--ui-panel)';
     return () => { document.body.style.background = prev; };
   });
 

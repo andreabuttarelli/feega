@@ -66,14 +66,14 @@
     max-width: 640px;
     margin: 0 auto;
     padding: 32px 16px 64px;
-    color: var(--ink, #1d1d1f);
-    background: var(--paper, #fff);
+    color: var(--ui-text, #1d1d1f);
+    background: var(--ui-panel, #fff);
     min-height: 100vh;
   }
   .mark {
     font-size: 12px;
     font-weight: 600;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary, #9a9a9e);
     text-decoration: none;
   }
   h1 {
@@ -100,8 +100,9 @@
     gap: 10px;
     padding: 10px;
     margin-bottom: 6px;
-    border: 1px solid var(--line, #ededef);
+    border: 1px solid var(--ui-divider, #ededef);
     cursor: pointer;
+    border-radius: var(--ui-radius-md);
   }
   .reason span {
     display: flex;
@@ -110,7 +111,7 @@
     font-size: 14px;
   }
   .reason small {
-    color: var(--ink-faint, #6e6e73);
+    color: var(--ui-text-tertiary, #6e6e73);
   }
   .trap {
     position: absolute;
@@ -123,8 +124,8 @@
     padding: 12px 20px;
     font: inherit;
     font-weight: 600;
-    color: var(--paper, #fff);
-    background: var(--ink, #1d1d1f);
+    color: var(--ui-panel, #fff);
+    background: var(--ui-text, #1d1d1f);
     border: 0;
     border-radius: 0;
     cursor: pointer;
@@ -136,6 +137,6 @@
   .fine {
     margin-top: 16px;
     font-size: 12px;
-    color: var(--ink-faint, #6e6e73);
+    color: var(--ui-text-tertiary, #6e6e73);
   }
 </style>

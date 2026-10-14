@@ -133,12 +133,12 @@
     height: 100%;
     margin: 0;
     font-size: 13px;
-    color: var(--ink-faint);
+    color: var(--ui-text-tertiary);
   }
   .shared-canvas {
     position: fixed;
     inset: 0;
-    background: var(--paper-2, #f9f9f9);
+    background: var(--ui-panel-sunken, #f9f9f9);
   }
 
   .shared-canvas :global(.svelte-flow__handle) {
@@ -156,8 +156,9 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line, #ededef);
+    background: var(--ui-panel, #fff);
+    border: 1px solid var(--ui-divider, #ededef);
+    border-radius: var(--ui-radius-md);
   }
 
   .view img,
@@ -195,11 +196,11 @@
     align-items: center;
     gap: 8px;
     padding: 4px 0;
-    border-bottom: 1px solid var(--line, #ededef);
+    border-bottom: 1px solid var(--ui-divider, #ededef);
   }
 
   .index {
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary, #9a9a9e);
   }
 
   .view .thumb {
@@ -227,7 +228,7 @@
   .big span {
     font-size: 11px;
     font-weight: 400;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary, #9a9a9e);
   }
 
   .face {
@@ -263,8 +264,9 @@
     text-overflow: ellipsis;
     font-size: 14px;
     font-weight: 600;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
+    background: var(--ui-panel, #fff);
+    border: 1px solid var(--ui-divider-strong, #d2d2d7);
+    border-radius: var(--ui-radius-md);
   }
 
   .mark {
@@ -275,13 +277,13 @@
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.02em;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary, #9a9a9e);
     text-decoration: none;
   }
   .report {
     margin-right: 10px;
     font-size: 11px;
-    color: var(--ink-faint, #9a9a9e);
+    color: var(--ui-text-tertiary, #9a9a9e);
   }
   .legal-mark {
     display: flex;
@@ -305,6 +307,7 @@
     font-weight: 600;
     color: var(--port);
     border: 1px solid var(--port);
+    border-radius: var(--ui-radius-md);
   }
   .outputs li.flagged {
     border-style: dashed;

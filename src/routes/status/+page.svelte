@@ -191,6 +191,7 @@
     background: #fff;
     border: 1px solid #e5e7eb;
     transition: border-color 0.2s;
+    border-radius: var(--ui-radius-md);
   }
 
   .card.ok {
