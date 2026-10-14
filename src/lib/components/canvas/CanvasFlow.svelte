@@ -932,6 +932,10 @@
     visibility: hidden;
   }
 
+  .wrap.moving :global(.poster-lod .svelte-flow__node.has-poster:not(.selected)) {
+    display: none;
+  }
+
   .wrap.moving :global(.svelte-flow__viewport) {
     will-change: transform;
   }
