@@ -862,6 +862,13 @@
     }
   });
 
+  const dialogOpen = $derived(Boolean(publishing || sounding || menuOpen || helpOpen || exporting || browsing || componentsOpen || templating));
+  $effect(() => {
+    if (rules.tools === ToolsPlace.CanvasBar) {
+      frameBar.covered = dialogOpen;
+    }
+  });
+
   const FRAME_ACTS: Record<FrameAction, () => void> = { [FrameAction.Image]: () => add('Image'), [FrameAction.Library]: () => (templating = true) };
 
   function drawn(id: string) {

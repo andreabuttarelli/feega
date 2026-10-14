@@ -11,6 +11,7 @@ class FrameBar {
   tool = $state(DrawTool.Select);
   timelinePx = $state(0);
   host = $state<Host | null>(null);
+  covered = $state(false);
 
   attach(host: Host) {
     this.host = host;
@@ -19,6 +20,7 @@ class FrameBar {
         this.host = null;
         this.timelinePx = 0;
         this.tool = DrawTool.Select;
+        this.covered = false;
       }
     };
   }
