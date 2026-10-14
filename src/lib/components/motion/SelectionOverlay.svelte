@@ -5,6 +5,7 @@
   import { DragPhase, isOutside, type ElementOut } from '$lib/canvas/canvas-drop';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { selectionView } from '$lib/motion/selection-context';
+  import { reorderAt } from '$lib/motion/layout/guides';
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
@@ -286,6 +287,7 @@
   function end(e: PointerEvent | null) {
     const done = live;
     const grip = grab?.grip;
+    const reordered = done && grip === Grip.Move && grab && e ? reorderAt(doc, grab.clipId, local(e)) : null;
     const outside = grab && e ? leaving(e) : null;
     out = false;
     grab = null;
@@ -293,6 +295,10 @@
     onpreview(null);
     if (outside) {
       ondragout?.(outside, DragPhase.Drop);
+      return;
+    }
+    if (reordered?.ok) {
+      onchange(reordered.doc, 'Reordered in the auto layout');
       return;
     }
     if (done && grip) {

@@ -69,6 +69,7 @@ import Shuffle from '@lucide/svelte/icons/shuffle';
 import ArrowRight from '@lucide/svelte/icons/arrow-right';
 import CircleDashed from '@lucide/svelte/icons/circle-dashed';
 import Group from '@lucide/svelte/icons/group';
+import Columns2 from '@lucide/svelte/icons/columns-2';
 import FolderOpen from '@lucide/svelte/icons/folder-open';
 import CopyCheck from '@lucide/svelte/icons/copy-check';
 import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
@@ -186,6 +187,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.SelectAll]: { name: 'Select all clips', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Deselect]: { name: 'Deselect', icon: X, group: GuideGroup.Edit, gesture: 'Tap an empty lane', menu: MenuSection.Layer },
   [Command.Precompose]: { name: 'Precompose', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Tool.NullFromSelection]: { name: 'Null parent', icon: CircleDashed, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.StartHere]: { name: 'Move clip to start here', icon: AlignStart, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },
   [Command.EndHere]: { name: 'Move clip to end here', icon: AlignEnd, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },

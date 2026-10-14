@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, type OpResult } from '../timeline';
 import { Direction, Sizing } from './auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from './model';
-import { leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout } from './ops';
+import { addAutoLayout, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout } from './ops';
 import { withAutoLayout } from './resolve';
 
 function must(r: OpResult): MotionDoc {
@@ -109,5 +109,23 @@ describe('the patch schemas', () => {
   it('fill in nothing the caller did not send', () => {
     expect(autoLayoutPatchSchema.parse({ gap: 3 })).toEqual({ gap: 3 });
     expect(layoutItemPatchSchema.parse({})).toEqual({});
+  });
+});
+
+describe('addAutoLayout (⇧A)', () => {
+  let n = 0;
+  const newId = () => `n${++n}`;
+
+  it('wraps a selection in a new container', () => {
+    const { result, containerId } = addAutoLayout(row, ['a', 'b'], newId);
+    expect(clip(must(result), 'a').parent).toBe(containerId);
+  });
+
+  it('turns a lone clip that already has children into the container', () => {
+    const wrapped = must(wrapInAutoLayout(row, ['a', 'b'], 'box', 'lane'));
+    const plain = must(setAutoLayout(wrapped, 'box', null));
+    const { result, containerId } = addAutoLayout(plain, ['box'], newId);
+    expect(containerId).toBe('box');
+    expect(clip(must(result), 'box').autoLayout).toBeTruthy();
   });
 });

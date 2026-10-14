@@ -33,6 +33,7 @@
   import { SPRINGS } from '$lib/motion/spring';
   import GraphEditor from '$lib/components/motion/GraphEditor.svelte';
   import { nullFromSelection } from '$lib/motion/parent-ops';
+  import { addAutoLayout } from '$lib/motion/layout/ops';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import ZoomStage from '$lib/components/motion/ZoomStage.svelte';
   import type { StreamData } from '$lib/components/brand-agent/chat-session.svelte';
@@ -58,6 +59,7 @@
   import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
   import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
@@ -884,6 +886,19 @@
     selection = [id];
   }
 
+  function autoLayoutSelection() {
+    if (!selection.length) {
+      return;
+    }
+    const { result, containerId } = addAutoLayout(doc, selection, newId);
+    if (!result.ok) {
+      notice = result.error;
+      return;
+    }
+    edit(result.doc, 'Added auto layout');
+    selection = [containerId];
+  }
+
   function componentDraft(id: string, format: StarterFormat): Instance | null {
     const entry = templates.find((t) => t.id === id);
     const made = entry ? starterDoc(entry, format, newId) : null;
@@ -1300,7 +1315,8 @@
     [Command.ToggleInspector]: toggleInspector,
     [Command.ToggleTimeline]: () => relayout(toggleTimeline(layout)),
     [Command.Help]: () => (helpOpen = !helpOpen),
-    [Command.Precompose]: precomposeSelection
+    [Command.Precompose]: precomposeSelection,
+    [Command.AutoLayout]: autoLayoutSelection
   };
 
   const TOOL_RUN: Partial<Record<ActionId, () => void>> = {
@@ -1312,7 +1328,7 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
@@ -1628,6 +1644,7 @@
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={selected} onchange={edit} />{/if}
+        {#if selected?.autoLayout && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<AutoLayoutOverlay {doc} clip={{ ...selected, autoLayout: selected.autoLayout }} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.textPath && !playing}<TextPathOverlay {doc} clip={selected} {frame} />{/if}
         {#if frameBar.tool !== DrawTool.Select && !playing}<DrawOverlay {doc} {frame} tool={frameBar.tool} onchange={apply} oncreated={drawn} />{/if}
