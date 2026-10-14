@@ -12,10 +12,11 @@ const NAME_WORDS = 6;
 export type BriefTemplate = { id: string; name: string; brief: string };
 
 export const BRIEF_TEMPLATES: readonly BriefTemplate[] = [
-  { id: 'launch', name: 'Product launch', brief: 'A 15-second product launch teaser: bold titles, fast cuts, a clear call to action at the end.' },
-  { id: 'app', name: 'App walkthrough', brief: 'A 20-second app walkthrough: the screens in a device, a cursor showing the three key steps, calm music.' },
-  { id: 'logo', name: 'Logo reveal', brief: 'A 6-second logo reveal on a clean background, with a short tagline after it.' },
-  { id: 'promo', name: 'Offer promo', brief: 'A vertical 10-second promo for a limited offer: price, deadline and a button-style call to action.' }
+  { id: 'posters', name: 'a launch poster series', brief: 'A series of three launch posters in one style: a bold headline, the product, a date. Lay them side by side.' },
+  { id: 'teaser', name: 'an animated product teaser', brief: 'A 10-second animated product teaser: the interface shown one element at a time, a title card, a clear call to action.' },
+  { id: 'moodboard', name: 'moodboard to motion', brief: 'Start a moodboard of six images in one mood, then turn it into a short looping motion piece.' },
+  { id: 'onboarding', name: 'an onboarding flow in motion', brief: 'Three onboarding screens for a mobile app, then a short animation moving from one to the next.' },
+  { id: 'social', name: 'a set of social stills', brief: 'Four square social posts that share a grid, a type scale and one accent colour.' }
 ];
 
 function hostOf(text: string): string | null {

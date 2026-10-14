@@ -33,6 +33,12 @@ describe('a brief typed on /app names its video and travels to the editor', () =
     expect(BRIEF_TEMPLATES.every((t) => t.brief.length > 0 && t.name.length > 0)).toBe(true);
   });
 
+  it('the suggestions start a canvas, lowercase, with more than the three shown so they rotate', () => {
+    expect(BRIEF_TEMPLATES.map((t) => t.name)).toEqual(expect.arrayContaining(['a launch poster series', 'an animated product teaser', 'moodboard to motion']));
+    expect(BRIEF_TEMPLATES.length).toBeGreaterThan(3);
+    expect(BRIEF_TEMPLATES.every((t) => t.name === t.name.toLowerCase())).toBe(true);
+  });
+
   it('a bare URL is a site to read, anything else a brief', () => {
     expect(briefKind('acme.com')).toBe(BriefKind.Site);
     expect(briefKind(' https://www.acme.com/pricing ')).toBe(BriefKind.Site);

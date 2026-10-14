@@ -3,17 +3,17 @@ import { render } from 'svelte/server';
 import '$lib/i18n';
 import Page from './+page.svelte';
 
-const motion = { id: 'm1', name: 'acme.com', projectName: 'Launch', updatedAt: '2026-10-03', format: '9:16', poster: 'https://signed/poster.jpg', preview: null, href: '/p/p1/c/c1/motion/m1' };
+const canvas = { id: 'c1', name: 'Spring teaser', projectName: 'Launch', updatedAt: '2026-10-03', href: '/p/p1/c/c1', thumbs: ['https://signed/poster.jpg'] };
 const project = { id: 'p1', name: 'Launch', href: '/p/p1', updatedAt: '2026-10-03', canvases: [], thumbs: [], videoCount: 1, posters: ['https://signed/poster.jpg'] };
 const PLACEHOLDER = 'Describe what you want to make, or paste your website…';
 
-function page(motions: (typeof motion)[] = [motion], moreVideos: string | null = null, name: string | null = 'Andrea') {
-  const data = { dashboard: { projects: [project], batches: [], motions, moreVideos }, templates: [{ id: 't', name: 'Logo reveal', brief: 'A logo reveal' }], tools: [], attachProjectId: 'p1', profile: { name, email: 'a@b.c', avatarUrl: null } };
+function page(canvases: (typeof canvas)[] = [canvas]) {
+  const data = { dashboard: { canvases, projects: [project], batches: [], motions: [], moreVideos: null }, templates: [{ id: 't', name: 'A poster series', brief: 'A poster series' }], tools: [], attachProjectId: 'p1' };
   return render(Page, { props: { data, form: null } as never }).body;
 }
 
 describe('the /app home: a hero, the recents, one prompt', () => {
-  it('reads create actions, greeting, recents, then the prompt', () => {
+  it('reads create actions, hero, recents, then the prompt', () => {
     const body = page();
     const at = (needle: string) => body.indexOf(needle);
 
@@ -45,19 +45,22 @@ describe('the /app home: a hero, the recents, one prompt', () => {
     expect(body).not.toContain('home-gallery');
   });
 
-  it('a recent row has a sized lazy thumbnail, its name, its project and opens the editor', () => {
+  it('a recent is a canvas: a sized lazy thumbnail, its name, its project, and it opens the canvas', () => {
     const body = page();
     const recents = body.slice(body.indexOf('data-testid="home-recents"'), body.indexOf('data-testid="video-brief"'));
 
-    expect(recents).toContain('href="/p/p1/c/c1/motion/m1"');
+    expect(recents).toContain('href="/p/p1/c/c1"');
     expect(recents).toMatch(/<img src="https:\/\/signed\/poster.jpg"[^>]*loading="lazy"[^>]*width="\d+" height="\d+"/);
-    expect(recents).toContain('acme.com');
+    expect(recents).toContain('Spring teaser');
     expect(recents).toContain('Launch');
   });
 
-  it('offers more recents only when the server said there are', () => {
-    expect(page()).not.toContain('data-testid="more-videos"');
-    expect(page([motion], '2026-10-01')).toContain('data-testid="more-videos"');
+  it('a canvas with several frames shows them side by side; one with none shows its initial', () => {
+    const many = page([{ ...canvas, thumbs: ['https://signed/a.jpg', 'https://signed/b.jpg'] }]);
+    const none = page([{ ...canvas, thumbs: [] }]);
+
+    expect(many).toContain('https://signed/b.jpg');
+    expect(none).toMatch(/class="initial[^"]*"[^>]*>s</);
   });
 
   it('a new user sees an empty state that points at the prompt and the new canvas', () => {
@@ -75,7 +78,7 @@ describe('the /app home: a hero, the recents, one prompt', () => {
     expect(body).toMatch(/<form[^>]*action="\?\/video"/);
     expect(body).toMatch(/<textarea[^>]*data-testid="video-brief"/);
     expect(body).toContain(`placeholder="${PLACEHOLDER}"`);
-    expect(chips).toMatch(/<button type="button"[^>]*data-brief="A logo reveal"/);
+    expect(chips).toMatch(/<button type="button"[^>]*data-brief="A poster series"/);
     expect(body.indexOf('data-testid="video-brief"')).toBeLessThan(body.indexOf('data-testid="brief-send"'));
   });
 });

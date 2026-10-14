@@ -8,17 +8,14 @@ import Flag from '@lucide/svelte/icons/flag';
 import Scale from '@lucide/svelte/icons/scale';
 import SunMoon from '@lucide/svelte/icons/sun-moon';
 import LogOut from '@lucide/svelte/icons/log-out';
-import Shuffle from '@lucide/svelte/icons/shuffle';
+import Shapes from '@lucide/svelte/icons/shapes';
+import Wrench from '@lucide/svelte/icons/wrench';
 import CircleHelp from '@lucide/svelte/icons/circle-help';
-import { GALLERY_PATH } from '$lib/gallery/paths';
-import { TOOLS, TOOL_STATUS_LABEL, ToolRole, toolHref } from '$lib/tools';
-import { TOOL_ICONS } from '$lib/components/app/tool-icons';
 import { REPORT_PATH } from '$lib/reports/report-link';
 import { BILLING_PATH } from '$lib/billing-path';
 
 export enum NavSection {
   Main = 'main',
-  Tools = 'tools',
   Account = 'account'
 }
 
@@ -61,7 +58,9 @@ export type NavItem = {
 };
 
 const DASHBOARD_PATH = '/app';
+const CANVASES_PATH = `${DASHBOARD_PATH}/canvases`;
 const TEMPLATES_PATH = `${DASHBOARD_PATH}/templates`;
+export const TOOLS_PATH = `${DASHBOARD_PATH}/tools`;
 
 const none = () => null;
 
@@ -76,30 +75,11 @@ const row = (item: Omit<NavItem, 'needs' | 'load' | 'badge' | 'meta' | 'href'> &
 
 const inProject = (path: string) => (projectId: string | null) => (projectId ? `/p/${projectId}${path}` : null);
 
-const SECTION_OF_ROLE: Record<ToolRole, NavSection> = {
-  [ToolRole.Lead]: NavSection.Main,
-  [ToolRole.Support]: NavSection.Tools
-};
-
-const toolRow = (tool: (typeof TOOLS)[number]) =>
-  row({
-    id: `tool:${tool.id}`,
-    section: SECTION_OF_ROLE[tool.role],
-    kind: NavKind.Link,
-    label: { text: tool.name },
-    icon: TOOL_ICONS[tool.icon],
-    badge: TOOL_STATUS_LABEL[tool.status],
-    href: (projectId) => toolHref(tool, projectId)
-  });
-
-const toolsOf = (role: ToolRole) => TOOLS.filter((tool) => tool.role === role).map(toolRow);
-
 export const APP_NAV: readonly NavItem[] = [
   row({ id: 'home', section: NavSection.Main, kind: NavKind.Link, label: { key: 'app.shell.menu.home' }, icon: LayoutGrid, href: () => DASHBOARD_PATH }),
+  row({ id: 'canvases', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Canvases' }, icon: Shapes, href: () => CANVASES_PATH }),
   row({ id: 'templates', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Templates' }, icon: LayoutTemplate, href: () => TEMPLATES_PATH }),
-  ...toolsOf(ToolRole.Lead),
-  row({ id: 'gallery', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Gallery' }, icon: Shuffle, load: NavLoad.Document, href: () => GALLERY_PATH }),
-  ...toolsOf(ToolRole.Support),
+  row({ id: 'tools', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Tools' }, icon: Wrench, href: () => TOOLS_PATH }),
   row({ id: 'settings', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.settings' }, icon: Settings, needs: NavNeeds.Project, href: inProject('/settings/project') }),
   row({ id: 'billing', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.billing' }, icon: CreditCard, meta: NavMeta.Credits, href: () => BILLING_PATH }),
   row({ id: 'changelog', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.changelog' }, icon: Sparkles, load: NavLoad.Document, href: () => '/changelog' }),

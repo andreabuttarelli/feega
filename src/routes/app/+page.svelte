@@ -5,8 +5,7 @@
   import { enhance } from '$app/forms';
   import { preloadCode } from '$app/navigation';
   import { BriefPhase, briefPhaseAfter, briefProgress } from '$lib/motion/brief-progress';
-  import type { VideoPage } from '$lib/server/dashboard/dashboard';
-  import { relativeDate } from '$lib/relative-date';
+  import CanvasRows from '$lib/components/app/CanvasRows.svelte';
   import { BRIEF_MAX } from '$lib/motion/video-brief';
   import { ComposerKey, composerKey, rotateTemplates } from '$lib/motion/brief-composer';
   import { composerHeight } from '$lib/components/brand-agent/composer-height';
@@ -21,9 +20,6 @@
   const PLACEHOLDER = 'Describe what you want to make, or paste your website…';
   const EXAMPLES_SHOWN = 3;
   const EXAMPLE_TURN_MS = 6000;
-  const SKELETONS = 3;
-  const THUMB_W = 96;
-  const THUMB_H = 54;
   const EDITOR_ROUTE = '/p/_/c/_/motion/_';
 
   let phase = $state(BriefPhase.Idle);
@@ -34,9 +30,7 @@
   let field = $state<HTMLTextAreaElement | null>(null);
   let composer = $state<HTMLFormElement | null>(null);
   let picker = $state<HTMLInputElement | null>(null);
-  let videos = $state(data.dashboard.motions);
-  let more = $state(data.dashboard.moreVideos);
-  let loadingMore = $state(false);
+  const recents = $derived(data.dashboard.canvases);
 
   const uploads = $derived(data.attachProjectId ? new ChatUploads(data.attachProjectId) : null);
   const ready = $derived(uploads?.ready ?? []);
@@ -59,25 +53,6 @@
     field.style.height = 'auto';
     field.style.height = composerHeight(field.scrollHeight);
   });
-
-  async function loadMore() {
-    if (!more || loadingMore) {
-      return;
-    }
-    loadingMore = true;
-    try {
-      const response = await fetch(`/app/videos?before=${encodeURIComponent(more)}`);
-      if (!response.ok) {
-        return;
-      }
-      const page: VideoPage = await response.json();
-      const seen = new Set(videos.map((v) => v.id));
-      videos = [...videos, ...page.videos.filter((v) => !seen.has(v.id))];
-      more = page.more;
-    } finally {
-      loadingMore = false;
-    }
-  }
 
   function preloadEditor() {
     void preloadCode(EDITOR_ROUTE);
@@ -158,40 +133,21 @@
     </form>
   </div>
 
-  <HomeHero />
+  <div class="scroll" data-testid="home-scroll">
+    <HomeHero />
 
-  <div class="column">
-    {#if videos.length}
-      <section class="recents" aria-labelledby="recents-heading">
-        <h2 id="recents-heading">recents</h2>
-        <ul data-testid="home-recents">
-          {#each videos as video (video.id)}
-            <li>
-              <a href={video.href} class="recent" data-testid="video-card">
-                <span class="thumb">
-                  {#if video.poster}<img src={video.poster} alt="" loading="lazy" decoding="async" width={THUMB_W} height={THUMB_H} />{/if}
-                </span>
-                <span class="name">{video.name}</span>
-                <span class="project">{video.projectName}</span>
-                <span class="when">{relativeDate(video.updatedAt)}</span>
-              </a>
-            </li>
-          {/each}
-          {#if loadingMore}
-            {#each { length: SKELETONS } as _, i (i)}
-              <li class="skeleton" aria-hidden="true"><span></span><i></i></li>
-            {/each}
-          {/if}
-        </ul>
-        {#if more}
-          <button type="button" class="quiet" data-testid="more-videos" disabled={loadingMore} onclick={loadMore}>show more</button>
-        {/if}
-      </section>
-    {:else}
-      <p class="empty" data-testid="home-empty">
-        nothing here yet. <a href="#video-brief">describe what you want</a> and feega opens a canvas for it, or start a blank one with new canvas.
-      </p>
-    {/if}
+    <div class="column">
+      {#if recents.length}
+        <section class="recents" aria-labelledby="recents-heading">
+          <h2 id="recents-heading">recents</h2>
+          <CanvasRows canvases={recents} testid="home-recents" />
+        </section>
+      {:else}
+        <p class="empty" data-testid="home-empty">
+          nothing here yet. <a href="#video-brief">describe what you want</a> and feega opens a canvas for it, or start a blank one with new canvas.
+        </p>
+      {/if}
+    </div>
   </div>
 
   <div class="dock">
@@ -256,8 +212,15 @@
     --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
     display: flex;
     flex-direction: column;
-    min-height: calc(100svh - var(--ui-bar-h) - var(--content-pad-top) - var(--content-pad-bottom));
+    height: calc(100svh - var(--ui-bar-h) - var(--content-pad-top) - var(--content-pad-bottom));
     color: var(--ui-ink);
+  }
+
+  .scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
   }
 
   .create {
@@ -331,112 +294,14 @@
     color: var(--ui-text-3);
   }
 
-  ul {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  .recent {
-    display: grid;
-    grid-template-columns: 96px minmax(0, 1fr) auto auto;
-    align-items: center;
-    gap: var(--ui-space-4);
-    min-height: 44px;
-    padding: var(--ui-space-2);
-    margin: 0 calc(-1 * var(--ui-space-2));
-    color: var(--ui-ink);
-    text-decoration: none;
-    transition: background 0.2s var(--ease-expo);
-  }
-
-  .recent:hover {
-    background: var(--ui-hover);
-  }
-
-  .recent:focus-visible {
-    outline: none;
-    box-shadow: var(--ui-focus);
-  }
-
-  .thumb {
-    display: block;
-    aspect-ratio: 16 / 9;
-    overflow: hidden;
-    background: var(--ui-surface);
-  }
-
-  .thumb img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .name {
-    overflow: hidden;
-    font-size: var(--ui-text-md);
-    font-weight: 500;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .project,
-  .when {
-    font-size: var(--ui-text-sm);
-    color: var(--ui-text-3);
-    white-space: nowrap;
-  }
-
-  .skeleton {
-    display: grid;
-    grid-template-columns: 96px 1fr;
-    align-items: center;
-    gap: var(--ui-space-4);
-    padding: var(--ui-space-2) 0;
-  }
-
-  .skeleton span {
-    aspect-ratio: 16 / 9;
-    background: var(--ui-surface);
-    animation: breathe 1.4s ease-in-out infinite;
-  }
-
-  .skeleton i {
-    width: 40%;
-    height: 12px;
-    background: var(--ui-surface);
-    animation: breathe 1.4s ease-in-out infinite;
-  }
-
   @keyframes breathe {
     50% {
       opacity: 0.5;
     }
   }
 
-  .quiet {
-    align-self: flex-start;
-    height: 32px;
-    padding: 0 var(--ui-space-3);
-    margin-left: calc(-1 * var(--ui-space-3));
-    border: 0;
-    border-radius: 9999px;
-    background: transparent;
-    color: var(--ui-text-3);
-    font: inherit;
-    font-size: var(--ui-text-sm);
-    cursor: pointer;
-  }
 
-  .quiet:hover {
-    background: var(--ui-hover);
-    color: var(--ui-ink);
-  }
 
-  .quiet:disabled {
-    opacity: 0.5;
-    cursor: default;
-  }
 
   .empty {
     margin: 0;
@@ -454,16 +319,14 @@
   }
 
   .dock {
-    position: sticky;
-    bottom: var(--ui-space-4);
+    flex: none;
     display: flex;
     flex-direction: column;
     gap: var(--ui-space-3);
     width: 100%;
     max-width: 720px;
-    margin: auto auto 0;
-    padding-top: 64px;
-    background: linear-gradient(to bottom, transparent, var(--ui-bg) 56px);
+    margin: 0 auto;
+    padding-top: var(--ui-space-4);
   }
 
   .examples {
@@ -598,9 +461,7 @@
 
   @media (prefers-reduced-motion: reduce) {
     .column,
-    .send.busy:disabled,
-    .skeleton span,
-    .skeleton i {
+    .send.busy:disabled {
       animation: none;
     }
   }
@@ -611,18 +472,8 @@
       margin-top: 32px;
     }
 
-    .recent {
-      grid-template-columns: 72px minmax(0, 1fr) auto;
-      gap: var(--ui-space-3);
-    }
-
-    .project {
-      display: none;
-    }
-
     .dock {
-      bottom: 0;
-      padding: 48px 0 var(--ui-space-2);
+      padding-top: var(--ui-space-3);
     }
 
     textarea {

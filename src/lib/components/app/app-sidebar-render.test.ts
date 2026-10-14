@@ -22,13 +22,18 @@ describe('app sidebar', () => {
     expect(html()).toMatch(/class="wordmark[^"]*"[^>]*>feega<\/a>/);
   });
 
-  it('lists every tool from tools.ts with its link and a beta badge', () => {
+  it('is a simple nav: home, canvases, templates, tools, then the projects; no tool rows, no badges', () => {
     const body = html();
+    const at = (needle: string) => body.indexOf(needle);
+
+    expect(at('href="/app"')).toBeLessThan(at('href="/app/canvases"'));
+    expect(at('href="/app/canvases"')).toBeLessThan(at('href="/app/templates"'));
+    expect(at('href="/app/templates"')).toBeLessThan(at('href="/app/tools"'));
+    expect(at('href="/app/tools"')).toBeLessThan(at('>Projects<'));
     for (const tool of TOOLS) {
-      expect(body).toContain(`href="${tool.route}?project=p1"`);
-      expect(body).toContain(tool.name);
+      expect(body).not.toContain(tool.name);
     }
-    expect(body.match(/class="badge[^"]*"/g)?.length).toBe(TOOLS.filter((t) => t.status === 'beta').length);
+    expect(body).not.toMatch(/class="badge[^"]*"/);
   });
 
   it('ends the projects section with a light New project entry', () => {
@@ -48,9 +53,9 @@ describe('app sidebar', () => {
   });
 
   it('marks only the current page as active', () => {
-    const body = html({ pathname: '/app/motion' });
+    const body = html({ pathname: '/app/templates' });
     expect(body.match(/aria-current="page"/g)?.length).toBe(1);
-    expect(body).toMatch(/href="\/app\/motion\?project=p1"[^>]*aria-current="page"/);
+    expect(body).toMatch(/href="\/app\/templates"[^>]*aria-current="page"/);
   });
 
   it('keeps account entries: settings, billing, changelog, report, legal, theme, sign out', () => {

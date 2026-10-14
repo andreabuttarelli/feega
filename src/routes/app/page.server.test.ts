@@ -95,19 +95,19 @@ describe('/app is the dashboard for a returning user', () => {
     expect(redirected).toMatchObject({ status: 303, location: '/p/p-new/c/c-new' });
   });
 
-  it('a brief opens a new canvas of its own and hands the words to its chat', async () => {
+  it('a prompt opens a new canvas of its own and hands the words to the canvas chat', async () => {
     const brief = 'https://acme.com';
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief }) } as never));
 
     expect(createCanvas).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', name: 'acme.com' });
-    expect(createNode).toHaveBeenCalledWith({}, expect.objectContaining({ orgId: 'org-a', projectId: 'p1', canvasId: 'c-new', type: 'motion', displayName: 'acme.com' }));
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new/motion/m-new?brief=Make+a+launch+film+of+https%3A%2F%2Facme.com' });
+    expect(createNode).not.toHaveBeenCalled();
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=Make+a+launch+film+of+https%3A%2F%2Facme.com' });
   });
 
-  it('a described video opens the chat with the words as typed', async () => {
+  it('a described idea reaches the chat with the words as typed', async () => {
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request: form({ brief: 'A logo reveal' }) } as never));
 
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new/motion/m-new?brief=A+logo+reveal' });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=A+logo+reveal' });
   });
 
   it('attachments uploaded on the home ride with the brief into the first turn', async () => {
@@ -120,7 +120,7 @@ describe('/app is the dashboard for a returning user', () => {
     const redirected = await thrown(() => actions.video({ locals, cookies: cookieJar(), url: new URL('http://x/app'), request } as never));
 
     expect(loadAttachments).toHaveBeenCalledWith({}, { orgId: 'org-a', projectId: 'p1', ids: ['a1', 'stranger', 'a2'] });
-    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new/motion/m-new?brief=A+logo+reveal&attach=a1%2Ca2' });
+    expect(redirected).toMatchObject({ status: 303, location: '/p/p1/c/c-new?prompt=A+logo+reveal&attach=a1%2Ca2' });
   });
 
   it('files alone are a brief', async () => {

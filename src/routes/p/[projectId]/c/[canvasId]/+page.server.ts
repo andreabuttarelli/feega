@@ -1,3 +1,4 @@
+import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
 import { isOutputHandle } from '$lib/canvas/select-outputs';
 import { error, fail, redirect } from '@sveltejs/kit';
@@ -263,7 +264,7 @@ async function loadInfluencerViews(
   }
 }
 
-export const load: PageServerLoad = async ({ params, locals }) => {
+export const load: PageServerLoad = async ({ params, locals, url }) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId } = await scopeFor(locals, params.canvasId);
 
   const [nodes, connections, fullCatalogue, shareToken, references, uncensored] = await Promise.all([
@@ -276,17 +277,19 @@ export const load: PageServerLoad = async ({ params, locals }) => {
   ]);
   const catalogue = catalogueIn(mode, visibleCatalogue(fullCatalogue, uncensored));
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
     firstRunFor(db, { userId, orgId, nodeCount: nodes.length }),
-    templateLibrary(db, { orgId, actor: userActor({ userId }) }).list()
+    templateLibrary(db, { orgId, actor: userActor({ userId }) }).list(),
+    chatHandoff(db, { orgId, projectId: canvas.projectId }, url)
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
 
   return {
+    handoff,
     canvas,
     nodes,
     connections,

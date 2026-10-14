@@ -27,6 +27,7 @@
   import { browser } from '$app/environment';
   import { deserialize } from '$app/forms';
   import type { ShareState } from '$lib/canvas/shared-view';
+  import { handoffOf } from '$lib/canvas/chat-handoff';
 
   let { data, children } = $props();
 
@@ -75,6 +76,14 @@
     }
     shareWritten = { canvasId, token: (result.data?.shareToken as string | null) ?? null };
   }
+
+  $effect(() => {
+    if (!page.data.handoff || !handoffOf(page.url)) {
+      return;
+    }
+    chatOpen = true;
+    mobileView = untrack(() => showView(mobileView, 'chat'));
+  });
 
   $effect(() => {
     if ($guideOpenRequest) {

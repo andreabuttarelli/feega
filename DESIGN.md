@@ -42,6 +42,9 @@ between the two is the point.
   button) and `import`. Catalogues live on their own page (templates), never as rows on the home.
 - The account entries (settings, billing, changelog, theme, sign out…) sit in a menu behind the
   avatar at the foot of the sidebar, not in the sidebar itself.
+- The sidebar nav is four plain entries (home, canvases, templates, tools) and the projects. Tools
+  and the gallery live on the tools page; no badges in the nav.
+- A list that sits above a docked composer scrolls in its own area: nothing passes behind the dock.
 - Cards: a large preview, a small title and author underneath, no frame. Previews play on hover
   (on touch, when in view).
 - Filters are light: text or chips, icons that show what they mean (a format chip draws its real

@@ -125,15 +125,8 @@
     {/each}
   </div>
 
-  <div class="group" data-testid="app-sidebar-tools">
-    <span class="heading">Tools</span>
-    {#each inSection(NavSection.Tools) as item (item.id)}
-      {@render entry(item)}
-    {/each}
-  </div>
-
   <div class="group" data-testid="app-sidebar-canvas">
-    <span class="heading">Assets &amp; canvas</span>
+    <span class="heading">Projects</span>
     {#each projects as project (project.id)}
       <a class="row" href="/p/{project.id}">
         <Folder size={ICON} strokeWidth={STROKE} />
