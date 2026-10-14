@@ -43,6 +43,24 @@ import { SLICED_PHOTO_COMPONENT } from './sliced-photo-poster/component';
 import { SLICED_PHOTO_POSTER_TEMPLATE, SLICED_PHOTO_TEMPLATE_ID } from './sliced-photo-poster/template';
 import { RED_NUMBER_COMPONENT } from './red-number-poster/component';
 import { RED_NUMBER_POSTER_TEMPLATE, RED_NUMBER_TEMPLATE_ID } from './red-number-poster/template';
+import { HAZE_GRID_COMPONENT } from './haze-grid-poster/component';
+import { HAZE_GRID_POSTER_TEMPLATE, HAZE_GRID_TEMPLATE_ID } from './haze-grid-poster/template';
+import { FLOW_QUOTE_COMPONENT } from './flow-quote-poster/component';
+import { FLOW_QUOTE_POSTER_TEMPLATE, FLOW_QUOTE_TEMPLATE_ID } from './flow-quote-poster/template';
+import { STACKED_PLUS_COMPONENT } from './stacked-plus-poster/component';
+import { STACKED_PLUS_POSTER_TEMPLATE, STACKED_PLUS_TEMPLATE_ID } from './stacked-plus-poster/template';
+import { BARCODE_TABLE_COMPONENT } from './barcode-table-poster/component';
+import { BARCODE_TABLE_POSTER_TEMPLATE, BARCODE_TABLE_TEMPLATE_ID } from './barcode-table-poster/template';
+import { PIXEL_CAPS_COMPONENT } from './pixel-caps-poster/component';
+import { PIXEL_CAPS_POSTER_TEMPLATE, PIXEL_CAPS_TEMPLATE_ID } from './pixel-caps-poster/template';
+import { MONTH_GRID_COMPONENT } from './month-grid-poster/component';
+import { MONTH_GRID_POSTER_TEMPLATE, MONTH_GRID_TEMPLATE_ID } from './month-grid-poster/template';
+import { ROTATED_CARDS_COMPONENT } from './rotated-cards-poster/component';
+import { ROTATED_CARDS_POSTER_TEMPLATE, ROTATED_CARDS_TEMPLATE_ID } from './rotated-cards-poster/template';
+import { BRICK_CAPS_COMPONENT } from './brick-caps-poster/component';
+import { BRICK_CAPS_POSTER_TEMPLATE, BRICK_CAPS_TEMPLATE_ID } from './brick-caps-poster/template';
+import { DARK_TAGS_COMPONENT } from './dark-tags-poster/component';
+import { DARK_TAGS_POSTER_TEMPLATE, DARK_TAGS_TEMPLATE_ID } from './dark-tags-poster/template';
 
 const POSTERS: [string, TemplateEntry, string][] = [
   [TYPE_GRID_TEMPLATE_ID, TYPE_GRID_POSTER_TEMPLATE, TYPE_GRID_COMPONENT],
@@ -65,7 +83,16 @@ const PART_TAGGED: [string, TemplateEntry, string][] = [
   [WIDE_FILMSTRIP_TEMPLATE_ID, WIDE_FILMSTRIP_POSTER_TEMPLATE, WIDE_FILMSTRIP_COMPONENT],
   [SCATTERED_TYPE_TEMPLATE_ID, SCATTERED_TYPE_POSTER_TEMPLATE, SCATTERED_TYPE_COMPONENT],
   [SLICED_PHOTO_TEMPLATE_ID, SLICED_PHOTO_POSTER_TEMPLATE, SLICED_PHOTO_COMPONENT],
-  [RED_NUMBER_TEMPLATE_ID, RED_NUMBER_POSTER_TEMPLATE, RED_NUMBER_COMPONENT]
+  [RED_NUMBER_TEMPLATE_ID, RED_NUMBER_POSTER_TEMPLATE, RED_NUMBER_COMPONENT],
+  [HAZE_GRID_TEMPLATE_ID, HAZE_GRID_POSTER_TEMPLATE, HAZE_GRID_COMPONENT],
+  [FLOW_QUOTE_TEMPLATE_ID, FLOW_QUOTE_POSTER_TEMPLATE, FLOW_QUOTE_COMPONENT],
+  [STACKED_PLUS_TEMPLATE_ID, STACKED_PLUS_POSTER_TEMPLATE, STACKED_PLUS_COMPONENT],
+  [BARCODE_TABLE_TEMPLATE_ID, BARCODE_TABLE_POSTER_TEMPLATE, BARCODE_TABLE_COMPONENT],
+  [PIXEL_CAPS_TEMPLATE_ID, PIXEL_CAPS_POSTER_TEMPLATE, PIXEL_CAPS_COMPONENT],
+  [MONTH_GRID_TEMPLATE_ID, MONTH_GRID_POSTER_TEMPLATE, MONTH_GRID_COMPONENT],
+  [ROTATED_CARDS_TEMPLATE_ID, ROTATED_CARDS_POSTER_TEMPLATE, ROTATED_CARDS_COMPONENT],
+  [BRICK_CAPS_TEMPLATE_ID, BRICK_CAPS_POSTER_TEMPLATE, BRICK_CAPS_COMPONENT],
+  [DARK_TAGS_TEMPLATE_ID, DARK_TAGS_POSTER_TEMPLATE, DARK_TAGS_COMPONENT]
 ];
 
 const NOT_A_PART: (string | undefined)[] = [PropFormat.Color, PropFormat.Font, PropFormat.Media];
