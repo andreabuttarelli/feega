@@ -395,7 +395,7 @@
   });
 </script>
 
-<div class="inspector" data-testid="motion-inspector" style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
+<div class="inspector" data-testid="motion-inspector" data-side-edge style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
   <header class="head" title={clip.id} data-testid="selection-head">
     <span class="icon"><FamilyIcon {family} /></span>
     <span class="name">{customName ? componentLabel(customName) : layerName(clip)}</span>

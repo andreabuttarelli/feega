@@ -9,6 +9,12 @@ import FillStack from './FillStack.svelte';
 const dir = dirname(fileURLToPath(import.meta.url));
 const { flushSync, mount, unmount } = (await import(join(dir, '../../../../node_modules/svelte/src/index-client.js'))) as typeof import('svelte');
 
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+} as unknown as typeof ResizeObserver;
+
 const stack = (raw: unknown[]) => fillsSchema.parse(raw);
 const TWO = stack([{ type: 'solid', color: '#111111' }, { type: 'solid', color: '#222222', opacity: 0.5 }]);
 const ASSETS = [{ id: 'pic', kind: 'image' as const, label: 'Pic', previewUrl: 'https://cdn/pic.png' }];
@@ -99,14 +105,52 @@ describe('the fill stack in Properties', () => {
 
   it('the type switcher turns a colour into a gradient with that colour', () => {
     const onchange = show(TWO);
-    change(inRow<HTMLSelectElement>(1, 'fill-type'), 'linear-gradient');
+    click(rows()[1]);
+    change(byId<HTMLSelectElement>('fill-type'), 'linear-gradient');
     expect(sent(onchange)[0]).toMatchObject({ type: 'linear-gradient', stops: [{ color: '#111111', pos: 0 }, { color: '#ffffff', pos: 1 }] });
   });
 
-  it('the swatch opens the layer editor', () => {
+  it('the swatch opens the layer editor beside the panel, named for its layer and anchored to its row', () => {
     show(TWO);
     click(inRow(0, 'fill-swatch'));
-    expect(document.querySelectorAll('[data-testid="fill-editor"]')).toHaveLength(1);
+    const popover = byId('side-popover');
+    expect(popover.getAttribute('aria-label')).toBe('Solid fill');
+    expect(popover.querySelector('[data-testid="side-popover-title"]')!.textContent).toBe('Solid');
+    expect(popover.querySelector('[data-testid="side-popover-swatch"]')).not.toBeNull();
+    expect(popover.dataset.anchor).toBe('1');
+    expect(popover.querySelectorAll('[data-testid="fill-editor"]')).toHaveLength(1);
+    expect(rows()[0].dataset.open).toBe('true');
+    expect(rows()[1].dataset.open).toBeUndefined();
+  });
+
+  it('only one editor is open; another row swaps its content, Escape and close shut it', () => {
+    show(stack([{ type: 'solid', color: '#111111' }, { type: 'linear-gradient', stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }]));
+    click(rows()[0]);
+    click(rows()[1]);
+    expect(document.querySelectorAll('[data-testid="side-popover"]')).toHaveLength(1);
+    expect(byId('side-popover-title').textContent).toBe('Solid');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    flushSync();
+    expect(document.querySelector('[data-testid="side-popover"]')).toBeNull();
+    click(rows()[0]);
+    click(byId('side-popover-close'));
+    expect(document.querySelector('[data-testid="side-popover"]')).toBeNull();
+  });
+
+  it('a click outside the stack closes the editor', () => {
+    show(TWO);
+    click(rows()[0]);
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    flushSync();
+    expect(document.querySelector('[data-testid="side-popover"]')).toBeNull();
+  });
+
+  it('a collapsed row shows its swatch, hex or type, opacity, eye and remove, nothing else', () => {
+    show(stack([{ type: 'solid', color: '#11aa33' }, { type: 'linear-gradient', stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }]));
+    expect(inRow(1, 'fill-label').textContent).toBe('11AA33');
+    expect(inRow(0, 'fill-label').textContent).toBe('Linear');
+    expect(rows()[0].querySelector('select')).toBeNull();
+    expect([...rows()[0].querySelectorAll('[data-testid]')].map((e) => (e as HTMLElement).dataset.testid)).toEqual(['fill-swatch', 'fill-label', 'fill-opacity', 'fill-eye', 'fill-remove']);
   });
 
   it('a layer shows only its own type fields', () => {
