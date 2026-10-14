@@ -184,7 +184,7 @@ and its session. Free.
 | `canvas_tool` `request_upload` + `register_upload` | `feega canvas upload <projectId> <file> [--canvas <id>]` |
 
 `canvas_tool({ org, project_id, op, input })` runs one op of the project chat on that project,
-through the same code: `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `list_connections`, `list_runs`,
+through the same code: `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `estimate_text_cost`, `suggest_next_steps`, `list_connections`, `list_runs`,
 `list_templates`, `create_node`, `update_node`, `move_node`, `resize_node`, `duplicate_nodes`,
 `write_nodes`, `paste_nodes`,
 `connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `undo_gesture`, `run_demo`, `end_onboarding`, `delete_node`, `create_canvas`,

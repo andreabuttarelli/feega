@@ -61,11 +61,7 @@ import { parseUndoItem, type Gesture, type UndoItem } from '$lib/canvas/undo-pla
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { canvasSnapshot, loadDownloaded, loadGenRuns } from '$lib/server/canvas/snapshot';
 import { listSourcesForNodes } from '$lib/server/repos/posts';
-import { suggestNextSteps } from '$lib/canvas/suggest-next-steps';
-import { actionFrequencyFor } from '$lib/server/next-step-stats';
-import { decideWithJev } from '$lib/server/jev';
-import { upstreamInputsFor } from '$lib/server/canvas/upstream';
-import { estimateCanvasTextCost } from '$lib/server/canvas/text-cost-estimate';
+import { nextStepsFor, nodeTextCost } from '$lib/server/canvas/node-hints';
 import { applyEffectsNode } from '$lib/server/canvas/apply-effects';
 import { makeEffectsPair } from '$lib/server/canvas/effects-actions';
 import { nodeAcceptsConnection } from '$lib/canvas/connector-ports';
@@ -451,25 +447,7 @@ export const actions: Actions = {
       return fail(400, { error: 'node not found' });
     }
 
-    const upstream = await upstreamInputsFor(scope.db, {
-      orgId: scope.orgId,
-      canvasId: scope.canvasId,
-      nodeId,
-      model,
-      medium: 'text'
-    });
-    const decide = process.env.TYPESAFE_API_KEY ? decideWithJev : null;
-    return estimateCanvasTextCost({
-      material: upstream.text,
-      ownPrompt: userPrompt,
-      inputCost:
-        upstream.referenceImageUrls.length > 0 ||
-        upstream.referenceVideoUrls.length > 0 ||
-        upstream.referenceAudioUrls.length > 0
-          ? 'variable_media'
-          : 'fixed',
-      decide
-    });
+    return nodeTextCost(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeId, prompt: userPrompt, model });
   },
 
   upload: async ({ request, params, locals }) => {
@@ -1365,25 +1343,11 @@ export const actions: Actions = {
     const fd = await request.formData();
 
     const nodeId = String(fd.get('node_id') ?? '');
-    const node = (await listNodes(scope.db, scope)).find((n) => n.id === nodeId);
-    if (!node) {
+    const suggestions = await nextStepsFor(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeId });
+    if (!suggestions) {
       return fail(404, { error: 'node not found' });
     }
-
-    const frequency = await actionFrequencyFor(scope.db, scope.orgId, node.type);
-    const decide = process.env.TYPESAFE_API_KEY ? decideWithJev : null;
-    const suggestions = await suggestNextSteps(node.type, frequency, decide, node.data);
-
-    return {
-      suggestions: suggestions.map((s) => ({
-        id: s.action.id,
-        label: s.action.label,
-        createsNodeType: s.action.createsNodeType,
-        wiring: s.action.wiring,
-        promptTemplate: s.action.promptTemplate,
-        confidence: s.confidence
-      }))
-    };
+    return { suggestions };
   }
 
 };
