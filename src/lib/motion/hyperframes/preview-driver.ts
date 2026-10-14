@@ -31,6 +31,7 @@ export type PreviewDriver = {
   seek: (seconds: number) => void;
   shoot: (time: number, request: ShotRequest, waitMs?: number) => Promise<CaptureReply>;
   exclusive: <T>(work: () => Promise<T>) => Promise<T>;
+  whenLive: () => Promise<void>;
   ready: () => void;
   playback: (next: Playback) => void;
 };
@@ -41,6 +42,8 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
   let wanted = Playback.Paused;
   let live = false;
   let current = '';
+  let markLive = () => {};
+  const firstLive = new Promise<void>((resolve) => (markLive = resolve));
 
   let reload: ReturnType<typeof setTimeout> | null = null;
 
@@ -88,6 +91,7 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
 
   function ready() {
     live = true;
+    markLive();
     apply();
   }
 
@@ -161,5 +165,5 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
     return run;
   }
 
-  return { load, update, loaded, seek, shoot, exclusive, ready, playback };
+  return { load, update, loaded, seek, shoot, exclusive, whenLive: () => firstLive, ready, playback };
 }

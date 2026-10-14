@@ -20,6 +20,17 @@ export function estimateWorkflowCredits(steps: { medium: GenMedium; model: strin
   return steps.reduce((total, step) => total + stepCredits(step.medium, step.model), 0);
 }
 
+export async function workflowCredits(db: Db, input: { orgId: string; nodeIds: string[] }): Promise<number> {
+  const nodes = await Promise.all(input.nodeIds.map((id) => findNode(db, { orgId: input.orgId, nodeId: id })));
+  const steps = nodes
+    .filter((n): n is CanvasNodeRecord => n !== null)
+    .map((n) => ({
+      medium: (n.type === 'text' || n.type === 'video' ? n.type : 'image') as GenMedium,
+      model: typeof n.data.model === 'string' ? n.data.model : null
+    }));
+  return estimateWorkflowCredits(steps);
+}
+
 type WorkflowTicket = {
   phase: 'queued';
   workflowId: string;

@@ -44,7 +44,7 @@
   --sh-border: var(--ui-line);
   --sh-input: var(--line);
   --sh-ring: var(--ui-accent);
-  --radius: 0rem;
+  --radius: var(--ui-radius-md);
   --mobile-topbar-h: 48px;
   --touch-target: 44px;
   --mobile-bar-inset: 8px;
@@ -103,10 +103,46 @@
   --color-sidebar-border: var(--sh-sidebar-border);
   --color-sidebar-ring: var(--sh-sidebar-ring);
 
-  --radius-sm: 0rem;
-  --radius-md: 0rem;
-  --radius-lg: 0rem;
-  --radius-xl: 0rem;
+  --radius-xs: var(--ui-radius-xs);
+  --radius-sm: var(--ui-radius-sm);
+  --radius-md: var(--ui-radius-md);
+  --radius-lg: var(--ui-radius-lg);
+  --radius-xl: var(--ui-radius-lg);
+
+  --color-ui-app: var(--ui-app);
+  --color-ui-canvas: var(--ui-canvas);
+  --color-ui-panel: var(--ui-panel);
+  --color-ui-sunken: var(--ui-panel-sunken);
+  --color-ui-raised: var(--ui-panel-raised);
+  --color-ui-input: var(--ui-input);
+  --color-ui-input-hover: var(--ui-input-hover);
+  --color-ui-wash: var(--ui-wash);
+  --color-ui-pressed: var(--ui-pressed);
+  --color-ui-selected: var(--ui-selected);
+  --color-ui-divider: var(--ui-divider);
+  --color-ui-divider-strong: var(--ui-divider-strong);
+  --color-ui-text: var(--ui-text);
+  --color-ui-text-2: var(--ui-text-secondary);
+  --color-ui-text-3: var(--ui-text-tertiary);
+  --color-ui-text-off: var(--ui-text-disabled);
+  --color-ui-icon: var(--ui-icon-ink);
+  --color-ui-accent: var(--ui-accent);
+  --color-ui-accent-solid: var(--ui-accent-solid);
+  --color-ui-accent-text: var(--ui-accent-text);
+  --color-ui-on-accent: var(--ui-on-accent);
+  --color-ui-tooltip: var(--ui-tooltip);
+  --color-ui-danger: var(--ui-danger);
+  --color-ui-tooltip-ink: var(--ui-tooltip-ink);
+
+  --text-ui-section: var(--ui-type-section);
+  --text-ui-caption: var(--ui-type-caption);
+  --text-ui-label: var(--ui-type-label);
+  --text-ui-body: var(--ui-type-body);
+  --text-ui-title: var(--ui-type-title);
+
+  --shadow-ui-raised: var(--ui-shadow-raised);
+  --shadow-ui-float: var(--ui-shadow-float);
+  --ease-ui: var(--ui-ease);
 
   --font-sans: var(--sans);
   --font-serif: var(--serif);

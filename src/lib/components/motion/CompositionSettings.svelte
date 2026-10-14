@@ -98,12 +98,12 @@
   .settings {
     display: grid;
     gap: 6px;
-    font-size: var(--ui-text-sm);
+    font-size: var(--ui-text-xs);
   }
 
   label {
     display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-columns: 88px minmax(0, 1fr);
     align-items: center;
     gap: var(--ui-space-2);
     color: var(--ui-ink-2);
@@ -117,14 +117,13 @@
   select,
   input:not([type='checkbox']) {
     width: 100%;
-    height: 24px;
-    padding: 0 6px;
-    border: 1px solid var(--ui-line-strong);
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid transparent;
     border-radius: 0;
-    background: var(--ui-bg);
+    background: var(--ui-field);
     color: var(--ui-ink);
-    font-family: var(--ui-mono);
-    font-size: var(--ui-text-xs);
+    font: inherit;
     font-variant-numeric: tabular-nums;
   }
 
@@ -136,17 +135,18 @@
 
   .fit {
     justify-self: end;
-    padding: 2px 8px;
-    border: 1px solid var(--ui-line-strong);
+    height: 28px;
+    padding: 0 8px;
+    border: 0;
     border-radius: 0;
-    background: var(--ui-bg);
+    background: var(--ui-field);
     color: var(--ui-ink);
-    font-size: var(--ui-text-xs);
+    font: inherit;
     cursor: pointer;
   }
 
   .fit:hover {
-    border-color: var(--ui-accent);
+    background: var(--ui-hover);
   }
 
   .unit-field {
@@ -156,11 +156,10 @@
 
   .unit-field em {
     position: absolute;
-    right: 6px;
+    right: 8px;
     top: 50%;
     transform: translateY(-50%);
     font-style: normal;
-    font-size: 10px;
     color: var(--ui-ink-3);
     pointer-events: none;
   }

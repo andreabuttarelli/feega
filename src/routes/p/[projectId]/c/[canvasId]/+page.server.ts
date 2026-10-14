@@ -11,12 +11,10 @@ import {
   createConnection,
   createNode,
   deleteConnection,
-  deleteNode,
   findNode,
   listConnections,
   listNodes,
   moveNode,
-  resizeNode,
   setConnectionMode,
   writeNodeData,
   patchNodeData,
@@ -25,11 +23,9 @@ import {
   type CanvasNodeRecord
 } from '$lib/server/repos/canvas';
 import { nodeSize } from '$lib/canvas/node-size';
-import { isNodeType, docData, productsOf, socialFeedOf, influencerOf } from '$lib/canvas-node-data';
+import { isNodeType, influencerOf } from '$lib/canvas-node-data';
 import { validateNodeData } from '$lib/canvas/node-data';
 import type { Actor } from '$lib/server/repos/actor';
-import { mintShareToken } from '$lib/canvas/doc-node';
-import { clearDocShare, setDocShare } from '$lib/server/repos/doc-share';
 import { isCanvasEdgeKind, isWireMode } from '$lib/canvas-edges';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { Capability, catalogueIn, MODE_REFUSAL, modeAllows, modeOf, type ProjectMode } from '$lib/project-mode';
@@ -47,14 +43,16 @@ const VOICE_FAIL_STATUS: Partial<Record<VoiceRefusal | 'voice_not_found', number
 };
 import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from '$lib/server/uncensored-access';
 import { runGenNode, runsOf } from '$lib/server/canvas/generate';
-import { planLoop, enqueueLoop, cancelLoop, retryLoopCombination } from '$lib/server/canvas/loop';
-import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, estimateWorkflowCredits } from '$lib/server/canvas/workflow';
+import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/canvas/loop';
+import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
-import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { ShowRun, removeNodes, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
+import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
+import { serverTiming } from '$lib/server/server-timing';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import { endOnboarding, firstRunFor, runDemo } from '$lib/server/onboarding/first-run';
 import { OnboardingStatus } from '$lib/onboarding/coach';
@@ -62,14 +60,8 @@ import { undoGesture } from '$lib/server/canvas/undo';
 import type { Gesture, UndoItem } from '$lib/canvas/undo-plan';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { listNodeProducts } from '$lib/server/repos/products';
-import { normalizeUrl } from '$lib/ads-fee';
-import { normalizeHandle } from '$lib/canvas/source-filters';
 import { listNodeSocialPosts } from '$lib/server/repos/social-posts';
 import { getInfluencer, listInfluencerViewsByIds, signInfluencerViewFiles } from '$lib/server/repos/influencers';
-import { syncProductsNode } from '$lib/server/canvas/products-sync';
-import { syncSocialFeedNode, syncSocialFeedEntries } from '$lib/server/canvas/social-feed-sync';
-import { isProductPlatform } from '$lib/canvas/products-node';
-import { isSocialFeedPlatform } from '$lib/canvas/social-feed-node';
 import { createPostFromNodes } from '$lib/server/repos/create-post-from-nodes';
 import { findBrand } from '$lib/server/repos/brands';
 import { listBrandAccounts } from '$lib/server/repos/social-accounts';
@@ -415,77 +407,11 @@ function parseUndoItem(raw: unknown): UndoItem | null {
   return null;
 }
 
-type SyncNodeOutcome = { ok: true; synced: number; extra?: Record<string, unknown> } | { ok: false; error: string };
-
-/** `products`: `type`/`url`/`limit`/`after`/`only_first_photo` sono la query — `productsOf` li legge già validati. */
-async function syncProducts(db: Db, orgId: string, projectId: string | null, node: { id: string; data: Record<string, unknown> }): Promise<SyncNodeOutcome> {
-  const parsed = productsOf({ id: node.id, type: 'products', data: node.data });
-  const storeUrl = normalizeUrl(parsed?.url);
-  if (!parsed || !isProductPlatform(parsed.platform) || !storeUrl) {
-    return { ok: false, error: 'invalid_url: this node has no store URL to sync' };
-  }
-
-  const outcome = await syncProductsNode(db, {
-    orgId,
-    projectId,
-    nodeId: node.id,
-    platform: parsed.platform,
-    storeUrl,
-    limit: parsed.limit,
-    after: parsed.after,
-    onlyFirstPhoto: parsed.onlyFirstPhoto,
-    category: parsed.category
-  });
-
-  return outcome.ok
-    ? { ok: true, synced: outcome.synced, extra: { after: outcome.after, sync_summary: outcome.summary } }
-    : outcome;
-}
-
-/**
- * `social_account_feed`: `handle` porta quel che l'utente ha incollato — un handle nudo, un URL
- * di profilo, un URL di un post, più righe — e viene CLASSIFICATO prima di sincronizzare
- * (`social-url-classifier.ts`), non letto alla lettera come prima. La piattaforma scelta a mano
- * nel campo `platform` resta l'override per un handle nudo senza dominio nell'URL — un handle
- * come "nike" da solo non dice se è Instagram o TikTok, e lì la scelta manuale vince.
- */
-async function syncSocialFeed(db: Db, orgId: string, projectId: string | null, node: { id: string; data: Record<string, unknown> }): Promise<SyncNodeOutcome> {
-  const parsed = socialFeedOf({ id: node.id, type: 'social_account_feed', data: node.data });
-  const raw = (parsed?.handle ?? '').trim();
-  if (!parsed || !raw) {
-    return { ok: false, error: 'missing_handle: this node has no handle to sync' };
-  }
-
-  const looksLikeUrlOrMultiline = raw.includes('/') || raw.includes('\n') || raw.includes(',') || raw.startsWith('#');
-  if (!looksLikeUrlOrMultiline) {
-    const handle = normalizeHandle(raw);
-    if (!isSocialFeedPlatform(parsed.platform) || !handle) {
-      return { ok: false, error: 'missing_handle: this node has no handle to sync' };
-    }
-    return syncSocialFeedNode(db, { orgId, projectId, nodeId: node.id, platform: parsed.platform, handle, limit: parsed.limit });
-  }
-
-  const outcome = await syncSocialFeedEntries(db, { orgId, projectId, nodeId: node.id, raw, limit: parsed.limit });
-  if (!outcome.ok) {
-    return outcome;
-  }
-
-  const summary = outcome.entries
-    .map((e) => `${PLATFORM_LABELS[e.platform] ?? e.platform} · ${e.kind} · ${e.synced}`)
-    .concat(outcome.unsupported.map((u) => `${u.source}: ${u.message}`))
-    .join(' — ');
-
-  return { ok: true, synced: outcome.synced, extra: { sync_summary: summary } };
-}
-
-const PLATFORM_LABELS: Record<string, string> = {
-  instagram: 'Instagram',
-  tiktok: 'TikTok',
-  x: 'X',
-  threads: 'Threads',
-  facebook: 'Facebook',
-  youtube: 'YouTube',
-  linkedin: 'LinkedIn'
+const SHOW_RUN_ANSWERS: { [K in ShowRun]: (shown: Extract<RunShown, { outcome: K }>) => unknown } = {
+  [ShowRun.Shown]: (shown) => ({ node: shown.node }),
+  [ShowRun.NodeMissing]: () => fail(HTTP_NOT_FOUND, { error: 'node not found' }),
+  [ShowRun.RunMissing]: () => fail(HTTP_NOT_FOUND, { error: 'generation not found' }),
+  [ShowRun.Conflict]: () => fail(HTTP_CONFLICT, { conflict: true })
 };
 
 function isShareState(value: string): value is ShareState {
@@ -881,26 +807,16 @@ export const actions: Actions = {
       return fail(denied.status, denied.data);
     }
 
-    const runs = await listNodeRuns(scope.db, { orgId: scope.orgId, nodeId });
-    const ticket = runs.find((run) => {
-      const loop = (run.params as { loop?: { outputListNodeId?: string; label?: string } }).loop;
-      if (!loop || loop.outputListNodeId !== outputListNodeId) return false;
-      if (typeof runId === 'string' && runId) return run.id === runId;
-      return loop.label === label;
-    });
-    const values = (ticket?.params as { loop?: { values?: Record<string, string> } } | undefined)?.loop?.values ?? {};
-
-    const out = await retryLoopCombination(scope.db, {
+    return retryLoopCombo(scope.db, {
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
       nodeId,
       userId: scope.userId,
       outputListNodeId,
-      combination: { label, values }
+      label,
+      runId: typeof runId === 'string' && runId ? runId : null
     });
-
-    return out;
   },
 
   /**
@@ -921,15 +837,7 @@ export const actions: Actions = {
       return fail(400, { error: plan.reason });
     }
 
-    const nodes = await Promise.all(nodeIds.map((id) => findNode(scope.db, { orgId: scope.orgId, nodeId: id })));
-    const stepsCost = nodes
-      .filter((n): n is CanvasNodeRecord => n !== null)
-      .map((n) => ({
-        medium: (n.type === 'text' || n.type === 'video' ? n.type : 'image') as 'text' | 'image' | 'video',
-        model: typeof n.data.model === 'string' ? n.data.model : null
-      }));
-
-    return { steps: plan.steps, estimatedCredits: estimateWorkflowCredits(stepsCost) };
+    return { steps: plan.steps, estimatedCredits: await workflowCredits(scope.db, { orgId: scope.orgId, nodeIds }) };
   },
 
   /**
@@ -963,15 +871,7 @@ export const actions: Actions = {
       return fail(400, { error: out.error });
     }
 
-    const nodes = await Promise.all(nodeIds.map((id) => findNode(scope.db, { orgId: scope.orgId, nodeId: id })));
-    const stepsCost = nodes
-      .filter((n): n is CanvasNodeRecord => n !== null)
-      .map((n) => ({
-        medium: (n.type === 'text' || n.type === 'video' ? n.type : 'image') as 'text' | 'image' | 'video',
-        model: typeof n.data.model === 'string' ? n.data.model : null
-      }));
-
-    return { workflowId: out.workflowId, steps: out.steps, estimatedCredits: estimateWorkflowCredits(stepsCost) };
+    return { workflowId: out.workflowId, steps: out.steps, estimatedCredits: await workflowCredits(scope.db, { orgId: scope.orgId, nodeIds }) };
   },
 
   graph_plan: async ({ request, params, locals }) => {
@@ -1037,39 +937,10 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid request' });
     }
 
-    const node = await findNode(scope.db, { orgId: scope.orgId, nodeId });
-    if (!node || (node.type !== 'products' && node.type !== 'social_account_feed')) {
+    const written = await syncNode(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, nodeId, version, actor: userActor(scope) });
+    if (written.outcome === 'not_syncable') {
       return fail(404, { error: 'node not found' });
     }
-
-    const running = await writeNodeData(scope.db, {
-      orgId: scope.orgId,
-      nodeId,
-      expectedVersion: version,
-      data: { ...node.data, sync_status: 'running', sync_error: null },
-      actor: userActor(scope)
-    });
-    if (running.outcome === 'conflict') {
-      return fail(409, { conflict: true });
-    }
-
-    const outcome =
-      node.type === 'products'
-        ? await syncProducts(scope.db, scope.orgId, scope.canvas.projectId, node)
-        : await syncSocialFeed(scope.db, scope.orgId, scope.canvas.projectId, node);
-
-    const patch = outcome.ok
-      ? { sync_status: 'done', sync_error: null, synced_count: outcome.synced, synced_at: new Date().toISOString(), ...outcome.extra }
-      : { sync_status: 'failed', sync_error: outcome.error };
-
-    const written = await patchNodeData(scope.db, {
-      orgId: scope.orgId,
-      nodeId,
-      patch,
-      check: DataCheck.None,
-      actor: userActor(scope)
-    });
-
     return (PATCH_ANSWERS[written.outcome] as (w: PatchWrite) => unknown)(written);
   },
 
@@ -1087,33 +958,8 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid request' });
     }
 
-    const node = await findNode(scope.db, { orgId: scope.orgId, nodeId });
-    if (!node || node.type !== 'text' && node.type !== 'image' && node.type !== 'video') {
-      return fail(404, { error: 'node not found' });
-    }
-
-    const run = (await runsOf(scope.db, { orgId: scope.orgId, nodeId })).find((r) => r.id === runId);
-    if (!run?.outputAssetId) {
-      return fail(404, { error: 'generation not found' });
-    }
-
-    const shown = await writeNodeData(scope.db, {
-      orgId: scope.orgId,
-      nodeId,
-      expectedVersion: node.version,
-      data: {
-        ...node.data,
-        refId: run.outputAssetId,
-        runId: run.id,
-        running: false,
-        error: null
-      },
-      actor: userActor(scope)
-    });
-    if (shown.outcome === 'conflict') {
-      return fail(409, { conflict: true });
-    }
-    return { node: shown.node };
+    const shown = await showRun(scope.db, { orgId: scope.orgId, nodeId, runId, actor: userActor(scope) });
+    return SHOW_RUN_ANSWERS[shown.outcome](shown as never);
   },
 
   create: async ({ request, params, locals }) => {
@@ -1206,19 +1052,9 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid resize' });
     }
 
-    const existing = (await listNodes(scope.db, scope)).find((node) => node.id === nodeId);
-    if (!existing) {
+    if (!(await resizeOnCanvas(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeId, width, height }))) {
       return fail(404, { error: 'node not found' });
     }
-
-    const min = nodeSize(existing.type, existing.data);
-    await resizeNode(scope.db, {
-      orgId: scope.orgId,
-      nodeId,
-      width: Math.max(min.w, width),
-      height: Math.max(min.h, height)
-    });
-
     return { resized: true };
   },
 
@@ -1362,32 +1198,8 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid document' });
     }
 
-    const node = (await listNodes(scope.db, scope)).find((row) => row.id === nodeId);
-    if (!node || node.type !== 'doc') {
-      return fail(404, { error: 'document not found' });
-    }
-
-    const data = docData({
-      id: node.id,
-      content: typeof node.data.content === 'string' ? node.data.content : '',
-      public: on
-    });
-
-    if (!on) {
-      await clearDocShare(scope.db, { orgId: scope.orgId, nodeId, data });
-      return { public: false };
-    }
-
-    const { token, token_hash } = await mintShareToken();
-    await setDocShare(scope.db, {
-      orgId: scope.orgId,
-      nodeId,
-      data,
-      tokenHash: token_hash,
-      expiresAt: null
-    });
-
-    return { public: true, path: `/d/${token}` };
+    const shared = await shareDoc(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeId, on });
+    return shared ?? fail(404, { error: 'document not found' });
   },
 
   share_canvas: async ({ request, params, locals }) => {
@@ -1533,21 +1345,9 @@ export const actions: Actions = {
       return fail(400, { error: 'nothing to delete' });
     }
 
-    const canvasNodes = new Set((await listNodes(scope.db, scope)).map((node) => node.id));
-    if (nodeIds.some((id) => !canvasNodes.has(id))) {
+    if (!(await removeNodes(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, nodeIds, actor: userActor(scope) }))) {
       return fail(404, { error: 'node not found' });
     }
-    const connectionIds = (await listConnections(scope.db, scope))
-      .filter((edge) => nodeIds.includes(edge.sourceNodeId) || nodeIds.includes(edge.targetNodeId))
-      .map((edge) => edge.id);
-
-    for (const connectionId of connectionIds) {
-      await deleteConnection(scope.db, { orgId: scope.orgId, connectionId, actor: userActor(scope) });
-    }
-    for (const nodeId of nodeIds) {
-      await deleteNode(scope.db, { orgId: scope.orgId, nodeId, actor: userActor(scope) });
-    }
-
     return { removed: true };
   },
 
@@ -1664,8 +1464,9 @@ export const actions: Actions = {
     return { ended: await endOnboarding(scope.db, scope.userId, to) };
   },
 
-  frame_template: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
+  frame_template: async ({ request, params, locals, setHeaders }) => {
+    const phases = serverTiming();
+    const scope = await phases.time('scope', scopeFor(locals, params.canvasId));
     const fd = await request.formData();
 
     const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
@@ -1675,7 +1476,7 @@ export const actions: Actions = {
     }
 
     const actor = userActor(scope);
-    const started = await startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, {
+    const started = await phases.time('start', startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, {
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
@@ -1684,12 +1485,14 @@ export const actions: Actions = {
       format,
       at,
       actor
-    });
+    }));
     if (started.outcome !== FromTemplate.Started) {
       return fail(400, { error: started.outcome });
     }
 
-    return { node: await findNode(scope.db, { orgId: scope.orgId, nodeId: started.start.nodeId }) };
+    const node = await phases.time('read', findNode(scope.db, { orgId: scope.orgId, nodeId: started.start.nodeId }));
+    setHeaders({ 'server-timing': phases.header() });
+    return { node };
   },
 
   template: async ({ request, params, locals }) => {

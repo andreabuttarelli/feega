@@ -67,7 +67,7 @@ export async function startFromTemplate(db: Db, deps: FromTemplateDeps, input: I
     return { outcome: FromTemplate.Invalid, error: placed.error };
   }
 
-  const start = await startMotion(db, deps, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId ?? null, userId: input.userId, name: entry.template.name, format: input.format, at: input.at, actor, pick: input.pick });
+  const start = await startMotion(db, deps, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId ?? null, userId: input.userId, name: entry.template.name, format: input.format, at: input.at, picture: placed.doc, actor, pick: input.pick });
   if (!start) {
     return { outcome: FromTemplate.NoCanvas };
   }

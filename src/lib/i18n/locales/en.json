@@ -482,14 +482,12 @@
         "read": "Read",
         "write": "Write",
         "allBrands": "All my brands",
-        "brandScope": "Brand scope",
         "keyRevoked": "API key revoked.",
         "copyKey": "Copy key",
         "copied": "Copied!",
         "warning": "This is the only time the full key will be shown. Store it securely.",
         "noKeys": "No API keys yet. Create one to get started with the API."
       },
-      "back": "← Back",
       "video": {
         "title": "Images & video",
         "modelDefault": "Platform default",

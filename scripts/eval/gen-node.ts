@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env } from '../_shims/env-private';
+import { refuseAdminWrites, targetOf } from '../e2e/target';
 import { runGenNode, reconcileVideoNodeRuns } from '$lib/server/canvas/generate';
 import { writeNodeData } from '$lib/server/repos/canvas';
 import { grantWelcomeCredits } from '$lib/server/tenancy/free-org-limit';
@@ -29,6 +30,7 @@ const TEXT_EVAL_MODEL = env.LLM_DEFAULT_MODEL?.trim() || 'z-ai/glm-5.3-flash';
  * disegno (`kind: 'queued'`), quindi la prova video si ferma a "sottomesso e tracciato", e lo dice.
  */
 const url = env.PUBLIC_SUPABASE_URL!;
+refuseAdminWrites(targetOf(url));
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
 const admin = createClient(url, env.SUPABASE_SERVICE_ROLE_KEY!, options);
 const BUCKET = 'brand-knowledge';

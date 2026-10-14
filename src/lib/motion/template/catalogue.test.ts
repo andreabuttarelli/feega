@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { FORMATS, MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { BUILTIN_TEMPLATES, builtinTemplate } from './builtins';
 import { PROMPT_TEMPLATE_ID } from './prompt-input/template';
-import { ComponentKind, POSTER_FORMATS, catalogue, componentKind, matching, posterShelf, previewOf, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
+import { ComponentKind, FORMATS_OF_MODE, POSTER_FORMATS, catalogue, libraryFormat, componentKind, matching, posterShelf, previewOf, starterDoc, starterFormatOf, STARTER_FORMATS } from './catalogue';
 import { DocMode } from '$lib/motion/still';
 import PREVIEWED from './previews.json';
 
@@ -120,5 +120,23 @@ describe('the library previews in the format of the video it inserts into', () =
   it('keeps a starter format and falls back to landscape for any other', () => {
     expect(starterFormatOf(newMotionDoc(MotionFormat.Vertical))).toBe(MotionFormat.Vertical);
     expect(starterFormatOf({ width: 1080, height: 1350 })).toBe(MotionFormat.Landscape);
+  });
+
+  it('a poster is listed in its own 4:5, not collapsed to landscape', () => {
+    const poster = catalogue(BUILTIN_TEMPLATES).find((i) => i.id === 'builtin:poster-type-grid')!;
+
+    expect(poster.format).toBe(MotionFormat.Portrait);
+  });
+
+  it('a still offers the print formats, a video the screen ones', () => {
+    expect(FORMATS_OF_MODE[DocMode.Still]).toEqual(POSTER_FORMATS);
+    expect(FORMATS_OF_MODE[DocMode.Video]).toEqual(STARTER_FORMATS);
+  });
+
+  it('opens a poster in its own format when the target asks for one stills do not have', () => {
+    const poster = catalogue(BUILTIN_TEMPLATES).find((i) => i.id === 'builtin:poster-type-grid')!;
+
+    expect(libraryFormat(poster, MotionFormat.Landscape)).toBe(MotionFormat.Portrait);
+    expect(libraryFormat(poster, MotionFormat.Vertical)).toBe(MotionFormat.Vertical);
   });
 });
