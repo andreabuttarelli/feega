@@ -1,14 +1,47 @@
-let offered = $state.raw<{ nodeId: string; el: HTMLElement } | null>(null);
+import { Paint } from './inline-motion';
+
+type Offer = { nodeId: string; el: HTMLElement };
+
+let offered = $state.raw<Offer | null>(null);
+let paint = $state(Paint.Pending);
+
+const SWAP_GRACE_MS = 300;
+
+const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+async function reveal(offer: Offer) {
+  await nextFrame();
+  await nextFrame();
+  if (offered !== offer || paint !== Paint.Pending) {
+    return;
+  }
+  paint = Paint.Shown;
+  setTimeout(() => {
+    if (offered === offer) {
+      paint = Paint.Swapped;
+    }
+  }, SWAP_GRACE_MS);
+}
 
 export const inlineStage = {
   offer(nodeId: string, el: HTMLElement) {
     const mine = { nodeId, el };
     offered = mine;
+    paint = Paint.Pending;
     return () => {
       if (offered === mine) {
         offered = null;
+        paint = Paint.Pending;
       }
     };
+  },
+  ready(nodeId: string) {
+    if (offered?.nodeId === nodeId) {
+      void reveal(offered);
+    }
+  },
+  paintOf(nodeId: string): Paint {
+    return offered?.nodeId === nodeId ? paint : Paint.Pending;
   },
   get editing() {
     return offered !== null;

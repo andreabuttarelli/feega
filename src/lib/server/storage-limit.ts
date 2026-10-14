@@ -37,16 +37,37 @@ export async function probeUploadLimit(target: StorageTarget, fetcher: Fetcher =
   return fits;
 }
 
-let cached: { at: number; limit: Promise<number> } | null = null;
+type Cached = { at: number; limit: Promise<number>; value: number | null };
 
-export function uploadLimit(target: StorageTarget): Promise<number> {
-  if (cached && Date.now() - cached.at < CACHE_MS) {
-    return cached.limit;
+export function uploadLimits(fetcher: Fetcher = fetch) {
+  let cached: Cached | null = null;
+
+  function limit(target: StorageTarget): Promise<number> {
+    if (cached && Date.now() - cached.at < CACHE_MS) {
+      return cached.limit;
+    }
+    const entry: Cached = { at: Date.now(), limit: Promise.resolve(0), value: null };
+    entry.limit = probeUploadLimit(target, fetcher).then(
+      (bytes) => (entry.value = bytes),
+      (e) => {
+        cached = null;
+        throw e;
+      }
+    );
+    cached = entry;
+    return entry.limit;
   }
-  const limit = probeUploadLimit(target).catch((e) => {
-    cached = null;
-    throw e;
-  });
-  cached = { at: Date.now(), limit };
-  return limit;
+
+  function known(target: StorageTarget): number | null {
+    limit(target).catch(() => null);
+    return cached?.value ?? null;
+  }
+
+  return { limit, known };
 }
+
+const shared = uploadLimits();
+
+export const uploadLimit = (target: StorageTarget) => shared.limit(target);
+
+export const knownUploadLimit = (target: StorageTarget) => shared.known(target);

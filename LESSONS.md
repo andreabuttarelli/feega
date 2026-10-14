@@ -96,6 +96,14 @@ Vite osserva anche `changelog/*.md`: scriverne uno mentre l'harness naviga l'edi
 `page reload <file>` all'ora del fallimento. Mossa: niente edit nel worktree servito finché il
 giro non è finito, o un dev server da un checkout separato.
 
+### Un editor lento solo in produzione: `VERCEL=1` accende rami che in locale non esistono
+La chat del motion editor restava sullo scheletro 8–15 s in produzione e partiva in 0,4 s in
+locale. In produzione `farmAccess` vede `VERCEL=1`, e la sessione dell'editor aspettava la sonda
+del limite di upload (ricerca binaria: ~40 POST in serie a `storage/v1/upload/resumable`, per
+istanza fredda). Segnale: negli `edge_logs` di Supabase una raffica di `POST 413 .../upload/resumable`
+tra la sessione e la prima chiamata della chat. Mossa: rifare il giro e2e col dev server lanciato
+con `VERCEL=1`; un dato accessorio non blocca mai il caricamento (`knownUploadLimit`).
+
 ### Un render server riesce e il salvataggio fallisce con `EntityTooLarge`
 Storage del progetto accetta al massimo 50 MB per file (limite globale, non del bucket): un
 ProRes, un 4K o un PNG lungo esce dal farm e muore all'upload con `413`. La dimensione dipende
@@ -2885,3 +2893,6 @@ Signal: the open-frame budget swings by 2 s between runs with no code change. Mo
 
 ### A video on iPhone shows a black, zoomed-in corner of the frame
 Signal: on iOS Safari the editor player is black with a few specks while the node poster is fine; desktop WebKit (Playwright `iPhone 15`) renders the same doc correctly. Cause: CSS `zoom` on the player iframe (sharpness fix for Chromium) shrinks the box but iOS lays the frame's document out unzoomed, so only the top-left ~1/6 of the 1920 px composition shows. Move: scale the player iframe by `zoom` only where it is proven (`crispFor` in `crisp-scale.ts`, Chromium); WebKit keeps the player's transform. Emulated WebKit is not iOS: verify iframe/zoom fixes on a device.
+
+### Every motion e2e fails at once after a run was killed
+Signal: a batch of `@real` motion specs fails together (`motion-editor` never appears), each passes alone. Cause: a killed playwright run left `reuseExistingServer` on a dying dev server. Move: rerun on a clean server before judging a spec.

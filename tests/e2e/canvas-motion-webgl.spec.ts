@@ -65,6 +65,9 @@ test.describe('a three.js component in the motion editor @real', () => {
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await page.locator(`.svelte-flow__node[data-id="${node.id}"]`).getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
+    if (test.info().project.name === 'webkit-iphone') {
+      await page.locator(`.svelte-flow__node[data-id="${node.id}"]`).getByTestId('open-motion-editor').dispatchEvent('click');
+    }
     await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
     await expectDrawn(page, 'inline editor');
 

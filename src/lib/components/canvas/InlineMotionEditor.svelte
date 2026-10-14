@@ -1,41 +1,92 @@
+<script lang="ts" module>
+  import { earlyFetch } from '$lib/canvas/early-fetch';
+  import type { MotionEditorData } from '$lib/server/motion/editor-session';
+
+  const sessions = earlyFetch<MotionEditorData | null>({
+    load: (url) => fetch(url).then((res) => (res.ok ? (res.json() as Promise<MotionEditorData>) : null)),
+    now: () => performance.now()
+  });
+
+  export const sessionUrl = (editorPath: string) => `${editorPath}/session`;
+
+  export const prefetchSession = (editorPath: string) => sessions.start(sessionUrl(editorPath));
+
+  let lastPress: number | null = null;
+
+  if (typeof window !== 'undefined') {
+    addEventListener('pointerdown', (e) => (lastPress = e.timeStamp), { capture: true, passive: true });
+  }
+</script>
+
 <script lang="ts">
+  import { onMount, untrack } from 'svelte';
   import MotionEditorShell from '$lib/components/motion/MotionEditorShell.svelte';
   import { Mount } from '$lib/motion/editor-mount';
   import { motionEditorPath } from '$lib/canvas/motion-node';
-  import type { MotionEditorData } from '$lib/server/motion/editor-session';
   import { DOCK_ATTR, freeArea, type Dock, type Insets } from '$lib/canvas/free-area';
   import { warmPlayer } from '$lib/motion/hyperframes/warm-player';
+  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { Paint } from '$lib/canvas/inline-motion';
+  import { OpenMark, openTiming, tapTime } from '$lib/canvas/open-timing';
+  import { engineOf } from '$lib/motion/engine';
+  import { viewportOf } from '$lib/motion/editor-layout';
+  import { track } from '$lib/analytics';
 
   let { projectId, canvasId, nodeId, onclose, onframe }: { projectId: string; canvasId: string; nodeId: string; onclose: () => void; onframe: (free: Insets) => void } = $props();
 
   const SETTLE_MS = 150;
+  const OPEN_EVENT = 'frame_open_timing';
 
   const editorPath = $derived(motionEditorPath({ projectId, canvasId, nodeId }));
   let session = $state.raw<MotionEditorData | null>(null);
   let failed = $state(false);
+
+  const timing = openTiming({
+    tap: tapTime(lastPress, performance.now()),
+    now: () => performance.now(),
+    report: (phases) => track(OPEN_EVENT, { ...phases, engine: engineOf(navigator.userAgent), viewport: viewportOf(innerWidth), cores: navigator.hardwareConcurrency ?? null })
+  });
+
+  onMount(() => () => timing.end());
 
   $effect(() => {
     void warmPlayer(location.origin);
   });
 
   $effect(() => {
-    const url = `${editorPath}/session`;
+    const url = sessionUrl(editorPath);
     let stale = false;
     session = null;
     failed = false;
-    void fetch(url)
-      .then((res) => (res.ok ? (res.json() as Promise<MotionEditorData>) : null))
-      .then((next) => {
-        if (stale) {
-          return;
-        }
-        session = next;
-        failed = next === null;
-      });
+    void sessions.take(url).then((next) => {
+      if (stale) {
+        return;
+      }
+      timing.mark(OpenMark.Session);
+      session = next;
+      failed = next === null;
+    });
     return () => {
       stale = true;
     };
   });
+
+  $effect(() => {
+    if (session) {
+      timing.mark(OpenMark.Chrome);
+    }
+  });
+
+  $effect(() => {
+    if (inlineStage.paintOf(nodeId) !== Paint.Pending) {
+      untrack(() => timing.mark(OpenMark.Shown));
+    }
+  });
+
+  function stageReady() {
+    timing.mark(OpenMark.Ready);
+    inlineStage.ready(nodeId);
+  }
 
   $effect(() => {
     if (!session) {
@@ -57,7 +108,7 @@
 </script>
 
 {#if session}
-  <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} />
+  <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} />
 {:else if failed}
   <p class="inline-status" role="status">This video could not be opened here. <a href={editorPath}>Open the editor</a></p>
 {:else}
