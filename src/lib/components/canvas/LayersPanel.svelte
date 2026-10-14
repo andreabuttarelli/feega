@@ -5,6 +5,9 @@
   import LockOpen from '@lucide/svelte/icons/lock-open';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import Square from '@lucide/svelte/icons/square';
+  import ImageIcon from '@lucide/svelte/icons/image';
+  import TypeIcon from '@lucide/svelte/icons/type';
+  import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { untrack } from 'svelte';
   import { PART_SEP } from '$lib/motion/poster-parts';
@@ -57,6 +60,7 @@
   let renaming = $state<string | null>(null);
   let dragged = $state<string | null>(null);
 
+  const ROW_ICON: Record<string, typeof Square> = { motion: Clapperboard, image: ImageIcon, text: TypeIcon, arrow: ArrowRight };
   const isPicked = (row: LayerRow) => rowPicked(row, selection);
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
 
@@ -135,6 +139,7 @@
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div class="layers" role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" onkeydown={onKey}>
   {#each rows as row (row.nodeId + row.id)}
+    {@const RowIcon = ROW_ICON[row.type] ?? Square}
     <div
       class="row"
       class:picked={isPicked(row)}
@@ -157,7 +162,7 @@
       ondragover={(e) => row.kind === LayerKind.Track && e.preventDefault()}
       ondrop={() => drop(row)}
     >
-      <span class="icon">{#if row.type === 'motion'}<Clapperboard size={ICON} />{:else}<Square size={ICON} />{/if}</span>
+      <span class="icon"><RowIcon size={ICON} /></span>
       {#if renaming === row.id}
         <!-- svelte-ignore a11y_autofocus -->
         <input class="name-input" value={row.label} autofocus aria-label="Track name" onblur={(e) => rename(row, e.currentTarget.value)} onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />

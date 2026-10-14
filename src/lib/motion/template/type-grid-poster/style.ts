@@ -88,10 +88,18 @@ export const TYPE_GRID_CSS = String.raw`
 }
 
 .tg-arrow {
+  display: block;
   flex: none;
   width: 1.05em;
   height: 0.62em;
   margin-left: auto;
+  color: var(--tg-arrow);
+}
+
+.tg-arrow svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .tg-foot {

@@ -1,3 +1,4 @@
+import { PartKind, parsePart, partKind } from './poster-parts';
 import { withModifierParam } from './shape/model';
 import { modifierOfKey, shapeFieldShown, type Modifier, type ShapeKind } from './shape/schema';
 import { z } from 'zod';
@@ -171,6 +172,25 @@ export function partFieldKeys(doc: MotionDoc, clip: MotionClip, field: string): 
     .flatMap((g) => g.fields.map((f) => f.key))
     .filter((k) => !claimed.has(k));
   return [field, ...ownFields(keys, poster, field), ...shared];
+}
+
+enum PartField {
+  Shown = 'shown',
+  Own = 'own'
+}
+
+const PART_FIELD: Record<PartKind, PartField> = {
+  [PartKind.Text]: PartField.Shown,
+  [PartKind.Other]: PartField.Shown,
+  [PartKind.Line]: PartField.Own,
+  [PartKind.Photo]: PartField.Own,
+  [PartKind.Arrow]: PartField.Own
+};
+
+export function partFocus(doc: MotionDoc, clip: MotionClip, part: string): string[] {
+  const { field } = parsePart(part);
+  const keys = [...new Set(partFieldKeys(doc, clip, field))];
+  return PART_FIELD[partKind(doc, clip, part)] === PartField.Shown ? keys : keys.filter((k) => k !== field);
 }
 
 const SECONDS_PRECISION = 100;

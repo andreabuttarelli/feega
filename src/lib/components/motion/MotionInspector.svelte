@@ -29,6 +29,9 @@
   import { KeyMark } from '$lib/motion/timeline-layers';
   import type { LayoutStore } from '$lib/motion/editor-layout';
   import CodeEditor from './CodeEditor.svelte';
+  import MarkedLines from './MarkedLines.svelte';
+  import { MarkedField, markedField } from '$lib/motion/poster-lines';
+  import { componentLabel } from '$lib/motion/poster-parts';
   import FontPicker from './FontPicker.svelte';
   import LutPicker from './LutPicker.svelte';
   import TextPathSection from './TextPathSection.svelte';
@@ -72,6 +75,7 @@
     onuploadfont,
     onopen,
     focus = null,
+    lead,
     mode = EditMode.Motion
   }: {
     doc: MotionDoc;
@@ -87,6 +91,7 @@
     onuploadfont?: (file: File) => Promise<string | null>;
     onopen?: (comp: string) => void;
     focus?: readonly string[] | null;
+    lead?: Snippet;
     mode?: EditMode;
   } = $props();
 
@@ -371,9 +376,11 @@
 <div class="inspector" data-testid="motion-inspector" style={`--hue: ${CLIP_FAMILIES[family].hue};`}>
   <header>
     <span class="swatch-bar" aria-hidden="true"></span>
-    <span class="kind">{customName ?? spec.label}</span>
+    <span class="kind">{customName ? componentLabel(customName) : spec.label}</span>
     <span class="id">{clip.id}</span>
   </header>
+
+  {@render lead?.()}
 
   {#if warning}<p class="mode-warning" role="status" data-testid="design-animated-warning">{warning}</p>{/if}
 
@@ -472,6 +479,9 @@
   {#if field.control === Control.Range}
     <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
+  {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
+  {:else if markedField(customName ?? '', field.key) === MarkedField.Lines}
+    <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
   {:else if field.control === Control.Textarea}
     <div class="stack">
       <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>

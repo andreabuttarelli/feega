@@ -133,9 +133,10 @@
   import { EDIT_MODE_KEY, EditMode, nextMode, readMode } from '$lib/motion/edit-mode';
   import DrawOverlay from './DrawOverlay.svelte';
   import DrawTools from './DrawTools.svelte';
-  import { PART_SEP, parsePart } from '$lib/motion/poster-parts';
+  import { PART_SEP } from '$lib/motion/poster-parts';
   import { PropertiesView, propertiesFor } from '$lib/motion/properties-view';
-  import { partFieldKeys } from '$lib/motion/inspector';
+  import { partFocus } from '$lib/motion/inspector';
+  import PosterPartPanel from './PosterPartPanel.svelte';
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 
@@ -273,7 +274,10 @@
             selection = [clipId];
             queueMicrotask(() => (selectedPart = part));
           },
-          select: (ids) => (selection = ids),
+          select: (ids) => {
+            selection = ids;
+            selectedPart = null;
+          },
           edit: (result, summary) => apply(result, summary)
         })
       : undefined
@@ -1647,7 +1651,8 @@
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
         <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
-        <MotionInspector {doc} mode={editMode} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart && selected ? partFieldKeys(doc, selected, parsePart(selectedPart).field) : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} onchange={edit} />{/if}{/snippet}
+        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart ? partFocus(doc, selected, selectedPart) : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
