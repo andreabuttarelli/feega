@@ -1,6 +1,6 @@
 # Media generation goes through one provider port
 
-ADR 0011. Wiro's submit/poll/deposit loop (`wiro-run.ts`) becomes the provider-neutral
+ADR 0012. Wiro's submit/poll/deposit loop (`wiro-run.ts`) becomes the provider-neutral
 `canvas/task-run.ts` behind the `TaskProvider` port (`canvas/task-provider.ts`). A task model's id
 prefix (`wiro/`, `kie/`, `higgsfield/`) picks the adapter; the job id carries the same prefix
 (`wiro:…`), so one reconciler (`reconcileTaskNodeRuns`) serves every async provider.

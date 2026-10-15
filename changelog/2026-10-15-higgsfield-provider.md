@@ -1,6 +1,6 @@
 # Higgsfield joins as a primary provider
 
-Third adapter behind `TaskProvider` (ADR 0011). `higgsfield.ts` submits to the model path with
+Third adapter behind `TaskProvider` (ADR 0012). `higgsfield.ts` submits to the model path with
 `Authorization: Key <id>:<secret>` and an `Idempotency-Key` equal to the `node_runs` id (the docs'
 fix for ambiguous timeouts), polls `/requests/{id}/status`, and cancels queued requests with
 `/requests/{id}/cancel` — the first adapter that implements `cancel`.

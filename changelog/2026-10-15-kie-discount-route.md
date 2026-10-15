@@ -1,6 +1,6 @@
 # kie.ai returns as a discount route, with fallback
 
-kie.ai was removed on 2026-09-20 for failures (ADR 0011 lists them). It returns because it resells
+kie.ai was removed on 2026-09-20 for failures (ADR 0012 lists them). It returns because it resells
 Nano Banana 2 and Pro 33–40% cheaper than our primary route, and only as a second-choice route:
 the picker never lists a kie model, a kie row in `ai_models` carries `wire_spec.discountFor`.
 
