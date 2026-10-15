@@ -23,6 +23,7 @@ feega (**[LEGAL ENTITY]**, VAT no. **[VAT]**, **[ADDRESS]**) uses the providers 
 | OpenRouter, and the model providers it routes each request to | text, chat, image and video generation; the second-stage moderation review | prompts, attachments, brand context, generated outputs | US / other, per model | SCCs [to confirm per provider] |
 | Wiro | image and video generation for age-restricted features; 3D models from an image (every project) | prompts, reference media, generated outputs | [LOCATION] | [SCCs — to confirm] |
 | kie.ai | image generation for models it resells at a discount, tried before the primary provider | prompts, reference media, generated outputs | [LOCATION] | [SCCs — to confirm] |
+| Higgsfield | image and video generation on Higgsfield models | prompts, reference media, generated outputs | [LOCATION] | [SCCs — to confirm] |
 | ElevenLabs | voice-over, music and sound generation | script text, chosen voice, generated audio | US / EU | DPF / SCCs |
 | TypeSafe (Jev classifier) | first-stage prompt moderation | prompt text, reference descriptions | [LOCATION] | [SCCs — to confirm] |
 
