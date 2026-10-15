@@ -3011,3 +3011,9 @@ Signal: a clip with a track matte (or a Figma mask) is invisible everywhere; its
 
 ### ⌘Z of a delete answers "node_deleted_by_peer"
 Signal: undoing a canvas delete is refused with `node_deleted_by_peer` on the real stack; `undo.test.ts` stays green. Cause: the precondition looked the node up with `findNode`, which filters `deleted_at is null`, so a soft-deleted row is never found; `fakeDb` without `{ filter: true }` ignores that filter. Move: a test about soft deletes seeds `deleted_at` and uses `fakeDb(rows, { filter: true })`; a precondition on a deleted row reads it with `nodeRowExists`.
+
+### Playwright waits 120 s for a dev server that is already up
+Signal: `Timed out waiting 120000ms from config.webServer` while `curl http://localhost:4173` answers and `curl http://127.0.0.1:4173` gets nothing. Cause: `localhost` resolves to `::1` only, vite listens on IPv6, Playwright probes IPv4. Move: start vite with `--host 127.0.0.1` and run Playwright with `E2E_BASE_URL=http://127.0.0.1:4173`.
+
+### "504 (Outdated Optimize Dep)" and a bare 500 page in a worktree
+Signal: `@real` specs fail on their first locator; the page shows a bare `500`; the console fills with `504 (Outdated Optimize Dep)`. Cause: worktrees symlink the main `node_modules`, so they share `node_modules/.vite`; another worktree's server re-optimized the deps under yours. Move: give your server its own cache: an untracked `vite.agent.config.ts` that spreads `vite.config.ts` and sets `cacheDir` to a scratch folder, started with `--config vite.agent.config.ts`.
