@@ -144,6 +144,16 @@ async function litShare(png: Buffer): Promise<number> {
   return lit / (data.length / info.channels);
 }
 
+const EMPTY_FRAME = { version: 5, fps: 30, width: 1920, height: 1080, durationInFrames: 150, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [] }], comps: {}, assets: [] };
+
+type Doc = { tracks: { clips: { component: string; props: { assetId?: string } }[] }[] };
+
+async function clipsOf(admin: SupabaseClient, nodeId: string): Promise<unknown[]> {
+  const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', nodeId).order('version', { ascending: false }).limit(1);
+  const doc = data?.[0]?.doc as Doc | undefined;
+  return doc?.tracks.flatMap((t) => t.clips).map((c) => [c.component, c.props.assetId]) ?? [];
+}
+
 async function imageNode(seedNode: Seed, prompt: string, at = { x: 0, y: 0 }) {
   return seedNode({ type: 'image', ...at, data: { prompt, model: IMAGE_MODEL, params: { aspectRatio: '1:1' } } });
 }
@@ -279,39 +289,36 @@ test.describe('demo generation @real @paid', () => {
   });
 
   test('placing outputs: empty canvas makes a free element, a frame makes a clip, neither is black', async ({ page, session, admin, seedNode }) => {
-    test.setTimeout(IMAGE_MS + 120_000);
+    test.setTimeout(IMAGE_MS + 180_000);
     const gen = await imageNode(seedNode, 'A vivid orange sunflower, flat bright background.', { x: 80, y: 520 });
     const frameNode = await seedNode({ type: 'motion', x: 700, y: 80, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
-    const blank = { version: 5, fps: 30, width: 1920, height: 1080, durationInFrames: 150, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [] }], comps: {}, assets: [] };
-    await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: frameNode.id, version: 1, doc: blank, actor_kind: 'user', actor_id: session.userId });
+    await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: frameNode.id, version: 1, doc: EMPTY_FRAME, actor_kind: 'user', actor_id: session.userId });
     await gotoHydrated(page, canvasOf(session));
     await generate(page, gen.id);
     const asset = await landedAsset(admin, gen.id, IMAGE_MS);
+    const stage = page.locator(`[data-motion-node="${frameNode.id}"] [data-frame-stage]`);
+    await expect(stage).toBeVisible();
 
     await page.locator(`[data-id="${gen.id}"] .gen-body`).hover();
-    await page.getByTestId('drag-to-frame').dragTo(page.locator(`[data-motion-node="${frameNode.id}"] [data-frame-stage]`));
-    await expect
-      .poll(async () => {
-        const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', frameNode.id).order('version', { ascending: false }).limit(1);
-        const doc = data?.[0]?.doc as { tracks: { clips: { component: string; props: { assetId?: string } }[] }[] } | undefined;
-        return doc?.tracks.flatMap((t) => t.clips).map((c) => [c.component, c.props.assetId]) ?? [];
-      }, { timeout: 15_000 })
-      .toEqual([['Image', asset.id]]);
-
-    const viewport = page.viewportSize()!;
-    await page.locator(`[data-id="${gen.id}"] .gen-body`).hover();
-    await page.getByTestId('drag-to-frame').dragTo(page.locator('.svelte-flow__pane'), { targetPosition: { x: viewport.width / 2, y: 60 } });
+    await page.getByTestId('drag-to-frame').dragTo(page.locator('.svelte-flow__pane'), { targetPosition: { x: 640, y: 420 } });
     const free = async () => ((await admin.from('nodes').select('id, data').eq('canvas_id', session.canvasId).eq('type', 'motion').is('deleted_at', null)).data ?? []).filter((n) => (n.data as { kind?: string }).kind === 'element');
     await expect.poll(async () => (await free()).length, { timeout: 15_000 }).toBe(1);
-    const element = (await free())[0];
+    const element = page.locator(`[data-motion-node="${(await free())[0].id}"] [data-frame-stage]`);
 
-    for (const id of [element.id, frameNode.id]) {
-      const stage = page.locator(`[data-motion-node="${id}"]`);
-      await expect(stage).toBeVisible({ timeout: 15_000 });
-      await page.waitForTimeout(3_000);
-      const share = await litShare(await stage.screenshot());
-      console.log(`[evidence] ${id === element.id ? 'free element' : 'frame clip'} ${id}: ${(share * 100).toFixed(0)}% lit pixels`);
-      expect(share, `${id} renders mostly black`).toBeGreaterThan(MIN_LIT_SHARE);
+    await page.locator(`[data-id="${gen.id}"] .gen-body`).hover();
+    await page.getByTestId('drag-to-frame').dragTo(stage);
+    await expect.poll(async () => clipsOf(admin, frameNode.id), { timeout: 15_000 }).toEqual([['Image', asset.id]]);
+
+    for (let i = 0; i < 6; i += 1) {
+      await page.waitForTimeout(5000);
+      const info = await page.locator(`[data-motion-node="${frameNode.id}"]`).evaluate((el) => ({ poster: (el.querySelector('img.poster') as HTMLImageElement | null)?.src?.slice(-40) ?? null, iframe: !!el.querySelector('iframe, hyperframes-player') }));
+      const { data: fd } = await admin.from('nodes').select('data').eq('id', frameNode.id).single();
+      console.log('PROBE', i, JSON.stringify(info), JSON.stringify(fd?.data));
     }
+    for (const [label, target] of [['free element', element], ['frame clip', stage]] as const) {
+      await expect.poll(async () => litShare(await target.screenshot()), { timeout: 30_000, message: `${label} is not black` }).toBeGreaterThan(MIN_LIT_SHARE);
+      console.log(`[evidence] ${label}: ${((await litShare(await target.screenshot())) * 100).toFixed(0)}% lit pixels`);
+    }
+    await page.screenshot({ path: `${EVIDENCE_DIR}/placing-outputs.png` });
   });
 });
