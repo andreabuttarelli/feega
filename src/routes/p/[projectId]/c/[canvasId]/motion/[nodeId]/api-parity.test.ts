@@ -439,3 +439,34 @@ describe('POST /api/v1/motion/[nodeId]/ops guards like the page', () => {
     expect(endpoint.data.error).toBe('unknown_op');
   });
 });
+
+describe('upload_slot hands the browser a signed upload the register ops accept', () => {
+  it('an export slot lands in the export folder record_export reads', async () => {
+    const slot = await viaEndpoint('upload_slot', { purpose: 'export' });
+    const recorded = await viaEndpoint('record_export', { path: slot.data.path, width: 1920, height: 1080, seconds: 3 });
+
+    expect(slot.status).toBe(200);
+    expect(slot.data.token).toBe('upload-token');
+    expect(recorded).toEqual({ status: 400, data: { error: 'file_not_found' } });
+  });
+
+  it('a font slot lands under the uploads upload_font reads', async () => {
+    const slot = await viaEndpoint('upload_slot', { purpose: 'font', name: 'My Font.woff2' });
+    const uploaded = await viaEndpoint('upload_font', { path: slot.data.path });
+
+    expect(slot.data.path).toMatch(/My_Font\.woff2$/);
+    expect(uploaded).toEqual({ status: 400, data: { error: 'file_not_found' } });
+  });
+
+  it('refuses a purpose it does not know', async () => {
+    const slot = await viaEndpoint('upload_slot', { purpose: 'nope' });
+
+    expect(slot.status).toBe(400);
+  });
+
+  it('refuses a read-only key', async () => {
+    const slot = await viaEndpoint('upload_slot', { purpose: 'export' }, false);
+
+    expect(slot).toEqual({ status: 403, data: { error: 'api_key_read_only' } });
+  });
+});

@@ -19,7 +19,9 @@ import type { Sfx } from '$lib/motion/sfx';
 import { Sound, generateSound } from '$lib/server/motion/voiceover';
 import { rowRequests, rowsFrom } from '$lib/server/motion/batch-input';
 import { startFarmBatch } from '$lib/server/motion/render-start';
-import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
+import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
+import { exportPath } from '$lib/motion/export-plan';
+import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { settingsFrom } from '$lib/motion/export-formats';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { editorSession } from '$lib/server/motion/editor-session';
@@ -38,6 +40,11 @@ import { publishNode } from '$lib/server/gallery/service';
 export enum EditorAccess {
   Read = 'read',
   Write = 'write'
+}
+
+export enum UploadPurpose {
+  Export = 'export',
+  Font = 'font'
 }
 
 export type EditorAnswer = { status: number; body: Record<string, unknown> };
@@ -65,6 +72,13 @@ const summaryInput = z.string().nullable().optional();
 const placeOf = (ctx: EditorCtx) => ({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.canvas.projectId, canvasId: ctx.canvas.id, nodeId: ctx.motion.record.id });
 
 const userScope = (ctx: EditorCtx) => ({ db: ctx.db, orgId: ctx.orgId, userId: ctx.userId, actor: ctx.actor });
+
+const safeName = (name: string) => name.replace(/[^\w.-]+/g, '_');
+
+const UPLOAD_PATH: Record<UploadPurpose, (ctx: EditorCtx, name: string) => string> = {
+  [UploadPurpose.Export]: (ctx) => exportPath({ orgId: ctx.orgId, projectId: ctx.canvas.projectId, nodeId: ctx.motion.record.id }, crypto.randomUUID()),
+  [UploadPurpose.Font]: (ctx, name) => `${canvasUploadPrefix(ctx.orgId, ctx.canvas.projectId)}${crypto.randomUUID()}-${safeName(name)}`
+};
 
 const soundScope = (ctx: EditorCtx) => ({ orgId: ctx.orgId, projectId: ctx.canvas.projectId, nodeId: ctx.motion.record.id, userId: ctx.userId, actor: ctx.actor });
 
@@ -125,6 +139,16 @@ export const EDITOR_OPS = {
         return refused(HTTP_CONFLICT, { error: 'busy' });
       }
       return ok({ version: commit.head.version, doc: commit.head.doc, rebased: commit.rebased });
+    }
+  }),
+
+  upload_slot: op({
+    access: EditorAccess.Write,
+    input: z.object({ purpose: z.nativeEnum(UploadPurpose), name: z.string().optional() }),
+    run: async (ctx, input) => {
+      const path = UPLOAD_PATH[input.purpose](ctx, input.name ?? 'upload');
+      const { data, error } = await ctx.db.storage.from(CANVAS_ASSET_BUCKET).createSignedUploadUrl(path);
+      return error || !data ? refused(HTTP_UNAVAILABLE, { error: 'upload_slot_failed' }) : ok({ path, token: data.token });
     }
   }),
 
