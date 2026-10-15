@@ -4,6 +4,7 @@ import type { Db } from '$lib/server/db/client';
 import { billedCreditsFor } from '$lib/credit-ladder';
 import { wiro } from './wiro';
 import { kie } from './kie';
+import { higgsfield, higgsfieldConfig } from './higgsfield';
 import { wireSpecOf } from './task-choice';
 import type { TaskProvider } from './canvas/task-provider';
 import type { TaskBill, TaskCatalogue, TaskModel, TaskRunDeps, TaskScope } from './canvas/task-run';
@@ -16,18 +17,15 @@ type Env = Readonly<Record<string, string | undefined>>;
 
 const trimmed = (value: string | undefined): string | undefined => value?.trim() || undefined;
 
-const ADAPTERS: Readonly<Partial<Record<TaskProviderName, (env: Env) => TaskProvider>>> = {
+const ADAPTERS: Readonly<Record<TaskProviderName, (env: Env) => TaskProvider>> = {
   [TaskProviderName.Wiro]: (e) => wiro({ apiKey: e.WIRO_API_KEY!.trim(), apiSecret: trimmed(e.WIRO_API_SECRET), baseUrl: trimmed(e.WIRO_BASE_URL) }),
-  [TaskProviderName.Kie]: (e) => kie({ apiKey: e.KIE_API_KEY!.trim(), baseUrl: trimmed(e.KIE_BASE_URL) })
+  [TaskProviderName.Kie]: (e) => kie({ apiKey: e.KIE_API_KEY!.trim(), baseUrl: trimmed(e.KIE_BASE_URL) }),
+  [TaskProviderName.Higgsfield]: (e) => higgsfield(higgsfieldConfig(e)!)
 };
 
+
 export function configuredTaskProviders(source: Env = env): Partial<Record<TaskProviderName, TaskProvider>> {
-  return Object.fromEntries(
-    [...configuredIn(source)].flatMap((provider) => {
-      const adapter = ADAPTERS[provider];
-      return adapter ? [[provider, adapter(source)]] : [];
-    })
-  );
+  return Object.fromEntries([...configuredIn(source)].map((provider) => [provider, ADAPTERS[provider](source)]));
 }
 
 export function configuredWiro(): TaskProvider | null {

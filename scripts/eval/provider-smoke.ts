@@ -1,6 +1,7 @@
 import { env } from '../_shims/env-private';
 import type { TaskProvider } from '$lib/server/canvas/task-provider';
 import { configuredTaskProviders } from '$lib/server/task-providers-config';
+import { higgsfieldConfig, higgsfieldEstimate } from '$lib/server/higgsfield';
 import { TaskProviderName } from '$lib/server/generation/task-providers';
 import { nextFits, overspent, planFits, SMOKE_CAP_USD, type SmokeCase } from './provider-smoke-budget';
 
@@ -73,10 +74,33 @@ const openrouterCase: ProviderCase = {
   }
 };
 
+const HIGGSFIELD_SOUL = 'higgsfield-ai/soul/standard';
+const HIGGSFIELD_INPUTS = { prompt: PROMPT, resolution: '2K', aspect_ratio: '1:1' };
+
+function higgsfieldCase(maxUsd: number): ProviderCase {
+  const task = taskCase(TaskProviderName.Higgsfield, maxUsd, { path: HIGGSFIELD_SOUL }, HIGGSFIELD_INPUTS);
+  return {
+    ...task,
+    async run() {
+      const config = higgsfieldConfig(env);
+      if (!config) {
+        throw new Error('higgsfield has no key in env');
+      }
+      const quoted = await higgsfieldEstimate(config, HIGGSFIELD_SOUL, HIGGSFIELD_INPUTS);
+      if (quoted === null || quoted > maxUsd) {
+        throw new Error(`estimate $${quoted} is above the $${maxUsd} allowed: not submitted`);
+      }
+      const outcome = await task.run();
+      return { ...outcome, costUsd: outcome.costUsd ?? quoted };
+    }
+  };
+}
+
 const CASES: readonly ProviderCase[] = [
   openrouterCase,
   taskCase(TaskProviderName.Wiro, 0.02, { owner: 'wiro-partners', project: 'z-image-uncensored' }, { prompt: PROMPT, ratio: '1:1', promptExtend: 'false' }),
-  taskCase(TaskProviderName.Kie, 0.05, { model: 'nano-banana-2' }, { prompt: PROMPT, resolution: '1K', aspect_ratio: '1:1' })
+  taskCase(TaskProviderName.Kie, 0.05, { model: 'nano-banana-2' }, { prompt: PROMPT, resolution: '1K', aspect_ratio: '1:1' }),
+  higgsfieldCase(0.15)
 ];
 
 async function main(): Promise<void> {
