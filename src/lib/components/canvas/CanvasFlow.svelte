@@ -32,7 +32,7 @@
   import { SvelteFlow, type Node } from '@xyflow/svelte';
   import CanvasDots from './CanvasDots.svelte';
   import CanvasPosterLayer from './CanvasPosterLayer.svelte';
-  import { POSTER_CLASS } from '$lib/canvas/poster-lod';
+  import { POSTER_CLASS, type Poster } from '$lib/canvas/poster-lod';
   import '@xyflow/svelte/dist/style.css';
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
@@ -114,7 +114,7 @@
      *  seleziona; un inserimento realtime da un altro utente non la porta mai. */
     select?: boolean;
     settings?: boolean;
-    poster?: string;
+    poster?: Poster;
   };
 
   let {

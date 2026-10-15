@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { test, expect, type Page } from '@playwright/test';
 
@@ -8,19 +9,41 @@ const STEP = { x: 520, y: 640 };
 const RED = { r: 204, g: 51, b: 51 };
 const PAN_STEPS = 6;
 
-async function mountZoomedOut(page: Page) {
-  const poster = `data:image/jpeg;base64,${(await sharp({ create: { width: 400, height: 400, channels: 3, background: RED } }).jpeg().toBuffer()).toString('base64')}`;
+const redImage = async () => `data:image/jpeg;base64,${(await sharp({ create: { width: 400, height: 400, channels: 3, background: RED } }).jpeg().toBuffer()).toString('base64')}`;
+
+const RED_VIDEO = 'tests/e2e/fixtures/red-frame.webm';
+const redVideo = () => `data:video/webm;base64,${readFileSync(RED_VIDEO).toString('base64')}`;
+
+async function mountZoomedOut(page: Page, source = 'image') {
+  const poster = source === 'video' ? redVideo() : await redImage();
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/changelog');
   await page.evaluate((path) => import(path), HARNESS);
   await page.evaluate(
-    ({ art, count, columns, step }) =>
-      window.motionCanvas.mount(Array.from({ length: count }, (_, i) => ({ id: `n${i}`, x: (i % columns) * step.x, y: Math.floor(i / columns) * step.y, format: '1:1', poster: art }))),
-    { art: poster, count: NODES, columns: COLUMNS, step: STEP }
+    ({ art, source, count, columns, step }) =>
+      window.motionCanvas.mount(Array.from({ length: count }, (_, i) => ({ id: `n${i}`, x: (i % columns) * step.x, y: Math.floor(i / columns) * step.y, format: '1:1', poster: art, source }))),
+    { art: poster, source, count: NODES, columns: COLUMNS, step: STEP }
   );
 }
 
 const shellDisplays = (page: Page) => page.locator('.svelte-flow__node.has-poster').evaluateAll((nodes) => [...new Set(nodes.map((node) => getComputedStyle(node).display))]);
+
+const redOnLayer = (page: Page) =>
+  page.getByTestId('poster-layer').evaluate((canvas: HTMLCanvasElement) => {
+    const pixels = canvas.getContext('2d')!.getImageData(0, 0, canvas.width, canvas.height).data;
+    let red = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      red += pixels[i] > 150 && pixels[i + 1] < 100 ? 1 : 0;
+    }
+    return red;
+  });
+
+test('zoomed out, a video node is drawn by the poster layer from a paused frame', async ({ page }) => {
+  await mountZoomedOut(page, 'video');
+
+  await expect(page.locator('.svelte-flow.poster-lod')).toHaveCount(1);
+  await expect.poll(() => redOnLayer(page)).toBeGreaterThan(0);
+});
 
 test('zoomed out, poster nodes are drawn by one canvas and their DOM stops painting', async ({ page }) => {
   await mountZoomedOut(page);

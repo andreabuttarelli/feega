@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LOD_ZOOM, lodWanted, posterRects, THUMB_WIDTH } from './poster-lod';
+import { LOD_ZOOM, lodWanted, mediaPoster, oncePerUrl, posterRects, PosterSource, THUMB_WIDTH } from './poster-lod';
 
 const screen = { width: 1000, height: 800 };
 const node = (id: string, x: number, y: number) => ({ id, x, y, w: 400, h: 300 });
@@ -25,4 +25,43 @@ describe('posterRects', () => {
 
 it('keeps thumbnails small enough that 500 of them fit a phone budget', () => {
   expect(THUMB_WIDTH * THUMB_WIDTH * 4 * 500).toBeLessThan(64 * 1024 * 1024);
+});
+
+describe('oncePerUrl', () => {
+  it('loads a url once however many nodes show it, and never more than the limit at a time', async () => {
+    let running = 0;
+    let peak = 0;
+    const calls: string[] = [];
+    const load = oncePerUrl(async (url: string) => {
+      calls.push(url);
+      running += 1;
+      peak = Math.max(peak, running);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      running -= 1;
+      return url.toUpperCase();
+    }, 2);
+
+    const out = await Promise.all(['a', 'b', 'a', 'c', 'd', 'b'].map(load));
+
+    expect(out).toEqual(['A', 'B', 'A', 'C', 'D', 'B']);
+    expect(calls).toEqual(['a', 'b', 'c', 'd']);
+    expect(peak).toBe(2);
+  });
+});
+
+describe('mediaPoster', () => {
+  const url = '/p/pr/c/cv/assets/a1';
+
+  it('draws an image node from its smallest tier', () => {
+    expect(mediaPoster('image', url)).toEqual({ url: '/p/pr/c/cv/assets/a1?size=256', source: PosterSource.Image });
+  });
+
+  it('draws a video node from a paused frame of the file itself', () => {
+    expect(mediaPoster('video', url)).toEqual({ url, source: PosterSource.VideoFrame });
+  });
+
+  it('leaves other nodes, and media without a file, in the DOM', () => {
+    expect(mediaPoster('text', url)).toBeNull();
+    expect(mediaPoster('image', null)).toBeNull();
+  });
 });

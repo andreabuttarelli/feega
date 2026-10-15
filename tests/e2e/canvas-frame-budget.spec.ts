@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
 import type { Page } from '@playwright/test';
@@ -10,6 +11,7 @@ type Idle = { appFrames: number; infinite: string[]; mutations: number };
 const HOST_PAGE = '/changelog';
 const HARNESS = '/tests/e2e/fixtures/motion-canvas-harness.ts';
 const SOURCE = process.env.CANVAS_PERF_SOURCE;
+const MEDIA = process.env.CANVAS_PERF_MEDIA ?? 'image';
 const THROTTLE = Number(process.env.CANVAS_PERF_THROTTLE ?? 1);
 const DESKTOP = { width: 1440, height: 900 };
 const SETTLE_MS = 3000;
@@ -26,7 +28,17 @@ const FORMATS = ['16:9', '9:16', '1:1', '4:5'];
 const POSTER_WIDTH = 1080;
 const ASPECT: Record<string, number> = { '16:9': 16 / 9, '9:16': 9 / 16, '1:1': 1, '4:5': 4 / 5 };
 
+function clip(format: string, seed: number): string {
+  const height = Math.round(POSTER_WIDTH / ASPECT[format] / 2) * 2;
+  const source = `testsrc2=s=${POSTER_WIDTH}x${height}:d=2:r=30,hue=h=${seed * 40}`;
+  const webm = execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', source, '-c:v', 'libvpx-vp9', '-deadline', 'realtime', '-f', 'webm', 'pipe:1'], { maxBuffer: 256 * 1024 * 1024 });
+  return `data:video/webm;base64,${webm.toString('base64')}`;
+}
+
 async function poster(format: string, seed: number): Promise<string> {
+  if (MEDIA.startsWith('video')) {
+    return clip(format, seed);
+  }
   const height = Math.round(POSTER_WIDTH / ASPECT[format]);
   const image = await sharp({ create: { width: POSTER_WIDTH, height, channels: 3, background: '#000', noise: { type: 'gaussian', mean: 60 + seed * 7, sigma: 40 } } }).jpeg().toBuffer();
   return `data:image/jpeg;base64,${image.toString('base64')}`;
@@ -37,7 +49,7 @@ async function syntheticCanvas(count: number): Promise<HarnessNode[]> {
   const columns = Math.ceil(Math.sqrt(count));
   return Array.from({ length: count }, (_, i) => {
     const format = FORMATS[i % FORMATS.length];
-    return { id: `n${i}`, x: (i % columns) * STEP.x, y: Math.floor(i / columns) * STEP.y, format, poster: posters[i % FORMATS.length] };
+    return { id: `n${i}`, x: (i % columns) * STEP.x, y: Math.floor(i / columns) * STEP.y, format, poster: posters[i % FORMATS.length], source: MEDIA };
   });
 }
 
@@ -108,7 +120,6 @@ async function selectEach(page: Page) {
   const boxes = (await onScreen(page)).slice(0, SELECTIONS);
   for (const box of boxes) {
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-    console.log('DEBUG', JSON.stringify(box), await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.className, { x: box.x + box.width / 2, y: box.y + box.height / 2 }), await page.locator('.svelte-flow__node.selected').getAttribute('data-id'), await page.evaluate(() => window.selectionEmits));
   }
 }
 

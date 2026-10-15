@@ -20,6 +20,7 @@
   import { keepSame } from '$lib/canvas/snapshot-keep';
   import { AssetSize, sized } from '$lib/canvas/asset-url';
   import TieredImage from '$lib/components/canvas/TieredImage.svelte';
+  import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
@@ -846,7 +847,7 @@
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
-      poster: frameLook(n).poster ?? undefined,
+      poster: tilePoster(n) ?? undefined,
       minW: nodeSize(n.type, n.data).w,
       minH: nodeSize(n.type, n.data).h,
       node: n.type === 'effects'
@@ -1968,6 +1969,14 @@
 
   function focusOn(ids: string[], free?: Insets, mode = FocusMode.Frame) {
     focus = { ids, key: (focus?.key ?? 0) + 1, free, mode };
+  }
+
+  function tilePoster(n: { id: string; type: string; data: Record<string, unknown> }): Poster | null {
+    const motion = frameLook(n).poster;
+    if (motion) {
+      return { url: motion, source: PosterSource.Image };
+    }
+    return mediaPoster(n.type, assetUrl(typeof n.data.refId === 'string' ? n.data.refId : null));
   }
 
   function frameLook(n: { id: string; type: string; data: Record<string, unknown> }) {
