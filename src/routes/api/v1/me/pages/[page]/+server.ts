@@ -9,11 +9,11 @@ type PageModule = { load?: Handler; actions?: Record<string, Handler> };
 type DashboardPage = { path: string; module: () => Promise<PageModule> };
 
 const PAGES: Record<string, DashboardPage> = {
-  home: { path: '/app', module: () => import('../../../../../app/+page.server') },
-  canvases: { path: '/app/canvases', module: () => import('../../../../../app/canvases/+page.server') },
-  templates: { path: '/app/templates', module: () => import('../../../../../app/templates/+page.server') },
-  motion: { path: '/app/motion', module: () => import('../../../../../app/motion/+page.server') },
-  credits: { path: '/app/credits', module: () => import('../../../../../app/credits/+page.server') }
+  home: { path: '/app', module: () => import('$lib/server/dashboard/pages/home') },
+  canvases: { path: '/app/canvases', module: () => import('$lib/server/dashboard/pages/canvases') },
+  templates: { path: '/app/templates', module: () => import('$lib/server/dashboard/pages/templates') },
+  motion: { path: '/app/motion', module: () => import('$lib/server/dashboard/pages/motion') },
+  credits: { path: '/app/credits', module: () => import('$lib/server/dashboard/pages/credits') }
 };
 
 const UNKNOWN = () => json({ error: 'not_found' }, { status: NOT_FOUND });
