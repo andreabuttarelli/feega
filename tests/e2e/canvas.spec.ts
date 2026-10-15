@@ -7,8 +7,11 @@ import { test, expect, ON_PRODUCTION, REAL_STACK, gotoHydrated, createE2eSession
  * in più la sessione crea org/progetto/tela veri e li smonta in `finally` (vedi
  * fixtures/session.ts).
  */
+const REAL_GENERATION_BUDGET_MS = 120_000;
+
 test.describe('canvas @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
+  test.describe.configure({ timeout: REAL_GENERATION_BUDGET_MS });
 
   test('la tela si apre senza 500 e senza overlay di errore', async ({ page, session }) => {
     const consoleErrors: string[] = [];
