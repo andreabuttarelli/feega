@@ -26,7 +26,7 @@
   import { guideOpenRequest } from '$lib/canvas/guide-open';
   import { chatOpenRequest } from '$lib/canvas/empty-canvas';
   import { browser } from '$app/environment';
-  import { postCanvasAction } from '$lib/dashboard/api';
+  import { postCanvasAction } from '$lib/canvas/canvas-api';
   import type { ShareState } from '$lib/canvas/shared-view';
   import { handoffOf } from '$lib/canvas/chat-handoff';
   import { editingLabel, propertiesRequest, propertiesTarget } from '$lib/canvas/phone-properties';

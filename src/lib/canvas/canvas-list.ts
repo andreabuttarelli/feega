@@ -1,6 +1,6 @@
 import { applyAction } from '$app/forms';
 import { invalidate } from '$app/navigation';
-import { postCanvasAction } from '$lib/dashboard/api';
+import { postCanvasAction } from './canvas-api';
 import { canvasRouteOf } from './canvas-action-url';
 
 export const CANVAS_LIST_DEPENDENCY = 'app:canvases';

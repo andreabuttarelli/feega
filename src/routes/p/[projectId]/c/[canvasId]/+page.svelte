@@ -23,7 +23,7 @@
   import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
-  import { postCanvasAction } from '$lib/dashboard/api';
+  import { postCanvasAction } from '$lib/canvas/canvas-api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actionResultOf, liveActionResultOf, loadedOf } from './answers';
+import { actionResultOf, loadedOf } from './answers';
 
 describe('what an API answer means to a dashboard page', () => {
   it('a load answer is its data', () => {
@@ -26,10 +26,5 @@ describe('what an API answer means to a dashboard page', () => {
 
   it('an expired session during an action is sent to login', () => {
     expect(actionResultOf(401, { error: 'invalid_token' })).toEqual({ type: 'redirect', status: 303, location: '/login' });
-  });
-
-  it('a server error during a live action stays an error, with the message the page reads', () => {
-    expect(liveActionResultOf(500, { message: 'db_busy' })).toEqual({ type: 'error', status: 500, error: { message: 'db_busy' } });
-    expect(liveActionResultOf(409, { conflict: true, keys: ['prompt'] })).toEqual({ type: 'failure', status: 409, data: { conflict: true, keys: ['prompt'] } });
   });
 });
