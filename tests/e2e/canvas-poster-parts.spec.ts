@@ -37,7 +37,7 @@ test.describe('poster parts on the canvas @real', () => {
       await overlay.click({ position: title });
       await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 1000 });
     }, 'the poster selects once the preview has measured it').toPass({ timeout: 15_000 });
-    await overlay.click({ position: title });
+    await overlay.dblclick({ position: title });
     const part = page.getByTestId('part-box');
     await expect(part).toHaveAttribute('data-part', TITLE_LINE);
     await shoot(page, '8-poster-part');

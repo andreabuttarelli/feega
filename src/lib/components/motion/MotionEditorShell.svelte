@@ -61,6 +61,8 @@
   import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import { Gesture } from '$lib/motion/drill';
+  import { frameDrill } from '$lib/canvas/frame-drill';
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
   import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
@@ -1308,7 +1310,12 @@
     [Command.PreviewFit]: () => zoomStage?.fit(),
     [Command.PreviewActual]: () => zoomStage?.actual(),
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
+    [Command.SelectChild]: () => overlay?.key(Gesture.Enter),
+    [Command.SelectParent]: selectParent,
     [Command.Deselect]: () => {
+      if (overlay?.key(Gesture.Leave)) {
+        return;
+      }
       helpOpen = false;
       selection = [];
       keySelection = [];
@@ -1417,6 +1424,21 @@
   });
 
   let caughtAt = $state<[number, number] | null>(null);
+  let overlay = $state<ReturnType<typeof SelectionOverlay> | null>(null);
+
+  function askedDrill() {
+    const asked = frameDrill.take(data.node.id);
+    return asked ? { at: [asked.at.x * doc.width, asked.at.y * doc.height] as [number, number], gesture: asked.gesture } : null;
+  }
+
+  function selectParent() {
+    if (overlay?.key(Gesture.Leave)) {
+      return;
+    }
+    if (rules.closes) {
+      onclose();
+    }
+  }
 
   $effect(() => {
     if (playing) {
@@ -1466,7 +1488,7 @@
       return;
     }
     if (rules.closes && e.key === 'Escape' && !isTyping(e.target as HTMLElement | null)) {
-      onclose();
+      selectParent();
       return;
     }
     if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
@@ -1668,7 +1690,7 @@
       <MotionPreview bind:this={preview} bind:redraws {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
-        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={findClip(withAutoLayout(doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}

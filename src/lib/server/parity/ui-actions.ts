@@ -126,6 +126,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.Paste]: motion('set_keyframes'),
   [Command.SelectAll]: VIEW,
   [Command.Deselect]: VIEW,
+  [Command.SelectChild]: VIEW,
+  [Command.SelectParent]: VIEW,
   [Command.StartHere]: motion('set_timing'),
   [Command.EndHere]: motion('set_timing'),
   [Command.TrimIn]: motion('trim_clip'),
