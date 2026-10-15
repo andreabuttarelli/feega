@@ -232,9 +232,9 @@ async function viaPosterEndpoint(form: FormData, writeAllowed = true) {
 }
 
 describe('the poster action and POST /api/v1/motion/[nodeId]/poster answer the same', () => {
-  it('both refuse a poster that is not a jpeg', async () => {
+  it('both refuse a poster that is not a jpeg or png', async () => {
     const form = new FormData();
-    form.set('file', new File(['x'], 'p.png', { type: 'image/png' }));
+    form.set('file', new File(['x'], 'p.gif', { type: 'image/gif' }));
 
     const action = await viaAction('poster', { width: '10', height: '10' });
     const endpoint = await viaPosterEndpoint(form);

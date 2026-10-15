@@ -49,7 +49,7 @@ export async function editorSession(canvas: CanvasScope, params: SessionAsk, pha
     projectId: params.projectId,
     canvas: { id: scope.canvas.id, name: scope.canvas.name },
     orgId: scope.orgId,
-    node: { id: scope.motion.record.id, name: scope.motion.record.displayName, lastRenderAssetId: scope.motion.node.lastRenderAssetId, posterAssetId: scope.motion.node.posterAssetId },
+    node: { id: scope.motion.record.id, name: scope.motion.record.displayName, lastRenderAssetId: scope.motion.node.lastRenderAssetId, posterAssetId: scope.motion.node.posterAssetId, kind: scope.motion.node.kind },
     head: { version: head.version, doc: head.doc },
     tokens,
     assets,

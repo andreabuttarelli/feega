@@ -24,7 +24,7 @@
    */
   import { Handle, NodeResizer, Position, useConnection, type NodeProps } from '@xyflow/svelte';
   import { CONNECTOR_STYLE, portLook, type ConnectorType, type DragOrigin } from '$lib/canvas/connectors';
-  import { NODE_KIND_ICON, NODE_KIND_LABEL } from '$lib/canvas/node-label';
+  import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { isNodeType } from '$lib/canvas/node-data';
   import { getTileRender } from '$lib/canvas/tile-render-context';
   import { getTileResize } from '$lib/canvas/tile-resize-context';
@@ -45,6 +45,7 @@
     kind?: string;
     /** `nodes.display_name`, quando chi ha nominato il nodo l'ha scritto. Vince sul nome del tipo. */
     displayName?: string | null;
+    tag?: NameTag;
     /** Questo nodo è sorgente di almeno un post (`post_sources`). */
     inPost?: boolean;
     /** La taglia minima del TIPO di questo nodo (`nodeSize`). Assente = non ridimensionabile a
@@ -80,7 +81,7 @@
 
   const kind = $derived(tile.kind && isNodeType(tile.kind) ? tile.kind : null);
   const LabelIcon = $derived(kind ? NODE_KIND_ICON[kind] : null);
-  const label = $derived(tile.displayName?.trim() || (kind ? NODE_KIND_LABEL[kind] : null));
+  const label = $derived(tile.tag === NameTag.Hidden ? null : tile.displayName?.trim() || (kind ? NODE_KIND_LABEL[kind] : null));
 
   // IL COLORE DELLA SELEZIONE — quello che il nodo produrrebbe se avesse una porta d'uscita, lo
   // stesso `CONNECTOR_STYLE` che colora la porta stessa: un nodo testo si seleziona blu, un'

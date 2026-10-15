@@ -1,9 +1,9 @@
 import { COMPONENTS, type ComponentId } from './components';
-import type { MotionDoc } from './doc';
+import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { DrawTool, type DrawBox } from './draw-tool';
 import { mapOutline, pathData, type Outline, type Pt } from './shape/geometry';
 import { ShapeKind } from './shape/schema';
-import { DocMode, docMode } from './still';
+import { DocMode, docMode, setStill } from './still';
 import { addClip, type OpResult } from './timeline';
 
 type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse;
@@ -63,4 +63,47 @@ export function penClip(doc: MotionDoc, outline: Outline, frame: number, id: str
   const unit = mapOutline(outline, ([x, y]) => [round(box.width ? (x - left) / box.width : 0), round(box.height ? (y - top) / box.height : 0)]);
   const placed = { x: round(box.x), y: round(box.y), width: round(Math.max(box.width, MIN_SIDE)), height: round(Math.max(box.height, MIN_SIDE)) };
   return place(doc, 'Shape', { shape: ShapeKind.Path, path: pathData(unit), ...placed }, frame, id);
+}
+
+export type CanvasBox = { left: number; top: number; width: number; height: number };
+
+export type Drawn = { tool: BoxTool; box: CanvasBox } | { tool: DrawTool.Pen; outline: Outline };
+
+export type DrawnWire = { tool: BoxTool; box: CanvasBox } | { tool: DrawTool.Pen; path: string };
+
+export type DrawnElement = { ok: true; doc: MotionDoc; box: CanvasBox } | { ok: false; error: string };
+
+const PIXELS_PER_CANVAS_PX = 2;
+const MIN_DOC_SIDE = 16;
+const FULL_BOX: DrawBox = { x: 0.5, y: 0.5, width: 1, height: 1 };
+
+const evenSide = (n: number) => Math.max(MIN_DOC_SIDE, Math.round(n / 2) * 2);
+
+function elementPixels(box: CanvasBox): { width: number; height: number } {
+  const long = Math.max(box.width, box.height);
+  const short = Math.min(box.width, box.height);
+  const scale = Math.min(PIXELS_PER_CANVAS_PX, MAX_SIDE / long, MAX_SHORT_SIDE / short);
+  return { width: evenSide(box.width * scale), height: evenSide(box.height * scale) };
+}
+
+function blankElement(box: CanvasBox): OpResult {
+  return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box), background: Background.Transparent }, 0);
+}
+
+function canvasBoxOf(outline: Outline): CanvasBox {
+  const box = boundsOf(outline);
+  return { left: box.x - box.width / 2, top: box.y - box.height / 2, width: Math.max(box.width, MIN_SIDE), height: Math.max(box.height, MIN_SIDE) };
+}
+
+export function drawnElement(drawn: Drawn, id: string): DrawnElement {
+  const box = drawn.tool === DrawTool.Pen ? canvasBoxOf(drawn.outline) : drawn.box;
+  const blank = blankElement(box);
+  if (!blank.ok) {
+    return blank;
+  }
+  const made =
+    drawn.tool === DrawTool.Pen
+      ? penClip(blank.doc, mapOutline(drawn.outline, ([x, y]) => [(x - box.left) / box.width, (y - box.top) / box.height]), 0, id)
+      : drawClip(blank.doc, drawn.tool, FULL_BOX, 0, id);
+  return made.ok ? { ok: true, doc: made.doc, box } : made;
 }

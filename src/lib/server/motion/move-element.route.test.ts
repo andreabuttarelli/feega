@@ -136,3 +136,33 @@ describe('connect action', () => {
     expect(doc.links).toEqual({ [GEN]: doc.tracks[0].clips[0].id });
   });
 });
+
+describe('drawElement action', () => {
+  const inserted = (input: ReturnType<typeof event>) => input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { type: string; x: number; y: number; width: number; height: number; data: Record<string, unknown> });
+
+  it('a rectangle drawn on the empty canvas is a free element: a chromeless frame on the drawn box', async () => {
+    const input = event({ drawn: JSON.stringify({ tool: 'rectangle', box: { left: 120, top: 40, width: 300, height: 100 } }) });
+
+    const result = await actions.drawElement(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', created: true, node: { type: 'motion' } });
+    expect(inserted(input)).toMatchObject([{ type: 'motion', x: 120, y: 40, width: 300, height: 100, data: { kind: 'element' } }]);
+    const revisions = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => c.payload as { version: number; doc: MotionDoc });
+    expect(revisions.map((r) => [r.version, r.doc.background, r.doc.tracks.flatMap((t) => t.clips).map((c) => c.component)])).toEqual([[1, 'transparent', ['Shape']]]);
+  });
+
+  it('a pen path is placed at the box of its points', async () => {
+    const input = event({ drawn: JSON.stringify({ tool: 'pen', path: 'M 10 20 L 110 20 L 110 70' }) });
+
+    await actions.drawElement(input as never);
+
+    expect(inserted(input)).toMatchObject([{ x: 10, y: 20, width: 100, height: 50 }]);
+  });
+
+  it('an unreadable drawing is a 400, nothing written', async () => {
+    const input = event({ drawn: JSON.stringify({ tool: 'select', box: { left: 0, top: 0, width: 1, height: 1 } }) });
+
+    expect(await actions.drawElement(input as never)).toMatchObject({ status: 400 });
+    expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
+  });
+});

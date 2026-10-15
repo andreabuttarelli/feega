@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { MOTION_NODE_BAR_H, frameNodeOf, frameNodeSize, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
 import { NodeMode } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -11,7 +11,8 @@ describe('motion node', () => {
       format: MotionFormat.Vertical,
       docHeadRevision: 0,
       posterAssetId: null,
-      lastRenderAssetId: null
+      lastRenderAssetId: null,
+      kind: FrameKind.Frame
     });
   });
 
@@ -88,5 +89,34 @@ describe('a frame node follows the shape of its graphic', () => {
   it('while edited it is only the picture: no bar under it', () => {
     expect(frameNodeSize(420, { width: 1920, height: 1080 }, NodeMode.Edit)).toEqual({ w: 420, h: 236 });
     expect(frameNodeSize(420, { width: 1920, height: 1080 }, NodeMode.Preview)).toEqual({ w: 420, h: 236 + MOTION_NODE_BAR_H });
+  });
+});
+
+describe('a free element is a frame without chrome', () => {
+  it('is the drawn box exactly: no bar, in preview or edit', () => {
+    const made = elementNodeOf({ width: 240, height: 80 });
+
+    expect(made.data.kind).toBe(FrameKind.Element);
+    expect({ w: made.w, h: made.h }).toEqual({ w: 240, h: 80 });
+    expect(frameNodeSize(120, { width: 480, height: 160 }, NodeMode.Preview, FrameKind.Element)).toEqual({ w: 120, h: 40 });
+  });
+
+  it('has no ports, no name tag and a small minimum size: it is a shape, not a node', () => {
+    const element = { id: 'e', type: 'motion', data: elementNodeOf({ width: 10, height: 10 }).data };
+
+    expect(tileChromeOf(element)).toMatchObject({ ports: false, label: false, bar: false });
+    expect(tileChromeOf({ id: 'f', type: 'motion', data: newMotionData() })).toMatchObject({ ports: true, label: true, bar: true });
+    expect(tileChromeOf({ id: 't', type: 'text', data: {} })).toMatchObject({ ports: true, label: true });
+    expect(nodeSize('motion', element.data).w).toBeLessThan(40);
+  });
+
+  it('opens with its own shapes selected, so the properties show at once; a frame opens on nothing', () => {
+    expect(openingSelection(FrameKind.Element, ['a', 'b'])).toEqual(['a', 'b']);
+    expect(openingSelection(FrameKind.Frame, ['a', 'b'])).toEqual([]);
+  });
+
+  it('reads back as an element; an old frame without the field stays a frame', () => {
+    expect(motionOf({ id: 'e', type: 'motion', data: elementNodeOf({ width: 10, height: 10 }).data })?.kind).toBe(FrameKind.Element);
+    expect(motionOf({ id: 'f', type: 'motion', data: { format: '9:16', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } })?.kind).toBe(FrameKind.Frame);
   });
 });

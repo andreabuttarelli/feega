@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 import MotionNode from './MotionNode.svelte';
 import { MotionFormat } from '$lib/motion/doc';
+import { FrameKind } from '$lib/canvas/motion-node';
 
-const node = { id: 'n1', format: MotionFormat.Landscape, docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
+const node = { id: 'n1', format: MotionFormat.Landscape, docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null, kind: FrameKind.Frame };
 
 function openLink(onopen: (() => void) | null): string {
   const body = render(MotionNode, { props: { node, href: '/p/p1/c/c1/motion/n1', previewUrl: '/preview', onopen } }).body;

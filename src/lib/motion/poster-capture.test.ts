@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { POSTER_DEBOUNCE_MS, posterJob, posterSecond } from './poster-capture';
+import { POSTER_DEBOUNCE_MS, posterFormat, posterJob, posterSecond } from './poster-capture';
+import { Background } from './doc';
+import { FrameFormat } from './hyperframes/capture';
 
 describe('the poster of a composition', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -31,5 +33,13 @@ describe('the poster of a composition', () => {
     await vi.advanceTimersByTimeAsync(POSTER_DEBOUNCE_MS);
 
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe('the poster keeps what is see-through', () => {
+  it('a transparent picture, like a free element, posters as png; a branded one as jpeg', () => {
+    expect(posterFormat(Background.Transparent)).toBe(FrameFormat.Png);
+    expect(posterFormat(Background.Brand)).toBe(FrameFormat.Jpeg);
+    expect(posterFormat(undefined)).toBe(FrameFormat.Jpeg);
   });
 });

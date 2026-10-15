@@ -64,6 +64,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   connect: canvas('connect_nodes'),
   moveElement: canvas('move_frame_element'),
   placeOutput: canvas('place_in_frame'),
+  drawElement: canvas('draw_element'),
   disconnect: canvas('disconnect_nodes'),
   set_edge_mode: canvas('set_edge_mode'),
   remove: canvas('delete_node'),

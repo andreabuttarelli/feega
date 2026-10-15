@@ -9,14 +9,14 @@ describe('one bottom bar, its tools by context', () => {
     expect(barContextOf(CanvasState.Editing)).toBe(BarContext.Frame);
   });
 
-  it('canvas tools add nodes; frame tools draw inside the frame', () => {
-    expect(BAR_SLOTS[BarContext.Canvas]).toEqual([BarSlot.Upload, BarSlot.Nodes, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates]);
+  it('canvas tools draw free elements and add nodes; frame tools draw inside the frame', () => {
+    expect(BAR_SLOTS[BarContext.Canvas]).toEqual([BarSlot.Draw, BarSlot.Upload, BarSlot.Nodes, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates]);
     expect(BAR_SLOTS[BarContext.Frame]).toEqual([BarSlot.Draw, BarSlot.Image, BarSlot.FrameLibrary]);
   });
 
-  it('no slot belongs to both contexts', () => {
+  it('only the draw tools belong to both contexts', () => {
     const canvas = new Set(BAR_SLOTS[BarContext.Canvas]);
-    expect(BAR_SLOTS[BarContext.Frame].filter((s) => canvas.has(s))).toEqual([]);
+    expect(BAR_SLOTS[BarContext.Frame].filter((s) => canvas.has(s))).toEqual([BarSlot.Draw]);
   });
 
   it('sits flush to the edge, above the timeline only while a frame shows one', () => {
