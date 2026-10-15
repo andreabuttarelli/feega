@@ -32,6 +32,12 @@ vecchia e i box di selezione spariscono finché non si riseleziona. Due cause: u
 paint); e una misura vuota mentre la preview ricarica sovrascriveva i box. Mossa: leggere il campo
 da un `$derived`, e non sostituire i box con una misura vuota (`remeasured`).
 
+### Un componente custom con un prop `move` fa esplodere `composeHtml`
+`compose.ts` legge `props.move` su ogni clip (Ken Burns di Image) senza guardare il componente:
+un custom con `move` numerico dà `Cannot read properties of undefined (reading 'from')` in
+`moveTweens`. Segnale: quello stack al primo compose del template. Mossa: niente prop custom
+con nomi di prop dei clip nativi (`move`, `easing`); rinominare (`stepSeconds`).
+
 ### Un template a 60 fps che va al doppio e diventa nero a metà
 Ogni frame di un doc (clip, keyframe, comp) è nell'fps del doc: un pezzo che arriva da un doc con
 un altro fps va convertito tutto, comps comprese. Segnale: template da 12 s che finisce a 6 s, o
@@ -123,6 +129,13 @@ Vite osserva anche `changelog/*.md`: scriverne uno mentre l'harness naviga l'edi
 `page reload` e il `goto` muore con `net::ERR_ABORTED`. Segnale: nel log del dev server
 `page reload <file>` all'ora del fallimento. Mossa: niente edit nel worktree servito finché il
 giro non è finito, o un dev server da un checkout separato.
+
+### Un e2e `@real` che prende 500 dall'editor motion e il server di un altro agente
+Due cause, stesso sintomo ("Something broke", `Server is not running`). (1) Node 25 espone un
+`localStorage` globale senza `getItem` in SSR: `browserStore(...)?.getItem is not a function` in
+`MotionEditorShell`, e `handleError` non logga. Mossa: `NODE_OPTIONS=--no-experimental-webstorage`
+sul dev server. (2) La porta 4173 è di chiunque: `reuseExistingServer` prova il codice di un
+altro worktree. Mossa: un dev server tuo su una porta tua e `E2E_BASE_URL`.
 
 ### Un e2e da un worktree agente prova codice vecchio
 `vite.config.ts` esclude `**/.claude/worktrees/**` dal watcher: un dev server lanciato DENTRO un
