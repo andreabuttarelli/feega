@@ -391,6 +391,16 @@
     align-self: stretch;
   }
 
+  .top-box.left {
+    flex-shrink: 1000;
+    min-width: calc(var(--ui-control-h) + 8px);
+    overflow: hidden;
+  }
+
+  .top-box.right {
+    flex-shrink: 0;
+  }
+
   .top-box {
     display: flex;
     align-items: center;
@@ -441,6 +451,7 @@
     display: flex;
     align-items: center;
     gap: 5px;
+    min-width: 0;
     max-width: 220px;
     appearance: none;
     border: 0;
