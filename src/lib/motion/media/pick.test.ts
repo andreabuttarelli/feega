@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MediaAccept, MediaKind, accepts, itemOfPick, linkOf, pickOfItem } from './pick';
+import { MediaAccept, MediaKind, acceptOf, accepts, itemOfPick, linkOf, pickOfItem, setSlot, slotPick } from './pick';
 
 describe('a single media value, as an asset id or a link', () => {
   it('reads an asset id, a video id and a link without changing what is stored', () => {
@@ -28,5 +28,22 @@ describe('a single media value, as an asset id or a link', () => {
     expect(accepts(MediaAccept.Image, MediaKind.Video)).toBe(false);
     expect(accepts(MediaAccept.Any, MediaKind.Video)).toBe(true);
     expect(accepts(MediaAccept.Video, MediaKind.Video)).toBe(true);
+  });
+});
+
+describe('a list of media slots', () => {
+  const LIST = [{ assetId: 'a', kind: 'image', fit: 'contain' }, { assetId: 'b', kind: 'video' }];
+
+  it('replaces a slot keeping its look, removes one, appends past the end', () => {
+    expect(setSlot(LIST, 0, { kind: MediaKind.Image, assetId: 'c' })[0]).toEqual({ assetId: 'c', kind: 'image', fit: 'contain' });
+    expect(setSlot(LIST, 1, null)).toEqual([LIST[0]]);
+    expect(setSlot(LIST, 2, { kind: MediaKind.Video, assetId: 'd' })).toHaveLength(3);
+    expect(slotPick(LIST[1])).toEqual({ kind: MediaKind.Video, assetId: 'b' });
+  });
+
+  it('reads which kinds a slot accepts from its asset kind', () => {
+    expect(acceptOf('video')).toBe(MediaAccept.Video);
+    expect(acceptOf('image')).toBe(MediaAccept.Image);
+    expect(acceptOf(undefined)).toBe(MediaAccept.Any);
   });
 });

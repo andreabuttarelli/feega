@@ -97,9 +97,9 @@ describe('the media picker', () => {
 
   it('uploads a file with progress, then sets the new asset', async () => {
     let finish: (v: Awaited<ReturnType<MediaUploader>>) => void = () => {};
-    const uploader: MediaUploader = vi.fn((_file, progress) => {
+    const uploader = vi.fn((_file: File, progress: (f: number) => void) => {
       progress(0.5);
-      return new Promise((resolve) => (finish = resolve));
+      return new Promise<Awaited<ReturnType<MediaUploader>>>((resolve) => (finish = resolve));
     });
     const onpick = show({ uploader });
     click(byId('media-add'));

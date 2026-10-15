@@ -202,7 +202,7 @@
         <input class={FIELD_INPUT} type="search" placeholder="Search the project" aria-label="Search the project" data-testid="media-search" bind:value={query} />
         <div class="grid max-h-48 grid-cols-4 gap-1 overflow-y-auto">
           {#each library as asset (asset.id)}
-            <button type="button" class={cn('aspect-square overflow-hidden rounded-xs border border-ui-divider p-0', value?.assetId === asset.id && 'ring-2 ring-ui-accent-solid', FOCUS_RING)} title={asset.label} data-testid="media-library-item" onclick={() => choose({ kind: asset.kind as MediaKind, assetId: asset.id })}>{@render thumb(asset.previewUrl, asset.kind as MediaKind)}</button>
+            <button type="button" class={cn('aspect-square overflow-hidden rounded-xs border border-ui-divider p-0', value?.assetId === asset.id && 'ring-2 ring-ui-accent-solid', FOCUS_RING)} title={asset.label} data-testid="media-library-item" data-asset-id={asset.id} onclick={() => choose({ kind: asset.kind as MediaKind, assetId: asset.id })}>{@render thumb(asset.previewUrl, asset.kind as MediaKind)}</button>
           {:else}
             <span class="col-span-4 text-ui-caption text-ui-text-3">{query ? 'Nothing matches.' : `No ${NOUN[accept]}s in this project yet. Upload one.`}</span>
           {/each}

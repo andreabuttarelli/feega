@@ -5,7 +5,7 @@
   import { duckUnder, voicesOver } from '$lib/motion/duck';
   import { PULSE_PROPS, pulseWithMusic } from '$lib/motion/pulse';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
-  import { COMPONENTS, Control, TrackKind, type AssetKind } from '$lib/motion/components';
+  import { AssetKind, COMPONENTS, Control, TrackKind } from '$lib/motion/components';
   import { DEPTH, Space } from '$lib/motion/camera';
   import { setClipDepth } from '$lib/motion/camera-ops';
   import { ParentOpacity, parentChoices } from '$lib/motion/parent';
@@ -80,9 +80,13 @@
   import { propsOwner, sliderOf, toShown, toStored, type Ranged } from '$lib/motion/units';
   import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '$lib/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
+  import { LinkUse, MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
+  import MediaPicker from './MediaPicker.svelte';
+  import MediaListField from './MediaListField.svelte';
+  import type { MediaUploader } from './media-upload';
 
 
-  type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
+  type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string; seconds?: number | null };
 
   let {
     doc,
@@ -96,6 +100,7 @@
     tab = $bindable<InspectorTab>(InspectorTab.Properties),
     onchange,
     onuploadfont,
+    upload = null,
     onopen,
     focus = null,
     shared = [],
@@ -115,6 +120,7 @@
     tab?: InspectorTab;
     onchange: (doc: MotionDoc, summary: string) => void;
     onuploadfont?: (file: File) => Promise<string | null>;
+    upload?: MediaUploader | null;
     onopen?: (comp: string) => void;
     focus?: readonly string[] | null;
     shared?: readonly string[];
@@ -542,7 +548,7 @@
     <div class="stack" data-prop={field.key}>{@render rangeField(field)}</div>
     {#if keyed}{@render exprEditor(field.key)}{/if}
   {:else if field.control === Control.Fills}
-    <div class="stack" data-prop={field.key}><FillStack fills={elementFills(clip.component, clip.props)} adder={Adder.Section} {assets} {tokens} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
+    <div class="stack" data-prop={field.key}><FillStack fills={elementFills(clip.component, clip.props)} adder={Adder.Section} {assets} {tokens} {upload} onchange={(fills, summary) => commit(setProps(doc, clip.id, { fills }), summary)} /></div>
   {:else if field.control === Control.Strokes}
     <div class="stack" data-prop={field.key}><StrokeStack strokes={elementStrokes(clip.component, clip.props)} adder={Adder.Section} sided={sidesShown(clip.props.shape as ShapeKind)} short={Math.min(doc.width, doc.height)} {tokens} onchange={(strokes, summary) => commit(setProps(doc, clip.id, { strokes }), summary)} /></div>
   {:else if markedField(customName ?? '', field.key) === MarkedField.Hidden}
@@ -567,16 +573,11 @@
         {:else if field.control === Control.Color}
           <ColorField id={`f-${field.key}`} name={field.label} value={value(field)} {tokens} onchange={(v) => setProp(field, v)} />
         {:else if field.control === Control.Asset}
-          <div class="assets">
-            <button type="button" class="asset none" class:on={!value(field)} onclick={() => setProp(field, null)}>None</button>
-            {#each assets.filter((a) => a.kind === field.assetKind) as asset (asset.id)}
-              <button type="button" class="asset" class:on={value(field) === asset.id} title={asset.label} onclick={() => setProp(field, asset.id)}>
-                {#if asset.kind === 'image'}<img src={asset.previewUrl} alt="" />{:else}<span>{asset.label}</span>{/if}
-              </button>
-            {:else}
-              <span class="empty">No {field.assetKind} assets on this canvas yet.</span>
-            {/each}
-          </div>
+          <MediaPicker label={field.label} value={typeof value(field) === 'string' && value(field) ? { kind: field.assetKind === AssetKind.Video ? MediaKind.Video : MediaKind.Image, assetId: String(value(field)) } : null} {assets} accept={acceptOf(field.assetKind)} links={LinkUse.Import} uploader={upload} onpick={(pick) => setProp(field, pick?.assetId ?? null)} />
+        {:else if field.control === Control.MediaItem}
+          <MediaPicker label={field.label} value={pickOfItem(value(field))} {assets} accept={acceptOf(field.assetKind)} links={LinkUse.Keep} uploader={upload} onpick={(pick) => setProp(field, itemOfPick(pick))} />
+        {:else if field.control === Control.MediaList}
+          <MediaListField label={field.label} value={value(field)} {assets} {upload} onchange={(list) => setProp(field, list)} />
         {:else if field.control === Control.Font}
           <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} onupload={onuploadfont} />
         {:else if field.control === Control.Comp}

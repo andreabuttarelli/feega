@@ -248,7 +248,7 @@
             <label class={FIELD_ROW}><span class={LABEL}>Radius</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="1" max="400" step="1" data-testid="fill-radius" value={pct(fill.radius)} onchange={(e) => patch(index, { radius: Math.max(1, Number(e.currentTarget.value)) / PERCENT }, 'Gradient radius')} /></label>
           {/if}
         {:else}
-          <MediaPicker label="Fill image" value={imagePick(fill)} {assets} {upload} onpick={(pick) => patch(index, IMAGE_PATCH(pick), 'Fill image')} />
+          <MediaPicker label="Fill image" value={imagePick(fill)} {assets} uploader={upload} onpick={(pick) => patch(index, IMAGE_PATCH(pick), 'Fill image')} />
           <label class={FIELD_ROW}
             ><span class={LABEL}>Fit</span>
             <select class={cn(FIELD_INPUT, 'w-28')} data-testid="fill-fit" value={fill.fit} onchange={(e) => patch(index, { fit: e.currentTarget.value }, 'Image fit')}>

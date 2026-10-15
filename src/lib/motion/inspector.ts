@@ -100,7 +100,9 @@ const FORMAT_CONTROL: Record<PropFormat, Control> = {
   [PropFormat.Color]: Control.Color,
   [PropFormat.Textarea]: Control.Textarea,
   [PropFormat.Asset]: Control.Asset,
-  [PropFormat.Font]: Control.Font
+  [PropFormat.Font]: Control.Font,
+  [PropFormat.Media]: Control.MediaList,
+  [PropFormat.MediaItem]: Control.MediaItem
 };
 
 const TYPE_CONTROL: Record<PropSpec['type'], (spec: PropSpec) => Control> = {
@@ -122,7 +124,7 @@ export function customFields(schema: PropsSchema): Field[] {
       max: spec.type === 'number' ? (spec.maximum ?? Math.max(RANGE_FALLBACK_MAX, Number(fallback ?? 0) * 4)) : undefined,
       step: spec.type === 'number' ? (spec.step ?? 1) : undefined,
       options: spec.enum,
-      assetKind: control === Control.Asset ? ((spec.assetKind as AssetKind | undefined) ?? AssetKind.Image) : undefined,
+      assetKind: control === Control.Asset ? ((spec.assetKind as AssetKind | undefined) ?? AssetKind.Image) : (spec.assetKind as AssetKind | undefined),
       fallback
     };
   });

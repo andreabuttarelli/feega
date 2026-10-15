@@ -33,7 +33,9 @@ export enum Control {
   Comp = 'comp',
   Corners = 'corners',
   Fills = 'fills',
-  Strokes = 'strokes'
+  Strokes = 'strokes',
+  MediaItem = 'media-item',
+  MediaList = 'media-list'
 }
 
 export enum AssetKind {

@@ -65,3 +65,19 @@ export function linkOf(raw: string): LinkVerdict {
   }
   return { ok: true, url, kind: VIDEO_FILE.test(url) ? MediaKind.Video : MediaKind.Image };
 }
+
+export type MediaSlot = { assetId: string; kind: string } & Record<string, unknown>;
+
+const ACCEPT_OF_KIND: Record<string, MediaAccept> = { [MediaKind.Image]: MediaAccept.Image, [MediaKind.Video]: MediaAccept.Video };
+
+export const acceptOf = (kind: string | undefined): MediaAccept => (kind ? (ACCEPT_OF_KIND[kind] ?? MediaAccept.Any) : MediaAccept.Any);
+
+export const slotPick = (slot: MediaSlot): MediaPick => ({ kind: slot.kind === MediaKind.Video ? MediaKind.Video : MediaKind.Image, assetId: slot.assetId });
+
+export function setSlot(list: readonly MediaSlot[], at: number, pick: MediaPick | null): MediaSlot[] {
+  if (!pick?.assetId) {
+    return list.filter((_, i) => i !== at);
+  }
+  const slot = { ...(list[at] ?? {}), assetId: pick.assetId, kind: pick.kind };
+  return at < list.length ? list.map((s, i) => (i === at ? slot : s)) : [...list, slot];
+}
