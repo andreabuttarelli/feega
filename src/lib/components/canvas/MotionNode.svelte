@@ -27,7 +27,7 @@
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
   import { coverFrame } from '$lib/motion/still';
-  import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
+  import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewAt, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
   let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null, onenter = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null; onenter?: (() => void) | null } = $props();
 
@@ -120,8 +120,9 @@
   });
 
   $effect(() => {
-    if (capturing && player && preview) {
-      void captureCover(player, preview, posterKey);
+    const current = previewAt(preview, node.docHeadRevision);
+    if (capturing && player && current) {
+      void captureCover(player, current, posterKey);
     }
   });
 

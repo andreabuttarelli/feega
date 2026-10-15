@@ -3020,3 +3020,6 @@ Signal: the first `upload(..., { upsert: true })` to a path succeeds, every late
 
 ### A sub-agent round answers the user instead of doing its step
 Signal: an agent reply says it "only has tools to read/research/import" or "can't build" while the run summary shows it wrote something. Cause: a role round with a narrow tool set (researcher) got the user's raw request and no brief, so it answered it; its text leads the turn's reply. Move: every narrowed round gets its own brief message (like `crewBrief`, `RESEARCH_BRIEF`), and a turn that stops by design returns a field the caller can relay (`script_ready`).
+
+### A node patch with `null` silently does nothing
+Signal: a server write reports success, the revision row exists, but `nodes.data` did not move (`docHeadRevision` stays behind). Cause: `mergeNodeData` deletes keys patched to `null`; `DataCheck.Schema` then rejects a field that is `.nullable()` but required, and `patchNodeData` returns `invalid` that the caller ignores. A unit test mocking `patchNodeData` stays green. Move: give the field `.default(null)`, and test the patch through `mergeNodeData` + `validateNodeData`, never a mock.

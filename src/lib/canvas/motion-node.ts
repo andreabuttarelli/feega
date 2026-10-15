@@ -46,7 +46,7 @@ const linkSchema = z.object({ canvasId: z.string().min(1), placed: z.array(z.str
 export const motionNodeSchema = z.object({
   format: z.preprocess(formatOf, z.enum(MOTION_FORMATS)),
   docHeadRevision: z.number().int().min(0),
-  posterAssetId: z.string().nullable(),
+  posterAssetId: z.string().nullable().default(null),
   lastRenderAssetId: z.string().nullable(),
   storyboard: linkSchema.optional(),
   budgetRaisedUsd: z.number().min(0).optional(),

@@ -8,6 +8,17 @@ import {
   validateNodeData,
   type NodeType
 } from './node-data';
+import { mergeNodeData } from './node-patch';
+
+describe('a frame whose poster was dropped', () => {
+  it('stays valid: a new revision clears posterAssetId and the merge removes the key', () => {
+    const frame = { format: '16:9', docHeadRevision: 1, posterAssetId: 'poster-1', lastRenderAssetId: null };
+
+    const next = mergeNodeData(frame, { docHeadRevision: 2, posterAssetId: null });
+
+    expect(validateNodeData('motion', next).ok).toBe(true);
+  });
+});
 
 const GEN_STATE = { status: 'idle' as const };
 

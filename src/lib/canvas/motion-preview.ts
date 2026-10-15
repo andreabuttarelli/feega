@@ -59,3 +59,7 @@ export function scrubFrame(ratio: number, durationInFrames: number): number {
 export function previewClock(frame: number, fps: number, durationInFrames: number): string {
   return `${timecode(frame, fps)} / ${timecode(durationInFrames, fps)}`;
 }
+
+export function previewAt(preview: MotionPreview | null, revision: number): MotionPreview | null {
+  return preview?.version === revision ? preview : null;
+}

@@ -22,6 +22,15 @@ async function centrePixel(page: Page, target: Locator): Promise<{ r: number; g:
   return { r: data[0], g: data[1], b: data[2] };
 }
 
+const EMPTY_FRAME = { version: 5, fps: 30, width: 1920, height: 1080, durationInFrames: 150, tracks: [{ id: 'v1', kind: 'visual', name: 'Video 1', clips: [] }], comps: {}, assets: [] };
+
+async function pixelAt(page: Page, target: Locator, at: number): Promise<{ r: number; g: number; b: number }> {
+  const box = (await target.boundingBox())!;
+  const shot = await page.screenshot({ clip: { x: box.x + box.width * at - 5, y: box.y + box.height * at - 5, width: 10, height: 10 } });
+  const { data } = await sharp(shot).resize(1, 1).raw().toBuffer({ resolveWithObject: true });
+  return { r: data[0], g: data[1], b: data[2] };
+}
+
 const isRed = (p: { r: number; g: number; b: number }) => p.r > 180 && p.g < 90 && p.b < 90;
 
 test.use({ video: process.env.E2E_VIDEO ? 'on' : 'off' });
@@ -72,6 +81,30 @@ test.describe('a generated output placed on the canvas shows what was generated 
     }
   });
   }
+
+  test('a red image dragged into a frame shows red in the frame, closed and after a reload', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(150_000);
+    const png = await redPng(SIZE);
+    const path = `${session.orgId}/${session.projectId}/e2e/${randomUUID()}.png`;
+    await admin.storage.from('canvas-assets').upload(path, png, { contentType: 'image/png' });
+    const { data: asset } = await admin.from('assets').insert({ org_id: session.orgId, project_id: session.projectId, type: 'image', url: path, mime_type: 'image/png', bytes: png.length, ...SIZE, source: 'upload' }).select('id').single();
+    const gen = await seedNode({ type: 'image', x: 80, y: 520, data: { prompt: 'red', refId: asset!.id } });
+    const frame = await seedNode({ type: 'motion', x: 700, y: 80, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+    await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: frame.id, version: 1, doc: EMPTY_FRAME, actor_kind: 'user', actor_id: session.userId });
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const stage = page.locator(`[data-motion-node="${frame.id}"] [data-frame-stage]`);
+    await expect(stage).toBeVisible();
+    await page.locator(`[data-id="${gen.id}"] .gen-body`).hover();
+    await page.getByTestId('drag-to-frame').dragTo(stage);
+
+    const head = async () => (await admin.from('motion_revisions').select('version').eq('node_id', frame.id).order('version', { ascending: false }).limit(1)).data?.[0]?.version;
+    await expect.poll(head, { timeout: 10_000 }).toBe(2);
+    await expect.poll(async () => isRed(await pixelAt(page, stage, 0.5)), { timeout: 20_000, message: 'closed, the frame shows the red picture' }).toBe(true);
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await expect.poll(async () => isRed(await pixelAt(page, stage, 0.5)), { timeout: 20_000, message: 'after a reload, the frame poster is red too' }).toBe(true);
+  });
 
   test('a red video becomes a red free element', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(150_000);

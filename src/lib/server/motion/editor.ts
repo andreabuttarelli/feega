@@ -138,7 +138,7 @@ export async function saveMotionDoc(
   await patchNodeData(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,
-    patch: { docHeadRevision: write.head.version, format: formatOf(write.head.doc as MotionDoc) },
+    patch: { docHeadRevision: write.head.version, format: formatOf(write.head.doc as MotionDoc), posterAssetId: null },
     check: DataCheck.Schema,
     actor: input.actor
   });

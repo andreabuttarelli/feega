@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop, type Slots } from './motion-preview';
+import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewAt, previewClock, previewMode, releaseCapture, scrubFrame, stop, type Slots } from './motion-preview';
 
 const IDLE: Slots = { playing: null, capturing: null };
+
+describe('the preview a cover is shot from', () => {
+  const rev1 = { version: 1, html: '<p>empty</p>', width: 1920, height: 1080, fps: 30, durationInFrames: 150 };
+
+  it('is the loaded one when it is the revision the node is at', () => {
+    expect(previewAt(rev1, 1)).toBe(rev1);
+  });
+
+  it('is none while the previous revision is still loaded: a cover shot then would show the old frame', () => {
+    expect(previewAt(rev1, 2)).toBeNull();
+  });
+});
 
 describe('motion preview in the node', () => {
   it.each([
