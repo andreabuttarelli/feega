@@ -139,7 +139,7 @@ export type GenNode = {
   running?: boolean;
   /** Perché l'ultimo giro non è atterrato. Null quando non c'è nulla da dire. */
   error?: string | null;
-  /** Set when Auto had to leave the cheaper provider, e.g. "kie.ai failed, made on OpenRouter". */
+  /** Set when Auto had to leave the cheaper provider, e.g. "Kie.ai failed, made on OpenRouter". */
   routeNote?: string | null;
 };
 

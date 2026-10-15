@@ -66,7 +66,7 @@ describe('the price the picker shows is the price the route that runs charges', 
     expect(choice.variableCredits).toBe(true);
   });
 
-  it('offers Auto, OpenRouter and kie.ai as separate rows, each with its own price', () => {
+  it('offers Auto, OpenRouter and Kie.ai as separate rows, each with its own price', () => {
     const choice = withDiscountPrices(book(), { ...nanoBanana2, unitCredits: 13, variableCredits: false }, 'image');
 
     expect(choice.routes?.map((r) => r.provider)).toEqual(['auto', 'openrouter', 'kie']);
@@ -89,6 +89,6 @@ describe('the price the picker shows is the price the route that runs charges', 
   });
 
   it('marks the choice with the route that will be tried first', () => {
-    expect(withDiscountPrices(book(), nanoBanana2, 'image').discountRoute).toEqual({ provider: 'kie', label: 'kie.ai' });
+    expect(withDiscountPrices(book(), nanoBanana2, 'image').discountRoute).toEqual({ provider: 'kie', label: 'Kie.ai' });
   });
 });

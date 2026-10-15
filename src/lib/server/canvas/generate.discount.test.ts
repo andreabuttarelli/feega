@@ -168,7 +168,7 @@ describe('the provider saved on the node decides the route', () => {
 
     const out = await runGenNode(db, { ...start, params: { provider: 'kie' } });
 
-    expect(out).toEqual({ kind: 'refused', error: expect.stringMatching(/^kie\.ai failed: .*Pick Auto/) });
+    expect(out).toEqual({ kind: 'refused', error: expect.stringMatching(/^Kie\.ai failed: .*Pick Auto/) });
     expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
   });
 
@@ -187,7 +187,7 @@ describe('the provider saved on the node decides the route', () => {
 
     await runGenNode(db, start);
 
-    expect(nodeWrites(calls).some((w) => w.includes('"routeNote":"kie.ai failed, made on OpenRouter"'))).toBe(true);
+    expect(nodeWrites(calls).some((w) => w.includes('"routeNote":"Kie.ai failed, made on OpenRouter"'))).toBe(true);
   });
 });
 

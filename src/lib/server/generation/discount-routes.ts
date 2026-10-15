@@ -1,3 +1,4 @@
+import { providerName } from '$lib/canvas/model-provider';
 import { env } from '$env/dynamic/private';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { GenParams, ModelChoice, PricedInputs, RouteOption, RoutePrice, RouteStats } from '$lib/canvas/gen-node';
@@ -48,7 +49,9 @@ function primaryUsdOf(choice: ModelChoice, medium: TaskMedium, params: GenParams
   return credits === null ? null : credits / CREDITS_PER_USD_SUBSCRIPTION_LIST;
 }
 
-export const PRIMARY_ROUTE = { provider: 'openrouter', label: 'OpenRouter' } as const;
+const PRIMARY_PROVIDER = 'openrouter';
+
+export const PRIMARY_ROUTE = { provider: PRIMARY_PROVIDER, label: providerName(PRIMARY_PROVIDER) } as const;
 
 const AUTO_LABEL = 'Auto (cheapest healthy)';
 
