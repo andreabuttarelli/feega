@@ -4,7 +4,7 @@ const listGallery = vi.fn(async () => [{ id: 'g1', title: 'Launch', authorName: 
 vi.mock('$lib/server/repos/gallery', () => ({ listGallery }));
 vi.mock('$lib/server/dashboard/tool-scope', () => ({ toolScope: vi.fn(async () => ({ projectId: 'p1' })) }));
 
-const { load } = await import('./+page.server');
+const { load } = await import('$lib/server/dashboard/pages/templates');
 
 const locals = { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => ({}) };
 

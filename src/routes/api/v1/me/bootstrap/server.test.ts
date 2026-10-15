@@ -42,7 +42,8 @@ const { load: rootLoad } = await import('../../../../+layout.server');
 async function call(headers: Record<string, string>, org?: string) {
   const url = new URL(`https://feega.test/api/v1/me/bootstrap${org ? `?org=${org}` : ''}`);
   const res = await (GET as (e: unknown) => Promise<Response>)({ request: new Request(url, { headers }), url });
-  return { res, body: await res.json() };
+  const raw = await res.json();
+  return { res, body: raw.data ?? raw };
 }
 
 const locals = { safeGetSession: async () => ({ session: {}, user: USER }), db: async () => db };
