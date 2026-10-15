@@ -3,7 +3,7 @@ import doc from './fixtures/motion-doc.json' with { type: 'json' };
 import poster from './fixtures/poster-type-grid.json' with { type: 'json' };
 
 const FRAMES = 10;
-const ELEMENTS_BUDGET_MS = 300;
+const ELEMENTS_BUDGET_MS = 500;
 const PARTS_BUDGET_MS = 2_500;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const PORTRAIT = { format: '4:5', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };

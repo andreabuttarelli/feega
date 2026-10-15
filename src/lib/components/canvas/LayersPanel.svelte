@@ -29,20 +29,22 @@
   const PRECOMP = 'Precomp';
   const INDENT_PX = 14;
   const FOLD_GUTTER = 24;
+  const PROBE_LANES = 4;
 
   const canvas = $derived(layersSource.canvas);
   const video = $derived(layersSource.video);
   const heads = $derived(canvasHeads(canvas?.nodes ?? []));
   let outlines = $state.raw<OutlineCache>({});
+  const known = $derived({ ...canvas?.outlines, ...outlines });
   let opening = $state<{ nodeId: string; id: string } | null>(null);
   let folds = $state.raw<Set<string>>(typeof localStorage === 'undefined' ? new Set() : readFolds(localStorage));
 
-  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts, mode: video.mode } : null, outlinesFor(heads, outlines), folds));
+  const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts, mode: video.mode } : null, outlinesFor(heads, known), folds));
   const frames = $derived(new Set([...heads.map((h) => h.nodeId), ...(video ? [video.nodeId] : [])]));
   const fold = (nodeId: string) => (folds = toggleFold(localStorage, folds, nodeId));
 
   let probed = $state.raw<ReadonlySet<string>>(new Set());
-  const probing = $derived(canvas ? (posterHeads(heads, outlines, probed, video?.nodeId ?? null)[0] ?? null) : null);
+  const probing = $derived(canvas ? posterHeads(heads, known, probed, video?.nodeId ?? null).slice(0, PROBE_LANES) : []);
 
   function measured(head: FrameHead, boxes: Record<string, MeasuredBox>) {
     probed = new Set([...probed, headKey(head)]);
@@ -60,7 +62,7 @@
 
   $effect(() => {
     const url = canvas?.outlinesUrl;
-    const missing = missingHeads(heads, untrack(() => outlines), video?.nodeId ?? null);
+    const missing = missingHeads(heads, untrack(() => known), video?.nodeId ?? null);
     if (!url || !missing.length) {
       return;
     }
@@ -209,10 +211,10 @@
   }
 </script>
 
-{#if probing && canvas}
-  {#key headKey(probing)}
-    <PartsProbe url={`${canvas.previewUrl(probing.nodeId)}?revision=${probing.version}`} onmeasured={(boxes) => measured(probing, boxes)} />
-  {/key}
+{#if canvas}
+  {#each probing as head (headKey(head))}
+    <PartsProbe url={`${canvas.previewUrl(head.nodeId)}?revision=${head.version}`} onmeasured={(boxes) => measured(head, boxes)} />
+  {/each}
 {/if}
 
 <input class="search" type="search" placeholder="Search layers…" aria-label="Search layers" data-testid="layers-search" bind:value={query} />
