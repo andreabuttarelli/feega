@@ -11,7 +11,8 @@ import { videoDurationOptions, VIDEO_RESOLUTIONS, MIN_DURATION } from '$lib/serv
 import { modelParamsOf } from '$lib/canvas/model-params';
 import { env } from '$env/dynamic/private';
 import { taskChoice } from './task-choice';
-import { configuredIn, taskProviderOf, TaskProviderName } from './generation/task-providers';
+import { configuredIn, RouteRole, TASK_PROVIDERS, taskProviderOf, TaskProviderName } from './generation/task-providers';
+import { discountBook, withDiscountPrices } from './generation/discount-routes';
 import { model3dChoiceParams, REVIEWED_MODEL3D_MODELS } from '$lib/model3d-models';
 
 const VIDEO_SPEC_IDS = [
@@ -108,7 +109,7 @@ const CHOICE_OF_PROVIDER: Readonly<Record<string, (row: SyncedRow) => ModelChoic
 
 function providerReachable(row: SyncedRow, configured: ReadonlySet<TaskProviderName>): boolean {
   const provider = taskProviderOf(row.id);
-  return !provider || configured.has(provider);
+  return !provider || (configured.has(provider) && TASK_PROVIDERS[provider].role === RouteRole.Primary);
 }
 
 function unspeccedChoice(row: SyncedRow, generic: (row: SyncedRow) => ModelChoice): ModelChoice {
@@ -325,7 +326,7 @@ function videoChoice(spec: VideoModelSpec, row: SyncedRow, inputModalities: stri
   };
 }
 
-async function offerableImages(admin: SupabaseClient): Promise<OfferableModels> {
+async function offerableImages(admin: SupabaseClient, view = PricingView.Offered): Promise<OfferableModels> {
   const { rows, synced } = await syncedRows(admin, 'image');
 
   const specs = IMAGE_MODEL_CHOICES.map((c) => imageModelSpec(c.id)).filter(
@@ -351,10 +352,10 @@ async function offerableImages(admin: SupabaseClient): Promise<OfferableModels> 
     if (!specced.has(id)) choices.push(unspeccedChoice(row, genericImageChoice));
   }
 
-  return { synced, choices };
+  return { synced, choices: await priced(admin, 'image', choices, view) };
 }
 
-async function offerableVideos(admin: SupabaseClient): Promise<OfferableModels> {
+async function offerableVideos(admin: SupabaseClient, view = PricingView.Offered): Promise<OfferableModels> {
   const { rows, synced } = await syncedRows(admin, 'video');
 
   const specs = VIDEO_SPEC_IDS.map((id) => videoModelSpec(id)).filter(
@@ -375,10 +376,23 @@ async function offerableVideos(admin: SupabaseClient): Promise<OfferableModels> 
     if (!specced.has(id)) choices.push(unspeccedChoice(row, genericVideoChoice));
   }
 
-  return { synced, choices };
+  return { synced, choices: await priced(admin, 'video', choices, view) };
 }
 
 export type OfferableModels = { synced: boolean; choices: ModelChoice[] };
+
+export enum PricingView {
+  Offered = 'offered',
+  Primary = 'primary'
+}
+
+async function priced(admin: SupabaseClient, medium: 'image' | 'video', choices: ModelChoice[], view: PricingView): Promise<ModelChoice[]> {
+  if (view === PricingView.Primary) {
+    return choices;
+  }
+  const book = await discountBook(admin, medium);
+  return choices.map((choice) => withDiscountPrices(book, choice, medium));
+}
 
 /**
  * QUEL CHE QUESTO MEDIUM PUÒ OFFRIRE, ORA. Il testo non passa da questa regola: il centralino
@@ -393,14 +407,14 @@ async function offerableModels3d(admin: SupabaseClient): Promise<OfferableModels
   return { synced, choices: reviewed.map((row) => ({ ...taskChoice(row), params: model3dChoiceParams(row.id) })) };
 }
 
-const OFFERABLE: Readonly<Record<SyncedCatalogue, (admin: SupabaseClient) => Promise<OfferableModels>>> = {
+const OFFERABLE: Readonly<Record<SyncedCatalogue, (admin: SupabaseClient, view: PricingView) => Promise<OfferableModels>>> = {
   image: offerableImages,
   video: offerableVideos,
   model3d: offerableModels3d
 };
 
-export async function offerableModels(admin: SupabaseClient, medium: SyncedCatalogue): Promise<OfferableModels> {
-  return OFFERABLE[medium](admin);
+export async function offerableModels(admin: SupabaseClient, medium: SyncedCatalogue, view = PricingView.Offered): Promise<OfferableModels> {
+  return OFFERABLE[medium](admin, view);
 }
 
 /**

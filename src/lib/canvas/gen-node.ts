@@ -67,6 +67,8 @@ export type ModelChoice = {
   params?: ModelParam[];
   wireId?: string;
   uncensored?: boolean;
+  /** Set when a cheaper provider serves this model first; the credits above are that route's. */
+  discountRoute?: { provider: string; label: string };
   pricedInputs?: PricedInputs[];
   tiers?: RecommendationTier[];
   recommendedWhy?: string;

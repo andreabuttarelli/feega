@@ -286,6 +286,7 @@ npm run eval:bootstrap    # a real signup lands in a working org/project — the
 npm run eval:canvas       # realtime on nodes/canvases/presence: does a peer see what another peer wrote?
 npm run eval:gen-node     # the three paths run_node_generation can take, against the real engine
 npm run eval:image-node   # an image node lands a real file in storage, not just a row that claims one
+npm run eval:provider-smoke -- --spend   # one cheapest render per media provider, $1 hard cap; dry run without --spend
 ```
 
 `eval:bootstrap` proves the entry path a real signup takes — a fresh user through `enterApp` —
