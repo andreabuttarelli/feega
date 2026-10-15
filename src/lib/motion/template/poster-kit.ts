@@ -36,7 +36,7 @@ export const fontProp = (title: string, value: string): PropSpec => ({ type: 'st
 export const prefixProp = (prefix: string): PropSpec => textProp('Runtime variable prefix', prefix, { group: 'Layout', maxLength: 20 });
 
 const POSTER_HELPERS = String.raw`
-const fontOf = (f) => (String(f).includes(',') ? f : '"' + f + '", system-ui, sans-serif');
+const fontOf = (f) => (String(f).includes(',') ? f : "'" + f + "', system-ui, sans-serif");
 const escaped = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const linesOf = (s) => String(s || '').split('\n');
 const box = (x, y, w, h) => 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px;';
@@ -153,7 +153,7 @@ export const smallTextProps = (font: string, size: number): Record<string, PropS
 });
 
 export const POSTER_TEXT = String.raw`
-const cssFont = (f) => fontOf(f).replace(/"/g, "'");
+const cssFont = (f) => fontOf(f);
 const sizeOf = (p, key) => (p[key + 'Size'] === undefined ? p.smallSize : p[key + 'Size']);
 const textPart = (p, key, width, height, extra = '') =>
   '<div' + part(key) + ' style="position:absolute;margin:0;white-space:pre;line-height:1.04;left:' + (p[key + 'X'] / 100) * width + 'px;top:' + (p[key + 'Y'] / 100) * height + 'px;font-size:' + (sizeOf(p, key) / 100) * width + 'px;font-weight:' + (p[key + 'Weight'] || 'inherit') + ';color:' + p[key + 'Color'] + ';font-family:' + cssFont(p[key + 'Font'] || p.smallFont) + ';' + extra + '">' + escaped(p[key]) + '</div>';
