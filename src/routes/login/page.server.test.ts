@@ -52,4 +52,11 @@ describe('login page load', () => {
       location: '/p/proj1/c/canvas1'
     });
   });
+
+  it('a CLI sign-in finished on the client goes back to the CLI callback', async () => {
+    await expect(run('/login?cli_port=9876&cli_state=s')).resolves.toEqual({
+      status: 303,
+      location: '/cli/callback?cli_port=9876&cli_state=s'
+    });
+  });
 });

@@ -1,9 +1,10 @@
 import { goto } from '$app/navigation';
 import { createSupabaseBrowserClient } from '$lib/supabase/client';
-import { NATIVE_AUTH_BASE } from '$lib/native-shell';
-import { HOSTED_ORIGIN } from '$lib/runtime';
+import { NATIVE_AUTH_BASE, isNativeShell } from '$lib/native-shell';
+import { HOSTED_ORIGIN, RUNTIME, Runtime } from '$lib/runtime';
 import { call, chooseWorkspace, withOrg } from '$lib/dashboard/api';
 import { inBundle, LOGIN_PATH } from '$lib/native/bundle-routes';
+import { INVITE_PARAM } from './invite';
 
 export type AuthRefusal = { errorCode?: string; error?: string };
 
@@ -36,15 +37,36 @@ export async function signUp(email: string, password: string): Promise<AuthRefus
   return signIn(email, password);
 }
 
-export async function sendReset(email: string, locale: string): Promise<AuthRefusal | null> {
-  const sent = await postJson('/api/v1/auth/reset', { email, locale });
+export async function sendReset(email: string, locale: string, invite: string | null): Promise<AuthRefusal | null> {
+  const sent = await postJson('/api/v1/auth/reset', invite ? { email, locale, invite } : { email, locale });
   return sent.ok ? null : sent.body;
 }
 
-export async function startOAuth(provider: OAuthProvider): Promise<AuthRefusal | null> {
+const CALLBACK_PARAMS = ['cli_port', 'cli_state', INVITE_PARAM];
+
+function authBase(): string {
+  if (RUNTIME === Runtime.Bundle || isNativeShell(navigator.userAgent)) {
+    return NATIVE_AUTH_BASE;
+  }
+  return `${location.origin}/auth`;
+}
+
+function callbackUrl(from: URLSearchParams): string {
+  const kept = new URLSearchParams();
+  for (const name of CALLBACK_PARAMS) {
+    const value = from.get(name);
+    if (value) {
+      kept.set(name, value);
+    }
+  }
+  const query = kept.toString();
+  return `${authBase()}/callback${query ? `?${query}` : ''}`;
+}
+
+export async function startOAuth(provider: OAuthProvider, from: URLSearchParams): Promise<AuthRefusal | null> {
   const { data, error } = await createSupabaseBrowserClient().auth.signInWithOAuth({
     provider,
-    options: { redirectTo: `${NATIVE_AUTH_BASE}/callback`, skipBrowserRedirect: true }
+    options: { redirectTo: callbackUrl(from), skipBrowserRedirect: true }
   });
   if (error || !data.url) {
     return { error: error?.message ?? `Could not start ${provider} sign-in` };
@@ -86,4 +108,12 @@ export async function land(): Promise<void> {
     chooseWorkspace(body.org);
   }
   await follow(body.redirect);
+}
+
+export async function afterSignIn(): Promise<void> {
+  if (RUNTIME === Runtime.Bundle) {
+    await land();
+    return;
+  }
+  location.assign(`${LOGIN_PATH}${location.search}`);
 }

@@ -211,5 +211,33 @@ an unlocked screen; `feega://auth/callback` must be on Supabase's redirect allow
 maps `feega://auth/callback?code=` onto the current window origin, so in the bundle it lands on the
 bundle's `/auth/callback`, which exchanges the code with the PKCE verifier in `localStorage`.
 
+### One login for web and native (2026-10-15)
+
+The web login uses the bundle's client-only flow (`$lib/login/client-auth.ts`); the `/login` form
+actions are gone. On the web the browser client keeps session and PKCE verifier in cookies, so
+the hosted cookie session still serves the server-rendered pages that remain. After sign-in the
+web reloads `/login`, whose load routes (MCP consent, CLI, invite, home).
+
+OAuth round trips:
+
+| Where the login runs | `redirectTo` | Who exchanges the code |
+|---|---|---|
+| Web browser | `<origin>/auth/callback?…` | `src/routes/auth/callback/+server.ts` (verifier cookie) |
+| Hosted page inside the shell | `feega://auth/callback?…` → shell maps onto `<hosted>/auth/callback?code=` | same server route |
+| Bundle | `feega://auth/callback?…` → shell maps onto `<bundle>/auth/callback?code=` | `src/native-routes/auth/callback` (verifier in `localStorage`) |
+
+`feega://` round trip, step by step: the page calls `signInWithOAuth({ redirectTo:
+'feega://auth/callback', skipBrowserRedirect })` and opens the provider URL; the system browser
+signs in at the provider, Supabase redirects to `feega://auth/callback?code=…`; macOS/iOS hand the
+URL to the app (scheme registered in the Tauri config); `routing.rs` rewrites it onto the current
+window origin; the page there exchanges the code with the verifier it stored before leaving.
+Precondition: `feega://auth/callback` on Supabase's redirect allow-list, otherwise Supabase falls
+back to the Site URL and the app never gets the code. Not verified (no read access to the auth
+config).
+
+Verified on web: `tests/e2e/login-oauth.spec.ts` (authorize leaves with `code_challenge`, the
+`redirect_to` keeps `cli_port`/`cli_state`/`invite_token`, the verifier cookie is set; a provider
+refusal lands on `/login?error=oauth`). The provider step itself is not automated.
+
 Open: hosted pages link back to the hosted `/app`, not to the bundle; the canvas and editor still
 need their own API move before they can be bundled.

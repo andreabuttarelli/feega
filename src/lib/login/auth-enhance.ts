@@ -1,13 +1,13 @@
-import { applyAction, enhance } from '$app/forms';
+import { applyAction } from '$app/forms';
 import type { ActionResult, SubmitFunction } from '@sveltejs/kit';
-import { RUNTIME, Runtime } from '$lib/runtime';
 import { actionTarget } from '$lib/dashboard/api-enhance';
-import { land, OAuthProvider, sendReset, signIn, signUp, startOAuth, type AuthRefusal } from './client-auth';
+import { inviteTokenIn } from './invite';
+import { afterSignIn, OAuthProvider, sendReset, signIn, signUp, startOAuth, type AuthRefusal } from './client-auth';
 
 const OK = 200;
 const BAD_REQUEST = 400;
 
-type Fields = { email: string; password: string; locale: string };
+type Fields = { email: string; password: string; locale: string; invite: string | null; params: URLSearchParams };
 type AuthAction = (fields: Fields) => Promise<ActionResult | null>;
 
 function refusedOrLanded(email: string) {
@@ -15,7 +15,7 @@ function refusedOrLanded(email: string) {
     if (refusal) {
       return { type: 'failure', status: BAD_REQUEST, data: { ...refusal, email } };
     }
-    await land();
+    await afterSignIn();
     return null;
   };
 }
@@ -23,23 +23,25 @@ function refusedOrLanded(email: string) {
 const AUTH_ACTIONS: Record<string, AuthAction> = {
   login: ({ email, password }) => signIn(email, password).then(refusedOrLanded(email)),
   signup: ({ email, password }) => signUp(email, password).then(refusedOrLanded(email)),
-  reset: async ({ email, locale }) => {
-    const refusal = await sendReset(email, locale);
+  reset: async ({ email, locale, invite }) => {
+    const refusal = await sendReset(email, locale, invite);
     return refusal ? { type: 'failure', status: BAD_REQUEST, data: { ...refusal, email } } : { type: 'success', status: OK, data: { reset: true, email } };
   },
-  google: () => startOAuth(OAuthProvider.Google).then((refusal) => (refusal ? { type: 'failure', status: BAD_REQUEST, data: refusal } : null)),
-  github: () => startOAuth(OAuthProvider.GitHub).then((refusal) => (refusal ? { type: 'failure', status: BAD_REQUEST, data: refusal } : null))
+  google: ({ params }) => startOAuth(OAuthProvider.Google, params).then((refusal) => (refusal ? { type: 'failure', status: BAD_REQUEST, data: refusal } : null)),
+  github: ({ params }) => startOAuth(OAuthProvider.GitHub, params).then((refusal) => (refusal ? { type: 'failure', status: BAD_REQUEST, data: refusal } : null))
 };
 
 function fieldsOf(form: FormData): Fields {
   return {
     email: String(form.get('email') ?? '').trim().toLowerCase(),
     password: String(form.get('password') ?? ''),
-    locale: String(form.get('locale') ?? '')
+    locale: String(form.get('locale') ?? ''),
+    invite: inviteTokenIn(form),
+    params: new URLSearchParams([...form].filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
   };
 }
 
-function bundledAuth(form: HTMLFormElement, submit?: SubmitFunction) {
+export function authEnhance(form: HTMLFormElement, submit?: SubmitFunction) {
   async function submitted(event: SubmitEvent) {
     const target = actionTarget(form.getAttribute('action') ?? '', location.pathname);
     const run = target ? AUTH_ACTIONS[target.action] : undefined;
@@ -64,14 +66,4 @@ function bundledAuth(form: HTMLFormElement, submit?: SubmitFunction) {
 
   form.addEventListener('submit', submitted);
   return { destroy: () => form.removeEventListener('submit', submitted) };
-}
-
-export function authEnhance(form: HTMLFormElement, submit?: SubmitFunction) {
-  if (RUNTIME === Runtime.Bundle) {
-    return bundledAuth(form, submit);
-  }
-  if (!submit) {
-    return { destroy: () => {} };
-  }
-  return enhance(form, submit);
 }

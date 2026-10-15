@@ -41,6 +41,7 @@ const { sendEmail } = await import('$lib/server/email');
 const login = await import('./+page.server');
 const callback = await import('../auth/callback/+server');
 const reset = await import('../auth/reset-password/+page.server');
+const resetApi = await import('../api/v1/auth/reset/+server');
 
 const user = { id: 'user-b', email: INVITED };
 const session = { access_token: 'jwt' };
@@ -107,24 +108,6 @@ function expectJoinedOrgA() {
 }
 
 describe("l'invito si accetta da ogni porta d'ingresso", () => {
-  it('login con password', async () => {
-    const res = await outcome(() =>
-      (login.actions.login as any)(event('/login', { email: INVITED, password: 'pw', invite_token: TOKEN }))
-    );
-
-    expect(res).toEqual({ location: HOME });
-    expectJoinedOrgA();
-  });
-
-  it('registrazione', async () => {
-    const res = await outcome(() =>
-      (login.actions.signup as any)(event('/login', { email: INVITED, password: 'password', invite_token: TOKEN }))
-    );
-
-    expect(res).toEqual({ location: HOME });
-    expectJoinedOrgA();
-  });
-
   it('chi è già dentro e apre il link', async () => {
     const res = await outcome(() => (login.load as any)(event(`/login?invite_token=${TOKEN}`)));
 
@@ -150,21 +133,9 @@ describe("l'invito si accetta da ogni porta d'ingresso", () => {
     expectJoinedOrgA();
   });
 
-  it("il token sopravvive al giro OAuth dentro l'indirizzo di ritorno", async () => {
-    let redirectTo = '';
-    const e = event('/login', { invite_token: TOKEN }, false);
-    (e.locals.supabase.auth as any).signInWithOAuth = async (o: any) => {
-      redirectTo = o.options.redirectTo;
-      return { data: { url: 'https://github.com/login' }, error: null };
-    };
-
-    await outcome(() => (login.actions.github as any)(e));
-
-    expect(new URL(redirectTo).searchParams.get('invite_token')).toBe(TOKEN);
-  });
-
   it("il token sopravvive all'email di reset", async () => {
-    await outcome(() => (login.actions.reset as any)(event('/login', { email: INVITED, invite_token: TOKEN }, false)));
+    const req = new Request('https://feega.app/api/v1/auth/reset', { method: 'POST', body: JSON.stringify({ email: INVITED, invite: TOKEN }) });
+    await resetApi.POST({ request: req, url: new URL(req.url) } as any);
 
     const link = new URL(String(vi.mocked(sendEmail).mock.calls[0][0].text));
     const next = new URL(link.searchParams.get('next')!, 'https://feega.app');
@@ -177,9 +148,7 @@ describe('un invito che non vale si dice sul login', () => {
   it('scaduto', async () => {
     kit = createTestSupabase({ orgs_invites: [invite({ expires_at: '2020-01-01T00:00:00Z' })], orgs_members: [] });
 
-    const res = await outcome(() =>
-      (login.actions.login as any)(event('/login', { email: INVITED, password: 'pw', invite_token: TOKEN }))
-    );
+    const res = await outcome(() => (login.load as any)(event(`/login?invite_token=${TOKEN}`)));
 
     expect(res).toEqual({ location: '/login?invite_error=invalid' });
     expect(members()).toEqual([]);

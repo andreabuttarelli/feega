@@ -274,7 +274,7 @@ export async function gotoHydrated(page: Page, path: string): Promise<import('@p
  * `click` cade prima che `use:enhance` sia davvero agganciato — il form allora naviga per
  * davvero, e la pagina che arriva è di nuovo `/login` (vuota, senza `?/login` in coda: un giro
  * morto, non un errore di credenziali). `waitForResponse` aspetta il segnale vero — il POST che
- * `use:enhance` intercetta — non un'approssimazione temporale.
+ * il client manda a Supabase — non un'approssimazione temporale.
  */
 export async function skipTour(page: Page): Promise<void> {
   await page.addInitScript((key) => {
@@ -293,7 +293,7 @@ export async function signInE2e(page: Page, session: Pick<E2eSession, 'email' | 
   await page.locator('input[type="password"]').fill(session.password);
 
   const loggedIn = page.waitForResponse(
-    (r) => r.url().includes('/login?/login') && r.request().method() === 'POST'
+    (r) => r.url().includes('/auth/v1/token') && r.request().method() === 'POST'
   );
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await loggedIn;
