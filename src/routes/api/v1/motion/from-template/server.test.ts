@@ -3,9 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const caller = vi.hoisted(() => ({ writeAllowed: true }));
 const store = vi.hoisted(() => ({ revisions: [] as { doc: { comps: Record<string, { template?: { id: string } }> } }[], nodes: [] as Record<string, unknown>[] }));
 
+vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
+  const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
+  return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
+});
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async () => ({ caller: { db: {}, orgId: 'org-1', userId: 'u-1', writeAllowed: caller.writeAllowed } }) }));
 vi.mock('$lib/server/repos/projects', () => ({
-  listProjects: async () => [{ id: 'p-recent' }],
+  listProjects: async () => [{ id: 'p-recent', mode: 'standard' }],
   findProjectById: async (_db: unknown, input: { projectId: string }) => (input.projectId === 'p-1' ? { id: 'p-1' } : null)
 }));
 vi.mock('$lib/server/repos/canvas', async (original) => ({

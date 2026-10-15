@@ -1,5 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
+import { callerReach } from '$lib/server/org-data/reach';
 import { videoFromTemplate } from '$lib/server/motion/from-template';
 import type { RequestHandler } from './$types';
 
@@ -15,6 +16,11 @@ export const POST: RequestHandler = async ({ request, url }) => {
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: HTTP_FORBIDDEN });
   }
-  const out = await videoFromTemplate(db, { orgId, userId }, await request.json().catch(() => ({})));
+  const body = (await request.json().catch(() => ({}))) as { project?: unknown };
+  const unreachable = await callerReach(resolved.caller, { project: typeof body.project === 'string' ? body.project : null });
+  if (unreachable) {
+    return unreachable;
+  }
+  const out = await videoFromTemplate(db, { orgId, userId }, body);
   return out instanceof Response ? out : json(out);
 };

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { findProjectById, listProjects } from '$lib/server/repos/projects';
+import { ProjectMode } from '$lib/project-mode';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
@@ -97,7 +98,7 @@ async function apiProject(db: Db, orgId: string, wanted: string | undefined): Pr
   if (wanted) {
     return (await findProjectById(db, { orgId, projectId: wanted }))?.id ?? null;
   }
-  return (await listProjects(db, orgId))[0]?.id ?? null;
+  return (await listProjects(db, orgId)).find((p) => p.mode === ProjectMode.Standard)?.id ?? null;
 }
 
 export async function videoFromTemplate(db: Db, scope: { orgId: string; userId: string }, raw: unknown): Promise<Record<string, unknown> | Response> {

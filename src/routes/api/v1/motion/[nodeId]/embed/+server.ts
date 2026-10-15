@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { resolveOrgCaller } from '$lib/server/org-data/auth';
+import { reachableCaller } from '$lib/server/org-data/reach';
 import { appOrigin } from '$lib/server/app-url';
 import { EmbedFailure, motionEmbedState, publishMotionEmbed, unpublishMotionEmbed, type EmbedAnswer } from '$lib/server/motion/agent-embed';
 import type { RequestHandler } from './$types';
@@ -24,20 +24,19 @@ enum Access {
   Write = 'write'
 }
 
-async function caller(request: Request, url: URL, access: Access) {
-  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
-  if ('error' in resolved) {
-    return json(resolved.error.body, { status: resolved.error.status });
+async function caller(request: Request, url: URL, access: Access, nodeId: string | undefined) {
+  const found = await reachableCaller(request, url, { nodes: [nodeId ?? ''] });
+  if (found instanceof Response) {
+    return found;
   }
-  if (access === Access.Write && !resolved.caller.writeAllowed) {
+  if (access === Access.Write && !found.writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: HTTP_FORBIDDEN });
   }
-  return resolved.caller;
+  return found;
 }
 
 export const GET: RequestHandler = async ({ request, params, url }) => {
-  const found = await caller(request, url, Access.Read);
+  const found = await caller(request, url, Access.Read, params.nodeId);
   if (found instanceof Response) {
     return found;
   }
@@ -45,7 +44,7 @@ export const GET: RequestHandler = async ({ request, params, url }) => {
 };
 
 export const POST: RequestHandler = async ({ request, params, url }) => {
-  const found = await caller(request, url, Access.Write);
+  const found = await caller(request, url, Access.Write, params.nodeId);
   if (found instanceof Response) {
     return found;
   }
@@ -53,7 +52,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
 };
 
 export const DELETE: RequestHandler = async ({ request, params, url }) => {
-  const found = await caller(request, url, Access.Write);
+  const found = await caller(request, url, Access.Write, params.nodeId);
   if (found instanceof Response) {
     return found;
   }

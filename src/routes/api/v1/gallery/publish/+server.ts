@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
+import { callerReach } from '$lib/server/org-data/reach';
 import { agentActor } from '$lib/server/repos/actor';
 import { MCP_AGENT_KEY } from '$lib/server/motion/ask';
 import { publishNode } from '$lib/server/gallery/service';
@@ -31,6 +32,10 @@ export const POST: RequestHandler = async ({ request, url }) => {
   }
 
   const { node_id, ...meta } = body.data;
+  const unreachable = await callerReach(resolved.caller, { nodes: [node_id] });
+  if (unreachable) {
+    return unreachable;
+  }
   const published = await publishNode({ db, orgId, userId, actor: agentActor(userId, MCP_AGENT_KEY) }, { nodeId: node_id, meta });
   if (!published.ok) {
     return json({ error: published.error, detail: published.message }, { status: publishStatus(published.error) });

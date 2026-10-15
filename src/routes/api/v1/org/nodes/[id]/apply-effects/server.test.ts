@@ -3,6 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const resolveOrgCaller = vi.fn();
 const applyEffectsTo = vi.fn();
 
+vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
+  const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
+  return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
+});
 vi.mock('$lib/server/org-data/auth', () => ({
   resolveOrgCaller: (...args: unknown[]) => resolveOrgCaller(...args)
 }));
