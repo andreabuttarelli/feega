@@ -49,9 +49,15 @@ const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
   connect_nodes:
     'Connect two nodes on one canvas of THIS project. The edge is directed: source feeds target. Refused when the target node uses an uncensored model — those take no inputs of any kind, ever: switch the model first. Also refused when the source medium does not feed the target — an audio node only takes what its current operation needs (describe_node_types type "audio" lists them).',
   move_frame_element:
-    'Move one element (a clip: text, image, video, shape, component) out of a Frame into another Frame of THIS project, or onto the empty canvas as a new Frame holding only it. Props, style and keyframes are kept and re-timed to the target frame rate; x/y (0..1 of the target frame) is where its centre lands. Never turns an element into a generative node. Both frames are saved as revisions.',
+    'Move one element (a clip: text, image, video, shape, component) out of a Frame into another Frame of THIS project, or onto the empty canvas as a free element (a Text, Box, Ellipse, Path or Image on its own, no frame around it, the size it had in its frame). Props, style and keyframes are kept and re-timed to the target frame rate; x/y (0..1 of the target frame) is where its centre lands. Never turns an element into a generative node. Both frames are saved as revisions.',
   place_in_frame:
     "Put the generated output of a Generate image, Generate video or Generate text node of THIS project into a Frame as an element (image, video at the frame's start, or text), centred at x/y (0..1). Omit toFrameId to make a new Frame on the canvas holding only it. The generative node is not changed. To keep the element following the node's next generations, connect_nodes the node to the Frame instead.",
+  draw_element:
+    'Draw a free graphic element on a canvas of THIS project, outside any frame: drawn { tool: "text" | "rectangle" | "ellipse", box: { left, top, width, height } } in canvas units, or { tool: "pen", path: "<SVG d in canvas units>" }. It is a Text, Box, Ellipse or Path with the same fills, strokes, effects and text style as inside a frame; it is NOT a Generate text node. Answers frame_id (the element node) and element_id (its clip): edit it with the frame tools.',
+  group_elements:
+    'Group two or more free elements of THIS project into one Group on the canvas; they keep their places and sizes and move as one. nodeIds are element nodes (list_nodes: type motion with data.kind element or group). Inside a frame, group clips with the frame tool precompose instead.',
+  ungroup_element:
+    'Split a Group of free elements on the canvas of THIS project back into one element per shape, each where it was.',
   delete_node:
     'Soft-delete a node on THIS project. The node disappears from list_nodes; undo can bring it back.',
   run_node:
