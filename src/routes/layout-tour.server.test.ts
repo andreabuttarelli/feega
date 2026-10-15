@@ -24,6 +24,7 @@ function event(user: { id: string; created_at: string } | null, profile: Profile
   return {
     request: new Request('https://feega.test/app'),
     url: new URL('https://feega.test/app'),
+    untrack: <T>(fn: () => T): T => fn(),
     locals: {
       safeGetSession: async () => ({ session: user ? { user } : null, user }),
       db: async () => ({

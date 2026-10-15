@@ -9,7 +9,7 @@ import { listMemberships } from '$lib/server/repos/orgs';
 import { createProject } from '$lib/server/repos/projects';
 import { createCanvas } from '$lib/server/repos/canvas';
 import { SUPPORT_TOOLS } from '$lib/tools';
-import { toolScope } from '$lib/server/dashboard/tool-scope';
+import { PROJECT_PARAM, toolScope } from '$lib/server/dashboard/tool-scope';
 import { CanvasPick } from '$lib/server/motion/start';
 import { handoffPath } from '$lib/canvas/chat-handoff';
 import { loadAttachments } from '$lib/server/chat-attachments/register';
@@ -27,15 +27,27 @@ const SLUG_BYTES = 4;
 export const load: PageServerLoad = async (event) => {
   const { db, user } = await signedInDb(event);
   const { cookies } = event;
-  const path = await homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null, takeCampaign(cookies));
-  if (path !== DASHBOARD_PATH) {
-    throw redirect(HTTP_SEE_OTHER, path);
+  const campaign = takeCampaign(cookies);
+  const { org, projects } = await event.parent();
+  const recentProjectId = projects?.[0]?.id ?? null;
+
+  if (campaign || !recentProjectId) {
+    const path = await homePathFor(db, ENTRY_DEPS, user, cookies.get(ORG_COOKIE) ?? null, cookies.get(LAST_PROJECT_COOKIE) ?? null, campaign);
+    if (path !== DASHBOARD_PATH) {
+      throw redirect(HTTP_SEE_OTHER, path);
+    }
   }
 
-  const { org } = await event.parent();
-  const [dashboard, attachProjectId] = await Promise.all([dashboardFor(db, DASHBOARD_DEPS, org.id), toolScope(event).then((scope) => scope.projectId, () => null)]);
+  const [dashboard, attachProjectId] = await Promise.all([dashboardFor(db, DASHBOARD_DEPS, org.id), attachTarget(event, recentProjectId)]);
   return { dashboard, templates: BRIEF_TEMPLATES, tools: SUPPORT_TOOLS, attachProjectId };
 };
+
+async function attachTarget(event: Parameters<PageServerLoad>[0], recentProjectId: string | null): Promise<string | null> {
+  if (recentProjectId && !event.url.searchParams.has(PROJECT_PARAM)) {
+    return recentProjectId;
+  }
+  return toolScope(event).then((scope) => scope.projectId, () => null);
+}
 
 function projectSlug(): string {
   const suffix = [...crypto.getRandomValues(new Uint8Array(SLUG_BYTES))].map((b) => b.toString(16).padStart(2, '0')).join('');

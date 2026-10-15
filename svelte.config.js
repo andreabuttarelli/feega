@@ -25,7 +25,7 @@ const config = {
       deployTarget === NODE_DEPLOY_TARGET
         ? nodeAdapter()
         : // Pin the Vercel runtime so local builds don't depend on the local Node version.
-          vercelAdapter({ runtime: 'nodejs22.x', maxDuration: 300 }),
+          vercelAdapter({ runtime: 'nodejs22.x', maxDuration: 300, regions: ['lhr1'] }),
 
     version: { name: releaseName, pollInterval: VERSION_POLL_MS },
 
