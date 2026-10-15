@@ -13,6 +13,10 @@ const store = vi.hoisted(() => ({
   farm: [] as Record<string, unknown>[]
 }));
 
+vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
+  const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
+  return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
+});
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async () => (store.caller ? { caller: store.caller } : { error: { status: 401, body: { error: 'unauthenticated' } } }) }));
 vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiAction: async () => store.gate ?? undefined }));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({

@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { resolveOrgCaller } from '$lib/server/org-data/auth';
+import { reachableCaller } from '$lib/server/org-data/reach';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { findNode } from '$lib/server/repos/canvas';
 import { runGenNode } from '$lib/server/canvas/generate';
@@ -25,11 +25,12 @@ function savedModel(data: Record<string, unknown> | undefined): string | null {
  * un'immagine su un nodo video prenderebbe un giro sprecato senza questo rifiuto anticipato.
  */
 export const POST: RequestHandler = async ({ request, params, url }) => {
-  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
-  if ('error' in resolved) return json(resolved.error.body, { status: resolved.error.status });
+  const caller = await reachableCaller(request, url, { nodes: [params.id ?? ''] });
+  if (caller instanceof Response) {
+    return caller;
+  }
 
-  const { db, orgId, userId, apiKeyId, writeAllowed } = resolved.caller;
+  const { db, orgId, userId, apiKeyId, writeAllowed } = caller;
   if (!writeAllowed) return json({ error: 'api_key_read_only' }, { status: 403 });
 
   const nodeId = params.id ?? '';

@@ -6,6 +6,10 @@ const store = vi.hoisted(() => ({ asked: [] as Record<string, unknown>[] }));
 
 const motion = (id: string, projectId: string, data: Record<string, unknown>) => ({ id, projectId, canvasId: 'c-1', type: 'motion', displayName: `video ${id}`, data: { format: '16:9', docHeadRevision: 4, posterAssetId: null, lastRenderAssetId: null, ...data } });
 
+vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
+  const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
+  return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
+});
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async () => ({ caller: { db: { storage: { from: () => ({ createSignedUrl: async (path: string) => ({ data: { signedUrl: `https://signed/${path}` } }) }) } }, orgId: ORG, userId: 'u-1', writeAllowed: false } }) }));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()),

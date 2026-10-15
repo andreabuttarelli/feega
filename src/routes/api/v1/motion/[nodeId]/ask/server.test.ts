@@ -64,6 +64,10 @@ const store = vi.hoisted(() => ({
   history: [] as unknown[]
 }));
 
+vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
+  const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
+  return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
+});
 vi.mock('$lib/server/web/view-images', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/web/view-images')>()),
   viewImages: async (urls: string[], _detail: unknown, prefix: string) => ({ images: urls.map((url, i) => ({ url, path: `${prefix}/${i}.jpg`, width: 1, height: 1 })), parts: [] })

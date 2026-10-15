@@ -3011,3 +3011,6 @@ Signal: a clip with a track matte (or a Figma mask) is invisible everywhere; its
 
 ### ⌘Z of a delete answers "node_deleted_by_peer"
 Signal: undoing a canvas delete is refused with `node_deleted_by_peer` on the real stack; `undo.test.ts` stays green. Cause: the precondition looked the node up with `findNode`, which filters `deleted_at is null`, so a soft-deleted row is never found; `fakeDb` without `{ filter: true }` ignores that filter. Move: a test about soft deletes seeds `deleted_at` and uses `fakeDb(rows, { filter: true })`; a precondition on a deleted row reads it with `nodeRowExists`.
+
+### Every project-scoped route resolves scope through `reachableCaller`/`callerReach`
+Signal: a Bearer route under `/api/v1` looks a node, run, asset or project up "by org and id" and answers for an uncensored project the caller cannot open. RLS and `org_id` say the row is the org's; the uncensored lock is a per-user rule neither knows. Move: resolve the caller with `reachableCaller(request, url, { nodes | runs | assets | project })` (`src/lib/server/org-data/reach.ts`), or `callerReach(caller, …)` once the ids are in the body; lists filter with `callerHidden`. Session routes use `findReachableProject` / `motionScope`. Never a per-route `canvasReachable`. Guard: `src/routes/api/v1/uncensored-lock.test.ts` — a new route gets a row there.
