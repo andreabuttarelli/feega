@@ -34,10 +34,11 @@ export const PD_PROPS: Record<string, PropSpec> = {
   darkColor: colour('Dark card', '#141414'),
   accentColor: colour('Accent card', '#e9d8c4'),
   placeholderColor: colour('Empty card colour', '#7d7d7d'),
-  count: number('Cards', 12, 6, 16, 'Layout', 1),
-  cardSize: number('Card size (share of the short side)', 0.56, 0.3, 0.8, 'Layout', 0.01),
-  fan: number('Fan opening', 1, 0, 2, 'Layout', 0.05),
-  riffleGap: number('Riffle speed (seconds between cards)', 0.12, 0.05, 0.3, 'Motion', 0.01),
+  chains: number('Snakes', 3, 1, 4, 'Layout', 1),
+  count: number('Cards per snake', 6, 4, 12, 'Layout', 1),
+  cardSize: number('Card size (share of the short side)', 0.22, 0.12, 0.5, 'Layout', 0.01),
+  fan: number('Path width', 1, 0.5, 1.5, 'Layout', 0.05),
+  riffleGap: number('Delay between cards (seconds)', 0.04, 0, 0.2, 'Motion', 0.01),
   [VAR_PREFIX]: text('Runtime variable prefix', PD_VAR_PREFIX, { group: 'Layout', maxLength: 20 })
 };
 

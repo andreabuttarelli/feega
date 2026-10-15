@@ -20,7 +20,7 @@ let cache = { layoutKey: '', layout: null, buildKey: '', nodes: [], unit: 1, loo
 const sizeOf = () => ({ width: scene.clientWidth || 1080, height: scene.clientHeight || 1920 });
 
 const layoutFor = (p) => {
-  const key = JSON.stringify([p.count]);
+  const key = JSON.stringify([p.count, p.chains]);
   if (key !== cache.layoutKey) {
     cache = { ...cache, layoutKey: key, layout: fanLayout(p), buildKey: '' };
   }
@@ -62,7 +62,7 @@ const FACES = {
 };
 
 const build = (p, layout, width, height) => {
-  const key = JSON.stringify([p.media, layout.n, p.cardSize, p.aTop, p.aTitle, p.aBottom, p.bTop, p.bTitle, p.bBottom, p.rings, width, height]);
+  const key = JSON.stringify([p.media, layout.cards.length, p.cardSize, p.aTop, p.aTitle, p.aBottom, p.bTop, p.bTitle, p.bBottom, p.rings, width, height]);
   if (key === cache.buildKey) {
     return cache.nodes;
   }
@@ -70,20 +70,20 @@ const build = (p, layout, width, height) => {
   const unit = Math.min(width, height);
   const c = unit * p.cardSize;
   deck.innerHTML = '';
-  scene.style.perspective = unit * PERSPECTIVE + 'px';
-  deck.style.left = width / 2 + 'px';
-  deck.style.top = height / 2 + 'px';
-  const nodes = [...layout.cards].reverse().map((card) => {
+  deck.style.width = width + 'px';
+  deck.style.height = height + 'px';
+  deck.style.perspective = unit * PERSPECTIVE + 'px';
+  const nodes = layout.cards.map((card) => {
     const node = make(deck, 'div', 'pd-card');
     node.style.width = c + 'px';
     node.style.height = c + 'px';
-    node.style.left = -c / 2 + 'px';
-    node.style.top = -c / 2 + 'px';
+    node.style.left = width / 2 - c / 2 + 'px';
+    node.style.top = height / 2 - c / 2 + 'px';
     node.style.fontSize = c + 'px';
     const sheet = make(node, 'div', 'pd-sheet');
     const video = FACES[card.kind](sheet, card, items, p);
     return { k: card.k, node, sheet, video };
-  }).sort((a, b) => a.k - b.k);
+  });
   cache = { ...cache, buildKey: key, nodes, unit: c };
   return nodes;
 };
@@ -115,15 +115,14 @@ const draw = () => {
   paintLook(p);
   const layout = layoutFor(p);
   const nodes = build(p, layout, width, height);
-  const c = cache.unit;
   const f = fanFrame(layout, p, t, duration);
-  const d = f.deck;
+  const unit = Math.min(width, height);
 
-  deck.style.transform = 'translate3d(' + d.shiftX * width + 'px, ' + d.shiftY * height + 'px, 0) rotateX(' + d.x + 'deg) rotateY(' + d.y + 'deg) rotateZ(' + d.z + 'deg)';
   f.cards.forEach((card, i) => {
     const node = nodes[i];
-    node.node.style.transform = 'translate3d(' + card.shift * c + 'px, 0, ' + (card.depth + card.lift) * c + 'px) rotateZ(' + card.fan + 'deg)';
-    node.sheet.style.transform = 'rotateX(' + card.riffle + 'deg) rotateY(' + card.turn + 'deg)';
+    node.node.style.zIndex = String(card.order);
+    node.node.style.transform = 'translate3d(' + card.x * width + 'px, ' + card.y * height + 'px, ' + card.z * unit + 'px) rotateY(' + card.yaw + 'deg) rotateX(' + card.pitch + 'deg) rotateZ(' + card.roll + 'deg)';
+    node.sheet.style.transform = 'rotateY(' + card.turn + 'deg)';
     seekVideo(node.video, t);
   });
 };

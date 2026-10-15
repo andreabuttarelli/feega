@@ -7,14 +7,14 @@ export const PD_TEMPLATE_ID = `${BUILTIN_PREFIX}poster-deck-fan`;
 export const PD_KEY_FIELDS = ['a_title', 'b_title', 'media', 'count', 'riffle_gap'];
 
 const IN_GROUP: Record<string, readonly string[]> = {
-  Deck: ['count', 'cardSize', 'fan', 'aColor', 'bColor', 'ink', 'paperColor', 'darkColor', 'accentColor', 'placeholderColor']
+  Deck: ['chains', 'count', 'cardSize', 'fan', 'aColor', 'bColor', 'ink', 'paperColor', 'darkColor', 'accentColor', 'placeholderColor']
 };
 
 export const POSTER_DECK_FAN_TEMPLATE: TemplateEntry = {
   id: PD_TEMPLATE_ID,
   template: {
     name: 'Poster deck fan',
-    description: 'A thick deck of square posters fans open in 3D, riffles through card by card, and the front poster turns to show a second design. Loops.',
+    description: 'Snakes of square posters glide through 3D space, each card trailing the one before; the lead poster turns to show a second design. Loops.',
     keyFields: PD_KEY_FIELDS,
     doc: customTemplateDoc({
       name: 'poster-deck-fan',

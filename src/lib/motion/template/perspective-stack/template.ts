@@ -7,7 +7,7 @@ export const PS_TEMPLATE_ID = `${BUILTIN_PREFIX}perspective-stack`;
 export const PS_KEY_FIELDS = ['media', 'caption', 'count', 'colour_a'];
 
 const IN_GROUP: Record<string, readonly string[]> = {
-  Deck: ['count', 'deckSize', 'radius', 'tilt', 'productCard', 'colourA', 'colourB', 'colourC'],
+  Deck: ['chains', 'count', 'deckSize', 'spread', 'radius', 'productCard', 'colourA', 'colourB', 'colourC'],
   Liquid: ['floorTilt', 'floorBack', 'floorFront', 'liquidA', 'liquidB', 'liquidC']
 };
 
@@ -15,7 +15,7 @@ export const PERSPECTIVE_STACK_TEMPLATE: TemplateEntry = {
   id: PS_TEMPLATE_ID,
   template: {
     name: 'Perspective card stack',
-    description: 'A tilted deck of cards with your product on the front one flips through card by card in 3D, over a dark card of moving liquid colour. Loops.',
+    description: 'Snakes of cards, your product leading each one, glide through 3D space card after card, over a dark card of moving liquid colour. Loops.',
     keyFields: PS_KEY_FIELDS,
     doc: customTemplateDoc({
       name: 'perspective-stack',

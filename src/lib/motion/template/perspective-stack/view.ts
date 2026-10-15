@@ -26,7 +26,7 @@ let cache = { layoutKey: '', layout: null, buildKey: '', nodes: [], unit: 1, loo
 const sizeOf = () => ({ width: scene.clientWidth || 1080, height: scene.clientHeight || 1920 });
 
 const layoutFor = (p) => {
-  const key = JSON.stringify([p.count]);
+  const key = JSON.stringify([p.count, p.chains]);
   if (key !== cache.layoutKey) {
     cache = { ...cache, layoutKey: key, layout: deckLayout(p), buildKey: '' };
   }
@@ -34,7 +34,7 @@ const layoutFor = (p) => {
 };
 
 const build = (p, layout, width, height) => {
-  const key = JSON.stringify([p.media, layout.n, p.deckSize, width, height]);
+  const key = JSON.stringify([p.media, layout.cards.length, p.deckSize, width, height]);
   if (key === cache.buildKey) {
     return cache.nodes;
   }
@@ -43,15 +43,16 @@ const build = (p, layout, width, height) => {
   const w = unit * p.deckSize;
   const h = w * CARD_ASPECT;
   deck.innerHTML = '';
-  deck.style.left = width / 2 + 'px';
-  deck.style.top = height * DECK_Y + 'px';
+  deck.style.width = width + 'px';
+  deck.style.height = height + 'px';
   deck.style.perspective = unit * PERSPECTIVE + 'px';
+  deck.style.perspectiveOrigin = '50% ' + DECK_Y * 100 + '%';
   const nodes = layout.cards.map((card) => {
     const node = make(deck, 'div', 'ps-card ps-' + card.kind);
     node.style.width = w + 'px';
     node.style.height = h + 'px';
-    node.style.left = -w / 2 + 'px';
-    node.style.top = -h / 2 + 'px';
+    node.style.left = width / 2 - w / 2 + 'px';
+    node.style.top = height * DECK_Y - h / 2 + 'px';
     const video = card.kind === 'photo' ? mountMedia(make(node, 'div', 'ps-photo'), items.length ? items[card.media % items.length] : null) : null;
     return { node, video };
   });
@@ -102,10 +103,8 @@ const draw = () => {
 
   f.cards.forEach((c, i) => {
     const s = nodes[i].node.style;
-    s.opacity = String(c.opacity);
-    s.visibility = c.opacity > 0.001 ? 'visible' : 'hidden';
-    s.zIndex = String(c.z);
-    s.transform = 'translate3d(0, ' + c.y * unit + 'px, 0) rotateX(' + c.turn + 'deg) scale(' + c.scale + ')';
+    s.zIndex = String(c.order);
+    s.transform = 'translate3d(' + c.x * width + 'px, ' + c.y * height + 'px, ' + c.z * unit + 'px) rotateY(' + c.yaw + 'deg) rotateX(' + c.pitch + 'deg) rotateZ(' + c.roll + 'deg) scale(' + c.scale + ')';
     seekVideo(nodes[i].video, t);
   });
   f.blobs.forEach((b, i) => {
