@@ -6,7 +6,6 @@ import { lintAdvice, lintSource } from '$lib/motion/custom/lint';
 import { EffectKind } from '$lib/motion/effects/registry';
 import { DocMode, docMode } from '$lib/motion/still';
 import { builtinTemplate } from './builtins';
-import { PART_FIELDS_BY_POSTER } from '$lib/motion/inspector';
 import { catalogue, matching, starterDoc } from './catalogue';
 import type { TemplateEntry } from './library';
 import { TYPE_GRID_COMPONENT } from './type-grid-poster/component';
@@ -185,17 +184,5 @@ describe.each(PART_TAGGED)('the %s poster parts', (_id, entry, name) => {
       .map((f) => f.prop)
       .filter((prop) => !NOT_A_PART.includes(props[prop]?.format));
     expect(drawn.filter((prop) => ![`part('${prop}'`, `textPart(p, '${prop}'`, `labelPart(p, '${prop}'`].some((tag) => component.source.js.includes(tag)))).toEqual([]);
-  });
-});
-
-describe('the part field table', () => {
-  const schemaOf = (name: string) => [...POSTERS, ...PART_TAGGED].map(([, entry]) => entry.template.doc.components[name]).find(Boolean)?.propsSchema.properties;
-
-  it.each(Object.entries(PART_FIELDS_BY_POSTER))('%s names only parts and fields it has', (name, rows) => {
-    const props = schemaOf(name);
-    expect(props, name).toBeDefined();
-    for (const [part, fields] of Object.entries(rows)) {
-      expect(Object.keys(props!)).toEqual(expect.arrayContaining([part, ...fields]));
-    }
   });
 });

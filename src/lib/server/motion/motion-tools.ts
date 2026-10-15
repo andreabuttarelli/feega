@@ -1,6 +1,8 @@
 import { ungroupClip } from '$lib/motion/group';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
+import { setPartFills } from '$lib/motion/part-style';
+import { staticParts } from './static-parts';
 import { strokesSchema } from '$lib/motion/stroke/model';
 import { THREE_GUIDANCE } from './three-guidance';
 import { GUIDES, guidesFor, type GuideTopic } from './guides';
@@ -23,7 +25,7 @@ import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/de
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
-import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
+import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
@@ -294,6 +296,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
   const cameraSummary = (camera: Camera | null) =>
     camera ? { values: shownRecord(CAMERA_LANE, camera.base, doc), dof: camera.dof, keyframes: inSeconds(shownKeyframes(CAMERA_LANE, camera.keyframes, doc)), expressions: camera.expressions } : null;
   const lookSummary = (look: Look | null) => (look ? { ...look, lights: look.lights.map((l) => ({ ...l, keyframes: inSeconds(l.keyframes) })) } : null);
+  const posterParts = staticParts(doc);
 
   return {
     width: doc.width,
@@ -332,6 +335,8 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         parentOpacity: c.parentOpacity,
         autoLayout: c.autoLayout ?? null,
         layoutItem: c.layoutItem ?? null,
+        parts: posterParts[c.id] ?? [],
+        partStyles: c.partStyles ?? null,
         expressions: c.expressions,
         effects: c.effects,
         shaders: c.shaders,
@@ -1455,6 +1460,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'How a clip sizes inside its auto layout, per axis: fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; only inside a container). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this.',
       inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string() }),
       execute: async ({ clip_id, ...patch }) => apply(setLayoutItem(session.doc, clip_id, patch), `sized ${clip_id} in its auto layout`)
+    }),
+
+    set_part_fill: tool({
+      description: 'Colour one text part of a poster (a data-part such as "title" or "lines:0", as the clip summary lists them in parts) without touching the other parts. fills is its fill stack (solid, linear, radial, image), bottom first. A plain solid on a part that has its own colour field writes that field; anything else, or a part whose colour is shared with other parts, is kept as an override on this part only. fills null drops the override and the part takes its shared colour again.',
+      inputSchema: z.object({ clip_id: z.string(), part: z.string().min(1).max(80), fills: fillsSchema.nullable() }),
+      execute: async ({ clip_id, part, fills }) => apply(fills ? setPartFills(session.doc, clip_id, part, fills) : setPartStyle(session.doc, clip_id, part, null), `coloured ${part} of ${clip_id}`)
     }),
 
     reorder_auto_layout: tool({

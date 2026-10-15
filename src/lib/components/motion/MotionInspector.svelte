@@ -98,6 +98,9 @@
     onuploadfont,
     onopen,
     focus = null,
+    shared = [],
+    sharedWith = 0,
+    partFill = null,
     lead,
     mode = EditMode.Motion
   }: {
@@ -114,6 +117,9 @@
     onuploadfont?: (file: File) => Promise<string | null>;
     onopen?: (comp: string) => void;
     focus?: readonly string[] | null;
+    shared?: readonly string[];
+    sharedWith?: number;
+    partFill?: Snippet | null;
     lead?: Snippet;
     mode?: EditMode;
   } = $props();
@@ -171,6 +177,11 @@
       .filter((f) => !uiHidden(f.key))
       .filter((f) => !focus || focus.includes(f.key))
       .filter((f) => !shadowed(f.key, (clip.props as Record<string, unknown>)[f.key], f.fallback, transformKeys))
+  );
+  const sharedFields = $derived(
+    clipFieldGroups(doc, clip)
+      .flatMap((g) => g.fields)
+      .filter((f) => !uiHidden(f.key) && shared.includes(f.key))
   );
   const animated = $derived(withParams(doc, clip));
   const customName = $derived(clip.component === 'Custom' ? String(clip.props.name) : null);
@@ -389,7 +400,7 @@
     [Section.Content]: fieldsIn(Section.Content).length > 0,
     [Section.Layout]: layoutProps.length > 0 || fieldsIn(Section.Layout).length > 0,
     [Section.Layer]: layerProps.length > 0 || fieldsIn(Section.Layer).length > 0 || (visual && !focus),
-    [Section.Fill]: fieldsIn(Section.Fill).length > 0,
+    [Section.Fill]: !!partFill || fieldsIn(Section.Fill).length > 0,
     [Section.Stroke]: fieldsIn(Section.Stroke).length > 0,
     [Section.Text]: fieldsIn(Section.Text).length > 0,
     [Section.Timing]: true,
@@ -439,10 +450,16 @@
   {:else}
     {@render lead?.()}
     {#each sectionsFor(family, view, mode).filter((s) => has[s]) as section (section)}
-      <InspectorSection actions={SECTION_ACTIONS[section]} title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section) || (!!focus && fieldsIn(section).length > 0)} ontoggle={() => toggleSection(section)}>
+      <InspectorSection actions={SECTION_ACTIONS[section]} title={SECTION_TITLE[section]} {section} summary={sectionSummary(section, clip, doc.fps)} open={sectionOpen(sections, family, section) || (!!focus && (fieldsIn(section).length > 0 || (section === Section.Fill && !!partFill)))} ontoggle={() => toggleSection(section)}>
         {@render BODIES[section]()}
       </InspectorSection>
     {/each}
+    {#if sharedFields.length}
+      <details class="shared" data-testid="part-shared">
+        <summary>Shared with {sharedWith} {sharedWith === 1 ? 'part' : 'parts'}</summary>
+        {#each sharedFields as field (field.key)}{@render fieldRow(field)}{/each}
+      </details>
+    {/if}
     {#if visual}<AutoLayoutSection {doc} {clip} {commit} />{/if}
   {/if}
 
@@ -612,6 +629,7 @@
 {/snippet}
 
 {#snippet fillBody()}
+  {@render partFill?.()}
   {@render groupFields(Section.Fill)}
 {/snippet}
 
@@ -1521,6 +1539,17 @@
   .error {
     margin: 8px 12px;
     color: var(--ui-danger);
+  }
+
+  .shared {
+    border-top: 1px solid var(--ui-line);
+  }
+
+  .shared > summary {
+    padding: var(--ui-space-3) var(--ui-space-4);
+    color: var(--ui-ink-2);
+    font-size: var(--ui-text-xs);
+    cursor: pointer;
   }
 
   .mode-warning {
