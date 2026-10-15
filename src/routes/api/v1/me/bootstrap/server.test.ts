@@ -27,6 +27,9 @@ const db = {
   auth: { getUser },
   from: () => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { terms_version: '2020-01-01' } }) }) }) })
 };
+const DASHBOARD = { canvases: [], projects: [], batches: [], motions: [], moreVideos: null };
+const dashboardFor = vi.fn(async (_db: unknown, _deps: unknown, _org: string) => DASHBOARD);
+vi.mock('$lib/server/dashboard/dashboard', () => ({ DASHBOARD_DEPS: {}, dashboardFor }));
 vi.mock('$lib/server/db/client', () => ({ createUserDb: () => db }));
 vi.mock('$lib/server/feature-flags', () => ({ isPlanGoEnabled: () => false }));
 vi.mock('$lib/server/seline', () => ({ selineSetUser: vi.fn() }));
@@ -68,6 +71,26 @@ describe('GET /api/v1/me/bootstrap: the dashboard layouts in one call', () => {
 
     expect(body.flags).toEqual({ termsNoticeVersion: root.termsNoticeVersion, tour: root.tour });
     expect(body.flags.termsNoticeVersion).not.toBeNull();
+  });
+
+  it('carries the recents of the chosen workspace, read in parallel with the shell', async () => {
+    let release: (m: unknown) => void = () => {};
+    listMemberships.mockReturnValueOnce(new Promise((r) => (release = r)) as never);
+    dashboardFor.mockClear();
+
+    const pending = call({ authorization: 'Bearer jwt' }, 'org-b');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(dashboardFor).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'org-b');
+    release([{ org: { id: 'org-b', name: 'B', slug: 'b' }, role: 'member' }]);
+
+    expect((await pending).body.dashboard).toEqual(DASHBOARD);
+  });
+
+  it('reads the recents of the workspace actually chosen when the hint was wrong', async () => {
+    dashboardFor.mockClear();
+    const { body } = await call({ authorization: 'Bearer jwt' }, 'org-gone');
+    expect(body.shell.org.id).toBe('org-a');
+    expect(dashboardFor).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'org-a');
   });
 
   it('refuses a request without a bearer', async () => {

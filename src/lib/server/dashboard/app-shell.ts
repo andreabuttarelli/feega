@@ -41,14 +41,28 @@ export async function appShell(event: ShellEvent): Promise<AppShell> {
   return shell;
 }
 
+type WorkspaceReads = { creditBalance: number; projects: Awaited<ReturnType<typeof listProjects>> };
+
+async function workspaceReads(db: Db, orgId: string): Promise<WorkspaceReads> {
+  const [creditBalance, projects] = await Promise.all([orgCreditBalance(db, orgId), listProjects(db, orgId)]);
+  return { creditBalance, projects };
+}
+
+function settledLater<T>(work: Promise<T>): () => Promise<T> {
+  work.catch(() => {});
+  return () => work;
+}
+
 export async function shellOf(db: Db, user: User, chosenOrgId: string | null): Promise<AppShell | null> {
+  const guessed = chosenOrgId ? settledLater(workspaceReads(db, chosenOrgId)) : null;
   const [profile, memberships] = await Promise.all([ensureProfile(db, user), listMemberships(db, user.id)]);
   const membership = chooseOrg(memberships, chosenOrgId);
   if (!membership) {
     return null;
   }
 
-  const [creditBalance, projects] = await Promise.all([orgCreditBalance(db, membership.org.id), listProjects(db, membership.org.id)]);
+  const reads = guessed && membership.org.id === chosenOrgId ? guessed() : workspaceReads(db, membership.org.id);
+  const { creditBalance, projects } = await reads;
 
   return {
     profile: { name: profile.name, email: profile.email, avatarUrl: profile.avatarUrl },
