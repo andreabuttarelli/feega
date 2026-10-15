@@ -72,7 +72,8 @@ const MOTION_STAGE_WIDTH: Record<MotionFormat, number> = {
   [MotionFormat.Square]: 320,
   [MotionFormat.Portrait]: 300,
   [MotionFormat.SquareLarge]: 320,
-  [MotionFormat.Poster]: 280
+  [MotionFormat.Poster]: 280,
+  [MotionFormat.Custom]: 420
 };
 
 export function motionNodeSize(format: MotionFormat = MotionFormat.Vertical): { w: number; h: number } {
@@ -84,6 +85,29 @@ export function motionNodeSize(format: MotionFormat = MotionFormat.Vertical): { 
 export function frameNodeSize(width: number, picture: { width: number; height: number }, mode: NodeMode = NodeMode.Preview, kind: FrameKind = FrameKind.Frame): { w: number; h: number } {
   const w = Math.round(width);
   return { w, h: Math.round((w * picture.height) / picture.width) + BAR_H[kind][mode] };
+}
+
+enum Sizing {
+  Fixed = 'fixed',
+  Free = 'free'
+}
+
+const sizingOf = (node: Pick<MotionNode, 'kind' | 'format'>): Sizing => (node.kind === FrameKind.Frame && node.format === MotionFormat.Custom ? Sizing.Free : Sizing.Fixed);
+
+type Picture = { width: number; height: number };
+
+export type FrameResize = { w: number; h: number; picture: Picture | null };
+
+const RESIZE: Record<Sizing, (node: MotionNode, asked: { w: number; h: number }, picture: Picture, mode: NodeMode) => FrameResize> = {
+  [Sizing.Fixed]: (node, asked, picture, mode) => ({ ...frameNodeSize(asked.w, picture, mode, node.kind), picture: null }),
+  [Sizing.Free]: (node, asked, _, mode) => {
+    const picture = { width: Math.round(asked.w), height: Math.round(asked.h) - BAR_H[node.kind][mode] };
+    return { w: picture.width, h: picture.height + BAR_H[node.kind][NodeMode.Preview], picture };
+  }
+};
+
+export function frameResize(node: MotionNode, asked: { w: number; h: number }, picture: Picture, mode: NodeMode = NodeMode.Preview): FrameResize {
+  return RESIZE[sizingOf(node)](node, asked, picture, mode);
 }
 
 export function elementNodeOf(box: { width: number; height: number }, kind: FrameKind = FrameKind.Element): { data: Record<string, unknown>; w: number; h: number } {
