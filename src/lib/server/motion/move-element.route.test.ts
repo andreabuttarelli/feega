@@ -42,6 +42,7 @@ function event(fields: Record<string, string>, rows: Record<string, unknown[]> =
     ...fake,
     request: new Request('http://localhost/c/canvas', { method: 'POST', body }),
     params: { canvasId: 'canvas', projectId: 'project' },
+    setHeaders: () => undefined,
     locals: { safeGetSession: async () => ({ session: {}, user: { id: 'user' } }), db: async () => fake.db }
   };
 }

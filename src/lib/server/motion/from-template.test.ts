@@ -4,7 +4,7 @@ import { MotionFormat, parseMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
 import { PROMPT_TEMPLATE_ID } from '$lib/motion/template/prompt-input/template';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
-import { frameNodeOf, newMotionData } from '$lib/canvas/motion-node';
+import { atFirstRevision, frameNodeOf, newMotionData } from '$lib/canvas/motion-node';
 import { FromTemplate, startFromTemplate, type FromTemplateDeps } from './from-template';
 
 const db = {} as Db;
@@ -16,8 +16,8 @@ function deps(overrides: Partial<FromTemplateDeps> = {}): FromTemplateDeps {
     createCanvas: vi.fn(async () => canvas),
     listNodes: vi.fn(async () => []),
     createNode: vi.fn(async () => ({ id: 'n1', canvasId: 'c-motion', projectId: 'p1', type: 'motion', displayName: null, position: { x: 0, y: 0, z: 0 }, size: { width: null, height: null }, data: {}, version: 1 })),
-    templates: vi.fn(async () => BUILTIN_TEMPLATES),
-    save: vi.fn(async (_db: Db, input: { doc: unknown }) => ({ outcome: RevisionOutcome.Written as const, head: { version: 1, doc: input.doc as MotionDoc, summary: null, actorKind: 'user' } })),
+    template: vi.fn(async (_db: Db, _scope: unknown, id: string) => BUILTIN_TEMPLATES.find((e) => e.id === id) ?? null),
+    append: vi.fn(async (_db: Db, input: { doc: unknown }) => ({ outcome: RevisionOutcome.Written as const, head: { version: 1, doc: input.doc as MotionDoc, summary: null, actorKind: 'user' } })),
     ...overrides
   };
 }
@@ -29,10 +29,10 @@ describe('a video started from a component', () => {
     const d = deps();
     const started = await startFromTemplate(db, d, input);
 
-    expect(started).toEqual({ outcome: FromTemplate.Started, start: { projectId: 'p1', canvasId: 'c-motion', nodeId: 'n1' }, version: 1 });
-    expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ displayName: 'Prompt input', data: newMotionData(MotionFormat.Vertical) }));
+    expect(started).toEqual({ outcome: FromTemplate.Started, start: { projectId: 'p1', canvasId: 'c-motion', nodeId: 'n1' }, node: expect.objectContaining({ id: 'n1' }), version: 1 });
+    expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ displayName: 'Prompt input', data: atFirstRevision(newMotionData(MotionFormat.Vertical)) }));
 
-    const saved = vi.mocked(d.save).mock.calls[0][1];
+    const saved = vi.mocked(d.append).mock.calls[0][1];
     expect(saved).toMatchObject({ orgId: 'org', nodeId: 'n1', expectedVersion: 0 });
     const doc = saved.doc as MotionDoc;
     expect(parseMotionDoc(doc).ok).toBe(true);
@@ -51,17 +51,17 @@ describe('a video started from a component', () => {
     const d = deps();
     await startFromTemplate(db, d, { ...input, templateId: 'builtin:poster-type-grid', format: MotionFormat.Portrait, canvasId: 'c-motion', at: { x: 0, y: 0 } });
 
-    const doc = vi.mocked(d.save).mock.calls[0][1].doc as MotionDoc;
+    const doc = vi.mocked(d.append).mock.calls[0][1].doc as MotionDoc;
     const shaped = frameNodeOf(doc);
     expect(doc).toMatchObject({ width: 1080, height: 1350 });
-    expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ data: shaped.data, width: shaped.w, height: shaped.h }));
+    expect(d.createNode).toHaveBeenCalledWith(db, expect.objectContaining({ data: atFirstRevision(shaped.data), width: shaped.w, height: shaped.h }));
   });
 
   it('a poster starts as its own clip, not wrapped in a precomp, so its parts select and edit on the canvas', async () => {
     const d = deps();
     await startFromTemplate(db, d, { ...input, templateId: 'builtin:poster-type-grid', format: MotionFormat.Portrait, canvasId: 'c-motion', at: { x: 0, y: 0 } });
 
-    const doc = vi.mocked(d.save).mock.calls[0][1].doc as MotionDoc;
+    const doc = vi.mocked(d.append).mock.calls[0][1].doc as MotionDoc;
     const clips = doc.tracks.flatMap((t) => t.clips);
     expect(parseMotionDoc(doc).ok).toBe(true);
     expect(clips.map((c) => c.component)).toEqual(['Custom']);

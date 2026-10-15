@@ -177,8 +177,10 @@ function canonical(value: unknown): string {
   return JSON.stringify(value ?? null);
 }
 
+const ECHOED_EVENTS: ReadonlySet<string> = new Set(['INSERT', 'UPDATE']);
+
 export function isOwnEcho(change: RealtimeChange, tiles: ShownTile[]): boolean {
-  if (change.table !== 'nodes' || change.eventType !== 'UPDATE') {
+  if (change.table !== 'nodes' || !ECHOED_EVENTS.has(change.eventType)) {
     return false;
   }
   const row = (change.new ?? {}) as ChangedRow;

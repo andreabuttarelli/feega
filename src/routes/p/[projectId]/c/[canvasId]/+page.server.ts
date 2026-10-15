@@ -243,6 +243,7 @@ function jsonObject(value: FormDataEntryValue | null): Record<string, unknown> |
 }
 
 const HTTP_BAD_REQUEST = 400;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 
@@ -1151,14 +1152,18 @@ export const actions: Actions = {
     return { ...drawn, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: drawn.frameId }) };
   },
 
-  placeOutput: async ({ request, params, locals }) => {
-    const scope = await scopeFor(locals, params.canvasId);
+  placeOutput: async ({ request, params, locals, setHeaders }) => {
+    const phases = serverTiming();
+    const scope = await phases.time('scope', scopeFor(locals, params.canvasId));
     const fd = await request.formData();
-    const ask = outputAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop') });
+    const ask = outputAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop'), id: fd.get('node_id') ?? undefined });
     if (!ask.success) {
       return fail(400, { error: 'rilascio non valido' });
     }
-    return movedAnswer(await placeOutput(canvasFrames(scope), ask.data));
+    const placed = await phases.time('place', placeOutput(phases.port(canvasFrames(scope)), ask.data));
+    const node = placed.outcome === MoveOutcome.Done && placed.created ? await phases.time('read', findNode(scope.db, { orgId: scope.orgId, nodeId: placed.frameId })) : null;
+    setHeaders({ 'server-timing': phases.header() });
+    return placed.outcome === MoveOutcome.Done ? { ...placed, node } : movedAnswer(placed);
   },
 
   disconnect: async ({ request, params, locals }) => {
@@ -1311,12 +1316,15 @@ export const actions: Actions = {
 
     const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
     const format = String(fd.get('format') ?? MotionFormat.Landscape) as MotionFormat;
-    if (!Number.isFinite(at.x) || !Number.isFinite(at.y) || !MOTION_FORMATS.includes(format)) {
+    const id = String(fd.get('node_id') ?? '') || undefined;
+    if (!Number.isFinite(at.x) || !Number.isFinite(at.y) || !MOTION_FORMATS.includes(format) || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid frame' });
     }
 
     const actor = userActor(scope);
-    const started = await phases.time('start', startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, {
+    const deps = { ...FROM_TEMPLATE_DEPS, listCanvases: async () => [scope.canvas] };
+    const started = await phases.time('start', startFromTemplate(scope.db, deps, {
+      id,
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
@@ -1330,7 +1338,7 @@ export const actions: Actions = {
       return fail(400, { error: started.outcome });
     }
 
-    const node = await phases.time('read', findNode(scope.db, { orgId: scope.orgId, nodeId: started.start.nodeId }));
+    const node = started.node;
     setHeaders({ 'server-timing': phases.header() });
     return { node };
   },

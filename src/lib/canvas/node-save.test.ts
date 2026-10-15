@@ -113,8 +113,13 @@ describe('isOwnEcho: realtime does not refetch what this tab just wrote', () => 
     expect(isOwnEcho(update({ display_name: 'Hook' }), tiles)).toBe(false);
   });
 
+  it('ignores the insert of a node this tab already placed', () => {
+    expect(isOwnEcho({ table: 'nodes', eventType: 'INSERT', new: shown }, tiles)).toBe(true);
+  });
+
   it('refetches inserts, deletes and connections', () => {
     expect(isOwnEcho({ table: 'nodes', eventType: 'INSERT', new: { id: 'z', version: 1 } }, tiles)).toBe(false);
+    expect(isOwnEcho({ table: 'nodes', eventType: 'DELETE', new: shown }, tiles)).toBe(false);
     expect(isOwnEcho(update({}, 'nodes_connections'), tiles)).toBe(false);
   });
 });
