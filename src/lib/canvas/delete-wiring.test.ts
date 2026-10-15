@@ -28,7 +28,7 @@ const canvasPage = (name: string) =>
   readFileSync(join(dir, '..', '..', 'routes', 'p', '[projectId]', 'c', '[canvasId]', name), 'utf8');
 
 const page = canvasPage('+page.svelte');
-const server = canvasPage('+page.server.ts');
+const server = readFileSync(join(dir, '..', 'server', 'canvas', 'canvas-page.ts'), 'utf8');
 
 describe('il gesto di cancellare arriva fino alla riga', () => {
   it('la tela passa alla tastiera chi sa togliere una tile', () => {

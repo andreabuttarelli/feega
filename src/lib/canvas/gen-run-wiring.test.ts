@@ -21,10 +21,7 @@ const page = readFileSync(
   join(dir, '..', '..', 'routes', 'p', '[projectId]', 'c', '[canvasId]', '+page.svelte'),
   'utf8'
 );
-const server = readFileSync(
-  join(dir, '..', '..', 'routes', 'p', '[projectId]', 'c', '[canvasId]', '+page.server.ts'),
-  'utf8'
-);
+const server = readFileSync(join(dir, '..', 'server', 'canvas', 'canvas-page.ts'), 'utf8');
 
 describe('premere Genera fa partire qualcosa', () => {
   it('il nodo riceve `onrun`: senza, il bottone chiama il vuoto', () => {
