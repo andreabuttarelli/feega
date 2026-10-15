@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MotionFormat, newClip, newMotionDoc, parseMotionDoc } from './doc';
 import { Quality, TIMELINE_ONLY, docProblems } from './direction';
-import { ANIMATE_SECONDS, DocMode, animateStill, docMode, setStill, stillFrame } from './still';
+import { ANIMATE_SECONDS, coverFrame, DocMode, animateStill, docMode, setStill, stillFrame } from './still';
 import { setCanvas } from './timeline';
 import { ImageFormat, IMAGE_FORMATS, ImageScale, stillExport } from './still-model';
 
@@ -134,5 +134,17 @@ describe('Motion on a one-frame still makes it animatable', () => {
     const video = newMotionDoc(MotionFormat.Portrait);
 
     expect(animateStill(video)).toEqual({ ok: true, doc: video });
+  });
+});
+
+describe('the cover frame a frame node shows, closed or just opened', () => {
+  it('is the middle of a video, past the entrances that leave frame 0 black', () => {
+    expect(coverFrame({ durationInFrames: 90 })).toBe(45);
+  });
+
+  it('is the pinned frame of a still', () => {
+    const made = setStill(newMotionDoc(MotionFormat.Portrait), 2);
+
+    expect(made.ok && coverFrame(made.doc)).toBe(60);
   });
 });

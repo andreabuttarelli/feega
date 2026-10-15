@@ -1,4 +1,5 @@
 import type { MotionDoc } from './doc';
+import { coverFrame } from './still';
 import { Viewport } from './editor-layout';
 import { Dock } from '$lib/canvas/free-area';
 
@@ -32,11 +33,23 @@ export enum ToolsPlace {
   CanvasBar = 'canvas-bar'
 }
 
-type MountRules = { ownsTitle: boolean; closes: boolean; stage: Stage; zoom: Zoom; measure: Measure; tools: ToolsPlace };
+export enum OpensAt {
+  Start = 'start',
+  Cover = 'cover'
+}
+
+type MountRules = { ownsTitle: boolean; closes: boolean; stage: Stage; zoom: Zoom; measure: Measure; tools: ToolsPlace; opensAt: OpensAt };
+
+const OPENING_FRAME: Record<OpensAt, (doc: Pick<MotionDoc, 'still' | 'durationInFrames'>) => number> = {
+  [OpensAt.Start]: () => 0,
+  [OpensAt.Cover]: coverFrame
+};
+
+export const openingFrame = (rules: Pick<MountRules, 'opensAt'>, doc: Pick<MotionDoc, 'still' | 'durationInFrames'>) => OPENING_FRAME[rules.opensAt](doc);
 
 export const MOUNT: Record<Mount, MountRules> = {
-  [Mount.Page]: { ownsTitle: true, closes: false, stage: Stage.Own, zoom: Zoom.Stage, measure: Measure.Window, tools: ToolsPlace.Stage },
-  [Mount.Canvas]: { ownsTitle: false, closes: true, stage: Stage.Node, zoom: Zoom.Canvas, measure: Measure.Host, tools: ToolsPlace.CanvasBar }
+  [Mount.Page]: { ownsTitle: true, closes: false, stage: Stage.Own, zoom: Zoom.Stage, measure: Measure.Window, tools: ToolsPlace.Stage, opensAt: OpensAt.Start },
+  [Mount.Canvas]: { ownsTitle: false, closes: true, stage: Stage.Node, zoom: Zoom.Canvas, measure: Measure.Host, tools: ToolsPlace.CanvasBar, opensAt: OpensAt.Cover }
 };
 
 const STILL_FRAMES = 1;

@@ -17,6 +17,10 @@ export function stillFrame(doc: Pick<MotionDoc, 'still'>): number | null {
   return doc.still?.frame ?? null;
 }
 
+export function coverFrame(doc: Pick<MotionDoc, 'still' | 'durationInFrames'>): number {
+  return stillFrame(doc) ?? Math.floor(doc.durationInFrames / 2);
+}
+
 export function stillSeconds(doc: Pick<MotionDoc, 'still' | 'fps'>): number | null {
   return doc.still ? doc.still.frame / doc.fps : null;
 }

@@ -130,7 +130,8 @@
   import { ATTACH_PARAM, BRIEF_PARAM } from '$lib/motion/video-brief';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
-  import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, ToolsPlace, Zoom, timelineFits } from '$lib/motion/editor-mount';
+  import { DRAWN_EVENT } from '$lib/motion/hyperframes/measure';
+  import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, openingFrame, PART_DOCK, Part, Stage, ToolsPlace, Zoom, timelineFits } from '$lib/motion/editor-mount';
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
@@ -179,7 +180,7 @@
   let cameraOpen = $state(false);
   let keySelection = $state<KeyRef[]>([]);
   let keyBoard: KeyBoard = [];
-  let frame = $state(0);
+  let frame = $state(untrack(() => openingFrame(MOUNT[mount], history.present)));
   let playing = $state(false);
   let zoom = $state(1.5);
   let snap = $state(Snap.On);
@@ -326,8 +327,8 @@
       return;
     }
     const ready = () => onstageready();
-    el.addEventListener('ready', ready, true);
-    return () => el.removeEventListener('ready', ready, true);
+    el.addEventListener(DRAWN_EVENT, ready);
+    return () => el.removeEventListener(DRAWN_EVENT, ready);
   });
 
   const firstLayout = (): EditorLayout => ({ ...DEFAULT_LAYOUT, timelinePx: defaultTimelinePx(viewportOf(innerWidth), innerHeight) });

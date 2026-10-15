@@ -4,7 +4,7 @@ import sharp from 'sharp';
 import doc from './fixtures/motion-doc.json' with { type: 'json' };
 
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
-const START = /^00:00:00 \//;
+const COVER = /^00:01:15 \//;
 const SHOTS = process.env.CANVAS_MOTION_SHOTS;
 const PHONE = { width: 390, height: 844 };
 const TABLET = { width: 820, height: 1180 };
@@ -183,8 +183,9 @@ test.describe('motion editor inside the canvas @real', () => {
     await shoot(page, '2-open');
 
     const timecode = editor.getByTestId('timecode');
+    await expect(timecode, 'opened on the cover frame, the middle of the video').toHaveText(COVER);
     await editor.getByRole('button', { name: 'Play', exact: true }).click();
-    await expect(timecode).not.toHaveText(START, { timeout: 5000 });
+    await expect(timecode).not.toHaveText(COVER, { timeout: 5000 });
     await shoot(page, '3-playing');
     await editor.getByRole('button', { name: 'Pause', exact: true }).click();
 

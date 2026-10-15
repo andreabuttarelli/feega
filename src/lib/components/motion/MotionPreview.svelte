@@ -11,7 +11,7 @@
   import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
   import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
   import { CAPTURE_PROFILES, CaptureProfile } from '$lib/motion/export/capture-profile';
-  import { REDRAWN, MEASURE_REPLY, MEASURE_REQUEST, Pose, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import { DRAWN_EVENT, DRAWN_FALLBACK_MS, REDRAWN, MEASURE_REPLY, MEASURE_REQUEST, Pose, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
   import { INPUT_MESSAGE } from '$lib/motion/interactive/runtime';
   import type { VarValues } from '$lib/motion/interactive/var-model';
@@ -65,6 +65,7 @@
   let ready = false;
   let pending: number | null = null;
   let capturing = false;
+  let drawnDue: ReturnType<typeof setTimeout> | null = null;
 
   function setSource(next: string) {
     if (!player) {
@@ -74,9 +75,19 @@
     player.setAttribute('srcdoc', next);
   }
 
+  function announceDrawn() {
+    if (drawnDue === null) {
+      return;
+    }
+    clearTimeout(drawnDue);
+    drawnDue = null;
+    host?.dispatchEvent(new CustomEvent(DRAWN_EVENT, { bubbles: true }));
+  }
+
   function redrawn(e: MessageEvent) {
     if (e.source === player?.iframeElement?.contentWindow && e.data?.type === REDRAWN) {
       redraws++;
+      announceDrawn();
     }
   }
 
@@ -100,6 +111,7 @@
         shown = el.iframeElement;
         crisp = shown ? crispFor(engineOf(navigator.userAgent), shown) : () => {};
         ready = true;
+        drawnDue = setTimeout(announceDrawn, frame === 0 ? 0 : DRAWN_FALLBACK_MS);
         driver.seek(frame / fps);
         driver.ready();
       });
@@ -120,6 +132,7 @@
     });
     return () => {
       disposed = true;
+      clearTimeout(drawnDue ?? undefined);
       crisp();
       player?.remove();
       player = null;
