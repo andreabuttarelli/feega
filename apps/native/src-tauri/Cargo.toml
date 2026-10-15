@@ -22,3 +22,4 @@ tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 
 [features]
 bench = []
+e2e = []

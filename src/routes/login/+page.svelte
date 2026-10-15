@@ -2,7 +2,7 @@
   import PageTitle from '$lib/components/PageTitle.svelte';
   import { TitleSize } from '$lib/components/page-title';
   import { onMount } from 'svelte';
-  import { enhance } from '$app/forms';
+  import { authEnhance } from '$lib/native/auth-enhance';
   import { page } from '$app/stores';
   import { _, locale } from 'svelte-i18n';
   import { isPlanKey, planByKey } from '$lib/plans';
@@ -162,7 +162,7 @@
           <p class="sub">{$_('login.signin.sub')}</p>
         {/if}
         {#if mode !== 'forgot'}
-        <form method="POST" action="?/google" class="form oauth-form" onsubmit={startOAuth}>
+        <form method="POST" action="?/google" class="form oauth-form" onsubmit={startOAuth} use:authEnhance>
           {#if cliPort}<input type="hidden" name="cli_port" value={cliPort} />{/if}
           {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
           {#if inviteToken}<input type="hidden" name="invite_token" value={inviteToken} />{/if}
@@ -181,7 +181,7 @@
           </button>
         </form>
 
-        <form method="POST" action="?/github" class="form oauth-form" onsubmit={startOAuth}>
+        <form method="POST" action="?/github" class="form oauth-form" onsubmit={startOAuth} use:authEnhance>
           {#if cliPort}<input type="hidden" name="cli_port" value={cliPort} />{/if}
           {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
           {#if inviteToken}<input type="hidden" name="invite_token" value={inviteToken} />{/if}
@@ -207,7 +207,7 @@
           method="POST"
           action={formAction}
           class="form email-form"
-          use:enhance={() => {
+          use:authEnhance={() => {
             loading = true;
             return async ({ update }) => {
               await update();

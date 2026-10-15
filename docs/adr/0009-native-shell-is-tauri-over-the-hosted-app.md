@@ -167,3 +167,39 @@ Consequences:
 - The server knows one thing about the shell: the `FeegaNative` user-agent mark, read in one module.
 - The shell never exposes Tauri IPC to the remote origin (no `remote` capability) until a native
   feature needs it; then only that command, only for the app host.
+
+## (d) in practice, 2026-10-15: the dashboard is bundled, the canvas stays hosted
+
+Steps 1–3 are done for the dashboard surface (`/app`, canvases, templates, motion, credits, tools,
+the sidebar and account menu) and for login:
+
+- Every dashboard load and action is served by `/api/v1/me/bootstrap` and `/api/v1/me/pages/<page>`,
+  which run the page's own server code with an event built from the Bearer token. Login needs
+  `/api/v1/auth/signup`, `/api/v1/auth/reset`, `/api/v1/me/landing` and `/api/v1/me/handoff`.
+- The web dashboard renders on the client from that API (`ssr = false`, SWR cache).
+- `npm run build:native` assembles `.native/routes` (the dashboard route files, plus
+  `src/native-routes`: root layout, login, `/auth/callback`) and builds it with `adapter-static`
+  (`FEEGA_TARGET=bundle`, SPA fallback) into `apps/native/bundle-dist`. `FEEGA_API` picks the
+  hosted API (default `https://oh.feega.app`). `npm run build:mac:bundle` in `apps/native` ships it.
+
+Runtime in the bundle (`PUBLIC_FEEGA_RUNTIME=bundle`):
+
+- Supabase runs in the bundle with PKCE and `localStorage`; email/password signs in directly,
+  sign-up and reset go through the API, OAuth returns on `feega://auth/callback?code=`, which the
+  shell turns into `<bundle>/auth/callback?code=`, where the bundle exchanges the code itself.
+- The API answers CORS for `tauri://localhost` and `http(s)://tauri.localhost` only; Bearer
+  requests skip the cookie CSRF check.
+- A navigation to a page not in the bundle (canvas, editor, settings, studio…) is cancelled and
+  replaced by `POST /api/v1/me/handoff`: a one-time magic link to the hosted
+  `/auth/confirm?…&next=<page>`, which sets the hosted session cookies and opens the page. The shell
+  keeps the bundle origin and the hosted origin (`FEEGA_HOSTED`) inside the window; everything
+  else goes to the system browser.
+
+Verified: the bundle on the `http://tauri.localhost` origin in Chromium (`tests/e2e/native-bundle.spec.ts`):
+sign in → dashboard from the API → cached nav ~50 ms → canvas opens hosted, signed in. The macOS
+`.app` builds (28 MB, bundle included); its run could not be observed (screen locked, WKWebView
+paused). The iOS simulator build installs and renders the bundled login page; the scripted flow
+(`apps/native/e2e`, feature `e2e`) did not report from the simulator.
+
+Open: hosted pages link back to the hosted `/app`, not to the bundle; the bundle carries all of
+`static/` (27 MB); the canvas and editor still need their own API move before they can be bundled.
