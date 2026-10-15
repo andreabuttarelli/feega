@@ -112,7 +112,7 @@ const MIGRATED_NAME = 'Composition';
 type Picked = { template: NonNullable<CompositionNode['template']>; aspect: CompositionNode['aspect']; cards: UpstreamCard[] };
 
 async function openTemplate(db: Db, deps: ComposeDeps, input: CanvasNodeInput, picked: Picked): Promise<ComposeStart> {
-  const started = await startFromTemplate(db, { ...deps, save: deps.saveMotionDoc }, {
+  const started = await startFromTemplate(db, { ...deps, append: deps.saveMotionDoc }, {
     ...input,
     templateId: picked.template.id,
     format: FORMAT_OF_ASPECT[picked.aspect],

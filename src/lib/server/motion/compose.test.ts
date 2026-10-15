@@ -163,7 +163,7 @@ describe('openCanvasComposition: an existing canvas composition node becomes the
 
   it('a node on a library component opens as that component in the motion editor, the wired media in its media field', async () => {
     const picked = record('comp-node', 'composition', { ...legacy.data, aspect: '9:16', template: { id: STRIP_TEMPLATE_ID, values: { captions: 'Rome' } } });
-    const d = migrating({ findNode: vi.fn(async () => picked), templates: vi.fn(async () => BUILTIN_TEMPLATES) });
+    const d = migrating({ findNode: vi.fn(async () => picked), template: vi.fn(async (_db: Db, _scope: unknown, id: string) => BUILTIN_TEMPLATES.find((e) => e.id === id) ?? null) });
 
     const opened = await openCanvasComposition(db, d, { orgId: 'org', projectId: 'p1', canvasId: 'c1', nodeId: 'comp-node', userId: 'u1' });
 

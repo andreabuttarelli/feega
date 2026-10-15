@@ -77,6 +77,8 @@
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
+  import { pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
@@ -377,9 +379,30 @@
 
   async function dropOutput(nodeId: string, client: PointerPoint) {
     const drop = dropAt(client, null);
-    if (drop) {
-      landed(await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
+    if (!drop) {
+      return;
     }
+    if (drop.on !== DropOn.Canvas) {
+      landed(await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    const source = nodes.find((n) => n.id === nodeId);
+    const file = source?.data.refId ?? source?.data.assetId;
+    const picture = assetUrl(typeof file === 'string' ? file : null);
+    if (picture) {
+      catalogPosters.set(id, picture);
+    }
+    nodes = [...nodes, toTile(pendingOutput(id, drop))];
+    const res = await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop), node_id: id });
+    const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+    nodes = settle(nodes, id, node ? toTile(node) : null);
+    if (!node) {
+      catalogPosters.delete(id);
+      return;
+    }
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -1394,6 +1417,7 @@
   }
 
   let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
+  const catalogPosters = new SvelteMap<string, string>();
 
   function frameDraft(templateId: string, format: MotionFormat): Instance | null {
     const entry = data.componentTemplates.find((t) => t.id === templateId);
@@ -1416,13 +1440,18 @@
     const probe = pendingFrame(at, doc);
     const frameSize = { w: probe.size.width ?? 0, h: probe.size.height ?? 0 };
     const spot = placeNear(at, frameSize, occupiedRects());
-    const shown = pendingFrame(spot, doc);
-    nodes = [...nodes, toTile(shown)];
-    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y });
+    const id = crypto.randomUUID();
+    const name = data.componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
+    const poster = item?.preview?.poster;
+    if (poster) {
+      catalogPosters.set(id, poster);
+    }
+    nodes = [...nodes, toTile(placedFrame({ id, canvasId: data.canvas.id, projectId: data.projectId, name, at: spot, doc }))];
+    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y, node_id: id });
     const node = result?.node as CanvasNodeRecord | undefined;
-    nodes = nodes.filter((n) => n.id !== shown.id);
-    if (node && !nodes.some((n) => n.id === node.id)) {
-      nodes = [...nodes, toTile(node)];
+    nodes = settle(nodes, id, node ? toTile(node) : null);
+    if (!node) {
+      catalogPosters.delete(id);
     }
     if (node && offCentre(at, spot, frameSize)) {
       focusOn([node.id]);
@@ -3059,10 +3088,11 @@
             onpickcomponent={() => (componentPickFor = id)}
           />
         {:else if row.type === PENDING_FRAME_TYPE}
-          <div class="pending-frame" data-testid="motion-node-pending" aria-busy="true"></div>
+          {@const look = catalogPosters.get(id)}
+          <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}</div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} onenter={() => requestMotion(id)} />
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId) ?? catalogPosters.get(id) ?? null} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} onenter={() => requestMotion(id)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}
@@ -3162,6 +3192,17 @@
     height: 100%;
     background: var(--muted);
     animation: pending-pulse 1.2s ease-in-out infinite alternate;
+  }
+
+  .pending-frame.shown {
+    background: none;
+    animation: none;
+  }
+
+  .pending-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 
   @keyframes pending-pulse {

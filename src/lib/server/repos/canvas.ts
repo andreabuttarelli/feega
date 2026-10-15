@@ -322,6 +322,7 @@ export async function findNode(
 export async function createNode(
   db: Db,
   input: {
+    id?: string;
     orgId: string;
     projectId: string;
     canvasId: string;
@@ -341,6 +342,7 @@ export async function createNode(
    * per l'MCP, non qui. Il cast dichiara l'onestà del confine, non una garanzia che non c'è.
    */
   const row: NodeInsert = {
+    ...(input.id ? { id: input.id } : {}),
     org_id: input.orgId,
     project_id: input.projectId,
     canvas_id: input.canvasId,

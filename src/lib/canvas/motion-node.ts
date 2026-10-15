@@ -95,6 +95,10 @@ export function frameNodeOf(picture: { width: number; height: number }): { data:
   return { data: newMotionData(format), ...frameNodeSize(MOTION_STAGE_WIDTH[format], picture) };
 }
 
+export const FIRST_REVISION = 1;
+
+export const atFirstRevision = (data: Record<string, unknown>): Record<string, unknown> => ({ ...data, docHeadRevision: FIRST_REVISION });
+
 export function newMotionData(format: MotionFormat = MotionFormat.Vertical): Record<string, unknown> {
   return { format, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null };
 }
