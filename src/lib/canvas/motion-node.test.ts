@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
-import { NodeMode } from './inline-motion';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
 describe('motion node', () => {
@@ -113,6 +113,15 @@ describe('a free element is a frame without chrome', () => {
   it('opens with its own shapes selected, so the properties show at once; a frame opens on nothing', () => {
     expect(openingSelection(FrameKind.Element, ['a', 'b'])).toEqual(['a', 'b']);
     expect(openingSelection(FrameKind.Frame, ['a', 'b'])).toEqual([]);
+  });
+
+  it('a group is a free element that opens only on a double-click, so a click selects the whole group', () => {
+    const group = { id: 'g', type: 'motion', data: elementNodeOf({ width: 10, height: 10 }, FrameKind.Group).data };
+
+    expect(tileChromeOf(group)).toMatchObject({ ports: false, label: false, takesDrops: false });
+    expect(openingFor(group, Opening.OnSelect)).toBe(Opening.OnRequest);
+    expect(openingFor({ id: 'e', type: 'motion', data: elementNodeOf({ width: 10, height: 10 }).data }, Opening.OnSelect)).toBe(Opening.OnSelect);
+    expect(openingFor({ id: 't', type: 'text', data: {} }, Opening.OnSelect)).toBe(Opening.OnSelect);
   });
 
   it('reads back as an element; an old frame without the field stays a frame', () => {

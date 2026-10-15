@@ -65,6 +65,13 @@ describe('mentre si scrive, la tela non tocca la tastiera', () => {
   });
 });
 
+describe('raggruppare sulla tela', () => {
+  it('⌘G raggruppa, ⇧⌘G scioglie', () => {
+    expect(matchCanvasShortcut(ev('g', { metaKey: true }))).toEqual({ id: 'group' });
+    expect(matchCanvasShortcut(ev('g', { metaKey: true, shiftKey: true }))).toEqual({ id: 'ungroup' });
+  });
+});
+
 describe('duplicare, copiare, incollare', () => {
   it('⌘D duplica la selezione', () => {
     expect(matchCanvasShortcut(ev('d', { metaKey: true }))).toEqual({ id: 'duplicate' });

@@ -25,7 +25,8 @@ export function fractionIn(stage: StageRect, at: PointerPoint): PointerPoint {
 
 export type FrameTarget = { frameId: string; at: PointerPoint };
 
-const kindOf = (frame: HTMLElement | null): FrameKind => (frame?.dataset.kind === FrameKind.Element ? FrameKind.Element : FrameKind.Frame);
+const KINDS = new Set<string>(Object.values(FrameKind));
+const kindOf = (frame: HTMLElement | null): FrameKind => (KINDS.has(frame?.dataset.kind ?? '') ? (frame!.dataset.kind as FrameKind) : FrameKind.Frame);
 
 export function frameUnderPointer(at: PointerPoint, exceptId: string | null = null): FrameTarget | null {
   for (const element of document.elementsFromPoint(at.x, at.y)) {

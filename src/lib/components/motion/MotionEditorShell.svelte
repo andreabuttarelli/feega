@@ -1,5 +1,6 @@
 <script lang="ts">
   import { FrameKind, openingSelection } from '$lib/canvas/motion-node';
+  import { groupClips, ungroupClip } from '$lib/motion/group';
   import { onMount, tick, untrack } from 'svelte';
   import { clipSeek } from '$lib/motion/storyboard';
   import { POSTER_WIDTH, posterFormat, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
@@ -924,6 +925,29 @@
     selection = [id];
   }
 
+  const topClipIds = (of: MotionDoc) => new Set(of.tracks.flatMap((t) => t.clips.map((c) => c.id)));
+
+  function groupSelection() {
+    if (selection.length < 2) {
+      return;
+    }
+    const before = topClipIds(doc);
+    const grouped = groupClips(doc, selection, newId);
+    apply(grouped, 'Grouped');
+    selection = grouped.ok ? [...topClipIds(grouped.doc)].filter((id) => !before.has(id)) : selection;
+  }
+
+  function ungroupSelection() {
+    const group = selection[0];
+    if (selection.length !== 1 || !group) {
+      return;
+    }
+    const before = topClipIds(doc);
+    const result = ungroupClip(doc, group, newId);
+    apply(result, 'Ungrouped');
+    selection = result.ok ? [...topClipIds(result.doc)].filter((id) => !before.has(id)) : selection;
+  }
+
   function autoLayoutSelection() {
     if (!selection.length) {
       return;
@@ -1359,6 +1383,8 @@
     [Command.ToggleTimeline]: () => relayout(toggleTimeline(layout)),
     [Command.Help]: () => (helpOpen = !helpOpen),
     [Command.Precompose]: precomposeSelection,
+    [Command.Group]: groupSelection,
+    [Command.Ungroup]: ungroupSelection,
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
     [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask')

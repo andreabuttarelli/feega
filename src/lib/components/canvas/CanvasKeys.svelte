@@ -29,7 +29,9 @@
     oncopy,
     onpaste,
     onundo,
-    onredo
+    onredo,
+    ongroup,
+    onungroup
   }: {
     /** Aggiungi una tile del tipo chiesto, dove chi monta la tela decide. */
     onadd?: (what: Addable) => void;
@@ -54,6 +56,8 @@
     onundo?: () => void;
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
     onredo?: () => void;
+    ongroup?: (ids: string[]) => void;
+    onungroup?: (ids: string[]) => void;
   } = $props();
 
   const { fitView, zoomIn, zoomOut, getNodes, getEdges, updateNode, screenToFlowPosition } = useSvelteFlow();
@@ -114,7 +118,9 @@
     },
     paste: () => onpaste?.(screenCentre()),
     undo: () => onundo?.(),
-    redo: () => onredo?.()
+    redo: () => onredo?.(),
+    group: () => ongroup?.(selected().map((n) => n.id)),
+    ungroup: () => onungroup?.(selected().map((n) => n.id))
   };
 
   function onKeydown(e: KeyboardEvent) {

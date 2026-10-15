@@ -29,7 +29,7 @@
   import { coverFrame } from '$lib/motion/still';
   import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
-  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null } = $props();
+  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null, onenter = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null; onenter?: (() => void) | null } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
   const nodeId = $derived(node.id);
@@ -186,6 +186,7 @@
   class:editing={!previewing}
   class:bare={!chrome.bar}
   data-kind={node.kind}
+  ondblclick={() => onenter?.()}
   data-testid="motion-node"
   data-motion-node={node.id}
   data-mode={mode}

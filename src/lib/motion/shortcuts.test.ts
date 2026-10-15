@@ -134,6 +134,11 @@ describe('typing', () => {
     expect(press('c', { mod: true, shift: true })).toBe(Command.Precompose);
     expect(press('c', { mod: true })).toBe(Command.Copy);
   });
+
+  it('cmd+g groups the selection, shift+cmd+g ungroups it', () => {
+    expect(press('g', { mod: true })).toBe(Command.Group);
+    expect(press('g', { mod: true, shift: true })).toBe(Command.Ungroup);
+  });
 });
 
 describe('preview zoom keys', () => {

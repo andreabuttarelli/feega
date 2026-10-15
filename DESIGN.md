@@ -150,6 +150,11 @@ nothing inside), a clip, a part (a poster line, a photo, a text). One table deci
 
 A frame is not a group: its direct children take a single click, closed or open.
 
+A group is. On the canvas (⌘G on free elements) a click selects the whole group and a
+double-click enters it (`frameChrome(FrameKind.Group).opening`); inside a frame (⌘G on clips) the
+group is a clip at the clip depth, its children reached through Layers. Entering a group inside a
+frame by double-click is still a missing row in `DRILL`.
+
 | gesture | canvas | frame | clip | part |
 |---|---|---|---|---|
 | hover | outlines exactly what a click would select | same | same | same |
