@@ -70,6 +70,9 @@
           {@render tier(choice)}
           <span class="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
             <ModalityIcons inputModalities={choice.inputModalities ?? []} />
+            {#if choice.discountRoute}
+              <span class="text-[0.625rem]" data-testid="discount-route" title="Runs on {choice.discountRoute.label} first, at its price">via {choice.discountRoute.label}</span>
+            {/if}
             {#if typeof listedCredits(choice) === 'number'}
               <CreditAmount amount={listedCredits(choice) ?? 0} />
             {/if}

@@ -390,6 +390,16 @@ canvas
   });
 
 canvas
+  .command('models <projectId>')
+  .description('Models a project can generate with: provider, credits, uncensored flag, cheaper route tried first')
+  .option('--medium <medium>', 'text, image, video, audio or model3d', 'image')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, opts) => {
+    const { cmdCanvasModels } = await import('./commands/canvas.ts');
+    await cmdCanvasModels(projectId, opts);
+  });
+
+canvas
   .command('upload <projectId> <file>')
   .description('Upload an image, video or document into a new node on a canvas; prints the node and asset')
   .option('--canvas <id>', 'The canvas (default: the first of the project)')

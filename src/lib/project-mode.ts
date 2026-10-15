@@ -54,9 +54,11 @@ export function modeAllows(mode: ProjectMode, capability: Capability): boolean {
   return MODE_ALLOWS[mode].has(capability);
 }
 
-function capabilityOfModel(model: string): Capability {
-  const uncensoredOnly = model.startsWith(WIRO_PREFIX) && !REVIEWED_MODEL3D_MODELS.has(model);
-  return uncensoredOnly ? Capability.WiroModels : Capability.StandardModels;
+type ModelFacts = { id: string; uncensored?: boolean };
+
+function capabilityOfModel(model: ModelFacts): Capability {
+  const wiroOnly = model.id.startsWith(WIRO_PREFIX) && !REVIEWED_MODEL3D_MODELS.has(model.id);
+  return model.uncensored || wiroOnly ? Capability.WiroModels : Capability.StandardModels;
 }
 
 export function sectionAllowed(mode: ProjectMode, section: string): boolean {
@@ -68,20 +70,20 @@ export function modelAllowedIn(mode: ProjectMode, model: string | null | undefin
   if (!model) {
     return true;
   }
-  return modeAllows(mode, capabilityOfModel(model));
+  return modeAllows(mode, capabilityOfModel({ id: model }));
 }
 
 export function modelRefusal(mode: ProjectMode, model: string | null | undefined): string | null {
-  return modelAllowedIn(mode, model) ? null : MODE_REFUSAL[capabilityOfModel(model ?? '')];
+  return modelAllowedIn(mode, model) ? null : MODE_REFUSAL[capabilityOfModel({ id: model ?? '' })];
 }
 
-export function offerableIn<C extends { id: string }>(mode: ProjectMode, choices: readonly C[]): C[] {
-  return choices.filter((choice) => modelAllowedIn(mode, choice.id));
+export function offerableIn<C extends ModelFacts>(mode: ProjectMode, choices: readonly C[]): C[] {
+  return choices.filter((choice) => modeAllows(mode, capabilityOfModel(choice)));
 }
 
 const CATALOGUE_LISTS = ['choices', 'recommended', 'candidates'] as const;
 
-type Offered = { [L in (typeof CATALOGUE_LISTS)[number]]?: readonly { id: string }[] };
+type Offered = { [L in (typeof CATALOGUE_LISTS)[number]]?: readonly ModelFacts[] };
 
 function entryIn<M extends Offered>(mode: ProjectMode, entry: M): M {
   const filtered = CATALOGUE_LISTS.filter((list) => entry[list]).map((list) => [list, offerableIn(mode, entry[list] ?? [])]);
