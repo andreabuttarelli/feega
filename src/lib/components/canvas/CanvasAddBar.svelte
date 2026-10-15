@@ -97,6 +97,13 @@
     return { tool, name: tip.name, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[TOOL_COMMAND[tool]].icon };
   });
 
+  let drawOpen = $state(false);
+
+  function pickTool(tool: DrawTool) {
+    drawOpen = frameBar.tool === tool && !drawOpen;
+    frameBar.tool = tool;
+  }
+
   const SLOT: Record<BarSlot, Snippet> = {
     [BarSlot.Upload]: uploadSlot,
     [BarSlot.Nodes]: nodesSlot,
@@ -189,10 +196,10 @@
 {/snippet}
 
 {#snippet drawSlot()}
-  <span class="draw" role="toolbar" aria-label="Draw" data-testid="draw-tools">
+  <span class="draw" class:open={drawOpen} role="toolbar" aria-label="Draw" data-testid="draw-tools">
     {#each DRAW_TOOLS as t (t.tool)}
       <span class="tool">
-        <button type="button" class="pick" class:on={frameBar.tool === t.tool} aria-pressed={frameBar.tool === t.tool} aria-label={t.label} title={t.label} data-tool={t.tool} onclick={() => (frameBar.tool = t.tool)}>
+        <button type="button" class="pick" class:on={frameBar.tool === t.tool} aria-pressed={frameBar.tool === t.tool} aria-label={t.label} title={t.label} data-tool={t.tool} onclick={() => pickTool(t.tool)}>
           <t.icon size={17} strokeWidth={1.7} />
         </button>
         <span class="add-tip" role="tooltip">{t.label}</span>
@@ -374,6 +381,18 @@
   }
 
   @media (max-width: 767px) {
+    .draw:not(.open) .tool:not(:has(.pick.on)) {
+      display: none;
+    }
+    .group:has(.draw.open) > :not(.draw),
+    .add-bar:has(.draw.open) .zoom {
+      display: none;
+    }
+    .draw.open {
+      border-right: 0;
+      margin-right: 0;
+      padding-right: 0;
+    }
     .add-bar {
       left: 50%;
       bottom: calc(var(--mobile-bar-inset) + env(safe-area-inset-bottom, 0px) + var(--lift, 0px));

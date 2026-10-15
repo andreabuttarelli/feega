@@ -20,6 +20,7 @@
   import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, DISPLAY_NAME, isTap } from '$lib/motion/editor-bar';
   import Upload from '@lucide/svelte/icons/upload';
   import HistoryIcon from '@lucide/svelte/icons/history';
+  import { BarItem, ON_PHONE, PhonePlace } from '$lib/motion/phone-bar';
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
   import { decodePeaks } from '$lib/motion/peaks-decode';
   import MenuDrawer from '$lib/components/motion/MenuDrawer.svelte';
@@ -168,6 +169,8 @@
   const HEAD_POLL_MS = 500;
   const ZOOM_STEP = 1.25;
   const STEP_MORE = 10;
+
+  const phoneMore = (item: BarItem) => viewport === Viewport.Phone && ON_PHONE[item] === PhonePlace.More;
 
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
@@ -1627,7 +1630,7 @@
     <div class="group trail" {...dockOf(Part.Bar)} data-testid="bar-trail">
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
       <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
-      <div class="popover-anchor">
+      <div class="popover-anchor" data-phone={ON_PHONE[BarItem.History]}>
         <button type="button" class="clock" aria-haspopup="menu" aria-expanded={revisionsOpen} aria-label="Version history" title="Version history" disabled={agent === Agent.Working} data-testid="revisions-open" onclick={() => void toggleRevisions()}><HistoryIcon size={16} /></button>
         {#if revisionsOpen}
           <div class="menu more" role="menu" data-testid="revisions">
@@ -1646,12 +1649,18 @@
       {#if data.storyboardHref}
         <a class="secondary storyboard" href={data.storyboardHref} data-testid="storyboard-open">Storyboard</a>
       {/if}
-      <button type="button" class="secondary wide" onclick={() => (leaveTo(0), (publishing = true))} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
+      <button type="button" class="secondary wide" data-phone={ON_PHONE[BarItem.Publish]} onclick={() => (leaveTo(0), (publishing = true))} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
       <div class="popover-anchor narrow" class:always={menu === MenuPlace.More}>
         <IconButton action={Action.More} aria-expanded={moreOpen} data-testid="more-actions" onclick={() => (moreOpen = !moreOpen)} />
         {#if moreOpen}
           <div class="menu more" role="menu">
             <button type="button" role="menuitem" onclick={() => ((moreOpen = false), leaveTo(0), (publishing = true))}><Upload size={14} /><span>{listed ? 'In gallery' : 'Publish'}</span></button>
+            {#if phoneMore(BarItem.Export)}
+              <button type="button" role="menuitem" data-testid="phone-export" onclick={() => ((moreOpen = false), leaveTo(0), (exporting = true))}><Upload size={14} /><span>Export</span></button>
+            {/if}
+            {#if fullHref && rules.closes && phoneMore(BarItem.FullScreen)}
+              <a role="menuitem" href={fullHref} data-testid="phone-full-screen"><span>Full screen</span></a>
+            {/if}
             {#if menu === MenuPlace.More}
               <button type="button" role="menuitem" data-testid="template-open" onclick={() => ((moreOpen = false), leaveTo(0), (templating = true))}><LayoutTemplate size={14} /><span>Template</span></button>
               <button type="button" role="menuitem" data-testid="guide-open-menu" onclick={() => ((moreOpen = false), COMMANDS[Command.Help]())}><Keyboard size={14} /><span>Keyboard & gestures</span></button>
@@ -1659,9 +1668,9 @@
           </div>
         {/if}
       </div>
-      <button type="button" class="render" onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open">Export</button>
+      <button type="button" class="render" data-phone={ON_PHONE[BarItem.Export]} onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open">Export</button>
       {#if rules.closes}
-        {#if fullHref}<a class="secondary storyboard" href={fullHref} data-testid="inline-full-screen">Full screen</a>{/if}
+        {#if fullHref}<a class="secondary storyboard" data-phone={ON_PHONE[BarItem.FullScreen]} href={fullHref} data-testid="inline-full-screen">Full screen</a>{/if}
         <IconButton action={Action.Close} data-testid="inline-close" onclick={onclose} />
       {/if}
     </div>
@@ -1989,7 +1998,7 @@
     display: none;
   }
 
-  .editor[data-mount='canvas'][data-viewport='phone'] .trail .popover-anchor {
+  .editor[data-mount='canvas'][data-viewport='phone'] .trail .popover-anchor:not(.narrow) {
     display: none;
   }
 
@@ -2758,7 +2767,7 @@
 
   [data-viewport='phone'] {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto minmax(0, 1fr) auto auto;
     grid-template-areas: 'lead trail' 'body body' 'transport transport' 'tabs tabs';
   }
@@ -2767,8 +2776,18 @@
     display: contents;
   }
 
+  [data-viewport='phone'] .trail [data-phone='more'],
+  [data-viewport='phone'] .trail [data-phone='off'] {
+    display: none;
+  }
+
+  [data-viewport='phone'] .trail .narrow {
+    display: block;
+  }
+
   [data-viewport='phone'] .lead {
     grid-area: lead;
+    min-width: 0;
     height: 56px;
     padding-left: var(--ui-space-2);
   }
@@ -2778,9 +2797,7 @@
     height: 56px;
     min-width: 0;
     padding-right: var(--ui-space-2);
-    justify-content: safe flex-end;
-    overflow-x: auto;
-    scrollbar-width: none;
+    justify-content: flex-end;
   }
 
   [data-viewport='phone'] .trail > :global([data-testid='inline-close']) {
