@@ -26,6 +26,7 @@
   import { NodeMode, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
+  import { coverFrame } from '$lib/motion/still';
   import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
   let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null } = $props();
@@ -36,7 +37,6 @@
   $effect(() => (host ? inlineStage.offer(nodeId, host) : undefined));
 
   const ICON = 16;
-  const FIRST_FRAME = 0;
 
   let root = $state<HTMLDivElement | null>(null);
   let player = $state<ReturnType<typeof MotionPreview> | null>(null);
@@ -121,13 +121,13 @@
 
   $effect(() => {
     if (capturing && player && preview) {
-      void captureFirstFrame(player, preview, posterKey);
+      void captureCover(player, preview, posterKey);
     }
   });
 
-  async function captureFirstFrame(shooter: NonNullable<typeof player>, source: Preview, key: string) {
+  async function captureCover(shooter: NonNullable<typeof player>, source: Preview, key: string) {
     const width = Math.min(POSTER_WIDTH, source.width);
-    const shot = await shooter.still(FIRST_FRAME / source.fps, width, chrome.poster).catch(() => '');
+    const shot = await shooter.still(coverFrame(source) / source.fps, width, chrome.poster).catch(() => '');
     posters.set(key, shot);
     slots = releaseCapture(slots, node.id);
     if (shot) {
