@@ -129,6 +129,31 @@ describe('a generated output placed on the empty canvas', () => {
       expect(node.width / node.height).toBeCloseTo(width / height, 1);
     }
   });
+
+  it('a placed text shows settled: the still sits where its entrance has finished, not on its first frame', async () => {
+    const input = event(
+      { source: GEN, drop: JSON.stringify({ on: 'canvas', x: 500, y: 300 }) },
+      { nodes: [{ ...frameRow(GEN), type: 'text', data: { prompt: 'p', refId: ASSET } }], assets: [asset('text', 0, 0)] }
+    );
+
+    await actions.placeOutput(input as never);
+    const { doc } = placed(input);
+    const clip = doc.tracks.flatMap((t) => t.clips)[0];
+    expect(doc.still?.frame).toBe(clip.from + clip.durationInFrames - 1);
+    expect(clip.props.color).toBe('#111111');
+  });
+
+  it('a tiny picture still gets a sharp element: the doc is sized by the canvas box, not by the source pixels', async () => {
+    const input = event(
+      { source: GEN, drop: JSON.stringify({ on: 'canvas', x: 500, y: 300 }) },
+      { nodes: [{ ...frameRow(GEN), type: 'image', data: { prompt: 'p', refId: ASSET } }], assets: [asset('image', 1, 1)] }
+    );
+
+    await actions.placeOutput(input as never);
+    const { node, doc } = placed(input);
+    expect(doc.width).toBeGreaterThanOrEqual(node.width);
+    expect(doc.tracks.flatMap((t) => t.clips)[0].props).toMatchObject({ width: 1, height: 1 });
+  });
 });
 
 describe('undo of a move', () => {
