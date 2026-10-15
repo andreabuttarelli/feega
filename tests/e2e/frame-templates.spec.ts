@@ -4,7 +4,7 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 const SHOTS = process.env.E2E_SHOTS_DIR;
 const POSTER = 'builtin:poster-checker-steps';
 const SETTLE_MS = 2000;
-const CARD_TEMPLATES = ['framed-reveal', 'showcase-scatter', 'card-cascade', 'perspective-stack', 'poster-deck-fan'];
+const CARD_TEMPLATES = ['framed-reveal', 'showcase-scatter', 'card-cascade'];
 const OCTOBER_POSTERS = ['diagonal-pills', 'blue-trails', 'step-blobs', 'metaball-listing', 'pixel-burst', 'acid-strokes', 'glyph-specimen', 'stencil-steps'];
 
 const VIEWPORTS = [
@@ -90,10 +90,10 @@ test.describe('frame templates @real', () => {
     for (const id of CARD_TEMPLATES) {
       await expect(picker.locator(`[data-component="builtin:${id}"][data-mode="video"]`)).toHaveCount(1);
     }
-    await picker.getByTestId('component-search').fill('poster deck');
+    await picker.getByTestId('component-search').fill('card cascade');
     await shoot(page, 'desktop-card-templates');
 
-    await picker.locator('[data-component="builtin:poster-deck-fan"]').click();
+    await picker.locator('[data-component="builtin:card-cascade"]').click();
     await expect(picker).toHaveCount(0);
     await expect(page.locator('[data-testid=motion-node]')).toHaveCount(1, { timeout: 15_000 });
     await expect

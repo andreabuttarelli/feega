@@ -653,26 +653,6 @@ const CUSTOM_CARDS: Record<string, TemplateCard> = {
     edges: { start: LIGHT, end: LIGHT },
     goodFor: ['a portfolio', 'services or values as a list']
   }),
-  'perspective-stack': card({
-    roles: [R.Product, R.Gallery],
-    energy: Energy.Calm,
-    loops: true,
-    onScreen: [beat(0, 15, 'snakes of cards, a product photo leading each, glide through 3D space in eased surges every 3 s, each card trailing the one before, over a dark card of moving liquid colour')],
-    needs: { media: media(1, 3, MediaAspect.Square), text: TextAmount.None },
-    bestFormats: ALL_FORMATS,
-    edges: { start: LIGHT, end: LIGHT },
-    goodFor: ['a product launch', 'one product, several colourways']
-  }),
-  'poster-deck-fan': card({
-    roles: [R.Gallery, R.Poster],
-    energy: Energy.Medium,
-    loops: true,
-    onScreen: [beat(0, 4, 'snakes of square posters glide through 3D space in eased surges, each card trailing the one before'), beat(4, 6, 'the lead poster turns to a second design'), beat(6, 12, 'the snakes keep travelling; the lead poster turns back')],
-    needs: { media: media(3, 10, MediaAspect.Square), text: TextAmount.Word },
-    bestFormats: ALL_FORMATS,
-    edges: { start: LIGHT, end: LIGHT },
-    goodFor: ['a poster or print collection', 'an event series']
-  }),
   'poster-liquid-glass': card({
     roles: [R.Opener, R.Background],
     energy: Energy.Calm,
