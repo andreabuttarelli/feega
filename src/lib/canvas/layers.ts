@@ -152,9 +152,21 @@ export const frameRows = (doc: MotionDoc, nodeId: string, parts: Parts = {}): La
 
 export type FrameOutlines = Record<string, readonly LayerRow[]>;
 
+function namedParts(rows: readonly LayerRow[]): Parts {
+  const parts: Record<string, string[]> = {};
+  for (const row of rows) {
+    const at = row.kind === LayerKind.Part ? row.id.indexOf(PART_SEP) : -1;
+    if (at >= 0) {
+      (parts[row.id.slice(0, at)] ??= []).push(row.id.slice(at + 1));
+    }
+  }
+  return parts;
+}
+
 function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlines): LayerRow[] {
   if (open?.nodeId === nodeId) {
-    return trackRows(frameWalk(open.doc, nodeId, open.parts ?? {}, open.mode ?? EditMode.Design), open.doc.tracks, TRACK_DEPTH);
+    const parts = { ...open.parts, ...namedParts(outlines[nodeId] ?? []) };
+    return trackRows(frameWalk(open.doc, nodeId, parts, open.mode ?? EditMode.Design), open.doc.tracks, TRACK_DEPTH);
   }
   return (outlines[nodeId] ?? []).map((row) => ({ ...row, nested: true }));
 }

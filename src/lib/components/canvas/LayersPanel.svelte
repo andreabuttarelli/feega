@@ -29,7 +29,7 @@
   const PRECOMP = 'Precomp';
   const INDENT_PX = 14;
   const FOLD_GUTTER = 24;
-  const PROBE_LANES = 4;
+  const PROBE_LANES = 6;
 
   const canvas = $derived(layersSource.canvas);
   const video = $derived(layersSource.video);
@@ -62,7 +62,7 @@
 
   $effect(() => {
     const url = canvas?.outlinesUrl;
-    const missing = missingHeads(heads, untrack(() => known), video?.nodeId ?? null);
+    const missing = missingHeads(heads, untrack(() => known));
     if (!url || !missing.length) {
       return;
     }

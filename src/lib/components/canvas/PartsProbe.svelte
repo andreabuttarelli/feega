@@ -67,7 +67,7 @@
 </script>
 
 {#if preview}
-  <div class="probe" aria-hidden="true" style={`width: ${preview.width}px; height: ${preview.height}px`}>
+  <div class="probe" aria-hidden="true" data-testid="parts-probe" style={`width: ${preview.width}px; height: ${preview.height}px`}>
     <MotionPreview bind:this={player} bind:redraws html={preview.html} width={preview.width} height={preview.height} fps={preview.fps} muted />
   </div>
 {/if}

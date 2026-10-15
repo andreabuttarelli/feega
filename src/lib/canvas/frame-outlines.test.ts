@@ -18,10 +18,6 @@ describe('frame outlines on the client', () => {
     expect(missingHeads([{ nodeId: 'm1', version: 4 }, { nodeId: 'm2', version: 9 }], cache)).toEqual([{ nodeId: 'm1', version: 4 }]);
   });
 
-  it('never asks for the open frame: its rows come from the editor, and every save would refetch it', () => {
-    expect(missingHeads([{ nodeId: 'm1', version: 4 }, { nodeId: 'm2', version: 1 }], {}, 'm1')).toEqual([{ nodeId: 'm2', version: 1 }]);
-  });
-
   it('serves each frame the outline of its current revision', () => {
     const cache = cacheOutlines({}, [{ nodeId: 'm1', version: 3 }], { m1: [row('t1', 'm1')] });
 
@@ -46,6 +42,13 @@ describe('closed posters list their parts', () => {
 
     expect(posterHeads(heads, cache, new Set(), 'm3')).toEqual([{ nodeId: 'm1', version: 1 }]);
     expect(posterHeads(heads, cache, new Set(['m1:1']), null)).toEqual([{ nodeId: 'm3', version: 1 }]);
+  });
+
+  it('never probes a poster whose parts the outline already names', () => {
+    const heads = [{ nodeId: 'm1', version: 1 }];
+    const named = cacheOutlines({}, heads, { m1: [poster('m1'), { ...row('p#title:0', 'm1'), kind: LayerKind.Part }] });
+
+    expect(posterHeads(heads, named, new Set(), null)).toEqual([]);
   });
 
   it('keeps the part ids of a measure, per clip, without their boxes', () => {

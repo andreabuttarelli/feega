@@ -11,7 +11,7 @@ remounted — rows keep their keys, the xyflow node keeps its element. What did 
 | stage `srcdoc` reload (unchecked component, e.g. a fresh template) | 1–2 | 0 |
 | canvas `?/snapshot` | 2–3 | 0 |
 | editor `?/head` | 2–4 | 0–1 |
-| `frame-outlines` GET | 1–2 | 0 |
+| `frame-outlines` GET | 1–2 | 1 (kept: it carries the derived parts, ADR 0012) |
 | poster capture + upload | 1 (debounced 2.5 s) | 1 (unchanged) |
 | input → second rAF | 16–51 ms | 18–30 ms |
 
@@ -26,8 +26,6 @@ Causes and fixes:
   the editor re-read its head. Now `adoptFrameHead` takes a frame's new head/version in place when
   only `data` moved and nothing is dirty, and the editor skips rows whose `docHeadRevision` is not
   newer than its own (`headMoved`).
-- Layers fetched outlines for the open frame's new head on every save, though its rows come from
-  the editor doc: `missingHeads` skips the open frame, as `posterHeads` already did.
 
 Kept: the poster capture, already debounced at 2.5 s; an agent edit still lands through the same
 in-place adopt plus the editor's head pull.
