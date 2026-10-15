@@ -46,10 +46,10 @@ vi.mock('$lib/server/nav-cache', () => ({ verifiedToken: async (_db: unknown, to
 vi.mock('$lib/server/repos/profiles', async (original) => ({ ...(await original<object>()), ensureProfile: vi.fn(async () => ({ name: 'Ada', email: 'ada@x.it', avatarUrl: null })) }));
 vi.mock('$lib/server/credits', () => ({ orgCreditBalance: vi.fn(async () => 42) }));
 
-const page = await import('../../../../../app/+page.server');
-const templates = await import('../../../../../app/templates/+page.server');
-const canvases = await import('../../../../../app/canvases/+page.server');
-const motion = await import('../../../../../app/motion/+page.server');
+const page = await import('$lib/server/dashboard/pages/home');
+const templates = await import('$lib/server/dashboard/pages/templates');
+const canvases = await import('$lib/server/dashboard/pages/canvases');
+const motion = await import('$lib/server/dashboard/pages/motion');
 const { appShell } = await import('$lib/server/dashboard/app-shell');
 const { GET, POST } = await import('./+server');
 

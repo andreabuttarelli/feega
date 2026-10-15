@@ -10,7 +10,7 @@ const HTTP_SEE_OTHER = 303;
 const HTTP_NOT_FOUND = 404;
 const UNTITLED_VIDEO = 'Untitled video';
 
-export const load: PageServerLoad = async (event) => {
+export const load = async (event: Parameters<PageServerLoad>[0]) => {
   const { db, orgId, projectId } = await toolScope(event);
   const [dashboard, canvases] = await Promise.all([dashboardFor(db, DASHBOARD_DEPS, orgId), listCanvases(db, { orgId, projectId })]);
 
@@ -39,3 +39,5 @@ export const actions: Actions = {
     throw redirect(HTTP_SEE_OTHER, motionEditorPath(started));
   }
 };
+
+export type MotionData = Awaited<ReturnType<typeof load>>;

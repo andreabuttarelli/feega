@@ -23,7 +23,7 @@ export const GET: RequestHandler = async ({ request, url }) => {
   }
 
   const dashboard = await (guessed && shell.org.id === hint ? guessed : recentsOf(db, shell.org.id));
-  return json({ user: { id: user.id, email: user.email ?? null }, shell, flags, dashboard });
+  return json({ data: { user: { id: user.id, email: user.email ?? null }, shell, flags, dashboard } });
 };
 
 function recentsOf(db: Db, orgId: string): Promise<Dashboard> {

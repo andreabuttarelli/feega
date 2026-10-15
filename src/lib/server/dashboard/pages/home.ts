@@ -24,7 +24,7 @@ const HTTP_NOT_FOUND = 404;
 const ORG_COOKIE_MAX_AGE_S = 60 * 60 * 24 * 365;
 const SLUG_BYTES = 4;
 
-export const load: PageServerLoad = async (event) => {
+export const load = async (event: Parameters<PageServerLoad>[0]) => {
   const { db, user } = await signedInDb(event);
   const { cookies } = event;
   const campaign = takeCampaign(cookies);
@@ -112,3 +112,5 @@ export const actions: Actions = {
     throw redirect(HTTP_SEE_OTHER, DASHBOARD_PATH);
   }
 };
+
+export type HomeData = Awaited<ReturnType<typeof load>>;

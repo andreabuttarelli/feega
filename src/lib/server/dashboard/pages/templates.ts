@@ -8,7 +8,7 @@ import { catalogue, posterShelf } from '$lib/motion/template/catalogue';
 
 const GALLERY_SIZE = 8;
 
-export const load: PageServerLoad = async (event) => {
+export const load = async (event: Parameters<PageServerLoad>[0]) => {
   const { db } = await signedInDb(event);
   const [gallery, attachProjectId] = await Promise.all([
     listGallery(db, gallerySearchSchema.parse({ limit: GALLERY_SIZE })),
@@ -17,3 +17,5 @@ export const load: PageServerLoad = async (event) => {
   const components = catalogue(BUILTIN_TEMPLATES);
   return { components, posters: posterShelf(components), gallery, attachProjectId };
 };
+
+export type TemplatesData = Awaited<ReturnType<typeof load>>;

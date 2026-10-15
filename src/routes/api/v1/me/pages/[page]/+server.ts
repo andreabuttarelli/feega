@@ -1,30 +1,29 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
+import { DashboardPage, PAGE_PATH, isDashboardPage } from '$lib/dashboard/pages';
 import { ACTION_PARAM, answerOf, bearerOf, pageEvent } from '$lib/server/api/bearer-page';
 
 const NOT_FOUND = 404;
 
 type Handler = (event: never) => unknown;
 type PageModule = { load?: Handler; actions?: Record<string, Handler> };
-type DashboardPage = { path: string; module: () => Promise<PageModule> };
 
-const PAGES: Record<string, DashboardPage> = {
-  home: { path: '/app', module: () => import('$lib/server/dashboard/pages/home') },
-  canvases: { path: '/app/canvases', module: () => import('$lib/server/dashboard/pages/canvases') },
-  templates: { path: '/app/templates', module: () => import('$lib/server/dashboard/pages/templates') },
-  motion: { path: '/app/motion', module: () => import('$lib/server/dashboard/pages/motion') },
-  credits: { path: '/app/credits', module: () => import('$lib/server/dashboard/pages/credits') }
+const MODULES: Record<DashboardPage, () => Promise<PageModule>> = {
+  [DashboardPage.Home]: () => import('$lib/server/dashboard/pages/home'),
+  [DashboardPage.Canvases]: () => import('$lib/server/dashboard/pages/canvases'),
+  [DashboardPage.Templates]: () => import('$lib/server/dashboard/pages/templates'),
+  [DashboardPage.Motion]: () => import('$lib/server/dashboard/pages/motion'),
+  [DashboardPage.Credits]: () => import('$lib/server/dashboard/pages/credits')
 };
 
 const UNKNOWN = () => json({ error: 'not_found' }, { status: NOT_FOUND });
 
 async function serve(request: Request, url: URL, pageName: string, pick: (module: PageModule) => Handler | undefined): Promise<Response> {
-  const page = PAGES[pageName];
-  if (!page) {
+  if (!isDashboardPage(pageName)) {
     return UNKNOWN();
   }
 
-  const handler = pick(await page.module());
+  const handler = pick(await MODULES[pageName]());
   if (!handler) {
     return UNKNOWN();
   }
@@ -34,7 +33,7 @@ async function serve(request: Request, url: URL, pageName: string, pick: (module
     return bearer;
   }
 
-  const event = pageEvent(bearer, request, url, page.path);
+  const event = pageEvent(bearer, request, url, PAGE_PATH[pageName]);
   return answerOf(async () => handler(event as never));
 }
 

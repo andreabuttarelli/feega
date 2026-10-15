@@ -18,7 +18,7 @@ const stripeApi = () => import('$lib/server/stripe');
 type OrgRow = { id: string; name: string; stripe_customer_id: string | null };
 type BrandRow = { id: string; name: string; slug: string };
 
-export const load: PageServerLoad = async ({ parent, url, locals: { supabase } }) => {
+export const load = async ({ parent, url, locals: { supabase } }: Parameters<PageServerLoad>[0]) => {
   const {
     data: { user }
   } = await supabase.auth.getUser();
@@ -111,3 +111,5 @@ export const actions: Actions = {
   cancelPlan,
   buyOneTime
 };
+
+export type CreditsData = Awaited<ReturnType<typeof load>>;

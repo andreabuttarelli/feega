@@ -10,7 +10,7 @@ vi.mock('$lib/server/stripe', () => ({
 	subscribedRungPrice: (...a: unknown[]) => subscribedRungPrice(...a)
 }));
 
-import { load, actions } from './+page.server';
+import { load, actions } from '$lib/server/dashboard/pages/credits';
 
 type Row = Record<string, unknown>;
 

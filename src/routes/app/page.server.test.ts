@@ -41,7 +41,7 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships }));
 const loadAttachments = vi.fn(async (_db: unknown, input: { ids: string[] }) => input.ids.filter((id) => id !== 'stranger').map((id) => ({ assetId: id, kind: 'image', name: `${id}.png`, mimeType: 'image/png', bytes: 1 })));
 vi.mock('$lib/server/chat-attachments/register', () => ({ loadAttachments }));
 
-const { load, actions } = await import('./+page.server');
+const { load, actions } = await import('$lib/server/dashboard/pages/home');
 
 const locals = { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => ({}) };
 
@@ -70,7 +70,7 @@ describe('/app is the dashboard for a returning user', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('loads projects, tools and the latest outputs of the chosen org', async () => {
-    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as {
+    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as unknown as {
       dashboard: { projects: { id: string; canvases: unknown[] }[]; batches: { href: string }[] };
       tools: { id: string }[];
     };
@@ -156,7 +156,7 @@ describe('/app is the dashboard for a returning user', () => {
   });
 
   it('the home loads the brief suggestions and no catalogue: templates live on their own page', async () => {
-    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as Record<string, unknown> & { templates: unknown[] };
+    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as unknown as Record<string, unknown> & { templates: unknown[] };
 
     expect(data.templates.length).toBeGreaterThan(0);
     expect(data).not.toHaveProperty('components');
