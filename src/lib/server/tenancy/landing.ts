@@ -8,8 +8,9 @@ import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
 import { CURRENT_TERMS_VERSION } from '$lib/legal-links';
 import { takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 
-export const INVITE_PARAM = 'invite_token';
-export const INVITE_ERROR_PARAM = 'invite_error';
+import { INVITE_ERROR_PARAM } from '$lib/login/invite';
+
+export { INVITE_ERROR_PARAM, INVITE_PARAM, inviteTokenIn } from '$lib/login/invite';
 
 export type LandingDeps = {
   ensureProfile: typeof ensureProfile;
@@ -23,11 +24,6 @@ const LANDING_DEPS: LandingDeps = { ensureProfile, recordTermsAcceptance, accept
 async function recordFirstAcceptance(db: Db, deps: LandingDeps, userId: string, termsAcceptedAt: string | null) {
   if (termsAcceptedAt) return;
   await deps.recordTermsAcceptance(db, userId, CURRENT_TERMS_VERSION);
-}
-
-export function inviteTokenIn(params: URLSearchParams | FormData): string | null {
-  const token = params.get(INVITE_PARAM);
-  return typeof token === 'string' && token ? token : null;
 }
 
 export async function landingPath(

@@ -1,38 +1,16 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { EMAIL_RE, createConfirmedAccount, sendPasswordReset } from '$lib/server/auth/accounts';
-import { sanitizeWebsiteParam } from '$lib/website-param';
 import { appOrigin } from '$lib/server/app-url';
 import { takeOAuthReturn } from '$lib/server/oauth';
-import { INVITE_ERROR_PARAM, INVITE_PARAM, inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
-import { signInErrorIn } from './sign-in-error';
+import { INVITE_PARAM, inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
+import { loginPageOf } from '$lib/login/login-page';
 import { NATIVE_AUTH_BASE, isNativeShell } from '$lib/native-shell';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-
-/** Homepage/ads URL CTA, pricing plan CTA → open create-account, not sign-in. */
-function preferSignup(url: URL): boolean {
-  if (url.searchParams.get('next') === 'onboarding') return true;
-  if (url.searchParams.get('mode') === 'signup') return true;
-  if (sanitizeWebsiteParam(url.searchParams.get('website'))) return true;
-  return false;
-}
-
-const INVITE_ERRORS = ['invalid', 'wrong_email'] as const;
-type InviteError = (typeof INVITE_ERRORS)[number];
-
-function inviteErrorIn(url: URL): InviteError | null {
-  const code = url.searchParams.get(INVITE_ERROR_PARAM);
-  return INVITE_ERRORS.find((known) => known === code) ?? null;
-}
-
 export const load: PageServerLoad = async ({ url, cookies, locals: { safeGetSession, db } }) => {
-  const cliPort = url.searchParams.get('cli_port') ?? '';
-  const cliState = url.searchParams.get('cli_state') ?? '';
-  const inviteToken = inviteTokenIn(url.searchParams);
-  const inviteError = inviteErrorIn(url);
-  const signInError = signInErrorIn(url);
-  const page = { cliPort, cliState, inviteToken, inviteError, signInError, homeHref: null as string | null, preferSignup: preferSignup(url) };
+  const page = loginPageOf(url);
+  const { cliPort, cliState, inviteToken, inviteError } = page;
 
   const { session, user } = await safeGetSession();
   const client = session && user ? await db() : null;

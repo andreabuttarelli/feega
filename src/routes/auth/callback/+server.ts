@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { takeOAuthReturn } from '$lib/server/oauth';
 import { inviteTokenIn, landingPath } from '$lib/server/tenancy/landing';
-import { SIGN_IN_ERROR_PARAM, SignInError } from '../../login/sign-in-error';
+import { SIGN_IN_ERROR_PARAM, SignInError } from '$lib/login/sign-in-error';
 import type { RequestHandler } from './$types';
 
 // Scambia il codice del magic link / OAuth per una sessione, poi instrada. Le destinazioni sono
