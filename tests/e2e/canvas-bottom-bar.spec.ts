@@ -85,6 +85,7 @@ test.describe('one bottom bar, by context @real', () => {
 
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
     await expect(bar).toHaveAttribute('data-context', 'canvas', { timeout: 10_000 });
     await expect(page.getByTestId('draw-tools')).toHaveCount(0);
     await shoot(page, '6-back-to-canvas');

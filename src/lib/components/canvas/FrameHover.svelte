@@ -36,10 +36,14 @@
     return { x: (e.clientX - r.left - fit.left) / fit.width, y: (e.clientY - r.top - fit.top) / fit.height };
   }
 
-  function enter() {
-    if (!boxes && revision > 0) {
-      probing = true;
+  const DWELL_MS = 200;
+  let dwell: ReturnType<typeof setTimeout> | undefined;
+
+  function enter(e: PointerEvent) {
+    if (boxes || e.buttons || e.pointerType !== 'mouse') {
+      return;
     }
+    dwell = setTimeout(() => (probing = true), DWELL_MS);
   }
 
   function done(next: Record<string, MeasuredBox>) {
@@ -59,6 +63,7 @@
   }
 
   function leave() {
+    clearTimeout(dwell);
     if (hovered) {
       layersSource.hover(null);
     }
