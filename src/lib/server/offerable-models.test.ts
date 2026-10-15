@@ -109,6 +109,23 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
     expect(ids).not.toContain('kie/nano-banana-2');
   });
 
+  it('hides a model whose published schema no node request can satisfy', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'wiro/wiro/train-flux-lora',
+        catalogue: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+        provider: 'wiro',
+        wire_spec: { owner: 'wiro', project: 'train-flux-lora', fields: { prompt: 'prompt', images: [] }, unrunnable: 'required_field_without_default' }
+      } as never
+    ]);
+
+    const out = await offerableModels(admin, 'image');
+
+    expect(out.choices.map((c) => c.id)).not.toContain('wiro/wiro/train-flux-lora');
+  });
+
   it('hides a provider whose key is missing instead of offering a model that cannot run', async () => {
     delete testEnv.WIRO_API_KEY;
     const admin = fakeAdmin([

@@ -290,3 +290,46 @@ describe('finishTaskJob — what a finished, failed or abandoned task bills', ()
     expect(out).toEqual({ state: 'pending' });
   });
 });
+
+describe('startTaskRun — a request the provider would refuse never leaves', () => {
+  const editModel: TaskModel = {
+    id: 'wiro/fireredteam/firered-image-edit',
+    catalogue: 'image',
+    spec: { owner: 'fireredteam', project: 'firered-image-edit', fields: { prompt: 'prompt', images: ['inputImage'] }, requiresImage: true },
+    uncensored: false,
+    paramSchema: {}
+  };
+
+  it('refuses a model that needs an input image when the node has none', async () => {
+    const { deps, gatewayRun } = depsFor(editModel);
+
+    const out = await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: editModel.id });
+
+    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.needsImage, stage: RefusalStage.Policy });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+
+  it('refuses a model the catalogue marked unrunnable', async () => {
+    const model: TaskModel = { ...editModel, spec: { owner: 'o', project: 'p', fields: { prompt: 'prompt', images: [] }, unrunnable: 'required_field_without_default' } };
+    const { deps, gatewayRun } = depsFor(model);
+
+    const out = await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: model.id });
+
+    expect(out.kind).toBe('refused');
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+
+  it('sends required defaults and drops a stale aspect the model does not take', async () => {
+    const model: TaskModel = {
+      ...editModel,
+      spec: { owner: 'o', project: 'p', fields: { prompt: 'prompt', aspectRatio: 'ratio', images: [] }, fixed: { ratio: '1:1', size: '1K' } },
+      paramSchema: { aspect_ratio: { type: 'enum', values: ['1:1', '16:9'] } }
+    };
+    const { deps, gatewayRun } = depsFor(model);
+
+    await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: model.id, params: { aspectRatio: '21:9' } });
+
+    expect(gatewayRun.mock.calls[0][0]).toEqual({ owner: 'o', project: 'p' });
+    expect(gatewayRun.mock.calls[0][1]).toEqual({ prompt: 'a picture', ratio: '1:1', size: '1K' });
+  });
+});
