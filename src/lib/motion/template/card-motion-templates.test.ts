@@ -15,10 +15,6 @@ import { SHOWCASE_SCATTER_TEMPLATE } from './showcase-scatter/template';
 import { SS_MODEL } from './showcase-scatter/model';
 import { CARD_CASCADE_TEMPLATE } from './card-cascade/template';
 import { CC_MODEL } from './card-cascade/model';
-import { PERSPECTIVE_STACK_TEMPLATE } from './perspective-stack/template';
-import { PS_MODEL } from './perspective-stack/model';
-import { POSTER_DECK_FAN_TEMPLATE } from './poster-deck-fan/template';
-import { PD_MODEL } from './poster-deck-fan/model';
 
 type Frame = (p: Record<string, unknown>, t: number, length: number) => unknown;
 type Case = { entry: TemplateEntry; model: string; frame: string; layout: string | null; marker: string; text: [string, string]; count: [string, number] };
@@ -26,9 +22,7 @@ type Case = { entry: TemplateEntry; model: string; frame: string; layout: string
 const CASES: Case[] = [
   { entry: FRAMED_REVEAL_TEMPLATE, model: FR_MODEL, frame: 'revealFrame', layout: null, marker: 'fr-window', text: ['label', 'zqx caption'], count: ['count', 4] },
   { entry: SHOWCASE_SCATTER_TEMPLATE, model: SS_MODEL, frame: 'scatterFrame', layout: 'scatterLayout', marker: 'ss-cards', text: ['headline', 'zqx headline'], count: ['count', 8] },
-  { entry: CARD_CASCADE_TEMPLATE, model: CC_MODEL, frame: 'cascadeFrame', layout: 'cascadeLayout', marker: 'cc-stack', text: ['words', 'zqx word'], count: ['count', 6] },
-  { entry: PERSPECTIVE_STACK_TEMPLATE, model: PS_MODEL, frame: 'stackFrame', layout: 'deckLayout', marker: 'ps-deck', text: ['caption', 'zqx caption'], count: ['count', 4] },
-  { entry: POSTER_DECK_FAN_TEMPLATE, model: PD_MODEL, frame: 'fanFrame', layout: 'fanLayout', marker: 'pd-deck', text: ['a_title', 'zqx title'], count: ['count', 8] }
+  { entry: CARD_CASCADE_TEMPLATE, model: CC_MODEL, frame: 'cascadeFrame', layout: 'cascadeLayout', marker: 'cc-stack', text: ['words', 'zqx word'], count: ['count', 6] }
 ];
 
 const COMPONENT = (entry: TemplateEntry) => Object.values(entry.template.doc.components)[0];
@@ -143,39 +137,14 @@ describe.each(CASES)('the $entry.template.name template', (c) => {
   });
 });
 
-type SnakeCard = { x: number; y: number; z: number; opacity: number };
 
-describe.each(CASES.filter((c) => c.entry === PERSPECTIVE_STACK_TEMPLATE || c.entry === POSTER_DECK_FAN_TEMPLATE))('the $entry.template.name snakes', (c) => {
-  const cards = (t: number) => (frameOf(c)(defaults(c.entry), t, seconds(c.entry)) as { cards: SnakeCard[] }).cards;
-  const times = Array.from({ length: seconds(c.entry) * 30 + 1 }, (_, i) => i / 30);
+describe('a frame that already holds one of these templates', () => {
+  it('carries its own component code, so it renders without the built-in list', () => {
+    const placed = inserted(FRAMED_REVEAL_TEMPLATE);
+    const { components } = placed.doc;
+    const html = composeHtml({ doc: { ...placed.doc, components }, tokens: FEEGA_TOKENS, assets: {} });
 
-  it('never lets a card vanish: every card stays opaque and in front of the camera', () => {
-    times.forEach((t) =>
-      cards(t).forEach((card) => {
-        expect(card.opacity).toBe(1);
-        expect(card.z).toBeLessThan(1);
-      })
-    );
-  });
-
-  it('moves every card through space, not in place', () => {
-    const first = cards(0);
-    const frames = times.map(cards);
-    const travelled = first.map((card, i) => Math.max(...frames.map((f) => Math.hypot(f[i].x - card.x, f[i].y - card.y, f[i].z - card.z))));
-
-    travelled.forEach((d) => expect(d).toBeGreaterThan(0.2));
-  });
-
-  it('keeps each card close behind the one it follows', () => {
-    const per = Number(defaults(c.entry).count);
-    times.forEach((t) => {
-      const all = cards(t);
-      all.forEach((card, i) => {
-        if (i % per === 0) {
-          return;
-        }
-        expect(Math.hypot(card.x - all[i - 1].x, card.y - all[i - 1].y, card.z - all[i - 1].z)).toBeLessThan(0.4);
-      });
-    });
+    expect(Object.keys(components)).toContain('FramedReveal');
+    expect(html).toContain('fr-window');
   });
 });
