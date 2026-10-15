@@ -1,12 +1,16 @@
 import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const ROOT = new URL('..', import.meta.url).pathname;
 const WEB = join(ROOT, 'src/routes');
 const NATIVE = join(ROOT, 'src/native-routes');
 const NATIVE_ROUTES = join(ROOT, '.native/routes');
 const OUT = join(ROOT, 'apps/native/bundle-dist');
+const STATIC = join(ROOT, 'static');
+const NATIVE_STATIC = join(ROOT, '.native/static');
+const BUNDLED_STATIC = JSON.parse(readFileSync(join(ROOT, 'src/lib/native/bundled-static.json'), 'utf8'));
 const DEFAULT_API = 'https://oh.feega.app';
 
 const WEB_FILES = ['+error.svelte', 'app/+layout.svelte', 'app/+layout.ts', 'app/+page.svelte', 'app/+page.ts', 'app/tools/+page.svelte'];
@@ -35,6 +39,13 @@ function assembleRoutes() {
   cpSync(NATIVE, NATIVE_ROUTES, { recursive: true });
 }
 
+function assembleStatic() {
+  rmSync(NATIVE_STATIC, { recursive: true, force: true });
+  for (const entry of BUNDLED_STATIC) {
+    copy(join(STATIC, entry), join(NATIVE_STATIC, entry));
+  }
+}
+
 function build() {
   rmSync(OUT, { recursive: true, force: true });
   const env = {
@@ -56,5 +67,6 @@ function entryPerRoute() {
 }
 
 assembleRoutes();
+assembleStatic();
 build();
 entryPerRoute();

@@ -201,5 +201,15 @@ sign in → dashboard from the API → cached nav ~50 ms → canvas opens hosted
 paused). The iOS simulator build installs and renders the bundled login page; the scripted flow
 (`apps/native/e2e`, feature `e2e`) did not report from the simulator.
 
-Open: hosted pages link back to the hosted `/app`, not to the bundle; the bundle carries all of
-`static/` (27 MB); the canvas and editor still need their own API move before they can be bundled.
+The bundle carries only the static files its own pages reference (`src/lib/native/bundled-static.json`,
+2.7 MB in total instead of 27 MB); any other root-relative file path in API data is rewritten to
+the hosted origin. In the bundle the login page never treats the shell as an in-app browser: the iOS
+WKWebView user agent has no Safari token and hid OAuth.
+
+Not verified: the real `feega://` OAuth round trip (needs a provider login in the system browser and
+an unlocked screen; `feega://auth/callback` must be on Supabase's redirect allow-list). The shell
+maps `feega://auth/callback?code=` onto the current window origin, so in the bundle it lands on the
+bundle's `/auth/callback`, which exchanges the code with the PKCE verifier in `localStorage`.
+
+Open: hosted pages link back to the hosted `/app`, not to the bundle; the canvas and editor still
+need their own API move before they can be bundled.

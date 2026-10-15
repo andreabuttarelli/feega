@@ -16,7 +16,7 @@ const NATIVE_FILES = {
   routes: `${NATIVE_SRC}/routes`,
   lib: 'src/lib',
   params: 'src/params',
-  assets: 'static',
+  assets: `${NATIVE_SRC}/static`,
   appTemplate: 'src/app.html',
   hooks: { client: 'src/hooks.client', server: `${NATIVE_SRC}/hooks.server`, universal: `${NATIVE_SRC}/hooks` },
   serviceWorker: `${NATIVE_SRC}/service-worker`

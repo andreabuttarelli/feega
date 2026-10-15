@@ -1,5 +1,6 @@
 import { invalidate } from '$app/navigation';
-import { HOSTED_ORIGIN } from '$lib/runtime';
+import { HOSTED_ORIGIN, RUNTIME, Runtime } from '$lib/runtime';
+import { hostedAssets } from '$lib/native/static-assets';
 import type { ActionResult } from '@sveltejs/kit';
 import { createSupabaseBrowserClient } from '$lib/supabase/client';
 import { SwrCache } from './swr';
@@ -85,7 +86,8 @@ function keyOf(path: string): `api:${string}` {
 function reader(path: string): () => Promise<unknown> {
   return async () => {
     const { status, body } = await call(path);
-    return loadedOf(status, body);
+    const data = loadedOf(status, body);
+    return RUNTIME === Runtime.Bundle ? hostedAssets(data, HOSTED_ORIGIN) : data;
   };
 }
 

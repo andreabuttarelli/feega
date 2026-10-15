@@ -3,6 +3,7 @@
   import { TitleSize } from '$lib/components/page-title';
   import { onMount } from 'svelte';
   import { authEnhance } from '$lib/native/auth-enhance';
+  import { RUNTIME, Runtime } from '$lib/runtime';
   import { page } from '$app/stores';
   import { _, locale } from 'svelte-i18n';
   import { isPlanKey, planByKey } from '$lib/plans';
@@ -38,7 +39,7 @@
   let copied = $state(false);
 
   onMount(() => {
-    const detected = detectInAppBrowser();
+    const detected = RUNTIME === Runtime.Bundle ? { isInApp: false } : detectInAppBrowser();
     if (detected.isInApp) {
       inApp = detected;
       // Inside in-app browsers OAuth is unavailable, so people sign up with email/password.
