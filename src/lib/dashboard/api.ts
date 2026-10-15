@@ -4,7 +4,7 @@ import type { ActionResult } from '@sveltejs/kit';
 import { createSupabaseBrowserClient } from '$lib/supabase/client';
 import { SwrCache } from './swr';
 import { actionResultOf, loadedOf, type Answer } from './answers';
-import type { DashboardPage } from './pages';
+import { pageAt, type DashboardPage } from './pages';
 import type { AppShell } from '$lib/server/dashboard/app-shell';
 import type { FirstRunFlags } from '$lib/server/dashboard/first-run-flags';
 import type { Dashboard } from '$lib/server/dashboard/dashboard';
@@ -59,22 +59,47 @@ async function call(path: string, init: RequestInit = {}): Promise<{ status: num
   return { status: res.status, body: (await res.json().catch(() => ({}))) as Answer };
 }
 
-async function cachedLoad(path: string, depends: Depends): Promise<unknown> {
-  const key = `api:${path}` as const;
-  depends(key);
-  const read = async () => {
+function keyOf(path: string): `api:${string}` {
+  return `api:${path}`;
+}
+
+function reader(path: string): () => Promise<unknown> {
+  return async () => {
     const { status, body } = await call(path);
     return loadedOf(status, body);
   };
-  return cache.read(key, read, () => void invalidate(key));
+}
+
+async function cachedLoad(path: string, depends: Depends): Promise<unknown> {
+  const key = keyOf(path);
+  depends(key);
+  return cache.read(key, reader(path), () => void invalidate(key));
+}
+
+function bootstrapPath(): string {
+  return withOrg('/api/v1/me/bootstrap');
+}
+
+function pagePath(page: DashboardPage, url: URL): string {
+  return withOrg(`/api/v1/me/pages/${page}`, url.searchParams);
 }
 
 export async function loadBootstrap(depends: Depends): Promise<Bootstrap> {
-  return (await cachedLoad(withOrg('/api/v1/me/bootstrap'), depends)) as Bootstrap;
+  return (await cachedLoad(bootstrapPath(), depends)) as Bootstrap;
 }
 
 export async function loadPage<T>(page: DashboardPage, url: URL, depends: Depends): Promise<T> {
-  return (await cachedLoad(withOrg(`/api/v1/me/pages/${page}`, url.searchParams), depends)) as T;
+  return (await cachedLoad(pagePath(page, url), depends)) as T;
+}
+
+export function warmDashboard(url: URL): void {
+  const page = pageAt(url.pathname);
+  if (!page) {
+    return;
+  }
+  for (const path of [bootstrapPath(), pagePath(page, url)]) {
+    cache.warm(keyOf(path), reader(path));
+  }
 }
 
 export async function postAction(page: DashboardPage, action: string, form: FormData): Promise<ActionResult> {

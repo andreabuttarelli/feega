@@ -66,4 +66,22 @@ describe('a stale-while-revalidate cache for dashboard navigation', () => {
 
     expect(await cache.read('k', async () => 'v2', () => {})).toBe('v2');
   });
+
+  it('a fetch warmed before the page asks is the one the page awaits', async () => {
+    const cache = new SwrCache(clock().now);
+    const fetcher = vi.fn(async () => 'v1');
+    cache.warm('k', fetcher);
+
+    const later = vi.fn(async () => 'v2');
+    expect(await cache.read('k', later, () => {})).toBe('v1');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(later).not.toHaveBeenCalled();
+  });
+
+  it('a failed warm-up leaves the page to fetch for itself', async () => {
+    const cache = new SwrCache(clock().now);
+    cache.warm('k', async () => Promise.reject(new Error('offline')));
+
+    expect(await cache.read('k', async () => 'v2', () => {})).toBe('v2');
+  });
 });
