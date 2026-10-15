@@ -67,6 +67,8 @@ function pricedInputsOf(row: TaskRow, fields: WireFields): PricedInputs[] | unde
   }));
 }
 
+const textOnly = (modalities: string[] | null): string[] => (modalities ?? []).filter((modality) => modality !== 'image');
+
 export function taskChoice(row: TaskRow): ModelChoice {
   const spec = wireSpecOf(row.wire_spec);
   const fields = spec?.fields ?? { prompt: 'prompt', images: [] };
@@ -74,20 +76,21 @@ export function taskChoice(row: TaskRow): ModelChoice {
   const durations = enumValues(schema, 'duration').map(Number).filter((n) => Number.isFinite(n) && n > 0);
   const aspects = enumValues(schema, 'aspect_ratio');
   const pricedInputs = pricedInputsOf(row, fields);
+  const uncensored = row.uncensored === true;
 
   return {
     id: row.id,
     label: row.label ?? row.id,
     aspectRatios: aspects.length ? aspects : DEFAULT_ASPECTS,
-    maxRefs: maxRefsOf(spec),
+    maxRefs: uncensored ? 0 : maxRefsOf(spec),
     ...providerOf(row.id),
     wireId: row.id,
-    inputModalities: row.input_modalities ?? [],
+    inputModalities: uncensored ? textOnly(row.input_modalities) : row.input_modalities ?? [],
     resolutions: row.supported_resolutions?.length ? row.supported_resolutions : undefined,
     ...(durations.length
       ? { durationOptions: durations, minDuration: Math.min(...durations), maxDuration: Math.max(...durations) }
       : {}),
-    uncensored: row.uncensored === true,
+    uncensored,
     pricedInputs,
     variableCredits: !pricedInputs,
     params: modelParamsOf(schema)

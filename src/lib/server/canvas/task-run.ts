@@ -59,14 +59,20 @@ export const TASK_REFUSALS = {
   unknownModel: 'model_not_synced',
   notEnabled: UNCENSORED_REFUSALS.disabled,
   noInputsAllowed: UNCENSORED_REFUSALS.inputs,
-  noOutput: 'task_failed: no output'
+  noOutput: 'task_failed: no output',
+  needsImage: 'missing_input: this model needs an input image'
 } as const;
 
 export type TaskScope = { orgId: string; projectId: string; nodeId: string; userId: string; actor?: Actor };
 
 export type TaskCatalogue = 'image' | 'video' | 'model3d';
 
-export type TaskWireSpec = { fields: WireFields } & Readonly<Record<string, unknown>>;
+export type TaskWireSpec = {
+  fields: WireFields;
+  fixed?: Readonly<Record<string, string>>;
+  requiresImage?: boolean;
+  unrunnable?: string;
+} & Readonly<Record<string, unknown>>;
 
 export type TaskModel = {
   id: string;
@@ -140,6 +146,12 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   if (!model || !provider) {
     return refused(TASK_REFUSALS.unknownModel);
   }
+  if (model.spec.unrunnable) {
+    return refused(TASK_REFUSALS.unknownModel);
+  }
+  if (model.spec.requiresImage && !req.imageUrls.length) {
+    return refused(TASK_REFUSALS.needsImage);
+  }
 
   const uncensored = uncensoredRefusal({
     uncensored: model.uncensored,
@@ -172,8 +184,8 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
     return refused(screened.error);
   }
 
-  const inputs = wireInputs(model.spec.fields, req, model.paramSchema);
-  const { fields: _fields, ...ref } = model.spec;
+  const inputs = wireInputs(model.spec, req, model.paramSchema);
+  const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, unrunnable: _unrunnable, ...ref } = model.spec;
   const startedAt = Date.now();
   try {
     const { taskId } = await gateway.run(ref, inputs, req.idempotencyKey);
@@ -245,7 +257,7 @@ function outlivedFallback(provider: TaskProviderName, model: TaskModel, job: Tas
 }
 
 function jobQuote(model: TaskModel, job: TaskJob): number | null {
-  const inputs = wireInputs(model.spec.fields, { prompt: '', params: job.params ?? {}, imageUrls: [], lastFrameUrl: null }, model.paramSchema);
+  const inputs = wireInputs(model.spec, { prompt: '', params: job.params ?? {}, imageUrls: [], lastFrameUrl: null }, model.paramSchema);
   return quoteOf(model, inputs);
 }
 

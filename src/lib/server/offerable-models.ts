@@ -109,8 +109,8 @@ const CHOICE_OF_PROVIDER: Readonly<Record<string, (row: SyncedRow) => ModelChoic
 
 function providerReachable(row: SyncedRow, configured: ReadonlySet<TaskProviderName>): boolean {
   const provider = taskProviderOf(row.id);
-  const isRoute = Boolean((row.wire_spec as { discountFor?: unknown } | null)?.discountFor);
-  return !provider || (configured.has(provider) && !isRoute);
+  const spec = row.wire_spec as { discountFor?: unknown; unrunnable?: unknown } | null;
+  return !provider || (configured.has(provider) && !spec?.discountFor && !spec?.unrunnable);
 }
 
 function unspeccedChoice(row: SyncedRow, generic: (row: SyncedRow) => ModelChoice): ModelChoice {

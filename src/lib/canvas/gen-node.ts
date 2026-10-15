@@ -224,6 +224,14 @@ export function snapResolution(choice: ModelChoice, saved: string | undefined): 
   return options[0];
 }
 
+export function snapAspectRatio(choice: ModelChoice, saved: string | undefined): string | undefined {
+  const options = choice.aspectRatios;
+  if (!options.length) {
+    return undefined;
+  }
+  return saved && options.includes(saved) ? saved : options[0];
+}
+
 /** Il provider rifiuterebbe questo prompt? Si chiede prima di spendere il giro. */
 export function promptTooLong(prompt: string, choice: ModelChoice): boolean {
   const ceiling = choice.maxPromptChars;

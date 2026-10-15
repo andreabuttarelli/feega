@@ -131,7 +131,7 @@
   import { hasUpstreamText } from '$lib/canvas/upstream-inputs';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
-  import { snapResolution } from '$lib/canvas/gen-node';
+  import { snapAspectRatio, snapResolution } from '$lib/canvas/gen-node';
   import { snapDynamicParams } from '$lib/canvas/model-params';
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
@@ -2362,6 +2362,16 @@
       // Un modello nuovo può non fare più il gradino di durata o la risoluzione salvati: si
       // scivola al più vicino fra quelli che offre — mai una durata o un token di risoluzione che
       // quel modello rifiuta (`happyhorse-1.0` non fa 480p, `video_renders` cb1de6e2).
+      if (model !== undefined && (n.type === 'video' || n.type === 'image')) {
+        const nextModel = catalogue[n.type]?.find((c) => c.id === model);
+        const aspectRatio = nextModel ? snapAspectRatio(nextModel, nextParams.aspectRatio as string | undefined) : undefined;
+        if (nextModel && aspectRatio) {
+          nextParams.aspectRatio = aspectRatio;
+        } else if (nextModel) {
+          delete nextParams.aspectRatio;
+        }
+      }
+
       if (model !== undefined && n.type === 'video') {
         const nextModel = catalogue.video?.find((c) => c.id === model);
         const options = nextModel?.durationOptions;
