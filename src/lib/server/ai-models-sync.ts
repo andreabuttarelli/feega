@@ -25,6 +25,8 @@ import { env } from '$env/dynamic/private';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchWiroCatalogue } from './wiro-catalogue';
 import { DEFAULT_WIRO_BASE_URL } from './wiro';
+import { kieModelRows } from './kie-catalogue';
+import { configuredIn, TaskProviderName } from './generation/task-providers';
 
 export type AiModelCatalogue = 'chat' | 'image' | 'video' | 'model3d';
 
@@ -382,7 +384,8 @@ export async function syncAiModels(
     fetchCatalogue(doFetch, baseUrl, CHAT_CATALOGUE, syncedAt),
     fetchImageCatalogue(doFetch, baseUrl, syncedAt),
     fetchCatalogue(doFetch, baseUrl, VIDEO_CATALOGUE, syncedAt),
-    fetchWiroCatalogue(doFetch, opts.wiroBaseUrl ?? env.WIRO_BASE_URL?.trim() ?? DEFAULT_WIRO_BASE_URL, syncedAt)
+    fetchWiroCatalogue(doFetch, opts.wiroBaseUrl ?? env.WIRO_BASE_URL?.trim() ?? DEFAULT_WIRO_BASE_URL, syncedAt),
+    { rows: configuredIn(env).has(TaskProviderName.Kie) ? kieModelRows(syncedAt) : [], ok: true as const }
   ]);
 
   const rows = await keepImagePricing(admin, results.flatMap((result) => result.rows));

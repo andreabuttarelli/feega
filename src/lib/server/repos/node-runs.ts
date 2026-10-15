@@ -324,6 +324,21 @@ export async function setRunPrompt(
   }
 }
 
+export async function setRunRoute(
+  db: Db,
+  input: { orgId: string; runId: string; model: string; params: Record<string, unknown> }
+): Promise<void> {
+  const { error } = await db
+    .from('node_runs')
+    .update({ model: input.model, params: input.params as never })
+    .eq('id', input.runId)
+    .eq('org_id', input.orgId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function failRun(
   db: Db,
   input: { orgId: string; runId: string; error: string }

@@ -25,6 +25,7 @@ import {
   runningRuns,
   setExternalJob,
   setRunPrompt,
+  setRunRoute,
   type NodeRun
 } from '$lib/server/repos/node-runs';
 import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
@@ -38,7 +39,8 @@ import { resolveNodeModel } from './node-model';
 import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio-run';
 import { audioOperationOf, defaultAudioModel, operationSpec, voiceIdOf } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
-import { taskJobOf, taskProviderOf } from '$lib/server/generation/task-providers';
+import { RouteRole, taskJobOf, taskProviderOf } from '$lib/server/generation/task-providers';
+import { RefusalStage, type TaskStart } from './task-run';
 import { model3dParamsOf } from '$lib/model3d-models';
 import { cheapestImageChoice, Model3dPath, model3dPathOf, productShotPrompt } from '$lib/canvas/model3d-run';
 
@@ -74,6 +76,7 @@ export type StartRun = {
    *  invece della lista intera — la stessa mappa che `upstreamInputsFor` accetta. Assente = un
    *  giro ordinario, ogni `list` a monte si comporta come un filo `fixed`. */
   iterateSelection?: Record<string, number>;
+  route?: RouteRole;
 };
 
 export type RunOutcome =
@@ -305,7 +308,7 @@ const TASK_IMAGE_PATHS: Readonly<Record<string, (upstream: UpstreamInputs) => st
   model3d: (upstream) => upstream.referenceImageUrls
 };
 
-async function runTaskNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
+async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<TaskStart> {
   const [{ taskRunDeps }, { startTaskRun }, { upstreamProvenance }, { projectModeOf }] = await Promise.all([
     import('$lib/server/task-providers-config'),
     import('./task-run'),
@@ -319,7 +322,7 @@ async function runTaskNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
     upstreamProvenance(db, { orgId: input.orgId, canvasId: input.canvasId, nodeId: input.nodeId, data: node?.data ?? {} })
   ]);
 
-  const out = await startTaskRun(taskRunDeps(db), {
+  return startTaskRun(taskRunDeps(db), {
     scope: audioScopeOf(input),
     mode: await projectModeOf(db, input),
     modelId: input.model ?? '',
@@ -330,12 +333,54 @@ async function runTaskNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
     provenance,
     idempotencyKey: run.id
   });
+}
+
+async function queueTask(db: Db, input: StartRun, run: NodeRun, jobId: string): Promise<RunOutcome> {
+  await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: jobId });
+  return { kind: 'queued', run: { ...run, externalJobId: jobId } };
+}
+
+async function runTaskNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
+  const out = await startTask(db, input, run, upstream, prompt);
   if (out.kind === 'refused') {
     await giveUp(db, input, run, out.error);
     return { kind: 'refused', error: out.error };
   }
-  await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: out.jobId });
-  return { kind: 'queued', run: { ...run, externalJobId: out.jobId } };
+  return queueTask(db, input, run, out.jobId);
+}
+
+const DISCOUNTED_MEDIA: ReadonlySet<GenMedium> = new Set(['image', 'video']);
+
+export const FALLBACK_MODEL_PARAM = 'fallbackModel';
+
+async function runDiscountRoute(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome | null> {
+  if (input.route === RouteRole.Primary || !input.model || !DISCOUNTED_MEDIA.has(input.medium)) {
+    return null;
+  }
+  const medium = input.medium as 'image' | 'video';
+  const [{ discountBook, routeFor }, { offerableModels, PricingView }] = await Promise.all([
+    import('$lib/server/generation/discount-routes'),
+    import('$lib/server/offerable-models')
+  ]);
+  const book = await discountBook(db as never, medium);
+  const choice = book ? (await offerableModels(db as never, medium, PricingView.Primary)).choices.find((c) => c.id === input.model) : undefined;
+  const route = choice ? routeFor(book, choice, medium, input.params) : null;
+  if (!route) {
+    return null;
+  }
+
+  const routed: StartRun = { ...input, model: route.modelId, params: route.params };
+  await setRunRoute(db, { orgId: input.orgId, runId: run.id, model: route.modelId, params: { ...route.params, [FALLBACK_MODEL_PARAM]: input.model } });
+  const out = await startTask(db, routed, run, upstream, prompt);
+  if (out.kind === 'job') {
+    return queueTask(db, routed, run, out.jobId);
+  }
+  if (out.stage === RefusalStage.Policy) {
+    await giveUp(db, input, run, out.error);
+    return { kind: 'refused', error: out.error };
+  }
+  await setRunRoute(db, { orgId: input.orgId, runId: run.id, model: input.model, params: input.params as Record<string, unknown> });
+  return null;
 }
 
 const NO_IMAGE_MODEL = 'No image model is available to turn this text into a 3D model.';
@@ -557,6 +602,11 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
 
   if (providerRun) {
     return providerRun(db, input, run, upstream, sentPrompt);
+  }
+
+  const discounted = await runDiscountRoute(db, input, run, upstream, sentPrompt);
+  if (discounted) {
+    return discounted;
   }
 
   try {
@@ -971,6 +1021,15 @@ export async function reconcileAudioNodeRuns(db: Db): Promise<VideoReconcileOutc
         outcome.pending += 1;
         continue;
       }
+      if (progress.state === 'failed' && fallbackModelOf(run)) {
+        await failRun(db, { orgId: run.orgId, runId: run.id, error: progress.error });
+        const fallback = await fallBackToPrimary(db, run, node);
+        if (fallback.kind === 'conflict') {
+          await showRunState(db, shape, { running: false, runId: run.id, error: progress.error });
+        }
+        outcome.failed += 1;
+        continue;
+      }
       if (progress.state === 'failed') {
         await giveUp(db, shape, finishing, progress.error);
         outcome.failed += 1;
@@ -1000,6 +1059,28 @@ export async function reconcileAudioNodeRuns(db: Db): Promise<VideoReconcileOutc
   }
 
   return outcome;
+}
+
+function fallbackModelOf(run: NodeRun): string | null {
+  const model = (run.params ?? {})[FALLBACK_MODEL_PARAM];
+  return typeof model === 'string' && model ? model : null;
+}
+
+async function fallBackToPrimary(db: Db, run: NodeRun, node: { projectId: string; canvasId: string; type: string; version: number }): Promise<RunOutcome> {
+  const { [FALLBACK_MODEL_PARAM]: _discounted, ...params } = run.params ?? {};
+  return runGenNode(db, {
+    orgId: run.orgId,
+    projectId: node.projectId,
+    canvasId: node.canvasId,
+    nodeId: run.nodeId,
+    userId: run.actorId ?? '',
+    medium: node.type as GenMedium,
+    prompt: run.prompt ?? '',
+    model: fallbackModelOf(run),
+    params: { ...(params as GenParams), enhancePrompt: false },
+    expectedVersion: node.version,
+    route: RouteRole.Primary
+  });
 }
 
 const TASK_RECONCILE_LIMIT = 20;
@@ -1044,6 +1125,15 @@ export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutco
       if (progress.state === 'pending') {
         await releaseClaim(db, { orgId: run.orgId, runId: run.id });
         outcome.pending += 1;
+        continue;
+      }
+      if (progress.state === 'failed' && fallbackModelOf(run)) {
+        await failRun(db, { orgId: run.orgId, runId: run.id, error: progress.error });
+        const fallback = await fallBackToPrimary(db, run, node);
+        if (fallback.kind === 'conflict') {
+          await showRunState(db, shape, { running: false, runId: run.id, error: progress.error });
+        }
+        outcome.failed += 1;
         continue;
       }
       if (progress.state === 'failed') {

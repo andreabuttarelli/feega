@@ -8,6 +8,7 @@ import { taskUsdFor } from '$lib/server/generation/task-pricing';
 import { uncensoredRefusal, UNCENSORED_REFUSALS } from '$lib/server/generation/uncensored-guard';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
 import type { TaskProvider, TaskOutput, WireFields } from './task-provider';
+import { wireInputs } from '$lib/server/generation/wire-inputs';
 import type { Purgers } from './provider-purge';
 import { ProjectMode, STORAGE_FOLDER } from '$lib/project-mode';
 import { ModerationProfile, profileOf } from '$lib/server/moderation/profiles';
@@ -16,7 +17,6 @@ import { MODEL3D_MIME } from '$lib/model3d-models';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
 export const taskLabelOf = (provider: TaskProviderName): string => `canvas.${provider}`;
-const CONTROLLED_SCHEMA_KEYS = new Set(['aspect_ratio', 'resolution', 'duration']);
 
 const EXTENSION_OF_MIME: Readonly<Record<string, string>> = {
   'image/png': 'png',
@@ -118,41 +118,6 @@ export type TaskStart = { kind: 'job'; jobId: string } | { kind: 'refused'; erro
 
 function carriesInputs(req: Pick<TaskRequest, 'imageUrls' | 'lastFrameUrl' | 'provenance'>): boolean {
   return req.imageUrls.length > 0 || req.lastFrameUrl !== null || req.provenance.length > 0;
-}
-
-function extraInputs(params: GenParams, schema: Record<string, unknown>): Record<string, unknown> {
-  const raw = params as Record<string, unknown>;
-  return Object.fromEntries(
-    Object.keys(schema)
-      .filter((key) => !CONTROLLED_SCHEMA_KEYS.has(key) && raw[key] !== undefined)
-      .map((key) => [key, String(raw[key])])
-  );
-}
-
-export function wireInputs(fields: WireFields, input: Omit<TaskRequest, 'scope' | 'mode' | 'modelId' | 'provenance'>, schema: Record<string, unknown>): Record<string, unknown> {
-  const inputs: Record<string, unknown> = { ...extraInputs(input.params, schema), ...(fields.prompt ? { [fields.prompt]: input.prompt } : {}) };
-  const controls: Array<[string | undefined, unknown]> = [
-    [fields.aspectRatio, input.params.aspectRatio],
-    [fields.resolution, input.params.resolution],
-    [fields.duration, input.params.duration]
-  ];
-  for (const [wireId, value] of controls) {
-    if (wireId && value !== undefined && value !== null && value !== '') {
-      inputs[wireId] = String(value);
-    }
-  }
-  fields.images.forEach((wireId, index) => {
-    if (input.imageUrls[index]) {
-      inputs[wireId] = input.imageUrls[index];
-    }
-  });
-  if (fields.imageList && input.imageUrls.length) {
-    inputs[fields.imageList] = input.imageUrls;
-  }
-  if (fields.lastFrame && input.lastFrameUrl) {
-    inputs[fields.lastFrame] = input.lastFrameUrl;
-  }
-  return inputs;
 }
 
 const LIKENESS_GUARDED_IN_UNCENSORED_PROJECTS: ReadonlySet<TaskCatalogue> = new Set(['model3d']);
