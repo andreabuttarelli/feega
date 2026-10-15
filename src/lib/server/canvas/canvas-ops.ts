@@ -127,6 +127,7 @@ type Op<S extends z.ZodType> = {
 const op = <S extends z.ZodType>(o: Op<S>): Op<S> => o;
 
 const listCanvasesInput = z.object({}).strict();
+const listModelsInput = z.object({ medium: z.enum(GEN_MEDIUMS).describe('Which kind of node the models generate.') }).strict();
 const listNodesInput = z.object({ canvasId: z.string().describe('Canvas id from list_canvases.') }).strict();
 const createNodeInput = z
   .object({
@@ -607,6 +608,20 @@ export const CANVAS_OPS = {
       );
 
       return outcomeOf(out);
+    }
+  }),
+
+  list_models: op({
+    access: Access.Read,
+    input: listModelsInput,
+    run: async (ctx, input) => {
+      const [{ projectCatalogue, listedModel }, { projectModeOf }] = await Promise.all([
+        import('$lib/server/project-catalogue'),
+        import('$lib/server/uncensored-workspace/workspace-server')
+      ]);
+      const mode = await projectModeOf(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId });
+      const catalogue = await projectCatalogue(ctx.db, { orgId: ctx.orgId, mode });
+      return { models: catalogue[input.medium].choices.map(listedModel) };
     }
   }),
 

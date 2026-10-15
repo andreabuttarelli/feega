@@ -49,8 +49,10 @@ export function registerNodeTools(server: McpServer) {
         'when it has none (`describe_node_types` lists the recommended ones). A model the canvas does ' +
         'not offer is refused with the recommended alternatives; an old or weak one still runs but ' +
         'the result carries a `warning` naming the recommended one. ' +
-        'Models whose id starts with `wiro/` run on Wiro and are always queued like a video, after a ' +
-        'safety screen that refuses with a readable reason. Uncensored `wiro/` models run only when the ' +
+        'Models whose id starts with `wiro/` or `higgsfield/` run on that provider and are always queued like a video, after a ' +
+        'safety screen that refuses with a readable reason. Some models run first on a cheaper route (kie.ai) at its price ' +
+        'and fall back to their own provider if it fails; you are charged once. `canvas_tool` `list_models` lists ids, providers and prices. ' +
+        'Uncensored models run only in an uncensored project, when the ' +
         'org owner turned them on in Settings; minors and real, identifiable people are refused regardless. ' +
         'An uncensored model takes NO input of any kind — no upstream connections, no picked references, ' +
         'no image/mask/init params — and the call is refused before anything is spent if any are present. ' +

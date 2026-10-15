@@ -25,8 +25,8 @@ import { isNodeType, influencerOf } from '$lib/canvas-node-data';
 import { validateNodeData } from '$lib/canvas/node-data';
 import type { Actor } from '$lib/server/repos/actor';
 import { isCanvasEdgeKind, isWireMode } from '$lib/canvas-edges';
-import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
-import { Capability, catalogueIn, MODE_REFUSAL, modeAllows, modeOf, type ProjectMode } from '$lib/project-mode';
+import { projectCatalogue } from '$lib/server/project-catalogue';
+import { Capability, MODE_REFUSAL, modeAllows, modeOf, type ProjectMode } from '$lib/project-mode';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { MIN_VOICE_DESCRIPTION, VOICE_REFUSAL_MESSAGE, type VoiceRefusal } from '$lib/canvas/voices';
 import type { VoiceDeps } from '$lib/server/voices/custom-voices';
@@ -39,7 +39,6 @@ const VOICE_FAIL_STATUS: Partial<Record<VoiceRefusal | 'voice_not_found', number
   voice_not_yours: 403,
   cloning_not_in_this_project: 403
 };
-import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from '$lib/server/uncensored-access';
 import { runGenNode, runsOf } from '$lib/server/canvas/generate';
 import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
@@ -183,15 +182,13 @@ async function spendOnVoice<T>(
 export const load: PageServerLoad = async ({ params, locals, url }) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, connections, fullCatalogue, shareToken, references, uncensored] = await Promise.all([
+  const [nodes, connections, catalogue, shareToken, references] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
-    canvasModelCatalogue(),
+    projectCatalogue(db, { orgId, mode }),
     readCanvasShare(db, { orgId, canvasId }),
-    referenceLibrary(db, { orgId, projectId: canvas.projectId }),
-    uncensoredAccess(db, orgId).catch(() => NO_UNCENSORED_ACCESS)
+    referenceLibrary(db, { orgId, projectId: canvas.projectId })
   ]);
-  const catalogue = catalogueIn(mode, visibleCatalogue(fullCatalogue, uncensored));
 
   const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
