@@ -130,6 +130,13 @@ Vite osserva anche `changelog/*.md`: scriverne uno mentre l'harness naviga l'edi
 `page reload <file>` all'ora del fallimento. Mossa: niente edit nel worktree servito finché il
 giro non è finito, o un dev server da un checkout separato.
 
+### Un e2e `@real` che prende 500 dall'editor motion e il server di un altro agente
+Due cause, stesso sintomo ("Something broke", `Server is not running`). (1) Node 25 espone un
+`localStorage` globale senza `getItem` in SSR: `browserStore(...)?.getItem is not a function` in
+`MotionEditorShell`, e `handleError` non logga. Mossa: `NODE_OPTIONS=--no-experimental-webstorage`
+sul dev server. (2) La porta 4173 è di chiunque: `reuseExistingServer` prova il codice di un
+altro worktree. Mossa: un dev server tuo su una porta tua e `E2E_BASE_URL`.
+
 ### Un e2e da un worktree agente prova codice vecchio
 `vite.config.ts` esclude `**/.claude/worktrees/**` dal watcher: un dev server lanciato DENTRO un
 worktree agente non vede nessun file salvato dopo l'avvio. Segnale: l'e2e fallisce su
