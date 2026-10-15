@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiEnhance } from '$lib/dashboard/api-enhance';
   import PageTitle from '$lib/components/PageTitle.svelte';
   import { goto } from '$app/navigation';
   import Film from '@lucide/svelte/icons/film';
@@ -17,7 +18,7 @@
 
   <section class="new" aria-labelledby="new-heading">
     <h2 id="new-heading">New video</h2>
-    <form method="POST" action="?/create" class="new-form" data-testid="motion-new">
+    <form method="POST" action="?/create" use:apiEnhance class="new-form" data-testid="motion-new">
       <label>
         <span>Project</span>
         <select name="project" value={data.projectId} onchange={(e) => goto(`/app/motion?project=${e.currentTarget.value}`)}>

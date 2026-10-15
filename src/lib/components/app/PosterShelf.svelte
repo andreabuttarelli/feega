@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiEnhance } from '$lib/dashboard/api-enhance';
   import { FORMATS } from '$lib/motion/doc';
   import { POSTER_FORMATS, type CatalogueItem, type PosterFormat } from '$lib/motion/template/catalogue';
 
@@ -21,7 +22,7 @@
   <ul class="strip">
     {#each items as item (item.id)}
       <li data-poster={item.id}>
-        <form method="POST" action="/app?/fromTemplate" onsubmit={() => (starting = item.id)}>
+        <form method="POST" action="/app?/fromTemplate" use:apiEnhance onsubmit={() => (starting = item.id)}>
           <input type="hidden" name="template" value={item.id} />
           <input type="hidden" name="format" value={format} />
           {#if projectId}<input type="hidden" name="projectId" value={projectId} />{/if}
