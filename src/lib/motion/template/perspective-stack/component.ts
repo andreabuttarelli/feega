@@ -28,12 +28,15 @@ export const PS_PROPS: Record<string, PropSpec> = {
   liquidA: colour('Liquid colour 1', '#47b4ff'),
   liquidB: colour('Liquid colour 2', '#ff7b2e'),
   liquidC: colour('Liquid colour 3', '#e8f4ff'),
-  count: number('Cards in the deck', 5, 3, 7, 'Layout', 1),
-  deckSize: number('Card size (share of the short side)', 0.5, 0.3, 0.7, 'Layout', 0.01),
+  chains: number('Snakes', 2, 1, 4, 'Layout', 1),
+  count: number('Cards per snake', 6, 3, 9, 'Layout', 1),
+  deckSize: number('Card size (share of the short side)', 0.24, 0.12, 0.45, 'Layout', 0.01),
+  spread: number('Path width', 1, 0.5, 1.5, 'Layout', 0.05),
   radius: number('Corner radius (%)', 4, 0, 15, 'Layout', 0.5),
-  tilt: number('Deck tilt (degrees)', 14, 0, 40, 'Layout', 1),
   floorTilt: number('Lower cards tilt (degrees)', 38, 0, 70, 'Layout', 1),
-  flip: number('Flip length (seconds)', 1.3, 0.6, 2.4, 'Motion', 0.1),
+  flip: number('Move length (seconds)', 1.6, 0.6, 2.6, 'Motion', 0.1),
+  trail: number('Delay between cards (seconds)', 0.04, 0, 0.2, 'Motion', 0.01),
+  gap: number('Spacing along the path', 0.045, 0.02, 0.1, 'Motion', 0.005),
   [VAR_PREFIX]: text('Runtime variable prefix', PS_VAR_PREFIX, { group: 'Layout', maxLength: 20 })
 };
 

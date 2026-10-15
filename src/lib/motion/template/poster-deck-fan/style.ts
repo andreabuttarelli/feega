@@ -10,13 +10,13 @@ export const PD_CSS = String.raw`
 
 .pd-deck {
   position: absolute;
-  transform-style: preserve-3d;
+  left: 0;
+  top: 0;
 }
 
 .pd-card {
   position: absolute;
   transform-style: preserve-3d;
-  transform-origin: 0 100%;
   will-change: transform;
 }
 
@@ -24,7 +24,6 @@ export const PD_CSS = String.raw`
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
-  transform-origin: 50% 100%;
   will-change: transform;
 }
 
@@ -33,7 +32,7 @@ export const PD_CSS = String.raw`
   inset: 0;
   overflow: hidden;
   backface-visibility: hidden;
-  box-shadow: 0 0 0 0.002em rgba(0, 0, 0, 0.18);
+  box-shadow: 0 0.04em 0.1em rgba(0, 0, 0, 0.2);
 }
 
 .pd-face-a {

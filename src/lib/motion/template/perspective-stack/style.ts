@@ -8,14 +8,17 @@ export const PS_CSS = String.raw`
 
 .ps-deck {
   position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
 }
 
 .ps-card {
   position: absolute;
   overflow: hidden;
   border-radius: var(--ps-radius);
-  transform-origin: 50% 100%;
-  will-change: transform, opacity;
+  box-shadow: 0 0.6em 1.4em rgba(0, 0, 0, 0.18);
+  will-change: transform;
 }
 
 .ps-photo {
