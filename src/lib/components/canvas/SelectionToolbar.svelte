@@ -17,6 +17,7 @@
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import { cn } from '$lib/utils.js';
   import ModelMenu from './ModelMenu.svelte';
+  import { PROVIDER_PARAM } from '$lib/canvas/model-routes';
   import NodeSettings from './NodeSettings.svelte';
 
   const ICON_BUTTON = 'size-11 md:size-8';
@@ -70,6 +71,10 @@
   );
   const choice = $derived(modelValue ? choices.find((c) => c.id === modelValue) : null);
   const dynamicValues = $derived(dynamicParamsOf(nodeSummaries, (choice?.params ?? []).map((p) => p.name)));
+  const providerValue = $derived.by(() => {
+    const value = dynamicParamsOf(nodeSummaries, [PROVIDER_PARAM])[PROVIDER_PARAM];
+    return value.kind === 'same' && typeof value.value === 'string' ? value.value : null;
+  });
   const controls = $derived(nodeControlsOf(properties, choice, dynamicValues));
 
   const primary = $derived(actionsIn('primary', count));
@@ -125,8 +130,9 @@
             <ModelMenu
               {choices}
               value={modelValue}
+              provider={providerValue}
               mixed={properties.model.kind === 'mixed'}
-              onselect={(id) => onpropertychange?.({ model: id || null })}
+              onselect={(id, provider) => onpropertychange?.({ model: id || null, dynamicParams: { [PROVIDER_PARAM]: provider } })}
             />
           {/if}
           {#if controls.length}

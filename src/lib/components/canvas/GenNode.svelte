@@ -288,6 +288,10 @@
     </div>
   {/if}
 
+  {#if node.routeNote && !node.running}
+    <p class="gen-route-note nodrag" data-testid="route-note">{node.routeNote}</p>
+  {/if}
+
   {#if references && node.medium !== 'text'}
     {#if choice?.uncensored}
       <p class="gen-uncensored-note nodrag">Uncensored models don't accept references</p>
@@ -562,6 +566,13 @@
      girato, CLAUDE.md): senza, l'altezza fissa del nodo lascerebbe uno spazio vuoto sotto la
      casella invece del bordo del nodo. Con `.gen-body` presente non cambia niente: `flex: 1` ha
      già preso lo spazio restante. */
+  .gen-route-note {
+    margin: 0;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.6875rem;
+    color: var(--muted-foreground);
+  }
+
   .gen-uncensored-note {
     margin: 0;
     padding: 6px 9px;

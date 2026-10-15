@@ -46,7 +46,7 @@ const { syncedCandidates } = vi.hoisted(() => ({
 }));
 vi.mock('./recommended-models', () => ({ syncedCandidates }));
 
-import { canvasModelCatalogue } from './canvas-catalogue';
+import { canvasModelCatalogue, kieTextChoices } from './canvas-catalogue';
 
 describe('i modelli che un nodo può scegliere', () => {
   beforeEach(() => vi.clearAllMocks());
@@ -133,5 +133,14 @@ describe('i modelli che un nodo può scegliere', () => {
     expect(out.image.synced).toBe(false);
     expect(out.image.choices).toEqual([]);
     expect(out.video.synced).toBe(false);
+  });
+});
+
+describe('kie text models', () => {
+  it('are offered under kie.ai, priced per token at kie\'s rates, only when kie has a key', () => {
+    expect(kieTextChoices({})).toEqual([]);
+    expect(kieTextChoices({ KIE_API_KEY: 'k' })).toEqual([
+      expect.objectContaining({ id: 'kie/gpt-6-luna', providerLabel: 'kie.ai', textPricing: { inputCreditsPerMillion: 6, outputCreditsPerMillion: 30, systemPromptTokens: 0 } })
+    ]);
   });
 });

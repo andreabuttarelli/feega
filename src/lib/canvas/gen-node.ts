@@ -69,10 +69,18 @@ export type ModelChoice = {
   uncensored?: boolean;
   /** Set when a cheaper provider serves this model first; the credits above are that route's. */
   discountRoute?: { provider: string; label: string };
+  /** One row per provider that serves this model, Auto first; absent when only one does. */
+  routes?: RouteOption[];
   pricedInputs?: PricedInputs[];
   tiers?: RecommendationTier[];
   recommendedWhy?: string;
 };
+
+export type RoutePrice = Pick<ModelChoice, 'unitCredits' | 'pricedInputs' | 'creditOverrides' | 'variableCredits'>;
+
+export type RouteStats = { successRate: number | null; p95Ms: number | null; healthy: boolean };
+
+export type RouteOption = { provider: string; label: string; price: RoutePrice; stats: RouteStats | null };
 
 /** Quel che l'utente ha scelto nell'overlay. Non è il catalogo: è la scelta dentro al catalogo. */
 export type GenParams = Omit<AudioParams, 'duration'> & {
@@ -90,6 +98,8 @@ export type GenParams = Omit<AudioParams, 'duration'> & {
   repeat?: number;
   /** Cartesiano (default, assente) o accoppiato indice-per-indice — `loop-plan.ts::LoopCombine`. */
   combine?: 'product' | 'zip';
+  /** The provider the user picked for this model; absent or `auto` = cheapest healthy. */
+  provider?: string;
 };
 
 /**
@@ -129,6 +139,8 @@ export type GenNode = {
   running?: boolean;
   /** Perché l'ultimo giro non è atterrato. Null quando non c'è nulla da dire. */
   error?: string | null;
+  /** Set when Auto had to leave the cheaper provider, e.g. "kie.ai failed, made on OpenRouter". */
+  routeNote?: string | null;
 };
 
 /**

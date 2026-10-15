@@ -9,6 +9,11 @@ export enum RouteHealth {
   Demoted = 'demoted'
 }
 
+export enum RouteChoice {
+  Auto = 'auto',
+  Forced = 'forced'
+}
+
 export type DiscountCandidate = {
   id: string;
   discountFor: string;
@@ -39,8 +44,10 @@ export function discountRouteFor(input: {
   health: RouteHealth;
   params: GenParams;
   primaryUsd: number | null;
+  choice?: RouteChoice;
 }): DiscountRoute | null {
-  if (input.health === RouteHealth.Demoted) {
+  const forced = input.choice === RouteChoice.Forced;
+  if (!forced && input.health === RouteHealth.Demoted) {
     return null;
   }
   const params = withDefaults(input.candidate, input.params);
@@ -48,7 +55,7 @@ export function discountRouteFor(input: {
   if (usd === null) {
     return null;
   }
-  if (input.primaryUsd !== null && usd >= input.primaryUsd) {
+  if (!forced && input.primaryUsd !== null && usd >= input.primaryUsd) {
     return null;
   }
   return { modelId: input.candidate.id, usd, params };
@@ -69,6 +76,16 @@ const MAX_P95_MS: Readonly<Record<TaskMedium, number>> = {
 function percentile(values: number[], fraction: number): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.max(0, Math.ceil(fraction * sorted.length) - 1)] ?? 0;
+}
+
+export type RouteSampleStats = { successRate: number | null; p95Ms: number | null };
+
+export function sampleStatsOf(samples: readonly CallSample[]): RouteSampleStats {
+  if (!samples.length) {
+    return { successRate: null, p95Ms: null };
+  }
+  const delivered = samples.filter((s) => s.ok).map((s) => s.ms);
+  return { successRate: delivered.length / samples.length, p95Ms: delivered.length ? percentile(delivered, P95) : null };
 }
 
 export function routeHealthOf(medium: TaskMedium, samples: readonly CallSample[]): RouteHealth {

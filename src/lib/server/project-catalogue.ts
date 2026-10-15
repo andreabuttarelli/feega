@@ -21,6 +21,7 @@ export type ListedModel = {
   inputs: string[];
   resolutions: string[];
   durations: number[];
+  routes: Array<{ provider: string; label: string; credits: number | null; healthy: boolean | null }>;
 };
 
 export function listedModel(choice: ModelChoice): ListedModel {
@@ -34,6 +35,12 @@ export function listedModel(choice: ModelChoice): ListedModel {
     routedVia: choice.discountRoute?.label ?? null,
     inputs: choice.inputModalities ?? [],
     resolutions: choice.resolutions ?? [],
-    durations: choice.durationOptions ?? []
+    durations: choice.durationOptions ?? [],
+    routes: (choice.routes ?? []).map((route) => ({
+      provider: route.provider,
+      label: route.label,
+      credits: listedCredits({ ...choice, ...route.price }) ?? null,
+      healthy: route.stats?.healthy ?? null
+    }))
   };
 }

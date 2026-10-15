@@ -3,17 +3,30 @@ import type { TaskProvider } from '$lib/server/canvas/task-provider';
 import { configuredTaskProviders } from '$lib/server/task-providers-config';
 import { higgsfieldConfig, higgsfieldEstimate } from '$lib/server/higgsfield';
 import { TaskProviderName } from '$lib/server/generation/task-providers';
+import { KIE_TEXT_MODELS } from '$lib/server/kie-chat';
+import { kieTextDeps, runKieText } from '$lib/server/kie-text-run';
+import type { AiCallLog } from '$lib/server/ai-log';
 import { nextFits, overspent, planFits, SMOKE_CAP_USD, type SmokeCase } from './provider-smoke-budget';
 
 const SPEND_FLAG = '--spend';
 const POLL_MS = 3_000;
 const POLL_LIMIT_MS = 5 * 60_000;
 const PROMPT = 'a red apple on a white table, studio light';
+const VIDEO_PROMPT = 'a red apple slowly rotating on a white table, studio light';
+const TEXT_PROMPT = 'Reply with one word: ready.';
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 type Outcome = { costUsd: number | null; bytes: number };
 
-type ProviderCase = SmokeCase & { run(): Promise<Outcome> };
+enum SmokeMedium {
+  Text = 'text',
+  Image = 'image',
+  Video = 'video'
+}
+
+type ProviderCase = SmokeCase & { medium: SmokeMedium; run(): Promise<Outcome> };
+
+const caseName = (c: ProviderCase): string => `${c.provider}:${c.medium}`;
 
 async function downloadedBytes(url: string): Promise<number> {
   const res = await fetch(url);
@@ -38,9 +51,10 @@ async function untilSettled(gateway: TaskProvider, taskId: string): Promise<Outc
   throw new Error(`still running after ${POLL_LIMIT_MS / 1000}s: task ${taskId} may still bill`);
 }
 
-function taskCase(provider: TaskProviderName, maxUsd: number, ref: Record<string, unknown>, inputs: Record<string, unknown>): ProviderCase {
+function taskCase(provider: TaskProviderName, medium: SmokeMedium, maxUsd: number, ref: Record<string, unknown>, inputs: Record<string, unknown>): ProviderCase {
   return {
     provider,
+    medium,
     maxUsd,
     async run() {
       const gateway = configuredTaskProviders(env)[provider];
@@ -55,6 +69,7 @@ function taskCase(provider: TaskProviderName, maxUsd: number, ref: Record<string
 
 const openrouterCase: ProviderCase = {
   provider: 'openrouter',
+  medium: SmokeMedium.Image,
   maxUsd: 0.02,
   async run() {
     const key = env.OPENROUTER_API_KEY?.trim();
@@ -78,7 +93,7 @@ const HIGGSFIELD_SOUL = 'higgsfield-ai/soul/standard';
 const HIGGSFIELD_INPUTS = { prompt: PROMPT, resolution: '2K', aspect_ratio: '1:1' };
 
 function higgsfieldCase(maxUsd: number): ProviderCase {
-  const task = taskCase(TaskProviderName.Higgsfield, maxUsd, { path: HIGGSFIELD_SOUL }, HIGGSFIELD_INPUTS);
+  const task = taskCase(TaskProviderName.Higgsfield, SmokeMedium.Image, maxUsd, { path: HIGGSFIELD_SOUL }, HIGGSFIELD_INPUTS);
   return {
     ...task,
     async run() {
@@ -96,19 +111,39 @@ function higgsfieldCase(maxUsd: number): ProviderCase {
   };
 }
 
+function kieTextCase(maxUsd: number): ProviderCase {
+  return {
+    provider: TaskProviderName.Kie,
+    medium: SmokeMedium.Text,
+    maxUsd,
+    async run() {
+      const log = (entry: AiCallLog) => console.log(`  kie text: ${entry.ok ? 'ok' : entry.error}`);
+      const out = await runKieText(kieTextDeps(log), { model: KIE_TEXT_MODELS[0].id, prompt: TEXT_PROMPT, scope: { orgId: 'smoke', projectId: 'smoke', userId: 'smoke' } });
+      return { costUsd: out.costUsd, bytes: out.text.length };
+    }
+  };
+}
+
+function flag(prefix: string): string | undefined {
+  return process.argv.find((arg) => arg.startsWith(prefix))?.slice(prefix.length);
+}
+
 const CASES: readonly ProviderCase[] = [
   openrouterCase,
-  taskCase(TaskProviderName.Wiro, 0.02, { owner: 'wiro-partners', project: 'z-image-uncensored' }, { prompt: PROMPT, ratio: '1:1', promptExtend: 'false' }),
-  taskCase(TaskProviderName.Kie, 0.05, { model: 'nano-banana-2' }, { prompt: PROMPT, resolution: '1K', aspect_ratio: '1:1' }),
+  taskCase(TaskProviderName.Wiro, SmokeMedium.Image, 0.02, { owner: 'wiro-partners', project: 'z-image-uncensored' }, { prompt: PROMPT, ratio: '1:1', promptExtend: 'false' }),
+  taskCase(TaskProviderName.Kie, SmokeMedium.Image, 0.05, { model: 'nano-banana-2' }, { prompt: PROMPT, resolution: '1K', aspect_ratio: '1:1' }),
+  taskCase(TaskProviderName.Kie, SmokeMedium.Video, 0.08, { model: 'grok-imagine/text-to-video', numeric: ['duration'] }, { prompt: VIDEO_PROMPT, resolution: '480p', duration: '6', aspect_ratio: '9:16' }),
+  kieTextCase(0.001),
   higgsfieldCase(0.15)
 ];
 
 async function main(): Promise<void> {
-  const only = process.argv.find((arg) => arg.startsWith('--only='))?.slice('--only='.length);
-  const cases = CASES.filter((c) => !only || c.provider === only);
+  const only = flag('--only=');
+  const medium = flag('--medium=');
+  const cases = CASES.filter((c) => (!only || c.provider === only) && (!medium || c.medium === medium));
   const plan = planFits(cases);
 
-  console.log(`provider smoke: ${cases.map((c) => `${c.provider} ≤ $${c.maxUsd}`).join(', ')} (cap $${SMOKE_CAP_USD})`);
+  console.log(`provider smoke: ${cases.map((c) => `${caseName(c)} ≤ $${c.maxUsd}`).join(', ')} (cap $${SMOKE_CAP_USD})`);
   if (!plan.ok) {
     throw new Error(plan.reason);
   }
@@ -122,7 +157,7 @@ async function main(): Promise<void> {
   for (const smoke of cases) {
     const fits = nextFits(spent, smoke);
     if (!fits.ok) {
-      report[smoke.provider] = `unrun: ${fits.reason}`;
+      report[caseName(smoke)] = `unrun: ${fits.reason}`;
       continue;
     }
     const startedAt = Date.now();
@@ -130,10 +165,10 @@ async function main(): Promise<void> {
       const outcome = await smoke.run();
       spent += outcome.costUsd ?? smoke.maxUsd;
       const flag = overspent(outcome.costUsd, smoke) ? ' OVER DECLARED MAX' : '';
-      report[smoke.provider] = `ok: ${outcome.bytes} bytes, $${outcome.costUsd ?? 'unknown (counted at max)'}, ${Date.now() - startedAt} ms${flag}`;
+      report[caseName(smoke)] = `ok: ${outcome.bytes} bytes, $${outcome.costUsd ?? 'unknown (counted at max)'}, ${Date.now() - startedAt} ms${flag}`;
     } catch (error) {
       spent += smoke.maxUsd;
-      report[smoke.provider] = `failed: ${error instanceof Error ? error.message : String(error)}`;
+      report[caseName(smoke)] = `failed: ${error instanceof Error ? error.message : String(error)}`;
     }
   }
   console.table(report);

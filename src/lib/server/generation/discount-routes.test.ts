@@ -60,8 +60,32 @@ describe('the price the picker shows is the price the route that runs charges', 
     expect(creditsForRun({ medium: 'image', model: choice, params: { resolution: '4K' } })).toBeNull();
   });
 
-  it('kie demoted: the choice keeps the primary price untouched and names no discount', () => {
-    expect(withDiscountPrices(book(RouteHealth.Demoted), nanoBanana2, 'image')).toBe(nanoBanana2);
+  it('kie demoted: Auto keeps the primary price and names no discount', () => {
+    const choice = withDiscountPrices(book(RouteHealth.Demoted), nanoBanana2, 'image');
+    expect(choice.discountRoute).toBeUndefined();
+    expect(choice.variableCredits).toBe(true);
+  });
+
+  it('offers Auto, OpenRouter and kie.ai as separate rows, each with its own price', () => {
+    const choice = withDiscountPrices(book(), { ...nanoBanana2, unitCredits: 13, variableCredits: false }, 'image');
+
+    expect(choice.routes?.map((r) => r.provider)).toEqual(['auto', 'openrouter', 'kie']);
+    expect(creditsForRun({ medium: 'image', model: choice, params: { provider: 'openrouter' } })).toBe(13);
+    expect(creditsForRun({ medium: 'image', model: choice, params: { provider: 'kie', resolution: '2K' } })).toBe(billedCreditsFor(0.06));
+    expect(choice.routes?.find((r) => r.provider === 'kie')?.stats).toMatchObject({ healthy: true });
+  });
+
+  it('a demoted kie stays pickable by hand, flagged, while Auto falls back to the primary price', () => {
+    const choice = withDiscountPrices(book(RouteHealth.Demoted), { ...nanoBanana2, unitCredits: 13, variableCredits: false }, 'image');
+
+    expect(choice.routes?.find((r) => r.provider === 'kie')?.stats).toMatchObject({ healthy: false });
+    expect(creditsForRun({ medium: 'image', model: choice, params: {} })).toBe(13);
+    expect(creditsForRun({ medium: 'image', model: choice, params: { provider: 'kie' } })).toBe(billedCreditsFor(0.04));
+  });
+
+  it('a chosen provider routes there even when Auto would not', () => {
+    expect(routeFor(book(RouteHealth.Demoted), nanoBanana2, 'image', { provider: 'kie' })?.modelId).toBe('kie/nano-banana-2');
+    expect(routeFor(book(), nanoBanana2, 'image', { provider: 'openrouter' })).toBeNull();
   });
 
   it('marks the choice with the route that will be tried first', () => {

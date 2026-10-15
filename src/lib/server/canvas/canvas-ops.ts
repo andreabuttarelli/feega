@@ -182,6 +182,7 @@ const runNodeInput = z
     prompt: z.string().optional().describe('Omit to keep the prompt already on the node.'),
     model: z.string().optional().describe('Omit to keep the model already on the node.'),
     params: z.record(z.string(), z.unknown()).optional().describe('e.g. { aspectRatio: "1:1", duration: 8 }.'),
+    provider: z.string().optional().describe('A provider id from list_models routes (e.g. "kie", "openrouter"); omit or "auto" for the cheapest healthy one.'),
     expectedVersion: z.number().int()
   })
   .strict();
@@ -601,7 +602,7 @@ export const CANVAS_OPS = {
           medium,
           prompt: input.prompt ?? data.prompt ?? '',
           model: input.model ?? data.model ?? null,
-          params: (input.params ?? data.params ?? {}) as GenParams,
+          params: { ...(input.params ?? data.params ?? {}), ...(input.provider ? { provider: input.provider } : {}) } as GenParams,
           expectedVersion: input.expectedVersion,
           actor: ctx.actor
         })

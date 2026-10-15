@@ -55,7 +55,7 @@ const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
   delete_node:
     'Soft-delete a node on THIS project. The node disappears from list_nodes; undo can bring it back.',
   run_node:
-    'Generate on a producing node of THIS project (Generate text/image/video/audio/3D model; type ids text, image, video, audio, model3d — a model3d node turns one connected image, or its prompt via a generated product shot, into a GLB and is always queued). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video or an audio dubbing may come back queued; poll with list_runs. An audio node runs params.operation (describe_node_types type "audio" lists operations and voices). Model ids, providers and prices: canvas_tool list_models.',
+    'Generate on a producing node of THIS project (Generate text/image/video/audio/3D model; type ids text, image, video, audio, model3d — a model3d node turns one connected image, or its prompt via a generated product shot, into a GLB and is always queued). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video or an audio dubbing may come back queued; poll with list_runs. An audio node runs params.operation (describe_node_types type "audio" lists operations and voices). Model ids, providers and prices: canvas_tool list_models; pass provider (a routes[].provider) to run on that one, omit for the cheapest healthy.',
   list_runs:
     'Generation history of one node on THIS project, oldest first, with status, cost and the produced text when there is one.',
   preview_node_loop:

@@ -148,6 +148,49 @@ describe('kie is tried first for a model it discounts', () => {
   });
 });
 
+const nodeWrites = (calls: ReturnType<typeof fakeDb>['calls']) =>
+  calls.filter((c) => c.table === 'nodes' && c.op === 'update').map((c) => JSON.stringify(c.payload));
+
+describe('the provider saved on the node decides the route', () => {
+  it('OpenRouter picked by hand never touches kie', async () => {
+    const { db } = canvas();
+
+    const out = await runGenNode(db, { ...start, params: { provider: 'openrouter' } });
+
+    expect(out.kind).toBe('done');
+    expect(gateway.run).not.toHaveBeenCalled();
+    expect(generateImagesWithoutBrand).toHaveBeenCalledOnce();
+  });
+
+  it('kie picked by hand that fails is refused with a clear reason, and never silently moves to OpenRouter', async () => {
+    gateway.run.mockRejectedValue(new Error('kie_failed: HTTP 500 on /jobs/createTask'));
+    const { db } = canvas();
+
+    const out = await runGenNode(db, { ...start, params: { provider: 'kie' } });
+
+    expect(out).toEqual({ kind: 'refused', error: expect.stringMatching(/^kie\.ai failed: .*Pick Auto/) });
+    expect(generateImagesWithoutBrand).not.toHaveBeenCalled();
+  });
+
+  it('kie picked by hand queues without a fallback model', async () => {
+    gateway.run.mockResolvedValue({ taskId: 'task_9' });
+    const { db, calls } = canvas();
+
+    await runGenNode(db, { ...start, params: { provider: 'kie' } });
+
+    expect(runUpdates(calls)).toContainEqual(expect.objectContaining({ model: KIE_MODEL, params: { resolution: '1K', provider: 'kie' } }));
+  });
+
+  it('Auto that falls back says so on the node', async () => {
+    gateway.run.mockRejectedValue(new Error('kie_failed: HTTP 500 on /jobs/createTask'));
+    const { db, calls } = canvas();
+
+    await runGenNode(db, start);
+
+    expect(nodeWrites(calls).some((w) => w.includes('"routeNote":"kie.ai failed, made on OpenRouter"'))).toBe(true);
+  });
+});
+
 describe('a kie task that fails falls back to the primary once, and only the primary charges', () => {
   const queued = {
     id: RUN,
