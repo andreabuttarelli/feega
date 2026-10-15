@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { relativeDate } from './relative-date';
+import { editedAgo, relativeDate } from './relative-date';
 
 const NOW = new Date('2026-10-09T12:00:00Z');
 
@@ -15,5 +15,12 @@ describe('a date said the way people say it', () => {
     ['2024-10-01T12:00:00Z', '2 years ago']
   ])('%s reads %s', (iso, said) => {
     expect(relativeDate(iso, NOW)).toBe(said);
+  });
+});
+
+describe('the label says it is the last edit', () => {
+  it('reads as an edit, not a birth', () => {
+    expect(editedAgo('2026-10-09T11:55:00Z', NOW)).toBe('Edited 5 minutes ago');
+    expect(editedAgo('2026-10-08T10:00:00Z', NOW)).toBe('Edited yesterday');
   });
 });
