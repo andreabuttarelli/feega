@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BarContext, BarMode, BarSlot, barSlots, readBarMode, barContextOf, barHidden, barKeys, barLift, barShift } from './bottom-bar';
+import { EditMode } from '$lib/motion/edit-mode';
+import { BarContext, BarMode, barShown, BarSlot, barSlots, readBarMode, barContextOf, barHidden, barKeys, barLift, barShift } from './bottom-bar';
 import { CanvasState } from './inline-motion';
 import { Region } from './key-region.svelte';
 
@@ -52,5 +53,14 @@ describe('one bottom bar, its tools by context', () => {
     expect(barHidden(BarContext.Frame, true)).toBe(true);
     expect(barHidden(BarContext.Frame, false)).toBe(false);
     expect(barHidden(BarContext.Canvas, true)).toBe(false);
+  });
+});
+
+describe('a frame shows one tool strip at a time', () => {
+  it('Design shows the add bar; Motion hides it for the timeline; the canvas always shows it', () => {
+    expect(barShown(BarContext.Frame, EditMode.Design)).toBe(true);
+    expect(barShown(BarContext.Frame, EditMode.Motion)).toBe(false);
+    expect(barShown(BarContext.Canvas, EditMode.Motion)).toBe(true);
+    expect(barShown(BarContext.Canvas, EditMode.Design)).toBe(true);
   });
 });

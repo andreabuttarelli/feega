@@ -268,6 +268,11 @@
 
   let editMode = $state(timelineFits(history.present) ? readMode(browserStore()?.getItem(EDIT_MODE_KEY) ?? null) : EditMode.Design);
 
+  $effect(() => {
+    if (rules.tools === ToolsPlace.CanvasBar) {
+      frameBar.editMode = editMode;
+    }
+  });
   const unanimated = $derived(editMode === EditMode.Motion && doc.tracks.every((t) => t.clips.every((c) => !Object.keys(c.keyframes).length)));
 
   function setMode(next: EditMode) {

@@ -1,5 +1,6 @@
 import { CanvasState } from './inline-motion';
 import { Region } from './key-region.svelte';
+import { EditMode } from '$lib/motion/edit-mode';
 
 export enum BarContext {
   Canvas = 'canvas',
@@ -24,12 +25,13 @@ export enum BarSlot {
   FrameLibrary = 'frame-library'
 }
 
-type ContextRules = { slots: Record<BarMode, readonly BarSlot[]>; followsTimeline: boolean; keys: Region; yieldsToDialogs: boolean };
+type ContextRules = { shown: Record<EditMode, boolean>; slots: Record<BarMode, readonly BarSlot[]>; followsTimeline: boolean; keys: Region; yieldsToDialogs: boolean };
 
 const FRAME_TOOLS: readonly BarSlot[] = [BarSlot.Draw, BarSlot.Image, BarSlot.FrameLibrary];
 
 const CONTEXT: Record<BarContext, ContextRules> = {
   [BarContext.Canvas]: {
+    shown: { [EditMode.Design]: true, [EditMode.Motion]: true },
     slots: {
       [BarMode.Design]: [BarSlot.Mode, BarSlot.Draw, BarSlot.Upload, BarSlot.FrameTemplates],
       [BarMode.Generate]: [BarSlot.Mode, BarSlot.Select, BarSlot.Generate, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates]
@@ -38,7 +40,7 @@ const CONTEXT: Record<BarContext, ContextRules> = {
     keys: Region.Canvas,
     yieldsToDialogs: false
   },
-  [BarContext.Frame]: { slots: { [BarMode.Design]: FRAME_TOOLS, [BarMode.Generate]: FRAME_TOOLS }, followsTimeline: true, keys: Region.Editor, yieldsToDialogs: true }
+  [BarContext.Frame]: { shown: { [EditMode.Design]: true, [EditMode.Motion]: false }, slots: { [BarMode.Design]: FRAME_TOOLS, [BarMode.Generate]: FRAME_TOOLS }, followsTimeline: true, keys: Region.Editor, yieldsToDialogs: true }
 };
 
 export const barSlots = (context: BarContext, mode: BarMode): readonly BarSlot[] => CONTEXT[context].slots[mode];
@@ -65,3 +67,5 @@ export const barShift = (context: BarContext, sidePx: number): number => (CONTEX
 export const barKeys = (context: BarContext): Region => CONTEXT[context].keys;
 
 export const barHidden = (context: BarContext, frameDialogOpen: boolean): boolean => CONTEXT[context].yieldsToDialogs && frameDialogOpen;
+
+export const barShown = (context: BarContext, mode: EditMode): boolean => CONTEXT[context].shown[mode];

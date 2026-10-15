@@ -1,4 +1,5 @@
 import { DrawTool } from '$lib/motion/draw-tool';
+import { EditMode } from '$lib/motion/edit-mode';
 
 export enum FrameAction {
   Image = 'image',
@@ -13,6 +14,7 @@ class FrameBar {
   sidePx = $state(0);
   host = $state<Host | null>(null);
   covered = $state(false);
+  editMode = $state(EditMode.Design);
 
   attach(host: Host) {
     this.host = host;
@@ -23,6 +25,7 @@ class FrameBar {
         this.sidePx = 0;
         this.tool = DrawTool.Select;
         this.covered = false;
+        this.editMode = EditMode.Design;
       }
     };
   }

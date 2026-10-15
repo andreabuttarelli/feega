@@ -50,8 +50,7 @@ test.describe('the canvas around the inline editor on desktop @real', () => {
 
     const timeline = (await page.getByRole('region', { name: 'Timeline', exact: true }).boundingBox())!;
     expect(timeline.height, 'the timeline opens low, about three tracks').toBeLessThanOrEqual(TIMELINE_MAX_PX);
-    const frameBar = (await addBar.boundingBox())!;
-    expect(Math.abs(frameBar.y + frameBar.height - timeline.y), 'the bar rides on the timeline').toBeLessThanOrEqual(2);
+    await expect(addBar, 'in Motion the timeline shows and the bar stows').toHaveAttribute('inert', '');
 
     await page.getByTestId('inline-close').click();
     await expect(page.getByTestId('motion-editor')).toHaveCount(0);

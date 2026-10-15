@@ -5,7 +5,7 @@
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
-  import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barHidden, barKeys, barLift, barShift, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
+  import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barHidden, barKeys, barLift, barShift, barShown, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
   import PenTool from '@lucide/svelte/icons/pen-tool';
   import Sparkles from '@lucide/svelte/icons/sparkles';
   import { KEY_REGION_ATTR } from '$lib/canvas/key-region.svelte';
@@ -277,7 +277,7 @@
   </span>
 {/snippet}
 
-<div bind:this={barEl} class="add-bar" class:covered={barHidden(context, frameBar.covered)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
+<div bind:this={barEl} class="add-bar" class:covered={barHidden(context, frameBar.covered)} class:stowed={!barShown(context, frameBar.editMode)} aria-hidden={!barShown(context, frameBar.editMode)} inert={!barShown(context, frameBar.editMode)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
   {#key `${context}:${mode}`}
     <div class="group" data-testid={`bar-${context}`}>
       {#each barSlots(context, mode) as s (s)}{@render SLOT[s]()}{/each}
@@ -324,13 +324,19 @@
     visibility: hidden;
   }
 
+  .add-bar.stowed {
+    opacity: 0;
+    translate: 0 16px;
+    pointer-events: none;
+  }
+
   .add-bar {
     position: absolute;
     z-index: 61;
     bottom: var(--lift, 0px);
     left: calc(50% - var(--shift, 0px));
     transform: translateX(-50%);
-    transition: bottom var(--chrome-move) var(--ease-expo), left var(--chrome-move) var(--ease-expo);
+    transition: bottom var(--chrome-move) var(--ease-expo), left var(--chrome-move) var(--ease-expo), opacity var(--chrome-move) var(--ease-expo), translate var(--chrome-move) var(--ease-expo);
     display: flex;
     align-items: center;
     gap: 2px;
