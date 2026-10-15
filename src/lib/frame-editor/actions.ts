@@ -1,5 +1,10 @@
 const HTTP_BAD_REQUEST = 400;
 
+export enum UploadPurpose {
+  Export = 'export',
+  Font = 'font'
+}
+
 export type OpAsk = { op: string; input: Record<string, unknown> };
 export type ActionAsk = OpAsk | { refused: { status: number; body: { error: string } } };
 

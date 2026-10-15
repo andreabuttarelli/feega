@@ -25,6 +25,7 @@ import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
 import { settingsFrom } from '$lib/motion/export-formats';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { editorSession } from '$lib/server/motion/editor-session';
+import { UploadPurpose } from '$lib/frame-editor/actions';
 import { listRevisions } from '$lib/server/repos/motion-revisions';
 import { Restore, restoreRevision } from '$lib/server/motion/editor';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
@@ -40,11 +41,6 @@ import { publishNode } from '$lib/server/gallery/service';
 export enum EditorAccess {
   Read = 'read',
   Write = 'write'
-}
-
-export enum UploadPurpose {
-  Export = 'export',
-  Font = 'font'
 }
 
 export type EditorAnswer = { status: number; body: Record<string, unknown> };
