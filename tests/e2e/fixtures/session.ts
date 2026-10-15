@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { test as base, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -43,7 +44,16 @@ export function e2eTarget(): E2eTarget {
   return targetOf(supabaseUrl());
 }
 
-async function userClient(email: string, password: string): Promise<{ db: SupabaseClient; userId: string }> {
+const signedClients = new Map<string, Promise<{ db: SupabaseClient; userId: string }>>();
+
+function userClient(email: string, password: string): Promise<{ db: SupabaseClient; userId: string }> {
+  const signed = signedClients.get(email) ?? signInClient(email, password);
+  signedClients.set(email, signed);
+  signed.catch(() => signedClients.delete(email));
+  return signed;
+}
+
+async function signInClient(email: string, password: string): Promise<{ db: SupabaseClient; userId: string }> {
   const anonKey = process.env.PUBLIC_SUPABASE_ANON_KEY;
   if (!anonKey) {
     throw new Error('E2E_REAL_STACK=1 richiede PUBLIC_SUPABASE_ANON_KEY');
@@ -290,6 +300,28 @@ export async function signInE2e(page: Page, session: Pick<E2eSession, 'email' | 
   await page.waitForURL(/\/(app|p\/)/);
 }
 
+const SIGN_IN_DIR = 'tests/e2e/.auth';
+const SIGN_IN_TTL_MS = 30 * 60_000;
+
+function signInFile(email: string): string {
+  return `${SIGN_IN_DIR}/${email.replace(/[^a-z0-9]/gi, '_')}.json`;
+}
+
+async function reuseSignIn(page: Page, session: Pick<E2eSession, 'email'>): Promise<boolean> {
+  const file = signInFile(session.email);
+  if (!existsSync(file) || Date.now() - statSync(file).mtimeMs > SIGN_IN_TTL_MS) {
+    return false;
+  }
+  await skipTour(page);
+  await page.context().addCookies(JSON.parse(readFileSync(file, 'utf8')));
+  return true;
+}
+
+async function saveSignIn(page: Page, session: Pick<E2eSession, 'email'>): Promise<void> {
+  mkdirSync(SIGN_IN_DIR, { recursive: true });
+  writeFileSync(signInFile(session.email), JSON.stringify(await page.context().cookies()));
+}
+
 type CanvasNodeSeed = {
   type: string;
   x?: number;
@@ -318,7 +350,10 @@ export const test = base.extend<{
   },
 
   page: async ({ page, session }, use) => {
-    await signInE2e(page, session);
+    if (!(await reuseSignIn(page, session))) {
+      await signInE2e(page, session);
+      await saveSignIn(page, session);
+    }
     await use(page);
   },
 

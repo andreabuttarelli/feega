@@ -103,3 +103,4 @@ bun.lock
 .playwright-mcp/
 
 /static/motion-libs/
+tests/e2e/.auth/
