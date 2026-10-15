@@ -1,9 +1,11 @@
 import { SPAWN_AGENT } from '$lib/server/agents/spawn';
 import { spawnAgentTool, spawnAgents, spawnOffers } from '$lib/server/agents/spawn-agent';
 import { json } from '@sveltejs/kit';
-import { streamText, type ModelMessage } from 'ai';
+import { createUIMessageStream, createUIMessageStreamResponse, streamText, type ModelMessage } from 'ai';
 import type { Db } from '$lib/server/db/client';
 import { llmLanguageModel } from '$lib/server/llm';
+import { PromptCache } from '$lib/server/prompt-cache';
+import { pickOf, turnModel } from '$lib/server/project-agent/model-route';
 import { offeredChatModels, reasoningProviderOptions, resolveChoice } from '$lib/server/chat-model/catalogue';
 import { extractSdkUsage, logAiCall, withBrandContext, withOrgContext } from '$lib/server/ai-log';
 import { gateAiAction, gateOrgAiAction } from '$lib/server/cli-auth';
@@ -16,6 +18,10 @@ import { openReply, ReplyStatus } from '$lib/server/repos/chat-reply';
 import { agentActor, SIDEBAR_AGENT_KEY } from '$lib/server/repos/actor';
 import { createProjectTools } from '$lib/server/project-agent/project-tools';
 import { createMotionDelegation } from '$lib/server/project-agent/motion-delegation';
+import { createFrameTools, editorFrames, openFrameSchema, type OpenFrame } from '$lib/server/project-agent/frame-tools';
+import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
+import { FRAMES_REQUEST, type FramesRequest } from '$lib/motion/frames-request';
+import type { FrameBucket } from '$lib/server/motion/frame-store';
 import { openAgentTools } from '$lib/server/project-agent/tool-surface';
 import { createWebTools } from '$lib/server/web/web-tools';
 import { liveWebDeps, productImport, productsNodePlacer, webImageImport } from '$lib/server/web/live';
@@ -83,7 +89,9 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
   if (gated) return gated;
 
-  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown };
+  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown };
+  const parsedFrame = openFrameSchema.safeParse(askedFrame);
+  const frame: OpenFrame | null = parsedFrame.success ? parsedFrame.data : null;
   const text = message?.trim() ?? '';
   const attachments = await askedAttachments(db, { orgId, projectId: project.id }, askedFiles);
   if (attachments instanceof Response) {
@@ -97,7 +105,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   if (!resolved.ok) {
     return json({ error: resolved.error }, { status: 400 });
   }
-  const { model, reasoning } = resolved.choice;
+  const { model, reasoning } = turnModel(resolved.choice, pickOf(askedModel), text);
 
   const screening = screenModelInput(db, {
     profile: ModerationProfile.Standard,
@@ -130,6 +138,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const steps: Parameters<typeof finishedTurn>[0][number][] = [];
 
   let spent = 0;
+  let askEditor: (request: FramesRequest) => void = () => {};
   const webTools = createWebTools({
     ...liveWebDeps(db, { orgId, userId: user.id, projectId: project.id, brandId: brand?.id ?? null, mode: project.mode }, (usd) => {
       spent += usd;
@@ -146,6 +155,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const projectTools = {
     ...createProjectTools({ db, orgId, projectId: project.id, userId: user.id, brandId: brand?.id ?? null }),
     ...createMotionDelegation({ db, orgId, projectId: project.id, userId: user.id, origin: url.origin, model, canvasId }),
+    ...createFrameTools({ db, orgId, projectId: project.id, userId: user.id, open: frame, editor: frame ? editorFrames(db, db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket, { orgId, projectId: project.id, nodeId: frame.nodeId, userId: user.id }, (request) => askEditor(request)) : null }),
     ...webTools
   };
   Object.assign(projectTools, {
@@ -180,12 +190,13 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const billedScope = <T>(fn: () => T): T => (brand ? withBrandContext(brand.id, fn) : withOrgContext(orgId, fn));
 
   const result = billedScope(() => streamText({
-    model: llmLanguageModel(model),
+    model: llmLanguageModel(model, PromptCache.On),
     system: projectAgentPrompt({
       project: { id: project.id, name: project.name },
       canvases: canvases.map((c) => ({ id: c.id, name: c.name })),
       brand: brand ? { name: brand.name, slug: brand.slug } : null,
-      openCanvasId: canvasId
+      openCanvasId: canvasId,
+      frame
     }),
     allowSystemInMessages: true,
     messages: [...history, { role: 'user', content: opening }] as ModelMessage[],
@@ -229,7 +240,13 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
     'project-agent-turn'
   );
 
-  return result.toUIMessageStreamResponse({ sendReasoning: true });
+  const stream = createUIMessageStream({
+    execute: ({ writer }) => {
+      askEditor = (request) => writer.write({ type: FRAMES_REQUEST, data: request });
+      writer.merge(result.toUIMessageStream({ sendReasoning: true }));
+    }
+  });
+  return createUIMessageStreamResponse({ stream });
 };
 
 export const GET: RequestHandler = async ({ params, locals }) => {
