@@ -1021,15 +1021,6 @@ export async function reconcileAudioNodeRuns(db: Db): Promise<VideoReconcileOutc
         outcome.pending += 1;
         continue;
       }
-      if (progress.state === 'failed' && fallbackModelOf(run)) {
-        await failRun(db, { orgId: run.orgId, runId: run.id, error: progress.error });
-        const fallback = await fallBackToPrimary(db, run, node);
-        if (fallback.kind === 'conflict') {
-          await showRunState(db, shape, { running: false, runId: run.id, error: progress.error });
-        }
-        outcome.failed += 1;
-        continue;
-      }
       if (progress.state === 'failed') {
         await giveUp(db, shape, finishing, progress.error);
         outcome.failed += 1;
