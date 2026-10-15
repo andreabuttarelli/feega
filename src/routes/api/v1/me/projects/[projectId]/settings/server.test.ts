@@ -200,6 +200,14 @@ describe('settings over the API answer what the settings pages answer', () => {
     expect(missing).toEqual(['project/verifyAge', 'profile/deleteAccount']);
   });
 
+  it('an action on a project the caller cannot open is refused before it runs', async () => {
+    const { findProjectForUser } = await import('$lib/server/projects/lookup');
+    vi.mocked(findProjectForUser).mockResolvedValueOnce(null as never);
+
+    expect((await api('POST', '/project?action=rename', form({ name: 'Hijacked' }))).status).toBe(404);
+    expect(state.kit && (state.kit as TestSupabase).tables.get('projects')![0].name).toBe(PROJECT.name);
+  });
+
   it('an unknown section or action is a 404, a missing or bad token a 401', async () => {
     expect((await api('GET', '/nope')).status).toBe(404);
     expect((await api('POST', '/project?action=nope', form({}))).status).toBe(404);

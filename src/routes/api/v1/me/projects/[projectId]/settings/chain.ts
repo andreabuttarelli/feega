@@ -12,5 +12,5 @@ export function settingsChain(bearer: Bearer, request: Request, apiUrl: URL, pag
   const project = once(async () => (await projectShell(event as never)) as Record<string, unknown>);
   const layout = once(async () => (await settingsShell({ ...event, parent: project } as never)) as Record<string, unknown>);
   const parent = async () => ({ ...(await project()), ...(await layout()) });
-  return { event, layout, page: { ...event, parent } };
+  return { event, project, layout, page: { ...event, parent } };
 }

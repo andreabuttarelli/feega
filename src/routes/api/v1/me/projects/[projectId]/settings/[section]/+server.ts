@@ -27,8 +27,11 @@ async function serve(request: Request, url: URL, projectId: string, section: str
     return bearer;
   }
 
-  const { page } = settingsChain(bearer, request, url, settingsPath(projectId, section), projectId);
-  return answerOf(async () => handler(page as never));
+  const { project, page } = settingsChain(bearer, request, url, settingsPath(projectId, section), projectId);
+  return answerOf(async () => {
+    await project();
+    return handler(page as never);
+  });
 }
 
 export const GET: RequestHandler = ({ request, url, params }) => serve(request, url, params.projectId, params.section, (page) => page.load ?? NOTHING);

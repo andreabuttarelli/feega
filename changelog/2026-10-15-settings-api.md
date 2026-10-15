@@ -23,3 +23,7 @@ Two defects found on the way, both also on `dev` before this change:
 Open, not fixed here: `ensureProfile` (run by the project layout on every load) overwrites
 `profiles.name` with the auth metadata name, so a name saved in Profile does not stick for users
 without one in their metadata.
+
+The API is stricter than the old form actions in one place: every settings action first resolves
+the project shell, so a project the caller cannot open (missing, or uncensored and locked) answers
+404 before the action runs. The form actions never checked the uncensored lock.
