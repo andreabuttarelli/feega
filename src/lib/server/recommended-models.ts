@@ -20,7 +20,6 @@ export type ReleaseRow = {
 };
 
 const TOKENS_PER_MILLION = 1_000_000;
-const TOKENS_PER_1K_IMAGE = 1290;
 const MEGAPIXELS_PER_1K_IMAGE = 1;
 const VIDEO_TOKENS_PER_SECOND_720P = (1280 * 720 * 24) / 1024;
 const CENTS_PER_USD = 100;
@@ -31,7 +30,6 @@ const CATALOGUE_OF: Record<CatalogueMedium, AiModelCatalogue> = { text: 'chat', 
 
 const IMAGE_LINE_USD: Record<string, (cost: number) => number> = {
   image: (cost) => cost,
-  token: (cost) => cost * TOKENS_PER_1K_IMAGE,
   megapixel: (cost) => cost * MEGAPIXELS_PER_1K_IMAGE
 };
 
