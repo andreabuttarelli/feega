@@ -107,6 +107,19 @@ const csrf: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
+const DASHBOARD_PREFIX = '/app';
+
+async function refuseSignedOutDashboard(event: RequestEvent): Promise<void> {
+  const path = event.url.pathname;
+  if (path !== DASHBOARD_PREFIX && !path.startsWith(`${DASHBOARD_PREFIX}/`)) {
+    return;
+  }
+  const { session } = await event.locals.safeGetSession();
+  if (!session) {
+    throw redirect(303, '/login');
+  }
+}
+
 async function refuseUncensoredSection(event: RequestEvent): Promise<void> {
   const { guardedSection, sectionRefusal } = await import('$lib/server/uncensored-workspace/section-guard');
   const projectId = event.params.projectId;
@@ -201,6 +214,7 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
 
   await refuseSocialPublishing(event);
   await refuseUncensoredSection(event);
+  await refuseSignedOutDashboard(event);
 
   const themePref = await themePrefFor(event);
   const doResolve = () =>
