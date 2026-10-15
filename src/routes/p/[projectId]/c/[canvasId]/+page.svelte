@@ -23,7 +23,7 @@
   import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
-  import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
+  import { postCanvasAction } from '$lib/dashboard/api';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
@@ -36,7 +36,6 @@
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
-  import { deserialize } from '$app/forms';
   import { beforeNavigate, goto, invalidate, replaceState } from '$app/navigation';
   import { page, updated } from '$app/state';
   import { track } from '$lib/analytics';
@@ -1246,28 +1245,17 @@
     return body;
   }
 
+  const canvasRoute = $derived({ projectId: data.projectId, canvasId: data.canvas.id });
+
   async function send(
     action: string,
     fields: Record<string, string | number | File | string[]>
   ): Promise<ActionAnswer> {
-    let res: Response;
     try {
-      res = await fetch(canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action), {
-        method: 'POST',
-        headers: { 'x-sveltekit-action': 'true' },
-        body: formOf(fields)
-      });
+      return await postCanvasAction(canvasRoute, action, formOf(fields));
     } catch (cause) {
       console.warn(`canvas action ${action}: network`, cause);
       return { type: 'network' };
-    }
-
-    const text = await res.text();
-    try {
-      return deserialize(text) as ActionAnswer;
-    } catch {
-      console.warn(`canvas action ${action}: unreadable ${res.status}`, text.slice(0, 500));
-      return { type: 'error', status: res.status };
     }
   }
 
@@ -2814,7 +2802,7 @@
   />
 
   <CanvasFlow
-    actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
+    postAction={(action: string, form: FormData) => postCanvasAction(canvasRoute, action, form)}
     {tiles}
     {edges}
     onMove={move}

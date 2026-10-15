@@ -29,6 +29,10 @@ export class SwrCache {
     this.warming.set(key, work);
   }
 
+  fresh<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+    return this.firstOf(key, fetcher);
+  }
+
   clear(): void {
     this.entries.clear();
     this.warming.clear();

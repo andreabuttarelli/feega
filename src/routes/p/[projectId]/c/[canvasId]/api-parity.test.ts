@@ -12,7 +12,7 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [{ org: 
 vi.mock('$lib/server/projects/lookup', () => ({ findProjectForUser: async () => null }));
 vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: (...a: unknown[]) => findCanvasForUser(...a) }));
 
-import { actions } from './+page.server';
+import { actions } from '$lib/server/canvas/canvas-page';
 import { POST } from '../../../../api/v1/org/canvas/+server';
 
 const ORG = '11111111-1111-1111-1111-111111111111';

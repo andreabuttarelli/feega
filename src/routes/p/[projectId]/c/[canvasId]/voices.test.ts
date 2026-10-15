@@ -57,7 +57,7 @@ vi.mock('$lib/server/voices/custom-voices', async (importOriginal) => ({
 	voiceSlots: (...a: unknown[]) => voiceSlots(...a)
 }));
 
-import { actions } from './+page.server';
+import { actions } from '$lib/server/canvas/canvas-page';
 
 function fakeEvent(form: FormData) {
 	return {

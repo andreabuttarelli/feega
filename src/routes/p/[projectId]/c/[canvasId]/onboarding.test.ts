@@ -17,7 +17,7 @@ vi.mock('$lib/server/canvas/generate', async (orig) => ({
   runGenNode: (...a: unknown[]) => runGenNode(...a)
 }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/canvas/canvas-page');
 
 const ORG = 'org-1';
 const CANVAS = 'canvas-1';

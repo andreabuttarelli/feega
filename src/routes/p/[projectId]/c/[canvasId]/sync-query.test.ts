@@ -52,7 +52,7 @@ vi.mock('$lib/server/repos/influencers', () => ({
 	signInfluencerViewFiles: vi.fn()
 }));
 
-import { actions } from './+page.server';
+import { actions } from '$lib/server/canvas/canvas-page';
 
 function fakeEvent(formEntries: Record<string, string>) {
 	const fd = new FormData();

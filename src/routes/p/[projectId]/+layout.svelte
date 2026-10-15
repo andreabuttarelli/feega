@@ -26,7 +26,7 @@
   import { guideOpenRequest } from '$lib/canvas/guide-open';
   import { chatOpenRequest } from '$lib/canvas/empty-canvas';
   import { browser } from '$app/environment';
-  import { deserialize } from '$app/forms';
+  import { postCanvasAction } from '$lib/dashboard/api';
   import type { ShareState } from '$lib/canvas/shared-view';
   import { handoffOf } from '$lib/canvas/chat-handoff';
   import { editingLabel, propertiesRequest, propertiesTarget } from '$lib/canvas/phone-properties';
@@ -70,8 +70,7 @@
   async function onShare(state: ShareState) {
     const body = new FormData();
     body.set('state', state);
-    const res = await fetch(`/p/${projectId}/c/${canvasId}?/share_canvas`, { method: 'POST', body });
-    const result = deserialize(await res.text());
+    const result = await postCanvasAction({ projectId, canvasId }, 'share_canvas', body);
     if (result.type !== 'success') {
       console.error('condivisione della tela fallita', result);
       return;

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ActionResult } from '@sveltejs/kit';
   const MIN_ZOOM = 0.05;
   import { focusEdges } from '$lib/canvas/edge-focus';
   import type { FocusRequest } from '$lib/canvas/free-area';
@@ -127,7 +128,7 @@
   };
 
   let {
-    actionUrl,
+    postAction,
     tiles = [],
     edges: incomingEdges = [],
     onMove,
@@ -174,7 +175,7 @@
     mode = CanvasMode.Edit,
     tile
   }: {
-    actionUrl?: (action: string) => string;
+    postAction?: (action: string, form: FormData) => Promise<ActionResult>;
     tiles?: Tile[];
     /** Le linee già in `brand_canvas_edges`, pronte per il disegno. */
     edges?: FlowEdge[];
@@ -871,8 +872,8 @@
     onpropertychange={(patch) => onPropertyChange?.(selection.ids, patch)}
   />
 
-  {#if actionUrl}
-    <NextStepChips {actionUrl} box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
+  {#if postAction}
+    <NextStepChips {postAction} box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
   {/if}
   {/if}
 

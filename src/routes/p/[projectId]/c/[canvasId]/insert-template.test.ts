@@ -13,7 +13,7 @@ vi.mock('$lib/server/canvas/lookup', () => ({
 }));
 vi.mock('$lib/server/canvas-catalogue', () => ({ canvasModelCatalogue: vi.fn() }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/canvas/canvas-page');
 
 const ORG = 'org-1';
 const CANVAS = 'canvas-1';

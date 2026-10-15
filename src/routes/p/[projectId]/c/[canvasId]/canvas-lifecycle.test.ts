@@ -8,7 +8,7 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: (...a: unknown[]) =>
 vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: (...a: unknown[]) => findCanvasForUser(...a) }));
 vi.mock('$lib/server/canvas-catalogue', () => ({ canvasModelCatalogue: vi.fn() }));
 
-import { actions } from './+page.server';
+import { actions } from '$lib/server/canvas/canvas-page';
 import { Remote } from '$lib/canvas/staleness';
 import { revisionOf } from '$lib/server/canvas/revision';
 

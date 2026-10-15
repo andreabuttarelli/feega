@@ -14,7 +14,7 @@ vi.mock('$lib/server/canvas-catalogue', () => ({ canvasModelCatalogue: vi.fn() }
 vi.mock('$lib/server/motion/still-export', () => ({ exportStill, drawStill: exportStill }));
 vi.mock('$lib/server/motion/chromium-frames', () => ({ chromiumFrames: { open: chromium, frame: chromium, close: chromium } }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/canvas/canvas-page');
 
 const ORG = 'org-1';
 const CANVAS = 'canvas-1';

@@ -9,7 +9,7 @@ vi.mock('$lib/server/credits', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/credits')>()),
   orgCreditBalance: async () => Number.MAX_SAFE_INTEGER
 }));
-import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server';
+import { actions } from '$lib/server/canvas/canvas-page';
 import { fakeDb } from '$lib/server/db/fake-db';
 
 function event(fields: Record<string, string>) {

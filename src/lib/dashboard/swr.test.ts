@@ -84,4 +84,12 @@ describe('a stale-while-revalidate cache for dashboard navigation', () => {
 
     expect(await cache.read('k', async () => 'v2', () => {})).toBe('v2');
   });
+
+  it('a fresh read takes a warmed fetch once and never serves a stored answer', async () => {
+    const cache = new SwrCache(clock().now);
+    cache.warm('k', async () => 'warm');
+
+    expect(await cache.fresh('k', async () => 'net')).toBe('warm');
+    expect(await cache.fresh('k', async () => 'net')).toBe('net');
+  });
 });

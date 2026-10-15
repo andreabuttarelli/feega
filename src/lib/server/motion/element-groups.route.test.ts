@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server';
+import { actions } from '$lib/server/canvas/canvas-page';
 import { fakeDb } from '$lib/server/db/fake-db';
 import type { MotionDoc } from '$lib/motion/doc';
 import { DrawTool } from '$lib/motion/draw-tool';

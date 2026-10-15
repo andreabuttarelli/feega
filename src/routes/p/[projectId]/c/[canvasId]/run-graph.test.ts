@@ -17,7 +17,7 @@ vi.mock('$lib/server/canvas/generate', () => ({
 	runsOf: vi.fn()
 }));
 
-import { actions } from './+page.server';
+import { actions } from '$lib/server/canvas/canvas-page';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const PROJECT = '22222222-2222-2222-2222-222222222222';

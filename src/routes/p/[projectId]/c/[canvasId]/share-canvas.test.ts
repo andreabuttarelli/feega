@@ -51,7 +51,7 @@ vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({
 	canvasReachable: async (_db: unknown, found: { mode: string }) => found.mode !== 'uncensored' || (await uncensoredLockFor()) === 'open'
 }));
 
-import { actions } from './+page.server';
+import { actions } from '$lib/server/canvas/canvas-page';
 
 function fakeEvent(formEntries: Record<string, string>) {
 	const fd = new FormData();

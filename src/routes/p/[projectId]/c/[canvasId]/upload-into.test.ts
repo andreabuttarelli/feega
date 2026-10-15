@@ -41,7 +41,7 @@ vi.mock('$lib/server/repos/influencers', () => ({
 	signInfluencerViewFiles: vi.fn()
 }));
 
-import { actions } from './+page.server';
+import { actions } from '$lib/server/canvas/canvas-page';
 
 const SCOPE = { orgId: 'org-1', canvasId: 'canvas-1' };
 

@@ -3,7 +3,8 @@ import { env as publicEnv } from '$env/dynamic/public';
 import type { ActionResult } from '@sveltejs/kit';
 import { createSupabaseBrowserClient } from '$lib/supabase/client';
 import { SwrCache } from './swr';
-import { actionResultOf, loadedOf, type Answer } from './answers';
+import { actionResultOf, liveActionResultOf, loadedOf, type Answer } from './answers';
+import type { CanvasRoute } from '$lib/canvas/canvas-action-url';
 import { pageAt, type DashboardPage } from './pages';
 import type { AppShell } from '$lib/server/dashboard/app-shell';
 import type { FirstRunFlags } from '$lib/server/dashboard/first-run-flags';
@@ -107,4 +108,22 @@ export async function postAction(page: DashboardPage, action: string, form: Form
   const { status, body } = await call(withOrg(`/api/v1/me/pages/${page}`, query), { method: 'POST', body: form });
   cache.clear();
   return actionResultOf(status, body);
+}
+
+function canvasPath(route: CanvasRoute): string {
+  return `/api/v1/projects/${route.projectId}/canvases/${route.canvasId}`;
+}
+
+export async function loadCanvas<T>(route: CanvasRoute, url: URL, depends: Depends): Promise<T> {
+  const search = url.searchParams.toString();
+  const path = search ? `${canvasPath(route)}?${search}` : canvasPath(route);
+  depends(keyOf(path));
+  return (await cache.fresh(keyOf(path), reader(path))) as T;
+}
+
+export async function postCanvasAction(route: CanvasRoute, action: string, form: FormData): Promise<ActionResult> {
+  const query = new URLSearchParams({ action });
+  const { status, body } = await call(`${canvasPath(route)}?${query}`, { method: 'POST', body: form });
+  cache.clear();
+  return liveActionResultOf(status, body);
 }

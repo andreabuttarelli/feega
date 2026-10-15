@@ -49,7 +49,7 @@ vi.mock('$lib/server/canvas/canvas-share', () => ({
 	setCanvasShare: (...a: unknown[]) => setCanvasShare(...a)
 }));
 
-import { actions } from './+page.server';
+import { actions } from '$lib/server/canvas/canvas-page';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
 const CANVAS = '22222222-2222-2222-2222-222222222222';

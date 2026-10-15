@@ -1,22 +1,29 @@
-import { applyAction, deserialize } from '$app/forms';
+import { applyAction } from '$app/forms';
 import { invalidate } from '$app/navigation';
+import { postCanvasAction } from '$lib/dashboard/api';
+import { canvasRouteOf } from './canvas-action-url';
 
 export const CANVAS_LIST_DEPENDENCY = 'app:canvases';
 
 export enum CanvasAction {
   New = 'new_canvas',
   Rename = 'rename_canvas',
-  Delete = 'delete_canvas'
+  Delete = 'delete_canvas',
+  RenameProject = 'rename_project'
 }
 
 export async function submitCanvasAction(canvasHref: string, action: CanvasAction, fields: Record<string, string> = {}): Promise<void> {
+  const route = canvasRouteOf(canvasHref);
+  if (!route) {
+    return;
+  }
+
   const body = new FormData();
   for (const [key, value] of Object.entries(fields)) {
     body.set(key, value);
   }
 
-  const res = await fetch(`${canvasHref}?/${action}`, { method: 'POST', body });
-  const result = deserialize(await res.text());
+  const result = await postCanvasAction(route, action, body);
   if (result.type === 'success') {
     await invalidate(CANVAS_LIST_DEPENDENCY);
     return;
@@ -25,14 +32,5 @@ export async function submitCanvasAction(canvasHref: string, action: CanvasActio
 }
 
 export async function renameProjectAction(canvasHref: string, name: string): Promise<void> {
-  const body = new FormData();
-  body.set('name', name);
-
-  const res = await fetch(`${canvasHref}?/rename_project`, { method: 'POST', body });
-  const result = deserialize(await res.text());
-  if (result.type === 'success') {
-    await invalidate(CANVAS_LIST_DEPENDENCY);
-    return;
-  }
-  await applyAction(result);
+  await submitCanvasAction(canvasHref, CanvasAction.RenameProject, { name });
 }

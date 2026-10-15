@@ -13,7 +13,7 @@ vi.mock('$lib/server/canvas/effects-actions', async (original) => ({
   makeEffectsPair: (...a: unknown[]) => makeEffectsPair(...a)
 }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/canvas/canvas-page');
 
 const twin = { id: 'fx-2', org_id: 'org-1', canvas_id: 'canvas-1', project_id: 'project-1', type: 'effects', data: {}, x: 0, y: 0, z: 0, width: null, height: null, display_name: null, version: 1, deleted_at: null };
 const edge = { id: 'e-2', org_id: 'org-1', canvas_id: 'canvas-1', source_node_id: 'image-1', target_node_id: 'fx-2', source_handle: null, target_handle: 'images', mode: 'fixed', deleted_at: null };
