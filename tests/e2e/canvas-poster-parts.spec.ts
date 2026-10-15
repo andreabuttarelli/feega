@@ -165,12 +165,13 @@ test.describe('poster parts on the canvas @real', () => {
     await shoot(page, '11-layers-one-selection');
 
     await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
     await layers.locator('[data-layer="poster"]').first().click();
     await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 15_000 });
     await shoot(page, '12-layers-closed-child-opens');
 
-    await layers.locator('[data-layer="poster#lines:1"]').hover();
+    await layers.locator('[data-layer="poster#lines:1"]').first().hover();
     await expect(page.getByTestId('layer-hover-part')).toBeVisible();
     await shoot(page, '13-layers-hover-part');
   });
