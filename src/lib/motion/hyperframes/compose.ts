@@ -3,6 +3,7 @@ import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
 import { EASE_NAME, easeName } from '../keyframes';
 import { Background, clipsOf, type MotionClip, type MotionDoc } from '../doc';
+import { stillSeconds } from '../still';
 import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
 import { DEVICE_OVERSCAN, TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
@@ -355,6 +356,10 @@ function untrimmed(tweens: Tween[], clipStart: number, trimmed: number): Tween[]
   });
 }
 
+function settledBy(tweens: Tween[], still: number | null): Tween[] {
+  return still === null ? tweens : tweens.filter((t) => t.at + t.duration <= still);
+}
+
 function heldUntilStart(tweens: Tween[], clipStart: number): Hold[] {
   return tweens.filter((t) => t.at > clipStart).map((t) => ({ target: t.target, vars: t.from, at: clipStart }));
 }
@@ -677,7 +682,7 @@ export function composeHtml(raw: ComposeInput): string {
       const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(filtered, ctx, placed, template.html(ctx as never));
       (onStage.has(clip.id) && !group && !hidden.has(clip.id) ? world : layers).push(html);
       effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(filtered, ctx, ctx.color, paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null))));
-      const own = untrimmed(template.tweens?.(ctx as never) ?? [], ctx.start, ctx.mediaStart);
+      const own = settledBy(untrimmed(template.tweens?.(ctx as never) ?? [], ctx.start, ctx.mediaStart), stillSeconds(doc));
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {
