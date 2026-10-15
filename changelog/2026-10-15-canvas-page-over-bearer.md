@@ -11,4 +11,4 @@ apply_effects, effects_pair, draw/group/ungroup/place/move element.
 
 Discarded: routing the client through `CANVAS_OPS`. Ops are the agent dialect (agent actor,
 200 + error body) and differ in rules from the actions; switching would have changed behaviour.
-Answer convention in ADR 0014.
+Answer convention (status + `{ error }`, success unwrapped) in ADR 0014.

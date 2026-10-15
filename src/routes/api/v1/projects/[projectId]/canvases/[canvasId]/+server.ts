@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { ACTION_PARAM, answerOf, bearerOf, pageEvent } from '$lib/server/api/bearer-page';
+import { ACTION_PARAM, bareAnswerOf, bearerOf, pageEvent } from '$lib/server/api/bearer-page';
 import { actions, load } from '$lib/server/canvas/canvas-page';
 
 export { config } from '$lib/server/canvas/canvas-page';
@@ -21,7 +21,7 @@ async function serve(request: Request, url: URL, params: Params, handler: Handle
   }
 
   const event = pageEvent(bearer, request, url, `/p/${params.projectId}/c/${params.canvasId}`, params);
-  return answerOf(async () => handler(event as never));
+  return bareAnswerOf(async () => handler(event as never));
 }
 
 export const GET: RequestHandler = ({ request, url, params }) => serve(request, url, params, load as Handler);

@@ -92,8 +92,8 @@ async function viaEndpoint(name: string, fields: Record<string, string>, token =
     params: { projectId: PROJECT, canvasId: CANVAS },
     setHeaders: () => {}
   });
-  const body = (await res.json()) as { data?: unknown };
-  return res.status === 200 ? { status: 200, data: plain(body.data) } : { status: res.status, data: body };
+  const body = (await res.json()) as unknown;
+  return { status: res.status, data: res.status === 200 ? plain(body) : body };
 }
 
 beforeEach(() => {
@@ -148,6 +148,14 @@ describe('the canvas page action and its /api/v1 canvas endpoint answer the same
     expect(api).toEqual(page);
   });
 
+  it('a thrown page error answers its status with { error }', async () => {
+    findCanvasForUser.mockResolvedValue(null);
+
+    const api = await viaEndpoint('move', { node_id: NODE, x: '1', y: '1' });
+
+    expect(api).toEqual({ status: 404, data: { error: expect.any(String) } });
+  });
+
   it('an unknown action answers 404', async () => {
     expect((await viaEndpoint('explode', {})).status).toBe(404);
   });
@@ -167,11 +175,11 @@ describe('GET /api/v1/projects/[projectId]/canvases/[canvasId]', () => {
       params: { projectId: PROJECT, canvasId: CANVAS },
       setHeaders: () => {}
     });
-    const body = (await res.json()) as { data: { canvas: { id: string }; nodes: unknown[]; projectId: string } };
+    const body = (await res.json()) as { canvas: { id: string }; nodes: unknown[]; projectId: string };
 
     expect(res.status).toBe(200);
-    expect(body.data.canvas.id).toBe(CANVAS);
-    expect(body.data.nodes).toHaveLength(2);
-    expect(body.data.projectId).toBe(PROJECT);
+    expect(body.canvas.id).toBe(CANVAS);
+    expect(body.nodes).toHaveLength(2);
+    expect(body.projectId).toBe(PROJECT);
   });
 });
