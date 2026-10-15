@@ -334,7 +334,7 @@ seconds?}` and `render_batch {version, rows: [{name, values}], settings?}` (409 
 CLI `motion move` / `motion place`:
 `POST /api/v1/motion/elements` `{ frame_id?, element_id?, node_id?, to_frame_id?, x?, y?, canvas_x?, canvas_y? }` → `{ outcome, frame_id, element_id, new_frame, revisions }`. `frame_id` +
 `element_id` moves a clip into `to_frame_id` (props, style, keyframes kept, re-timed to its fps); `node_id`
-puts a generative image/video/text node's output in as an element, the node unchanged. No
+puts a Generate image/video/text node's output in as an element, the node unchanged. No
 `to_frame_id`: a new frame at `canvas_x`/`canvas_y`. `x`/`y` 0..1 of the target frame. Stale frame 409,
 same frame 400, nothing generated yet 409. Free.
 
