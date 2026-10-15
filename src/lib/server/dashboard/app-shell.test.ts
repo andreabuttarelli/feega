@@ -7,7 +7,8 @@ const listMemberships = vi.fn(async () => [
 ]);
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships }));
 vi.mock('$lib/server/repos/profiles', () => ({ ensureProfile: vi.fn(async () => ({ name: 'Ada', email: 'ada@x.it', avatarUrl: null })) }));
-vi.mock('$lib/server/credits', () => ({ orgCreditBalance: vi.fn(async () => 42) }));
+const orgCreditBalance = vi.fn(async (_db: unknown, _org: string) => 42);
+vi.mock('$lib/server/credits', () => ({ orgCreditBalance }));
 vi.mock('$lib/server/repos/projects', () => ({
   listProjects: vi.fn(async () => [
     { id: 'p1', name: 'Launch', mode: ProjectMode.Standard },
@@ -15,7 +16,7 @@ vi.mock('$lib/server/repos/projects', () => ({
   ])
 }));
 
-const { appShell } = await import('./app-shell');
+const { appShell, shellOf } = await import('./app-shell');
 
 const locals = { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => ({}) };
 const cookies = (org?: string) => ({ get: (name: string) => (name === 'dz-org' ? org : undefined) });
@@ -33,5 +34,34 @@ describe('the /app shell: who, which workspace, how many credits', () => {
     listMemberships.mockResolvedValueOnce([]);
     const refused = await appShell({ locals, cookies: cookies() } as never).catch((e) => e);
     expect(refused).toMatchObject({ status: 303, location: '/' });
+  });
+
+  it('reads a known workspace alongside the memberships, not after them', async () => {
+    let release: (m: unknown) => void = () => {};
+    listMemberships.mockReturnValueOnce(new Promise((r) => (release = r)) as never);
+    orgCreditBalance.mockClear();
+
+    const pending = shellOf({} as never, { id: 'u1' } as never, 'org-b');
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(orgCreditBalance).toHaveBeenCalledWith(expect.anything(), 'org-b');
+    release([{ org: { id: 'org-b', name: 'B', slug: 'b' }, role: 'member' }]);
+    expect((await pending)?.creditBalance).toBe(42);
+  });
+
+  it('a guessed workspace the user left is discarded for the one they belong to', async () => {
+    listMemberships.mockResolvedValueOnce([{ org: { id: 'org-a', name: 'A', slug: 'a' }, role: 'owner' }]);
+    orgCreditBalance.mockImplementation(async (_db, org) => {
+      if (org === 'org-gone') {
+        throw new Error('rls');
+      }
+      return 7;
+    });
+
+    const shell = await shellOf({} as never, { id: 'u1' } as never, 'org-gone');
+
+    expect(shell?.org.id).toBe('org-a');
+    expect(shell?.creditBalance).toBe(7);
+    orgCreditBalance.mockImplementation(async () => 42);
   });
 });

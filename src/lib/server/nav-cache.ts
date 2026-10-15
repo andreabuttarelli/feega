@@ -45,10 +45,28 @@ export async function verifiedUser(
   supabase: SupabaseClient,
   session: Session
 ): Promise<User | null> {
-  const token = session.access_token;
+  return cachedUser(session.access_token, session.expires_at ?? 0, () => supabase.auth.getUser());
+}
+
+export async function verifiedToken(supabase: SupabaseClient, token: string): Promise<User | null> {
+  return cachedUser(token, expiryOf(token), () => supabase.auth.getUser(token));
+}
+
+function expiryOf(token: string): number {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')) as { exp?: number };
+    return typeof payload.exp === 'number' ? payload.exp : 0;
+  } catch {
+    return 0;
+  }
+}
+
+type UserFetch = () => Promise<{ data: { user: User | null }; error: unknown }>;
+
+async function cachedUser(token: string, expiresAtS: number, fetchUser: UserFetch): Promise<User | null> {
   if (!token) return null;
   const now = Date.now();
-  const expMs = (session.expires_at ?? 0) * 1000;
+  const expMs = expiresAtS * 1000;
   if (expMs && expMs < now + 8_000) {
     userByToken.delete(token);
   } else {
@@ -59,7 +77,7 @@ export async function verifiedUser(
   const {
     data: { user },
     error
-  } = await supabase.auth.getUser();
+  } = await fetchUser();
   if (error || !user) {
     userByToken.delete(token);
     return null;
