@@ -11,6 +11,7 @@ import type { Handle } from '@sveltejs/kit';
 import { withBrandContext, withToolContext } from '$lib/server/ai-log';
 import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
 import { createAdminClient } from '$lib/server/supabase-admin';
+import { NO_CONTENT, nativeCors } from '$lib/server/native-cors';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { redirectFor } from '$lib/server/host-redirects';
 import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-cookie';
@@ -97,6 +98,21 @@ const hostRedirect: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
+const cors: Handle = async ({ event, resolve }) => {
+  const allowed = nativeCors(event.request, event.url);
+  if (!allowed) {
+    return resolve(event);
+  }
+  if (allowed.preflight) {
+    return new Response(null, { status: NO_CONTENT, headers: allowed.headers });
+  }
+  const response = await resolve(event);
+  for (const [name, value] of Object.entries(allowed.headers)) {
+    response.headers.set(name, value);
+  }
+  return response;
+};
+
 const csrf: Handle = async ({ event, resolve }) => {
   if (isCsrfForbidden(event.request, event.url)) {
     const message = `Cross-site ${event.request.method} form submissions are forbidden`;
@@ -149,7 +165,7 @@ async function refuseSocialPublishing(event: RequestEvent): Promise<void> {
   }
 }
 
-export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
+export const handle: Handle = sequence(cors, hostRedirect, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
