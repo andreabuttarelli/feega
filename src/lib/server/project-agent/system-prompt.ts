@@ -15,7 +15,18 @@ export type PromptScope = {
   brand: { name: string; slug: string } | null;
   openCanvasId?: string | null;
   frame?: OpenFrame | null;
+  selectedNodeIds?: readonly string[];
 };
+
+const NODE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_SELECTED = 20;
+
+export function selectedNodes(raw: unknown): string[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.filter((id): id is string => typeof id === 'string' && NODE_ID.test(id)).slice(0, MAX_SELECTED);
+}
 
 const MODE_WORD: Record<DocMode, string> = { [DocMode.Still]: 'a still', [DocMode.Video]: 'a video' };
 
@@ -33,6 +44,8 @@ export function projectAgentPrompt(scope: PromptScope): string {
     : 'This project has no canvases yet.';
   const open = scope.canvases.find((c) => c.id === scope.openCanvasId);
   const openLine = open ? `The user has canvas "${open.name}" (${open.id}) open: put anything new there unless they name another canvas.` : '';
+  const picked = scope.selectedNodeIds ?? [];
+  const pickedLine = open && picked.length ? `The user has these selected on canvas "${open.name}": ${picked.map((id) => `node ${id}`).join(', ')}. "This", "it" and "the selection" mean them.` : '';
 
   const brandLine = scope.brand
     ? `Brand in scope: "${scope.brand.name}" (slug: ${scope.brand.slug}). Brand and publishing tools are available; pass slug "${scope.brand.slug}" to every brand tool that takes one. Never ask which brand the user means.`
@@ -42,6 +55,7 @@ export function projectAgentPrompt(scope: PromptScope): string {
     `You work inside project "${scope.project.name}" (id: ${scope.project.id}).`,
     canvasLine,
     ...(openLine ? [openLine] : []),
+    ...(pickedLine ? [pickedLine] : []),
     brandLine,
     '',
     'Project and canvas tools act on THIS project only. They never reach other projects or brands.',

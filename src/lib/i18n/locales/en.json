@@ -306,8 +306,9 @@
       "mobile": {
         "canvas": "Canvas",
         "chat": "Chat",
+        "properties": "Properties",
         "backToCanvas": "Back to canvas",
-        "switchView": "Canvas or chat",
+        "switchView": "Canvas, properties or chat",
         "projects": "Projects",
         "canvases": "Canvases"
       },

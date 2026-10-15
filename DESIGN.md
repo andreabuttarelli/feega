@@ -135,6 +135,24 @@ section a field lands in is another (`src/lib/motion/inspector-sections.ts`).
 - Several layers show their shared value, or an empty field reading `Mixed`.
 - The panel runs the editor's full height and scrolls on its own.
 
+### properties and chat on a phone
+
+Desktop and tablet keep the right panel as it is. On a phone (< 760px) Properties and Chat live in
+**one bottom sheet with two tabs**, and the way in is always on screen:
+
+| State | Way in | What opens |
+|---|---|---|
+| Canvas, nothing selected | view switch: canvas · **properties** (disabled) · chat | chat full screen |
+| Canvas, frame / free element / group selected | **properties** lights up in the view switch | the frame opens with the Properties sheet at peek |
+| Frame open | tab bar at the foot: **Properties · Chat**, icon + label, pressed state | the sheet at the tapped tab |
+| Element or part selected in a frame | nothing to tap: the sheet snaps to **Properties** at peek, even over Chat | Properties of the selection |
+
+- **Selecting is opening:** a new selection in a frame shows Properties at peek (160px); the stage
+  stays above it, never under. Drag the grabber to half or full.
+- **Chat knows the selection:** the chat sheet and the canvas chat carry a chip
+  `Editing: <name>` (the selected layer, else the frame, else the canvas node).
+- One word for it: **Chat**, never Agent, on every surface.
+
 ### states
 
 Hover is a wash (`--ui-wash`), pressed a deeper grey (`--ui-pressed`), focus an accent ring, selection an accent wash with accent text.

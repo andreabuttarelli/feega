@@ -25,7 +25,7 @@ import type { FrameBucket } from '$lib/server/motion/frame-store';
 import { openAgentTools } from '$lib/server/project-agent/tool-surface';
 import { createWebTools } from '$lib/server/web/web-tools';
 import { liveWebDeps, productImport, productsNodePlacer, webImageImport } from '$lib/server/web/live';
-import { projectAgentPrompt } from '$lib/server/project-agent/system-prompt';
+import { projectAgentPrompt, selectedNodes } from '$lib/server/project-agent/system-prompt';
 import { AGENT_MAX_DURATION_S, AGENT_TURN_CAP_USD, agentStopWhen, overTurnCap } from '$lib/server/project-agent/limits';
 import { spentUsd } from '$lib/server/motion/model-route';
 import { ensureGatewayModels, gatewayRate } from '$lib/server/openrouter-models';
@@ -89,7 +89,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
   if (gated) return gated;
 
-  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown };
+  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame, selection } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown; selection?: unknown };
   const parsedFrame = openFrameSchema.safeParse(askedFrame);
   const frame: OpenFrame | null = parsedFrame.success ? parsedFrame.data : null;
   const text = message?.trim() ?? '';
@@ -196,7 +196,8 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
       canvases: canvases.map((c) => ({ id: c.id, name: c.name })),
       brand: brand ? { name: brand.name, slug: brand.slug } : null,
       openCanvasId: canvasId,
-      frame
+      frame,
+      selectedNodeIds: selectedNodes(selection)
     }),
     allowSystemInMessages: true,
     messages: [...history, { role: 'user', content: opening }] as ModelMessage[],

@@ -2,14 +2,16 @@
   import { _ } from 'svelte-i18n';
   import Workflow from '@lucide/svelte/icons/workflow';
   import MessageCircle from '@lucide/svelte/icons/message-circle';
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import { MOBILE_ICON } from '$lib/canvas/mobile-chrome';
   import type { ChatBadge, MobileView } from '$lib/canvas/mobile-view';
 
   let {
     view,
     badge,
-    onselect
-  }: { view: MobileView; badge: ChatBadge; onselect: (view: MobileView) => void } = $props();
+    onselect,
+    properties
+  }: { view: MobileView; badge: ChatBadge; onselect: (view: MobileView) => void; properties: { target: string | null; onopen: () => void } } = $props();
 </script>
 
 <div class="view-switch" role="group" aria-label={$_('app.shell.mobile.switchView')} data-testid="mobile-view-switch">
@@ -22,6 +24,17 @@
     onclick={() => onselect('canvas')}
   >
     <Workflow size={MOBILE_ICON.size} strokeWidth={MOBILE_ICON.stroke} />
+  </button>
+  <button
+    type="button"
+    class="segment"
+    disabled={!properties.target}
+    aria-label={$_('app.shell.mobile.properties')}
+    title={properties.target ?? undefined}
+    data-testid="mobile-view-properties"
+    onclick={properties.onopen}
+  >
+    <SlidersHorizontal size={MOBILE_ICON.size} strokeWidth={MOBILE_ICON.stroke} />
   </button>
   <button
     type="button"
@@ -68,6 +81,10 @@
   .segment[aria-pressed='true'] {
     background: var(--ui-accent-solid);
     color: var(--ui-on-accent);
+  }
+  .segment:disabled {
+    color: var(--ui-text-3);
+    opacity: 0.4;
   }
   .segment:active {
     background: var(--ui-pressed);
