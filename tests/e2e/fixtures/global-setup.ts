@@ -1,5 +1,6 @@
 import { startMockZernio, type MockZernio } from './mock-zernio';
 import { startMockImages } from './mock-images';
+import { startRecordingProxy } from './recording-proxy';
 
 /**
  * Il webServer di Playwright parte UNA volta, prima di ogni spec: il mock Zernio deve già
@@ -27,8 +28,11 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     process.env.LLM_BASE_URL = images.url;
   }
 
+  const recording = process.env.E2E_PAID === '1' ? await startRecordingProxy() : null;
+
   return async () => {
     await mock.close();
     await images?.close();
+    await recording?.close();
   };
 }

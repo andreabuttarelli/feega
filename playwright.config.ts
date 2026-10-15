@@ -1,9 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
+import { RECORDING_PROXY_URL } from './tests/e2e/fixtures/recording-proxy';
 
 // Smoke suite against the dev server with PLACEHOLDER Supabase env: every target page is
 // db-free by design (see tests/e2e/README.md). Port 4173 stays clear of a developer's own
 // `npm run dev` on 5173.
-const E2E_PORT = 4173;
+const E2E_PORT = Number(process.env.E2E_PORT ?? 4173);
 const BASE_URL = process.env.E2E_BASE_URL ?? `http://localhost:${E2E_PORT}`;
 
 export default defineConfig({
@@ -45,6 +46,7 @@ export default defineConfig({
       // calendar.spec.ts per il server che risponde su questa porta.
       ...(process.env.ZERNIO_BASE_URL ? { ZERNIO_BASE_URL: process.env.ZERNIO_BASE_URL } : {}),
       ...(process.env.E2E_FAKE_IMAGES && process.env.LLM_BASE_URL ? { LLM_BASE_URL: process.env.LLM_BASE_URL } : {}),
+      ...(process.env.E2E_PAID === '1' ? { LLM_BASE_URL: RECORDING_PROXY_URL, LLM_VIDEO_BASE_URL: RECORDING_PROXY_URL } : {}),
       ZERNIO_API_KEY: process.env.ZERNIO_API_KEY ?? 'e2e-placeholder-zernio-key'
     }
   }
