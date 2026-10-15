@@ -2,6 +2,7 @@ import type { ActionResult } from '@sveltejs/kit';
 import { apiCall, withOrg } from '$lib/api/client';
 import { createSupabaseBrowserClient } from '$lib/supabase/client';
 import type { MotionEditorData } from '$lib/server/motion/editor-session';
+import { posterForm } from '$lib/motion/poster-capture';
 import { UploadPurpose, actionAsk, type EditorActionName } from './actions';
 
 const OK = 200;
@@ -10,7 +11,7 @@ const BUCKET = 'canvas-assets';
 
 export type Uploaded = { ok: true; path: string } | { ok: false; error: string };
 
-const nodeIdOf = (editorUrl: string) => editorUrl.split('/').filter(Boolean).at(-1) ?? '';
+export const nodeIdOf = (editorUrl: string) => editorUrl.split(/[?#]/)[0].split('/').filter(Boolean).at(-1) ?? '';
 
 const opsPath = (nodeId: string) => withOrg(`/api/v1/motion/${nodeId}/ops`);
 
@@ -42,6 +43,6 @@ export async function uploadToSlot(editorUrl: string, purpose: UploadPurpose, fi
   return upload.error ? { ok: false, error: upload.error.message } : { ok: true, path };
 }
 
-export async function sendPoster(editorUrl: string, form: FormData): Promise<void> {
-  await apiCall(withOrg(`/api/v1/motion/${nodeIdOf(editorUrl)}/poster`), { method: 'POST', body: form });
+export async function sendPoster(editorUrl: string, jpeg: string, fields: Record<string, string>): Promise<void> {
+  await apiCall(withOrg(`/api/v1/motion/${nodeIdOf(editorUrl)}/poster`), { method: 'POST', body: await posterForm(jpeg, fields) });
 }

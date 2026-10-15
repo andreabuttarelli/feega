@@ -1,6 +1,5 @@
 import { fail, type Action } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
-import { loadEditorSession } from '$lib/server/motion/editor-session';
+import type { Actions } from './$types';
 import { motionScope as scopeFor, type MotionEditorScope } from '$lib/server/motion/editor-scope';
 import { isEditorOp, runEditorOp, type EditorAnswer, type EditorCtx } from '$lib/server/frame-editor/editor-ops';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
@@ -8,8 +7,6 @@ import { savePoster } from '$lib/server/motion/poster';
 import { EDITOR_ACTIONS, actionAsk, type EditorActionName } from '$lib/frame-editor/actions';
 
 const HTTP_BAD_REQUEST = 400;
-
-export const load: PageServerLoad = ({ locals, params, url }) => loadEditorSession(locals, params, url);
 
 const editorCtx = (scope: MotionEditorScope): EditorCtx => ({
   ...scope,

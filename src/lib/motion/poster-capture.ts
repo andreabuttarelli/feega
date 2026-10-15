@@ -36,12 +36,16 @@ export function posterJob(shoot: () => Promise<string>, send: (jpeg: string) => 
   };
 }
 
-export async function sendPoster(actionUrl: string, jpeg: string, fields: Record<string, string>): Promise<void> {
+export async function posterForm(jpeg: string, fields: Record<string, string>): Promise<FormData> {
   const form = new FormData();
   const mime = DATA_URL_MIME.exec(jpeg)?.[1] ?? JPEG_MIME;
   form.set('file', new File([await (await fetch(jpeg)).blob()], POSTER_FILE[mime] ?? 'poster.jpg', { type: mime }));
   Object.entries(fields).forEach(([k, v]) => form.set(k, v));
-  await fetch(actionUrl, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
+  return form;
+}
+
+export async function sendPoster(actionUrl: string, jpeg: string, fields: Record<string, string>): Promise<void> {
+  await fetch(actionUrl, { method: 'POST', body: await posterForm(jpeg, fields), headers: { 'x-sveltekit-action': 'true' } });
 }
 
 export function videoPoster(src: string, width: number): Promise<{ jpeg: string; height: number }> {

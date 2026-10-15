@@ -1,15 +1,14 @@
 <script lang="ts" module>
   import { earlyFetch } from '$lib/canvas/early-fetch';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
+  import { editorSessionOf, nodeIdOf } from '$lib/frame-editor/client';
 
   const sessions = earlyFetch<MotionEditorData | null>({
-    load: (url) => fetch(url).then((res) => (res.ok ? (res.json() as Promise<MotionEditorData>) : null)),
+    load: (editorPath) => editorSessionOf(nodeIdOf(editorPath), []),
     now: () => performance.now()
   });
 
-  export const sessionUrl = (editorPath: string) => `${editorPath}/session`;
-
-  export const prefetchSession = (editorPath: string) => sessions.start(sessionUrl(editorPath));
+  export const prefetchSession = (editorPath: string) => sessions.start(editorPath);
 
   let lastPress: number | null = null;
 
@@ -60,7 +59,7 @@
   });
 
   $effect(() => {
-    const url = sessionUrl(editorPath);
+    const url = editorPath;
     let stale = false;
     session = null;
     failed = false;

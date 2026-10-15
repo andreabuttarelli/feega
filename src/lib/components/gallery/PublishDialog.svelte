@@ -2,6 +2,7 @@
   import X from '@lucide/svelte/icons/x';
   import ExternalLink from '@lucide/svelte/icons/external-link';
   import { deserialize } from '$app/forms';
+  import type { ActionResult } from '@sveltejs/kit';
   import CompositionPlayer from '$lib/components/motion/CompositionPlayer.svelte';
   import type { BrandTokens } from '$lib/motion/brand';
   import type { MotionDoc } from '$lib/motion/doc';
@@ -18,9 +19,11 @@
     listed,
     saved,
     onlisted,
-    onclose
+    onclose,
+    send = viaPage
   }: {
     actionUrl: string;
+    send?: (action: 'publishGallery' | 'withdrawGallery', form: FormData) => Promise<ActionResult>;
     doc: MotionDoc;
     assets: Record<string, string>;
     tokens: BrandTokens;
@@ -37,9 +40,13 @@
   let busy = $state(false);
   let error = $state('');
 
-  async function post(action: string, form: FormData): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+  async function viaPage(action: string, form: FormData): Promise<ActionResult> {
     const res = await fetch(`${actionUrl}${actionUrl.includes('?') ? '&' : '?'}/${action}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    return deserialize(await res.text());
+  }
+
+  async function post(action: 'publishGallery' | 'withdrawGallery', form: FormData): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+    const result = await send(action, form);
     if (result.type === 'success') {
       return { ok: true, data: (result.data ?? {}) as Record<string, unknown> };
     }

@@ -6,7 +6,7 @@
   import type { MotionDoc } from '$lib/motion/doc';
   import { Background, FORMATS, formatOf } from '$lib/motion/doc';
   import { Resolution } from '$lib/motion/render-quote';
-  import { eta, exportSize, outputSize, type Capabilities, type ExportScope, type Size } from '$lib/motion/export-plan';
+  import { eta, exportSize, outputSize, type Capabilities, type Size } from '$lib/motion/export-plan';
   import { audioPlan } from '$lib/motion/audio-plan';
   import { capabilities } from '$lib/motion/export/encode';
   import { BrowserStage, renderInBrowser } from '$lib/motion/export/browser-render';
@@ -16,7 +16,8 @@
   import type { FrameSize } from './MotionPreview.svelte';
   import { liveNote, stillStandIns, unverified } from '$lib/motion/custom/determinism';
   import { CheckState } from '$lib/motion/custom/component';
-  import { deserialize } from '$app/forms';
+  import { editorAction } from '$lib/frame-editor/client';
+  import type { EditorActionName } from '$lib/frame-editor/actions';
   import { HOLD_BUFFER, renderQuote } from '$lib/motion/render-quote';
   import { EXPORT_FORMATS, ExportFormat, FORMAT, Preset, Quality, estimateBytes, exportProblem, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
   import { FRAME_RATES } from '$lib/motion/design';
@@ -83,7 +84,6 @@
   let {
     doc,
     assetUrls,
-    scope,
     editorUrl,
     fileName,
     render,
@@ -96,7 +96,6 @@
   }: {
     doc: MotionDoc;
     assetUrls: Record<string, string>;
-    scope: ExportScope;
     editorUrl: string;
     fileName: string;
     render: Renderer;
@@ -159,9 +158,8 @@
   const canBack = $derived(mode !== null && !busy && !jobRunning);
   const STAGE_PHASE: Record<BrowserStage, Phase> = { [BrowserStage.Mixing]: Phase.Mixing, [BrowserStage.Rendering]: Phase.Rendering };
 
-  async function postAction(name: string, form: FormData): Promise<{ ok: boolean; data: Record<string, unknown> }> {
-    const res = await fetch(`${editorUrl}?/${name}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+  async function postAction(name: EditorActionName, form: FormData): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+    const result = await editorAction(editorUrl, name, form);
     if (result.type === 'success') {
       return { ok: true, data: (result.data ?? {}) as Record<string, unknown> };
     }
@@ -271,7 +269,7 @@
       downloadUrl = URL.createObjectURL(blob);
 
       phase = Phase.Saving;
-      const saved = await saveExport(blob, { scope, editorUrl, size, seconds: target.durationInFrames / target.fps });
+      const saved = await saveExport(blob, { editorUrl, size, seconds: target.durationInFrames / target.fps });
       savedNote = saved.ok ? 'Saved to the canvas assets and attached to this video.' : `Not saved to your assets (${saved.error}). The download below still works.`;
       phase = Phase.Done;
     } catch (e) {

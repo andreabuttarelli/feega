@@ -227,7 +227,6 @@
   <ExportDialog
     {doc}
     {assetUrls}
-    scope={{ orgId: data.orgId, projectId: data.projectId, nodeId: data.node.id }}
     editorUrl={data.editorUrl}
     fileName={data.node.name ?? 'composition'}
     render={exportFrames}

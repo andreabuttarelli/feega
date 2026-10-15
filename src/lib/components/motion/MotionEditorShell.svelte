@@ -3,13 +3,13 @@
   import { groupClips, ungroupClip } from '$lib/motion/group';
   import { onMount, tick, untrack } from 'svelte';
   import { clipSeek } from '$lib/motion/storyboard';
-  import { POSTER_WIDTH, posterFormat, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
-  import { deserialize } from '$app/forms';
+  import { POSTER_WIDTH, posterFormat, posterJob, posterSecond } from '$lib/motion/poster-capture';
+  import { editorAction as sendAction, sendPoster, uploadToSlot } from '$lib/frame-editor/client';
+  import { UploadPurpose, type EditorActionName } from '$lib/frame-editor/actions';
   import { replaceState } from '$app/navigation';
   import { page } from '$app/state';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { headMoved, watchMotionNode } from '$lib/realtime/motion-channel';
-  import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { registerUpload } from '$lib/motion/fonts/ops';
   import Plus from '@lucide/svelte/icons/plus';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
@@ -499,7 +499,7 @@
 
   const poster = posterJob(
     () => preview?.still(posterSecond(history.present), POSTER_WIDTH, posterFormat(history.present.background)) ?? Promise.resolve(''),
-    (jpeg) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)) })
+    (jpeg) => sendPoster(editorUrl, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)) })
   );
   let posterVersion = data.node.posterAssetId ? data.head.version : -1;
   $effect(() => {
@@ -559,8 +559,7 @@
     for (const id of ids) {
       form.append('assetId', id);
     }
-    const res = await fetch(`${editorUrl}?/analyze`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await sendAction(editorUrl, 'analyze', form);
     if (result.type === 'success') {
       analyses = { ...analyses, ...((result.data as { analyses: Record<string, AudioAnalysis> }).analyses ?? {}) };
     }
@@ -633,8 +632,7 @@
     form.set('ops', JSON.stringify(outgoing({ version, doc: baseDoc }, sent)));
     form.set('version', String(version));
     form.set('summary', unsavedSummary);
-    const res = await fetch(`${editorUrl}?/ops`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await sendAction(editorUrl, 'ops', form);
     saving = false;
 
     if (result.type === 'success') {
@@ -663,15 +661,13 @@
   }
 
   async function uploadFont(file: File): Promise<string | null> {
-    const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
-    const up = await supabase.storage.from('canvas-assets').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
-    if (up.error) {
-      return up.error.message;
+    const up = await uploadToSlot(editorUrl, UploadPurpose.Font, file, file.name);
+    if (!up.ok) {
+      return up.error;
     }
     const form = new FormData();
-    form.set('path', path);
-    const res = await fetch(`${editorUrl}?/uploadFont`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    form.set('path', up.path);
+    const result = await sendAction(editorUrl, 'uploadFont', form);
     if (result.type !== 'success' || !result.data?.asset) {
       return result.type === 'failure' ? String(result.data?.error ?? 'Upload refused') : 'Upload failed';
     }
@@ -1026,8 +1022,7 @@
     const form = new FormData();
     form.set('doc', JSON.stringify(withTemplate));
     form.set('clipId', clipId);
-    const res = await fetch(`${editorUrl}?/templateSounds`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await sendAction(editorUrl, 'templateSounds', form);
     if (result.type !== 'success') {
       notice = 'The template is in; its sounds could not be added.';
       return;
@@ -1140,9 +1135,8 @@
   let revisionsOpen = $state(false);
   let revisions = $state<Revision[]>([]);
 
-  async function editorAction(name: string, form = new FormData()) {
-    const res = await fetch(`${editorUrl}?/${name}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    return deserialize(await res.text());
+  function editorAction(name: EditorActionName, form = new FormData()) {
+    return sendAction(editorUrl, name, form);
   }
 
   async function toggleRevisions() {
@@ -1674,6 +1668,7 @@
   {#if publishing}
     <PublishDialog
       actionUrl={editorUrl}
+      send={(name, form) => sendAction(editorUrl, name, form)}
       {doc}
       assets={assetUrls}
       tokens={data.tokens}
@@ -1718,7 +1713,6 @@
     <ExportDialog
       {doc}
       assetUrls={assetUrls}
-      scope={{ orgId: data.orgId, projectId: data.projectId, nodeId: data.node.id }}
       {editorUrl}
       fileName={data.node.name ?? 'motion'}
       render={exportFrames}
@@ -1760,7 +1754,6 @@
       batch={data.batch}
       assetHref={(id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}`}
       {assetUrls}
-      scope={{ orgId: data.orgId, projectId: data.projectId, nodeId: data.node.id }}
       framesFor={docFrames}
       onchange={apply}
       onpreview={(next) => (previewDoc = next)}
