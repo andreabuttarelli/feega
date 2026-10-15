@@ -1467,12 +1467,13 @@
     const spot = placeNear(at, frameSize, occupiedRects());
     const id = crypto.randomUUID();
     const name = data.componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
-    const poster = item?.preview?.poster;
+    const values = frameValues(templateId, draft);
+    const poster = Object.keys(values).length ? null : item?.preview?.poster;
     if (poster) {
       catalogPosters.set(id, poster);
     }
     nodes = [...nodes, toTile(placedFrame({ id, canvasId: data.canvas.id, projectId: data.projectId, name, at: spot, doc }))];
-    const result = await post('frame_template', { template: templateId, format: formatOf(doc), values: JSON.stringify(frameValues(templateId, draft)), x: spot.x, y: spot.y, node_id: id });
+    const result = await post('frame_template', { template: templateId, format: formatOf(doc), values: JSON.stringify(values), x: spot.x, y: spot.y, node_id: id });
     const node = result?.node as CanvasNodeRecord | undefined;
     nodes = settle(nodes, id, node ? toTile(node) : null);
     if (!node) {
