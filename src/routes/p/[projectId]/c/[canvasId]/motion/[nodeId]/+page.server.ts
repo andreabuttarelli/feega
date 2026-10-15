@@ -1,28 +1,10 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
-import { libraryOf, loadEditorSession } from '$lib/server/motion/editor-session';
+import { loadEditorSession } from '$lib/server/motion/editor-session';
 import { motionScope as scopeFor, type MotionEditorScope } from '$lib/server/motion/editor-scope';
 import { runEditorOp, type EditorAnswer, type EditorCtx } from '$lib/server/frame-editor/editor-ops';
-import { Restore, headOrNew, motionAssets, motionTokens, restoreRevision } from '$lib/server/motion/editor';
-import { listRevisions } from '$lib/server/repos/motion-revisions';
-import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
-import { cancelRender } from '$lib/server/motion/render-run';
-import { startFarmRender } from '$lib/server/motion/render-start';
-import { serverRenderOpen } from '$lib/motion/server-render';
-import { renderQueue } from '$lib/server/motion/render-queue';
-import { parseSettings } from '$lib/motion/export-formats';
-import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { savePoster } from '$lib/server/motion/poster';
-import { exportStill } from '$lib/server/motion/still-export';
-import { stillAskSchema, stillExport } from '$lib/motion/still-model';
-import { clipsOf } from '$lib/motion/doc';
-import { templateLibrary } from '$lib/server/motion/templates';
-import type { Db } from '$lib/server/db/client';
-import { loadAttachments } from '$lib/server/chat-attachments/register';
-import { briefAttachmentIds } from '$lib/motion/video-brief';
-import { storyboardPath } from '$lib/canvas/motion-node';
-import { editorGallery, publishFromForm, withdrawFromForm } from '$lib/server/gallery/editor';
 
 function parsedJson(text: string): unknown {
   try {
@@ -32,10 +14,7 @@ function parsedJson(text: string): unknown {
   }
 }
 
-const HTTP_CONFLICT = 409;
 const HTTP_BAD_REQUEST = 400;
-const HTTP_UNAVAILABLE = 503;
-const HTTP_NOT_FOUND = 404;
 
 export const load: PageServerLoad = ({ locals, params, url }) => loadEditorSession(locals, params, url);
 
@@ -49,8 +28,6 @@ const editorCtx = (scope: MotionEditorScope): EditorCtx => ({
 });
 
 const answered = (answer: EditorAnswer) => (answer.status >= HTTP_BAD_REQUEST ? fail(answer.status, answer.body) : answer.body);
-
-const galleryScope = (scope: { db: Db; orgId: string; userId: string }) => ({ db: scope.db, orgId: scope.orgId, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } });
 
 export const actions: Actions = {
   save: async ({ locals, params, request }) => {
@@ -74,22 +51,12 @@ export const actions: Actions = {
 
   head: async ({ locals, params }) => answered(await runEditorOp('read_head', editorCtx(await scopeFor(locals, params)), {})),
 
-  revisions: async ({ locals, params }) => {
-    const scope = await scopeFor(locals, params);
-    return { revisions: await listRevisions(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id }) };
-  },
+  revisions: async ({ locals, params }) => answered(await runEditorOp('list_revisions', editorCtx(await scopeFor(locals, params)), {})),
 
   restore: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const version = Number((await request.formData()).get('version'));
-    const out = await restoreRevision(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id, node: scope.motion.node, version, actor: { kind: 'user', id: scope.userId } });
-    if (out.outcome === Restore.Missing) {
-      return fail(HTTP_NOT_FOUND, { error: 'no_such_version' });
-    }
-    if (out.outcome === Restore.Conflict) {
-      return fail(HTTP_CONFLICT, { error: 'conflict' });
-    }
-    return { head: { version: out.head.version, doc: out.head.doc } };
+    return answered(await runEditorOp('restore_revision', editorCtx(scope), { version }));
   },
 
   exported: async ({ locals, params, request }) => {
@@ -107,18 +74,7 @@ export const actions: Actions = {
   still: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const ask = stillAskSchema.safeParse({ format: form.get('format') ?? undefined, scale: form.get('scale') ?? undefined });
-    if (!ask.success) {
-      return fail(HTTP_BAD_REQUEST, { error: 'invalid_image_format' });
-    }
-    const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
-    const [head, tokens, assets] = await Promise.all([
-      headOrNew(scope.db, nodeScope, scope.motion.node),
-      motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
-      motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id }, SIGNED_URL_TTL_S.render)
-    ]);
-    const made = await exportStill(scope.db, { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id }, head.doc, stillExport(ask.data.format, ask.data.scale), { tokens, assets });
-    return made.ok ? made : fail(HTTP_UNAVAILABLE, { error: made.error });
+    return answered(await runEditorOp('export_still', editorCtx(scope), { format: form.get('format') ?? undefined, scale: form.get('scale') ?? undefined }));
   },
 
   uploadFont: async ({ locals, params, request }) => {
@@ -143,25 +99,8 @@ export const actions: Actions = {
   render: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const version = Number(form.get('version'));
-    const settings = parseSettings(form.get('settings') as string | null);
-    if (!settings.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: settings.error });
-    }
-    const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
-    const head = await headOrNew(scope.db, nodeScope, scope.motion.node);
-    if (head.version !== version) {
-      return fail(HTTP_CONFLICT, { error: 'save_first' });
-    }
-
-    const denied = await gateOrgAiActionForForm(scope.orgId);
-    if (denied) {
-      return fail(denied.status, denied.data);
-    }
-
-    const editorUrl = `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
-    const started = await startFarmRender(scope.db, { ...nodeScope, projectId: params.projectId, canvasId: scope.canvas.id, userId: scope.userId, brandId: scope.projectBrandId, editorUrl, head, settings: settings.settings });
-    return started.ok ? { runId: started.runId, quote: started.quote } : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
+    const settings = form.get('settings') ? parsedJson(String(form.get('settings'))) : undefined;
+    return answered(await runEditorOp('start_render', editorCtx(scope), { version: Number(form.get('version')), settings }));
   },
 
   renderBatch: async ({ locals, params, request }) => {
@@ -193,32 +132,24 @@ export const actions: Actions = {
 
   publishGallery: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
-    return publishFromForm(galleryScope(scope), scope.motion.record.id, await request.formData());
+    const form = await request.formData();
+    const input = { title: String(form.get('title') ?? ''), description: String(form.get('description') ?? ''), tags: String(form.get('tags') ?? '') };
+    return answered(await runEditorOp('publish_gallery', editorCtx(scope), input));
   },
 
   withdrawGallery: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
-    return withdrawFromForm(galleryScope(scope), await request.formData());
+    return answered(await runEditorOp('withdraw_gallery', editorCtx(scope), { id: String((await request.formData()).get('id') ?? '') }));
   },
 
   deleteTemplate: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    const removed = await libraryOf(scope).remove(String(form.get('id') ?? ''));
-    return removed ? { removed: true } : fail(HTTP_BAD_REQUEST, { error: 'not_removable' });
+    return answered(await runEditorOp('delete_template', editorCtx(scope), { id: String((await request.formData()).get('id') ?? '') }));
   },
 
   batchStatus: async ({ locals, params }) => answered(await runEditorOp('batch_status', editorCtx(await scopeFor(locals, params)), {})),
 
-  cancelRender: async ({ locals, params }) => {
-    const scope = await scopeFor(locals, params);
-    const farm = motionRenderFarm();
-    if (!farm) {
-      return fail(HTTP_UNAVAILABLE, { error: 'rendering_not_configured' });
-    }
-    const cancelled = await cancelRender(scope.db, farm, { orgId: scope.orgId, nodeId: scope.motion.record.id });
-    return cancelled.ok ? { cancelled: true } : fail(HTTP_CONFLICT, { error: 'nothing_to_cancel' });
-  },
+  cancelRender: async ({ locals, params }) => answered(await runEditorOp('cancel_render', editorCtx(await scopeFor(locals, params)), {})),
 
   renderStatus: async ({ locals, params }) => answered(await runEditorOp('render_status', editorCtx(await scopeFor(locals, params)), {}))
 };

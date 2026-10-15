@@ -308,6 +308,91 @@ describe('the frame editor spending actions answer like their ops', () => {
   });
 });
 
+describe('the frame editor history, export and library actions answer like their ops', () => {
+  it('revisions and list_revisions', async () => {
+    const action = await viaAction('revisions', {});
+    const endpoint = await viaEndpoint('list_revisions', {});
+
+    expect(action.status).toBe(200);
+    expect(action.data.revisions).toHaveLength(1);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('restore and restore_revision refuse a version that never existed', async () => {
+    const action = await viaAction('restore', { version: '9' });
+    const endpoint = await viaEndpoint('restore_revision', { version: 9 });
+
+    expect(action).toEqual({ status: 404, data: { error: 'no_such_version' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('still and export_still refuse an unknown image format', async () => {
+    const action = await viaAction('still', { format: 'bmp' });
+    const endpoint = await viaEndpoint('export_still', { format: 'bmp' });
+
+    expect(action).toEqual({ status: 400, data: { error: 'invalid_image_format' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('render and start_render refuse bad settings', async () => {
+    const action = await viaAction('render', { version: '1', settings: '{"fps":"x"}' });
+    const endpoint = await viaEndpoint('start_render', { version: 1, settings: { fps: 'x' } });
+
+    expect(action).toEqual({ status: 400, data: { error: 'invalid_settings' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('render and start_render ask to save first on a stale version', async () => {
+    const action = await viaAction('render', { version: '9' });
+    const endpoint = await viaEndpoint('start_render', { version: 9 });
+
+    expect(action).toEqual({ status: 409, data: { error: 'save_first' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('render and start_render stop at the credit gate', async () => {
+    gated.value = true;
+
+    const action = await viaAction('render', { version: '1' });
+    const endpoint = await viaEndpoint('start_render', { version: 1 });
+
+    expect(action.status).toBe(402);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('withdrawGallery and withdraw_gallery on an item that is not listed', async () => {
+    const action = await viaAction('withdrawGallery', { id: 'nope' });
+    const endpoint = await viaEndpoint('withdraw_gallery', { id: 'nope' });
+
+    expect(action.status).toBe(404);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('publishGallery and publish_gallery refuse an empty title', async () => {
+    const action = await viaAction('publishGallery', { title: '', description: '', tags: '' });
+    const endpoint = await viaEndpoint('publish_gallery', { title: '', description: '', tags: '' });
+
+    expect(action.status).toBeGreaterThanOrEqual(400);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('deleteTemplate and delete_template refuse what is not removable', async () => {
+    const action = await viaAction('deleteTemplate', { id: 'nope' });
+    const endpoint = await viaEndpoint('delete_template', { id: 'nope' });
+
+    expect(action).toEqual({ status: 400, data: { error: 'not_removable' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('cancelRender and cancel_render with nothing running', async () => {
+    const action = await viaAction('cancelRender', {});
+    const endpoint = await viaEndpoint('cancel_render', {});
+
+    expect(action.status).toBeGreaterThanOrEqual(400);
+    expect(endpoint).toEqual(action);
+  });
+});
+
 describe('the frame editor save refuses a malformed doc instead of throwing', () => {
   it('save and save_doc answer 400 to tracks that are not a list', async () => {
     const action = await viaAction('save', { version: '1', doc: '{"tracks":3}' });
