@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import fixture from './wiro-tool-list.fixture.json';
 import fixture3d from './wiro-3d-tool-list.fixture.json';
-import { fetchTaskCatalogue, wiroModelRow, wiroUsdFor } from './wiro-catalogue';
+import { fetchWiroCatalogue, wiroModelRow, wiroUsdFor } from './wiro-catalogue';
 
 const SYNCED = '2026-09-29T00:00:00.000Z';
 const tool = (title: string) => fixture.tool.find((t) => t.title === title)!;
@@ -79,7 +79,7 @@ describe('a Wiro 3D tool becomes a model3d row', () => {
 describe('fetching the Wiro catalogue', () => {
   it('asks for the 3D generation category too', async () => {
     const fetchFn = vi.fn(async () => Response.json(fixture3d));
-    const out = await fetchTaskCatalogue(fetchFn as unknown as typeof fetch, 'https://wiro.test/v1', SYNCED);
+    const out = await fetchWiroCatalogue(fetchFn as unknown as typeof fetch, 'https://wiro.test/v1', SYNCED);
 
     const bodies = fetchFn.mock.calls.map((call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)));
     expect(bodies).toEqual(expect.arrayContaining([expect.objectContaining({ categories: ['3d-generation'] })]));
@@ -88,7 +88,7 @@ describe('fetching the Wiro catalogue', () => {
 
   it('reads text-to-image, text-to-video and the uncensored search, once per model', async () => {
     const fetchFn = vi.fn(async () => Response.json(fixture));
-    const out = await fetchTaskCatalogue(fetchFn as unknown as typeof fetch, 'https://wiro.test/v1', SYNCED);
+    const out = await fetchWiroCatalogue(fetchFn as unknown as typeof fetch, 'https://wiro.test/v1', SYNCED);
 
     expect(out.ok).toBe(true);
     const bodies = fetchFn.mock.calls.map((call) => JSON.parse(String((call as unknown as [string, RequestInit])[1].body)));
@@ -103,7 +103,7 @@ describe('fetching the Wiro catalogue', () => {
   });
 
   it('reports a failure without rows when Wiro is down', async () => {
-    const out = await fetchTaskCatalogue((async () => new Response('', { status: 503 })) as unknown as typeof fetch, 'https://wiro.test/v1', SYNCED);
+    const out = await fetchWiroCatalogue((async () => new Response('', { status: 503 })) as unknown as typeof fetch, 'https://wiro.test/v1', SYNCED);
     expect(out).toMatchObject({ ok: false, rows: [] });
   });
 });
