@@ -1,5 +1,5 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import poster from './fixtures/poster-type-grid.json' with { type: 'json' };
 
 const PORTRAIT = { format: '4:5', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
@@ -8,6 +8,18 @@ const WIDTH = poster.width;
 
 type Clip = { id: string; component: string; props: Record<string, unknown>; transform: Record<string, number> };
 type Pt = { x: number; y: number };
+
+async function geometry(shape: Locator) {
+  return shape.evaluate((el: SVGGraphicsElement) => {
+    const svg = el.ownerSVGElement!;
+    const view = svg.viewBox.baseVal;
+    const rect = svg.getBoundingClientRect();
+    const b = el.getBBox();
+    const sx = view.width ? rect.width / view.width : 1;
+    const sy = view.height ? rect.height / view.height : 1;
+    return { x: rect.left + (b.x - view.x) * sx, y: rect.top + (b.y - view.y) * sy, width: b.width * sx, height: b.height * sy };
+  });
+}
 
 async function shoot(page: Page, name: string) {
   if (SHOTS) {
@@ -105,6 +117,46 @@ test.describe('draw polish inside a frame @real', () => {
     await page.keyboard.press('Backspace');
     await expect.poll(points, { timeout: 10_000 }).toBe(3);
     expect(await shapes('path')).toHaveLength(1);
+  });
+
+  test('a dragged pen shape keeps its path outline and points on the drawn shape', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const { shapes, at, drag } = await open({ page, session, admin, seedNode });
+    const TOLERANCE_PX = 2;
+
+    await page.getByTestId('draw-tools').locator('[data-tool="pen"]').click();
+    for (const [fx, fy] of [
+      [0.1, 0.1],
+      [0.7, 0.1],
+      [0.4, 0.6],
+      [0.1, 0.1]
+    ]) {
+      const p = at(fx, fy);
+      await page.mouse.click(p.x, p.y);
+    }
+    await expect.poll(async () => (await shapes('path')).length, { timeout: 10_000 }).toBe(1);
+    await expect(page.getByTestId('pen-overlay')).toBeVisible({ timeout: 10_000 });
+    await shoot(page, '35-pen-before-drag');
+
+    await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 15_000 });
+    await drag(at(0.3, 0.2), at(0.5, 0.45));
+    await expect.poll(async () => (await shapes('path'))[0].transform?.x ?? 0, { timeout: 10_000 }).toBeGreaterThan(0.1);
+    await page.waitForTimeout(500);
+    await shoot(page, '36-pen-after-drag');
+
+    const rendered = page.getByTestId('selection-box');
+    const outline = page.getByTestId('pen-path');
+    await expect
+      .poll(async () => {
+        const [r, o] = [await geometry(rendered), await geometry(outline)];
+        return Math.max(Math.abs(r.x - o.x), Math.abs(r.y - o.y), Math.abs(r.width - o.width), Math.abs(r.height - o.height));
+      }, { timeout: 10_000 })
+      .toBeLessThanOrEqual(TOLERANCE_PX);
+
+    const o = await geometry(outline);
+    const first = (await page.getByTestId('pen-overlay').locator('[data-point="0.0"]').boundingBox())!;
+    expect(Math.abs(first.x + first.width / 2 - o.x)).toBeLessThanOrEqual(TOLERANCE_PX);
+    expect(Math.abs(first.y + first.height / 2 - o.y)).toBeLessThanOrEqual(TOLERANCE_PX);
   });
 
   test('arrows nudge the selection in Design and step frames in Motion', async ({ page, session, admin, seedNode }) => {
