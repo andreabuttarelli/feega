@@ -5,7 +5,6 @@ export default {
   title: 'Generation settings that fit the model',
   items: [
     'Switching model keeps the aspect ratio only when the new model supports it.',
-    'Models that cannot run from a canvas node are no longer offered.',
-    'Uncensored models no longer offer reference image inputs.'
+    'Models that cannot run from a canvas node are no longer offered.'
   ]
 } satisfies ChangelogEntry;
