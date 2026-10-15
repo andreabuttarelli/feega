@@ -336,4 +336,10 @@ describe('what the canvas chat is told to do with a finished motion run', () => 
     expect(state.next).toMatch(/cut_review\.answers/);
     expect(relayed({ status: 'done' }).next).toBeUndefined();
   });
+
+  it('a run that only wrote the script is relayed as "ask again to build", not as the finished video (prod: timeline stayed empty)', async () => {
+    const { relayed } = await import('./motion-delegation');
+
+    expect(relayed({ status: 'done', script_ready: true }).next).toMatch(/ask_motion_agent/);
+  });
 });

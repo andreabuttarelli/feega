@@ -21,9 +21,12 @@ const PICK_RELAY = 'The motion agent asks the user which references to follow: c
 
 const CUT_RELAY = 'The motion agent finished a first cut and its critic scored it: show the user cut_review (score, fixes, sheet) and ask whether to apply the fixes, apply them and stop asking, or keep the cut as is; then call ask_motion_agent with the matching cut_review.answers text as the request, unchanged.';
 
+const BUILD_RELAY = 'The motion agent wrote the script and storyboard only: the timeline is still empty. Do not tell the user it cannot build. If the user asked to build, call ask_motion_agent on the same node now with "Build the video from the script.", then get_motion_run; otherwise show the plan and ask whether to build.';
+
 const RELAYS: readonly { field: string; next: string }[] = [
   { field: 'reference_pick', next: PICK_RELAY },
-  { field: 'cut_review', next: CUT_RELAY }
+  { field: 'cut_review', next: CUT_RELAY },
+  { field: 'script_ready', next: BUILD_RELAY }
 ];
 
 export function relayed(state: Record<string, unknown>): Record<string, unknown> {

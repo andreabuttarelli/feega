@@ -276,7 +276,7 @@ vi.mock('$lib/server/motion/brand-sources', async () => {
   return { brandSources: () => (world.scripting ? { importAsset, site: async () => ({ ok: true, site: { url: SITE, logos: [], pages: [pageOf(SITE, `<h1>${PROMISE}</h1>`)] } }) } : { importAsset }) };
 });
 
-const { startMotionTurn, Browser, MAX_DELIVERY_ATTEMPTS } = await import('./turn');
+const { startMotionTurn, Browser, MAX_DELIVERY_ATTEMPTS, RESEARCH_BRIEF } = await import('./turn');
 const { DOC_EDITED, FRAMES_REQUEST } = await import('$lib/motion/frames-request');
 const { FrameUpload } = await import('./frames');
 type DocEdited = import('$lib/motion/frames-request').DocEdited;
@@ -429,6 +429,27 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.tools[0]).toContain('analyze_site');
     expect(world.tools[0]).not.toContain('write_script');
     expect(world.tools.some((t) => t.includes('write_script'))).toBe(true);
+  });
+
+  it('"build the teaser now" on a blank doc: the researcher is told it only researches, so it does not tell the user it cannot build (prod: "I can\'t build this video yet")', async () => {
+    world.message = 'build the teaser now';
+    await turn();
+
+    expect(textOf(lastMessage(world.calls[0].prompt))).toContain(RESEARCH_BRIEF);
+  });
+
+  it('a director turn tells its caller the script is ready and the build is the next ask, not a dead end', async () => {
+    world.message = 'build the teaser now';
+    world.scripting = true;
+    const outcome = await turn();
+
+    expect(outcome.scripted).toBe(true);
+  });
+
+  it('a builder turn is not a script-only turn', async () => {
+    const outcome = await turn();
+
+    expect(outcome.scripted).toBe(false);
   });
 
   it('after the shot builder, a sound pass on Sonnet lays music and cuts on the beat with the sound tools only', async () => {
