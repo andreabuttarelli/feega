@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
-import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { MotionFormat, newClip, newMotionDoc } from '$lib/motion/doc';
 import { ImageFormat, ImageScale } from '$lib/motion/still-model';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
 
@@ -30,6 +30,18 @@ describe('the motion agent makes still graphics', () => {
     await run('set_canvas', { still: false });
 
     expect(session.doc.still).toBeUndefined();
+  });
+
+  it('set_canvas with still false on a one-frame poster makes it a video its elements span, like Motion in the editor', async () => {
+    const { run, session } = setup();
+    const doc = session.doc;
+    session.doc = { ...doc, durationInFrames: 1, still: { frame: 0 }, tracks: doc.tracks.map((t, i) => (i === 0 ? { ...t, clips: [newClip({ id: 'title', from: 0, durationInFrames: 1, component: 'Title', props: {} })] } : t)) };
+
+    expect(await run('set_canvas', { still: false, duration: 3 })).toMatchObject({ ok: true });
+
+    expect(session.doc.still).toBeUndefined();
+    expect(session.doc.durationInFrames).toBe(90);
+    expect(session.doc.tracks[0].clips[0].durationInFrames).toBe(90);
   });
 
   it('export_image draws the doc being edited at full size and returns the file url', async () => {
