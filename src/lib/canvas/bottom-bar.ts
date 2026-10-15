@@ -20,7 +20,7 @@ export enum BarSlot {
 type ContextRules = { slots: readonly BarSlot[]; followsTimeline: boolean; keys: Region; yieldsToDialogs: boolean };
 
 const CONTEXT: Record<BarContext, ContextRules> = {
-  [BarContext.Canvas]: { slots: [BarSlot.Upload, BarSlot.Nodes, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates], followsTimeline: false, keys: Region.Canvas, yieldsToDialogs: false },
+  [BarContext.Canvas]: { slots: [BarSlot.Draw, BarSlot.Upload, BarSlot.Nodes, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates], followsTimeline: false, keys: Region.Canvas, yieldsToDialogs: false },
   [BarContext.Frame]: { slots: [BarSlot.Draw, BarSlot.Image, BarSlot.FrameLibrary], followsTimeline: true, keys: Region.Editor, yieldsToDialogs: true }
 };
 

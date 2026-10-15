@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { FrameKind, openingSelection } from '$lib/canvas/motion-node';
   import { onMount, tick, untrack } from 'svelte';
   import { clipSeek } from '$lib/motion/storyboard';
-  import { POSTER_WIDTH, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
+  import { POSTER_WIDTH, posterFormat, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
   import { deserialize } from '$app/forms';
   import { replaceState } from '$app/navigation';
   import { page } from '$app/state';
@@ -173,7 +174,7 @@
   let baseDoc = data.head.doc as MotionDoc;
   let saving = false;
   let resave = false;
-  let selection = $state<string[]>([]);
+  let selection = $state<string[]>(openingSelection(data.node.kind ?? FrameKind.Frame, (data.head.doc as MotionDoc).tracks.flatMap((t) => t.clips.map((c) => c.id))));
   let path = $state<{ comp: string; frame: number }[]>([]);
   let cameraOpen = $state(false);
   let keySelection = $state<KeyRef[]>([]);
@@ -332,6 +333,9 @@
       seekTo(at);
     }
     layout = readLayout(browserStore(), firstLayout());
+    if (selection.length) {
+      relayout({ side: Side.Properties, inspector: Panel.Open });
+    }
     const url = new URL(window.location.href);
     if (url.searchParams.has(BRAND_PARAM)) {
       void askBrand();
@@ -475,7 +479,7 @@
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
 
   const poster = posterJob(
-    () => preview?.still(posterSecond(history.present), POSTER_WIDTH) ?? Promise.resolve(''),
+    () => preview?.still(posterSecond(history.present), POSTER_WIDTH, posterFormat(history.present.background)) ?? Promise.resolve(''),
     (jpeg) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)) })
   );
   let posterVersion = data.node.posterAssetId ? data.head.version : -1;

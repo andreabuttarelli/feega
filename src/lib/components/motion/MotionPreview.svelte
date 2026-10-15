@@ -196,8 +196,8 @@
     });
   }
 
-  export function still(time: number, captureWidth = CAPTURE_WIDTH): Promise<string> {
-    const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
+  export function still(time: number, captureWidth = CAPTURE_WIDTH, format: FrameFormat = FrameFormat.Jpeg): Promise<string> {
+    const request = { format, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
     return driver.exclusive(async () => {
       await driver.whenLive();
       try {

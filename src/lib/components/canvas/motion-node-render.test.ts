@@ -4,7 +4,7 @@ import MotionNode from './MotionNode.svelte';
 import { NodeMode } from '$lib/canvas/inline-motion';
 import type { MotionNode as Node } from '$lib/canvas/motion-node';
 
-const node = { id: 'm1', format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } as unknown as Node;
+const node = { id: 'm1', format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null, kind: 'frame' } as unknown as Node;
 
 const html = (nodeMode: NodeMode, posterUrl: string | null) => render(MotionNode, { props: { node, href: '/e', previewUrl: '/p', posterUrl, nodeMode } }).body;
 
@@ -18,5 +18,23 @@ describe('a frame opening in the editor', () => {
 
     expect(body).toContain('data-testid="motion-node-poster"');
     expect(body).not.toContain('motion-node-skeleton');
+  });
+});
+
+describe('a free element on the canvas', () => {
+  const element = { ...node, kind: 'element' } as unknown as Node;
+  const body = (posterUrl: string | null) => render(MotionNode, { props: { node: element, href: '/e', previewUrl: '/p', posterUrl, nodeMode: NodeMode.Preview } }).body;
+
+  it('is only its picture: no play bar, no Open editor, no clapperboard', () => {
+    const shown = body(null);
+
+    expect(shown).not.toContain('Open editor');
+    expect(shown).not.toContain('aria-label="Play"');
+    expect(shown).toContain('data-testid="element-placeholder"');
+    expect(shown).toContain('data-kind="element"');
+  });
+
+  it('shows its poster once it has one', () => {
+    expect(body('/assets/poster')).toContain('data-testid="motion-node-poster"');
   });
 });

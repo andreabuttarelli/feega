@@ -22,7 +22,7 @@ import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPU
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
-import { MoveOutcome, dropFor, frameAnswer, frameStore, linkFrame, moveElement, placeOutput } from '$lib/server/motion/move-element';
+import { MoveOutcome, drawElement, drawnSchema, dropFor, frameAnswer, frameStore, linkFrame, moveElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
 import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
@@ -161,6 +161,10 @@ const frameTarget = {
 };
 const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame node the element is in'), elementId: z.string().describe('the clip id inside that frame'), ...frameTarget }).strict();
 const placeInFrameInput = z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
+
+const drawElementInput = z
+  .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse, box:{left,top,width,height}} in canvas units, or {tool:pen, path:SVG d in canvas units}') })
+  .strict();
 
 const framesOf = (ctx: CanvasCtx) => frameStore(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, projectId: ctx.projectId });
 
@@ -554,6 +558,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: moveFrameElementInput,
     run: async (ctx, input) => frameAnswer(await moveElement(framesOf(ctx), { sourceNodeId: input.frameId, clipId: input.elementId, drop: dropFor(input) }))
+  }),
+
+  draw_element: op({
+    access: Access.Write,
+    input: drawElementInput,
+    run: async (ctx, input) => frameAnswer(await drawElement(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.drawn))
   }),
 
   place_in_frame: op({

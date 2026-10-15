@@ -83,7 +83,9 @@
   import { FEEGA_TOKENS } from '$lib/motion/brand';
   import { AssetKind } from '$lib/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
-  import { frameNodeSize, motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
+  import type { DrawnWire } from '$lib/motion/draw-create';
+  import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, tileChromeOf } from '$lib/canvas/motion-node';
+  import { NameTag } from '$lib/canvas/node-label';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { barContextOf } from '$lib/canvas/bottom-bar';
   import { CanvasState, NodeMode, Opening, Reframe, dismissedAfterClick, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
@@ -297,6 +299,18 @@
     },
     run: () => undo()
   };
+
+  async function drawElement(drawn: DrawnWire) {
+    const res = await post('drawElement', { drawn: JSON.stringify(drawn) });
+    if (res?.outcome !== 'done') {
+      return;
+    }
+    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+    const node = res.node as CanvasNodeRecord | null;
+    if (node) {
+      nodes = [...nodes.filter((n) => n.id !== node.id), toTile(node, { select: true })];
+    }
+  }
 
   async function dropOutput(nodeId: string, client: PointerPoint) {
     const drop = dropAt(client, null);
@@ -833,18 +847,19 @@
   }
 
   const tiles = $derived(
-    nodes.map((n) => ({ n, ports: portsOfTile(n), outputs: outputsOfTile(n) })).map(({ n, ports, outputs }) => ({
+    nodes.map((n) => ({ n, chrome: tileChromeOf(n), ports: portsOfTile(n), outputs: outputsOfTile(n) })).map(({ n, chrome, ports, outputs }) => ({
       id: n.id,
       x: n.x,
       y: n.y,
       w: n.w,
       h: tileHeight(n),
-      connectable: true,
-      connectors: ports.inputs,
-      output: outputs.some((o) => !o.custom) ? null : ports.output,
-      outputs,
+      connectable: chrome.ports,
+      connectors: chrome.ports ? ports.inputs : [],
+      output: !chrome.ports || outputs.some((o) => !o.custom) ? null : ports.output,
+      outputs: chrome.ports ? outputs : [],
       kind: n.type,
       displayName: n.displayName,
+      tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
@@ -1759,13 +1774,20 @@
    */
   const FIT_SLACK_PX = 1;
 
+  const PICTURE_OF_KIND: Record<FrameKind, (motion: { format: MotionFormat }, row: { w: number; h: number }) => { width: number; height: number }> = {
+    [FrameKind.Frame]: (motion) => FORMATS[motion.format],
+    [FrameKind.Element]: (_, row) => ({ width: row.w, height: row.h })
+  };
+
   function frameFit(id: string, w: number, mode: NodeMode = NodeMode.Preview): { w: number; h: number } | null {
-    const motion = motionOf(nodes.find((node) => node.id === id) ?? { id, type: '', data: {} });
-    if (!motion) {
+    const row = nodes.find((node) => node.id === id);
+    const motion = motionOf(row ?? { id, type: '', data: {} });
+    if (!motion || !row) {
       return null;
     }
     const open = layersSource.video;
-    return frameNodeSize(w, open?.nodeId === id ? open.doc : FORMATS[motion.format], mode);
+    const picture = open?.nodeId === id ? open.doc : PICTURE_OF_KIND[motion.kind](motion, row);
+    return frameNodeSize(w, picture, mode, motion.kind);
   }
 
   $effect(() => {
@@ -1774,7 +1796,7 @@
     if (!open || !row) {
       return;
     }
-    const fit = frameNodeSize(row.w, open.doc);
+    const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motionOf(row)?.kind);
     if (Math.abs(fit.h - row.h) > FIT_SLACK_PX) {
       void resize(row.id, fit.w, fit.h);
     }
@@ -2704,6 +2726,7 @@
     onCreate={create}
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
+    onDraw={drawElement}
     onFlow={(fn) => (toFlow = fn)}
     onUpload={upload}
     onDuplicate={duplicate}

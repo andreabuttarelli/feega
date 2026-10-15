@@ -24,6 +24,11 @@ import { ADDABLE_ICON } from './addable-icons';
 import { ADDABLE_LABEL } from './addable';
 import type { NodeType } from './node-data';
 
+export enum NameTag {
+  Shown = 'shown',
+  Hidden = 'hidden'
+}
+
 export const NODE_KIND_ICON: Record<NodeType, Component> = {
   ...ADDABLE_ICON,
   social_post_mockup: LayoutTemplate,

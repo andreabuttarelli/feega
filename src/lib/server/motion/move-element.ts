@@ -4,7 +4,10 @@ import type { Db } from '$lib/server/db/client';
 import { createNode, deleteNode, findNode, listConnections } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
-import { motionNodeSize } from '$lib/canvas/motion-node';
+import { elementNodeOf, motionNodeSize } from '$lib/canvas/motion-node';
+import { drawnElement, type Drawn } from '$lib/motion/draw-create';
+import { DrawTool } from '$lib/motion/draw-tool';
+import { parsePath } from '$lib/motion/shape/geometry';
 import { frameShape } from './start';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
@@ -54,10 +57,12 @@ export type StoredFrame = { nodeId: string; projectId: string; canvasId: string;
 
 export type Place = { projectId: string; canvasId: string };
 
+export type NodeShape = { data: Record<string, unknown>; width: number; height: number };
+
 export type FrameStore = {
   read: (nodeId: string) => Promise<StoredFrame | null>;
   write: (nodeId: string, expectedVersion: number, doc: MotionDoc, summary: string) => Promise<RevisionWrite>;
-  create: (at: Place & { x: number; y: number }, doc: MotionDoc) => Promise<string>;
+  create: (at: Place & { x: number; y: number }, doc: MotionDoc, shape?: NodeShape) => Promise<string>;
   remove: (nodeId: string) => Promise<void>;
   output: (nodeId: string) => Promise<(Place & { output: Output }) | null>;
   fedFrames: (nodeId: string) => Promise<string[]>;
@@ -304,8 +309,8 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor; project
       return inScope(saved ? { nodeId, projectId: saved.project.id, canvasId: saved.record.canvasId, version: saved.version, doc: saved.doc } : null);
     },
     write: (nodeId, expectedVersion, doc, summary) => saveMotionDoc(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
-    create: async (at, doc) => {
-      const node = await createNode(db, { orgId, projectId: at.projectId, canvasId: at.canvasId, type: 'motion', x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...frameShape(doc), actor });
+    create: async (at, doc, shape) => {
+      const node = await createNode(db, { orgId, projectId: at.projectId, canvasId: at.canvasId, type: 'motion', x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...(shape ?? frameShape(doc)), actor });
       await saveMotionDoc(db, { orgId, nodeId: node.id, expectedVersion: 0, doc, actor, summary: SUMMARY.movedIn });
       return node.id;
     },
@@ -357,4 +362,36 @@ export const frameRequestSchema = z
 export function frameRequest(store: FrameStore, ask: z.infer<typeof frameRequestSchema>): Promise<Moved> {
   const drop = dropFor({ toFrameId: ask.to_frame_id, x: ask.x, y: ask.y, canvasX: ask.canvas_x, canvasY: ask.canvas_y });
   return ask.node_id ? placeOutput(store, { sourceNodeId: ask.node_id, drop }) : moveElement(store, { sourceNodeId: ask.frame_id ?? '', clipId: ask.element_id ?? '', drop });
+}
+
+const canvasBoxSchema = z.object({ left: z.number().finite(), top: z.number().finite(), width: z.number().positive(), height: z.number().positive() }).strict();
+
+export const drawnSchema = z.discriminatedUnion('tool', [
+  z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse]), box: canvasBoxSchema }).strict(),
+  z.object({ tool: z.literal(DrawTool.Pen), path: z.string().min(1).max(20_000) }).strict()
+]);
+
+function drawnOf(wire: z.infer<typeof drawnSchema>): Drawn | string {
+  if (wire.tool !== DrawTool.Pen) {
+    return wire;
+  }
+  const outline = parsePath(wire.path);
+  return typeof outline === 'string' ? outline : { tool: DrawTool.Pen, outline };
+}
+
+export async function drawElement(store: FrameStore, place: Place, wire: z.infer<typeof drawnSchema>): Promise<Moved> {
+  const drawn = drawnOf(wire);
+  if (typeof drawn === 'string') {
+    return refused(MoveOutcome.Invalid, drawn);
+  }
+  const made = drawnElement(drawn, newId());
+  if (!made.ok) {
+    return refused(MoveOutcome.Invalid, made.error);
+  }
+
+  const shaped = elementNodeOf(made.box);
+  const at = { x: made.box.left, y: made.box.top };
+  const frameId = await store.create({ ...place, ...at }, made.doc, { data: shaped.data, width: shaped.w, height: shaped.h });
+  const clipId = made.doc.tracks.flatMap((t) => t.clips)[0]?.id ?? '';
+  return { outcome: MoveOutcome.Done, frameId, clipId, created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
 }

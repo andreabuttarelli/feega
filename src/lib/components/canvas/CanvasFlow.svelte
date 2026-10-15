@@ -37,7 +37,12 @@
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
   import CanvasAddBar from './CanvasAddBar.svelte';
-  import type { BarContext } from '$lib/canvas/bottom-bar';
+  import { BarContext } from '$lib/canvas/bottom-bar';
+  import CanvasDrawLayer from './CanvasDrawLayer.svelte';
+  import type { NameTag } from '$lib/canvas/node-label';
+  import { frameBar } from '$lib/canvas/frame-bar.svelte';
+  import { DrawTool } from '$lib/motion/draw-tool';
+  import type { DrawnWire } from '$lib/motion/draw-create';
   import CanvasKeys from './CanvasKeys.svelte';
   import CanvasSelectionBridge from './CanvasSelectionBridge.svelte';
   import CanvasImageTiers from './CanvasImageTiers.svelte';
@@ -90,6 +95,7 @@
     w: number;
     h: number;
     connectable?: boolean;
+    tag?: NameTag;
     node?: CanvasNode;
     /** La taglia minima di QUESTO tipo di nodo (`nodeSize`, `node-size.ts`) — `NodeResizer` non
      *  lascia stringere sotto. Assente = non ridimensionabile a mano (il resize resta spento). */
@@ -143,6 +149,7 @@
     onFrameTemplates,
     onNodeClicked,
     barContext,
+    onDraw,
     onUndo,
     onRedo,
     onConnectNew,
@@ -221,6 +228,7 @@
     onFrameTemplates?: (at: { x: number; y: number }) => void;
     onNodeClicked?: (id: string) => void;
     barContext?: BarContext;
+    onDraw?: (drawn: DrawnWire) => void;
     /** ⌘Z: annulla l'ultimo gesto di questa scheda. */
     onUndo?: () => void;
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
@@ -295,6 +303,7 @@
       outputs: t.outputs,
       kind: t.kind,
       displayName: t.displayName,
+      tag: t.tag,
       inPost: t.inPost,
       minW: t.minW,
       minH: t.minH
@@ -816,6 +825,17 @@
 
   {#if targeting}
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
+  {/if}
+
+  {#if onDraw && toFlow && barContext === BarContext.Canvas && frameBar.tool !== DrawTool.Select}
+    <CanvasDrawLayer
+      tool={frameBar.tool}
+      {toFlow}
+      ondraw={(drawn) => {
+        frameBar.tool = DrawTool.Select;
+        onDraw(drawn);
+      }}
+    />
   {/if}
 
   {#if spec.chrome && onCreate}

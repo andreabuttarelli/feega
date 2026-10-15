@@ -1,9 +1,25 @@
 import { z } from 'zod';
 import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$lib/motion/doc';
 import { NodeMode } from './inline-motion';
+import { FrameFormat } from '$lib/motion/hyperframes/capture';
+
+export enum FrameKind {
+  Frame = 'frame',
+  Element = 'element'
+}
+
+type Chrome = { bar: boolean; ports: boolean; label: boolean; poster: FrameFormat };
+
+const CHROME: Record<FrameKind, Chrome> = {
+  [FrameKind.Frame]: { bar: true, ports: true, label: true, poster: FrameFormat.Jpeg },
+  [FrameKind.Element]: { bar: false, ports: false, label: false, poster: FrameFormat.Png }
+};
+
+export const frameChrome = (kind: FrameKind): Chrome => CHROME[kind];
 
 export type MotionNode = {
   id: string;
+  kind: FrameKind;
   format: MotionFormat;
   docHeadRevision: number;
   posterAssetId: string | null;
@@ -31,7 +47,8 @@ export const motionNodeSchema = z.object({
   posterAssetId: z.string().nullable(),
   lastRenderAssetId: z.string().nullable(),
   storyboard: linkSchema.optional(),
-  budgetRaisedUsd: z.number().min(0).optional()
+  budgetRaisedUsd: z.number().min(0).optional(),
+  kind: z.enum(FrameKind).optional()
 });
 
 export function storyboardOf(data: Record<string, unknown>): StoryboardLink | null {
@@ -41,9 +58,9 @@ export function storyboardOf(data: Record<string, unknown>): StoryboardLink | nu
 
 export const MOTION_NODE_BAR_H = 44;
 
-const BAR_H: Record<NodeMode, number> = {
-  [NodeMode.Preview]: MOTION_NODE_BAR_H,
-  [NodeMode.Edit]: 0
+const BAR_H: Record<FrameKind, Record<NodeMode, number>> = {
+  [FrameKind.Frame]: { [NodeMode.Preview]: MOTION_NODE_BAR_H, [NodeMode.Edit]: 0 },
+  [FrameKind.Element]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0 }
 };
 
 const MOTION_STAGE_WIDTH: Record<MotionFormat, number> = {
@@ -61,9 +78,13 @@ export function motionNodeSize(format: MotionFormat = MotionFormat.Vertical): { 
   return { w, h: Math.round((w * height) / width) + MOTION_NODE_BAR_H };
 }
 
-export function frameNodeSize(width: number, picture: { width: number; height: number }, mode: NodeMode = NodeMode.Preview): { w: number; h: number } {
+export function frameNodeSize(width: number, picture: { width: number; height: number }, mode: NodeMode = NodeMode.Preview, kind: FrameKind = FrameKind.Frame): { w: number; h: number } {
   const w = Math.round(width);
-  return { w, h: Math.round((w * picture.height) / picture.width) + BAR_H[mode] };
+  return { w, h: Math.round((w * picture.height) / picture.width) + BAR_H[kind][mode] };
+}
+
+export function elementNodeOf(box: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
+  return { data: { ...newMotionData(docFormat(box)), kind: FrameKind.Element }, w: Math.round(box.width), h: Math.round(box.height) };
 }
 
 export function frameNodeOf(picture: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
@@ -82,7 +103,7 @@ export function motionOf(row: { id: string; type: string; data: Record<string, u
 
   const parsed = motionNodeSchema.safeParse({ ...newMotionData(), ...row.data });
   const data = parsed.success ? parsed.data : motionNodeSchema.parse(newMotionData());
-  return { id: row.id, ...data };
+  return { id: row.id, ...data, kind: data.kind ?? FrameKind.Frame };
 }
 
 export function motionEditorPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
@@ -101,3 +122,24 @@ export function storyboardPath(projectId: string, data: Record<string, unknown>)
   const link = storyboardOf(data);
   return link ? `/p/${projectId}/c/${link.canvasId}` : null;
 }
+
+const ELEMENT_MIN_SIZE = { w: 8, h: 8 };
+
+export const tileChromeOf = (row: { id: string; type: string; data: Record<string, unknown> }): Chrome => frameChrome(motionOf(row)?.kind ?? FrameKind.Frame);
+
+const DEFAULT_SIZE: Record<FrameKind, (node: MotionNode) => { w: number; h: number }> = {
+  [FrameKind.Frame]: (node) => motionNodeSize(node.format),
+  [FrameKind.Element]: () => ELEMENT_MIN_SIZE
+};
+
+export function frameDefaultSize(data: Record<string, unknown>): { w: number; h: number } {
+  const node = motionOf({ id: '', type: 'motion', data })!;
+  return DEFAULT_SIZE[node.kind](node);
+}
+
+const OPENING_SELECTION: Record<FrameKind, (clipIds: string[]) => string[]> = {
+  [FrameKind.Frame]: () => [],
+  [FrameKind.Element]: (clipIds) => clipIds
+};
+
+export const openingSelection = (kind: FrameKind, clipIds: string[]): string[] => OPENING_SELECTION[kind](clipIds);
