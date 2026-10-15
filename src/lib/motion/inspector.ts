@@ -1,4 +1,5 @@
 import { PartKind, parsePart, partKind } from './poster-parts';
+import { Reach, partUsage, reach } from './part-usage';
 import { withModifierParam } from './shape/model';
 import { fillReplaces } from './fill/elements';
 import { strokeReplaces } from './stroke/elements';
@@ -144,42 +145,21 @@ function componentGroups(doc: MotionDoc, clip: MotionClip): { group: Group; fiel
   return GROUP_ORDER.map((group) => ({ group, fields: fields.filter((f) => f.group === group) })).filter((g) => g.fields.length > 0);
 }
 
-const PART_SHARED_GROUPS = [Group.Style, Group.Layout];
 const PART_FIELD_SUFFIXES = ['Color', 'Colour', 'TextColor', 'BgColor', 'BorderColor', 'TagColor', 'Font', 'Size', 'Weight', 'Height', 'X', 'Y', 'Leading'];
 
-export const PART_FIELDS_BY_POSTER: Record<string, Record<string, readonly string[]>> = {
-  BlueTrailsPoster: { title: ['titleShift'] },
-  StepBlobsPoster: { blobs: ['blobsRound'] },
-  BlockTitlePoster: { title: ['fontWeight', 'leading', 'fill', 'overlap'] },
-  BoxedTypePoster: { word: ['wordLeft'], note: ['noteLine'] },
-  CircleEventPoster: { heading: ['nameSize'], marker: ['circleSize', 'circleX', 'circleY'] },
-  IsoBlocksPoster: { lineup: ['blockTextSize', 'blockFont'] },
-  OverlayGridPoster: { overlay: ['overlayLeading'], overlayLow: ['lowX', 'lowY'] },
-  RedNumberPoster: { photos: ['photoSize', 'tint'] },
-  RepeatLineupPoster: { lineup: ['nameSize', 'repeatSize'] },
-  ScatteredTypePoster: { blocks: ['textSize'] },
-  SlicedPhotoPoster: { phrases: ['phraseSize'], photos: ['photoSize'] },
-  SquareWordsPoster: { words: ['wordSize'], body: ['square', 'squareX', 'squareY', 'squareW', 'squareH'], dotLabel: ['dot', 'dotSize', 'dotY'] },
-  VerticalTypePoster: { words: ['wordSize'] },
-  WideFilmstripPoster: { title: ['titleWeight'] }
-};
+export type PartFields = { own: string[]; shared: string[] };
 
-function ownFields(keys: readonly string[], poster: string, field: string): string[] {
-  const listed = PART_FIELDS_BY_POSTER[poster]?.[field] ?? [];
-  return keys.filter((k) => listed.includes(k) || PART_FIELD_SUFFIXES.some((suffix) => k === field + suffix));
-}
+const byName = (keys: readonly string[], field: string) => keys.filter((k) => k === field || PART_FIELD_SUFFIXES.some((suffix) => k === field + suffix));
 
-export function partFieldKeys(doc: MotionDoc, clip: MotionClip, field: string): string[] {
-  const poster = String(clip.props.name);
-  const groups = clipFieldGroups(doc, clip);
-  const keys = groups.flatMap((g) => g.fields.map((f) => f.key));
-  const parts = groups.filter((g) => g.group === Group.Content).flatMap((g) => g.fields.map((f) => f.key));
-  const claimed = new Set(parts.flatMap((part) => ownFields(keys, poster, part)));
-  const shared = groups
-    .filter((g) => PART_SHARED_GROUPS.includes(g.group))
-    .flatMap((g) => g.fields.map((f) => f.key))
-    .filter((k) => !claimed.has(k));
-  return [field, ...ownFields(keys, poster, field), ...shared];
+export function partFields(doc: MotionDoc, clip: MotionClip, part: string): PartFields {
+  const keys = clipFieldGroups(doc, clip).flatMap((g) => g.fields.map((f) => f.key));
+  const usage = partUsage(String(clip.props.name));
+  if (!usage) {
+    return { own: byName(keys, parsePart(part).field), shared: [] };
+  }
+  const own = keys.filter((k) => reach(usage, k, part) === Reach.Own);
+  const shared = keys.filter((k) => reach(usage, k, part) === Reach.Shared);
+  return { own, shared };
 }
 
 enum PartField {
@@ -200,13 +180,18 @@ const PART_FIELD: Record<PartKind, PartField> = {
 
 export function partFocus(doc: MotionDoc, clip: MotionClip, part: string): string[] {
   const { field } = parsePart(part);
-  const keys = [...new Set(partFieldKeys(doc, clip, field))];
+  const { own } = partFields(doc, clip, part);
   const scope = PART_FIELD[partKind(doc, clip, part)];
   if (scope === PartField.Alone) {
     const all = clipFieldGroups(doc, clip).flatMap((g) => g.fields.map((f) => f.key));
-    return [...new Set([...ownFields(all, String(clip.props.name), field), ...all.filter((k) => PHOTO_KEY.test(k))])];
+    return [...new Set([...own, ...all.filter((k) => PHOTO_KEY.test(k))])];
   }
-  return scope === PartField.Shown ? keys : keys.filter((k) => k !== field);
+  return scope === PartField.Shown ? own : own.filter((k) => k !== field);
+}
+
+export function partShared(doc: MotionDoc, clip: MotionClip, part: string): string[] {
+  const { field } = parsePart(part);
+  return partFields(doc, clip, part).shared.filter((k) => k !== field);
 }
 
 const SECONDS_PRECISION = 100;
