@@ -50,7 +50,7 @@ export function registerNodeTools(server: McpServer) {
         'not offer is refused with the recommended alternatives; an old or weak one still runs but ' +
         'the result carries a `warning` naming the recommended one. ' +
         'Models whose id starts with `wiro/` or `higgsfield/` run on that provider and are always queued like a video, after a ' +
-        'safety screen that refuses with a readable reason. Some models run first on a cheaper route (kie.ai) at its price ' +
+        'safety screen that refuses with a readable reason. Some models run first on a cheaper route (Kie.ai) at its price ' +
         'and fall back to their own provider if it fails; you are charged once. `canvas_tool` `list_models` lists ids, providers and prices. ' +
         'Uncensored models run only in an uncensored project, when the ' +
         'org owner turned them on in Settings; minors and real, identifiable people are refused regardless. ' +

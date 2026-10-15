@@ -1,3 +1,5 @@
+import { providerName } from '$lib/canvas/model-provider';
+
 export enum TaskProviderName {
   Wiro = 'wiro',
   Kie = 'kie',
@@ -24,14 +26,14 @@ const MINUTE_MS = 60_000;
 
 export const TASK_PROVIDERS: Readonly<Record<TaskProviderName, ProviderFacts>> = {
   [TaskProviderName.Wiro]: {
-    label: 'Wiro',
+    label: providerName(TaskProviderName.Wiro),
     role: RouteRole.Primary,
     envKeys: ['WIRO_API_KEY'],
     priceSource: 'Wiro /Tool/List dynamicprice, per model',
     storageFolder: 'wiro'
   },
   [TaskProviderName.Kie]: {
-    label: 'kie.ai',
+    label: providerName(TaskProviderName.Kie),
     role: RouteRole.Discount,
     envKeys: ['KIE_API_KEY'],
     priceSource: 'https://kie.ai/pricing, checked against recordInfo creditsConsumed',
@@ -39,7 +41,7 @@ export const TASK_PROVIDERS: Readonly<Record<TaskProviderName, ProviderFacts>> =
     fallbackAfterMs: { image: 3 * MINUTE_MS, video: 15 * MINUTE_MS, model3d: 15 * MINUTE_MS }
   },
   [TaskProviderName.Higgsfield]: {
-    label: 'Higgsfield',
+    label: providerName(TaskProviderName.Higgsfield),
     role: RouteRole.Primary,
     envKeys: ['HIGGSFIELD_API_KEY_ID', 'HIGGSFIELD_API_KEY_SECRET'],
     priceSource: 'Higgsfield POST /estimate/<model>, per variant',

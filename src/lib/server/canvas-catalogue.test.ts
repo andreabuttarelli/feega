@@ -137,10 +137,10 @@ describe('i modelli che un nodo può scegliere', () => {
 });
 
 describe('kie text models', () => {
-  it('are offered under kie.ai, priced per token at kie\'s rates, only when kie has a key', () => {
+  it('are offered under Kie.ai, priced per token at kie\'s rates, only when kie has a key', () => {
     expect(kieTextChoices({})).toEqual([]);
     expect(kieTextChoices({ KIE_API_KEY: 'k' })).toEqual([
-      expect.objectContaining({ id: 'kie/gpt-6-luna', providerLabel: 'kie.ai', textPricing: { inputCreditsPerMillion: 6, outputCreditsPerMillion: 30, systemPromptTokens: 0 } })
+      expect.objectContaining({ id: 'kie/gpt-6-luna', providerLabel: 'Kie.ai', textPricing: { inputCreditsPerMillion: 6, outputCreditsPerMillion: 30, systemPromptTokens: 0 } })
     ]);
   });
 });

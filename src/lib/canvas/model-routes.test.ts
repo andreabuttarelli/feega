@@ -13,7 +13,7 @@ const banana: ModelChoice = {
   routes: [
     { provider: AUTO_ROUTE, label: 'Auto (cheapest healthy)', price: { pricedInputs: [{ inputs: { resolution: '' }, credits: 8 }] }, stats: null },
     { provider: 'openrouter', label: 'OpenRouter', price: { unitCredits: 10 }, stats: null },
-    { provider: 'kie', label: 'kie.ai', price: { pricedInputs: [{ inputs: { resolution: '' }, credits: 8 }] }, stats: { successRate: 0.99, p95Ms: 14_000, healthy: true } }
+    { provider: 'kie', label: 'Kie.ai', price: { pricedInputs: [{ inputs: { resolution: '' }, credits: 8 }] }, stats: { successRate: 0.99, p95Ms: 14_000, healthy: true } }
   ]
 };
 
@@ -25,7 +25,7 @@ describe('the picker lists a model once, with one row per provider that serves i
   it('groups a model served by several providers under its own name, Auto first', () => {
     const group = groups.find((g) => g.id === 'nano-banana-2')!;
     expect(group.label).toBe('Nano Banana 2');
-    expect(group.items.map((i) => i.label)).toEqual(['Nano Banana 2 · Auto (cheapest healthy)', 'Nano Banana 2 · OpenRouter', 'Nano Banana 2 · kie.ai']);
+    expect(group.items.map((i) => i.label)).toEqual(['Nano Banana 2 · Auto (cheapest healthy)', 'Nano Banana 2 · OpenRouter', 'Nano Banana 2 · Kie.ai']);
   });
 
   it('keeps a single-provider model under its provider, as before', () => {
