@@ -72,7 +72,8 @@ import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
-import { groupAskSchema, groupElements, ungroupElement } from '$lib/server/motion/element-groups';
+import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { nodeMembers } from '$lib/server/motion/node-members';
 import { MOVE_STATUS, MoveOutcome, drawElement, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -113,6 +114,10 @@ function jsonField(fd: FormData, key: string): unknown {
 
 function canvasFrames(scope: Scope) {
   return frameStore(scope.db, { orgId: scope.orgId, actor: userActor(scope), projectId: scope.canvas.projectId });
+}
+
+function canvasMembers(scope: Scope) {
+  return nodeMembers(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, actor: userActor(scope) });
 }
 
 function movedAnswer(moved: Moved) {
@@ -1097,7 +1102,30 @@ export const actions: Actions = {
     if (!ask.success) {
       return fail(400, { error: 'invalid group' });
     }
-    return movedAnswer(await groupElements(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids));
+    return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids));
+  },
+
+  rotateGroup: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const degrees = Number(fd.get('degrees'));
+    const id = String(fd.get('id') ?? '');
+    if (!id || !Number.isFinite(degrees)) {
+      return fail(400, { error: 'invalid rotation' });
+    }
+    return movedAnswer(await rotateNodeGroup(canvasFrames(scope), canvasMembers(scope), id, degrees));
+  },
+
+  moveGroup: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const id = String(fd.get('id') ?? '');
+    const x = coord(fd.get('x'));
+    const y = coord(fd.get('y'));
+    if (!id || x === null || y === null) {
+      return fail(400, { error: 'invalid move' });
+    }
+    return movedAnswer(await moveNodeGroup(canvasMembers(scope), id, { x, y }));
   },
 
   ungroupElement: async ({ request, params, locals }) => {
@@ -1106,7 +1134,7 @@ export const actions: Actions = {
     if (!id) {
       return fail(400, { error: 'invalid group' });
     }
-    return movedAnswer(await ungroupElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, id));
+    return movedAnswer(await ungroupElement(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, id));
   },
 
   drawElement: async ({ request, params, locals }) => {

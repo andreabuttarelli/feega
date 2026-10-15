@@ -68,6 +68,8 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   moveFree: canvas('move_frame_element'),
   groupElements: canvas('group_elements'),
   ungroupElement: canvas('ungroup_element'),
+  rotateGroup: canvas('rotate_group'),
+  moveGroup: canvas('move_group'),
   disconnect: canvas('disconnect_nodes'),
   set_edge_mode: canvas('set_edge_mode'),
   remove: canvas('delete_node'),

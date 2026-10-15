@@ -1,4 +1,5 @@
-import { groupElements, ungroupElement } from '$lib/server/motion/element-groups';
+import { groupElements, moveNodeGroup, rotateNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { nodeMembers } from '$lib/server/motion/node-members';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import {
@@ -170,6 +171,10 @@ const drawElementInput = z
 
 const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (frame nodes with data.kind element)') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
+
+const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
+const moveGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), x: z.number().finite(), y: z.number().finite() }).strict();
+const membersOf = (ctx: CanvasCtx, canvasId: string) => nodeMembers(ctx.db, { orgId: ctx.orgId, canvasId, actor: ctx.actor });
 
 const framesOf = (ctx: CanvasCtx) => frameStore(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, projectId: ctx.projectId });
 
@@ -575,13 +580,25 @@ export const CANVAS_OPS = {
   group_elements: op({
     access: Access.Write,
     input: groupElementsInput,
-    run: async (ctx, input) => frameAnswer(await groupElements(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds))
+    run: async (ctx, input) => frameAnswer(await groupElements(framesOf(ctx), membersOf(ctx, input.canvasId), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds))
   }),
 
   ungroup_element: op({
     access: Access.Write,
     input: ungroupElementInput,
-    run: async (ctx, input) => frameAnswer(await ungroupElement(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeId))
+    run: async (ctx, input) => frameAnswer(await ungroupElement(framesOf(ctx), membersOf(ctx, input.canvasId), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeId))
+  }),
+
+  rotate_group: op({
+    access: Access.Write,
+    input: rotateGroupInput,
+    run: async (ctx, input) => frameAnswer(await rotateNodeGroup(framesOf(ctx), membersOf(ctx, input.canvasId), input.nodeId, input.degrees))
+  }),
+
+  move_group: op({
+    access: Access.Write,
+    input: moveGroupInput,
+    run: async (ctx, input) => frameAnswer(await moveNodeGroup(membersOf(ctx, input.canvasId), input.nodeId, { x: input.x, y: input.y }))
   }),
 
   place_in_frame: op({

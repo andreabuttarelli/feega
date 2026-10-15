@@ -41,4 +41,24 @@ Discarded:
 
 Costs: every element carries a doc and a revision history — heavier than a row of `data`, cheap
 next to a second renderer. A poster is a raster: zoomed far in, an element is soft until it is
-opened. Frames inside a group are out of scope until a frame can be a child clip.
+opened. Groups: see below.
+
+## Groups (amended 2026-10-15)
+
+A canvas group is a frame of kind `group`. It holds two things:
+
+- **Free elements**, drawn inside its doc as clips, so they render, scale and edit with the group.
+- **Any other node** (frames, generation nodes) as a member: `data.groupId` on the member names
+  the group. A member stays its own node, so a frame in a group still opens, plays and edits.
+  The group sits behind its members (`z = -1`), so they keep taking clicks.
+
+Every node may carry `data.rotation` (degrees, -180..180), applied as the CSS `rotate` property
+on the node wrapper; `rotation` and `groupId` are layout fields shared by all node types
+(`nodeLayoutSchema`, `node-layout.ts`), validated alongside each type's own schema. No column,
+no migration.
+
+Rotating a group turns it and moves every member around the group centre, adding the angle to
+each (`rotateGroup`); moving a group moves its members by the same delta (`translateGroup`).
+Discarded: SvelteFlow parent nodes (`parentId`) — positions become relative to the parent, so
+every reader of `nodes.x/y` (MCP, agent, posters, LOD) would need to resolve the parent chain.
+Not done: scaling a group with members (only its own clips scale), rotation undo.
