@@ -148,16 +148,18 @@ Figma's drill-in. A depth is what is selected: the canvas (frame closed), the fr
 nothing inside), a clip, a part (a poster line, a photo, a text). One table decides every gesture
 (`DRILL` in `src/lib/motion/drill.ts`); a new case is a row there, never an `if` elsewhere.
 
+A frame is not a group: its direct children take a single click, closed or open.
+
 | gesture | canvas | frame | clip | part |
 |---|---|---|---|---|
-| hover | outline the child under the pointer | same | the part under the pointer, else the clip | same |
-| click | the frame | the clip under the pointer | a sibling clip (same spot again: the one beneath) | a sibling part, else the clip |
-| double-click | the child under the pointer | same | its part under the pointer, else edit its text | edit the text |
+| hover | outlines exactly what a click would select | same | same | same |
+| click | the direct child under the pointer, else the frame | same | a sibling clip (same spot again: the one beneath) | a sibling part, else the clip |
+| double-click | one level below the click: the child's part | same | its part under the pointer, else edit its text | edit the text |
 | ⌘/Ctrl-click | the innermost element | same | same | same |
 | Enter | — | the top clip | its first part | edit the text |
 | Esc, ⇧Enter | — | close the frame | the frame | the clip |
 
-Empty space inside the frame selects the frame. Hover never reopens or re-renders a node: a
+Empty space inside the frame, or its title, selects the frame. Dragging a closed frame (its title, its empty area or a child) moves the whole frame; only a click without movement selects the child. Hover never reopens or re-renders a node: a
 closed frame measures its children once, on the first pointer enter. Layers follows: the
 selected row scrolls into view, hover lights the row and the row lights the canvas.
 Loading shows skeletons, never spinners in the middle of a page. Errors say what happened and

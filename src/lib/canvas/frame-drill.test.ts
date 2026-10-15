@@ -19,12 +19,6 @@ describe('a drill asked on a closed frame', () => {
     expect(asks.take('a')?.gesture).toBe(Gesture.Double);
   });
 
-  it('a plain click is never taken: it would undo a selection made since', () => {
-    const asks = drillRequests(() => 0);
-    asks.request('a', { x: 0.4, y: 0.1 }, Gesture.Click);
-    expect(asks.take('a')).toBeNull();
-  });
-
   it('goes stale when no editor opened soon after', () => {
     let now = 0;
     const asks = drillRequests(() => now);
