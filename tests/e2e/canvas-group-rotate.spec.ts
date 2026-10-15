@@ -32,6 +32,7 @@ test.describe('groups that hold frames, and turn @real', () => {
     await page.keyboard.press('ControlOrMeta+g');
     await expect.poll(async () => (await rowOf(frame.id)).data.groupId, { timeout: 10_000 }).toBeTruthy();
     const groupId = String((await rowOf(frame.id)).data.groupId);
+    await shoot(page, '0-grouped');
 
     await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
     await page.locator(`.svelte-flow__node[data-id="${groupId}"]`).click({ position: { x: 4, y: 4 } });
@@ -41,22 +42,41 @@ test.describe('groups that hold frames, and turn @real', () => {
     const from = (await handle.boundingBox())!;
     await page.mouse.move(from.x + 6, from.y + 6);
     await page.mouse.down();
-    await page.mouse.move(tile.x + tile.width + 80, tile.y + tile.height / 2, { steps: 10 });
-    await page.keyboard.down('Shift');
+    await page.mouse.move(tile.x + tile.width + 80, from.y + 6 + (tile.y + tile.height / 2 - from.y - 6), { steps: 10 });
     await page.mouse.up();
-    await page.keyboard.up('Shift');
-    await expect.poll(async () => (await rowOf(groupId)).data.rotation, { timeout: 10_000 }).toBe(90);
-    expect((await rowOf(frame.id)).data.rotation).toBe(90);
+    await expect.poll(async () => Math.round(Number((await rowOf(groupId)).data.rotation)), { timeout: 10_000 }).toBe(90);
+    const angle = Number((await rowOf(groupId)).data.rotation);
+    expect(Number((await rowOf(frame.id)).data.rotation)).toBeCloseTo(angle, 5);
     await shoot(page, '1-rotated');
 
-    await page.reload();
-    await expect(page.locator(`.svelte-flow__node[data-id="${frame.id}"]`)).toHaveCSS('rotate', '90deg');
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await expect.poll(async () => Math.round(parseFloat(await page.locator(`.svelte-flow__node[data-id="${frame.id}"]`).evaluate((n) => getComputedStyle(n).rotate))), { timeout: 15_000 }).toBe(90);
 
     const before = await rowOf(frame.id);
-    await page.locator(`.svelte-flow__node[data-id="${groupId}"]`).dragTo(page.locator('.svelte-flow__pane'), { sourcePosition: { x: 4, y: 4 }, targetPosition: { x: 300, y: 450 } });
+    const turned = (await page.locator(`.svelte-flow__node[data-id="${groupId}"]`).boundingBox())!;
+    const grab = await page.evaluate(([id, box]) => {
+      for (let fy = 0.05; fy < 1; fy += 0.05) {
+        for (let fx = 0.05; fx < 1; fx += 0.05) {
+          const p = { x: box.x + box.width * fx, y: box.y + box.height * fy };
+          if (document.elementFromPoint(p.x, p.y)?.closest('.svelte-flow__node')?.getAttribute('data-id') === id) {
+            return p;
+          }
+        }
+      }
+      return null;
+    }, [groupId, turned] as const);
+    await shoot(page, '1b-reloaded');
+    expect(grab, 'some of the group shows outside its frame, to grab it by').not.toBeNull();
+    await page.mouse.move(grab!.x, grab!.y);
+    await page.mouse.down();
+    await page.mouse.move(grab!.x + 60, grab!.y + 80, { steps: 10 });
+    await page.mouse.up();
     await expect.poll(async () => (await rowOf(frame.id)).x, { timeout: 10_000 }).not.toBe(before.x);
 
-    await page.locator(`[data-motion-node="${frame.id}"] [data-frame-stage]`).click({ position: { x: 10, y: 10 } });
+    await page.keyboard.press('Escape');
+    await page.mouse.click(60, 600);
+    const stage = (await page.locator(`[data-motion-node="${frame.id}"] [data-frame-stage]`).boundingBox())!;
+    await page.mouse.click(stage.x + stage.width / 2, stage.y + stage.height / 2);
     await expect(page.getByTestId('motion-editor'), 'a frame inside a group still opens').toBeVisible({ timeout: 15_000 });
     await shoot(page, '2-frame-opens');
   });

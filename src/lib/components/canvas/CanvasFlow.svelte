@@ -321,7 +321,7 @@
     },
     type: 'tile',
     class: [t.settings && 'has-settings', t.poster && POSTER_CLASS].filter(Boolean).join(' ') || undefined,
-    style: `width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg` : ''}`
+    style: `width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.x + t.w / 2}px ${t.y + t.h / 2}px` : ''}`
   });
 
   // svelte-ignore state_referenced_locally -- la cattura iniziale è voluta: da qui in poi i nodi
