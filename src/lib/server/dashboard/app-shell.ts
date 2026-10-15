@@ -34,10 +34,18 @@ export async function signedInDb(event: Pick<RequestEvent, 'locals'>): Promise<{
 
 export async function appShell(event: ShellEvent): Promise<AppShell> {
   const { db, user } = await signedInDb(event);
-  const [profile, memberships] = await Promise.all([ensureProfile(db, user), listMemberships(db, user.id)]);
-  const membership = chooseOrg(memberships, event.cookies.get(ORG_COOKIE) ?? null);
-  if (!membership) {
+  const shell = await shellOf(db, user, event.cookies.get(ORG_COOKIE) ?? null);
+  if (!shell) {
     throw redirect(303, HOME_PATH);
+  }
+  return shell;
+}
+
+export async function shellOf(db: Db, user: User, chosenOrgId: string | null): Promise<AppShell | null> {
+  const [profile, memberships] = await Promise.all([ensureProfile(db, user), listMemberships(db, user.id)]);
+  const membership = chooseOrg(memberships, chosenOrgId);
+  if (!membership) {
+    return null;
   }
 
   const [creditBalance, projects] = await Promise.all([orgCreditBalance(db, membership.org.id), listProjects(db, membership.org.id)]);
