@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MotionFormat, newClip, newMotionDoc, parseMotionDoc } from './doc';
 import { Quality, TIMELINE_ONLY, docProblems } from './direction';
-import { DocMode, docMode, setStill, stillFrame } from './still';
+import { ANIMATE_SECONDS, DocMode, animateStill, docMode, setStill, stillFrame } from './still';
 import { setCanvas } from './timeline';
 import { ImageFormat, IMAGE_FORMATS, ImageScale, stillExport } from './still-model';
 
@@ -110,5 +110,29 @@ describe('image export settings', () => {
   it('png is lossless: no quality, the lossy ones have one', () => {
     expect(stillExport(ImageFormat.Png, ImageScale.One).quality).toBeUndefined();
     expect(stillExport(ImageFormat.Jpg, ImageScale.One).quality).toBeGreaterThan(80);
+  });
+});
+
+describe('Motion on a one-frame still makes it animatable', () => {
+  const poster = () => {
+    const doc = newMotionDoc(MotionFormat.Portrait);
+    const clip = newClip({ id: 'title', from: 0, durationInFrames: 1, component: 'Title', props: { text: 'Poster' } });
+    return { ...doc, durationInFrames: 1, still: { frame: 0 }, tracks: doc.tracks.map((t, i) => (i === 0 ? { ...t, clips: [clip] } : t)) };
+  };
+
+  it('the frame gets five seconds, becomes a video, and every element spans it', () => {
+    const made = animateStill(poster());
+
+    expect(made.ok).toBe(true);
+    const doc = made.ok ? made.doc : poster();
+    expect(doc.durationInFrames).toBe(ANIMATE_SECONDS * doc.fps);
+    expect(docMode(doc)).toBe(DocMode.Video);
+    expect(doc.tracks[0].clips[0]).toMatchObject({ from: 0, durationInFrames: doc.durationInFrames, props: { text: 'Poster' } });
+  });
+
+  it('a frame that already has a timeline is left as it is', () => {
+    const video = newMotionDoc(MotionFormat.Portrait);
+
+    expect(animateStill(video)).toEqual({ ok: true, doc: video });
   });
 });

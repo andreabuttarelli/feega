@@ -1,5 +1,8 @@
 import type { MotionDoc } from './doc';
-import type { OpResult } from './timeline';
+import { setCanvas, type OpResult } from './timeline';
+import { timelineFits } from './editor-mount';
+
+export const ANIMATE_SECONDS = 5;
 
 export enum DocMode {
   Video = 'video',
@@ -28,4 +31,15 @@ export function setStill(doc: MotionDoc, seconds: number | null): OpResult {
   }
   const frame = Math.min(Math.round(seconds * doc.fps), doc.durationInFrames - 1);
   return { ok: true, doc: { ...doc, still: { frame } } };
+}
+
+export function animateStill(doc: MotionDoc, seconds = ANIMATE_SECONDS): OpResult {
+  if (timelineFits(doc)) {
+    return { ok: true, doc };
+  }
+  const end = doc.durationInFrames;
+  const durationInFrames = Math.round(seconds * doc.fps);
+  const stretched = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.from + c.durationInFrames >= end ? { ...c, durationInFrames: durationInFrames - c.from } : c)) })) };
+  const sized = setCanvas(stretched, { durationInFrames });
+  return sized.ok ? setStill(sized.doc, null) : sized;
 }

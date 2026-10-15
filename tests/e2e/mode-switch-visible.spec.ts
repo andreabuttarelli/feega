@@ -22,6 +22,7 @@ const VIEWPORTS = [
 ];
 const STILL_FRAME = 30;
 const SETTLE_MS = 700;
+const MIN_TIMELINE_PX = 80;
 const LONG_PROJECT = 'Spring campaign for the Milano flagship store launch';
 const LONG_CANVAS = 'Hero video variations for Instagram reels and stories';
 const FRAMES = [
@@ -98,4 +99,33 @@ test.describe('the Design | Motion switch on a frame opened on the canvas @real'
       });
     }
   }
+
+  test('Motion on a one-frame poster opens the timeline and gives the frame a duration, saved', async ({ page, session, admin, seedNode }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const poster = { ...motion, durationInFrames: 1, still: { frame: 0 }, tracks: motion.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, durationInFrames: 1, keyframes: {} })) })) };
+    const node = await seedNode({ type: 'motion', x: 80, y: 120, data: LANDSCAPE });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: poster, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.locator(`.svelte-flow__node[data-id="${node.id}"]`).getByTestId(Open.Stage).click({ position: { x: 10, y: 10 } });
+    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+    const modeSwitch = page.getByTestId('edit-mode');
+    await modeSwitch.locator('[data-mode="design"]').click();
+    await modeSwitch.locator('[data-mode="motion"]').click();
+
+    const timeline = page.getByRole('region', { name: 'Timeline', exact: true });
+    await expect(timeline).toBeVisible();
+    await expect.poll(async () => (await timeline.boundingBox())?.height ?? 0, { message: 'the timeline opens' }).toBeGreaterThan(MIN_TIMELINE_PX);
+    await expect(timeline, 'the timeline slides into view').toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId('animate-hint')).toHaveText('Animate this frame — add keyframes at the playhead');
+    await page.waitForTimeout(SETTLE_MS);
+    await shoot(page, 'poster-motion');
+    const savedFrames = async () => (await admin.from('motion_revisions').select('doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1).single()).data?.doc?.durationInFrames ?? 0;
+    await expect.poll(savedFrames, { timeout: 15_000, message: 'the longer frame is saved' }).toBeGreaterThan(1);
+
+    await modeSwitch.locator('[data-mode="design"]').click();
+    await page.waitForTimeout(SETTLE_MS);
+    expect(await savedFrames(), 'Design keeps the duration').toBeGreaterThan(1);
+  });
 });

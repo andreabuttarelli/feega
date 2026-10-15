@@ -71,7 +71,7 @@
   import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import StillExport from '$lib/components/motion/StillExport.svelte';
-  import { DocMode, docMode, stillFrame } from '$lib/motion/still';
+  import { animateStill, DocMode, docMode, stillFrame } from '$lib/motion/still';
   import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
   import { Liveness, interactiveOf } from '$lib/motion/interactive/settings';
   import { defaultsOf, type VarValues } from '$lib/motion/interactive/var-model';
@@ -253,9 +253,14 @@
     }
   }
 
-  let editMode = $state(readMode(browserStore()?.getItem(EDIT_MODE_KEY) ?? null));
+  let editMode = $state(timelineFits(history.present) ? readMode(browserStore()?.getItem(EDIT_MODE_KEY) ?? null) : EditMode.Design);
+
+  const unanimated = $derived(editMode === EditMode.Motion && doc.tracks.every((t) => t.clips.every((c) => !Object.keys(c.keyframes).length)));
 
   function setMode(next: EditMode) {
+    if (next === EditMode.Motion && !timelineFits(doc)) {
+      apply(animateStill(doc), 'Made the frame animatable');
+    }
     editMode = next;
     try {
       browserStore()?.setItem(EDIT_MODE_KEY, next);
@@ -1769,6 +1774,8 @@
     <section class="timeline-area" bind:this={timelineEl} bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
 
+      {#if unanimated}<p class="animate-hint" data-testid="animate-hint">Animate this frame — add keyframes at the playhead</p>{/if}
+
       {#if clipBarShown}
         <ClipBar {doc} {selection} pick={pickMode} onrun={runFromBar} ondone={() => (pickMode = PickMode.One)} />
       {/if}
@@ -2178,6 +2185,13 @@
     color: var(--ui-text);
     font-weight: var(--ui-weight-medium);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+  }
+
+  .animate-hint {
+    margin: 0;
+    padding: var(--ui-space-1) var(--ui-space-3);
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
   }
 
   .body.no-timeline {
