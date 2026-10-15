@@ -1,5 +1,6 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Page } from '@playwright/test';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import poster from './fixtures/poster-type-grid.json' with { type: 'json' };
 
 const PORTRAIT = { format: '4:5', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
@@ -7,6 +8,13 @@ const DESKTOP = { width: 1440, height: 900 };
 const ECHO_SETTLE_MS = 5_000;
 const LINE = 'poster#lines:1';
 const RELOADING = /\?\/(snapshot|head)$/;
+
+type PosterDoc = { tracks: { clips: { id: string; props: { lines?: string } }[] }[] };
+
+const headDoc = async (admin: SupabaseClient, nodeId: string) =>
+  (await admin.from('motion_revisions').select('doc').eq('node_id', nodeId).order('version', { ascending: false }).limit(1)).data?.[0]?.doc as PosterDoc | undefined;
+
+const clipOf = (doc: PosterDoc | undefined) => doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'poster');
 
 type Probe = { stageReloads: number; rowsKept: number; rows: number; nodeKept: boolean };
 
@@ -67,11 +75,11 @@ test.describe('a frame edit patches, it does not reload @real', () => {
       }
     });
 
+    const savedText = async () => clipOf(await headDoc(admin, node.id))?.props.lines;
     await editLine(page, 'HELLO');
+    await expect.poll(savedText, { timeout: 10_000 }).toContain('HELLO');
     await editLine(page, 'HELLO AGAIN');
-    await expect
-      .poll(async () => ((await admin.from('motion_revisions').select('version').eq('node_id', node.id).order('version', { ascending: false }).limit(1)).data?.[0]?.version ?? 0), { timeout: 10_000 })
-      .toBeGreaterThanOrEqual(3);
+    await expect.poll(savedText, { timeout: 10_000 }).toContain('HELLO AGAIN');
     await page.waitForTimeout(ECHO_SETTLE_MS);
 
     const probe = await read(page, node.id);
