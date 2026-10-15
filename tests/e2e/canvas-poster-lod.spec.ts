@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { test, expect, type Page } from '@playwright/test';
 
@@ -11,10 +11,8 @@ const PAN_STEPS = 6;
 
 const redImage = async () => `data:image/jpeg;base64,${(await sharp({ create: { width: 400, height: 400, channels: 3, background: RED } }).jpeg().toBuffer()).toString('base64')}`;
 
-function redVideo(): string {
-  const webm = execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=0xcc3333:s=320x320:d=1', '-c:v', 'libvpx-vp9', '-f', 'webm', 'pipe:1']);
-  return `data:video/webm;base64,${webm.toString('base64')}`;
-}
+const RED_VIDEO = 'tests/e2e/fixtures/red-frame.webm';
+const redVideo = () => `data:video/webm;base64,${readFileSync(RED_VIDEO).toString('base64')}`;
 
 async function mountZoomedOut(page: Page, source = 'image') {
   const poster = source === 'video' ? redVideo() : await redImage();
