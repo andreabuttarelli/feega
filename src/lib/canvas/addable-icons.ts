@@ -23,8 +23,8 @@ import MousePointerClick from '@lucide/svelte/icons/mouse-pointer-click';
 import WandSparkles from '@lucide/svelte/icons/wand-sparkles';
 import Orbit from '@lucide/svelte/icons/orbit';
 import CalendarDays from '@lucide/svelte/icons/calendar-days';
-import AudioLines from '@lucide/svelte/icons/audio-lines';
-import Box from '@lucide/svelte/icons/box';
+import GenerateAudio from '$lib/components/canvas/icons/GenerateAudio.svelte';
+import GenerateModel3d from '$lib/components/canvas/icons/GenerateModel3d.svelte';
 import Clapperboard from '@lucide/svelte/icons/clapperboard';
 import Camera from '@lucide/svelte/icons/camera';
 import type { Component } from 'svelte';
@@ -43,8 +43,8 @@ export const ADDABLE_ICON: Record<Addable, Component> = {
   effects: WandSparkles,
   composition: Orbit,
   calendar: CalendarDays,
-  audio: AudioLines,
-  model3d: Box,
+  audio: GenerateAudio,
+  model3d: GenerateModel3d,
   motion: Clapperboard,
   studio_batch: Camera
 };

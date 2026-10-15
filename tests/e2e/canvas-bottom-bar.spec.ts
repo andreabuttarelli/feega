@@ -37,6 +37,7 @@ test.describe('one bottom bar, by context @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const bar = page.getByTestId('add-bar');
     await expect(bar).toHaveAttribute('data-context', 'canvas');
+    await bar.getByTestId('bar-mode').getByRole('radio', { name: 'Design' }).click();
     await expect(bar.getByRole('button', { name: 'Upload file' })).toBeVisible();
     await expect(page.getByTestId('draw-tools')).toHaveCount(1);
     await shoot(page, '1-canvas-tools');

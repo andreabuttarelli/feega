@@ -5,7 +5,9 @@
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
-  import { BAR_SLOTS, BarContext, BarSlot, barHidden, barKeys, barLift, barShift } from '$lib/canvas/bottom-bar';
+  import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barHidden, barKeys, barLift, barShift, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
+  import PenTool from '@lucide/svelte/icons/pen-tool';
+  import Sparkles from '@lucide/svelte/icons/sparkles';
   import { KEY_REGION_ATTR } from '$lib/canvas/key-region.svelte';
   import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -104,9 +106,39 @@
     frameBar.tool = tool;
   }
 
+  function storedMode(): BarMode {
+    try {
+      return readBarMode(localStorage.getItem(BAR_MODE_KEY));
+    } catch {
+      return BarMode.Generate;
+    }
+  }
+
+  let mode = $state(typeof localStorage === 'undefined' ? BarMode.Generate : storedMode());
+
+  function pickMode(next: BarMode) {
+    mode = next;
+    showMore = false;
+    showTemplates = false;
+    try {
+      localStorage.setItem(BAR_MODE_KEY, next);
+    } catch {
+      return;
+    }
+  }
+
+  const MODES: { mode: BarMode; label: string; icon: typeof PenTool }[] = [
+    { mode: BarMode.Design, label: 'Design', icon: PenTool },
+    { mode: BarMode.Generate, label: 'Generate', icon: Sparkles }
+  ];
+
+  const SELECT_TOOL = DRAW_TOOLS.find((t) => t.tool === DrawTool.Select)!;
+
   const SLOT: Record<BarSlot, Snippet> = {
+    [BarSlot.Mode]: modeSlot,
+    [BarSlot.Select]: selectSlot,
+    [BarSlot.Generate]: nodesSlot,
     [BarSlot.Upload]: uploadSlot,
-    [BarSlot.Nodes]: nodesSlot,
     [BarSlot.More]: moreSlot,
     [BarSlot.Templates]: templatesSlot,
     [BarSlot.FrameTemplates]: frameTemplatesSlot,
@@ -115,6 +147,25 @@
     [BarSlot.FrameLibrary]: frameLibrarySlot
   };
 </script>
+
+{#snippet modeSlot()}
+  <span class="mode" role="radiogroup" aria-label="Bar tools" data-testid="bar-mode">
+    {#each MODES as m (m.mode)}
+      <button type="button" role="radio" aria-checked={mode === m.mode} aria-label={m.label} title={m.label} data-mode={m.mode} onclick={() => pickMode(m.mode)}>
+        <m.icon size={12} strokeWidth={2} />
+      </button>
+    {/each}
+  </span>
+{/snippet}
+
+{#snippet selectSlot()}
+  <span class="tool">
+    <button type="button" class="pick" class:on={frameBar.tool === DrawTool.Select} aria-pressed={frameBar.tool === DrawTool.Select} aria-label={SELECT_TOOL.label} title={SELECT_TOOL.label} data-tool={DrawTool.Select} onclick={() => (frameBar.tool = DrawTool.Select)}>
+      <SELECT_TOOL.icon size={17} strokeWidth={1.7} />
+    </button>
+    <span class="add-tip" role="tooltip">{SELECT_TOOL.label}</span>
+  </span>
+{/snippet}
 
 {#snippet uploadSlot()}
   <span class="tool">
@@ -227,9 +278,9 @@
 {/snippet}
 
 <div bind:this={barEl} class="add-bar" class:covered={barHidden(context, frameBar.covered)} data-testid="add-bar" data-context={context} data-dock="timeline" {...{ [KEY_REGION_ATTR]: barKeys(context) }} style:--lift={`${barLift(context, timelinePx)}px`} style:--shift={`${barShift(context, frameBar.sidePx)}px`}>
-  {#key context}
+  {#key `${context}:${mode}`}
     <div class="group" data-testid={`bar-${context}`}>
-      {#each BAR_SLOTS[context] as s (s)}{@render SLOT[s]()}{/each}
+      {#each barSlots(context, mode) as s (s)}{@render SLOT[s]()}{/each}
     </div>
   {/key}
   {#if zoom !== undefined && context === BarContext.Canvas}
@@ -401,7 +452,7 @@
       box-shadow: var(--mobile-bar-shadow);
     }
     button {
-      min-width: var(--touch-target);
+      min-width: min(var(--touch-target), calc((100vw - 48px) / 10));
       min-height: var(--touch-target);
       padding: 0;
       -webkit-tap-highlight-color: transparent;
@@ -496,5 +547,44 @@
     font-size: var(--ui-type-caption);
     color: var(--ui-text-secondary);
     text-align: center;
+  }
+  .mode {
+    display: inline-flex;
+    gap: 1px;
+    padding: 2px;
+    margin-right: 2px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-wash);
+  }
+
+  .mode button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--ui-radius-full);
+    background: transparent;
+    color: var(--ui-ink-muted, inherit);
+    cursor: pointer;
+  }
+
+  @media (max-width: 767px) {
+    .mode {
+      display: inline-grid;
+      grid-template-columns: 20px;
+    }
+
+    .mode button {
+      min-width: 20px;
+      min-height: 20px;
+    }
+  }
+
+  .mode button[aria-checked='true'] {
+    background: var(--ui-panel-raised);
+    color: var(--ui-accent);
   }
 </style>

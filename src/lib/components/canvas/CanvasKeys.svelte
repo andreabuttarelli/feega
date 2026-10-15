@@ -20,6 +20,7 @@
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import type { Addable } from '$lib/canvas/addable';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
+  import { frameBar } from '$lib/canvas/frame-bar.svelte';
 
   let {
     onadd,
@@ -119,6 +120,11 @@
     paste: () => onpaste?.(screenCentre()),
     undo: () => onundo?.(),
     redo: () => onredo?.(),
+    tool: (c) => {
+      if (c.id === 'tool') {
+        frameBar.tool = c.tool;
+      }
+    },
     group: () => ongroup?.(selected().map((n) => n.id)),
     ungroup: () => onungroup?.(selected().map((n) => n.id))
   };

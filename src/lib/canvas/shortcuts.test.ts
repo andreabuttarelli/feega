@@ -10,6 +10,7 @@ import {
   type CanvasCommand
 } from './shortcuts';
 import { CANVAS_ADD_BAR } from './addable';
+import { DrawTool } from '$lib/motion/draw-tool';
 
 /** Un evento tastiera finto: bastano i campi che il registro guarda. */
 function ev(
@@ -62,6 +63,16 @@ describe('mentre si scrive, la tela non tocca la tastiera', () => {
     expect(matchCanvasShortcut(ev('d', { metaKey: true, target: TEXTAREA }))).toBeNull();
     expect(matchCanvasShortcut(ev('c', { metaKey: true, target: TEXTAREA }))).toBeNull();
     expect(matchCanvasShortcut(ev('v', { metaKey: true, target: TEXTAREA }))).toBeNull();
+  });
+});
+
+describe('gli strumenti di disegno sulla tela, in ogni set della barra', () => {
+  it('⇧T, ⇧R, ⇧O, ⇧P e V scelgono lo strumento, come nel frame', () => {
+    expect(matchCanvasShortcut(ev('T', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Text });
+    expect(matchCanvasShortcut(ev('R', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Rectangle });
+    expect(matchCanvasShortcut(ev('O', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Ellipse });
+    expect(matchCanvasShortcut(ev('P', { shiftKey: true }))).toEqual({ id: 'tool', tool: DrawTool.Pen });
+    expect(matchCanvasShortcut(ev('v'))).toEqual({ id: 'tool', tool: DrawTool.Select });
   });
 });
 

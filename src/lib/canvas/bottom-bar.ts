@@ -6,9 +6,16 @@ export enum BarContext {
   Frame = 'frame'
 }
 
+export enum BarMode {
+  Design = 'design',
+  Generate = 'generate'
+}
+
 export enum BarSlot {
+  Mode = 'mode',
+  Select = 'select',
+  Generate = 'generate',
   Upload = 'upload',
-  Nodes = 'nodes',
   More = 'more',
   Templates = 'templates',
   FrameTemplates = 'frame-templates',
@@ -17,14 +24,30 @@ export enum BarSlot {
   FrameLibrary = 'frame-library'
 }
 
-type ContextRules = { slots: readonly BarSlot[]; followsTimeline: boolean; keys: Region; yieldsToDialogs: boolean };
+type ContextRules = { slots: Record<BarMode, readonly BarSlot[]>; followsTimeline: boolean; keys: Region; yieldsToDialogs: boolean };
+
+const FRAME_TOOLS: readonly BarSlot[] = [BarSlot.Draw, BarSlot.Image, BarSlot.FrameLibrary];
 
 const CONTEXT: Record<BarContext, ContextRules> = {
-  [BarContext.Canvas]: { slots: [BarSlot.Draw, BarSlot.Upload, BarSlot.Nodes, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates], followsTimeline: false, keys: Region.Canvas, yieldsToDialogs: false },
-  [BarContext.Frame]: { slots: [BarSlot.Draw, BarSlot.Image, BarSlot.FrameLibrary], followsTimeline: true, keys: Region.Editor, yieldsToDialogs: true }
+  [BarContext.Canvas]: {
+    slots: {
+      [BarMode.Design]: [BarSlot.Mode, BarSlot.Draw, BarSlot.Upload, BarSlot.FrameTemplates],
+      [BarMode.Generate]: [BarSlot.Mode, BarSlot.Select, BarSlot.Generate, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates]
+    },
+    followsTimeline: false,
+    keys: Region.Canvas,
+    yieldsToDialogs: false
+  },
+  [BarContext.Frame]: { slots: { [BarMode.Design]: FRAME_TOOLS, [BarMode.Generate]: FRAME_TOOLS }, followsTimeline: true, keys: Region.Editor, yieldsToDialogs: true }
 };
 
-export const BAR_SLOTS = Object.fromEntries(Object.entries(CONTEXT).map(([context, rules]) => [context, rules.slots])) as Record<BarContext, readonly BarSlot[]>;
+export const barSlots = (context: BarContext, mode: BarMode): readonly BarSlot[] => CONTEXT[context].slots[mode];
+
+export const BAR_MODE_KEY = 'feega:canvas-bar-mode';
+
+const MODES = new Set<string>(Object.values(BarMode));
+
+export const readBarMode = (stored: string | null): BarMode => (stored && MODES.has(stored) ? (stored as BarMode) : BarMode.Generate);
 
 const STATE_CONTEXT: Record<CanvasState, BarContext> = {
   [CanvasState.Browsing]: BarContext.Canvas,
