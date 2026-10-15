@@ -2,7 +2,7 @@
   import { beforeNavigate } from '$app/navigation';
   import WebRoot from '$web/+layout.svelte';
   import { inBundle } from '$lib/native/bundle-routes';
-  import { openHosted } from '$lib/native/native-auth';
+  import { openHosted } from '$lib/login/client-auth';
 
   let { data, children } = $props();
 

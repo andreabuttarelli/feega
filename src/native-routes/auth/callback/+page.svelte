@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
-  import { finishOAuth, land } from '$lib/native/native-auth';
+  import { finishOAuth, land } from '$lib/login/client-auth';
   import { SIGN_IN_ERROR_PARAM, SignInError } from '$lib/login/sign-in-error';
   import { LOGIN_PATH } from '$lib/native/bundle-routes';
 

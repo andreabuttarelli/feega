@@ -3,7 +3,7 @@ import { createSupabaseBrowserClient } from '$lib/supabase/client';
 import { NATIVE_AUTH_BASE } from '$lib/native-shell';
 import { HOSTED_ORIGIN } from '$lib/runtime';
 import { call, chooseWorkspace, withOrg } from '$lib/dashboard/api';
-import { inBundle, LOGIN_PATH } from './bundle-routes';
+import { inBundle, LOGIN_PATH } from '$lib/native/bundle-routes';
 
 export type AuthRefusal = { errorCode?: string; error?: string };
 

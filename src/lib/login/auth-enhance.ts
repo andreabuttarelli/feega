@@ -2,7 +2,7 @@ import { applyAction, enhance } from '$app/forms';
 import type { ActionResult, SubmitFunction } from '@sveltejs/kit';
 import { RUNTIME, Runtime } from '$lib/runtime';
 import { actionTarget } from '$lib/dashboard/api-enhance';
-import { land, OAuthProvider, sendReset, signIn, signUp, startOAuth, type AuthRefusal } from './native-auth';
+import { land, OAuthProvider, sendReset, signIn, signUp, startOAuth, type AuthRefusal } from './client-auth';
 
 const OK = 200;
 const BAD_REQUEST = 400;
