@@ -24,7 +24,7 @@ test.use({ video: SHOTS ? 'on' : 'off' });
 test.describe('drill into a frame like Figma @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
-  test('hover a child of a closed frame, double-click down to a part, Esc back up, cmd-click deep, Layers in sync', async ({ page, session, admin, seedNode }) => {
+  test('hover and one click select a closed frame\'s child, double-click to a part, Esc back up, cmd-click deep, Layers in sync', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(150_000);
     const node = await seedNode({ type: 'motion', x: 80, y: 80, data: PORTRAIT });
     const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: poster, actor_kind: 'user', actor_id: session.userId });
@@ -49,10 +49,10 @@ test.describe('drill into a frame like Figma @real', () => {
     await expect(page.getByTestId('motion-editor'), 'hovering never opens the frame').toHaveCount(0);
     await shoot(page, 'drill-1-hover-closed-child');
 
-    await stage.dblclick({ position: title });
+    await stage.click({ position: title });
     const overlay = page.getByTestId('selection-overlay');
     await expect(overlay).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('selection-box'), 'double-click on a closed frame selects its child').toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId('selection-box'), 'one click on a closed frame selects its direct child: a frame is not a group').toBeVisible({ timeout: 15_000 });
     await expect(clipRow).toHaveAttribute('aria-selected', 'true');
     await expect(clipRow).toBeInViewport();
     await shoot(page, 'drill-2-child');
@@ -91,6 +91,19 @@ test.describe('drill into a frame like Figma @real', () => {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await expect(page.getByTestId('motion-editor'), 'Esc at frame level closes the frame').toHaveCount(0);
+
+    const tile = page.locator(`.svelte-flow__node[data-id="${node.id}"]`);
+    const label = tile.locator('.node-label');
+    const before = (await tile.boundingBox())!;
+    const grip = (await label.boundingBox())!;
+    await page.mouse.move(grip.x + 10, grip.y + grip.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + 60, grip.y + grip.height / 2 + 40, { steps: 6 });
+    await page.mouse.up();
+    await expect.poll(async () => Math.round((await tile.boundingBox())!.x - before.x), { message: 'dragging the title moves the whole frame' }).toBeGreaterThan(30);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('motion-editor')).toHaveCount(0);
 
     await stage.click({ position: title, modifiers: ['ControlOrMeta'] });
     await expect(page.getByTestId('part-box'), 'cmd-click on a closed frame opens it on the innermost element').toHaveAttribute('data-part', TITLE_PART, { timeout: 15_000 });

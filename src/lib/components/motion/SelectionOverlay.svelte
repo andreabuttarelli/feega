@@ -254,7 +254,7 @@
     }
     const asked = asking ? ask() : null;
     asking = false;
-    if (asked) {
+    if (asked && !selection.length) {
       step(asked.gesture, asked.at, levelOf({ open: false, clip: null, part: null }));
       return;
     }

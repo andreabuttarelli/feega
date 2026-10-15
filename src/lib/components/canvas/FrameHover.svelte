@@ -71,6 +71,7 @@
   }
 
   const DOUBLE_MS = 600;
+  const DRAG_PX = 4;
 
   function press(e: PointerEvent) {
     const p = pointOf(e);
@@ -78,10 +79,17 @@
       return;
     }
     if (!(e.metaKey || e.ctrlKey)) {
-      frameDrill.request(nodeId, p, Gesture.Click);
-      const upgrade = () => frameDrill.upgrade(nodeId, Gesture.Double);
-      addEventListener('dblclick', upgrade, { capture: true, once: true });
-      setTimeout(() => removeEventListener('dblclick', upgrade, { capture: true }), DOUBLE_MS);
+      const from = { x: e.clientX, y: e.clientY };
+      const release = (up: PointerEvent) => {
+        if (Math.hypot(up.clientX - from.x, up.clientY - from.y) > DRAG_PX) {
+          return;
+        }
+        frameDrill.request(nodeId, p, Gesture.Click);
+        const upgrade = () => frameDrill.upgrade(nodeId, Gesture.Double);
+        addEventListener('dblclick', upgrade, { capture: true, once: true });
+        setTimeout(() => removeEventListener('dblclick', upgrade, { capture: true }), DOUBLE_MS);
+      };
+      addEventListener('pointerup', release, { capture: true, once: true });
       return;
     }
     e.stopPropagation();

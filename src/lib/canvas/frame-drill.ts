@@ -1,4 +1,4 @@
-import { Gesture } from '$lib/motion/drill';
+import type { Gesture } from '$lib/motion/drill';
 
 export type FramePoint = { x: number; y: number };
 export type DrillAsk = { at: FramePoint; gesture: Gesture };
@@ -22,8 +22,7 @@ export function drillRequests(now: () => number) {
         return null;
       }
       pending = null;
-      const usable = ask.gesture !== Gesture.Click && now() - ask.when <= FRESH_MS;
-      return usable ? { at: ask.at, gesture: ask.gesture } : null;
+      return now() - ask.when > FRESH_MS ? null : { at: ask.at, gesture: ask.gesture };
     }
   };
 }

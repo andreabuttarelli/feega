@@ -29,8 +29,12 @@ describe('depth of a selection', () => {
 });
 
 describe('click selects at the current level', () => {
-  it('on a closed frame selects the frame, never a child', () => {
-    expect(drill(CANVAS, Gesture.Click, over('title', 'lines:0')).level).toEqual(FRAME);
+  it('on a closed frame selects the direct child under the pointer: a frame is not a group', () => {
+    expect(drill(CANVAS, Gesture.Click, over('title', 'lines:0')).level).toEqual(TITLE);
+  });
+
+  it('on the empty area of a closed frame selects the frame', () => {
+    expect(drill(CANVAS, Gesture.Click, nothing).level).toEqual(FRAME);
   });
 
   it('inside the open frame selects the child under the pointer', () => {
@@ -57,9 +61,10 @@ describe('click selects at the current level', () => {
 });
 
 describe('double-click goes one level deeper', () => {
-  it('walks frame → child → part → text editing', () => {
-    expect(drill(CANVAS, Gesture.Double, over('title', 'lines:0')).level).toEqual(TITLE);
-    expect(drill(FRAME, Gesture.Double, over('title', 'lines:0')).level).toEqual(TITLE);
+  it('goes one level below what a click selects: child → part → text editing', () => {
+    expect(drill(CANVAS, Gesture.Double, over('title', 'lines:0')).level).toEqual(LINE);
+    expect(drill(FRAME, Gesture.Double, over('title', 'lines:0')).level).toEqual(LINE);
+    expect(drill(FRAME, Gesture.Double, over('photo')).level).toEqual({ depth: Depth.Clip, clip: 'photo', part: null });
     expect(drill(TITLE, Gesture.Double, over('title', 'lines:0')).level).toEqual(LINE);
     expect(drill(LINE, Gesture.Double, over('title', 'lines:0'))).toEqual({ level: LINE, edit: true });
   });
@@ -119,8 +124,20 @@ describe('hover outlines what a double-click would reach', () => {
     expect(drill(CANVAS, Gesture.Hover, over('title', 'lines:0')).level).toEqual(TITLE);
   });
 
-  it('outlines the part under the pointer inside the selected clip', () => {
-    expect(drill(TITLE, Gesture.Hover, over('title', 'lines:1')).level).toEqual({ ...LINE, part: 'lines:1' });
+  it('at clip level outlines the clip a click would pick, never its part', () => {
+    expect(drill(TITLE, Gesture.Hover, over('title', 'lines:1')).level).toEqual(TITLE);
+  });
+
+  it('at part level outlines the sibling part a click would pick', () => {
+    expect(drill(LINE, Gesture.Hover, over('title', 'lines:1')).level).toEqual({ ...LINE, part: 'lines:1' });
+  });
+
+  it('always predicts the click', () => {
+    for (const from of [CANVAS, FRAME, TITLE, LINE]) {
+      for (const probe of [over('title', 'lines:1'), over('photo'), nothing]) {
+        expect(drill(from, Gesture.Hover, probe).level).toEqual(drill(from, Gesture.Click, probe).level);
+      }
+    }
   });
 
   it('outlines a sibling clip at clip level', () => {

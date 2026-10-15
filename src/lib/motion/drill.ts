@@ -45,11 +45,6 @@ const partOrPicked: Rule = (level, p) => {
   return part ? at(Depth.Part, level.clip, part) : pickedAt(level, p);
 };
 
-const partOrChild: Rule = (level, p) => {
-  const part = ownPart(level, p);
-  return part ? at(Depth.Part, level.clip, part) : childAt(level, p);
-};
-
 const innermost: Rule = (_level, p) => {
   const part = p.top ? p.partOf(p.top) : null;
   return part ? at(Depth.Part, p.top, part) : clipOr(p.top);
@@ -76,13 +71,15 @@ const firstPart: Rule = (level, p) => {
 
 const toClip: Rule = (level) => at(Depth.Clip, level.clip);
 
+const CLICK: Record<Depth, Rule> = { [Depth.Canvas]: pickedAt, [Depth.Frame]: pickedAt, [Depth.Clip]: pickedAt, [Depth.Part]: partOrPicked };
+
 export const DRILL: Record<Gesture, Record<Depth, Rule>> = {
-  [Gesture.Click]: { [Depth.Canvas]: frame, [Depth.Frame]: pickedAt, [Depth.Clip]: pickedAt, [Depth.Part]: partOrPicked },
-  [Gesture.Double]: { [Depth.Canvas]: pointed(childAt), [Depth.Frame]: pointed(childAt), [Depth.Clip]: pointed(intoPart), [Depth.Part]: editHere },
+  [Gesture.Click]: CLICK,
+  [Gesture.Double]: { [Depth.Canvas]: pointed(innermost), [Depth.Frame]: pointed(innermost), [Depth.Clip]: pointed(intoPart), [Depth.Part]: editHere },
   [Gesture.Deep]: { [Depth.Canvas]: innermost, [Depth.Frame]: innermost, [Depth.Clip]: innermost, [Depth.Part]: innermost },
   [Gesture.Enter]: { [Depth.Canvas]: frame, [Depth.Frame]: firstChild, [Depth.Clip]: firstPart, [Depth.Part]: editHere },
   [Gesture.Leave]: { [Depth.Canvas]: canvas, [Depth.Frame]: canvas, [Depth.Clip]: frame, [Depth.Part]: toClip },
-  [Gesture.Hover]: { [Depth.Canvas]: childAt, [Depth.Frame]: childAt, [Depth.Clip]: partOrChild, [Depth.Part]: partOrChild }
+  [Gesture.Hover]: CLICK
 };
 
 export const drill = (level: Level, gesture: Gesture, probe: Probe): Step => DRILL[gesture][level.depth](level, probe);
