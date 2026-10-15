@@ -8,7 +8,7 @@ import type { OutlineCache } from '$lib/canvas/frame-outlines';
 const POSTER = '/p/x/c/y/assets/a1';
 
 const canvasWith = (nodes: { id: string; type: string; name: string | null; poster?: string | null; still?: boolean; head?: number }[], outlines: OutlineCache = {}) =>
-  layersSource.publishCanvas({ nodes, selected: [], outlinesUrl: '', outlines, previewUrl: () => '', select: () => {} });
+  layersSource.publishCanvas({ nodes, selected: [], outlinesUrl: '', outlines, previewUrl: () => '', select: () => {}, open: () => {} });
 
 let unpublish = () => {};
 

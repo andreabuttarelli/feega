@@ -177,6 +177,7 @@ test.describe('the canvas spends frames only on motion @perf', () => {
         expect(frames.fpsAvg, `${name} average fps`).toBeGreaterThanOrEqual(MIN_FPS_AVG);
         expect(frames.fpsP5, `${name} 5th-percentile fps`).toBeGreaterThanOrEqual(MIN_FPS_P5);
       }
+      expect(dragged.fpsAvg, 'drag average fps').toBeGreaterThanOrEqual(MIN_FPS_AVG);
       expect(quiet.infinite, 'no endless animation while idle').toEqual([]);
       expect(quiet.appFrames, 'no animation frame while idle').toBeLessThanOrEqual(IDLE_FRAMES_TOLERANCE);
     });

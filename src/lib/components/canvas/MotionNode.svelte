@@ -19,6 +19,7 @@
   import Volume2 from '@lucide/svelte/icons/volume-2';
   import VolumeX from '@lucide/svelte/icons/volume-x';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
+  import FrameHover from './FrameHover.svelte';
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, type MotionNode } from '$lib/canvas/motion-node';
@@ -219,6 +220,7 @@
       {/if}
     {/if}
     {#if !previewing}<div class="host nodrag nopan" data-testid="motion-node-editing" bind:this={host}></div>{/if}
+    {#if previewing && node.docHeadRevision}<FrameHover nodeId={node.id} revision={node.docHeadRevision} {previewUrl} width={size.width} height={size.height} />{/if}
     {#if previewing}<a class="open nodrag" {href} data-testid="open-motion-editor" data-sveltekit-preload-data={onopen ? 'off' : 'hover'} onclick={open}>Open editor</a>{/if}
   </div>
 

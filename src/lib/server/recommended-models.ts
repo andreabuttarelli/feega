@@ -4,7 +4,7 @@ import type { GenerativeMedium } from '$lib/canvas/default-models';
 type CatalogueMedium = Exclude<GenerativeMedium, 'audio'>;
 import type { CandidateModel } from '$lib/canvas/recommended-models';
 import type { AiModelCatalogue } from './ai-models-sync';
-import { isWiroPricing } from './wiro-catalogue';
+import { isTaskPricing } from './generation/task-pricing';
 
 export type ReleaseRow = {
   id: string;
@@ -20,7 +20,6 @@ export type ReleaseRow = {
 };
 
 const TOKENS_PER_MILLION = 1_000_000;
-const TOKENS_PER_1K_IMAGE = 1290;
 const MEGAPIXELS_PER_1K_IMAGE = 1;
 const VIDEO_TOKENS_PER_SECOND_720P = (1280 * 720 * 24) / 1024;
 const CENTS_PER_USD = 100;
@@ -31,7 +30,6 @@ const CATALOGUE_OF: Record<CatalogueMedium, AiModelCatalogue> = { text: 'chat', 
 
 const IMAGE_LINE_USD: Record<string, (cost: number) => number> = {
   image: (cost) => cost,
-  token: (cost) => cost * TOKENS_PER_1K_IMAGE,
   megapixel: (cost) => cost * MEGAPIXELS_PER_1K_IMAGE
 };
 
@@ -64,7 +62,7 @@ function imageLines(pricing: unknown): ImageLine[] {
 }
 
 function imageCost(pricing: unknown): number | null {
-  if (isWiroPricing(pricing)) {
+  if (isTaskPricing(pricing)) {
     return cheapest(pricing.lines.filter((line) => PER_RUN_METHODS.has(line.method)).map((line) => line.usd));
   }
   const costs = imageLines(pricing)

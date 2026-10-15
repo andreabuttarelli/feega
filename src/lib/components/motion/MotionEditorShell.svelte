@@ -61,6 +61,8 @@
   import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import { Gesture } from '$lib/motion/drill';
+  import { frameDrill } from '$lib/canvas/frame-drill';
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
   import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
@@ -131,6 +133,7 @@
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { claimsWidth } from '$lib/canvas/claim-width';
   import { NodeMode, nodeLayers } from '$lib/canvas/inline-motion';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHover } from '$lib/canvas/layers';
@@ -1311,7 +1314,12 @@
     [Command.PreviewFit]: () => zoomStage?.fit(),
     [Command.PreviewActual]: () => zoomStage?.actual(),
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
+    [Command.SelectChild]: () => overlay?.key(Gesture.Enter),
+    [Command.SelectParent]: selectParent,
     [Command.Deselect]: () => {
+      if (overlay?.key(Gesture.Leave)) {
+        return;
+      }
       helpOpen = false;
       selection = [];
       keySelection = [];
@@ -1420,6 +1428,21 @@
   });
 
   let caughtAt = $state<[number, number] | null>(null);
+  let overlay = $state<ReturnType<typeof SelectionOverlay> | null>(null);
+
+  function askedDrill() {
+    const asked = frameDrill.take(data.node.id);
+    return asked ? { at: [asked.at.x * doc.width, asked.at.y * doc.height] as [number, number], gesture: asked.gesture } : null;
+  }
+
+  function selectParent() {
+    if (overlay?.key(Gesture.Leave)) {
+      return;
+    }
+    if (rules.closes) {
+      onclose();
+    }
+  }
 
   $effect(() => {
     if (playing) {
@@ -1469,7 +1492,7 @@
       return;
     }
     if (rules.closes && e.key === 'Escape' && !isTyping(e.target as HTMLElement | null)) {
-      onclose();
+      selectParent();
       return;
     }
     if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
@@ -1488,7 +1511,7 @@
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
 <div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
-  <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost}>
+  <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost} use:claimsWidth={barHost}>
     <div class="group lead" {...dockOf(Part.Bar)}>
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
       <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
@@ -1671,7 +1694,7 @@
       <MotionPreview bind:this={preview} bind:redraws {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
-        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={findClip(withAutoLayout(doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
@@ -1926,6 +1949,10 @@
   .bar.in-canvas-bar > :global(*) {
     flex: 0 1 auto;
     min-width: 0;
+  }
+
+  .bar.in-canvas-bar > .lead {
+    flex-shrink: 0;
   }
 
   .editor .stage.hosted {

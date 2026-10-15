@@ -20,6 +20,7 @@
   import { keepSame } from '$lib/canvas/snapshot-keep';
   import { AssetSize, sized } from '$lib/canvas/asset-url';
   import TieredImage from '$lib/components/canvas/TieredImage.svelte';
+  import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
@@ -1979,7 +1980,8 @@
     if (motion) {
       return { url: motion, source: PosterSource.Image };
     }
-    return mediaPoster(n.type, assetUrl(typeof n.data.refId === 'string' ? n.data.refId : null));
+    const file = n.data.refId ?? n.data.assetId;
+    return mediaPoster(n.type, assetUrl(typeof file === 'string' ? file : null));
   }
 
   function frameLook(n: { id: string; type: string; data: Record<string, unknown> }) {
@@ -1998,7 +2000,11 @@
       get selected() {
         return selectedIds;
       },
-      select: (ids) => focusOn(ids, undefined, FocusMode.Select)
+      select: (ids) => focusOn(ids, undefined, FocusMode.Select),
+      open: (id) => {
+        requestMotion(id);
+        focusOn([id], undefined, FocusMode.Select);
+      }
     })
   );
 
@@ -2749,6 +2755,7 @@
           <UploadedNode
             node={{ ...uploaded, url: assetUrl(uploaded.assetId) ?? uploaded.url }}
             medium={row.type === 'video' ? 'video' : 'image'}
+            {selected}
           />
         {:else if gen}
           <GenNode
@@ -2816,8 +2823,7 @@
               {:else if gen.medium === 'audio'}
                 <AudioResult nodeId={id} {...audioUrlsOf(row)} files={audioFilesOf(row, gen.params.targetLanguage ?? null)} />
               {:else if gen.medium === 'video'}
-                <!-- svelte-ignore a11y_media_has_caption -->
-                <video src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} controls playsinline preload="metadata"></video>
+                <LiveVideo src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} {selected} controls />
                 <div class="gen-download">
                   <NodeDownload kind="video" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>

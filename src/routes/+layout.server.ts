@@ -10,12 +10,16 @@ import type { User } from '@supabase/supabase-js';
 import { readTourSeen } from '$lib/server/repos/profiles';
 import { TourState, tourStateOf } from '$lib/onboarding/tour';
 
-export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession, db } }) => {
+export const load: LayoutServerLoad = async ({ url, untrack, locals: { safeGetSession, db } }) => {
   const { session, user } = await safeGetSession();
 
   // Chi ha già accettato una versione dei termini vede l'avviso solo quando la versione corrente
   // è cambiata — non sul primo accesso, dove `landingPath` registra già quella corrente.
-  const termsNoticeVersion = await outdatedTermsNoticeFor(db, user?.id ?? null);
+  const [termsNoticeVersion, tour, social] = await Promise.all([
+    outdatedTermsNoticeFor(db, user?.id ?? null),
+    tourFor(db, user),
+    socialPublishing()
+  ]);
 
   // I due guard degli analytics, decisi qui una volta sola.
   //
@@ -25,7 +29,7 @@ export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession, db
   // Il secondo si risolve QUI, non nel browser: la lista di chi è interno vive in $lib/server e al
   // client arriva solo il booleano — gli indirizzi del team non finiscono in un bundle pubblico.
   const internalViewer = isInternalEmail(user?.email);
-  const analyticsOptOut = !trackingAllowed(url.hostname) || internalViewer;
+  const analyticsOptOut = !trackingAllowed(untrack(() => url.hostname)) || internalViewer;
 
   // Seline Profiles: identify authenticated users server-side (adblock-proof). Debounced in
   // $lib/server/seline. Client script still stitches the browser visitor via setUser in identifyUser.
@@ -51,9 +55,9 @@ export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession, db
     analyticsOptOut,
     internalViewer,
     planGo: isPlanGoEnabled(),
-    socialPublishing: await socialPublishing(),
+    socialPublishing: social,
     termsNoticeVersion,
-    tour: await tourFor(db, user)
+    tour
   };
 };
 

@@ -11,6 +11,7 @@ export type CanvasSide = {
   readonly outlines: OutlineCache;
   previewUrl(nodeId: string): string;
   select(ids: string[]): void;
+  open(nodeId: string): void;
 };
 
 export type VideoSide = {

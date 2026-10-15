@@ -91,6 +91,13 @@
   }
   const selection = $derived({ canvas: canvas?.selected ?? [], video: video ? { nodeId: video.nodeId, selection: video.selection, part: video.part } : null });
   const picked = $derived(selectedLayers(selection));
+  let list = $state<HTMLDivElement | null>(null);
+
+  $effect(() => {
+    const first = picked[0];
+    const row = first && list ? list.querySelector<HTMLElement>(`[data-layer="${CSS.escape(first)}"][aria-selected="true"]`) : null;
+    row?.scrollIntoView({ block: 'nearest' });
+  });
 
   let renaming = $state<string | null>(null);
   let dragged = $state<string | null>(null);
@@ -220,7 +227,7 @@
 <input class="search" type="search" placeholder="Search layers…" aria-label="Search layers" data-testid="layers-search" bind:value={query} />
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="layers" role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" onkeydown={onKey}>
+<div class="layers" bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" onkeydown={onKey}>
   {#each shown as row (`${row.nodeId}/${row.key}`)}
     {@const RowIcon = KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square}
     <div

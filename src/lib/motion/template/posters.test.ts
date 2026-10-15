@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, parseMotionDoc } from '$lib/motion/doc';
 import { customValues, PropFormat, Strictness } from '$lib/motion/custom/component';
@@ -62,6 +63,7 @@ import { BRICK_CAPS_COMPONENT } from './brick-caps-poster/component';
 import { BRICK_CAPS_POSTER_TEMPLATE, BRICK_CAPS_TEMPLATE_ID } from './brick-caps-poster/template';
 import { DARK_TAGS_COMPONENT } from './dark-tags-poster/component';
 import { DARK_TAGS_POSTER_TEMPLATE, DARK_TAGS_TEMPLATE_ID } from './dark-tags-poster/template';
+import { POSTER_BATCH_6 } from './poster-batch-6';
 
 const POSTERS: [string, TemplateEntry, string][] = [
   [TYPE_GRID_TEMPLATE_ID, TYPE_GRID_POSTER_TEMPLATE, TYPE_GRID_COMPONENT],
@@ -93,12 +95,21 @@ const PART_TAGGED: [string, TemplateEntry, string][] = [
   [MONTH_GRID_TEMPLATE_ID, MONTH_GRID_POSTER_TEMPLATE, MONTH_GRID_COMPONENT],
   [ROTATED_CARDS_TEMPLATE_ID, ROTATED_CARDS_POSTER_TEMPLATE, ROTATED_CARDS_COMPONENT],
   [BRICK_CAPS_TEMPLATE_ID, BRICK_CAPS_POSTER_TEMPLATE, BRICK_CAPS_COMPONENT],
-  [DARK_TAGS_TEMPLATE_ID, DARK_TAGS_POSTER_TEMPLATE, DARK_TAGS_COMPONENT]
+  [DARK_TAGS_TEMPLATE_ID, DARK_TAGS_POSTER_TEMPLATE, DARK_TAGS_COMPONENT],
+  ...POSTER_BATCH_6
 ];
 
 const NOT_A_PART: (string | undefined)[] = [PropFormat.Color, PropFormat.Font, PropFormat.Media];
 
-const REFERENCE_WORDS = /cosmic|aoxomoxoa|aachen|myspace|smets|sibel|thorwart|tomek|kennedy|tomorrow|marvels|new york|paju|isang|moving sites|wine|cheese and|galeria|azur|berlin|karl|marx|ferran|adri|interbrand|wooster|soho|intef|darmstadt|doda|fassbender|guadagnino|cholovdenko|malek|laverne|tenderness|ui\/ux|inspo|6tm|radioactive|afrodeutsche|sybil|brighton|marine parade|hullabaloo|figueres|moritz|escapism|zemun|kapetanija|gligorijevi|sonnenstub|woolloo|firstdraft|more club|makes no sense|sensations with|stage of life|figured out/i;
+const TIMELINE = { to: () => TIMELINE };
+
+function drawnHtml(js: string, props: Record<string, unknown>): string {
+  const root = document.createElement('div');
+  new Function('root', 'props', 'tl', 'duration', 'assets', js)(root, props, TIMELINE, 2, {});
+  return root.innerHTML;
+}
+
+const REFERENCE_WORDS = /cosmic|aoxomoxoa|aachen|myspace|smets|sibel|thorwart|tomek|kennedy|tomorrow|marvels|new york|paju|isang|moving sites|wine|cheese and|galeria|azur|berlin|karl|marx|ferran|adri|interbrand|wooster|soho|intef|darmstadt|doda|fassbender|guadagnino|cholovdenko|malek|laverne|tenderness|ui\/ux|inspo|6tm|radioactive|afrodeutsche|sybil|brighton|marine parade|hullabaloo|figueres|moritz|escapism|zemun|kapetanija|gligorijevi|sonnenstub|woolloo|firstdraft|more club|makes no sense|sensations with|stage of life|figured out|yodiz|gaskessel|extraset|katowice|lingang|shanghai|figma|skydiving|salarkhan|futurneue|mateco/i;
 
 describe.each([...POSTERS, ...PART_TAGGED])('the %s still template', (id, entry, name) => {
   const doc = entry.template.doc;
@@ -124,6 +135,12 @@ describe.each([...POSTERS, ...PART_TAGGED])('the %s still template', (id, entry,
 
   it('has its grain as an editable effect on the poster', () => {
     expect(doc.tracks.flatMap((t) => t.clips).flatMap((c) => c.effects).map((e) => e.kind)).toContain(EffectKind.Noise);
+  });
+
+  it('keeps each font inside its style attribute', () => {
+    const values = customValues(component, {}, Strictness.Strict);
+    const html = drawnHtml(component.source.js, values.ok ? values.values : {});
+    expect(html).not.toContain('system-ui,=""');
   });
 
   it('carries marks of its own design beyond the reference, each editable', () => {
@@ -167,7 +184,7 @@ describe.each(PART_TAGGED)('the %s poster parts', (_id, entry, name) => {
       .filter((f) => (entry.template.keyFields ?? []).includes(f.key))
       .map((f) => f.prop)
       .filter((prop) => !NOT_A_PART.includes(props[prop]?.format));
-    expect(drawn.filter((prop) => !component.source.js.includes(`part('${prop}'`))).toEqual([]);
+    expect(drawn.filter((prop) => ![`part('${prop}'`, `textPart(p, '${prop}'`, `labelPart(p, '${prop}'`].some((tag) => component.source.js.includes(tag)))).toEqual([]);
   });
 });
 

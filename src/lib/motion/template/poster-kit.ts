@@ -36,7 +36,7 @@ export const fontProp = (title: string, value: string): PropSpec => ({ type: 'st
 export const prefixProp = (prefix: string): PropSpec => textProp('Runtime variable prefix', prefix, { group: 'Layout', maxLength: 20 });
 
 const POSTER_HELPERS = String.raw`
-const fontOf = (f) => (String(f).includes(',') ? f : '"' + f + '", system-ui, sans-serif');
+const fontOf = (f) => (String(f).includes(',') ? f : "'" + f + "', system-ui, sans-serif");
 const escaped = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const linesOf = (s) => String(s || '').split('\n');
 const box = (x, y, w, h) => 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px;';
@@ -129,3 +129,63 @@ export function posterComponent(source: PosterSource, props: Record<string, Prop
     check: null
   };
 }
+
+export type TextPartLook = { color: string; x: number; y: number; font?: string; size?: number; weight?: number; lines?: boolean };
+
+const optional = <T>(value: T | undefined, spec: (v: T) => Record<string, PropSpec>): Record<string, PropSpec> => (value === undefined ? {} : spec(value));
+
+export function textPartProps(key: string, title: string, value: string, look: TextPartLook): Record<string, PropSpec> {
+  const words = look.lines ? linesProp(title, value) : textProp(title, value, { maxLength: 120 });
+  return {
+    [key]: words,
+    [`${key}Color`]: colourProp(`${title}: colour`, look.color),
+    ...optional(look.font, (font) => ({ [`${key}Font`]: fontProp(`${title}: font`, font) })),
+    ...optional(look.size, (size) => ({ [`${key}Size`]: numberProp(`${title}: size (% of the width)`, size, 0.4, 60, 0.1) })),
+    ...optional(look.weight, (weight) => ({ [`${key}Weight`]: numberProp(`${title}: weight`, weight, 100, 900, 100, 'Style') })),
+    [`${key}X`]: numberProp(`${title}: left %`, look.x, -20, 100, 0.5),
+    [`${key}Y`]: numberProp(`${title}: top %`, look.y, -20, 100, 0.5)
+  };
+}
+
+export const smallTextProps = (font: string, size: number): Record<string, PropSpec> => ({
+  smallFont: fontProp('Small text font', font),
+  smallSize: numberProp('Small text size (% of the width)', size, 0.4, 6, 0.1)
+});
+
+export const POSTER_TEXT = String.raw`
+const cssFont = (f) => fontOf(f);
+const sizeOf = (p, key) => (p[key + 'Size'] === undefined ? p.smallSize : p[key + 'Size']);
+const textPart = (p, key, width, height, extra = '') =>
+  '<div' + part(key) + ' style="position:absolute;margin:0;white-space:pre;line-height:1.04;left:' + (p[key + 'X'] / 100) * width + 'px;top:' + (p[key + 'Y'] / 100) * height + 'px;font-size:' + (sizeOf(p, key) / 100) * width + 'px;font-weight:' + (p[key + 'Weight'] || 'inherit') + ';color:' + p[key + 'Color'] + ';font-family:' + cssFont(p[key + 'Font'] || p.smallFont) + ';' + extra + '">' + escaped(p[key]) + '</div>';
+const rowsOf = (raw) => linesOf(raw).filter((l) => l.trim()).map((l) => l.split('|').map((t) => t.trim()));
+`;
+
+export const POSTER_SHAPES = String.raw`
+const roundedPath = (points, r) => {
+  const n = points.length;
+  const near = (a, b, d) => {
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+    const k = Math.min(d, len / 2) / len;
+    return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
+  };
+  return points.map((v, i) => {
+    const before = near(v, points[(i + n - 1) % n], r);
+    const after = near(v, points[(i + 1) % n], r);
+    return (i ? 'L' : 'M') + before[0] + ' ' + before[1] + 'Q' + v[0] + ' ' + v[1] + ' ' + after[0] + ' ' + after[1];
+  }).join('') + 'Z';
+};
+
+const starPath = (cx, cy, r, inner, points, turn = 0) => {
+  const all = [];
+  for (let i = 0; i < points * 2; i++) {
+    const a = turn + (Math.PI * i) / points - Math.PI / 2;
+    const d = i % 2 ? r * inner : r;
+    all.push((i ? 'L' : 'M') + (cx + Math.cos(a) * d) + ' ' + (cy + Math.sin(a) * d));
+  }
+  return all.join('') + 'Z';
+};
+
+const gooFilter = (id, blur) => '<filter id="' + id + '" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="' + blur + '"/><feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 28 -12"/></filter>';
+
+const dotPattern = (id, step, r, colour) => '<pattern id="' + id + '" width="' + step + '" height="' + step + '" patternUnits="userSpaceOnUse"><circle cx="' + step / 2 + '" cy="' + step / 2 + '" r="' + r + '" fill="' + colour + '"/></pattern>';
+`;

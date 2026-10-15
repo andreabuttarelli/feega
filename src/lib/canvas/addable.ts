@@ -64,9 +64,9 @@ export function isGenAddable(x: Addable): x is GenMedium {
  * nome cambiato, in silenzio e solo su una delle due.
  */
 export const ADDABLE_LABEL: Record<Addable, string> = {
-  text: 'Text',
-  image: 'Image',
-  video: 'Video',
+  text: 'Generate text',
+  image: 'Generate image',
+  video: 'Generate video',
   iframe: 'Web page',
   doc: 'Document',
   products: 'Products',
@@ -76,8 +76,8 @@ export const ADDABLE_LABEL: Record<Addable, string> = {
   effects: 'Effects',
   composition: 'Composition',
   calendar: 'Calendar',
-  audio: 'Audio',
-  model3d: '3D model',
+  audio: 'Generate audio',
+  model3d: 'Generate 3D model',
   motion: 'Frame',
   studio_batch: 'Studio batch'
 };

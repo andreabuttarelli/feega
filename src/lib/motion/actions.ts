@@ -1,5 +1,7 @@
 import type { Component } from 'svelte';
 import Play from '@lucide/svelte/icons/play';
+import CornerRightDown from '@lucide/svelte/icons/corner-right-down';
+import CornerLeftUp from '@lucide/svelte/icons/corner-left-up';
 import Pipette from '@lucide/svelte/icons/pipette';
 import MousePointer2 from '@lucide/svelte/icons/mouse-pointer-2';
 import TypeIcon from '@lucide/svelte/icons/type';
@@ -190,6 +192,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Paste]: { name: 'Paste keyframes', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Keyframes },
   [Command.SelectAll]: { name: 'Select all clips', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Deselect]: { name: 'Deselect', icon: X, group: GuideGroup.Edit, gesture: 'Tap an empty lane', menu: MenuSection.Layer },
+  [Command.SelectChild]: { name: 'Select inside', icon: CornerRightDown, group: GuideGroup.Edit, gesture: 'Double-click', menu: MenuSection.Layer },
+  [Command.SelectParent]: { name: 'Select the parent', icon: CornerLeftUp, group: GuideGroup.Edit, gesture: 'Esc', menu: MenuSection.Layer },
   [Command.Precompose]: { name: 'Precompose', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
