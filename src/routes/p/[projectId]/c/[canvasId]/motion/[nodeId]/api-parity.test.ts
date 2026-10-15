@@ -308,6 +308,16 @@ describe('the frame editor spending actions answer like their ops', () => {
   });
 });
 
+describe('the frame editor save refuses a malformed doc instead of throwing', () => {
+  it('save and save_doc answer 400 to tracks that are not a list', async () => {
+    const action = await viaAction('save', { version: '1', doc: '{"tracks":3}' });
+    const endpoint = await viaEndpoint('save_doc', { version: 1, doc: { tracks: 3 } });
+
+    expect(action.status).toBe(400);
+    expect(endpoint).toEqual(action);
+  });
+});
+
 describe('the frame editor page load and its op answer the same', () => {
   it('load and editor_session', async () => {
     const db = seed();
