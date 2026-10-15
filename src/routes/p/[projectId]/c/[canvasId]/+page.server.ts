@@ -48,6 +48,7 @@ import { ShowRun, removeNodes, resizeOnCanvas, shareDoc, showRun, type RunShown 
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { templateLibrary } from '$lib/server/motion/templates';
+import { canvasOutlines } from '$lib/server/motion/frame-outlines';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
 import { serverTiming } from '$lib/server/server-timing';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
@@ -190,13 +191,14 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     referenceLibrary(db, { orgId, projectId: canvas.projectId })
   ]);
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
     firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length }),
     templateLibrary(db, { orgId, actor: userActor({ userId }) }).list(),
-    chatHandoff(db, { orgId, projectId: canvas.projectId }, url)
+    chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
+    canvasOutlines(db, { orgId, nodes })
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
@@ -220,7 +222,8 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     mode,
     projectBrandId,
     onboarding,
-    componentTemplates
+    componentTemplates,
+    outlines
   };
 };
 

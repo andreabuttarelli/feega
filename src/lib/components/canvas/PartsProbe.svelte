@@ -5,11 +5,14 @@
 
   const TRIES = 20;
   const PAUSE_MS = 250;
+  const DRAWN_WAIT_MS = 1500;
 
   let { url, onmeasured, pose = Pose.Base }: { url: string; onmeasured: (boxes: Record<string, MeasuredBox>) => void; pose?: Pose } = $props();
 
   let preview = $state<Preview | null>(null);
   let player = $state<ReturnType<typeof MotionPreview> | null>(null);
+  let redraws = $state(0);
+  let overdue = $state(false);
 
   $effect(() => {
     let stale = false;
@@ -32,8 +35,16 @@
   });
 
   $effect(() => {
+    if (!player) {
+      return;
+    }
+    const timer = setTimeout(() => (overdue = true), DRAWN_WAIT_MS);
+    return () => clearTimeout(timer);
+  });
+
+  $effect(() => {
     const shooter = player;
-    if (!shooter) {
+    if (!shooter || (!redraws && !overdue)) {
       return;
     }
     let stale = false;
@@ -56,8 +67,8 @@
 </script>
 
 {#if preview}
-  <div class="probe" aria-hidden="true" style={`width: ${preview.width}px; height: ${preview.height}px`}>
-    <MotionPreview bind:this={player} html={preview.html} width={preview.width} height={preview.height} fps={preview.fps} muted />
+  <div class="probe" aria-hidden="true" data-testid="parts-probe" style={`width: ${preview.width}px; height: ${preview.height}px`}>
+    <MotionPreview bind:this={player} bind:redraws html={preview.html} width={preview.width} height={preview.height} fps={preview.fps} muted />
   </div>
 {/if}
 

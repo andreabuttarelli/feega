@@ -184,16 +184,22 @@
     }
   }
 
-  export function capture(times: number[], source: string, captureWidth = CAPTURE_WIDTH): Promise<CapturedFrame[]> {
+  export async function capture(times: number[], source: string, captureWidth = CAPTURE_WIDTH): Promise<CapturedFrame[]> {
+    if (!host) {
+      throw new Error('the preview is still loading');
+    }
     const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
-    return borrowed(source, async () => {
+    const aside = await mountCapturePlayer(host, source);
+    try {
       const frames: CapturedFrame[] = [];
       for (const time of times) {
-        const reply = await shoot(time, request);
+        const reply = await aside.shoot(time, request);
         frames.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', errors: reply.errors ?? [] });
       }
       return frames;
-    });
+    } finally {
+      aside.dispose();
+    }
   }
 
   export function still(time: number, captureWidth = CAPTURE_WIDTH): Promise<string> {

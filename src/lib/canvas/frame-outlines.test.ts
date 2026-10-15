@@ -44,6 +44,13 @@ describe('closed posters list their parts', () => {
     expect(posterHeads(heads, cache, new Set(['m1:1']), null)).toEqual([{ nodeId: 'm3', version: 1 }]);
   });
 
+  it('never probes a poster whose parts the outline already names', () => {
+    const heads = [{ nodeId: 'm1', version: 1 }];
+    const named = cacheOutlines({}, heads, { m1: [poster('m1'), { ...row('p#title:0', 'm1'), kind: LayerKind.Part }] });
+
+    expect(posterHeads(heads, named, new Set(), null)).toEqual([]);
+  });
+
   it('keeps the part ids of a measure, per clip, without their boxes', () => {
     const box = { left: 0, top: 0, width: 1, height: 1 };
 

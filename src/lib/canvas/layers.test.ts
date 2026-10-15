@@ -125,6 +125,14 @@ describe('poster parts in layers', () => {
       ['Arrow', 'arrow']
     ]);
   });
+
+  it('an open poster keeps the parts its outline names while nothing has measured it', () => {
+    const doc = video();
+    const outline = { m1: [{ id: 't1#lines:0', key: 't1#lines:0', kind: LayerKind.Part, depth: 2, label: 'Line 1', type: 'text', nodeId: 'm1', hidden: false, locked: false, nested: false }] };
+    const rows = layerRows(NODES, { nodeId: 'm1', doc, parts: {} }, outline);
+
+    expect(rows.map((r) => r.id)).toContain('t1#lines:0');
+  });
 });
 
 describe('layer edits go through the doc operations the editor and the agent already use', () => {
