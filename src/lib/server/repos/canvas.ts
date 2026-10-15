@@ -293,6 +293,14 @@ export async function listMotionNodes(
   return (data ?? []).map(toNode);
 }
 
+export async function nodeRowExists(db: Db, input: { orgId: string; nodeId: string }): Promise<boolean> {
+  const { data, error } = await db.from('nodes').select('id').eq('org_id', input.orgId).eq('id', input.nodeId).maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return data !== null;
+}
+
 export async function findNode(
   db: Db,
   input: { orgId: string; nodeId: string }

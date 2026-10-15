@@ -3008,3 +3008,6 @@ Signal: a button or hint has the right size but the default text colour (white o
 
 ### A matted clip renders nothing in preview, still and video
 Signal: a clip with a track matte (or a Figma mask) is invisible everywhere; its `.kt` wrapper has a `mask:url(data:image/svg+xml…)` that, opened alone, shows the right shape. Cause: `.kt` was `position:absolute` with no box, 0×0, so `mask-size:100% 100%` covered nothing. Markup tests and the fast-vs-exact PSNR spec stayed green: black equals black. Move: look at pixels, not markup — `npm run bench:export -- --doc=<{doc,assets}.json> --engines=chromium --lanes=1 --keep` writes the real export mp4, `--parity --live` the preview frames; check `getBoundingClientRect()` of the wrapper.
+
+### ⌘Z of a delete answers "node_deleted_by_peer"
+Signal: undoing a canvas delete is refused with `node_deleted_by_peer` on the real stack; `undo.test.ts` stays green. Cause: the precondition looked the node up with `findNode`, which filters `deleted_at is null`, so a soft-deleted row is never found; `fakeDb` without `{ filter: true }` ignores that filter. Move: a test about soft deletes seeds `deleted_at` and uses `fakeDb(rows, { filter: true })`; a precondition on a deleted row reads it with `nodeRowExists`.

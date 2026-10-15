@@ -8,11 +8,11 @@ export enum FrameKind {
   Element = 'element'
 }
 
-type Chrome = { bar: boolean; ports: boolean; label: boolean; poster: FrameFormat };
+type Chrome = { bar: boolean; ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat };
 
 const CHROME: Record<FrameKind, Chrome> = {
-  [FrameKind.Frame]: { bar: true, ports: true, label: true, poster: FrameFormat.Jpeg },
-  [FrameKind.Element]: { bar: false, ports: false, label: false, poster: FrameFormat.Png }
+  [FrameKind.Frame]: { bar: true, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg },
+  [FrameKind.Element]: { bar: false, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png }
 };
 
 export const frameChrome = (kind: FrameKind): Chrome => CHROME[kind];

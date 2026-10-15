@@ -84,6 +84,25 @@ describe('undo action: node.delete is undone by a restore', () => {
   });
 });
 
+describe('undo action: a soft-deleted node is still there to restore', () => {
+  it('restores a node whose row carries deleted_at, as every real delete leaves it', async () => {
+    const fake = fakeDb(
+      {
+        orgs_members: [{ user_id: 'user', org_id: 'org', role: 'owner', orgs: { id: 'org', name: 'Org', slug: 'org' } }],
+        canvases: [{ id: 'canvas', org_id: 'org', project_id: 'project', name: 'Canvas', viewport: null }],
+        nodes: [{ id: NODE, org_id: 'org', canvas_id: 'canvas', project_id: 'project', type: 'text', display_name: null, x: 1, y: 2, z: 0, width: null, height: null, data: { prompt: 'ciao' }, version: 1, deleted_at: '2026-10-15T10:00:00Z' }],
+        nodes_connections: []
+      },
+      { filter: true }
+    );
+    const body = new FormData();
+    body.set('items', JSON.stringify([{ kind: 'node.delete', nodeId: NODE, before: { type: 'text', position: { x: 1, y: 2, z: 0 }, size: { width: null, height: null }, data: { prompt: 'ciao' }, version: 1 } }]));
+    const input = { ...fake, request: new Request('http://localhost/c/canvas', { method: 'POST', body }), params: { canvasId: 'canvas' }, locals: { safeGetSession: async () => ({ session: {}, user: { id: 'user' } }), db: async () => fake.db } };
+
+    expect(await actions.undo(input as never)).toMatchObject({ outcome: 'undone' });
+  });
+});
+
 describe('undo action: node.update is undone by writing before back, with the expected version', () => {
   it('writes the previous data through writeNodeData, expecting the version the gesture recorded', async () => {
     const input = event(

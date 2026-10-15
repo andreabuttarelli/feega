@@ -96,7 +96,7 @@
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
-  import { DragPhase, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
   import { DropOn, type Drop } from '$lib/motion/move-element';
   import { inputChanged } from '$lib/canvas/effects/editor';
@@ -299,6 +299,31 @@
     },
     run: () => undo()
   };
+
+  const freeElement = (ids: string[]): string | null => {
+    const row = ids.length === 1 ? nodes.find((n) => n.id === ids[0]) : null;
+    return row && !tileChromeOf(row).takesDrops ? row.id : null;
+  };
+
+  function tileDragOver(ids: string[], client: PointerPoint) {
+    const id = freeElement(ids);
+    markFrame(id ? client : null, id);
+  }
+
+  function tileDrop(ids: string[], client: PointerPoint): DropVerdict {
+    markFrame(null, null);
+    const id = freeElement(ids);
+    const frame = id ? frameUnderPointer(client, id) : null;
+    if (!id || !frame) {
+      return DropVerdict.Ignored;
+    }
+    void post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frame.frameId, at: frame.at }) }).then((res) => {
+      if (landed(res)) {
+        nodes = nodes.filter((n) => n.id !== id);
+      }
+    });
+    return DropVerdict.Taken;
+  }
 
   async function drawElement(drawn: DrawnWire) {
     const res = await post('drawElement', { drawn: JSON.stringify(drawn) });
@@ -2731,6 +2756,8 @@
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
     onDraw={drawElement}
+    onTileDragOver={tileDragOver}
+    onTileDrop={tileDrop}
     onFlow={(fn) => (toFlow = fn)}
     onUpload={upload}
     onDuplicate={duplicate}

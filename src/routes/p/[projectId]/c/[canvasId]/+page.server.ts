@@ -72,7 +72,7 @@ import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
-import { MOVE_STATUS, MoveOutcome, drawElement, drawnSchema, frameStore, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { MOVE_STATUS, MoveOutcome, drawElement, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -1078,6 +1078,16 @@ export const actions: Actions = {
       return fail(400, { error: 'spostamento non valido' });
     }
     return movedAnswer(await moveElement(canvasFrames(scope), ask.data));
+  },
+
+  moveFree: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = freeAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid drop' });
+    }
+    return movedAnswer(await moveFree(canvasFrames(scope), ask.data));
   },
 
   drawElement: async ({ request, params, locals }) => {

@@ -3,7 +3,7 @@ import type { Page, Locator } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
-const BAR_H = 44;
+const STAGE_W = 420;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const PNG_1X1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
 
@@ -83,12 +83,14 @@ test.describe('moving elements between frames @real', () => {
     await expect.poll(async () => clipIds(await head(admin, a)), { timeout: 10_000 }).toEqual([]);
   });
 
-  test('dropped on the empty canvas it becomes a new frame holding only that element', async ({ page, session, admin, seedNode }) => {
+  test('dropped on the empty canvas it becomes a free element of the size it had on screen', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(120_000);
     const a = await frame(admin, seedNode, session, { x: 80, y: 80 }, withText);
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const from = await openAndGrab(page, a);
+    const seen = (await page.getByTestId('selection-box').boundingBox())!;
+    const stage = (await stageOf(page, a).boundingBox())!;
     const viewport = page.viewportSize()!;
     await dragTo(page, from, { x: viewport.width - 120, y: viewport.height - 120 });
 
@@ -97,10 +99,39 @@ test.describe('moving elements between frames @real', () => {
     expect(frames).toHaveLength(1);
     expect(clipIds(await head(admin, frames![0].id))).toEqual(['Text:txt']);
 
-    const made = (await head(admin, frames![0].id)) as Doc & { width: number; height: number };
-    const { data: node } = await admin.from('nodes').select('width, height').eq('id', frames![0].id).single();
-    expect(made.width / made.height, 'the new frame takes the element shape').toBeGreaterThan(16 / 9 + 0.5);
-    expect(Math.abs(Number(node!.height) - BAR_H - (Number(node!.width) * made.height) / made.width), 'the node is the shape of its frame, no letterbox').toBeLessThanOrEqual(1);
+    const made = (await head(admin, frames![0].id)) as Doc & { width: number; height: number; background: string };
+    const { data: node } = await admin.from('nodes').select('width, height, data').eq('id', frames![0].id).single();
+    expect((node!.data as { kind?: string }).kind).toBe('element');
+    expect(made.background).toBe('transparent');
+    expect(Math.abs(Number(node!.width) - (STAGE_W * seen.width) / stage.width), 'as wide as it was in its frame').toBeLessThanOrEqual(8);
+    expect(Math.abs(Number(node!.height) - (Number(node!.width) * made.height) / made.width), 'the node is the shape of the element, no bar').toBeLessThanOrEqual(1);
+  });
+
+  test('a free element dragged onto a frame goes inside it; cmd+Z brings it back out', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const b = await frame(admin, seedNode, session, { x: 700, y: 80 }, blank);
+    const free = await seedNode({ type: 'motion', x: 120, y: 120, data: { ...LANDSCAPE, kind: 'element' } });
+    await admin.from('nodes').update({ width: 200, height: 80 }).eq('id', free.id);
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: free.id, version: 1, doc: { ...withText, width: 400, height: 160, background: 'transparent' }, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+    const alive = async () => (await admin.from('nodes').select('id').eq('id', free.id).is('deleted_at', null)).data?.length ?? 0;
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const moved = page.waitForResponse((r) => r.url().includes('?/moveFree'));
+    await dragTo(page, await centre(page.locator(`[data-motion-node="${free.id}"]`)), await centre(stageOf(page, b)));
+    await moved;
+
+    await expect.poll(async () => clipIds(await head(admin, b)), { timeout: 10_000 }).toEqual(['Text:txt']);
+    await expect.poll(alive, { timeout: 10_000 }).toBe(0);
+    await expect(page.locator(`[data-motion-node="${free.id}"]`)).toHaveCount(0);
+
+    await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
+    const undone = page.waitForResponse((r) => r.url().includes('?/undo'));
+    await page.keyboard.press('ControlOrMeta+z');
+    await undone;
+    await expect.poll(alive, { timeout: 10_000 }).toBe(1);
+    await expect.poll(async () => clipIds(await head(admin, b)), { timeout: 10_000 }).toEqual([]);
+    await expect(page.locator(`[data-motion-node="${free.id}"]`)).toHaveCount(1);
   });
 
   test('cmd+Z in the open editor after a move to another frame undoes both frames', async ({ page, session, admin, seedNode }) => {

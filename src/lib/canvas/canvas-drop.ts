@@ -1,3 +1,4 @@
+import { FrameKind, frameChrome } from './motion-node';
 export type PointerPoint = { x: number; y: number };
 
 export enum DropVerdict {
@@ -24,12 +25,14 @@ export function fractionIn(stage: StageRect, at: PointerPoint): PointerPoint {
 
 export type FrameTarget = { frameId: string; at: PointerPoint };
 
+const kindOf = (frame: HTMLElement | null): FrameKind => (frame?.dataset.kind === FrameKind.Element ? FrameKind.Element : FrameKind.Frame);
+
 export function frameUnderPointer(at: PointerPoint, exceptId: string | null = null): FrameTarget | null {
   for (const element of document.elementsFromPoint(at.x, at.y)) {
     const frame = (element as HTMLElement).closest<HTMLElement>('[data-motion-node]');
     const frameId = frame?.dataset.motionNode;
     const stage = frame?.querySelector<HTMLElement>('[data-frame-stage]');
-    if (!frameId || !stage || frameId === exceptId) {
+    if (!frameId || !stage || frameId === exceptId || !frameChrome(kindOf(frame)).takesDrops) {
       continue;
     }
     return { frameId, at: fractionIn(stage.getBoundingClientRect(), at) };
