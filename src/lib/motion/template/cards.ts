@@ -623,6 +623,56 @@ const CUSTOM_CARDS: Record<string, TemplateCard> = {
     bestFormats: [PORTRAIT, SQUARE, TALL],
     goodFor: ['a poster or editorial piece', 'change, time, erosion']
   }),
+  'framed-reveal': card({
+    roles: [R.Gallery, R.Opener],
+    energy: Energy.Calm,
+    loops: true,
+    onScreen: [beat(0, 12, 'a colour picture in a frame over a full-bleed black and white one; every 4 s the frame wipes to the next pair with parallax and a slow push-in')],
+    needs: { media: media(2, 12, MediaAspect.Portrait), text: TextAmount.Word },
+    bestFormats: ALL_FORMATS,
+    edges: { start: EdgeTone.Media, end: EdgeTone.Media, transition: Joint.Wipe },
+    goodFor: ['portraits or editorial photos', 'a moody gallery']
+  }),
+  'showcase-scatter': card({
+    roles: [R.Gallery, R.Opener],
+    energy: Energy.Calm,
+    loops: true,
+    onScreen: [beat(0, 2, 'pictures, colour blocks and a type card pop in around a centred headline'), beat(2, 11, 'they drift at different depths; one picture glides across the headline'), beat(11, 12, 'everything leaves')],
+    needs: { media: media(3, 8), text: TextAmount.Line },
+    bestFormats: ALL_FORMATS,
+    edges: { start: LIGHT, end: LIGHT, transition: Joint.Fade },
+    goodFor: ['a portfolio or collection', 'a studio reel opener']
+  }),
+  'card-cascade': card({
+    roles: [R.Gallery, R.List],
+    energy: Energy.Medium,
+    loops: true,
+    onScreen: [beat(0, 16, 'rounded cards step along a diagonal one after another every 2 s: pictures, a type card, a scrolling word list, a big letter')],
+    needs: { media: media(3, 8, MediaAspect.Square), text: TextAmount.Lines },
+    bestFormats: ALL_FORMATS,
+    edges: { start: LIGHT, end: LIGHT },
+    goodFor: ['a portfolio', 'services or values as a list']
+  }),
+  'perspective-stack': card({
+    roles: [R.Product, R.Gallery],
+    energy: Energy.Calm,
+    loops: true,
+    onScreen: [beat(0, 15, 'a tilted deck with the product on the front card flips through card by card every 3 s, the product card lifting forward, over a dark card of moving liquid colour')],
+    needs: { media: media(1, 3, MediaAspect.Square), text: TextAmount.None },
+    bestFormats: ALL_FORMATS,
+    edges: { start: LIGHT, end: LIGHT },
+    goodFor: ['a product launch', 'one product, several colourways']
+  }),
+  'poster-deck-fan': card({
+    roles: [R.Gallery, R.Poster],
+    energy: Energy.Medium,
+    loops: true,
+    onScreen: [beat(0, 2, 'a thick deck of square posters fans open in 3D'), beat(2, 5, 'the cards riffle through one by one'), beat(5, 7, 'the front poster turns to a second design'), beat(7, 11, 'riffle again, turn back'), beat(11, 12, 'the deck closes')],
+    needs: { media: media(3, 10, MediaAspect.Square), text: TextAmount.Word },
+    bestFormats: ALL_FORMATS,
+    edges: { start: LIGHT, end: LIGHT },
+    goodFor: ['a poster or print collection', 'an event series']
+  }),
   'poster-liquid-glass': card({
     roles: [R.Opener, R.Background],
     energy: Energy.Calm,

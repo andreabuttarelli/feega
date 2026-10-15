@@ -4,6 +4,7 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 const SHOTS = process.env.E2E_SHOTS_DIR;
 const POSTER = 'builtin:poster-checker-steps';
 const SETTLE_MS = 2000;
+const CARD_TEMPLATES = ['framed-reveal', 'showcase-scatter', 'card-cascade', 'perspective-stack', 'poster-deck-fan'];
 
 const VIEWPORTS = [
   { name: 'desktop', width: 1440, height: 900, open: (page: Page) => page.getByTestId('frame-templates').click() },
@@ -58,6 +59,26 @@ test.describe('frame templates @real', () => {
       await shoot(page, `${viewport.name}-inserted`);
     });
   }
+
+  test('desktop: the card video templates are listed and insert as a frame', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.getByTestId('frame-templates').click();
+    const picker = page.getByRole('dialog', { name: 'Frame templates' });
+    for (const id of CARD_TEMPLATES) {
+      await expect(picker.locator(`[data-component="builtin:${id}"][data-mode="video"]`)).toHaveCount(1);
+    }
+    await picker.getByTestId('component-search').fill('poster deck');
+    await shoot(page, 'desktop-card-templates');
+
+    await picker.locator('[data-component="builtin:poster-deck-fan"]').click();
+    await expect(picker).toHaveCount(0);
+    await expect(page.locator('[data-testid=motion-node]')).toHaveCount(1, { timeout: 15_000 });
+    await expect
+      .poll(async () => (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).eq('type', 'motion').is('deleted_at', null)).data?.length ?? 0, { message: 'the frame is saved' })
+      .toBe(1);
+  });
 
   test('desktop: one preview plays at a time, keyboard moves and Escape closes', async ({ page, session }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
