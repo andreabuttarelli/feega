@@ -96,7 +96,7 @@
   import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
-  import { findClip, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import { Background, findClip, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import {
     ClipEdge,
     Direction,
@@ -1769,9 +1769,9 @@
   {/if}
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
-    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
+    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
-      <MotionPreview bind:this={preview} bind:redraws {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
+      <MotionPreview bind:this={preview} bind:redraws {html} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
         {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
@@ -2042,6 +2042,10 @@
     z-index: 0;
     padding: 0;
     background: #000;
+  }
+
+  .editor .stage.hosted.see-through {
+    background: transparent;
   }
 
   .editor[data-mount='canvas'] .bar > :global(*),

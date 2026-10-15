@@ -5,7 +5,7 @@ import { createNode, deleteNode, findNode, listConnections, type CanvasNodeRecor
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
 import { FrameKind, elementNodeOf, frameChrome, motionNodeSize } from '$lib/canvas/motion-node';
-import { drawnElement, type Drawn } from '$lib/motion/draw-create';
+import { blankElement, canvasReady, drawnElement, type Drawn } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { parsePath } from '$lib/motion/shape/geometry';
@@ -141,11 +141,26 @@ async function landOnCanvas(store: FrameStore, place: Place, element: Element, d
   return { frameId, clipId, created: true, version: 1, undo: [created(frameId, drop)], rollback: () => store.remove(frameId) };
 }
 
-async function landFree(store: FrameStore, place: Place, element: Element, drop: Extract<Drop, { on: DropOn.Canvas }>, mode: DocMode, box: Box | null, stage: Stage): Promise<Landing> {
+function atCanvasPixels(element: Element, area: Box, node: { w: number; h: number }): Element {
+  const sheet = blankElement({ left: 0, top: 0, width: node.w, height: node.h });
+  if (!sheet.ok || element.size.width * area.width >= sheet.doc.width) {
+    return element;
+  }
+  return { ...element, size: { width: sheet.doc.width / area.width, height: sheet.doc.height / area.height } };
+}
+
+enum StillAt {
+  Kept = 'kept',
+  Settled = 'settled'
+}
+
+const STILL_AT: Record<StillAt, (doc: MotionDoc) => MotionDoc> = { [StillAt.Kept]: (doc) => doc, [StillAt.Settled]: canvasReady };
+
+async function landFree(store: FrameStore, place: Place, element: Element, drop: Extract<Drop, { on: DropOn.Canvas }>, mode: DocMode, box: Box | null, stage: Stage, stillAt: StillAt = StillAt.Kept): Promise<Landing> {
   const area = box ?? elementBox(element);
   const shaped = elementNodeOf({ width: area.width * stage.width, height: area.height * stage.height });
   const at = { x: drop.x - shaped.w / 2, y: drop.y - shaped.h / 2 };
-  const doc = { ...frameOf(element, mode, area, newId), background: Background.Transparent };
+  const doc = STILL_AT[stillAt]({ ...frameOf(atCanvasPixels(element, area, shaped), mode, area, newId), background: Background.Transparent });
   const frameId = await store.create({ ...place, ...at }, doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: elementName(element.clip) });
   const clipId = doc.tracks.flatMap((t) => t.clips)[0]?.id ?? element.clip.id;
   return { frameId, clipId, created: true, version: 1, undo: [created(frameId, at)], rollback: () => store.remove(frameId) };
@@ -305,7 +320,7 @@ export async function placeOutput(store: FrameStore, ask: OutputAsk): Promise<Mo
   const element = mediaElement(found.output, target?.doc.fps);
   const landing = target
     ? await landInFrame(store, target, element, ask.drop as Extract<Drop, { on: DropOn.Frame }>, SUMMARY.placed)
-    : await landFree(store, found, element, ask.drop as Extract<Drop, { on: DropOn.Canvas }>, FRAME_OF_OUTPUT[found.output.kind], null, outputStage(element));
+    : await landFree(store, found, element, ask.drop as Extract<Drop, { on: DropOn.Canvas }>, FRAME_OF_OUTPUT[found.output.kind], null, outputStage(element), StillAt.Settled);
   if (!isLanding(landing)) {
     return landing;
   }

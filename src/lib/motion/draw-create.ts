@@ -3,7 +3,7 @@ import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type 
 import { DrawTool, type DrawBox } from './draw-tool';
 import { mapOutline, pathData, type Outline, type Pt } from './shape/geometry';
 import { ShapeKind } from './shape/schema';
-import { DocMode, docMode, setStill } from './still';
+import { DocMode, docMode, setStill, settledStill } from './still';
 import { addClip, type OpResult } from './timeline';
 
 type BoxTool = DrawTool.Text | DrawTool.Rectangle | DrawTool.Ellipse;
@@ -105,5 +105,20 @@ export function drawnElement(drawn: Drawn, id: string): DrawnElement {
     drawn.tool === DrawTool.Pen
       ? penClip(blank.doc, mapOutline(drawn.outline, ([x, y]) => [(x - box.left) / box.width, (y - box.top) / box.height]), 0, id)
       : drawClip(blank.doc, drawn.tool, FULL_BOX, 0, id);
-  return made.ok ? { ok: true, doc: made.doc, box } : made;
+  return made.ok ? { ok: true, doc: canvasReady(made.doc), box } : made;
 }
+
+export const CANVAS_INK = '#111111';
+const BRAND_TEXT = 'brand.text';
+
+function defaultColor(component: string): unknown {
+  const parsed = COMPONENTS[component as ComponentId]?.schema.safeParse({});
+  return parsed?.success ? (parsed.data as { color?: unknown }).color : undefined;
+}
+
+function inked(doc: MotionDoc): MotionDoc {
+  const brandInk = (c: MotionDoc['tracks'][number]['clips'][number]) => (c.props.color ?? defaultColor(c.component)) === BRAND_TEXT;
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (brandInk(c) ? { ...c, props: { ...c.props, color: CANVAS_INK } } : c)) })) };
+}
+
+export const canvasReady = (doc: MotionDoc): MotionDoc => inked(settledStill(doc));

@@ -21,7 +21,7 @@
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import FrameHover from './FrameHover.svelte';
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
-  import { FORMATS } from '$lib/motion/doc';
+  import { Background, FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
   import { NodeMode, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
@@ -196,7 +196,7 @@
   <div class="stage" data-testid="motion-node-stage" data-frame-stage>
     {#if layers.own}
       {#if mounted && preview}
-        <MotionPreview bind:this={player} html={preview.html} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} />
+        <MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} />
         {#if previewing && chrome.bar}
           <span class="clock" data-testid="motion-node-timecode">{previewClock(frame, preview.fps, preview.durationInFrames)}</span>
           <input
