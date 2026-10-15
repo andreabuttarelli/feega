@@ -22,3 +22,11 @@ $0.39, cache hits 75–99%. Headline landed; export_image was called correctly
 Discarded: history compaction (history carries no tool results already), a
 step cap (the existing one was never hit), loosening the describe_frames gate
 (it only fires after the agent chose to view frames).
+
+Pre-merge check (15/10, rebased on dev, local server against prod, test
+account, same prompts on dev): question $0.17 vs $0.24; brief $0.10 vs
+$0.27; frame from template $0.23, landed (dev: not found, nothing
+created); headline+colour edit $0.10 / 12 s and label $0.20 / 24 s (dev
+editor chat: $0.66 / 184 s and $0.23 / 180 s); image $0.10 vs $0.60;
+build handoff $0.23 vs $0.54, both under 2 min. The motion agent stalls
+after planning with an empty timeline on both branches: not this change.
