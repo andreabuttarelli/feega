@@ -1,9 +1,9 @@
 <script lang="ts">
+  import { apiEnhance } from '$lib/dashboard/api-enhance';
   import HomeHero from '$lib/components/app/HomeHero.svelte';
   import { Button } from '$lib/components/ui/button/index.js';
   import { onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
-  import { enhance } from '$app/forms';
   import { preloadCode } from '$app/navigation';
   import { BriefPhase, briefPhaseAfter, briefProgress } from '$lib/motion/brief-progress';
   import CanvasRows from '$lib/components/app/CanvasRows.svelte';
@@ -129,7 +129,7 @@
       <Button variant="secondary" data-testid="home-import" onclick={() => picker?.click()}>import</Button>
       <input bind:this={picker} class="sr-only" type="file" multiple accept={CHAT_ATTACH_ACCEPT} tabindex="-1" aria-hidden="true" onchange={picked} />
     {/if}
-    <form method="POST" action="?/project">
+    <form method="POST" action="?/project" use:apiEnhance>
       <Button type="submit" data-testid="new-canvas">new canvas</Button>
     </form>
   </div>
@@ -165,7 +165,7 @@
       class:dragging
       aria-busy={sending}
       bind:this={composer}
-      use:enhance={submit}
+      use:apiEnhance={submit}
       ondragover={dragged}
       ondragleave={() => (dragging = false)}
       ondrop={dropped}
