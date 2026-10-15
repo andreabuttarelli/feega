@@ -4,6 +4,7 @@ import { ACTIONS } from '$lib/motion/actions';
 import { SELECTION_ACTIONS } from '$lib/canvas/selection-actions';
 import { isCanvasOp } from '$lib/server/canvas/canvas-ops';
 import { isEditorOp } from '$lib/server/frame-editor/editor-ops';
+import { EDITOR_ACTIONS as FRAME_FORM_ACTIONS } from '$lib/frame-editor/actions';
 import { motionToolList } from '$lib/server/motion/tool-run';
 import { CANVAS_PAGE_ACTIONS, EDITOR_ACTIONS, FRAME_PAGE_ACTIONS, PARITY_TABLES, SELECTION_TOOLBAR, type Parity, type Route } from './ui-actions';
 
@@ -40,7 +41,7 @@ describe('every change a person makes in the app, an agent can make over MCP', (
   });
 
   it('maps every action of the frame editor page, or says why it is ui-only', () => {
-    expect(formActions(FRAME_PAGE).sort()).toEqual(Object.keys(FRAME_PAGE_ACTIONS).sort());
+    expect([...formActions(FRAME_PAGE), ...Object.keys(FRAME_FORM_ACTIONS)].sort()).toEqual(Object.keys(FRAME_PAGE_ACTIONS).sort());
   });
 
   it('maps every editor command and button', () => {
