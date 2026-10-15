@@ -141,6 +141,25 @@ Hover is a wash (`--ui-wash`), pressed a deeper grey (`--ui-pressed`), focus an 
 Hovering a Layers row outlines what it names on the canvas in `--ui-hover-outline` (violet
 `#b14cff`), never the accent: hover and selection must read apart at a glance.
 Panels that open or fold (the timeline in Design mode) move on `--ease-expo-out`, 320 ms.
+
+### selecting inside a frame
+
+Figma's drill-in. A depth is what is selected: the canvas (frame closed), the frame (open,
+nothing inside), a clip, a part (a poster line, a photo, a text). One table decides every gesture
+(`DRILL` in `src/lib/motion/drill.ts`); a new case is a row there, never an `if` elsewhere.
+
+| gesture | canvas | frame | clip | part |
+|---|---|---|---|---|
+| hover | outline the child under the pointer | same | the part under the pointer, else the clip | same |
+| click | the frame | the clip under the pointer | a sibling clip (same spot again: the one beneath) | a sibling part, else the clip |
+| double-click | the child under the pointer | same | its part under the pointer, else edit its text | edit the text |
+| ⌘/Ctrl-click | the innermost element | same | same | same |
+| Enter | — | the top clip | its first part | edit the text |
+| Esc, ⇧Enter | — | close the frame | the frame | the clip |
+
+Empty space inside the frame selects the frame. Hover never reopens or re-renders a node: a
+closed frame measures its children once, on the first pointer enter. Layers follows: the
+selected row scrolls into view, hover lights the row and the row lights the canvas.
 Loading shows skeletons, never spinners in the middle of a page. Errors say what happened and
 what to do.
 

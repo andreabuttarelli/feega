@@ -9,6 +9,7 @@ export type CanvasSide = {
   readonly outlinesUrl: string;
   previewUrl(nodeId: string): string;
   select(ids: string[]): void;
+  open(nodeId: string): void;
 };
 
 export type VideoSide = {

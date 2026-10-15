@@ -11,7 +11,7 @@
   import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
   import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
   import { CAPTURE_PROFILES, CaptureProfile } from '$lib/motion/export/capture-profile';
-  import { REDRAWN, MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import { REDRAWN, MEASURE_REPLY, MEASURE_REQUEST, Pose, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
   import { INPUT_MESSAGE } from '$lib/motion/interactive/runtime';
   import type { VarValues } from '$lib/motion/interactive/var-model';
@@ -208,7 +208,7 @@
     });
   }
 
-  export function measure(): Promise<Record<string, MeasuredBox>> {
+  export function measure(pose: Pose = Pose.Base): Promise<Record<string, MeasuredBox>> {
     const target = player?.iframeElement?.contentWindow;
     if (!target || capturing) {
       return Promise.resolve({});
@@ -229,7 +229,7 @@
       };
       const timer = setTimeout(() => settle({}), MEASURE_TIMEOUT_MS);
       window.addEventListener('message', onMessage);
-      target.postMessage({ type: MEASURE_REQUEST, id }, '*');
+      target.postMessage({ type: MEASURE_REQUEST, id, pose }, '*');
     });
   }
 

@@ -11,14 +11,19 @@ export type MeasuredBox = {
   width: number;
   height: number;
 };
-export type MeasureRequest = { type: typeof MEASURE_REQUEST; id: string };
+export enum Pose {
+  Base = 'base',
+  Posed = 'posed'
+}
+
+export type MeasureRequest = { type: typeof MEASURE_REQUEST; id: string; pose?: Pose };
 export type MeasureReply = {
   type: typeof MEASURE_REPLY;
   id: string;
   boxes: Record<string, MeasuredBox>;
 };
 
-type Kinds = { posed: string; solid: string[]; part: string };
+type Kinds = { posed: string | null; solid: string[]; part: string };
 
 const KINDS: Kinds = {
   posed: '.kp,.kf,.ks,.fx,.layer,#world',
@@ -26,8 +31,15 @@ const KINDS: Kinds = {
   part: 'data-part'
 };
 
+const KINDS_BY_POSE: Record<Pose, Kinds> = {
+  [Pose.Base]: KINDS,
+  [Pose.Posed]: { ...KINDS, posed: null }
+};
+
+export const kindsOf = (pose: Pose): Kinds => KINDS_BY_POSE[pose];
+
 export function measureClips(root: HTMLElement, kinds: Kinds = KINDS): Record<string, MeasuredBox> {
-  const posed = [...root.querySelectorAll<HTMLElement>(kinds.posed)];
+  const posed = kinds.posed ? [...root.querySelectorAll<HTMLElement>(kinds.posed)] : [];
   const saved = posed.map((el) => el.style.transform);
   posed.forEach((el) => (el.style.transform = 'none'));
 
@@ -104,5 +116,5 @@ export function watchRedraws(drawing: Node, redrawn: () => void, quietMs: number
 }
 
 export function measureScript(): string {
-  return `<script>(function(){var KINDS=${js(KINDS)};var measureClips=${measureClips.toString()};var watchRedraws=${watchRedraws.toString()};var forget=watchRedraws(document.body,function(){parent.postMessage({type:${js(REDRAWN)}},'*');},${REDRAW_QUIET_MS});addEventListener('message',function(e){var m=e.data;if(!m||m.type!==${js(MEASURE_REQUEST)}||!e.source){return;}var root=document.getElementById('root');if(!root){return;}var boxes=measureClips(root,KINDS);forget();e.source.postMessage({type:${js(MEASURE_REPLY)},id:m.id,boxes:boxes},'*');});})();</script>`;
+  return `<script>(function(){var KINDS=${js(KINDS_BY_POSE)};var measureClips=${measureClips.toString()};var watchRedraws=${watchRedraws.toString()};var forget=watchRedraws(document.body,function(){parent.postMessage({type:${js(REDRAWN)}},'*');},${REDRAW_QUIET_MS});addEventListener('message',function(e){var m=e.data;if(!m||m.type!==${js(MEASURE_REQUEST)}||!e.source){return;}var root=document.getElementById('root');if(!root){return;}var boxes=measureClips(root,KINDS[m.pose]||KINDS[${js(Pose.Base)}]);forget();e.source.postMessage({type:${js(MEASURE_REPLY)},id:m.id,boxes:boxes},'*');});})();</script>`;
 }

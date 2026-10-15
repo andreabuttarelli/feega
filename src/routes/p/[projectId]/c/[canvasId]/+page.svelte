@@ -1996,7 +1996,11 @@
       get selected() {
         return selectedIds;
       },
-      select: (ids) => focusOn(ids, undefined, FocusMode.Select)
+      select: (ids) => focusOn(ids, undefined, FocusMode.Select),
+      open: (id) => {
+        requestMotion(id);
+        focusOn([id], undefined, FocusMode.Select);
+      }
     })
   );
 

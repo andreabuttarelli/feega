@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { MEASURE_REPLY, MEASURE_REQUEST, measureClips, measureScript } from './measure';
+import { MEASURE_REPLY, MEASURE_REQUEST, Pose, kindsOf, measureClips, measureScript } from './measure';
 
 type R = { left: number; top: number; width: number; height: number };
 
@@ -72,6 +72,11 @@ describe('measuring the clips in the preview', () => {
     expect(boxes['a#lines:1']).toEqual({ left: 0.1, top: 0.2, width: 0.1, height: 0.1 });
   });
 
+  it('posed, reads the box where the element is drawn now, transforms included', () => {
+    const { a } = measureClips(stage(), kindsOf(Pose.Posed));
+    expect(a.left + a.width).toBeCloseTo(0.7, 5);
+  });
+
   it('a clip with nothing drawn has no box', () => {
     expect(measureClips(stage()).empty).toBeUndefined();
   });
@@ -95,5 +100,16 @@ describe('measuring the clips in the preview', () => {
         boxes: { a: { left: 0.1, top: 0.1, width: 0.35, height: 0.2 }, 'a#lines:1': { left: 0.1, top: 0.2, width: 0.1, height: 0.1 } }
       }
     ]);
+  });
+
+  it('answers a posed request with the drawn boxes', () => {
+    stage();
+    const replies: { boxes: Record<string, R> }[] = [];
+    const source = { postMessage: (m: { boxes: Record<string, R> }) => replies.push(m) };
+    new Function(measureScript().replace(/^<script>|<\/script>$/g, ''))();
+    window.dispatchEvent(new MessageEvent('message', { data: { type: MEASURE_REQUEST, id: 'p', pose: Pose.Posed }, source: source as unknown as Window }));
+
+    const a = replies.at(-1)!.boxes.a;
+    expect(a.left + a.width).toBeCloseTo(0.7, 5);
   });
 });

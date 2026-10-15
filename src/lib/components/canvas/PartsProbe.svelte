@@ -1,12 +1,12 @@
 <script lang="ts">
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
-  import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import { Pose, type MeasuredBox } from '$lib/motion/hyperframes/measure';
   import type { MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
   const TRIES = 20;
   const PAUSE_MS = 250;
 
-  let { url, onmeasured }: { url: string; onmeasured: (boxes: Record<string, MeasuredBox>) => void } = $props();
+  let { url, onmeasured, pose = Pose.Base }: { url: string; onmeasured: (boxes: Record<string, MeasuredBox>) => void; pose?: Pose } = $props();
 
   let preview = $state<Preview | null>(null);
   let player = $state<ReturnType<typeof MotionPreview> | null>(null);
@@ -39,7 +39,7 @@
     let stale = false;
     void (async () => {
       for (let i = 0; i < TRIES && !stale; i++) {
-        const boxes = await shooter.measure();
+        const boxes = await shooter.measure(pose);
         if (Object.keys(boxes).length) {
           return !stale && onmeasured(boxes);
         }
