@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto';
 import type { PurgeOutcome } from './canvas/provider-purge';
-import type { WiroGateway, WiroTask } from './canvas/wiro-gateway';
+import type { TaskProvider, TaskState } from './canvas/task-provider';
 
 export const DEFAULT_WIRO_BASE_URL = 'https://api.wiro.ai/v1';
 
@@ -41,7 +41,7 @@ function errorsOf(reply: WiroReply): string {
   return (reply.errors ?? []).map((e) => (typeof e === 'string' ? e : e.message ?? '')).filter(Boolean).join('; ') || 'unknown error';
 }
 
-function taskOf(row: TaskRow | undefined): WiroTask {
+function taskOf(row: TaskRow | undefined): TaskState {
   if (!row) {
     return { state: 'failed', error: 'wiro_task_missing' };
   }
@@ -63,7 +63,7 @@ function taskOf(row: TaskRow | undefined): WiroTask {
   };
 }
 
-export function wiro(config: WiroConfig): WiroGateway {
+export function wiro(config: WiroConfig): TaskProvider {
   const baseUrl = (config.baseUrl ?? DEFAULT_WIRO_BASE_URL).replace(/\/$/, '');
   const doFetch = config.fetchFn ?? fetch;
 

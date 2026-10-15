@@ -253,7 +253,7 @@ export async function queuedRenderRuns(db: Db, input: { limit: number }): Promis
   return queuedRunsWithPrefix(db, { ...input, prefix: RENDER_JOB_PREFIX });
 }
 
-export async function queuedWiroRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
+export async function queuedTaskRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
   return queuedRunsWithPrefix(db, { ...input, prefix: WIRO_JOB_PREFIX });
 }
 

@@ -185,7 +185,7 @@ export function wiroModelRow(tool: WiroTool, syncedAt: string): (AiModelRow & { 
   };
 }
 
-export async function fetchWiroCatalogue(
+export async function fetchTaskCatalogue(
   doFetch: typeof fetch,
   baseUrl: string,
   syncedAt: string

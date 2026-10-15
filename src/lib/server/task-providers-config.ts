@@ -4,13 +4,13 @@ import type { Db } from '$lib/server/db/client';
 import { wiro } from './wiro';
 import { WIRO_PROVIDER } from './wiro-catalogue';
 import { wireSpecOf } from './wiro-choice';
-import type { WiroGateway } from './canvas/wiro-gateway';
-import type { WiroBill, WiroCatalogue, WiroModel, WiroRunDeps, WiroScope } from './canvas/wiro-run';
-import { WIRO_LABEL } from './canvas/wiro-run';
+import type { TaskProvider } from './canvas/task-provider';
+import type { TaskBill, TaskCatalogue, TaskModel, TaskRunDeps, TaskScope } from './canvas/task-run';
+import { TASK_LABEL } from './canvas/task-run';
 import { uncensoredAccess } from './uncensored-access';
 import { moderationPorts, recordModeration } from './moderation/moderation-config';
 
-export function configuredWiro(): WiroGateway | null {
+export function configuredWiro(): TaskProvider | null {
   const apiKey = env.WIRO_API_KEY?.trim();
   if (!apiKey) {
     return null;
@@ -18,11 +18,11 @@ export function configuredWiro(): WiroGateway | null {
   return wiro({ apiKey, apiSecret: env.WIRO_API_SECRET?.trim() || undefined, baseUrl: env.WIRO_BASE_URL?.trim() || undefined });
 }
 
-const WIRO_CATALOGUES: ReadonlySet<WiroCatalogue> = new Set(['image', 'video', 'model3d']);
+const WIRO_CATALOGUES: ReadonlySet<TaskCatalogue> = new Set(['image', 'video', 'model3d']);
 
 type WiroModelRow = { id: string; catalogue: string; uncensored: boolean | null; wire_spec: unknown; param_schema: Record<string, unknown> | null };
 
-async function wiroModel(modelId: string): Promise<WiroModel | null> {
+async function wiroModel(modelId: string): Promise<TaskModel | null> {
   const { createAdminClient } = await import('./supabase-admin');
   const { data } = await (createAdminClient() as SupabaseClient)
     .from('ai_models')
@@ -37,17 +37,17 @@ async function wiroModel(modelId: string): Promise<WiroModel | null> {
   }
   return {
     id: row.id,
-    catalogue: WIRO_CATALOGUES.has(row.catalogue as WiroCatalogue) ? (row.catalogue as WiroCatalogue) : 'image',
+    catalogue: WIRO_CATALOGUES.has(row.catalogue as TaskCatalogue) ? (row.catalogue as TaskCatalogue) : 'image',
     spec,
     uncensored: row.uncensored === true,
     paramSchema: row.param_schema ?? {}
   };
 }
 
-function bill(entry: WiroBill): void {
+function bill(entry: TaskBill): void {
   void import('./ai-log').then(({ logAiCall }) =>
     logAiCall({
-      label: WIRO_LABEL,
+      label: TASK_LABEL,
       provider: 'wiro',
       model: entry.model,
       ms: entry.ms,
@@ -65,11 +65,11 @@ function bill(entry: WiroBill): void {
   );
 }
 
-function moderationScope(scope: WiroScope, model: WiroModel) {
+function moderationScope(scope: TaskScope, model: TaskModel) {
   return { ...scope, model: model.id, uncensored: model.uncensored };
 }
 
-export function wiroRunDeps(db: Db): WiroRunDeps {
+export function taskRunDeps(db: Db): TaskRunDeps {
   return {
     gateway: configuredWiro(),
     model: wiroModel,

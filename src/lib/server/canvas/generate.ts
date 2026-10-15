@@ -17,7 +17,7 @@ import {
   listNodeRuns,
   queuedAudioRuns,
   queuedVideoRuns,
-  queuedWiroRuns,
+  queuedTaskRuns,
   RENDER_JOB_PREFIX,
   BROWSER_RENDER_PREFIX,
   releaseClaim,
@@ -307,9 +307,9 @@ const WIRO_IMAGE_PATHS: Readonly<Record<string, (upstream: UpstreamInputs) => st
 };
 
 async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
-  const [{ wiroRunDeps }, { startWiroRun }, { upstreamProvenance }, { projectModeOf }] = await Promise.all([
-    import('$lib/server/wiro-config'),
-    import('./wiro-run'),
+  const [{ taskRunDeps }, { startTaskRun }, { upstreamProvenance }, { projectModeOf }] = await Promise.all([
+    import('$lib/server/task-providers-config'),
+    import('./task-run'),
     import('./likeness-guard'),
     import('$lib/server/uncensored-workspace/workspace-server')
   ]);
@@ -320,7 +320,7 @@ async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
     upstreamProvenance(db, { orgId: input.orgId, canvasId: input.canvasId, nodeId: input.nodeId, data: node?.data ?? {} })
   ]);
 
-  const out = await startWiroRun(wiroRunDeps(db), {
+  const out = await startTaskRun(taskRunDeps(db), {
     scope: audioScopeOf(input),
     mode: await projectModeOf(db, input),
     modelId: input.model ?? '',
@@ -1007,16 +1007,16 @@ export async function reconcileAudioNodeRuns(db: Db): Promise<VideoReconcileOutc
 const WIRO_RECONCILE_LIMIT = 20;
 const WIRO_RUN_MAX_ATTEMPTS = 8;
 
-export async function reconcileWiroNodeRuns(db: Db): Promise<VideoReconcileOutcome> {
+export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutcome> {
   const outcome: VideoReconcileOutcome = { checked: 0, done: 0, failed: 0, pending: 0 };
-  const [{ wiroRunDeps }, { finishWiroJob }, { projectModeOf }] = await Promise.all([
-    import('$lib/server/wiro-config'),
-    import('./wiro-run'),
+  const [{ taskRunDeps }, { finishTaskJob }, { projectModeOf }] = await Promise.all([
+    import('$lib/server/task-providers-config'),
+    import('./task-run'),
     import('$lib/server/uncensored-workspace/workspace-server')
   ]);
-  const deps = wiroRunDeps(db);
+  const deps = taskRunDeps(db);
 
-  for (const run of await queuedWiroRuns(db, { limit: WIRO_RECONCILE_LIMIT })) {
+  for (const run of await queuedTaskRuns(db, { limit: WIRO_RECONCILE_LIMIT })) {
     const claimed = await claimRun(db, { orgId: run.orgId, runId: run.id });
     if (!claimed || !run.externalJobId) {
       continue;
@@ -1034,7 +1034,7 @@ export async function reconcileWiroNodeRuns(db: Db): Promise<VideoReconcileOutco
     const finishing: NodeRun = { ...run, status: 'finishing' };
     try {
       const mode = await projectModeOf(db, shape);
-      const progress = await finishWiroJob(db, deps, { externalJobId: run.externalJobId, modelId: run.model ?? '', scope: audioScopeOf(shape), mode });
+      const progress = await finishTaskJob(db, deps, { externalJobId: run.externalJobId, modelId: run.model ?? '', scope: audioScopeOf(shape), mode });
 
       if (progress.state === 'pending') {
         await releaseClaim(db, { orgId: run.orgId, runId: run.id });

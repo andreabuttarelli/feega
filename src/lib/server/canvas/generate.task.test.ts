@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
 import type { Db } from '$lib/server/db/client';
-import { reconcileWiroNodeRuns, runGenNode } from './generate';
-import type { WiroModel, WiroRunDeps } from './wiro-run';
+import { reconcileTaskNodeRuns, runGenNode } from './generate';
+import type { TaskModel, TaskRunDeps } from './task-run';
 import type { ScreenPorts } from '$lib/server/moderation/screen';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
@@ -16,7 +16,7 @@ const INFLUENCER_NODE = '77777777-7777-7777-7777-777777777777';
 const UNCENSORED = 'wiro/wiro-partners/z-image-uncensored';
 const SAFE = 'wiro/alibaba/qwen-image-3-0-pro';
 
-const models: Record<string, WiroModel> = {
+const models: Record<string, TaskModel> = {
   [UNCENSORED]: {
     id: UNCENSORED,
     catalogue: 'image',
@@ -42,8 +42,8 @@ const judgeIdentifiability = vi.fn();
 const record = vi.fn();
 const screen: ScreenPorts = { decide, judge, decideIdentifiability, judgeIdentifiability, record };
 
-const { deps } = vi.hoisted(() => ({ deps: { current: null as null | ((db: Db) => WiroRunDeps) } }));
-vi.mock('$lib/server/wiro-config', () => ({ wiroRunDeps: (db: Db) => deps.current!(db) }));
+const { deps } = vi.hoisted(() => ({ deps: { current: null as null | ((db: Db) => TaskRunDeps) } }));
+vi.mock('$lib/server/task-providers-config', () => ({ taskRunDeps: (db: Db) => deps.current!(db) }));
 vi.mock('$app/environment', () => ({ dev: true, browser: false, building: false }));
 vi.mock('$env/dynamic/private', () => ({ env: { UNCENSORED_DEV_MANUAL_VERIFICATION: 'true' } }));
 vi.mock('./node-model', () => ({ resolveNodeModel: async (_m: string, model: string | null) => ({ ok: true, model }) }));
@@ -214,8 +214,8 @@ describe('an image node on a Wiro model', () => {
     // Uncensored models take no input of any kind (CLAUDE.md, "No inputs for uncensored
     // models"): a wired node — real talent or not — is refused by that broader rule before the
     // likeness guard ever runs. The likeness guard (`likeness-guard.ts`) stays as defense in
-    // depth for a crafted request that reaches `startWiroRun` without going through
-    // `upstreamInputsFor` — see `wiro-run.test.ts`.
+    // depth for a crafted request that reaches `startTaskRun` without going through
+    // `upstreamInputsFor` — see `task-run.test.ts`.
     expect(out).toMatchObject({ kind: 'refused', error: expect.stringMatching(/accept references/) });
     expect(gateway.run).not.toHaveBeenCalled();
   });
@@ -273,14 +273,14 @@ describe('the run tick finishes a Wiro task', () => {
     gateway.task.mockResolvedValue({ state: 'pending' });
     const { db } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })] });
 
-    expect(await reconcileWiroNodeRuns(db)).toMatchObject({ checked: 1, pending: 1 });
+    expect(await reconcileTaskNodeRuns(db)).toMatchObject({ checked: 1, pending: 1 });
   });
 
   it('stores the output as a flagged asset, bills the real cost and marks the node', async () => {
     gateway.task.mockResolvedValue({ state: 'done', costUsd: 0.013, outputs: [{ url: 'https://cdn.wiro.test/0.png', contentType: 'image/png' }] });
     const { db, calls } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })], projects: [uncensoredProject] });
 
-    expect(await reconcileWiroNodeRuns(db)).toMatchObject({ done: 1 });
+    expect(await reconcileTaskNodeRuns(db)).toMatchObject({ done: 1 });
 
     expect(gateway.task).toHaveBeenCalledWith('2221');
     const asset = calls.find((c) => c.table === 'assets' && c.op === 'insert')?.payload as Record<string, unknown>;
@@ -299,7 +299,7 @@ describe('the run tick finishes a Wiro task', () => {
     gateway.task.mockResolvedValue({ state: 'done', costUsd: 0.013, outputs: [{ url: 'https://cdn.wiro.test/0.png', contentType: 'image/png' }] });
     const { db, calls } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })], projects: [uncensoredProject] });
 
-    await reconcileWiroNodeRuns(db);
+    await reconcileTaskNodeRuns(db);
 
     const asset = calls.find((c) => c.table === 'assets' && c.op === 'insert')?.payload as Record<string, unknown>;
     expect(asset.ai_marked).toBe(true);
@@ -312,18 +312,18 @@ describe('the run tick finishes a Wiro task', () => {
     gateway.task.mockResolvedValue({ state: 'failed', error: 'wiro_task_failed: exit 1' });
     const { db, calls } = fakeDb({ node_runs: [queued], nodes: [imageNode({ running: true, runId: RUN })] });
 
-    expect(await reconcileWiroNodeRuns(db)).toMatchObject({ failed: 1 });
+    expect(await reconcileTaskNodeRuns(db)).toMatchObject({ failed: 1 });
     const failed = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as Record<string, unknown>)?.status === 'failed');
     expect((failed?.payload as Record<string, unknown>).error).toBe('wiro_task_failed: exit 1');
   });
 });
 
-describe('wiroPurgers', () => {
+describe('taskPurgers', () => {
   it('deletes a task at Wiro by its own task id', async () => {
-    const { wiroPurgers } = await import('./wiro-run');
+    const { taskPurgers } = await import('./task-run');
     gateway.purge.mockResolvedValue('purged');
 
-    expect(await wiroPurgers(gateway)['wiro:']('wiro:2221')).toBe('purged');
+    expect(await taskPurgers(gateway)['wiro:']('wiro:2221')).toBe('purged');
     expect(gateway.purge).toHaveBeenCalledWith('2221');
   });
 });
