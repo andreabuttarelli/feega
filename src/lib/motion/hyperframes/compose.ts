@@ -39,6 +39,7 @@ import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { shapeScript, shapeStudy, type ShapeBake } from './shapes';
 import { photoFills } from '../fill/model';
 import { resolveFills } from '../fill/render';
+import { partStyleTag } from './part-styles';
 import type { Extent } from '../shape/render';
 import { TEXT_PATH_CSS, textPathBake, textPathScript, textPathTemplate, type TextPathBake } from './text-path';
 import { particleBake, particleScript } from './particles';
@@ -755,6 +756,7 @@ export function composeHtml(raw: ComposeInput): string {
     HOT_OPEN,
     stage ? `<style>${stageRootStyle(stage)}</style><div id="world" class="world">${world.join('')}</div><!--/world-->` : '',
     layers.join(''),
+    partStyleTag(clips, (v) => resolveColor(v, tokens), (id) => (id ? (input.assets[id] ?? null) : null)),
     fontProbe(doc),
     HOT_CLOSE,
     '</div>',

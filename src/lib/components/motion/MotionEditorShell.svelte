@@ -96,7 +96,8 @@
   import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
-  import { Background, findClip, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import { Background, findClip, type MotionClip, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import type { Fill } from '$lib/motion/fill/model';
   import {
     ClipEdge,
     Direction,
@@ -151,7 +152,8 @@
   import DrawTools from './DrawTools.svelte';
   import { PART_SEP, PartAction, runPart } from '$lib/motion/poster-parts';
   import { PropertiesView, propertiesFor } from '$lib/motion/properties-view';
-  import { partFocus } from '$lib/motion/inspector';
+  import { partView, setPartFills } from '$lib/motion/part-style';
+  import FillStack from './FillStack.svelte';
   import PosterPartPanel from './PosterPartPanel.svelte';
   import MultiInspector from './MultiInspector.svelte';
   import FamilyIcon from './FamilyIcon.svelte';
@@ -578,6 +580,13 @@
       .catch(() => {})
       .then(() => decodeMissing(fresh));
   });
+
+  function commitPartFills(clip: MotionClip, part: string, fills: Fill[], summary: string) {
+    const result = setPartFills(doc, clip.id, part, fills);
+    if (result.ok) {
+      edit(result.doc, summary);
+    }
+  }
 
   function edit(next: MotionDoc, summary: string) {
     const now = Date.now();
@@ -1820,7 +1829,9 @@
         <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
         {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
-        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart ? partFocus(doc, selected, selectedPart) : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
+        {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
+        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
