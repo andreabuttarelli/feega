@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { createUserDb } from '$lib/server/db/client';
+import { verifiedToken } from '$lib/server/nav-cache';
 import { shellOf } from '$lib/server/dashboard/app-shell';
 import { firstRunFlags } from '$lib/server/dashboard/first-run-flags';
 import { DASHBOARD_DEPS, dashboardFor, type Dashboard } from '$lib/server/dashboard/dashboard';
@@ -16,11 +17,10 @@ export const GET: RequestHandler = async ({ request, url }) => {
   }
 
   const db = createUserDb(token);
-  const { data, error } = await db.auth.getUser(token);
-  if (error || !data.user) {
+  const user = await verifiedToken(db, token);
+  if (!user) {
     return json({ error: 'invalid_token' }, { status: UNAUTHORIZED });
   }
-  const user = data.user;
 
   const hint = url.searchParams.get('org');
   const guessed = hint ? recentsOf(db, hint) : null;

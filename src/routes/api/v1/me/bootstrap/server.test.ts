@@ -93,6 +93,13 @@ describe('GET /api/v1/me/bootstrap: the dashboard layouts in one call', () => {
     expect(dashboardFor).toHaveBeenLastCalledWith(expect.anything(), expect.anything(), 'org-a');
   });
 
+  it('verifies a token with Auth once, not on every navigation', async () => {
+    getUser.mockClear();
+    await call({ authorization: 'Bearer same-token' });
+    await call({ authorization: 'Bearer same-token' });
+    expect(getUser).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses a request without a bearer', async () => {
     const { res, body } = await call({});
     expect(res.status).toBe(401);
