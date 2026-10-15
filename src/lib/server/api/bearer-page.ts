@@ -27,7 +27,7 @@ export async function bearerOf(request: Request): Promise<Bearer | Response> {
   return { token, db, user };
 }
 
-export function pageEvent(bearer: Bearer, request: Request, apiUrl: URL, pagePath: string) {
+export function pageEvent(bearer: Bearer, request: Request, apiUrl: URL, pagePath: string, params: Record<string, string> = {}) {
   const org = apiUrl.searchParams.get(ORG_PARAM) ?? undefined;
   const url = new URL(pagePath, apiUrl);
   for (const [key, value] of apiUrl.searchParams) {
@@ -42,7 +42,7 @@ export function pageEvent(bearer: Bearer, request: Request, apiUrl: URL, pagePat
     supabase: withVerifiedUser(bearer.db, bearer.user)
   };
   const cookies = { get: (name: string) => (name === ORG_COOKIE ? org : undefined), getAll: () => [], set: () => {}, delete: () => {} };
-  const event = { request, url, params: {}, locals, cookies, route: { id: null }, depends: () => {}, untrack: <T>(fn: () => T) => fn(), setHeaders: () => {} };
+  const event = { request, url, params, locals, cookies, route: { id: null }, depends: () => {}, untrack: <T>(fn: () => T) => fn(), setHeaders: () => {} };
   return { ...event, parent: () => appShell(event as never) };
 }
 
