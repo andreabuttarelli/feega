@@ -34,6 +34,7 @@ import type { CameraPresetId } from './composition/camera';
 import { CALENDAR_VIEWS } from '$lib/calendar/period-grid';
 import { CALENDAR_SCOPES } from './calendar-node';
 import { motionNodeSchema } from './motion-node';
+import { LAYOUT_KEYS, nodeLayoutSchema } from './node-layout';
 import { compositionTemplateSchema } from './composition-node';
 import { studioBatchNodeSchema } from './studio-batch-node';
 import { AUDIO_OPERATION_IDS, type AudioOperationId } from './audio-operations';
@@ -567,9 +568,15 @@ export function validateNodeData(type: string, data: unknown): NodeDataVerdict {
   }
 
   const schema = NODE_DATA_SCHEMAS[type];
-  const result = schema.safeParse(data ?? {});
+  const { rotation, groupId, ...own } = (data ?? {}) as Record<string, unknown>;
+  const layout = nodeLayoutSchema.safeParse({ rotation, groupId });
+  if (!layout.success) {
+    return { ok: false, error: `${type}.data.${layout.error.issues[0].path.join('.')}: ${layout.error.issues[0].message}` };
+  }
+  const result = schema.safeParse(own);
   if (result.success) {
-    return { ok: true, data: result.data as Record<string, unknown> };
+    const kept = Object.fromEntries(Object.entries(layout.data).filter(([, v]) => v !== undefined));
+    return { ok: true, data: { ...(result.data as Record<string, unknown>), ...kept } };
   }
 
   const [issue] = result.error.issues;
@@ -639,7 +646,7 @@ export function unknownFieldsError(type: string, data: unknown, scope = FieldSco
     return null;
   }
 
-  const allowed = FIELDS_BY_SCOPE[scope](type);
+  const allowed = [...FIELDS_BY_SCOPE[scope](type), ...LAYOUT_KEYS];
   const unknown = Object.entries(data)
     .filter(([key, value]) => value !== null && !allowed.includes(key))
     .map(([key]) => key);

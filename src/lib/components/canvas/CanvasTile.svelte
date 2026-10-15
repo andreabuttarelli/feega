@@ -28,6 +28,8 @@
   import { isNodeType } from '$lib/canvas/node-data';
   import { getTileRender } from '$lib/canvas/tile-render-context';
   import { getTileResize } from '$lib/canvas/tile-resize-context';
+  import { getTileRotate } from '$lib/canvas/tile-rotate-context';
+  import { dragAngle } from '$lib/canvas/node-layout';
   import { growthOf } from '$lib/canvas/settings-column';
   import { portOfHandle, type SelectOutput } from '$lib/canvas/select-outputs';
   import NodeBoundary from './NodeBoundary.svelte';
@@ -52,6 +54,7 @@
      *  mano — il recap del brand non ha una taglia minima propria da rispettare. */
     minW?: number;
     minH?: number;
+    rotatable?: boolean;
   };
 
   // `selected` lo tiene SvelteFlow e lo passa a ogni nodo: è l'unico che sa davvero cosa è
@@ -62,6 +65,24 @@
   const tile = $derived(data as unknown as TileData);
   const render = getTileRender();
   const resize = getTileResize();
+  const rotate = getTileRotate();
+  const SNAP_DEG = 15;
+
+  function startRotate(e: PointerEvent) {
+    e.stopPropagation();
+    const handle = e.currentTarget as HTMLElement;
+    const box = handle.closest('.svelte-flow__node')!.getBoundingClientRect();
+    const centre = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
+    const from = { x: e.clientX, y: e.clientY };
+    handle.setPointerCapture(e.pointerId);
+    handle.onpointerup = (up) => {
+      handle.onpointerup = null;
+      const degrees = dragAngle(centre, from, { x: up.clientX, y: up.clientY }, up.shiftKey ? SNAP_DEG : 0);
+      if (degrees) {
+        rotate()?.(tile.id, degrees);
+      }
+    };
+  }
   const growth = $derived(growthOf(data));
 
   const connection = useConnection();
@@ -139,6 +160,10 @@
     lineStyle="border-radius:0;"
     onResizeEnd={(_event, params) => resize()?.(tile.id, params.width - growth.w, params.height - growth.h)}
   />
+{/if}
+
+{#if selected && tile.rotatable && rotate()}
+  <button type="button" class="rotate-handle nodrag nopan" aria-label="Rotate" data-testid="rotate-handle" style={`border-color:${selectionColor}`} onpointerdown={startRotate}></button>
 {/if}
 
 <NodeBoundary>
@@ -350,5 +375,19 @@
     :global(.svelte-flow__handle) {
       transition: none;
     }
+  }
+  .rotate-handle {
+    position: absolute;
+    left: 50%;
+    top: -28px;
+    width: 12px;
+    height: 12px;
+    margin-left: -6px;
+    padding: 0;
+    border: 2px solid;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-panel-raised, #fff);
+    cursor: grab;
+    z-index: 5;
   }
 </style>

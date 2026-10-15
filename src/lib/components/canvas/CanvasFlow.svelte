@@ -68,6 +68,7 @@
   import { anyPortAccepts, landingPort, portListValued, type ConnectorType } from '$lib/canvas/connectors';
   import { setTileRender } from '$lib/canvas/tile-render-context';
   import { setTileResize } from '$lib/canvas/tile-resize-context';
+  import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { CanvasNode } from '$lib/canvas/graph';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import type { RunQuote } from '$lib/canvas/run-quote';
@@ -96,6 +97,8 @@
     h: number;
     connectable?: boolean;
     tag?: NameTag;
+    rotation?: number;
+    rotatable?: boolean;
     node?: CanvasNode;
     /** La taglia minima di QUESTO tipo di nodo (`nodeSize`, `node-size.ts`) — `NodeResizer` non
      *  lascia stringere sotto. Assente = non ridimensionabile a mano (il resize resta spento). */
@@ -150,6 +153,7 @@
     onNodeClicked,
     barContext,
     onDraw,
+    onRotate,
     onGroup,
     onUngroup,
     onUndo,
@@ -231,6 +235,7 @@
     onNodeClicked?: (id: string) => void;
     barContext?: BarContext;
     onDraw?: (drawn: DrawnWire) => void;
+    onRotate?: (id: string, degrees: number) => void;
     onGroup?: (ids: string[]) => void;
     onUngroup?: (ids: string[]) => void;
     /** ⌘Z: annulla l'ultimo gesto di questa scheda. */
@@ -294,6 +299,7 @@
   // libreria — quando arriverà `brand_canvas_items`, è qui che le due posizioni si riconciliano.
   setTileRender(() => tile);
   setTileResize(() => onResize);
+  setTileRotate(() => onRotate);
 
   const toNode = (t: Tile): Node => ({
     id: t.id,
@@ -308,13 +314,14 @@
       kind: t.kind,
       displayName: t.displayName,
       tag: t.tag,
+      rotatable: t.rotatable,
       inPost: t.inPost,
       minW: t.minW,
       minH: t.minH
     },
     type: 'tile',
     class: [t.settings && 'has-settings', t.poster && POSTER_CLASS].filter(Boolean).join(' ') || undefined,
-    style: `width:${t.w}px;height:${t.h}px`
+    style: `width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.x + t.w / 2}px ${t.y + t.h / 2}px` : ''}`
   });
 
   // svelte-ignore state_referenced_locally -- la cattura iniziale è voluta: da qui in poi i nodi

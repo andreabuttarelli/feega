@@ -86,6 +86,7 @@
   import type { DrawnWire } from '$lib/motion/draw-create';
   import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, openingFor, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
+  import { layoutOf, rotateGroup, type Placed } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { barContextOf } from '$lib/canvas/bottom-bar';
   import { CanvasState, NodeMode, Opening, Reframe, dismissedAfterClick, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
@@ -302,7 +303,8 @@
 
   const freeElement = (ids: string[]): string | null => {
     const row = ids.length === 1 ? nodes.find((n) => n.id === ids[0]) : null;
-    return row && !tileChromeOf(row).takesDrops ? row.id : null;
+    const holdsNodes = row ? nodes.some((n) => layoutOf(n.data).groupId === row.id) : false;
+    return row && !tileChromeOf(row).takesDrops && !holdsNodes ? row.id : null;
   };
 
   function tileDragOver(ids: string[], client: PointerPoint) {
@@ -332,6 +334,20 @@
     }
     pushGesture({ items: (res.undo ?? []) as UndoItem[] });
     await refresh();
+  }
+
+  function rotateGroupBy(id: string, degrees: number) {
+    const group = nodes.find((n) => n.id === id);
+    if (!group) {
+      return;
+    }
+    const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
+    const turned = new Map(rotateGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), degrees).map((t) => [t.id, t]));
+    nodes = nodes.map((n) => {
+      const t = turned.get(n.id);
+      return t ? { ...n, x: t.x, y: t.y, data: { ...n.data, rotation: t.rotation } } : n;
+    });
+    void post('rotateGroup', { id, degrees: String(degrees) });
   }
 
   function groupElements(ids: string[]) {
@@ -906,6 +922,8 @@
       kind: n.type,
       displayName: n.displayName,
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
+      rotation: layoutOf(n.data).rotation,
+      rotatable: motionOf(n)?.kind === FrameKind.Group,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
@@ -1810,6 +1828,12 @@
 
   async function move(id: string, x: number, y: number) {
     const before = nodes.find((node) => node.id === id);
+    if (before && motionOf(before)?.kind === FrameKind.Group) {
+      const delta = { dx: x - before.x, dy: y - before.y };
+      nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : layoutOf(n.data).groupId === id ? { ...n, x: n.x + delta.dx, y: n.y + delta.dy } : n));
+      await post('moveGroup', { id, x, y });
+      return;
+    }
     nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : n));
 
     const result = await post('move', { node_id: id, x, y });
@@ -2782,6 +2806,7 @@
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
     onDraw={drawElement}
+    onRotate={rotateGroupBy}
     onGroup={groupElements}
     onUngroup={ungroupElements}
     onTileDragOver={tileDragOver}

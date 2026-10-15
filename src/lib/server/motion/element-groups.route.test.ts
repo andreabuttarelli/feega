@@ -75,9 +75,8 @@ describe('grouping free elements on the canvas', () => {
     expect((result as { undo: { kind: string }[] }).undo.map((u) => u.kind)).toEqual(['node.create', 'node.delete', 'node.delete']);
   });
 
-  it('refuses a selection that holds a frame', async () => {
-    const frame = { ...elementRow(FRAME, AT_B), data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } };
-    const input = event({ ids: JSON.stringify([A, FRAME]) }, { nodes: [elementRow(A, AT_A), frame], motion_revisions: [revisionRow(A, box('a', AT_A)), revisionRow(FRAME, box('f', AT_B))] });
+  it('refuses a lone pick: one thing is not a group', async () => {
+    const input = event({ ids: JSON.stringify([A, 'gone-node']) }, { nodes: [elementRow(A, AT_A)], motion_revisions: [revisionRow(A, box('a', AT_A))] });
 
     expect(await actions.groupElements(input as never)).toMatchObject({ status: 422 });
     expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
