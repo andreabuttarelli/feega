@@ -57,7 +57,8 @@ export enum Quality {
   OneScreen = 'one-screen',
   RecolouredUi = 'recoloured-ui',
   ShrunkUi = 'shrunk-ui',
-  SmallUi = 'small-ui'
+  SmallUi = 'small-ui',
+  HiddenInStill = 'hidden-in-still'
 }
 
 export enum Severity {
@@ -101,6 +102,7 @@ export const SEVERITY: Record<Check, Severity> = {
   [Quality.RecolouredUi]: Severity.Blocking,
   [Quality.ShrunkUi]: Severity.Blocking,
   [Quality.SmallUi]: Severity.Blocking,
+  [Quality.HiddenInStill]: Severity.Blocking,
   [LookMiss.Unrecorded]: Severity.Blocking,
   [LookMiss.TypeScale]: Severity.Warning,
   [LookMiss.TypeScaleGross]: Severity.Blocking,
@@ -668,7 +670,15 @@ export const TIMELINE_ONLY: ReadonlySet<Quality> = new Set([Quality.Silent, Qual
 
 export function docProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
   const all = timelineProblems(doc, input);
-  return doc.still ? all.filter((p) => !TIMELINE_ONLY.has(p.kind as Quality)) : all;
+  return doc.still ? [...all.filter((p) => !TIMELINE_ONLY.has(p.kind as Quality)), ...hiddenInStill(doc, doc.still.frame)] : all;
+}
+
+function hiddenInStill(doc: MotionDoc, frame: number): QualityProblem[] {
+  const at = seconds(doc, frame);
+  return doc.tracks
+    .flatMap((t) => t.clips)
+    .filter((clip) => frame < clip.from || frame >= clip.from + clip.durationInFrames)
+    .map((clip) => ({ kind: Quality.HiddenInStill, at, detail: `${clip.id} is not on screen at the still frame (${at}s): a still shows that one frame only. Move the still inside every clip, or stretch the clip over it.` }));
 }
 
 function timelineProblems(doc: MotionDoc, input: { audioAssets: number; pixels?: Pixels; logos?: readonly string[]; referencesSeen?: boolean }): QualityProblem[] {
