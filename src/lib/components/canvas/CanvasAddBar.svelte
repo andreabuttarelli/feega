@@ -36,14 +36,16 @@
   $effect(() => {
     const timeline = frameBar.timeline;
     const host = barEl?.parentElement;
-    if (!timeline || !host) {
+    if (!frameBar.host || !host) {
       timelinePx = 0;
       return;
     }
     let frame = 0;
+    const bottomDocks = () => [...(timeline ? [timeline] : []), ...document.querySelectorAll<HTMLElement>('[data-dock="timeline"]')].filter((el) => el !== barEl);
     const follow = () => {
-      const rect = timeline.getBoundingClientRect();
-      const px = rect.height ? Math.max(0, Math.round(host.getBoundingClientRect().bottom - rect.top)) : 0;
+      const bottom = host.getBoundingClientRect().bottom;
+      const tops = bottomDocks().map((el) => el.getBoundingClientRect()).filter((r) => r.height > 0 && r.top < bottom).map((r) => bottom - r.top);
+      const px = Math.max(0, Math.round(Math.max(0, ...tops)));
       if (px !== timelinePx) {
         timelinePx = px;
       }
@@ -326,7 +328,6 @@
 
   .add-bar.stowed {
     opacity: 0;
-    translate: 0 16px;
     pointer-events: none;
   }
 
@@ -578,14 +579,10 @@
   }
 
   @media (max-width: 767px) {
-    .mode {
-      display: inline-grid;
-      grid-template-columns: 20px;
-    }
-
     .mode button {
-      min-width: 20px;
-      min-height: 20px;
+      width: 22px;
+      min-width: 22px;
+      min-height: var(--touch-target);
     }
   }
 
