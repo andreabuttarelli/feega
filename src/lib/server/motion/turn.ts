@@ -168,6 +168,8 @@ export function crewTools<T extends Record<string, Tool>>(all: T, crew: Crew): T
 
 export const crewBrief = (crew: Crew) => `Shot crew: build only the ${crew.acts.join(', ')} acts of the script, from ${crew.from} s to ${crew.to} s. Each section starts from a library template (list_templates by role, add_template inside your range, set_template_fields from the script lines); library shots only for the beats no template covers. Another crew builds the rest at the same time: never place, move or remove anything outside your range, and leave music to the sound pass.`;
 
+export const RESEARCH_BRIEF = 'Research step: gather the facts, captures and references this video needs. You do not build and you do not answer the user: the director writes the script from your findings next, and the shots are built on the next ask.';
+
 const RESEARCH_DONE = 'Research is done: the facts, captures and references are in the conversation above. Now write the script and the storyboard from them.';
 const SOUND_PASS = 'Sound pass: lay the music under the whole video if there is none, mark its beats and cut the shots onto them. Change nothing else.';
 
@@ -224,7 +226,7 @@ async function importFollowed(answer: PickAnswer | null, importAsset: MotionTool
   return { ids: ok.map((o) => o.asset.id), note: lines.length ? `The references the user follows are now project assets: hang each under the storyboard beat it inspires (write_storyboard media) and take the look from them:\n${lines.join('\n')}` : '' };
 }
 
-export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number; pick: PickAsk | null; cut: CutReview | null; budget: BudgetCard | null };
+export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number; pick: PickAsk | null; cut: CutReview | null; budget: BudgetCard | null; scripted: boolean };
 
 export type MotionTurn = { stream: ReadableStream<UIMessageChunk>; done: Promise<TurnOutcome> };
 
@@ -245,7 +247,7 @@ function writeText(writer: { write: (chunk: UIMessageChunk) => void }, id: strin
 }
 
 function cannedTurn(content: string, reply: Pick<Reply, 'finish'>, card: BudgetCard | null = null): MotionTurn {
-  const done = reply.finish({ content, tools: card ? [budgetTool(card)] : [] }, ReplyStatus.Done).then((): TurnOutcome => ({ reply: content, summary: null, version: null, revision: null, costUsd: 0, pick: null, cut: null, budget: card }));
+  const done = reply.finish({ content, tools: card ? [budgetTool(card)] : [] }, ReplyStatus.Done).then((): TurnOutcome => ({ reply: content, summary: null, version: null, revision: null, costUsd: 0, pick: null, cut: null, budget: card, scripted: false }));
   const stream = createUIMessageStream({
     execute: ({ writer }) => {
       writer.write({ type: 'start' });
@@ -639,7 +641,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
         }));
         conversation = [...base, ...crewed.flat()];
       } else {
-        await play(openingMessages, openingRound);
+        await play(openingRound === Round.Research ? [...openingMessages, { role: 'user', content: RESEARCH_BRIEF }] : openingMessages, openingRound);
       }
       if (openingRound === Round.Research && !awaitsUser(steps)) {
         await play([...conversation, { role: 'user', content: RESEARCH_DONE }], Round.Edit);
@@ -752,7 +754,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
 
     const written = write?.outcome === RevisionOutcome.Written ? write.head : null;
     const asked = finished.tools.map(savedPick).findLast((p) => p !== null) ?? null;
-    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null, budget: card };
+    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null, budget: card, scripted: role === StudioRole.Director && written !== null };
   }
 
   const reader = stream.getReader();

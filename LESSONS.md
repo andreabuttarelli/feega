@@ -3014,3 +3014,9 @@ Signal: undoing a canvas delete is refused with `node_deleted_by_peer` on the re
 
 ### Every project-scoped route resolves scope through `reachableCaller`/`callerReach`
 Signal: a Bearer route under `/api/v1` looks a node, run, asset or project up "by org and id" and answers for an uncensored project the caller cannot open. RLS and `org_id` say the row is the org's; the uncensored lock is a per-user rule neither knows. Move: resolve the caller with `reachableCaller(request, url, { nodes | runs | assets | project })` (`src/lib/server/org-data/reach.ts`), or `callerReach(caller, …)` once the ids are in the body; lists filter with `callerHidden`. Session routes use `findReachableProject` / `motionScope`. Never a per-route `canvasReachable`. Guard: `src/routes/api/v1/uncensored-lock.test.ts` — a new route gets a row there.
+
+### `new row violates row-level security policy` on a Storage upsert that worked once
+Signal: the first `upload(..., { upsert: true })` to a path succeeds, every later one to the same path fails with RLS. Cause: overwriting needs an UPDATE policy on `storage.objects`; `canvas-assets` has SELECT/INSERT/DELETE only. A fake bucket in unit tests overwrites happily. Move: reproduce with the test account's JWT (two uploads to one path), then either write to a fresh path or `remove` before `upload`; a fake bucket for a private bucket refuses overwrites.
+
+### A sub-agent round answers the user instead of doing its step
+Signal: an agent reply says it "only has tools to read/research/import" or "can't build" while the run summary shows it wrote something. Cause: a role round with a narrow tool set (researcher) got the user's raw request and no brief, so it answered it; its text leads the turn's reply. Move: every narrowed round gets its own brief message (like `crewBrief`, `RESEARCH_BRIEF`), and a turn that stops by design returns a field the caller can relay (`script_ready`).
