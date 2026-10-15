@@ -2,12 +2,13 @@ import type { ModelChoice, PricedInputs } from '$lib/canvas/gen-node';
 import { providerOf } from '$lib/canvas/model-provider';
 import { modelParamsOf } from '$lib/canvas/model-params';
 import { billedCreditsFor } from '$lib/credit-ladder';
-import { isWiroPricing, type WiroFields, type WiroWireSpec } from './wiro-catalogue';
+import type { WireFields } from './canvas/task-provider';
+import type { TaskWireSpec } from './canvas/task-run';
+import { isTaskPricing, PER_RUN_METHODS } from './generation/task-pricing';
 
-const PRICED_PER_RUN = new Set(['cpr', 'cpo']);
 const DEFAULT_ASPECTS = ['1:1'];
 
-export type WiroRow = {
+export type TaskRow = {
   id: string;
   label: string | null;
   input_modalities: string[] | null;
@@ -29,12 +30,20 @@ function enumValues(schema: Record<string, unknown> | null, key: string): string
   return Array.isArray(values) ? values.map(String) : [];
 }
 
-export function wireSpecOf(raw: unknown): WiroWireSpec | null {
-  const spec = raw as Partial<WiroWireSpec> | null;
-  return spec?.owner && spec.project && spec.fields ? (spec as WiroWireSpec) : null;
+export function wireSpecOf(raw: unknown): TaskWireSpec | null {
+  const spec = raw as Partial<TaskWireSpec> | null;
+  return spec?.fields && Array.isArray(spec.fields.images) ? (spec as TaskWireSpec) : null;
 }
 
-function nodeKeyOf(fields: WiroFields): (wireKey: string) => string {
+function maxRefsOf(spec: TaskWireSpec | null): number {
+  const fields = spec?.fields;
+  if (!fields) {
+    return 0;
+  }
+  return fields.imageList ? Number(spec.maxRefs ?? 1) : fields.images.length;
+}
+
+function nodeKeyOf(fields: WireFields): (wireKey: string) => string {
   const byWire = new Map(
     (Object.keys(NODE_PARAM_OF_FIELD) as Array<keyof typeof NODE_PARAM_OF_FIELD>)
       .filter((field) => fields[field])
@@ -43,11 +52,11 @@ function nodeKeyOf(fields: WiroFields): (wireKey: string) => string {
   return (wireKey) => byWire.get(wireKey) ?? wireKey;
 }
 
-function pricedInputsOf(row: WiroRow, fields: WiroFields): PricedInputs[] | undefined {
-  if (!isWiroPricing(row.pricing)) {
+function pricedInputsOf(row: TaskRow, fields: WireFields): PricedInputs[] | undefined {
+  if (!isTaskPricing(row.pricing)) {
     return undefined;
   }
-  const lines = row.pricing.lines.filter((line) => PRICED_PER_RUN.has(line.method) && line.usd > 0);
+  const lines = row.pricing.lines.filter((line) => PER_RUN_METHODS.has(line.method) && line.usd > 0);
   if (!lines.length) {
     return undefined;
   }
@@ -58,8 +67,9 @@ function pricedInputsOf(row: WiroRow, fields: WiroFields): PricedInputs[] | unde
   }));
 }
 
-export function wiroChoice(row: WiroRow): ModelChoice {
-  const fields = wireSpecOf(row.wire_spec)?.fields ?? { prompt: 'prompt', images: [] };
+export function taskChoice(row: TaskRow): ModelChoice {
+  const spec = wireSpecOf(row.wire_spec);
+  const fields = spec?.fields ?? { prompt: 'prompt', images: [] };
   const schema = row.param_schema ?? {};
   const durations = enumValues(schema, 'duration').map(Number).filter((n) => Number.isFinite(n) && n > 0);
   const aspects = enumValues(schema, 'aspect_ratio');
@@ -69,7 +79,7 @@ export function wiroChoice(row: WiroRow): ModelChoice {
     id: row.id,
     label: row.label ?? row.id,
     aspectRatios: aspects.length ? aspects : DEFAULT_ASPECTS,
-    maxRefs: fields.images.length,
+    maxRefs: maxRefsOf(spec),
     ...providerOf(row.id),
     wireId: row.id,
     inputModalities: row.input_modalities ?? [],

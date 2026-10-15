@@ -2,11 +2,12 @@ import type { Db } from '$lib/server/db/client';
 import { markGenerated } from '$lib/server/content-credentials';
 import type { Actor } from '$lib/server/repos/actor';
 import { insertAsset, type Asset, type AssetType } from '$lib/server/repos/assets';
-import { WIRO_JOB_PREFIX } from '$lib/server/repos/node-runs';
 import type { GenParams } from '$lib/canvas/gen-node';
-import type { WiroFields, WiroWireSpec } from '$lib/server/wiro-catalogue';
+import { jobPrefixOf, taskJobOf, taskProviderOf, TASK_PROVIDERS, TaskProviderName } from '$lib/server/generation/task-providers';
+import { taskUsdFor } from '$lib/server/generation/task-pricing';
+import { uncensoredRefusal, UNCENSORED_REFUSALS } from '$lib/server/generation/uncensored-guard';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
-import type { TaskProvider, TaskOutput } from './task-provider';
+import type { TaskProvider, TaskOutput, WireFields } from './task-provider';
 import type { Purgers } from './provider-purge';
 import { ProjectMode, STORAGE_FOLDER } from '$lib/project-mode';
 import { ModerationProfile, profileOf } from '$lib/server/moderation/profiles';
@@ -14,7 +15,7 @@ import { likenessRefusal, type ProvenanceEntry } from './likeness-guard';
 import { MODEL3D_MIME } from '$lib/model3d-models';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
-export const TASK_LABEL = 'canvas.wiro';
+export const taskLabelOf = (provider: TaskProviderName): string => `canvas.${provider}`;
 const CONTROLLED_SCHEMA_KEYS = new Set(['aspect_ratio', 'resolution', 'duration']);
 
 const EXTENSION_OF_MIME: Readonly<Record<string, string>> = {
@@ -54,21 +55,32 @@ function mimeOfUrl(url: string): string | undefined {
 }
 
 export const TASK_REFUSALS = {
-  notConfigured: 'wiro_not_configured',
-  unknownModel: 'wiro_model_not_synced',
-  notEnabled: 'Uncensored models are off for this workspace. The owner can turn them on in Settings.',
-  noInputsAllowed: "Uncensored models don't accept references: remove every incoming connection and reference first.",
-  noOutput: 'wiro_task_failed: no output'
+  notConfigured: 'provider_not_configured',
+  unknownModel: 'model_not_synced',
+  notEnabled: UNCENSORED_REFUSALS.disabled,
+  noInputsAllowed: UNCENSORED_REFUSALS.inputs,
+  noOutput: 'task_failed: no output'
 } as const;
 
 export type TaskScope = { orgId: string; projectId: string; nodeId: string; userId: string; actor?: Actor };
 
 export type TaskCatalogue = 'image' | 'video' | 'model3d';
 
-export type TaskModel = { id: string; catalogue: TaskCatalogue; spec: WiroWireSpec; uncensored: boolean; paramSchema: Record<string, unknown> };
+export type TaskWireSpec = { fields: WireFields } & Readonly<Record<string, unknown>>;
+
+export type TaskModel = {
+  id: string;
+  catalogue: TaskCatalogue;
+  spec: TaskWireSpec;
+  uncensored: boolean;
+  paramSchema: Record<string, unknown>;
+  pricing?: unknown;
+};
 
 export type TaskBill = {
+  provider: TaskProviderName;
   model: string;
+  quotedUsd: number | null;
   ms: number;
   costUsd: number | null;
   error?: string;
@@ -77,7 +89,7 @@ export type TaskBill = {
 };
 
 export type TaskRunDeps = {
-  gateway: TaskProvider | null;
+  providers: Readonly<Partial<Record<TaskProviderName, TaskProvider>>>;
   model(id: string): Promise<TaskModel | null>;
   access(orgId: string): Promise<{ allowed: boolean }>;
   screen(scope: TaskScope, model: TaskModel): ScreenPorts;
@@ -94,9 +106,15 @@ export type TaskRequest = {
   imageUrls: string[];
   lastFrameUrl: string | null;
   provenance: ProvenanceEntry[];
+  idempotencyKey?: string;
 };
 
-export type TaskStart = { kind: 'job'; jobId: string } | { kind: 'refused'; error: string };
+export enum RefusalStage {
+  Policy = 'policy',
+  Provider = 'provider'
+}
+
+export type TaskStart = { kind: 'job'; jobId: string } | { kind: 'refused'; error: string; stage: RefusalStage };
 
 function carriesInputs(req: Pick<TaskRequest, 'imageUrls' | 'lastFrameUrl' | 'provenance'>): boolean {
   return req.imageUrls.length > 0 || req.lastFrameUrl !== null || req.provenance.length > 0;
@@ -111,7 +129,7 @@ function extraInputs(params: GenParams, schema: Record<string, unknown>): Record
   );
 }
 
-export function wireInputs(fields: WiroFields, input: Omit<TaskRequest, 'scope' | 'mode' | 'modelId' | 'provenance'>, schema: Record<string, unknown>): Record<string, unknown> {
+export function wireInputs(fields: WireFields, input: Omit<TaskRequest, 'scope' | 'mode' | 'modelId' | 'provenance'>, schema: Record<string, unknown>): Record<string, unknown> {
   const inputs: Record<string, unknown> = { ...extraInputs(input.params, schema), ...(fields.prompt ? { [fields.prompt]: input.prompt } : {}) };
   const controls: Array<[string | undefined, unknown]> = [
     [fields.aspectRatio, input.params.aspectRatio],
@@ -128,6 +146,9 @@ export function wireInputs(fields: WiroFields, input: Omit<TaskRequest, 'scope' 
       inputs[wireId] = input.imageUrls[index];
     }
   });
+  if (fields.imageList && input.imageUrls.length) {
+    inputs[fields.imageList] = input.imageUrls;
+  }
   if (fields.lastFrame && input.lastFrameUrl) {
     inputs[fields.lastFrame] = input.lastFrameUrl;
   }
@@ -140,25 +161,40 @@ function guardsLikeness(model: TaskModel, mode: ProjectMode): boolean {
   return model.uncensored || (mode === ProjectMode.Uncensored && LIKENESS_GUARDED_IN_UNCENSORED_PROJECTS.has(model.catalogue));
 }
 
+function quoteOf(model: TaskModel, inputs: Record<string, unknown>): number | null {
+  return taskUsdFor(model.pricing, inputs);
+}
+
+function refused(error: string, stage = RefusalStage.Policy): TaskStart {
+  return { kind: 'refused', error, stage };
+}
+
 export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise<TaskStart> {
   const model = await deps.model(req.modelId);
-  if (!model) {
-    return { kind: 'refused', error: TASK_REFUSALS.unknownModel };
+  const provider = taskProviderOf(req.modelId);
+  if (!model || !provider) {
+    return refused(TASK_REFUSALS.unknownModel);
   }
-  if (model.uncensored && !(await deps.access(req.scope.orgId)).allowed) {
-    return { kind: 'refused', error: TASK_REFUSALS.notEnabled };
+
+  const uncensored = uncensoredRefusal({
+    uncensored: model.uncensored,
+    mode: req.mode,
+    carriesInputs: carriesInputs(req),
+    accessAllowed: model.uncensored ? (await deps.access(req.scope.orgId)).allowed : true
+  });
+  if (uncensored) {
+    return refused(uncensored);
   }
-  if (model.uncensored && carriesInputs(req)) {
-    return { kind: 'refused', error: TASK_REFUSALS.noInputsAllowed };
-  }
-  if (!deps.gateway) {
-    return { kind: 'refused', error: TASK_REFUSALS.notConfigured };
+
+  const gateway = deps.providers[provider];
+  if (!gateway) {
+    return refused(TASK_REFUSALS.notConfigured, RefusalStage.Provider);
   }
 
   const likeness = guardsLikeness(model, req.mode) ? likenessRefusal(req.provenance) : null;
   if (likeness) {
     deps.refuseLikeness(req.scope, model, likeness);
-    return { kind: 'refused', error: likeness };
+    return refused(likeness);
   }
 
   const screened = await screenGeneration(deps.screen(req.scope, model), {
@@ -168,41 +204,42 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
     operation: model.catalogue
   });
   if (!screened.ok) {
-    return { kind: 'refused', error: screened.error };
+    return refused(screened.error);
   }
 
+  const inputs = wireInputs(model.spec.fields, req, model.paramSchema);
+  const { fields: _fields, ...ref } = model.spec;
   const startedAt = Date.now();
   try {
-    const { taskId } = await deps.gateway.run(
-      { owner: model.spec.owner, project: model.spec.project },
-      wireInputs(model.spec.fields, req, model.paramSchema)
-    );
-    return { kind: 'job', jobId: `${WIRO_JOB_PREFIX}${taskId}` };
+    const { taskId } = await gateway.run(ref, inputs, req.idempotencyKey);
+    return { kind: 'job', jobId: `${jobPrefixOf(provider)}${taskId}` };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'wiro_failed';
-    deps.bill({ model: model.id, ms: Date.now() - startedAt, costUsd: null, error: message, uncensored: model.uncensored, scope: req.scope });
-    return { kind: 'refused', error: message };
+    const message = error instanceof Error ? error.message : `${provider}_failed`;
+    deps.bill({ provider, model: model.id, quotedUsd: quoteOf(model, inputs), ms: Date.now() - startedAt, costUsd: null, error: message, uncensored: model.uncensored, scope: req.scope });
+    return refused(message, RefusalStage.Provider);
   }
 }
 
 export type TaskProgress =
   | { state: 'pending' }
   | { state: 'failed'; error: string }
-  | { state: 'landed'; asset: Asset; poster: Asset | null; costUsd: number; uncensored: boolean };
+  | { state: 'landed'; asset: Asset; poster: Asset | null; costUsd: number | null; uncensored: boolean };
+
+export const TASK_TIMED_OUT = 'task_timeout';
 
 async function download(output: TaskOutput): Promise<{ bytes: Uint8Array; mime: string }> {
   const res = await fetch(output.url);
   if (!res.ok) {
-    throw new Error(`wiro_download_failed: HTTP ${res.status}`);
+    throw new Error(`download_failed: HTTP ${res.status}`);
   }
   const declared = res.headers.get('content-type') ?? output.contentType;
   return { bytes: new Uint8Array(await res.arrayBuffer()), mime: mimeOfUrl(output.url) ?? declared };
 }
 
-async function deposit(db: Db, job: { scope: TaskScope; mode: ProjectMode }, model: TaskModel, file: { bytes: Uint8Array; mime: string }): Promise<Asset> {
+async function deposit(db: Db, job: { scope: TaskScope; mode: ProjectMode }, provider: TaskProviderName, model: TaskModel, file: { bytes: Uint8Array; mime: string }): Promise<Asset> {
   const { scope } = job;
-  const path = `${scope.userId}/${STORAGE_FOLDER[job.mode]}/wiro/${crypto.randomUUID()}.${EXTENSION_OF_MIME[file.mime] ?? 'bin'}`;
-  const marked = await markGenerated(Buffer.from(file.bytes), file.mime, { model: model.id, provider: 'wiro' });
+  const path = `${scope.userId}/${STORAGE_FOLDER[job.mode]}/${TASK_PROVIDERS[provider].storageFolder}/${crypto.randomUUID()}.${EXTENSION_OF_MIME[file.mime] ?? 'bin'}`;
+  const marked = await markGenerated(Buffer.from(file.bytes), file.mime, { model: model.id, provider });
   const { error } = await db.storage
     .from(GENERATED_MEDIA_BUCKET)
     .upload(path, new Blob([marked.bytes as BlobPart], { type: file.mime }), { contentType: file.mime, upsert: false });
@@ -224,40 +261,79 @@ async function deposit(db: Db, job: { scope: TaskScope; mode: ProjectMode }, mod
   });
 }
 
-export async function finishTaskJob(
-  db: Db,
-  deps: Pick<TaskRunDeps, 'gateway' | 'model' | 'bill'>,
-  job: { externalJobId: string; modelId: string; scope: TaskScope; mode: ProjectMode }
-): Promise<TaskProgress> {
+type TaskJob = {
+  externalJobId: string;
+  modelId: string;
+  scope: TaskScope;
+  mode: ProjectMode;
+  params?: GenParams;
+  startedAt?: string;
+  now?: number;
+};
+
+function outlivedFallback(provider: TaskProviderName, model: TaskModel, job: TaskJob): boolean {
+  const limit = TASK_PROVIDERS[provider].fallbackAfterMs?.[model.catalogue];
+  if (!limit || !job.startedAt) {
+    return false;
+  }
+  return (job.now ?? Date.now()) - new Date(job.startedAt).getTime() > limit;
+}
+
+function jobQuote(model: TaskModel, job: TaskJob): number | null {
+  const inputs = wireInputs(model.spec.fields, { prompt: '', params: job.params ?? {}, imageUrls: [], lastFrameUrl: null }, model.paramSchema);
+  return quoteOf(model, inputs);
+}
+
+export async function finishTaskJob(db: Db, deps: Pick<TaskRunDeps, 'providers' | 'model' | 'bill'>, job: TaskJob): Promise<TaskProgress> {
+  const parsed = taskJobOf(job.externalJobId);
   const model = await deps.model(job.modelId);
-  if (!deps.gateway || !model) {
-    return { state: 'failed', error: deps.gateway ? TASK_REFUSALS.unknownModel : TASK_REFUSALS.notConfigured };
+  const gateway = parsed ? deps.providers[parsed.provider] : undefined;
+  if (!parsed || !gateway || !model) {
+    return { state: 'failed', error: gateway ? TASK_REFUSALS.unknownModel : TASK_REFUSALS.notConfigured };
   }
 
-  const startedAt = Date.now();
-  const task = await deps.gateway.task(job.externalJobId.slice(WIRO_JOB_PREFIX.length));
+  const { provider, taskId } = parsed;
+  const bill = (costUsd: number | null, error?: string) =>
+    deps.bill({ provider, model: model.id, quotedUsd: jobQuote(model, job), ms: elapsedMs(job), costUsd, error, uncensored: model.uncensored, scope: job.scope });
+
+  const task = await gateway.task(taskId);
+  if (task.state === 'pending' && outlivedFallback(provider, model, job)) {
+    await gateway.cancel?.(taskId).catch(() => false);
+    bill(null, TASK_TIMED_OUT);
+    return { state: 'failed', error: TASK_TIMED_OUT };
+  }
   if (task.state === 'pending') {
     return task;
   }
   if (task.state === 'failed') {
-    deps.bill({ model: model.id, ms: Date.now() - startedAt, costUsd: null, error: task.error, uncensored: model.uncensored, scope: job.scope });
+    bill(null, task.error);
     return task;
   }
 
   const output = PRIMARY_OUTPUT[model.catalogue](task.outputs);
   if (!output) {
+    bill(null, TASK_REFUSALS.noOutput);
     return { state: 'failed', error: TASK_REFUSALS.noOutput };
   }
-  deps.bill({ model: model.id, ms: Date.now() - startedAt, costUsd: task.costUsd, uncensored: model.uncensored, scope: job.scope });
+  const costUsd = task.costUsd ?? jobQuote(model, job);
+  bill(costUsd);
 
   const posterOutput = POSTER_OUTPUT[model.catalogue]?.(task.outputs);
   const [asset, poster] = await Promise.all([
-    deposit(db, job, model, await download(output)),
-    posterOutput ? download(posterOutput).then((file) => deposit(db, job, model, file)) : null
+    deposit(db, job, provider, model, await download(output)),
+    posterOutput ? download(posterOutput).then((file) => deposit(db, job, provider, model, file)) : null
   ]);
-  return { state: 'landed', asset, poster, costUsd: task.costUsd, uncensored: model.uncensored };
+  return { state: 'landed', asset, poster, costUsd, uncensored: model.uncensored };
 }
 
-export function taskPurgers(gateway: TaskProvider): Purgers {
-  return { [WIRO_JOB_PREFIX]: (externalJobId) => gateway.purge(externalJobId.slice(WIRO_JOB_PREFIX.length)) };
+function elapsedMs(job: TaskJob): number {
+  return job.startedAt ? Math.max(0, (job.now ?? Date.now()) - new Date(job.startedAt).getTime()) : 0;
+}
+
+export function taskPurgers(providers: Readonly<Partial<Record<TaskProviderName, TaskProvider>>>): Purgers {
+  return Object.fromEntries(
+    (Object.entries(providers) as Array<[TaskProviderName, TaskProvider | undefined]>)
+      .filter(([, gateway]) => gateway?.purge)
+      .map(([provider, gateway]) => [jobPrefixOf(provider), (externalJobId: string) => gateway!.purge!(externalJobId.slice(jobPrefixOf(provider).length))])
+  );
 }

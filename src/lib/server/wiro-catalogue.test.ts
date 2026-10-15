@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import fixture from './wiro-tool-list.fixture.json';
 import fixture3d from './wiro-3d-tool-list.fixture.json';
-import { fetchWiroCatalogue, wiroModelRow, wiroUsdFor } from './wiro-catalogue';
+import { fetchWiroCatalogue, wiroModelRow } from './wiro-catalogue';
+import { taskUsdFor } from './generation/task-pricing';
 
 const SYNCED = '2026-09-29T00:00:00.000Z';
 const tool = (title: string) => fixture.tool.find((t) => t.title === title)!;
@@ -65,14 +66,14 @@ describe('a Wiro 3D tool becomes a model3d row', () => {
     });
     expect(row.wire_spec.fields.prompt).toBeUndefined();
     expect(row.param_schema).toMatchObject({ pipeline_type: { type: 'enum', values: ['512', '1024_cascade', '1536_cascade'] } });
-    expect(wiroUsdFor(row.pricing, { pipeline_type: '512' })).toBe(0.25);
+    expect(taskUsdFor(row.pricing, { pipeline_type: '512' })).toBe(0.25);
   });
 
   it('prices Hunyuan3D by texture', () => {
     const row = wiroModelRow(tool3d('hunyuan3d-2-1'), SYNCED)!;
 
     expect(row.catalogue).toBe('model3d');
-    expect(wiroUsdFor(row.pricing, { generate_texture: 'true' })).toBe(0.9);
+    expect(taskUsdFor(row.pricing, { generate_texture: 'true' })).toBe(0.9);
   });
 });
 
@@ -117,14 +118,14 @@ describe('pricing a Wiro run', () => {
   };
 
   it('picks the line whose inputs match the chosen settings', () => {
-    expect(wiroUsdFor(pricing, { resolution: '720p', duration: '5' })).toBe(0.5);
+    expect(taskUsdFor(pricing, { resolution: '720p', duration: '5' })).toBe(0.5);
   });
 
   it('is unknown when no line matches', () => {
-    expect(wiroUsdFor(pricing, { resolution: '1080p', duration: '5' })).toBeNull();
+    expect(taskUsdFor(pricing, { resolution: '1080p', duration: '5' })).toBeNull();
   });
 
   it('is unknown for a per-output-second price', () => {
-    expect(wiroUsdFor({ lines: [{ inputs: {}, usd: 0, method: 'cp-readoutput' }] }, {})).toBeNull();
+    expect(taskUsdFor({ lines: [{ inputs: {}, usd: 0, method: 'cp-readoutput' }] }, {})).toBeNull();
   });
 });

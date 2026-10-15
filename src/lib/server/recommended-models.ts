@@ -4,7 +4,7 @@ import type { GenerativeMedium } from '$lib/canvas/default-models';
 type CatalogueMedium = Exclude<GenerativeMedium, 'audio'>;
 import type { CandidateModel } from '$lib/canvas/recommended-models';
 import type { AiModelCatalogue } from './ai-models-sync';
-import { isWiroPricing } from './wiro-catalogue';
+import { isTaskPricing } from './generation/task-pricing';
 
 export type ReleaseRow = {
   id: string;
@@ -62,7 +62,7 @@ function imageLines(pricing: unknown): ImageLine[] {
 }
 
 function imageCost(pricing: unknown): number | null {
-  if (isWiroPricing(pricing)) {
+  if (isTaskPricing(pricing)) {
     return cheapest(pricing.lines.filter((line) => PER_RUN_METHODS.has(line.method)).map((line) => line.usd));
   }
   const costs = imageLines(pricing)

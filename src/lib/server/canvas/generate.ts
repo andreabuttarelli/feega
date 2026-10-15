@@ -25,7 +25,6 @@ import {
   runningRuns,
   setExternalJob,
   setRunPrompt,
-  WIRO_JOB_PREFIX,
   type NodeRun
 } from '$lib/server/repos/node-runs';
 import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
@@ -39,7 +38,7 @@ import { resolveNodeModel } from './node-model';
 import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio-run';
 import { audioOperationOf, defaultAudioModel, operationSpec, voiceIdOf } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
-import { WIRO_ID_PREFIX } from '$lib/server/wiro-catalogue';
+import { taskJobOf, taskProviderOf } from '$lib/server/generation/task-providers';
 import { model3dParamsOf } from '$lib/model3d-models';
 import { cheapestImageChoice, Model3dPath, model3dPathOf, productShotPrompt } from '$lib/canvas/model3d-run';
 
@@ -300,13 +299,13 @@ async function runAudioNode(db: Db, input: StartRun, run: NodeRun, upstream: Ups
 
 type ProviderRun = (db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string) => Promise<RunOutcome>;
 
-const WIRO_IMAGE_PATHS: Readonly<Record<string, (upstream: UpstreamInputs) => string[]>> = {
+const TASK_IMAGE_PATHS: Readonly<Record<string, (upstream: UpstreamInputs) => string[]>> = {
   image: (upstream) => upstream.referenceImageUrls,
   video: (upstream) => [...new Set([upstream.startFrameUrl, ...upstream.referenceImageUrls].filter((u): u is string => Boolean(u)))],
   model3d: (upstream) => upstream.referenceImageUrls
 };
 
-async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
+async function runTaskNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
   const [{ taskRunDeps }, { startTaskRun }, { upstreamProvenance }, { projectModeOf }] = await Promise.all([
     import('$lib/server/task-providers-config'),
     import('./task-run'),
@@ -315,7 +314,7 @@ async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
   ]);
   const node = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => null);
   const [imageUrls, lastFrame, provenance] = await Promise.all([
-    signMediaPaths(db, WIRO_IMAGE_PATHS[input.medium]?.(upstream) ?? []),
+    signMediaPaths(db, TASK_IMAGE_PATHS[input.medium]?.(upstream) ?? []),
     signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : []),
     upstreamProvenance(db, { orgId: input.orgId, canvasId: input.canvasId, nodeId: input.nodeId, data: node?.data ?? {} })
   ]);
@@ -328,11 +327,12 @@ async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
     params: input.params,
     imageUrls,
     lastFrameUrl: lastFrame[0] ?? null,
-    provenance
+    provenance,
+    idempotencyKey: run.id
   });
   if (out.kind === 'refused') {
     await giveUp(db, input, run, out.error);
-    return out;
+    return { kind: 'refused', error: out.error };
   }
   await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: out.jobId });
   return { kind: 'queued', run: { ...run, externalJobId: out.jobId } };
@@ -389,7 +389,7 @@ async function runModel3dNode(db: Db, requested: StartRun, run: NodeRun, upstrea
     return refuse(db, input, run, start.error);
   }
   if (start.path === Model3dPath.FromImage) {
-    return runWiroNode(db, input, run, upstream, prompt);
+    return runTaskNode(db, input, run, upstream, prompt);
   }
 
   const shot = await productShotOf(db, input, prompt);
@@ -397,18 +397,16 @@ async function runModel3dNode(db: Db, requested: StartRun, run: NodeRun, upstrea
     return refuse(db, input, run, shot.error);
   }
   await showRunState(db, input, { posterRefId: shot.asset.id });
-  return runWiroNode(db, input, run, { ...upstream, referenceImageUrls: [shot.asset.url ?? ''] }, '');
+  return runTaskNode(db, input, run, { ...upstream, referenceImageUrls: [shot.asset.url ?? ''] }, '');
 }
 
 const MEDIUM_RUNS: Partial<Record<GenMedium, ProviderRun>> = { audio: runAudioNode, model3d: runModel3dNode };
 
-const GENERATION_PROVIDERS: ReadonlyArray<{ prefix: string; run: ProviderRun }> = [{ prefix: WIRO_ID_PREFIX, run: runWiroNode }];
-
 function providerRunOf(medium: GenMedium, model: string | null): ProviderRun | null {
-  if (medium === 'text' || !model) {
+  if (medium === 'text') {
     return null;
   }
-  return GENERATION_PROVIDERS.find((p) => model.startsWith(p.prefix))?.run ?? null;
+  return taskProviderOf(model) ? runTaskNode : null;
 }
 
 function missingInputOf(input: StartRun, upstream: UpstreamInputs, prompt: string): string | null {
@@ -1004,8 +1002,8 @@ export async function reconcileAudioNodeRuns(db: Db): Promise<VideoReconcileOutc
   return outcome;
 }
 
-const WIRO_RECONCILE_LIMIT = 20;
-const WIRO_RUN_MAX_ATTEMPTS = 8;
+const TASK_RECONCILE_LIMIT = 20;
+const TASK_RUN_MAX_ATTEMPTS = 8;
 
 export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutcome> {
   const outcome: VideoReconcileOutcome = { checked: 0, done: 0, failed: 0, pending: 0 };
@@ -1016,7 +1014,7 @@ export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutco
   ]);
   const deps = taskRunDeps(db);
 
-  for (const run of await queuedTaskRuns(db, { limit: WIRO_RECONCILE_LIMIT })) {
+  for (const run of await queuedTaskRuns(db, { limit: TASK_RECONCILE_LIMIT })) {
     const claimed = await claimRun(db, { orgId: run.orgId, runId: run.id });
     if (!claimed || !run.externalJobId) {
       continue;
@@ -1034,7 +1032,14 @@ export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutco
     const finishing: NodeRun = { ...run, status: 'finishing' };
     try {
       const mode = await projectModeOf(db, shape);
-      const progress = await finishTaskJob(db, deps, { externalJobId: run.externalJobId, modelId: run.model ?? '', scope: audioScopeOf(shape), mode });
+      const progress = await finishTaskJob(db, deps, {
+        externalJobId: run.externalJobId,
+        modelId: run.model ?? '',
+        scope: audioScopeOf(shape),
+        mode,
+        params: shape.params,
+        startedAt: run.startedAt
+      });
 
       if (progress.state === 'pending') {
         await releaseClaim(db, { orgId: run.orgId, runId: run.id });
@@ -1052,8 +1057,8 @@ export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutco
       await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored, ...poster });
       outcome.done += 1;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'wiro_reconcile_failed';
-      if (run.attempts + 1 < WIRO_RUN_MAX_ATTEMPTS) {
+      const message = error instanceof Error ? error.message : 'task_reconcile_failed';
+      if (run.attempts + 1 < TASK_RUN_MAX_ATTEMPTS) {
         await retryClaim(db, { orgId: run.orgId, runId: run.id, attempts: run.attempts + 1, error: message }).catch(() => {});
         outcome.pending += 1;
         continue;
@@ -1101,18 +1106,18 @@ export { claimRun, completeRun, failRun };
  */
 export const RUN_STALE_MS = 6 * 60_000;
 const VIDEO_TIMEOUT_MS = 20 * 60_000;
-const WIRO_IMAGE_TIMEOUT_MS = 10 * 60_000;
-const WIRO_VIDEO_TIMEOUT_MS = 30 * 60_000;
+const TASK_IMAGE_TIMEOUT_MS = 10 * 60_000;
+const TASK_VIDEO_TIMEOUT_MS = 30 * 60_000;
 const DUBBING_TIMEOUT_MS = 60 * 60_000;
 
-type JobKind = 'sync' | 'agent_turn' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing' | 'motion_render' | 'browser_render';
+type JobKind = 'sync' | 'agent_turn' | 'video' | 'task_image' | 'task_video' | 'dubbing' | 'motion_render' | 'browser_render';
 
 const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
   sync: RUN_STALE_MS,
   agent_turn: AGENT_STALE_MS,
   video: VIDEO_TIMEOUT_MS,
-  wiro_image: WIRO_IMAGE_TIMEOUT_MS,
-  wiro_video: WIRO_VIDEO_TIMEOUT_MS,
+  task_image: TASK_IMAGE_TIMEOUT_MS,
+  task_video: TASK_VIDEO_TIMEOUT_MS,
   dubbing: DUBBING_TIMEOUT_MS,
   motion_render: RENDER_DEADLINE_MS,
   browser_render: BROWSER_RENDER_DEADLINE_MS
@@ -1137,8 +1142,8 @@ function jobKindOf(run: { externalJobId: string | null; params: Record<string, u
   if (run.externalJobId.startsWith(AUDIO_JOB_PREFIX)) {
     return 'dubbing';
   }
-  if (run.externalJobId.startsWith(WIRO_JOB_PREFIX)) {
-    return nodeType === 'video' ? 'wiro_video' : 'wiro_image';
+  if (taskJobOf(run.externalJobId)) {
+    return nodeType === 'video' ? 'task_video' : 'task_image';
   }
   if (run.externalJobId.startsWith(RENDER_JOB_PREFIX)) {
     return 'motion_render';

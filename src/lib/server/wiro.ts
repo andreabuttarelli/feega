@@ -63,7 +63,7 @@ function taskOf(row: TaskRow | undefined): TaskState {
   };
 }
 
-export function wiro(config: WiroConfig): TaskProvider {
+export function wiro(config: WiroConfig): TaskProvider & Required<Pick<TaskProvider, 'purge'>> {
   const baseUrl = (config.baseUrl ?? DEFAULT_WIRO_BASE_URL).replace(/\/$/, '');
   const doFetch = config.fetchFn ?? fetch;
 
@@ -85,7 +85,7 @@ export function wiro(config: WiroConfig): TaskProvider {
 
   return {
     async run(model, inputs) {
-      const reply = await post<WiroReply & { taskid?: string }>(`/Run/${model.owner}/${model.project}`, inputs);
+      const reply = await post<WiroReply & { taskid?: string }>(`/Run/${String(model.owner)}/${String(model.project)}`, inputs);
       if (!reply.taskid) {
         throw new Error('wiro_failed: no task id');
       }

@@ -127,7 +127,7 @@ beforeEach(() => {
   moderation.screen.mockReset();
   moderation.screen.mockResolvedValue({ ok: true });
   deps.current = () => ({
-    gateway,
+    providers: { wiro: gateway },
     model: async (id) => (id === TRELLIS ? trellis : null),
     access: async () => ({ allowed: true }),
     screen: () => screen,
@@ -151,7 +151,7 @@ describe('a 3D node on a Wiro image-to-3D model', () => {
     const out = await runGenNode(db, start());
 
     expect(out.kind).toBe('queued');
-    expect(gateway.run).toHaveBeenCalledWith({ owner: 'microsoft', project: 'trellis-2' }, { inputImage: PRODUCT_URL, pipeline_type: '512' });
+    expect(gateway.run).toHaveBeenCalledWith({ owner: 'microsoft', project: 'trellis-2' }, { inputImage: PRODUCT_URL, pipeline_type: '512' }, expect.any(String));
     const job = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as Record<string, unknown>)?.external_job_id);
     expect((job?.payload as Record<string, unknown>).external_job_id).toBe('wiro:9001');
   });
@@ -182,7 +182,7 @@ describe('a 3D node on a Wiro image-to-3D model', () => {
 
     await runGenNode(db, { ...start(), params: { repeat: 2 } as Record<string, unknown> });
 
-    expect(gateway.run).toHaveBeenCalledWith({ owner: 'microsoft', project: 'trellis-2' }, { inputImage: PRODUCT_URL, pipeline_type: '512' });
+    expect(gateway.run).toHaveBeenCalledWith({ owner: 'microsoft', project: 'trellis-2' }, { inputImage: PRODUCT_URL, pipeline_type: '512' }, expect.any(String));
   });
 });
 
@@ -206,7 +206,8 @@ describe('a 3D node with text and no image', () => {
     );
     expect(gateway.run).toHaveBeenCalledWith(
       { owner: 'microsoft', project: 'trellis-2' },
-      { inputImage: `https://signed.test/${USER}/media/teapot.png`, pipeline_type: '512' }
+      { inputImage: `https://signed.test/${USER}/media/teapot.png`, pipeline_type: '512' },
+      expect.any(String)
     );
 
     const poster = calls.find((c) => c.table === 'assets' && c.op === 'insert' && (c.payload as Record<string, unknown>).type === 'image');

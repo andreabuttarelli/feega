@@ -1,7 +1,7 @@
 import { ProjectMode } from '$lib/project-mode';
 import { describe, expect, it, vi } from 'vitest';
 import { Provenance } from './likeness-guard';
-import { startTaskRun, TASK_REFUSALS, type TaskModel, type TaskRunDeps, type TaskRequest } from './task-run';
+import { finishTaskJob, RefusalStage, startTaskRun, TASK_REFUSALS, TASK_TIMED_OUT, type TaskModel, type TaskRunDeps, type TaskRequest } from './task-run';
 
 const SCOPE = { orgId: 'org-1', projectId: 'p1', canvasId: 'c1', nodeId: 'n1', userId: 'u1' };
 
@@ -16,7 +16,7 @@ const uncensoredModel: TaskModel = {
 function depsFor(model: TaskModel | null): { deps: TaskRunDeps; gatewayRun: ReturnType<typeof vi.fn> } {
   const gatewayRun = vi.fn().mockResolvedValue({ taskId: 'job-1' });
   const deps: TaskRunDeps = {
-    gateway: { run: gatewayRun, task: vi.fn(), purge: vi.fn() },
+    providers: { wiro: { run: gatewayRun, task: vi.fn(), purge: vi.fn() } },
     model: async () => model,
     access: async () => ({ allowed: true }),
     screen: () => ({
@@ -52,7 +52,7 @@ describe('startTaskRun — un modello uncensored non porta MAI ingressi al provi
       imageUrls: ['https://example.com/ref.png']
     });
 
-    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.noInputsAllowed });
+    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.noInputsAllowed, stage: RefusalStage.Policy });
     expect(gatewayRun).not.toHaveBeenCalled();
   });
 
@@ -66,7 +66,7 @@ describe('startTaskRun — un modello uncensored non porta MAI ingressi al provi
       lastFrameUrl: 'https://example.com/last.png'
     });
 
-    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.noInputsAllowed });
+    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.noInputsAllowed, stage: RefusalStage.Policy });
     expect(gatewayRun).not.toHaveBeenCalled();
   });
 
@@ -80,7 +80,7 @@ describe('startTaskRun — un modello uncensored non porta MAI ingressi al provi
       provenance: [{ kind: 'generated_media', label: 'a media' } as TaskRequest['provenance'][number]]
     });
 
-    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.noInputsAllowed });
+    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.noInputsAllowed, stage: RefusalStage.Policy });
     expect(gatewayRun).not.toHaveBeenCalled();
   });
 
@@ -132,7 +132,8 @@ describe('startTaskRun — a 3D model', () => {
 
     expect(gatewayRun).toHaveBeenCalledWith(
       { owner: 'microsoft', project: 'trellis-2' },
-      { inputImage: 'https://example.com/product.png', pipeline_type: '512' }
+      { inputImage: 'https://example.com/product.png', pipeline_type: '512' },
+      undefined
     );
   });
 
@@ -197,5 +198,95 @@ describe('an image-only 3D run in a standard project', () => {
 
     expect(out).toEqual({ kind: 'job', jobId: 'wiro:job-1' });
     expect(gatewayRun).toHaveBeenCalledTimes(1);
+  });
+});
+
+const kieBanana: TaskModel = {
+  id: 'kie/nano-banana-2',
+  catalogue: 'image',
+  spec: { model: 'nano-banana-2', fields: { prompt: 'prompt', resolution: 'resolution', images: [], imageList: 'image_input' } },
+  uncensored: false,
+  paramSchema: {},
+  pricing: { lines: [{ inputs: { resolution: '1K' }, usd: 0.04, method: 'cpr' }] }
+};
+
+describe('startTaskRun — one port, several providers', () => {
+  it('sends a kie model to the kie adapter and tags the job with its provider', async () => {
+    const { deps } = depsFor(kieBanana);
+    const kieRun = vi.fn().mockResolvedValue({ taskId: 'task_42' });
+    deps.providers = { kie: { run: kieRun, task: vi.fn() } };
+
+    const out = await startTaskRun(deps, {
+      ...baseRequest,
+      mode: ProjectMode.Standard,
+      scope: SCOPE,
+      modelId: kieBanana.id,
+      params: { resolution: '1K' },
+      imageUrls: ['https://example.com/a.png', 'https://example.com/b.png'],
+      idempotencyKey: 'run-1'
+    });
+
+    expect(out).toEqual({ kind: 'job', jobId: 'kie:task_42' });
+    expect(kieRun).toHaveBeenCalledWith(
+      { model: 'nano-banana-2' },
+      { prompt: 'a picture', resolution: '1K', image_input: ['https://example.com/a.png', 'https://example.com/b.png'] },
+      'run-1'
+    );
+  });
+
+  it('refuses at the provider stage when that provider has no key, so routing may fall back', async () => {
+    const { deps } = depsFor(kieBanana);
+    deps.providers = {};
+
+    const out = await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: kieBanana.id });
+
+    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.notConfigured, stage: RefusalStage.Provider });
+  });
+
+  it('bills a submit that throws as a failed attempt at the quoted price, refused at the provider stage', async () => {
+    const { deps } = depsFor(kieBanana);
+    deps.providers = { kie: { run: vi.fn().mockRejectedValue(new Error('kie_failed: HTTP 500')), task: vi.fn() } };
+
+    const out = await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: kieBanana.id, params: { resolution: '1K' } });
+
+    expect(out).toEqual({ kind: 'refused', error: 'kie_failed: HTTP 500', stage: RefusalStage.Provider });
+    expect(deps.bill).toHaveBeenCalledWith(expect.objectContaining({ provider: 'kie', costUsd: null, quotedUsd: 0.04, error: 'kie_failed: HTTP 500' }));
+  });
+
+  it('refuses an uncensored model in a standard project before any provider is called, whoever serves it', async () => {
+    const uncensoredKie: TaskModel = { ...kieBanana, id: 'kie/uncensored', uncensored: true };
+    const { deps } = depsFor(uncensoredKie);
+    const kieRun = vi.fn();
+    deps.providers = { kie: { run: kieRun, task: vi.fn() } };
+
+    const out = await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: uncensoredKie.id });
+
+    expect(out).toEqual({ kind: 'refused', error: 'uncensored_requires_uncensored_project', stage: RefusalStage.Policy });
+    expect(kieRun).not.toHaveBeenCalled();
+  });
+});
+
+describe('finishTaskJob — what a finished, failed or abandoned task bills', () => {
+  const STARTED = '2026-10-15T10:00:00.000Z';
+  const job = { externalJobId: 'kie:task_42', modelId: kieBanana.id, scope: SCOPE, mode: ProjectMode.Standard, params: { resolution: '1K' }, startedAt: STARTED };
+
+  it('gives up on a discount task that outlived its window, cancels it if it can, and bills nothing', async () => {
+    const bill = vi.fn();
+    const cancel = vi.fn().mockResolvedValue(false);
+    const providers = { kie: { run: vi.fn(), task: vi.fn().mockResolvedValue({ state: 'pending' }), cancel } };
+
+    const out = await finishTaskJob({} as never, { providers, model: async () => kieBanana, bill }, { ...job, now: Date.parse(STARTED) + 4 * 60_000 });
+
+    expect(out).toEqual({ state: 'failed', error: TASK_TIMED_OUT });
+    expect(cancel).toHaveBeenCalledWith('task_42');
+    expect(bill).toHaveBeenCalledWith(expect.objectContaining({ provider: 'kie', costUsd: null, error: TASK_TIMED_OUT }));
+  });
+
+  it('keeps waiting on a discount task still inside its window', async () => {
+    const providers = { kie: { run: vi.fn(), task: vi.fn().mockResolvedValue({ state: 'pending' }) } };
+
+    const out = await finishTaskJob({} as never, { providers, model: async () => kieBanana, bill: vi.fn() }, { ...job, now: Date.parse(STARTED) + 60_000 });
+
+    expect(out).toEqual({ state: 'pending' });
   });
 });

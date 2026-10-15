@@ -72,7 +72,7 @@ beforeEach(async () => {
   gateway.run.mockResolvedValue({ taskId: '2221' });
   const { uncensoredAccess } = await import('$lib/server/uncensored-access');
   deps.current = (db) => ({
-    gateway,
+    providers: { wiro: gateway },
     model: async (id) => models[id] ?? null,
     access: (orgId) => uncensoredAccess(db, orgId),
     screen: () => screen,
@@ -180,7 +180,8 @@ describe('an image node on a Wiro model', () => {
     expect(decide).toHaveBeenCalledOnce();
     expect(gateway.run).toHaveBeenCalledWith(
       { owner: 'wiro-partners', project: 'z-image-uncensored' },
-      { prompt: 'a woman on a balcony', ratio: '1:1', promptExtend: 'false' }
+      { prompt: 'a woman on a balcony', ratio: '1:1', promptExtend: 'false' },
+      expect.any(String)
     );
     expect(externalJobOf(calls)).toBe('wiro:2221');
   });
@@ -323,7 +324,7 @@ describe('taskPurgers', () => {
     const { taskPurgers } = await import('./task-run');
     gateway.purge.mockResolvedValue('purged');
 
-    expect(await taskPurgers(gateway)['wiro:']('wiro:2221')).toBe('purged');
+    expect(await taskPurgers({ wiro: gateway })['wiro:']('wiro:2221')).toBe('purged');
     expect(gateway.purge).toHaveBeenCalledWith('2221');
   });
 });

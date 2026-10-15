@@ -9,8 +9,9 @@ import { videoCredits } from '$lib/server/content-cost';
 import { billedCreditsFor } from '$lib/credit-ladder';
 import { videoDurationOptions, VIDEO_RESOLUTIONS, MIN_DURATION } from '$lib/server/video';
 import { modelParamsOf } from '$lib/canvas/model-params';
-import { WIRO_PROVIDER } from './wiro-catalogue';
-import { wiroChoice } from './wiro-choice';
+import { env } from '$env/dynamic/private';
+import { taskChoice } from './task-choice';
+import { configuredIn, taskProviderOf, TaskProviderName } from './generation/task-providers';
 import { model3dChoiceParams, REVIEWED_MODEL3D_MODELS } from '$lib/model3d-models';
 
 const VIDEO_SPEC_IDS = [
@@ -48,7 +49,8 @@ async function syncedRows(
     .select('id, label, input_modalities, supported_parameters, supported_resolutions, param_schema, pricing, provider, uncensored, wire_spec')
     .eq('catalogue', catalogue);
 
-  const rows = (data ?? []) as SyncedRow[];
+  const configured = configuredIn(env);
+  const rows = ((data ?? []) as SyncedRow[]).filter((row) => providerReachable(row, configured));
   return {
     rows: new Map(rows.map((r) => [r.id, r])),
     synced: rows.length > 0
@@ -100,9 +102,14 @@ function genericImageChoice(row: SyncedRow): ModelChoice {
  * migration) ripiega su `VIDEO_RESOLUTIONS`, il tetto misurato del nostro trasporto — mai un menu
  * senza selettore, che spedirebbe la resa di default silenziosa.
  */
-const CHOICE_OF_PROVIDER: Readonly<Record<string, (row: SyncedRow) => ModelChoice>> = {
-  [WIRO_PROVIDER]: wiroChoice
-};
+const CHOICE_OF_PROVIDER: Readonly<Record<string, (row: SyncedRow) => ModelChoice>> = Object.fromEntries(
+  Object.values(TaskProviderName).map((provider) => [provider, taskChoice])
+);
+
+function providerReachable(row: SyncedRow, configured: ReadonlySet<TaskProviderName>): boolean {
+  const provider = taskProviderOf(row.id);
+  return !provider || configured.has(provider);
+}
 
 function unspeccedChoice(row: SyncedRow, generic: (row: SyncedRow) => ModelChoice): ModelChoice {
   return (CHOICE_OF_PROVIDER[row.provider ?? ''] ?? generic)(row);
@@ -383,7 +390,7 @@ export type OfferableModels = { synced: boolean; choices: ModelChoice[] };
 async function offerableModels3d(admin: SupabaseClient): Promise<OfferableModels> {
   const { rows, synced } = await syncedRows(admin, 'model3d');
   const reviewed = [...rows.values()].filter((row) => REVIEWED_MODEL3D_MODELS.has(row.id));
-  return { synced, choices: reviewed.map((row) => ({ ...wiroChoice(row), params: model3dChoiceParams(row.id) })) };
+  return { synced, choices: reviewed.map((row) => ({ ...taskChoice(row), params: model3dChoiceParams(row.id) })) };
 }
 
 const OFFERABLE: Readonly<Record<SyncedCatalogue, (admin: SupabaseClient) => Promise<OfferableModels>>> = {

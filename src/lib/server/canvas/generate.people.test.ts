@@ -76,7 +76,7 @@ beforeEach(async () => {
   gateway.run.mockResolvedValue({ taskId: '2221' });
   const { uncensoredAccess } = await import('$lib/server/uncensored-access');
   deps.current = (db) => ({
-    gateway,
+    providers: { wiro: gateway },
     model: async (id) => models[id] ?? null,
     access: (orgId) => uncensoredAccess(db, orgId),
     screen: () => screen,
