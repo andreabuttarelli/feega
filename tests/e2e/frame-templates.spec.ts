@@ -5,6 +5,7 @@ const SHOTS = process.env.E2E_SHOTS_DIR;
 const POSTER = 'builtin:poster-checker-steps';
 const SETTLE_MS = 2000;
 const CARD_TEMPLATES = ['framed-reveal', 'showcase-scatter', 'card-cascade', 'perspective-stack', 'poster-deck-fan'];
+const OCTOBER_POSTERS = ['diagonal-pills', 'blue-trails', 'step-blobs', 'metaball-listing', 'pixel-burst', 'acid-strokes', 'glyph-specimen', 'stencil-steps'];
 
 const VIEWPORTS = [
   { name: 'desktop', width: 1440, height: 900, open: (page: Page) => page.getByTestId('frame-templates').click() },
@@ -59,6 +60,26 @@ test.describe('frame templates @real', () => {
       await shoot(page, `${viewport.name}-inserted`);
     });
   }
+
+  test('desktop: the October posters are found by name and insert as a frame', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.getByTestId('frame-templates').click();
+    const picker = page.getByRole('dialog', { name: 'Frame templates' });
+    await picker.getByRole('radio', { name: 'Still', exact: true }).click();
+    for (const name of OCTOBER_POSTERS) {
+      await picker.getByTestId('component-search').fill(name.replaceAll('-', ' '));
+      await expect(picker.locator(`[data-component="builtin:poster-${name}"]`)).toHaveCount(1);
+    }
+    await picker.getByTestId('component-search').fill('pixel burst');
+    await picker.locator('[data-component="builtin:poster-pixel-burst"]').click();
+    await expect(page.locator('[data-testid=motion-node]')).toHaveCount(1, { timeout: 15_000 });
+    await expect
+      .poll(async () => (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).eq('type', 'motion').is('deleted_at', null)).data?.length ?? 0, { message: 'the frame is saved' })
+      .toBe(1);
+    await shoot(page, 'desktop-october-poster');
+  });
 
   test('desktop: the card video templates are listed and insert as a frame', async ({ page, session, admin }) => {
     test.setTimeout(120_000);

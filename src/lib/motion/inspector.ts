@@ -148,6 +148,8 @@ const PART_SHARED_GROUPS = [Group.Style, Group.Layout];
 const PART_FIELD_SUFFIXES = ['Color', 'Colour', 'TextColor', 'BgColor', 'BorderColor', 'TagColor', 'Font', 'Size', 'Weight', 'Height', 'X', 'Y', 'Leading'];
 
 export const PART_FIELDS_BY_POSTER: Record<string, Record<string, readonly string[]>> = {
+  BlueTrailsPoster: { title: ['titleShift'] },
+  StepBlobsPoster: { blobs: ['blobsRound'] },
   BlockTitlePoster: { title: ['fontWeight', 'leading', 'fill', 'overlap'] },
   BoxedTypePoster: { word: ['wordLeft'], note: ['noteLine'] },
   CircleEventPoster: { heading: ['nameSize'], marker: ['circleSize', 'circleX', 'circleY'] },

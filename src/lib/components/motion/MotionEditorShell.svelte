@@ -131,6 +131,7 @@
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { claimsWidth } from '$lib/canvas/claim-width';
   import { NodeMode, nodeLayers } from '$lib/canvas/inline-motion';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHover } from '$lib/canvas/layers';
@@ -1484,7 +1485,7 @@
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
 <div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
-  <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost}>
+  <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost} use:claimsWidth={barHost}>
     <div class="group lead" {...dockOf(Part.Bar)}>
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
       <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
@@ -1922,6 +1923,10 @@
   .bar.in-canvas-bar > :global(*) {
     flex: 0 1 auto;
     min-width: 0;
+  }
+
+  .bar.in-canvas-bar > .lead {
+    flex-shrink: 0;
   }
 
   .editor .stage.hosted {

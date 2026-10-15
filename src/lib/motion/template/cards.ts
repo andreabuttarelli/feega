@@ -821,7 +821,15 @@ const POSTERS: Record<string, { what: string; photos: [number, number] | null; t
   'month-grid': { what: 'huge thin month words down the page under a grid of yellow event cards', photos: null, tone: LIGHT, goodFor: 'a calendar of events' },
   'rotated-cards': { what: 'a serif title over slightly rotated colour cards, each with a date, a tag and a name', photos: null, tone: LIGHT, goodFor: 'a series of dates or people' },
   'brick-caps': { what: 'black bars with big white caps lines over a brick grid on pale yellow, an accent circle', photos: null, tone: COLOUR, goodFor: 'an event day and programme' },
-  'dark-tags': { what: 'a huge light grey multi-line title on dark grey with small coloured name tags scattered across it', photos: null, tone: DARK, goodFor: 'names or credits' }
+  'dark-tags': { what: 'a huge light grey multi-line title on dark grey with small coloured name tags scattered across it', photos: null, tone: DARK, goodFor: 'names or credits' },
+  'diagonal-pills': { what: 'diagonal lilac pills with gradient tails on black, words along them and a big rotated title', photos: null, tone: DARK, goodFor: 'a course or a role' },
+  'blue-trails': { what: 'rows of electric blue dots with gradient trails on grainy black, a two-line title', photos: null, tone: DARK, goodFor: 'a course or a skill set' },
+  'step-blobs': { what: 'a huge thin title and number on a grey grid with black rounded stepped shapes and small notes', photos: null, tone: LIGHT, goodFor: 'a guide or explainer' },
+  'metaball-listing': { what: 'a ruled grid of dated events, pink metaball blobs with halftone, huge black words across the rows', photos: null, tone: LIGHT, goodFor: 'a monthly programme' },
+  'pixel-burst': { what: 'a slanted pixel title on black, a pink starburst masking a photo, heavy stacked words', photos: [1, 1], tone: DARK, goodFor: 'a contest or a call to act' },
+  'acid-strokes': { what: 'acid green with black brush strokes and starbursts, a centred title with a script word', photos: null, tone: COLOUR, goodFor: 'an exhibition' },
+  'glyph-specimen': { what: 'giant black glyph crops in a ruled grid under a fluorescent blob chain, vertical titles', photos: null, tone: LIGHT, goodFor: 'a typeface or a design show' },
+  'stencil-steps': { what: 'green and magenta stepped rectangles, stencil-cut syllables down the page, black label tags', photos: null, tone: LIGHT, goodFor: 'a festival programme' }
 };
 
 const posterCard = (p: (typeof POSTERS)[string]): TemplateCard =>

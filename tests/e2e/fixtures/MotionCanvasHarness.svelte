@@ -2,6 +2,7 @@
   import CanvasFlow, { type Tile } from '$lib/components/canvas/CanvasFlow.svelte';
   import { nodeSize } from '$lib/canvas/node-size';
   import { PosterSource } from '$lib/canvas/poster-lod';
+  import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import type { HarnessNode } from './motion-canvas-harness';
 
   let { nodes }: { nodes: HarnessNode[] } = $props();
@@ -19,11 +20,11 @@
 
 <div class="harness">
   <CanvasFlow {tiles} onSelectionChange={() => (window.selectionEmits = (window.selectionEmits ?? 0) + 1)}>
-    {#snippet tile({ id })}
+    {#snippet tile({ id, selected })}
       {@const node = byId.get(id)!}
       <div class="stage" data-testid="motion-node">
         {#if sourceOf(node) === PosterSource.VideoFrame}
-          <video class="poster" src={node.poster} controls muted playsinline preload="metadata"></video>
+          <LiveVideo src={node.poster} nodeId={id} {selected} controls muted />
         {:else}
           <img class="poster" src={node.poster} alt="" draggable="false" loading="lazy" decoding="async" />
         {/if}
