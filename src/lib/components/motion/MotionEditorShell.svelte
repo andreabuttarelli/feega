@@ -6,7 +6,7 @@
   import { replaceState } from '$app/navigation';
   import { page } from '$app/state';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
-  import { watchMotionNode } from '$lib/realtime/motion-channel';
+  import { headMoved, watchMotionNode } from '$lib/realtime/motion-channel';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { registerUpload } from '$lib/motion/fonts/ops';
   import Plus from '@lucide/svelte/icons/plus';
@@ -337,7 +337,11 @@
     if (brief) {
       void sendBrief(url, brief);
     }
-    return watchMotionNode(supabase, data.node.id, () => void pullExternalEdit());
+    return watchMotionNode(supabase, data.node.id, (row) => {
+      if (headMoved(row, version)) {
+        void pullExternalEdit();
+      }
+    });
   });
   let body = $state<HTMLDivElement | null>(null);
 

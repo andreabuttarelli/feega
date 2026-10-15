@@ -24,7 +24,7 @@
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { ActionKind, SaveFailure, actionKind, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -1078,7 +1078,10 @@
       peer: { userId: user.id, name: user.email ?? 'User', avatar: null,
         path: `/p/${data.projectId}/c/${data.canvas.id}`, threadId: null },
       onChange: (change) => {
-        if (!isOwnEcho(change, nodes)) { refreshSoon(); }
+        if (isOwnEcho(change, nodes)) { return; }
+        const moved = adoptFrameHead(change, nodes, saves.dirtyKeys);
+        if (moved) { nodes = moved; return; }
+        refreshSoon();
       },
       onReconnect: () => { void checkStale(Trigger.Reconnect); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },

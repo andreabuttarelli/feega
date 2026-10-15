@@ -18,6 +18,10 @@ describe('frame outlines on the client', () => {
     expect(missingHeads([{ nodeId: 'm1', version: 4 }, { nodeId: 'm2', version: 9 }], cache)).toEqual([{ nodeId: 'm1', version: 4 }]);
   });
 
+  it('never asks for the open frame: its rows come from the editor, and every save would refetch it', () => {
+    expect(missingHeads([{ nodeId: 'm1', version: 4 }, { nodeId: 'm2', version: 1 }], {}, 'm1')).toEqual([{ nodeId: 'm2', version: 1 }]);
+  });
+
   it('serves each frame the outline of its current revision', () => {
     const cache = cacheOutlines({}, [{ nodeId: 'm1', version: 3 }], { m1: [row('t1', 'm1')] });
 

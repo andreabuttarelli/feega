@@ -44,7 +44,7 @@ export const headKey = (head: FrameHead) => `${head.nodeId}${VERSION_SEP}${head.
 
 export type OutlineCache = Readonly<Record<string, readonly LayerRow[]>>;
 
-export const missingHeads = (heads: readonly FrameHead[], cache: OutlineCache) => heads.filter((h) => !(headKey(h) in cache));
+export const missingHeads = (heads: readonly FrameHead[], cache: OutlineCache, openNodeId: string | null = null) => heads.filter((h) => h.nodeId !== openNodeId && !(headKey(h) in cache));
 
 export function cacheOutlines(cache: OutlineCache, asked: readonly FrameHead[], answer: FrameOutlines): OutlineCache {
   return { ...cache, ...Object.fromEntries(asked.map((h) => [headKey(h), answer[h.nodeId] ?? []])) };

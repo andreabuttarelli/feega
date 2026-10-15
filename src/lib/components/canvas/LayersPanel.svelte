@@ -60,7 +60,7 @@
 
   $effect(() => {
     const url = canvas?.outlinesUrl;
-    const missing = missingHeads(heads, untrack(() => outlines));
+    const missing = missingHeads(heads, untrack(() => outlines), video?.nodeId ?? null);
     if (!url || !missing.length) {
       return;
     }

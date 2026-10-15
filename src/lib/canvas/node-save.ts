@@ -156,12 +156,15 @@ type ShownTile = { id: string; data: Record<string, unknown>; x?: number; y?: nu
 
 type ChangedRow = {
   id?: string;
+  version?: number;
   data?: Record<string, unknown>;
   x?: number;
   y?: number;
   display_name?: string | null;
   deleted_at?: string | null;
 };
+
+const samePlace = (row: ChangedRow, tile: ShownTile) => row.x === tile.x && row.y === tile.y && (row.display_name ?? null) === (tile.displayName ?? null);
 
 function canonical(value: unknown): string {
   if (Array.isArray(value)) {
@@ -183,10 +186,24 @@ export function isOwnEcho(change: RealtimeChange, tiles: ShownTile[]): boolean {
   if (!tile || row.deleted_at) {
     return false;
   }
-  return row.x === tile.x
-    && row.y === tile.y
-    && (row.display_name ?? null) === (tile.displayName ?? null)
-    && canonical(row.data ?? {}) === canonical(tile.data);
+  return samePlace(row, tile) && canonical(row.data ?? {}) === canonical(tile.data);
+}
+
+type HeadTile = ShownTile & { type: string; version: number; saved: Record<string, unknown> };
+
+const HEAD_IN_PLACE = new Set(['motion']);
+
+export function adoptFrameHead<T extends HeadTile>(change: RealtimeChange, tiles: T[], dirtyKeys: (id: string) => string[]): T[] | null {
+  if (change.table !== 'nodes' || change.eventType !== 'UPDATE') {
+    return null;
+  }
+  const row = (change.new ?? {}) as ChangedRow;
+  const tile = tiles.find((known) => known.id === row.id);
+  if (!tile || !HEAD_IN_PLACE.has(tile.type) || row.deleted_at || !row.data || row.version === undefined || dirtyKeys(tile.id).length || !samePlace(row, tile)) {
+    return null;
+  }
+  const { data, version } = row;
+  return tiles.map((known) => (known === tile ? { ...known, data, saved: data, version } : known));
 }
 
 type Written = { id: string; version: number; data: Record<string, unknown> };
