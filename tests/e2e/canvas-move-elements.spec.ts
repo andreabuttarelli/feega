@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { Page, Locator } from '@playwright/test';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
 const STAGE_W = 420;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 const PNG_1X1 = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+const canvasAction = (name: string) => (r: { url(): string }) => new URL(r.url()).searchParams.get('action') === name;
 
 type Clip = { id: string; component: string; props: Record<string, unknown> };
 type Doc = { tracks: { clips: Clip[] }[]; links?: Record<string, string> };
@@ -117,7 +119,7 @@ test.describe('moving elements between frames @real', () => {
     const alive = async () => (await admin.from('nodes').select('id').eq('id', free.id).is('deleted_at', null)).data?.length ?? 0;
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    const moved = page.waitForResponse((r) => r.url().includes('?/moveFree'));
+    const moved = page.waitForResponse(canvasAction('moveFree'));
     await dragTo(page, await centre(page.locator(`[data-motion-node="${free.id}"]`)), await centre(stageOf(page, b)));
     await moved;
 
@@ -126,7 +128,7 @@ test.describe('moving elements between frames @real', () => {
     await expect(page.locator(`[data-motion-node="${free.id}"]`)).toHaveCount(0);
 
     await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
-    const undone = page.waitForResponse((r) => r.url().includes('?/undo'));
+    const undone = page.waitForResponse(canvasAction('undo'));
     await page.keyboard.press('ControlOrMeta+z');
     await undone;
     await expect.poll(alive, { timeout: 10_000 }).toBe(1);
@@ -141,7 +143,7 @@ test.describe('moving elements between frames @real', () => {
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const from = await openAndGrab(page, a);
-    const moved = page.waitForResponse((r) => r.url().includes('?/moveElement'));
+    const moved = page.waitForResponse(canvasAction('moveElement'));
     await dragTo(page, from, await centre(stageOf(page, b)));
     await moved;
     await expect.poll(async () => clipIds(await head(admin, b)), { timeout: 10_000 }).toEqual(['Text:txt']);
@@ -193,17 +195,13 @@ test.describe('moving elements between frames @real', () => {
     const b = await frame(admin, seedNode, session, { x: 700, y: 80 }, blank);
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    const answer = await page.evaluate(
-      async ({ source, target }) => {
-        const body = new FormData();
-        body.set('source_node_id', source);
-        body.set('target_node_id', target);
-        body.set('kind', 'derives_from');
-        const res = await fetch(`${location.pathname}?/connect`, { method: 'POST', body, headers: { 'x-sveltekit-action': 'true' } });
-        return res.ok;
-      },
-      { source: gen.id, target: b }
-    );
+    const anon = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
+    const signedIn = await anon.auth.signInWithPassword({ email: session.email, password: session.password });
+    const connected = await page.request.post(`/api/v1/projects/${session.projectId}/canvases/${session.canvasId}?action=connect`, {
+      headers: { authorization: `Bearer ${signedIn.data.session!.access_token}` },
+      multipart: { source_node_id: gen.id, target_node_id: b, kind: 'derives_from' }
+    });
+    const answer = connected.ok();
     expect(answer).toBe(true);
 
     await expect.poll(async () => (await head(admin, b))?.links?.[gen.id] ?? null, { timeout: 10_000 }).not.toBeNull();
