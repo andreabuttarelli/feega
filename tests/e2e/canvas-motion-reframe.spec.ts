@@ -1,9 +1,20 @@
 import { mkdirSync } from 'node:fs';
+import sharp from 'sharp';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import type { Locator, Page } from '@playwright/test';
 import doc from './fixtures/motion-doc.json' with { type: 'json' };
 
-const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
+const landscape = (posterAssetId: string) => ({ format: '16:9', docHeadRevision: 1, posterAssetId, lastRenderAssetId: null });
+const POSTER = { width: 480, height: 270 };
+
+async function storedPoster(admin: import('@supabase/supabase-js').SupabaseClient, session: { orgId: string; projectId: string }): Promise<string> {
+  const jpeg = await sharp({ create: { ...POSTER, channels: 3, background: { r: 40, g: 40, b: 40 } } }).jpeg().toBuffer();
+  const path = `${session.orgId}/${session.projectId}/${crypto.randomUUID()}.jpg`;
+  expect((await admin.storage.from('canvas-assets').upload(path, jpeg, { contentType: 'image/jpeg' })).error).toBeNull();
+  const asset = await admin.from('assets').insert({ org_id: session.orgId, project_id: session.projectId, type: 'image', source: 'upload', url: path, mime_type: 'image/jpeg' }).select('id').single();
+  expect(asset.error).toBeNull();
+  return asset.data!.id;
+}
 const ZOOMS = [0.25, 0.5, 1, 2];
 const ZOOM_TOLERANCE = 0.1;
 const MAX_ZOOM_STEPS = 20;
@@ -79,8 +90,16 @@ async function open(page: Page, stage: Locator, touch: boolean) {
   const left = Math.max(box.x, 0);
   const top = Math.max(box.y, 0);
   const position = { x: (left + Math.min(box.x + box.width, view.width)) / 2 - box.x, y: (top + Math.min(box.y + box.height, view.height)) / 2 - box.y };
+  const drawnByPosterLayer = !(await stage.isVisible());
+  if (drawnByPosterLayer) {
+    const at = { x: box.x + position.x, y: box.y + position.y };
+    await (touch ? page.touchscreen.tap(at.x, at.y) : page.mouse.click(at.x, at.y));
+    await expect(stage, 'zoomed out the poster layer draws the frame; selecting it brings the frame back').toBeVisible();
+  }
   if (touch) {
-    await stage.tap({ position });
+    if (!drawnByPosterLayer) {
+      await stage.tap({ position });
+    }
     await stage.getByTestId('open-motion-editor').dispatchEvent('click');
     return;
   }
@@ -94,7 +113,7 @@ for (const [name, use] of Object.entries(DEVICES)) {
 
     for (const zoom of ZOOMS) {
       test(`opened from canvas zoom ${zoom}`, async ({ page, session, admin, seedNode }) => {
-        const node = await seedNode({ type: 'motion', x: 80, y: 120, data: LANDSCAPE });
+        const node = await seedNode({ type: 'motion', x: 80, y: 120, data: landscape(await storedPoster(admin, session)) });
         const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
         expect(error).toBeNull();
         await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
