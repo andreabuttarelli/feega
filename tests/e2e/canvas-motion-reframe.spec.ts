@@ -90,8 +90,16 @@ async function open(page: Page, stage: Locator, touch: boolean) {
   const left = Math.max(box.x, 0);
   const top = Math.max(box.y, 0);
   const position = { x: (left + Math.min(box.x + box.width, view.width)) / 2 - box.x, y: (top + Math.min(box.y + box.height, view.height)) / 2 - box.y };
+  const drawnByPosterLayer = !(await stage.isVisible());
+  if (drawnByPosterLayer) {
+    const at = { x: box.x + position.x, y: box.y + position.y };
+    await (touch ? page.touchscreen.tap(at.x, at.y) : page.mouse.click(at.x, at.y));
+    await expect(stage, 'zoomed out the poster layer draws the frame; selecting it brings the frame back').toBeVisible();
+  }
   if (touch) {
-    await stage.tap({ position });
+    if (!drawnByPosterLayer) {
+      await stage.tap({ position });
+    }
     await stage.getByTestId('open-motion-editor').dispatchEvent('click');
     return;
   }
