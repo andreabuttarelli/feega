@@ -6,6 +6,7 @@ import { findNode } from '$lib/server/repos/canvas';
 import { runGenNode } from '$lib/server/canvas/generate';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { modelAdvice } from '$lib/canvas/recommended-models';
+import { PROVIDER_PARAM } from '$lib/canvas/model-routes';
 import type { GenMedium } from '$lib/canvas/gen-node';
 
 async function modelWarning(medium: GenMedium, requested: string | null): Promise<string | null> {
@@ -40,6 +41,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     prompt?: string;
     model?: string;
     version?: number;
+    provider?: string;
     params?: Record<string, unknown>;
   };
 
@@ -61,7 +63,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     medium: body.medium as never,
     prompt: body.prompt ?? '',
     model,
-    params: (body.params ?? {}) as never,
+    params: { ...(body.params ?? {}), ...(body.provider ? { [PROVIDER_PARAM]: body.provider } : {}) } as never,
     expectedVersion: body.version ?? node.version
   });
 

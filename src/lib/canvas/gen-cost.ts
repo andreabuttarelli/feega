@@ -1,4 +1,5 @@
 import type { GenMedium, GenParams, ModelChoice } from './gen-node';
+import { pricedFor } from './model-routes';
 import { audioCreditsFor, audioDurationOf, audioModelFor, audioOperationOf } from './audio-operations';
 
 export type RunCostInput = {
@@ -72,7 +73,8 @@ export function listedCredits(choice: ModelChoice): number | undefined {
   return priced.length ? Math.min(...priced) : undefined;
 }
 
-export function creditsForRun(input: RunCostInput): number | null {
+export function creditsForRun(raw: RunCostInput): number | null {
+  const input = { ...raw, model: pricedFor(raw.model, raw.params) };
   if (input.model?.pricedInputs) {
     return pricedCredits(input);
   }

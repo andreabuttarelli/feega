@@ -11,7 +11,7 @@ import { videoDurationOptions, VIDEO_RESOLUTIONS, MIN_DURATION } from '$lib/serv
 import { modelParamsOf } from '$lib/canvas/model-params';
 import { env } from '$env/dynamic/private';
 import { taskChoice } from './task-choice';
-import { configuredIn, RouteRole, TASK_PROVIDERS, taskProviderOf, TaskProviderName } from './generation/task-providers';
+import { configuredIn, taskProviderOf, TaskProviderName } from './generation/task-providers';
 import { discountBook, withDiscountPrices } from './generation/discount-routes';
 import { model3dChoiceParams, REVIEWED_MODEL3D_MODELS } from '$lib/model3d-models';
 
@@ -109,7 +109,8 @@ const CHOICE_OF_PROVIDER: Readonly<Record<string, (row: SyncedRow) => ModelChoic
 
 function providerReachable(row: SyncedRow, configured: ReadonlySet<TaskProviderName>): boolean {
   const provider = taskProviderOf(row.id);
-  return !provider || (configured.has(provider) && TASK_PROVIDERS[provider].role === RouteRole.Primary);
+  const isRoute = Boolean((row.wire_spec as { discountFor?: unknown } | null)?.discountFor);
+  return !provider || (configured.has(provider) && !isRoute);
 }
 
 function unspeccedChoice(row: SyncedRow, generic: (row: SyncedRow) => ModelChoice): ModelChoice {

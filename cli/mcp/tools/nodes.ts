@@ -63,6 +63,7 @@ export function registerNodeTools(server: McpServer) {
         medium: z.enum(['text', 'image', 'video', 'audio', 'model3d']),
         prompt: z.string(),
         model: z.string().optional(),
+        provider: z.string().optional().describe('Which provider runs the model: a `routes[].provider` from `canvas_tool` `list_models` (e.g. "kie", "openrouter"). Omit or "auto" for the cheapest healthy one with automatic fallback; a chosen provider that fails is reported, never silently replaced.'),
         version: z.number().int(),
         params: z.record(z.string(), z.unknown()).optional()
       }),

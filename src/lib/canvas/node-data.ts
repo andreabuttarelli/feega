@@ -606,7 +606,8 @@ export const SYSTEM_OWNED_FIELDS = [
   'error',
   'params',
   'html',
-  'outputUncensored'
+  'outputUncensored',
+  'routeNote'
 ] as const;
 
 export const SERVER_WRITTEN_FIELDS: readonly string[] = [
@@ -618,6 +619,7 @@ export const SERVER_WRITTEN_FIELDS: readonly string[] = [
   'running',
   'error',
   'outputUncensored',
+  'routeNote',
   'sync_status',
   'sync_error'
 ];

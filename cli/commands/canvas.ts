@@ -24,15 +24,21 @@ export async function cmdCanvasUpload(project: string, file: string, opts: { can
   console.log(JSON.stringify(result, null, 2));
 }
 
-type ListedModel = { id: string; provider: string; credits: number | null; uncensored: boolean; routedVia: string | null };
+type ListedRoute = { provider: string; label: string; credits: number | null };
+
+type ListedModel = { id: string; provider: string; credits: number | null; uncensored: boolean; routedVia: string | null; routes?: ListedRoute[] };
 
 export async function cmdCanvasModels(project: string, opts: { medium: string; org?: string }) {
   const result = (await canvasApi.run(await token(), { project, op: 'list_models', input: { medium: opts.medium } }, opts.org)) as { models?: ListedModel[] };
-  const rows = (result.models ?? []).map((m) => ({
-    id: m.id,
-    provider: m.routedVia ? `${m.provider} via ${m.routedVia}` : m.provider,
-    credits: m.credits ?? 'varies',
-    uncensored: m.uncensored ? 'yes' : ''
-  }));
+  const rows = (result.models ?? []).flatMap((m) => {
+    const routes = m.routes?.length ? m.routes : [{ provider: '', label: m.provider, credits: m.credits }];
+    return routes.map((r) => ({
+      id: m.id,
+      provider: r.label,
+      '--provider': r.provider,
+      credits: r.credits ?? 'varies',
+      uncensored: m.uncensored ? 'yes' : ''
+    }));
+  });
   console.table(rows);
 }

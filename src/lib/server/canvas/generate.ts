@@ -39,7 +39,10 @@ import { resolveNodeModel } from './node-model';
 import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio-run';
 import { audioOperationOf, defaultAudioModel, operationSpec, voiceIdOf } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
-import { RouteRole, taskJobOf, taskProviderOf } from '$lib/server/generation/task-providers';
+import { RouteRole, TASK_PROVIDERS, taskJobOf, taskProviderOf } from '$lib/server/generation/task-providers';
+import { AUTO_ROUTE } from '$lib/canvas/model-routes';
+import { kieTextModel } from '$lib/server/kie-chat';
+import { PRIMARY_ROUTE } from '$lib/server/generation/discount-routes';
 import { RefusalStage, type TaskStart } from './task-run';
 import { model3dParamsOf } from '$lib/model3d-models';
 import { cheapestImageChoice, Model3dPath, model3dPathOf, productShotPrompt } from '$lib/canvas/model3d-run';
@@ -365,12 +368,17 @@ async function runDiscountRoute(db: Db, input: StartRun, run: NodeRun, upstream:
   const book = await discountBook(db as never, medium);
   const choice = book ? (await offerableModels(db as never, medium, PricingView.Primary)).choices.find((c) => c.id === input.model) : undefined;
   const route = choice ? routeFor(book, choice, medium, input.params) : null;
+  const chosen = Boolean(input.params.provider && input.params.provider !== AUTO_ROUTE);
+  if (!route && chosen && input.params.provider !== PRIMARY_PROVIDER) {
+    return refuse(db, input, run, `${input.params.provider} does not serve ${input.model} right now. Pick Auto or ${PRIMARY_LABEL}.`);
+  }
   if (!route) {
     return null;
   }
 
   const routed: StartRun = { ...input, model: route.modelId, params: route.params };
-  await setRunRoute(db, { orgId: input.orgId, runId: run.id, model: route.modelId, params: { ...route.params, [FALLBACK_MODEL_PARAM]: input.model } });
+  const fallback = chosen ? {} : { [FALLBACK_MODEL_PARAM]: input.model };
+  await setRunRoute(db, { orgId: input.orgId, runId: run.id, model: route.modelId, params: { ...route.params, ...fallback } });
   const out = await startTask(db, routed, run, upstream, prompt);
   if (out.kind === 'job') {
     return queueTask(db, routed, run, out.jobId);
@@ -379,9 +387,22 @@ async function runDiscountRoute(db: Db, input: StartRun, run: NodeRun, upstream:
     await giveUp(db, input, run, out.error);
     return { kind: 'refused', error: out.error };
   }
+  const label = book ? TASK_PROVIDERS[book.provider].label : '';
+  if (chosen) {
+    return refuse(db, input, run, chosenRouteFailed(label, out.error));
+  }
   await setRunRoute(db, { orgId: input.orgId, runId: run.id, model: input.model, params: input.params as Record<string, unknown> });
+  await showRunState(db, input, { routeNote: fellBackNote(label) });
   return null;
 }
+
+const PRIMARY_LABEL = PRIMARY_ROUTE.label;
+const PRIMARY_PROVIDER = PRIMARY_ROUTE.provider;
+
+export const fellBackNote = (label: string): string => `${label} failed, made on ${PRIMARY_LABEL}`;
+
+const chosenRouteFailed = (label: string, error: string): string =>
+  `${label} failed: ${error}. Pick Auto to fall back to ${PRIMARY_LABEL} automatically, or pick ${PRIMARY_LABEL}.`;
 
 const NO_IMAGE_MODEL = 'No image model is available to turn this text into a 3D model.';
 const PRODUCT_SHOT_ASPECT = '1:1';
@@ -532,7 +553,8 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
       model: input.model,
       params: input.params,
       running: true,
-      runId: run.id
+      runId: run.id,
+      routeNote: null
     }
   });
   if (marked.outcome === 'conflict') {
@@ -610,6 +632,17 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
   }
 
   try {
+    if (input.medium === 'text' && kieTextModel(input.model)) {
+      const [{ runKieText, kieTextDeps }, { logAiCall }] = await Promise.all([import('$lib/server/kie-text-run'), import('$lib/server/ai-log')]);
+      const out = await runKieText(kieTextDeps(logAiCall), {
+        model: input.model ?? '',
+        prompt,
+        system: textInput?.system || undefined,
+        scope: { orgId: input.orgId, projectId: input.projectId, userId: input.userId, actorKind: input.actor?.kind === 'agent' ? 'agent' : 'user', actorId: input.actor?.id, agentKey: input.actor?.agentKey ?? null }
+      });
+      return land(db, input, run, await depositText(db, input, out.text), out.costUsd);
+    }
+
     if (input.medium === 'text') {
       const { llmText } = await import('$lib/server/llm');
       const { withOrgContext, billedUsdInScope } = await import('$lib/server/ai-log');
@@ -1021,15 +1054,6 @@ export async function reconcileAudioNodeRuns(db: Db): Promise<VideoReconcileOutc
         outcome.pending += 1;
         continue;
       }
-      if (progress.state === 'failed' && fallbackModelOf(run)) {
-        await failRun(db, { orgId: run.orgId, runId: run.id, error: progress.error });
-        const fallback = await fallBackToPrimary(db, run, node);
-        if (fallback.kind === 'conflict') {
-          await showRunState(db, shape, { running: false, runId: run.id, error: progress.error });
-        }
-        outcome.failed += 1;
-        continue;
-      }
       if (progress.state === 'failed') {
         await giveUp(db, shape, finishing, progress.error);
         outcome.failed += 1;
@@ -1130,9 +1154,8 @@ export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutco
       if (progress.state === 'failed' && fallbackModelOf(run)) {
         await failRun(db, { orgId: run.orgId, runId: run.id, error: progress.error });
         const fallback = await fallBackToPrimary(db, run, node);
-        if (fallback.kind === 'conflict') {
-          await showRunState(db, shape, { running: false, runId: run.id, error: progress.error });
-        }
+        const shown = fallback.kind === 'conflict' ? { running: false, runId: run.id, error: progress.error } : { routeNote: fellBackNote(TASK_PROVIDERS[taskJobOf(run.externalJobId)!.provider].label) };
+        await showRunState(db, shape, shown);
         outcome.failed += 1;
         continue;
       }

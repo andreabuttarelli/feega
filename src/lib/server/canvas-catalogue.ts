@@ -1,3 +1,6 @@
+import { env } from '$env/dynamic/private';
+import { KIE_TEXT_MODELS } from './kie-chat';
+import { configuredIn, TaskProviderName } from './generation/task-providers';
 /**
  * I MODELLI CHE UN NODO DELLA TELA PUÒ SCEGLIERE.
  *
@@ -66,6 +69,25 @@ export type MediumCatalogue = {
  * questa chiamata il primo caricamento della tela troverebbe la lista vuota — cioè un menù che si
  * riempie solo alla seconda visita, che è il difetto peggiore da diagnosticare.
  */
+export function kieTextChoices(source: Readonly<Record<string, string | undefined>>): ModelChoice[] {
+  if (!configuredIn(source).has(TaskProviderName.Kie)) {
+    return [];
+  }
+  return KIE_TEXT_MODELS.map((model) => ({
+    id: model.id,
+    label: model.label,
+    aspectRatios: [],
+    ...providerOf(model.id),
+    wireId: model.id,
+    inputModalities: ['text'],
+    textPricing: {
+      inputCreditsPerMillion: model.usdPerMillionIn * CREDITS_PER_USD_SUBSCRIPTION_LIST,
+      outputCreditsPerMillion: model.usdPerMillionOut * CREDITS_PER_USD_SUBSCRIPTION_LIST,
+      systemPromptTokens: 0
+    }
+  }));
+}
+
 export async function canvasModelCatalogue(): Promise<Record<GenMedium, MediumCatalogue>> {
   await ensureGatewayModels().catch(() => {});
   const admin = createAdminClient();
@@ -94,6 +116,8 @@ export async function canvasModelCatalogue(): Promise<Record<GenMedium, MediumCa
       systemPromptTokens: 0
     }
   }));
+
+  textChoices.push(...kieTextChoices(env));
 
   return {
     text: { ...withRecommendations('text', textChoices, textSynced, now), synced: true },

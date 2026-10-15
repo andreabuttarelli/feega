@@ -85,7 +85,8 @@ describe('un nodo che produce, letto dalla riga', () => {
       refId: null,
       runs: [],
       running: false,
-      error: null
+      error: null,
+      routeNote: null
     });
   });
 

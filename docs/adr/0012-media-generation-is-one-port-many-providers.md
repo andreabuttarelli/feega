@@ -76,3 +76,15 @@ offered. Wiro `WIRO_API_KEY` (+ `WIRO_API_SECRET`), kie `KIE_API_KEY`, Higgsfiel
 A new async provider is an adapter, a row in `TASK_PROVIDERS` and its catalogue rows. A kie fallback can
 cost us two provider bills for one user charge; health demotion keeps that rare. Prices that
 OpenRouter states per token have no per-image quote and show as variable.
+
+## Addendum 2026-10-15: the user picks the provider
+
+A model served by several providers is one entry in the picker with one row per provider: Auto
+(cheapest healthy, the default), the primary (OpenRouter) and kie.ai, each with its own price and,
+for kie, its success rate and p95 from `ai_calls`. The choice is `params.provider` on the node.
+Auto keeps the rules above, including the automatic fallback, and the node then says
+"kie.ai failed, made on OpenRouter". A provider picked by hand is honoured even when Auto would
+skip it (demoted, or dearer), and a failure there is reported, never replaced by another provider:
+the user asked for that one. kie also serves models nobody else does (Grok Imagine video,
+GPT 6 Luna text); those are ordinary picker entries under kie.ai. kie prices come from its public
+price list, `POST https://api.kie.ai/client/v1/model-pricing/page`.

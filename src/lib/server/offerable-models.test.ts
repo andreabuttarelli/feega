@@ -6,6 +6,7 @@ vi.mock('$env/dynamic/private', () => ({ env: testEnv }));
 
 beforeEach(() => {
   testEnv.WIRO_API_KEY = 'wiro-test-key';
+  delete testEnv.KIE_API_KEY;
 });
 import { GPT_IMAGE_2_MODEL, NANO_BANANA_PRO_MODEL, QWEN3_PRO_MODEL } from '$lib/image-models';
 import { SEEDANCE_25_MODEL, OPENROUTER_UPSCALE_MODEL, KLING_3_VIDEO_MODEL } from '$lib/video-models';
@@ -24,15 +25,15 @@ function fakeAdmin(
     pricing?: unknown;
   }[]
 ) {
+  type Query = { eq: (col: string, value: string) => Query; order: () => Query; limit: () => Query; then: (resolve: (v: { data: unknown[]; error: null }) => unknown) => unknown };
+  const query = (matching: typeof rows): Query => ({
+    eq: (col, value) => query(matching.filter((r) => (r as Record<string, unknown>)[col] === undefined || (r as Record<string, unknown>)[col] === value)),
+    order: () => query(matching),
+    limit: () => query(matching),
+    then: (resolve) => resolve({ data: matching, error: null })
+  });
   const admin = {
-    from: () => ({
-      select: () => ({
-        eq: (_col: string, value: string) => ({
-          then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
-            resolve({ data: rows.filter((r) => r.catalogue === value), error: null })
-        })
-      })
-    })
+    from: (table: string) => ({ select: () => query(table === 'ai_models' ? rows : []) })
   } as unknown as SupabaseClient;
   return admin;
 }
@@ -93,6 +94,19 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
     expect(out.choices).toContainEqual(
       expect.objectContaining({ id: 'wiro/wiro-partners/z-image-uncensored', providerLabel: 'Wiro', uncensored: true })
     );
+  });
+
+  it('offers a model only kie serves as its own choice, but never a kie row that is a cheaper route of another model', async () => {
+    testEnv.KIE_API_KEY = 'kie-test-key';
+    const admin = fakeAdmin([
+      { id: 'kie/grok-imagine/text-to-video', catalogue: 'video', input_modalities: ['text'], output_modalities: ['video'], provider: 'kie', wire_spec: { model: 'grok-imagine/text-to-video', fields: { prompt: 'prompt', images: [] } } } as never,
+      { id: 'kie/nano-banana-2', catalogue: 'video', input_modalities: ['text'], output_modalities: ['video'], provider: 'kie', wire_spec: { model: 'nano-banana-2', discountFor: 'nano-banana-2', fields: { prompt: 'prompt', images: [] } } } as never
+    ]);
+
+    const ids = (await offerableModels(admin, 'video')).choices.map((c) => c.id);
+
+    expect(ids).toContain('kie/grok-imagine/text-to-video');
+    expect(ids).not.toContain('kie/nano-banana-2');
   });
 
   it('hides a provider whose key is missing instead of offering a model that cannot run', async () => {
