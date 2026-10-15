@@ -15,7 +15,9 @@ const PROVIDER_LABELS: Record<string, string> = {
   perplexity: 'Perplexity',
   deepseek: 'DeepSeek',
   cohere: 'Cohere',
-  wiro: 'Wiro'
+  wiro: 'Wiro',
+  kie: 'kie.ai',
+  higgsfield: 'Higgsfield'
 };
 
 function labelFor(key: string): string {

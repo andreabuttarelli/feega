@@ -53,10 +53,10 @@ describe('candidateOf — what one catalogue row is worth recommending', () => {
     expect(candidateOf('image', row({ pricing })).unitCostUsd).toBeCloseTo(0.045);
   });
 
-  it('an image billed per token costs one 1K image worth of tokens', () => {
-    const pricing = { endpoints: [{ lines: [{ billable: 'output_image', unit: 'token', cost_usd: 0.00006 }], parameters: {} }] };
+  it('an image billed per token has no per-image price: Hy Image was quoted $0.002 and charged $0.024', () => {
+    const hyImage = { endpoints: [{ lines: [{ billable: 'output_image', unit: 'token', cost_usd: 0.0000016 }], parameters: {} }] };
 
-    expect(candidateOf('image', row({ pricing })).unitCostUsd).toBeCloseTo(0.0774);
+    expect(candidateOf('image', row({ pricing: hyImage })).unitCostUsd).toBeNull();
   });
 
   it('an image with no price lines has no known cost', () => {

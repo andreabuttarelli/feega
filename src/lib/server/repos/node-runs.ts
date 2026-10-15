@@ -1,3 +1,4 @@
+import { TASK_JOB_PREFIXES } from '$lib/server/generation/task-providers';
 import type { Db } from '$lib/server/db/client';
 import type { Database } from '$lib/database.types';
 
@@ -205,14 +206,13 @@ export async function retryClaim(
  * filtro basta a distinguere i due mondi senza un `medium` sulla riga.
  */
 export const AUDIO_JOB_PREFIX = 'elevenlabs:';
-export const WIRO_JOB_PREFIX = 'wiro:';
 export const AUDIO_HISTORY_PREFIX = 'elevenlabs-history:';
 export const RENDER_JOB_PREFIX = 'motion-render:';
 export const BROWSER_RENDER_PREFIX = 'browser-render:';
 
 const SETTLED_STATUSES: NodeRunStatus[] = ['done', 'failed', 'expired'];
 
-const OWN_RECONCILER_PREFIXES = [AUDIO_JOB_PREFIX, WIRO_JOB_PREFIX, RENDER_JOB_PREFIX, BROWSER_RENDER_PREFIX];
+const OWN_RECONCILER_PREFIXES = [AUDIO_JOB_PREFIX, ...TASK_JOB_PREFIXES, RENDER_JOB_PREFIX, BROWSER_RENDER_PREFIX];
 
 async function queuedRunsWithPrefix(db: Db, input: { limit: number; prefix: string }): Promise<NodeRun[]> {
   const { data, error } = await db
@@ -253,8 +253,10 @@ export async function queuedRenderRuns(db: Db, input: { limit: number }): Promis
   return queuedRunsWithPrefix(db, { ...input, prefix: RENDER_JOB_PREFIX });
 }
 
-export async function queuedWiroRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
-  return queuedRunsWithPrefix(db, { ...input, prefix: WIRO_JOB_PREFIX });
+export async function queuedTaskRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {
+  const batches = await Promise.all(TASK_JOB_PREFIXES.map((prefix) => queuedRunsWithPrefix(db, { ...input, prefix })));
+  const runs = new Map(batches.flat().filter((run) => TASK_JOB_PREFIXES.some((prefix) => run.externalJobId?.startsWith(prefix))).map((run) => [run.id, run]));
+  return [...runs.values()].sort((a, b) => a.startedAt.localeCompare(b.startedAt)).slice(0, input.limit);
 }
 
 export async function queuedVideoRuns(db: Db, input: { limit: number }): Promise<NodeRun[]> {

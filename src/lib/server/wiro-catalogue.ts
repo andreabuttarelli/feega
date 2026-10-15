@@ -1,7 +1,10 @@
 import type { AiModelCatalogue, AiModelRow } from './ai-models-sync';
+import type { WireFields } from './canvas/task-provider';
+import type { TaskPricing } from './generation/task-pricing';
+import { idPrefixOf, TaskProviderName } from './generation/task-providers';
 
-export const WIRO_PROVIDER = 'wiro';
-export const WIRO_ID_PREFIX = `${WIRO_PROVIDER}/`;
+export const WIRO_PROVIDER = TaskProviderName.Wiro;
+export const WIRO_ID_PREFIX = idPrefixOf(TaskProviderName.Wiro);
 
 const LIST_LIMIT = '500';
 const CATALOGUE_QUERIES: ReadonlyArray<Record<string, unknown>> = [
@@ -23,7 +26,6 @@ const PROMPT_FIELD = 'prompt';
 const UNCENSORED = /uncensored/i;
 const LAST_FRAME = /last|end/i;
 const NON_IMAGE_FILE = /video|audio/i;
-const PRICED_PER_RUN = new Set(['cpr', 'cpo']);
 
 const CONTROL_ALIASES: Readonly<Record<'aspectRatio' | 'resolution' | 'duration', { wire: readonly string[]; schemaKey: string }>> = {
   aspectRatio: { wire: ['ratio', 'aspectRatio', 'aspect_ratio'], schemaKey: 'aspect_ratio' },
@@ -48,20 +50,7 @@ export type WiroTool = {
   time?: string | number | null;
 };
 
-export type WiroFields = {
-  prompt?: string;
-  aspectRatio?: string;
-  resolution?: string;
-  duration?: string;
-  images: string[];
-  lastFrame?: string;
-};
-
-export type WiroWireSpec = { owner: string; project: string; fields: WiroFields };
-
-export type WiroPriceLine = { inputs: Record<string, string>; usd: number; method: string };
-
-export type WiroPricing = { lines: WiroPriceLine[] };
+export type WiroWireSpec = { owner: string; project: string; fields: WireFields };
 
 function paramsOf(tool: WiroTool): WiroParam[] {
   return (tool.parameters ?? []).flatMap((group) => group.items ?? []).filter((p) => typeof p.id === 'string');
@@ -76,7 +65,7 @@ function catalogueOf(tool: WiroTool): AiModelCatalogue {
   return matched ?? 'image';
 }
 
-function pricingOf(raw: string | null | undefined): WiroPricing {
+function pricingOf(raw: string | null | undefined): TaskPricing {
   try {
     const lines = JSON.parse(raw ?? '[]') as Array<{ inputs?: Record<string, unknown>; price?: unknown; priceMethod?: unknown }>;
     return {
@@ -100,7 +89,7 @@ function isFile(param: WiroParam): boolean {
   return FILE_INPUT_TYPES.has(param.type ?? '');
 }
 
-function wiringOf(params: WiroParam[], catalogue: AiModelCatalogue): { fields: WiroFields; controls: Set<string> } | null {
+function wiringOf(params: WiroParam[], catalogue: AiModelCatalogue): { fields: WireFields; controls: Set<string> } | null {
   const hasPrompt = params.some((p) => p.id === PROMPT_FIELD);
   if (!hasPrompt && !PROMPTLESS_CATALOGUES.has(catalogue)) {
     return null;
@@ -109,7 +98,7 @@ function wiringOf(params: WiroParam[], catalogue: AiModelCatalogue): { fields: W
     return null;
   }
 
-  const fields: WiroFields = hasPrompt ? { prompt: PROMPT_FIELD, images: [] } : { images: [] };
+  const fields: WireFields = hasPrompt ? { prompt: PROMPT_FIELD, images: [] } : { images: [] };
   const controls = new Set<string>(hasPrompt ? [PROMPT_FIELD] : []);
   for (const [control, alias] of Object.entries(CONTROL_ALIASES) as Array<[keyof typeof CONTROL_ALIASES, (typeof CONTROL_ALIASES)[keyof typeof CONTROL_ALIASES]]>) {
     const match = params.find((p) => alias.wire.includes(p.id!) && optionValues(p).length);
@@ -130,7 +119,7 @@ function wiringOf(params: WiroParam[], catalogue: AiModelCatalogue): { fields: W
   return { fields, controls };
 }
 
-function paramSchemaOf(params: WiroParam[], fields: WiroFields, controls: Set<string>): Record<string, unknown> {
+function paramSchemaOf(params: WiroParam[], fields: WireFields, controls: Set<string>): Record<string, unknown> {
   const schema: Record<string, unknown> = {};
   for (const [control, alias] of Object.entries(CONTROL_ALIASES)) {
     const wireId = fields[control as keyof typeof CONTROL_ALIASES];
@@ -215,16 +204,4 @@ export async function fetchWiroCatalogue(
   } catch (error) {
     return { rows: [], ok: false, reason: error instanceof Error ? error.message : 'wiro catalogue fetch_failed' };
   }
-}
-
-export function isWiroPricing(pricing: unknown): pricing is WiroPricing {
-  return Boolean(pricing && typeof pricing === 'object' && Array.isArray((pricing as WiroPricing).lines));
-}
-
-export function wiroUsdFor(pricing: unknown, inputs: Record<string, unknown>): number | null {
-  if (!isWiroPricing(pricing)) {
-    return null;
-  }
-  const line = pricing.lines.find((l) => Object.entries(l.inputs).every(([k, v]) => String(inputs[k] ?? '') === v));
-  return line && PRICED_PER_RUN.has(line.method) && line.usd > 0 ? line.usd : null;
 }

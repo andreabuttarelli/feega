@@ -1,5 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
+
+const { testEnv } = vi.hoisted(() => ({ testEnv: {} as Record<string, string | undefined> }));
+vi.mock('$env/dynamic/private', () => ({ env: testEnv }));
+
+beforeEach(() => {
+  testEnv.WIRO_API_KEY = 'wiro-test-key';
+});
 import { GPT_IMAGE_2_MODEL, NANO_BANANA_PRO_MODEL, QWEN3_PRO_MODEL } from '$lib/image-models';
 import { SEEDANCE_25_MODEL, OPENROUTER_UPSCALE_MODEL, KLING_3_VIDEO_MODEL } from '$lib/video-models';
 import { mediaModelSlot } from '$lib/media-model-slots';
@@ -86,6 +93,24 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
     expect(out.choices).toContainEqual(
       expect.objectContaining({ id: 'wiro/wiro-partners/z-image-uncensored', providerLabel: 'Wiro', uncensored: true })
     );
+  });
+
+  it('hides a provider whose key is missing instead of offering a model that cannot run', async () => {
+    delete testEnv.WIRO_API_KEY;
+    const admin = fakeAdmin([
+      {
+        id: 'wiro/alibaba/qwen-image-3-0-pro',
+        catalogue: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+        provider: 'wiro',
+        wire_spec: { owner: 'alibaba', project: 'qwen-image-3-0-pro', fields: { prompt: 'prompt', images: [] } }
+      } as never
+    ]);
+
+    const out = await offerableModels(admin, 'image');
+
+    expect(out.choices.map((c) => c.id)).not.toContain('wiro/alibaba/qwen-image-3-0-pro');
   });
 
   it('ogni immagine offerta porta un unitCredits — il prezzo che il bottone "Genera" mostra', async () => {

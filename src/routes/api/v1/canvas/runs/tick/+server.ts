@@ -3,7 +3,7 @@ import { json } from '@sveltejs/kit';
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { cronAuthorized } from '$lib/server/cron-auth';
-import { expireStuckRuns, reconcileAudioNodeRuns, reconcileVideoNodeRuns, reconcileWiroNodeRuns } from '$lib/server/canvas/generate';
+import { expireStuckRuns, reconcileAudioNodeRuns, reconcileVideoNodeRuns, reconcileTaskNodeRuns } from '$lib/server/canvas/generate';
 import { drainLoopQueue } from '$lib/server/canvas/loop';
 import { drainWorkflowQueue } from '$lib/server/canvas/workflow';
 import { drainStudio } from '$lib/server/studio/studio-drain';
@@ -62,7 +62,7 @@ export const GET: RequestHandler = async ({ request }) => {
     return { checked: 0, done: 0, failed: 0, pending: 0 };
   });
 
-  const wiro = await reconcileWiroNodeRuns(db).catch((e) => {
+  const wiro = await reconcileTaskNodeRuns(db).catch((e) => {
     console.error('[canvas runs] wiro reconcile failed', e);
     return { checked: 0, done: 0, failed: 0, pending: 0 };
   });
