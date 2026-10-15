@@ -99,6 +99,7 @@
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
+  import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
@@ -1069,6 +1070,17 @@
   $effect(() => {
     canvasSelection.set(selectedIds);
     return () => canvasSelection.set([]);
+  });
+
+  $effect(() => {
+    propertiesTarget.set(targetOf(selectedIds, nodes));
+    return () => propertiesTarget.set(null);
+  });
+
+  $effect(() => {
+    if ($propertiesRequest) {
+      requestMotion($propertiesRequest);
+    }
   });
 
   let seenRevision = '';

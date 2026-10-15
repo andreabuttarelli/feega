@@ -12,6 +12,9 @@
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { registerUpload } from '$lib/motion/fonts/ops';
   import Plus from '@lucide/svelte/icons/plus';
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+  import MessageCircle from '@lucide/svelte/icons/message-circle';
+  import { editingLabel } from '$lib/canvas/phone-properties';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import CompositionSettings from '$lib/components/motion/CompositionSettings.svelte';
   import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, DISPLAY_NAME, isTap } from '$lib/motion/editor-bar';
@@ -28,7 +31,7 @@
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import { Detent, nearestDetent, nextDetent, sheetHeight } from '$lib/motion/sheet-detents';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
-  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, defaultTimelinePx, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, OpensOn, defaultTimelinePx, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import { Lens, addLens } from '$lib/motion/glass/ops';
@@ -70,7 +73,7 @@
   import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
-  import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
+  import { Align, addMarker, alignClips, allMarkers, clipName, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import StillExport from '$lib/components/motion/StillExport.svelte';
   import { animateStill, DocMode, docMode, stillFrame } from '$lib/motion/still';
@@ -169,7 +172,7 @@
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
-  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, canvasundo = null }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null } = $props();
+  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
   const rules = $derived(MOUNT[mount]);
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
@@ -219,6 +222,7 @@
   const analysing = new Set<string>();
   let sheet = $state<Sheet>(Sheet.None);
   let detent = $state(Detent.Half);
+  let openAt = Detent.Half;
   let sheetDrag = $state<{ y: number; from: number; height: number } | null>(null);
   let stageEl = $state<HTMLElement | null>(null);
   let selectedPart = $state<string | null>(null);
@@ -343,6 +347,9 @@
     layout = readLayout(browserStore(), firstLayout());
     if (selection.length) {
       relayout({ side: Side.Properties, inspector: Panel.Open });
+    }
+    if (opensOn === OpensOn.Properties && viewport === Viewport.Phone) {
+      peekProperties();
     }
     const url = new URL(window.location.href);
     if (url.searchParams.has(BRAND_PARAM)) {
@@ -740,7 +747,8 @@
 
   $effect(() => {
     void sheet;
-    detent = Detent.Half;
+    detent = openAt;
+    openAt = Detent.Half;
   });
 
   function grabSheet(e: PointerEvent) {
@@ -880,9 +888,20 @@
   $effect(() => (rules.tools === ToolsPlace.CanvasBar ? frameBar.attach({ act: (action) => FRAME_ACTS[action]() }) : undefined));
   let timelineShownPx = $state(0);
   let timelineEl = $state<HTMLElement | null>(null);
+  let transportEl = $state<HTMLElement | null>(null);
+  let tabsEl = $state<HTMLElement | null>(null);
+  const barFloor = $derived.by(() => {
+    if (viewport !== Viewport.Phone) {
+      return timelineHidden ? null : timelineEl;
+    }
+    if (mode === DocMode.Still) {
+      return tabsEl;
+    }
+    return timelineHidden ? transportEl : timelineEl;
+  });
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
-      frameBar.timeline = timelineHidden ? null : timelineEl;
+      frameBar.timeline = barFloor;
     }
   });
   $effect(() => {
@@ -894,7 +913,7 @@
   const dialogOpen = $derived(Boolean(publishing || sounding || menuOpen || helpOpen || exporting || browsing || componentsOpen || templating));
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
-      frameBar.covered = dialogOpen;
+      frameBar.covered = dialogOpen || (viewport === Viewport.Phone && sheet !== Sheet.None);
     }
   });
 
@@ -1421,6 +1440,28 @@
     }))
   ]);
 
+  function peekProperties() {
+    if (sheet !== Sheet.Properties) {
+      openAt = Detent.Peek;
+      sheet = Sheet.Properties;
+    }
+  }
+
+  let lastPick = '';
+
+  $effect(() => {
+    const pick = [...selection, selectedPart ?? ''].join();
+    if (pick === lastPick) {
+      return;
+    }
+    lastPick = pick;
+    if (selection.length && viewport === Viewport.Phone) {
+      untrack(peekProperties);
+    }
+  });
+
+  const editingName = $derived(selected ? clipName(selected) : (data.node.name ?? 'Frame'));
+
   function showProperties() {
     if (viewport === Viewport.Phone) {
       sheet = Sheet.Properties;
@@ -1549,7 +1590,7 @@
 <svelte:head>{#if rules.ownsTitle}<title>{data.node.name ?? 'Frame'} · Frame editor</title>{/if}</svelte:head>
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
-<div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
+<div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} data-sheet={sheet === Sheet.None ? undefined : detent} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
   <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost} use:claimsWidth={barHost}>
     <div class="group lead" {...dockOf(Part.Bar)}>
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
@@ -1562,7 +1603,7 @@
       </div>
     </div>
 
-    <div class="group transport" {...dockOf(Part.Transport)} role="group" aria-label="Transport">
+    <div class="group transport" bind:this={transportEl} {...dockOf(Part.Transport)} role="group" aria-label="Transport">
       <IconButton action={Action.GoStart} onclick={COMMANDS[Command.GoStart]} />
       <IconButton action={Action.StepBack} class="step" onclick={COMMANDS[Command.StepBack]} />
       <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" onclick={COMMANDS[Command.TogglePlay]} />
@@ -1799,7 +1840,7 @@
     {/snippet}
     {#snippet chat()}
     <aside class="chat" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Agent} aria-label="Agent">
-      <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Agent</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
+      <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Chat</span><span class="editing" data-testid="chat-editing">{editingLabel(editingName)}</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
       {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} /><ChatPanel projectId={data.projectId} reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />{/if}
     </aside>
     {/snippet}
@@ -1869,9 +1910,9 @@
     </section>
   </div>
 
-  <nav class="tabs" {...dockOf(Part.Tabs)} aria-label="Panels">
-    <button type="button" class:on={sheet === Sheet.Properties} onclick={() => (sheet = sheet === Sheet.Properties ? Sheet.None : Sheet.Properties)}>Properties</button>
-    <button type="button" class:on={sheet === Sheet.Agent} onclick={() => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)}>Agent</button>
+  <nav class="tabs" bind:this={tabsEl} {...dockOf(Part.Tabs)} aria-label="Panels">
+    <button type="button" class:on={sheet === Sheet.Properties} aria-pressed={sheet === Sheet.Properties} data-testid="phone-tab-properties" onclick={() => (sheet = sheet === Sheet.Properties ? Sheet.None : Sheet.Properties)}><SlidersHorizontal size={18} aria-hidden="true" />Properties</button>
+    <button type="button" class:on={sheet === Sheet.Agent} aria-pressed={sheet === Sheet.Agent} data-testid="phone-tab-chat" onclick={() => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)}><MessageCircle size={18} aria-hidden="true" />Chat</button>
   </nav>
 </div>
 
@@ -2802,6 +2843,10 @@
     flex: 1;
   }
 
+  [data-viewport='phone'][data-sheet='peek'] .body.no-timeline {
+    padding-bottom: var(--sheet-h);
+  }
+
   [data-viewport='phone'] .body.no-timeline .timeline-area {
     display: none;
   }
@@ -2904,18 +2949,36 @@
   [data-viewport='phone'] .tabs {
     grid-area: tabs;
     display: flex;
+    gap: 4px;
     height: 56px;
+    padding: 6px var(--ui-space-2);
   }
 
   .tabs button {
     flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--ui-radius-full);
     font-size: 13px;
     font-weight: 500;
-    color: var(--ui-text-3);
+    color: var(--ui-text-2);
   }
 
   .tabs button.on {
-    color: var(--ui-ink);
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
+  }
+
+  .sheet-head .editing {
+    flex: 1;
+    min-width: 0;
+    margin-left: var(--ui-space-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ui-accent);
   }
 
   .play-catch {
