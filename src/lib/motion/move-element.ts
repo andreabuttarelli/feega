@@ -154,6 +154,16 @@ function shiftKeys(clip: MotionClip, key: string, delta: number, range: { min: n
   return { ...clip.keyframes, [key]: track.map((k) => (typeof k.value === 'number' ? { ...k, value: clamp(k.value + delta, range.min, range.max) } : k)) };
 }
 
+export function clipCentre(clip: MotionClip): Point {
+  const along = (axis: keyof Point) => {
+    if (rangeOf(clip.component, axis)) {
+      return typeof clip.props[axis] === 'number' ? (clip.props[axis] as number) : CENTRE[axis];
+    }
+    return CENTRE[axis] + (clip.transform[axis] ?? TRANSFORM[axis].fallback);
+  };
+  return { x: along('x'), y: along('y') };
+}
+
 function positioned(clip: MotionClip, at: Point): MotionClip {
   let next = clip;
   for (const axis of Object.values(POSITION_KEYS)) {

@@ -150,6 +150,8 @@
     onNodeClicked,
     barContext,
     onDraw,
+    onGroup,
+    onUngroup,
     onUndo,
     onRedo,
     onConnectNew,
@@ -229,6 +231,8 @@
     onNodeClicked?: (id: string) => void;
     barContext?: BarContext;
     onDraw?: (drawn: DrawnWire) => void;
+    onGroup?: (ids: string[]) => void;
+    onUngroup?: (ids: string[]) => void;
     /** ⌘Z: annulla l'ultimo gesto di questa scheda. */
     onUndo?: () => void;
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
@@ -797,6 +801,8 @@
       onpaste={onPaste}
       onundo={onUndo}
       onredo={onRedo}
+      ongroup={onGroup}
+      onungroup={onUngroup}
     />
     {/if}
     <CanvasSelectionBridge

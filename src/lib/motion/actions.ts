@@ -72,6 +72,7 @@ import Shuffle from '@lucide/svelte/icons/shuffle';
 import ArrowRight from '@lucide/svelte/icons/arrow-right';
 import CircleDashed from '@lucide/svelte/icons/circle-dashed';
 import Group from '@lucide/svelte/icons/group';
+import Ungroup from '@lucide/svelte/icons/ungroup';
 import Columns2 from '@lucide/svelte/icons/columns-2';
 import FolderOpen from '@lucide/svelte/icons/folder-open';
 import CopyCheck from '@lucide/svelte/icons/copy-check';
@@ -195,6 +196,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.SelectChild]: { name: 'Select inside', icon: CornerRightDown, group: GuideGroup.Edit, gesture: 'Double-click', menu: MenuSection.Layer },
   [Command.SelectParent]: { name: 'Select the parent', icon: CornerLeftUp, group: GuideGroup.Edit, gesture: 'Esc', menu: MenuSection.Layer },
   [Command.Precompose]: { name: 'Precompose', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.Group]: { name: 'Group', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.Ungroup]: { name: 'Ungroup', icon: Ungroup, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },

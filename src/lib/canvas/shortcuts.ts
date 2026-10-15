@@ -59,7 +59,9 @@ export type CanvasCommandId =
   | 'copy'
   | 'paste'
   | 'undo'
-  | 'redo';
+  | 'redo'
+  | 'group'
+  | 'ungroup';
 
 /**
  * Il comando riconosciuto. `add` e `nudge` portano con sé il loro argomento perché è il tasto a
@@ -111,6 +113,7 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
     // `return null` che lo shift porta per ogni altro comando con modificatore, o ⇧⌘Z non
     // arriverebbe mai qui.
     if (key.toLowerCase() === 'z') return { id: e.shiftKey ? 'redo' : 'undo' };
+    if (key.toLowerCase() === 'g') return { id: e.shiftKey ? 'ungroup' : 'group' };
     if (e.shiftKey) return null;
     if (key.toLowerCase() === 'a') return { id: 'select-all' };
     const command = PASTE_MOD_KEYS[key.toLowerCase()];
@@ -168,6 +171,8 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'undo', keys: ['mod', 'Z'], label: 'Undo' },
   { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Ripeti' },
   { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplicate selection' },
+  { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
+  { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
   { id: 'copy', keys: ['mod', 'C'], label: 'Copy selection' },
   { id: 'paste', keys: ['mod', 'V'], label: 'Incolla' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },

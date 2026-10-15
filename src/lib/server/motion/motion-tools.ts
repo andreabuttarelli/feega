@@ -1,3 +1,4 @@
+import { ungroupClip } from '$lib/motion/group';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
 import { strokesSchema } from '$lib/motion/stroke/model';
@@ -2385,6 +2386,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const out = apply(precompose(session.doc, input.clip_ids, { comp, clip }, input.name ?? `Comp ${Object.keys(session.doc.comps).length + 1}`), `precomposed ${input.clip_ids.length} clip(s)`);
         return out.ok ? { ...out, comp, clip_id: clip } : out;
       }
+    }),
+
+    ungroup: tool({
+      description: 'Ungroup: put the clips of a group (a Precomp made by precompose or ⌘G) back on the top level, at the same place and time; its offset is carried to each clip. Refused when the group is scaled, rotated or animated.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(ungroupClip(session.doc, input.clip_id, deps.newId), 'ungrouped')
     }),
 
     create_comp: tool({

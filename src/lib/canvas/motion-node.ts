@@ -1,18 +1,20 @@
 import { z } from 'zod';
 import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$lib/motion/doc';
-import { NodeMode } from './inline-motion';
+import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '$lib/motion/hyperframes/capture';
 
 export enum FrameKind {
   Frame = 'frame',
-  Element = 'element'
+  Element = 'element',
+  Group = 'group'
 }
 
-type Chrome = { bar: boolean; ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat };
+type Chrome = { bar: boolean; ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null };
 
 const CHROME: Record<FrameKind, Chrome> = {
-  [FrameKind.Frame]: { bar: true, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg },
-  [FrameKind.Element]: { bar: false, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png }
+  [FrameKind.Frame]: { bar: true, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null },
+  [FrameKind.Element]: { bar: false, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null },
+  [FrameKind.Group]: { bar: false, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest }
 };
 
 export const frameChrome = (kind: FrameKind): Chrome => CHROME[kind];
@@ -60,7 +62,8 @@ export const MOTION_NODE_BAR_H = 44;
 
 const BAR_H: Record<FrameKind, Record<NodeMode, number>> = {
   [FrameKind.Frame]: { [NodeMode.Preview]: MOTION_NODE_BAR_H, [NodeMode.Edit]: 0 },
-  [FrameKind.Element]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0 }
+  [FrameKind.Element]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0 },
+  [FrameKind.Group]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0 }
 };
 
 const MOTION_STAGE_WIDTH: Record<MotionFormat, number> = {
@@ -83,8 +86,8 @@ export function frameNodeSize(width: number, picture: { width: number; height: n
   return { w, h: Math.round((w * picture.height) / picture.width) + BAR_H[kind][mode] };
 }
 
-export function elementNodeOf(box: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
-  return { data: { ...newMotionData(docFormat(box)), kind: FrameKind.Element }, w: Math.round(box.width), h: Math.round(box.height) };
+export function elementNodeOf(box: { width: number; height: number }, kind: FrameKind = FrameKind.Element): { data: Record<string, unknown>; w: number; h: number } {
+  return { data: { ...newMotionData(docFormat(box)), kind }, w: Math.round(box.width), h: Math.round(box.height) };
 }
 
 export function frameNodeOf(picture: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
@@ -129,7 +132,8 @@ export const tileChromeOf = (row: { id: string; type: string; data: Record<strin
 
 const DEFAULT_SIZE: Record<FrameKind, (node: MotionNode) => { w: number; h: number }> = {
   [FrameKind.Frame]: (node) => motionNodeSize(node.format),
-  [FrameKind.Element]: () => ELEMENT_MIN_SIZE
+  [FrameKind.Element]: () => ELEMENT_MIN_SIZE,
+  [FrameKind.Group]: () => ELEMENT_MIN_SIZE
 };
 
 export function frameDefaultSize(data: Record<string, unknown>): { w: number; h: number } {
@@ -139,7 +143,10 @@ export function frameDefaultSize(data: Record<string, unknown>): { w: number; h:
 
 const OPENING_SELECTION: Record<FrameKind, (clipIds: string[]) => string[]> = {
   [FrameKind.Frame]: () => [],
-  [FrameKind.Element]: (clipIds) => clipIds
+  [FrameKind.Element]: (clipIds) => clipIds,
+  [FrameKind.Group]: () => []
 };
 
 export const openingSelection = (kind: FrameKind, clipIds: string[]): string[] => OPENING_SELECTION[kind](clipIds);
+
+export const openingFor = (row: { id: string; type: string; data: Record<string, unknown> }, opening: Opening): Opening => tileChromeOf(row).opening ?? opening;

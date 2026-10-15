@@ -84,7 +84,7 @@
   import { AssetKind } from '$lib/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import type { DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, openingFor, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { barContextOf } from '$lib/canvas/bottom-bar';
@@ -323,6 +323,27 @@
       }
     });
     return DropVerdict.Taken;
+  }
+
+  async function regroup(action: string, fields: Record<string, string>) {
+    const res = await post(action, fields);
+    if (res?.outcome !== 'done') {
+      return;
+    }
+    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+    await refresh();
+  }
+
+  function groupElements(ids: string[]) {
+    if (ids.length > 1) {
+      void regroup('groupElements', { ids: JSON.stringify(ids) });
+    }
+  }
+
+  function ungroupElements(ids: string[]) {
+    for (const id of ids) {
+      void regroup('ungroupElement', { id });
+    }
   }
 
   async function drawElement(drawn: DrawnWire) {
@@ -994,7 +1015,11 @@
   let requestedMotion = $state<string | null>(null);
   let pageWidth = $state(0);
   const opening = $derived(openingOf(viewportOf(pageWidth)));
-  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, opening, requestedMotion));
+  const openingHere = $derived.by(() => {
+    const row = selectedIds.length === 1 ? nodes.find((n) => n.id === selectedIds[0]) : null;
+    return row ? openingFor(row, opening) : opening;
+  });
+  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, openingHere, requestedMotion));
 
   $effect(() => {
     if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => dismissedMotion)) {
@@ -1804,7 +1829,8 @@
 
   const PICTURE_OF_KIND: Record<FrameKind, (motion: { format: MotionFormat }, row: { w: number; h: number }) => { width: number; height: number }> = {
     [FrameKind.Frame]: (motion) => FORMATS[motion.format],
-    [FrameKind.Element]: (_, row) => ({ width: row.w, height: row.h })
+    [FrameKind.Element]: (_, row) => ({ width: row.w, height: row.h }),
+    [FrameKind.Group]: (_, row) => ({ width: row.w, height: row.h })
   };
 
   function frameFit(id: string, w: number, mode: NodeMode = NodeMode.Preview): { w: number; h: number } | null {
@@ -2756,6 +2782,8 @@
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
     onDraw={drawElement}
+    onGroup={groupElements}
+    onUngroup={ungroupElements}
     onTileDragOver={tileDragOver}
     onTileDrop={tileDrop}
     onFlow={(fn) => (toFlow = fn)}
@@ -2987,7 +3015,7 @@
           <div class="pending-frame" data-testid="motion-node-pending" aria-busy="true"></div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} />
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} onenter={() => requestMotion(id)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}

@@ -86,7 +86,7 @@ function elementPixels(box: CanvasBox): { width: number; height: number } {
   return { width: evenSide(box.width * scale), height: evenSide(box.height * scale) };
 }
 
-function blankElement(box: CanvasBox): OpResult {
+export function blankElement(box: CanvasBox): OpResult {
   return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box), background: Background.Transparent }, 0);
 }
 

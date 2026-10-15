@@ -1,3 +1,4 @@
+import { groupElements, ungroupElement } from '$lib/server/motion/element-groups';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import {
@@ -166,6 +167,9 @@ const placeInFrameInput = z.object({ nodeId: z.string().describe('the Generate i
 const drawElementInput = z
   .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse, box:{left,top,width,height}} in canvas units, or {tool:pen, path:SVG d in canvas units}') })
   .strict();
+
+const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (frame nodes with data.kind element)') }).strict();
+const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
 const framesOf = (ctx: CanvasCtx) => frameStore(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, projectId: ctx.projectId });
 
@@ -566,6 +570,18 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: drawElementInput,
     run: async (ctx, input) => frameAnswer(await drawElement(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.drawn))
+  }),
+
+  group_elements: op({
+    access: Access.Write,
+    input: groupElementsInput,
+    run: async (ctx, input) => frameAnswer(await groupElements(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds))
+  }),
+
+  ungroup_element: op({
+    access: Access.Write,
+    input: ungroupElementInput,
+    run: async (ctx, input) => frameAnswer(await ungroupElement(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeId))
   }),
 
   place_in_frame: op({

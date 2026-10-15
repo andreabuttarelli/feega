@@ -257,9 +257,9 @@
       ondrop={() => drop(row)}
       oncontextmenu={(e) => openMenu(row, e)}
     >
-      {#if row.kind === LayerKind.Node && frames.has(row.id)}
-        <button type="button" class="fold" aria-label={folds.has(row.id) ? 'Unfold' : 'Fold'} aria-expanded={!folds.has(row.id)} data-testid="layer-fold" onclick={(e) => (e.stopPropagation(), fold(row.id))}>
-          {#if folds.has(row.id)}<ChevronRight size={ICON} />{:else}<ChevronDown size={ICON} />{/if}
+      {#if (row.kind === LayerKind.Node && frames.has(row.id)) || row.foldable}
+        <button type="button" class="fold" aria-label={folds.has(row.key) ? 'Unfold' : 'Fold'} aria-expanded={!folds.has(row.key)} data-testid="layer-fold" onclick={(e) => (e.stopPropagation(), fold(row.key))}>
+          {#if folds.has(row.key)}<ChevronRight size={ICON} />{:else}<ChevronDown size={ICON} />{/if}
         </button>
       {/if}
       {#if row.thumb}

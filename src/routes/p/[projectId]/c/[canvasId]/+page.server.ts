@@ -72,6 +72,7 @@ import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
+import { groupAskSchema, groupElements, ungroupElement } from '$lib/server/motion/element-groups';
 import { MOVE_STATUS, MoveOutcome, drawElement, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -1088,6 +1089,24 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid drop' });
     }
     return movedAnswer(await moveFree(canvasFrames(scope), ask.data));
+  },
+
+  groupElements: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const ask = groupAskSchema.safeParse({ ids: jsonField(await request.formData(), 'ids') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid group' });
+    }
+    return movedAnswer(await groupElements(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids));
+  },
+
+  ungroupElement: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const id = String((await request.formData()).get('id') ?? '');
+    if (!id) {
+      return fail(400, { error: 'invalid group' });
+    }
+    return movedAnswer(await ungroupElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, id));
   },
 
   drawElement: async ({ request, params, locals }) => {

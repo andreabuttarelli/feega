@@ -4,8 +4,9 @@ import type { Db } from '$lib/server/db/client';
 import { createNode, deleteNode, findNode, listConnections, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
-import { FrameKind, elementNodeOf, motionNodeSize } from '$lib/canvas/motion-node';
+import { FrameKind, elementNodeOf, frameChrome, motionNodeSize } from '$lib/canvas/motion-node';
 import { drawnElement, type Drawn } from '$lib/motion/draw-create';
+import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { parsePath } from '$lib/motion/shape/geometry';
 import { frameShape } from './start';
@@ -13,7 +14,7 @@ import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
 import { saveMotionDoc } from './editor';
 import { DocMode, docMode } from '$lib/motion/still';
-import { DropOn, OutputKind, elementBox, frameOf, liftElement, linkOutput, mediaElement, placeElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
+import { DropOn, OutputKind, clipCentre, elementBox, frameOf, liftElement, linkOutput, mediaElement, placeElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 
@@ -57,11 +58,11 @@ export const MOVE_STATUS: Record<Exclude<MoveOutcome, MoveOutcome.Done>, number>
 
 export type Stage = { width: number; height: number };
 
-export type StoredFrame = { nodeId: string; projectId: string; canvasId: string; version: number; doc: MotionDoc; kind?: FrameKind; stage?: Stage; row?: Record<string, unknown> };
+export type StoredFrame = { nodeId: string; projectId: string; canvasId: string; version: number; doc: MotionDoc; kind?: FrameKind; stage?: Stage; row?: Record<string, unknown>; at?: { x: number; y: number } };
 
 export type Place = { projectId: string; canvasId: string };
 
-export type NodeShape = { data: Record<string, unknown>; width: number; height: number };
+export type NodeShape = { data: Record<string, unknown>; width: number; height: number; displayName?: string };
 
 export type FrameStore = {
   read: (nodeId: string) => Promise<StoredFrame | null>;
@@ -98,13 +99,13 @@ const ID_LENGTH = 8;
 
 const newId: NewId = () => crypto.randomUUID().slice(0, ID_LENGTH);
 
-const refused = (outcome: Exclude<MoveOutcome, MoveOutcome.Done>, detail?: string): Moved => ({ outcome, detail });
+export const refused = (outcome: Exclude<MoveOutcome, MoveOutcome.Done>, detail?: string): Moved => ({ outcome, detail });
 
 const revision = (nodeId: string, before: number): UndoItem => ({ kind: 'doc.revision', nodeId, before, after: before + 1 });
 
-const deleted = (frame: StoredFrame): UndoItem => ({ kind: 'node.delete', nodeId: frame.nodeId, before: frame.row ?? {} });
+export const deleted = (frame: StoredFrame): UndoItem => ({ kind: 'node.delete', nodeId: frame.nodeId, before: frame.row ?? {} });
 
-const created = (nodeId: string, at: { x: number; y: number }): UndoItem => ({ kind: 'node.create', nodeId, after: { position: { x: at.x, y: at.y, z: 0 } } });
+export const created = (nodeId: string, at: { x: number; y: number }): UndoItem => ({ kind: 'node.create', nodeId, after: { position: { x: at.x, y: at.y, z: 0 } } });
 
 const stale = (frame: StoredFrame, versions: Record<string, number> | undefined) => versions?.[frame.nodeId] !== undefined && versions[frame.nodeId] !== frame.version;
 
@@ -145,7 +146,7 @@ async function landFree(store: FrameStore, place: Place, element: Element, drop:
   const shaped = elementNodeOf({ width: area.width * stage.width, height: area.height * stage.height });
   const at = { x: drop.x - shaped.w / 2, y: drop.y - shaped.h / 2 };
   const doc = { ...frameOf(element, mode, area, newId), background: Background.Transparent };
-  const frameId = await store.create({ ...place, ...at }, doc, { data: shaped.data, width: shaped.w, height: shaped.h });
+  const frameId = await store.create({ ...place, ...at }, doc, { data: shaped.data, width: shaped.w, height: shaped.h, displayName: elementName(element.clip) });
   const clipId = doc.tracks.flatMap((t) => t.clips)[0]?.id ?? element.clip.id;
   return { frameId, clipId, created: true, version: 1, undo: [created(frameId, at)], rollback: () => store.remove(frameId) };
 }
@@ -192,7 +193,7 @@ export async function landElement(store: FrameStore, from: StoredFrame & { right
   return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
 }
 
-const emptied = (source: StoredFrame, doc: MotionDoc) => source.kind === FrameKind.Element && doc.tracks.every((t) => t.clips.length === 0);
+const emptied = (source: StoredFrame, doc: MotionDoc) => !frameChrome(source.kind ?? FrameKind.Frame).takesDrops && doc.tracks.every((t) => t.clips.length === 0);
 
 function landOut(store: FrameStore, source: StoredFrame, element: Element, drop: Extract<Drop, { on: DropOn.Canvas }>, box: Box | null): Promise<Landing> {
   const mode = docMode(source.doc);
@@ -249,11 +250,38 @@ export async function moveElement(store: FrameStore, ask: MoveAsk): Promise<Move
 
 export async function moveFree(store: FrameStore, ask: z.infer<typeof freeAskSchema>): Promise<Moved> {
   const source = await store.read(ask.sourceNodeId);
-  const clipId = source?.doc.tracks.flatMap((t) => t.clips)[0]?.id;
-  if (!source || !clipId) {
+  if (!source || ask.drop.on !== DropOn.Frame) {
     return refused(MoveOutcome.NotFound, `no element ${ask.sourceNodeId}`);
   }
-  return moveElement(store, { sourceNodeId: source.nodeId, clipId, drop: ask.drop });
+  const target = await targetOf(store, ask.drop);
+  if (!target || !('doc' in target)) {
+    return target ?? refused(MoveOutcome.NotFound);
+  }
+
+  const drop = ask.drop;
+  const spread = (axis: 'x' | 'y', size: 'width' | 'height', centre: number) => drop.at[axis] + ((centre - 0.5) * (source.stage?.[size] ?? 0)) / (target.stage?.[size] ?? 1);
+  let doc = target.doc;
+  let clipId = '';
+  for (const clip of source.doc.tracks.flatMap((t) => t.clips)) {
+    const lifted = liftElement(source.doc, clip.id);
+    if (!lifted.ok) {
+      return refused(MoveOutcome.NoElement, lifted.error);
+    }
+    const centre = clipCentre(clip);
+    const placed = placeElement(doc, seenAt(lifted.element, source, target), { at: { x: spread('x', 'width', centre.x), y: spread('y', 'height', centre.y) }, frame: drop.frame }, newId);
+    if (!placed.ok) {
+      return refused(MoveOutcome.Invalid, placed.error);
+    }
+    doc = placed.doc;
+    clipId = placed.clipId;
+  }
+
+  const write = await store.write(target.nodeId, target.version, doc, SUMMARY.movedIn);
+  if (write.outcome !== RevisionOutcome.Written) {
+    return failedWrite(write);
+  }
+  await store.remove(source.nodeId);
+  return { outcome: MoveOutcome.Done, frameId: target.nodeId, clipId, created: false, versions: { [target.nodeId]: write.head.version }, undo: [revision(target.nodeId, target.version), deleted(source)] };
 }
 
 export async function placeOutput(store: FrameStore, ask: OutputAsk): Promise<Moved> {
@@ -357,7 +385,7 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor; project
   return {
     read: async (nodeId) => {
       const saved = await savedMotion(db, { orgId, nodeId });
-      return inScope(saved ? { nodeId, projectId: saved.project.id, canvasId: saved.record.canvasId, version: saved.version, doc: saved.doc, kind: saved.node.kind, stage: stageOf(saved.record, saved.doc), row: rowOf(saved.record) } : null);
+      return inScope(saved ? { nodeId, projectId: saved.project.id, canvasId: saved.record.canvasId, version: saved.version, doc: saved.doc, kind: saved.node.kind, stage: stageOf(saved.record, saved.doc), row: rowOf(saved.record), at: { x: saved.record.position.x, y: saved.record.position.y } } : null);
     },
     write: (nodeId, expectedVersion, doc, summary) => saveMotionDoc(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
     create: async (at, doc, shape) => {
@@ -442,7 +470,8 @@ export async function drawElement(store: FrameStore, place: Place, wire: z.infer
 
   const shaped = elementNodeOf(made.box);
   const at = { x: made.box.left, y: made.box.top };
-  const frameId = await store.create({ ...place, ...at }, made.doc, { data: shaped.data, width: shaped.w, height: shaped.h });
-  const clipId = made.doc.tracks.flatMap((t) => t.clips)[0]?.id ?? '';
+  const first = made.doc.tracks.flatMap((t) => t.clips)[0];
+  const frameId = await store.create({ ...place, ...at }, made.doc, { data: shaped.data, width: shaped.w, height: shaped.h, ...(first ? { displayName: elementName(first) } : {}) });
+  const clipId = first?.id ?? '';
   return { outcome: MoveOutcome.Done, frameId, clipId, created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
 }
