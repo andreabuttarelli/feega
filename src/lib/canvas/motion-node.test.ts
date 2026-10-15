@@ -104,7 +104,7 @@ describe('a free element is a frame without chrome', () => {
   it('has no ports, no name tag and a small minimum size: it is a shape, not a node', () => {
     const element = { id: 'e', type: 'motion', data: elementNodeOf({ width: 10, height: 10 }).data };
 
-    expect(tileChromeOf(element)).toMatchObject({ ports: false, label: false, bar: false });
+    expect(tileChromeOf(element)).toMatchObject({ ports: false, label: false, bar: false, takesDrops: false });
     expect(tileChromeOf({ id: 'f', type: 'motion', data: newMotionData() })).toMatchObject({ ports: true, label: true, bar: true });
     expect(tileChromeOf({ id: 't', type: 'text', data: {} })).toMatchObject({ ports: true, label: true });
     expect(nodeSize('motion', element.data).w).toBeLessThan(40);

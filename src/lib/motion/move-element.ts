@@ -243,7 +243,7 @@ export function placeElement(doc: MotionDoc, element: Element, place: Placement,
   return { ok: true, clipId: clip.id, doc: { ...doc, ...merged(doc, element.carried, element), tracks, durationInFrames: grown(doc, clip) } };
 }
 
-function defaultBox(element: Element): Box {
+export function elementBox(element: Element): Box {
   const { props } = element.clip;
   if (!laidOut(element.clip.component) || typeof props.width !== 'number' || typeof props.height !== 'number') {
     return FULL;
@@ -263,7 +263,7 @@ function fittedSize(px: Size): Size {
 }
 
 export function frameOf(element: Element, mode: DocMode, box: Box | null, newId: NewId): MotionDoc {
-  const area = box ?? defaultBox(element);
+  const area = box ?? elementBox(element);
   const size = fittedSize({ width: area.width * element.size.width, height: area.height * element.size.height });
   const durationInFrames = Math.max(1, element.clip.durationInFrames);
   const blank: MotionDoc = { ...newMotionDoc(MotionFormat.Landscape), ...size, fps: element.fps as MotionDoc['fps'], durationInFrames, tracks: [] };

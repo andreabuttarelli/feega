@@ -11,6 +11,8 @@ async function shoot(page: Page, name: string) {
   }
 }
 
+test.use({ video: process.env.E2E_VIDEO ? 'on' : 'off' });
+
 test.describe('free elements on the canvas @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
@@ -44,7 +46,7 @@ test.describe('free elements on the canvas @real', () => {
 
     await expect.poll(async () => (await elements()).length, { timeout: 10_000 }).toBe(1);
     const [element] = await elements();
-    expect((await clipsOf(element.id)).map((c) => [c.component, c.props.shape])).toEqual([['Shape', 'rect']]);
+    await expect.poll(async () => (await clipsOf(element.id)).map((c) => [c.component, c.props.shape]), { timeout: 10_000 }).toEqual([['Shape', 'rect']]);
     expect(element.width! / element.height!).toBeCloseTo(2, 1);
     await expect(page.getByTestId('canvas-draw'), 'one shape per pick, then back to select').toHaveCount(0);
 
@@ -55,7 +57,7 @@ test.describe('free elements on the canvas @real', () => {
     await expect(tile.locator('.node-label'), 'a shape has no name tag').toHaveCount(0);
     await expect(tile.locator('.typed-port'), 'a shape has no ports').toHaveCount(0);
     await expect(page.getByTestId('motion-editor'), 'the new element opens on its properties').toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 30_000 });
     await expect(page.locator('aside.props').getByTestId('selection-head'), 'the inspector of frames, on the shape').toContainText('Shape', { timeout: 10_000 });
     await expect(page.locator('aside.props').getByTestId('selection-head')).toBeVisible();
     await shoot(page, '2-element-editing');

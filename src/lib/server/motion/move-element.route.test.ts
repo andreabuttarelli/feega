@@ -137,6 +137,44 @@ describe('connect action', () => {
   });
 });
 
+describe('elements in and out of frames', () => {
+  const inserted = (input: ReturnType<typeof event>) => input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { x: number; y: number; width: number; height: number; data: Record<string, unknown> });
+  const wideFrame = (id: string) => ({ ...frameRow(id), width: 400 });
+
+  it('dragged out onto the canvas it is a free element of the size it had on screen, centred where it was dropped', async () => {
+    const input = event(
+      { source: SOURCE, clip: 'txt', drop: JSON.stringify({ on: 'canvas', x: 900, y: 40 }), box: JSON.stringify({ left: 0.25, top: 0.25, width: 0.5, height: 0.2 }) },
+      { nodes: [wideFrame(SOURCE), frameRow(TARGET)] }
+    );
+
+    expect(await actions.moveElement(input as never)).toMatchObject({ outcome: 'done', created: true });
+    expect(inserted(input)).toMatchObject([{ x: 800, y: 17.5, width: 200, height: 45, data: { kind: 'element' } }]);
+    const made = input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')?.payload as { doc: MotionDoc };
+    expect(made.doc.background).toBe('transparent');
+  });
+
+  it('a free element dropped on a frame goes inside it, and the empty element leaves the canvas', async () => {
+    const element = { ...frameRow(SOURCE), width: 200, height: 45, data: { ...frameRow(SOURCE).data, kind: 'element' } };
+    const input = event({ source: SOURCE, clip: 'txt', drop: JSON.stringify({ on: 'frame', nodeId: TARGET, at: { x: 0.5, y: 0.5 } }) }, { nodes: [element, frameRow(TARGET)] });
+
+    const result = await actions.moveElement(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', frameId: TARGET });
+    expect(written(input, TARGET).map((r) => clipIds(r.doc))).toEqual([['txt']]);
+    expect(written(input, SOURCE)).toEqual([]);
+    expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'update' && (c.payload as { deleted_at?: string }).deleted_at && c.filters.some(([k, v]) => k === 'id' && v === SOURCE))).toBe(true);
+    expect((result as { undo: { kind: string }[] }).undo.map((u) => u.kind)).toEqual(['doc.revision', 'node.delete']);
+  });
+
+  it('moveFree drops the whole free element on a frame without naming its clip', async () => {
+    const element = { ...frameRow(SOURCE), width: 200, height: 45, data: { ...frameRow(SOURCE).data, kind: 'element' } };
+    const input = event({ source: SOURCE, drop: JSON.stringify({ on: 'frame', nodeId: TARGET, at: { x: 0.3, y: 0.6 } }) }, { nodes: [element, frameRow(TARGET)] });
+
+    expect(await actions.moveFree(input as never)).toMatchObject({ outcome: 'done', frameId: TARGET });
+    expect(written(input, TARGET).map((r) => clipIds(r.doc))).toEqual([['txt']]);
+  });
+});
+
 describe('drawElement action', () => {
   const inserted = (input: ReturnType<typeof event>) => input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { type: string; x: number; y: number; width: number; height: number; data: Record<string, unknown> });
 
