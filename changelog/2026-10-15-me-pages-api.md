@@ -2,7 +2,7 @@
 
 Step 2 of the client-only dashboard (ADR 0009, option d). Each dashboard page (`home`,
 `canvases`, `templates`, `motion`, `credits`) is served by calling the page's own `load` and
-`actions` with an event built from the Bearer token (`bearerPage`): same server functions, same
+`actions` with an event built from the Bearer token (`bearerOf` + `pageEvent`): same server functions, same
 org checks, no copy to drift. `?org=` stands for the `dz-org` cookie, `?action=` picks the action,
 every other query parameter reaches the page as its own.
 

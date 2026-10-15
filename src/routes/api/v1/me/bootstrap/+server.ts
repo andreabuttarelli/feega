@@ -1,28 +1,21 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { createUserDb } from '$lib/server/db/client';
-import { verifiedToken } from '$lib/server/nav-cache';
+import { ORG_PARAM, bearerOf } from '$lib/server/api/bearer-page';
 import { shellOf } from '$lib/server/dashboard/app-shell';
 import { firstRunFlags } from '$lib/server/dashboard/first-run-flags';
 import { DASHBOARD_DEPS, dashboardFor, type Dashboard } from '$lib/server/dashboard/dashboard';
 import type { Db } from '$lib/server/db/client';
 
-const UNAUTHORIZED = 401;
 const NOT_FOUND = 404;
 
 export const GET: RequestHandler = async ({ request, url }) => {
-  const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '').trim();
-  if (!token) {
-    return json({ error: 'missing_bearer' }, { status: UNAUTHORIZED });
+  const bearer = await bearerOf(request);
+  if (bearer instanceof Response) {
+    return bearer;
   }
+  const { db, user } = bearer;
 
-  const db = createUserDb(token);
-  const user = await verifiedToken(db, token);
-  if (!user) {
-    return json({ error: 'invalid_token' }, { status: UNAUTHORIZED });
-  }
-
-  const hint = url.searchParams.get('org');
+  const hint = url.searchParams.get(ORG_PARAM);
   const guessed = hint ? recentsOf(db, hint) : null;
   const [shell, flags] = await Promise.all([shellOf(db, user, hint), firstRunFlags(db, user)]);
   if (!shell) {
