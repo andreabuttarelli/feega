@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { isRedirect } from '@sveltejs/kit';
 import { fakeDb } from '$lib/server/db/fake-db';
-import { actions } from './+page.server';
+import { actions } from '$lib/server/settings/pages/project';
 import { OUTPUTS_PRESENT, SWITCH_REFUSAL_TEXT } from '$lib/server/uncensored-workspace/mode-switch';
 import { UNCENSORED_LOCK_TEXT, UncensoredLock } from '$lib/uncensored-lock';
 

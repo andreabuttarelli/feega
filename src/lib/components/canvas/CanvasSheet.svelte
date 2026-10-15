@@ -74,7 +74,7 @@
                   {#snippet children()}
                     {#if settingsLoader}
                       {#await settingsLoader() then { default: SettingsSectionPage }}
-                        <SettingsSectionPage data={sheet.data as never} form={null} />
+                        <SettingsSectionPage data={sheet.data as never} form={page.form} />
                       {/await}
                     {/if}
                   {/snippet}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
+  import { enhance } from '$lib/settings/enhance';
   import { _ } from 'svelte-i18n';
   import { SvelteSet } from 'svelte/reactivity';
   import { jpegIfHeicFormFiles } from '$lib/raster-image-client';

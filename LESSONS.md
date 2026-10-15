@@ -3020,3 +3020,10 @@ Signal: the first `upload(..., { upsert: true })` to a path succeeds, every late
 
 ### A sub-agent round answers the user instead of doing its step
 Signal: an agent reply says it "only has tools to read/research/import" or "can't build" while the run summary shows it wrote something. Cause: a role round with a narrow tool set (researcher) got the user's raw request and no brief, so it answered it; its text leads the turn's reply. Move: every narrowed round gets its own brief message (like `crewBrief`, `RESEARCH_BRIEF`), and a turn that stops by design returns a field the caller can relay (`script_ready`).
+## A settings action in the canvas sheet changes nothing on screen
+
+Signal: the action answers 200, a full reload shows the change, the open sheet does not (or
+closes). Cause: `invalidateAll()` resets `page.state`, and the sheet lives in `page.state.sheet`
+(shallow routing); its data is a `preloadData` snapshot nobody refreshes. Move: read the sheet
+before invalidating and reopen it with fresh data (`refreshSheet` in `sheet-nav.ts`). A spec that
+passes only after `page.reload()` does not prove the sheet works.

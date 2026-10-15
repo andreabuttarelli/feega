@@ -102,9 +102,17 @@ export function warmDashboard(url: URL): void {
   }
 }
 
-export async function postAction(page: DashboardPage, action: string, form: FormData): Promise<ActionResult> {
+export async function loadApi<T>(path: string, query: URLSearchParams, depends: Depends): Promise<T> {
+  return (await cachedLoad(withOrg(path, query), depends)) as T;
+}
+
+export async function postApi(path: string, action: string, form: FormData): Promise<ActionResult> {
   const query = new URLSearchParams({ action });
-  const { status, body } = await call(withOrg(`/api/v1/me/pages/${page}`, query), { method: 'POST', body: form });
+  const { status, body } = await call(withOrg(path, query), { method: 'POST', body: form });
   cache.clear();
   return actionResultOf(status, body);
+}
+
+export function postAction(page: DashboardPage, action: string, form: FormData): Promise<ActionResult> {
+  return postApi(`/api/v1/me/pages/${page}`, action, form);
 }

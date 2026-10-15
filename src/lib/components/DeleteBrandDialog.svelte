@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
+  import { enhance } from '$lib/settings/enhance';
   import { page } from '$app/stores';
   import { _ } from 'svelte-i18n';
 
