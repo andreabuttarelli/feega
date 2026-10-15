@@ -34,7 +34,8 @@ vi.mock('$lib/server/canvas/lookup', () => ({
 vi.mock('$lib/server/canvas/sign-media', async (real) => ({ ...(await real<object>()), createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: () => reachable() }));
 
-const { actions, load } = await import('./+page.server');
+const { actions } = await import('./+page.server');
+const { loadEditorSession } = await import('$lib/server/motion/editor-session');
 const { POST } = await import('../../../../../../api/v1/motion/[nodeId]/ops/+server');
 const { POST: POST_POSTER } = await import('../../../../../../api/v1/motion/[nodeId]/poster/+server');
 
@@ -308,14 +309,106 @@ describe('the frame editor spending actions answer like their ops', () => {
   });
 });
 
+describe('the frame editor history, export and library actions answer like their ops', () => {
+  it('revisions and list_revisions', async () => {
+    const action = await viaAction('revisions', {});
+    const endpoint = await viaEndpoint('list_revisions', {});
+
+    expect(action.status).toBe(200);
+    expect(action.data.revisions).toHaveLength(1);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('restore and restore_revision refuse a version that never existed', async () => {
+    const action = await viaAction('restore', { version: '9' });
+    const endpoint = await viaEndpoint('restore_revision', { version: 9 });
+
+    expect(action).toEqual({ status: 404, data: { error: 'no_such_version' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('still and export_still refuse an unknown image format', async () => {
+    const action = await viaAction('still', { format: 'bmp' });
+    const endpoint = await viaEndpoint('export_still', { format: 'bmp' });
+
+    expect(action).toEqual({ status: 400, data: { error: 'invalid_image_format' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('render and start_render refuse bad settings', async () => {
+    const action = await viaAction('render', { version: '1', settings: '{"fps":"x"}' });
+    const endpoint = await viaEndpoint('start_render', { version: 1, settings: { fps: 'x' } });
+
+    expect(action).toEqual({ status: 400, data: { error: 'invalid_settings' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('render and start_render ask to save first on a stale version', async () => {
+    const action = await viaAction('render', { version: '9' });
+    const endpoint = await viaEndpoint('start_render', { version: 9 });
+
+    expect(action).toEqual({ status: 409, data: { error: 'save_first' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('render and start_render stop at the credit gate', async () => {
+    gated.value = true;
+
+    const action = await viaAction('render', { version: '1' });
+    const endpoint = await viaEndpoint('start_render', { version: 1 });
+
+    expect(action.status).toBe(402);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('withdrawGallery and withdraw_gallery on an item that is not listed', async () => {
+    const action = await viaAction('withdrawGallery', { id: 'nope' });
+    const endpoint = await viaEndpoint('withdraw_gallery', { id: 'nope' });
+
+    expect(action.status).toBe(404);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('publishGallery and publish_gallery refuse an empty title', async () => {
+    const action = await viaAction('publishGallery', { title: '', description: '', tags: '' });
+    const endpoint = await viaEndpoint('publish_gallery', { title: '', description: '', tags: '' });
+
+    expect(action.status).toBeGreaterThanOrEqual(400);
+    expect(endpoint).toEqual(action);
+  });
+
+  it('deleteTemplate and delete_template refuse what is not removable', async () => {
+    const action = await viaAction('deleteTemplate', { id: 'nope' });
+    const endpoint = await viaEndpoint('delete_template', { id: 'nope' });
+
+    expect(action).toEqual({ status: 400, data: { error: 'not_removable' } });
+    expect(endpoint).toEqual(action);
+  });
+
+  it('cancelRender and cancel_render with nothing running', async () => {
+    const action = await viaAction('cancelRender', {});
+    const endpoint = await viaEndpoint('cancel_render', {});
+
+    expect(action.status).toBeGreaterThanOrEqual(400);
+    expect(endpoint).toEqual(action);
+  });
+});
+
+describe('the frame editor save refuses a malformed doc instead of throwing', () => {
+  it('save and save_doc answer 400 to tracks that are not a list', async () => {
+    const action = await viaAction('save', { version: '1', doc: '{"tracks":3}' });
+    const endpoint = await viaEndpoint('save_doc', { version: 1, doc: { tracks: 3 } });
+
+    expect(action.status).toBe(400);
+    expect(endpoint).toEqual(action);
+  });
+});
+
 describe('the frame editor page load and its op answer the same', () => {
   it('load and editor_session', async () => {
     const db = seed();
-    const page = await (load as (event: unknown) => Promise<unknown>)({
-      params: { projectId: PROJECT, canvasId: CANVAS, nodeId: NODE },
-      url: new URL(`https://feega.test/p/${PROJECT}/c/${CANVAS}/motion/${NODE}`),
-      locals: { safeGetSession: async () => ({ session: {}, user: { id: USER } }), db: async () => db }
-    });
+    const locals = { safeGetSession: async () => ({ session: {}, user: { id: USER } }), db: async () => db } as never;
+    const page = await loadEditorSession(locals, { projectId: PROJECT, canvasId: CANVAS, nodeId: NODE }, new URL(`https://feega.test/p/${PROJECT}/c/${CANVAS}/motion/${NODE}`));
     const endpoint = await viaEndpoint('editor_session', {});
 
     expect(endpoint).toEqual({ status: 200, data: JSON.parse(JSON.stringify(page)) });
@@ -342,5 +435,36 @@ describe('POST /api/v1/motion/[nodeId]/ops guards like the page', () => {
 
     expect(endpoint.status).toBe(400);
     expect(endpoint.data.error).toBe('unknown_op');
+  });
+});
+
+describe('upload_slot hands the browser a signed upload the register ops accept', () => {
+  it('an export slot lands in the export folder record_export reads', async () => {
+    const slot = await viaEndpoint('upload_slot', { purpose: 'export' });
+    const recorded = await viaEndpoint('record_export', { path: slot.data.path, width: 1920, height: 1080, seconds: 3 });
+
+    expect(slot.status).toBe(200);
+    expect(slot.data.token).toBe('upload-token');
+    expect(recorded).toEqual({ status: 400, data: { error: 'file_not_found' } });
+  });
+
+  it('a font slot lands under the uploads upload_font reads', async () => {
+    const slot = await viaEndpoint('upload_slot', { purpose: 'font', name: 'My Font.woff2' });
+    const uploaded = await viaEndpoint('upload_font', { path: slot.data.path });
+
+    expect(slot.data.path).toMatch(/My_Font\.woff2$/);
+    expect(uploaded).toEqual({ status: 400, data: { error: 'file_not_found' } });
+  });
+
+  it('refuses a purpose it does not know', async () => {
+    const slot = await viaEndpoint('upload_slot', { purpose: 'nope' });
+
+    expect(slot.status).toBe(400);
+  });
+
+  it('refuses a read-only key', async () => {
+    const slot = await viaEndpoint('upload_slot', { purpose: 'export' }, false);
+
+    expect(slot).toEqual({ status: 403, data: { error: 'api_key_read_only' } });
   });
 });

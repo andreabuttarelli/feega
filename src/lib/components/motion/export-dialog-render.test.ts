@@ -19,7 +19,6 @@ function dialog(start: ExportMode | null = null, shown = doc) {
     props: {
       doc: shown,
       assetUrls: {},
-      scope: { orgId: 'o', projectId: 'p', nodeId: 'n' },
       editorUrl: '/p/p/c/c/motion/n',
       fileName: 'video',
       render: async () => {},

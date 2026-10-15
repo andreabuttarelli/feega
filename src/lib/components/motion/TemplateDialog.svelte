@@ -3,7 +3,8 @@
   import { Action } from '$lib/motion/actions';
   import { onMount } from 'svelte';
   import Download from '@lucide/svelte/icons/download';
-  import { deserialize } from '$app/forms';
+  import { editorAction } from '$lib/frame-editor/client';
+  import type { EditorActionName } from '$lib/frame-editor/actions';
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
   import { applyValues, exposeField, FieldType, fieldValues, removeField } from '$lib/motion/template/fields';
@@ -11,7 +12,7 @@
   import { batchRows, DEFAULT_NAME_PATTERN, MAX_BATCH_ROWS, outputName, parseCsv, sheetCsvUrl, type ColumnMap, type CsvTable } from '$lib/motion/template/batch';
   import { renderQuote } from '$lib/motion/render-quote';
   import { EXPORT_FORMATS, FORMAT, Preset, settingsOf, type RenderSettings } from '$lib/motion/export-formats';
-  import { exportSize, type Capabilities, type ExportScope } from '$lib/motion/export-plan';
+  import { exportSize, type Capabilities } from '$lib/motion/export-plan';
   import { audioPlan } from '$lib/motion/audio-plan';
   import { capabilities } from '$lib/motion/export/encode';
   import { renderInBrowser, type FrameSource } from '$lib/motion/export/browser-render';
@@ -31,7 +32,6 @@
     batch: initial,
     assetHref,
     assetUrls,
-    scope,
     framesFor,
     onchange,
     onpreview,
@@ -45,7 +45,6 @@
     batch: Batch | null;
     assetHref: (id: string) => string;
     assetUrls: Record<string, string>;
-    scope: ExportScope;
     framesFor: (doc: MotionDoc) => FrameSource;
     onchange: (result: OpResult, summary: string) => void;
     onpreview: (doc: MotionDoc | null) => void;
@@ -133,9 +132,8 @@
     onpreview(filled?.ok ? filled.doc : null);
   }
 
-  async function post(name: string, form: FormData) {
-    const res = await fetch(`${editorUrl}?/${name}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+  async function post(name: EditorActionName, form: FormData) {
+    const result = await editorAction(editorUrl, name, form);
     return result.type === 'success' ? { ok: true, data: (result.data ?? {}) as Record<string, unknown> } : { ok: false, data: (result.type === 'failure' ? result.data : { error: 'request_failed' }) as Record<string, unknown> };
   }
 
@@ -161,7 +159,7 @@
       const size = exportSize(filled.doc, settings.resolution);
       try {
         const blob = await renderInBrowser({ doc: filled.doc, assetUrls, size, quality: settings.quality, withAudio: Boolean(caps?.aac), frames: framesFor(filled.doc), signal: controller.signal, onStage: () => {}, onFrame: () => {}, onPause: () => {} });
-        await saveExport(blob, { scope, editorUrl, size, seconds: filled.doc.durationInFrames / filled.doc.fps });
+        await saveExport(blob, { editorUrl, size, seconds: filled.doc.durationInFrames / filled.doc.fps });
         local[i] = { ...local[i], status: 'done', url: URL.createObjectURL(blob) };
       } catch (e) {
         if (controller.signal.aborted) {

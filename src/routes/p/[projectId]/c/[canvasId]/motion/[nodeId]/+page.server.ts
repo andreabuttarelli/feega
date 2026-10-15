@@ -1,43 +1,12 @@
-import { fail } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
-import { libraryOf, loadEditorSession } from '$lib/server/motion/editor-session';
+import { fail, type Action } from '@sveltejs/kit';
+import type { Actions } from './$types';
 import { motionScope as scopeFor, type MotionEditorScope } from '$lib/server/motion/editor-scope';
-import { runEditorOp, type EditorAnswer, type EditorCtx } from '$lib/server/frame-editor/editor-ops';
-import { Restore, headOrNew, motionAssets, motionTokens, restoreRevision } from '$lib/server/motion/editor';
-import { listRevisions } from '$lib/server/repos/motion-revisions';
-import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
-import { cancelRender } from '$lib/server/motion/render-run';
-import { startFarmRender } from '$lib/server/motion/render-start';
-import { serverRenderOpen } from '$lib/motion/server-render';
-import { renderQueue } from '$lib/server/motion/render-queue';
-import { parseSettings } from '$lib/motion/export-formats';
-import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
+import { isEditorOp, runEditorOp, type EditorAnswer, type EditorCtx } from '$lib/server/frame-editor/editor-ops';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { savePoster } from '$lib/server/motion/poster';
-import { exportStill } from '$lib/server/motion/still-export';
-import { stillAskSchema, stillExport } from '$lib/motion/still-model';
-import { clipsOf } from '$lib/motion/doc';
-import { templateLibrary } from '$lib/server/motion/templates';
-import type { Db } from '$lib/server/db/client';
-import { loadAttachments } from '$lib/server/chat-attachments/register';
-import { briefAttachmentIds } from '$lib/motion/video-brief';
-import { storyboardPath } from '$lib/canvas/motion-node';
-import { editorGallery, publishFromForm, withdrawFromForm } from '$lib/server/gallery/editor';
+import { EDITOR_ACTIONS, actionAsk, type EditorActionName } from '$lib/frame-editor/actions';
 
-function parsedJson(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-const HTTP_CONFLICT = 409;
 const HTTP_BAD_REQUEST = 400;
-const HTTP_UNAVAILABLE = 503;
-const HTTP_NOT_FOUND = 404;
-
-export const load: PageServerLoad = ({ locals, params, url }) => loadEditorSession(locals, params, url);
 
 const editorCtx = (scope: MotionEditorScope): EditorCtx => ({
   ...scope,
@@ -50,175 +19,25 @@ const editorCtx = (scope: MotionEditorScope): EditorCtx => ({
 
 const answered = (answer: EditorAnswer) => (answer.status >= HTTP_BAD_REQUEST ? fail(answer.status, answer.body) : answer.body);
 
-const galleryScope = (scope: { db: Db; orgId: string; userId: string }) => ({ db: scope.db, orgId: scope.orgId, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } });
+const viaOp =
+  (name: EditorActionName): Action<{ projectId: string; canvasId: string; nodeId: string }> =>
+  async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const asked = actionAsk(name, await request.formData());
+    if ('refused' in asked) {
+      return fail(asked.refused.status, asked.refused.body);
+    }
+    if (!isEditorOp(asked.op)) {
+      throw new Error(`editor action ${name} names no op: ${asked.op}`);
+    }
+    return answered(await runEditorOp(asked.op, editorCtx(scope), asked.input as never));
+  };
 
 export const actions: Actions = {
-  save: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    let doc: unknown;
-    try {
-      doc = JSON.parse(String(form.get('doc') ?? ''));
-    } catch {
-      return fail(HTTP_BAD_REQUEST, { error: 'invalid_doc' });
-    }
-    return answered(await runEditorOp('save_doc', editorCtx(scope), { version: Number(form.get('version')), doc, summary: String(form.get('summary') ?? '') }));
-  },
-
-  ops: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    const input = { version: Number(form.get('version')), ops: parsedJson(String(form.get('ops') ?? '')), summary: String(form.get('summary') ?? '') };
-    return answered(await runEditorOp('apply_ops', editorCtx(scope), input));
-  },
-
-  head: async ({ locals, params }) => answered(await runEditorOp('read_head', editorCtx(await scopeFor(locals, params)), {})),
-
-  revisions: async ({ locals, params }) => {
-    const scope = await scopeFor(locals, params);
-    return { revisions: await listRevisions(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id }) };
-  },
-
-  restore: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const version = Number((await request.formData()).get('version'));
-    const out = await restoreRevision(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id, node: scope.motion.node, version, actor: { kind: 'user', id: scope.userId } });
-    if (out.outcome === Restore.Missing) {
-      return fail(HTTP_NOT_FOUND, { error: 'no_such_version' });
-    }
-    if (out.outcome === Restore.Conflict) {
-      return fail(HTTP_CONFLICT, { error: 'conflict' });
-    }
-    return { head: { version: out.head.version, doc: out.head.doc } };
-  },
-
-  exported: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    const input = { path: String(form.get('path') ?? ''), width: Number(form.get('width')), height: Number(form.get('height')), seconds: Number(form.get('seconds')) };
-    return answered(await runEditorOp('record_export', editorCtx(scope), input));
-  },
+  ...(Object.fromEntries(Object.keys(EDITOR_ACTIONS).map((name) => [name, viaOp(name as EditorActionName)])) as Record<EditorActionName, Action>),
 
   poster: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     return savePoster(scope.db, { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id, actor: { kind: 'user', id: scope.userId }, form: await request.formData() });
-  },
-
-  still: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    const ask = stillAskSchema.safeParse({ format: form.get('format') ?? undefined, scale: form.get('scale') ?? undefined });
-    if (!ask.success) {
-      return fail(HTTP_BAD_REQUEST, { error: 'invalid_image_format' });
-    }
-    const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
-    const [head, tokens, assets] = await Promise.all([
-      headOrNew(scope.db, nodeScope, scope.motion.node),
-      motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId }),
-      motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id }, SIGNED_URL_TTL_S.render)
-    ]);
-    const made = await exportStill(scope.db, { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id }, head.doc, stillExport(ask.data.format, ask.data.scale), { tokens, assets });
-    return made.ok ? made : fail(HTTP_UNAVAILABLE, { error: made.error });
-  },
-
-  uploadFont: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    return answered(await runEditorOp('upload_font', editorCtx(scope), { path: String(form.get('path') ?? '') }));
-  },
-
-  analyze: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    return answered(await runEditorOp('analyze_sounds', editorCtx(scope), { assetIds: form.getAll('assetId').map(String) }));
-  },
-
-  sound: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    const input = { sound: String(form.get('sound')), text: String(form.get('text') ?? ''), seconds: Number(form.get('seconds')) || undefined };
-    return answered(await runEditorOp('generate_sound', editorCtx(scope), input));
-  },
-
-  render: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    const version = Number(form.get('version'));
-    const settings = parseSettings(form.get('settings') as string | null);
-    if (!settings.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: settings.error });
-    }
-    const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
-    const head = await headOrNew(scope.db, nodeScope, scope.motion.node);
-    if (head.version !== version) {
-      return fail(HTTP_CONFLICT, { error: 'save_first' });
-    }
-
-    const denied = await gateOrgAiActionForForm(scope.orgId);
-    if (denied) {
-      return fail(denied.status, denied.data);
-    }
-
-    const editorUrl = `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
-    const started = await startFarmRender(scope.db, { ...nodeScope, projectId: params.projectId, canvasId: scope.canvas.id, userId: scope.userId, brandId: scope.projectBrandId, editorUrl, head, settings: settings.settings });
-    return started.ok ? { runId: started.runId, quote: started.quote } : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
-  },
-
-  renderBatch: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    const settings = form.get('settings') ? parsedJson(String(form.get('settings'))) : undefined;
-    const input = { version: Number(form.get('version')), settings, rows: parsedJson(String(form.get('rows') ?? '')) };
-    return answered(await runEditorOp('render_batch', editorCtx(scope), input));
-  },
-
-  templateSounds: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    return answered(await runEditorOp('template_sounds', editorCtx(scope), { doc: parsedJson(String(form.get('doc') ?? '')), clipId: String(form.get('clipId') ?? '') }));
-  },
-
-  saveTemplate: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    const input = {
-      doc: parsedJson(String(form.get('doc') ?? '')),
-      compId: String(form.get('compId') ?? '') || null,
-      name: String(form.get('name') ?? ''),
-      description: String(form.get('description') ?? ''),
-      posterFrame: Number(form.get('posterFrame')) || 0
-    };
-    return answered(await runEditorOp('save_template', editorCtx(scope), input));
-  },
-
-  publishGallery: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    return publishFromForm(galleryScope(scope), scope.motion.record.id, await request.formData());
-  },
-
-  withdrawGallery: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    return withdrawFromForm(galleryScope(scope), await request.formData());
-  },
-
-  deleteTemplate: async ({ locals, params, request }) => {
-    const scope = await scopeFor(locals, params);
-    const form = await request.formData();
-    const removed = await libraryOf(scope).remove(String(form.get('id') ?? ''));
-    return removed ? { removed: true } : fail(HTTP_BAD_REQUEST, { error: 'not_removable' });
-  },
-
-  batchStatus: async ({ locals, params }) => answered(await runEditorOp('batch_status', editorCtx(await scopeFor(locals, params)), {})),
-
-  cancelRender: async ({ locals, params }) => {
-    const scope = await scopeFor(locals, params);
-    const farm = motionRenderFarm();
-    if (!farm) {
-      return fail(HTTP_UNAVAILABLE, { error: 'rendering_not_configured' });
-    }
-    const cancelled = await cancelRender(scope.db, farm, { orgId: scope.orgId, nodeId: scope.motion.record.id });
-    return cancelled.ok ? { cancelled: true } : fail(HTTP_CONFLICT, { error: 'nothing_to_cancel' });
-  },
-
-  renderStatus: async ({ locals, params }) => answered(await runEditorOp('render_status', editorCtx(await scopeFor(locals, params)), {}))
+  }
 };

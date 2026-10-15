@@ -12,7 +12,6 @@ function dialog(queue: RenderQueue) {
     props: {
       doc: newMotionDoc(MotionFormat.Landscape),
       assetUrls: {},
-      scope: { orgId: 'o', projectId: 'p', nodeId: 'n' },
       editorUrl: '/p/p/c/c/motion/n',
       fileName: 'video',
       render: async () => {},

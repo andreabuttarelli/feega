@@ -193,12 +193,14 @@ export type TemplateMark = NonNullable<MotionComp['template']>;
 
 export type DocVerdict = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
-type Raw = Record<string, unknown> & { tracks?: { clips?: Record<string, unknown>[] }[] };
+type Raw = Record<string, unknown> & { tracks?: unknown };
+
+const listOr = (value: unknown, apply: (item: Record<string, unknown>) => unknown): unknown => (Array.isArray(value) ? value.map((item) => (item && typeof item === 'object' ? apply(item) : item)) : value);
 
 const withClips = (doc: Raw, version: number, defaults: Record<string, unknown>): Raw => ({
   ...doc,
   version,
-  tracks: (doc.tracks ?? []).map((t) => ({ ...t, clips: (t.clips ?? []).map((c) => ({ ...defaults, ...c })) }))
+  tracks: listOr(doc.tracks ?? [], (t) => ({ ...t, clips: listOr(t.clips ?? [], (c) => ({ ...defaults, ...c })) }))
 });
 
 const MIGRATIONS: Record<number, (doc: Raw) => Raw> = {

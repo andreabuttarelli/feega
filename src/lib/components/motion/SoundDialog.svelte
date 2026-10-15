@@ -1,7 +1,7 @@
 <script lang="ts">
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
-  import { deserialize } from '$app/forms';
+  import { editorAction } from '$lib/frame-editor/client';
 
   export type SoundKind = 'voice' | 'music';
   export type Made = { assetId: string; seconds: number; url: string | null };
@@ -32,8 +32,7 @@
     form.set('sound', kind);
     form.set('text', text);
     form.set('seconds', String(seconds));
-    const res = await fetch(`${editorUrl}?/sound`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await editorAction(editorUrl, 'sound', form);
     working = false;
     if (result.type === 'success' && result.data) {
       onmade(result.data as Made);

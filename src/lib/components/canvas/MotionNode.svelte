@@ -25,7 +25,8 @@
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
   import { NodeMode, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
-  import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
+  import { POSTER_WIDTH } from '$lib/motion/poster-capture';
+  import { sendPoster } from '$lib/frame-editor/client';
   import { coverFrame } from '$lib/motion/still';
   import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
@@ -131,7 +132,7 @@
     posters.set(key, shot);
     slots = releaseCapture(slots, node.id);
     if (shot) {
-      void sendPoster(`${href}?/poster`, shot, { width: String(width), height: String(Math.round((width * source.height) / source.width)) }).catch(() => undefined);
+      void sendPoster(href, shot, { width: String(width), height: String(Math.round((width * source.height) / source.width)) }).catch(() => undefined);
     }
   }
 
