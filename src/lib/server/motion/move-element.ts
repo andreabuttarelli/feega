@@ -284,6 +284,14 @@ export async function moveFree(store: FrameStore, ask: z.infer<typeof freeAskSch
   return { outcome: MoveOutcome.Done, frameId: target.nodeId, clipId, created: false, versions: { [target.nodeId]: write.head.version }, undo: [revision(target.nodeId, target.version), deleted(source)] };
 }
 
+const OUTPUT_LONG_SIDE = 320;
+
+function outputStage(element: Element): Stage {
+  const { width, height } = element.size;
+  const k = OUTPUT_LONG_SIDE / Math.max(width, height);
+  return { width: width * k, height: height * k };
+}
+
 export async function placeOutput(store: FrameStore, ask: OutputAsk): Promise<Moved> {
   const found = await store.output(ask.sourceNodeId);
   if (!found) {
@@ -297,7 +305,7 @@ export async function placeOutput(store: FrameStore, ask: OutputAsk): Promise<Mo
   const element = mediaElement(found.output, target?.doc.fps);
   const landing = target
     ? await landInFrame(store, target, element, ask.drop as Extract<Drop, { on: DropOn.Frame }>, SUMMARY.placed)
-    : await landOnCanvas(store, found, element, ask.drop as Extract<Drop, { on: DropOn.Canvas }>, FRAME_OF_OUTPUT[found.output.kind], null);
+    : await landFree(store, found, element, ask.drop as Extract<Drop, { on: DropOn.Canvas }>, FRAME_OF_OUTPUT[found.output.kind], null, outputStage(element));
   if (!isLanding(landing)) {
     return landing;
   }

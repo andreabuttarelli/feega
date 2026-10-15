@@ -171,6 +171,21 @@ test.describe('moving elements between frames @real', () => {
     });
   }
 
+  test('a generated image dragged onto the empty canvas becomes a free image element', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const assetId = await generated(admin, session, 'image');
+    const gen = await seedNode({ type: 'image', x: 80, y: 520, data: { prompt: 'an image', refId: assetId } });
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.locator(`[data-id="${gen.id}"] .gen-body`).hover();
+    const viewport = page.viewportSize()!;
+    await page.getByTestId('drag-to-frame').dragTo(page.locator('.svelte-flow__pane'), { targetPosition: { x: viewport.width / 2, y: 120 } });
+
+    const made = async () => (await admin.from('nodes').select('id, data').eq('canvas_id', session.canvasId).eq('type', 'motion').is('deleted_at', null)).data ?? [];
+    await expect.poll(async () => (await made()).map((n) => (n.data as { kind?: string }).kind), { timeout: 10_000 }).toEqual(['element']);
+    expect(clipIds(await head(admin, (await made())[0].id))).toEqual([expect.stringMatching(/^Image:/)]);
+  });
+
   test('an image node connected to a frame shows its picture as an element in it', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(120_000);
     const assetId = await generated(admin, session, 'image');

@@ -103,6 +103,34 @@ describe('placeOutput action', () => {
   });
 });
 
+describe('a generated output placed on the empty canvas', () => {
+  const asset = (type: string, width: number, height: number) => ({ id: ASSET, org_id: 'org', project_id: 'project', type, url: 'x', content: type === 'text' ? 'Hello' : null, mime_type: 'image/png', bytes: 1, width, height, duration_s: type === 'video' ? 3 : null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' });
+  const placed = (input: ReturnType<typeof event>) => ({
+    node: input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload as { width: number; height: number; data: Record<string, unknown> },
+    doc: (input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')?.payload as { doc: MotionDoc }).doc
+  });
+
+  it.each([
+    ['image', 'Image', 800, 400],
+    ['video', 'Video', 1920, 1080],
+    ['text', 'Text', 0, 0]
+  ])('a %s becomes a free %s element, not a frame', async (type, component, width, height) => {
+    const input = event(
+      { source: GEN, drop: JSON.stringify({ on: 'canvas', x: 500, y: 300 }) },
+      { nodes: [{ ...frameRow(GEN), type, data: { prompt: 'p', refId: ASSET } }], assets: [asset(type, width, height)] }
+    );
+
+    expect(await actions.placeOutput(input as never)).toMatchObject({ outcome: 'done', created: true });
+    const { node, doc } = placed(input);
+    expect(node.data.kind).toBe('element');
+    expect(doc.background).toBe('transparent');
+    expect(doc.tracks.flatMap((t) => t.clips).map((c) => c.component)).toEqual([component]);
+    if (width) {
+      expect(node.width / node.height).toBeCloseTo(width / height, 1);
+    }
+  });
+});
+
 describe('undo of a move', () => {
   it('restores the frame doc that was there before, as a new revision', async () => {
     const before = withText();
