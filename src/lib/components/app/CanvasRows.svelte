@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { relativeDate } from '$lib/relative-date';
+  import { editedAgo } from '$lib/relative-date';
   import type { DashboardCanvas } from '$lib/server/dashboard/dashboard';
 
   let { canvases, testid }: { canvases: DashboardCanvas[]; testid: string } = $props();
@@ -21,7 +21,7 @@
         </span>
         <span class="name">{canvas.name}</span>
         <span class="project">{canvas.projectName}</span>
-        <span class="when">{relativeDate(canvas.updatedAt)}</span>
+        <span class="when">{editedAgo(canvas.updatedAt)}</span>
       </a>
     </li>
   {/each}
