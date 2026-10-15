@@ -7,18 +7,23 @@
   import ColorField from './ColorField.svelte';
   import { Adder } from './stack-adder';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
+  import MediaPicker from './MediaPicker.svelte';
+  import type { MediaUploader } from './media-upload';
+  import { MediaKind, type MediaPick } from '$lib/motion/media/pick';
 
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
 
-  let { fills, assets, tokens, title = '', adder = Adder.Own, onchange }: { fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; onchange: (fills: Fill[], summary: string) => void } = $props();
+  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, onchange }: { fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
-  const IMAGE = 'image';
   const ICON = cn('inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-ui-icon hover:bg-ui-wash hover:text-ui-text', FOCUS_RING);
   const LABEL = 'text-ui-label text-ui-text-2';
   const FIELD_ROW = 'flex items-center justify-between gap-2';
 
   const TYPE_LABEL = FILL_LABEL;
+
+  const imagePick = (f: FillOf<FillType.Image>): MediaPick | null => (f.src ? { kind: MediaKind.Image, url: f.src } : f.assetId ? { kind: MediaKind.Image, assetId: f.assetId } : null);
+  const IMAGE_PATCH = (pick: MediaPick | null): FillPatch => ({ assetId: pick?.assetId ?? '', src: pick?.url });
 
   let open = $state<number | null>(null);
   let adding = $state(false);
@@ -243,13 +248,7 @@
             <label class={FIELD_ROW}><span class={LABEL}>Radius</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="1" max="400" step="1" data-testid="fill-radius" value={pct(fill.radius)} onchange={(e) => patch(index, { radius: Math.max(1, Number(e.currentTarget.value)) / PERCENT }, 'Gradient radius')} /></label>
           {/if}
         {:else}
-          <div class="grid grid-cols-4 gap-1">
-            {#each assets.filter((a) => a.kind === IMAGE) as asset (asset.id)}
-              <button type="button" class={cn('aspect-square overflow-hidden rounded-xs border border-ui-divider p-0.5', fill.assetId === asset.id && 'ring-2 ring-ui-accent-solid', FOCUS_RING)} data-testid="fill-asset" title={asset.label} onclick={() => patch(index, { assetId: asset.id, src: undefined }, 'Fill image')}><img class="size-full object-cover" src={asset.previewUrl} alt={asset.label} /></button>
-            {:else}
-              <span class="col-span-4 text-ui-caption text-ui-text-3">No images in this project yet.</span>
-            {/each}
-          </div>
+          <MediaPicker label="Fill image" value={imagePick(fill)} {assets} {upload} onpick={(pick) => patch(index, IMAGE_PATCH(pick), 'Fill image')} />
           <label class={FIELD_ROW}
             ><span class={LABEL}>Fit</span>
             <select class={cn(FIELD_INPUT, 'w-28')} data-testid="fill-fit" value={fill.fit} onchange={(e) => patch(index, { fit: e.currentTarget.value }, 'Image fit')}>
