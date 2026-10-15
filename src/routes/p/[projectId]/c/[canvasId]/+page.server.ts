@@ -72,7 +72,7 @@ import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
-import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { MOVE_STATUS, MoveOutcome, drawElement, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
@@ -1114,6 +1114,18 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid rotation' });
     }
     return movedAnswer(await rotateNodeGroup(canvasFrames(scope), canvasMembers(scope), id, degrees));
+  },
+
+  scaleGroup: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const id = String(fd.get('id') ?? '');
+    const w = Number(fd.get('width'));
+    const h = Number(fd.get('height'));
+    if (!id || !(w > 0) || !(h > 0)) {
+      return fail(400, { error: 'invalid size' });
+    }
+    return movedAnswer(await scaleNodeGroup(canvasMembers(scope), id, { w, h }));
   },
 
   moveGroup: async ({ request, params, locals }) => {

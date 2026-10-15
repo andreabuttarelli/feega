@@ -59,7 +59,8 @@
   const layers = $derived(nodeLayers(nodeMode, paint));
   const chrome = $derived(frameChrome(node.kind));
   const previewing = $derived(nodeMode === NodeMode.Preview);
-  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing));
+  const liveUntilPoster = $derived(chrome.liveWhileMissing && still === Still.Missing && sight === Sight.InView);
+  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveUntilPoster));
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));

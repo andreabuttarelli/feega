@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { FrameKind, elementNodeOf, frameChrome } from '$lib/canvas/motion-node';
-import { rotateGroup, translateGroup, type Placed } from '$lib/canvas/node-layout';
+import { rotateGroup, scaleGroup, translateGroup, type Placed } from '$lib/canvas/node-layout';
 import { Background, type MotionDoc } from '$lib/motion/doc';
 import { blankElement, type CanvasBox } from '$lib/motion/draw-create';
 import { clipCentre, elementBox, frameOf, liftElement, placeElement, type Element } from '$lib/motion/move-element';
@@ -66,6 +66,7 @@ export type Members = {
   inGroup: (groupId: string) => Promise<Member[]>;
   join: (id: string, groupId: string | null) => Promise<UndoItem | null>;
   place: (id: string, at: { x: number; y: number; rotation: number }) => Promise<void>;
+  resize: (id: string, at: { x: number; y: number; w: number; h: number }) => Promise<void>;
   sendBack: (id: string) => Promise<void>;
 };
 
@@ -140,6 +141,17 @@ export async function rotateNodeGroup(store: FrameStore, members: Members, id: s
   const placed = (m: Member): Placed => ({ id: m.id, x: m.box.left, y: m.box.top, w: m.box.width, h: m.box.height, rotation: m.rotation });
   const turned = rotateGroup(placed(group), inside.map(placed), degrees);
   await Promise.all(turned.map((n) => members.place(n.id, { x: n.x, y: n.y, rotation: n.rotation })));
+  return { outcome: MoveOutcome.Done, frameId: id, clipId: '', created: false, versions: {}, undo: [], turn: { id, degrees } };
+}
+
+export async function scaleNodeGroup(members: Members, id: string, to: { w: number; h: number }): Promise<Moved> {
+  const [group] = await members.read([id]);
+  if (!group) {
+    return refused(MoveOutcome.NotFound, `no group ${id}`);
+  }
+  const placed = (m: Member): Placed => ({ id: m.id, x: m.box.left, y: m.box.top, w: m.box.width, h: m.box.height, rotation: m.rotation });
+  const scaled = scaleGroup(placed(group), (await members.inGroup(id)).map(placed), to);
+  await Promise.all(scaled.map((n) => members.resize(n.id, { x: n.x, y: n.y, w: n.w, h: n.h })));
   return { outcome: MoveOutcome.Done, frameId: id, clipId: '', created: false, versions: {}, undo: [] };
 }
 
