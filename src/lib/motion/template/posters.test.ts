@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, parseMotionDoc } from '$lib/motion/doc';
 import { customValues, PropFormat, Strictness } from '$lib/motion/custom/component';
@@ -100,6 +101,14 @@ const PART_TAGGED: [string, TemplateEntry, string][] = [
 
 const NOT_A_PART: (string | undefined)[] = [PropFormat.Color, PropFormat.Font, PropFormat.Media];
 
+const TIMELINE = { to: () => TIMELINE };
+
+function drawnHtml(js: string, props: Record<string, unknown>): string {
+  const root = document.createElement('div');
+  new Function('root', 'props', 'tl', 'duration', 'assets', js)(root, props, TIMELINE, 2, {});
+  return root.innerHTML;
+}
+
 const REFERENCE_WORDS = /cosmic|aoxomoxoa|aachen|myspace|smets|sibel|thorwart|tomek|kennedy|tomorrow|marvels|new york|paju|isang|moving sites|wine|cheese and|galeria|azur|berlin|karl|marx|ferran|adri|interbrand|wooster|soho|intef|darmstadt|doda|fassbender|guadagnino|cholovdenko|malek|laverne|tenderness|ui\/ux|inspo|6tm|radioactive|afrodeutsche|sybil|brighton|marine parade|hullabaloo|figueres|moritz|escapism|zemun|kapetanija|gligorijevi|sonnenstub|woolloo|firstdraft|more club|makes no sense|sensations with|stage of life|figured out|yodiz|gaskessel|extraset|katowice|lingang|shanghai|figma|skydiving|salarkhan|futurneue|mateco/i;
 
 describe.each([...POSTERS, ...PART_TAGGED])('the %s still template', (id, entry, name) => {
@@ -126,6 +135,12 @@ describe.each([...POSTERS, ...PART_TAGGED])('the %s still template', (id, entry,
 
   it('has its grain as an editable effect on the poster', () => {
     expect(doc.tracks.flatMap((t) => t.clips).flatMap((c) => c.effects).map((e) => e.kind)).toContain(EffectKind.Noise);
+  });
+
+  it('keeps each font inside its style attribute', () => {
+    const values = customValues(component, {}, Strictness.Strict);
+    const html = drawnHtml(component.source.js, values.ok ? values.values : {});
+    expect(html).not.toContain('system-ui,=""');
   });
 
   it('carries marks of its own design beyond the reference, each editable', () => {
