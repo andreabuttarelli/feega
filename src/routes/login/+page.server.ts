@@ -1,8 +1,5 @@
-import { swallow } from '$lib/server/swallow';
 import { fail, redirect } from '@sveltejs/kit';
-import { createAdminClient } from '$lib/server/supabase-admin';
-import { sendEmail, passwordResetEmailSubject, passwordResetEmailHtml, passwordResetEmailText } from '$lib/server/email';
-import { emailLocale } from '$lib/server/email-i18n';
+import { EMAIL_RE, createConfirmedAccount, sendPasswordReset } from '$lib/server/auth/accounts';
 import { sanitizeWebsiteParam } from '$lib/website-param';
 import { appOrigin } from '$lib/server/app-url';
 import { takeOAuthReturn } from '$lib/server/oauth';
@@ -12,8 +9,6 @@ import { NATIVE_AUTH_BASE, isNativeShell } from '$lib/native-shell';
 import type { Cookies, RequestEvent } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 
-const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const MIN_PASSWORD = 6;
 
 /** Homepage/ads URL CTA, pricing plan CTA → open create-account, not sign-in. */
 function preferSignup(url: URL): boolean {
@@ -118,21 +113,8 @@ export const actions: Actions = {
     const cliPort = String(data.get('cli_port') ?? '');
     const cliState = String(data.get('cli_state') ?? '');
 
-    if (!EMAIL_RE.test(email)) return fail(400, { errorCode: 'invalidEmail', email });
-    if (password.length < MIN_PASSWORD) return fail(400, { errorCode: 'weakPassword', email });
-
-    const admin = createAdminClient();
-    const { error: createErr } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true
-    });
-    if (createErr) {
-      if (/already|registered|exists|duplicate/i.test(createErr.message)) {
-        return fail(400, { errorCode: 'emailExists', email });
-      }
-      return fail(400, { error: createErr.message, email });
-    }
+    const refused = await createConfirmedAccount(email, password);
+    if (refused) return fail(400, { ...refused, email });
 
     const { error: signErr } = await locals.supabase.auth.signInWithPassword({ email, password });
     if (signErr) return fail(400, { error: signErr.message, email });
@@ -149,22 +131,7 @@ export const actions: Actions = {
     const email = String(data.get('email') ?? '').trim().toLowerCase();
     if (!EMAIL_RE.test(email)) return fail(400, { errorCode: 'invalidEmail', email });
 
-    const locale = emailLocale(String(data.get('locale') ?? ''));
-    try {
-      const admin = createAdminClient();
-      const { data: link, error } = await admin.auth.admin.generateLink({ type: 'recovery', email });
-      const hashed = link?.properties?.hashed_token;
-      if (!error && hashed) {
-        const base = appBase(url);
-        const confirmUrl = `${base}/auth/confirm?token_hash=${encodeURIComponent(hashed)}&type=recovery&next=${encodeURIComponent(resetPasswordPath(inviteTokenIn(data)))}`;
-        await sendEmail({
-          to: email,
-          subject: passwordResetEmailSubject(locale),
-          html: passwordResetEmailHtml(locale, confirmUrl, base),
-          text: passwordResetEmailText(locale, confirmUrl)
-        });
-      }
-    } catch (error) { swallow('deliver password reset', error); }
+    await sendPasswordReset({ email, locale: String(data.get('locale') ?? ''), base: appBase(url), inviteToken: inviteTokenIn(data) });
 
     return { reset: true, email };
   },
@@ -174,10 +141,6 @@ export const actions: Actions = {
   github: (event) => oauthSignIn(event, 'github'),
   google: (event) => oauthSignIn(event, 'google')
 };
-
-function resetPasswordPath(inviteToken: string | null): string {
-  return inviteToken ? `/auth/reset-password?${INVITE_PARAM}=${encodeURIComponent(inviteToken)}` : '/auth/reset-password';
-}
 
 function buildRedirectTo(authBase: string, cliPort: string, cliState: string, inviteToken: string | null): string {
   const cb = new URLSearchParams();
