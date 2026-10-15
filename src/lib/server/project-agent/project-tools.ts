@@ -51,11 +51,11 @@ const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
   move_frame_element:
     'Move one element (a clip: text, image, video, shape, component) out of a Frame into another Frame of THIS project, or onto the empty canvas as a new Frame holding only it. Props, style and keyframes are kept and re-timed to the target frame rate; x/y (0..1 of the target frame) is where its centre lands. Never turns an element into a generative node. Both frames are saved as revisions.',
   place_in_frame:
-    "Put the generated output of an image, video or text node of THIS project into a Frame as an element (image, video at the frame's start, or text), centred at x/y (0..1). Omit toFrameId to make a new Frame on the canvas holding only it. The generative node is not changed. To keep the element following the node's next generations, connect_nodes the node to the Frame instead.",
+    "Put the generated output of a Generate image, Generate video or Generate text node of THIS project into a Frame as an element (image, video at the frame's start, or text), centred at x/y (0..1). Omit toFrameId to make a new Frame on the canvas holding only it. The generative node is not changed. To keep the element following the node's next generations, connect_nodes the node to the Frame instead.",
   delete_node:
     'Soft-delete a node on THIS project. The node disappears from list_nodes; undo can bring it back.',
   run_node:
-    'Generate on a producing node of THIS project (text, image, video, audio or model3d — a model3d node turns one connected image, or its prompt via a generated product shot, into a GLB and is always queued). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video or an audio dubbing may come back queued; poll with list_runs. An audio node runs params.operation (describe_node_types type "audio" lists operations and voices).',
+    'Generate on a producing node of THIS project (Generate text/image/video/audio/3D model; type ids text, image, video, audio, model3d — a model3d node turns one connected image, or its prompt via a generated product shot, into a GLB and is always queued). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video or an audio dubbing may come back queued; poll with list_runs. An audio node runs params.operation (describe_node_types type "audio" lists operations and voices).',
   list_runs:
     'Generation history of one node on THIS project, oldest first, with status, cost and the produced text when there is one.',
   preview_node_loop:

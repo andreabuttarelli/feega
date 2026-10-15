@@ -160,7 +160,7 @@ const frameTarget = {
   canvasY: z.number().optional()
 };
 const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame node the element is in'), elementId: z.string().describe('the clip id inside that frame'), ...frameTarget }).strict();
-const placeInFrameInput = z.object({ nodeId: z.string().describe('the generative image, video or text node'), ...frameTarget }).strict();
+const placeInFrameInput = z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
 
 const framesOf = (ctx: CanvasCtx) => frameStore(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, projectId: ctx.projectId });
 

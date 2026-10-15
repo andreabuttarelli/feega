@@ -17,21 +17,21 @@ export type CoachStepSpec = { number: number; title: string; body: string; locat
 export const COACH_STEPS: Record<CoachStep, CoachStepSpec> = {
   [CoachStep.AddText]: {
     number: 1,
-    title: 'Add a Text node',
-    body: 'Click Text in the bar below. We fill in a prompt for you.',
-    locate: (root) => root.querySelector('.add-bar button[aria-label="Text"]')
+    title: 'Add a Generate text node',
+    body: 'Click Generate text in the bar below. We fill in a prompt for you.',
+    locate: (root) => root.querySelector('.add-bar button[aria-label="Generate text"]')
   },
   [CoachStep.AddImage]: {
     number: 2,
-    title: 'Connect an Image node',
-    body: 'Select the text node, press Connect to new… and pick Image.',
-    locate: connectFrom('Image', 'text')
+    title: 'Connect a Generate image node',
+    body: 'Select the Generate text node, press Connect to new… and pick Generate image.',
+    locate: connectFrom('Generate image', 'text')
   },
   [CoachStep.AddVideo]: {
     number: 3,
-    title: 'Connect a Video node',
-    body: 'Select the image node, press Connect to new… and pick Video.',
-    locate: connectFrom('Video', 'image')
+    title: 'Connect a Generate video node',
+    body: 'Select the Generate image node, press Connect to new… and pick Generate video.',
+    locate: connectFrom('Generate video', 'image')
   },
   [CoachStep.Run]: {
     number: 3,

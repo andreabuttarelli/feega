@@ -120,7 +120,7 @@ test.describe('canvas @real', () => {
     try {
       await signInE2e(page, session);
       await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-      await page.getByRole('button', { name: 'Text', exact: true }).click();
+      await page.getByRole('button', { name: 'Generate text', exact: true }).click();
 
       const node = page.locator('.svelte-flow__node').last();
       await node.click();
