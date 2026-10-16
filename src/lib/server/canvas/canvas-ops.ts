@@ -167,7 +167,7 @@ const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame
 const placeInFrameInput = z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
 
 const drawElementInput = z
-  .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse, box:{left,top,width,height}} in canvas units, or {tool:pen, path:SVG d in canvas units}') })
+  .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse, box:{left,top,width,height}, theme?:light|dark} in canvas units (theme picks the ink of a text), or {tool:pen, path:SVG d in canvas units}') })
   .strict();
 
 const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (frame nodes with data.kind element)') }).strict();
