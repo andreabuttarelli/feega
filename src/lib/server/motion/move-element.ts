@@ -5,10 +5,9 @@ import { createNode, deleteNode, findNode, listConnections, type CanvasNodeRecor
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
 import { FrameKind, atFirstRevision, elementNodeOf, frameChrome, motionNodeSize } from '$lib/canvas/motion-node';
-import { blankElement, canvasReady, drawnElement, type Drawn } from '$lib/motion/draw-create';
+import { blankElement, canvasReady, drawnElement, drawnOf } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { parsePath } from '$lib/motion/shape/geometry';
 import { frameShape } from './start';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
@@ -473,14 +472,6 @@ export const drawnSchema = z.discriminatedUnion('tool', [
   z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse]), box: canvasBoxSchema }).strict(),
   z.object({ tool: z.literal(DrawTool.Pen), path: z.string().min(1).max(20_000) }).strict()
 ]);
-
-function drawnOf(wire: z.infer<typeof drawnSchema>): Drawn | string {
-  if (wire.tool !== DrawTool.Pen) {
-    return wire;
-  }
-  const outline = parsePath(wire.path);
-  return typeof outline === 'string' ? outline : { tool: DrawTool.Pen, outline };
-}
 
 export async function drawElement(store: FrameStore, place: Place, wire: z.infer<typeof drawnSchema>): Promise<Moved> {
   const drawn = drawnOf(wire);
