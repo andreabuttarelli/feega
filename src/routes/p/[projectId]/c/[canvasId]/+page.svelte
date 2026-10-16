@@ -78,7 +78,7 @@
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
-  import { pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
   import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
@@ -86,13 +86,15 @@
   import { FEEGA_TOKENS } from '$lib/motion/brand';
   import { AssetKind } from '$lib/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
-  import type { DrawnWire } from '$lib/motion/draw-create';
+  import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, openingFor, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, type Placed } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { barContextOf } from '$lib/canvas/bottom-bar';
-  import { CanvasState, NodeMode, Opening, Reframe, dismissedAfterClick, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
+  import { CanvasState, NodeMode, Opening, Paint, Reframe, dismissedAfterClick, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
+  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { decoded, painted } from '$lib/canvas/paint-wait';
   import { viewportOf } from '$lib/motion/editor-layout';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -374,16 +376,58 @@
   }
 
   async function drawElement(drawn: DrawnWire) {
-    const res = await post('drawElement', { drawn: JSON.stringify(drawn) });
-    if (res?.outcome !== 'done') {
+    const id = crypto.randomUUID();
+    const ghost = drawnTile(id, drawn);
+    if (!ghost) {
+      void saveDrawn(id, drawn);
       return;
     }
-    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
-    const node = res.node as CanvasNodeRecord | null;
-    if (node) {
-      nodes = [...nodes.filter((n) => n.id !== node.id), toTile(node, { select: true })];
-    }
+    await decoded(ghost.look);
+    catalogPosters.set(id, ghost.look);
+    nodes = [...nodes, toTile(ghost.node)];
+    void saveDrawn(id, drawn);
+    await painted();
   }
+
+  async function drawFrame(target: { box: CanvasBox } | { at: { x: number; y: number } }) {
+    const box = 'box' in target ? target.box : defaultFrameBox(target.at);
+    const id = crypto.randomUUID();
+    nodes = [...nodes, toTile(drawnFrameTile(id, box))];
+    void saveFrame(id, box);
+    await painted();
+  }
+
+  async function saveFrame(id: string, box: CanvasBox) {
+    const res = await post('drawFrame', { box: JSON.stringify(box), node_id: id });
+    const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+    if (!node) {
+      nodes = settle(nodes, id, null);
+      return;
+    }
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    nodes = settle(nodes, id, toTile(node));
+    focusOn([id], undefined, FocusMode.Select);
+  }
+
+  async function saveDrawn(id: string, drawn: DrawnWire) {
+    const res = await post('drawElement', { drawn: JSON.stringify(drawn), node_id: id });
+    const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+    if (!node) {
+      catalogPosters.delete(id);
+      nodes = settle(nodes, id, null);
+      return;
+    }
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    nodes = settle(nodes, id, toTile(node));
+    focusOn([id], undefined, FocusMode.Select);
+  }
+
+  $effect(() => {
+    const id = inlineMotion;
+    if (id && catalogPosters.has(id) && inlineStage.paintOf(id) === Paint.Swapped) {
+      catalogPosters.delete(id);
+    }
+  });
 
   async function dropOutput(nodeId: string, client: PointerPoint) {
     const drop = dropAt(client, null);
@@ -1090,6 +1134,9 @@
   });
 
   function warmMotion(id: string) {
+    if (!nodes.some((n) => n.id === id && n.version > 0)) {
+      return;
+    }
     prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
   }
 
@@ -2153,7 +2200,7 @@
 
   function frameLook(n: { id: string; type: string; data: Record<string, unknown> }) {
     const motion = motionOf(n);
-    return motion ? { poster: assetUrl(motion.posterAssetId), still: motion.format === MotionFormat.Poster } : {};
+    return motion ? { poster: assetUrl(motion.posterAssetId), still: motion.format === MotionFormat.Poster, element: motion.kind === FrameKind.Element } : {};
   }
 
   $effect(() =>
@@ -2886,6 +2933,7 @@
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
     onDraw={drawElement}
+    onDrawFrame={drawFrame}
     onRotate={rotateGroupBy}
     onGroup={groupElements}
     onUngroup={ungroupElements}

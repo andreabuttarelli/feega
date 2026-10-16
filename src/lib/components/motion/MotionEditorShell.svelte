@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { painted } from '$lib/canvas/paint-wait';
   import { FrameKind, openingSelection } from '$lib/canvas/motion-node';
   import { groupClips, ungroupClip } from '$lib/motion/group';
   import { onMount, tick, untrack } from 'svelte';
@@ -931,8 +932,11 @@
 
   const FRAME_ACTS: Record<FrameAction, () => void> = { [FrameAction.Image]: () => add('Image'), [FrameAction.Library]: () => (templating = true) };
 
-  function drawn(id: string) {
+  const DRAWN_SETTLE_FRAMES = 4;
+
+  async function drawn(id: string) {
     selection = [id];
+    await painted(DRAWN_SETTLE_FRAMES);
     frameBar.tool = DrawTool.Select;
   }
 

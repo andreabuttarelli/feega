@@ -65,6 +65,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   moveElement: canvas('move_frame_element'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),
+  drawFrame: canvas('create_node'),
   moveFree: canvas('move_frame_element'),
   groupElements: canvas('group_elements'),
   restack: canvas('move_node'),
