@@ -333,3 +333,52 @@ describe('startTaskRun — a request the provider would refuse never leaves', ()
     expect(gatewayRun.mock.calls[0][1]).toEqual({ prompt: 'a picture', ratio: '1:1', size: '1K' });
   });
 });
+
+const referenceVideo: TaskModel = {
+  id: 'higgsfield/bytedance/seedance-2.5/reference-to-video',
+  catalogue: 'video',
+  spec: { path: 'bytedance/seedance-2.5/reference-to-video', fields: { prompt: 'prompt', images: [], videoList: 'video_urls', audioList: 'audio_urls' }, caps: { video: 10 } },
+  uncensored: false,
+  paramSchema: {}
+};
+
+describe('startTaskRun — video and audio references', () => {
+  it('sends upstream videos and audios to the model, and nothing but the path as its ref', async () => {
+    const { deps, gatewayRun } = depsFor(referenceVideo);
+    deps.providers = { higgsfield: deps.providers.wiro };
+
+    await startTaskRun(deps, {
+      ...baseRequest,
+      mode: ProjectMode.Standard,
+      scope: SCOPE,
+      modelId: referenceVideo.id,
+      videoUrls: ['https://example.com/v.mp4'],
+      audioUrls: ['https://example.com/a.wav']
+    });
+
+    expect(gatewayRun).toHaveBeenCalledWith(
+      { path: 'bytedance/seedance-2.5/reference-to-video' },
+      { prompt: 'a picture', video_urls: ['https://example.com/v.mp4'], audio_urls: ['https://example.com/a.wav'] },
+      undefined
+    );
+  });
+
+  it('refuses a video reference to an uncensored model that takes videos', async () => {
+    const takesVideo = { ...uncensoredModel, spec: { ...uncensoredModel.spec, fields: { prompt: 'prompt', images: [], video: 'video_url' } } };
+    const { deps, gatewayRun } = depsFor(takesVideo);
+
+    const out = await startTaskRun(deps, { ...baseRequest, scope: SCOPE, modelId: takesVideo.id, videoUrls: ['https://example.com/v.mp4'] });
+
+    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.noInputsAllowed, stage: RefusalStage.Policy });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+
+  it('ignores a connected video an uncensored image model never receives', async () => {
+    const { deps, gatewayRun } = depsFor(uncensoredModel);
+
+    await startTaskRun(deps, { ...baseRequest, scope: SCOPE, modelId: uncensoredModel.id, videoUrls: ['https://example.com/v.mp4'] });
+
+    expect(gatewayRun).toHaveBeenCalled();
+  });
+});
+

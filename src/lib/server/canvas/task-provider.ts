@@ -7,6 +7,9 @@ export type WireFields = {
   duration?: string;
   images: string[];
   imageList?: string;
+  video?: string;
+  videoList?: string;
+  audioList?: string;
   lastFrame?: string;
 };
 
