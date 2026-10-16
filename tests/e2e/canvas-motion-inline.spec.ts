@@ -100,7 +100,7 @@ async function expectFramed(page: Page, node: Locator) {
   await expect
     .poll(
       async () => {
-        const [picture, body] = [await page.getByTestId('motion-preview').boundingBox(), await node.getByTestId('motion-node-editing').boundingBox()];
+        const [picture, body] = [await page.getByTestId('editor-stage').getByTestId('motion-preview').boundingBox(), await node.getByTestId('motion-node-editing').boundingBox()];
         return picture && body ? Math.max(Math.abs(picture.width - body.width), Math.abs(picture.height - body.height)) : Infinity;
       },
       { timeout: 10_000, message: 'the node takes the shape of the graphic: the picture fills its body, no bands' }
@@ -296,7 +296,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
     await page.waitForTimeout(2500);
 
-    const player = (await page.getByTestId('motion-preview').boundingBox())!;
+    const player = (await page.getByTestId('editor-stage').getByTestId('motion-preview').boundingBox())!;
     const onScreen = await sharp(await page.screenshot()).extract({ left: Math.ceil(player.x), top: Math.ceil(player.y), width: Math.floor(player.width) - 1, height: Math.floor(player.height) - 1 }).png().toBuffer();
     expect(await sharpestEdge(onScreen), 'the title is drawn sharp, not scaled up').toBeGreaterThan(SHARP_EDGE);
   });
