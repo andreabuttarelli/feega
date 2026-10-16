@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { parseBreakdown } from '$lib/video-reference';
-import { MAX_REFERENCE_FRAMES, SCENE_FRAMES_CAP, denseTimes, judgeTimes, keyTimes, referenceFrames, sceneScores, similarity } from './reference-frames';
+import { MAX_REFERENCE_FRAMES, SCENE_FRAMES_CAP, denseTimes, spreadTimes, keyTimes, referenceFrames, sceneScores, similarity } from './reference-frames';
 
 const breakdown = parseBreakdown(
   JSON.stringify({
@@ -91,7 +91,7 @@ describe('dense frames of one scene', () => {
   });
 
   it('the judge looks at a few of them, first and last included', () => {
-    expect(judgeTimes([1, 2, 3, 4, 5, 6, 7, 8, 9])).toEqual([1, 4, 6, 9]);
-    expect(judgeTimes([1, 2])).toEqual([1, 2]);
+    expect(spreadTimes([1, 2, 3, 4, 5, 6, 7, 8, 9], 4)).toEqual([1, 4, 6, 9]);
+    expect(spreadTimes([1, 2], 4)).toEqual([1, 2]);
   });
 });

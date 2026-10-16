@@ -233,7 +233,7 @@ async function importFollowed(answer: PickAnswer | null, importAsset: MotionTool
   return { ids: ok.map((o) => o.asset.id), note: lines.length ? `The references the user follows are now project assets: hang each under the storyboard beat it inspires (write_storyboard media) and take the look from them:\n${lines.join('\n')}` : '' };
 }
 
-export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number; pick: PickAsk | null; cut: CutReview | null; budget: BudgetCard | null; scripted: boolean };
+export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number; pick: PickAsk | null; cut: CutReview | null; budget: BudgetCard | null; scripted: boolean; edits: number };
 
 export type MotionTurn = { stream: ReadableStream<UIMessageChunk>; done: Promise<TurnOutcome> };
 
@@ -254,7 +254,7 @@ function writeText(writer: { write: (chunk: UIMessageChunk) => void }, id: strin
 }
 
 function cannedTurn(content: string, reply: Pick<Reply, 'finish'>, card: BudgetCard | null = null): MotionTurn {
-  const done = reply.finish({ content, tools: card ? [budgetTool(card)] : [] }, ReplyStatus.Done).then((): TurnOutcome => ({ reply: content, summary: null, version: null, revision: null, costUsd: 0, pick: null, cut: null, budget: card, scripted: false }));
+  const done = reply.finish({ content, tools: card ? [budgetTool(card)] : [] }, ReplyStatus.Done).then((): TurnOutcome => ({ reply: content, summary: null, version: null, revision: null, costUsd: 0, pick: null, cut: null, budget: card, scripted: false, edits: 0 }));
   const stream = createUIMessageStream({
     execute: ({ writer }) => {
       writer.write({ type: 'start' });
@@ -774,7 +774,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
 
     const written = write?.outcome === RevisionOutcome.Written ? write.head : null;
     const asked = finished.tools.map(savedPick).findLast((p) => p !== null) ?? null;
-    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null, budget: card, scripted: role === StudioRole.Director && written !== null };
+    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null, budget: card, scripted: role === StudioRole.Director && written !== null, edits: session.edits.length };
   }
 
   const reader = stream.getReader();

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import sharp from 'sharp';
 import { parseBreakdown } from '$lib/video-reference';
-import { MAX_SCENE_FIXES, SCENE_PASS, parseVerdict, runReplicaLoop, type LoopPorts, type SceneStep } from './replica-loop';
+import { MAX_SCENE_FIXES, REVIEW_PAIRS, runReplicaLoop, type KeptFrame, type LoopPorts, type SceneStep } from './replica-loop';
 
 const breakdown = parseBreakdown(
   JSON.stringify({
@@ -14,106 +15,118 @@ const breakdown = parseBreakdown(
   })
 )!;
 
-function fakePorts(scores: number[], costPerTurn = 0.5) {
+const orange = await sharp({ create: { width: 16, height: 9, channels: 3, background: '#ff6a00' } }).jpeg().toBuffer();
+const black = await sharp({ create: { width: 16, height: 9, channels: 3, background: '#000000' } }).jpeg().toBuffer();
+
+function fakePorts(editsPerTurn: number[], costPerTurn = 0.5) {
   const steps: SceneStep[] = [];
-  const judged: number[][] = [];
+  const kept: { scene: number; frames: KeptFrame[] }[] = [];
   let spent = 0;
   const ports: LoopPorts = {
-    grab: async () => Buffer.from([1]),
+    grab: async () => orange,
     turn: async (step) => {
       steps.push(step);
       spent += costPerTurn;
+      return { edits: editsPerTurn.shift() ?? 0 };
     },
-    draw: async (times) => times.map((time) => ({ time, bytes: Buffer.from([2]) })),
-    judge: async (input) => {
-      judged.push(input.pairs.map((p) => p.time));
-      return { score: scores.shift() ?? 1, fixes: ['make the orange radial'] };
-    },
-    spent: async () => spent
+    draw: async (times) => times.map((time) => ({ time, bytes: black })),
+    spent: async () => spent,
+    keep: async (scene, frames) => void kept.push({ scene, frames })
   };
-  return { ports, steps, judged };
+  return { ports, steps, kept };
 }
 
-describe('the replica is built scene by scene by the server, not in one go', () => {
+const reviews = (steps: SceneStep[], scene: number) => steps.filter((s) => s.scene === scene && s.review);
+
+describe('the replica is built scene by scene by the server, and Opus reviews each scene itself', () => {
   it('one build turn per scene, each locked to its own time range, with dense frames of that scene only', async () => {
-    const { ports, steps } = fakePorts([0.9, 0.9]);
+    const { ports, steps } = fakePorts([3, 0, 3, 0]);
 
     await runReplicaLoop(breakdown, ports, { capUsd: 6 });
 
-    expect(steps.map((s) => [s.scene, s.span])).toEqual([
+    const builds = steps.filter((s) => !s.review);
+    expect(builds.map((s) => [s.scene, s.span])).toEqual([
       [1, { fromS: 0, toS: 2 }],
       [2, { fromS: 2, toS: 6 }]
     ]);
-    expect(steps[0].pictures).toHaveLength(12);
-    expect(steps[1].pictures).toHaveLength(SCENE_FRAMES_FOR_4S);
-    expect(steps[0].text).toContain('CAUTIVA');
-    expect(steps[0].text).not.toContain('creatividad');
+    expect(builds[0].pictures).toHaveLength(12);
+    expect(builds[1].pictures).toHaveLength(24);
+    expect(builds[0].text).toContain('CAUTIVA');
+    expect(builds[0].text).not.toContain('creatividad');
   });
 
-  it('a scene below the bar gets a fix turn with the judge notes and the side-by-side pairs, then is judged again', async () => {
-    const { ports, steps } = fakePorts([0.4, 0.85, 0.9]);
+  it('the review turn receives the reference and our frame side by side, at the same times, and is told to edit, not explain', async () => {
+    const { ports, steps } = fakePorts([3, 0, 3, 0]);
+
+    await runReplicaLoop(breakdown, ports, { capUsd: 6 });
+
+    const review = reviews(steps, 1)[0];
+    expect(review.pictures.length).toBeGreaterThan(0);
+    expect(review.pictures.map((p) => p.label.split(' ')[0])).toEqual(review.pictures.map((_, i) => (i % 2 ? 'Yours' : 'Reference')));
+    expect(review.pictures[0].label.replace('Reference', '')).toBe(review.pictures[1].label.replace('Yours', ''));
+    expect(review.pictures[1].bytes).toBe(black);
+    expect(review.text).toMatch(/fix the differences now; reply only with edits/);
+  });
+
+  it('a review turn with no edits means the scene matches: the loop moves on', async () => {
+    const { ports, steps } = fakePorts([3, 0, 3, 0]);
 
     const report = await runReplicaLoop(breakdown, ports, { capUsd: 6 });
 
-    expect(steps.map((s) => s.scene)).toEqual([1, 1, 2]);
-    expect(steps[1].text).toContain('make the orange radial');
-    expect(steps[1].pictures.some((p) => p.label.startsWith('Your frame'))).toBe(true);
-    expect(report.map((r) => [r.scene, r.score, r.fixes])).toEqual([
-      [1, 0.85, 1],
-      [2, 0.9, 0]
+    expect(reviews(steps, 1)).toHaveLength(1);
+    expect(report.map((r) => [r.scene, r.reviews, r.matched])).toEqual([
+      [1, 1, true],
+      [2, 1, true]
     ]);
   });
 
-  it('fixes stop after the limit', async () => {
-    const { ports, steps } = fakePorts([0.1, 0.1, 0.1, 0.1, 0.9]);
+  it('a review that keeps editing is redrawn and reviewed again, up to the limit', async () => {
+    const { ports, steps } = fakePorts([3, 2, 2, 2, 2, 3, 0]);
 
     const report = await runReplicaLoop(breakdown, ports, { capUsd: 60 });
 
-    expect(steps.filter((s) => s.scene === 1)).toHaveLength(1 + MAX_SCENE_FIXES);
-    expect(report[0].fixes).toBe(MAX_SCENE_FIXES);
+    expect(reviews(steps, 1)).toHaveLength(MAX_SCENE_FIXES);
+    expect(report[0]).toMatchObject({ reviews: MAX_SCENE_FIXES, matched: false });
   });
 
-  it('each scene gets an equal share of the cap, and stops fixing when its share is spent', async () => {
-    const { ports, steps } = fakePorts([0.1, 0.1, 0.1, 0.9], 1.6);
+  it('each scene gets an equal share of the cap, and stops reviewing when its share is spent', async () => {
+    const { ports, steps } = fakePorts([3, 2, 2, 2, 3, 0], 1.6);
 
     await runReplicaLoop(breakdown, ports, { capUsd: 6 });
 
     expect(steps[0].capUsd).toBe(3);
     expect(steps[1].capUsd).toBeCloseTo(1.4);
     expect(steps.filter((s) => s.scene === 1)).toHaveLength(2);
-    expect(steps.at(-1)!.scene).toBe(2);
   });
 
-  it('the judge sees a few reference and replica pairs of the scene', async () => {
-    const { ports, judged } = fakePorts([0.9, 0.9]);
+  it('a frame drawing that crashes leaves the scene unreviewed and the build goes on (live: "Connection closed." failed the whole run)', async () => {
+    const { ports, steps } = fakePorts([3, 3]);
 
-    await runReplicaLoop(breakdown, ports, { capUsd: 6 });
-
-    expect(judged[0]).toHaveLength(4);
-    judged[0].forEach((t) => expect(t).toBeLessThan(2));
-  });
-
-  it('a frame drawing that crashes leaves the scene unjudged and the build goes on (live: "Connection closed." failed the whole run)', async () => {
-    const { ports, steps } = fakePorts([]);
     const report = await runReplicaLoop(breakdown, { ...ports, draw: async () => Promise.reject(new Error('Connection closed.')) }, { capUsd: 6 });
 
     expect(steps.map((s) => s.scene)).toEqual([1, 2]);
-    expect(report.map((r) => r.score)).toEqual([null, null]);
+    expect(report.map((r) => r.reviews)).toEqual([0, 0]);
   });
 
-  it('the pass bar is a vision score of 0.8', () => {
-    expect(SCENE_PASS).toBe(0.8);
-  });
-});
+  it('keeps the reference frames and every round of our frames per scene, to inspect', async () => {
+    const { ports, kept } = fakePorts([3, 0, 3, 0]);
 
-const SCENE_FRAMES_FOR_4S = 24;
+    await runReplicaLoop(breakdown, ports, { capUsd: 6 });
 
-describe('the vision verdict', () => {
-  it('reads a 0–10 score and fixes, even in a json fence', () => {
-    expect(parseVerdict('```json\n{"score": 7, "fixes": ["bigger type"]}\n```')).toEqual({ score: 0.7, fixes: ['bigger type'] });
+    const scene1 = kept.filter((k) => k.scene === 1).flatMap((k) => k.frames);
+    expect(scene1.some((f) => f.kind === 'reference')).toBe(true);
+    expect(scene1.some((f) => f.kind === 'ours' && f.round === 1)).toBe(true);
   });
 
-  it('prose is no verdict', () => {
-    expect(parseVerdict('looks great')).toBeNull();
+  it('logs a cheap pixel similarity, not used as the gate', async () => {
+    const { ports } = fakePorts([3, 0, 3, 0]);
+
+    const report = await runReplicaLoop(breakdown, ports, { capUsd: 6 });
+
+    expect(report[0].similarity).toBeLessThan(0.6);
+  });
+
+  it('reviews up to a handful of pairs', () => {
+    expect(REVIEW_PAIRS).toBe(6);
   });
 });

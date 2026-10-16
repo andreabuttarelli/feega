@@ -6,11 +6,13 @@ import { VideoKind, replicaSource } from '$lib/motion/replica';
 import { videoSpentUsd } from '$lib/server/repos/video-spend';
 import { breakdownReader, videoGrabber } from '$lib/server/video-reference';
 import { FramesFailure, motionFrames } from './agent-frames';
-import { VERDICT_PROMPT, parseVerdict, runReplicaLoop, type LoopPorts, type SceneReport, type SceneStep } from './replica-loop';
+import { runReplicaLoop, type KeptFrame, type LoopPorts, type SceneReport, type SceneStep } from './replica-loop';
+import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 
 const LIMITED_WAIT_MS = 61_000;
+const JPEG = 'image/jpeg';
 
-type Scope = { orgId: string; projectId: string; nodeId: string; mode: Parameters<typeof breakdownReader>[1]['mode'] };
+type Scope = { orgId: string; projectId: string; nodeId: string; runId: string; mode: Parameters<typeof breakdownReader>[1]['mode'] };
 
 export type ReplicaPlan = { referenceId: string };
 
@@ -35,19 +37,16 @@ async function drawSaved(db: Db, scope: Scope, times: number[]): Promise<{ time:
   return (drawn.body.frames as DrawnFrame[]).map((f) => ({ time: f.time, bytes: Buffer.from(f.data, 'base64') }));
 }
 
-async function judgeScene(scope: Scope, input: Parameters<LoopPorts['judge']>[0]) {
-  const [{ llmText, llmVisionModel }, { withOrgContext, withNodeContext }] = await Promise.all([import('$lib/server/llm'), import('$lib/server/ai-log')]);
-  const model = llmVisionModel();
-  if (!model) {
-    return null;
-  }
-  const images = input.pairs.flatMap((p) => [p.reference, p.ours]).map((b) => ({ mediaType: 'image/jpeg', data: b.toString('base64') }));
-  const ask = () => llmText({ prompt: VERDICT_PROMPT(input.scene, input.brief), model, images, label: 'motion.replica-judge' });
-  const answer = await withOrgContext(scope.orgId, () => withNodeContext(scope.nodeId, ask)).catch(() => null);
-  return answer ? parseVerdict(answer.text) : null;
+export const keptPrefix = (scope: Scope) => `${scope.orgId}/${scope.projectId}/replica/${scope.nodeId}/${scope.runId}`;
+
+export const keptPath = (scope: Scope, scene: number, frame: KeptFrame) => `${keptPrefix(scope)}/scene-${scene}/${frame.kind}-r${frame.round}-${frame.time.toFixed(2)}s.jpg`;
+
+async function keepFrames(db: Db, scope: Scope, scene: number, frames: readonly KeptFrame[]): Promise<void> {
+  const bucket = db.storage.from(CANVAS_ASSET_BUCKET);
+  await Promise.all(frames.map((f) => bucket.upload(keptPath(scope, scene, f), f.bytes, { contentType: JPEG, upsert: true })));
 }
 
-export async function buildReplica(db: Db, scope: Scope, plan: ReplicaPlan, turn: (step: SceneStep) => Promise<void>): Promise<SceneReport[] | null> {
+export async function buildReplica(db: Db, scope: Scope, plan: ReplicaPlan, turn: (step: SceneStep) => Promise<{ edits: number }>): Promise<SceneReport[] | null> {
   const breakdown = await breakdownReader(db, scope)(plan.referenceId);
   const grab = await videoGrabber(db, { orgId: scope.orgId, projectId: scope.projectId, assetId: plan.referenceId });
   if (!breakdown.ok || !grab) {
@@ -57,14 +56,15 @@ export async function buildReplica(db: Db, scope: Scope, plan: ReplicaPlan, turn
     grab,
     turn,
     draw: (times) => drawSaved(db, scope, times),
-    judge: (input) => judgeScene(scope, input),
+    keep: (scene, frames) => keepFrames(db, scope, scene, frames),
     spent: () => videoSpentUsd(db, { orgId: scope.orgId, nodeId: scope.nodeId })
   };
   return runReplicaLoop(breakdown.breakdown, ports, { capUsd: VIDEO_CAPS[VideoKind.Replica].videoUsd });
 }
 
-export const reportText = (reports: readonly SceneReport[]) =>
+export const reportText = (reports: readonly SceneReport[], frames: string) =>
   [
-    'Built scene by scene against the reference. Similarity per scene (vision judge, 0–1):',
-    ...reports.map((r) => `- scene ${r.scene}: ${r.score === null ? 'not judged' : r.score.toFixed(2)} after ${r.fixes} fix${r.fixes === 1 ? '' : 'es'}, $${r.spentUsd.toFixed(2)}`)
+    'Built scene by scene; after each scene the motion agent reviewed its frames next to the reference and fixed them.',
+    ...reports.map((r) => `- scene ${r.scene}: ${r.matched ? 'matches' : 'still differs'} after ${r.reviews} review${r.reviews === 1 ? '' : 's'}, pixel similarity ${r.similarity === null ? 'n/a' : r.similarity.toFixed(2)}, $${r.spentUsd.toFixed(2)}`),
+    `Reference and replica frames per scene: ${frames}`
   ].join('\n');

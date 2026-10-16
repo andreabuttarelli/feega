@@ -17,7 +17,7 @@ import { ATTACHMENT_PORTS, AttachmentFailure, resolveSources, type AttachmentSou
 import type { ChatAttachment } from '$lib/chat-attachments';
 import { failed } from '$lib/server/chat-attachments/route-scope';
 import { loadTurns, openNodeThread } from '$lib/server/repos/chat';
-import { buildReplica, replicaPlan, reportText } from '$lib/server/motion/replica-build';
+import { buildReplica, keptPrefix, replicaPlan, reportText } from '$lib/server/motion/replica-build';
 import type { SceneReport, SceneStep } from '$lib/server/motion/replica-loop';
 import { Mark, answerText, pickOf, rejectText, type PickAsk } from '$lib/reference-pick';
 
@@ -106,12 +106,14 @@ export async function askMotion(db: Db, input: { orgId: string; userId: string; 
     const run = await createRun(db, { orgId, nodeId, prompt, model: choice.choice.model, params: { kind: MOTION_ASK_KIND }, actorKind: 'agent', actorId: userId });
     const step = async (s: SceneStep) => {
       const started = await turnFor(s.text, attachments, s);
-      if (!(started instanceof Response)) {
-        await started.stream.pipeTo(new WritableStream());
-        await started.done;
+      if (started instanceof Response) {
+        return { edits: 0 };
       }
+      await started.stream.pipeTo(new WritableStream());
+      return { edits: (await started.done).edits };
     };
-    runInBackground(() => settleReplica(db, run, buildReplica(db, { orgId, projectId: project.id, nodeId, mode: project.mode }, plan, step)), MOTION_ASK_KIND);
+    const replicaScope = { orgId, projectId: project.id, nodeId, runId: run.id, mode: project.mode };
+    runInBackground(() => settleReplica(db, run, keptPrefix(replicaScope), buildReplica(db, replicaScope, plan, step)), MOTION_ASK_KIND);
     return { runId: run.id, model: choice.choice.model, refusedModel: guarded.refused };
   }
 
@@ -125,10 +127,10 @@ export async function askMotion(db: Db, input: { orgId: string; userId: string; 
   return { runId: run.id, model: choice.choice.model, refusedModel: guarded.refused };
 }
 
-async function settleReplica(db: Db, run: NodeRun, built: Promise<SceneReport[] | null>): Promise<void> {
+async function settleReplica(db: Db, run: NodeRun, frames: string, built: Promise<SceneReport[] | null>): Promise<void> {
   try {
     const reports = await built;
-    const reply = reports ? reportText(reports) : 'The reference video could not be read, so the scene-by-scene build did not start.';
+    const reply = reports ? reportText(reports, frames) : 'The reference video could not be read, so the scene-by-scene build did not start.';
     await settleRun(db, { orgId: run.orgId, runId: run.id, params: { kind: MOTION_ASK_KIND, reply, summary: reply, scenes: reports ?? [] }, costUsd: (reports ?? []).reduce((sum, r) => sum + r.spentUsd, 0) });
   } catch (e) {
     await failRun(db, { orgId: run.orgId, runId: run.id, error: e instanceof Error ? e.message : String(e) });
