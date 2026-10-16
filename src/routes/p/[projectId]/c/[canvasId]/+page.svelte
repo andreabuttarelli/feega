@@ -24,6 +24,7 @@
   import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
+  import { createPlaceSaves, keepPlaced } from '$lib/canvas/place-save';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
@@ -1066,6 +1067,11 @@
     onStatus: (status) => { saveStatus = status; }
   });
 
+  const places = createPlaceSaves({
+    send,
+    backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1))
+  });
+
   /**
    * LO STACK DI QUESTA SCHEDA — non dell'utente, non del database: `undo-stack.ts` lo dice in
    * testa al file, e vale anche qui. Un gesto entra dopo che il server l'ha già scritto (mai
@@ -1246,7 +1252,7 @@
     }
     const now = Date.now();
     const before = nodes;
-    nodes = keepSame(nodes, keepDirty((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys), now);
+    nodes = keepSame(nodes, keepPlaced(keepDirty((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys), nodes, places.dirty), now);
     edges = keepSame(edges, (snapshot.connections as Connection[]).map(toEdge), now);
     productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
     socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
@@ -1347,10 +1353,10 @@
   }
 
   $effect(() => {
-    const flushAll = () => { void saves.flush(); };
+    const flushAll = () => { void saves.flush(); void places.flush(); };
     const flushHidden = () => { if (document.visibilityState === 'hidden') { flushAll(); } };
     const warnUnsent = (event: BeforeUnloadEvent) => {
-      if (!saves.unsent()) { return; }
+      if (!saves.unsent() && !places.unsent()) { return; }
       flushAll();
       event.preventDefault();
     };
@@ -1366,7 +1372,7 @@
     };
   });
 
-  beforeNavigate(() => { void saves.flush(); });
+  beforeNavigate(() => { void saves.flush(); void places.flush(); });
 
   function formOf(fields: Record<string, string | number | File | string[]>): FormData {
     const body = new FormData();
@@ -1986,15 +1992,11 @@
     if (before && motionOf(before)?.kind === FrameKind.Group) {
       const delta = { dx: x - before.x, dy: y - before.y };
       nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : layoutOf(n.data).groupId === id ? { ...n, x: n.x + delta.dx, y: n.y + delta.dy } : n));
-      await post('moveGroup', { id, x, y });
+      await places.moveGroup(id, x, y);
       return;
     }
     nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : n));
-
-    const result = await post('move', { node_id: id, x, y });
-    if (!result && before) {
-      nodes = nodes.map((node) => node.id === id ? { ...node, x: before.x, y: before.y } : node);
-    }
+    await places.move(id, x, y);
   }
 
   /**
@@ -2039,13 +2041,8 @@
     const fit = frameFit(id, width);
     const w = fit?.w ?? width;
     const h = fit?.h ?? height;
-    const before = nodes.find((node) => node.id === id);
     nodes = nodes.map((n) => (n.id === id ? { ...n, w, h, userHeight: h } : n));
-
-    const result = await post('resize', { node_id: id, width: w, height: h });
-    if (!result && before) {
-      nodes = nodes.map((node) => (node.id === id ? { ...node, w: before.w, h: before.h, userHeight: before.userHeight } : node));
-    }
+    await places.resize(id, w, h);
   }
 
   /**
