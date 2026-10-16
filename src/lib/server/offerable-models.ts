@@ -126,14 +126,21 @@ function videoResolutionsFor(row: SyncedRow): string[] {
  * prodotto pubblica) e una sola durata — `MIN_DURATION` del prodotto, non il minimo grezzo del
  * provider, che non conosciamo per un modello senza spec.
  */
+function declaredDurations(row: SyncedRow): number[] {
+  const declared = (row.param_schema?.duration as { values?: unknown } | undefined)?.values;
+  const seconds = Array.isArray(declared) ? declared.map(Number).filter((s) => Number.isInteger(s) && s > 0) : [];
+  return seconds.length ? seconds.sort((a, b) => a - b) : [MIN_DURATION];
+}
+
 function genericVideoChoice(row: SyncedRow): ModelChoice {
+  const durations = declaredDurations(row);
   return {
     id: row.id,
     label: row.label ?? row.id,
     aspectRatios: ['9:16'],
-    minDuration: MIN_DURATION,
-    maxDuration: MIN_DURATION,
-    durationOptions: [MIN_DURATION],
+    minDuration: durations[0],
+    maxDuration: durations[durations.length - 1],
+    durationOptions: durations,
     resolutions: videoResolutionsFor(row),
     ...providerOf(row.id),
     wireId: row.id,
