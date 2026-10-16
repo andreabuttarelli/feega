@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { liveTiles } from './live-tiles.svelte';
+import { liveTiles, posterDue } from './live-tiles.svelte';
 import { Viewport } from '$lib/motion/editor-layout';
 
 describe('live tiles', () => {
@@ -35,5 +35,21 @@ describe('live tiles', () => {
     const { LIVE_CAP } = await import('./live-tiles.svelte');
 
     expect(LIVE_CAP[Viewport.Phone]).toBeLessThan(LIVE_CAP[Viewport.Desktop]);
+  });
+});
+
+describe('posters from live tiles', () => {
+  const due = { live: true, drawn: true, local: false, atHead: true, hasPoster: false, shooting: false };
+
+  it('a live tile drawn at the server revision with no poster for it shoots one', () => {
+    expect(posterDue(due)).toBe(true);
+  });
+
+  it('never shoots a local doc, an older revision, twice, or a tile already covered', () => {
+    expect(posterDue({ ...due, local: true })).toBe(false);
+    expect(posterDue({ ...due, atHead: false })).toBe(false);
+    expect(posterDue({ ...due, shooting: true })).toBe(false);
+    expect(posterDue({ ...due, hasPoster: true })).toBe(false);
+    expect(posterDue({ ...due, drawn: false })).toBe(false);
   });
 });
