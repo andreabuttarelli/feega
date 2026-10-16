@@ -228,6 +228,24 @@ function written(result: ActionAnswer): Written | null {
   return ((result.data ?? {}) as { node?: Written }).node ?? null;
 }
 
+export type VersionedAction = {
+  settle: () => Promise<void>;
+  version: () => number;
+  send: (version: number) => Promise<ActionAnswer>;
+  reread: () => Promise<unknown>;
+};
+
+export async function actAtVersion(action: VersionedAction): Promise<ActionAnswer> {
+  await action.settle();
+  const first = await action.send(action.version());
+  if (first.type === 'success' || failureOf(first) !== SaveFailure.Conflict) {
+    return first;
+  }
+
+  await action.reread();
+  return action.send(action.version());
+}
+
 export async function writeWithRetry(attempt: WriteAttempt): Promise<WriteOutcome> {
   const tried = await attempt.send(attempt.patch, attempt.base);
   const first = failureOf(tried) === SaveFailure.Busy ? await attempt.send(attempt.patch, attempt.base) : tried;

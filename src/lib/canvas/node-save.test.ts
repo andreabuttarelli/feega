@@ -1,5 +1,41 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry } from './node-save';
+import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry, actAtVersion } from './node-save';
+
+describe('actAtVersion: an action on a node waits for my own writes and never conflicts with them', () => {
+  const ok = { type: 'success', data: {} };
+  const conflict = { type: 'failure', status: 409, data: { conflict: true } };
+
+  it('sends only after my pending writes landed, at the version they left', async () => {
+    let version = 3;
+    const steps: string[] = [];
+    const send = vi.fn(async (at: number) => { steps.push(`send@${at}`); return ok; });
+    const answer = await actAtVersion({
+      settle: async () => { steps.push('settle'); version = 4; },
+      version: () => version,
+      send,
+      reread: async () => {}
+    });
+    expect(answer).toBe(ok);
+    expect(steps).toEqual(['settle', 'send@4']);
+  });
+
+  it('a conflict from another actor rereads and retries once at the fresh version', async () => {
+    let version = 4;
+    const send = vi.fn(async (at: number) => (at === 4 ? conflict : ok));
+    const answer = await actAtVersion({ settle: async () => {}, version: () => version, send, reread: async () => { version = 5; } });
+    expect(answer).toBe(ok);
+    expect(send.mock.calls.map(([at]) => at)).toEqual([4, 5]);
+  });
+
+  it('any other failure is returned as is, without a retry', async () => {
+    const refused = { type: 'failure', status: 400, data: { error: 'no' } };
+    const send = vi.fn(async () => refused);
+    const reread = vi.fn(async () => {});
+    expect(await actAtVersion({ settle: async () => {}, version: () => 1, send, reread })).toBe(refused);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(reread).not.toHaveBeenCalled();
+  });
+});
 
 describe('failureOf: every server answer has one reason', () => {
   it.each([
