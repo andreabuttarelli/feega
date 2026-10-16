@@ -113,7 +113,7 @@
   import { upstreamCards as compositionCards, cardAssetIds } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
   import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
-  import { isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
+  import { isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, sourceOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
   import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
   import { hasInspector, inspectorOf } from '$lib/canvas/node-inspector';
   import SourceSettingsFrame from '$lib/components/canvas/SourceSettingsFrame.svelte';
@@ -943,8 +943,13 @@
     return audioInputKindOf(wired.filter((port): port is ConnectorType => port !== null));
   }
 
+  const NAMED_OUTPUTS: Partial<Record<string, (n: Tile) => SelectOutput[]>> = {
+    audio: (n) => audioNamedOutputs(audioOperationOfTile(n), audioInputOfTile(n)),
+    social_account_feed: () => sourceOutputs('social_account_feed')
+  };
+
   function outputsOfTile(n: Tile): SelectOutput[] {
-    return n.type === 'audio' ? audioNamedOutputs(audioOperationOfTile(n), audioInputOfTile(n)) : selectOutputsOf(n);
+    return (NAMED_OUTPUTS[n.type] ?? selectOutputsOf)(n);
   }
 
   function audioUrlsOf(n: Tile): { videoUrl: string | null; audioUrl: string | null } {

@@ -166,9 +166,9 @@ export function fieldValue<T extends SyncedSourceType>(type: T, key: string, row
   return field ? field.extract(row) : null;
 }
 
-export const DEFAULT_FIELDS: Record<SyncedSourceType, { images: string; text: string }> = {
+export const DEFAULT_FIELDS: Record<SyncedSourceType, { images: string; text: string; videos?: string }> = {
   products: { images: 'images', text: 'title_description' },
-  social_account_feed: { images: 'media', text: 'caption' }
+  social_account_feed: { images: 'media', text: 'caption', videos: 'video' }
 };
 
 function itemOf<T extends SyncedSourceType>(type: T, row: RowOf[T]): SelectableItem {

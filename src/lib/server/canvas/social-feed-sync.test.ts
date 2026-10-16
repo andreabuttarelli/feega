@@ -1,15 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const { fetchSocialFeed, fetchClassifiedEntry, upsertNodeSocialPosts, archiveImageToBucket } = vi.hoisted(() => ({
+const { fetchSocialFeed, fetchClassifiedEntry, upsertNodeSocialPosts, archiveImageToBucket, archiveVideoToBucket } = vi.hoisted(() => ({
   fetchSocialFeed: vi.fn(),
   fetchClassifiedEntry: vi.fn(),
   upsertNodeSocialPosts: vi.fn(),
-  archiveImageToBucket: vi.fn()
+  archiveImageToBucket: vi.fn(),
+  archiveVideoToBucket: vi.fn()
 }));
 
 vi.mock('$lib/server/social-feed-fetch', () => ({ fetchSocialFeed, fetchClassifiedEntry }));
 vi.mock('$lib/server/repos/social-posts', () => ({ upsertNodeSocialPosts }));
-vi.mock('$lib/server/media-archive', () => ({ archiveImageToBucket }));
+vi.mock('$lib/server/media-archive', () => ({ archiveImageToBucket, archiveVideoToBucket }));
 
 import { syncSocialFeedNode, syncSocialFeedEntries } from './social-feed-sync';
 
@@ -113,6 +114,32 @@ describe('syncSocialFeedNode', () => {
     expect(out.ok).toBe(true);
     const [, input] = upsertNodeSocialPosts.mock.calls[0];
     expect(input.posts[0].items[0].thumbnailPath).toBeUndefined();
+  });
+
+  it('archives the file of a video slide too, so it outlives the CDN link', async () => {
+    fetchSocialFeed.mockResolvedValue({
+      ok: true,
+      posts: [
+        {
+          externalId: '1',
+          items: [
+            { type: 'image', url: 'https://cdn.example.com/a.jpg', thumbnailUrl: 'https://cdn.example.com/a.jpg' },
+            { type: 'video', url: 'https://cdn.example.com/b.mp4', thumbnailUrl: 'https://cdn.example.com/b.jpg' }
+          ]
+        }
+      ]
+    });
+    archiveImageToBucket.mockResolvedValue(`${ORG}/${NODE}/cover.jpg`);
+    archiveVideoToBucket.mockResolvedValue(`${ORG}/${NODE}/clip.mp4`);
+    upsertNodeSocialPosts.mockResolvedValue(1);
+
+    await syncSocialFeedNode({} as never, { orgId: ORG, projectId: PROJECT, nodeId: NODE, platform: 'instagram', handle: 'brand', limit: 20 });
+
+    expect(archiveVideoToBucket).toHaveBeenCalledTimes(1);
+    expect(archiveVideoToBucket).toHaveBeenCalledWith({}, expect.stringMatching(new RegExp(`^${ORG}/${NODE}/.+\\.mp4$`)), 'https://cdn.example.com/b.mp4', 'canvas-assets');
+    const [, input] = upsertNodeSocialPosts.mock.calls[0];
+    expect(input.posts[0].items[0].videoPath).toBeUndefined();
+    expect(input.posts[0].items[1].videoPath).toBe(`${ORG}/${NODE}/clip.mp4`);
   });
 });
 
