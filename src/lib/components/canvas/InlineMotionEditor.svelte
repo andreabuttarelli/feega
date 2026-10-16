@@ -62,6 +62,7 @@
   $effect(() => {
     const url = sessionUrl(editorPath);
     let stale = false;
+    const release = sessions.hold(url);
     const landed = sessions.settled(url);
     session = landed ?? null;
     failed = false;
@@ -78,6 +79,7 @@
     });
     return () => {
       stale = true;
+      release();
     };
   });
 

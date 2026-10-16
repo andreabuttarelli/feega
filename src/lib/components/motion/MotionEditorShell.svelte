@@ -441,6 +441,13 @@
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let unsavedSummary = '';
 
+  onMount(() => () => {
+    if (saveTimer && saveState === SaveState.Pending) {
+      clearTimeout(saveTimer);
+      void save();
+    }
+  });
+
   const compPath = $derived(path.map((p) => p.comp));
   const doc = $derived(viewOf(draft?.doc ?? history.present, compPath));
   const mode = $derived(docMode(history.present));
@@ -507,7 +514,8 @@
 
   const poster = posterJob(
     () => preview?.still(posterSecond(history.present), POSTER_WIDTH, posterFormat(history.present.background)) ?? Promise.resolve(''),
-    (jpeg) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)), revision: String(version) })
+    (jpeg, shotAt) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)), revision: String(shotAt) }),
+    () => version
   );
   let posterVersion = data.node.posterAssetId ? data.head.version : -1;
   $effect(() => {
