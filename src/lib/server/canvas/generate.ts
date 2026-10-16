@@ -39,11 +39,11 @@ import { resolveNodeModel } from './node-model';
 import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio-run';
 import { audioOperationOf, defaultAudioModel, operationSpec, voiceIdOf } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
-import { inputTtlOf, RouteRole, TASK_PROVIDERS, taskJobOf, taskProviderOf } from '$lib/server/generation/task-providers';
+import { inputTtlOf, RouteRole, TASK_PROVIDERS, taskJobOf, taskProviderOf, WAITING_TASK_ID, waitingJobOf } from '$lib/server/generation/task-providers';
 import { AUTO_ROUTE } from '$lib/canvas/model-routes';
 import { kieTextModel } from '$lib/server/kie-chat';
 import { PRIMARY_ROUTE } from '$lib/server/generation/discount-routes';
-import { RefusalStage, type TaskStart } from './task-run';
+import { QueuePlace, RefusalStage, type TaskStart } from './task-run';
 import { model3dParamsOf } from '$lib/model3d-models';
 import { cheapestImageChoice, Model3dPath, model3dPathOf, productShotPrompt } from '$lib/canvas/model3d-run';
 
@@ -311,7 +311,7 @@ const TASK_IMAGE_PATHS: Readonly<Record<string, (upstream: UpstreamInputs) => st
   model3d: (upstream) => upstream.referenceImageUrls
 };
 
-async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<TaskStart> {
+async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string, place = QueuePlace.New): Promise<Exclude<TaskStart, { kind: 'waiting' }>> {
   const [{ taskRunDeps }, { startTaskRun }, { upstreamProvenance }, { projectModeOf }] = await Promise.all([
     import('$lib/server/task-providers-config'),
     import('./task-run'),
@@ -328,7 +328,8 @@ async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: Upstre
     upstreamProvenance(db, { orgId: input.orgId, canvasId: input.canvasId, nodeId: input.nodeId, data: node?.data ?? {} })
   ]);
 
-  return startTaskRun(taskRunDeps(db), {
+  const out = await startTaskRun(taskRunDeps(db), {
+    place,
     scope: audioScopeOf(input),
     mode: await projectModeOf(db, input),
     modelId: input.model ?? '',
@@ -341,6 +342,21 @@ async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: Upstre
     provenance,
     idempotencyKey: run.id
   });
+  return out.kind === 'waiting' ? { kind: 'job', jobId: waitingJobOf(taskProviderOf(input.model)!) } : out;
+}
+
+async function resubmitWaiting(db: Db, shape: StartRun, run: NodeRun): Promise<void> {
+  const { upstreamInputsFor } = await import('$lib/server/canvas/upstream');
+  const upstream = await upstreamInputsFor(db, { orgId: shape.orgId, canvasId: shape.canvasId, nodeId: shape.nodeId, model: shape.model, medium: shape.medium });
+  const out = await startTask(db, shape, run, upstream, shape.prompt, QueuePlace.Waiting);
+  if (out.kind === 'refused') {
+    await giveUp(db, shape, { ...run, status: 'finishing' }, out.error);
+    return;
+  }
+  if (out.jobId !== run.externalJobId) {
+    await setExternalJob(db, { orgId: run.orgId, runId: run.id, externalJobId: out.jobId });
+  }
+  await releaseClaim(db, { orgId: run.orgId, runId: run.id });
 }
 
 async function queueTask(db: Db, input: StartRun, run: NodeRun, jobId: string): Promise<RunOutcome> {
@@ -1149,6 +1165,11 @@ export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutco
     const shape: StartRun = { ...toStartRunShape(run), medium: node.type as GenMedium, projectId: node.projectId, canvasId: node.canvasId };
     const finishing: NodeRun = { ...run, status: 'finishing' };
     try {
+      if (taskJobOf(run.externalJobId)?.taskId === WAITING_TASK_ID) {
+        await resubmitWaiting(db, shape, run);
+        outcome.pending += 1;
+        continue;
+      }
       const mode = await projectModeOf(db, shape);
       const progress = await finishTaskJob(db, deps, {
         externalJobId: run.externalJobId,
