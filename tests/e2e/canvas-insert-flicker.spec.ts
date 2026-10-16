@@ -19,6 +19,9 @@ async function watchFreeElement(page: Page) {
       if (img?.complete && img.naturalWidth > 0) {
         return true;
       }
+      if (node.querySelector('[data-drawn="true"]')) {
+        return true;
+      }
       const stage = document.querySelector('[data-testid=editor-stage]') as HTMLElement | null;
       return !node.querySelector('[data-testid=motion-node-skeleton]') && stage?.dataset.shown === 'true';
     };
