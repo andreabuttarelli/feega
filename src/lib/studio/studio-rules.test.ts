@@ -83,8 +83,9 @@ describe('planBatch', () => {
     expect(plan.items.map((i) => i.variation)).toEqual([3, 4]);
   });
 
-  it('una cella è ambiente + inquadratura + modello', () => {
-    expect(cellKey({ environment: Environment.Beach, shot: Shot.Detail, influencerId: null })).toBe('beach|detail|-');
+  it('ogni foto ha la sua cella, così le foto di un lotto girano insieme', () => {
+    const plan = planBatch({ products: [shirt, { ...shirt, index: 3, title: 'Mug' }], models: [], environments: [Environment.WhiteEcom], shots: [Shot.Packshot], variations: 6 });
+    expect(new Set(plan.items.map(cellKey)).size).toBe(12);
   });
 });
 
@@ -132,6 +133,11 @@ describe('macchina a stati', () => {
     expect(afterFailure('timeout', 1)).toEqual({ status: ItemStatus.Queued, delayMs: 30_000 });
     expect(afterFailure('timeout', 2)).toEqual({ status: ItemStatus.Queued, delayMs: 60_000 });
     expect(afterFailure('timeout', MAX_RETRIES + 1)).toEqual({ status: ItemStatus.Failed });
+  });
+
+  it('un errore qualsiasi si ritenta una volta, subito', () => {
+    expect(afterFailure('no image returned', 1)).toEqual({ status: ItemStatus.Queued, delayMs: 0 });
+    expect(afterFailure('no image returned', 2)).toEqual({ status: ItemStatus.Failed });
   });
 
   it('un blocco di moderazione non si ritenta mai', () => {
