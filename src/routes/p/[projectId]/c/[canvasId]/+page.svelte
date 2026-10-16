@@ -26,7 +26,7 @@
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -1400,14 +1400,28 @@
     announce(action, failureOf(result), result.data ?? result);
   }
 
-  async function post(
-    action: string,
-    fields: Record<string, string | number | File | string[]>
-  ): Promise<Record<string, unknown> | null> {
+  type Fields = Record<string, string | number | File | string[]>;
+
+  function post(action: string, fields: Fields): Promise<Record<string, unknown> | null> {
+    return answered(action, () => send(action, fields));
+  }
+
+  function postAtVersion(action: string, id: string, fields: Fields): Promise<Record<string, unknown> | null> {
+    let release = () => {};
+    const asked = actAtVersion({
+      settle: async () => { await saves.flush(id); release = saves.hold(id); },
+      version: () => nodes.find((node) => node.id === id)?.version ?? 0,
+      send: (version) => send(action, { ...fields, node_id: id, version }),
+      reread: refresh
+    });
+    return answered(action, () => asked).finally(() => release());
+  }
+
+  async function answered(action: string, ask: () => Promise<ActionAnswer>): Promise<Record<string, unknown> | null> {
     const mutating = actionKind(action) === ActionKind.Write;
     if (mutating) { pending += 1; snapshotVersion += 1; }
     try {
-      const result = await send(action, fields);
+      const result = await ask();
       if (result.type !== 'success') {
         report(action, result);
         return null;
@@ -1717,24 +1731,13 @@
 
     nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
 
-    await saves.flush(id);
-
-    const before = nodes.find((node) => node.id === id);
-    if (!before) {
-      return;
-    }
-
     pending += 1;
-    const release = saves.hold(id);
-
-    const result = await post('run', {
-      node_id: id,
+    const result = await postAtVersion('run', id, {
       medium: gen.medium,
       prompt: gen.prompt,
       model: effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []) ?? '',
-      params: JSON.stringify(gen.params),
-      version: before.version
-    }).finally(release);
+      params: JSON.stringify(gen.params)
+    });
     pending -= 1;
 
     if (!result) {
@@ -1937,7 +1940,7 @@
     nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, sync_status: 'running' } } : node));
     pending += 1;
 
-    const result = await post('sync', { node_id: id, version: before.version });
+    const result = await postAtVersion('sync', id, {});
     pending -= 1;
 
     if (!result) {
