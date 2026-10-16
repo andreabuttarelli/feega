@@ -44,6 +44,7 @@
   import { DrawTool } from '$lib/motion/draw-tool';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import CanvasKeys from './CanvasKeys.svelte';
+  import CanvasZoomLock from './CanvasZoomLock.svelte';
   import CanvasSelectionBridge from './CanvasSelectionBridge.svelte';
   import CanvasImageTiers from './CanvasImageTiers.svelte';
   import { provideTierBoard } from '$lib/canvas/tier-board.svelte';
@@ -866,6 +867,7 @@
   >
     <CanvasPointer onready={(fn) => { toFlow = fn; onFlow?.(fn); }} />
     <CanvasFocus {focus} />
+    <CanvasZoomLock />
     {#if spec.chrome}
     <CanvasKeys
       onadd={addAtCentre}
