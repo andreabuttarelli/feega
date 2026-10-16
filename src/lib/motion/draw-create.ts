@@ -98,6 +98,10 @@ export function blankElement(box: CanvasBox): OpResult {
   return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box), background: Background.Transparent }, 0);
 }
 
+export function drawnFrame(box: CanvasBox): MotionDoc {
+  return { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box) };
+}
+
 function canvasBoxOf(outline: Outline): CanvasBox {
   const box = boundsOf(outline);
   return { left: box.x - box.width / 2, top: box.y - box.height / 2, width: Math.max(box.width, MIN_SIDE), height: Math.max(box.height, MIN_SIDE) };

@@ -90,6 +90,10 @@ export function elementNodeOf(box: { width: number; height: number }, kind: Fram
   return { data: { ...newMotionData(docFormat(box)), kind }, w: Math.round(box.width), h: Math.round(box.height) };
 }
 
+export function drawnFrameNodeOf(box: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
+  return { data: newMotionData(docFormat(box)), w: Math.round(box.width), h: Math.round(box.height) + MOTION_NODE_BAR_H };
+}
+
 export function frameNodeOf(picture: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
   const format = docFormat(picture);
   return { data: newMotionData(format), ...frameNodeSize(MOTION_STAGE_WIDTH[format], picture) };

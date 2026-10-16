@@ -42,7 +42,7 @@
   import type { NameTag } from '$lib/canvas/node-label';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
-  import type { DrawnWire } from '$lib/motion/draw-create';
+  import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import CanvasKeys from './CanvasKeys.svelte';
   import CanvasSelectionBridge from './CanvasSelectionBridge.svelte';
   import CanvasImageTiers from './CanvasImageTiers.svelte';
@@ -155,6 +155,7 @@
     onNodeClicked,
     barContext,
     onDraw,
+    onDrawFrame,
     onRotate,
     onGroup,
     onUngroup,
@@ -237,7 +238,8 @@
     onFrameTemplates?: (at: { x: number; y: number }) => void;
     onNodeClicked?: (id: string) => void;
     barContext?: BarContext;
-    onDraw?: (drawn: DrawnWire) => void;
+    onDraw?: (drawn: DrawnWire) => Promise<void>;
+    onDrawFrame?: (target: { box: CanvasBox } | { at: { x: number; y: number } }) => Promise<void>;
     onRotate?: (id: string, degrees: number) => void;
     onGroup?: (ids: string[]) => void;
     onUngroup?: (ids: string[]) => void;
@@ -911,9 +913,13 @@
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
-      ondraw={(drawn) => {
+      ondraw={async (drawn) => {
+        await onDraw(drawn);
         frameBar.tool = DrawTool.Select;
-        onDraw(drawn);
+      }}
+      onframe={async (target) => {
+        await onDrawFrame?.(target);
+        frameBar.tool = DrawTool.Select;
       }}
     />
   {/if}
