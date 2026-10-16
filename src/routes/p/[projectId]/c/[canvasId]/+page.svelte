@@ -26,7 +26,7 @@
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -2097,16 +2097,6 @@
     return out;
   }
 
-  const SEND_RESULT: Record<SaveFailure, SendResult> = {
-    [SaveFailure.Network]: SendResult.Retry,
-    [SaveFailure.Server]: SendResult.Retry,
-    [SaveFailure.Conflict]: SendResult.Dropped,
-    [SaveFailure.Invalid]: SendResult.Dropped,
-    [SaveFailure.Gone]: SendResult.Dropped,
-    [SaveFailure.Credits]: SendResult.Dropped,
-    [SaveFailure.Auth]: SendResult.Dropped
-  };
-
   async function sendSave(id: string, touched: Record<string, unknown>): Promise<SendResult> {
     const current = nodes.find((node) => node.id === id);
     if (!current) { return SendResult.Dropped; }
@@ -2114,7 +2104,7 @@
     if (!Object.keys(change).length) { return SendResult.Saved; }
 
     const out = await saveNode(id, change, baseOf(current.saved, change));
-    if (!out.ok) { return SEND_RESULT[out.reason]; }
+    if (!out.ok) { return sendResultOf(out.reason); }
 
     const written = out.node;
     nodes = nodes.map((node) => node.id === id

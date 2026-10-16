@@ -1,6 +1,7 @@
 import { baseOf, type NodeData } from './node-patch';
 import { SERVER_WRITTEN_FIELDS } from './node-data';
 import { DB_BUSY, isStatementTimeout } from '$lib/db-busy';
+import { SendResult } from './save-scheduler';
 
 export enum SaveFailure {
   Conflict = 'conflict',
@@ -270,4 +271,19 @@ export async function writeWithRetry(attempt: WriteAttempt): Promise<WriteOutcom
     return { ok: true, node: retried };
   }
   return { ok: false, reason: failureOf(second), patch: attempt.patch, detail: dataOf(second) };
+}
+
+const SEND_RESULT: Record<SaveFailure, SendResult> = {
+  [SaveFailure.Network]: SendResult.Retry,
+  [SaveFailure.Server]: SendResult.Retry,
+  [SaveFailure.Busy]: SendResult.Retry,
+  [SaveFailure.Conflict]: SendResult.Retry,
+  [SaveFailure.Invalid]: SendResult.Dropped,
+  [SaveFailure.Gone]: SendResult.Dropped,
+  [SaveFailure.Credits]: SendResult.Dropped,
+  [SaveFailure.Auth]: SendResult.Dropped
+};
+
+export function sendResultOf(reason: SaveFailure): SendResult {
+  return SEND_RESULT[reason];
 }
