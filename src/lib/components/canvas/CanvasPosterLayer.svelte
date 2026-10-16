@@ -1,7 +1,7 @@
 <script lang="ts">
   import { useNodes, useStore } from '@xyflow/svelte';
-  import { onMount } from 'svelte';
-  import { LOD_CLASS, LOD_SETTLE_MS, lodWanted, oncePerUrl, posterRects, PosterSource, THUMB_WIDTH, type PlacedNode, type Poster } from '$lib/canvas/poster-lod';
+  import { onMount, untrack } from 'svelte';
+  import { LOD_CLASS, lodNext, oncePerUrl, posterRects, PosterSource, THUMB_WIDTH, type PlacedNode, type Poster } from '$lib/canvas/poster-lod';
 
   let { posters }: { posters: Map<string, Poster> } = $props();
 
@@ -16,15 +16,10 @@
   let painted = false;
 
   let active = $state(false);
-  let settle: ReturnType<typeof setTimeout> | undefined;
 
   $effect(() => {
-    const wanted = lodWanted(store.viewport.zoom);
-    clearTimeout(settle);
-    if (wanted === active) {
-      return;
-    }
-    settle = setTimeout(() => (active = wanted), LOD_SETTLE_MS);
+    const zoom = store.viewport.zoom;
+    active = lodNext(untrack(() => active), zoom);
   });
 
   $effect(() => {
@@ -142,7 +137,6 @@
 
   onMount(() => () => {
     cancelAnimationFrame(frame);
-    clearTimeout(settle);
   });
 </script>
 
