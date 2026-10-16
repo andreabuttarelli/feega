@@ -153,7 +153,7 @@ export function orphanedEdits(local: { id: string }[], server: { id: string }[],
 
 type RealtimeChange = { table: string; eventType: string; new: unknown };
 
-type ShownTile = { id: string; data: Record<string, unknown>; x?: number; y?: number; displayName?: string | null };
+type ShownTile = { id: string; version?: number; data: Record<string, unknown>; x?: number; y?: number; displayName?: string | null };
 
 type ChangedRow = {
   id?: string;
@@ -189,7 +189,11 @@ export function isOwnEcho(change: RealtimeChange, tiles: ShownTile[]): boolean {
   if (!tile || row.deleted_at) {
     return false;
   }
-  return samePlace(row, tile) && canonical(row.data ?? {}) === canonical(tile.data);
+  if (!samePlace(row, tile)) {
+    return false;
+  }
+  const passed = row.version !== undefined && tile.version !== undefined && row.version < tile.version;
+  return passed || canonical(row.data ?? {}) === canonical(tile.data);
 }
 
 type HeadTile = ShownTile & { type: string; version: number; saved: Record<string, unknown> };
