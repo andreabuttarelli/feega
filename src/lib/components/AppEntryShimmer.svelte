@@ -7,7 +7,7 @@
   loading. Mirrors the brand-layout optimistic shimmer so marketing → /app feels
   like an instant route change instead of a stuck homepage + progress bar.
 -->
-<div class="app-entry" aria-busy="true" aria-live="polite">
+<div class="app-entry" data-testid="app-entry-shimmer" aria-busy="true" aria-live="polite">
   <aside class="app-entry-rail" aria-hidden="true">
     <div class="app-entry-block app-entry-logo"></div>
     <div class="app-entry-nav">
