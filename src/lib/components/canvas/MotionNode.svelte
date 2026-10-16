@@ -57,7 +57,8 @@
   const size = $derived(FORMATS[node.format]);
   const posterKey = $derived(`${node.id}:${node.docHeadRevision}`);
   const local = $derived(frameDocs.latest(node.id, node.docHeadRevision));
-  const preview = $derived(local ?? fetched);
+  let lastLocal = $state.raw<Preview | null>(null);
+  const preview = $derived(local ?? (previewRevision === node.docHeadRevision ? fetched : null) ?? lastLocal ?? fetched);
   const poster = $derived(posterCurrent(local) ? (posterUrl ?? posters.get(posterKey) ?? null) : null);
   const still = $derived(posterCurrent(local) && (posterUrl || posters.has(posterKey)) ? Still.Ready : Still.Missing);
   const intent = $derived(intentOf(slots, node.id));
@@ -73,8 +74,8 @@
   const capturable = $derived(nodeMode !== NodeMode.Edit && !liveTile);
   let ownDrawn = $state(false);
   let decodedPoster = $state<string | null>(untrack(() => poster));
-  const shownPoster = $derived(local || decodedPoster !== poster ? null : decodedPoster);
-  const painted = $derived((!!poster && shownPoster === poster) || ownDrawn);
+  const shownPoster = $derived(posterCurrent(local) && decodedPoster === poster ? decodedPoster : null);
+  const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster));
   const playerUp = $derived(mounted && !!preview);
   const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
 
@@ -163,7 +164,7 @@
 
   $effect(() => {
     const key = posterKey;
-    const ask = { live: liveTile && previewing, drawn: ownDrawn, local: !!local, atHead: previewRevision === node.docHeadRevision, hasPoster: !!posterUrl || posters.has(key), shooting: shooting.has(key) };
+    const ask = { live: liveTile && previewing, drawn: ownDrawn, unsaved: frameDocs.unsaved(node.id, node.docHeadRevision), atHead: local ? local.version === node.docHeadRevision : previewRevision === node.docHeadRevision, hasPoster: !!posterUrl || posters.has(key), shooting: shooting.has(key) };
     if (!player || !preview || !posterDue(ask)) {
       return;
     }
@@ -183,6 +184,24 @@
     if (!(mounted && preview)) {
       ownDrawn = false;
     }
+  });
+
+  $effect(() => {
+    if (local) {
+      lastLocal = local;
+    }
+  });
+
+  $effect(() => {
+    const source = preview;
+    if (!source) {
+      return;
+    }
+    untrack(() => {
+      if (!playing && intent !== Intent.Play) {
+        frame = coverFrame(source);
+      }
+    });
   });
 
   $effect(() => {
@@ -383,6 +402,7 @@
     position: absolute;
     inset: 0;
     z-index: 1;
+    pointer-events: none;
     display: flex;
     align-items: center;
     justify-content: center;

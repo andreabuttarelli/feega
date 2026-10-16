@@ -39,14 +39,14 @@ describe('live tiles', () => {
 });
 
 describe('posters from live tiles', () => {
-  const due = { live: true, drawn: true, local: false, atHead: true, hasPoster: false, shooting: false };
+  const due = { live: true, drawn: true, unsaved: false, atHead: true, hasPoster: false, shooting: false };
 
   it('a live tile drawn at the server revision with no poster for it shoots one', () => {
     expect(posterDue(due)).toBe(true);
   });
 
-  it('never shoots a local doc, an older revision, twice, or a tile already covered', () => {
-    expect(posterDue({ ...due, local: true })).toBe(false);
+  it('never shoots an unsaved local doc, an older revision, twice, or a tile already covered', () => {
+    expect(posterDue({ ...due, unsaved: true })).toBe(false);
     expect(posterDue({ ...due, atHead: false })).toBe(false);
     expect(posterDue({ ...due, shooting: true })).toBe(false);
     expect(posterDue({ ...due, hasPoster: true })).toBe(false);

@@ -32,6 +32,6 @@ export function liveTiles(cap: () => number) {
 
 export const tiles = liveTiles(() => LIVE_CAP[typeof window === 'undefined' ? Viewport.Desktop : viewportOf(innerWidth)]);
 
-export type PosterAsk = { live: boolean; drawn: boolean; local: boolean; atHead: boolean; hasPoster: boolean; shooting: boolean };
+export type PosterAsk = { live: boolean; drawn: boolean; unsaved: boolean; atHead: boolean; hasPoster: boolean; shooting: boolean };
 
-export const posterDue = (ask: PosterAsk): boolean => ask.live && ask.drawn && !ask.local && ask.atHead && !ask.hasPoster && !ask.shooting;
+export const posterDue = (ask: PosterAsk): boolean => ask.live && ask.drawn && !ask.unsaved && ask.atHead && !ask.hasPoster && !ask.shooting;

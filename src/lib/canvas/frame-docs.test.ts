@@ -49,4 +49,24 @@ describe('frame docs', () => {
     frameDocs.landed('f', 2, 3);
     expect(frameDocs.latest('f', 4)).toBeNull();
   });
+
+  it('a local doc the editor has not changed yet keeps the poster of its revision on screen', () => {
+    frameDocs.put('g', { ...entry(1), clean: true });
+
+    expect(posterCurrent(frameDocs.latest('g', 1))).toBe(true);
+
+    frameDocs.put('g', entry(1, 'edited'));
+    expect(posterCurrent(frameDocs.latest('g', 1))).toBe(false);
+  });
+
+  it('a local doc is unsaved while its save is in flight or behind the server head', () => {
+    frameDocs.put('h', entry(3, 'x'));
+    expect(frameDocs.unsaved('h', 3)).toBe(false);
+    expect(frameDocs.unsaved('h', 4)).toBe(true);
+
+    frameDocs.sending('h');
+    expect(frameDocs.unsaved('h', 3)).toBe(true);
+    frameDocs.landed('h', 3, 4);
+    expect(frameDocs.unsaved('h', 4)).toBe(false);
+  });
 });
