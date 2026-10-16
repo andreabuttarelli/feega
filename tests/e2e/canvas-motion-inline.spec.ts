@@ -173,7 +173,8 @@ test.describe('motion editor inside the canvas @real', () => {
     const editor = page.getByTestId('motion-editor');
     await expect(editor).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
     await expectOnNode(page, nodeOf(first));
-    await expect(page.getByTestId('motion-preview')).toHaveCount(1);
+    await expect(page.getByTestId('editor-stage').getByTestId('motion-preview')).toHaveCount(1);
+    await expect(nodeOf(first).getByTestId('motion-preview')).toHaveCount(0);
     await expect(page).toHaveURL(new RegExp(`/c/${session.canvasId}$`));
     await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible();
     await expect(page.getByLabel('Agent', { exact: true })).toBeVisible();
@@ -209,7 +210,8 @@ test.describe('motion editor inside the canvas @real', () => {
 
     await nodeOf(second).getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
     await expectOnNode(page, nodeOf(second));
-    await expect(page.getByTestId('motion-preview')).toHaveCount(1);
+    await expect(page.getByTestId('editor-stage').getByTestId('motion-preview')).toHaveCount(1);
+    await expect(nodeOf(second).getByTestId('motion-preview')).toHaveCount(0);
     await shoot(page, '5-switched');
 
     const empty = await emptyCanvasPoint(page);

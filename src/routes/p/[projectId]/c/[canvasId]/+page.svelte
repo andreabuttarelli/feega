@@ -1104,7 +1104,16 @@
 
   function selectionChanged(ids: string[]) {
     if (ids.join() !== untrack(() => selectedIds.join())) { void saves.flush(); }
+    const before = untrack(() => inlineMotion);
     selectedIds = ids;
+    leaveNow(before);
+  }
+
+  function leaveNow(before: string | null) {
+    const after = untrack(() => inlineMotion);
+    if (before && before !== after) {
+      inlineStage.leave(before);
+    }
   }
 
   let dismissedMotion = $state<string | null>(null);
