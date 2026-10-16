@@ -1,7 +1,7 @@
 import { COMPONENTS, type ComponentId } from './components';
 import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { DrawTool, type DrawBox } from './draw-tool';
-import { mapOutline, pathData, type Outline, type Pt } from './shape/geometry';
+import { mapOutline, parsePath, pathData, type Outline, type Pt } from './shape/geometry';
 import { ShapeKind } from './shape/schema';
 import { DocMode, docMode, setStill, settledStill } from './still';
 import { addClip, type OpResult } from './timeline';
@@ -71,6 +71,14 @@ export type Drawn = { tool: BoxTool; box: CanvasBox } | { tool: DrawTool.Pen; ou
 
 export type DrawnWire = { tool: BoxTool; box: CanvasBox } | { tool: DrawTool.Pen; path: string };
 
+export function drawnOf(wire: DrawnWire): Drawn | string {
+  if (wire.tool !== DrawTool.Pen) {
+    return wire;
+  }
+  const outline = parsePath(wire.path);
+  return typeof outline === 'string' ? outline : { tool: DrawTool.Pen, outline };
+}
+
 export type DrawnElement = { ok: true; doc: MotionDoc; box: CanvasBox } | { ok: false; error: string };
 
 const PIXELS_PER_CANVAS_PX = 2;
@@ -88,6 +96,10 @@ function elementPixels(box: CanvasBox): { width: number; height: number } {
 
 export function blankElement(box: CanvasBox): OpResult {
   return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box), background: Background.Transparent }, 0);
+}
+
+export function drawnFrame(box: CanvasBox): MotionDoc {
+  return { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box) };
 }
 
 function canvasBoxOf(outline: Outline): CanvasBox {

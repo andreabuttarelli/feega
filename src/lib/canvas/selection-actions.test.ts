@@ -1,9 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { actionsIn, enabledFor } from './selection-actions';
+import { CANVAS_MENU, actionsIn, enabledFor, shownFor } from './selection-actions';
+
+describe('group and ungroup', () => {
+  const box = { id: '1', type: 'motion', data: { kind: 'element' } };
+  const group = { id: 'g', type: 'motion', data: { kind: 'group' } };
+  const shown = (summaries: { id: string; type: string; data: Record<string, unknown> }[]) =>
+    actionsIn('secondary', summaries.length).filter((a) => shownFor(a.id, summaries)).map((a) => a.id);
+
+  it('offers Group from two picked things of any kind', () => {
+    expect(shown([box, { id: '2', type: 'image', data: {} }])).toContain('group');
+    expect(shown([box])).not.toContain('group');
+  });
+
+  it('offers Ungroup only when a group is picked', () => {
+    expect(shown([group])).toContain('ungroup');
+    expect(shown([box, { id: '2', type: 'text', data: {} }])).not.toContain('ungroup');
+  });
+
+  it('the context menu lists every edit with its shortcut', () => {
+    expect(CANVAS_MENU.map((a) => [a.id, a.shortcut ?? null])).toEqual([
+      ['group', 'Mod+G'],
+      ['ungroup', 'Mod+Shift+G'],
+      ['duplicate', 'Mod+D'],
+      ['copy', 'Mod+C'],
+      ['paste', 'Mod+V'],
+      ['bring-front', 'Mod+]'],
+      ['send-back', 'Mod+['],
+      ['delete', 'Backspace']
+    ]);
+  });
+});
 
 describe('la barra ha lo stesso ordine per ogni tipo di nodo', () => {
   it('secondarie, overflow e distruttive in gruppi fissi', () => {
-    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate']);
+    expect(actionsIn('secondary', 1).map((a) => a.id)).toEqual(['run-downstream', 'run-stale', 'connect-new', 'connect-existing', 'duplicate', 'ungroup']);
     expect(actionsIn('overflow', 1).map((a) => a.id)).toEqual(['copy-id', 'report']);
     expect(actionsIn('danger', 1).map((a) => a.id)).toEqual(['delete']);
   });

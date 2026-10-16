@@ -62,9 +62,13 @@
   $effect(() => {
     const url = sessionUrl(editorPath);
     let stale = false;
-    session = null;
+    const landed = sessions.settled(url);
+    session = landed ?? null;
     failed = false;
     void sessions.take(url).then((next) => {
+      if (landed) {
+        return;
+      }
       if (stale) {
         return;
       }

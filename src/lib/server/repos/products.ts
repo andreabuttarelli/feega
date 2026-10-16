@@ -126,13 +126,6 @@ export async function listNodeProducts(
   return (data ?? []).map(toProduct);
 }
 
-/**
- * UN GIRO DI SINCRONIZZAZIONE: le righe di questa pagina entrano, quelle di ieri restano finché
- * non arriva un prodotto con lo stesso `external_id` che le sostituisce. Non è uno swap totale
- * come `replaceBrandCatalog` — quel repository cancella tutto il catalogo del brand a ogni giro,
- * cosa che qui moltiplicherebbe le query per un nodo che pagina 250 prodotti alla volta in più
- * chiamate: l'upsert riga per riga è già la forma giusta perché il vincolo unico la rende sicura.
- */
 export async function upsertNodeProducts(
   db: Db,
   input: {
@@ -182,6 +175,20 @@ export async function deleteNodeProducts(db: Db, scope: { orgId: string; nodeId:
   if (error) {
     throw error;
   }
+}
+
+export async function replaceNodeProducts(
+  db: Db,
+  input: {
+    orgId: string;
+    projectId: string | null;
+    nodeId: string;
+    platform: StorePlatform;
+    products: FetchedProduct[];
+  }
+): Promise<number> {
+  await deleteNodeProducts(db, { orgId: input.orgId, nodeId: input.nodeId });
+  return upsertNodeProducts(db, input);
 }
 
 export async function listBrandProducts(db: Db, scope: { orgId: string; brandId: string; limit: number }): Promise<Product[]> {
