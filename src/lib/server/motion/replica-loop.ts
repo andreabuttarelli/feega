@@ -56,13 +56,13 @@ async function grabAll(grab: GrabFrame, times: readonly number[]): Promise<{ tim
 }
 
 async function judged(ports: LoopPorts, scene: number, brief: string, references: readonly { time: number; bytes: Buffer }[]): Promise<{ verdict: Verdict | null; pairs: FramePair[] }> {
-  const drawn = await ports.draw(references.map((r) => r.time));
+  const drawn = await ports.draw(references.map((r) => r.time)).catch(() => null);
   if (!drawn) {
     return { verdict: null, pairs: [] };
   }
   const ours = new Map(drawn.filter((d) => d.bytes.length).map((d) => [d.time, d.bytes]));
   const pairs = references.filter((r) => ours.has(r.time)).map((r) => ({ time: r.time, reference: r.bytes, ours: ours.get(r.time)! }));
-  return { verdict: pairs.length ? await ports.judge({ scene, brief, pairs }) : null, pairs };
+  return { verdict: pairs.length ? await ports.judge({ scene, brief, pairs }).catch(() => null) : null, pairs };
 }
 
 async function runScene(ports: LoopPorts, input: { scene: Scene; index: number; count: number; shareUsd: number }): Promise<SceneReport> {

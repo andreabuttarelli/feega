@@ -93,6 +93,14 @@ describe('the replica is built scene by scene by the server, not in one go', () 
     judged[0].forEach((t) => expect(t).toBeLessThan(2));
   });
 
+  it('a frame drawing that crashes leaves the scene unjudged and the build goes on (live: "Connection closed." failed the whole run)', async () => {
+    const { ports, steps } = fakePorts([]);
+    const report = await runReplicaLoop(breakdown, { ...ports, draw: async () => Promise.reject(new Error('Connection closed.')) }, { capUsd: 6 });
+
+    expect(steps.map((s) => s.scene)).toEqual([1, 2]);
+    expect(report.map((r) => r.score)).toEqual([null, null]);
+  });
+
   it('the pass bar is a vision score of 0.8', () => {
     expect(SCENE_PASS).toBe(0.8);
   });
