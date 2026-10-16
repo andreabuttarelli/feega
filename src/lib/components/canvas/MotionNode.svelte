@@ -5,6 +5,7 @@
 
   const posters = new SvelteMap<string, string>();
   const previews = new Map<string, Preview>();
+  const shooting = new Set<string>();
   let slots = $state<Slots>({ playing: null, capturing: null });
 </script>
 
@@ -28,7 +29,7 @@
   import { DRAWN_EVENT } from '$lib/motion/hyperframes/measure';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
-  import { tiles } from '$lib/canvas/live-tiles.svelte';
+  import { posterDue, tiles } from '$lib/canvas/live-tiles.svelte';
   import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
   import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
   import { coverFrame } from '$lib/motion/still';
@@ -158,6 +159,18 @@
     return () => {
       stale = true;
     };
+  });
+
+  $effect(() => {
+    const key = posterKey;
+    const ask = { live: liveTile && previewing, drawn: ownDrawn, local: !!local, atHead: previewRevision === node.docHeadRevision, hasPoster: !!posterUrl || posters.has(key), shooting: shooting.has(key) };
+    if (!player || !preview || !posterDue(ask)) {
+      return;
+    }
+    shooting.add(key);
+    const shooter = player;
+    const source = preview;
+    whenIdle(() => void captureCover(shooter, source, key, node.docHeadRevision).finally(() => shooting.delete(key)));
   });
 
   $effect(() => {
