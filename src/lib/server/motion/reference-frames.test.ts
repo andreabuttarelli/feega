@@ -36,6 +36,12 @@ describe('reference keyframes', () => {
     expect(new Set(times.map((t) => t.scene)).size).toBe(10);
   });
 
+  it('six scenes stay within the cap (live: Cautiva gave 18 frames)', () => {
+    const six = parseBreakdown(JSON.stringify({ durationS: 9.8, scenes: Array.from({ length: 6 }, (_, i) => ({ start: i * 1.6, end: i * 1.6 + 1.6 })), pacing: { cutsPerMinute: 36, rhythm: '' } }))!;
+
+    expect(keyTimes(six).length).toBeLessThanOrEqual(MAX_REFERENCE_FRAMES);
+  });
+
   it('grabs one picture per key time and drops the ones that fail', async () => {
     const red = await solid('#c80010');
     const frames = await referenceFrames(async (t) => (t > 5 ? null : red), keyTimes(breakdown));

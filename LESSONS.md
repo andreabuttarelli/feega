@@ -3026,3 +3026,6 @@ Signal: a `@real` e2e gives the same result with and without your change. Cause:
 
 ### A clip added to a still is invisible
 Signal: a new Text/Title/Line in a still frame renders with opacity 0 (or clipped) while its colour and fills are right. Cause: the template's intro tween starts at clip start = still frame. Move: inspect computed opacity/transform in the srcdoc iframe before suspecting paint; `settledBy` in `compose.ts` keeps unfinished template tweens out of stills.
+
+### Il dev server tenuto acceso mentre cambi gli export dà `X is not a function` in SSR
+Rinominato un export (`videoKindOf` → `replicaSource`) con `vite dev` già acceso: il modulo SSR restava quello vecchio e ogni turno motion moriva con `__vite_ssr_import_1__.replicaSource is not a function`, mentre i test erano verdi. Segnale: un errore "not a function" su un export appena aggiunto, solo nel server dev. Mossa: riavvia `vite dev` dopo aver cambiato gli export, prima di un giro live che costa.

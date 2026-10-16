@@ -18,7 +18,7 @@ const tenth = (s: number) => Math.round(s * 10) / 10;
 
 function sceneTimes(start: number, end: number, count: number): number[] {
   const mid = tenth((start + end) / 2);
-  if (count === 1 || end - start < 2 * EDGE_S) {
+  if (count < PER_SCENE || end - start < 2 * EDGE_S) {
     return [mid];
   }
   return [tenth(start + EDGE_S), mid, tenth(end - EDGE_S)];
