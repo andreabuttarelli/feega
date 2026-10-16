@@ -441,6 +441,13 @@
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let unsavedSummary = '';
 
+  onMount(() => () => {
+    if (saveTimer && saveState === SaveState.Pending) {
+      clearTimeout(saveTimer);
+      void save();
+    }
+  });
+
   const compPath = $derived(path.map((p) => p.comp));
   const doc = $derived(viewOf(draft?.doc ?? history.present, compPath));
   const mode = $derived(docMode(history.present));
