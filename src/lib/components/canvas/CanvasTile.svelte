@@ -87,8 +87,12 @@
 
   const updateNodeInternals = useUpdateNodeInternals();
   const portLayout = $derived(JSON.stringify([tile.connectable, tile.connectors, tile.output, tile.outputs?.map((o) => o.handle)]));
+  let measuredLayout = portLayout;
   $effect(() => {
-    void portLayout;
+    if (portLayout === measuredLayout) {
+      return;
+    }
+    measuredLayout = portLayout;
     updateNodeInternals(tile.id);
   });
 
