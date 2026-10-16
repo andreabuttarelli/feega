@@ -23,9 +23,10 @@
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { Background, FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
-  import { NodeMode, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
+  import { NodeMode, Paint, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
   import { DRAWN_EVENT } from '$lib/motion/hyperframes/measure';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
   import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
   import { coverFrame } from '$lib/motion/still';
   import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
@@ -41,8 +42,8 @@
 
   let root = $state<HTMLDivElement | null>(null);
   let player = $state<ReturnType<typeof MotionPreview> | null>(null);
-  let sight = $state(Sight.OutOfView);
-  let preview = $state<Preview | null>(null);
+  let sight = $state<Sight>(Sight.OutOfView);
+  let fetched = $state<Preview | null>(null);
   let previewRevision = $state(-1);
   let frame = $state(0);
   let playing = $state(false);
@@ -51,8 +52,10 @@
 
   const size = $derived(FORMATS[node.format]);
   const posterKey = $derived(`${node.id}:${node.docHeadRevision}`);
-  const poster = $derived(posterUrl ?? posters.get(posterKey) ?? null);
-  const still = $derived(posterUrl || posters.has(posterKey) ? Still.Ready : Still.Missing);
+  const local = $derived(frameDocs.latest(node.id, node.docHeadRevision));
+  const preview = $derived(local ?? fetched);
+  const poster = $derived(posterCurrent(local) ? (posterUrl ?? posters.get(posterKey) ?? null) : null);
+  const still = $derived(posterCurrent(local) && (posterUrl || posters.has(posterKey)) ? Still.Ready : Still.Missing);
   const intent = $derived(intentOf(slots, node.id));
   const mode = $derived(previewMode(sight, intent, still));
   const capturing = $derived(mode === PreviewMode.Capture && slots.capturing === node.id);
@@ -61,12 +64,14 @@
   const layers = $derived(nodeLayers(nodeMode, paint));
   const chrome = $derived(frameChrome(node.kind));
   const previewing = $derived(nodeMode === NodeMode.Preview);
-  const capturable = $derived(nodeMode !== NodeMode.Edit);
+  const capturable = $derived(nodeMode !== NodeMode.Edit && !local);
   let ownDrawn = $state(false);
-  let shownPoster = $state<string | null>(untrack(() => poster));
+  let decodedPoster = $state<string | null>(untrack(() => poster));
+  const shownPoster = $derived(local || decodedPoster !== poster ? null : decodedPoster);
   const painted = $derived((!!poster && shownPoster === poster) || ownDrawn);
   const playerUp = $derived(mounted && !!preview);
-  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing));
+  const keptLive = $derived(!!local && sight === Sight.InView && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending));
+  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || keptLive));
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));
@@ -112,6 +117,9 @@
       playing = false;
       return;
     }
+    if (local) {
+      return;
+    }
     const revision = node.docHeadRevision;
     const url = `${previewUrl}?revision=${revision}`;
     let stale = false;
@@ -119,7 +127,7 @@
       .then((res) => (res.ok ? (res.json() as Promise<Preview>) : null))
       .then((next) => {
         if (!stale && next) {
-          preview = next;
+          fetched = next;
           previewRevision = revision;
         }
       });
@@ -158,13 +166,13 @@
 
   $effect(() => {
     const next = poster;
-    if (!next || next === shownPoster) {
+    if (!next || next === decodedPoster) {
       return;
     }
     let stale = false;
     void decoded(next).then(() => {
       if (!stale) {
-        shownPoster = next;
+        decodedPoster = next;
       }
     });
     return () => {
