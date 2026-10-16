@@ -39,7 +39,7 @@ import { resolveNodeModel } from './node-model';
 import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio-run';
 import { audioOperationOf, defaultAudioModel, operationSpec, voiceIdOf } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
-import { RouteRole, TASK_PROVIDERS, taskJobOf, taskProviderOf } from '$lib/server/generation/task-providers';
+import { inputTtlOf, RouteRole, TASK_PROVIDERS, taskJobOf, taskProviderOf } from '$lib/server/generation/task-providers';
 import { AUTO_ROUTE } from '$lib/canvas/model-routes';
 import { kieTextModel } from '$lib/server/kie-chat';
 import { PRIMARY_ROUTE } from '$lib/server/generation/discount-routes';
@@ -319,9 +319,12 @@ async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: Upstre
     import('$lib/server/uncensored-workspace/workspace-server')
   ]);
   const node = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => null);
-  const [imageUrls, lastFrame, provenance] = await Promise.all([
-    signMediaPaths(db, TASK_IMAGE_PATHS[input.medium]?.(upstream) ?? []),
-    signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : []),
+  const ttl = inputTtlOf(taskProviderOf(input.model));
+  const [imageUrls, lastFrame, videoUrls, audioUrls, provenance] = await Promise.all([
+    signMediaPaths(db, TASK_IMAGE_PATHS[input.medium]?.(upstream) ?? [], ttl),
+    signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : [], ttl),
+    signMediaPaths(db, upstream.referenceVideoUrls, ttl),
+    signMediaPaths(db, upstream.referenceAudioUrls, ttl),
     upstreamProvenance(db, { orgId: input.orgId, canvasId: input.canvasId, nodeId: input.nodeId, data: node?.data ?? {} })
   ]);
 
@@ -333,6 +336,8 @@ async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: Upstre
     params: input.params,
     imageUrls,
     lastFrameUrl: lastFrame[0] ?? null,
+    videoUrls,
+    audioUrls,
     provenance,
     idempotencyKey: run.id
   });

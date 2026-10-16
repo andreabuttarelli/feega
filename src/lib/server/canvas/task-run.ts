@@ -8,7 +8,7 @@ import { taskUsdFor } from '$lib/server/generation/task-pricing';
 import { uncensoredRefusal, UNCENSORED_REFUSALS } from '$lib/server/generation/uncensored-guard';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
 import type { TaskProvider, TaskOutput, WireFields } from './task-provider';
-import { wireInputs } from '$lib/server/generation/wire-inputs';
+import { wireInputs, type ListCaps } from '$lib/server/generation/wire-inputs';
 import type { Purgers } from './provider-purge';
 import { ProjectMode, STORAGE_FOLDER } from '$lib/project-mode';
 import { ModerationProfile, profileOf } from '$lib/server/moderation/profiles';
@@ -72,6 +72,7 @@ export type TaskWireSpec = {
   fixed?: Readonly<Record<string, string>>;
   requiresImage?: boolean;
   unrunnable?: string;
+  caps?: ListCaps;
 } & Readonly<Record<string, unknown>>;
 
 export type TaskModel = {
@@ -111,6 +112,8 @@ export type TaskRequest = {
   params: GenParams;
   imageUrls: string[];
   lastFrameUrl: string | null;
+  videoUrls?: string[];
+  audioUrls?: string[];
   provenance: ProvenanceEntry[];
   idempotencyKey?: string;
 };
@@ -122,8 +125,14 @@ export enum RefusalStage {
 
 export type TaskStart = { kind: 'job'; jobId: string } | { kind: 'refused'; error: string; stage: RefusalStage };
 
-function carriesInputs(req: Pick<TaskRequest, 'imageUrls' | 'lastFrameUrl' | 'provenance'>): boolean {
-  return req.imageUrls.length > 0 || req.lastFrameUrl !== null || req.provenance.length > 0;
+function carriesInputs(req: Pick<TaskRequest, 'imageUrls' | 'lastFrameUrl' | 'videoUrls' | 'audioUrls' | 'provenance'>): boolean {
+  const media = [req.imageUrls, req.videoUrls ?? [], req.audioUrls ?? [], req.provenance];
+  return media.some((list) => list.length > 0) || req.lastFrameUrl !== null;
+}
+
+function consumedBy(fields: WireFields, req: TaskRequest): TaskRequest {
+  const takesVideo = Boolean(fields.video || fields.videoList);
+  return { ...req, videoUrls: takesVideo ? req.videoUrls : [], audioUrls: fields.audioList ? req.audioUrls : [] };
 }
 
 const LIKENESS_GUARDED_IN_UNCENSORED_PROJECTS: ReadonlySet<TaskCatalogue> = new Set(['model3d']);
@@ -156,7 +165,7 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   const uncensored = uncensoredRefusal({
     uncensored: model.uncensored,
     mode: req.mode,
-    carriesInputs: carriesInputs(req),
+    carriesInputs: carriesInputs(consumedBy(model.spec.fields, req)),
     accessAllowed: model.uncensored ? (await deps.access(req.scope.orgId)).allowed : true
   });
   if (uncensored) {
@@ -185,7 +194,7 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   }
 
   const inputs = wireInputs(model.spec, req, model.paramSchema);
-  const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, unrunnable: _unrunnable, ...ref } = model.spec;
+  const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, unrunnable: _unrunnable, caps: _caps, ...ref } = model.spec;
   const startedAt = Date.now();
   try {
     const { taskId } = await gateway.run(ref, inputs, req.idempotencyKey);

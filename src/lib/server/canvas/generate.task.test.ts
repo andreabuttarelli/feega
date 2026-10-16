@@ -16,7 +16,16 @@ const INFLUENCER_NODE = '77777777-7777-7777-7777-777777777777';
 const UNCENSORED = 'wiro/wiro-partners/z-image-uncensored';
 const SAFE = 'wiro/alibaba/qwen-image-3-0-pro';
 
+const REFERENCE_VIDEO = 'higgsfield/bytedance/seedance-2.5/reference-to-video';
+
 const models: Record<string, TaskModel> = {
+  [REFERENCE_VIDEO]: {
+    id: REFERENCE_VIDEO,
+    catalogue: 'video',
+    uncensored: false,
+    spec: { path: 'bytedance/seedance-2.5/reference-to-video', fields: { prompt: 'prompt', images: [], imageList: 'image_urls', videoList: 'video_urls', audioList: 'audio_urls' } },
+    paramSchema: {}
+  },
   [UNCENSORED]: {
     id: UNCENSORED,
     catalogue: 'image',
@@ -42,7 +51,10 @@ const judgeIdentifiability = vi.fn();
 const record = vi.fn();
 const screen: ScreenPorts = { decide, judge, decideIdentifiability, judgeIdentifiability, record };
 
-const { deps } = vi.hoisted(() => ({ deps: { current: null as null | ((db: Db) => TaskRunDeps) } }));
+const { deps, upstreamMedia } = vi.hoisted(() => ({
+  deps: { current: null as null | ((db: Db) => TaskRunDeps) },
+  upstreamMedia: { current: {} as Record<string, unknown> }
+}));
 vi.mock('$lib/server/task-providers-config', () => ({ taskRunDeps: (db: Db) => deps.current!(db) }));
 vi.mock('$app/environment', () => ({ dev: true, browser: false, building: false }));
 vi.mock('$env/dynamic/private', () => ({ env: { UNCENSORED_DEV_MANUAL_VERIFICATION: 'true' } }));
@@ -58,7 +70,8 @@ vi.mock('$lib/server/canvas/upstream', () => ({
     startFrameUrl: null,
     endFrameUrl: null,
     blocked: null,
-    rejected: []
+    rejected: [],
+    ...upstreamMedia.current
   })
 }));
 
@@ -70,9 +83,10 @@ beforeEach(async () => {
   decideIdentifiability.mockResolvedValue({ choice: 'generic', probabilities: { generic: 0.999 } });
   judgeIdentifiability.mockResolvedValue({ allowed: true, category: 'generic', reason: '' });
   gateway.run.mockResolvedValue({ taskId: '2221' });
+  upstreamMedia.current = {};
   const { uncensoredAccess } = await import('$lib/server/uncensored-access');
   deps.current = (db) => ({
-    providers: { wiro: gateway },
+    providers: { wiro: gateway, higgsfield: gateway },
     model: async (id) => models[id] ?? null,
     access: (orgId) => uncensoredAccess(db, orgId),
     screen: () => screen,
@@ -328,3 +342,23 @@ describe('taskPurgers', () => {
     expect(gateway.purge).toHaveBeenCalledWith('2221');
   });
 });
+
+describe('a video node on a model that takes video and audio references', () => {
+  it('sends the connected videos and audios, signed, to the provider', async () => {
+    upstreamMedia.current = { referenceVideoUrls: ['https://cdn.test/clip.mp4'], referenceAudioUrls: ['https://cdn.test/voice.wav'] };
+    const { db } = fakeDb(
+      { nodes: [{ ...imageNode(), type: 'video' }], nodes_connections: [], assets: [], orgs: [paidOrg], projects: [{ id: PROJECT, org_id: ORG, mode: 'standard' }] },
+      { updateRows: { nodes: [{ ...imageNode(), type: 'video', version: 2 }] } }
+    );
+
+    const out = await runGenNode(db, { ...start(REFERENCE_VIDEO, 'dance'), medium: 'video' });
+
+    expect(out.kind).toBe('queued');
+    expect(gateway.run).toHaveBeenCalledWith(
+      { path: 'bytedance/seedance-2.5/reference-to-video' },
+      expect.objectContaining({ video_urls: ['https://cdn.test/clip.mp4'], audio_urls: ['https://cdn.test/voice.wav'] }),
+      expect.any(String)
+    );
+  });
+});
+
