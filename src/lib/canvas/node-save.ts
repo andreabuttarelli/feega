@@ -273,10 +273,11 @@ export async function writeWithRetry(attempt: WriteAttempt): Promise<WriteOutcom
   return { ok: false, reason: failureOf(second), patch: attempt.patch, detail: dataOf(second) };
 }
 
-const SEND_RESULT: Partial<Record<SaveFailure, SendResult>> = {
+const SEND_RESULT: Record<SaveFailure, SendResult> = {
   [SaveFailure.Network]: SendResult.Retry,
   [SaveFailure.Server]: SendResult.Retry,
-  [SaveFailure.Conflict]: SendResult.Dropped,
+  [SaveFailure.Busy]: SendResult.Retry,
+  [SaveFailure.Conflict]: SendResult.Retry,
   [SaveFailure.Invalid]: SendResult.Dropped,
   [SaveFailure.Gone]: SendResult.Dropped,
   [SaveFailure.Credits]: SendResult.Dropped,
@@ -284,5 +285,5 @@ const SEND_RESULT: Partial<Record<SaveFailure, SendResult>> = {
 };
 
 export function sendResultOf(reason: SaveFailure): SendResult {
-  return SEND_RESULT[reason] as SendResult;
+  return SEND_RESULT[reason];
 }
