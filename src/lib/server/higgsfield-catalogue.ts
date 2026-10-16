@@ -6,13 +6,13 @@ import { idPrefixOf, TaskProviderName } from './generation/task-providers';
 
 type Variant = { key: string; values: readonly (string | number)[] };
 
-type HiggsfieldModel = {
+export type HiggsfieldModel = {
   path: string;
   label: string;
   catalogue: 'image' | 'video';
   fields: WireFields;
   numeric: readonly string[];
-  priceBy: Variant;
+  priceBy: readonly Variant[];
   schema: Readonly<Record<string, readonly (string | number)[]>>;
   estimateBase: Readonly<Record<string, unknown>>;
 };
@@ -31,7 +31,7 @@ export const HIGGSFIELD_MODELS: readonly HiggsfieldModel[] = [
     catalogue: 'image',
     fields: { prompt: 'prompt', aspectRatio: 'aspect_ratio', resolution: 'resolution', images: [] },
     numeric: [],
-    priceBy: { key: 'resolution', values: ['720p', '1080p'] },
+    priceBy: [{ key: 'resolution', values: ['720p', '1080p'] }],
     schema: { aspect_ratio: SOUL_ASPECTS },
     estimateBase: { prompt: ESTIMATE_PROMPT }
   },
@@ -41,7 +41,7 @@ export const HIGGSFIELD_MODELS: readonly HiggsfieldModel[] = [
     catalogue: 'video',
     fields: TEXT_TO_VIDEO,
     numeric: ['duration'],
-    priceBy: { key: 'duration', values: [5, 10] },
+    priceBy: [{ key: 'duration', values: [5, 10] }],
     schema: { duration: [5, 10] },
     estimateBase: { prompt: ESTIMATE_PROMPT }
   },
@@ -51,7 +51,7 @@ export const HIGGSFIELD_MODELS: readonly HiggsfieldModel[] = [
     catalogue: 'video',
     fields: IMAGE_TO_VIDEO,
     numeric: ['duration'],
-    priceBy: { key: 'duration', values: [5, 10] },
+    priceBy: [{ key: 'duration', values: [5, 10] }],
     schema: { duration: [5, 10] },
     estimateBase: { prompt: ESTIMATE_PROMPT, image_url: ESTIMATE_IMAGE }
   },
@@ -61,7 +61,7 @@ export const HIGGSFIELD_MODELS: readonly HiggsfieldModel[] = [
     catalogue: 'video',
     fields: TEXT_TO_VIDEO,
     numeric: ['duration'],
-    priceBy: { key: 'duration', values: [6, 10] },
+    priceBy: [{ key: 'duration', values: [6, 10] }],
     schema: { duration: [6, 10] },
     estimateBase: { prompt: ESTIMATE_PROMPT }
   },
@@ -71,7 +71,7 @@ export const HIGGSFIELD_MODELS: readonly HiggsfieldModel[] = [
     catalogue: 'video',
     fields: IMAGE_TO_VIDEO,
     numeric: ['duration'],
-    priceBy: { key: 'duration', values: [6, 10] },
+    priceBy: [{ key: 'duration', values: [6, 10] }],
     schema: { duration: [6, 10] },
     estimateBase: { prompt: ESTIMATE_PROMPT, image_url: ESTIMATE_IMAGE }
   }
@@ -79,15 +79,25 @@ export const HIGGSFIELD_MODELS: readonly HiggsfieldModel[] = [
 
 export type Estimate = (path: string, inputs: Record<string, unknown>) => Promise<number | null>;
 
+type Pair = Record<string, string | number>;
+
+function pairsOf(variants: readonly Variant[]): Pair[] {
+  return variants.reduce<Pair[]>((pairs, variant) => pairs.flatMap((pair) => variant.values.map((value) => ({ ...pair, [variant.key]: value }))), [{}]);
+}
+
+const asWire = (pair: Pair): Record<string, string> => Object.fromEntries(Object.entries(pair).map(([key, value]) => [key, String(value)]));
+
 async function priceLines(model: HiggsfieldModel, estimate: Estimate): Promise<TaskPriceLine[] | null> {
   const lines = await Promise.all(
-    model.priceBy.values.map(async (value) => {
-      const usd = await estimate(model.path, { ...model.estimateBase, [model.priceBy.key]: value });
-      return usd === null ? null : { inputs: { [model.priceBy.key]: String(value) }, usd, method: PER_RUN };
+    pairsOf(model.priceBy).map(async (pair) => {
+      const usd = await estimate(model.path, { ...model.estimateBase, ...pair });
+      return usd === null ? null : { inputs: asWire(pair), usd, method: PER_RUN };
     })
   );
   return lines.every((line) => line !== null) ? (lines as TaskPriceLine[]) : null;
 }
+
+const resolutionsOf = (model: HiggsfieldModel): string[] => model.priceBy.find((variant) => variant.key === 'resolution')?.values.map(String) ?? [];
 
 function schemaOf(model: HiggsfieldModel): Record<string, unknown> {
   return Object.fromEntries(Object.entries(model.schema).map(([key, values]) => [key, { type: 'enum', values: values.map(String) }]));
@@ -102,7 +112,7 @@ function higgsfieldRow(model: HiggsfieldModel, lines: TaskPriceLine[], syncedAt:
     input_modalities: model.fields.images.length ? ['text', 'image'] : ['text'],
     output_modalities: [model.catalogue],
     supported_parameters: Object.values(model.fields).flat().filter((v): v is string => typeof v === 'string'),
-    supported_resolutions: model.priceBy.key === 'resolution' ? model.priceBy.values.map(String) : [],
+    supported_resolutions: resolutionsOf(model),
     param_schema: schemaOf(model),
     pricing: { lines },
     synced_at: syncedAt,
@@ -115,9 +125,13 @@ function higgsfieldRow(model: HiggsfieldModel, lines: TaskPriceLine[], syncedAt:
   };
 }
 
-export async function higgsfieldModelRows(estimate: Estimate, syncedAt: string): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
+export async function higgsfieldModelRows(
+  estimate: Estimate,
+  syncedAt: string,
+  models: readonly HiggsfieldModel[] = HIGGSFIELD_MODELS
+): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
   try {
-    const priced = await Promise.all(HIGGSFIELD_MODELS.map(async (model) => ({ model, lines: await priceLines(model, estimate) })));
+    const priced = await Promise.all(models.map(async (model) => ({ model, lines: await priceLines(model, estimate) })));
     const rows = priced.filter((p) => p.lines !== null).map((p) => higgsfieldRow(p.model, p.lines!, syncedAt));
     return { rows, ok: true };
   } catch (error) {
