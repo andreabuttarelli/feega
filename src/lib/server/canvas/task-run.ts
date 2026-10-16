@@ -60,7 +60,8 @@ export const TASK_REFUSALS = {
   notEnabled: UNCENSORED_REFUSALS.disabled,
   noInputsAllowed: UNCENSORED_REFUSALS.inputs,
   noOutput: 'task_failed: no output',
-  needsImage: 'missing_input: this model needs an input image'
+  needsImage: 'missing_input: this model needs an input image',
+  needsVideo: 'missing_input: this model needs a source video'
 } as const;
 
 export type TaskScope = { orgId: string; projectId: string; nodeId: string; userId: string; actor?: Actor };
@@ -71,6 +72,7 @@ export type TaskWireSpec = {
   fields: WireFields;
   fixed?: Readonly<Record<string, string>>;
   requiresImage?: boolean;
+  requiresVideo?: boolean;
   unrunnable?: string;
   caps?: ListCaps;
 } & Readonly<Record<string, unknown>>;
@@ -182,6 +184,9 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   if (model.spec.requiresImage && !req.imageUrls.length) {
     return refused(TASK_REFUSALS.needsImage);
   }
+  if (model.spec.requiresVideo && !req.videoUrls?.length) {
+    return refused(TASK_REFUSALS.needsVideo);
+  }
 
   const uncensored = uncensoredRefusal({
     uncensored: model.uncensored,
@@ -215,7 +220,7 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   }
 
   const inputs = wireInputs(model.spec, req, model.paramSchema);
-  const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, unrunnable: _unrunnable, caps: _caps, ...ref } = model.spec;
+  const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, requiresVideo: _requiresVideo, unrunnable: _unrunnable, caps: _caps, ...ref } = model.spec;
   if (!(await slotFree(deps, provider, req.place ?? QueuePlace.New))) {
     return WAITING;
   }

@@ -4,6 +4,7 @@ import { billedCreditsFor } from '$lib/credit-ladder';
 import { ProjectMode } from '$lib/project-mode';
 import { higgsfieldModelRows, HIGGSFIELD_MODELS, type HiggsfieldModel } from './higgsfield-catalogue';
 import { taskChoice } from './task-choice';
+import { listedModel } from './project-catalogue';
 import { finishTaskJob, type TaskModel } from './canvas/task-run';
 import { HF_VIDEO_DONE } from './higgsfield.fixtures';
 
@@ -85,6 +86,31 @@ describe('the Higgsfield catalogue', () => {
     const soul = rows.find((r) => r.id === 'higgsfield/higgsfield-ai/soul/standard')!;
     expect(soul.supported_resolutions).toEqual(['720p', '1080p']);
     expect(soul.param_schema).toEqual({ aspect_ratio: { type: 'enum', values: ['9:16', '16:9', '4:3', '3:4', '1:1', '2:3', '3:2'] } });
+  });
+
+  it('offers every Seedance 2.5 mode with the inputs, sizes and caps its schema declares', async () => {
+    const { rows } = await higgsfieldModelRows(async () => 0.5, SYNCED);
+    const row = (mode: string) => rows.find((r) => r.id === `higgsfield/bytedance/seedance-2.5/${mode}`)!;
+
+    expect(row('text-to-video').input_modalities).toEqual(['text']);
+    expect(row('text-to-video').param_schema).toMatchObject({ aspect_ratio: { values: ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9'] } });
+    expect(row('image-to-video').input_modalities).toEqual(['text', 'image']);
+    expect(row('image-to-video').wire_spec).toMatchObject({ requiresImage: true, fields: { images: ['image_url'], lastFrame: 'end_image_url' } });
+    expect(row('reference-to-video').input_modalities).toEqual(['text', 'image', 'video', 'audio']);
+    expect(row('reference-to-video').wire_spec).toMatchObject({ caps: { image: 30, video: 10, audio: 10 } });
+    expect(row('video-edit').wire_spec).toMatchObject({ requiresVideo: true, caps: { video: 9 }, fields: { video: 'video_url', videoList: 'video_urls' } });
+    expect(row('video-edit').param_schema).not.toHaveProperty('duration');
+    expect(row('video-extend').param_schema).toMatchObject({ duration: { values: expect.arrayContaining(['4', '30']) } });
+    for (const mode of ['text-to-video', 'image-to-video', 'reference-to-video', 'video-edit', 'video-extend']) {
+      expect(row(mode).supported_resolutions).toEqual(['480p', '720p', '1080p']);
+    }
+  });
+
+  it('lists Seedance 2.5 to the chat agent with the ports, sizes and durations a person sees', async () => {
+    const { rows } = await higgsfieldModelRows(async () => 0.5, SYNCED);
+    const listed = listedModel(taskChoice(rows.find((r) => r.id === 'higgsfield/bytedance/seedance-2.5/video-extend')!));
+
+    expect(listed).toMatchObject({ inputs: ['text', 'image', 'video', 'audio'], resolutions: ['480p', '720p', '1080p'], durations: [4, 5, 6, 8, 10, 12, 15, 20, 25, 30] });
   });
 });
 
