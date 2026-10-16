@@ -1,9 +1,13 @@
-import type { TaskOutput, TaskProvider, TaskState } from './canvas/task-provider';
+import { ProviderBusyError, type TaskOutput, type TaskProvider, type TaskState } from './canvas/task-provider';
 import { mimeOfOutputUrl, numericKeysOf, withNumbers } from './generation/wire-values';
 
 export const DEFAULT_HIGGSFIELD_BASE_URL = 'https://api.higgsfield.ai';
 
 const CANCEL_ACCEPTED = 202;
+
+const BAD_REQUEST = 400;
+
+const CONCURRENCY_REACHED = /maximum number of concurrent requests/i;
 
 const RUNNING_STATUSES = new Set(['queued', 'in_progress']);
 
@@ -65,6 +69,9 @@ function client(config: HiggsfieldConfig) {
 async function failure(res: Response): Promise<Error> {
   const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
   const detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail ?? '');
+  if (res.status === BAD_REQUEST && CONCURRENCY_REACHED.test(detail)) {
+    return new ProviderBusyError(`higgsfield_busy: ${detail}`);
+  }
   return new Error(`higgsfield_failed: HTTP ${res.status} ${detail}`.trim());
 }
 

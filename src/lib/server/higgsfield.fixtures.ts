@@ -23,3 +23,6 @@ export const HF_NSFW = { status: 'nsfw', request_id: REQUEST_ID };
 export const HF_UNAUTHORIZED = { detail: 'Invalid credentials' };
 
 export const HF_ESTIMATE = { credits: '1.500', usd: '0.094' };
+
+export const HF_CONCURRENCY_REACHED = { detail: 'Maximum number of concurrent requests (4) has been reached' };
+

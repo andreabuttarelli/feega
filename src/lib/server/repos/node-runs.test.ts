@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb, filtersOf } from '$lib/server/db/fake-db';
+import { providerLoad } from './node-runs';
 import { activeRenderRuns, claimRun, completeRun, createRun, failRun, listNodeRuns, queuedVideoRuns, RENDER_JOB_PREFIX, BROWSER_RENDER_PREFIX, runningRuns, setRunParams } from './node-runs';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
@@ -157,3 +158,19 @@ describe('activeRenderRuns — i render che hanno ancora macchine accese', () =>
     expect(filtersOf(calls, 'select')).toEqual({ status: ['running', 'finishing'] });
   });
 });
+
+describe('providerLoad', () => {
+  it('counts submitted and locally waiting runs of one provider, across orgs', async () => {
+    const { db, calls } = fakeDb({
+      node_runs: [
+        { external_job_id: 'higgsfield:req-1' },
+        { external_job_id: 'higgsfield:req-2' },
+        { external_job_id: 'higgsfield:waiting' }
+      ]
+    });
+
+    expect(await providerLoad(db, { prefix: 'higgsfield:', waitingJobId: 'higgsfield:waiting' })).toEqual({ inFlight: 2, waiting: 1 });
+    expect(filtersOf(calls, 'select')).toMatchObject({ status: ['running', 'finishing'] });
+  });
+});
+

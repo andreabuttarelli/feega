@@ -7,7 +7,7 @@ import { jobPrefixOf, taskJobOf, taskProviderOf, TASK_PROVIDERS, TaskProviderNam
 import { taskUsdFor } from '$lib/server/generation/task-pricing';
 import { uncensoredRefusal, UNCENSORED_REFUSALS } from '$lib/server/generation/uncensored-guard';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
-import type { TaskProvider, TaskOutput, WireFields } from './task-provider';
+import { ProviderBusyError, type TaskProvider, type TaskOutput, type WireFields } from './task-provider';
 import { wireInputs, type ListCaps } from '$lib/server/generation/wire-inputs';
 import type { Purgers } from './provider-purge';
 import { ProjectMode, STORAGE_FOLDER } from '$lib/project-mode';
@@ -95,8 +95,16 @@ export type TaskBill = {
   scope: TaskScope;
 };
 
+export type ProviderLoad = { inFlight: number; waiting: number; cap: number | null };
+
+export enum QueuePlace {
+  New = 'new',
+  Waiting = 'waiting'
+}
+
 export type TaskRunDeps = {
   providers: Readonly<Partial<Record<TaskProviderName, TaskProvider>>>;
+  load?(provider: TaskProviderName): Promise<ProviderLoad>;
   model(id: string): Promise<TaskModel | null>;
   access(orgId: string): Promise<{ allowed: boolean }>;
   screen(scope: TaskScope, model: TaskModel): ScreenPorts;
@@ -116,6 +124,7 @@ export type TaskRequest = {
   audioUrls?: string[];
   provenance: ProvenanceEntry[];
   idempotencyKey?: string;
+  place?: QueuePlace;
 };
 
 export enum RefusalStage {
@@ -123,7 +132,19 @@ export enum RefusalStage {
   Provider = 'provider'
 }
 
-export type TaskStart = { kind: 'job'; jobId: string } | { kind: 'refused'; error: string; stage: RefusalStage };
+export type TaskStart = { kind: 'job'; jobId: string } | { kind: 'waiting' } | { kind: 'refused'; error: string; stage: RefusalStage };
+
+const WAITING: TaskStart = { kind: 'waiting' };
+
+const AHEAD_OF: Readonly<Record<QueuePlace, (load: ProviderLoad) => number>> = {
+  [QueuePlace.New]: (load) => load.inFlight + load.waiting,
+  [QueuePlace.Waiting]: (load) => load.inFlight
+};
+
+async function slotFree(deps: TaskRunDeps, provider: TaskProviderName, place: QueuePlace): Promise<boolean> {
+  const load = await deps.load?.(provider);
+  return !load || load.cap === null || AHEAD_OF[place](load) < load.cap;
+}
 
 function carriesInputs(req: Pick<TaskRequest, 'imageUrls' | 'lastFrameUrl' | 'videoUrls' | 'audioUrls' | 'provenance'>): boolean {
   const media = [req.imageUrls, req.videoUrls ?? [], req.audioUrls ?? [], req.provenance];
@@ -195,11 +216,17 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
 
   const inputs = wireInputs(model.spec, req, model.paramSchema);
   const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, unrunnable: _unrunnable, caps: _caps, ...ref } = model.spec;
+  if (!(await slotFree(deps, provider, req.place ?? QueuePlace.New))) {
+    return WAITING;
+  }
   const startedAt = Date.now();
   try {
     const { taskId } = await gateway.run(ref, inputs, req.idempotencyKey);
     return { kind: 'job', jobId: `${jobPrefixOf(provider)}${taskId}` };
   } catch (error) {
+    if (error instanceof ProviderBusyError) {
+      return WAITING;
+    }
     const message = error instanceof Error ? error.message : `${provider}_failed`;
     deps.bill({ provider, model: model.id, quotedUsd: quoteOf(model, inputs), ms: Date.now() - startedAt, costUsd: null, error: message, uncensored: model.uncensored, scope: req.scope });
     return refused(message, RefusalStage.Provider);

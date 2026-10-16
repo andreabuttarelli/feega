@@ -1,7 +1,8 @@
 import { ProjectMode } from '$lib/project-mode';
 import { describe, expect, it, vi } from 'vitest';
 import { Provenance } from './likeness-guard';
-import { finishTaskJob, RefusalStage, startTaskRun, TASK_REFUSALS, TASK_TIMED_OUT, type TaskModel, type TaskRunDeps, type TaskRequest } from './task-run';
+import { ProviderBusyError } from './task-provider';
+import { finishTaskJob, QueuePlace, RefusalStage, startTaskRun, TASK_REFUSALS, TASK_TIMED_OUT, type TaskModel, type TaskRunDeps, type TaskRequest } from './task-run';
 
 const SCOPE = { orgId: 'org-1', projectId: 'p1', canvasId: 'c1', nodeId: 'n1', userId: 'u1' };
 
@@ -379,6 +380,45 @@ describe('startTaskRun — video and audio references', () => {
     await startTaskRun(deps, { ...baseRequest, scope: SCOPE, modelId: uncensoredModel.id, videoUrls: ['https://example.com/v.mp4'] });
 
     expect(gatewayRun).toHaveBeenCalled();
+  });
+});
+
+describe('startTaskRun — a provider with a concurrency cap', () => {
+  const busyDeps = (load: { inFlight: number; waiting: number; cap: number }) => {
+    const made = depsFor(referenceVideo);
+    made.deps.providers = { higgsfield: made.deps.providers.wiro };
+    made.deps.load = async () => load;
+    return made;
+  };
+  const request = (place?: QueuePlace) => ({ ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: referenceVideo.id, place });
+
+  it('waits instead of submitting when every slot is taken', async () => {
+    const { deps, gatewayRun } = busyDeps({ inFlight: 4, waiting: 0, cap: 4 });
+
+    expect(await startTaskRun(deps, request())).toEqual({ kind: 'waiting' });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+
+  it('queues a new run behind runs already waiting, even with a free slot', async () => {
+    const { deps, gatewayRun } = busyDeps({ inFlight: 3, waiting: 1, cap: 4 });
+
+    expect(await startTaskRun(deps, request(QueuePlace.New))).toEqual({ kind: 'waiting' });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+
+  it('submits a waiting run as soon as a slot frees', async () => {
+    const { deps, gatewayRun } = busyDeps({ inFlight: 3, waiting: 1, cap: 4 });
+
+    expect(await startTaskRun(deps, request(QueuePlace.Waiting))).toEqual({ kind: 'job', jobId: 'higgsfield:job-1' });
+    expect(gatewayRun).toHaveBeenCalled();
+  });
+
+  it('waits, unbilled, when the provider itself answers that it is busy', async () => {
+    const { deps } = busyDeps({ inFlight: 0, waiting: 0, cap: 4 });
+    (deps.providers.higgsfield!.run as ReturnType<typeof vi.fn>).mockRejectedValue(new ProviderBusyError('higgsfield_busy'));
+
+    expect(await startTaskRun(deps, request())).toEqual({ kind: 'waiting' });
+    expect(deps.bill).not.toHaveBeenCalled();
   });
 });
 

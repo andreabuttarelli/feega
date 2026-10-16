@@ -28,3 +28,6 @@ export type TaskProvider = {
   purge?(taskId: string): Promise<PurgeOutcome>;
   cancel?(taskId: string): Promise<boolean>;
 };
+
+export class ProviderBusyError extends Error {}
+
