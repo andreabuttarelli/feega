@@ -26,7 +26,7 @@
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -92,7 +92,7 @@
   import { layoutOf, rotateGroup, type Placed } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { barContextOf } from '$lib/canvas/bottom-bar';
-  import { CanvasState, NodeMode, Opening, Paint, Reframe, dismissedAfterClick, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
+  import { CanvasState, NodeMode, Opening, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { decoded, painted } from '$lib/canvas/paint-wait';
   import { viewportOf } from '$lib/motion/editor-layout';
@@ -1116,6 +1116,22 @@
     return row ? openingFor(row, opening) : opening;
   });
   const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, openingHere, requestedMotion));
+  const editingMotion = $derived(editorOn(inlineMotion, inlineStage.leaving));
+  let lastOpen: string | null = null;
+
+  $effect(() => {
+    const open = inlineMotion;
+    const closed = lastOpen;
+    lastOpen = open;
+    untrack(() => {
+      if (open && open === inlineStage.leaving) {
+        inlineStage.landed(open);
+      }
+      if (closed && closed !== open && nodes.some((n) => n.id === closed)) {
+        inlineStage.leave(closed);
+      }
+    });
+  });
 
   $effect(() => {
     if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => dismissedMotion)) {
@@ -1384,14 +1400,28 @@
     announce(action, failureOf(result), result.data ?? result);
   }
 
-  async function post(
-    action: string,
-    fields: Record<string, string | number | File | string[]>
-  ): Promise<Record<string, unknown> | null> {
+  type Fields = Record<string, string | number | File | string[]>;
+
+  function post(action: string, fields: Fields): Promise<Record<string, unknown> | null> {
+    return answered(action, () => send(action, fields));
+  }
+
+  function postAtVersion(action: string, id: string, fields: Fields): Promise<Record<string, unknown> | null> {
+    let release = () => {};
+    const asked = actAtVersion({
+      settle: async () => { await saves.flush(id); release = saves.hold(id); },
+      version: () => nodes.find((node) => node.id === id)?.version ?? 0,
+      send: (version) => send(action, { ...fields, node_id: id, version }),
+      reread: refresh
+    });
+    return answered(action, () => asked).finally(() => release());
+  }
+
+  async function answered(action: string, ask: () => Promise<ActionAnswer>): Promise<Record<string, unknown> | null> {
     const mutating = actionKind(action) === ActionKind.Write;
     if (mutating) { pending += 1; snapshotVersion += 1; }
     try {
-      const result = await send(action, fields);
+      const result = await ask();
       if (result.type !== 'success') {
         report(action, result);
         return null;
@@ -1701,24 +1731,13 @@
 
     nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
 
-    await saves.flush(id);
-
-    const before = nodes.find((node) => node.id === id);
-    if (!before) {
-      return;
-    }
-
     pending += 1;
-    const release = saves.hold(id);
-
-    const result = await post('run', {
-      node_id: id,
+    const result = await postAtVersion('run', id, {
       medium: gen.medium,
       prompt: gen.prompt,
       model: effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []) ?? '',
-      params: JSON.stringify(gen.params),
-      version: before.version
-    }).finally(release);
+      params: JSON.stringify(gen.params)
+    });
     pending -= 1;
 
     if (!result) {
@@ -1921,7 +1940,7 @@
     nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, sync_status: 'running' } } : node));
     pending += 1;
 
-    const result = await post('sync', { node_id: id, version: before.version });
+    const result = await postAtVersion('sync', id, {});
     pending -= 1;
 
     if (!result) {
@@ -3170,7 +3189,7 @@
           <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}</div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} onenter={() => requestMotion(id)} />
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} nodeMode={tileMode(id, inlineMotion, inlineStage.leaving)} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} onenter={() => requestMotion(id)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}
@@ -3182,9 +3201,9 @@
   {#if showsEmptyState(nodes.length, inlineMotion)}
     <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
   {/if}
-  {#if inlineMotion}
-    {#key inlineMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => reframe(inlineMotion, free)} onmoveout={moveOut} {canvasundo} />
+  {#if editingMotion}
+    {#key editingMotion}
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} {canvasundo} />
     {/key}
   {/if}
 

@@ -120,9 +120,16 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
     return html === current && !reload ? Promise.resolve() : loaded(html);
   }
 
-  function seek(seconds: number) {
+  function place(seconds: number) {
     port.seek(seconds);
     port.post(exactSeek(seconds));
+  }
+
+  function seek(seconds: number) {
+    place(seconds);
+    if (wanted === Playback.Playing) {
+      apply();
+    }
   }
 
   function shoot(time: number, request: ShotRequest, waitMs = timeoutMs): Promise<CaptureReply> {
@@ -140,7 +147,7 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
         settle();
       };
       const send = () => {
-        seek(time);
+        place(time);
         if (!port.post(message)) {
           done(() => reject(new Error('preview not ready')));
         }

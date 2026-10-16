@@ -248,6 +248,29 @@ describe('the preview transport', () => {
 
     expect(calls).toEqual(['pause', 'play', 'load', 'play']);
   });
+
+  it('a seek while playing, as a poster capture does, keeps playing: the player pauses on every seek', async () => {
+    const { port, calls } = transport();
+    const replies = new Set<(r: CaptureReply) => void>();
+    const driver = previewDriver({
+      ...port,
+      seek: () => calls.push('seek'),
+      post: (m) => {
+        if (m.type === CAPTURE_REQUEST) {
+          queueMicrotask(() => replies.forEach((l) => l({ type: CAPTURE_REPLY, id: (m as CaptureRequest).id, url: 'x' })));
+        }
+        return true;
+      },
+      onReply: (l) => (replies.add(l), () => replies.delete(l))
+    });
+    driver.ready();
+    driver.playback(Playback.Playing);
+
+    await driver.shoot(1.2, REQUEST);
+    driver.seek(0.2);
+
+    expect(calls.at(-1)).toBe('play');
+  });
 });
 
 describe('seeking the preview', () => {

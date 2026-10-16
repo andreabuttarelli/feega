@@ -4,6 +4,18 @@ type Offer = { nodeId: string; el: HTMLElement };
 
 let offered = $state.raw<Offer | null>(null);
 let paint = $state(Paint.Pending);
+let leaving = $state<string | null>(null);
+let leaveCap: ReturnType<typeof setTimeout> | null = null;
+
+export const LEAVE_CAP_MS = 3000;
+
+function letGo() {
+  if (leaveCap) {
+    clearTimeout(leaveCap);
+    leaveCap = null;
+  }
+  leaving = null;
+}
 
 const SWAP_GRACE_MS = 300;
 
@@ -42,6 +54,19 @@ export const inlineStage = {
   },
   paintOf(nodeId: string): Paint {
     return offered?.nodeId === nodeId ? paint : Paint.Pending;
+  },
+  leave(nodeId: string) {
+    letGo();
+    leaving = nodeId;
+    leaveCap = setTimeout(letGo, LEAVE_CAP_MS);
+  },
+  landed(nodeId: string) {
+    if (leaving === nodeId) {
+      letGo();
+    }
+  },
+  get leaving() {
+    return leaving;
   },
   get editing() {
     return offered !== null;

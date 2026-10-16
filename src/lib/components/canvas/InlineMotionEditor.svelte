@@ -35,7 +35,7 @@
   import { track } from '$lib/analytics';
   import type { CanvasUndo, MoveOut } from '$lib/canvas/canvas-drop';
 
-  let { projectId, canvasId, nodeId, onclose, onframe, onmoveout = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null } = $props();
+  let { projectId, canvasId, nodeId, leaving = false, onclose, onframe, onmoveout = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; leaving?: boolean; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null } = $props();
 
   const opensOn = untrack(() => (get(propertiesRequest) === nodeId ? OpensOn.Properties : OpensOn.Stage));
   propertiesRequest.set(null);
@@ -120,7 +120,9 @@
 </script>
 
 {#if session}
-  <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} {canvasundo} {opensOn} />
+  <div class="inline" class:leaving data-leaving={leaving || undefined}>
+    <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} {canvasundo} {opensOn} />
+  </div>
 {:else if failed}
   <p class="inline-status" role="status">This video could not be opened here. <a href={editorPath}>Open the editor</a></p>
 {:else}
@@ -128,6 +130,23 @@
 {/if}
 
 <style>
+  .inline {
+    display: contents;
+  }
+
+  .leaving {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .leaving :global([data-testid='editor-stage']) {
+    visibility: visible;
+  }
+
+  .leaving :global([data-testid='selection-overlay']) {
+    visibility: hidden;
+  }
+
   .inline-status {
     position: fixed;
     left: 50%;
