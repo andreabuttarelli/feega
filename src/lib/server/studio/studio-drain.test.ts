@@ -44,6 +44,7 @@ function patchesFor(id: string) {
 describe('drainStudio', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    repo.dueItems.mockResolvedValue([]);
     repo.moveItems.mockImplementation(async (_db, input) => {
       const queued = (await repo.dueItems.mock.results[0].value) as ReturnType<typeof item>[];
       const claimed = queued.find((q) => q.id === input.itemIds[0])!;
@@ -52,7 +53,7 @@ describe('drainStudio', () => {
   });
 
   it('gira ogni item col motore vero, sul suo nodo, vedendo solo il suo prodotto', async () => {
-    repo.dueItems.mockResolvedValue([item('a', 'n1')]);
+    repo.dueItems.mockResolvedValueOnce([item('a', 'n1')]);
     engine.runGenNode.mockResolvedValue({ kind: 'done', asset: { id: 'asset' }, run: { id: 'run' } });
 
     const out = await drainStudio({} as never);
@@ -63,7 +64,7 @@ describe('drainStudio', () => {
   });
 
   it('un errore transitorio torna in coda con attesa; un blocco di moderazione no', async () => {
-    repo.dueItems.mockResolvedValue([item('t', 'n1'), item('m', 'n2')]);
+    repo.dueItems.mockResolvedValueOnce([item('t', 'n1'), item('m', 'n2')]);
     engine.runGenNode.mockImplementation(async (_db, run) =>
       run.nodeId === 'n1' ? { kind: 'refused', error: 'provider 503' } : { kind: 'refused', error: 'Refused: unsafe' }
     );
@@ -76,7 +77,7 @@ describe('drainStudio', () => {
   });
 
   it('due item della stessa cella non girano insieme', async () => {
-    repo.dueItems.mockResolvedValue([item('a', 'same'), item('b', 'same')]);
+    repo.dueItems.mockResolvedValueOnce([item('a', 'same'), item('b', 'same')]);
     engine.runGenNode.mockResolvedValue({ kind: 'done', asset: { id: 'x' }, run: { id: 'r' } });
 
     const out = await drainStudio({} as never);
