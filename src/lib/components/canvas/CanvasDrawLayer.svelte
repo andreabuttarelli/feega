@@ -2,7 +2,7 @@
   import DrawOverlay from '$lib/components/motion/DrawOverlay.svelte';
   import { MotionFormat, findClip, newMotionDoc } from '$lib/motion/doc';
   import { DrawTool } from '$lib/motion/draw-tool';
-  import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
+  import { CanvasTheme, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
   import type { OpResult } from '$lib/motion/timeline';
   import { drawnOnCanvas } from '$lib/canvas/canvas-draw';
 
@@ -21,10 +21,12 @@
 
   const sheet = $derived({ ...newMotionDoc(MotionFormat.Landscape), width: Math.max(1, Math.round(size.width)), height: Math.max(1, Math.round(size.height)) });
 
+  const themeOf = (): CanvasTheme => (document.documentElement.dataset.theme === CanvasTheme.Dark ? CanvasTheme.Dark : CanvasTheme.Light);
+
   function created(id: string) {
     const rect = host?.getBoundingClientRect();
     const found = made?.ok && rect ? findClip(made.doc, id) : null;
-    const drawn = found && rect ? drawnOnCanvas(found.clip, { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, toFlow) : null;
+    const drawn = found && rect ? drawnOnCanvas(found.clip, { left: rect.left, top: rect.top, width: rect.width, height: rect.height }, toFlow, themeOf()) : null;
     made = null;
     placed = true;
     if (drawn && framing && 'box' in drawn) {

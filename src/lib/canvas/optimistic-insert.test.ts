@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { isOwnEcho } from './node-save';
 import { drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from './optimistic-insert';
 import { DrawTool } from '$lib/motion/draw-tool';
+import { CANVAS_INK, CanvasTheme } from '$lib/motion/draw-create';
 
 const doc = { width: 1080, height: 1350 };
 const placed = placedFrame({ id: 'f1', canvasId: 'c', projectId: 'p', name: 'Checker', at: { x: 10, y: 20 }, doc });
@@ -43,6 +44,14 @@ describe('a shape drawn on the canvas before the server answers', () => {
 
     expect(drawn?.node).toMatchObject({ id: 'e1', type: 'motion', position: { x: 120, y: 40 }, size: { width: 300, height: 100 }, data: { kind: 'element', docHeadRevision: 1 } });
     expect(drawn?.look).toMatch(/^data:image\/svg\+xml,/);
+  });
+
+  it('a text stands as its words in the ink of the canvas, not as a grey box', () => {
+    const look = decodeURIComponent(drawnTile('t1', { tool: DrawTool.Text, box: { left: 0, top: 0, width: 300, height: 100 }, theme: CanvasTheme.Dark })?.look ?? '');
+
+    expect(look).toContain('>Text</text>');
+    expect(look).toContain(`fill="${CANVAS_INK[CanvasTheme.Dark]}"`);
+    expect(look).not.toContain('<rect');
   });
 
   it('places a pen path at the box of its points', () => {
