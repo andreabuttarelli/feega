@@ -187,3 +187,12 @@ describe('reference capacity of the Higgsfield Seedance 2.5 modes', () => {
     expect(videoRefCapacity('higgsfield/bytedance/seedance-2.5/text-to-video')).toEqual({ images: 0, videos: 0, audios: 0 });
   });
 });
+
+describe('reference capacity of the Genjutsu transforms', () => {
+  it('takes one source video and the character images its schema allows', () => {
+    expect(videoRefCapacity('higgsfield/higgsfield/genjutsu/motion-transfer/v1.0')).toEqual({ images: 8, videos: 1, audios: 0 });
+    expect(videoRefCapacity('higgsfield/higgsfield/genjutsu/object-swap/v1.0')).toEqual({ images: 8, videos: 1, audios: 0 });
+    expect(videoRefCapacity('higgsfield/higgsfield/genjutsu/restyle/v1.0')).toEqual({ images: 5, videos: 1, audios: 0 });
+  });
+});
+

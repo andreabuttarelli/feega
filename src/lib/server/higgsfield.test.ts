@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { higgsfield, higgsfieldEstimate } from './higgsfield';
+import { higgsfield, higgsfieldEstimate, higgsfieldOptions } from './higgsfield';
 import { ProviderBusyError } from './canvas/task-provider';
-import { HF_CONCURRENCY_REACHED, HF_ESTIMATE, HF_FAILED, HF_IMAGE_DONE, HF_IN_PROGRESS, HF_NSFW, HF_QUEUED, HF_REQUEST_ID, HF_UNAUTHORIZED, HF_VIDEO_DONE } from './higgsfield.fixtures';
+import { HF_CONCURRENCY_REACHED, HF_ESTIMATE, HF_RESTYLE_PRESETS, HF_FAILED, HF_IMAGE_DONE, HF_IN_PROGRESS, HF_NSFW, HF_QUEUED, HF_REQUEST_ID, HF_UNAUTHORIZED, HF_VIDEO_DONE } from './higgsfield.fixtures';
 
 const CREDENTIALS = { keyId: 'id', keySecret: 'secret' };
 
@@ -88,3 +88,29 @@ describe('higgsfield estimate — the price source', () => {
     expect(fetchFn.mock.calls[0][0]).toBe('https://api.higgsfield.ai/estimate/higgsfield-ai/soul/standard');
   });
 });
+
+describe('higgsfield adapter — quote', () => {
+  it('prices the exact request body through /estimate', async () => {
+    const { gateway, fetchFn } = replying({ body: HF_ESTIMATE });
+
+    const usd = await gateway.quote({ path: 'higgsfield/genjutsu/restyle/v1.0', numeric: ['duration'] }, { video_url: 'https://cdn.test/v.mp4', resolution: '1080p' });
+
+    expect(usd).toBe(0.094);
+    const [url, init] = fetchFn.mock.calls[0];
+    expect(url).toBe('https://api.higgsfield.ai/estimate/higgsfield/genjutsu/restyle/v1.0');
+    expect(JSON.parse(init.body)).toEqual({ video_url: 'https://cdn.test/v.mp4', resolution: '1080p' });
+  });
+});
+
+describe('higgsfield adapter — presets', () => {
+  it('reads the selectable restyle presets as id and name', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify(HF_RESTYLE_PRESETS)));
+
+    const presets = await higgsfieldOptions({ ...CREDENTIALS, fetchFn: fetchFn as unknown as typeof fetch }, 'models/higgsfield/genjutsu/restyle/v1.0/presets');
+
+    expect(presets).toEqual(HF_RESTYLE_PRESETS.items.map(({ id, name }) => ({ id, name })));
+    expect(fetchFn.mock.calls[0][0]).toBe('https://api.higgsfield.ai/models/higgsfield/genjutsu/restyle/v1.0/presets');
+    expect(fetchFn.mock.calls[0][1]).toMatchObject({ method: 'GET', headers: { Authorization: 'Key id:secret' } });
+  });
+});
+

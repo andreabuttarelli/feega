@@ -24,6 +24,7 @@ import {
   retryClaim,
   runningRuns,
   setExternalJob,
+  setRunParams,
   setRunPrompt,
   setRunRoute,
   type NodeRun
@@ -43,7 +44,7 @@ import { inputTtlOf, RouteRole, TASK_PROVIDERS, taskJobOf, taskProviderOf, WAITI
 import { AUTO_ROUTE } from '$lib/canvas/model-routes';
 import { kieTextModel } from '$lib/server/kie-chat';
 import { PRIMARY_ROUTE } from '$lib/server/generation/discount-routes';
-import { QueuePlace, RefusalStage, type TaskStart } from './task-run';
+import { QUOTED_USD_PARAM, QueuePlace, RefusalStage, type TaskStart } from './task-run';
 import { model3dParamsOf } from '$lib/model3d-models';
 import { cheapestImageChoice, Model3dPath, model3dPathOf, productShotPrompt } from '$lib/canvas/model3d-run';
 
@@ -353,15 +354,23 @@ async function resubmitWaiting(db: Db, shape: StartRun, run: NodeRun): Promise<v
     await giveUp(db, shape, { ...run, status: 'finishing' }, out.error);
     return;
   }
+  await keepQuote(db, run, shape.params as Record<string, unknown>, out.quotedUsd);
   if (out.jobId !== run.externalJobId) {
     await setExternalJob(db, { orgId: run.orgId, runId: run.id, externalJobId: out.jobId });
   }
   await releaseClaim(db, { orgId: run.orgId, runId: run.id });
 }
 
-async function queueTask(db: Db, input: StartRun, run: NodeRun, jobId: string): Promise<RunOutcome> {
-  await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: jobId });
-  return { kind: 'queued', run: { ...run, externalJobId: jobId } };
+async function keepQuote(db: Db, run: NodeRun, params: Record<string, unknown>, quotedUsd: number | undefined): Promise<void> {
+  if (quotedUsd) {
+    await setRunParams(db, { orgId: run.orgId, runId: run.id, params: { ...params, [QUOTED_USD_PARAM]: quotedUsd } });
+  }
+}
+
+async function queueTask(db: Db, input: StartRun, run: NodeRun, job: { jobId: string; quotedUsd?: number }): Promise<RunOutcome> {
+  await keepQuote(db, run, input.params as Record<string, unknown>, job.quotedUsd);
+  await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: job.jobId });
+  return { kind: 'queued', run: { ...run, externalJobId: job.jobId } };
 }
 
 async function runTaskNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
@@ -370,7 +379,7 @@ async function runTaskNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
     await giveUp(db, input, run, out.error);
     return { kind: 'refused', error: out.error };
   }
-  return queueTask(db, input, run, out.jobId);
+  return queueTask(db, input, run, out);
 }
 
 const DISCOUNTED_MEDIA: ReadonlySet<GenMedium> = new Set(['image', 'video']);
@@ -402,7 +411,7 @@ async function runDiscountRoute(db: Db, input: StartRun, run: NodeRun, upstream:
   await setRunRoute(db, { orgId: input.orgId, runId: run.id, model: route.modelId, params: { ...route.params, ...fallback } });
   const out = await startTask(db, routed, run, upstream, prompt);
   if (out.kind === 'job') {
-    return queueTask(db, routed, run, out.jobId);
+    return queueTask(db, routed, run, out);
   }
   if (out.stage === RefusalStage.Policy) {
     await giveUp(db, input, run, out.error);

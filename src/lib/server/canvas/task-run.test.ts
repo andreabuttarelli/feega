@@ -435,3 +435,58 @@ describe('startTaskRun — a model that edits a video', () => {
   });
 });
 
+describe('a model billed per source second, quoted on the real request', () => {
+  const restyle: TaskModel = {
+    id: 'higgsfield/higgsfield/genjutsu/restyle/v1.0',
+    catalogue: 'video',
+    spec: { path: 'higgsfield/genjutsu/restyle/v1.0', fields: { prompt: 'prompt', images: [], video: 'video_url' }, quotedAtSubmit: true },
+    uncensored: false,
+    paramSchema: {}
+  };
+  const quoting = (usd: number | null) => {
+    const made = depsFor(restyle);
+    const quote = vi.fn().mockResolvedValue(usd);
+    made.deps.providers = { higgsfield: { ...made.deps.providers.wiro!, quote } };
+    return { ...made, quote };
+  };
+  const request = { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: restyle.id, videoUrls: ['https://cdn.test/source.mp4'] };
+
+  it('asks the provider the price of these exact inputs and carries it with the job', async () => {
+    const { deps, quote } = quoting(13.6);
+
+    const out = await startTaskRun(deps, request);
+
+    expect(quote).toHaveBeenCalledWith({ path: 'higgsfield/genjutsu/restyle/v1.0' }, { prompt: 'a picture', video_url: 'https://cdn.test/source.mp4' });
+    expect(out).toEqual({ kind: 'job', jobId: 'higgsfield:job-1', quotedUsd: 13.6 });
+  });
+
+  it('never runs what it cannot price', async () => {
+    const { deps, gatewayRun } = quoting(null);
+
+    expect(await startTaskRun(deps, request)).toEqual({ kind: 'refused', error: TASK_REFUSALS.unpriced, stage: RefusalStage.Provider });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+
+  it('bills the finished task at the price quoted on submit', async () => {
+    const bill = vi.fn();
+    const providers = { higgsfield: { run: vi.fn(), task: vi.fn().mockResolvedValue({ state: 'failed', error: 'higgsfield_failed: x' }) } };
+
+    await finishTaskJob({} as never, { providers, model: async () => restyle, bill }, { externalJobId: 'higgsfield:r1', modelId: restyle.id, scope: SCOPE, mode: ProjectMode.Standard, params: { quotedUsd: 13.6 } as never });
+
+    expect(bill).toHaveBeenCalledWith(expect.objectContaining({ quotedUsd: 13.6 }));
+  });
+});
+
+describe('a model that needs a param the person must choose', () => {
+  it('refuses before any call when the style is not chosen', async () => {
+    const restyle: TaskModel = { ...referenceVideo, spec: { ...referenceVideo.spec, requiredParams: ['preset_id'] }, paramSchema: { preset_id: { type: 'enum', values: ['u1'] } } };
+    const { deps, gatewayRun } = depsFor(restyle);
+    deps.providers = { higgsfield: deps.providers.wiro };
+
+    const out = await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: restyle.id });
+
+    expect(out).toEqual({ kind: 'refused', error: 'missing_input: choose a style', stage: RefusalStage.Policy });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+});
+
