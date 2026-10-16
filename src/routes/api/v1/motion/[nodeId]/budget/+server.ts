@@ -1,4 +1,5 @@
 import { json } from '@sveltejs/kit';
+import { kindOf } from '$lib/motion/replica';
 import { reachableCaller } from '$lib/server/org-data/reach';
 import { budgetCard, raiseVideoBudget, readVideoBudget } from '$lib/server/motion/video-budget';
 import { findNode } from '$lib/server/repos/canvas';
@@ -37,7 +38,7 @@ export const GET: RequestHandler = async ({ request, params, url }) => {
   if (!motion) {
     return notFound();
   }
-  return json(budgetCard(await readVideoBudget(found.db, scope, motion.budgetRaisedUsd ?? 0, motion.videoKind)));
+  return json(budgetCard(await readVideoBudget(found.db, scope, motion.budgetRaisedUsd ?? 0, kindOf(motion.replicaOf))));
 };
 
 export const POST: RequestHandler = async ({ request, params, url }) => {

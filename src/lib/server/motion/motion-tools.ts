@@ -160,6 +160,7 @@ import { liftElement, type Element } from '$lib/motion/move-element';
 import { MoveOutcome, type FrameTarget, type Moved } from './move-element';
 import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '$lib/motion/still-model';
 import type { BreakdownAnswer } from '$lib/server/video-reference';
+import { CLOSE_TO_REFERENCE, type Comparison } from './reference-frames';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
 const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
@@ -192,6 +193,7 @@ export type MotionToolDeps = {
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
   videoBreakdown?: (assetId: string) => Promise<BreakdownAnswer>;
+  compareReference?: (callId: string) => Promise<Comparison | null>;
   spawn?: { offers: readonly ModelOffer[]; run: (input: SpawnInput) => Promise<SpawnResult> };
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
   renderLink?: (quality: ExportQuality) => Promise<Record<string, unknown>>;
@@ -1046,6 +1048,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const answer = await deps.videoBreakdown(input.asset_id);
         return answer.ok ? { ok: true, brief: answer.brief, breakdown: answer.breakdown } : { ok: false, error: answer.message };
+      }
+    }),
+
+    compare_to_reference: tool({
+      description: `Remake of a reference video only: draws this video at the reference key times and scores each scene 0–1 against the reference frames (colour and layout, pixel by pixel). fix_first is the lowest scene; close is true when every scene scores ${CLOSE_TO_REFERENCE} or more. Free.`,
+      inputSchema: z.object({}),
+      execute: async (_input, { toolCallId }) => {
+        if (!deps.compareReference) {
+          return UNREADABLE('comparing with a reference video');
+        }
+        const compared = await deps.compareReference(toolCallId);
+        if (!compared || !compared.scenes.length) {
+          return { ok: false, error: 'the frames could not be drawn: try again after the next edit' };
+        }
+        const worst = compared.scenes.reduce((a, b) => (b.score < a.score ? b : a));
+        return { ok: true, scenes: compared.scenes, fix_first: worst.scene, close: worst.score >= CLOSE_TO_REFERENCE };
       }
     }),
 

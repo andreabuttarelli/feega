@@ -4,7 +4,7 @@ import { DataCheck, findNode, patchNodeData } from '$lib/server/repos/canvas';
 import { motionOf } from '$lib/canvas/motion-node';
 import { videoSpentUsd } from '$lib/server/repos/video-spend';
 import { FIX_RESERVE_SHARE, VIDEO_CAPS, VIDEO_RAISE_USD } from '$lib/server/project-agent/limits';
-import { VideoKind } from '$lib/motion/replica';
+import { VideoKind, kindOf } from '$lib/motion/replica';
 import type { BudgetCard } from '$lib/motion/budget-card';
 
 export { VIDEO_BUDGET, type BudgetCard } from '$lib/motion/budget-card';
@@ -56,7 +56,7 @@ export async function raiseVideoBudget(db: Db, scope: NodeScope & { actor?: Acto
       return null;
     }
     if (written.outcome === 'written') {
-      return readVideoBudget(db, scope, raised + VIDEO_RAISE_USD, motion.videoKind);
+      return readVideoBudget(db, scope, raised + VIDEO_RAISE_USD, kindOf(motion.replicaOf));
     }
   }
   return null;

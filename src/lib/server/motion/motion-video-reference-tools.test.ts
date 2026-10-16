@@ -32,3 +32,26 @@ describe('read_video_reference', () => {
     expect((await setup()({ asset_id: 'v-1' })).ok).toBe(false);
   });
 });
+
+describe('compare_to_reference', () => {
+  function compare(compareReference?: Parameters<typeof createMotionTools>[0]['compareReference']) {
+    const session: MotionSession = { doc: newMotionDoc(MotionFormat.Landscape), baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 };
+    const tools = createMotionTools({ session, assets: [], newId: () => 'id', voiceover: vi.fn(), frames: vi.fn(), check: vi.fn(), compareReference });
+    return (tools.compare_to_reference as Tool & { execute: Exec }).execute({}, { toolCallId: 'c-1' });
+  }
+
+  it('scores each scene against the reference and names the one to fix first', async () => {
+    const out = await compare(async () => ({ scenes: [{ scene: 1, score: 0.9 }, { scene: 2, score: 0.4 }], times: [] }));
+
+    expect(out).toMatchObject({ ok: true, scenes: [{ scene: 1, score: 0.9 }, { scene: 2, score: 0.4 }], fix_first: 2, close: false });
+  });
+
+  it('every scene at 0.9 or more is close; 0.87 is not (the failed Cautiva opening scored 0.87)', async () => {
+    expect(await compare(async () => ({ scenes: [{ scene: 1, score: 0.92 }], times: [] }))).toMatchObject({ close: true });
+    expect(await compare(async () => ({ scenes: [{ scene: 1, score: 0.87 }], times: [] }))).toMatchObject({ close: false });
+  });
+
+  it('without a reference it refuses instead of pretending', async () => {
+    expect((await compare()).ok).toBe(false);
+  });
+});

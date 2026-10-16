@@ -1,14 +1,17 @@
 import { AttachmentKind, type ChatAttachment } from '$lib/chat-attachments';
-import { VideoKind, replicaFormat, videoKindOf, type ReplicaCanvas } from '$lib/motion/replica';
-import { breakdownSize } from '$lib/video-reference';
+import { VideoKind, kindOf, replicaFormat, replicaSource, type ReplicaCanvas } from '$lib/motion/replica';
+import { breakdownSize, type VideoBreakdown } from '$lib/video-reference';
 import type { BreakdownAnswer } from '$lib/server/video-reference';
+import { keyTimes, referenceFrames, type GrabFrame, type ReferenceFrame } from './reference-frames';
 
-export type ReplicaTurn = { kind: VideoKind; canvas: ReplicaCanvas | null };
+export type ReplicaTurn = { kind: VideoKind; replicaOf: string | null; canvas: ReplicaCanvas | null; frames: ReferenceFrame[] };
 
 type ReadBreakdown = (assetId: string) => Promise<BreakdownAnswer>;
 
-export function onceEach(read: ReadBreakdown): ReadBreakdown {
-  const seen = new Map<string, Promise<BreakdownAnswer>>();
+export type ReplicaPorts = { read: ReadBreakdown; grabber: (assetId: string) => Promise<GrabFrame | null> };
+
+export function onceEach<T>(read: (assetId: string) => Promise<T>): (assetId: string) => Promise<T> {
+  const seen = new Map<string, Promise<T>>();
   return (assetId) => {
     const known = seen.get(assetId) ?? read(assetId);
     seen.set(assetId, known);
@@ -16,17 +19,27 @@ export function onceEach(read: ReadBreakdown): ReadBreakdown {
   };
 }
 
-async function referenceCanvas(video: ChatAttachment, read: ReadBreakdown): Promise<ReplicaCanvas | null> {
-  const answer = await read(video.assetId);
-  const size = answer.ok ? breakdownSize(answer.breakdown) : null;
-  return answer.ok && size ? { format: replicaFormat(size), durationS: answer.breakdown.durationS } : null;
+function canvasOf(breakdown: VideoBreakdown): ReplicaCanvas | null {
+  const size = breakdownSize(breakdown);
+  return size ? { format: replicaFormat(size), durationS: breakdown.durationS } : null;
 }
 
-export async function replicaTurn(input: { message: string; attachments: readonly ChatAttachment[]; stored: VideoKind | undefined; read: ReadBreakdown }): Promise<ReplicaTurn> {
+const STANDARD: ReplicaTurn = { kind: VideoKind.Standard, replicaOf: null, canvas: null, frames: [] };
+
+export async function replicaTurn(input: { message: string; attachments: readonly ChatAttachment[]; replicaOf: string | undefined }, ports: ReplicaPorts): Promise<ReplicaTurn> {
   const video = input.attachments.find((a) => a.kind === AttachmentKind.Video);
-  const kind = videoKindOf({ message: input.message, videoAttached: !!video, stored: input.stored });
-  if (kind !== VideoKind.Replica || !video) {
-    return { kind, canvas: null };
+  const replicaOf = replicaSource({ message: input.message, videoId: video?.assetId, replicaOf: input.replicaOf });
+  if (!replicaOf) {
+    return STANDARD;
   }
-  return { kind, canvas: await referenceCanvas(video, input.read) };
+
+  const answer = await ports.read(replicaOf);
+  const kind = kindOf(replicaOf);
+  if (!answer.ok) {
+    return { kind, replicaOf, canvas: null, frames: [] };
+  }
+  const grab = await ports.grabber(replicaOf);
+  const frames = grab ? await referenceFrames(grab, keyTimes(answer.breakdown)) : [];
+  const canvas = video?.assetId === replicaOf ? canvasOf(answer.breakdown) : null;
+  return { kind, replicaOf, canvas, frames };
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MotionFormat, newMotionDoc } from './doc';
 import { addClip } from './timeline';
-import { REPLICA_BRIEF, VideoKind, asksReplica, replicaCanvas, replicaFormat, videoKindOf } from './replica';
+import { REPLICA_BRIEF, VideoKind, asksReplica, kindTools, replicaCanvas, replicaFormat, kindOf, replicaSource } from './replica';
 
 describe('a request to recreate a reference video', () => {
   it.each(['Recreate this video as faithfully as possible', 'replicate it', 'remake this one', 'ricrea questo video', 'Recrea este vídeo', 'refais cette vidéo'])('"%s" asks for a replica', (message) => {
@@ -12,10 +12,12 @@ describe('a request to recreate a reference video', () => {
     expect(asksReplica('Make a launch teaser for our app')).toBe(false);
   });
 
-  it('only a turn carrying a video reference turns a video into a replica, and it stays one', () => {
-    expect(videoKindOf({ message: 'Recreate this video', videoAttached: true, stored: undefined })).toBe(VideoKind.Replica);
-    expect(videoKindOf({ message: 'Recreate this video', videoAttached: false, stored: undefined })).toBe(VideoKind.Standard);
-    expect(videoKindOf({ message: 'Build the video from the script.', videoAttached: false, stored: VideoKind.Replica })).toBe(VideoKind.Replica);
+  it('only a turn carrying a video reference makes a replica of it, and it stays one', () => {
+    expect(replicaSource({ message: 'Recreate this video', videoId: 'v-1', replicaOf: undefined })).toBe('v-1');
+    expect(replicaSource({ message: 'Recreate this video', videoId: undefined, replicaOf: undefined })).toBeNull();
+    expect(replicaSource({ message: 'Build the video from the script.', videoId: undefined, replicaOf: 'v-1' })).toBe('v-1');
+    expect(kindOf('v-1')).toBe(VideoKind.Replica);
+    expect(kindOf(null)).toBe(VideoKind.Standard);
   });
 });
 
@@ -49,5 +51,17 @@ describe('the replica takes the reference canvas', () => {
 
   it('the brief asks for scene-by-scene fidelity and no empty span', () => {
     ['scene by scene', 'hex', 'condensed', 'transition', 'camera', 'black'].forEach((word) => expect(REPLICA_BRIEF.toLowerCase()).toContain(word));
+  });
+});
+
+describe('a replica is drawn from the reference, never from the kit (live test: Cautiva and the SaaS remake both started from list_templates, add_template and add_shot)', () => {
+  const names = ['list_templates', 'get_template', 'add_template', 'set_template_fields', 'list_shots', 'add_shot', 'add_ui', 'ui_morph_reel', 'apply_layout', 'apply_text_preset', 'add_clip', 'set_props', 'recreate_ui', 'view_frames'];
+
+  it('the template, shot, kit-UI and preset tools are not offered', () => {
+    expect(kindTools(VideoKind.Replica, names)).toEqual(['add_clip', 'set_props', 'recreate_ui', 'view_frames']);
+  });
+
+  it('a standard video keeps them all', () => {
+    expect(kindTools(VideoKind.Standard, names)).toEqual(names);
   });
 });

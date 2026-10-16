@@ -10,12 +10,23 @@ const REPLICA_ASK = /\b(recreat|replicat|remak|reproduc|clon|ricrea|rifai|replic
 
 export const asksReplica = (message: string) => REPLICA_ASK.test(message);
 
-export function videoKindOf(turn: { message: string; videoAttached: boolean; stored: VideoKind | undefined }): VideoKind {
-  if (turn.stored === VideoKind.Replica) {
-    return VideoKind.Replica;
+export function replicaSource(turn: { message: string; videoId: string | undefined; replicaOf: string | undefined }): string | null {
+  if (turn.replicaOf) {
+    return turn.replicaOf;
   }
-  return turn.videoAttached && asksReplica(turn.message) ? VideoKind.Replica : VideoKind.Standard;
+  return turn.videoId && asksReplica(turn.message) ? turn.videoId : null;
 }
+
+export const kindOf = (replicaOf: string | null | undefined) => (replicaOf ? VideoKind.Replica : VideoKind.Standard);
+
+const KIT_TOOLS: ReadonlySet<string> = new Set(['list_templates', 'get_template', 'add_template', 'set_template_fields', 'list_shots', 'add_shot', 'add_ui', 'ui_morph_reel', 'apply_layout', 'list_layouts', 'apply_text_preset', 'apply_shape_preset']);
+
+const OFFERED: Record<VideoKind, (name: string) => boolean> = {
+  [VideoKind.Standard]: () => true,
+  [VideoKind.Replica]: (name) => !KIT_TOOLS.has(name)
+};
+
+export const kindTools = (kind: VideoKind, names: readonly string[]) => names.filter(OFFERED[kind]);
 
 const REPLICA_FORMATS = [MotionFormat.Landscape, MotionFormat.Vertical, MotionFormat.Square, MotionFormat.Portrait] as const;
 
@@ -39,12 +50,16 @@ export function replicaCanvas(doc: MotionDoc, ref: ReplicaCanvas): MotionDoc | n
   return sized.ok ? sized.doc : null;
 }
 
+export const CLOSE_TO_REFERENCE = 0.9;
+
 export const REPLICA_BRIEF = [
-  'This is a remake of the attached reference video: the breakdown above is the plan, so do not write a new script or storyboard — build.',
+  'This is a remake of the attached reference video: the breakdown and the reference frames above are the plan, so do not write a new script or storyboard — build.',
+  'Compose every scene from what the reference frames show, not from the text: no templates, shots, kit UI or presets (they are not offered). Place each element at the position and size it has in the frame (as a share of the width and height), with the exact hex colours, and the closest Google Font to the lettering you see.',
   'The canvas already has the reference format and duration: keep them.',
   'Build it scene by scene from the breakdown: each scene starts and ends at the reference timings, with its on-screen text verbatim.',
   'Use the reference palette as exact hex colours and gradients (a radial vignette stays a radial gradient, a red scene stays red).',
   'Match the type scale: when the reference text fills the frame, set it huge, bold and condensed, edge to edge — never a small title in a box.',
   'Recreate each transition and camera move the breakdown names (push, pan, 3D turn, whip, blur sweep) instead of a plain cut.',
-  'No span may be empty or black unless the reference is: the first frame already shows the first scene. View one frame per reference scene before you finish.'
+  'No span may be empty or black unless the reference is: the first frame already shows the first scene. View one frame per reference scene before you finish.',
+  `After each scene, call compare_to_reference: it draws your frames at the reference times and scores each scene 0–1 against the reference. Fix the lowest scene and compare again until every scene scores ${CLOSE_TO_REFERENCE} or more, or the budget ends.`
 ].join('\n');

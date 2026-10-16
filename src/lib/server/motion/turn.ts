@@ -75,10 +75,11 @@ import { exportStill } from './still-export';
 import { renderPagePath } from '$lib/motion/render-link';
 import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
 import type { ChatAttachment } from '$lib/chat-attachments';
-import { motionPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
-import { breakdownReader } from '$lib/server/video-reference';
+import { motionPlaceHint, userContent, withPictures } from '$lib/server/chat-attachments/model-parts';
+import { compareFrames, referencePicture } from '$lib/server/motion/reference-frames';
+import { breakdownReader, videoGrabber } from '$lib/server/video-reference';
 import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
-import { REPLICA_BRIEF, VideoKind, replicaCanvas } from '$lib/motion/replica';
+import { REPLICA_BRIEF, VideoKind, kindTools, replicaCanvas } from '$lib/motion/replica';
 import { onceEach, replicaTurn } from '$lib/server/motion/replica-turn';
 
 export const MOTION_AGENT_KEY = 'motion';
@@ -293,9 +294,10 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const reply = await openReply(db, { orgId, threadId, actor });
   const raisedUsd = motion.node.budgetRaisedUsd ?? 0;
   const videoBreakdown = onceEach(breakdownReader(db, { orgId, projectId: project.id, mode: project.mode }));
-  const replica = await replicaTurn({ message, attachments, stored: motion.node.videoKind, read: videoBreakdown });
-  if (replica.kind !== (motion.node.videoKind ?? VideoKind.Standard)) {
-    await patchNodeData(db, { ...nodeScope, patch: { videoKind: replica.kind }, check: DataCheck.Schema, actor }).catch(() => null);
+  const grabber = (assetId: string) => videoGrabber(db, { orgId, projectId: project.id, assetId });
+  const replica = await replicaTurn({ message, attachments, replicaOf: motion.node.replicaOf }, { read: videoBreakdown, grabber });
+  if (replica.replicaOf && replica.replicaOf !== motion.node.replicaOf) {
+    await patchNodeData(db, { ...nodeScope, patch: { replicaOf: replica.replicaOf }, check: DataCheck.Schema, actor }).catch(() => null);
   }
   const budget = await readVideoBudget(db, nodeScope, raisedUsd, replica.kind).catch(() => videoBudget(0, raisedUsd, replica.kind));
   const role = turnRole(message, head.doc, replica.kind);
@@ -335,7 +337,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   }
   const replicaNote = replica.kind === VideoKind.Replica ? REPLICA_BRIEF : '';
   const openingText = [message, note, picked.note, memory, replicaNote].filter(Boolean).join('\n\n');
-  const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint, breakdown: videoBreakdown });
+  const openingContent = withPictures(await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint, breakdown: videoBreakdown }), replica.frames.map(referencePicture));
   let seamDraws = 0;
   const drawTurnFrames = async (callId: string, times: number[]) => {
     const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
@@ -369,6 +371,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
     sfx: (sound) => withOrgContext(orgId, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
     frames: drawTurnFrames,
+    compareReference: replica.frames.length ? async (callId) => compareFrames(replica.frames, await drawTurnFrames(callId, replica.frames.map((f) => f.time))) : undefined,
     inspect: frameStats,
     seam: async () => {
       const end = session.doc.durationInFrames / session.doc.fps;
@@ -454,7 +457,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const visionModel = gatewayModel(model)?.usable ? model : llmVisionModel();
   const vision = BROWSER_VISION[browser](visionModel);
   const asksPick = !choosesForUser(message);
-  const toolNames = roleTools(role, Object.keys(tools)).filter((name) => (vision === Vision.Available || (name !== VIEW_FRAMES && name !== DESCRIBE_FRAMES)) && (asksPick || name !== ASK_REFERENCE_PICK));
+  const toolNames = kindTools(replica.kind, roleTools(role, Object.keys(tools))).filter((name) => (vision === Vision.Available || (name !== VIEW_FRAMES && name !== DESCRIBE_FRAMES)) && (asksPick || name !== ASK_REFERENCE_PICK));
   const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
   const t0 = Date.now();
   const stepModels: string[] = [];

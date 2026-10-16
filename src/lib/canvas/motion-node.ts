@@ -2,7 +2,6 @@ import { z } from 'zod';
 import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$lib/motion/doc';
 import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '$lib/motion/hyperframes/capture';
-import { VideoKind } from '$lib/motion/replica';
 
 export enum FrameKind {
   Frame = 'frame',
@@ -29,7 +28,7 @@ export type MotionNode = {
   lastRenderAssetId: string | null;
   storyboard?: StoryboardLink;
   budgetRaisedUsd?: number;
-  videoKind?: VideoKind;
+  replicaOf?: string;
 };
 
 const FORMAT_NAMES: Record<string, MotionFormat> = {
@@ -52,7 +51,7 @@ export const motionNodeSchema = z.object({
   lastRenderAssetId: z.string().nullable(),
   storyboard: linkSchema.optional(),
   budgetRaisedUsd: z.number().min(0).optional(),
-  videoKind: z.enum(VideoKind).optional(),
+  replicaOf: z.string().min(1).optional(),
   kind: z.enum(FrameKind).optional()
 });
 
