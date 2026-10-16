@@ -92,6 +92,7 @@ const MODEL_CALLERS: Readonly<Record<string, string>> = {
   'src/lib/server/video-render-queue.ts': 'submits a render whose prompt runGenNode already screened',
   'src/lib/server/captions.ts': 'transcribes the audio of a rendered video',
   'src/lib/server/video-reference.ts': 'sends a fixed breakdown prompt with a video screened by screenModelReferences; no user text',
+  'src/lib/server/motion/replica-build.ts': 'judges frames of a screened reference video against frames of the motion doc, whose texts each turn screens; fixed prompt plus the reference breakdown, no user text',
   'src/lib/server/craft-model.ts': 'model resolver for prompt-enhance, screened at its callers',
   'src/lib/server/photo-craft-review.ts': 'unused by the canvas product',
   'src/lib/server/clip-craft-review.ts': 'unused by the canvas product',
