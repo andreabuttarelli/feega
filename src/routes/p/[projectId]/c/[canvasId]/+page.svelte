@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Stack } from '$lib/canvas/stacking';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
   import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
@@ -362,6 +363,13 @@
   function ungroupElements(ids: string[]) {
     for (const id of ids) {
       void regroup('ungroupElement', { id });
+    }
+  }
+
+  async function restack(ids: string[], to: Stack) {
+    const res = await post('restack', { ids: JSON.stringify(ids), to });
+    if (res) {
+      await refresh();
     }
   }
 
@@ -2860,6 +2868,7 @@
     onRotate={rotateGroupBy}
     onGroup={groupElements}
     onUngroup={ungroupElements}
+    onRestack={restack}
     onTileDragOver={tileDragOver}
     onTileDrop={tileDrop}
     onFlow={(fn) => (toFlow = fn)}

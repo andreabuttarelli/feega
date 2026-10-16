@@ -72,6 +72,7 @@ import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
+import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
 import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { MOVE_STATUS, MoveOutcome, drawElement, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
@@ -1104,6 +1105,16 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid group' });
     }
     return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids));
+  },
+
+  restack: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = restackAskSchema.safeParse({ ids: jsonField(fd, 'ids'), to: fd.get('to') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid restack' });
+    }
+    return { restacked: await restackNodes(scope.db, scope, userActor(scope), ask.data.ids, ask.data.to) };
   },
 
   rotateGroup: async ({ request, params, locals }) => {
