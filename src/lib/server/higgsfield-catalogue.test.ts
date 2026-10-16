@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { creditsForRun } from '$lib/canvas/gen-cost';
 import { billedCreditsFor } from '$lib/credit-ladder';
 import { ProjectMode } from '$lib/project-mode';
-import { higgsfieldModelRows, HIGGSFIELD_MODELS } from './higgsfield-catalogue';
+import { higgsfieldModelRows, HIGGSFIELD_MODELS, type HiggsfieldModel } from './higgsfield-catalogue';
 import { taskChoice } from './task-choice';
 import { finishTaskJob, type TaskModel } from './canvas/task-run';
 import { HF_VIDEO_DONE } from './higgsfield.fixtures';
@@ -51,6 +51,35 @@ describe('the Higgsfield catalogue', () => {
     expect(choices.every((c) => c.providerLabel === 'Higgsfield' && c.uncensored === false)).toBe(true);
   });
 
+  it('prices every duration × resolution pair, and the run is quoted on its own pair', async () => {
+    const both: HiggsfieldModel = {
+      path: 'bytedance/seedance-2.5/text-to-video',
+      label: 'Seedance 2.5',
+      catalogue: 'video',
+      fields: { prompt: 'prompt', duration: 'duration', resolution: 'resolution', images: [] },
+      numeric: ['duration'],
+      priceBy: [
+        { key: 'duration', values: [5, 10] },
+        { key: 'resolution', values: ['720p', '1080p'] }
+      ],
+      schema: { duration: [5, 10], resolution: ['720p', '1080p'] },
+      estimateBase: { prompt: 'price estimate' }
+    };
+    const usd = (inputs: Record<string, unknown>) => Number(inputs.duration) * (inputs.resolution === '1080p' ? 0.2 : 0.1);
+
+    const { rows } = await higgsfieldModelRows(async (_path, inputs) => usd(inputs), SYNCED, [both]);
+
+    expect((rows[0].pricing as { lines: unknown[] }).lines).toEqual([
+      { inputs: { duration: '5', resolution: '720p' }, usd: 0.5, method: 'cpr' },
+      { inputs: { duration: '5', resolution: '1080p' }, usd: 1, method: 'cpr' },
+      { inputs: { duration: '10', resolution: '720p' }, usd: 1, method: 'cpr' },
+      { inputs: { duration: '10', resolution: '1080p' }, usd: 2, method: 'cpr' }
+    ]);
+    expect(rows[0].supported_resolutions).toEqual(['720p', '1080p']);
+    const shown = creditsForRun({ medium: 'video', model: taskChoice(rows[0]), params: { duration: 10, resolution: '1080p' } });
+    expect(shown).toBe(billedCreditsFor(2));
+  });
+
   it('offers Soul only the resolutions and aspect ratios its schema accepts', async () => {
     const { rows } = await higgsfieldModelRows(estimate, SYNCED);
     const soul = rows.find((r) => r.id === 'higgsfield/higgsfield-ai/soul/standard')!;
@@ -58,3 +87,4 @@ describe('the Higgsfield catalogue', () => {
     expect(soul.param_schema).toEqual({ aspect_ratio: { type: 'enum', values: ['9:16', '16:9', '4:3', '3:4', '1:1', '2:3', '3:2'] } });
   });
 });
+
