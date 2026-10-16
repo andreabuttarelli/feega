@@ -180,8 +180,8 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
 
     ask_motion_agent: tool({
       description: [
-        'Hand a request to the motion editor agent for one motion video of THIS project: it writes the video itself, in the editor thread, and costs credits like the editor — only when the user asked.',
-        'Runs in the background: poll get_motion_run with the returned run_id. media: node or asset ids of the canvas whose image, video or audio it should use.'
+        'Hand a request to the motion editor agent for one motion video of THIS project: it writes the video in the editor thread and costs credits like the editor — only when the user asked.',
+        'Background: poll get_motion_run with the returned run_id. media: node or asset ids of the canvas whose image, video or audio it should use.'
       ].join(' '),
       inputSchema: z.object({ nodeId: z.string(), request: z.string().min(1).max(8000), media: z.array(z.string()).optional(), reference_pick: pickReplySchema.optional() }).strict(),
       execute: async (input: { nodeId: string; request: string; media?: string[]; reference_pick?: PickReply }) => ask(input.nodeId, input.request, input.media, input.reference_pick)

@@ -1061,7 +1061,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     compare_to_reference: tool({
-      description: `Remake of a reference video only: draws this video at the reference key times and scores each scene 0–1 against the reference frames (colour and layout, pixel by pixel). fix_first is the lowest scene; close is true when every scene scores ${CLOSE_TO_REFERENCE} or more. Free.`,
+      description: `Remake only: scores each scene 0–1 against the reference frames; fix_first is the lowest, close when all reach ${CLOSE_TO_REFERENCE}. Free.`,
       inputSchema: z.object({}),
       execute: async (_input, { toolCallId }) => {
         if (!deps.compareReference) {
