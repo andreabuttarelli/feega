@@ -36,7 +36,7 @@ import { signMediaPaths } from './sign-media';
 import { peopleScreened, ReferenceMedium } from '$lib/server/moderation/people';
 import { composePrompt } from '$lib/canvas/compose-prompt';
 import { textRequest } from '$lib/canvas/text-request';
-import { resolveNodeModel } from './node-model';
+import { resolveModelIn } from './node-model';
 import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio-run';
 import { audioOperationOf, defaultAudioModel, operationSpec, voiceIdOf } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
@@ -551,13 +551,14 @@ function offeredDuration(options: readonly number[] | undefined, wanted: number 
 }
 
 export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcome> {
-  const pick = await resolveNodeModel(requested.medium, requested.model, requested.params);
+  const { generationRefusal, projectModeOf } = await import('$lib/server/uncensored-workspace/workspace-server');
+  const mode = await projectModeOf(db, { orgId: requested.orgId, projectId: requested.projectId });
+  const pick = await resolveModelIn(mode, requested.medium, requested.model, requested.params);
   if (!pick.ok) {
     return { kind: 'refused', error: pick.error };
   }
   const input: StartRun = { ...requested, model: pick.model };
 
-  const { generationRefusal } = await import('$lib/server/uncensored-workspace/workspace-server');
   const refusal = await generationRefusal(db, { orgId: input.orgId, projectId: input.projectId, userId: input.userId, model: input.model });
   if (refusal) {
     return { kind: 'refused', error: refusal };

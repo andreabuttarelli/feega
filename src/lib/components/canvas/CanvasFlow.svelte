@@ -62,7 +62,8 @@
   import { ColumnAxis, withSettingsColumn } from '$lib/canvas/settings-column';
   import { MOBILE_QUERY } from '$lib/breakpoints';
   import { isOutputHandle, portOfHandle, unavailableOutput, type SelectOutput } from '$lib/canvas/select-outputs';
-  import { CANVAS_EDGE_KINDS, EDGE_KIND_LABEL, WIRE_MODES, WIRE_MODE_LABEL, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
+  import { CANVAS_EDGE_KINDS, EDGE_KIND_LABEL, WIRE_EDGE_TYPE, WIRE_MODES, WIRE_MODE_LABEL, WIRE_MODE_LOOK, wireEdge, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
+  import WireEdge from './WireEdge.svelte';
   import { isAddable, type Addable } from '$lib/canvas/addable';
   import { DEFAULT_EDGE_KIND, edgeKindsFor, verdictBetween } from '$lib/canvas/connect-rules';
   import { connectorAccepts, nodeAcceptsConnection } from '$lib/canvas/connector-ports';
@@ -296,6 +297,7 @@
   // Un tipo di nodo solo: la tela non ha tipi di NODO, ha tipi di CONTENUTO, e quelli li decide
   // lo snippet di chi la usa.
   const nodeTypes = { tile: CanvasTile };
+  const edgeTypes = { [WIRE_EDGE_TYPE]: WireEdge };
 
   // IL COSTO DELLA LIBRERIA, IN UNA RIGA. SvelteFlow tiene il proprio stato dei nodi, quindi la
   // posizione esiste in due posti: qui e in `brand_canvas_items`. Il compilatore lo dice da solo —
@@ -337,7 +339,7 @@
   let nodes = $state.raw<Node[]>(tiles.map(toNode));
   // svelte-ignore state_referenced_locally -- stessa cattura iniziale dei nodi, e stesso motivo:
   // da qui in poi gli archi sono di SvelteFlow, e l'effetto sotto ci porta dentro solo i NUOVI.
-  let edges = $state.raw<FlowEdge[]>($state.snapshot(incomingEdges) as FlowEdge[]);
+  let edges = $state.raw<FlowEdge[]>(($state.snapshot(incomingEdges) as FlowEdge[]).map(wireEdge));
 
   // Le tile che arrivano dal server entrano, quelle sparite escono, e quelle che l'utente sta
   // muovendo restano dove le ha lasciate — la riconciliazione sta in `syncNodes`, col suo test.
@@ -360,7 +362,7 @@
 
   // Gli archi seguono la stessa riconciliazione dei nodi: entrano i nuovi, escono quelli tolti.
   $effect(() => {
-    const next = syncNodes(untrack(() => edges), $state.snapshot(incomingEdges) as FlowEdge[], (e) => e);
+    const next = syncNodes(untrack(() => edges), $state.snapshot(incomingEdges) as FlowEdge[], wireEdge);
     if (next) edges = next;
   });
 
@@ -847,6 +849,7 @@
     bind:nodes
     bind:edges
     {nodeTypes}
+    {edgeTypes}
     onnodedragstart={onNodeDragStart}
     onnodedrag={onNodeDrag}
     onnodedragstop={onNodeDragStop}
@@ -991,6 +994,10 @@
             class:is-on={(picked.edge.mode ?? 'fixed') === mode}
             onclick={() => retypeMode(mode)}
           >
+            {#if WIRE_MODE_LOOK[mode].icon}
+              {@const Icon = WIRE_MODE_LOOK[mode].icon}
+              <Icon class="edge-mode-icon" data-testid="wire-mode-icon-{mode}" size={12} />
+            {/if}
             {WIRE_MODE_LABEL[mode]}
           </button>
         {/each}
@@ -1156,6 +1163,12 @@
     border-radius: 0;
     color: #c0392b;
   }
+  .edge-panel :global(.edge-mode-icon) {
+    color: var(--ui-wire-iterate);
+    vertical-align: -2px;
+    margin-right: 4px;
+  }
+
   .edge-panel-sep {
     margin: 3px 0;
     border-top: 1px solid var(--line, #e5e5e5);
