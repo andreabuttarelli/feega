@@ -1,5 +1,6 @@
 <script lang="ts">
   import { painted } from '$lib/canvas/paint-wait';
+  import { frameDocs } from '$lib/canvas/frame-docs.svelte';
   import { FrameKind, freshText, openingSelection } from '$lib/canvas/motion-node';
   import { DRAWN_TEXT } from '$lib/motion/draw-create';
   import { groupClips, ungroupClip } from '$lib/motion/group';
@@ -467,6 +468,10 @@
   let previewVars = $state<VarValues>({});
   let tiltY = $state(0);
   const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
+  $effect(() => {
+    const root = history.present;
+    frameDocs.put(data.node.id, { version, html: composeHtml({ doc: root, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen }), width: root.width, height: root.height, fps: root.fps, durationInFrames: root.durationInFrames, clean: !history.past.length && !history.future.length });
+  });
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
   const view = $derived(propertiesFor({ count: selection.length, clip: selected?.id ?? null, part: selectedPart }));
@@ -631,6 +636,7 @@
   function follow(next: Synced) {
     baseDoc = next.base.doc;
     version = next.base.version;
+    frameDocs.saved(data.node.id, next.base);
     if (next.present === history.present) {
       return;
     }
@@ -642,6 +648,7 @@
     history = adoptHead(history, head.doc, version);
     baseDoc = head.doc;
     version = head.version;
+    frameDocs.saved(data.node.id, head);
   }
 
   async function save() {
@@ -656,14 +663,17 @@
     form.set('ops', JSON.stringify(outgoing({ version, doc: baseDoc }, sent)));
     form.set('version', String(version));
     form.set('summary', unsavedSummary);
+    frameDocs.sending(data.node.id);
     const res = await fetch(`${editorUrl}?/ops`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
     const result = deserialize(await res.text());
     saving = false;
 
     if (result.type === 'success') {
+      frameDocs.landed(data.node.id, version, Number(result.data?.version));
       follow(landed({ version, doc: baseDoc }, sent, history.present, { version: Number(result.data?.version), doc: result.data?.doc as MotionDoc }));
       saveState = SaveState.Saved;
     } else {
+      frameDocs.landed(data.node.id, version, version);
       saveState = SaveState.Failed;
       notice = result.type === 'failure' ? String(result.data?.error ?? '') : '';
     }

@@ -26,7 +26,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchWiroCatalogue } from './wiro-catalogue';
 import { DEFAULT_WIRO_BASE_URL } from './wiro';
 import { kieModelRows } from './kie-catalogue';
-import { estimateWith, higgsfieldModelRows } from './higgsfield-catalogue';
+import { higgsfieldModelRows, sourceWith } from './higgsfield-catalogue';
 import { higgsfieldConfig } from './higgsfield';
 import { configuredIn, TaskProviderName } from './generation/task-providers';
 
@@ -380,7 +380,7 @@ async function keepImagePricing(admin: SupabaseClient, rows: AiModelRow[]): Prom
 
 async function higgsfieldRows(syncedAt: string): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
   const config = higgsfieldConfig(env);
-  return config ? higgsfieldModelRows(estimateWith(config), syncedAt) : { rows: [], ok: true };
+  return config ? higgsfieldModelRows(sourceWith(config), syncedAt) : { rows: [], ok: true };
 }
 
 export async function syncAiModels(

@@ -93,7 +93,7 @@ async function castableModels(db: Db): Promise<StudioModel[]> {
   const signed = await signInfluencerViewFiles(db, covers);
 
   return influencers.map((i) => {
-    const verdict = castingVerdict({ orgId: i.orgId, source: i.source, age: i.age });
+    const verdict = castingVerdict({ source: i.source, age: i.age });
     const cover = views.get(i.id)?.[0]?.storagePath;
     return {
       id: i.id,

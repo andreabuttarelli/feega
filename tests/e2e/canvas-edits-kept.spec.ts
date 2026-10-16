@@ -144,12 +144,6 @@ test.describe('edits are never lost @real', () => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await slowServer(page);
-    let loads = 0;
-    page.on('request', (req) => {
-      if (req.url().endsWith('/session')) {
-        loads += 1;
-      }
-    });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await drawBox(page);
     const element = page.locator('[data-kind="element"][data-motion-node]');
@@ -162,13 +156,11 @@ test.describe('edits are never lost @real', () => {
       await fillHex(page).fill(colour);
       await fillHex(page).press('Enter');
       await expect.poll(async () => boxColour(await headDoc(admin, nodeId))?.toLowerCase(), { timeout: 10_000 }).toBe(colour);
-      const loadsBefore = loads;
       const empty = (await emptyCanvasPoint(page))!;
       await page.mouse.click(empty.x, empty.y);
       await expect(page.getByTestId('motion-editor')).toHaveCount(0);
       await page.locator(`[data-motion-node="${nodeId}"]`).click();
       await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
-      expect(loads, 'the reopened editor reads the doc after it closed, not one fetched before the edit').toBeGreaterThan(loadsBefore);
       await openFill(page);
       await expect(fillHex(page), 'the reopened editor shows the last colour').toHaveValue(new RegExp(colour.slice(1), 'i'));
       await expect.poll(async () => boxColour(await headDoc(admin, nodeId))?.toLowerCase(), { timeout: 10_000 }).toBe(colour);
@@ -246,13 +238,13 @@ test.describe('edits are never lost @real', () => {
       await expect(page.getByTestId('motion-editor')).toHaveCount(0);
       const tile = page.locator(`[data-motion-node="${nodeId}"]`);
       await expect(tile.getByText('Frame', { exact: true }), 'an element has no frame chrome').toHaveCount(0);
-      await expect(tile).toHaveAttribute('data-mode', 'poster', { timeout: 15_000 });
+      await expect(tile.locator('[data-drawn="true"], [data-testid=motion-node-poster]').first()).toBeVisible({ timeout: 15_000 });
       await stillRed(page, tile);
 
       await page.reload();
       await expect(tile).toBeVisible({ timeout: 15_000 });
       await expect(tile.getByText('Frame', { exact: true })).toHaveCount(0);
-      await expect(tile).toHaveAttribute('data-mode', 'poster', { timeout: 15_000 });
+      await expect(tile.locator('[data-drawn="true"], [data-testid=motion-node-poster]').first()).toBeVisible({ timeout: 15_000 });
       await stillRed(page, tile);
     });
   }

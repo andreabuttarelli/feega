@@ -33,6 +33,7 @@ export type PricedInputs = { inputs: Record<string, string>; credits: number };
 export type ModelChoice = {
   id: string;
   label: string;
+  menuGroup?: string;
   aspectRatios: string[];
   /** Chi ha fatto questo modello (`model-provider.ts::providerOf`), dall'id sul filo — mai
    *  ricalcolato lato client dall'id interno, che per immagine e video non ha il prefisso. */

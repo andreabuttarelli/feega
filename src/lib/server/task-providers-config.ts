@@ -7,9 +7,12 @@ import { kie } from './kie';
 import { higgsfield, higgsfieldConfig } from './higgsfield';
 import { wireSpecOf } from './task-choice';
 import type { TaskProvider } from './canvas/task-provider';
-import type { TaskBill, TaskCatalogue, TaskModel, TaskRunDeps, TaskScope } from './canvas/task-run';
+import type { ProviderLoad, TaskBill, TaskCatalogue, TaskModel, TaskRunDeps, TaskScope } from './canvas/task-run';
 import { taskLabelOf } from './canvas/task-run';
-import { configuredIn, taskProviderOf, TaskProviderName } from './generation/task-providers';
+import { configuredIn, jobPrefixOf, TASK_PROVIDERS, taskProviderOf, TaskProviderName, waitingJobOf } from './generation/task-providers';
+import { createServiceRoleDb } from './db/client';
+import { SERVICE_ROLE_USES } from './db/service-role-uses';
+import { providerLoad } from './repos/node-runs';
 import { uncensoredAccess } from './uncensored-access';
 import { moderationPorts, recordModeration } from './moderation/moderation-config';
 
@@ -92,6 +95,29 @@ function bill(entry: TaskBill): void {
   );
 }
 
+export function concurrencyCapOf(provider: TaskProviderName, source: Env): number | null {
+  const limit = TASK_PROVIDERS[provider].maxInFlight;
+  if (!limit) {
+    return null;
+  }
+  const configured = Number(source[limit.envKey]);
+  return Number.isInteger(configured) && configured > 0 ? configured : limit.fallback;
+}
+
+const LOAD_USE = SERVICE_ROLE_USES.find((use) => use.path.startsWith('src/lib/server/task-providers-config.ts'));
+
+async function loadOf(provider: TaskProviderName): Promise<ProviderLoad> {
+  const cap = concurrencyCapOf(provider, env);
+  if (cap === null) {
+    return { inFlight: 0, waiting: 0, cap: null };
+  }
+  if (!LOAD_USE) {
+    throw new Error('loadOf: missing entry in service-role-uses.ts');
+  }
+  const counted = await providerLoad(createServiceRoleDb(LOAD_USE), { prefix: jobPrefixOf(provider), waitingJobId: waitingJobOf(provider) });
+  return { ...counted, cap };
+}
+
 function moderationScope(scope: TaskScope, model: TaskModel) {
   return { ...scope, model: model.id, uncensored: model.uncensored };
 }
@@ -99,6 +125,7 @@ function moderationScope(scope: TaskScope, model: TaskModel) {
 export function taskRunDeps(db: Db): TaskRunDeps {
   return {
     providers: configuredTaskProviders(),
+    load: loadOf,
     model: taskModel,
     access: (orgId) => uncensoredAccess(db, orgId),
     screen: (scope, model) => moderationPorts(db, moderationScope(scope, model)),

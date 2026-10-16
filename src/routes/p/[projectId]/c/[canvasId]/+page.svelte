@@ -24,9 +24,10 @@
   import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
+  import { createPlaceSaves, keepPlaced } from '$lib/canvas/place-save';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -113,7 +114,7 @@
   import { upstreamCards as compositionCards, cardAssetIds } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
   import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
-  import { isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
+  import { isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, sourceOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
   import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
   import { hasInspector, inspectorOf } from '$lib/canvas/node-inspector';
   import SourceSettingsFrame from '$lib/components/canvas/SourceSettingsFrame.svelte';
@@ -943,8 +944,13 @@
     return audioInputKindOf(wired.filter((port): port is ConnectorType => port !== null));
   }
 
+  const NAMED_OUTPUTS: Partial<Record<string, (n: Tile) => SelectOutput[]>> = {
+    audio: (n) => audioNamedOutputs(audioOperationOfTile(n), audioInputOfTile(n)),
+    social_account_feed: () => sourceOutputs('social_account_feed')
+  };
+
   function outputsOfTile(n: Tile): SelectOutput[] {
-    return n.type === 'audio' ? audioNamedOutputs(audioOperationOfTile(n), audioInputOfTile(n)) : selectOutputsOf(n);
+    return (NAMED_OUTPUTS[n.type] ?? selectOutputsOf)(n);
   }
 
   function audioUrlsOf(n: Tile): { videoUrl: string | null; audioUrl: string | null } {
@@ -1061,6 +1067,11 @@
     onStatus: (status) => { saveStatus = status; }
   });
 
+  const places = createPlaceSaves({
+    send,
+    backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1))
+  });
+
   /**
    * LO STACK DI QUESTA SCHEDA — non dell'utente, non del database: `undo-stack.ts` lo dice in
    * testa al file, e vale anche qui. Un gesto entra dopo che il server l'ha già scritto (mai
@@ -1104,7 +1115,16 @@
 
   function selectionChanged(ids: string[]) {
     if (ids.join() !== untrack(() => selectedIds.join())) { void saves.flush(); }
+    const before = untrack(() => inlineMotion);
     selectedIds = ids;
+    leaveNow(before);
+  }
+
+  function leaveNow(before: string | null) {
+    const after = untrack(() => inlineMotion);
+    if (before && before !== after) {
+      inlineStage.leave(before);
+    }
   }
 
   let dismissedMotion = $state<string | null>(null);
@@ -1148,6 +1168,11 @@
       prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
     }
   });
+
+  function headRevisionOf(id: string): number {
+    const row = nodes.find((n) => n.id === id);
+    return row && row.type === 'motion' ? (motionOf(row)?.docHeadRevision ?? 0) : 0;
+  }
 
   function warmMotion(id: string) {
     if (!nodes.some((n) => n.id === id && n.version > 0)) {
@@ -1227,7 +1252,7 @@
     }
     const now = Date.now();
     const before = nodes;
-    nodes = keepSame(nodes, keepDirty((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys), now);
+    nodes = keepSame(nodes, keepPlaced(keepDirty((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys), nodes, places.dirty), now);
     edges = keepSame(edges, (snapshot.connections as Connection[]).map(toEdge), now);
     productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
     socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
@@ -1328,10 +1353,10 @@
   }
 
   $effect(() => {
-    const flushAll = () => { void saves.flush(); };
+    const flushAll = () => { void saves.flush(); void places.flush(); };
     const flushHidden = () => { if (document.visibilityState === 'hidden') { flushAll(); } };
     const warnUnsent = (event: BeforeUnloadEvent) => {
-      if (!saves.unsent()) { return; }
+      if (!saves.unsent() && !places.unsent()) { return; }
       flushAll();
       event.preventDefault();
     };
@@ -1347,7 +1372,7 @@
     };
   });
 
-  beforeNavigate(() => { void saves.flush(); });
+  beforeNavigate(() => { void saves.flush(); void places.flush(); });
 
   function formOf(fields: Record<string, string | number | File | string[]>): FormData {
     const body = new FormData();
@@ -1967,15 +1992,11 @@
     if (before && motionOf(before)?.kind === FrameKind.Group) {
       const delta = { dx: x - before.x, dy: y - before.y };
       nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : layoutOf(n.data).groupId === id ? { ...n, x: n.x + delta.dx, y: n.y + delta.dy } : n));
-      await post('moveGroup', { id, x, y });
+      await places.moveGroup(id, x, y);
       return;
     }
     nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : n));
-
-    const result = await post('move', { node_id: id, x, y });
-    if (!result && before) {
-      nodes = nodes.map((node) => node.id === id ? { ...node, x: before.x, y: before.y } : node);
-    }
+    await places.move(id, x, y);
   }
 
   /**
@@ -2020,13 +2041,8 @@
     const fit = frameFit(id, width);
     const w = fit?.w ?? width;
     const h = fit?.h ?? height;
-    const before = nodes.find((node) => node.id === id);
     nodes = nodes.map((n) => (n.id === id ? { ...n, w, h, userHeight: h } : n));
-
-    const result = await post('resize', { node_id: id, width: w, height: h });
-    if (!result && before) {
-      nodes = nodes.map((node) => (node.id === id ? { ...node, w: before.w, h: before.h, userHeight: before.userHeight } : node));
-    }
+    await places.resize(id, w, h);
   }
 
   /**
@@ -2078,16 +2094,6 @@
     return out;
   }
 
-  const SEND_RESULT: Record<SaveFailure, SendResult> = {
-    [SaveFailure.Network]: SendResult.Retry,
-    [SaveFailure.Server]: SendResult.Retry,
-    [SaveFailure.Conflict]: SendResult.Dropped,
-    [SaveFailure.Invalid]: SendResult.Dropped,
-    [SaveFailure.Gone]: SendResult.Dropped,
-    [SaveFailure.Credits]: SendResult.Dropped,
-    [SaveFailure.Auth]: SendResult.Dropped
-  };
-
   async function sendSave(id: string, touched: Record<string, unknown>): Promise<SendResult> {
     const current = nodes.find((node) => node.id === id);
     if (!current) { return SendResult.Dropped; }
@@ -2095,7 +2101,7 @@
     if (!Object.keys(change).length) { return SendResult.Saved; }
 
     const out = await saveNode(id, change, baseOf(current.saved, change));
-    if (!out.ok) { return SEND_RESULT[out.reason]; }
+    if (!out.ok) { return sendResultOf(out.reason); }
 
     const written = out.node;
     nodes = nodes.map((node) => node.id === id
@@ -3203,7 +3209,7 @@
   {/if}
   {#if editingMotion}
     {#key editingMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} {canvasundo} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} {canvasundo} />
     {/key}
   {/if}
 

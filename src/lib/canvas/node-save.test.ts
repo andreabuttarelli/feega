@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry, actAtVersion } from './node-save';
+import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry, actAtVersion, sendResultOf } from './node-save';
+import { SendResult } from './save-scheduler';
 
 describe('actAtVersion: an action on a node waits for my own writes and never conflicts with them', () => {
   const ok = { type: 'success', data: {} };
@@ -304,5 +305,15 @@ describe('adoptFrameHead: a frame saved by its editor moves its head without a c
     expect(adoptFrameHead(update({ id: 't', data: { prompt: 'agent' } }), tiles, clean)).toBeNull();
     expect(adoptFrameHead(update({}), tiles, () => ['data'])).toBeNull();
     expect(adoptFrameHead({ ...update({}), eventType: 'INSERT' }, tiles, clean)).toBeNull();
+  });
+});
+
+describe('sendResultOf: a queued edit is never dropped by a transient failure', () => {
+  it.each([SaveFailure.Network, SaveFailure.Server, SaveFailure.Busy, SaveFailure.Conflict])('%s keeps the edit queued for retry', (reason) => {
+    expect(sendResultOf(reason)).toBe(SendResult.Retry);
+  });
+
+  it.each([SaveFailure.Invalid, SaveFailure.Gone, SaveFailure.Credits, SaveFailure.Auth])('%s drops it', (reason) => {
+    expect(sendResultOf(reason)).toBe(SendResult.Dropped);
   });
 });
