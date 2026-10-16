@@ -648,6 +648,7 @@ export async function listConnections(
 export async function createConnection(
   db: Db,
   input: {
+    id?: string;
     orgId: string;
     canvasId: string;
     sourceNodeId: string;
@@ -661,6 +662,7 @@ export async function createConnection(
   const { data, error } = await db
     .from('nodes_connections')
     .insert({
+      ...(input.id ? { id: input.id } : {}),
       org_id: input.orgId,
       canvas_id: input.canvasId,
       source_node_id: input.sourceNodeId,
