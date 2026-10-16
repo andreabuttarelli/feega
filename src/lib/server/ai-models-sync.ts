@@ -57,6 +57,7 @@ type RawVideoModel = RawReleaseFacts & {
   upscale_factor?: unknown;
   creativity?: unknown;
   supported_resolutions?: unknown;
+  supported_durations?: unknown;
   pricing_skus?: Record<string, unknown>;
 };
 
@@ -207,6 +208,10 @@ function videoParamSchema(m: RawVideoModel): Record<string, unknown> {
   const creativity = rangeOf(m.creativity);
   if (creativity) {
     schema.creativity = creativity;
+  }
+  const durations = toArray(m.supported_durations);
+  if (durations.length) {
+    schema.duration = { type: 'enum', values: durations };
   }
   return schema;
 }

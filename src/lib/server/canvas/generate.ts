@@ -5,7 +5,7 @@ import { releaseHold } from '$lib/server/motion/render-run';
 import { MOTION_ASK_KIND } from '$lib/server/motion/ask-kind';
 import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
 import { promptRequired, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
-import { upscaleLimitsOf } from '$lib/video-models';
+import { nearestVideoDuration, upscaleLimitsOf } from '$lib/video-models';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
 import {
   AUDIO_JOB_PREFIX,
@@ -513,6 +513,13 @@ async function screenRunReferences(db: Db, input: StartRun, upstream: UpstreamIn
   return screenModelReferences({ orgId: input.orgId, mode, references: signed.flat() });
 }
 
+function offeredDuration(options: readonly number[] | undefined, wanted: number | undefined): number | undefined {
+  if (!options?.length) {
+    return wanted;
+  }
+  return nearestVideoDuration(options, wanted ?? options[0]);
+}
+
 export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcome> {
   const pick = await resolveNodeModel(requested.medium, requested.model, requested.params);
   if (!pick.ok) {
@@ -707,22 +714,23 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     const { generateVideoWithoutBrand } = await import('$lib/server/media-generate');
     const { offerableModels } = await import('$lib/server/offerable-models');
     const { extraParamsOf } = await import('$lib/canvas/model-params');
-    const [referenceImageUrls, referenceVideoUrls, referenceAudioUrls, lastFrame, videoDeclared] = await Promise.all([
+    const [referenceImageUrls, referenceVideoUrls, referenceAudioUrls, lastFrame, videoChoice] = await Promise.all([
       signMediaPaths(db, upstream.referenceImageUrls),
       signMediaPaths(db, upstream.referenceVideoUrls),
       signMediaPaths(db, upstream.referenceAudioUrls),
       signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : []),
       input.model
-        ? offerableModels(db, 'video').then((m) => m.choices.find((c) => c.id === input.model)?.params ?? [])
-        : Promise.resolve([])
+        ? offerableModels(db, 'video').then((m) => m.choices.find((c) => c.id === input.model))
+        : Promise.resolve(undefined)
     ]);
+    const videoDeclared = videoChoice?.params ?? [];
     const out = await generateVideoWithoutBrand({
       orgId: input.orgId,
       userId: input.userId,
       prompt: sentPrompt,
       model: input.model ?? undefined,
       aspectRatio: input.params.aspectRatio as never,
-      durationSeconds: input.params.duration,
+      durationSeconds: offeredDuration(videoChoice?.durationOptions, input.params.duration),
       resolution: input.params.resolution,
       baseMediaId: upstream.startFrameUrl ?? undefined,
       lastFrameUrl: lastFrame[0],
