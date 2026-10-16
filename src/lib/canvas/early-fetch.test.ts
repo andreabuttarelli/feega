@@ -23,4 +23,23 @@ describe('fetching the editor session when the frame is selected', () => {
     now = 60_000;
     expect(await early.take('/a/session')).toBe(2);
   });
+
+  it('a session already landed opens in the same frame, with no wait', async () => {
+    const early = earlyFetch<string>({ load: async () => 'doc', now: () => 0 });
+
+    expect(early.settled('/a/session')).toBeUndefined();
+    early.start('/a/session');
+    await Promise.resolve();
+    expect(early.settled('/a/session')).toBe('doc');
+  });
+
+  it('a landed session past its freshness is not offered', async () => {
+    let now = 0;
+    const early = earlyFetch<string>({ load: async () => 'doc', now: () => now });
+
+    early.start('/a/session');
+    await Promise.resolve();
+    now = 60_000;
+    expect(early.settled('/a/session')).toBeUndefined();
+  });
 });

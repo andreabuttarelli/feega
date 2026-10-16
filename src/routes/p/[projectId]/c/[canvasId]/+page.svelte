@@ -993,6 +993,8 @@
   const SAVE_MAX_WAIT_MS = 2000;
   const SAVE_BACKOFF_CAP_MS = 30000;
   const REMOTE_REFRESH_MS = 250;
+  const WARM_AFTER_MS = 500;
+  const WARM_ON_LOAD = 6;
   let saveStatus = $state(SaveStatus.Saved);
   const SAVE_LABEL: Record<SaveStatus, string> = {
     [SaveStatus.Saved]: 'Saved',
@@ -1077,6 +1079,25 @@
     if (selectedIds.length === 1 && untrack(() => nodes.find((n) => n.id === id))?.type === 'motion') {
       prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
     }
+  });
+
+  function warmMotion(id: string) {
+    prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
+  }
+
+  function warmHovered(e: PointerEvent) {
+    const id = (e.target as Element | null)?.closest?.('[data-motion-node]')?.getAttribute('data-motion-node');
+    if (id) {
+      warmMotion(id);
+    }
+  }
+
+  const motionIds = $derived(nodes.filter((n) => n.type === 'motion').slice(0, WARM_ON_LOAD).map((n) => n.id).join());
+
+  $effect(() => {
+    const ids = motionIds.split(',').filter(Boolean);
+    const timer = setTimeout(() => ids.forEach(warmMotion), WARM_AFTER_MS);
+    return () => clearTimeout(timer);
   });
 
   function reframe(id: string | null, free: Insets) {
@@ -2790,7 +2811,7 @@
 
 <svelte:window bind:innerWidth={pageWidth} />
 
-<div class="canvas" class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
+<div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
   {#if peers.length}
     {#if topPeers}
       <Portal to={topPeers}><PeerAvatars {peers} /></Portal>
