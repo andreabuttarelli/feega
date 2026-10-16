@@ -1,4 +1,5 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
+import sharp from 'sharp';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
@@ -15,8 +16,8 @@ async function headDoc(admin: SupabaseClient, nodeId: string): Promise<Doc | nul
 
 const boxColour = (doc: Doc | null) => doc?.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Shape')?.props.fills?.[0]?.color ?? null;
 
-async function drawBox(page: Page) {
-  await page.getByTestId('add-bar').getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
+async function drawBox(page: Page, tool = 'rectangle') {
+  await page.getByTestId('add-bar').getByTestId('draw-tools').locator(`[data-tool="${tool}"]`).click();
   const pane = (await page.locator('.svelte-flow').boundingBox())!;
   const from = { x: pane.x + pane.width * 0.35, y: pane.y + pane.height * 0.35 };
   await page.mouse.move(from.x, from.y);
@@ -61,6 +62,30 @@ const PROMPT_PLACEHOLDER = 'What should it be about…';
 const WORD = 'lorem ipsum ';
 const KEY_DELAY_MS = 25;
 const TYPING_MS = 10_000;
+const RED = '#ff0000';
+const RED_SHARE = 0.3;
+
+async function reddest(tile: Locator): Promise<number> {
+  const { data, info } = await sharp(await tile.screenshot()).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  let red = 0;
+  for (let i = 0; i < data.length; i += info.channels) {
+    if (data[i] > 200 && data[i + 1] < 80 && data[i + 2] < 80) {
+      red += 1;
+    }
+  }
+  return red / (info.width * info.height);
+}
+
+const WATCH_SAMPLES = 12;
+const WATCH_EVERY_MS = 500;
+
+async function stillRed(page: Page, tile: Locator) {
+  for (let i = 0; i < WATCH_SAMPLES; i++) {
+    expect(await reddest(tile), `the tile went back to another colour after ${i * WATCH_EVERY_MS} ms`).toBeGreaterThan(RED_SHARE);
+    await page.waitForTimeout(WATCH_EVERY_MS);
+  }
+}
+
 const SERVER_LAG_MS = 700;
 
 async function slowServer(page: Page) {
@@ -200,4 +225,35 @@ test.describe('edits are never lost @real', () => {
     await expect(promptIn(other, theirs.id)).toHaveValue(sentence);
     await expect(promptIn(page, mine.id)).toHaveValue(sentence);
   });
+
+  for (const tool of ['rectangle', 'ellipse']) {
+    test(`a ${tool} filled red stays red on its tile once deselected, and after a reload`, async ({ page, session, admin }) => {
+      test.setTimeout(180_000);
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+      await drawBox(page, tool);
+      const element = page.locator('[data-kind="element"][data-motion-node]');
+      await expect(element).toHaveCount(1, { timeout: 15_000 });
+      const nodeId = (await element.getAttribute('data-motion-node'))!;
+      await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
+      await openFill(page);
+      await fillHex(page).fill(RED);
+      await fillHex(page).press('Enter');
+      await expect.poll(async () => boxColour(await headDoc(admin, nodeId))?.toLowerCase(), { timeout: 10_000 }).toBe(RED);
+
+      const empty = (await emptyCanvasPoint(page))!;
+      await page.mouse.click(empty.x, empty.y);
+      await expect(page.getByTestId('motion-editor')).toHaveCount(0);
+      const tile = page.locator(`[data-motion-node="${nodeId}"]`);
+      await expect(tile.getByText('Frame', { exact: true }), 'an element has no frame chrome').toHaveCount(0);
+      await expect(tile).toHaveAttribute('data-mode', 'poster', { timeout: 15_000 });
+      await stillRed(page, tile);
+
+      await page.reload();
+      await expect(tile).toBeVisible({ timeout: 15_000 });
+      await expect(tile.getByText('Frame', { exact: true })).toHaveCount(0);
+      await expect(tile).toHaveAttribute('data-mode', 'poster', { timeout: 15_000 });
+      await stillRed(page, tile);
+    });
+  }
 });
