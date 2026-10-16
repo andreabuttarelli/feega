@@ -2,7 +2,8 @@ import { Viewport } from '$lib/motion/editor-layout';
 
 export enum NodeMode {
   Preview = 'preview',
-  Edit = 'edit'
+  Edit = 'edit',
+  Leaving = 'leaving'
 }
 
 export enum Opening {
@@ -50,8 +51,22 @@ const LAYERS: Record<NodeMode, Record<Paint, Layers>> = {
     [Paint.Pending]: { own: true, editor: false },
     [Paint.Shown]: { own: true, editor: true },
     [Paint.Swapped]: { own: false, editor: true }
+  },
+  [NodeMode.Leaving]: {
+    [Paint.Pending]: { own: true, editor: true },
+    [Paint.Shown]: { own: true, editor: true },
+    [Paint.Swapped]: { own: true, editor: true }
   }
 };
+
+export const editorOn = (current: string | null, leaving: string | null): string | null => leaving ?? current;
+
+export function tileMode(id: string, current: string | null, leaving: string | null): NodeMode {
+  if (id === leaving) {
+    return NodeMode.Leaving;
+  }
+  return id === editorOn(current, leaving) ? NodeMode.Edit : NodeMode.Preview;
+}
 
 export const nodeLayers = (mode: NodeMode, paint: Paint): Layers => LAYERS[mode][paint];
 

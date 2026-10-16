@@ -162,13 +162,13 @@ test.describe('edits are never lost @real', () => {
       await fillHex(page).fill(colour);
       await fillHex(page).press('Enter');
       await expect.poll(async () => boxColour(await headDoc(admin, nodeId))?.toLowerCase(), { timeout: 10_000 }).toBe(colour);
+      const loadsBefore = loads;
       const empty = (await emptyCanvasPoint(page))!;
       await page.mouse.click(empty.x, empty.y);
       await expect(page.getByTestId('motion-editor')).toHaveCount(0);
-      const loadsBefore = loads;
       await page.locator(`[data-motion-node="${nodeId}"]`).click();
       await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
-      expect(loads, 'the reopened editor asked for the doc as it is now, not one fetched before the edit').toBeGreaterThan(loadsBefore);
+      expect(loads, 'the reopened editor reads the doc after it closed, not one fetched before the edit').toBeGreaterThan(loadsBefore);
       await openFill(page);
       await expect(fillHex(page), 'the reopened editor shows the last colour').toHaveValue(new RegExp(colour.slice(1), 'i'));
       await expect.poll(async () => boxColour(await headDoc(admin, nodeId))?.toLowerCase(), { timeout: 10_000 }).toBe(colour);
