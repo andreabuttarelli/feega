@@ -82,7 +82,7 @@ async function ok<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function higgsfield(config: HiggsfieldConfig): TaskProvider & Required<Pick<TaskProvider, 'cancel'>> {
+export function higgsfield(config: HiggsfieldConfig): TaskProvider & Required<Pick<TaskProvider, 'cancel' | 'quote'>> {
   const call = client(config);
 
   return {
@@ -103,8 +103,19 @@ export function higgsfield(config: HiggsfieldConfig): TaskProvider & Required<Pi
     async cancel(taskId) {
       const res = await call(`requests/${encodeURIComponent(taskId)}/cancel`, { method: 'POST' });
       return res.status === CANCEL_ACCEPTED;
+    },
+
+    quote(model, inputs) {
+      return higgsfieldEstimate(config, String(model.path), withNumbers(inputs, numericKeysOf(model)));
     }
   };
+}
+
+export type HiggsfieldOption = { id: string; name: string };
+
+export async function higgsfieldOptions(config: HiggsfieldConfig, path: string): Promise<HiggsfieldOption[]> {
+  const reply = await ok<{ items?: Array<Partial<HiggsfieldOption>> }>(await client(config)(path, { method: 'GET' }));
+  return (reply.items ?? []).filter((item): item is HiggsfieldOption => Boolean(item.id && item.name)).map(({ id, name }) => ({ id, name }));
 }
 
 export async function higgsfieldEstimate(config: HiggsfieldConfig, path: string, inputs: Record<string, unknown>): Promise<number | null> {

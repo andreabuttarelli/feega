@@ -7,13 +7,14 @@ import { jobPrefixOf, taskJobOf, taskProviderOf, TASK_PROVIDERS, TaskProviderNam
 import { taskUsdFor } from '$lib/server/generation/task-pricing';
 import { uncensoredRefusal, UNCENSORED_REFUSALS } from '$lib/server/generation/uncensored-guard';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
-import { ProviderBusyError, type TaskProvider, type TaskOutput, type WireFields } from './task-provider';
+import { ProviderBusyError, type TaskProvider, type TaskOutput, type TaskWireRef, type WireFields } from './task-provider';
 import { wireInputs, type ListCaps } from '$lib/server/generation/wire-inputs';
 import type { Purgers } from './provider-purge';
 import { ProjectMode, STORAGE_FOLDER } from '$lib/project-mode';
 import { ModerationProfile, profileOf } from '$lib/server/moderation/profiles';
 import { likenessRefusal, type ProvenanceEntry } from './likeness-guard';
 import { MODEL3D_MIME } from '$lib/model3d-models';
+import { labelOf } from '$lib/canvas/model-params';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
 export const taskLabelOf = (provider: TaskProviderName): string => `canvas.${provider}`;
@@ -61,7 +62,8 @@ export const TASK_REFUSALS = {
   noInputsAllowed: UNCENSORED_REFUSALS.inputs,
   noOutput: 'task_failed: no output',
   needsImage: 'missing_input: this model needs an input image',
-  needsVideo: 'missing_input: this model needs a source video'
+  needsVideo: 'missing_input: this model needs a source video',
+  unpriced: 'price_unavailable: the provider did not quote this request'
 } as const;
 
 export type TaskScope = { orgId: string; projectId: string; nodeId: string; userId: string; actor?: Actor };
@@ -73,6 +75,9 @@ export type TaskWireSpec = {
   fixed?: Readonly<Record<string, string>>;
   requiresImage?: boolean;
   requiresVideo?: boolean;
+  quotedAtSubmit?: boolean;
+  requiredParams?: readonly string[];
+  menuGroup?: string;
   unrunnable?: string;
   caps?: ListCaps;
 } & Readonly<Record<string, unknown>>;
@@ -134,7 +139,9 @@ export enum RefusalStage {
   Provider = 'provider'
 }
 
-export type TaskStart = { kind: 'job'; jobId: string } | { kind: 'waiting' } | { kind: 'refused'; error: string; stage: RefusalStage };
+export const QUOTED_USD_PARAM = 'quotedUsd';
+
+export type TaskStart = { kind: 'job'; jobId: string; quotedUsd?: number } | { kind: 'waiting' } | { kind: 'refused'; error: string; stage: RefusalStage };
 
 const WAITING: TaskStart = { kind: 'waiting' };
 
@@ -172,6 +179,11 @@ function refused(error: string, stage = RefusalStage.Policy): TaskStart {
   return { kind: 'refused', error, stage };
 }
 
+async function submitQuote(gateway: TaskProvider, ref: TaskWireRef, inputs: Record<string, unknown>): Promise<{ quotedUsd: number } | null> {
+  const usd = await gateway.quote?.(ref, inputs).catch(() => null);
+  return usd ? { quotedUsd: usd } : null;
+}
+
 export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise<TaskStart> {
   const model = await deps.model(req.modelId);
   const provider = taskProviderOf(req.modelId);
@@ -186,6 +198,10 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   }
   if (model.spec.requiresVideo && !req.videoUrls?.length) {
     return refused(TASK_REFUSALS.needsVideo);
+  }
+  const unchosen = model.spec.requiredParams?.find((name) => !(req.params as Record<string, unknown>)[name]);
+  if (unchosen) {
+    return refused(`missing_input: choose a ${labelOf(unchosen).toLowerCase()}`);
   }
 
   const uncensored = uncensoredRefusal({
@@ -220,14 +236,18 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   }
 
   const inputs = wireInputs(model.spec, req, model.paramSchema);
-  const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, requiresVideo: _requiresVideo, unrunnable: _unrunnable, caps: _caps, ...ref } = model.spec;
+  const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, requiresVideo: _requiresVideo, quotedAtSubmit: _quotedAtSubmit, requiredParams: _requiredParams, menuGroup: _menuGroup, unrunnable: _unrunnable, caps: _caps, ...ref } = model.spec;
   if (!(await slotFree(deps, provider, req.place ?? QueuePlace.New))) {
     return WAITING;
+  }
+  const quoted = model.spec.quotedAtSubmit ? await submitQuote(gateway, ref, inputs) : {};
+  if (quoted === null) {
+    return refused(TASK_REFUSALS.unpriced, RefusalStage.Provider);
   }
   const startedAt = Date.now();
   try {
     const { taskId } = await gateway.run(ref, inputs, req.idempotencyKey);
-    return { kind: 'job', jobId: `${jobPrefixOf(provider)}${taskId}` };
+    return { kind: 'job', jobId: `${jobPrefixOf(provider)}${taskId}`, ...quoted };
   } catch (error) {
     if (error instanceof ProviderBusyError) {
       return WAITING;
@@ -298,6 +318,10 @@ function outlivedFallback(provider: TaskProviderName, model: TaskModel, job: Tas
 }
 
 function jobQuote(model: TaskModel, job: TaskJob): number | null {
+  const quoted = Number((job.params as Record<string, unknown> | undefined)?.[QUOTED_USD_PARAM]);
+  if (Number.isFinite(quoted) && quoted > 0) {
+    return quoted;
+  }
   const inputs = wireInputs(model.spec, { prompt: '', params: job.params ?? {}, imageUrls: [], lastFrameUrl: null }, model.paramSchema);
   return quoteOf(model, inputs);
 }

@@ -81,6 +81,7 @@ export function taskChoice(row: TaskRow): ModelChoice {
   return {
     id: row.id,
     label: row.label ?? row.id,
+    ...(spec?.menuGroup ? { menuGroup: spec.menuGroup } : {}),
     aspectRatios: aspects.length ? aspects : DEFAULT_ASPECTS,
     maxRefs: uncensored ? 0 : maxRefsOf(spec),
     ...providerOf(row.id),

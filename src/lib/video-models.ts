@@ -439,7 +439,10 @@ const SEEDANCE_25_REFS: VideoRefCapacity = { images: 30, videos: 10, audios: 10 
 const TASK_VIDEO_REFS: Readonly<Record<string, VideoRefCapacity>> = {
   'higgsfield/bytedance/seedance-2.5/reference-to-video': SEEDANCE_25_REFS,
   'higgsfield/bytedance/seedance-2.5/video-edit': SEEDANCE_25_REFS,
-  'higgsfield/bytedance/seedance-2.5/video-extend': SEEDANCE_25_REFS
+  'higgsfield/bytedance/seedance-2.5/video-extend': SEEDANCE_25_REFS,
+  'higgsfield/higgsfield/genjutsu/motion-transfer/v1.0': { images: 8, videos: 1, audios: 0 },
+  'higgsfield/higgsfield/genjutsu/object-swap/v1.0': { images: 8, videos: 1, audios: 0 },
+  'higgsfield/higgsfield/genjutsu/restyle/v1.0': { images: 5, videos: 1, audios: 0 }
 };
 
 export function videoRefCapacity(model: string | null | undefined): VideoRefCapacity {

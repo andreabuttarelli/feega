@@ -57,7 +57,7 @@ const models: Record<string, TaskModel> = {
   }
 };
 
-const gateway = { run: vi.fn(), task: vi.fn(), purge: vi.fn() };
+const gateway = { run: vi.fn(), task: vi.fn(), purge: vi.fn(), quote: vi.fn() };
 const bill = vi.fn();
 const decide = vi.fn();
 const judge = vi.fn();
@@ -92,7 +92,7 @@ vi.mock('$lib/server/canvas/upstream', () => ({
 }));
 
 beforeEach(async () => {
-  for (const fn of [gateway.run, gateway.task, gateway.purge, bill, decide, judge, decideIdentifiability, judgeIdentifiability, record]) {
+  for (const fn of [gateway.run, gateway.task, gateway.purge, gateway.quote, bill, decide, judge, decideIdentifiability, judgeIdentifiability, record]) {
     fn.mockReset();
   }
   decide.mockResolvedValue({ choice: 'safe', probabilities: { safe: 0.999 } });
@@ -466,6 +466,24 @@ describe('a video node editing a wired video with Seedance 2.5', () => {
 
     expect(out).toEqual({ kind: 'refused', error: 'missing_input: this model needs a source video' });
     expect(gateway.run).not.toHaveBeenCalled();
+  });
+});
+
+describe('a run quoted on submit', () => {
+  it('stores the provider quote on the run, so the finished task bills that price', async () => {
+    models[VIDEO_EDIT].spec.quotedAtSubmit = true;
+    gateway.quote.mockResolvedValue(8.2);
+    upstreamMedia.current = { referenceVideoUrls: ['https://cdn.test/source.mp4'] };
+    const { db, calls } = fakeDb(
+      { nodes: [{ ...imageNode(), type: 'video' }], nodes_connections: [], assets: [], orgs: [paidOrg], projects: [{ id: PROJECT, org_id: ORG, mode: 'standard' }] },
+      { updateRows: { nodes: [{ ...imageNode(), type: 'video', version: 2 }] } }
+    );
+
+    await runGenNode(db, { ...start(VIDEO_EDIT, 'restyle', { resolution: '720p' }), medium: 'video' });
+    models[VIDEO_EDIT].spec.quotedAtSubmit = false;
+
+    const stored = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { params?: Record<string, unknown> }).params?.quotedUsd);
+    expect((stored?.payload as { params: Record<string, unknown> }).params).toEqual({ resolution: '720p', quotedUsd: 8.2 });
   });
 });
 

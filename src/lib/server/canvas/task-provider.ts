@@ -27,6 +27,7 @@ export type TaskProvider = {
   task(taskId: string): Promise<TaskState>;
   purge?(taskId: string): Promise<PurgeOutcome>;
   cancel?(taskId: string): Promise<boolean>;
+  quote?(model: TaskWireRef, inputs: Record<string, unknown>): Promise<number | null>;
 };
 
 export class ProviderBusyError extends Error {}
