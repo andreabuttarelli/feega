@@ -35,6 +35,7 @@ import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { runInBackground } from '$lib/server/background-work';
 import { askedAttachments } from '$lib/server/chat-attachments/route-scope';
 import { canvasPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
+import { breakdownReader } from '$lib/server/video-reference';
 import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, rejectedRounds, shownRefs } from '$lib/reference-pick';
 import type { RequestHandler } from './$types';
 
@@ -133,7 +134,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const actor = agentActor(user.id, SIDEBAR_AGENT_KEY);
   const userActor = { kind: 'user' as const, id: user.id };
   await saveTurn(db, { orgId, threadId, role: 'user', content: text, attachments, actor: userActor });
-  const opening = await userContent(db, { orgId, text, attachments, hint: canvasPlaceHint(project.id) });
+  const opening = await userContent(db, { orgId, text, attachments, hint: canvasPlaceHint(project.id), breakdown: breakdownReader(db, { orgId, projectId: project.id, mode: project.mode }) });
   const reply = await openReply(db, { orgId, threadId, actor });
   const steps: Parameters<typeof finishedTurn>[0][number][] = [];
 
