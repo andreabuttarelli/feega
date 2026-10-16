@@ -165,6 +165,8 @@ export function freshText(kind: FrameKind, version: number, clips: { id: string;
   return kind === FrameKind.Element && version === FIRST_REVISION && clips.length === 1 && only.component === DRAWN_TEXT ? only.id : null;
 }
 
+export const ghostShown = (node: { docHeadRevision: number }): boolean => node.docHeadRevision <= FIRST_REVISION;
+
 export const posterFresh = (node: { docHeadRevision: number; posterRevision?: number }): boolean => node.posterRevision === undefined || node.posterRevision === node.docHeadRevision;
 
 export const openingFor = (row: { id: string; type: string; data: Record<string, unknown> }, opening: Opening): Opening => tileChromeOf(row).opening ?? opening;

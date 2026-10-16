@@ -27,3 +27,8 @@ Ora:
 
 Test: `tests/e2e/canvas-free-text.spec.ts` (click e drag, tela chiara e scura, pixel veri, reload;
 Size dal pannello).
+
+Dopo #673 (tile ottimistico): il fantasma del disegno in `catalogPosters` contava come poster e
+bloccava la cattura, e per un testo era un rettangolo grigio. Ora il fantasma di un testo è il
+testo stesso (`ghostText`, inchiostro del tema) e resta solo finché l'elemento è alla prima
+revisione (`ghostShown`).

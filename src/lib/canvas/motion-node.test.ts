@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, freshText, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, freshText, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -128,6 +128,11 @@ describe('a free element is a frame without chrome', () => {
     expect(posterFresh({ ...node, posterRevision: 2 })).toBe(true);
     expect(posterFresh({ ...node, posterRevision: 1 })).toBe(false);
     expect(posterFresh(node)).toBe(true);
+  });
+
+  it('the drawing ghost stands in only until the element is first edited', () => {
+    expect(ghostShown({ docHeadRevision: FIRST_REVISION })).toBe(true);
+    expect(ghostShown({ docHeadRevision: FIRST_REVISION + 1 })).toBe(false);
   });
 
   it('a group is a free element that opens only on a double-click, so a click selects the whole group', () => {

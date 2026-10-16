@@ -148,6 +148,9 @@ test.describe('free text on the canvas @real', () => {
     await page.keyboard.type('Hello');
     await leave(page, pane);
     await expect.poll(async () => (await clipsOf(admin, element.id)).map((c) => c.props.text), { timeout: 10_000 }).toEqual(['Hello']);
+    await page.waitForTimeout(8000);
+    console.log('DBG', JSON.stringify((await admin.from('nodes').select('data').eq('id', element.id).single()).data));
+    await page.screenshot({ path: `${process.env.SHOTS_DIR}/dbg-size.png` });
     await posterOfHead(admin, element.id);
     await visibleText(page, element.id);
     const before = await inkPixels(page, element.id);
