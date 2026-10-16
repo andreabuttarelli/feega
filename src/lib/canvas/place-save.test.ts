@@ -97,3 +97,22 @@ describe('keepPending: a reload of the canvas data never replaces what is still 
     expect(keepPending([server], [tile(99, 'old', 3)], () => [], () => false)).toEqual([server]);
   });
 });
+
+describe('placement entries survive a reload', () => {
+  it('lists unsent placements and replays them when restored', async () => {
+    const { places } = harness([{ type: 'network' }, { type: 'network' }]);
+    places.move('a', 5, 6);
+    places.resize('b', 30, 40);
+
+    const entries = places.unsentEntries();
+    expect(entries).toEqual(expect.arrayContaining([
+      { action: 'move', id: 'a', fields: { x: 5, y: 6 } },
+      { action: 'resize', id: 'b', fields: { width: 30, height: 40 } }
+    ]));
+
+    const reopened = harness([]);
+    reopened.places.restore(entries);
+    await reopened.places.flush();
+    expect(reopened.sent.map((s) => s.action).sort()).toEqual(['move', 'resize']);
+  });
+});
