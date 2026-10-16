@@ -1163,6 +1163,11 @@
     }
   });
 
+  function headRevisionOf(id: string): number {
+    const row = nodes.find((n) => n.id === id);
+    return row && row.type === 'motion' ? (motionOf(row)?.docHeadRevision ?? 0) : 0;
+  }
+
   function warmMotion(id: string) {
     if (!nodes.some((n) => n.id === id && n.version > 0)) {
       return;
@@ -3217,7 +3222,7 @@
   {/if}
   {#if editingMotion}
     {#key editingMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} {canvasundo} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} {canvasundo} />
     {/key}
   {/if}
 
