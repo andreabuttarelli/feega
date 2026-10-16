@@ -6,7 +6,7 @@ import {
   type FetchedProduct,
   type StorePlatform
 } from '$lib/server/store-fetch';
-import { upsertNodeProducts } from '$lib/server/repos/products';
+import { replaceNodeProducts } from '$lib/server/repos/products';
 
 /**
  * UN GIRO DI SINCRONIZZAZIONE PER UN NODO `products`.
@@ -24,7 +24,7 @@ import { upsertNodeProducts } from '$lib/server/repos/products';
  * `fetch_failed`) — qui non lo si riscrive, lo si porta fino al nodo.
  */
 export type ProductsSyncOutcome =
-  | { ok: true; synced: number; after: string | null; summary: string }
+  | { ok: true; synced: number; summary: string }
   | { ok: false; error: string };
 
 type SyncInput = {
@@ -34,7 +34,6 @@ type SyncInput = {
   platform: StorePlatform;
   storeUrl: string;
   limit: number;
-  after: string | null;
   onlyFirstPhoto: boolean;
   category?: string;
 };
@@ -64,7 +63,7 @@ async function syncSingleProducts(
     products.push(fetched.product);
   }
 
-  const synced = await upsertNodeProducts(db, {
+  const synced = await replaceNodeProducts(db, {
     orgId: input.orgId,
     projectId: input.projectId,
     nodeId: input.nodeId,
@@ -72,13 +71,13 @@ async function syncSingleProducts(
     products
   });
 
-  return { ok: true, synced, after: null, summary: summaryOf(synced) };
+  return { ok: true, synced, summary: summaryOf(synced) };
 }
 
 async function syncPage(db: Db, input: SyncInput, platform: StorePlatform, category?: string): Promise<ProductsSyncOutcome> {
   const page = await fetchStoreProductsPage(platform, input.storeUrl, {
     limit: input.limit,
-    after: input.after,
+    after: null,
     onlyFirstPhoto: input.onlyFirstPhoto,
     category
   });
@@ -87,7 +86,7 @@ async function syncPage(db: Db, input: SyncInput, platform: StorePlatform, categ
     return { ok: false, error: page.error };
   }
 
-  const synced = await upsertNodeProducts(db, {
+  const synced = await replaceNodeProducts(db, {
     orgId: input.orgId,
     projectId: input.projectId,
     nodeId: input.nodeId,
@@ -95,7 +94,7 @@ async function syncPage(db: Db, input: SyncInput, platform: StorePlatform, categ
     products: page.products
   });
 
-  return { ok: true, synced, after: page.after, summary: category ? `collection: ${category}` : 'whole store' };
+  return { ok: true, synced, summary: category ? `collection: ${category}` : 'whole store' };
 }
 
 export async function syncProductsNode(db: Db, input: SyncInput): Promise<ProductsSyncOutcome> {

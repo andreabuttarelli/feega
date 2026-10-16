@@ -72,9 +72,10 @@ import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
+import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
 import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
-import { MOVE_STATUS, MoveOutcome, drawElement, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { MOVE_STATUS, MoveOutcome, canvasBoxSchema, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -1106,6 +1107,16 @@ export const actions: Actions = {
     return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids));
   },
 
+  restack: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = restackAskSchema.safeParse({ ids: jsonField(fd, 'ids'), to: fd.get('to') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid restack' });
+    }
+    return { restacked: await restackNodes(scope.db, scope, userActor(scope), ask.data.ids, ask.data.to) };
+  },
+
   rotateGroup: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
@@ -1142,13 +1153,26 @@ export const actions: Actions = {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
     const ask = drawnSchema.safeParse(jsonField(fd, 'drawn'));
-    if (!ask.success) {
+    const id = String(fd.get('node_id') ?? '') || undefined;
+    if (!ask.success || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid drawing' });
     }
-    const drawn = await drawElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data);
+    const drawn = await drawElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, ask.data);
     if (drawn.outcome !== MoveOutcome.Done) {
       return movedAnswer(drawn);
     }
+    return { ...drawn, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: drawn.frameId }) };
+  },
+
+  drawFrame: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const box = canvasBoxSchema.safeParse(jsonField(fd, 'box'));
+    const id = String(fd.get('node_id') ?? '') || undefined;
+    if (!box.success || (id && !UUID.test(id))) {
+      return fail(400, { error: 'invalid frame' });
+    }
+    const drawn = await drawFrameAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, box.data);
     return { ...drawn, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: drawn.frameId }) };
   },
 

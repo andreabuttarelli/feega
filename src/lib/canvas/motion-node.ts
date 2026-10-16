@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$lib/motion/doc';
 import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '$lib/motion/hyperframes/capture';
+import { DRAWN_TEXT } from '$lib/motion/draw-create';
 
 export enum FrameKind {
   Frame = 'frame',
@@ -25,6 +26,7 @@ export type MotionNode = {
   format: MotionFormat;
   docHeadRevision: number;
   posterAssetId: string | null;
+  posterRevision?: number;
   lastRenderAssetId: string | null;
   storyboard?: StoryboardLink;
   budgetRaisedUsd?: number;
@@ -48,6 +50,7 @@ export const motionNodeSchema = z.object({
   format: z.preprocess(formatOf, z.enum(MOTION_FORMATS)),
   docHeadRevision: z.number().int().min(0),
   posterAssetId: z.string().nullable(),
+  posterRevision: z.number().int().min(0).optional(),
   lastRenderAssetId: z.string().nullable(),
   storyboard: linkSchema.optional(),
   budgetRaisedUsd: z.number().min(0).optional(),
@@ -90,6 +93,10 @@ export function frameNodeSize(width: number, picture: { width: number; height: n
 
 export function elementNodeOf(box: { width: number; height: number }, kind: FrameKind = FrameKind.Element): { data: Record<string, unknown>; w: number; h: number } {
   return { data: { ...newMotionData(docFormat(box)), kind }, w: Math.round(box.width), h: Math.round(box.height) };
+}
+
+export function drawnFrameNodeOf(box: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
+  return { data: newMotionData(docFormat(box)), w: Math.round(box.width), h: Math.round(box.height) + MOTION_NODE_BAR_H };
 }
 
 export function frameNodeOf(picture: { width: number; height: number }): { data: Record<string, unknown>; w: number; h: number } {
@@ -154,5 +161,14 @@ const OPENING_SELECTION: Record<FrameKind, (clipIds: string[]) => string[]> = {
 };
 
 export const openingSelection = (kind: FrameKind, clipIds: string[]): string[] => OPENING_SELECTION[kind](clipIds);
+
+export function freshText(kind: FrameKind, version: number, clips: { id: string; component: string }[]): string | null {
+  const [only] = clips;
+  return kind === FrameKind.Element && version === FIRST_REVISION && clips.length === 1 && only.component === DRAWN_TEXT ? only.id : null;
+}
+
+export const ghostShown = (node: { docHeadRevision: number }): boolean => node.docHeadRevision <= FIRST_REVISION;
+
+export const posterFresh = (node: { docHeadRevision: number; posterRevision?: number }): boolean => node.posterRevision === undefined || node.posterRevision === node.docHeadRevision;
 
 export const openingFor = (row: { id: string; type: string; data: Record<string, unknown> }, opening: Opening): Opening => tileChromeOf(row).opening ?? opening;

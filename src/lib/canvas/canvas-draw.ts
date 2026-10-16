@@ -1,5 +1,5 @@
 import { DrawTool } from '$lib/motion/draw-tool';
-import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
+import { CanvasTheme, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
 import { mapOutline, parsePath, pathData } from '$lib/motion/shape/geometry';
 
 type Point = { x: number; y: number };
@@ -24,14 +24,14 @@ function flowBox(clip: DrawnClip, host: CanvasBox, toFlow: ToFlow): CanvasBox {
   return { left: from.x, top: from.y, width: to.x - from.x, height: to.y - from.y };
 }
 
-export function drawnOnCanvas(clip: DrawnClip, host: CanvasBox, toFlow: ToFlow): DrawnWire | null {
+export function drawnOnCanvas(clip: DrawnClip, host: CanvasBox, toFlow: ToFlow, theme: CanvasTheme = CanvasTheme.Light): DrawnWire | null {
   const tool = toolOf(clip);
   if (!tool || tool === DrawTool.Select) {
     return null;
   }
   const box = flowBox(clip, host, toFlow);
   if (tool !== DrawTool.Pen) {
-    return { tool, box };
+    return { tool, box, theme };
   }
   const outline = parsePath(String(clip.props.path ?? ''));
   if (typeof outline === 'string') {

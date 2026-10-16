@@ -4,11 +4,10 @@ import type { Db } from '$lib/server/db/client';
 import { createNode, deleteNode, findNode, listConnections, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
-import { FrameKind, atFirstRevision, elementNodeOf, frameChrome, motionNodeSize } from '$lib/canvas/motion-node';
-import { blankElement, canvasReady, drawnElement, type Drawn } from '$lib/motion/draw-create';
+import { FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, frameChrome, motionNodeSize } from '$lib/canvas/motion-node';
+import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { parsePath } from '$lib/motion/shape/geometry';
 import { frameShape } from './start';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
@@ -467,22 +466,14 @@ export function frameRequest(store: FrameStore, ask: z.infer<typeof frameRequest
   return ask.node_id ? placeOutput(store, { sourceNodeId: ask.node_id, drop }) : moveElement(store, { sourceNodeId: ask.frame_id ?? '', clipId: ask.element_id ?? '', drop });
 }
 
-const canvasBoxSchema = z.object({ left: z.number().finite(), top: z.number().finite(), width: z.number().positive(), height: z.number().positive() }).strict();
+export const canvasBoxSchema = z.object({ left: z.number().finite(), top: z.number().finite(), width: z.number().positive(), height: z.number().positive() }).strict();
 
 export const drawnSchema = z.discriminatedUnion('tool', [
-  z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse]), box: canvasBoxSchema }).strict(),
+  z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse]), box: canvasBoxSchema, theme: z.enum(CanvasTheme).optional() }).strict(),
   z.object({ tool: z.literal(DrawTool.Pen), path: z.string().min(1).max(20_000) }).strict()
 ]);
 
-function drawnOf(wire: z.infer<typeof drawnSchema>): Drawn | string {
-  if (wire.tool !== DrawTool.Pen) {
-    return wire;
-  }
-  const outline = parsePath(wire.path);
-  return typeof outline === 'string' ? outline : { tool: DrawTool.Pen, outline };
-}
-
-export async function drawElement(store: FrameStore, place: Place, wire: z.infer<typeof drawnSchema>): Promise<Moved> {
+export async function drawElement(store: FrameStore, place: Place & { id?: string }, wire: z.infer<typeof drawnSchema>): Promise<Moved> {
   const drawn = drawnOf(wire);
   if (typeof drawn === 'string') {
     return refused(MoveOutcome.Invalid, drawn);
@@ -498,4 +489,11 @@ export async function drawElement(store: FrameStore, place: Place, wire: z.infer
   const frameId = await store.create({ ...place, ...at }, made.doc, { data: shaped.data, width: shaped.w, height: shaped.h, ...(first ? { displayName: elementName(first) } : {}) });
   const clipId = first?.id ?? '';
   return { outcome: MoveOutcome.Done, frameId, clipId, created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
+}
+
+export async function drawFrameAt(store: FrameStore, place: Place & { id?: string }, box: CanvasBox): Promise<Extract<Moved, { outcome: MoveOutcome.Done }>> {
+  const shaped = drawnFrameNodeOf(box);
+  const at = { x: box.left, y: box.top };
+  const frameId = await store.create({ ...place, ...at }, drawnFrame(box), { data: shaped.data, width: shaped.w, height: shaped.h });
+  return { outcome: MoveOutcome.Done, frameId, clipId: '', created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
 }

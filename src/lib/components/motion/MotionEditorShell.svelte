@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { FrameKind, openingSelection } from '$lib/canvas/motion-node';
+  import { painted } from '$lib/canvas/paint-wait';
+  import { FrameKind, freshText, openingSelection } from '$lib/canvas/motion-node';
+  import { DRAWN_TEXT } from '$lib/motion/draw-create';
   import { groupClips, ungroupClip } from '$lib/motion/group';
   import { onMount, tick, untrack } from 'svelte';
   import { clipSeek } from '$lib/motion/storyboard';
@@ -186,6 +188,7 @@
   let saving = false;
   let resave = false;
   let selection = $state<string[]>(openingSelection(data.node.kind ?? FrameKind.Frame, (data.head.doc as MotionDoc).tracks.flatMap((t) => t.clips.map((c) => c.id))));
+  let typeInto = $state<string | null>(freshText(data.node.kind ?? FrameKind.Frame, data.head.version, (data.head.doc as MotionDoc).tracks.flatMap((t) => t.clips)));
   let path = $state<{ comp: string; frame: number }[]>([]);
   let cameraOpen = $state(false);
   let keySelection = $state<KeyRef[]>([]);
@@ -504,7 +507,7 @@
 
   const poster = posterJob(
     () => preview?.still(posterSecond(history.present), POSTER_WIDTH, posterFormat(history.present.background)) ?? Promise.resolve(''),
-    (jpeg) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)) })
+    (jpeg) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)), revision: String(version) })
   );
   let posterVersion = data.node.posterAssetId ? data.head.version : -1;
   $effect(() => {
@@ -931,8 +934,12 @@
 
   const FRAME_ACTS: Record<FrameAction, () => void> = { [FrameAction.Image]: () => add('Image'), [FrameAction.Library]: () => (templating = true) };
 
-  function drawn(id: string) {
+  const DRAWN_SETTLE_FRAMES = 4;
+
+  async function drawn(id: string) {
     selection = [id];
+    typeInto = findClip(history.present, id)?.clip.component === DRAWN_TEXT ? id : null;
+    await painted(DRAWN_SETTLE_FRAMES);
     frameBar.tool = DrawTool.Select;
   }
 
@@ -1840,7 +1847,7 @@
         {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
         {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
-        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        <MotionInspector {typeInto} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}

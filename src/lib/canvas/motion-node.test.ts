@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, freshText, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -113,6 +113,26 @@ describe('a free element is a frame without chrome', () => {
   it('opens with its own shapes selected, so the properties show at once; a frame opens on nothing', () => {
     expect(openingSelection(FrameKind.Element, ['a', 'b'])).toEqual(['a', 'b']);
     expect(openingSelection(FrameKind.Frame, ['a', 'b'])).toEqual([]);
+  });
+
+  it('a text element just drawn opens ready to type into; an edited one, a frame or a shape does not', () => {
+    const text = [{ id: 't', component: 'Text' }];
+    expect(freshText(FrameKind.Element, FIRST_REVISION, text)).toBe('t');
+    expect(freshText(FrameKind.Element, FIRST_REVISION + 1, text)).toBeNull();
+    expect(freshText(FrameKind.Frame, FIRST_REVISION, text)).toBeNull();
+    expect(freshText(FrameKind.Element, FIRST_REVISION, [{ id: 's', component: 'Shape' }])).toBeNull();
+  });
+
+  it('a poster shows only while it pictures the head revision; one saved before revisions were recorded is trusted', () => {
+    const node = { docHeadRevision: 2 };
+    expect(posterFresh({ ...node, posterRevision: 2 })).toBe(true);
+    expect(posterFresh({ ...node, posterRevision: 1 })).toBe(false);
+    expect(posterFresh(node)).toBe(true);
+  });
+
+  it('the drawing ghost stands in only until the element is first edited', () => {
+    expect(ghostShown({ docHeadRevision: FIRST_REVISION })).toBe(true);
+    expect(ghostShown({ docHeadRevision: FIRST_REVISION + 1 })).toBe(false);
   });
 
   it('a group is a free element that opens only on a double-click, so a click selects the whole group', () => {

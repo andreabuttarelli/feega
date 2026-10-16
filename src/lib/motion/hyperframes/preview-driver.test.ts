@@ -295,4 +295,16 @@ describe('seeking the preview', () => {
 
     expect((await shot).url).toBe('poster');
   });
+
+  it('a still asked while an edit waits to reload pictures the edit, not the document before it', async () => {
+    const driver = previewDriver(slowPlayer(page('first')));
+    await driver.loaded(page('first'));
+    driver.ready();
+
+    driver.update(page('edited'));
+    await driver.fresh(page('edited'));
+    const reply = await driver.shoot(0, REQUEST);
+
+    expect(reply.url).toBe('edited');
+  });
 });

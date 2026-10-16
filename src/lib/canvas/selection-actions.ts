@@ -15,6 +15,7 @@
  */
 
 import type { PostCompositionNode } from './post-composition';
+import { FrameKind } from './motion-node';
 import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-plan';
 
 export type SelectionActionId =
@@ -26,16 +27,22 @@ export type SelectionActionId =
   | 'run-stale'
   | 'copy-id'
   | 'report'
+  | 'group'
+  | 'ungroup'
+  | 'copy'
+  | 'paste'
+  | 'bring-front'
+  | 'send-back'
   | 'delete';
 
-export type SelectionActionGroup = 'primary' | 'secondary' | 'overflow' | 'danger';
+export type SelectionActionGroup = 'primary' | 'secondary' | 'overflow' | 'menu' | 'danger';
 
 export type SelectionAction = {
   id: SelectionActionId;
   label: string;
   group: SelectionActionGroup;
   minNodes: number;
-  keys?: string[];
+  shortcut?: string;
 };
 
 export const SELECTION_ACTIONS: readonly SelectionAction[] = [
@@ -44,11 +51,33 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'run-stale', label: 'Re-run out of date', group: 'secondary', minNodes: 1 },
   { id: 'connect-new', label: 'Connect to new…', group: 'secondary', minNodes: 1 },
   { id: 'connect-existing', label: 'Connect to…', group: 'secondary', minNodes: 1 },
-  { id: 'duplicate', label: 'Duplicate', group: 'secondary', minNodes: 1, keys: ['mod', 'D'] },
+  { id: 'duplicate', label: 'Duplicate', group: 'secondary', minNodes: 1, shortcut: 'Mod+D' },
+  { id: 'group', label: 'Group', group: 'secondary', minNodes: 2, shortcut: 'Mod+G' },
+  { id: 'ungroup', label: 'Ungroup', group: 'secondary', minNodes: 1, shortcut: 'Mod+Shift+G' },
+  { id: 'copy', label: 'Copy', group: 'menu', minNodes: 1, shortcut: 'Mod+C' },
+  { id: 'paste', label: 'Paste', group: 'menu', minNodes: 1, shortcut: 'Mod+V' },
+  { id: 'bring-front', label: 'Bring to front', group: 'menu', minNodes: 1, shortcut: 'Mod+]' },
+  { id: 'send-back', label: 'Send to back', group: 'menu', minNodes: 1, shortcut: 'Mod+[' },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
   { id: 'report', label: 'Report content', group: 'overflow', minNodes: 1 },
-  { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, keys: ['⌫'] }
+  { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, shortcut: 'Backspace' }
 ];
+
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'copy', 'paste', 'bring-front', 'send-back', 'delete'];
+
+export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
+
+type Summary = { data: Record<string, unknown> };
+
+const isGroup = (n: Summary) => n.data.kind === FrameKind.Group;
+
+const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
+  ungroup: (summaries) => summaries.some(isGroup)
+};
+
+export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): boolean {
+  return SHOWN[id]?.(summaries) ?? true;
+}
 
 export function actionsIn(group: SelectionActionGroup, count: number): SelectionAction[] {
   return SELECTION_ACTIONS.filter((a) => a.group === group && count >= a.minNodes);
