@@ -75,6 +75,8 @@
   import { GraphScope } from '$lib/canvas/run-graph';
   import { DropVerdict, pointOf, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { ReportChange, reportChange } from '$lib/canvas/selection-report';
+  import { Stack } from '$lib/canvas/stacking';
+  import CanvasContextMenu from './CanvasContextMenu.svelte';
 
   /**
    * Dove sta una tile e quanto è grande, in unità di tela — le stesse di `brand_canvas_items`.
@@ -156,6 +158,7 @@
     onRotate,
     onGroup,
     onUngroup,
+    onRestack,
     onUndo,
     onRedo,
     onConnectNew,
@@ -238,6 +241,7 @@
     onRotate?: (id: string, degrees: number) => void;
     onGroup?: (ids: string[]) => void;
     onUngroup?: (ids: string[]) => void;
+    onRestack?: (ids: string[], to: Stack) => void;
     /** ⌘Z: annulla l'ultimo gesto di questa scheda. */
     onUndo?: () => void;
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
@@ -609,8 +613,64 @@
     report: (ids) => {
       window.open(reportHref({ node: ids[0] }), '_blank', 'noopener');
     },
+    group: (ids) => onGroup?.(ids),
+    ungroup: (ids) => onUngroup?.(ids),
+    copy: (ids) => onCopy?.(ids),
+    paste: () => {
+      if (menuAt && toFlow) {
+        onPaste?.(toFlow(menuAt));
+      }
+    },
+    'bring-front': (ids) => onRestack?.(ids, Stack.Front),
+    'send-back': (ids) => onRestack?.(ids, Stack.Back),
     delete: (ids) => onDelete?.(ids)
   };
+
+  const LONG_PRESS_MS = 500;
+  const PRESS_SLOP_PX = 10;
+
+  let menuAt = $state<{ x: number; y: number } | null>(null);
+  let press: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | null = null;
+
+  function openMenu(id: string, at: { x: number; y: number }) {
+    if (!nodes.some((n) => n.id === id && n.selected)) {
+      nodes = nodes.map((n) => ({ ...n, selected: n.id === id }));
+    }
+    menuAt = at;
+  }
+
+  function onNodeMenu({ node, event }: { node: Node; event: MouseEvent }) {
+    event.preventDefault();
+    openMenu(node.id, { x: event.clientX, y: event.clientY });
+  }
+
+  function onSelectionMenu({ event }: { event: MouseEvent }) {
+    event.preventDefault();
+    menuAt = { x: event.clientX, y: event.clientY };
+  }
+
+  function endPress() {
+    if (press) {
+      clearTimeout(press.timer);
+      press = null;
+    }
+  }
+
+  function startPress(e: PointerEvent) {
+    const id = (e.target as HTMLElement).closest<HTMLElement>('.svelte-flow__node')?.dataset.id;
+    if (e.pointerType !== 'touch' || !id) {
+      return;
+    }
+    endPress();
+    const at = { x: e.clientX, y: e.clientY };
+    press = { ...at, timer: setTimeout(() => openMenu(id, at), LONG_PRESS_MS) };
+  }
+
+  function movePress(e: PointerEvent) {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > PRESS_SLOP_PX) {
+      endPress();
+    }
+  }
 
   function runSelectionAction(id: SelectionActionId) {
     if (!selection.ids.length) return;
@@ -753,6 +813,10 @@
   class="wrap"
   class:moving
   bind:this={wrap}
+  onpointerdowncapture={startPress}
+  onpointermove={movePress}
+  onpointerup={endPress}
+  onpointercancel={endPress}
   ondragover={onDragOver}
   ondrop={onDrop}
 >
@@ -786,6 +850,8 @@
     onconnect={onConnected}
     onedgeclick={onEdgeClick}
     onnodeclick={onNodeClick}
+    onnodecontextmenu={onNodeMenu}
+    onselectioncontextmenu={onSelectionMenu}
     {isValidConnection}
     onconnectend={() => (refusal = null)}
     {...spec.flow}
@@ -810,6 +876,7 @@
       onredo={onRedo}
       ongroup={onGroup}
       onungroup={onUngroup}
+      onrestack={onRestack}
     />
     {/if}
     <CanvasSelectionBridge
@@ -874,6 +941,10 @@
   {#if actionUrl}
     <NextStepChips {actionUrl} box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
   {/if}
+  {/if}
+
+  {#if menuAt && spec.chrome}
+    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} onpick={runSelectionAction} onclose={() => (menuAt = null)} />
   {/if}
 
   {#if connectPickerAt}
