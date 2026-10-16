@@ -9,6 +9,7 @@ import { Preset, settingsOf } from '$lib/motion/export-formats';
 import { findMotionNode } from '$lib/server/motion/editor';
 import { listMotionVideos } from '$lib/server/motion/agent-videos';
 import { askMotion, askStatus, type PickReply } from '$lib/server/motion/ask';
+import type { AttachmentSource } from '$lib/server/chat-attachments/register';
 import { MOTION_START_DEPS, startMotion } from '$lib/server/motion/start';
 import { RenderMode, renderState, requestRender } from '$lib/server/motion/agent-render';
 import { motionFrames } from '$lib/server/motion/agent-frames';
@@ -88,6 +89,8 @@ function framesForModel(output: Record<string, unknown>, drawn: DrawnFrame[] = [
 
 const VIEW_PREFIX = 'view-';
 
+export const referenceSources = (media: Asset[]): AttachmentSource[] => media.filter((a) => a.type === 'video').map((a) => ({ asset_id: a.id }));
+
 const mediaLine = (media: Asset[]) => `Media from the canvas to use (asset ids in list_assets): ${media.map((a) => `${a.id} (${a.type})`).join(', ')}.`;
 
 export function createMotionDelegation(deps: MotionDelegationDeps): Record<string, Tool> {
@@ -123,7 +126,8 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
     }
 
     const prompt = media.length ? `${request}\n\n${mediaLine(media as Asset[])}` : request;
-    const asked = await askMotion(db, { orgId, userId, nodeId, prompt, agentKey: SIDEBAR_AGENT_KEY, choice: { model: deps.model }, pick });
+    const attachments = referenceSources(media as Asset[]);
+    const asked = await askMotion(db, { orgId, userId, nodeId, prompt, attachments, agentKey: SIDEBAR_AGENT_KEY, choice: { model: deps.model }, pick });
     if (asked instanceof Response) {
       return asked.json();
     }

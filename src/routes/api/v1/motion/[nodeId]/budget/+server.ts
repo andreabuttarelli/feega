@@ -37,7 +37,7 @@ export const GET: RequestHandler = async ({ request, params, url }) => {
   if (!motion) {
     return notFound();
   }
-  return json(budgetCard(await readVideoBudget(found.db, scope, motion.budgetRaisedUsd ?? 0)));
+  return json(budgetCard(await readVideoBudget(found.db, scope, motion.budgetRaisedUsd ?? 0, motion.videoKind)));
 };
 
 export const POST: RequestHandler = async ({ request, params, url }) => {

@@ -77,6 +77,9 @@ import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
 import type { ChatAttachment } from '$lib/chat-attachments';
 import { motionPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
 import { breakdownReader } from '$lib/server/video-reference';
+import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
+import { REPLICA_BRIEF, VideoKind, replicaCanvas } from '$lib/motion/replica';
+import { onceEach, replicaTurn } from '$lib/server/motion/replica-turn';
 
 export const MOTION_AGENT_KEY = 'motion';
 const CHECK_WAIT_MS = 90_000;
@@ -289,8 +292,13 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const note = motion.node.storyboard ? boardNote(await storyboard.read()) : null;
   const reply = await openReply(db, { orgId, threadId, actor });
   const raisedUsd = motion.node.budgetRaisedUsd ?? 0;
-  const budget = await readVideoBudget(db, nodeScope, raisedUsd).catch(() => videoBudget(0, raisedUsd));
-  const role = turnRole(message, head.doc);
+  const videoBreakdown = onceEach(breakdownReader(db, { orgId, projectId: project.id, mode: project.mode }));
+  const replica = await replicaTurn({ message, attachments, stored: motion.node.videoKind, read: videoBreakdown });
+  if (replica.kind !== (motion.node.videoKind ?? VideoKind.Standard)) {
+    await patchNodeData(db, { ...nodeScope, patch: { videoKind: replica.kind }, check: DataCheck.Schema, actor }).catch(() => null);
+  }
+  const budget = await readVideoBudget(db, nodeScope, raisedUsd, replica.kind).catch(() => videoBudget(0, raisedUsd, replica.kind));
+  const role = turnRole(message, head.doc, replica.kind);
   const reserve = DRAWS_FIX_RESERVE.has(role) ? Reserve.Drawn : Reserve.Kept;
   if (budgetSpent(budget, reserve)) {
     const card = budgetCard(budget);
@@ -302,7 +310,8 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   }
 
   const knownAssets = assets.length;
-  const session: MotionSession = { doc: head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick };
+  const replicaDoc = replica.canvas ? replicaCanvas(head.doc, replica.canvas) : null;
+  const session: MotionSession = { doc: replicaDoc ?? head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick };
   const moderationScope = { orgId, userId, projectId: project.id, nodeId: motion.record.id, actor };
   const bucket = db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket;
   const frameScope = { orgId, projectId: project.id, nodeId: motion.record.id };
@@ -321,8 +330,11 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   session.pickAssets = picked.ids;
   const openingRound = role === StudioRole.Director ? Round.Research : Round.Edit;
   const memory = role === StudioRole.Director ? await projectMemory(db, { orgId, projectId: project.id, nodeId: motion.record.id }).catch(() => '') : '';
-  const openingText = [message, note, picked.note, memory].filter(Boolean).join('\n\n');
-  const videoBreakdown = breakdownReader(db, { orgId, projectId: project.id, mode: project.mode });
+  if (replicaDoc && replica.canvas) {
+    session.edits.push(`matched the reference canvas (${replica.canvas.format}, ${replica.canvas.durationS} s)`);
+  }
+  const replicaNote = replica.kind === VideoKind.Replica ? REPLICA_BRIEF : '';
+  const openingText = [message, note, picked.note, memory, replicaNote].filter(Boolean).join('\n\n');
   const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint, breakdown: videoBreakdown });
   let seamDraws = 0;
   const drawTurnFrames = async (callId: string, times: number[]) => {

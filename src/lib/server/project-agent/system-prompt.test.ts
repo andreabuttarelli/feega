@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { projectAgentPrompt, selectedNodes } from './system-prompt';
 import { DocMode } from '$lib/motion/still';
+import { REPLY_LANGUAGE_RULE } from '$lib/server/reply-language';
 
 describe('il prompt dichiara lo scope, non un brand obbligatorio', () => {
   const project = { id: 'p1', name: 'Lancio autunno' };
@@ -122,3 +123,21 @@ describe('the selection a client sends', () => {
   });
 });
 
+
+describe('what the chat agent shows the user (live test: replies in Spanish and French, "Tell it no account and proceed." on screen)', () => {
+  const prompt = projectAgentPrompt({ project: { id: 'p1', name: 'P' }, canvases: [], brand: null });
+
+  it('answers in the language of the user message, not of an attachment or the motion agent reply', () => {
+    expect(prompt).toContain(REPLY_LANGUAGE_RULE);
+    expect(REPLY_LANGUAGE_RULE).toMatch(/attach/);
+    expect(REPLY_LANGUAGE_RULE).toMatch(/motion agent/);
+  });
+
+  it('never writes its instructions to the motion agent as chat text', () => {
+    expect(prompt).toMatch(/Every word you write outside a tool call is shown to the user/);
+  });
+
+  it('hands a reference video to the motion agent in media, asking to recreate it', () => {
+    expect(prompt).toMatch(/recreate.*reference video.*media/i);
+  });
+});

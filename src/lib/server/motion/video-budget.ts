@@ -3,7 +3,8 @@ import type { Actor } from '$lib/server/repos/actor';
 import { DataCheck, findNode, patchNodeData } from '$lib/server/repos/canvas';
 import { motionOf } from '$lib/canvas/motion-node';
 import { videoSpentUsd } from '$lib/server/repos/video-spend';
-import { AGENT_TURN_CAP_USD, FIX_RESERVE_SHARE, VIDEO_CAP_USD, VIDEO_RAISE_USD } from '$lib/server/project-agent/limits';
+import { FIX_RESERVE_SHARE, VIDEO_CAPS, VIDEO_RAISE_USD } from '$lib/server/project-agent/limits';
+import { VideoKind } from '$lib/motion/replica';
 import type { BudgetCard } from '$lib/motion/budget-card';
 
 export { VIDEO_BUDGET, type BudgetCard } from '$lib/motion/budget-card';
@@ -11,22 +12,22 @@ export { VIDEO_BUDGET, type BudgetCard } from '$lib/motion/budget-card';
 const MIN_STEP_USD = 0.05;
 const RAISE_ATTEMPTS = 3;
 
-export type VideoBudget = { spentUsd: number; capUsd: number };
+export type VideoBudget = { spentUsd: number; capUsd: number; kind: VideoKind };
 
 type NodeScope = { orgId: string; nodeId: string };
 
-export const videoBudget = (spentUsd: number, raisedUsd: number): VideoBudget => ({ spentUsd, capUsd: VIDEO_CAP_USD + raisedUsd });
+export const videoBudget = (spentUsd: number, raisedUsd: number, kind = VideoKind.Standard): VideoBudget => ({ spentUsd, capUsd: VIDEO_CAPS[kind].videoUsd + raisedUsd, kind });
 
 export enum Reserve {
   Kept = 'kept',
   Drawn = 'drawn'
 }
 
-const RESERVED_USD: Record<Reserve, number> = { [Reserve.Kept]: VIDEO_CAP_USD * FIX_RESERVE_SHARE, [Reserve.Drawn]: 0 };
+const RESERVED_SHARE: Record<Reserve, number> = { [Reserve.Kept]: FIX_RESERVE_SHARE, [Reserve.Drawn]: 0 };
 
-const leftUsd = (budget: VideoBudget, reserve: Reserve) => Math.max(0, budget.capUsd - RESERVED_USD[reserve] - budget.spentUsd);
+const leftUsd = (budget: VideoBudget, reserve: Reserve) => Math.max(0, budget.capUsd - VIDEO_CAPS[budget.kind].videoUsd * RESERVED_SHARE[reserve] - budget.spentUsd);
 
-export const turnBudgetUsd = (budget: VideoBudget, reserve = Reserve.Drawn) => Math.min(AGENT_TURN_CAP_USD, leftUsd(budget, reserve));
+export const turnBudgetUsd = (budget: VideoBudget, reserve = Reserve.Drawn) => Math.min(VIDEO_CAPS[budget.kind].turnUsd, leftUsd(budget, reserve));
 
 export const budgetSpent = (budget: VideoBudget, reserve = Reserve.Drawn) => leftUsd(budget, reserve) < MIN_STEP_USD;
 
@@ -37,8 +38,8 @@ export const budgetCard = (budget: VideoBudget): BudgetCard => ({ ok: true, spen
 export const budgetNote = (card: BudgetCard) =>
   `This video has used its budget: $${card.spent_usd.toFixed(2)} spent so far. The work is saved. Continue to give it another $${card.raise_usd.toFixed(2)}.`;
 
-export async function readVideoBudget(db: Db, scope: NodeScope, raisedUsd: number): Promise<VideoBudget> {
-  return videoBudget(await videoSpentUsd(db, scope), raisedUsd);
+export async function readVideoBudget(db: Db, scope: NodeScope, raisedUsd: number, kind = VideoKind.Standard): Promise<VideoBudget> {
+  return videoBudget(await videoSpentUsd(db, scope), raisedUsd, kind);
 }
 
 export async function raiseVideoBudget(db: Db, scope: NodeScope & { actor?: Actor }): Promise<VideoBudget | null> {
@@ -55,7 +56,7 @@ export async function raiseVideoBudget(db: Db, scope: NodeScope & { actor?: Acto
       return null;
     }
     if (written.outcome === 'written') {
-      return readVideoBudget(db, scope, raised + VIDEO_RAISE_USD);
+      return readVideoBudget(db, scope, raised + VIDEO_RAISE_USD, motion.videoKind);
     }
   }
   return null;

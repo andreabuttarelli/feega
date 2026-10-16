@@ -1,4 +1,5 @@
 import { WEB_GUIDANCE } from '$lib/server/web/web-tools';
+import { REPLY_LANGUAGE_RULE } from '$lib/server/reply-language';
 import { DocMode } from '$lib/motion/still';
 import type { OpenFrame } from './frame-tools';
 
@@ -69,6 +70,9 @@ export function projectAgentPrompt(scope: PromptScope): string {
     WEB_GUIDANCE,
     'To put a picture you found on the canvas, import_image it, then create a Generate image node (type image) with data { assetId: "<asset_id>" }.',
     'Anything that spends credits needs the user to ask for it first.',
-    'Answer in the language the user writes in. Be brief: say what you did and what came back, not how you did it.'
+    'To recreate a reference video the user attached, pass its asset id in media and say "Recreate this reference video" in the request: the motion agent then takes its format, duration and scenes.',
+    'Every word you write outside a tool call is shown to the user: never write notes to yourself or instructions for the motion agent as text ("retry with the asset id", "tell it to proceed"). Those go only in the request of ask_motion_agent.',
+    REPLY_LANGUAGE_RULE,
+    'Be brief: say what you did and what came back, not how you did it.'
   ].join('\n');
 }

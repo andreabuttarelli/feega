@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AGENT_TURN_CAP_USD, FIX_RESERVE_SHARE, VIDEO_CAP_USD, VIDEO_RAISE_USD } from '$lib/server/brand-agent/limits';
+import { AGENT_TURN_CAP_USD, FIX_RESERVE_SHARE, VIDEO_CAPS, VIDEO_CAP_USD, VIDEO_RAISE_USD } from '$lib/server/brand-agent/limits';
+import { VideoKind } from '$lib/motion/replica';
 
 const nodes = vi.hoisted(() => ({ data: {} as Record<string, unknown>, patches: [] as { patch: Record<string, unknown>; base?: Record<string, unknown> }[] }));
 
@@ -86,6 +87,27 @@ describe('a motion video has one budget across all its turns', () => {
 
     expect(nodes.data.budgetRaisedUsd).toBe(2 * VIDEO_RAISE_USD);
     expect(nodes.patches[1].base).toEqual({ budgetRaisedUsd: VIDEO_RAISE_USD });
-    expect(raised).toEqual({ spentUsd: 2.1, capUsd: VIDEO_CAP_USD + 2 * VIDEO_RAISE_USD });
+    expect(raised).toMatchObject({ spentUsd: 2.1, capUsd: VIDEO_CAP_USD + 2 * VIDEO_RAISE_USD });
+  });
+});
+
+describe('a remake of a reference video gets a larger budget (live test: Cautiva stopped at $3 mid-build)', () => {
+  it('a replica costs $6, a standard video $3', () => {
+    expect(VIDEO_CAPS[VideoKind.Replica].videoUsd).toBe(6);
+    expect(VIDEO_CAPS[VideoKind.Standard].videoUsd).toBe(VIDEO_CAP_USD);
+  });
+
+  it('a replica still has room where a standard video is spent', () => {
+    expect(budgetSpent(videoBudget(3, 0, VideoKind.Standard), Reserve.Kept)).toBe(true);
+    expect(budgetSpent(videoBudget(3, 0, VideoKind.Replica), Reserve.Kept)).toBe(false);
+  });
+
+  it('a replica build turn gets its own larger turn cap', () => {
+    expect(turnBudgetUsd(videoBudget(0, 0, VideoKind.Replica))).toBe(VIDEO_CAPS[VideoKind.Replica].turnUsd);
+    expect(VIDEO_CAPS[VideoKind.Replica].turnUsd).toBeGreaterThan(AGENT_TURN_CAP_USD);
+  });
+
+  it('the card shows the replica cap', () => {
+    expect(budgetCard(videoBudget(1, 0, VideoKind.Replica)).cap_usd).toBe(6);
   });
 });

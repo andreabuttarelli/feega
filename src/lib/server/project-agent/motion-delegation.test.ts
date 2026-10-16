@@ -343,3 +343,13 @@ describe('what the canvas chat is told to do with a finished motion run', () => 
     expect(relayed({ status: 'done', script_ready: true }).next).toMatch(/ask_motion_agent/);
   });
 });
+
+describe('a reference video handed to the motion agent', () => {
+  const asset = (id: string, type: string) => ({ id, projectId: 'p', type, url: 'u', content: null, mimeType: null, bytes: 1, width: null, height: null, durationS: null, source: 'upload', sourceNodeId: null, uncensored: false, createdAt: '' }) as never;
+
+  it('goes as an attachment, so its breakdown and the reference canvas reach the motion turn (live test: only the id went, the remake came out 9:16)', async () => {
+    const { referenceSources } = await import('./motion-delegation');
+
+    expect(referenceSources([asset('v-1', 'video'), asset('i-1', 'image')])).toEqual([{ asset_id: 'v-1' }]);
+  });
+});

@@ -1,3 +1,4 @@
+import { VideoKind } from '$lib/motion/replica';
 import { stepCountIs } from 'ai';
 
 const MS_PER_S = 1000;
@@ -35,6 +36,11 @@ export function overTurnCap(spentUsd: () => number): (input: StepsSoFar) => bool
 }
 
 export const VIDEO_CAP_USD = 3;
+
+export const VIDEO_CAPS: Record<VideoKind, { videoUsd: number; turnUsd: number }> = {
+  [VideoKind.Standard]: { videoUsd: VIDEO_CAP_USD, turnUsd: AGENT_TURN_CAP_USD },
+  [VideoKind.Replica]: { videoUsd: 6, turnUsd: 3 }
+};
 
 export const FIX_RESERVE_SHARE = 0.25;
 

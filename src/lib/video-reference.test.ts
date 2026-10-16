@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BREAKDOWN_VERSION, breakdownBrief, parseBreakdown } from './video-reference';
+import { BREAKDOWN_PROMPT, BREAKDOWN_VERSION, breakdownBrief, breakdownSize, parseBreakdown } from './video-reference';
 
 const answer = {
   summary: 'A SaaS launch: prompt typed, result appears.',
@@ -48,5 +48,21 @@ describe('breakdownBrief', () => {
     expect(brief).toContain('15 cuts/min');
     expect(brief).toContain('#0A0A0A');
     expect(brief).toContain('Inter semibold');
+  });
+});
+
+describe('the reference frame shape', () => {
+  it('the model names the aspect ratio, so a remake can take it (live test: 16:9 reference came out 9:16)', () => {
+    expect(BREAKDOWN_PROMPT).toContain('aspectRatio');
+    expect(breakdownSize(parseBreakdown(JSON.stringify({ ...answer, aspectRatio: '16:9' }))!)).toEqual({ width: 16, height: 9 });
+  });
+
+  it('an older breakdown without it, or a garbled one, gives no size', () => {
+    expect(breakdownSize(parseBreakdown(JSON.stringify(answer))!)).toBeNull();
+    expect(breakdownSize(parseBreakdown(JSON.stringify({ ...answer, aspectRatio: 'wide' }))!)).toBeNull();
+  });
+
+  it('the brief states it', () => {
+    expect(breakdownBrief(parseBreakdown(JSON.stringify({ ...answer, aspectRatio: '16:9' }))!)).toContain('16:9');
   });
 });
