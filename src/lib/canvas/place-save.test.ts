@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createPlaceSaves, keepPlaced } from './place-save';
+import { createPlaceSaves, keepPending, keepPlaced } from './place-save';
 import type { ActionAnswer } from './node-save';
 
 const ok: ActionAnswer = { type: 'success', data: {} };
@@ -78,5 +78,22 @@ describe('keepPlaced: a resync never moves a tile whose placement is still being
 
     expect(kept[0]).toMatchObject({ x: 50, y: 60, w: 300, h: 200, userHeight: 200 });
     expect(kept[1]).toMatchObject({ x: 0, y: 0, w: 100, h: 100 });
+  });
+});
+
+describe('keepPending: a reload of the canvas data never replaces what is still unsent', () => {
+  const tile = (x: number, prompt: string, version: number) => ({ id: 'a', version, x, y: 0, w: 10, h: 10, userHeight: null, data: { prompt, model: 'm1' } });
+
+  it('keeps the unsent field and box, takes every other field from the server', () => {
+    const server = { ...tile(0, 'server', 3), data: { prompt: 'server', model: 'm2' } };
+    const [kept] = keepPending([server], [tile(99, 'typing', 3)], () => ['prompt'], () => true);
+
+    expect(kept.data).toEqual({ prompt: 'typing', model: 'm2' });
+    expect(kept.x).toBe(99);
+  });
+
+  it('takes the server row whole when nothing is pending', () => {
+    const server = tile(0, 'server', 4);
+    expect(keepPending([server], [tile(99, 'old', 3)], () => [], () => false)).toEqual([server]);
   });
 });

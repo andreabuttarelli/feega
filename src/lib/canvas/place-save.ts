@@ -1,4 +1,4 @@
-import { failureOf, sendResultOf, type ActionAnswer } from './node-save';
+import { failureOf, keepDirty, sendResultOf, type ActionAnswer } from './node-save';
 import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from './save-scheduler';
 
 type Fields = Record<string, string | number>;
@@ -74,4 +74,10 @@ export function keepPlaced<T extends Boxed>(fresh: T[], local: T[], dirty: (id: 
     }
     return { ...tile, x: held.x, y: held.y, w: held.w, h: held.h, userHeight: held.userHeight };
   });
+}
+
+type PendingTile = Boxed & { version: number; data: Record<string, unknown> };
+
+export function keepPending<T extends PendingTile>(fresh: T[], local: T[], dirtyKeys: (id: string) => string[], placed: (id: string) => boolean): T[] {
+  return keepPlaced(keepDirty(fresh, local, dirtyKeys), local, placed);
 }

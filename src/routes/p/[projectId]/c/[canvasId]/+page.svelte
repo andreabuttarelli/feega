@@ -24,7 +24,7 @@
   import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
-  import { createPlaceSaves, keepPlaced } from '$lib/canvas/place-save';
+  import { createPlaceSaves, keepPending } from '$lib/canvas/place-save';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
@@ -1252,7 +1252,7 @@
     }
     const now = Date.now();
     const before = nodes;
-    nodes = keepSame(nodes, keepPlaced(keepDirty((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys), nodes, places.dirty), now);
+    nodes = keepSame(nodes, keepPending((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty), now);
     edges = keepSame(edges, (snapshot.connections as Connection[]).map(toEdge), now);
     productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
     socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
@@ -1298,7 +1298,7 @@
   function openCanvas(loaded: CanvasNodeRecord[]) {
     snapshotVersion += 1;
     runsOverride = null;
-    nodes = loaded.map((n) => toTile(n));
+    nodes = keepPending(loaded.map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty);
     edges = (data.connections as Connection[]).map(toEdge);
     seenRevision = data.revision;
     const carried = takeNotice();
