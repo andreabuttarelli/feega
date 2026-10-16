@@ -50,4 +50,11 @@ describe('the Higgsfield catalogue', () => {
     const choices = rows.map(taskChoice);
     expect(choices.every((c) => c.providerLabel === 'Higgsfield' && c.uncensored === false)).toBe(true);
   });
+
+  it('offers Soul only the resolutions and aspect ratios its schema accepts', async () => {
+    const { rows } = await higgsfieldModelRows(estimate, SYNCED);
+    const soul = rows.find((r) => r.id === 'higgsfield/higgsfield-ai/soul/standard')!;
+    expect(soul.supported_resolutions).toEqual(['720p', '1080p']);
+    expect(soul.param_schema).toEqual({ aspect_ratio: { type: 'enum', values: ['9:16', '16:9', '4:3', '3:4', '1:1', '2:3', '3:2'] } });
+  });
 });

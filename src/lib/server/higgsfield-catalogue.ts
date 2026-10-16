@@ -19,7 +19,7 @@ type HiggsfieldModel = {
 
 const ESTIMATE_PROMPT = 'price estimate';
 const ESTIMATE_IMAGE = 'https://higgsfield.ai/estimate.png';
-const SOUL_ASPECTS = ['1:1', '4:3', '3:4', '3:2', '2:3', '5:4', '4:5', '16:9', '9:16', '21:9'];
+const SOUL_ASPECTS = ['9:16', '16:9', '4:3', '3:4', '1:1', '2:3', '3:2'];
 
 const TEXT_TO_VIDEO: WireFields = { prompt: 'prompt', duration: 'duration', images: [] };
 const IMAGE_TO_VIDEO: WireFields = { prompt: 'prompt', duration: 'duration', images: ['image_url'] };
@@ -31,7 +31,7 @@ export const HIGGSFIELD_MODELS: readonly HiggsfieldModel[] = [
     catalogue: 'image',
     fields: { prompt: 'prompt', aspectRatio: 'aspect_ratio', resolution: 'resolution', images: [] },
     numeric: [],
-    priceBy: { key: 'resolution', values: ['2K', '4K'] },
+    priceBy: { key: 'resolution', values: ['720p', '1080p'] },
     schema: { aspect_ratio: SOUL_ASPECTS },
     estimateBase: { prompt: ESTIMATE_PROMPT }
   },
