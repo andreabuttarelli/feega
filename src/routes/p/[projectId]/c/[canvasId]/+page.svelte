@@ -1134,6 +1134,9 @@
   });
 
   function warmMotion(id: string) {
+    if (!nodes.some((n) => n.id === id && n.version > 0)) {
+      return;
+    }
     prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
   }
 
