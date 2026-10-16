@@ -2,7 +2,6 @@ export const STUDIO_MIN_AGE = 21;
 
 export enum ModelVerdict {
   Allowed = 'allowed',
-  RealPerson = 'real_person',
   UploadedPhotos = 'uploaded_photos',
   UnknownAge = 'unknown_age',
   UnderAge = 'under_age'
@@ -10,23 +9,18 @@ export enum ModelVerdict {
 
 export const MODEL_VERDICT_TEXT: Readonly<Record<ModelVerdict, string>> = {
   [ModelVerdict.Allowed]: '',
-  [ModelVerdict.RealPerson]: 'Catalogue talents are real people: the studio casts only synthetic models.',
   [ModelVerdict.UploadedPhotos]: 'Built from uploaded photos, so it may be a real person.',
   [ModelVerdict.UnknownAge]: `Set an apparent age of ${STUDIO_MIN_AGE} or more first.`,
   [ModelVerdict.UnderAge]: `Studio models must look ${STUDIO_MIN_AGE} or older.`
 };
 
-export type ModelFacts = { orgId: string | null; source: string; age: number | null };
+export type ModelFacts = { source: string; age: number | null };
 
 const SOURCE_VERDICT: Readonly<Record<string, ModelVerdict>> = {
-  catalogue: ModelVerdict.RealPerson,
   upload: ModelVerdict.UploadedPhotos
 };
 
 export function castingVerdict(model: ModelFacts): ModelVerdict {
-  if (model.orgId === null) {
-    return ModelVerdict.RealPerson;
-  }
   const bySource = SOURCE_VERDICT[model.source];
   if (bySource) {
     return bySource;
