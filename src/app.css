@@ -167,6 +167,7 @@
   --ui-danger: #e5484d;
   --link-live: var(--ui-ok);
   --link-pending: var(--ui-warn);
+  --ui-wire-iterate: var(--ui-warn);
   --link-down: var(--ui-danger);
   --playhead: #ff3b30;
   --ui-bar-h: 48px;

@@ -74,7 +74,7 @@ const { deps, upstreamMedia, providerLoad } = vi.hoisted(() => ({
 vi.mock('$lib/server/task-providers-config', () => ({ taskRunDeps: (db: Db) => deps.current!(db) }));
 vi.mock('$app/environment', () => ({ dev: true, browser: false, building: false }));
 vi.mock('$env/dynamic/private', () => ({ env: { UNCENSORED_DEV_MANUAL_VERIFICATION: 'true' } }));
-vi.mock('./node-model', () => ({ resolveNodeModel: async (_m: string, model: string | null) => ({ ok: true, model }) }));
+vi.mock('./node-model', () => ({ resolveModelIn: async (_mode: string, _m: string, model: string | null) => ({ ok: true, model }) }));
 vi.mock('$lib/server/canvas/upstream', () => ({
   upstreamInputsFor: async () => ({
     text: [],
