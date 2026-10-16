@@ -76,8 +76,8 @@ function resolveItem(item: Record<string, unknown>, signed: Map<string, string>)
   if (!signedUrl) {
     return item;
   }
-  const isThumbnail = item.url === item.thumbnailUrl;
-  return { ...item, thumbnailUrl: signedUrl, url: isThumbnail ? signedUrl : item.url };
+  const urlIsStill = item.type !== 'video' || item.url === item.thumbnailUrl;
+  return { ...item, thumbnailUrl: signedUrl, url: urlIsStill ? signedUrl : item.url };
 }
 
 function resolveMedia(media: Record<string, unknown> | null, signed: Map<string, string>): Record<string, unknown> | null {

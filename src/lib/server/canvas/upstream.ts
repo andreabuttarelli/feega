@@ -307,7 +307,7 @@ async function toUpstreamNode(
       };
     }
 
-    return { id: node.id, type: node.type, medium: 'text', model: null, text: null, mediaUrl: null };
+    return { id: node.id, type: node.type, medium: 'image', model: null, text: null, mediaUrl: null, mediaUrls: items.flatMap((item) => item.mediaUrls) };
   }
 
   if (node.type === 'select') {
