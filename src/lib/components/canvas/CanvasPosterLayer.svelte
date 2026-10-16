@@ -1,6 +1,7 @@
 <script lang="ts">
   import { useNodes, useStore } from '@xyflow/svelte';
   import { onMount, untrack } from 'svelte';
+  import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
   import { LOD_CLASS, lodNext, oncePerUrl, posterRects, PosterSource, THUMB_WIDTH, type PlacedNode, type Poster } from '$lib/canvas/poster-lod';
 
   let { posters }: { posters: Map<string, Poster> } = $props();
@@ -24,6 +25,7 @@
 
   $effect(() => {
     canvas.closest('.svelte-flow')?.classList.toggle(LOD_CLASS, active);
+    canvasLod.set(active);
   });
 
   const VIDEO_FRAME_S = 0.1;

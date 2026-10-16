@@ -1,9 +1,10 @@
 <script lang="ts" module>
   import { SvelteMap } from 'svelte/reactivity';
 
-  import type { Slots } from '$lib/canvas/motion-preview';
+  import type { Slots, MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
   const posters = new SvelteMap<string, string>();
+  const previews = new Map<string, Preview>();
   let slots = $state<Slots>({ playing: null, capturing: null });
 </script>
 
@@ -27,9 +28,11 @@
   import { DRAWN_EVENT } from '$lib/motion/hyperframes/measure';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
+  import { tiles } from '$lib/canvas/live-tiles.svelte';
+  import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
   import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
   import { coverFrame } from '$lib/motion/still';
-  import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
+  import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn } from '$lib/canvas/motion-preview';
 
   let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null, onenter = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null; onenter?: (() => void) | null } = $props();
 
@@ -64,14 +67,15 @@
   const layers = $derived(nodeLayers(nodeMode, paint));
   const chrome = $derived(frameChrome(node.kind));
   const previewing = $derived(nodeMode === NodeMode.Preview);
-  const capturable = $derived(nodeMode !== NodeMode.Edit && !local);
+  const liveHere = $derived(sight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending));
+  const liveTile = $derived(liveHere && (!!local || node.docHeadRevision > 0) && (!previewing || tiles.live(node.id)));
+  const capturable = $derived(nodeMode !== NodeMode.Edit && !liveTile);
   let ownDrawn = $state(false);
   let decodedPoster = $state<string | null>(untrack(() => poster));
   const shownPoster = $derived(local || decodedPoster !== poster ? null : decodedPoster);
   const painted = $derived((!!poster && shownPoster === poster) || ownDrawn);
   const playerUp = $derived(mounted && !!preview);
-  const keptLive = $derived(!!local && sight === Sight.InView && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending));
-  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || keptLive));
+  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));
@@ -91,6 +95,16 @@
     if (sight === Sight.OutOfView) {
       slots = stopIn(slots, node.id);
     }
+  });
+
+  $effect(() => {
+    const id = node.id;
+    if (sight === Sight.OutOfView || canvasLod.far) {
+      tiles.drop(id);
+      return;
+    }
+    tiles.want(id);
+    return () => tiles.drop(id);
   });
 
   $effect(() => {
@@ -121,11 +135,21 @@
       return;
     }
     const revision = node.docHeadRevision;
+    const key = `${node.id}:${revision}`;
+    const cached = previews.get(key);
+    if (cached) {
+      fetched = cached;
+      previewRevision = revision;
+      return;
+    }
     const url = `${previewUrl}?revision=${revision}`;
     let stale = false;
     void fetch(url)
       .then((res) => (res.ok ? (res.json() as Promise<Preview>) : null))
       .then((next) => {
+        if (next) {
+          previews.set(key, next);
+        }
         if (!stale && next) {
           fetched = next;
           previewRevision = revision;
@@ -416,6 +440,7 @@
 
   .open {
     position: absolute;
+    z-index: 2;
     right: 6px;
     top: 6px;
     padding: 4px 8px;
