@@ -19,9 +19,9 @@ test.describe('connect to new @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
 
     const nodes = page.locator('.svelte-flow__node');
-    await connectNew(page, nodes.nth(0), 'Image');
+    await connectNew(page, nodes.nth(0), 'Generate image');
     await expect(nodes).toHaveCount(2);
-    await connectNew(page, nodes.nth(1), 'Video');
+    await connectNew(page, nodes.nth(1), 'Generate video');
     await expect(nodes).toHaveCount(3);
     await page.mouse.click(5, 450);
 

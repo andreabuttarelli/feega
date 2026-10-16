@@ -3,7 +3,7 @@ import { fakeDb } from '$lib/server/db/fake-db';
 import type { Db } from '$lib/server/db/client';
 import { runGenNode } from './generate';
 import { PEOPLE_REFUSAL, PeopleVerdict, type Reference } from '$lib/server/moderation/people';
-import type { WiroModel, WiroRunDeps } from './wiro-run';
+import type { TaskModel, TaskRunDeps } from './task-run';
 import type { ScreenPorts } from '$lib/server/moderation/screen';
 
 const ORG = '11111111-1111-1111-1111-111111111111';
@@ -17,7 +17,7 @@ const INFLUENCER_NODE = '77777777-7777-7777-7777-777777777777';
 const UNCENSORED = 'wiro/wiro-partners/z-image-uncensored';
 const SAFE = 'wiro/alibaba/qwen-image-3-0-pro';
 
-const models: Record<string, WiroModel> = {
+const models: Record<string, TaskModel> = {
   [UNCENSORED]: {
     id: UNCENSORED,
     catalogue: 'image',
@@ -43,8 +43,8 @@ const judgeIdentifiability = vi.fn();
 const record = vi.fn();
 const screen: ScreenPorts = { decide, judge, decideIdentifiability, judgeIdentifiability, record };
 
-const { deps } = vi.hoisted(() => ({ deps: { current: null as null | ((db: Db) => WiroRunDeps) } }));
-vi.mock('$lib/server/wiro-config', () => ({ wiroRunDeps: (db: Db) => deps.current!(db) }));
+const { deps } = vi.hoisted(() => ({ deps: { current: null as null | ((db: Db) => TaskRunDeps) } }));
+vi.mock('$lib/server/task-providers-config', () => ({ taskRunDeps: (db: Db) => deps.current!(db) }));
 vi.mock('$app/environment', () => ({ dev: true, browser: false, building: false }));
 vi.mock('$env/dynamic/private', () => ({ env: { UNCENSORED_DEV_MANUAL_VERIFICATION: 'true' } }));
 vi.mock('./node-model', () => ({ resolveNodeModel: async (_m: string, model: string | null) => ({ ok: true, model }) }));
@@ -76,7 +76,7 @@ beforeEach(async () => {
   gateway.run.mockResolvedValue({ taskId: '2221' });
   const { uncensoredAccess } = await import('$lib/server/uncensored-access');
   deps.current = (db) => ({
-    gateway,
+    providers: { wiro: gateway },
     model: async (id) => models[id] ?? null,
     access: (orgId) => uncensoredAccess(db, orgId),
     screen: () => screen,

@@ -623,6 +623,36 @@ const CUSTOM_CARDS: Record<string, TemplateCard> = {
     bestFormats: [PORTRAIT, SQUARE, TALL],
     goodFor: ['a poster or editorial piece', 'change, time, erosion']
   }),
+  'framed-reveal': card({
+    roles: [R.Gallery, R.Opener],
+    energy: Energy.Calm,
+    loops: true,
+    onScreen: [beat(0, 12, 'a colour picture in a frame over a full-bleed black and white one; every 4 s the frame wipes to the next pair with parallax and a slow push-in')],
+    needs: { media: media(2, 12, MediaAspect.Portrait), text: TextAmount.Word },
+    bestFormats: ALL_FORMATS,
+    edges: { start: EdgeTone.Media, end: EdgeTone.Media, transition: Joint.Wipe },
+    goodFor: ['portraits or editorial photos', 'a moody gallery']
+  }),
+  'showcase-scatter': card({
+    roles: [R.Gallery, R.Opener],
+    energy: Energy.Calm,
+    loops: true,
+    onScreen: [beat(0, 2, 'pictures, colour blocks and a type card pop in around a centred headline'), beat(2, 11, 'they drift at different depths; one picture glides across the headline'), beat(11, 12, 'everything leaves')],
+    needs: { media: media(3, 8), text: TextAmount.Line },
+    bestFormats: ALL_FORMATS,
+    edges: { start: LIGHT, end: LIGHT, transition: Joint.Fade },
+    goodFor: ['a portfolio or collection', 'a studio reel opener']
+  }),
+  'card-cascade': card({
+    roles: [R.Gallery, R.List],
+    energy: Energy.Medium,
+    loops: true,
+    onScreen: [beat(0, 16, 'rounded cards step along a diagonal one after another every 2 s: pictures, a type card, a scrolling word list, a big letter')],
+    needs: { media: media(3, 8, MediaAspect.Square), text: TextAmount.Lines },
+    bestFormats: ALL_FORMATS,
+    edges: { start: LIGHT, end: LIGHT },
+    goodFor: ['a portfolio', 'services or values as a list']
+  }),
   'poster-liquid-glass': card({
     roles: [R.Opener, R.Background],
     energy: Energy.Calm,
@@ -771,7 +801,15 @@ const POSTERS: Record<string, { what: string; photos: [number, number] | null; t
   'month-grid': { what: 'huge thin month words down the page under a grid of yellow event cards', photos: null, tone: LIGHT, goodFor: 'a calendar of events' },
   'rotated-cards': { what: 'a serif title over slightly rotated colour cards, each with a date, a tag and a name', photos: null, tone: LIGHT, goodFor: 'a series of dates or people' },
   'brick-caps': { what: 'black bars with big white caps lines over a brick grid on pale yellow, an accent circle', photos: null, tone: COLOUR, goodFor: 'an event day and programme' },
-  'dark-tags': { what: 'a huge light grey multi-line title on dark grey with small coloured name tags scattered across it', photos: null, tone: DARK, goodFor: 'names or credits' }
+  'dark-tags': { what: 'a huge light grey multi-line title on dark grey with small coloured name tags scattered across it', photos: null, tone: DARK, goodFor: 'names or credits' },
+  'diagonal-pills': { what: 'diagonal lilac pills with gradient tails on black, words along them and a big rotated title', photos: null, tone: DARK, goodFor: 'a course or a role' },
+  'blue-trails': { what: 'rows of electric blue dots with gradient trails on grainy black, a two-line title', photos: null, tone: DARK, goodFor: 'a course or a skill set' },
+  'step-blobs': { what: 'a huge thin title and number on a grey grid with black rounded stepped shapes and small notes', photos: null, tone: LIGHT, goodFor: 'a guide or explainer' },
+  'metaball-listing': { what: 'a ruled grid of dated events, pink metaball blobs with halftone, huge black words across the rows', photos: null, tone: LIGHT, goodFor: 'a monthly programme' },
+  'pixel-burst': { what: 'a slanted pixel title on black, a pink starburst masking a photo, heavy stacked words', photos: [1, 1], tone: DARK, goodFor: 'a contest or a call to act' },
+  'acid-strokes': { what: 'acid green with black brush strokes and starbursts, a centred title with a script word', photos: null, tone: COLOUR, goodFor: 'an exhibition' },
+  'glyph-specimen': { what: 'giant black glyph crops in a ruled grid under a fluorescent blob chain, vertical titles', photos: null, tone: LIGHT, goodFor: 'a typeface or a design show' },
+  'stencil-steps': { what: 'green and magenta stepped rectangles, stencil-cut syllables down the page, black label tags', photos: null, tone: LIGHT, goodFor: 'a festival programme' }
 };
 
 const posterCard = (p: (typeof POSTERS)[string]): TemplateCard =>

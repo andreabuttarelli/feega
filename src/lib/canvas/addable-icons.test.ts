@@ -5,6 +5,9 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CANVAS_ADDABLE, ADDABLE_LABEL } from './addable';
 import { ADDABLE_ICON } from './addable-icons';
+import { ACTIONS } from '$lib/motion/actions';
+import { Command } from '$lib/motion/shortcuts';
+import { GEN_MEDIUMS } from './gen-node';
 
 /**
  * UN NOME E UN'ICONA PER TIPO, IN UN POSTO SOLO.
@@ -70,5 +73,15 @@ describe('le icone che un componente importa', () => {
     }
 
     expect(missing).toEqual([]);
+  });
+});
+
+describe('a generation never wears a drawing tool icon', () => {
+  it('Generate text, image and video carry the generate badge, not the Text tool T', () => {
+    const tools = [Command.ToolText, Command.ToolRectangle, Command.ToolEllipse, Command.ToolPen].map((c) => ACTIONS[c].icon);
+    for (const medium of GEN_MEDIUMS) {
+      expect(tools).not.toContain(ADDABLE_ICON[medium]);
+    }
+    expect(new Set(GEN_MEDIUMS.map((m) => ADDABLE_ICON[m])).size).toBe(GEN_MEDIUMS.length);
   });
 });

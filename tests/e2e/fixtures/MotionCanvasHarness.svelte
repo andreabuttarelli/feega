@@ -1,22 +1,33 @@
 <script lang="ts">
   import CanvasFlow, { type Tile } from '$lib/components/canvas/CanvasFlow.svelte';
   import { nodeSize } from '$lib/canvas/node-size';
+  import { PosterSource } from '$lib/canvas/poster-lod';
+  import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import type { HarnessNode } from './motion-canvas-harness';
 
   let { nodes }: { nodes: HarnessNode[] } = $props();
 
+  const DOM_ONLY = '-dom';
+  const sourceOf = (node: HarnessNode) => (node.source?.startsWith(PosterSource.VideoFrame) ? PosterSource.VideoFrame : PosterSource.Image);
+  const layered = (node: HarnessNode) => !node.source?.endsWith(DOM_ONLY);
+
   const tiles: Tile[] = nodes.map((node) => {
     const size = nodeSize('motion', { format: node.format });
-    return { id: node.id, x: node.x, y: node.y, w: size.w, h: size.h, kind: 'motion', poster: node.poster };
+    return { id: node.id, x: node.x, y: node.y, w: size.w, h: size.h, kind: 'motion', poster: layered(node) ? { url: node.poster, source: sourceOf(node) } : undefined };
   });
-  const posterOf = new Map(nodes.map((node) => [node.id, node.poster]));
+  const byId = new Map(nodes.map((node) => [node.id, node]));
 </script>
 
 <div class="harness">
   <CanvasFlow {tiles} onSelectionChange={() => (window.selectionEmits = (window.selectionEmits ?? 0) + 1)}>
-    {#snippet tile({ id })}
+    {#snippet tile({ id, selected })}
+      {@const node = byId.get(id)!}
       <div class="stage" data-testid="motion-node">
-        <img class="poster" src={posterOf.get(id)} alt="" draggable="false" loading="lazy" decoding="async" />
+        {#if sourceOf(node) === PosterSource.VideoFrame}
+          <LiveVideo src={node.poster} nodeId={id} {selected} controls muted />
+        {:else}
+          <img class="poster" src={node.poster} alt="" draggable="false" loading="lazy" decoding="async" />
+        {/if}
       </div>
     {/snippet}
   </CanvasFlow>

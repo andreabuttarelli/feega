@@ -20,10 +20,12 @@
   import { keepSame } from '$lib/canvas/snapshot-keep';
   import { AssetSize, sized } from '$lib/canvas/asset-url';
   import TieredImage from '$lib/components/canvas/TieredImage.svelte';
+  import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
+  import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { ActionKind, SaveFailure, actionKind, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -75,13 +77,18 @@
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
+  import { pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
   import { FEEGA_TOKENS } from '$lib/motion/brand';
   import { AssetKind } from '$lib/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
-  import { frameNodeSize, motionEditorPath, motionOf, motionPreviewPath } from '$lib/canvas/motion-node';
+  import type { DrawnWire } from '$lib/motion/draw-create';
+  import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, openingFor, tileChromeOf } from '$lib/canvas/motion-node';
+  import { NameTag } from '$lib/canvas/node-label';
+  import { layoutOf, rotateGroup, type Placed } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { barContextOf } from '$lib/canvas/bottom-bar';
   import { CanvasState, NodeMode, Opening, Reframe, dismissedAfterClick, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
@@ -92,8 +99,9 @@
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
-  import { DragPhase, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
+  import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
@@ -125,7 +133,7 @@
   import { hasUpstreamText } from '$lib/canvas/upstream-inputs';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
-  import { snapResolution } from '$lib/canvas/gen-node';
+  import { snapAspectRatio, snapResolution } from '$lib/canvas/gen-node';
   import { snapDynamicParams } from '$lib/canvas/model-params';
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
@@ -296,11 +304,105 @@
     run: () => undo()
   };
 
+  const freeElement = (ids: string[]): string | null => {
+    const row = ids.length === 1 ? nodes.find((n) => n.id === ids[0]) : null;
+    const holdsNodes = row ? nodes.some((n) => layoutOf(n.data).groupId === row.id) : false;
+    return row && !tileChromeOf(row).takesDrops && !holdsNodes ? row.id : null;
+  };
+
+  function tileDragOver(ids: string[], client: PointerPoint) {
+    const id = freeElement(ids);
+    markFrame(id ? client : null, id);
+  }
+
+  function tileDrop(ids: string[], client: PointerPoint): DropVerdict {
+    markFrame(null, null);
+    const id = freeElement(ids);
+    const frame = id ? frameUnderPointer(client, id) : null;
+    if (!id || !frame) {
+      return DropVerdict.Ignored;
+    }
+    void post('moveFree', { source: id, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frame.frameId, at: frame.at }) }).then((res) => {
+      if (landed(res)) {
+        nodes = nodes.filter((n) => n.id !== id);
+      }
+    });
+    return DropVerdict.Taken;
+  }
+
+  async function regroup(action: string, fields: Record<string, string>) {
+    const res = await post(action, fields);
+    if (res?.outcome !== 'done') {
+      return;
+    }
+    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+    await refresh();
+  }
+
+  function rotateGroupBy(id: string, degrees: number) {
+    const group = nodes.find((n) => n.id === id);
+    if (!group) {
+      return;
+    }
+    const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
+    const turned = new Map(rotateGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), degrees).map((t) => [t.id, t]));
+    nodes = nodes.map((n) => {
+      const t = turned.get(n.id);
+      return t ? { ...n, x: t.x, y: t.y, data: { ...n.data, rotation: t.rotation } } : n;
+    });
+    void post('rotateGroup', { id, degrees: String(degrees) });
+  }
+
+  function groupElements(ids: string[]) {
+    if (ids.length > 1) {
+      void regroup('groupElements', { ids: JSON.stringify(ids) });
+    }
+  }
+
+  function ungroupElements(ids: string[]) {
+    for (const id of ids) {
+      void regroup('ungroupElement', { id });
+    }
+  }
+
+  async function drawElement(drawn: DrawnWire) {
+    const res = await post('drawElement', { drawn: JSON.stringify(drawn) });
+    if (res?.outcome !== 'done') {
+      return;
+    }
+    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+    const node = res.node as CanvasNodeRecord | null;
+    if (node) {
+      nodes = [...nodes.filter((n) => n.id !== node.id), toTile(node, { select: true })];
+    }
+  }
+
   async function dropOutput(nodeId: string, client: PointerPoint) {
     const drop = dropAt(client, null);
-    if (drop) {
-      landed(await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
+    if (!drop) {
+      return;
     }
+    if (drop.on !== DropOn.Canvas) {
+      landed(await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    const source = nodes.find((n) => n.id === nodeId);
+    const file = source?.data.refId ?? source?.data.assetId;
+    const picture = assetUrl(typeof file === 'string' ? file : null);
+    if (picture) {
+      catalogPosters.set(id, picture);
+    }
+    nodes = [...nodes, toTile(pendingOutput(id, drop))];
+    const res = await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop), node_id: id });
+    const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+    nodes = settle(nodes, id, node ? toTile(node) : null);
+    if (!node) {
+      catalogPosters.delete(id);
+      return;
+    }
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -831,22 +933,25 @@
   }
 
   const tiles = $derived(
-    nodes.map((n) => ({ n, ports: portsOfTile(n), outputs: outputsOfTile(n) })).map(({ n, ports, outputs }) => ({
+    nodes.map((n) => ({ n, chrome: tileChromeOf(n), ports: portsOfTile(n), outputs: outputsOfTile(n) })).map(({ n, chrome, ports, outputs }) => ({
       id: n.id,
       x: n.x,
       y: n.y,
       w: n.w,
       h: tileHeight(n),
-      connectable: true,
-      connectors: ports.inputs,
-      output: outputs.some((o) => !o.custom) ? null : ports.output,
-      outputs,
+      connectable: chrome.ports,
+      connectors: chrome.ports ? ports.inputs : [],
+      output: !chrome.ports || outputs.some((o) => !o.custom) ? null : ports.output,
+      outputs: chrome.ports ? outputs : [],
       kind: n.type,
       displayName: n.displayName,
+      tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
+      rotation: layoutOf(n.data).rotation,
+      rotatable: motionOf(n)?.kind === FrameKind.Group,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
-      poster: frameLook(n).poster ?? undefined,
+      poster: tilePoster(n) ?? undefined,
       minW: nodeSize(n.type, n.data).w,
       minH: nodeSize(n.type, n.data).h,
       node: n.type === 'effects'
@@ -952,7 +1057,11 @@
   let requestedMotion = $state<string | null>(null);
   let pageWidth = $state(0);
   const opening = $derived(openingOf(viewportOf(pageWidth)));
-  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, opening, requestedMotion));
+  const openingHere = $derived.by(() => {
+    const row = selectedIds.length === 1 ? nodes.find((n) => n.id === selectedIds[0]) : null;
+    return row ? openingFor(row, opening) : opening;
+  });
+  const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, openingHere, requestedMotion));
 
   $effect(() => {
     if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => dismissedMotion)) {
@@ -984,6 +1093,17 @@
   $effect(() => {
     canvasSelection.set(selectedIds);
     return () => canvasSelection.set([]);
+  });
+
+  $effect(() => {
+    propertiesTarget.set(targetOf(selectedIds, nodes));
+    return () => propertiesTarget.set(null);
+  });
+
+  $effect(() => {
+    if ($propertiesRequest) {
+      requestMotion($propertiesRequest);
+    }
   });
 
   let seenRevision = '';
@@ -1077,7 +1197,10 @@
       peer: { userId: user.id, name: user.email ?? 'User', avatar: null,
         path: `/p/${data.projectId}/c/${data.canvas.id}`, threadId: null },
       onChange: (change) => {
-        if (!isOwnEcho(change, nodes)) { refreshSoon(); }
+        if (isOwnEcho(change, nodes)) { return; }
+        const moved = adoptFrameHead(change, nodes, saves.dirtyKeys);
+        if (moved) { nodes = moved; return; }
+        refreshSoon();
       },
       onReconnect: () => { void checkStale(Trigger.Reconnect); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
@@ -1294,6 +1417,7 @@
   }
 
   let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
+  const catalogPosters = new SvelteMap<string, string>();
 
   function frameDraft(templateId: string, format: MotionFormat): Instance | null {
     const entry = data.componentTemplates.find((t) => t.id === templateId);
@@ -1316,13 +1440,18 @@
     const probe = pendingFrame(at, doc);
     const frameSize = { w: probe.size.width ?? 0, h: probe.size.height ?? 0 };
     const spot = placeNear(at, frameSize, occupiedRects());
-    const shown = pendingFrame(spot, doc);
-    nodes = [...nodes, toTile(shown)];
-    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y });
+    const id = crypto.randomUUID();
+    const name = data.componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
+    const poster = item?.preview?.poster;
+    if (poster) {
+      catalogPosters.set(id, poster);
+    }
+    nodes = [...nodes, toTile(placedFrame({ id, canvasId: data.canvas.id, projectId: data.projectId, name, at: spot, doc }))];
+    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y, node_id: id });
     const node = result?.node as CanvasNodeRecord | undefined;
-    nodes = nodes.filter((n) => n.id !== shown.id);
-    if (node && !nodes.some((n) => n.id === node.id)) {
-      nodes = [...nodes, toTile(node)];
+    nodes = settle(nodes, id, node ? toTile(node) : null);
+    if (!node) {
+      catalogPosters.delete(id);
     }
     if (node && offCentre(at, spot, frameSize)) {
       focusOn([node.id]);
@@ -1740,6 +1869,12 @@
 
   async function move(id: string, x: number, y: number) {
     const before = nodes.find((node) => node.id === id);
+    if (before && motionOf(before)?.kind === FrameKind.Group) {
+      const delta = { dx: x - before.x, dy: y - before.y };
+      nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : layoutOf(n.data).groupId === id ? { ...n, x: n.x + delta.dx, y: n.y + delta.dy } : n));
+      await post('moveGroup', { id, x, y });
+      return;
+    }
     nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : n));
 
     const result = await post('move', { node_id: id, x, y });
@@ -1757,13 +1892,21 @@
    */
   const FIT_SLACK_PX = 1;
 
+  const PICTURE_OF_KIND: Record<FrameKind, (motion: { format: MotionFormat }, row: { w: number; h: number }) => { width: number; height: number }> = {
+    [FrameKind.Frame]: (motion) => FORMATS[motion.format],
+    [FrameKind.Element]: (_, row) => ({ width: row.w, height: row.h }),
+    [FrameKind.Group]: (_, row) => ({ width: row.w, height: row.h })
+  };
+
   function frameFit(id: string, w: number, mode: NodeMode = NodeMode.Preview): { w: number; h: number } | null {
-    const motion = motionOf(nodes.find((node) => node.id === id) ?? { id, type: '', data: {} });
-    if (!motion) {
+    const row = nodes.find((node) => node.id === id);
+    const motion = motionOf(row ?? { id, type: '', data: {} });
+    if (!motion || !row) {
       return null;
     }
     const open = layersSource.video;
-    return frameNodeSize(w, open?.nodeId === id ? open.doc : FORMATS[motion.format], mode);
+    const picture = open?.nodeId === id ? open.doc : PICTURE_OF_KIND[motion.kind](motion, row);
+    return frameNodeSize(w, picture, mode, motion.kind);
   }
 
   $effect(() => {
@@ -1772,7 +1915,7 @@
     if (!open || !row) {
       return;
     }
-    const fit = frameNodeSize(row.w, open.doc);
+    const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motionOf(row)?.kind);
     if (Math.abs(fit.h - row.h) > FIT_SLACK_PX) {
       void resize(row.id, fit.w, fit.h);
     }
@@ -1970,6 +2113,15 @@
     focus = { ids, key: (focus?.key ?? 0) + 1, free, mode };
   }
 
+  function tilePoster(n: { id: string; type: string; data: Record<string, unknown> }): Poster | null {
+    const motion = frameLook(n).poster;
+    if (motion) {
+      return { url: motion, source: PosterSource.Image };
+    }
+    const file = n.data.refId ?? n.data.assetId;
+    return mediaPoster(n.type, assetUrl(typeof file === 'string' ? file : null));
+  }
+
   function frameLook(n: { id: string; type: string; data: Record<string, unknown> }) {
     const motion = motionOf(n);
     return motion ? { poster: assetUrl(motion.posterAssetId), still: motion.format === MotionFormat.Poster } : {};
@@ -1981,11 +2133,16 @@
         return nodes.map((n) => ({ id: n.id, type: n.type, name: n.displayName ?? null, head: frameHead(n.type, n.data), ...frameLook(n) }));
       },
       outlinesUrl: `/p/${data.projectId}/c/${data.canvas.id}/frame-outlines`,
+      outlines: data.outlines,
       previewUrl: (nodeId) => motionPreviewPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId }),
       get selected() {
         return selectedIds;
       },
-      select: (ids) => focusOn(ids, undefined, FocusMode.Select)
+      select: (ids) => focusOn(ids, undefined, FocusMode.Select),
+      open: (id) => {
+        requestMotion(id);
+        focusOn([id], undefined, FocusMode.Select);
+      }
     })
   );
 
@@ -2234,6 +2391,16 @@
       // Un modello nuovo può non fare più il gradino di durata o la risoluzione salvati: si
       // scivola al più vicino fra quelli che offre — mai una durata o un token di risoluzione che
       // quel modello rifiuta (`happyhorse-1.0` non fa 480p, `video_renders` cb1de6e2).
+      if (model !== undefined && (n.type === 'video' || n.type === 'image')) {
+        const nextModel = catalogue[n.type]?.find((c) => c.id === model);
+        const aspectRatio = nextModel ? snapAspectRatio(nextModel, nextParams.aspectRatio as string | undefined) : undefined;
+        if (nextModel && aspectRatio) {
+          nextParams.aspectRatio = aspectRatio;
+        } else if (nextModel) {
+          delete nextParams.aspectRatio;
+        }
+      }
+
       if (model !== undefined && n.type === 'video') {
         const nextModel = catalogue.video?.find((c) => c.id === model);
         const options = nextModel?.durationOptions;
@@ -2689,6 +2856,12 @@
     onCreate={create}
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
+    onDraw={drawElement}
+    onRotate={rotateGroupBy}
+    onGroup={groupElements}
+    onUngroup={ungroupElements}
+    onTileDragOver={tileDragOver}
+    onTileDrop={tileDrop}
     onFlow={(fn) => (toFlow = fn)}
     onUpload={upload}
     onDuplicate={duplicate}
@@ -2736,6 +2909,7 @@
           <UploadedNode
             node={{ ...uploaded, url: assetUrl(uploaded.assetId) ?? uploaded.url }}
             medium={row.type === 'video' ? 'video' : 'image'}
+            {selected}
           />
         {:else if gen}
           <GenNode
@@ -2803,8 +2977,7 @@
               {:else if gen.medium === 'audio'}
                 <AudioResult nodeId={id} {...audioUrlsOf(row)} files={audioFilesOf(row, gen.params.targetLanguage ?? null)} />
               {:else if gen.medium === 'video'}
-                <!-- svelte-ignore a11y_media_has_caption -->
-                <video src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} controls playsinline preload="metadata"></video>
+                <LiveVideo src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} {selected} controls />
                 <div class="gen-download">
                   <NodeDownload kind="video" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
@@ -2915,10 +3088,11 @@
             onpickcomponent={() => (componentPickFor = id)}
           />
         {:else if row.type === PENDING_FRAME_TYPE}
-          <div class="pending-frame" data-testid="motion-node-pending" aria-busy="true"></div>
+          {@const look = catalogPosters.get(id)}
+          <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}</div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} />
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId) ?? catalogPosters.get(id) ?? null} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} onenter={() => requestMotion(id)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}
@@ -3018,6 +3192,17 @@
     height: 100%;
     background: var(--muted);
     animation: pending-pulse 1.2s ease-in-out infinite alternate;
+  }
+
+  .pending-frame.shown {
+    background: none;
+    animation: none;
+  }
+
+  .pending-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 
   @keyframes pending-pulse {

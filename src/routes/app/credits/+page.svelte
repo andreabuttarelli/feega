@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiEnhance } from '$lib/dashboard/api-enhance';
   import { _ } from 'svelte-i18n';
   import '$lib/styles/settings-shell.css';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
@@ -95,7 +96,7 @@
                 <td>{$_('app.account.billing.creditsIncluded', { values: { credits: rung.credits / DISPLAY_UNITS_PER_CREDIT } })}</td>
                 <td>
                   {#if action}
-                    <form method="POST" action={`?/upgrade`}>
+                    <form method="POST" action={`?/upgrade`} use:apiEnhance>
                       <input type="hidden" name="usd" value={rung.price} />
                       <Button size="sm" type="submit">{$_(`app.account.billing.${action}`)}</Button>
                     </form>
@@ -104,7 +105,7 @@
                   {/if}
                 </td>
                 <td>
-                  <form method="POST" action={`?/buyOneTime`}>
+                  <form method="POST" action={`?/buyOneTime`} use:apiEnhance>
                     <input type="hidden" name="usd" value={rung.price} />
                     <Button variant="secondary" size="sm" type="submit">{$_('app.account.billing.topUp', { values: { credits: rung.credits / DISPLAY_UNITS_PER_CREDIT } })}</Button>
                   </form>
@@ -119,8 +120,8 @@
     {#if data.hasBilling}
       <Field label={$_('app.settings.billing.manage')} hint={$_('app.settings.billing.manageInvoicesDesc')} layout={FieldLayout.Row}>
         <div class="flex flex-wrap gap-2">
-          <form method="POST" action={`?/billingPortal`}><input type="hidden" name="flow" value="invoices" /><Button variant="secondary" size="sm" type="submit">{$_('app.settings.billing.invoices')}</Button></form>
-          <form method="POST" action={`?/billingPortal`}><input type="hidden" name="flow" value="payment_method" /><Button variant="secondary" size="sm" type="submit">{$_('app.settings.billing.changePayment')}</Button></form>
+          <form method="POST" action={`?/billingPortal`} use:apiEnhance><input type="hidden" name="flow" value="invoices" /><Button variant="secondary" size="sm" type="submit">{$_('app.settings.billing.invoices')}</Button></form>
+          <form method="POST" action={`?/billingPortal`} use:apiEnhance><input type="hidden" name="flow" value="payment_method" /><Button variant="secondary" size="sm" type="submit">{$_('app.settings.billing.changePayment')}</Button></form>
         </div>
       </Field>
     {/if}

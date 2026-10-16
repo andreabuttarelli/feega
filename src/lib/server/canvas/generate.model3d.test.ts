@@ -3,8 +3,8 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fakeDb } from '$lib/server/db/fake-db';
 import type { Db } from '$lib/server/db/client';
-import { reconcileWiroNodeRuns, runGenNode } from './generate';
-import type { WiroModel, WiroRunDeps } from './wiro-run';
+import { reconcileTaskNodeRuns, runGenNode } from './generate';
+import type { TaskModel, TaskRunDeps } from './task-run';
 import type { ScreenPorts } from '$lib/server/moderation/screen';
 import { readGlbJson } from '$lib/server/content-credentials';
 import { MODEL3D_INPUT_REQUIRED } from '$lib/canvas/model3d-run';
@@ -20,7 +20,7 @@ const TRELLIS = 'wiro/microsoft/trellis-2';
 const PRODUCT_URL = 'https://cdn.test/product.png';
 const GLB_FIXTURE = path.join(import.meta.dirname, '..', 'fixtures', 'triangle.glb');
 
-const trellis: WiroModel = {
+const trellis: TaskModel = {
   id: TRELLIS,
   catalogue: 'model3d',
   uncensored: false,
@@ -39,7 +39,7 @@ const screen: ScreenPorts = {
 };
 
 const { deps, upstream, imageStep, moderation } = vi.hoisted(() => ({
-  deps: { current: null as null | ((db: Db) => WiroRunDeps) },
+  deps: { current: null as null | ((db: Db) => TaskRunDeps) },
   upstream: { referenceImageUrls: [] as string[], text: [] as string[] },
   imageStep: { generate: null as unknown as ReturnType<typeof import('vitest').vi.fn> },
   moderation: { screen: null as unknown as ReturnType<typeof import('vitest').vi.fn> }
@@ -60,7 +60,7 @@ vi.mock('$lib/server/offerable-models', () => ({
 vi.mock('./sign-media', () => ({
   signMediaPaths: async (_db: unknown, paths: string[]) => paths.map((p) => (p.startsWith('https://') ? p : `https://signed.test/${p}`))
 }));
-vi.mock('$lib/server/wiro-config', () => ({ wiroRunDeps: (db: Db) => deps.current!(db) }));
+vi.mock('$lib/server/task-providers-config', () => ({ taskRunDeps: (db: Db) => deps.current!(db) }));
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
 vi.mock('./node-model', () => ({ resolveNodeModel: async (_m: string, model: string | null) => ({ ok: true, model }) }));
 vi.mock('$lib/server/canvas/upstream', () => ({
@@ -127,7 +127,7 @@ beforeEach(() => {
   moderation.screen.mockReset();
   moderation.screen.mockResolvedValue({ ok: true });
   deps.current = () => ({
-    gateway,
+    providers: { wiro: gateway },
     model: async (id) => (id === TRELLIS ? trellis : null),
     access: async () => ({ allowed: true }),
     screen: () => screen,
@@ -151,7 +151,7 @@ describe('a 3D node on a Wiro image-to-3D model', () => {
     const out = await runGenNode(db, start());
 
     expect(out.kind).toBe('queued');
-    expect(gateway.run).toHaveBeenCalledWith({ owner: 'microsoft', project: 'trellis-2' }, { inputImage: PRODUCT_URL, pipeline_type: '512' });
+    expect(gateway.run).toHaveBeenCalledWith({ owner: 'microsoft', project: 'trellis-2' }, { inputImage: PRODUCT_URL, pipeline_type: '512' }, expect.any(String));
     const job = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as Record<string, unknown>)?.external_job_id);
     expect((job?.payload as Record<string, unknown>).external_job_id).toBe('wiro:9001');
   });
@@ -182,7 +182,7 @@ describe('a 3D node on a Wiro image-to-3D model', () => {
 
     await runGenNode(db, { ...start(), params: { repeat: 2 } as Record<string, unknown> });
 
-    expect(gateway.run).toHaveBeenCalledWith({ owner: 'microsoft', project: 'trellis-2' }, { inputImage: PRODUCT_URL, pipeline_type: '512' });
+    expect(gateway.run).toHaveBeenCalledWith({ owner: 'microsoft', project: 'trellis-2' }, { inputImage: PRODUCT_URL, pipeline_type: '512' }, expect.any(String));
   });
 });
 
@@ -206,7 +206,8 @@ describe('a 3D node with text and no image', () => {
     );
     expect(gateway.run).toHaveBeenCalledWith(
       { owner: 'microsoft', project: 'trellis-2' },
-      { inputImage: `https://signed.test/${USER}/media/teapot.png`, pipeline_type: '512' }
+      { inputImage: `https://signed.test/${USER}/media/teapot.png`, pipeline_type: '512' },
+      expect.any(String)
     );
 
     const poster = calls.find((c) => c.table === 'assets' && c.op === 'insert' && (c.payload as Record<string, unknown>).type === 'image');
@@ -290,7 +291,7 @@ describe('the run tick lands a 3D model', () => {
     });
     const { db, calls } = fakeDb({ node_runs: [queued], nodes: [model3dNode({ running: true, runId: RUN })], projects: [standardProject] });
 
-    expect(await reconcileWiroNodeRuns(db)).toMatchObject({ done: 1 });
+    expect(await reconcileTaskNodeRuns(db)).toMatchObject({ done: 1 });
 
     const inserted = calls.filter((c) => c.table === 'assets' && c.op === 'insert').map((c) => c.payload as Record<string, unknown>);
     const model = inserted.find((a) => a.type === 'model3d')!;
@@ -312,6 +313,6 @@ describe('the run tick lands a 3D model', () => {
     gateway.task.mockResolvedValue({ state: 'done', costUsd: 0.25, outputs: [{ url: 'https://cdn.wiro.test/preview.png', contentType: 'image/png' }] });
     const { db } = fakeDb({ node_runs: [queued], nodes: [model3dNode({ running: true, runId: RUN })], projects: [standardProject] });
 
-    expect(await reconcileWiroNodeRuns(db)).toMatchObject({ failed: 1 });
+    expect(await reconcileTaskNodeRuns(db)).toMatchObject({ failed: 1 });
   });
 });

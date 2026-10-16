@@ -48,6 +48,18 @@ describe('project mode', () => {
 
 });
 
+describe('an uncensored model from any provider', () => {
+  const choices = [
+    { id: 'higgsfield/some/uncensored', uncensored: true },
+    { id: 'kie/nano-banana-2', uncensored: false }
+  ];
+
+  it('is hidden outside an uncensored project, whatever its id prefix', () => {
+    expect(offerableIn(ProjectMode.Standard, choices).map((c) => c.id)).toEqual(['kie/nano-banana-2']);
+    expect(offerableIn(ProjectMode.Uncensored, choices).map((c) => c.id)).toEqual(['higgsfield/some/uncensored', 'kie/nano-banana-2']);
+  });
+});
+
 describe('catalogueIn', () => {
   it('drops wiro choices and recommendations from every medium of a standard project', () => {
     const catalogue = {

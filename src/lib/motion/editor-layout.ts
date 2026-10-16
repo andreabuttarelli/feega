@@ -6,6 +6,11 @@ export enum Panel {
   Closed = 'closed'
 }
 
+export enum OpensOn {
+  Stage = 'stage',
+  Properties = 'properties'
+}
+
 export enum Side {
   Chat = 'chat',
   Properties = 'properties'

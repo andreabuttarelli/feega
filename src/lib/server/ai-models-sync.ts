@@ -25,6 +25,10 @@ import { env } from '$env/dynamic/private';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { fetchWiroCatalogue } from './wiro-catalogue';
 import { DEFAULT_WIRO_BASE_URL } from './wiro';
+import { kieModelRows } from './kie-catalogue';
+import { estimateWith, higgsfieldModelRows } from './higgsfield-catalogue';
+import { higgsfieldConfig } from './higgsfield';
+import { configuredIn, TaskProviderName } from './generation/task-providers';
 
 export type AiModelCatalogue = 'chat' | 'image' | 'video' | 'model3d';
 
@@ -369,6 +373,11 @@ async function keepImagePricing(admin: SupabaseClient, rows: AiModelRow[]): Prom
   );
 }
 
+async function higgsfieldRows(syncedAt: string): Promise<{ rows: AiModelRow[]; ok: boolean; reason?: string }> {
+  const config = higgsfieldConfig(env);
+  return config ? higgsfieldModelRows(estimateWith(config), syncedAt) : { rows: [], ok: true };
+}
+
 export async function syncAiModels(
   admin: SupabaseClient,
   opts: { fetchImpl?: typeof fetch; baseUrl?: string; wiroBaseUrl?: string } = {}
@@ -382,7 +391,9 @@ export async function syncAiModels(
     fetchCatalogue(doFetch, baseUrl, CHAT_CATALOGUE, syncedAt),
     fetchImageCatalogue(doFetch, baseUrl, syncedAt),
     fetchCatalogue(doFetch, baseUrl, VIDEO_CATALOGUE, syncedAt),
-    fetchWiroCatalogue(doFetch, opts.wiroBaseUrl ?? env.WIRO_BASE_URL?.trim() ?? DEFAULT_WIRO_BASE_URL, syncedAt)
+    fetchWiroCatalogue(doFetch, opts.wiroBaseUrl ?? env.WIRO_BASE_URL?.trim() ?? DEFAULT_WIRO_BASE_URL, syncedAt),
+    { rows: configuredIn(env).has(TaskProviderName.Kie) ? kieModelRows(syncedAt) : [], ok: true as const },
+    higgsfieldRows(syncedAt)
   ]);
 
   const rows = await keepImagePricing(admin, results.flatMap((result) => result.rows));

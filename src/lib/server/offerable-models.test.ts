@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
+
+const { testEnv } = vi.hoisted(() => ({ testEnv: {} as Record<string, string | undefined> }));
+vi.mock('$env/dynamic/private', () => ({ env: testEnv }));
+
+beforeEach(() => {
+  testEnv.WIRO_API_KEY = 'wiro-test-key';
+  delete testEnv.KIE_API_KEY;
+});
 import { GPT_IMAGE_2_MODEL, NANO_BANANA_PRO_MODEL, QWEN3_PRO_MODEL } from '$lib/image-models';
 import { SEEDANCE_25_MODEL, OPENROUTER_UPSCALE_MODEL, KLING_3_VIDEO_MODEL } from '$lib/video-models';
 import { mediaModelSlot } from '$lib/media-model-slots';
@@ -17,15 +25,15 @@ function fakeAdmin(
     pricing?: unknown;
   }[]
 ) {
+  type Query = { eq: (col: string, value: string) => Query; order: () => Query; limit: () => Query; then: (resolve: (v: { data: unknown[]; error: null }) => unknown) => unknown };
+  const query = (matching: typeof rows): Query => ({
+    eq: (col, value) => query(matching.filter((r) => (r as Record<string, unknown>)[col] === undefined || (r as Record<string, unknown>)[col] === value)),
+    order: () => query(matching),
+    limit: () => query(matching),
+    then: (resolve) => resolve({ data: matching, error: null })
+  });
   const admin = {
-    from: () => ({
-      select: () => ({
-        eq: (_col: string, value: string) => ({
-          then: (resolve: (v: { data: unknown[]; error: null }) => unknown) =>
-            resolve({ data: rows.filter((r) => r.catalogue === value), error: null })
-        })
-      })
-    })
+    from: (table: string) => ({ select: () => query(table === 'ai_models' ? rows : []) })
   } as unknown as SupabaseClient;
   return admin;
 }
@@ -86,6 +94,54 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
     expect(out.choices).toContainEqual(
       expect.objectContaining({ id: 'wiro/wiro-partners/z-image-uncensored', providerLabel: 'Wiro', uncensored: true })
     );
+  });
+
+  it('offers a model only kie serves as its own choice, but never a kie row that is a cheaper route of another model', async () => {
+    testEnv.KIE_API_KEY = 'kie-test-key';
+    const admin = fakeAdmin([
+      { id: 'kie/grok-imagine/text-to-video', catalogue: 'video', input_modalities: ['text'], output_modalities: ['video'], provider: 'kie', wire_spec: { model: 'grok-imagine/text-to-video', fields: { prompt: 'prompt', images: [] } } } as never,
+      { id: 'kie/nano-banana-2', catalogue: 'video', input_modalities: ['text'], output_modalities: ['video'], provider: 'kie', wire_spec: { model: 'nano-banana-2', discountFor: 'nano-banana-2', fields: { prompt: 'prompt', images: [] } } } as never
+    ]);
+
+    const ids = (await offerableModels(admin, 'video')).choices.map((c) => c.id);
+
+    expect(ids).toContain('kie/grok-imagine/text-to-video');
+    expect(ids).not.toContain('kie/nano-banana-2');
+  });
+
+  it('hides a model whose published schema no node request can satisfy', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'wiro/wiro/train-flux-lora',
+        catalogue: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+        provider: 'wiro',
+        wire_spec: { owner: 'wiro', project: 'train-flux-lora', fields: { prompt: 'prompt', images: [] }, unrunnable: 'required_field_without_default' }
+      } as never
+    ]);
+
+    const out = await offerableModels(admin, 'image');
+
+    expect(out.choices.map((c) => c.id)).not.toContain('wiro/wiro/train-flux-lora');
+  });
+
+  it('hides a provider whose key is missing instead of offering a model that cannot run', async () => {
+    delete testEnv.WIRO_API_KEY;
+    const admin = fakeAdmin([
+      {
+        id: 'wiro/alibaba/qwen-image-3-0-pro',
+        catalogue: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+        provider: 'wiro',
+        wire_spec: { owner: 'alibaba', project: 'qwen-image-3-0-pro', fields: { prompt: 'prompt', images: [] } }
+      } as never
+    ]);
+
+    const out = await offerableModels(admin, 'image');
+
+    expect(out.choices.map((c) => c.id)).not.toContain('wiro/alibaba/qwen-image-3-0-pro');
   });
 
   it('ogni immagine offerta porta un unitCredits — il prezzo che il bottone "Genera" mostra', async () => {

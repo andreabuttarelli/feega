@@ -7,9 +7,8 @@ const here = dirname(fileURLToPath(import.meta.url));
 const routes = join(here, '../../../routes');
 
 const SURFACES = [
-  join(here, 'UploadedNode.svelte'),
+  join(here, 'LiveVideo.svelte'),
   join(here, 'AudioResult.svelte'),
-  join(routes, 'p/[projectId]/c/[canvasId]/+page.svelte'),
   join(routes, 's/[token]/+page.svelte')
 ];
 

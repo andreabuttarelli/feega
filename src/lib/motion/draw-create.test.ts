@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
+import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { setStill } from './still';
 import { DrawTool } from './draw-tool';
-import { drawClip, penClip } from './draw-create';
-import { parsePath } from './shape/geometry';
+import { CANVAS_INK, drawClip, drawnElement, penClip } from './draw-create';
+import { parsePath, type Outline } from './shape/geometry';
 import type { OpResult } from './timeline';
 
 const ok = (r: OpResult): MotionDoc => {
@@ -67,5 +67,59 @@ describe('a pen path', () => {
 
   it('refuses fewer than two points', () => {
     expect(penClip(video(), [{ closed: false, vertices: [corner(0.2, 0.2)] }], 0, 'p1').ok).toBe(false);
+  });
+});
+
+describe('drawing an element on the canvas, outside any frame', () => {
+  const made = (r: ReturnType<typeof drawnElement>) => {
+    if (!r.ok) {
+      throw new Error(r.error);
+    }
+    return r;
+  };
+
+  it('a rectangle becomes a transparent still doc of the drawn shape, the clip filling it', () => {
+    const drawn = made(drawnElement({ tool: DrawTool.Rectangle, box: { left: 100, top: 50, width: 300, height: 100 } }, 'r1'));
+    const clip = findClip(drawn.doc, 'r1')!.clip;
+
+    expect(drawn.doc.background).toBe(Background.Transparent);
+    expect(drawn.doc.still).toBeTruthy();
+    expect(drawn.doc.width / drawn.doc.height).toBeCloseTo(3, 1);
+    expect(clip.props).toMatchObject({ shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 });
+    expect(drawn.box).toEqual({ left: 100, top: 50, width: 300, height: 100 });
+  });
+
+  it('a pen path takes the box of its points', () => {
+    const outline = parsePath('M 10 20 L 110 20 L 110 70') as Outline;
+    const drawn = made(drawnElement({ tool: DrawTool.Pen, outline }, 'p1'));
+
+    expect(drawn.box).toEqual({ left: 10, top: 20, width: 100, height: 50 });
+    expect(findClip(drawn.doc, 'p1')!.clip.props).toMatchObject({ shape: 'path', x: 0.5, y: 0.5, width: 1, height: 1 });
+  });
+
+  it('a big box stays inside the frame resolution limits', () => {
+    const drawn = made(drawnElement({ tool: DrawTool.Ellipse, box: { left: 0, top: 0, width: 5000, height: 2500 } }, 'e1'));
+
+    expect(drawn.doc.width).toBeLessThanOrEqual(1920);
+    expect(drawn.doc.height).toBeLessThanOrEqual(1080);
+  });
+});
+
+describe('a drawn text shows settled', () => {
+  it('its still sits at the end of the clip, where the entrance has finished', () => {
+    const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 60 } }, 't1');
+    if (!drawn.ok) {
+      throw new Error(drawn.error);
+    }
+    const clip = findClip(drawn.doc, 't1')!.clip;
+    expect(drawn.doc.still?.frame).toBe(clip.from + clip.durationInFrames - 1);
+  });
+
+  it('its letters are dark ink, readable on the light canvas, not the brand text colour meant for a dark video', () => {
+    const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 60 } }, 't1');
+    if (!drawn.ok) {
+      throw new Error(drawn.error);
+    }
+    expect(findClip(drawn.doc, 't1')!.clip.props.color).toBe(CANVAS_INK);
   });
 });

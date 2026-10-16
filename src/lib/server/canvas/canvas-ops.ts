@@ -1,3 +1,5 @@
+import { groupElements, moveNodeGroup, rotateNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { nodeMembers } from '$lib/server/motion/node-members';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
 import {
@@ -22,7 +24,7 @@ import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPU
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
-import { MoveOutcome, dropFor, frameAnswer, frameStore, linkFrame, moveElement, placeOutput } from '$lib/server/motion/move-element';
+import { MoveOutcome, drawElement, drawnSchema, dropFor, frameAnswer, frameStore, linkFrame, moveElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
 import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
@@ -127,6 +129,7 @@ type Op<S extends z.ZodType> = {
 const op = <S extends z.ZodType>(o: Op<S>): Op<S> => o;
 
 const listCanvasesInput = z.object({}).strict();
+const listModelsInput = z.object({ medium: z.enum(GEN_MEDIUMS).describe('Which kind of node the models generate.') }).strict();
 const listNodesInput = z.object({ canvasId: z.string().describe('Canvas id from list_canvases.') }).strict();
 const createNodeInput = z
   .object({
@@ -160,7 +163,18 @@ const frameTarget = {
   canvasY: z.number().optional()
 };
 const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame node the element is in'), elementId: z.string().describe('the clip id inside that frame'), ...frameTarget }).strict();
-const placeInFrameInput = z.object({ nodeId: z.string().describe('the generative image, video or text node'), ...frameTarget }).strict();
+const placeInFrameInput = z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
+
+const drawElementInput = z
+  .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse, box:{left,top,width,height}} in canvas units, or {tool:pen, path:SVG d in canvas units}') })
+  .strict();
+
+const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (frame nodes with data.kind element)') }).strict();
+const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
+
+const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
+const moveGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), x: z.number().finite(), y: z.number().finite() }).strict();
+const membersOf = (ctx: CanvasCtx, canvasId: string) => nodeMembers(ctx.db, { orgId: ctx.orgId, canvasId, actor: ctx.actor });
 
 const framesOf = (ctx: CanvasCtx) => frameStore(ctx.db, { orgId: ctx.orgId, actor: ctx.actor, projectId: ctx.projectId });
 
@@ -181,6 +195,7 @@ const runNodeInput = z
     prompt: z.string().optional().describe('Omit to keep the prompt already on the node.'),
     model: z.string().optional().describe('Omit to keep the model already on the node.'),
     params: z.record(z.string(), z.unknown()).optional().describe('e.g. { aspectRatio: "1:1", duration: 8 }.'),
+    provider: z.string().optional().describe('A provider id from list_models routes (e.g. "kie", "openrouter"); omit or "auto" for the cheapest healthy one.'),
     expectedVersion: z.number().int()
   })
   .strict();
@@ -556,6 +571,36 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => frameAnswer(await moveElement(framesOf(ctx), { sourceNodeId: input.frameId, clipId: input.elementId, drop: dropFor(input) }))
   }),
 
+  draw_element: op({
+    access: Access.Write,
+    input: drawElementInput,
+    run: async (ctx, input) => frameAnswer(await drawElement(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.drawn))
+  }),
+
+  group_elements: op({
+    access: Access.Write,
+    input: groupElementsInput,
+    run: async (ctx, input) => frameAnswer(await groupElements(framesOf(ctx), membersOf(ctx, input.canvasId), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeIds))
+  }),
+
+  ungroup_element: op({
+    access: Access.Write,
+    input: ungroupElementInput,
+    run: async (ctx, input) => frameAnswer(await ungroupElement(framesOf(ctx), membersOf(ctx, input.canvasId), { projectId: ctx.projectId, canvasId: input.canvasId }, input.nodeId))
+  }),
+
+  rotate_group: op({
+    access: Access.Write,
+    input: rotateGroupInput,
+    run: async (ctx, input) => frameAnswer(await rotateNodeGroup(framesOf(ctx), membersOf(ctx, input.canvasId), input.nodeId, input.degrees))
+  }),
+
+  move_group: op({
+    access: Access.Write,
+    input: moveGroupInput,
+    run: async (ctx, input) => frameAnswer(await moveNodeGroup(membersOf(ctx, input.canvasId), input.nodeId, { x: input.x, y: input.y }))
+  }),
+
   place_in_frame: op({
     access: Access.Write,
     input: placeInFrameInput,
@@ -600,13 +645,27 @@ export const CANVAS_OPS = {
           medium,
           prompt: input.prompt ?? data.prompt ?? '',
           model: input.model ?? data.model ?? null,
-          params: (input.params ?? data.params ?? {}) as GenParams,
+          params: { ...(input.params ?? data.params ?? {}), ...(input.provider ? { provider: input.provider } : {}) } as GenParams,
           expectedVersion: input.expectedVersion,
           actor: ctx.actor
         })
       );
 
       return outcomeOf(out);
+    }
+  }),
+
+  list_models: op({
+    access: Access.Read,
+    input: listModelsInput,
+    run: async (ctx, input) => {
+      const [{ projectCatalogue, listedModel }, { projectModeOf }] = await Promise.all([
+        import('$lib/server/project-catalogue'),
+        import('$lib/server/uncensored-workspace/workspace-server')
+      ]);
+      const mode = await projectModeOf(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId });
+      const catalogue = await projectCatalogue(ctx.db, { orgId: ctx.orgId, mode });
+      return { models: catalogue[input.medium].choices.map(listedModel) };
     }
   }),
 

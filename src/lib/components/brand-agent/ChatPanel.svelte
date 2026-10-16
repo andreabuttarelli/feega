@@ -71,9 +71,15 @@
     if (!session) {
       return;
     }
-    session.context = () => ({ ...(context?.() ?? {}), ...models.turnFields() });
-    session.onTurnEnd = onturnend ?? null;
-    session.onData = ondata ?? null;
+    const shared = session;
+    const before = { context: shared.context, onTurnEnd: shared.onTurnEnd, onData: shared.onData };
+    const mine = { context: () => ({ ...(context?.() ?? {}), ...models.turnFields() }), onTurnEnd: onturnend ?? null, onData: ondata ?? null };
+    Object.assign(shared, mine);
+    return () => {
+      if (shared.context === mine.context) {
+        Object.assign(shared, before);
+      }
+    };
   });
   const messages = $derived(session?.messages ?? []);
   const sending = $derived(session?.sending ?? false);

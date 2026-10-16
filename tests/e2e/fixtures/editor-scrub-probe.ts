@@ -1,5 +1,6 @@
 import { FEEGA_TOKENS } from '../../../src/lib/motion/brand';
 import { composeHtml } from '../../../src/lib/motion/hyperframes/compose';
+import { listenTap, type FramePoint } from '../../../src/lib/motion/hyperframes/frame-tap';
 import { exactSeek } from '../../../src/lib/motion/hyperframes/exact-seek';
 import { splitHeadline } from './fps-probe';
 
@@ -17,6 +18,7 @@ type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause
 
 let player: Player;
 let seconds = 0;
+const taps: FramePoint[] = [];
 
 async function mountEditor(): Promise<void> {
   await import('@hyperframes/player');
@@ -31,6 +33,13 @@ async function mountEditor(): Promise<void> {
   const ready = new Promise((resolve) => player.addEventListener('ready', resolve, { once: true }));
   player.setAttribute('srcdoc', composeHtml({ doc, tokens: FEEGA_TOKENS, assets: { photo: PHOTO } }).replace('</body>', `${INNER_PROBE}</body>`));
   await ready;
+}
+
+function listen() {
+  listenTap(player.iframeElement!, player, (at) => {
+    taps.push(at);
+    player.pause();
+  });
 }
 
 function post(message: unknown): boolean {
@@ -96,8 +105,8 @@ function stopInner(): Promise<{ gaps: number[]; work: number[] }> {
 
 declare global {
   interface Window {
-    editorScrub: { mount: typeof mountEditor; scrub: typeof scrub; play: typeof play; startInner: typeof startInner; stopInner: typeof stopInner };
+    editorScrub: { mount: typeof mountEditor; scrub: typeof scrub; play: typeof play; startInner: typeof startInner; stopInner: typeof stopInner; listen: typeof listen; taps: () => FramePoint[] };
   }
 }
 
-window.editorScrub = { mount: mountEditor, scrub, play, startInner, stopInner };
+window.editorScrub = { mount: mountEditor, scrub, play, startInner, stopInner, listen, taps: () => taps };

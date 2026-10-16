@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { resolveOrgCaller } from '$lib/server/org-data/auth';
+import { reachableCaller } from '$lib/server/org-data/reach';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { findNode } from '$lib/server/repos/canvas';
 import { planLoop, enqueueLoop, cancelLoop } from '$lib/server/canvas/loop';
@@ -21,11 +21,12 @@ import { planLoop, enqueueLoop, cancelLoop } from '$lib/server/canvas/loop';
  *          risultati già completati restano.
  */
 export const GET: RequestHandler = async ({ request, params, url }) => {
-  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
-  if ('error' in resolved) return json(resolved.error.body, { status: resolved.error.status });
+  const caller = await reachableCaller(request, url, { nodes: [params.id ?? ''] });
+  if (caller instanceof Response) {
+    return caller;
+  }
 
-  const { db, orgId } = resolved.caller;
+  const { db, orgId } = caller;
   const nodeId = params.id ?? '';
 
   const node = await findNode(db, { orgId, nodeId });
@@ -36,11 +37,12 @@ export const GET: RequestHandler = async ({ request, params, url }) => {
 };
 
 export const POST: RequestHandler = async ({ request, params, url }) => {
-  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
-  if ('error' in resolved) return json(resolved.error.body, { status: resolved.error.status });
+  const caller = await reachableCaller(request, url, { nodes: [params.id ?? ''] });
+  if (caller instanceof Response) {
+    return caller;
+  }
 
-  const { db, orgId, userId, apiKeyId, writeAllowed } = resolved.caller;
+  const { db, orgId, userId, apiKeyId, writeAllowed } = caller;
   if (!writeAllowed) return json({ error: 'api_key_read_only' }, { status: 403 });
 
   const nodeId = params.id ?? '';
@@ -67,11 +69,12 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
 };
 
 export const DELETE: RequestHandler = async ({ request, params, url }) => {
-  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
-  if ('error' in resolved) return json(resolved.error.body, { status: resolved.error.status });
+  const caller = await reachableCaller(request, url, { nodes: [params.id ?? ''] });
+  if (caller instanceof Response) {
+    return caller;
+  }
 
-  const { db, orgId, writeAllowed } = resolved.caller;
+  const { db, orgId, writeAllowed } = caller;
   if (!writeAllowed) return json({ error: 'api_key_read_only' }, { status: 403 });
 
   const nodeId = params.id ?? '';

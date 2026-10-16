@@ -154,6 +154,16 @@ function shiftKeys(clip: MotionClip, key: string, delta: number, range: { min: n
   return { ...clip.keyframes, [key]: track.map((k) => (typeof k.value === 'number' ? { ...k, value: clamp(k.value + delta, range.min, range.max) } : k)) };
 }
 
+export function clipCentre(clip: MotionClip): Point {
+  const along = (axis: keyof Point) => {
+    if (rangeOf(clip.component, axis)) {
+      return typeof clip.props[axis] === 'number' ? (clip.props[axis] as number) : CENTRE[axis];
+    }
+    return CENTRE[axis] + (clip.transform[axis] ?? TRANSFORM[axis].fallback);
+  };
+  return { x: along('x'), y: along('y') };
+}
+
 function positioned(clip: MotionClip, at: Point): MotionClip {
   let next = clip;
   for (const axis of Object.values(POSITION_KEYS)) {
@@ -243,7 +253,7 @@ export function placeElement(doc: MotionDoc, element: Element, place: Placement,
   return { ok: true, clipId: clip.id, doc: { ...doc, ...merged(doc, element.carried, element), tracks, durationInFrames: grown(doc, clip) } };
 }
 
-function defaultBox(element: Element): Box {
+export function elementBox(element: Element): Box {
   const { props } = element.clip;
   if (!laidOut(element.clip.component) || typeof props.width !== 'number' || typeof props.height !== 'number') {
     return FULL;
@@ -263,7 +273,7 @@ function fittedSize(px: Size): Size {
 }
 
 export function frameOf(element: Element, mode: DocMode, box: Box | null, newId: NewId): MotionDoc {
-  const area = box ?? defaultBox(element);
+  const area = box ?? elementBox(element);
   const size = fittedSize({ width: area.width * element.size.width, height: area.height * element.size.height });
   const durationInFrames = Math.max(1, element.clip.durationInFrames);
   const blank: MotionDoc = { ...newMotionDoc(MotionFormat.Landscape), ...size, fps: element.fps as MotionDoc['fps'], durationInFrames, tracks: [] };

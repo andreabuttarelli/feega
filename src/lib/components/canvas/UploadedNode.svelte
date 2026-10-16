@@ -11,8 +11,9 @@
    */
   import type { UploadedNode } from '$lib/canvas/uploaded-node';
   import TieredImage from './TieredImage.svelte';
+  import LiveVideo from './LiveVideo.svelte';
 
-  let { node, medium }: { node: UploadedNode; medium: 'image' | 'video' } = $props();
+  let { node, medium, selected = false }: { node: UploadedNode; medium: 'image' | 'video'; selected?: boolean } = $props();
 </script>
 
 <div class="uploaded">
@@ -20,8 +21,7 @@
     {#if medium === 'image'}
       <TieredImage src={node.url} nodeId={node.id} alt={node.name} />
     {:else}
-      <!-- svelte-ignore a11y_media_has_caption -->
-      <video src={node.url} controls playsinline preload="metadata"></video>
+      <LiveVideo src={node.url} nodeId={node.id} {selected} controls />
     {/if}
   </div>
 </div>

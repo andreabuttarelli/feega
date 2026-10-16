@@ -19,15 +19,17 @@
   import Volume2 from '@lucide/svelte/icons/volume-2';
   import VolumeX from '@lucide/svelte/icons/volume-x';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
+  import FrameHover from './FrameHover.svelte';
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
-  import { FORMATS } from '$lib/motion/doc';
-  import { MOTION_NODE_BAR_H, type MotionNode } from '$lib/canvas/motion-node';
+  import { Background, FORMATS } from '$lib/motion/doc';
+  import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
   import { NodeMode, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
+  import { coverFrame } from '$lib/motion/still';
   import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
-  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null } = $props();
+  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null, onenter = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null; onenter?: (() => void) | null } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
   const nodeId = $derived(node.id);
@@ -35,7 +37,6 @@
   $effect(() => (host ? inlineStage.offer(nodeId, host) : undefined));
 
   const ICON = 16;
-  const FIRST_FRAME = 0;
 
   let root = $state<HTMLDivElement | null>(null);
   let player = $state<ReturnType<typeof MotionPreview> | null>(null);
@@ -56,6 +57,7 @@
   const last = $derived(Math.max(0, (preview?.durationInFrames ?? 1) - 1));
   const paint = $derived(inlineStage.paintOf(node.id));
   const layers = $derived(nodeLayers(nodeMode, paint));
+  const chrome = $derived(frameChrome(node.kind));
   const previewing = $derived(nodeMode === NodeMode.Preview);
   const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing));
 
@@ -119,13 +121,13 @@
 
   $effect(() => {
     if (capturing && player && preview) {
-      void captureFirstFrame(player, preview, posterKey);
+      void captureCover(player, preview, posterKey);
     }
   });
 
-  async function captureFirstFrame(shooter: NonNullable<typeof player>, source: Preview, key: string) {
+  async function captureCover(shooter: NonNullable<typeof player>, source: Preview, key: string) {
     const width = Math.min(POSTER_WIDTH, source.width);
-    const shot = await shooter.still(FIRST_FRAME / source.fps, width).catch(() => '');
+    const shot = await shooter.still(coverFrame(source) / source.fps, width, chrome.poster).catch(() => '');
     posters.set(key, shot);
     slots = releaseCapture(slots, node.id);
     if (shot) {
@@ -182,6 +184,9 @@
 <div
   class="motion"
   class:editing={!previewing}
+  class:bare={!chrome.bar}
+  data-kind={node.kind}
+  ondblclick={() => onenter?.()}
   data-testid="motion-node"
   data-motion-node={node.id}
   data-mode={mode}
@@ -191,8 +196,8 @@
   <div class="stage" data-testid="motion-node-stage" data-frame-stage>
     {#if layers.own}
       {#if mounted && preview}
-        <MotionPreview bind:this={player} html={preview.html} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} />
-        {#if previewing}
+        <MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} />
+        {#if previewing && chrome.bar}
           <span class="clock" data-testid="motion-node-timecode">{previewClock(frame, preview.fps, preview.durationInFrames)}</span>
           <input
             class="scrub nodrag nopan"
@@ -211,6 +216,8 @@
         <img class="poster" src={poster} alt="" draggable="false" data-testid="motion-node-poster" loading="lazy" decoding="async" />
       {:else if !previewing}
         <div class="skeleton" data-testid="motion-node-skeleton"></div>
+      {:else if !chrome.bar}
+        <div class="placeholder" data-testid="element-placeholder"></div>
       {:else}
         <div class="empty">
           <Clapperboard size={28} />
@@ -219,10 +226,11 @@
       {/if}
     {/if}
     {#if !previewing}<div class="host nodrag nopan" data-testid="motion-node-editing" bind:this={host}></div>{/if}
-    {#if previewing}<a class="open nodrag" {href} data-testid="open-motion-editor" data-sveltekit-preload-data={onopen ? 'off' : 'hover'} onclick={open}>Open editor</a>{/if}
+    {#if previewing && node.docHeadRevision}<FrameHover nodeId={node.id} revision={node.docHeadRevision} {previewUrl} width={size.width} height={size.height} />{/if}
+    {#if previewing && chrome.bar}<a class="open nodrag" {href} data-testid="open-motion-editor" data-sveltekit-preload-data={onopen ? 'off' : 'hover'} onclick={open}>Open editor</a>{/if}
   </div>
 
-  {#if previewing}
+  {#if previewing && chrome.bar}
   <div class="bar nodrag nopan" onpointerdown={isolate} onclick={isolate} ondblclick={isolate}>
     <button type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={toggle}>
       {#if playing}<Pause size={ICON} />{:else}<Play size={ICON} />{/if}
@@ -271,6 +279,21 @@
   .host {
     position: absolute;
     inset: 0;
+  }
+
+  .motion.bare {
+    background: transparent;
+    border-color: transparent;
+  }
+
+  .motion.bare .stage {
+    background: transparent;
+  }
+
+  .placeholder {
+    position: absolute;
+    inset: 0;
+    outline: 1px dashed var(--ui-line);
   }
 
   .poster {

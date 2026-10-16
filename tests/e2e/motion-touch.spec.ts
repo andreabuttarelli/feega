@@ -30,7 +30,7 @@ async function smallTargets(page: Page): Promise<Small[]> {
         const target = el.matches('input[type=checkbox], input[type=radio]') ? (el.closest('label') ?? el) : el;
         const box = target.getBoundingClientRect();
         const style = getComputedStyle(el);
-        const hidden = box.width === 0 || box.height === 0 || style.visibility === 'hidden' || style.pointerEvents === 'none';
+        const hidden = box.width === 0 || box.height === 0 || style.visibility === 'hidden' || style.pointerEvents === 'none' || el.closest('[aria-hidden=true]') !== null;
         if (hidden) {
           continue;
         }
@@ -219,19 +219,23 @@ test.describe('motion editor a dito @real', () => {
     });
 
     test('un dito in orizzontale su una lane vuota sposta il playhead, in verticale no', async ({ page, session, seedNode }) => {
+      const TIMELINE_GROW_PX = 200;
       const node = await seedNode({ type: 'motion', data: MOTION_DATA });
       await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
       const timecode = page.getByTestId('timecode');
       const start = await timecode.textContent();
+      const handle = (await page.getByTestId('timeline-resize').boundingBox())!;
+      await touchDrag(page, { x: handle.x + handle.width / 2, y: handle.y + handle.height / 2 }, 0, -TIMELINE_GROW_PX);
       const bar = page.locator('[data-layer="bar-1"] .bar').first();
       await bar.scrollIntoViewIfNeeded();
       const clip = (await bar.boundingBox())!;
-      const empty = { x: Math.min(clip.x + clip.width + 160, page.viewportSize()!.width - 20), y: clip.y + clip.height / 2 };
+      const empty = { x: clip.x - 40, y: clip.y + clip.height / 2 };
+      expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.classList.contains('lane'), empty)).toBe(true);
 
       await touchDrag(page, empty, 0, -60);
       await expect(timecode).toHaveText(start ?? '');
 
-      await touchDrag(page, empty, -120, 4);
+      await touchDrag(page, empty, -80, 4);
       await expect(timecode).not.toHaveText(start ?? '');
     });
   });
@@ -249,7 +253,7 @@ test.describe('motion editor a dito @real', () => {
       await expect(page.getByTestId('clip-bar')).toHaveCount(0);
 
       await page.getByRole('button', { name: 'Play', exact: true }).click();
-      await page.getByTestId('play-catch').tap();
+      await page.getByTestId('motion-preview').tap();
 
       await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
       await expect(page.getByTestId('clip-bar')).toBeVisible();

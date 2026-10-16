@@ -49,13 +49,23 @@ const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
   connect_nodes:
     'Connect two nodes on one canvas of THIS project. The edge is directed: source feeds target. Refused when the target node uses an uncensored model — those take no inputs of any kind, ever: switch the model first. Also refused when the source medium does not feed the target — an audio node only takes what its current operation needs (describe_node_types type "audio" lists them).',
   move_frame_element:
-    'Move one element (a clip: text, image, video, shape, component) out of a Frame into another Frame of THIS project, or onto the empty canvas as a new Frame holding only it. Props, style and keyframes are kept and re-timed to the target frame rate; x/y (0..1 of the target frame) is where its centre lands. Never turns an element into a generative node. Both frames are saved as revisions.',
+    'Move one element (a clip: text, image, video, shape, component) out of a Frame into another Frame of THIS project, or onto the empty canvas as a free element (a Text, Box, Ellipse, Path or Image on its own, no frame around it, the size it had in its frame). Props, style and keyframes are kept and re-timed to the target frame rate; x/y (0..1 of the target frame) is where its centre lands. Never turns an element into a generative node. Both frames are saved as revisions.',
   place_in_frame:
-    "Put the generated output of an image, video or text node of THIS project into a Frame as an element (image, video at the frame's start, or text), centred at x/y (0..1). Omit toFrameId to make a new Frame on the canvas holding only it. The generative node is not changed. To keep the element following the node's next generations, connect_nodes the node to the Frame instead.",
+    "Put the generated output of a Generate image, Generate video or Generate text node of THIS project into a Frame as an element (image, video at the frame's start, or text), centred at x/y (0..1). Omit toFrameId to put it on the canvas as a free element (Image, Video or Text, no frame around it). The generative node is not changed. To keep the element following the node's next generations, connect_nodes the node to the Frame instead.",
+  draw_element:
+    'Draw a free graphic element on a canvas of THIS project, outside any frame: drawn { tool: "text" | "rectangle" | "ellipse", box: { left, top, width, height } } in canvas units, or { tool: "pen", path: "<SVG d in canvas units>" }. It is a Text, Box, Ellipse or Path with the same fills, strokes, effects and text style as inside a frame; it is NOT a Generate text node. Answers frame_id (the element node) and element_id (its clip): edit it with the frame tools.',
+  group_elements:
+    'Group two or more things on the canvas of THIS project into one Group; they keep their places and sizes and move as one. Free elements (type motion, data.kind element) are drawn inside the Group; frames and other nodes join it (data.groupId) and keep working. Inside a frame, group clips with the frame tool precompose instead.',
+  rotate_group:
+    'Turn a Group on the canvas of THIS project by degrees (clockwise); everything in it, frames included, turns around the group centre.',
+  move_group:
+    'Move a Group on the canvas of THIS project to x/y; everything in it moves by the same amount.',
+  ungroup_element:
+    'Split a Group of free elements on the canvas of THIS project back into one element per shape, each where it was.',
   delete_node:
     'Soft-delete a node on THIS project. The node disappears from list_nodes; undo can bring it back.',
   run_node:
-    'Generate on a producing node of THIS project (text, image, video, audio or model3d — a model3d node turns one connected image, or its prompt via a generated product shot, into a GLB and is always queued). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video or an audio dubbing may come back queued; poll with list_runs. An audio node runs params.operation (describe_node_types type "audio" lists operations and voices).',
+    'Generate on a producing node of THIS project (Generate text/image/video/audio/3D model; type ids text, image, video, audio, model3d — a model3d node turns one connected image, or its prompt via a generated product shot, into a GLB and is always queued). Costs credits: only when the user asked. Versioned like update_node — conflict means re-read and retry. A video or an audio dubbing may come back queued; poll with list_runs. An audio node runs params.operation (describe_node_types type "audio" lists operations and voices). Model ids, providers and prices: canvas_tool list_models; pass provider (a routes[].provider) to run on that one, omit for the cheapest healthy.',
   list_runs:
     'Generation history of one node on THIS project, oldest first, with status, cost and the produced text when there is one.',
   preview_node_loop:

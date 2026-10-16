@@ -15,11 +15,15 @@ export type RequestsVerdict = { ok: true; rows: BatchRow[] } | { ok: false; erro
 
 export function batchInput(raw: string | null): RowsVerdict {
   try {
-    const parsed = rowsSchema.safeParse(JSON.parse(raw ?? ''));
-    return parsed.success ? { ok: true, rows: parsed.data } : { ok: false, error: `invalid_rows: 1 to ${MAX_BATCH_ROWS} rows of { name, values }` };
+    return rowsFrom(JSON.parse(raw ?? ''));
   } catch {
     return { ok: false, error: 'invalid_rows' };
   }
+}
+
+export function rowsFrom(value: unknown): RowsVerdict {
+  const parsed = rowsSchema.safeParse(value);
+  return parsed.success ? { ok: true, rows: parsed.data } : { ok: false, error: `invalid_rows: 1 to ${MAX_BATCH_ROWS} rows of { name, values }` };
 }
 
 export function rowRequests(head: { version: number; doc: MotionDoc }, rows: RowValues[], look: Omit<ComposeInput, 'doc'>, settings: RenderSettings): RequestsVerdict {

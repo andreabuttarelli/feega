@@ -73,14 +73,21 @@ export type SettingsVerdict = { ok: true; settings: RenderSettings } | { ok: fal
 
 export function parseSettings(raw: string | null): SettingsVerdict {
   if (!raw) {
-    return { ok: true, settings: settingsOf(Preset.Social) };
+    return settingsFrom(undefined);
   }
   try {
-    const parsed = settingsSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? { ok: true, settings: parsed.data } : { ok: false, error: 'invalid_settings' };
+    return settingsFrom(JSON.parse(raw));
   } catch {
     return { ok: false, error: 'invalid_settings' };
   }
+}
+
+export function settingsFrom(value: unknown): SettingsVerdict {
+  if (value === undefined) {
+    return { ok: true, settings: settingsOf(Preset.Social) };
+  }
+  const parsed = settingsSchema.safeParse(value);
+  return parsed.success ? { ok: true, settings: parsed.data } : { ok: false, error: 'invalid_settings' };
 }
 
 export function settingsOf(preset: Preset): RenderSettings {

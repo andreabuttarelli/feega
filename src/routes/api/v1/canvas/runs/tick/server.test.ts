@@ -11,7 +11,7 @@ vi.mock('$lib/server/db/client', () => ({ createServiceRoleDb: () => ({}) }));
 vi.mock('$lib/server/canvas/generate', () => ({
   reconcileVideoNodeRuns: step('videos', {}),
   reconcileAudioNodeRuns: step('audios', {}),
-  reconcileWiroNodeRuns: step('wiro', {}),
+  reconcileTaskNodeRuns: step('wiro', {}),
   expireStuckRuns: step('expire', {})
 }));
 vi.mock('$lib/server/canvas/loop', () => ({ drainLoopQueue: step('loops', {}) }));

@@ -6,12 +6,16 @@ import { listRevisions, readRevision } from '$lib/server/repos/motion-revisions'
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { savedMotion } from './agent-embed';
-import { motionAssets, motionTokens } from './editor';
+import { assetUrls, motionAssets, motionTokens } from './editor';
 import { OpsOutcome, commitDoc } from './frame-ops';
 import { templateLibrary } from './templates';
 import { exportStill } from './still-export';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
 import { frameMover } from './move-element';
+import { drawFrames, firstFrames } from './server-frames';
+import { chromiumFrames, serverFramesOpen } from './chromium-frames';
+import type { Frame } from './frames';
+import type { MotionDoc } from '$lib/motion/doc';
 
 export enum ToolRun {
   Done = 'done',
@@ -22,9 +26,15 @@ export enum ToolRun {
   Conflict = 'conflict'
 }
 
-export type ToolRunAsk = { tool: string; input: unknown; version?: number };
+export type ToolRunAsk = { tool: string; input: unknown; version?: number; callId?: string };
 
-export type ToolRunResult = { outcome: ToolRun.Done; output: unknown; version: number; saved: boolean } | { outcome: Exclude<ToolRun, ToolRun.Done>; detail?: string };
+export type ToolRunScope = { orgId: string; userId: string; nodeId: string; projectId?: string; agentKey?: string };
+
+export type EditorFrames = (callId: string, times: number[], doc: MotionDoc) => Promise<Frame[] | null>;
+
+export type ToolRunTurn = { sessions: Map<string, MotionSession>; selection: string[]; editor: EditorFrames | null };
+
+export type ToolRunResult = { outcome: ToolRun.Done; output: unknown; version: number; saved: boolean; frames: Frame[] } | { outcome: Exclude<ToolRun, ToolRun.Done>; detail?: string };
 
 export const TOOL_RUN_AGENT_KEY = 'mcp';
 const ID_LENGTH = 8;
@@ -36,8 +46,17 @@ const offTurn = async () => ({ ok: false as const, error: HEADLESS });
 
 const freshSession = (doc: MotionSession['doc'], version: number): MotionSession => ({ doc, baseVersion: version, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0 });
 
-function toolsFor(deps: Omit<MotionToolDeps, 'voiceover' | 'frames' | 'check' | 'newId'>): Record<string, Tool> {
-  return createMotionTools({ ...deps, newId, voiceover: offTurn, frames: async () => null, check: async () => null });
+const noFrames: MotionToolDeps['frames'] = async () => null;
+
+function toolsFor(deps: Omit<MotionToolDeps, 'voiceover' | 'frames' | 'check' | 'newId'>, frames = noFrames): Record<string, Tool> {
+  return createMotionTools({ ...deps, newId, voiceover: offTurn, frames, check: async () => null });
+}
+
+function carried(turn: ToolRunTurn | undefined, nodeId: string, doc: MotionDoc, version: number): MotionSession {
+  const kept = turn?.sessions.get(nodeId);
+  const session = kept ? Object.assign(kept, { doc, baseVersion: version, edits: [] }) : { ...freshSession(doc, version), selection: turn?.selection ?? [] };
+  turn?.sessions.set(nodeId, session);
+  return session;
 }
 
 export type ToolEntry = { name: string; summary: string };
@@ -68,20 +87,23 @@ async function validInput(found: Tool, input: unknown): Promise<{ ok: true; valu
   return checked.success ? { ok: true, value: checked.value } : { ok: false, error: checked.error.message };
 }
 
-export async function runMotionTool(db: Db, scope: { orgId: string; userId: string; nodeId: string }, ask: ToolRunAsk): Promise<ToolRunResult> {
+export async function runMotionTool(db: Db, scope: ToolRunScope, ask: ToolRunAsk, turn?: ToolRunTurn): Promise<ToolRunResult> {
   const saved = await savedMotion(db, scope);
-  if (!saved) {
+  if (!saved || (scope.projectId && saved.project.id !== scope.projectId)) {
     return { outcome: ToolRun.NotFound };
   }
   if (ask.version !== undefined && ask.version !== saved.version) {
     return { outcome: ToolRun.Conflict, detail: `the video is at revision ${saved.version}, not ${ask.version}` };
   }
 
-  const actor = agentActor(scope.userId, TOOL_RUN_AGENT_KEY);
+  const actor = agentActor(scope.userId, scope.agentKey ?? TOOL_RUN_AGENT_KEY);
   const nodeScope = { orgId: scope.orgId, nodeId: scope.nodeId };
   const place = { db, orgId: scope.orgId, projectId: saved.project.id, canvasId: saved.record.canvasId };
   const [assets, tokens] = await Promise.all([motionAssets(place), motionTokens(db, { orgId: scope.orgId, brandId: saved.project.brandId })]);
-  const session = freshSession(saved.doc, saved.version);
+  const session = carried(turn, scope.nodeId, saved.doc, saved.version);
+  const editor = turn?.editor;
+  const server = async (times: number[]) => (serverFramesOpen() ? drawFrames(chromiumFrames, { compose: { doc: session.doc, tokens, assets: assetUrls(assets) }, times }) : null);
+  const frames: MotionToolDeps['frames'] = turn ? (callId, times) => firstFrames([async () => (editor ? editor(callId, times, session.doc) : null), () => server(times)]) : noFrames;
   const tools = toolsFor({
     session,
     assets,
@@ -89,7 +111,7 @@ export async function runMotionTool(db: Db, scope: { orgId: string; userId: stri
     revisions: { list: () => listRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null },
     exportStill: (doc, spec) => exportStill(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId }, doc, spec, { tokens, assets }),
     moveOut: frameMover(db, { orgId: scope.orgId, actor, projectId: saved.project.id }, scope.nodeId)
-  });
+  }, frames);
 
   const found = tools[ask.tool];
   if (!found?.execute) {
@@ -104,9 +126,11 @@ export async function runMotionTool(db: Db, scope: { orgId: string; userId: stri
     return { outcome: ToolRun.Blocked, detail: screened.error };
   }
 
-  const output = await found.execute(input.value, { toolCallId: `${TOOL_RUN_AGENT_KEY}-${newId()}`, messages: [], context: {} });
+  const callId = ask.callId ?? `${TOOL_RUN_AGENT_KEY}-${newId()}`;
+  const output = await found.execute(input.value, { toolCallId: callId, messages: [], context: {} });
+  const seen = session.frames.get(callId) ?? [];
   if (session.doc === saved.doc) {
-    return { outcome: ToolRun.Done, output, version: saved.version, saved: false };
+    return { outcome: ToolRun.Done, output, version: saved.version, saved: false, frames: seen };
   }
 
   const commit = await commitDoc(db, { ...nodeScope, node: saved.node, base: saved, doc: session.doc, actor, summary: session.edits.join('; ') || ask.tool });
@@ -116,5 +140,5 @@ export async function runMotionTool(db: Db, scope: { orgId: string; userId: stri
   if (commit.outcome !== OpsOutcome.Written) {
     return { outcome: ToolRun.Conflict };
   }
-  return { outcome: ToolRun.Done, output, version: commit.head.version, saved: true };
+  return { outcome: ToolRun.Done, output, version: commit.head.version, saved: true, frames: seen };
 }

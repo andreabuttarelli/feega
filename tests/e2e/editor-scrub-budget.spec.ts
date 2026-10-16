@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { instrument } from './fixtures/frame-sweeps';
 import type { SeekPath } from './fixtures/editor-scrub-probe';
 
@@ -7,6 +7,7 @@ const HOST_PAGE = '/changelog';
 const PROBE = '/tests/e2e/fixtures/editor-scrub-probe.ts';
 const SWEEP_MS = 5000;
 const THROTTLE = Number(process.env.CANVAS_PERF_THROTTLE ?? 1);
+const MIN_INNER_FPS = 55;
 
 const summary = (list: number[]) => {
   const sorted = [...list].sort((a, b) => a - b);
@@ -52,8 +53,16 @@ test.describe('editor scrub and playback frame budget @perf', () => {
     const played = await sweep(page, () => page.evaluate((ms) => window.editorScrub.play(ms), SWEEP_MS));
     console.log(`[editor-scrub] ${test.info().project.name} play ${JSON.stringify(played)}`);
 
+    await page.evaluate(() => window.editorScrub.listen());
     await page.mouse.click(480, 270);
+    await expect.poll(() => page.evaluate(() => window.editorScrub.taps().length)).toBe(1);
+
     const touched = await sweep(page, () => page.evaluate((ms) => window.editorScrub.play(ms), SWEEP_MS));
-    console.log(`[editor-scrub] ${test.info().project.name} play-after-click ${JSON.stringify(touched)}`);
+    console.log(`[editor-scrub] ${test.info().project.name} play-after-tap ${JSON.stringify(touched)}`);
+    expect(touched.inner.fpsAvg).toBeGreaterThanOrEqual(MIN_INNER_FPS);
+
+    const scrubbed = await sweep(page, () => page.evaluate(({ p, ms }) => window.editorScrub.scrub(p, ms), { p: 'both' as SeekPath, ms: SWEEP_MS }));
+    console.log(`[editor-scrub] ${test.info().project.name} scrub-after-tap ${JSON.stringify(scrubbed)}`);
+    expect(scrubbed.inner.fpsAvg).toBeGreaterThanOrEqual(MIN_INNER_FPS);
   });
 });

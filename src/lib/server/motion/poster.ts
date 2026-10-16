@@ -6,7 +6,7 @@ import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
 import { storeAssetFile } from '$lib/server/repos/asset-storage';
 import { exportFolder, type ExportScope } from '$lib/motion/export-plan';
 
-const POSTER_MIME = 'image/jpeg';
+const POSTER_EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png' };
 const POSTER_MAX_BYTES = 1_000_000;
 const HTTP_BAD_REQUEST = 400;
 
@@ -14,7 +14,7 @@ export type PosterInput = ExportScope & { actor: Actor; form: FormData };
 
 function posterFile(form: FormData): File | null {
   const file = form.get('file');
-  return file instanceof File && file.type === POSTER_MIME && file.size > 0 && file.size <= POSTER_MAX_BYTES ? file : null;
+  return file instanceof File && file.type in POSTER_EXT && file.size > 0 && file.size <= POSTER_MAX_BYTES ? file : null;
 }
 
 const sizeOf = (raw: FormDataEntryValue | null): number | null => (Number(raw) > 0 ? Math.round(Number(raw)) : null);
@@ -25,7 +25,7 @@ export async function savePoster(db: Db, input: PosterInput) {
     return fail(HTTP_BAD_REQUEST, { error: 'invalid_poster' });
   }
 
-  const path = `${exportFolder(input)}poster-${crypto.randomUUID()}.jpg`;
+  const path = `${exportFolder(input)}poster-${crypto.randomUUID()}.${POSTER_EXT[file.type]}`;
   await storeAssetFile(db, path, file);
   const asset = await insertAsset(db, {
     orgId: input.orgId,
@@ -33,7 +33,7 @@ export async function savePoster(db: Db, input: PosterInput) {
     type: 'image',
     source: 'upload',
     url: path,
-    mimeType: POSTER_MIME,
+    mimeType: file.type,
     bytes: file.size,
     width: sizeOf(input.form.get('width')),
     height: sizeOf(input.form.get('height')),

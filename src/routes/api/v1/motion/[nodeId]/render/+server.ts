@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
-import { resolveOrgCaller } from '$lib/server/org-data/auth';
+import { reachableCaller } from '$lib/server/org-data/reach';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { agentActor } from '$lib/server/repos/actor';
 import { MCP_AGENT_KEY } from '$lib/server/motion/ask';
@@ -37,13 +37,12 @@ const STATUS_OF: Record<string, number> = {
 const CREATED_FOR: Record<RenderMode, number> = { [RenderMode.Browser]: HTTP_CREATED, [RenderMode.Server]: HTTP_ACCEPTED };
 
 export const POST: RequestHandler = async ({ request, params, url }) => {
-  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
-  if ('error' in resolved) {
-    return json(resolved.error.body, { status: resolved.error.status });
+  const caller = await reachableCaller(request, url, { nodes: [params.nodeId ?? ''] });
+  if (caller instanceof Response) {
+    return caller;
   }
 
-  const { db, orgId, userId, apiKeyId, writeAllowed } = resolved.caller;
+  const { db, orgId, userId, apiKeyId, writeAllowed } = caller;
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: HTTP_FORBIDDEN });
   }

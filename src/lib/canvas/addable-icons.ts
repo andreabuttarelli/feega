@@ -11,9 +11,9 @@
  * elenchi a mano divergono al primo cambio, in silenzio e solo su una delle superfici: un globo in
  * fondo allo schermo e un quadrato sul nodo, per la stessa cosa.
  */
-import Type from '@lucide/svelte/icons/type';
-import Image from '@lucide/svelte/icons/image';
-import Video from '@lucide/svelte/icons/video';
+import GenerateText from '$lib/components/canvas/icons/GenerateText.svelte';
+import GenerateImage from '$lib/components/canvas/icons/GenerateImage.svelte';
+import GenerateVideo from '$lib/components/canvas/icons/GenerateVideo.svelte';
 import Globe from '@lucide/svelte/icons/globe';
 import FileText from '@lucide/svelte/icons/file-text';
 import ShoppingBag from '@lucide/svelte/icons/shopping-bag';
@@ -31,9 +31,9 @@ import type { Component } from 'svelte';
 import type { Addable } from './addable';
 
 export const ADDABLE_ICON: Record<Addable, Component> = {
-  text: Type,
-  image: Image,
-  video: Video,
+  text: GenerateText,
+  image: GenerateImage,
+  video: GenerateVideo,
   iframe: Globe,
   doc: FileText,
   products: ShoppingBag,

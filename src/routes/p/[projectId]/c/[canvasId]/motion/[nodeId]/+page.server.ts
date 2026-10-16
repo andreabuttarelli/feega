@@ -1,34 +1,23 @@
 import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { libraryOf, loadEditorSession } from '$lib/server/motion/editor-session';
-import { motionScope as scopeFor } from '$lib/server/motion/editor-scope';
-import { Restore, assetUrls, headOrNew, motionAssets, motionTokens, restoreRevision, saveMotionDoc } from '$lib/server/motion/editor';
-import { RevisionOutcome, listRevisions } from '$lib/server/repos/motion-revisions';
-import { OpsOutcome, commitOps } from '$lib/server/motion/frame-ops';
-import { parseOps } from '$lib/motion/doc-ops';
+import { motionScope as scopeFor, type MotionEditorScope } from '$lib/server/motion/editor-scope';
+import { runEditorOp, type EditorAnswer, type EditorCtx } from '$lib/server/frame-editor/editor-ops';
+import { Restore, headOrNew, motionAssets, motionTokens, restoreRevision } from '$lib/server/motion/editor';
+import { listRevisions } from '$lib/server/repos/motion-revisions';
 import { motionRenderFarm, motionRenderStorage } from '$lib/server/motion/renderer';
-import { batchView, cancelRender, renderView } from '$lib/server/motion/render-run';
-import { startFarmBatch, startFarmRender } from '$lib/server/motion/render-start';
+import { cancelRender } from '$lib/server/motion/render-run';
+import { startFarmRender } from '$lib/server/motion/render-start';
 import { serverRenderOpen } from '$lib/motion/server-render';
-import { batchInput, rowRequests } from '$lib/server/motion/batch-input';
 import { renderQueue } from '$lib/server/motion/render-queue';
 import { parseSettings } from '$lib/motion/export-formats';
-import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
-import { saveExport } from '$lib/server/motion/export';
 import { savePoster } from '$lib/server/motion/poster';
 import { exportStill } from '$lib/server/motion/still-export';
 import { stillAskSchema, stillExport } from '$lib/motion/still-model';
-import { Sound, generateSound } from '$lib/server/motion/voiceover';
-import { withOrgContext } from '$lib/server/ai-log';
-import { saveFontUpload } from '$lib/server/motion/font-upload';
-import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
-import { clipsOf, parseMotionDoc } from '$lib/motion/doc';
+import { clipsOf } from '$lib/motion/doc';
 import { templateLibrary } from '$lib/server/motion/templates';
-import { withTemplateSounds } from '$lib/server/motion/template-sounds';
-import { laySfx } from '$lib/server/motion/sfx';
-import type { Sfx } from '$lib/motion/sfx';
 import type { Db } from '$lib/server/db/client';
 import { loadAttachments } from '$lib/server/chat-attachments/register';
 import { briefAttachmentIds } from '$lib/motion/video-brief';
@@ -50,71 +39,40 @@ const HTTP_NOT_FOUND = 404;
 
 export const load: PageServerLoad = ({ locals, params, url }) => loadEditorSession(locals, params, url);
 
+const editorCtx = (scope: MotionEditorScope): EditorCtx => ({
+  ...scope,
+  actor: { kind: 'user', id: scope.userId },
+  gate: async () => {
+    const denied = await gateOrgAiActionForForm(scope.orgId);
+    return denied ? { status: denied.status, body: denied.data } : null;
+  }
+});
+
+const answered = (answer: EditorAnswer) => (answer.status >= HTTP_BAD_REQUEST ? fail(answer.status, answer.body) : answer.body);
+
 const galleryScope = (scope: { db: Db; orgId: string; userId: string }) => ({ db: scope.db, orgId: scope.orgId, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } });
 
 export const actions: Actions = {
   save: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const version = Number(form.get('version'));
-    const summary = String(form.get('summary') ?? '') || null;
     let doc: unknown;
     try {
       doc = JSON.parse(String(form.get('doc') ?? ''));
     } catch {
       return fail(HTTP_BAD_REQUEST, { error: 'invalid_doc' });
     }
-
-    const write = await saveMotionDoc(scope.db, {
-      orgId: scope.orgId,
-      nodeId: scope.motion.record.id,
-      expectedVersion: Number.isInteger(version) ? version : -1,
-      doc,
-      actor: { kind: 'user', id: scope.userId },
-      summary
-    });
-
-    if (write.outcome === RevisionOutcome.Conflict) {
-      const head = await headOrNew(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id }, scope.motion.node);
-      return fail(HTTP_CONFLICT, { error: 'conflict', head: { version: head.version, doc: head.doc } });
-    }
-    if (write.outcome === RevisionOutcome.Invalid) {
-      return fail(HTTP_BAD_REQUEST, { error: write.error });
-    }
-    return { version: write.head.version };
+    return answered(await runEditorOp('save_doc', editorCtx(scope), { version: Number(form.get('version')), doc, summary: String(form.get('summary') ?? '') }));
   },
 
   ops: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const ops = parseOps(parsedJson(String(form.get('ops') ?? '')));
-    if (!ops) {
-      return fail(HTTP_BAD_REQUEST, { error: 'invalid_ops' });
-    }
-
-    const commit = await commitOps(scope.db, {
-      orgId: scope.orgId,
-      nodeId: scope.motion.record.id,
-      node: scope.motion.node,
-      baseVersion: Number(form.get('version')),
-      ops,
-      actor: { kind: 'user', id: scope.userId },
-      summary: String(form.get('summary') ?? '') || null
-    });
-    if (commit.outcome === OpsOutcome.Invalid) {
-      return fail(HTTP_BAD_REQUEST, { error: commit.error });
-    }
-    if (commit.outcome === OpsOutcome.Busy) {
-      return fail(HTTP_CONFLICT, { error: 'busy' });
-    }
-    return { version: commit.head.version, doc: commit.head.doc, rebased: commit.rebased };
+    const input = { version: Number(form.get('version')), ops: parsedJson(String(form.get('ops') ?? '')), summary: String(form.get('summary') ?? '') };
+    return answered(await runEditorOp('apply_ops', editorCtx(scope), input));
   },
 
-  head: async ({ locals, params }) => {
-    const scope = await scopeFor(locals, params);
-    const head = await headOrNew(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id }, scope.motion.node);
-    return { version: head.version, doc: head.doc, actorKind: head.actorKind };
-  },
+  head: async ({ locals, params }) => answered(await runEditorOp('read_head', editorCtx(await scopeFor(locals, params)), {})),
 
   revisions: async ({ locals, params }) => {
     const scope = await scopeFor(locals, params);
@@ -137,17 +95,8 @@ export const actions: Actions = {
   exported: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const saved = await saveExport(scope.db, {
-      orgId: scope.orgId,
-      projectId: params.projectId,
-      nodeId: scope.motion.record.id,
-      actor: { kind: 'user', id: scope.userId },
-      path: String(form.get('path') ?? ''),
-      width: Number(form.get('width')),
-      height: Number(form.get('height')),
-      seconds: Number(form.get('seconds'))
-    });
-    return saved.ok ? { assetId: saved.assetId } : fail(HTTP_BAD_REQUEST, { error: saved.error });
+    const input = { path: String(form.get('path') ?? ''), width: Number(form.get('width')), height: Number(form.get('height')), seconds: Number(form.get('seconds')) };
+    return answered(await runEditorOp('record_export', editorCtx(scope), input));
   },
 
   poster: async ({ locals, params, request }) => {
@@ -175,39 +124,20 @@ export const actions: Actions = {
   uploadFont: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const saved = await saveFontUpload(scope.db, { orgId: scope.orgId, projectId: params.projectId, path: String(form.get('path') ?? '') });
-    if (!saved.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: saved.error });
-    }
-    const assets = await motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id });
-    return { asset: assets.find((a) => a.id === saved.assetId) ?? null };
+    return answered(await runEditorOp('upload_font', editorCtx(scope), { path: String(form.get('path') ?? '') }));
   },
 
   analyze: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const ids = form.getAll('assetId').map(String);
-    const assets = await motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id });
-    return { analyses: await analyzeSounds(storageAnalysis(scope.db), { orgId: scope.orgId, projectId: params.projectId }, assets, ids) };
+    return answered(await runEditorOp('analyze_sounds', editorCtx(scope), { assetIds: form.getAll('assetId').map(String) }));
   },
 
   sound: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const sound = String(form.get('sound')) as Sound;
-    const text = String(form.get('text') ?? '').trim();
-    if (!Object.values(Sound).includes(sound) || !text) {
-      return fail(HTTP_BAD_REQUEST, { error: 'invalid_sound' });
-    }
-
-    const denied = await gateOrgAiActionForForm(scope.orgId);
-    if (denied) {
-      return fail(denied.status, denied.data);
-    }
-
-    const soundScope = { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } };
-    const made = await withOrgContext(scope.orgId, () => generateSound(scope.db, soundScope, sound, { text, seconds: Number(form.get('seconds')) || undefined }));
-    return made.ok ? { assetId: made.assetId, seconds: made.seconds, url: made.url } : fail(HTTP_UNAVAILABLE, { error: made.error });
+    const input = { sound: String(form.get('sound')), text: String(form.get('text') ?? ''), seconds: Number(form.get('seconds')) || undefined };
+    return answered(await runEditorOp('generate_sound', editorCtx(scope), input));
   },
 
   render: async ({ locals, params, request }) => {
@@ -237,67 +167,28 @@ export const actions: Actions = {
   renderBatch: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const settings = parseSettings(form.get('settings') as string | null);
-    const input = batchInput(form.get('rows') as string | null);
-    if (!settings.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: settings.error });
-    }
-    if (!input.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: input.error });
-    }
-    const nodeScope = { orgId: scope.orgId, nodeId: scope.motion.record.id };
-    const head = await headOrNew(scope.db, nodeScope, scope.motion.node);
-    if (head.version !== Number(form.get('version'))) {
-      return fail(HTTP_CONFLICT, { error: 'save_first' });
-    }
-
-    const denied = await gateOrgAiActionForForm(scope.orgId);
-    if (denied) {
-      return fail(denied.status, denied.data);
-    }
-
-    const [assets, tokens] = await Promise.all([
-      motionAssets({ db: scope.db, orgId: scope.orgId, projectId: params.projectId, canvasId: scope.canvas.id, nodeId: scope.motion.record.id }, SIGNED_URL_TTL_S.render),
-      motionTokens(scope.db, { orgId: scope.orgId, brandId: scope.projectBrandId })
-    ]);
-    const rows = rowRequests(head, input.rows, { tokens, assets: assetUrls(assets) }, settings.settings);
-    if (!rows.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: 'invalid_row', detail: rows.error });
-    }
-
-    const editorUrl = `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
-    const renderScope = { ...nodeScope, projectId: params.projectId, userId: scope.userId, editorUrl };
-    const started = await startFarmBatch(scope.db, renderScope, rows.rows);
-    return started.ok ? started : fail(HTTP_UNAVAILABLE, { error: started.error, detail: started.detail });
+    const settings = form.get('settings') ? parsedJson(String(form.get('settings'))) : undefined;
+    const input = { version: Number(form.get('version')), settings, rows: parsedJson(String(form.get('rows') ?? '')) };
+    return answered(await runEditorOp('render_batch', editorCtx(scope), input));
   },
 
   templateSounds: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const parsed = parseMotionDoc(parsedJson(String(form.get('doc') ?? '')));
-    if (!parsed.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: parsed.error });
-    }
-    const soundScope = { orgId: scope.orgId, projectId: params.projectId, nodeId: scope.motion.record.id, userId: scope.userId, actor: { kind: 'user' as const, id: scope.userId } };
-    const make = (sfx: Sfx) => withOrgContext(scope.orgId, () => laySfx(scope.db, soundScope, sfx));
-    const laid = await withTemplateSounds(parsed.doc, String(form.get('clipId') ?? ''), make, () => crypto.randomUUID().slice(0, 8));
-    return laid.ok ? { doc: laid.doc } : fail(HTTP_UNAVAILABLE, { error: laid.error });
+    return answered(await runEditorOp('template_sounds', editorCtx(scope), { doc: parsedJson(String(form.get('doc') ?? '')), clipId: String(form.get('clipId') ?? '') }));
   },
 
   saveTemplate: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();
-    const parsed = parseMotionDoc(parsedJson(String(form.get('doc') ?? '')));
-    if (!parsed.ok) {
-      return fail(HTTP_BAD_REQUEST, { error: parsed.error });
-    }
-    const saved = await libraryOf(scope).save({
-      doc: parsed.doc,
+    const input = {
+      doc: parsedJson(String(form.get('doc') ?? '')),
       compId: String(form.get('compId') ?? '') || null,
-      meta: { name: String(form.get('name') ?? ''), description: String(form.get('description') ?? '') },
+      name: String(form.get('name') ?? ''),
+      description: String(form.get('description') ?? ''),
       posterFrame: Number(form.get('posterFrame')) || 0
-    });
-    return saved.ok ? { entry: saved.entry } : fail(HTTP_BAD_REQUEST, { error: saved.error });
+    };
+    return answered(await runEditorOp('save_template', editorCtx(scope), input));
   },
 
   publishGallery: async ({ locals, params, request }) => {
@@ -317,11 +208,7 @@ export const actions: Actions = {
     return removed ? { removed: true } : fail(HTTP_BAD_REQUEST, { error: 'not_removable' });
   },
 
-  batchStatus: async ({ locals, params }) => {
-    const scope = await scopeFor(locals, params);
-    const runs = await listNodeRuns(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id });
-    return { batch: batchView(runs) };
-  },
+  batchStatus: async ({ locals, params }) => answered(await runEditorOp('batch_status', editorCtx(await scopeFor(locals, params)), {})),
 
   cancelRender: async ({ locals, params }) => {
     const scope = await scopeFor(locals, params);
@@ -333,9 +220,5 @@ export const actions: Actions = {
     return cancelled.ok ? { cancelled: true } : fail(HTTP_CONFLICT, { error: 'nothing_to_cancel' });
   },
 
-  renderStatus: async ({ locals, params }) => {
-    const scope = await scopeFor(locals, params);
-    const runs = await listNodeRuns(scope.db, { orgId: scope.orgId, nodeId: scope.motion.record.id });
-    return { render: renderView(runs) };
-  }
+  renderStatus: async ({ locals, params }) => answered(await runEditorOp('render_status', editorCtx(await scopeFor(locals, params)), {}))
 };

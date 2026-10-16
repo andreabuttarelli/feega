@@ -3,6 +3,7 @@ import type { RequestHandler } from './$types';
 import { resolveOrgCaller, type OrgCaller } from '$lib/server/org-data/auth';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { findProjectById } from '$lib/server/repos/projects';
+import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { Access, CANVAS_OPS, canvasCtx, isCanvasOp } from '$lib/server/canvas/canvas-ops';
 
 type Gate = (caller: OrgCaller) => Promise<Response | undefined>;
@@ -42,7 +43,7 @@ export const POST: RequestHandler = async ({ request, url }) => {
   }
 
   const project = await findProjectById(caller.db, { orgId: caller.orgId, projectId: body.project_id ?? '' });
-  if (!project) {
+  if (!project || !(await canvasReachable(caller.db, { orgId: caller.orgId, mode: project.mode }, caller.userId))) {
     return json({ error: 'project_not_found' }, { status: 404 });
   }
 

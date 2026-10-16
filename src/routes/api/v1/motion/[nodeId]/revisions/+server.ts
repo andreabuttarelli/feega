@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
-import { resolveOrgCaller } from '$lib/server/org-data/auth';
+import { reachableCaller } from '$lib/server/org-data/reach';
 import { motionRevisions, restoreMotion } from '$lib/server/motion/ask';
 import type { RequestHandler } from './$types';
 
@@ -9,28 +9,27 @@ const HTTP_FORBIDDEN = 403;
 
 const bodySchema = z.object({ version: z.number().int().positive() });
 
-async function callerOf(request: Request, url: URL) {
-  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  return resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
+function callerOf(request: Request, url: URL, nodeId: string | undefined) {
+  return reachableCaller(request, url, { nodes: [nodeId ?? ''] });
 }
 
 const answer = (out: Record<string, unknown> | Response) => (out instanceof Response ? out : json(out));
 
 export const GET: RequestHandler = async ({ request, params, url }) => {
-  const resolved = await callerOf(request, url);
-  if ('error' in resolved) {
-    return json(resolved.error.body, { status: resolved.error.status });
+  const caller = await callerOf(request, url, params.nodeId);
+  if (caller instanceof Response) {
+    return caller;
   }
-  return answer(await motionRevisions(resolved.caller.db, { orgId: resolved.caller.orgId, nodeId: params.nodeId ?? '' }));
+  return answer(await motionRevisions(caller.db, { orgId: caller.orgId, nodeId: params.nodeId ?? '' }));
 };
 
 export const POST: RequestHandler = async ({ request, params, url }) => {
-  const resolved = await callerOf(request, url);
-  if ('error' in resolved) {
-    return json(resolved.error.body, { status: resolved.error.status });
+  const caller = await callerOf(request, url, params.nodeId);
+  if (caller instanceof Response) {
+    return caller;
   }
 
-  const { db, orgId, userId, writeAllowed } = resolved.caller;
+  const { db, orgId, userId, writeAllowed } = caller;
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: HTTP_FORBIDDEN });
   }

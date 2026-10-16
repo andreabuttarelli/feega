@@ -9,8 +9,12 @@ Segnale: `editor-scrub-budget.spec.ts` in WebKit dà host 60 fps e iframe 30 (pl
 via di seek). WebKit limita il rAF degli iframe cross-origin mai toccati dall'utente a 30 fps
 (`NonInteractedCrossOriginFrame`, changeset 215070); il player è `sandbox-origin="opaque"`, quindi
 cross-origin, e i clic li prendono i nostri overlay, non l'iframe. Mossa: misurare il rAF dentro
-l'iframe (sonda nello srcdoc), mai solo quello dell'host; togliere il limite vuol dire un iframe
-same-origin o un'interazione vera dentro il frame — scelta di sicurezza, non di performance.
+l'iframe (sonda nello srcdoc), mai solo quello dell'host. Solo i callback rAF sono limitati, non il
+disegno. Lo sblocca solo un evento vero nel documento del frame: focus, `postMessage` durante un
+gesto e hover no. Mai rubare il press agli overlay per darlo al frame (#594, revert #596: pen,
+drag e selezione rotti, replay sintetico non basta); il frame riceve solo il tocco che mette in
+pausa mentre suona (`listenTap`), quando gli overlay non ci sono. Prova: spec `@real` del
+canvas/editor, non solo l'harness perf.
 
 ### Il contorno di selezione è spostato o piccolo rispetto al disegno
 Segnale: il box blu non copre l'elemento, ma `measure()` restituisce frazioni giuste. Prima di
@@ -27,6 +31,12 @@ vecchia e i box di selezione spariscono finché non si riseleziona. Due cause: u
 `node.id` da una prop si riesegue a ogni nuovo oggetto `node` (qui `inlineStage.offer` riazzerava il
 paint); e una misura vuota mentre la preview ricarica sovrascriveva i box. Mossa: leggere il campo
 da un `$derived`, e non sostituire i box con una misura vuota (`remeasured`).
+
+### Un componente custom con un prop `move` fa esplodere `composeHtml`
+`compose.ts` legge `props.move` su ogni clip (Ken Burns di Image) senza guardare il componente:
+un custom con `move` numerico dà `Cannot read properties of undefined (reading 'from')` in
+`moveTweens`. Segnale: quello stack al primo compose del template. Mossa: niente prop custom
+con nomi di prop dei clip nativi (`move`, `easing`); rinominare (`stepSeconds`).
 
 ### Un template a 60 fps che va al doppio e diventa nero a metà
 Ogni frame di un doc (clip, keyframe, comp) è nell'fps del doc: un pezzo che arriva da un doc con
@@ -119,6 +129,13 @@ Vite osserva anche `changelog/*.md`: scriverne uno mentre l'harness naviga l'edi
 `page reload` e il `goto` muore con `net::ERR_ABORTED`. Segnale: nel log del dev server
 `page reload <file>` all'ora del fallimento. Mossa: niente edit nel worktree servito finché il
 giro non è finito, o un dev server da un checkout separato.
+
+### Un e2e `@real` che prende 500 dall'editor motion e il server di un altro agente
+Due cause, stesso sintomo ("Something broke", `Server is not running`). (1) Node 25 espone un
+`localStorage` globale senza `getItem` in SSR: `browserStore(...)?.getItem is not a function` in
+`MotionEditorShell`, e `handleError` non logga. Mossa: `NODE_OPTIONS=--no-experimental-webstorage`
+sul dev server. (2) La porta 4173 è di chiunque: `reuseExistingServer` prova il codice di un
+altro worktree. Mossa: un dev server tuo su una porta tua e `E2E_BASE_URL`.
 
 ### Un e2e da un worktree agente prova codice vecchio
 `vite.config.ts` esclude `**/.claude/worktrees/**` dal watcher: un dev server lanciato DENTRO un
@@ -2853,6 +2870,20 @@ Signal: a server-side edit (a tool, a port) has no effect in agent turns, and no
 storage, while unit tests pass. The dev server kept the old module for turns running in the
 background. Move: restart `vite dev` after server edits before trusting a real-check run.
 
+## A zoomed-out canvas pans below 60 fps though its images are already on one canvas
+
+Signal: a Chrome trace of the pan is ~80% `Layerize` / `PaintArtifactCompositor::Update`; a no-op
+poster draw, `ImageBitmap` thumbs or `display:none` on node children change nothing. Cause: 500
+node shells still go through layerization every frame, with nothing visible inside. Images were
+not the cost. Move: measure with the shells out of layout (`display:none`) before blaming decode;
+under LOD, `.moving` takes unselected poster shells out of layout (`canvas-poster-lod.spec.ts`).
+
+## `/login` answers 500 on a worktree dev server with a symlinked `node_modules`
+
+Signal: `Cannot find module '.../intl-messageformat/lib/src/core'` in the vite log; every
+real-stack e2e times out on the login placeholder. Cause: through the symlink vite SSR loads the
+package's ESM `module` entry. Move: `npm ci` in the worktree before a real-stack run.
+
 ## An export flickers every other frame but a 1-lane render is smooth
 
 Signal: consecutive exported frames alternate between two states (`bench:export --lanes=4` vs
@@ -2977,3 +3008,21 @@ Signal: a button or hint has the right size but the default text colour (white o
 
 ### A matted clip renders nothing in preview, still and video
 Signal: a clip with a track matte (or a Figma mask) is invisible everywhere; its `.kt` wrapper has a `mask:url(data:image/svg+xml…)` that, opened alone, shows the right shape. Cause: `.kt` was `position:absolute` with no box, 0×0, so `mask-size:100% 100%` covered nothing. Markup tests and the fast-vs-exact PSNR spec stayed green: black equals black. Move: look at pixels, not markup — `npm run bench:export -- --doc=<{doc,assets}.json> --engines=chromium --lanes=1 --keep` writes the real export mp4, `--parity --live` the preview frames; check `getBoundingClientRect()` of the wrapper.
+
+### ⌘Z of a delete answers "node_deleted_by_peer"
+Signal: undoing a canvas delete is refused with `node_deleted_by_peer` on the real stack; `undo.test.ts` stays green. Cause: the precondition looked the node up with `findNode`, which filters `deleted_at is null`, so a soft-deleted row is never found; `fakeDb` without `{ filter: true }` ignores that filter. Move: a test about soft deletes seeds `deleted_at` and uses `fakeDb(rows, { filter: true })`; a precondition on a deleted row reads it with `nodeRowExists`.
+
+### Every project-scoped route resolves scope through `reachableCaller`/`callerReach`
+Signal: a Bearer route under `/api/v1` looks a node, run, asset or project up "by org and id" and answers for an uncensored project the caller cannot open. RLS and `org_id` say the row is the org's; the uncensored lock is a per-user rule neither knows. Move: resolve the caller with `reachableCaller(request, url, { nodes | runs | assets | project })` (`src/lib/server/org-data/reach.ts`), or `callerReach(caller, …)` once the ids are in the body; lists filter with `callerHidden`. Session routes use `findReachableProject` / `motionScope`. Never a per-route `canvasReachable`. Guard: `src/routes/api/v1/uncensored-lock.test.ts` — a new route gets a row there.
+
+### `new row violates row-level security policy` on a Storage upsert that worked once
+Signal: the first `upload(..., { upsert: true })` to a path succeeds, every later one to the same path fails with RLS. Cause: overwriting needs an UPDATE policy on `storage.objects`; `canvas-assets` has SELECT/INSERT/DELETE only. A fake bucket in unit tests overwrites happily. Move: reproduce with the test account's JWT (two uploads to one path), then either write to a fresh path or `remove` before `upload`; a fake bucket for a private bucket refuses overwrites.
+
+### A sub-agent round answers the user instead of doing its step
+Signal: an agent reply says it "only has tools to read/research/import" or "can't build" while the run summary shows it wrote something. Cause: a role round with a narrow tool set (researcher) got the user's raw request and no brief, so it answered it; its text leads the turn's reply. Move: every narrowed round gets its own brief message (like `crewBrief`, `RESEARCH_BRIEF`), and a turn that stops by design returns a field the caller can relay (`script_ready`).
+
+### An e2e fix "does nothing", or a red test passes without the fix
+Signal: a `@real` e2e gives the same result with and without your change. Cause: Playwright reuses whatever listens on 4173 (`reuseExistingServer`), often another worktree's dev server; and with `NO_HMR=1` your own server keeps the code it compiled first. Move: `lsof -iTCP:4173` and check the cwd; run your own `vite dev --port <free>` with `E2E_BASE_URL`, and restart it after every code change before trusting red or green.
+
+### A clip added to a still is invisible
+Signal: a new Text/Title/Line in a still frame renders with opacity 0 (or clipped) while its colour and fills are right. Cause: the template's intro tween starts at clip start = still frame. Move: inspect computed opacity/transform in the srcdoc iframe before suspecting paint; `settledBy` in `compose.ts` keeps unfinished template tweens out of stills.

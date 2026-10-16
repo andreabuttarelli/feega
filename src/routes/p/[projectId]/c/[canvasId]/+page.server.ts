@@ -25,8 +25,8 @@ import { isNodeType, influencerOf } from '$lib/canvas-node-data';
 import { validateNodeData } from '$lib/canvas/node-data';
 import type { Actor } from '$lib/server/repos/actor';
 import { isCanvasEdgeKind, isWireMode } from '$lib/canvas-edges';
-import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
-import { Capability, catalogueIn, MODE_REFUSAL, modeAllows, modeOf, type ProjectMode } from '$lib/project-mode';
+import { projectCatalogue } from '$lib/server/project-catalogue';
+import { Capability, MODE_REFUSAL, modeAllows, modeOf, type ProjectMode } from '$lib/project-mode';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import { MIN_VOICE_DESCRIPTION, VOICE_REFUSAL_MESSAGE, type VoiceRefusal } from '$lib/canvas/voices';
 import type { VoiceDeps } from '$lib/server/voices/custom-voices';
@@ -39,7 +39,6 @@ const VOICE_FAIL_STATUS: Partial<Record<VoiceRefusal | 'voice_not_found', number
   voice_not_yours: 403,
   cloning_not_in_this_project: 403
 };
-import { NO_UNCENSORED_ACCESS, uncensoredAccess, visibleCatalogue } from '$lib/server/uncensored-access';
 import { runGenNode, runsOf } from '$lib/server/canvas/generate';
 import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
@@ -49,6 +48,7 @@ import { ShowRun, removeNodes, resizeOnCanvas, shareDoc, showRun, type RunShown 
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { templateLibrary } from '$lib/server/motion/templates';
+import { canvasOutlines } from '$lib/server/motion/frame-outlines';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
 import { serverTiming } from '$lib/server/server-timing';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
@@ -72,7 +72,9 @@ import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
-import { MOVE_STATUS, MoveOutcome, frameStore, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { nodeMembers } from '$lib/server/motion/node-members';
+import { MOVE_STATUS, MoveOutcome, drawElement, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -112,6 +114,10 @@ function jsonField(fd: FormData, key: string): unknown {
 
 function canvasFrames(scope: Scope) {
   return frameStore(scope.db, { orgId: scope.orgId, actor: userActor(scope), projectId: scope.canvas.projectId });
+}
+
+function canvasMembers(scope: Scope) {
+  return nodeMembers(scope.db, { orgId: scope.orgId, canvasId: scope.canvasId, actor: userActor(scope) });
 }
 
 function movedAnswer(moved: Moved) {
@@ -183,23 +189,22 @@ async function spendOnVoice<T>(
 export const load: PageServerLoad = async ({ params, locals, url }) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, connections, fullCatalogue, shareToken, references, uncensored] = await Promise.all([
+  const [nodes, connections, catalogue, shareToken, references] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
-    canvasModelCatalogue(),
+    projectCatalogue(db, { orgId, mode }),
     readCanvasShare(db, { orgId, canvasId }),
-    referenceLibrary(db, { orgId, projectId: canvas.projectId }),
-    uncensoredAccess(db, orgId).catch(() => NO_UNCENSORED_ACCESS)
+    referenceLibrary(db, { orgId, projectId: canvas.projectId })
   ]);
-  const catalogue = catalogueIn(mode, visibleCatalogue(fullCatalogue, uncensored));
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
     firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length }),
     templateLibrary(db, { orgId, actor: userActor({ userId }) }).list(),
-    chatHandoff(db, { orgId, projectId: canvas.projectId }, url)
+    chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
+    canvasOutlines(db, { orgId, nodes })
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
@@ -223,7 +228,8 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     mode,
     projectBrandId,
     onboarding,
-    componentTemplates
+    componentTemplates,
+    outlines
   };
 };
 
@@ -237,6 +243,7 @@ function jsonObject(value: FormDataEntryValue | null): Record<string, unknown> |
 }
 
 const HTTP_BAD_REQUEST = 400;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 
@@ -1080,14 +1087,83 @@ export const actions: Actions = {
     return movedAnswer(await moveElement(canvasFrames(scope), ask.data));
   },
 
-  placeOutput: async ({ request, params, locals }) => {
+  moveFree: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = outputAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop') });
+    const ask = freeAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid drop' });
+    }
+    return movedAnswer(await moveFree(canvasFrames(scope), ask.data));
+  },
+
+  groupElements: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const ask = groupAskSchema.safeParse({ ids: jsonField(await request.formData(), 'ids') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid group' });
+    }
+    return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids));
+  },
+
+  rotateGroup: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const degrees = Number(fd.get('degrees'));
+    const id = String(fd.get('id') ?? '');
+    if (!id || !Number.isFinite(degrees)) {
+      return fail(400, { error: 'invalid rotation' });
+    }
+    return movedAnswer(await rotateNodeGroup(canvasFrames(scope), canvasMembers(scope), id, degrees));
+  },
+
+  moveGroup: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const id = String(fd.get('id') ?? '');
+    const x = coord(fd.get('x'));
+    const y = coord(fd.get('y'));
+    if (!id || x === null || y === null) {
+      return fail(400, { error: 'invalid move' });
+    }
+    return movedAnswer(await moveNodeGroup(canvasMembers(scope), id, { x, y }));
+  },
+
+  ungroupElement: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const id = String((await request.formData()).get('id') ?? '');
+    if (!id) {
+      return fail(400, { error: 'invalid group' });
+    }
+    return movedAnswer(await ungroupElement(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, id));
+  },
+
+  drawElement: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = drawnSchema.safeParse(jsonField(fd, 'drawn'));
+    if (!ask.success) {
+      return fail(400, { error: 'invalid drawing' });
+    }
+    const drawn = await drawElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data);
+    if (drawn.outcome !== MoveOutcome.Done) {
+      return movedAnswer(drawn);
+    }
+    return { ...drawn, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: drawn.frameId }) };
+  },
+
+  placeOutput: async ({ request, params, locals, setHeaders }) => {
+    const phases = serverTiming();
+    const scope = await phases.time('scope', scopeFor(locals, params.canvasId));
+    const fd = await request.formData();
+    const ask = outputAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop'), id: fd.get('node_id') ?? undefined });
     if (!ask.success) {
       return fail(400, { error: 'rilascio non valido' });
     }
-    return movedAnswer(await placeOutput(canvasFrames(scope), ask.data));
+    const placed = await phases.time('place', placeOutput(phases.port(canvasFrames(scope)), ask.data));
+    const node = placed.outcome === MoveOutcome.Done && placed.created ? await phases.time('read', findNode(scope.db, { orgId: scope.orgId, nodeId: placed.frameId })) : null;
+    setHeaders({ 'server-timing': phases.header() });
+    return placed.outcome === MoveOutcome.Done ? { ...placed, node } : movedAnswer(placed);
   },
 
   disconnect: async ({ request, params, locals }) => {
@@ -1240,12 +1316,15 @@ export const actions: Actions = {
 
     const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
     const format = String(fd.get('format') ?? MotionFormat.Landscape) as MotionFormat;
-    if (!Number.isFinite(at.x) || !Number.isFinite(at.y) || !MOTION_FORMATS.includes(format)) {
+    const id = String(fd.get('node_id') ?? '') || undefined;
+    if (!Number.isFinite(at.x) || !Number.isFinite(at.y) || !MOTION_FORMATS.includes(format) || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid frame' });
     }
 
     const actor = userActor(scope);
-    const started = await phases.time('start', startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, {
+    const deps = { ...FROM_TEMPLATE_DEPS, listCanvases: async () => [scope.canvas] };
+    const started = await phases.time('start', startFromTemplate(scope.db, deps, {
+      id,
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
@@ -1259,7 +1338,7 @@ export const actions: Actions = {
       return fail(400, { error: started.outcome });
     }
 
-    const node = await phases.time('read', findNode(scope.db, { orgId: scope.orgId, nodeId: started.start.nodeId }));
+    const node = started.node;
     setHeaders({ 'server-timing': phases.header() });
     return { node };
   },

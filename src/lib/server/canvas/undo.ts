@@ -7,6 +7,7 @@ import {
   deleteNode,
   findNode,
   listConnections,
+  nodeRowExists,
   restoreConnection,
   restoreNode,
   writeNodeData
@@ -137,6 +138,10 @@ async function currentDocState(db: Db, orgId: string, nodeId: string): Promise<C
   return node ? { exists: true, version: head?.version ?? 0, connectedBy: [] } : { exists: false };
 }
 
+async function deletedNodeState(db: Db, orgId: string, nodeId: string): Promise<CurrentNodeState> {
+  return (await nodeRowExists(db, { orgId, nodeId })) ? { exists: true, version: 0, connectedBy: [] } : { exists: false };
+}
+
 export async function undoGesture(
   db: Db,
   input: { orgId: string; canvasId: string; gesture: Gesture; actor: Actor }
@@ -153,6 +158,10 @@ export async function undoGesture(
     }
     if (item.kind === 'doc.revision') {
       currentOf.set(item, { node: await currentDocState(db, input.orgId, item.nodeId) });
+      continue;
+    }
+    if (item.kind === 'node.delete') {
+      currentOf.set(item, { node: await deletedNodeState(db, input.orgId, item.nodeId) });
       continue;
     }
     currentOf.set(item, { node: await currentNodeState(db, input.orgId, item.nodeId, ownEdgeIds) });

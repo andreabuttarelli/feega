@@ -1,6 +1,6 @@
 export type ModelProvider = { provider: string; providerLabel: string };
 
-const PROVIDER_LABELS: Record<string, string> = {
+export const PROVIDER_NAMES: Readonly<Record<string, string>> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
   google: 'Google',
@@ -15,11 +15,14 @@ const PROVIDER_LABELS: Record<string, string> = {
   perplexity: 'Perplexity',
   deepseek: 'DeepSeek',
   cohere: 'Cohere',
-  wiro: 'Wiro'
+  wiro: 'Wiro',
+  kie: 'Kie.ai',
+  openrouter: 'OpenRouter',
+  higgsfield: 'Higgsfield'
 };
 
 function labelFor(key: string): string {
-  return PROVIDER_LABELS[key] ?? key.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return PROVIDER_NAMES[key] ?? key.replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export function providerOf(wireId: string): ModelProvider {
@@ -27,4 +30,8 @@ export function providerOf(wireId: string): ModelProvider {
   const slash = bare.indexOf('/');
   const key = slash === -1 ? 'other' : bare.slice(0, slash).toLowerCase();
   return { provider: key, providerLabel: labelFor(key) };
+}
+
+export function providerName(id: string): string {
+  return labelFor(id);
 }

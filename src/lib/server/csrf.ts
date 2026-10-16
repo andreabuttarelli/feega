@@ -15,12 +15,17 @@ const EXEMPT_PATHS = new Set(['/oauth/token']);
 const FORM_CONTENT_TYPES = ['application/x-www-form-urlencoded', 'multipart/form-data', 'text/plain'];
 const MUTATING = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
+function carriesBearer(request: Request): boolean {
+  return /^Bearer\s+\S/i.test(request.headers.get('authorization') ?? '');
+}
+
 export function isCsrfForbidden(request: Request, url: URL): boolean {
   const type = (request.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
   return (
     MUTATING.includes(request.method) &&
     FORM_CONTENT_TYPES.includes(type) &&
     !EXEMPT_PATHS.has(url.pathname) &&
+    !carriesBearer(request) &&
     request.headers.get('origin') !== url.origin
   );
 }

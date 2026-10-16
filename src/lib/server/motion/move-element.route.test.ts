@@ -42,6 +42,7 @@ function event(fields: Record<string, string>, rows: Record<string, unknown[]> =
     ...fake,
     request: new Request('http://localhost/c/canvas', { method: 'POST', body }),
     params: { canvasId: 'canvas', projectId: 'project' },
+    setHeaders: () => undefined,
     locals: { safeGetSession: async () => ({ session: {}, user: { id: 'user' } }), db: async () => fake.db }
   };
 }
@@ -103,6 +104,59 @@ describe('placeOutput action', () => {
   });
 });
 
+describe('a generated output placed on the empty canvas', () => {
+  const asset = (type: string, width: number, height: number) => ({ id: ASSET, org_id: 'org', project_id: 'project', type, url: 'x', content: type === 'text' ? 'Hello' : null, mime_type: 'image/png', bytes: 1, width, height, duration_s: type === 'video' ? 3 : null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' });
+  const placed = (input: ReturnType<typeof event>) => ({
+    node: input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload as { width: number; height: number; data: Record<string, unknown> },
+    doc: (input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')?.payload as { doc: MotionDoc }).doc
+  });
+
+  it.each([
+    ['image', 'Image', 800, 400],
+    ['video', 'Video', 1920, 1080],
+    ['text', 'Text', 0, 0]
+  ])('a %s becomes a free %s element, not a frame', async (type, component, width, height) => {
+    const input = event(
+      { source: GEN, drop: JSON.stringify({ on: 'canvas', x: 500, y: 300 }) },
+      { nodes: [{ ...frameRow(GEN), type, data: { prompt: 'p', refId: ASSET } }], assets: [asset(type, width, height)] }
+    );
+
+    expect(await actions.placeOutput(input as never)).toMatchObject({ outcome: 'done', created: true });
+    const { node, doc } = placed(input);
+    expect(node.data.kind).toBe('element');
+    expect(doc.background).toBe('transparent');
+    expect(doc.tracks.flatMap((t) => t.clips).map((c) => c.component)).toEqual([component]);
+    if (width) {
+      expect(node.width / node.height).toBeCloseTo(width / height, 1);
+    }
+  });
+
+  it('a placed text shows settled: the still sits where its entrance has finished, not on its first frame', async () => {
+    const input = event(
+      { source: GEN, drop: JSON.stringify({ on: 'canvas', x: 500, y: 300 }) },
+      { nodes: [{ ...frameRow(GEN), type: 'text', data: { prompt: 'p', refId: ASSET } }], assets: [asset('text', 0, 0)] }
+    );
+
+    await actions.placeOutput(input as never);
+    const { doc } = placed(input);
+    const clip = doc.tracks.flatMap((t) => t.clips)[0];
+    expect(doc.still?.frame).toBe(clip.from + clip.durationInFrames - 1);
+    expect(clip.props.color).toBe('#111111');
+  });
+
+  it('a tiny picture still gets a sharp element: the doc is sized by the canvas box, not by the source pixels', async () => {
+    const input = event(
+      { source: GEN, drop: JSON.stringify({ on: 'canvas', x: 500, y: 300 }) },
+      { nodes: [{ ...frameRow(GEN), type: 'image', data: { prompt: 'p', refId: ASSET } }], assets: [asset('image', 1, 1)] }
+    );
+
+    await actions.placeOutput(input as never);
+    const { node, doc } = placed(input);
+    expect(doc.width).toBeGreaterThanOrEqual(node.width);
+    expect(doc.tracks.flatMap((t) => t.clips)[0].props).toMatchObject({ width: 1, height: 1 });
+  });
+});
+
 describe('undo of a move', () => {
   it('restores the frame doc that was there before, as a new revision', async () => {
     const before = withText();
@@ -134,5 +188,73 @@ describe('connect action', () => {
     const doc = written(input, TARGET)[0].doc;
     expect(doc.tracks[0].clips[0]).toMatchObject({ component: 'Image', props: { assetId: ASSET } });
     expect(doc.links).toEqual({ [GEN]: doc.tracks[0].clips[0].id });
+  });
+});
+
+describe('elements in and out of frames', () => {
+  const inserted = (input: ReturnType<typeof event>) => input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { x: number; y: number; width: number; height: number; data: Record<string, unknown> });
+  const wideFrame = (id: string) => ({ ...frameRow(id), width: 400 });
+
+  it('dragged out onto the canvas it is a free element of the size it had on screen, centred where it was dropped', async () => {
+    const input = event(
+      { source: SOURCE, clip: 'txt', drop: JSON.stringify({ on: 'canvas', x: 900, y: 40 }), box: JSON.stringify({ left: 0.25, top: 0.25, width: 0.5, height: 0.2 }) },
+      { nodes: [wideFrame(SOURCE), frameRow(TARGET)] }
+    );
+
+    expect(await actions.moveElement(input as never)).toMatchObject({ outcome: 'done', created: true });
+    expect(inserted(input)).toMatchObject([{ x: 800, y: 17.5, width: 200, height: 45, data: { kind: 'element' } }]);
+    const made = input.calls.find((c) => c.table === 'motion_revisions' && c.op === 'insert')?.payload as { doc: MotionDoc };
+    expect(made.doc.background).toBe('transparent');
+  });
+
+  it('a free element dropped on a frame goes inside it, and the empty element leaves the canvas', async () => {
+    const element = { ...frameRow(SOURCE), width: 200, height: 45, data: { ...frameRow(SOURCE).data, kind: 'element' } };
+    const input = event({ source: SOURCE, clip: 'txt', drop: JSON.stringify({ on: 'frame', nodeId: TARGET, at: { x: 0.5, y: 0.5 } }) }, { nodes: [element, frameRow(TARGET)] });
+
+    const result = await actions.moveElement(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', frameId: TARGET });
+    expect(written(input, TARGET).map((r) => clipIds(r.doc))).toEqual([['txt']]);
+    expect(written(input, SOURCE)).toEqual([]);
+    expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'update' && (c.payload as { deleted_at?: string }).deleted_at && c.filters.some(([k, v]) => k === 'id' && v === SOURCE))).toBe(true);
+    expect((result as { undo: { kind: string }[] }).undo.map((u) => u.kind)).toEqual(['doc.revision', 'node.delete']);
+  });
+
+  it('moveFree drops the whole free element on a frame without naming its clip', async () => {
+    const element = { ...frameRow(SOURCE), width: 200, height: 45, data: { ...frameRow(SOURCE).data, kind: 'element' } };
+    const input = event({ source: SOURCE, drop: JSON.stringify({ on: 'frame', nodeId: TARGET, at: { x: 0.3, y: 0.6 } }) }, { nodes: [element, frameRow(TARGET)] });
+
+    expect(await actions.moveFree(input as never)).toMatchObject({ outcome: 'done', frameId: TARGET });
+    expect(written(input, TARGET).map((r) => clipIds(r.doc))).toEqual([['txt']]);
+  });
+});
+
+describe('drawElement action', () => {
+  const inserted = (input: ReturnType<typeof event>) => input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { type: string; x: number; y: number; width: number; height: number; data: Record<string, unknown> });
+
+  it('a rectangle drawn on the empty canvas is a free element: a chromeless frame on the drawn box', async () => {
+    const input = event({ drawn: JSON.stringify({ tool: 'rectangle', box: { left: 120, top: 40, width: 300, height: 100 } }) });
+
+    const result = await actions.drawElement(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', created: true, node: { type: 'motion' } });
+    expect(inserted(input)).toMatchObject([{ type: 'motion', x: 120, y: 40, width: 300, height: 100, data: { kind: 'element' } }]);
+    const revisions = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => c.payload as { version: number; doc: MotionDoc });
+    expect(revisions.map((r) => [r.version, r.doc.background, r.doc.tracks.flatMap((t) => t.clips).map((c) => c.component)])).toEqual([[1, 'transparent', ['Shape']]]);
+  });
+
+  it('a pen path is placed at the box of its points', async () => {
+    const input = event({ drawn: JSON.stringify({ tool: 'pen', path: 'M 10 20 L 110 20 L 110 70' }) });
+
+    await actions.drawElement(input as never);
+
+    expect(inserted(input)).toMatchObject([{ x: 10, y: 20, width: 100, height: 50 }]);
+  });
+
+  it('an unreadable drawing is a 400, nothing written', async () => {
+    const input = event({ drawn: JSON.stringify({ tool: 'select', box: { left: 0, top: 0, width: 1, height: 1 } }) });
+
+    expect(await actions.drawElement(input as never)).toMatchObject({ status: 400 });
+    expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
   });
 });

@@ -11,10 +11,11 @@ export const GET: RequestHandler = async ({ locals }) => {
   }
 
   const options = await offeredChatModels();
-  const saved = resolveChoice(options, await savedChoice(locals.supabase.auth));
+  const savedAsked = await savedChoice(locals.supabase.auth);
+  const saved = resolveChoice(options, savedAsked);
   const fallback = resolveChoice(options, {});
   const choice = saved.ok ? saved.choice : fallback.ok ? fallback.choice : DEFAULT_CHAT_CHOICE;
-  return json({ groups: groupByProvider(options), choice });
+  return json({ groups: groupByProvider(options), choice, picked: saved.ok && savedAsked.model !== undefined });
 };
 
 export const PUT: RequestHandler = async ({ request, locals }) => {

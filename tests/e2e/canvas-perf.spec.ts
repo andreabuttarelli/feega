@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
-import type { CDPSession, Page } from '@playwright/test';
+import type { CDPSession, Locator, Page } from '@playwright/test';
 import { test, expect, REAL_STACK } from './fixtures/session';
 import plainDoc from './fixtures/motion-doc.json' with { type: 'json' };
 import webglDoc from './fixtures/motion-webgl-doc.json' with { type: 'json' };
 import { CONSENT_COOKIE, CONSENT_VERSION, encodeConsent } from '../../src/lib/consent-model';
+import { LOD_CLASS, LOD_ZOOM } from '../../src/lib/canvas/poster-lod';
 
 type Seed = { x: number; y: number; format: string; doc: unknown; poster: Buffer };
 type Live = { players: number; offscreen: number; iframes: number; webgl: number };
@@ -205,9 +206,46 @@ async function open(page: Page, cdp: CDPSession, path: string, slowdown: number)
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: slowdown });
   const started = Date.now();
   await page.goto(path);
-  await expect(page.getByTestId('motion-node').first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId('motion-node').first()).toBeAttached({ timeout: 60_000 });
   await page.waitForFunction(() => [...document.querySelectorAll<HTMLImageElement>('[data-testid="motion-node"] img')].every((img) => img.complete), null, { timeout: 60_000 });
   return Date.now() - started;
+}
+
+const ZOOM_IN_STEPS = 20;
+const VIEW_STILL_MS = 500;
+const READABLE_NODE_PX = 320;
+
+async function zoomUntilVisible(page: Page, shellOf: Locator, node: Locator) {
+  const view = () =>
+    page.evaluate(
+      ({ lod, threshold }) => {
+        const transform = getComputedStyle(document.querySelector('.svelte-flow__viewport')!).transform;
+        const lodOn = !!document.querySelector('.svelte-flow')?.classList.contains(lod);
+        return { transform, settled: new DOMMatrix(transform).a >= threshold !== lodOn };
+      },
+      { lod: LOD_CLASS, threshold: LOD_ZOOM }
+    );
+  await expect
+    .poll(
+      async () => {
+        const before = await view();
+        await page.waitForTimeout(VIEW_STILL_MS);
+        const after = await view();
+        return before.transform === after.transform && after.settled;
+      },
+      { timeout: 20_000, message: 'the canvas fitted its view and settled into or out of the poster layer' }
+    )
+    .toBe(true);
+  const shell = (await shellOf.boundingBox())!;
+  await page.mouse.move(shell.x + shell.width / 2, shell.y + shell.height / 2);
+  await page.keyboard.down('Control');
+  const readable = async () => (await node.isVisible()) && ((await node.boundingBox())?.width ?? 0) >= READABLE_NODE_PX;
+  for (let i = 0; i < ZOOM_IN_STEPS && !(await readable()); i++) {
+    await page.mouse.wheel(0, -100);
+    await page.waitForTimeout(250);
+  }
+  await page.keyboard.up('Control');
+  await expect(node, 'zoomed out a frame is drawn by the poster layer; zooming in brings its controls back').toBeVisible();
 }
 
 function report(name: string, value: Report) {
@@ -258,7 +296,9 @@ test.describe('a heavy canvas of motion nodes stays smooth @real', () => {
     expect(swept.peakPlayers).toBe(0);
 
     await open(page, cdp, `/p/${session.projectId}/c/${session.canvasId}`, 1);
-    const node = page.getByTestId('motion-node').first();
+    const shell = page.locator('.svelte-flow__node').filter({ has: page.getByTestId('motion-node') }).first();
+    const node = shell.getByTestId('motion-node');
+    await zoomUntilVisible(page, shell, node);
     await node.getByRole('button', { name: 'Play', exact: true }).click();
     await expect(page.locator('[data-testid="motion-node"] hyperframes-player')).toHaveCount(1, { timeout: 15_000 });
     await node.getByRole('button', { name: 'Stop', exact: true }).click();

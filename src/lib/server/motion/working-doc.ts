@@ -6,13 +6,15 @@ export type WorkingScope = FrameScope & { bucket: FrameBucket };
 export const workingDocPath = (scope: FrameScope) => `${scope.orgId}/${scope.projectId}/motion-drafts/${scope.nodeId}.json`;
 
 export async function keepWorkingDoc(scope: WorkingScope, work: DocEdited): Promise<void> {
+  const path = workingDocPath(scope);
   try {
-    const { error } = await scope.bucket.upload(workingDocPath(scope), Buffer.from(JSON.stringify(work)), { contentType: 'application/json', upsert: true });
+    await scope.bucket.remove([path]);
+    const { error } = await scope.bucket.upload(path, Buffer.from(JSON.stringify(work)), { contentType: 'application/json', upsert: false });
     if (error) {
-      console.warn('[motion-agent] working doc not kept', error.message);
+      console.error('[motion-agent] working doc not kept', error.message);
     }
   } catch (e) {
-    console.warn('[motion-agent] working doc not kept', e);
+    console.error('[motion-agent] working doc not kept', e);
   }
 }
 

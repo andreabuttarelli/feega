@@ -1,16 +1,18 @@
 <script lang="ts">
+  import { Background } from '$lib/motion/doc';
   import { onMount, type Snippet } from 'svelte';
   import { FPS } from '$lib/motion/design';
   import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
   import { CAPTURE_TIMEOUT_MS, Playback, previewDriver, type ShotRequest } from '$lib/motion/hyperframes/preview-driver';
   import { mountCapturePlayer } from '$lib/motion/hyperframes/capture-player';
   import { crispFor } from '$lib/motion/hyperframes/crisp-scale';
+  import { listenTap, type FramePoint } from '$lib/motion/hyperframes/frame-tap';
   import { laneVisibility, shootInLanes } from '$lib/motion/export/lanes';
   import { engineOf } from '$lib/motion/engine';
   import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
   import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
   import { CAPTURE_PROFILES, CaptureProfile } from '$lib/motion/export/capture-profile';
-  import { REDRAWN, MEASURE_REPLY, MEASURE_REQUEST, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
+  import { DRAWN_EVENT, DRAWN_FALLBACK_MS, REDRAWN, MEASURE_REPLY, MEASURE_REQUEST, Pose, type MeasureReply, type MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
   import { INPUT_MESSAGE } from '$lib/motion/interactive/runtime';
   import type { VarValues } from '$lib/motion/interactive/var-model';
@@ -36,8 +38,10 @@
     live = null,
     vars = null,
     redraws = $bindable(0),
+    ontap = null,
+    background = Background.Brand,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; children?: Snippet } = $props();
 
   let pointer = $state<InputValues>({});
 
@@ -57,11 +61,15 @@
   });
 
   let host = $state<HTMLDivElement | null>(null);
+  let shown = $state<HTMLIFrameElement | null>(null);
+  const PLAYER_BACKDROP: Record<Background, string> = { [Background.Brand]: '', [Background.Transparent]: 'transparent' };
+
   let player: Player | null = null;
   let reported = -1;
   let ready = false;
   let pending: number | null = null;
   let capturing = false;
+  let drawnDue: ReturnType<typeof setTimeout> | null = null;
 
   function setSource(next: string) {
     if (!player) {
@@ -71,9 +79,19 @@
     player.setAttribute('srcdoc', next);
   }
 
+  function announceDrawn() {
+    if (drawnDue === null) {
+      return;
+    }
+    clearTimeout(drawnDue);
+    drawnDue = null;
+    host?.dispatchEvent(new CustomEvent(DRAWN_EVENT, { bubbles: true }));
+  }
+
   function redrawn(e: MessageEvent) {
     if (e.source === player?.iframeElement?.contentWindow && e.data?.type === REDRAWN) {
       redraws++;
+      announceDrawn();
     }
   }
 
@@ -90,13 +108,15 @@
       el.setAttribute('disable-click-to-play', '');
       el.style.width = '100%';
       el.style.height = '100%';
+      el.style.background = PLAYER_BACKDROP[background];
       el.muted = muted;
       el.loop = loop;
       el.addEventListener('ready', () => {
         crisp();
-        const shown = el.iframeElement;
+        shown = el.iframeElement;
         crisp = shown ? crispFor(engineOf(navigator.userAgent), shown) : () => {};
         ready = true;
+        drawnDue = setTimeout(announceDrawn, frame === 0 ? 0 : DRAWN_FALLBACK_MS);
         driver.seek(frame / fps);
         driver.ready();
       });
@@ -117,6 +137,7 @@
     });
     return () => {
       disposed = true;
+      clearTimeout(drawnDue ?? undefined);
       crisp();
       player?.remove();
       player = null;
@@ -181,20 +202,26 @@
     }
   }
 
-  export function capture(times: number[], source: string, captureWidth = CAPTURE_WIDTH): Promise<CapturedFrame[]> {
+  export async function capture(times: number[], source: string, captureWidth = CAPTURE_WIDTH): Promise<CapturedFrame[]> {
+    if (!host) {
+      throw new Error('the preview is still loading');
+    }
     const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
-    return borrowed(source, async () => {
+    const aside = await mountCapturePlayer(host, source);
+    try {
       const frames: CapturedFrame[] = [];
       for (const time of times) {
-        const reply = await shoot(time, request);
+        const reply = await aside.shoot(time, request);
         frames.push({ time, data: reply.url ?? '', layout: reply.layout ?? '', errors: reply.errors ?? [] });
       }
       return frames;
-    });
+    } finally {
+      aside.dispose();
+    }
   }
 
-  export function still(time: number, captureWidth = CAPTURE_WIDTH): Promise<string> {
-    const request = { format: FrameFormat.Jpeg, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
+  export function still(time: number, captureWidth = CAPTURE_WIDTH, format: FrameFormat = FrameFormat.Jpeg): Promise<string> {
+    const request = { format, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
     return driver.exclusive(async () => {
       await driver.whenLive();
       try {
@@ -205,7 +232,7 @@
     });
   }
 
-  export function measure(): Promise<Record<string, MeasuredBox>> {
+  export function measure(pose: Pose = Pose.Base): Promise<Record<string, MeasuredBox>> {
     const target = player?.iframeElement?.contentWindow;
     if (!target || capturing) {
       return Promise.resolve({});
@@ -226,7 +253,7 @@
       };
       const timer = setTimeout(() => settle({}), MEASURE_TIMEOUT_MS);
       window.addEventListener('message', onMessage);
-      target.postMessage({ type: MEASURE_REQUEST, id }, '*');
+      target.postMessage({ type: MEASURE_REQUEST, id, pose }, '*');
     });
   }
 
@@ -276,13 +303,23 @@
   });
 
   $effect(() => {
+    const frameEl = shown;
+    const lift = host;
+    const tapped = ontap;
+    if (!frameEl || !lift || !tapped || live) {
+      return;
+    }
+    return listenTap(frameEl, lift, tapped);
+  });
+
+  $effect(() => {
     driver.playback(playing ? Playback.Playing : Playback.Paused);
   });
 </script>
 
 <svelte:window onmessage={redrawn} />
 
-<div class="stage" style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview">
+<div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview">
   <div class="host" bind:this={host}></div>
   {@render children?.()}
   {#if live}
@@ -307,6 +344,10 @@
     flex-shrink: 0;
     background: #000;
     outline: 1px solid var(--ui-line);
+  }
+
+  .stage[data-backdrop='transparent'] {
+    background: transparent;
   }
 
   .host {

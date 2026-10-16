@@ -21,6 +21,7 @@ const MEDIA_TIMEOUT_MS = 8000;
 
 export enum FrameFormat {
   Jpeg = 'jpeg',
+  Png = 'png',
   Bitmap = 'bitmap'
 }
 
@@ -862,6 +863,7 @@ function captureRuntime(cfg: RuntimeConfig, freeze: () => Promise<() => void>, i
   };
   const output: Record<string, (root: HTMLElement, m: CaptureRequest, embed: string) => Promise<Shot>> = {
     jpeg: (root, m, embed) => drawn(root, m, embed).then((canvas) => ({ body: { url: canvas.toDataURL('image/jpeg', m.quality ?? 1) }, transfer: [] })),
+    png: (root, m, embed) => drawn(root, m, embed).then((canvas) => ({ body: { url: canvas.toDataURL('image/png') }, transfer: [] })),
     bitmap: async (root, m, embed) => {
       const layered = m.layering === GPU ? await treeOf(root, m, embed) : null;
       if (layered) {

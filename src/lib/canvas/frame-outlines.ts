@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { CUSTOM_CLIP, partBoxes } from '$lib/motion/poster-parts';
 import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
-import type { FrameOutlines, LayerRow } from './layers';
+import { LayerKind, type FrameOutlines, type LayerRow } from './layers';
 
 export const HEADS_PARAM = 'heads';
 export const PARTS_PARAM = 'parts';
@@ -63,8 +63,10 @@ export function frameHead(type: string, data: Record<string, unknown>): number |
 
 export const canvasHeads = (nodes: readonly { id: string; head?: number | null }[]): FrameHead[] => nodes.flatMap((n) => (n.head ? [{ nodeId: n.id, version: n.head }] : []));
 
+const unnamedParts = (rows: readonly LayerRow[]) => rows.some((r) => r.type === CUSTOM_CLIP) && !rows.some((r) => r.kind === LayerKind.Part);
+
 export const posterHeads = (heads: readonly FrameHead[], cache: OutlineCache, probed: ReadonlySet<string>, openNodeId: string | null) =>
-  heads.filter((h) => h.nodeId !== openNodeId && !probed.has(headKey(h)) && (cache[headKey(h)] ?? []).some((r) => r.type === CUSTOM_CLIP));
+  heads.filter((h) => h.nodeId !== openNodeId && !probed.has(headKey(h)) && unnamedParts(cache[headKey(h)] ?? []));
 
 export const partIds = (boxes: Record<string, MeasuredBox>): ClipParts =>
   Object.fromEntries(Object.entries(partBoxes(boxes).parts).map(([clip, list]) => [clip, list.map((p) => p.part)]));

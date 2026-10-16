@@ -38,6 +38,17 @@ describe('the motion agent after a reload mid-turn', () => {
     expect(body.parts).toEqual([{ type: DOC_EDITED, data: working }]);
   });
 
+  it('the old frame thread stays readable after the chat moved to the canvas thread', async () => {
+    serverWith([
+      { id: 'm-1', role: 'user', status: 'done', content: 'make it blue', created_at: ago(90) },
+      { id: 'm-2', role: 'assistant', status: 'done', content: 'Blue now.', created_at: ago(80) }
+    ]);
+
+    const body = await (await GET(event())).json();
+
+    expect(body.messages.map((m: { content: string }) => m.content).sort()).toEqual(['Blue now.', 'make it blue']);
+  });
+
   it('a finished turn hands back no working doc: the saved head is the truth', async () => {
     world.stored.set(WORKING, JSON.stringify({ edit: 1, doc: newMotionDoc(MotionFormat.Landscape) }));
     serverWith([{ id: 'm-1', role: 'assistant', status: 'done', content: 'ok', created_at: ago(30) }]);

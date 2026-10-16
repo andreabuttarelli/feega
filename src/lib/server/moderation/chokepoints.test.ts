@@ -12,7 +12,7 @@ const MODEL_ADAPTERS: readonly string[] = [
   'src/lib/server/openrouter-video',
   'src/lib/server/video',
   'src/lib/server/elevenlabs-config',
-  'src/lib/server/wiro-config'
+  'src/lib/server/task-providers-config'
 ];
 
 const MODEL_CALLS_FROM_AI_SDK = /\b(streamText|generateText|generateObject|streamObject)\b/;

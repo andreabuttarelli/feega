@@ -861,6 +861,7 @@ export type Database = {
           created_at: string
           deleted_at: string | null
           id: string
+          last_edited_at: string
           name: string
           org_id: string
           project_id: string
@@ -873,6 +874,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          last_edited_at?: string
           name: string
           org_id: string
           project_id: string
@@ -885,6 +887,7 @@ export type Database = {
           created_at?: string
           deleted_at?: string | null
           id?: string
+          last_edited_at?: string
           name?: string
           org_id?: string
           project_id?: string
@@ -2893,6 +2896,7 @@ export type Database = {
           brand_id: string | null
           created_at: string
           id: string
+          last_edited_at: string
           mode: Database["public"]["Enums"]["project_mode"]
           name: string
           org_id: string
@@ -2904,6 +2908,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string
           id?: string
+          last_edited_at?: string
           mode?: Database["public"]["Enums"]["project_mode"]
           name: string
           org_id: string
@@ -2915,6 +2920,7 @@ export type Database = {
           brand_id?: string | null
           created_at?: string
           id?: string
+          last_edited_at?: string
           mode?: Database["public"]["Enums"]["project_mode"]
           name?: string
           org_id?: string

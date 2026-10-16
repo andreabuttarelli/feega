@@ -26,7 +26,7 @@ vi.mock('$lib/server/repos/canvas', () => ({
   createNode
 }));
 
-const { load, actions } = await import('./+page.server');
+const { load, actions } = await import('$lib/server/dashboard/pages/motion');
 
 function form(fields: Record<string, string>) {
   const body = new FormData();

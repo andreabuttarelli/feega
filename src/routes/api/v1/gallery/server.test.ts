@@ -5,6 +5,10 @@ import { addClip } from '$lib/motion/timeline';
 
 const state = vi.hoisted(() => ({ world: null as null | FakeDb, write: true }));
 
+vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
+  const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
+  return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
+});
 vi.mock('$lib/server/db/client', async (original) => ({ ...(await original<typeof import('$lib/server/db/client')>()), createAnonDb: () => state.world!.db }));
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async () => ({ caller: { db: state.world!.db, orgId: 'org-1', userId: 'u-1', writeAllowed: state.write } }) }));
 vi.mock('$lib/server/gallery/moderation', () => ({ galleryModeration: () => ({ text: async () => ({ ok: true }), media: async () => ({ ok: true }) }) }));

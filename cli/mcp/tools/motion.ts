@@ -7,6 +7,13 @@ import { MAX_ATTACHMENTS } from '../../lib/attachments.ts';
 const MAX_FRAMES = 6;
 const MAX_FRAME_WIDTH = 960;
 
+const EDITOR_READS = 'editor_session {briefIds?} (everything the editor page loads: head, assets, tokens, templates, render state, gallery), read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render)';
+const EDITOR_WRITES =
+  'save_doc {version,doc,summary?} (whole doc; 409 answers the head), apply_ops {version,ops,summary?} (doc ops, rebased on newer edits), ' +
+  'record_export {path,width,height,seconds} (an mp4 already in storage becomes the render asset), upload_font {path} (a font file already in storage), analyze_sounds {assetIds} (tempo, beats, speech), ' +
+  'template_sounds {doc,clipId} (lays the template clip SFX; answers the doc), save_template {doc,name,description,compId?,posterFrame?}. ' +
+  'Spends credits: generate_sound {sound:voice|music,text,seconds?} (answers assetId, url), render_batch {version,rows:[{name,values}],settings?} (one server render per row of template field values; poll batch_status)';
+
 const org = z.string().optional().describe('Which org, if you belong to more than one.');
 
 const attachment = z.union([
@@ -250,6 +257,20 @@ export function registerMotionTools(server: McpServer) {
         }
         return motionApi.runTool(token, node_id, { tool, ...(input ? { input } : {}), ...(version === undefined ? {} : { version }) }, org);
       })
+  );
+
+  server.registerTool(
+    'motion_editor_op',
+    {
+      title: 'Run a frame editor action',
+      description:
+        'The actions the frame editor page runs on a `motion` node (`node_id`), same answers as the page, with `input` in camelCase. ' +
+        `Reads: ${EDITOR_READS}. Writes: ${EDITOR_WRITES}. ` +
+        'Unknown op answers the list; bad input answers the issues; a stale `version` answers 409.',
+      inputSchema: z.object({ org, node_id: z.string(), op: z.string(), input: z.record(z.string(), z.unknown()).optional() }),
+      annotations: { readOnlyHint: false, destructiveHint: true }
+    },
+    async ({ org, node_id, op, input }) => withAuth((token) => motionApi.editorOp(token, node_id, { op, input }, org))
   );
 
   server.registerTool(

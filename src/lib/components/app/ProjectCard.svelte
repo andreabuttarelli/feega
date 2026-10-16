@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { relativeDate } from '$lib/relative-date';
+  import { editedAgo } from '$lib/relative-date';
   import type { DashboardProject } from '$lib/server/dashboard/dashboard';
 
   let { project }: { project: DashboardProject } = $props();
@@ -21,7 +21,7 @@
     {/each}
   </span>
   <span class="title">{project.name}</span>
-  <span class="meta">{count} · {relativeDate(project.updatedAt)}</span>
+  <span class="meta">{count} · {editedAgo(project.updatedAt)}</span>
 </a>
 
 <style>

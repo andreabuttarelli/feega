@@ -43,7 +43,10 @@ const SAMPLE_MEDIA: Record<string, { field: string; photos: string[]; values?: R
   'builtin:stack-words': { field: 'media', photos: STRIP_PHOTOS },
   'builtin:phone-chat': { field: 'avatars', photos: ['p1074', 'p1069', 'p1080', 'p1015'] },
   'builtin:wire-globe-pages': { field: 'media', photos: STRIP_PHOTOS },
-  'builtin:path-cards': { field: 'media', photos: ['p1015', 'p1016', 'p1018'] }
+  'builtin:path-cards': { field: 'media', photos: ['p1015', 'p1016', 'p1018'] },
+  'builtin:framed-reveal': { field: 'media', photos: STRIP_PHOTOS },
+  'builtin:showcase-scatter': { field: 'media', photos: STRIP_PHOTOS },
+  'builtin:card-cascade': { field: 'media', photos: STRIP_PHOTOS }
 };
 
 const sampleAssets = (photos: string[]) => Object.fromEntries(photos.map((id) => [id, `data:image/jpeg;base64,${readFileSync(join(SAMPLES, `${id}.jpg`)).toString('base64')}`]));

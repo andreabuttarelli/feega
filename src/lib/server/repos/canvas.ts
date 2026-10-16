@@ -293,6 +293,14 @@ export async function listMotionNodes(
   return (data ?? []).map(toNode);
 }
 
+export async function nodeRowExists(db: Db, input: { orgId: string; nodeId: string }): Promise<boolean> {
+  const { data, error } = await db.from('nodes').select('id').eq('org_id', input.orgId).eq('id', input.nodeId).maybeSingle();
+  if (error) {
+    throw error;
+  }
+  return data !== null;
+}
+
 export async function findNode(
   db: Db,
   input: { orgId: string; nodeId: string }
@@ -314,6 +322,7 @@ export async function findNode(
 export async function createNode(
   db: Db,
   input: {
+    id?: string;
     orgId: string;
     projectId: string;
     canvasId: string;
@@ -333,6 +342,7 @@ export async function createNode(
    * per l'MCP, non qui. Il cast dichiara l'onestà del confine, non una garanzia che non c'è.
    */
   const row: NodeInsert = {
+    ...(input.id ? { id: input.id } : {}),
     org_id: input.orgId,
     project_id: input.projectId,
     canvas_id: input.canvasId,

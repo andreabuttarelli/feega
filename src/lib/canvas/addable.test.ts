@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CANVAS_ADDABLE, isAddable, isGenAddable } from './addable';
+import { ADDABLE_LABEL, CANVAS_ADDABLE, isAddable, isGenAddable } from './addable';
 import { GEN_MEDIUMS } from './gen-node';
 
 /**
@@ -68,5 +68,11 @@ describe('la barra corta: tre voci in vista, il resto in «Altro»', () => {
     const { CANVAS_BAR_MAIN, CANVAS_BAR_MORE, CANVAS_ADD_BAR } = await import('./addable');
     expect(CANVAS_BAR_MAIN).toEqual(['text', 'image', 'video']);
     expect([...CANVAS_BAR_MAIN, ...CANVAS_BAR_MORE].sort()).toEqual([...CANVAS_ADD_BAR].sort());
+  });
+});
+
+describe('i nodi che generano si chiamano per quello che fanno', () => {
+  it('ogni medium generato ha un nome che comincia con Generate', () => {
+    expect(GEN_MEDIUMS.map((m) => ADDABLE_LABEL[m])).toEqual(['Generate text', 'Generate image', 'Generate video', 'Generate audio', 'Generate 3D model']);
   });
 });

@@ -13,6 +13,10 @@ const gateOrgAiAction = vi.fn();
 const runGenNode = vi.fn();
 const findNode = vi.fn();
 
+vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
+  const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
+  return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
+});
 vi.mock('$lib/server/org-data/auth', () => ({
   resolveOrgCaller: (...args: unknown[]) => resolveOrgCaller(...args)
 }));
@@ -113,6 +117,14 @@ describe('POST /api/v1/org/nodes/:id/generate', () => {
       })
     );
     expect(body.kind).toBe('done');
+  });
+
+  it('carries a chosen provider into the run, the same field the canvas picker writes', async () => {
+    runGenNode.mockResolvedValue({ kind: 'queued', run: { id: 'run-2' } });
+
+    await call(NODE, { medium: 'image', prompt: 'a lake', model: 'nano-banana-2', version: 3, provider: 'kie', params: { resolution: '2K' } });
+
+    expect(runGenNode).toHaveBeenCalledWith({}, expect.objectContaining({ params: { resolution: '2K', provider: 'kie' } }));
   });
 
   it('gates on org credits before ever calling runGenNode', async () => {

@@ -32,12 +32,17 @@
   import { SvelteFlow, type Node } from '@xyflow/svelte';
   import CanvasDots from './CanvasDots.svelte';
   import CanvasPosterLayer from './CanvasPosterLayer.svelte';
-  import { POSTER_CLASS } from '$lib/canvas/poster-lod';
+  import { POSTER_CLASS, type Poster } from '$lib/canvas/poster-lod';
   import '@xyflow/svelte/dist/style.css';
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
   import CanvasAddBar from './CanvasAddBar.svelte';
-  import type { BarContext } from '$lib/canvas/bottom-bar';
+  import { BarContext } from '$lib/canvas/bottom-bar';
+  import CanvasDrawLayer from './CanvasDrawLayer.svelte';
+  import type { NameTag } from '$lib/canvas/node-label';
+  import { frameBar } from '$lib/canvas/frame-bar.svelte';
+  import { DrawTool } from '$lib/motion/draw-tool';
+  import type { DrawnWire } from '$lib/motion/draw-create';
   import CanvasKeys from './CanvasKeys.svelte';
   import CanvasSelectionBridge from './CanvasSelectionBridge.svelte';
   import CanvasImageTiers from './CanvasImageTiers.svelte';
@@ -63,6 +68,7 @@
   import { anyPortAccepts, landingPort, portListValued, type ConnectorType } from '$lib/canvas/connectors';
   import { setTileRender } from '$lib/canvas/tile-render-context';
   import { setTileResize } from '$lib/canvas/tile-resize-context';
+  import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { CanvasNode } from '$lib/canvas/graph';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import type { RunQuote } from '$lib/canvas/run-quote';
@@ -90,6 +96,9 @@
     w: number;
     h: number;
     connectable?: boolean;
+    tag?: NameTag;
+    rotation?: number;
+    rotatable?: boolean;
     node?: CanvasNode;
     /** La taglia minima di QUESTO tipo di nodo (`nodeSize`, `node-size.ts`) — `NodeResizer` non
      *  lascia stringere sotto. Assente = non ridimensionabile a mano (il resize resta spento). */
@@ -114,7 +123,7 @@
      *  seleziona; un inserimento realtime da un altro utente non la porta mai. */
     select?: boolean;
     settings?: boolean;
-    poster?: string;
+    poster?: Poster;
   };
 
   let {
@@ -143,6 +152,10 @@
     onFrameTemplates,
     onNodeClicked,
     barContext,
+    onDraw,
+    onRotate,
+    onGroup,
+    onUngroup,
     onUndo,
     onRedo,
     onConnectNew,
@@ -221,6 +234,10 @@
     onFrameTemplates?: (at: { x: number; y: number }) => void;
     onNodeClicked?: (id: string) => void;
     barContext?: BarContext;
+    onDraw?: (drawn: DrawnWire) => void;
+    onRotate?: (id: string, degrees: number) => void;
+    onGroup?: (ids: string[]) => void;
+    onUngroup?: (ids: string[]) => void;
     /** ⌘Z: annulla l'ultimo gesto di questa scheda. */
     onUndo?: () => void;
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
@@ -282,6 +299,7 @@
   // libreria — quando arriverà `brand_canvas_items`, è qui che le due posizioni si riconciliano.
   setTileRender(() => tile);
   setTileResize(() => onResize);
+  setTileRotate(() => onRotate);
 
   const toNode = (t: Tile): Node => ({
     id: t.id,
@@ -295,13 +313,15 @@
       outputs: t.outputs,
       kind: t.kind,
       displayName: t.displayName,
+      tag: t.tag,
+      rotatable: t.rotatable,
       inPost: t.inPost,
       minW: t.minW,
       minH: t.minH
     },
     type: 'tile',
     class: [t.settings && 'has-settings', t.poster && POSTER_CLASS].filter(Boolean).join(' ') || undefined,
-    style: `width:${t.w}px;height:${t.h}px`
+    style: `width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.x + t.w / 2}px ${t.y + t.h / 2}px` : ''}`
   });
 
   // svelte-ignore state_referenced_locally -- la cattura iniziale è voluta: da qui in poi i nodi
@@ -788,6 +808,8 @@
       onpaste={onPaste}
       onundo={onUndo}
       onredo={onRedo}
+      ongroup={onGroup}
+      onungroup={onUngroup}
     />
     {/if}
     <CanvasSelectionBridge
@@ -816,6 +838,17 @@
 
   {#if targeting}
     <p class="edge-refusal" role="status">Pick the node to connect to — Esc to cancel</p>
+  {/if}
+
+  {#if onDraw && toFlow && barContext === BarContext.Canvas && frameBar.tool !== DrawTool.Select}
+    <CanvasDrawLayer
+      tool={frameBar.tool}
+      {toFlow}
+      ondraw={(drawn) => {
+        frameBar.tool = DrawTool.Select;
+        onDraw(drawn);
+      }}
+    />
   {/if}
 
   {#if spec.chrome && onCreate}
@@ -930,6 +963,10 @@
 
   .wrap :global(.poster-lod .svelte-flow__node.has-poster:not(.selected) > *) {
     visibility: hidden;
+  }
+
+  .wrap.moving :global(.poster-lod .svelte-flow__node.has-poster:not(.selected)) {
+    display: none;
   }
 
   .wrap.moving :global(.svelte-flow__viewport) {

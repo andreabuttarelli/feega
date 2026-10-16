@@ -10,6 +10,7 @@
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
+  import { Depth, Gesture, drill, levelOf, type Level, type Probe } from '$lib/motion/drill';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
@@ -21,6 +22,7 @@
     onpreview,
     onchange,
     pickAt = null,
+    ask = () => null,
     part = $bindable(null),
     onparts = () => {},
     onboxes = () => {},
@@ -36,6 +38,7 @@
     onpreview: (doc: MotionDoc | null) => void;
     onchange: (doc: MotionDoc, summary: string) => void;
     pickAt?: Pt | null;
+    ask?: () => { at: Pt; gesture: Gesture } | null;
     part?: string | null;
     onparts?: (parts: Record<string, string[]>) => void;
     onboxes?: (boxes: Boxes) => void;
@@ -75,7 +78,8 @@
   const clip = $derived<MotionClip | null>(selected ? (findClip(shown, selected)?.clip ?? null) : null);
   const onFrame = (c: MotionClip) => frame >= c.from && frame < c.from + c.durationInFrames;
   const quad = $derived(clip && boxes[clip.id] && onFrame(clip) ? quadOf(shown, clip.id, frame, boxes[clip.id]) : null);
-  const hoverQuad = $derived(hover && hover !== selected && boxes[hover] ? quadOf(shown, hover, frame, boxes[hover]) : null);
+  const hoverQuad = $derived(hover && hover !== selected && !hover.includes(PART_SEP) && boxes[hover] ? quadOf(shown, hover, frame, boxes[hover]) : null);
+  const hoverPart = $derived(hover && hover.includes(PART_SEP) && hover !== `${selected}${PART_SEP}${part}` ? (boxes[hover] ?? null) : null);
   const anchor = $derived(quad && clip ? anchorOf(shown, clip.id, frame) : null);
   const outlinedPart = $derived(outlined?.includes(PART_SEP) ? (boxes[outlined] ?? null) : null);
   const outlinedQuad = $derived(outlined && !outlinedPart && boxes[outlined] && findClip(shown, outlined) ? quadOf(shown, outlined, frame, boxes[outlined]) : null);
@@ -108,6 +112,71 @@
 
   function partHit(p: Pt): string | null {
     return selected && clip && boxes[selected] ? partAt(ownParts, p) : null;
+  }
+
+  const level = (): Level => levelOf({ open: true, clip: selected, part });
+
+  function liveStack(p: Pt | null): string[] {
+    if (p) {
+      return stackAt(laid, frame, boxes, p);
+    }
+    return laid.tracks.flatMap((t) => [...t.clips].reverse()).filter((c) => onFrame(c) && boxes[c.id]).map((c) => c.id);
+  }
+
+  function probe(p: Pt | null, picked: string | null = null): Probe {
+    const stack = p ? liveStack(p) : [];
+    return {
+      top: stack[0] ?? null,
+      picked: picked ?? stack[0] ?? null,
+      partOf: (id) => (p ? partAt(split.parts[id] ?? [], p) : null),
+      firstClip: p ? null : (liveStack(null)[0] ?? null),
+      firstPart: (id) => split.parts[id]?.[0]?.part ?? null,
+      editable: (id, at) => {
+        const target = findClip(doc, id)?.clip;
+        return !!target && editablePart(doc, target, at ?? CLIP_TEXT) === PartEdit.Text;
+      }
+    };
+  }
+
+  function land(next: Level) {
+    if (next.depth === Depth.Frame || next.depth === Depth.Canvas) {
+      part = null;
+      if (selection.length) {
+        onselect([]);
+      }
+      return;
+    }
+    partOf = next.clip!;
+    if (next.clip !== selected) {
+      onselect([next.clip!]);
+    }
+    part = next.part;
+  }
+
+  function step(gesture: Gesture, p: Pt | null, from: Level = level(), picked: string | null = null): Level {
+    const { level: next, edit } = drill(from, gesture, probe(p, picked));
+    land(next);
+    if (edit) {
+      editPart();
+    }
+    return next;
+  }
+
+  export function key(gesture: Gesture.Enter | Gesture.Leave): boolean {
+    const from = level();
+    if (gesture === Gesture.Leave && from.depth === Depth.Frame) {
+      const had = selection.length > 0;
+      land(from);
+      return had;
+    }
+    step(gesture, null, from);
+    return true;
+  }
+
+  let froms: Level[] = [];
+
+  function double(e: MouseEvent) {
+    step(Gesture.Double, local(e as PointerEvent), froms[0] ?? level());
   }
 
   function editPart() {
@@ -177,14 +246,24 @@
   }
 
   let pendingPick = pickAt;
+  let asking = true;
 
   function pickPending() {
-    if (!pendingPick || !Object.keys(boxes).length) {
+    if (!Object.keys(boxes).length) {
       return;
     }
-    const next = stackAt(laid, frame, boxes, pendingPick)[0];
+    const asked = asking ? ask() : null;
+    asking = false;
+    if (asked && !selection.length) {
+      step(asked.gesture, asked.at, levelOf({ open: false, clip: null, part: null }));
+      return;
+    }
+    if (!pendingPick) {
+      return;
+    }
+    const at = pendingPick;
     pendingPick = null;
-    onselect(next ? [next] : []);
+    step(Gesture.Click, at, levelOf({ open: true, clip: null, part: null }));
   }
 
   $effect(() => {
@@ -221,23 +300,23 @@
   function press(e: PointerEvent) {
     menu = null;
     const p = local(e);
-    const hit = partHit(p);
-    if (hit) {
-      part = hit;
-      return;
-    }
-    part = null;
+    const from = level();
+    froms = [froms.at(-1) ?? from, from];
     const mode = pickModeAt(lastPress, p, e.altKey ? Modifier.Alt : Modifier.None);
     lastPress = p;
-    const next = pick(stackAt(laid, frame, boxes, p), selected, mode);
-    if (!next) {
-      onselect([]);
-      return;
+    const gesture = e.metaKey || e.ctrlKey ? Gesture.Deep : Gesture.Click;
+    const next = step(gesture, p, from, pick(stackAt(laid, frame, boxes, p), selected, mode));
+    if (next.depth === Depth.Clip) {
+      begin(e, Grip.Move, 0, next.clip!);
     }
-    if (next !== selected) {
-      onselect([next]);
+  }
+
+  function hoverAt(p: Pt): string | null {
+    const { level: target } = drill(level(), Gesture.Hover, probe(p));
+    if (!target.clip) {
+      return null;
     }
-    begin(e, Grip.Move, 0, next);
+    return target.part ? `${target.clip}${PART_SEP}${target.part}` : target.clip;
   }
 
   function others(clipId: string) {
@@ -259,7 +338,7 @@
 
   function move(e: PointerEvent) {
     if (!grab) {
-      hover = e.pointerType === 'mouse' ? (stackAt(laid, frame, boxes, local(e))[0] ?? null) : null;
+      hover = e.pointerType === 'mouse' ? hoverAt(local(e)) : null;
       return;
     }
     const outside = leaving(e);
@@ -319,9 +398,9 @@
   }
 </script>
 
-<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={editPart} oncontextmenu={openMenu} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
+<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={double} oncontextmenu={openMenu} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
-    {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} />{/if}
+    {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} data-testid="hover-box" />{/if}
     {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}
     {#if quad}<polygon class="box" class:passive={!chrome.handles} points={points(quad)} data-testid="selection-box" data-ring={chrome.ring} />{/if}
     {#each live?.gaps ?? [] as g (g.axis + g.from + g.to)}
@@ -334,6 +413,9 @@
   {#each live?.gaps ?? [] as g (g.axis + g.from + g.to)}
     <span class="gap-label" data-testid="gap-label" style={pct(g.axis === 'x' ? [(g.from + g.to) / 2, g.at] : [g.at, (g.from + g.to) / 2])}>{Math.round(g.to - g.from)}</span>
   {/each}
+  {#if hoverPart && !grab}
+    <div class="outlined-part hover-part" data-testid="hover-part" style={boxStyle(hoverPart)}></div>
+  {/if}
   {#if outlinedPart}
     <div class="outlined-part" data-testid="layer-hover-part" style={boxStyle(outlinedPart)}></div>
   {/if}

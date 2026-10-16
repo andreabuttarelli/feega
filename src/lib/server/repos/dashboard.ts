@@ -19,16 +19,16 @@ function rowsOf<T>(result: { data: unknown; error: unknown }): T[] {
 export async function listRecentCanvases(db: Db, scope: Scope): Promise<RecentCanvas[]> {
   const result = await db
     .from('canvases')
-    .select('id, project_id, name, updated_at')
+    .select('id, project_id, name, last_edited_at')
     .eq('org_id', scope.orgId)
     .is('deleted_at', null)
-    .order('updated_at', { ascending: false })
+    .order('last_edited_at', { ascending: false })
     .limit(scope.limit);
-  return rowsOf<{ id: string; project_id: string; name: string; updated_at: string }>(result).map((r) => ({
+  return rowsOf<{ id: string; project_id: string; name: string; last_edited_at: string }>(result).map((r) => ({
     id: r.id,
     projectId: r.project_id,
     name: r.name,
-    updatedAt: r.updated_at
+    updatedAt: r.last_edited_at
   }));
 }
 

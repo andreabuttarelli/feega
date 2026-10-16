@@ -3,6 +3,8 @@
   import { onDestroy } from 'svelte';
   import { planTiers, type TileView } from '$lib/canvas/image-tiers';
   import type { TierBoard } from '$lib/canvas/tier-board.svelte';
+  import { lodWanted } from '$lib/canvas/poster-lod';
+  import { View } from '$lib/canvas/live-video';
 
   const SETTLE_MS = 250;
   const FALLBACK_WIDTH = 320;
@@ -34,6 +36,7 @@
     });
 
     board.apply(planTiers(tiles, { zoom: view.zoom, dpr: devicePixelRatio, budgetPx: budgetPx() }));
+    board.see(new Set(tiles.filter((tile) => tile.visible).map((tile) => tile.id)), lodWanted(view.zoom) ? View.Overview : View.Readable);
   }
 
   $effect(() => {

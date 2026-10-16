@@ -25,7 +25,7 @@ describe('i crediti vivono nel workspace, non nel progetto', () => {
   });
 
   it('la pagina a cui porta esiste su disco', () => {
-    expect(existsSync(join(SRC, 'routes', 'app', 'credits', '+page.server.ts'))).toBe(true);
+    expect(existsSync(join(SRC, 'routes', 'app', 'credits', '+page.svelte'))).toBe(true);
   });
 
   it('nessun link punta a un vecchio indirizzo dei crediti', () => {

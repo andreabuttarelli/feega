@@ -182,9 +182,10 @@ and its session. Free.
 |-----|-----|
 | `canvas_tool` | `feega canvas <projectId> <op> --input <json>` |
 | `canvas_tool` `request_upload` + `register_upload` | `feega canvas upload <projectId> <file> [--canvas <id>]` |
+| `canvas_tool` `list_models` | `feega canvas models <projectId> [--medium image]` |
 
 `canvas_tool({ org, project_id, op, input })` runs one op of the project chat on that project,
-through the same code: `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `estimate_text_cost`, `suggest_next_steps`, `list_connections`, `list_runs`,
+through the same code: `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas_revision`, `estimate_text_cost`, `suggest_next_steps`, `list_connections`, `list_runs`, `list_models` (models this project can run, with provider, credits, uncensored flag and `routes[]` — one row per provider that serves the model; pass its `provider` to `run_node`),
 `list_templates`, `create_node`, `update_node`, `move_node`, `resize_node`, `duplicate_nodes`,
 `write_nodes`, `paste_nodes`,
 `connect_nodes`, `disconnect_nodes`, `set_edge_mode`, `undo_gesture`, `run_demo`, `end_onboarding`, `delete_node`, `create_canvas`,
@@ -258,6 +259,7 @@ list. Returns how many combinations it actually stopped.
 | `restore_motion_revision` | `feega motion revisions <nodeId> --restore <version>` |
 | `list_motion_templates` | `feega motion templates` |
 | `new_motion_from_template` | `feega motion new --template <id> [--format 16:9, 9:16, 1:1, 4:5 or "A poster"] [--still s] [--project id]` |
+| `motion_editor_op` | `feega motion op <nodeId> <op> [--input json]` |
 | `motion_tool` | `feega motion tools [name]`, `feega motion tool <nodeId> <tool> [--input json] [--version n]`, `feega motion still <nodeId> [--format png] [--scale 2] [--out file]` |
 | `canvas_tool` `move_frame_element` / `place_in_frame` | `feega motion move <frameId> <elementId> [--to frameId] [--x f] [--y f]`, `feega motion place <nodeId> [--to frameId]` |
 | `add_motion_template` | `feega motion add-template <nodeId> <templateId> [--at s] [--var k=v] [--no-sound]` |
@@ -316,11 +318,25 @@ saved, output }`, the input checked by the tool's own schema (400), screened lik
 need a chat turn answer `ok: false`. `export_image` `{ format: png|jpg|webp, scale: 1|2, time? }`
 draws the still frame (or `time`) at full size and returns `{ asset_id, url, width, height }`.
 
+`motion_editor_op({ org, node_id, op, input })` runs one action of the frame editor page on the
+video, through the same server function, with the same status and body:
+`POST /api/v1/motion/{node_id}/ops` `{ op, input }`. Reads: `editor_session {briefIds?}` (the
+whole page load), `read_head`, `render_status`,
+`batch_status`. Writes (a read-only key is 403): `save_doc {version, doc, summary?}` (409 with the
+head when stale), `apply_ops {version, ops, summary?}`, `record_export {path, width, height,
+seconds}` and `upload_font {path}` (files the Supabase session already put in storage),
+`analyze_sounds {assetIds}`, `template_sounds {doc, clipId}`, `save_template {doc, name,
+description, compId?, posterFrame?}`. A canvas the caller cannot open, or an uncensored workspace
+still locked, is 404. Spending credits (402 when none are left): `generate_sound {sound: voice|music, text,
+seconds?}` and `render_batch {version, rows: [{name, values}], settings?}` (409 `save_first` when
+`version` is not the head). Unknown op 400 with the list. The editor poster (a JPEG up to 1 MB) is
+`POST /api/v1/motion/{node_id}/poster` multipart `file`, `width`, `height` → `{ assetId }`.
+
 CLI `motion move` / `motion place`:
 `POST /api/v1/motion/elements` `{ frame_id?, element_id?, node_id?, to_frame_id?, x?, y?, canvas_x?, canvas_y? }` → `{ outcome, frame_id, element_id, new_frame, revisions }`. `frame_id` +
 `element_id` moves a clip into `to_frame_id` (props, style, keyframes kept, re-timed to its fps); `node_id`
-puts a generative image/video/text node's output in as an element, the node unchanged. No
-`to_frame_id`: a new frame at `canvas_x`/`canvas_y`. `x`/`y` 0..1 of the target frame. Stale frame 409,
+puts a Generate image/video/text node's output in as an element, the node unchanged. No
+`to_frame_id`: a moved element lands as a free element (no frame around it) centred at `canvas_x`/`canvas_y`; a placed output as a free Image, Video or Text element there. `x`/`y` 0..1 of the target frame. Stale frame 409,
 same frame 400, nothing generated yet 409. Free.
 
 ## Gallery

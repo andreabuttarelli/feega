@@ -10,6 +10,7 @@
   import { get } from 'svelte/store';
   import { readChatPanelPx, writeChatPanelPx, readChatTab, writeChatTab, CHAT_PANEL, type ChatTab } from '$lib/shell-prefs';
   import { guideOpenRequest } from '$lib/canvas/guide-open';
+  import { canvasSelection } from '$lib/canvas/promote-sheet';
   import CanvasGuideTab from './CanvasGuideTab.svelte';
   import { replaceState } from '$app/navigation';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
@@ -98,7 +99,7 @@
           <CanvasGuideTab initialSlug={$guideOpenRequest} onopened={() => guideOpenRequest.set(null)} />
         {:else if browser}
           {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
-            <ChatPanel {projectId} {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null })} />
+            <ChatPanel {projectId} {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
           {/await}
         {/if}
       </div>

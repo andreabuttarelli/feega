@@ -1,20 +1,26 @@
 <script lang="ts">
+  import { FrameKind, openingSelection } from '$lib/canvas/motion-node';
+  import { groupClips, ungroupClip } from '$lib/motion/group';
   import { onMount, tick, untrack } from 'svelte';
   import { clipSeek } from '$lib/motion/storyboard';
-  import { POSTER_WIDTH, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
+  import { POSTER_WIDTH, posterFormat, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
   import { deserialize } from '$app/forms';
   import { replaceState } from '$app/navigation';
   import { page } from '$app/state';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
-  import { watchMotionNode } from '$lib/realtime/motion-channel';
+  import { headMoved, watchMotionNode } from '$lib/realtime/motion-channel';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { registerUpload } from '$lib/motion/fonts/ops';
   import Plus from '@lucide/svelte/icons/plus';
+  import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
+  import MessageCircle from '@lucide/svelte/icons/message-circle';
+  import { editingLabel } from '$lib/canvas/phone-properties';
   import ChevronDown from '@lucide/svelte/icons/chevron-down';
   import CompositionSettings from '$lib/components/motion/CompositionSettings.svelte';
   import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, DISPLAY_NAME, isTap } from '$lib/motion/editor-bar';
   import Upload from '@lucide/svelte/icons/upload';
   import HistoryIcon from '@lucide/svelte/icons/history';
+  import { BarItem, ON_PHONE, PhonePlace } from '$lib/motion/phone-bar';
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
   import { decodePeaks } from '$lib/motion/peaks-decode';
   import MenuDrawer from '$lib/components/motion/MenuDrawer.svelte';
@@ -26,7 +32,7 @@
   import ClipBar from '$lib/components/motion/ClipBar.svelte';
   import { Detent, nearestDetent, nextDetent, sheetHeight } from '$lib/motion/sheet-detents';
   import OverflowMenu, { type MenuBlock } from '$lib/components/motion/OverflowMenu.svelte';
-  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, defaultTimelinePx, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
+  import { CHAT_PLACE, ChatPlace, DEFAULT_LAYOUT, OpensOn, defaultTimelinePx, Panel, Side, flip, readLayout, sideWidth, timelineHeight, sheetFloor, toggleSide, toggleTimeline, transportOf, viewportOf, Viewport, writeLayout, type EditorLayout, type LayoutStore } from '$lib/motion/editor-layout';
   import { provideSelection } from '$lib/motion/selection-context';
   import { addAdjustment, mergeView, pathNames, precompose, viewOf } from '$lib/motion/precomp';
   import { Lens, addLens } from '$lib/motion/glass/ops';
@@ -61,15 +67,17 @@
   import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import { Gesture } from '$lib/motion/drill';
+  import { frameDrill } from '$lib/canvas/frame-drill';
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
   import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
-  import { Align, addMarker, alignClips, allMarkers, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
+  import { Align, addMarker, alignClips, allMarkers, clipName, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import StillExport from '$lib/components/motion/StillExport.svelte';
-  import { DocMode, docMode, stillFrame } from '$lib/motion/still';
+  import { animateStill, DocMode, docMode, stillFrame } from '$lib/motion/still';
   import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
   import { Liveness, interactiveOf } from '$lib/motion/interactive/settings';
   import { defaultsOf, type VarValues } from '$lib/motion/interactive/var-model';
@@ -86,9 +94,11 @@
   import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
+  import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
-  import { findClip, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import { Background, findClip, type MotionClip, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import type { Fill } from '$lib/motion/fill/model';
   import {
     ClipEdge,
     Direction,
@@ -111,6 +121,7 @@
   import { InspectorTab } from '$lib/motion/inspector';
   import { Command, commandFor, isTyping } from '$lib/motion/shortcuts';
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
+  import type { FramePoint } from '$lib/motion/hyperframes/frame-tap';
   import { liveComponents } from '$lib/motion/custom/determinism';
   import { feegaTrailer } from '$lib/motion/trailer';
   import type { AudioAnalysis } from '$lib/motion/audio-analysis';
@@ -126,10 +137,12 @@
   import { ATTACH_PARAM, BRIEF_PARAM } from '$lib/motion/video-brief';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
-  import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, PART_DOCK, Part, Stage, ToolsPlace, Zoom, timelineFits } from '$lib/motion/editor-mount';
+  import { DRAWN_EVENT } from '$lib/motion/hyperframes/measure';
+  import { BAR_PLACE, BarPlace, MOUNT, Measure, MenuPlace, Mount, menuPlace, openingFrame, PART_DOCK, Part, Stage, ToolsPlace, Zoom, timelineFits } from '$lib/motion/editor-mount';
   import { DOCK_ATTR } from '$lib/canvas/free-area';
   import { KEY_REGION_ATTR, Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { anchoredTo, inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { claimsWidth } from '$lib/canvas/claim-width';
   import { NodeMode, nodeLayers } from '$lib/canvas/inline-motion';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHover } from '$lib/canvas/layers';
@@ -140,7 +153,8 @@
   import DrawTools from './DrawTools.svelte';
   import { PART_SEP, PartAction, runPart } from '$lib/motion/poster-parts';
   import { PropertiesView, propertiesFor } from '$lib/motion/properties-view';
-  import { partFocus } from '$lib/motion/inspector';
+  import { partView, setPartFills } from '$lib/motion/part-style';
+  import FillStack from './FillStack.svelte';
   import PosterPartPanel from './PosterPartPanel.svelte';
   import MultiInspector from './MultiInspector.svelte';
   import FamilyIcon from './FamilyIcon.svelte';
@@ -158,10 +172,12 @@
   const ZOOM_STEP = 1.25;
   const STEP_MORE = 10;
 
+  const phoneMore = (item: BarItem) => viewport === Viewport.Phone && ON_PHONE[item] === PhonePlace.More;
+
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
-  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, canvasundo = null }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null } = $props();
+  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
   const rules = $derived(MOUNT[mount]);
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
@@ -169,12 +185,12 @@
   let baseDoc = data.head.doc as MotionDoc;
   let saving = false;
   let resave = false;
-  let selection = $state<string[]>([]);
+  let selection = $state<string[]>(openingSelection(data.node.kind ?? FrameKind.Frame, (data.head.doc as MotionDoc).tracks.flatMap((t) => t.clips.map((c) => c.id))));
   let path = $state<{ comp: string; frame: number }[]>([]);
   let cameraOpen = $state(false);
   let keySelection = $state<KeyRef[]>([]);
   let keyBoard: KeyBoard = [];
-  let frame = $state(0);
+  let frame = $state(untrack(() => openingFrame(MOUNT[mount], history.present)));
   let playing = $state(false);
   let zoom = $state(1.5);
   let snap = $state(Snap.On);
@@ -211,6 +227,7 @@
   const analysing = new Set<string>();
   let sheet = $state<Sheet>(Sheet.None);
   let detent = $state(Detent.Half);
+  let openAt = Detent.Half;
   let sheetDrag = $state<{ y: number; from: number; height: number } | null>(null);
   let stageEl = $state<HTMLElement | null>(null);
   let selectedPart = $state<string | null>(null);
@@ -249,9 +266,14 @@
     }
   }
 
-  let editMode = $state(readMode(browserStore()?.getItem(EDIT_MODE_KEY) ?? null));
+  let editMode = $state(timelineFits(history.present) ? readMode(browserStore()?.getItem(EDIT_MODE_KEY) ?? null) : EditMode.Design);
+
+  const unanimated = $derived(editMode === EditMode.Motion && doc.tracks.every((t) => t.clips.every((c) => !Object.keys(c.keyframes).length)));
 
   function setMode(next: EditMode) {
+    if (next === EditMode.Motion && !timelineFits(doc)) {
+      apply(animateStill(doc), 'Made the frame animatable');
+    }
     editMode = next;
     try {
       browserStore()?.setItem(EDIT_MODE_KEY, next);
@@ -316,8 +338,8 @@
       return;
     }
     const ready = () => onstageready();
-    el.addEventListener('ready', ready, true);
-    return () => el.removeEventListener('ready', ready, true);
+    el.addEventListener(DRAWN_EVENT, ready);
+    return () => el.removeEventListener(DRAWN_EVENT, ready);
   });
 
   const firstLayout = (): EditorLayout => ({ ...DEFAULT_LAYOUT, timelinePx: defaultTimelinePx(viewportOf(innerWidth), innerHeight) });
@@ -328,6 +350,12 @@
       seekTo(at);
     }
     layout = readLayout(browserStore(), firstLayout());
+    if (selection.length) {
+      relayout({ side: Side.Properties, inspector: Panel.Open });
+    }
+    if (opensOn === OpensOn.Properties && viewport === Viewport.Phone) {
+      peekProperties();
+    }
     const url = new URL(window.location.href);
     if (url.searchParams.has(BRAND_PARAM)) {
       void askBrand();
@@ -336,7 +364,11 @@
     if (brief) {
       void sendBrief(url, brief);
     }
-    return watchMotionNode(supabase, data.node.id, () => void pullExternalEdit());
+    return watchMotionNode(supabase, data.node.id, (row) => {
+      if (headMoved(row, version)) {
+        void pullExternalEdit();
+      }
+    });
   });
   let body = $state<HTMLDivElement | null>(null);
 
@@ -471,7 +503,7 @@
   const editorUrl = $derived(`/p/${data.projectId}/c/${data.canvas.id}/motion/${data.node.id}`);
 
   const poster = posterJob(
-    () => preview?.still(posterSecond(history.present), POSTER_WIDTH) ?? Promise.resolve(''),
+    () => preview?.still(posterSecond(history.present), POSTER_WIDTH, posterFormat(history.present.background)) ?? Promise.resolve(''),
     (jpeg) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)) })
   );
   let posterVersion = data.node.posterAssetId ? data.head.version : -1;
@@ -482,6 +514,8 @@
     }
   });
   const agentUrl = $derived(`/api/v1/projects/${data.projectId}/motion/${data.node.id}/agent`);
+
+  const openFrame = () => ({ canvasId: data.canvas.id, frame: { nodeId: data.node.id, selection, playhead: frame / history.present.fps, mode } });
 
   const soundAssets = $derived(findSoundAssets(doc));
 
@@ -549,6 +583,13 @@
       .catch(() => {})
       .then(() => decodeMissing(fresh));
   });
+
+  function commitPartFills(clip: MotionClip, part: string, fills: Fill[], summary: string) {
+    const result = setPartFills(doc, clip.id, part, fills);
+    if (result.ok) {
+      edit(result.doc, summary);
+    }
+  }
 
   function edit(next: MotionDoc, summary: string) {
     const now = Date.now();
@@ -718,7 +759,8 @@
 
   $effect(() => {
     void sheet;
-    detent = Detent.Half;
+    detent = openAt;
+    openAt = Detent.Half;
   });
 
   function grabSheet(e: PointerEvent) {
@@ -858,9 +900,20 @@
   $effect(() => (rules.tools === ToolsPlace.CanvasBar ? frameBar.attach({ act: (action) => FRAME_ACTS[action]() }) : undefined));
   let timelineShownPx = $state(0);
   let timelineEl = $state<HTMLElement | null>(null);
+  let transportEl = $state<HTMLElement | null>(null);
+  let tabsEl = $state<HTMLElement | null>(null);
+  const barFloor = $derived.by(() => {
+    if (viewport !== Viewport.Phone) {
+      return timelineHidden ? null : timelineEl;
+    }
+    if (mode === DocMode.Still) {
+      return tabsEl;
+    }
+    return timelineHidden ? transportEl : timelineEl;
+  });
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
-      frameBar.timeline = timelineHidden ? null : timelineEl;
+      frameBar.timeline = barFloor;
     }
   });
   $effect(() => {
@@ -872,7 +925,7 @@
   const dialogOpen = $derived(Boolean(publishing || sounding || menuOpen || helpOpen || exporting || browsing || componentsOpen || templating));
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
-      frameBar.covered = dialogOpen;
+      frameBar.covered = dialogOpen || (viewport === Viewport.Phone && sheet !== Sheet.None);
     }
   });
 
@@ -904,6 +957,29 @@
     const count = Object.keys(history.present.comps).length + 1;
     apply(precompose(doc, selection, { comp: newId(), clip: id }, `Comp ${count}`), 'Precomposed');
     selection = [id];
+  }
+
+  const topClipIds = (of: MotionDoc) => new Set(of.tracks.flatMap((t) => t.clips.map((c) => c.id)));
+
+  function groupSelection() {
+    if (selection.length < 2) {
+      return;
+    }
+    const before = topClipIds(doc);
+    const grouped = groupClips(doc, selection, newId);
+    apply(grouped, 'Grouped');
+    selection = grouped.ok ? [...topClipIds(grouped.doc)].filter((id) => !before.has(id)) : selection;
+  }
+
+  function ungroupSelection() {
+    const group = selection[0];
+    if (selection.length !== 1 || !group) {
+      return;
+    }
+    const before = topClipIds(doc);
+    const result = ungroupClip(doc, group, newId);
+    apply(result, 'Ungrouped');
+    selection = result.ok ? [...topClipIds(result.doc)].filter((id) => !before.has(id)) : selection;
   }
 
   function autoLayoutSelection() {
@@ -1306,7 +1382,12 @@
     [Command.PreviewFit]: () => zoomStage?.fit(),
     [Command.PreviewActual]: () => zoomStage?.actual(),
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
+    [Command.SelectChild]: () => overlay?.key(Gesture.Enter),
+    [Command.SelectParent]: selectParent,
     [Command.Deselect]: () => {
+      if (overlay?.key(Gesture.Leave)) {
+        return;
+      }
       helpOpen = false;
       selection = [];
       keySelection = [];
@@ -1336,6 +1417,8 @@
     [Command.ToggleTimeline]: () => relayout(toggleTimeline(layout)),
     [Command.Help]: () => (helpOpen = !helpOpen),
     [Command.Precompose]: precomposeSelection,
+    [Command.Group]: groupSelection,
+    [Command.Ungroup]: ungroupSelection,
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
     [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask')
@@ -1368,6 +1451,28 @@
         }))
     }))
   ]);
+
+  function peekProperties() {
+    if (sheet !== Sheet.Properties) {
+      openAt = Detent.Peek;
+      sheet = Sheet.Properties;
+    }
+  }
+
+  let lastPick = '';
+
+  $effect(() => {
+    const pick = [...selection, selectedPart ?? ''].join();
+    if (pick === lastPick) {
+      return;
+    }
+    lastPick = pick;
+    if (selection.length && viewport === Viewport.Phone) {
+      untrack(peekProperties);
+    }
+  });
+
+  const editingName = $derived(selected ? clipName(selected) : (data.node.name ?? 'Frame'));
 
   function showProperties() {
     if (viewport === Viewport.Phone) {
@@ -1415,6 +1520,21 @@
   });
 
   let caughtAt = $state<[number, number] | null>(null);
+  let overlay = $state<ReturnType<typeof SelectionOverlay> | null>(null);
+
+  function askedDrill() {
+    const asked = frameDrill.take(data.node.id);
+    return asked ? { at: [asked.at.x * doc.width, asked.at.y * doc.height] as [number, number], gesture: asked.gesture } : null;
+  }
+
+  function selectParent() {
+    if (overlay?.key(Gesture.Leave)) {
+      return;
+    }
+    if (rules.closes) {
+      onclose();
+    }
+  }
 
   $effect(() => {
     if (playing) {
@@ -1424,7 +1544,11 @@
 
   function catchTap(e: PointerEvent) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    caughtAt = [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height];
+    catchAt({ x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height });
+  }
+
+  function catchAt(at: FramePoint) {
+    caughtAt = [at.x * doc.width, at.y * doc.height];
     playing = false;
   }
 
@@ -1460,7 +1584,7 @@
       return;
     }
     if (rules.closes && e.key === 'Escape' && !isTyping(e.target as HTMLElement | null)) {
-      onclose();
+      selectParent();
       return;
     }
     if (exporting || sounding || isTyping(e.target as HTMLElement | null)) {
@@ -1478,8 +1602,8 @@
 <svelte:head>{#if rules.ownsTitle}<title>{data.node.name ?? 'Frame'} · Frame editor</title>{/if}</svelte:head>
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
-<div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
-  <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost}>
+<div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} data-sheet={sheet === Sheet.None ? undefined : detent} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
+  <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost} use:claimsWidth={barHost}>
     <div class="group lead" {...dockOf(Part.Bar)}>
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
       <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
@@ -1491,7 +1615,7 @@
       </div>
     </div>
 
-    <div class="group transport" {...dockOf(Part.Transport)} role="group" aria-label="Transport">
+    <div class="group transport" bind:this={transportEl} {...dockOf(Part.Transport)} role="group" aria-label="Transport">
       <IconButton action={Action.GoStart} onclick={COMMANDS[Command.GoStart]} />
       <IconButton action={Action.StepBack} class="step" onclick={COMMANDS[Command.StepBack]} />
       <IconButton action={playing ? Action.Pause : Action.Play} class="play" fill="currentColor" onclick={COMMANDS[Command.TogglePlay]} />
@@ -1515,7 +1639,7 @@
     <div class="group trail" {...dockOf(Part.Bar)} data-testid="bar-trail">
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
       <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
-      <div class="popover-anchor">
+      <div class="popover-anchor" data-phone={ON_PHONE[BarItem.History]}>
         <button type="button" class="clock" aria-haspopup="menu" aria-expanded={revisionsOpen} aria-label="Version history" title="Version history" disabled={agent === Agent.Working} data-testid="revisions-open" onclick={() => void toggleRevisions()}><HistoryIcon size={16} /></button>
         {#if revisionsOpen}
           <div class="menu more" role="menu" data-testid="revisions">
@@ -1534,12 +1658,18 @@
       {#if data.storyboardHref}
         <a class="secondary storyboard" href={data.storyboardHref} data-testid="storyboard-open">Storyboard</a>
       {/if}
-      <button type="button" class="secondary wide" onclick={() => (leaveTo(0), (publishing = true))} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
+      <button type="button" class="secondary wide" data-phone={ON_PHONE[BarItem.Publish]} onclick={() => (leaveTo(0), (publishing = true))} data-testid="publish-open">{listed ? 'In gallery' : 'Publish'}</button>
       <div class="popover-anchor narrow" class:always={menu === MenuPlace.More}>
         <IconButton action={Action.More} aria-expanded={moreOpen} data-testid="more-actions" onclick={() => (moreOpen = !moreOpen)} />
         {#if moreOpen}
           <div class="menu more" role="menu">
             <button type="button" role="menuitem" onclick={() => ((moreOpen = false), leaveTo(0), (publishing = true))}><Upload size={14} /><span>{listed ? 'In gallery' : 'Publish'}</span></button>
+            {#if phoneMore(BarItem.Export)}
+              <button type="button" role="menuitem" data-testid="phone-export" onclick={() => ((moreOpen = false), leaveTo(0), (exporting = true))}><Upload size={14} /><span>Export</span></button>
+            {/if}
+            {#if fullHref && rules.closes && phoneMore(BarItem.FullScreen)}
+              <a role="menuitem" href={fullHref} data-testid="phone-full-screen"><span>Full screen</span></a>
+            {/if}
             {#if menu === MenuPlace.More}
               <button type="button" role="menuitem" data-testid="template-open" onclick={() => ((moreOpen = false), leaveTo(0), (templating = true))}><LayoutTemplate size={14} /><span>Template</span></button>
               <button type="button" role="menuitem" data-testid="guide-open-menu" onclick={() => ((moreOpen = false), COMMANDS[Command.Help]())}><Keyboard size={14} /><span>Keyboard & gestures</span></button>
@@ -1547,9 +1677,9 @@
           </div>
         {/if}
       </div>
-      <button type="button" class="render" onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open">Export</button>
+      <button type="button" class="render" data-phone={ON_PHONE[BarItem.Export]} onclick={() => (leaveTo(0), (exporting = true))} data-testid="export-open">Export</button>
       {#if rules.closes}
-        {#if fullHref}<a class="secondary storyboard" href={fullHref} data-testid="inline-full-screen">Full screen</a>{/if}
+        {#if fullHref}<a class="secondary storyboard" data-phone={ON_PHONE[BarItem.FullScreen]} href={fullHref} data-testid="inline-full-screen">Full screen</a>{/if}
         <IconButton action={Action.Close} data-testid="inline-close" onclick={onclose} />
       {/if}
     </div>
@@ -1657,14 +1787,14 @@
   {/if}
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
-    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
+    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
-      <MotionPreview bind:this={preview} bind:redraws {html} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null}>
+      <MotionPreview bind:this={preview} bind:redraws {html} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
-        {#if !playing}<SelectionOverlay pickAt={caughtAt} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
-        {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
+        {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={findClip(withAutoLayout(doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
         {#if selected?.autoLayout && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<AutoLayoutOverlay {doc} clip={{ ...selected, autoLayout: selected.autoLayout }} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -1708,7 +1838,9 @@
         <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
       {:else if selected}
         {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
-        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={view === PropertiesView.Part && selectedPart ? partFocus(doc, selected, selectedPart) : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
+        {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
+        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
@@ -1728,14 +1860,16 @@
     {/snippet}
     {#snippet chat()}
     <aside class="chat" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Agent} aria-label="Agent">
-      <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Agent</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
-      {#if panelsDue}<ChatPanel projectId={data.projectId} motionNodeId={data.node.id} reload={chatReload} prefill={brandAsk} context={() => ({ selection })} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />{/if}
+      <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Chat</span><span class="editing" data-testid="chat-editing">{editingLabel(editingName)}</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
+      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} /><ChatPanel projectId={data.projectId} reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />{/if}
     </aside>
     {/snippet}
     </SideColumn>
 
     <section class="timeline-area" bind:this={timelineEl} bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
+
+      {#if unanimated}<p class="animate-hint" data-testid="animate-hint">Animate this frame — add keyframes at the playhead</p>{/if}
 
       {#if clipBarShown}
         <ClipBar {doc} {selection} pick={pickMode} onrun={runFromBar} ondone={() => (pickMode = PickMode.One)} />
@@ -1796,9 +1930,9 @@
     </section>
   </div>
 
-  <nav class="tabs" {...dockOf(Part.Tabs)} aria-label="Panels">
-    <button type="button" class:on={sheet === Sheet.Properties} onclick={() => (sheet = sheet === Sheet.Properties ? Sheet.None : Sheet.Properties)}>Properties</button>
-    <button type="button" class:on={sheet === Sheet.Agent} onclick={() => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)}>Agent</button>
+  <nav class="tabs" bind:this={tabsEl} {...dockOf(Part.Tabs)} aria-label="Panels">
+    <button type="button" class:on={sheet === Sheet.Properties} aria-pressed={sheet === Sheet.Properties} data-testid="phone-tab-properties" onclick={() => (sheet = sheet === Sheet.Properties ? Sheet.None : Sheet.Properties)}><SlidersHorizontal size={18} aria-hidden="true" />Properties</button>
+    <button type="button" class:on={sheet === Sheet.Agent} aria-pressed={sheet === Sheet.Agent} data-testid="phone-tab-chat" onclick={() => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)}><MessageCircle size={18} aria-hidden="true" />Chat</button>
   </nav>
 </div>
 
@@ -1875,7 +2009,7 @@
     display: none;
   }
 
-  .editor[data-mount='canvas'][data-viewport='phone'] .trail .popover-anchor {
+  .editor[data-mount='canvas'][data-viewport='phone'] .trail .popover-anchor:not(.narrow) {
     display: none;
   }
 
@@ -1919,11 +2053,19 @@
     min-width: 0;
   }
 
+  .bar.in-canvas-bar > .lead {
+    flex-shrink: 0;
+  }
+
   .editor .stage.hosted {
     position: absolute;
     z-index: 0;
     padding: 0;
     background: #000;
+  }
+
+  .editor .stage.hosted.see-through {
+    background: transparent;
   }
 
   .editor[data-mount='canvas'] .bar > :global(*),
@@ -2142,6 +2284,13 @@
     color: var(--ui-text);
     font-weight: var(--ui-weight-medium);
     box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+  }
+
+  .animate-hint {
+    margin: 0;
+    padding: var(--ui-space-1) var(--ui-space-3);
+    color: var(--ui-text-2);
+    font-size: var(--ui-text-sm);
   }
 
   .body.no-timeline {
@@ -2629,7 +2778,7 @@
 
   [data-viewport='phone'] {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto minmax(0, 1fr) auto auto;
     grid-template-areas: 'lead trail' 'body body' 'transport transport' 'tabs tabs';
   }
@@ -2638,8 +2787,18 @@
     display: contents;
   }
 
+  [data-viewport='phone'] .trail [data-phone='more'],
+  [data-viewport='phone'] .trail [data-phone='off'] {
+    display: none;
+  }
+
+  [data-viewport='phone'] .trail .narrow {
+    display: block;
+  }
+
   [data-viewport='phone'] .lead {
     grid-area: lead;
+    min-width: 0;
     height: 56px;
     padding-left: var(--ui-space-2);
   }
@@ -2649,9 +2808,7 @@
     height: 56px;
     min-width: 0;
     padding-right: var(--ui-space-2);
-    justify-content: safe flex-end;
-    overflow-x: auto;
-    scrollbar-width: none;
+    justify-content: flex-end;
   }
 
   [data-viewport='phone'] .trail > :global([data-testid='inline-close']) {
@@ -2716,6 +2873,10 @@
 
   [data-viewport='phone'] .body.no-timeline .stage {
     flex: 1;
+  }
+
+  [data-viewport='phone'][data-sheet='peek'] .body.no-timeline {
+    padding-bottom: var(--sheet-h);
   }
 
   [data-viewport='phone'] .body.no-timeline .timeline-area {
@@ -2820,18 +2981,36 @@
   [data-viewport='phone'] .tabs {
     grid-area: tabs;
     display: flex;
+    gap: 4px;
     height: 56px;
+    padding: 6px var(--ui-space-2);
   }
 
   .tabs button {
     flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: var(--ui-radius-full);
     font-size: 13px;
     font-weight: 500;
-    color: var(--ui-text-3);
+    color: var(--ui-text-2);
   }
 
   .tabs button.on {
-    color: var(--ui-ink);
+    background: var(--ui-accent-solid);
+    color: var(--ui-on-accent);
+  }
+
+  .sheet-head .editing {
+    flex: 1;
+    min-width: 0;
+    margin-left: var(--ui-space-2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ui-accent);
   }
 
   .play-catch {

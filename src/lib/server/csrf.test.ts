@@ -3,8 +3,9 @@ import { isCsrfForbidden } from './csrf';
 
 const url = (path: string) => new URL(`https://www.feega.app${path}`);
 
-function req(init: { method?: string; type?: string; origin?: string } = {}) {
+function req(init: { method?: string; type?: string; origin?: string; bearer?: string } = {}) {
   const headers = new Headers();
+  if (init.bearer) headers.set('authorization', `Bearer ${init.bearer}`);
   if (init.type) headers.set('content-type', init.type);
   if (init.origin) headers.set('origin', init.origin);
   return new Request('https://www.feega.app/x', { method: init.method ?? 'POST', headers });
@@ -41,5 +42,13 @@ describe('isCsrfForbidden', () => {
 
   it('does not exempt anything else under /oauth', () => {
     expect(isCsrfForbidden(req({ type: FORM }), url('/oauth/authorize'))).toBe(true);
+  });
+
+  it('allows a bearer-authenticated form POST from another origin: no ambient credential to ride', () => {
+    expect(isCsrfForbidden(req({ type: 'multipart/form-data; boundary=x', origin: 'tauri://localhost', bearer: 'jwt' }), url('/api/v1/me/pages/home'))).toBe(false);
+  });
+
+  it('an empty bearer is not a credential', () => {
+    expect(isCsrfForbidden(req({ type: FORM, origin: 'https://evil.com', bearer: ' ' }), url('/login'))).toBe(true);
   });
 });

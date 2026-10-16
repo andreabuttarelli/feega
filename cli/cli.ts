@@ -259,6 +259,16 @@ motion
   });
 
 motion
+  .command('op <nodeId> <op>')
+  .description('Run a frame editor action on a video, e.g. read_head, save_doc, apply_ops (unknown op lists them all)')
+  .option('--input <json>', 'The op input as JSON')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (nodeId: string, op: string, opts) => {
+    const { cmdMotionOp } = await import('./commands/motion.ts');
+    await cmdMotionOp(nodeId, op, opts);
+  });
+
+motion
   .command('tools [name]')
   .description('List the motion editor tools, or describe one with its input schema')
   .option('--org <id>', 'Which org, if you belong to more than one')
@@ -377,6 +387,16 @@ canvas
   .action(async (projectId: string, op: string, opts) => {
     const { cmdCanvas } = await import('./commands/canvas.ts');
     await cmdCanvas(projectId, op, opts);
+  });
+
+canvas
+  .command('models <projectId>')
+  .description('Models a project can generate with: provider, credits, uncensored flag, cheaper route tried first')
+  .option('--medium <medium>', 'text, image, video, audio or model3d', 'image')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, opts) => {
+    const { cmdCanvasModels } = await import('./commands/canvas.ts');
+    await cmdCanvasModels(projectId, opts);
   });
 
 canvas

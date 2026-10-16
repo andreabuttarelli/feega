@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { apiEnhance } from '$lib/dashboard/api-enhance';
+  import { chooseWorkspace } from '$lib/dashboard/api';
+  import { goto } from '$app/navigation';
   import { _ } from 'svelte-i18n';
   import Folder from '@lucide/svelte/icons/folder';
   import Plus from '@lucide/svelte/icons/plus';
@@ -61,6 +64,11 @@
       .map((part) => part[0]?.toUpperCase() ?? '')
       .join('') || profile.email[0]?.toUpperCase() || '?'
   );
+
+  async function switchWorkspace(orgId: string) {
+    chooseWorkspace(orgId);
+    await goto('/app', { invalidateAll: true });
+  }
 </script>
 
 {#snippet link(item: NavItem)}
@@ -133,7 +141,7 @@
         <span class="label">{project.name}</span>
       </a>
     {/each}
-    <form method="POST" action="/app?/project">
+    <form method="POST" action="/app?/project" use:apiEnhance>
       <button type="submit" class="row new-project" data-testid="app-sidebar-new-project">
         <Plus size={ICON} strokeWidth={STROKE} />
         <span class="label">New project</span>
@@ -160,14 +168,14 @@
 
     {#if workspaces.length > 1}
       <div class="workspace">
-          <form method="POST" action="/app?/workspace">
+          <div>
             <label class="sr-only" for="workspace-select">Workspace</label>
-            <select id="workspace-select" name="orgId" value={org.id} onchange={(e) => e.currentTarget.form?.requestSubmit()}>
+            <select id="workspace-select" name="orgId" value={org.id} onchange={(e) => switchWorkspace(e.currentTarget.value)}>
               {#each workspaces as w (w.id)}
                 <option value={w.id}>{w.name}</option>
               {/each}
             </select>
-          </form>
+          </div>
       </div>
     {/if}
   </div>

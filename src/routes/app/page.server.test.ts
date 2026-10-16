@@ -41,7 +41,7 @@ vi.mock('$lib/server/repos/orgs', () => ({ listMemberships }));
 const loadAttachments = vi.fn(async (_db: unknown, input: { ids: string[] }) => input.ids.filter((id) => id !== 'stranger').map((id) => ({ assetId: id, kind: 'image', name: `${id}.png`, mimeType: 'image/png', bytes: 1 })));
 vi.mock('$lib/server/chat-attachments/register', () => ({ loadAttachments }));
 
-const { load, actions } = await import('./+page.server');
+const { load, actions } = await import('$lib/server/dashboard/pages/home');
 
 const locals = { safeGetSession: async () => ({ session: {}, user: { id: 'u1' } }), db: async () => ({}) };
 
@@ -70,7 +70,7 @@ describe('/app is the dashboard for a returning user', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('loads projects, tools and the latest outputs of the chosen org', async () => {
-    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as {
+    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as unknown as {
       dashboard: { projects: { id: string; canvases: unknown[] }[]; batches: { href: string }[] };
       tools: { id: string }[];
     };
@@ -79,6 +79,16 @@ describe('/app is the dashboard for a returning user', () => {
     expect(data.dashboard.projects[0].canvases).toEqual([{ id: 'c1', name: 'Board', href: '/p/p1/c/c1' }]);
     expect(data.dashboard.batches[0].href).toBe('/app/studio/b1');
     expect(data.tools.map((t) => t.id)).toEqual(['studio', 'compose', 'upscale']);
+  });
+
+  it('un ritorno alla home non rifà il giro d’ingresso: guscio e progetto vengono dal layout', async () => {
+    const parent = async () => ({ org: { id: 'org-a' }, projects: [{ id: 'p1', name: 'Launch' }] });
+
+    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent } as never)) as { attachProjectId: string | null };
+
+    expect(homePathFor).not.toHaveBeenCalled();
+    expect(listMemberships).not.toHaveBeenCalled();
+    expect(data.attachProjectId).toBe('p1');
   });
 
   it('a first-run or campaign arrival is sent on to its canvas', async () => {
@@ -146,7 +156,7 @@ describe('/app is the dashboard for a returning user', () => {
   });
 
   it('the home loads the brief suggestions and no catalogue: templates live on their own page', async () => {
-    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as Record<string, unknown> & { templates: unknown[] };
+    const data = (await load({ locals, cookies: cookieJar(), url: new URL('http://x/app'), parent: async () => ({ org: { id: 'org-a' } }) } as never)) as unknown as Record<string, unknown> & { templates: unknown[] };
 
     expect(data.templates.length).toBeGreaterThan(0);
     expect(data).not.toHaveProperty('components');

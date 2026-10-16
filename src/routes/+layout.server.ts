@@ -1,21 +1,17 @@
 import type { LayoutServerLoad } from './$types';
-import type { Db } from '$lib/server/db/client';
 import { isPlanGoEnabled } from '$lib/server/feature-flags';
 import { selineSetUser } from '$lib/server/seline';
 import { isInternalEmail } from '$lib/server/internal-users';
 import { trackingAllowed } from '$lib/analytics';
-import { outdatedTermsVersion } from '$lib/terms-notice';
 import { socialPublishing } from '$lib/server/social-publishing';
-import type { User } from '@supabase/supabase-js';
-import { readTourSeen } from '$lib/server/repos/profiles';
-import { TourState, tourStateOf } from '$lib/onboarding/tour';
+import { firstRunFlags } from '$lib/server/dashboard/first-run-flags';
 
-export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession, db } }) => {
+export const load: LayoutServerLoad = async ({ url, untrack, locals: { safeGetSession, db } }) => {
   const { session, user } = await safeGetSession();
 
   // Chi ha già accettato una versione dei termini vede l'avviso solo quando la versione corrente
   // è cambiata — non sul primo accesso, dove `landingPath` registra già quella corrente.
-  const termsNoticeVersion = await outdatedTermsNoticeFor(db, user?.id ?? null);
+  const [{ termsNoticeVersion, tour }, social] = await Promise.all([firstRunFlags(user ? await db() : null, user), socialPublishing()]);
 
   // I due guard degli analytics, decisi qui una volta sola.
   //
@@ -25,7 +21,7 @@ export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession, db
   // Il secondo si risolve QUI, non nel browser: la lista di chi è interno vive in $lib/server e al
   // client arriva solo il booleano — gli indirizzi del team non finiscono in un bundle pubblico.
   const internalViewer = isInternalEmail(user?.email);
-  const analyticsOptOut = !trackingAllowed(url.hostname) || internalViewer;
+  const analyticsOptOut = !trackingAllowed(untrack(() => url.hostname)) || internalViewer;
 
   // Seline Profiles: identify authenticated users server-side (adblock-proof). Debounced in
   // $lib/server/seline. Client script still stitches the browser visitor via setUser in identifyUser.
@@ -51,25 +47,8 @@ export const load: LayoutServerLoad = async ({ url, locals: { safeGetSession, db
     analyticsOptOut,
     internalViewer,
     planGo: isPlanGoEnabled(),
-    socialPublishing: await socialPublishing(),
+    socialPublishing: social,
     termsNoticeVersion,
-    tour: await tourFor(db, user)
+    tour
   };
 };
-
-async function tourFor(db: () => Promise<Db | null>, user: User | null): Promise<TourState> {
-  const client = user ? await db() : null;
-  if (!user || !client) {
-    return TourState.Seen;
-  }
-  return tourStateOf({ createdAt: user.created_at, seen: await readTourSeen(client, user.id) });
-}
-
-async function outdatedTermsNoticeFor(db: () => Promise<Db | null>, userId: string | null): Promise<string | null> {
-  if (!userId) return null;
-  const client = await db();
-  if (!client) return null;
-
-  const { data } = await client.from('profiles').select('terms_version').eq('id', userId).maybeSingle();
-  return outdatedTermsVersion(data?.terms_version ?? null);
-}

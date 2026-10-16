@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Db } from '$lib/server/db/client';
 import { ProjectMode } from '$lib/project-mode';
 import { UncensoredLock } from '$lib/uncensored-lock';
+import { embedPublished } from '$lib/server/motion/embed';
 import { uncensoredLockFor } from './workspace-server';
 
 export const OUTPUTS_PRESENT = 'uncensored_outputs_present';
@@ -9,7 +10,7 @@ export const NOT_SHAREABLE = 'uncensored_not_shareable';
 
 export const SWITCH_REFUSAL_TEXT: Readonly<Record<string, string>> = {
   [OUTPUTS_PRESENT]: 'This project already holds work made in uncensored mode, so it stays uncensored. Start a new project for standard work.',
-  [NOT_SHAREABLE]: 'Revoke the public share links in this project before turning uncensored mode on.'
+  [NOT_SHAREABLE]: 'Revoke the public share links and unpublish the video embeds in this project before turning uncensored mode on.'
 };
 
 export type SwitchFacts = { lock: UncensoredLock; hasOutputs: boolean; hasShares: boolean };
@@ -27,16 +28,23 @@ async function exists(query: PromiseLike<{ data: unknown[] | null }>): Promise<b
   return ((await query).data ?? []).length > 0;
 }
 
+async function liveEmbeds(db: Db, projectId: string): Promise<boolean> {
+  const { data } = await (db as unknown as SupabaseClient).from('nodes').select('id').eq('project_id', projectId).eq('type', 'motion').is('deleted_at', null);
+  const published = await Promise.all(((data ?? []) as { id: string }[]).map((node) => embedPublished(db, node.id)));
+  return published.some(Boolean);
+}
+
 async function factsOf(db: Db, input: { orgId: string; userId: string; projectId: string }): Promise<SwitchFacts> {
   const raw = db as unknown as SupabaseClient;
-  const [lock, assets, calls, canvases, nodes] = await Promise.all([
+  const [lock, assets, calls, canvases, nodes, embeds] = await Promise.all([
     uncensoredLockFor(db, input),
     exists(raw.from('assets').select('id').eq('project_id', input.projectId).eq('uncensored_project', true).limit(1)),
     exists(raw.from('ai_calls').select('id').eq('project_id', input.projectId).eq('billing_scope', ProjectMode.Uncensored).limit(1)),
     exists(raw.from('canvases').select('id').eq('project_id', input.projectId).not('share_token', 'is', null).limit(1)),
-    exists(raw.from('nodes').select('id').eq('project_id', input.projectId).not('public_token_hash', 'is', null).limit(1))
+    exists(raw.from('nodes').select('id').eq('project_id', input.projectId).not('public_token_hash', 'is', null).limit(1)),
+    liveEmbeds(db, input.projectId)
   ]);
-  return { lock, hasOutputs: assets || calls, hasShares: canvases || nodes };
+  return { lock, hasOutputs: assets || calls, hasShares: canvases || nodes || embeds };
 }
 
 export type SwitchOutcome = { ok: true } | { ok: false; error: string };

@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { resolveOrgCaller } from '$lib/server/org-data/auth';
+import { reachableCaller } from '$lib/server/org-data/reach';
 import { applyEffectsTo } from '$lib/server/canvas/effects-actions';
 import { effectsResponse } from '$lib/server/canvas/effects-response';
 
@@ -13,11 +13,12 @@ async function effectsOf(request: Request): Promise<unknown> {
 }
 
 export const POST: RequestHandler = async ({ request, params, url }) => {
-  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
-  if ('error' in resolved) return json(resolved.error.body, { status: resolved.error.status });
+  const caller = await reachableCaller(request, url, { nodes: [params.id ?? ''] });
+  if (caller instanceof Response) {
+    return caller;
+  }
 
-  const { db, orgId, userId, writeAllowed } = resolved.caller;
+  const { db, orgId, userId, writeAllowed } = caller;
   if (!writeAllowed) return json({ error: 'api_key_read_only' }, { status: 403 });
 
   let effects: unknown;

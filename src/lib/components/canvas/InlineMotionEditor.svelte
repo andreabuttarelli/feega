@@ -29,11 +29,16 @@
   import { Paint } from '$lib/canvas/inline-motion';
   import { OpenMark, openTiming, tapTime } from '$lib/canvas/open-timing';
   import { engineOf } from '$lib/motion/engine';
-  import { viewportOf } from '$lib/motion/editor-layout';
+  import { OpensOn, viewportOf } from '$lib/motion/editor-layout';
+  import { propertiesRequest } from '$lib/canvas/phone-properties';
+  import { get } from 'svelte/store';
   import { track } from '$lib/analytics';
   import type { CanvasUndo, MoveOut } from '$lib/canvas/canvas-drop';
 
   let { projectId, canvasId, nodeId, onclose, onframe, onmoveout = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null } = $props();
+
+  const opensOn = untrack(() => (get(propertiesRequest) === nodeId ? OpensOn.Properties : OpensOn.Stage));
+  propertiesRequest.set(null);
 
   const SETTLE_MS = 150;
   const OPEN_EVENT = 'frame_open_timing';
@@ -109,7 +114,7 @@
 </script>
 
 {#if session}
-  <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} {canvasundo} />
+  <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} {canvasundo} {opensOn} />
 {:else if failed}
   <p class="inline-status" role="status">This video could not be opened here. <a href={editorPath}>Open the editor</a></p>
 {:else}

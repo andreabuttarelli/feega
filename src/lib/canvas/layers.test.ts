@@ -58,6 +58,25 @@ describe('layer rows', () => {
   });
 });
 
+describe('a group folds like a frame', () => {
+  it('a group row says it folds; folded by its key, its insides are not listed', () => {
+    const doc = video();
+    const inner = { id: 'in', kind: TrackKind.Visual, name: 'Inner', clips: [{ ...doc.tracks[0].clips[0], id: 'deep' }] };
+    const grouped: MotionDoc = {
+      ...doc,
+      comps: { g1: { name: 'Group 1', durationInFrames: 30, tracks: [inner] } as never },
+      tracks: doc.tracks.map((t, i) => (i === 0 ? { ...t, clips: [{ ...t.clips[0], id: 'g', component: 'Precomp', props: { comp: 'g1' } }] } : t))
+    };
+    const open = { nodeId: 'm1', doc: grouped };
+    const group = layerRows(NODES, open).find((r) => r.id === 'g')!;
+
+    expect(group.foldable).toBe(true);
+    expect(group.label).toBe('Group 1');
+    expect(layerRows(NODES, open).some((r) => r.id === 'deep')).toBe(true);
+    expect(layerRows(NODES, open, {}, new Set([group.key])).some((r) => r.id === 'deep')).toBe(false);
+  });
+});
+
 describe('a row key is unique across the whole tree', () => {
   it('two clips playing the same composition list its insides twice under distinct keys', () => {
     const doc = video();
@@ -124,6 +143,14 @@ describe('poster parts in layers', () => {
       ['Photo 1', 'image'],
       ['Arrow', 'arrow']
     ]);
+  });
+
+  it('an open poster keeps the parts its outline names while nothing has measured it', () => {
+    const doc = video();
+    const outline = { m1: [{ id: 't1#lines:0', key: 't1#lines:0', kind: LayerKind.Part, depth: 2, label: 'Line 1', type: 'text', nodeId: 'm1', hidden: false, locked: false, nested: false }] };
+    const rows = layerRows(NODES, { nodeId: 'm1', doc, parts: {} }, outline);
+
+    expect(rows.map((r) => r.id)).toContain('t1#lines:0');
   });
 });
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { TourWrite, ensureProfile, markTourSeen, profileFromAuthUser, readTourSeen, recordTermsAcceptance } from '$lib/server/repos/profiles';
 import { fakeDb } from '$lib/server/db/fake-db';
+import { createTestSupabase } from '$lib/testkit/supabase';
+import type { Db } from '$lib/server/db/client';
 import type { User } from '@supabase/supabase-js';
 
 const USER = '11111111-1111-1111-1111-111111111111';
@@ -42,25 +44,51 @@ describe('il profilo si ricava dall utente di auth', () => {
   });
 });
 
-describe('il profilo nasce al primo accesso', () => {
-  it('scrive la riga sull id di auth, che è la stessa persona', async () => {
-    const { db, calls } = fakeDb({ profiles: [row] });
+describe('il profilo nasce al primo accesso, e poi è della persona', () => {
+  it('al primo accesso scrive la riga sull id di auth, con nome e avatar del provider', async () => {
+    const kit = createTestSupabase({ profiles: [] });
 
-    await ensureProfile(db, authUser({ full_name: 'Chi Esempio', picture: 'https://esempio.it/a.png' }));
+    await ensureProfile(kit.client as unknown as Db, authUser({ full_name: 'Chi Esempio', picture: 'https://esempio.it/a.png' }));
 
-    const upsert = calls.find((c) => c.op === 'upsert')!;
-    expect(upsert.payload).toMatchObject({
-      id: USER,
-      email: 'chi@esempio.it',
-      name: 'Chi Esempio',
-      avatar_url: 'https://esempio.it/a.png'
-    });
+    expect(kit.tables.get('profiles')).toEqual([expect.objectContaining({ id: USER, email: 'chi@esempio.it', name: 'Chi Esempio', avatar_url: 'https://esempio.it/a.png' })]);
+  });
+
+  it('un nome salvato nelle impostazioni resta, anche se il provider ne ha un altro', async () => {
+    const kit = createTestSupabase({ profiles: [{ ...row, name: 'Nome scelto' }] });
+
+    const profile = await ensureProfile(kit.client as unknown as Db, authUser({ full_name: 'Chi Esempio' }));
+
+    expect(profile.name).toBe('Nome scelto');
+    expect(kit.tables.get('profiles')![0].name).toBe('Nome scelto');
+  });
+
+  it('una foto caricata resta, anche se il provider ne ha un altra', async () => {
+    const kit = createTestSupabase({ profiles: [{ ...row, avatar_url: 'https://media/mia.png' }] });
+
+    await ensureProfile(kit.client as unknown as Db, authUser({ picture: 'https://google/altra.png' }));
+
+    expect(kit.tables.get('profiles')![0].avatar_url).toBe('https://media/mia.png');
+  });
+
+  it('un nome vuoto si riempie da quello del provider', async () => {
+    const kit = createTestSupabase({ profiles: [{ ...row, name: null }] });
+
+    expect((await ensureProfile(kit.client as unknown as Db, authUser({ full_name: 'Chi Esempio' }))).name).toBe('Chi Esempio');
+    expect(kit.tables.get('profiles')![0].name).toBe('Chi Esempio');
+  });
+
+  it('un profilo già completo non scrive niente: una lettura per pagina, non una scrittura', async () => {
+    const kit = createTestSupabase({ profiles: [row] });
+
+    await ensureProfile(kit.client as unknown as Db, authUser({ full_name: 'Altro', picture: 'https://p/altra.png' }));
+
+    expect(kit.calls.filter((c) => c.op !== 'select')).toEqual([]);
   });
 
   it('restituisce la forma di dominio, non la riga', async () => {
-    const { db } = fakeDb({ profiles: [row] });
+    const kit = createTestSupabase({ profiles: [row] });
 
-    expect(await ensureProfile(db, authUser({ full_name: 'Chi Esempio' }))).toEqual({
+    expect(await ensureProfile(kit.client as unknown as Db, authUser({ full_name: 'Chi Esempio' }))).toEqual({
       id: USER,
       email: 'chi@esempio.it',
       name: 'Chi Esempio',

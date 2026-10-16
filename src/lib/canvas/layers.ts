@@ -9,6 +9,7 @@ import { TrackKind } from '$lib/motion/components';
 import { joinMask, leaveMask, maskMembers, maskOf, releaseMasks, useAsMask } from '$lib/motion/mask-group';
 import { Command } from '$lib/motion/shortcuts';
 import { NODE_KIND_LABEL } from './node-label';
+import { elementName } from '$lib/motion/element-name';
 import type { NodeType } from './node-data';
 
 export enum LayerKind {
@@ -58,6 +59,7 @@ export type LayerRow = {
   locked: boolean;
   nested: boolean;
   thumb?: string | null;
+  foldable?: boolean;
 };
 
 type Track = MotionDoc['tracks'][number];
@@ -66,7 +68,7 @@ type Clip = Track['clips'][number];
 const NODE_DEPTH = 0;
 const TRACK_DEPTH = 1;
 
-const clipLabel = (clip: Clip) => (clip.component === CUSTOM_CLIP ? componentLabel(String(clip.props.name)) : (COMPONENTS[clip.component as ComponentId]?.label ?? clip.component));
+const clipLabel = (clip: Clip) => (clip.component === CUSTOM_CLIP ? componentLabel(String(clip.props.name)) : elementName(clip));
 
 const KEY_SEP = '/';
 
@@ -87,7 +89,7 @@ function groupLabel(track: Track, index: number): string {
 }
 
 type Masks = ReadonlyMap<string, readonly string[]>;
-type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode; masks: Masks; masked: ReadonlySet<string> };
+type Walk = { doc: MotionDoc; nodeId: string; nested: boolean; parts: Parts; path: string; mode: EditMode; masks: Masks; masked: ReadonlySet<string>; folded: ReadonlySet<string> };
 
 const NO_MASKS = { masks: new Map(), masked: new Set<string>() };
 
@@ -130,14 +132,16 @@ function layerTree(walk: Walk, clip: Clip, depth: number): LayerRow[] {
     key,
     kind: kindOf(walk, clip, template),
     depth,
-    label: template ? (doc.comps[comp]?.name ?? clipLabel(clip)) : clipLabel(clip),
+    label: doc.comps[comp]?.name ?? clipLabel(clip),
     type: clip.component,
     nodeId,
     hidden: !!clip.hidden,
     locked: template || !!clip.locked,
     nested
   };
-  const inside = comp && !template ? (doc.comps[comp]?.tracks ?? []) : [];
+  const nests = comp !== '' && !template;
+  row.foldable = nests || undefined;
+  const inside = nests && !walk.folded.has(key) ? (doc.comps[comp]?.tracks ?? []) : [];
   const own = (parts[clip.id] ?? []).map((part) => partRow(doc, clip, part, nodeId, depth + 1, key));
   return [row, ...own, ...trackRows({ ...walk, ...NO_MASKS, nested: true, parts: {}, path: `${key}${KEY_SEP}` }, inside, depth + 1), ...maskedRows(walk, clip.id, depth + 1)];
 }
@@ -146,15 +150,27 @@ function partRow(doc: MotionDoc, clip: Clip, part: string, nodeId: string, depth
   return { id: `${clip.id}${PART_SEP}${part}`, key: `${clipKey}${PART_SEP}${part}`, kind: LayerKind.Part, depth, label: partLabel(doc, clip, part), type: partIcon(doc, clip, part), nodeId, hidden: false, locked: false, nested: true };
 }
 
-const frameWalk = (doc: MotionDoc, nodeId: string, parts: Parts, mode: EditMode): Walk => ({ doc, nodeId, nested: false, parts, path: '', mode, ...masksOf(doc) });
+const frameWalk = (doc: MotionDoc, nodeId: string, parts: Parts, mode: EditMode, folded: ReadonlySet<string> = new Set()): Walk => ({ doc, nodeId, nested: false, parts, path: '', mode, folded, ...masksOf(doc) });
 
 export const frameRows = (doc: MotionDoc, nodeId: string, parts: Parts = {}): LayerRow[] => trackRows(frameWalk(doc, nodeId, parts, EditMode.Design), doc.tracks, TRACK_DEPTH);
 
 export type FrameOutlines = Record<string, readonly LayerRow[]>;
 
-function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlines): LayerRow[] {
+function namedParts(rows: readonly LayerRow[]): Parts {
+  const parts: Record<string, string[]> = {};
+  for (const row of rows) {
+    const at = row.kind === LayerKind.Part ? row.id.indexOf(PART_SEP) : -1;
+    if (at >= 0) {
+      (parts[row.id.slice(0, at)] ??= []).push(row.id.slice(at + 1));
+    }
+  }
+  return parts;
+}
+
+function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlines, folded: ReadonlySet<string>): LayerRow[] {
   if (open?.nodeId === nodeId) {
-    return trackRows(frameWalk(open.doc, nodeId, open.parts ?? {}, open.mode ?? EditMode.Design), open.doc.tracks, TRACK_DEPTH);
+    const parts = { ...open.parts, ...namedParts(outlines[nodeId] ?? []) };
+    return trackRows(frameWalk(open.doc, nodeId, parts, open.mode ?? EditMode.Design, folded), open.doc.tracks, TRACK_DEPTH);
   }
   return (outlines[nodeId] ?? []).map((row) => ({ ...row, nested: true }));
 }
@@ -162,7 +178,7 @@ function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlin
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
     const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null };
-    return folded.has(node.id) ? [row] : [row, ...childRows(node.id, open, outlines)];
+    return folded.has(node.id) ? [row] : [row, ...childRows(node.id, open, outlines, folded)];
   });
 }
 

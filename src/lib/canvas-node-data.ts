@@ -107,7 +107,8 @@ export function genOf(row: NodeRow): GenNode | null {
     refId: nullableStr(row.data.refId) ?? nullableStr(row.data.assetId),
     runs: [],
     running: row.data.running === true,
-    error: typeof row.data.error === 'string' && row.data.error ? row.data.error : null
+    error: typeof row.data.error === 'string' && row.data.error ? row.data.error : null,
+    routeNote: typeof row.data.routeNote === 'string' && row.data.routeNote ? row.data.routeNote : null
   };
 }
 

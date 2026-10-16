@@ -1,7 +1,7 @@
 import { mount } from 'svelte';
 import MotionCanvasHarness from './MotionCanvasHarness.svelte';
 
-export type HarnessNode = { id: string; x: number; y: number; format: string; poster: string };
+export type HarnessNode = { id: string; x: number; y: number; format: string; poster: string; source?: string };
 
 declare global {
   interface Window {

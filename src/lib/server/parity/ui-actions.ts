@@ -6,12 +6,14 @@ import { ClipOp } from '$lib/motion/clip-ops';
 import { EmptyAction } from '$lib/canvas/empty-canvas';
 import type { SelectionActionId } from '$lib/canvas/selection-actions';
 import type { CanvasOpName } from '$lib/server/canvas/canvas-ops';
+import type { EditorOpName } from '$lib/server/frame-editor/editor-ops';
 
-export type Route = { canvas: CanvasOpName } | { motion: string } | { tool: string };
+export type Route = { canvas: CanvasOpName } | { editor: EditorOpName } | { motion: string } | { tool: string };
 
 export type Parity = { route: Route } | { uiOnly: string } | { gap: string };
 
 const canvas = (op: CanvasOpName): Parity => ({ route: { canvas: op } });
+const editor = (op: EditorOpName): Parity => ({ route: { editor: op } });
 const motion = (name: string): Parity => ({ route: { motion: name } });
 const tool = (name: string): Parity => ({ route: { tool: name } });
 const uiOnly = (reason: string): Parity => ({ uiOnly: reason });
@@ -62,6 +64,12 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   connect: canvas('connect_nodes'),
   moveElement: canvas('move_frame_element'),
   placeOutput: canvas('place_in_frame'),
+  drawElement: canvas('draw_element'),
+  moveFree: canvas('move_frame_element'),
+  groupElements: canvas('group_elements'),
+  ungroupElement: canvas('ungroup_element'),
+  rotateGroup: canvas('rotate_group'),
+  moveGroup: canvas('move_group'),
   disconnect: canvas('disconnect_nodes'),
   set_edge_mode: canvas('set_edge_mode'),
   remove: canvas('delete_node'),
@@ -76,27 +84,27 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
 };
 
 export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
-  save: tool('motion_tool'),
-  ops: tool('motion_tool'),
-  head: tool('get_motion_summary'),
+  save: editor('save_doc'),
+  ops: editor('apply_ops'),
+  head: editor('read_head'),
   revisions: tool('list_motion_revisions'),
   restore: tool('restore_motion_revision'),
-  exported: tool('render_video'),
-  poster: uiOnly('thumbnail the browser captures after a save; export_image makes stills for agents'),
+  exported: editor('record_export'),
+  poster: uiOnly('thumbnail the browser captures after a save (POST /api/v1/motion/{node}/poster, multipart); export_image makes stills for agents'),
   still: motion('export_image'),
-  uploadFont: motion('register_font'),
-  analyze: motion('analyze_audio'),
-  sound: tool('ask_motion_agent'),
+  uploadFont: editor('upload_font'),
+  analyze: editor('analyze_sounds'),
+  sound: editor('generate_sound'),
   render: tool('render_video'),
-  renderBatch: tool('ask_motion_agent'),
-  templateSounds: motion('add_template'),
-  saveTemplate: motion('save_template'),
+  renderBatch: editor('render_batch'),
+  templateSounds: editor('template_sounds'),
+  saveTemplate: editor('save_template'),
   publishGallery: tool('publish_to_gallery'),
   withdrawGallery: canvas('withdraw_from_gallery'),
   deleteTemplate: motion('delete_template'),
-  batchStatus: tool('get_render'),
+  batchStatus: editor('batch_status'),
   cancelRender: canvas('cancel_render'),
-  renderStatus: tool('get_render')
+  renderStatus: editor('render_status')
 };
 
 export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
@@ -124,6 +132,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.Paste]: motion('set_keyframes'),
   [Command.SelectAll]: VIEW,
   [Command.Deselect]: VIEW,
+  [Command.SelectChild]: VIEW,
+  [Command.SelectParent]: VIEW,
   [Command.StartHere]: motion('set_timing'),
   [Command.EndHere]: motion('set_timing'),
   [Command.TrimIn]: motion('trim_clip'),
@@ -148,6 +158,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleTimeline]: VIEW,
   [Command.Help]: VIEW,
   [Command.Precompose]: motion('precompose'),
+  [Command.Group]: motion('precompose'),
+  [Command.Ungroup]: motion('ungroup'),
   [Command.AutoLayout]: motion('add_auto_layout'),
   [Command.UseAsMask]: motion('use_as_mask'),
   [Command.RemoveMask]: motion('release_mask'),

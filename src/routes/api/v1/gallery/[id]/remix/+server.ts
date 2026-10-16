@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { resolveOrgCaller } from '$lib/server/org-data/auth';
+import { callerReach } from '$lib/server/org-data/reach';
 import { agentActor } from '$lib/server/repos/actor';
 import { MCP_AGENT_KEY } from '$lib/server/motion/ask';
 import { remixInto } from '$lib/server/gallery/service';
@@ -27,6 +28,11 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
   const body = bodySchema.safeParse(await request.json().catch(() => ({})));
   if (!body.success) {
     return json({ error: 'invalid_body', detail: body.error.issues[0]?.message }, { status: HTTP_BAD_REQUEST });
+  }
+
+  const unreachable = await callerReach(resolved.caller, { project: body.data.project_id });
+  if (unreachable) {
+    return unreachable;
   }
 
   const remixed = await remixInto({ db, orgId, userId, actor: agentActor(userId, MCP_AGENT_KEY) }, { itemId: params.id ?? '', projectId: body.data.project_id, canvasId: body.data.canvas_id ?? null });

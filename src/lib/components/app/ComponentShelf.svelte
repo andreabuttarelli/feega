@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiEnhance } from '$lib/dashboard/api-enhance';
   import ComponentPreview from '$lib/components/motion/ComponentPreview.svelte';
   import { FORMATS } from '$lib/motion/doc';
   import { ComponentKind, KIND_LABEL, STARTER_FORMATS, matching, type CatalogueItem, type StarterFormat } from '$lib/motion/template/catalogue';
@@ -34,7 +35,7 @@
   <ul class="strip">
     {#each shown as item (item.id)}
       <li data-component={item.id}>
-        <form method="POST" action="/app?/fromTemplate" onsubmit={() => (starting = item.id)}>
+        <form method="POST" action="/app?/fromTemplate" use:apiEnhance onsubmit={() => (starting = item.id)}>
           <input type="hidden" name="template" value={item.id} />
           <input type="hidden" name="format" value={format} />
           {#if projectId}<input type="hidden" name="projectId" value={projectId} />{/if}

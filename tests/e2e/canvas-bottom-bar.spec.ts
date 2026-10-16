@@ -38,7 +38,7 @@ test.describe('one bottom bar, by context @real', () => {
     const bar = page.getByTestId('add-bar');
     await expect(bar).toHaveAttribute('data-context', 'canvas');
     await expect(bar.getByRole('button', { name: 'Upload file' })).toBeVisible();
-    await expect(page.getByTestId('draw-tools')).toHaveCount(0);
+    await expect(page.getByTestId('draw-tools')).toHaveCount(1);
     await shoot(page, '1-canvas-tools');
 
     await page.getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
@@ -85,8 +85,9 @@ test.describe('one bottom bar, by context @real', () => {
 
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
     await expect(bar).toHaveAttribute('data-context', 'canvas', { timeout: 10_000 });
-    await expect(page.getByTestId('draw-tools')).toHaveCount(0);
+    await expect(page.getByTestId('draw-tools')).toHaveCount(1);
     await shoot(page, '6-back-to-canvas');
   });
 

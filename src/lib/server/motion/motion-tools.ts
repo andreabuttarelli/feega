@@ -1,5 +1,8 @@
+import { ungroupClip } from '$lib/motion/group';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
+import { setPartFills } from '$lib/motion/part-style';
+import { staticParts } from './static-parts';
 import { strokesSchema } from '$lib/motion/stroke/model';
 import { THREE_GUIDANCE } from './three-guidance';
 import { GUIDES, guidesFor, type GuideTopic } from './guides';
@@ -22,7 +25,7 @@ import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/de
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
-import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
+import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
@@ -152,7 +155,7 @@ import { STYLES, styleOf } from '$lib/motion/style';
 import { MOTION_STYLES } from '$lib/motion/style-model';
 import { SPAWN_AGENT, type ModelOffer, type SpawnInput, type SpawnResult } from '$lib/server/agents/spawn';
 import { spawnAgentTool } from '$lib/server/agents/spawn-agent';
-import { setStill } from '$lib/motion/still';
+import { animateStill, setStill } from '$lib/motion/still';
 import { liftElement, type Element } from '$lib/motion/move-element';
 import { MoveOutcome, type FrameTarget, type Moved } from './move-element';
 import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '$lib/motion/still-model';
@@ -293,6 +296,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
   const cameraSummary = (camera: Camera | null) =>
     camera ? { values: shownRecord(CAMERA_LANE, camera.base, doc), dof: camera.dof, keyframes: inSeconds(shownKeyframes(CAMERA_LANE, camera.keyframes, doc)), expressions: camera.expressions } : null;
   const lookSummary = (look: Look | null) => (look ? { ...look, lights: look.lights.map((l) => ({ ...l, keyframes: inSeconds(l.keyframes) })) } : null);
+  const posterParts = staticParts(doc);
 
   return {
     width: doc.width,
@@ -331,6 +335,8 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         parentOpacity: c.parentOpacity,
         autoLayout: c.autoLayout ?? null,
         layoutItem: c.layoutItem ?? null,
+        parts: posterParts[c.id] ?? [],
+        partStyles: c.partStyles ?? null,
         expressions: c.expressions,
         effects: c.effects,
         shaders: c.shaders,
@@ -1456,6 +1462,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       execute: async ({ clip_id, ...patch }) => apply(setLayoutItem(session.doc, clip_id, patch), `sized ${clip_id} in its auto layout`)
     }),
 
+    set_part_fill: tool({
+      description: 'Colour one text part of a poster (a data-part such as "title" or "lines:0", as the clip summary lists them in parts) without touching the other parts. fills is its fill stack (solid, linear, radial, image), bottom first. A plain solid on a part that has its own colour field writes that field; anything else, or a part whose colour is shared with other parts, is kept as an override on this part only. fills null drops the override and the part takes its shared colour again.',
+      inputSchema: z.object({ clip_id: z.string(), part: z.string().min(1).max(80), fills: fillsSchema.nullable() }),
+      execute: async ({ clip_id, part, fills }) => apply(fills ? setPartFills(session.doc, clip_id, part, fills) : setPartStyle(session.doc, clip_id, part, null), `coloured ${part} of ${clip_id}`)
+    }),
+
     reorder_auto_layout: tool({
       description: 'Move a child of an auto layout to position index (0 = first) in its container.',
       inputSchema: z.object({ container_id: z.string(), clip_id: z.string(), index: z.number().int().min(0) }),
@@ -1926,7 +1938,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_canvas: tool({
-      description: `Change the format (16:9, 9:16, 1:1, 4:5), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again.`,
+      description: `Change the format (16:9, 9:16, 1:1, 4:5), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor.`,
       inputSchema: z.object({
         format: z.enum(MOTION_FORMATS).optional(),
         duration: z.number().positive().max(MAX_SECONDS).optional(),
@@ -1939,7 +1951,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (stretched) {
           return { ok: false, error: stretched };
         }
-        const paced = input.fps === undefined ? ({ ok: true, doc: session.doc } as OpResult) : setFrameRate(session.doc, input.fps);
+        const animated = input.still === false ? animateStill(session.doc, input.duration) : ({ ok: true, doc: session.doc } as OpResult);
+        const paced = !animated.ok || input.fps === undefined ? animated : setFrameRate(animated.doc, input.fps);
         const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         return apply(pinned, 'changed the canvas');
@@ -2384,6 +2397,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const out = apply(precompose(session.doc, input.clip_ids, { comp, clip }, input.name ?? `Comp ${Object.keys(session.doc.comps).length + 1}`), `precomposed ${input.clip_ids.length} clip(s)`);
         return out.ok ? { ...out, comp, clip_id: clip } : out;
       }
+    }),
+
+    ungroup: tool({
+      description: 'Ungroup: put the clips of a group (a Precomp made by precompose or ⌘G) back on the top level, at the same place and time; its offset is carried to each clip. Refused when the group is scaled, rotated or animated.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(ungroupClip(session.doc, input.clip_id, deps.newId), 'ungrouped')
     }),
 
     create_comp: tool({

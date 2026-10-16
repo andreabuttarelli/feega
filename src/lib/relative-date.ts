@@ -23,3 +23,7 @@ export function relativeDate(iso: string, now = new Date()): string {
   const { unit, ms } = UNITS.find((u) => elapsed < u.below)!;
   return said.format(-Math.floor(elapsed / ms), unit);
 }
+
+export function editedAgo(iso: string, now = new Date()): string {
+  return `Edited ${relativeDate(iso, now)}`;
+}

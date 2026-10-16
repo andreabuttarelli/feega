@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ActionKind, SaveFailure, actionKind, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry } from './node-save';
+import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry } from './node-save';
 
 describe('failureOf: every server answer has one reason', () => {
   it.each([
@@ -113,8 +113,13 @@ describe('isOwnEcho: realtime does not refetch what this tab just wrote', () => 
     expect(isOwnEcho(update({ display_name: 'Hook' }), tiles)).toBe(false);
   });
 
+  it('ignores the insert of a node this tab already placed', () => {
+    expect(isOwnEcho({ table: 'nodes', eventType: 'INSERT', new: shown }, tiles)).toBe(true);
+  });
+
   it('refetches inserts, deletes and connections', () => {
     expect(isOwnEcho({ table: 'nodes', eventType: 'INSERT', new: { id: 'z', version: 1 } }, tiles)).toBe(false);
+    expect(isOwnEcho({ table: 'nodes', eventType: 'DELETE', new: shown }, tiles)).toBe(false);
     expect(isOwnEcho(update({}, 'nodes_connections'), tiles)).toBe(false);
   });
 });
@@ -240,5 +245,28 @@ describe('saveBanner: a failed read never claims a save failed', () => {
   it('a failed write still shows the save banner', () => {
     expect(actionKind('write')).toBe(ActionKind.Write);
     expect(saveBanner('write', { type: 'error', status: 500 })).toBe(saveMessage(SaveFailure.Server));
+  });
+});
+
+describe('adoptFrameHead: a frame saved by its editor moves its head without a canvas resync', () => {
+  const frame = { id: 'f', type: 'motion', version: 3, data: { docHeadRevision: 2 }, saved: { docHeadRevision: 2 }, x: 0, y: 0, displayName: null };
+  const text = { id: 't', type: 'text', version: 1, data: { prompt: 'hi' }, saved: { prompt: 'hi' }, x: 0, y: 0, displayName: null };
+  const tiles = [frame, text];
+  const clean = () => [];
+  const update = (row: Record<string, unknown>) => ({ table: 'nodes', eventType: 'UPDATE', new: { id: 'f', version: 4, data: { docHeadRevision: 3 }, x: 0, y: 0, display_name: null, deleted_at: null, ...row } });
+
+  it('takes the new head and version in place, leaving every other tile the same object', () => {
+    const next = adoptFrameHead(update({}), tiles, clean);
+    expect(next?.[0]).toMatchObject({ version: 4, data: { docHeadRevision: 3 }, saved: { docHeadRevision: 3 } });
+    expect(next?.[1]).toBe(text);
+  });
+
+  it('leaves a move, a rename, a delete, another type or unsaved local edits to the resync', () => {
+    expect(adoptFrameHead(update({ x: 40 }), tiles, clean)).toBeNull();
+    expect(adoptFrameHead(update({ display_name: 'Hook' }), tiles, clean)).toBeNull();
+    expect(adoptFrameHead(update({ deleted_at: '2026-10-15T00:00:00Z' }), tiles, clean)).toBeNull();
+    expect(adoptFrameHead(update({ id: 't', data: { prompt: 'agent' } }), tiles, clean)).toBeNull();
+    expect(adoptFrameHead(update({}), tiles, () => ['data'])).toBeNull();
+    expect(adoptFrameHead({ ...update({}), eventType: 'INSERT' }, tiles, clean)).toBeNull();
   });
 });

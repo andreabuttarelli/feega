@@ -213,6 +213,7 @@ test.describe('motion editor on a phone @real', () => {
 
 test.describe('preview zoom @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
+  test.use({ viewport: { width: 1280, height: 1400 } });
 
   test('⌘= ingrandisce, doppio clic intorno torna a Fit, ⌘1 è 100%: la vista cambia, la storia no', async ({ page, session, seedNode }) => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });

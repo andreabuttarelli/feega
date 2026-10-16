@@ -1,11 +1,12 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { resolveOrgCaller } from '$lib/server/org-data/auth';
+import { reachableCaller } from '$lib/server/org-data/reach';
 import { gateOrgAiAction } from '$lib/server/cli-auth';
 import { findNode } from '$lib/server/repos/canvas';
 import { runGenNode } from '$lib/server/canvas/generate';
 import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { modelAdvice } from '$lib/canvas/recommended-models';
+import { PROVIDER_PARAM } from '$lib/canvas/model-routes';
 import type { GenMedium } from '$lib/canvas/gen-node';
 
 async function modelWarning(medium: GenMedium, requested: string | null): Promise<string | null> {
@@ -24,11 +25,12 @@ function savedModel(data: Record<string, unknown> | undefined): string | null {
  * un'immagine su un nodo video prenderebbe un giro sprecato senza questo rifiuto anticipato.
  */
 export const POST: RequestHandler = async ({ request, params, url }) => {
-  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
-  if ('error' in resolved) return json(resolved.error.body, { status: resolved.error.status });
+  const caller = await reachableCaller(request, url, { nodes: [params.id ?? ''] });
+  if (caller instanceof Response) {
+    return caller;
+  }
 
-  const { db, orgId, userId, apiKeyId, writeAllowed } = resolved.caller;
+  const { db, orgId, userId, apiKeyId, writeAllowed } = caller;
   if (!writeAllowed) return json({ error: 'api_key_read_only' }, { status: 403 });
 
   const nodeId = params.id ?? '';
@@ -40,6 +42,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     prompt?: string;
     model?: string;
     version?: number;
+    provider?: string;
     params?: Record<string, unknown>;
   };
 
@@ -61,7 +64,7 @@ export const POST: RequestHandler = async ({ request, params, url }) => {
     medium: body.medium as never,
     prompt: body.prompt ?? '',
     model,
-    params: (body.params ?? {}) as never,
+    params: { ...(body.params ?? {}), ...(body.provider ? { [PROVIDER_PARAM]: body.provider } : {}) } as never,
     expectedVersion: body.version ?? node.version
   });
 

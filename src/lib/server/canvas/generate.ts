@@ -17,7 +17,7 @@ import {
   listNodeRuns,
   queuedAudioRuns,
   queuedVideoRuns,
-  queuedWiroRuns,
+  queuedTaskRuns,
   RENDER_JOB_PREFIX,
   BROWSER_RENDER_PREFIX,
   releaseClaim,
@@ -25,7 +25,7 @@ import {
   runningRuns,
   setExternalJob,
   setRunPrompt,
-  WIRO_JOB_PREFIX,
+  setRunRoute,
   type NodeRun
 } from '$lib/server/repos/node-runs';
 import { DataCheck, findNode, patchNodeData, writeNodeData } from '$lib/server/repos/canvas';
@@ -39,7 +39,11 @@ import { resolveNodeModel } from './node-model';
 import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio-run';
 import { audioOperationOf, defaultAudioModel, operationSpec, voiceIdOf } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
-import { WIRO_ID_PREFIX } from '$lib/server/wiro-catalogue';
+import { RouteRole, TASK_PROVIDERS, taskJobOf, taskProviderOf } from '$lib/server/generation/task-providers';
+import { AUTO_ROUTE } from '$lib/canvas/model-routes';
+import { kieTextModel } from '$lib/server/kie-chat';
+import { PRIMARY_ROUTE } from '$lib/server/generation/discount-routes';
+import { RefusalStage, type TaskStart } from './task-run';
 import { model3dParamsOf } from '$lib/model3d-models';
 import { cheapestImageChoice, Model3dPath, model3dPathOf, productShotPrompt } from '$lib/canvas/model3d-run';
 
@@ -75,6 +79,7 @@ export type StartRun = {
    *  invece della lista intera — la stessa mappa che `upstreamInputsFor` accetta. Assente = un
    *  giro ordinario, ogni `list` a monte si comporta come un filo `fixed`. */
   iterateSelection?: Record<string, number>;
+  route?: RouteRole;
 };
 
 export type RunOutcome =
@@ -300,27 +305,27 @@ async function runAudioNode(db: Db, input: StartRun, run: NodeRun, upstream: Ups
 
 type ProviderRun = (db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string) => Promise<RunOutcome>;
 
-const WIRO_IMAGE_PATHS: Readonly<Record<string, (upstream: UpstreamInputs) => string[]>> = {
+const TASK_IMAGE_PATHS: Readonly<Record<string, (upstream: UpstreamInputs) => string[]>> = {
   image: (upstream) => upstream.referenceImageUrls,
   video: (upstream) => [...new Set([upstream.startFrameUrl, ...upstream.referenceImageUrls].filter((u): u is string => Boolean(u)))],
   model3d: (upstream) => upstream.referenceImageUrls
 };
 
-async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
-  const [{ wiroRunDeps }, { startWiroRun }, { upstreamProvenance }, { projectModeOf }] = await Promise.all([
-    import('$lib/server/wiro-config'),
-    import('./wiro-run'),
+async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<TaskStart> {
+  const [{ taskRunDeps }, { startTaskRun }, { upstreamProvenance }, { projectModeOf }] = await Promise.all([
+    import('$lib/server/task-providers-config'),
+    import('./task-run'),
     import('./likeness-guard'),
     import('$lib/server/uncensored-workspace/workspace-server')
   ]);
   const node = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => null);
   const [imageUrls, lastFrame, provenance] = await Promise.all([
-    signMediaPaths(db, WIRO_IMAGE_PATHS[input.medium]?.(upstream) ?? []),
+    signMediaPaths(db, TASK_IMAGE_PATHS[input.medium]?.(upstream) ?? []),
     signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : []),
     upstreamProvenance(db, { orgId: input.orgId, canvasId: input.canvasId, nodeId: input.nodeId, data: node?.data ?? {} })
   ]);
 
-  const out = await startWiroRun(wiroRunDeps(db), {
+  return startTaskRun(taskRunDeps(db), {
     scope: audioScopeOf(input),
     mode: await projectModeOf(db, input),
     modelId: input.model ?? '',
@@ -328,15 +333,76 @@ async function runWiroNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
     params: input.params,
     imageUrls,
     lastFrameUrl: lastFrame[0] ?? null,
-    provenance
+    provenance,
+    idempotencyKey: run.id
   });
+}
+
+async function queueTask(db: Db, input: StartRun, run: NodeRun, jobId: string): Promise<RunOutcome> {
+  await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: jobId });
+  return { kind: 'queued', run: { ...run, externalJobId: jobId } };
+}
+
+async function runTaskNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
+  const out = await startTask(db, input, run, upstream, prompt);
   if (out.kind === 'refused') {
     await giveUp(db, input, run, out.error);
-    return out;
+    return { kind: 'refused', error: out.error };
   }
-  await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: out.jobId });
-  return { kind: 'queued', run: { ...run, externalJobId: out.jobId } };
+  return queueTask(db, input, run, out.jobId);
 }
+
+const DISCOUNTED_MEDIA: ReadonlySet<GenMedium> = new Set(['image', 'video']);
+
+export const FALLBACK_MODEL_PARAM = 'fallbackModel';
+
+async function runDiscountRoute(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome | null> {
+  if (input.route === RouteRole.Primary || !input.model || !DISCOUNTED_MEDIA.has(input.medium)) {
+    return null;
+  }
+  const medium = input.medium as 'image' | 'video';
+  const [{ discountBook, routeFor }, { offerableModels, PricingView }] = await Promise.all([
+    import('$lib/server/generation/discount-routes'),
+    import('$lib/server/offerable-models')
+  ]);
+  const book = await discountBook(db as never, medium);
+  const choice = book ? (await offerableModels(db as never, medium, PricingView.Primary)).choices.find((c) => c.id === input.model) : undefined;
+  const route = choice ? routeFor(book, choice, medium, input.params) : null;
+  const chosen = Boolean(input.params.provider && input.params.provider !== AUTO_ROUTE);
+  if (!route && chosen && input.params.provider !== PRIMARY_PROVIDER) {
+    return refuse(db, input, run, `${input.params.provider} does not serve ${input.model} right now. Pick Auto or ${PRIMARY_LABEL}.`);
+  }
+  if (!route) {
+    return null;
+  }
+
+  const routed: StartRun = { ...input, model: route.modelId, params: route.params };
+  const fallback = chosen ? {} : { [FALLBACK_MODEL_PARAM]: input.model };
+  await setRunRoute(db, { orgId: input.orgId, runId: run.id, model: route.modelId, params: { ...route.params, ...fallback } });
+  const out = await startTask(db, routed, run, upstream, prompt);
+  if (out.kind === 'job') {
+    return queueTask(db, routed, run, out.jobId);
+  }
+  if (out.stage === RefusalStage.Policy) {
+    await giveUp(db, input, run, out.error);
+    return { kind: 'refused', error: out.error };
+  }
+  const label = book ? TASK_PROVIDERS[book.provider].label : '';
+  if (chosen) {
+    return refuse(db, input, run, chosenRouteFailed(label, out.error));
+  }
+  await setRunRoute(db, { orgId: input.orgId, runId: run.id, model: input.model, params: input.params as Record<string, unknown> });
+  await showRunState(db, input, { routeNote: fellBackNote(label) });
+  return null;
+}
+
+const PRIMARY_LABEL = PRIMARY_ROUTE.label;
+const PRIMARY_PROVIDER = PRIMARY_ROUTE.provider;
+
+export const fellBackNote = (label: string): string => `${label} failed, made on ${PRIMARY_LABEL}`;
+
+const chosenRouteFailed = (label: string, error: string): string =>
+  `${label} failed: ${error}. Pick Auto to fall back to ${PRIMARY_LABEL} automatically, or pick ${PRIMARY_LABEL}.`;
 
 const NO_IMAGE_MODEL = 'No image model is available to turn this text into a 3D model.';
 const PRODUCT_SHOT_ASPECT = '1:1';
@@ -389,7 +455,7 @@ async function runModel3dNode(db: Db, requested: StartRun, run: NodeRun, upstrea
     return refuse(db, input, run, start.error);
   }
   if (start.path === Model3dPath.FromImage) {
-    return runWiroNode(db, input, run, upstream, prompt);
+    return runTaskNode(db, input, run, upstream, prompt);
   }
 
   const shot = await productShotOf(db, input, prompt);
@@ -397,18 +463,16 @@ async function runModel3dNode(db: Db, requested: StartRun, run: NodeRun, upstrea
     return refuse(db, input, run, shot.error);
   }
   await showRunState(db, input, { posterRefId: shot.asset.id });
-  return runWiroNode(db, input, run, { ...upstream, referenceImageUrls: [shot.asset.url ?? ''] }, '');
+  return runTaskNode(db, input, run, { ...upstream, referenceImageUrls: [shot.asset.url ?? ''] }, '');
 }
 
 const MEDIUM_RUNS: Partial<Record<GenMedium, ProviderRun>> = { audio: runAudioNode, model3d: runModel3dNode };
 
-const GENERATION_PROVIDERS: ReadonlyArray<{ prefix: string; run: ProviderRun }> = [{ prefix: WIRO_ID_PREFIX, run: runWiroNode }];
-
 function providerRunOf(medium: GenMedium, model: string | null): ProviderRun | null {
-  if (medium === 'text' || !model) {
+  if (medium === 'text') {
     return null;
   }
-  return GENERATION_PROVIDERS.find((p) => model.startsWith(p.prefix))?.run ?? null;
+  return taskProviderOf(model) ? runTaskNode : null;
 }
 
 function missingInputOf(input: StartRun, upstream: UpstreamInputs, prompt: string): string | null {
@@ -489,7 +553,8 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
       model: input.model,
       params: input.params,
       running: true,
-      runId: run.id
+      runId: run.id,
+      routeNote: null
     }
   });
   if (marked.outcome === 'conflict') {
@@ -561,7 +626,23 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     return providerRun(db, input, run, upstream, sentPrompt);
   }
 
+  const discounted = await runDiscountRoute(db, input, run, upstream, sentPrompt);
+  if (discounted) {
+    return discounted;
+  }
+
   try {
+    if (input.medium === 'text' && kieTextModel(input.model)) {
+      const [{ runKieText, kieTextDeps }, { logAiCall }] = await Promise.all([import('$lib/server/kie-text-run'), import('$lib/server/ai-log')]);
+      const out = await runKieText(kieTextDeps(logAiCall), {
+        model: input.model ?? '',
+        prompt,
+        system: textInput?.system || undefined,
+        scope: { orgId: input.orgId, projectId: input.projectId, userId: input.userId, actorKind: input.actor?.kind === 'agent' ? 'agent' : 'user', actorId: input.actor?.id, agentKey: input.actor?.agentKey ?? null }
+      });
+      return land(db, input, run, await depositText(db, input, out.text), out.costUsd);
+    }
+
     if (input.medium === 'text') {
       const { llmText } = await import('$lib/server/llm');
       const { withOrgContext, billedUsdInScope } = await import('$lib/server/ai-log');
@@ -1004,19 +1085,41 @@ export async function reconcileAudioNodeRuns(db: Db): Promise<VideoReconcileOutc
   return outcome;
 }
 
-const WIRO_RECONCILE_LIMIT = 20;
-const WIRO_RUN_MAX_ATTEMPTS = 8;
+function fallbackModelOf(run: NodeRun): string | null {
+  const model = (run.params ?? {})[FALLBACK_MODEL_PARAM];
+  return typeof model === 'string' && model ? model : null;
+}
 
-export async function reconcileWiroNodeRuns(db: Db): Promise<VideoReconcileOutcome> {
+async function fallBackToPrimary(db: Db, run: NodeRun, node: { projectId: string; canvasId: string; type: string; version: number }): Promise<RunOutcome> {
+  const { [FALLBACK_MODEL_PARAM]: _discounted, ...params } = run.params ?? {};
+  return runGenNode(db, {
+    orgId: run.orgId,
+    projectId: node.projectId,
+    canvasId: node.canvasId,
+    nodeId: run.nodeId,
+    userId: run.actorId ?? '',
+    medium: node.type as GenMedium,
+    prompt: run.prompt ?? '',
+    model: fallbackModelOf(run),
+    params: { ...(params as GenParams), enhancePrompt: false },
+    expectedVersion: node.version,
+    route: RouteRole.Primary
+  });
+}
+
+const TASK_RECONCILE_LIMIT = 20;
+const TASK_RUN_MAX_ATTEMPTS = 8;
+
+export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutcome> {
   const outcome: VideoReconcileOutcome = { checked: 0, done: 0, failed: 0, pending: 0 };
-  const [{ wiroRunDeps }, { finishWiroJob }, { projectModeOf }] = await Promise.all([
-    import('$lib/server/wiro-config'),
-    import('./wiro-run'),
+  const [{ taskRunDeps }, { finishTaskJob }, { projectModeOf }] = await Promise.all([
+    import('$lib/server/task-providers-config'),
+    import('./task-run'),
     import('$lib/server/uncensored-workspace/workspace-server')
   ]);
-  const deps = wiroRunDeps(db);
+  const deps = taskRunDeps(db);
 
-  for (const run of await queuedWiroRuns(db, { limit: WIRO_RECONCILE_LIMIT })) {
+  for (const run of await queuedTaskRuns(db, { limit: TASK_RECONCILE_LIMIT })) {
     const claimed = await claimRun(db, { orgId: run.orgId, runId: run.id });
     if (!claimed || !run.externalJobId) {
       continue;
@@ -1034,11 +1137,26 @@ export async function reconcileWiroNodeRuns(db: Db): Promise<VideoReconcileOutco
     const finishing: NodeRun = { ...run, status: 'finishing' };
     try {
       const mode = await projectModeOf(db, shape);
-      const progress = await finishWiroJob(db, deps, { externalJobId: run.externalJobId, modelId: run.model ?? '', scope: audioScopeOf(shape), mode });
+      const progress = await finishTaskJob(db, deps, {
+        externalJobId: run.externalJobId,
+        modelId: run.model ?? '',
+        scope: audioScopeOf(shape),
+        mode,
+        params: shape.params,
+        startedAt: run.startedAt
+      });
 
       if (progress.state === 'pending') {
         await releaseClaim(db, { orgId: run.orgId, runId: run.id });
         outcome.pending += 1;
+        continue;
+      }
+      if (progress.state === 'failed' && fallbackModelOf(run)) {
+        await failRun(db, { orgId: run.orgId, runId: run.id, error: progress.error });
+        const fallback = await fallBackToPrimary(db, run, node);
+        const shown = fallback.kind === 'conflict' ? { running: false, runId: run.id, error: progress.error } : { routeNote: fellBackNote(TASK_PROVIDERS[taskJobOf(run.externalJobId)!.provider].label) };
+        await showRunState(db, shape, shown);
+        outcome.failed += 1;
         continue;
       }
       if (progress.state === 'failed') {
@@ -1052,8 +1170,8 @@ export async function reconcileWiroNodeRuns(db: Db): Promise<VideoReconcileOutco
       await showRunState(db, shape, { running: false, runId: run.id, refId: progress.asset.id, error: null, outputUncensored: progress.uncensored, ...poster });
       outcome.done += 1;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'wiro_reconcile_failed';
-      if (run.attempts + 1 < WIRO_RUN_MAX_ATTEMPTS) {
+      const message = error instanceof Error ? error.message : 'task_reconcile_failed';
+      if (run.attempts + 1 < TASK_RUN_MAX_ATTEMPTS) {
         await retryClaim(db, { orgId: run.orgId, runId: run.id, attempts: run.attempts + 1, error: message }).catch(() => {});
         outcome.pending += 1;
         continue;
@@ -1101,18 +1219,18 @@ export { claimRun, completeRun, failRun };
  */
 export const RUN_STALE_MS = 6 * 60_000;
 const VIDEO_TIMEOUT_MS = 20 * 60_000;
-const WIRO_IMAGE_TIMEOUT_MS = 10 * 60_000;
-const WIRO_VIDEO_TIMEOUT_MS = 30 * 60_000;
+const TASK_IMAGE_TIMEOUT_MS = 10 * 60_000;
+const TASK_VIDEO_TIMEOUT_MS = 30 * 60_000;
 const DUBBING_TIMEOUT_MS = 60 * 60_000;
 
-type JobKind = 'sync' | 'agent_turn' | 'video' | 'wiro_image' | 'wiro_video' | 'dubbing' | 'motion_render' | 'browser_render';
+type JobKind = 'sync' | 'agent_turn' | 'video' | 'task_image' | 'task_video' | 'dubbing' | 'motion_render' | 'browser_render';
 
 const JOB_TIMEOUTS_MS: Record<JobKind, number> = {
   sync: RUN_STALE_MS,
   agent_turn: AGENT_STALE_MS,
   video: VIDEO_TIMEOUT_MS,
-  wiro_image: WIRO_IMAGE_TIMEOUT_MS,
-  wiro_video: WIRO_VIDEO_TIMEOUT_MS,
+  task_image: TASK_IMAGE_TIMEOUT_MS,
+  task_video: TASK_VIDEO_TIMEOUT_MS,
   dubbing: DUBBING_TIMEOUT_MS,
   motion_render: RENDER_DEADLINE_MS,
   browser_render: BROWSER_RENDER_DEADLINE_MS
@@ -1137,8 +1255,8 @@ function jobKindOf(run: { externalJobId: string | null; params: Record<string, u
   if (run.externalJobId.startsWith(AUDIO_JOB_PREFIX)) {
     return 'dubbing';
   }
-  if (run.externalJobId.startsWith(WIRO_JOB_PREFIX)) {
-    return nodeType === 'video' ? 'wiro_video' : 'wiro_image';
+  if (taskJobOf(run.externalJobId)) {
+    return nodeType === 'video' ? 'task_video' : 'task_image';
   }
   if (run.externalJobId.startsWith(RENDER_JOB_PREFIX)) {
     return 'motion_render';
