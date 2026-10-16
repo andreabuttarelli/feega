@@ -20,8 +20,8 @@ describe('signAssetFiles', () => {
 });
 
 describe('signed URL lifetimes', () => {
-  it('canvas media lives a day, what a model provider fetches five minutes, a server render six hours, since its retries fetch late', () => {
-    expect(SIGNED_URL_TTL_S).toEqual({ canvas: 86_400, agentPreview: 300, providerInput: 300, userLink: 3600, render: 21_600 });
+  it('canvas media lives a day, what a model provider fetches five minutes or, from a queue, six hours, a server render six hours', () => {
+    expect(SIGNED_URL_TTL_S).toEqual({ canvas: 86_400, agentPreview: 300, providerInput: 300, queuedProviderInput: 21_600, userLink: 3600, render: 21_600 });
   });
 
   it('a cached redirect to the oldest reused URL still lands before that URL expires', () => {
