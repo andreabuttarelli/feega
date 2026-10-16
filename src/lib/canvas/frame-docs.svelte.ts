@@ -5,6 +5,9 @@ import type { MotionPreview } from './motion-preview';
 const docs = new SvelteMap<string, MotionPreview>();
 const inFlight = new SvelteSet<string>();
 
+export type SavedHead = { version: number; doc: unknown };
+const heads = new Map<string, SavedHead>();
+
 export const frameDocs = {
   put(nodeId: string, next: MotionPreview) {
     const held = untrack(() => docs.get(nodeId));
@@ -23,6 +26,16 @@ export const frameDocs = {
       return;
     }
     docs.set(nodeId, { ...held, version: saved });
+  },
+  saved(nodeId: string, head: SavedHead) {
+    const held = heads.get(nodeId);
+    if (held && held.version > head.version) {
+      return;
+    }
+    heads.set(nodeId, head);
+  },
+  headOf(nodeId: string): SavedHead | null {
+    return heads.get(nodeId) ?? null;
   },
   latest(nodeId: string, serverRevision: number): MotionPreview | null {
     const held = docs.get(nodeId);

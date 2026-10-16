@@ -198,4 +198,45 @@ test.describe('a free element tile is never blank @real', () => {
     expect(await page.evaluate(() => (window as unknown as { __loading: number }).__loading), 'frames showing the loading state').toBe(0);
     expect(fetched, 'session or preview requests while closing').toEqual([]);
   });
+
+  test('reopening an edited box fetches nothing and shows no loading state', async ({ page, session }) => {
+    test.setTimeout(120_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.getByTestId('add-bar').getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
+    const pane = (await page.locator('.svelte-flow').boundingBox())!;
+    const from = { x: pane.x + pane.width * 0.35, y: pane.y + pane.height * 0.35 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 240, from.y + 120);
+    await page.mouse.up();
+    const element = page.locator('[data-kind="element"][data-motion-node]');
+    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+    await recolour(page, COLOURS[1]);
+    await page.waitForTimeout(300);
+    await deselect(page);
+    await page.waitForTimeout(WATCH_MS);
+
+    const fetched: string[] = [];
+    page.on('request', (req) => {
+      if (/\/(session|preview)(\?|$)/.test(new URL(req.url()).pathname + '?')) {
+        fetched.push(req.url());
+      }
+    });
+    await page.evaluate(() => {
+      const w = window as unknown as { __loading: number };
+      w.__loading = 0;
+      const tick = () => {
+        w.__loading += document.querySelector('[data-testid=inline-motion-loading]') ? 1 : 0;
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    await element.click();
+    await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
+    await page.waitForTimeout(1000);
+
+    expect(await page.evaluate(() => (window as unknown as { __loading: number }).__loading), 'frames showing the loading state').toBe(0);
+    expect(fetched, 'session or preview requests while reopening').toEqual([]);
+  });
 });

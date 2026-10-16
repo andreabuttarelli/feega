@@ -636,6 +636,7 @@
   function follow(next: Synced) {
     baseDoc = next.base.doc;
     version = next.base.version;
+    frameDocs.saved(data.node.id, next.base);
     if (next.present === history.present) {
       return;
     }
@@ -647,6 +648,7 @@
     history = adoptHead(history, head.doc, version);
     baseDoc = head.doc;
     version = head.version;
+    frameDocs.saved(data.node.id, head);
   }
 
   async function save() {
