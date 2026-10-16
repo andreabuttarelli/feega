@@ -28,11 +28,13 @@ describe('rule tables', () => {
 
 describe('casting', () => {
   it.each([
-    [{ orgId: null, source: 'catalogue', age: 30 }, ModelVerdict.RealPerson],
-    [{ orgId: 'o', source: 'upload', age: 30 }, ModelVerdict.UploadedPhotos],
-    [{ orgId: 'o', source: 'generated', age: null }, ModelVerdict.UnknownAge],
-    [{ orgId: 'o', source: 'generated', age: STUDIO_MIN_AGE - 1 }, ModelVerdict.UnderAge],
-    [{ orgId: 'o', source: 'generated', age: STUDIO_MIN_AGE }, ModelVerdict.Allowed]
+    [{ source: 'catalogue', age: 30 }, ModelVerdict.Allowed],
+    [{ source: 'catalogue', age: STUDIO_MIN_AGE - 1 }, ModelVerdict.UnderAge],
+    [{ source: 'catalogue', age: null }, ModelVerdict.UnknownAge],
+    [{ source: 'upload', age: 30 }, ModelVerdict.UploadedPhotos],
+    [{ source: 'generated', age: null }, ModelVerdict.UnknownAge],
+    [{ source: 'generated', age: STUDIO_MIN_AGE - 1 }, ModelVerdict.UnderAge],
+    [{ source: 'generated', age: STUDIO_MIN_AGE }, ModelVerdict.Allowed]
   ])('%o → %s', (facts, verdict) => {
     expect(castingVerdict(facts)).toBe(verdict);
   });
