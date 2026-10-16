@@ -18,7 +18,22 @@ const SAFE = 'wiro/alibaba/qwen-image-3-0-pro';
 
 const REFERENCE_VIDEO = 'higgsfield/bytedance/seedance-2.5/reference-to-video';
 
+const VIDEO_EDIT = 'higgsfield/bytedance/seedance-2.5/video-edit';
+
 const models: Record<string, TaskModel> = {
+  [VIDEO_EDIT]: {
+    id: VIDEO_EDIT,
+    catalogue: 'video',
+    uncensored: false,
+    spec: {
+      path: 'bytedance/seedance-2.5/video-edit',
+      numeric: ['duration'],
+      fields: { prompt: 'prompt', resolution: 'resolution', images: [], video: 'video_url', imageList: 'image_urls', videoList: 'video_urls', audioList: 'audio_urls' },
+      requiresVideo: true,
+      caps: { image: 30, video: 9, audio: 10 }
+    },
+    paramSchema: {}
+  },
   [REFERENCE_VIDEO]: {
     id: REFERENCE_VIDEO,
     catalogue: 'video',
@@ -420,6 +435,37 @@ describe('a Higgsfield run when the account is at its concurrency cap', () => {
     expect(await reconcileTaskNodeRuns(db)).toMatchObject({ checked: 1, pending: 1 });
     expect(gateway.run).not.toHaveBeenCalled();
     expect(gateway.task).not.toHaveBeenCalled();
+  });
+});
+
+describe('a video node editing a wired video with Seedance 2.5', () => {
+  const editCanvas = () =>
+    fakeDb(
+      { nodes: [{ ...imageNode(), type: 'video' }], nodes_connections: [], assets: [], orgs: [paidOrg], projects: [{ id: PROJECT, org_id: ORG, mode: 'standard' }] },
+      { updateRows: { nodes: [{ ...imageNode(), type: 'video', version: 2 }] } }
+    );
+
+  it('sends the first wired video as the source, the others as references, at the chosen resolution', async () => {
+    upstreamMedia.current = { referenceVideoUrls: ['https://cdn.test/source.mp4', 'https://cdn.test/style.mp4'] };
+    const { db } = editCanvas();
+
+    const out = await runGenNode(db, { ...start(VIDEO_EDIT, 'make it night', { resolution: '1080p' }), medium: 'video' });
+
+    expect(out.kind).toBe('queued');
+    expect(gateway.run).toHaveBeenCalledWith(
+      { path: 'bytedance/seedance-2.5/video-edit', numeric: ['duration'] },
+      { prompt: 'make it night', resolution: '1080p', video_url: 'https://cdn.test/source.mp4', video_urls: ['https://cdn.test/style.mp4'] },
+      expect.any(String)
+    );
+  });
+
+  it('refuses without a wired video, before any provider call', async () => {
+    const { db } = editCanvas();
+
+    const out = await runGenNode(db, { ...start(VIDEO_EDIT, 'make it night'), medium: 'video' });
+
+    expect(out).toEqual({ kind: 'refused', error: 'missing_input: this model needs a source video' });
+    expect(gateway.run).not.toHaveBeenCalled();
   });
 });
 

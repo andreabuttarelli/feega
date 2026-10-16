@@ -58,7 +58,7 @@ function listsOf(shape: WireShape, input: WireInput): Array<[string | undefined,
   const { fields, caps } = shape;
   return [
     [fields.imageList, input.imageUrls, capOf(caps?.image ?? shape.maxRefs)],
-    [fields.videoList, input.videoUrls ?? [], capOf(caps?.video)],
+    [fields.videoList, (input.videoUrls ?? []).slice(fields.video ? 1 : 0), capOf(caps?.video)],
     [fields.audioList, input.audioUrls ?? [], capOf(caps?.audio)]
   ];
 }

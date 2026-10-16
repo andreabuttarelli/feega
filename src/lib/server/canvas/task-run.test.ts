@@ -422,3 +422,16 @@ describe('startTaskRun — a provider with a concurrency cap', () => {
   });
 });
 
+describe('startTaskRun — a model that edits a video', () => {
+  it('refuses before any call when no source video is wired', async () => {
+    const editor: TaskModel = { ...referenceVideo, spec: { ...referenceVideo.spec, fields: { prompt: 'prompt', images: [], video: 'video_url' }, requiresVideo: true } };
+    const { deps, gatewayRun } = depsFor(editor);
+    deps.providers = { higgsfield: deps.providers.wiro };
+
+    const out = await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: editor.id });
+
+    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.needsVideo, stage: RefusalStage.Policy });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+});
+

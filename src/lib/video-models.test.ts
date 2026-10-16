@@ -1,3 +1,4 @@
+import { videoRefCapacity } from './video-models';
 import { describe, expect, it } from 'vitest';
 import {
   isSeedance25Model,
@@ -174,5 +175,15 @@ describe('nearestVideoDuration', () => {
 
   it('nessuna opzione: il valore chiesto resta', () => {
     expect(nearestVideoDuration([], 17)).toBe(17);
+  });
+});
+
+describe('reference capacity of the Higgsfield Seedance 2.5 modes', () => {
+  it('takes images, videos and audios only in the modes whose schema lists them', () => {
+    expect(videoRefCapacity('higgsfield/bytedance/seedance-2.5/reference-to-video')).toEqual({ images: 30, videos: 10, audios: 10 });
+    expect(videoRefCapacity('higgsfield/bytedance/seedance-2.5/video-edit')).toEqual({ images: 30, videos: 10, audios: 10 });
+    expect(videoRefCapacity('higgsfield/bytedance/seedance-2.5/video-extend')).toEqual({ images: 30, videos: 10, audios: 10 });
+    expect(videoRefCapacity('higgsfield/bytedance/seedance-2.5/image-to-video')).toEqual({ images: 0, videos: 0, audios: 0 });
+    expect(videoRefCapacity('higgsfield/bytedance/seedance-2.5/text-to-video')).toEqual({ images: 0, videos: 0, audios: 0 });
   });
 });

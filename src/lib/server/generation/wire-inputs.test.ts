@@ -24,4 +24,10 @@ describe('wireInputs', () => {
     const inputs = wireInputs({ fields: { prompt: 'prompt', images: [], videoList: 'video_urls' } }, NO_MEDIA, {});
     expect(inputs).toEqual({ prompt: 'p' });
   });
+
+  it('sends the first video as the source and only the rest as references', () => {
+    const shape = { fields: { prompt: 'prompt', images: [], video: 'video_url', videoList: 'video_urls' }, caps: { video: 9 } };
+    const inputs = wireInputs(shape, { ...NO_MEDIA, videoUrls: ['source', 'r1', 'r2'] }, {});
+    expect(inputs).toEqual({ prompt: 'p', video_url: 'source', video_urls: ['r1', 'r2'] });
+  });
 });

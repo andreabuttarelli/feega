@@ -1,5 +1,6 @@
 import type { AiModelRow } from './ai-models-sync';
 import type { WireFields } from './canvas/task-provider';
+import type { TaskWireSpec } from './canvas/task-run';
 import { higgsfieldEstimate, type HiggsfieldConfig } from './higgsfield';
 import { PER_RUN, type TaskPriceLine } from './generation/task-pricing';
 import { idPrefixOf, TaskProviderName } from './generation/task-providers';
@@ -15,11 +16,72 @@ export type HiggsfieldModel = {
   priceBy: readonly Variant[];
   schema: Readonly<Record<string, readonly (string | number)[]>>;
   estimateBase: Readonly<Record<string, unknown>>;
+  wire?: Pick<TaskWireSpec, 'requiresImage' | 'requiresVideo' | 'caps'>;
 };
 
 const ESTIMATE_PROMPT = 'price estimate';
 const ESTIMATE_IMAGE = 'https://higgsfield.ai/estimate.png';
 const SOUL_ASPECTS = ['9:16', '16:9', '4:3', '3:4', '1:1', '2:3', '3:2'];
+
+const ESTIMATE_VIDEO = 'https://higgsfield.ai/estimate.mp4';
+
+const SEEDANCE_PATH = 'bytedance/seedance-2.5';
+const SEEDANCE_DURATIONS = [4, 5, 6, 8, 10, 12, 15, 20, 25, 30];
+const SEEDANCE_RESOLUTIONS = ['480p', '720p', '1080p'];
+const SEEDANCE_ASPECTS = ['16:9', '4:3', '1:1', '3:4', '9:16', '21:9'];
+const SEEDANCE_SIZES = [
+  { key: 'duration', values: SEEDANCE_DURATIONS },
+  { key: 'resolution', values: SEEDANCE_RESOLUTIONS }
+];
+const SEEDANCE_REF_CAPS = { image: 30, video: 10, audio: 10 };
+const SEEDANCE_SOURCE_CAPS = { ...SEEDANCE_REF_CAPS, video: 9 };
+const SEEDANCE_REFERENCES = { imageList: 'image_urls', videoList: 'video_urls', audioList: 'audio_urls' };
+const SEEDANCE_ON_SOURCE: WireFields = { prompt: 'prompt', resolution: 'resolution', images: [], video: 'video_url', ...SEEDANCE_REFERENCES };
+
+const seedance = (mode: string, label: string, model: Omit<HiggsfieldModel, 'path' | 'label' | 'catalogue' | 'numeric'>): HiggsfieldModel => ({
+  path: `${SEEDANCE_PATH}/${mode}`,
+  label: `Seedance 2.5 · ${label}`,
+  catalogue: 'video',
+  numeric: ['duration'],
+  ...model
+});
+
+const SEEDANCE_MODELS: readonly HiggsfieldModel[] = [
+  seedance('text-to-video', 'from text', {
+    fields: { prompt: 'prompt', duration: 'duration', resolution: 'resolution', aspectRatio: 'aspect_ratio', images: [] },
+    priceBy: SEEDANCE_SIZES,
+    schema: { duration: SEEDANCE_DURATIONS, aspect_ratio: SEEDANCE_ASPECTS },
+    estimateBase: { prompt: ESTIMATE_PROMPT }
+  }),
+  seedance('image-to-video', 'from image', {
+    fields: { prompt: 'prompt', duration: 'duration', resolution: 'resolution', images: ['image_url'], lastFrame: 'end_image_url' },
+    priceBy: SEEDANCE_SIZES,
+    schema: { duration: SEEDANCE_DURATIONS },
+    estimateBase: { prompt: ESTIMATE_PROMPT, image_url: ESTIMATE_IMAGE },
+    wire: { requiresImage: true }
+  }),
+  seedance('reference-to-video', 'from references', {
+    fields: { prompt: 'prompt', duration: 'duration', resolution: 'resolution', aspectRatio: 'aspect_ratio', images: [], ...SEEDANCE_REFERENCES },
+    priceBy: SEEDANCE_SIZES,
+    schema: { duration: SEEDANCE_DURATIONS, aspect_ratio: SEEDANCE_ASPECTS },
+    estimateBase: { prompt: ESTIMATE_PROMPT, image_urls: [ESTIMATE_IMAGE] },
+    wire: { caps: SEEDANCE_REF_CAPS }
+  }),
+  seedance('video-edit', 'edit video', {
+    fields: SEEDANCE_ON_SOURCE,
+    priceBy: [{ key: 'resolution', values: SEEDANCE_RESOLUTIONS }],
+    schema: {},
+    estimateBase: { prompt: ESTIMATE_PROMPT, video_url: ESTIMATE_VIDEO },
+    wire: { requiresVideo: true, caps: SEEDANCE_SOURCE_CAPS }
+  }),
+  seedance('video-extend', 'extend video', {
+    fields: { ...SEEDANCE_ON_SOURCE, duration: 'duration' },
+    priceBy: SEEDANCE_SIZES,
+    schema: { duration: SEEDANCE_DURATIONS },
+    estimateBase: { prompt: ESTIMATE_PROMPT, video_url: ESTIMATE_VIDEO },
+    wire: { requiresVideo: true, caps: SEEDANCE_SOURCE_CAPS }
+  })
+];
 
 const TEXT_TO_VIDEO: WireFields = { prompt: 'prompt', duration: 'duration', images: [] };
 const IMAGE_TO_VIDEO: WireFields = { prompt: 'prompt', duration: 'duration', images: ['image_url'] };
@@ -74,7 +136,8 @@ export const HIGGSFIELD_MODELS: readonly HiggsfieldModel[] = [
     priceBy: [{ key: 'duration', values: [6, 10] }],
     schema: { duration: [6, 10] },
     estimateBase: { prompt: ESTIMATE_PROMPT, image_url: ESTIMATE_IMAGE }
-  }
+  },
+  ...SEEDANCE_MODELS
 ];
 
 export type Estimate = (path: string, inputs: Record<string, unknown>) => Promise<number | null>;
@@ -103,13 +166,22 @@ function schemaOf(model: HiggsfieldModel): Record<string, unknown> {
   return Object.fromEntries(Object.entries(model.schema).map(([key, values]) => [key, { type: 'enum', values: values.map(String) }]));
 }
 
+const MODALITY_FIELDS: ReadonlyArray<[string, (fields: WireFields) => boolean]> = [
+  ['text', (f) => Boolean(f.prompt)],
+  ['image', (f) => f.images.length > 0 || Boolean(f.imageList)],
+  ['video', (f) => Boolean(f.video || f.videoList)],
+  ['audio', (f) => Boolean(f.audioList)]
+];
+
+const modalitiesOf = (fields: WireFields): string[] => MODALITY_FIELDS.filter(([, takes]) => takes(fields)).map(([modality]) => modality);
+
 function higgsfieldRow(model: HiggsfieldModel, lines: TaskPriceLine[], syncedAt: string): AiModelRow {
   return {
     id: `${idPrefixOf(TaskProviderName.Higgsfield)}${model.path}`,
     catalogue: model.catalogue,
     provider: TaskProviderName.Higgsfield,
     label: model.label,
-    input_modalities: model.fields.images.length ? ['text', 'image'] : ['text'],
+    input_modalities: modalitiesOf(model.fields),
     output_modalities: [model.catalogue],
     supported_parameters: Object.values(model.fields).flat().filter((v): v is string => typeof v === 'string'),
     supported_resolutions: resolutionsOf(model),
@@ -121,7 +193,7 @@ function higgsfieldRow(model: HiggsfieldModel, lines: TaskPriceLine[], syncedAt:
     context_length: null,
     intelligence_index: null,
     uncensored: false,
-    wire_spec: { path: model.path, numeric: [...model.numeric], fields: model.fields }
+    wire_spec: { path: model.path, numeric: [...model.numeric], fields: model.fields, ...model.wire }
   };
 }
 
