@@ -17,6 +17,8 @@ function posterFile(form: FormData): File | null {
   return file instanceof File && file.type in POSTER_EXT && file.size > 0 && file.size <= POSTER_MAX_BYTES ? file : null;
 }
 
+const revisionOf = (raw: FormDataEntryValue | null): { posterRevision: number } | Record<string, never> => (raw !== null && Number.isInteger(Number(raw)) && Number(raw) >= 0 ? { posterRevision: Number(raw) } : {});
+
 const sizeOf = (raw: FormDataEntryValue | null): number | null => (Number(raw) > 0 ? Math.round(Number(raw)) : null);
 
 export async function savePoster(db: Db, input: PosterInput) {
@@ -40,6 +42,6 @@ export async function savePoster(db: Db, input: PosterInput) {
     sourceNodeId: input.nodeId
   });
 
-  await patchNodeData(db, { orgId: input.orgId, nodeId: input.nodeId, patch: { posterAssetId: asset.id }, check: DataCheck.Schema, actor: input.actor });
+  await patchNodeData(db, { orgId: input.orgId, nodeId: input.nodeId, patch: { posterAssetId: asset.id, ...revisionOf(input.form.get('revision')) }, check: DataCheck.Schema, actor: input.actor });
   return { assetId: asset.id };
 }

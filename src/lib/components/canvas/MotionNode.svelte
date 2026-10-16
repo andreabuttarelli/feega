@@ -42,6 +42,7 @@
   let player = $state<ReturnType<typeof MotionPreview> | null>(null);
   let sight = $state(Sight.OutOfView);
   let preview = $state<Preview | null>(null);
+  let previewRevision = $state(-1);
   let frame = $state(0);
   let playing = $state(false);
   let looping = $state(false);
@@ -105,13 +106,15 @@
       playing = false;
       return;
     }
-    const url = `${previewUrl}?revision=${node.docHeadRevision}`;
+    const revision = node.docHeadRevision;
+    const url = `${previewUrl}?revision=${revision}`;
     let stale = false;
     void fetch(url)
       .then((res) => (res.ok ? (res.json() as Promise<Preview>) : null))
       .then((next) => {
         if (!stale && next) {
           preview = next;
+          previewRevision = revision;
         }
       });
     return () => {
@@ -120,18 +123,18 @@
   });
 
   $effect(() => {
-    if (capturing && player && preview) {
-      void captureCover(player, preview, posterKey);
+    if (capturing && player && preview && previewRevision === node.docHeadRevision) {
+      void captureCover(player, preview, posterKey, node.docHeadRevision);
     }
   });
 
-  async function captureCover(shooter: NonNullable<typeof player>, source: Preview, key: string) {
+  async function captureCover(shooter: NonNullable<typeof player>, source: Preview, key: string, revision: number) {
     const width = Math.min(POSTER_WIDTH, source.width);
     const shot = await shooter.still(coverFrame(source) / source.fps, width, chrome.poster).catch(() => '');
     posters.set(key, shot);
     slots = releaseCapture(slots, node.id);
     if (shot) {
-      void sendPoster(`${href}?/poster`, shot, { width: String(width), height: String(Math.round((width * source.height) / source.width)) }).catch(() => undefined);
+      void sendPoster(`${href}?/poster`, shot, { width: String(width), height: String(Math.round((width * source.height) / source.width)), revision: String(revision) }).catch(() => undefined);
     }
   }
 

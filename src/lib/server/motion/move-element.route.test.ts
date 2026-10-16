@@ -251,6 +251,15 @@ describe('drawElement action', () => {
     expect(inserted(input)).toMatchObject([{ id }]);
   });
 
+  it('a text drawn on a dark canvas is written in light ink', async () => {
+    const input = event({ drawn: JSON.stringify({ tool: 'text', box: { left: 0, top: 0, width: 300, height: 100 }, theme: 'dark' }) });
+
+    await actions.drawElement(input as never);
+
+    const revisions = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => c.payload as { doc: MotionDoc });
+    expect(revisions.flatMap((r) => r.doc.tracks.flatMap((t) => t.clips).map((c) => c.props.color))).toEqual(['#f5f5f5']);
+  });
+
   it('a pen path is placed at the box of its points', async () => {
     const input = event({ drawn: JSON.stringify({ tool: 'pen', path: 'M 10 20 L 110 20 L 110 70' }) });
 
