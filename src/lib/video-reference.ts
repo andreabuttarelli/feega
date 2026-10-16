@@ -67,7 +67,7 @@ export function breakdownSize(b: VideoBreakdown): { width: number; height: numbe
 const round = (s: number) => Math.round(s * 10) / 10;
 const span = (start: number, end: number) => `${round(start)}–${round(end)} s`;
 
-function sceneLine(scene: VideoBreakdown['scenes'][number], index: number): string {
+export function sceneLine(scene: VideoBreakdown['scenes'][number], index: number): string {
   const parts = [
     `${index + 1}. ${span(scene.start, scene.end)} (${round(scene.end - scene.start)} s) ${scene.description}`.trimEnd(),
     scene.onScreenText.length ? `Text: ${scene.onScreenText.map((t) => `"${t}"`).join(' | ')}` : '',

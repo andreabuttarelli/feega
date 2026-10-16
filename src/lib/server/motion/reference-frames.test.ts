@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { parseBreakdown } from '$lib/video-reference';
-import { MAX_REFERENCE_FRAMES, keyTimes, referenceFrames, sceneScores, similarity } from './reference-frames';
+import { MAX_REFERENCE_FRAMES, SCENE_FRAMES_CAP, denseTimes, judgeTimes, keyTimes, referenceFrames, sceneScores, similarity } from './reference-frames';
 
 const breakdown = parseBreakdown(
   JSON.stringify({
@@ -71,5 +71,27 @@ describe('similarity to the reference', () => {
       { scene: 1, score: 0.8 },
       { scene: 2, score: 0.5 }
     ]);
+  });
+});
+
+describe('dense frames of one scene', () => {
+  it('samples the scene at about 6 fps, inside it', () => {
+    const times = denseTimes({ start: 2.6, end: 4.75 });
+
+    expect(times.length).toBe(13);
+    expect(times[0]).toBeGreaterThanOrEqual(2.6);
+    expect(times.at(-1)!).toBeLessThan(4.75);
+  });
+
+  it('a long scene is capped, spread over its whole length', () => {
+    const times = denseTimes({ start: 0, end: 30 });
+
+    expect(times.length).toBe(SCENE_FRAMES_CAP);
+    expect(times.at(-1)!).toBeGreaterThan(28);
+  });
+
+  it('the judge looks at a few of them, first and last included', () => {
+    expect(judgeTimes([1, 2, 3, 4, 5, 6, 7, 8, 9])).toEqual([1, 4, 6, 9]);
+    expect(judgeTimes([1, 2])).toEqual([1, 2]);
   });
 });

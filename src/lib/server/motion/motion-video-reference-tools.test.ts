@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Tool } from 'ai';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
+import { addClip } from '$lib/motion/timeline';
 import { BreakdownError } from '$lib/server/video-reference';
 import { createMotionTools, type MotionSession } from './motion-tools';
 
@@ -53,5 +54,21 @@ describe('compare_to_reference', () => {
 
   it('without a reference it refuses instead of pretending', async () => {
     expect((await compare()).ok).toBe(false);
+  });
+});
+
+describe('a scene step of a replica', () => {
+  it('refuses an edit to a clip of an earlier, locked scene', async () => {
+    const added = addClip({ ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 300 }, { component: 'Title', from: 0, durationInFrames: 90, props: { text: 'CAUTIVA' } }, 'one');
+    if (!added.ok) {
+      throw new Error(added.error);
+    }
+    const session: MotionSession = { doc: added.doc, baseVersion: 1, edits: [], selection: [], frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, lock: { from: 90, to: 150 } };
+    const tools = createMotionTools({ session, assets: [], newId: () => 'id', voiceover: vi.fn(), frames: vi.fn(), check: vi.fn() });
+
+    const out = await (tools.set_props as Tool & { execute: Exec }).execute({ clip_id: 'one', props: { text: 'CAUTIVAR' } }, { toolCallId: 'c' });
+
+    expect(out).toMatchObject({ ok: false, error: expect.stringMatching(/locked/) });
+    expect(session.edits).toEqual([]);
   });
 });

@@ -52,6 +52,28 @@ export function replicaCanvas(doc: MotionDoc, ref: ReplicaCanvas): MotionDoc | n
 
 export const CLOSE_TO_REFERENCE = 0.9;
 
+export type FrameSpan = { from: number; to: number };
+
+type Placed = { id: string; from: number; durationInFrames: number };
+
+const clipsOf = (doc: MotionDoc) => new Map(doc.tracks.flatMap((t) => (t.clips as Placed[]).map((c) => [c.id, c] as const)));
+
+export const spanFrames = (span: { fromS: number; toS: number }, fps: number): FrameSpan => ({ from: Math.round(span.fromS * fps), to: Math.round(span.toS * fps) });
+
+export function lockBreach(before: MotionDoc, after: MotionDoc, span: FrameSpan): string | null {
+  const old = clipsOf(before);
+  const now = clipsOf(after);
+  const locked = [...old.values()].filter((c) => c.from + c.durationInFrames <= span.from);
+  const touched = locked.filter((c) => JSON.stringify(now.get(c.id)) !== JSON.stringify(c));
+  if (touched.length) {
+    return `${touched.map((c) => c.id).join(', ')} belong to an earlier scene, which is locked: edit only frames ${span.from}–${span.to}`;
+  }
+  const outside = [...now.values()].filter((c) => !old.has(c.id) && (c.from < span.from || c.from >= span.to));
+  return outside.length ? `${outside.map((c) => c.id).join(', ')} start outside the current scene (frames ${span.from}–${span.to}): build only this scene` : null;
+}
+
+export const REPLICA_COMPARE = `After each scene, call compare_to_reference: it draws your frames at the reference times and scores each scene 0–1 against the reference. Fix the lowest scene and compare again until every scene scores ${CLOSE_TO_REFERENCE} or more, or the budget ends.`;
+
 export const REPLICA_BRIEF = [
   'This is a remake of the attached reference video: the breakdown and the reference frames above are the plan, so do not write a new script or storyboard — build.',
   'Compose every scene from what the reference frames show, not from the text: no templates, shots, kit UI or presets (they are not offered). Place each element at the position and size it has in the frame (as a share of the width and height), with the exact hex colours, and the closest Google Font to the lettering you see.',
@@ -60,6 +82,5 @@ export const REPLICA_BRIEF = [
   'Use the reference palette as exact hex colours and gradients (a radial vignette stays a radial gradient, a red scene stays red).',
   'Match the type scale: when the reference text fills the frame, set it huge, bold and condensed, edge to edge — never a small title in a box.',
   'Recreate each transition and camera move the breakdown names (push, pan, 3D turn, whip, blur sweep) instead of a plain cut.',
-  'No span may be empty or black unless the reference is: the first frame already shows the first scene. View one frame per reference scene before you finish.',
-  `After each scene, call compare_to_reference: it draws your frames at the reference times and scores each scene 0–1 against the reference. Fix the lowest scene and compare again until every scene scores ${CLOSE_TO_REFERENCE} or more, or the budget ends.`
+  'No span may be empty or black unless the reference is: the first frame already shows the first scene. View one frame per reference scene before you finish.'
 ].join('\n');

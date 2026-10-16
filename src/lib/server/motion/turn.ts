@@ -79,7 +79,8 @@ import { motionPlaceHint, userContent, withPictures } from '$lib/server/chat-att
 import { compareFrames, referencePicture } from '$lib/server/motion/reference-frames';
 import { breakdownReader, videoGrabber } from '$lib/server/video-reference';
 import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
-import { REPLICA_BRIEF, VideoKind, kindTools, replicaCanvas } from '$lib/motion/replica';
+import { REPLICA_BRIEF, REPLICA_COMPARE, VideoKind, kindTools, replicaCanvas, spanFrames } from '$lib/motion/replica';
+import type { SceneStep } from '$lib/server/motion/replica-loop';
 import { onceEach, replicaTurn } from '$lib/server/motion/replica-turn';
 
 export const MOTION_AGENT_KEY = 'motion';
@@ -209,6 +210,7 @@ export type MotionTurnInput = {
   project: { id: string; brandId: string | null; mode: ProjectMode };
   motion: { record: CanvasNodeRecord; node: MotionNode };
   message: string;
+  step?: SceneStep;
   attachments?: ChatAttachment[];
   selection: string[];
   model: string;
@@ -306,14 +308,14 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     const card = budgetCard(budget);
     return cannedTurn(budgetNote(card), reply, card);
   }
-  const turnCapUsd = turnBudgetUsd(budget, reserve);
+  const turnCapUsd = Math.min(turnBudgetUsd(budget, reserve), input.step?.capUsd ?? Infinity);
   if (keepsCut(message)) {
     return cannedTurn(KEPT_CUT, reply);
   }
 
   const knownAssets = assets.length;
   const replicaDoc = replica.canvas ? replicaCanvas(head.doc, replica.canvas) : null;
-  const session: MotionSession = { doc: replicaDoc ?? head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick };
+  const session: MotionSession = { doc: replicaDoc ?? head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick, lock: input.step ? spanFrames(input.step.span, head.doc.fps) : undefined };
   const moderationScope = { orgId, userId, projectId: project.id, nodeId: motion.record.id, actor };
   const bucket = db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket;
   const frameScope = { orgId, projectId: project.id, nodeId: motion.record.id };
@@ -335,9 +337,9 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   if (replicaDoc && replica.canvas) {
     session.edits.push(`matched the reference canvas (${replica.canvas.format}, ${replica.canvas.durationS} s)`);
   }
-  const replicaNote = replica.kind === VideoKind.Replica ? REPLICA_BRIEF : '';
+  const replicaNote = replica.kind === VideoKind.Replica ? [REPLICA_BRIEF, input.step ? '' : REPLICA_COMPARE].filter(Boolean).join('\n') : '';
   const openingText = [message, note, picked.note, memory, replicaNote].filter(Boolean).join('\n\n');
-  const openingContent = withPictures(await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint, breakdown: videoBreakdown }), replica.frames.map(referencePicture));
+  const openingContent = withPictures(await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint, breakdown: videoBreakdown }), input.step?.pictures ?? replica.frames.map(referencePicture));
   let seamDraws = 0;
   const drawTurnFrames = async (callId: string, times: number[]) => {
     const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
@@ -371,7 +373,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
     sfx: (sound) => withOrgContext(orgId, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
     frames: drawTurnFrames,
-    compareReference: replica.frames.length ? async (callId) => compareFrames(replica.frames, await drawTurnFrames(callId, replica.frames.map((f) => f.time))) : undefined,
+    compareReference: replica.frames.length && !input.step ? async (callId) => compareFrames(replica.frames, await drawTurnFrames(callId, replica.frames.map((f) => f.time))) : undefined,
     inspect: frameStats,
     seam: async () => {
       const end = session.doc.durationInFrames / session.doc.fps;

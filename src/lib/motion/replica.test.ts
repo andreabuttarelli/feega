@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MotionFormat, newMotionDoc } from './doc';
 import { addClip } from './timeline';
-import { REPLICA_BRIEF, VideoKind, asksReplica, kindTools, replicaCanvas, replicaFormat, kindOf, replicaSource } from './replica';
+import { REPLICA_BRIEF, VideoKind, asksReplica, kindTools, replicaCanvas, replicaFormat, kindOf, lockBreach, replicaSource } from './replica';
 
 describe('a request to recreate a reference video', () => {
   it.each(['Recreate this video as faithfully as possible', 'replicate it', 'remake this one', 'ricrea questo video', 'Recrea este vídeo', 'refais cette vidéo'])('"%s" asks for a replica', (message) => {
@@ -50,7 +50,7 @@ describe('the replica takes the reference canvas', () => {
   });
 
   it('the brief asks for scene-by-scene fidelity and no empty span', () => {
-    ['scene by scene', 'hex', 'condensed', 'transition', 'camera', 'black'].forEach((word) => expect(REPLICA_BRIEF.toLowerCase()).toContain(word));
+    ['scene by scene', 'hex', 'condensed', 'transition', 'camera', 'black', 'reference frames'].forEach((word) => expect(REPLICA_BRIEF.toLowerCase()).toContain(word));
   });
 });
 
@@ -63,5 +63,44 @@ describe('a replica is drawn from the reference, never from the kit (live test: 
 
   it('a standard video keeps them all', () => {
     expect(kindTools(VideoKind.Standard, names)).toEqual(names);
+  });
+});
+
+describe('a replica is built one scene at a time: earlier scenes are locked', () => {
+  const blank = { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 300 };
+  const first = (() => {
+    const added = addClip(blank, { component: 'Title', from: 0, durationInFrames: 90, props: { text: 'CAUTIVA' } }, 'one');
+    if (!added.ok) {
+      throw new Error(added.error);
+    }
+    return added.doc;
+  })();
+  const span = { from: 90, to: 150 };
+  const add = (doc: typeof first, from: number, id: string) => {
+    const added = addClip(doc, { component: 'Title', from, durationInFrames: 30, props: { text: id } }, id);
+    if (!added.ok) {
+      throw new Error(added.error);
+    }
+    return added.doc;
+  };
+
+  it('adding a clip inside the current scene is allowed', () => {
+    expect(lockBreach(first, add(first, 100, 'two'), span)).toBeNull();
+  });
+
+  it('touching a clip of an earlier scene is refused', () => {
+    const edited = { ...first, tracks: first.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, props: { text: 'CAUTIVAR' } })) })) };
+
+    expect(lockBreach(first, edited, span)).toMatch(/one.*locked/);
+  });
+
+  it('removing a clip of an earlier scene is refused', () => {
+    const removed = { ...first, tracks: first.tracks.map((t) => ({ ...t, clips: [] })) };
+
+    expect(lockBreach(first, removed, span)).toMatch(/one/);
+  });
+
+  it('a new clip outside the current scene is refused', () => {
+    expect(lockBreach(first, add(first, 200, 'later'), span)).toMatch(/later/);
   });
 });

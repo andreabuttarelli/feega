@@ -161,13 +161,14 @@ import { MoveOutcome, type FrameTarget, type Moved } from './move-element';
 import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '$lib/motion/still-model';
 import type { BreakdownAnswer } from '$lib/server/video-reference';
 import { CLOSE_TO_REFERENCE, type Comparison } from './reference-frames';
+import { lockBreach, type FrameSpan } from '$lib/motion/replica';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
 const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
 
 const copyTexts = (slots: Record<string, unknown>) => Object.entries(slots).flatMap(([k, v]) => (COPY_SLOTS.has(k) && typeof v === 'string' ? v.split('|').map((s) => s.trim()).filter(Boolean) : []));
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[]; look?: Viewing; looks?: Looks };
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[]; look?: Viewing; looks?: Looks; lock?: FrameSpan };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
@@ -612,6 +613,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     if (blownUp.length) {
       return { ok: false, error: blownUp.map((p) => p.detail).join('; ') };
     }
+    const breach = session.lock ? lockBreach(session.doc, result.doc, session.lock) : null;
+    if (breach) {
+      return { ok: false, error: breach };
+    }
     session.doc = result.doc;
     session.edits.push(what);
     return { ok: true, edit: what };
@@ -632,6 +637,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     session.codeWrites += 1;
     if (!result.ok) {
       return { ok: false, error: result.error };
+    }
+    const breach = session.lock ? lockBreach(session.doc, result.doc, session.lock) : null;
+    if (breach) {
+      return { ok: false, error: breach };
     }
     session.doc = result.doc;
     session.edits.push(what);

@@ -24,6 +24,25 @@ function sceneTimes(start: number, end: number, count: number): number[] {
   return [tenth(start + EDGE_S), mid, tenth(end - EDGE_S)];
 }
 
+export const SCENE_FPS = 6;
+export const SCENE_FRAMES_CAP = 24;
+const JUDGE_FRAMES = 4;
+
+const hundredth = (s: number) => Math.round(s * 100) / 100;
+
+export function denseTimes(scene: { start: number; end: number }): number[] {
+  const length = scene.end - scene.start;
+  const count = Math.min(SCENE_FRAMES_CAP, Math.max(1, Math.round(length * SCENE_FPS)));
+  return Array.from({ length: count }, (_, i) => hundredth(scene.start + ((i + 0.5) * length) / count));
+}
+
+export function judgeTimes(times: readonly number[]): number[] {
+  if (times.length <= JUDGE_FRAMES) {
+    return [...times];
+  }
+  return Array.from({ length: JUDGE_FRAMES }, (_, i) => times[Math.round((i * (times.length - 1)) / (JUDGE_FRAMES - 1))]);
+}
+
 export function keyTimes(b: Pick<VideoBreakdown, 'scenes'>): KeyTime[] {
   const count = Math.max(1, Math.min(PER_SCENE, Math.floor(MAX_REFERENCE_FRAMES / b.scenes.length)));
   return b.scenes.slice(0, MAX_REFERENCE_FRAMES).flatMap((s, i) => sceneTimes(s.start, s.end, count).map((time) => ({ scene: i + 1, time })));
