@@ -236,4 +236,10 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev(']', { metaKey: true }))).toEqual({ id: 'bring-front' });
     expect(matchCanvasShortcut(ev('[', { ctrlKey: true }))).toEqual({ id: 'send-back' });
   });
+
+  it('Figma zoom keys by physical digit: ⇧0 is 100%, ⇧1 fits everything, ⇧2 zooms to the selection', () => {
+    expect(matchCanvasShortcut(ev(')', { shiftKey: true, code: 'Digit0' }))).toEqual({ id: 'zoom-actual' });
+    expect(matchCanvasShortcut(ev('!', { shiftKey: true, code: 'Digit1' }))).toEqual({ id: 'fit' });
+    expect(matchCanvasShortcut(ev('@', { shiftKey: true, code: 'Digit2' }))).toEqual({ id: 'zoom-selection' });
+  });
 });
