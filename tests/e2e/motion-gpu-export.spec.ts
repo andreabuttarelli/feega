@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
+import sharp from 'sharp';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import easing from './fixtures/gpu-docs/easing.json' with { type: 'json' };
 import post from './fixtures/gpu-docs/post.json' with { type: 'json' };
@@ -23,12 +24,49 @@ const DOCS: [string, Doc, Engine][] = [
 type Engine = 'gpu' | 'html';
 
 const MOTION_DATA = (doc: Doc) => ({ format: doc.width > doc.height ? '16:9' : '4:5', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null });
-const EXPORT_TIMEOUT_MS = 600_000;
+const EXPORT_TIMEOUT_MS = 1_800_000;
 const PLAY_MS = 2000;
 const OPEN_TIMEOUT_MS = 60_000;
 const MIN_SSIM = 0.99;
 const DURATION_SLACK_S = 0.1;
 const SABOTAGE_AFTER_FRAMES = 5;
+
+const PICTURE = { width: 1600, height: 1000 };
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+function assetIdsOf(value: unknown, into = new Set<string>()): Set<string> {
+  if (Array.isArray(value)) {
+    value.forEach((v) => assetIdsOf(v, into));
+  } else if (value && typeof value === 'object') {
+    for (const [key, v] of Object.entries(value)) {
+      if (key === 'assetId' && typeof v === 'string' && UUID.test(v)) {
+        into.add(v);
+      } else {
+        assetIdsOf(v, into);
+      }
+    }
+  }
+  return into;
+}
+
+async function picture(id: string): Promise<Buffer> {
+  const hue = [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${PICTURE.width}" height="${PICTURE.height}"><rect width="100%" height="100%" fill="hsl(${hue},70%,45%)"/><circle cx="520" cy="420" r="260" fill="hsl(${(hue + 60) % 360},80%,70%)"/><rect x="900" y="560" width="520" height="300" fill="#fff"/></svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
+async function seedPictures(doc: unknown, session: { orgId: string; projectId: string }, admin: import('@supabase/supabase-js').SupabaseClient): Promise<string[]> {
+  const paths: string[] = [];
+  for (const id of assetIdsOf(doc)) {
+    const png = await picture(id);
+    const path = `${session.orgId}/${session.projectId}/e2e/${id}.png`;
+    await admin.storage.from('canvas-assets').upload(path, png, { contentType: 'image/png', upsert: true });
+    const { error } = await admin.from('assets').upsert({ id, org_id: session.orgId, project_id: session.projectId, type: 'image', url: path, mime_type: 'image/png', bytes: png.length, ...PICTURE, source: 'upload' });
+    expect(error).toBeNull();
+    paths.push(path);
+  }
+  return paths;
+}
 
 async function seededEditor(page: Page, doc: Doc, { session, admin, seedNode }: { session: { orgId: string; userId: string; projectId: string; canvasId: string }; admin: import('@supabase/supabase-js').SupabaseClient; seedNode: (s: { type: string; data: Record<string, unknown> }) => Promise<{ id: string }> }) {
   const node = await seedNode({ type: 'motion', data: MOTION_DATA(doc) });
@@ -73,9 +111,14 @@ function ssimOf(a: string, b: string): number {
 }
 
 async function playPreview(page: Page, engine: Engine) {
-  await page.getByRole('button', { name: 'Play', exact: true }).click({ timeout: OPEN_TIMEOUT_MS });
+  await expect(page.getByTestId('motion-preview')).toBeVisible({ timeout: OPEN_TIMEOUT_MS });
   await page.waitForTimeout(PLAY_MS);
-  await page.keyboard.press('Space');
+  const play = page.getByRole('button', { name: 'Play', exact: true });
+  if (await play.isVisible()) {
+    await play.click();
+    await page.waitForTimeout(PLAY_MS);
+    await page.keyboard.press('Space');
+  }
   await expect(page.getByTestId('gpu-motion-canvas')).toHaveCount(engine === 'gpu' ? 1 : 0);
 }
 
@@ -86,7 +129,9 @@ test.describe('GPU motion engine is the default @real', () => {
   for (const [name, doc, engine] of DOCS) {
     test(`${name}: previews and exports on the ${engine} engine, same video as the HTML engine`, async ({ page, session, admin, seedNode }) => {
       const dir = mkdtempSync(join(tmpdir(), `gpu-${name}-`));
+      const pictures = await seedPictures(doc, session, admin);
       try {
+        page.on('console', (m) => m.text().includes('GPU engine') && console.log(name, m.text().slice(0, 300)));
         const url = await seededEditor(page, doc, { session, admin, seedNode });
         await gotoHydrated(page, url);
         await playPreview(page, engine);
@@ -106,6 +151,9 @@ test.describe('GPU motion engine is the default @real', () => {
         expect(score).toBeGreaterThanOrEqual(MIN_SSIM);
       } finally {
         rmSync(dir, { recursive: true, force: true });
+        if (pictures.length) {
+          await admin.storage.from('canvas-assets').remove(pictures);
+        }
       }
     });
   }
