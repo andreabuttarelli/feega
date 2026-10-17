@@ -36,12 +36,29 @@ describe('compileScene', () => {
     expect(kinds).toEqual([
       ['bg', PaintKind.Fill],
       ['card', PaintKind.Shape],
-      ['title', PaintKind.Html]
+      ['title', PaintKind.Text]
     ]);
   });
 
   it('reads the root background from the composed page', () => {
     expect(scene(base).background).toBe(FEEGA_TOKENS.colors['brand.background']);
+  });
+});
+
+describe('text', () => {
+  const twoLines = must(addClip(base, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'one\ntwo' } }, 'title'));
+
+  it('draws each revealed line of a title as its own part, so lines move on their own', () => {
+    const parts = scene(twoLines).layers.filter((l) => l.clip === 'title');
+
+    expect(parts.map((p) => p.paint.kind)).toEqual([PaintKind.Text, PaintKind.Text]);
+    expect(parts.map((p) => p.links[p.links.length - 1].el.id)).toEqual(['li-title-0', 'li-title-1']);
+  });
+
+  it('draws a paragraph as one part', () => {
+    const text = must(addClip(base, { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'a paragraph' } }, 'body'));
+
+    expect(scene(text).layers.filter((l) => l.clip === 'body').map((l) => l.paint.kind)).toEqual([PaintKind.Text]);
   });
 });
 

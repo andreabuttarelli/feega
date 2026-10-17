@@ -6,6 +6,7 @@ export enum PaintKind {
   Image = 'image',
   Video = 'video',
   Logo = 'logo',
+  Text = 'text',
   Html = 'html'
 }
 

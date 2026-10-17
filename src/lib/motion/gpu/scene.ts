@@ -12,9 +12,10 @@ export type Paint =
   | { kind: PaintKind.Image; src: string; fit: string }
   | { kind: PaintKind.Video; src: string; fit: string; start: number; duration: number; mediaStart: number; rate: number; element: Element }
   | { kind: PaintKind.Logo; src: string }
+  | { kind: PaintKind.Text; box: HTMLElement; leaf: HTMLElement }
   | { kind: PaintKind.Html };
 
-type Link = { el: HTMLElement; size: Size; offset: Point; perspectiveFor: boolean };
+export type Link = { el: HTMLElement; size: Size; offset: Point; perspectiveFor: boolean };
 
 export type SceneLayer = { clip: string; paint: Paint; links: Link[]; windows: [number, number][]; z: number[]; order: number; content: Size; blend: string };
 
@@ -46,6 +47,19 @@ function runTimeline(doc: Document): Timeline {
 
 function boxedChild(el: Element): boolean {
   return el.parentElement?.classList.contains('mv') === true && el.parentElement.parentElement?.classList.contains('box') === true;
+}
+
+const TEXT_EXTRAS = '.tu,.tw,.tg,img,svg,video,canvas';
+
+function textParts(layer: Element): { el: HTMLElement; paint: Paint }[] {
+  const block = layer.querySelector('[data-fit]') as HTMLElement | null;
+  if (!block || !boxedChild(block) || block.querySelector(TEXT_EXTRAS) || layer.querySelectorAll('[data-fit]').length !== 1) {
+    return [];
+  }
+  const box = block.parentElement!.parentElement as HTMLElement;
+  const lines = [...block.querySelectorAll('.li')] as HTMLElement[];
+  const whole = block.tagName === 'SPAN' ? block.parentElement! : block;
+  return (lines.length ? lines : [whole]).map((leaf) => ({ el: leaf, paint: { kind: PaintKind.Text, box, leaf } }));
 }
 
 function paintOf(layer: Element): { el: HTMLElement; paint: Paint } | null {
@@ -87,6 +101,7 @@ const insetFull = (el: HTMLElement) => INSET_CLASSES.some((c) => el.classList.co
 function contentSize(paint: Paint, parent: Size): Size {
   const SIZE: Record<PaintKind, () => Size> = {
     [PaintKind.Fill]: () => parent,
+    [PaintKind.Text]: () => parent,
     [PaintKind.Shape]: () => (paint as Extract<Paint, { kind: PaintKind.Shape }>).size,
     [PaintKind.Image]: () => parent,
     [PaintKind.Video]: () => parent,
@@ -144,17 +159,20 @@ export function compileScene(html: string): Scene {
   const frame = { width: px(root.dataset.width), height: px(root.dataset.height) };
   const background = [...doc.querySelectorAll('style')].map((s) => ROOT_BG.exec(s.textContent ?? '')?.[1]).find(Boolean) ?? null;
   const leaves = [...root.querySelectorAll('.layer[data-clip]')].filter((l) => !l.querySelector('.layer[data-clip]'));
-  const layers = leaves.flatMap((layer, order): SceneLayer[] => {
-    const found = paintOf(layer);
-    const anchor = (found?.el ?? layer) as HTMLElement;
-    const chain = chainOf(anchor, root);
-    const native = found && effectFree(chain) ? found : null;
-    const paint: Paint = native?.paint ?? { kind: PaintKind.Html };
-    const links = native ? linksOf(chain, frame, paint) : [];
-    const content = links.length ? links[links.length - 1].size : frame;
+  let order = 0;
+  const layers = leaves.flatMap((layer): SceneLayer[] => {
     const outer = chainOf(layer as HTMLElement, root);
     const blend = outer.map((el) => el.style.mixBlendMode).filter((b) => b && b !== 'normal').pop() ?? 'normal';
-    return [{ clip: (layer as HTMLElement).dataset.clip ?? '', paint, links, windows: windowsOf(outer, paint), z: zOf(outer), order, content, blend }];
+    const single = paintOf(layer);
+    const found = single ? [single] : textParts(layer);
+    const native = found.filter((f) => effectFree(chainOf(f.el, root)));
+    const parts = native.length === found.length && found.length ? native : [{ el: layer as HTMLElement, paint: { kind: PaintKind.Html } as Paint }];
+    return parts.map((part) => {
+      const chain = chainOf(part.el, root);
+      const links = part.paint.kind === PaintKind.Html ? [] : linksOf(chain, frame, part.paint);
+      const content = links.length ? links[links.length - 1].size : frame;
+      return { clip: (layer as HTMLElement).dataset.clip ?? '', paint: part.paint, links, windows: windowsOf(outer, part.paint), z: zOf(outer), order: order++, content, blend };
+    });
   });
   return { ...frame, background: background?.trim() ?? null, layers: layers.sort(compareZ), timeline: runTimeline(doc), duration: px(root.dataset.duration), doc };
 }

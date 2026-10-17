@@ -10,6 +10,7 @@ import { gpuEligible, runHtml, runsOf, type Run } from './runs';
 import { webglPerLane } from '../export/webgl-budget';
 import { compileScene, frameAt, type Drawn, type Scene } from './scene';
 import { createPainter } from './textures';
+import { layoutText } from './text-layout';
 
 export enum Freshness {
   Exact = 'exact',
@@ -43,6 +44,7 @@ export async function gpuEngine(compose: Compose, host: HTMLElement, preference:
   const frame = { width: scene.width, height: scene.height };
   const renderer = await createRenderer(frame, preference);
   const painter = createPainter();
+  painter.texts(await layoutText(scene, host));
   const states: RunState[] = runs.map((run, i) => ({ run, html: pages[i], player: null, texture: null, at: Number.NaN, busy: null }));
   const runOf = new Map(runs.flatMap((run, i) => run.clips.map((clip) => [clip, i] as const)));
   const request = { format: FrameFormat.Bitmap, settle: Settle.Seek, layering: Layering.Flat, ...frame };

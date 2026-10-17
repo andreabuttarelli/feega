@@ -3,7 +3,8 @@ import { fitRect, logoRect } from './fit';
 import { scaleOf, type Size } from './matrix';
 import { PaintKind } from './paint-of';
 import type { Placement } from './renderer';
-import type { Drawn, Paint } from './scene';
+import type { Drawn, Paint, SceneLayer } from './scene';
+import type { TextRaster } from './text-layout';
 
 type Of<K extends PaintKind> = Extract<Paint, { kind: K }>;
 
@@ -12,7 +13,7 @@ const MAX_RASTER = 3;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const VIDEO_TIMEOUT_MS = 3000;
 
-export type Painter = { prepare: (items: Drawn[], t: number) => Promise<void>; place: (d: Drawn) => Placement | null; fill: (color: string, size: Size) => Texture };
+export type Painter = { texts: (rasters: Map<SceneLayer, TextRaster>) => void; prepare: (items: Drawn[], t: number) => Promise<void>; place: (d: Drawn) => Placement | null; fill: (color: string, size: Size) => Texture };
 
 function picture(src: string): Promise<HTMLImageElement> {
   return new Promise((ok, ko) => {
@@ -63,6 +64,7 @@ export function createPainter(): Painter {
   const loaded = new Map<string, { texture: Texture; natural: Size }>();
   const videos = new Map<string, { el: HTMLVideoElement; texture: Texture | null }>();
   const fills = new Map<string, Texture>();
+  const texts = new Map<SceneLayer, Texture>();
 
   const load = (key: string, src: string) => {
     if (!images.has(key)) {
@@ -91,6 +93,7 @@ export function createPainter(): Painter {
 
   const PREPARE: Record<PaintKind, (d: Drawn, t: number) => Promise<unknown>> = {
     [PaintKind.Fill]: async () => {},
+    [PaintKind.Text]: async () => {},
     [PaintKind.Html]: async () => {},
     [PaintKind.Shape]: (d) => {
       const paint = d.paint as Of<PaintKind.Shape>;
@@ -119,6 +122,10 @@ export function createPainter(): Painter {
 
   const PLACE: Record<PaintKind, (d: Drawn) => Placement | null> = {
     [PaintKind.Html]: () => null,
+    [PaintKind.Text]: (d) => {
+      const texture = texts.get(d.layer);
+      return texture ? whole(texture, d.content) : null;
+    },
     [PaintKind.Fill]: (d) => {
       const paint = d.paint as Of<PaintKind.Fill>;
       return whole(fill(paint.color, d.content, paint.pattern), d.content);
@@ -144,6 +151,7 @@ export function createPainter(): Painter {
   };
 
   return {
+    texts: (rasters) => rasters.forEach((r, layer) => texts.set(layer, Texture.from(r.canvas))),
     prepare: async (items, t) => {
       await Promise.all(items.map((d) => PREPARE[d.paint.kind](d, t).catch(() => null)));
     },
