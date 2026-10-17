@@ -72,11 +72,10 @@ describe('la superficie del modello mostra solo ciò che può usare', () => {
         'group_elements',
         'ungroup_element',
         'rotate_group',
-        'move_group',
         'canvas_tool'
       ])
     );
-    expect(names).toHaveLength(33);
+    expect(names).toHaveLength(32);
   });
 
   it('col brand i tool di brand ci sono, accanto a quelli di progetto', () => {

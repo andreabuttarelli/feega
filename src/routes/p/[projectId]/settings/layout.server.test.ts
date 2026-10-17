@@ -18,7 +18,7 @@ vi.mock('$lib/server/org-billing', () => ({
 	orgBillingForBrand: (...a: unknown[]) => orgBillingForBrand(...a)
 }));
 
-import { load } from './+layout.server';
+import { load } from '$lib/server/settings/shell';
 
 const ORG = { id: 'org-1', role: 'owner' };
 

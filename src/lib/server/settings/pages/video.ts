@@ -1,11 +1,11 @@
-import type { Actions, PageServerLoad } from './$types';
+import type { SettingsActions, SettingsEvent } from '../event';
 import { studioActions } from '$lib/server/studio-actions';
 import { videoDurationOptions, isKnownVideoModel } from '$lib/server/video';
 import { MEDIA_MODEL_SLOTS, slotAccepts } from '$lib/media-model-slots';
 import { offerableSlotChoices } from '$lib/server/offerable-models';
 import { createAdminClient } from '$lib/server/supabase-admin';
 
-export const load: PageServerLoad = async ({ parent }) => {
+export const load = async ({ parent }: SettingsEvent) => {
   const { brand } = await parent();
   const prefs = (brand?.content_prefs ?? {}) as Record<string, unknown>;
   const videoModel = isKnownVideoModel(prefs.videoModel) ? String(prefs.videoModel) : null;
@@ -31,7 +31,7 @@ export const load: PageServerLoad = async ({ parent }) => {
   };
 };
 
-export const actions: Actions = {
+export const actions: SettingsActions = {
   updateVideoDuration: studioActions.updateVideoDuration,
   updateVideoResolution: studioActions.updateVideoResolution,
   updateVideoInstructions: studioActions.updateVideoInstructions,

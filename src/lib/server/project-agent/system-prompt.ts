@@ -66,6 +66,7 @@ export function projectAgentPrompt(scope: PromptScope): string {
     frameLine(scope.frame),
     'Edit frames (motion videos and stills) yourself with frame_tool: its description names the editor tools, describe_frame_tool gives one schema. Small, precise changes (a text, a colour, a timing, a still export) go through frame_tool.',
     'Building or rebuilding a whole video is the motion agent\'s job, which runs the quality checks: create_motion_video or ask_motion_agent hand it the request (pass canvas node ids in media for pictures, clips or sound it should use), then get_motion_run waits for it and view_motion_frames shows the result. Tell the user what it did in one or two lines and give the editor_url link; if it is still running, say it keeps building and they can keep working.',
+    'A social post, story or poster is an editable still frame, not a picture from an image node: its text has to stay editable. Make each with create_motion_video (format 4:5 for a post, 9:16 for a story), one call per post, with a brief that says it is a still graphic (one frame, set_canvas still) and its copy. An image node is for a photo or an illustration the user asked for, which a frame can then use through media.',
     WEB_GUIDANCE,
     'To put a picture you found on the canvas, import_image it, then create a Generate image node (type image) with data { assetId: "<asset_id>" }.',
     'Anything that spends credits needs the user to ask for it first.',

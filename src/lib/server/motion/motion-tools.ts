@@ -23,7 +23,7 @@ import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } fro
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
-import { Background, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, type MotionDoc } from '$lib/motion/doc';
+import { Background, MAX_SIDE, MIN_SIDE, MOTION_FORMATS, clipsOf, findClip, formatOf, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
@@ -301,6 +301,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
   const posterParts = staticParts(doc);
 
   return {
+    format: formatOf(doc),
     width: doc.width,
     height: doc.height,
     fps: doc.fps,
@@ -1953,9 +1954,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_canvas: tool({
-      description: `Change the format (16:9, 9:16, 1:1, 4:5), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor.`,
+      description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together; the long side up to ${MAX_SIDE}, the short side up to 1080), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor.`,
       inputSchema: z.object({
         format: z.enum(MOTION_FORMATS).optional(),
+        width: z.number().int().min(MIN_SIDE).max(MAX_SIDE).optional(),
+        height: z.number().int().min(MIN_SIDE).max(MAX_SIDE).optional(),
         duration: z.number().positive().max(MAX_SECONDS).optional(),
         fps: z.literal(FRAME_RATES).optional(),
         background: z.enum([Background.Brand, Background.Transparent]).optional(),
@@ -1968,7 +1971,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const animated = input.still === false ? animateStill(session.doc, input.duration) : ({ ok: true, doc: session.doc } as OpResult);
         const paced = !animated.ok || input.fps === undefined ? animated : setFrameRate(animated.doc, input.fps);
-        const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
+        const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, size: input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         return apply(pinned, 'changed the canvas');
       }
@@ -2299,7 +2302,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         html: z.string().max(MAX_HTML).describe('markup inside the component root; no script, style, iframe, media or external urls'),
         css: z.string().max(MAX_CSS).describe('scoped to the component root (:scope is the root); no animation, transition, @keyframes, @import or external url()'),
         js: z.string().max(MAX_JS).describe('body of a function receiving root, props, tl, duration, fps, assets, brand, rand, format, motion, three, lottie, THREE, d3, p5, PIXI, Matter, gen, twgl, fx, Splitting, OpenProps; build every animation on tl, easing on "feega.out" (entrances), "feega.in" (exits) and "feega.inOut" (moves); "none" only for a drift, a loop or a driver tween, never sine, elastic, back or bounce. d3 is for data viz: scales, shapes and layouts, marks set in an onUpdate from progress, never d3 transitions or timers. p5 is for generative art: p5((p) => { p.setup = () => p.createCanvas(w, h); p.draw = () => { /* whole frame from p.frameCount / fps */ }; }) is redrawn on every seek with random and noise reseeded, never on its own loop. PIXI is for thousands of 2D sprites or particles: new PIXI.Application({ width, height }), root.appendChild(app.view), sprites placed in an onUpdate from this.time() ending with app.render(); no ticker. Matter is for physics: build the world once, const at = Matter.seekable(engine), then in onUpdate at(this.time()).get(body) gives { x, y, angle }; no Runner, no Render, no Engine.update. gen: seeded generative helpers — noise2D/3D/4D(), poisson({ shape, minDistance }), Delaunay (Voronoi), simplify, isect, RBush, KDBush, inside, ClipperLib. twgl is for custom WebGL2 shaders: twgl.webgl(canvas), createProgramInfo and buffers once, then setUniforms({ t: this.time() }) and drawBufferInfo in onUpdate. fx: seekable CSS effects driven by one variable on tl — gradient, border, grid (lines or dots), shimmer, grain, marquee. Splitting({ target, by }) (by chars, words, lines or cells) splits text with index variables; stagger on tl, or Splitting.drive(el) moves one --split variable. OpenProps: tokens var(--size-*), var(--shadow-*), var(--gradient-*), easings as tl ease names (ease-out-3, ease-spring-2), OpenProps.animate(el, name, { at, duration }) turns its keyframes into tl tweens. motion.drawPath(path), motion.morph(path, d), motion.scramble(el, text), motion.flip(els, change) return a handle: tween its draw, morph, reveal or flip from 0 to 1 on tl. Its own names never clash with these or with other components. Numbers on screen go through format.number(n, { decimals, group, point }), format.compact(n) (12.4K) or format.percent(ratio): toLocaleString and Intl differ between preview and render. ' + THREE_GUIDANCE),
-        props_schema: z.union([propsSchemaSchema, z.string()]).optional().describe('optional: param() calls in js build it. ' + 'what a person may edit: { type: "object", properties: { key: { type: string|number|boolean, title, default, minimum, maximum, enum, format: color|textarea|asset } } }')
+        props_schema: z.union([propsSchemaSchema, z.string()]).optional().describe('optional: param() calls in js build it. ' + 'what a person may edit: { type: "object", properties: { key: { type: string|number|boolean, title, default, minimum, maximum, enum, format: color|textarea|asset|media|media-item } } }')
       }),
       execute: async (input, { toolCallId }) => {
         if (session.codeWrites >= MAX_CODE_WRITES_PER_TURN) {

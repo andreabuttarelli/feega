@@ -8,10 +8,11 @@
   import { FieldLayout, splitFields } from '$lib/motion/template/key-fields';
   import ComponentPreview from './ComponentPreview.svelte';
   import FieldForm from './FieldForm.svelte';
+  import type { MediaUploader } from './media-upload';
   import IconButton from './IconButton.svelte';
   import MotionPreview from './MotionPreview.svelte';
 
-  type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
+  type Asset = { id: string; kind: string; label: string; previewUrl: string };
 
   let {
     item,
@@ -19,6 +20,7 @@
     draftOf,
     compose,
     assets,
+    upload = null,
     target = AddTarget.Video,
     onadd,
     onclose
@@ -28,6 +30,7 @@
     draftOf: (id: string, format: MotionFormat) => Instance | null;
     compose: ((doc: Instance['doc']) => string) | null;
     assets: Asset[];
+    upload?: MediaUploader | null;
     target?: AddTarget;
     onadd: (sounds: boolean, draft: Instance | null) => void;
     onclose: () => void;
@@ -93,14 +96,14 @@
 
   {#if draft && split.key.length}
     <section class="key" data-testid="key-fields">
-      <FieldForm doc={draft.doc} fields={split.key} {assets} {setValue} onchange={edited} layout={FieldLayout.Flat} />
+      <FieldForm doc={draft.doc} fields={split.key} {assets} {upload} {setValue} onchange={edited} layout={FieldLayout.Flat} />
     </section>
   {/if}
 
   {#if draft && (split.advanced.length || vars.length)}
     <details class="advanced" data-testid="advanced-fields">
       <summary>Advanced</summary>
-      {#if split.advanced.length}<FieldForm doc={draft.doc} fields={split.advanced} {assets} {setValue} onchange={edited} />{/if}
+      {#if split.advanced.length}<FieldForm doc={draft.doc} fields={split.advanced} {assets} {upload} {setValue} onchange={edited} />{/if}
       <dl class="developer" data-testid="developer-info">
         <dt>Template</dt>
         <dd>{item.id}</dd>

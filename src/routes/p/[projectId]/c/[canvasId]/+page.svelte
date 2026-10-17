@@ -83,6 +83,10 @@
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
+  import { canvasMediaUploader, projectMedia } from '$lib/canvas/media-uploader';
+  import type { LibraryMedia, MediaUploader } from '$lib/components/motion/media-upload';
+  import { changedRaw } from '$lib/motion/template/raw-values';
+  import { templateFields } from '$lib/motion/template/library';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
@@ -94,10 +98,11 @@
   import { AssetKind } from '$lib/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, frameNodeSize, frameResize, motionEditorPath, type FrameResize, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
-  import { layoutOf, rotateGroup, type Placed } from '$lib/canvas/node-layout';
+  import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
+  import { fitToNode } from '$lib/motion/custom-size';
   import { barContextOf } from '$lib/canvas/bottom-bar';
   import { CanvasState, NodeMode, Opening, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
@@ -350,9 +355,15 @@
   }
 
   function rotateGroupBy(id: string, degrees: number) {
+    if (turnGroup({ id, degrees })) {
+      undoStack.push({ source: 'turn', turn: { id, degrees } });
+    }
+  }
+
+  function turnGroup({ id, degrees }: Turn): boolean {
     const group = nodes.find((n) => n.id === id);
     if (!group) {
-      return;
+      return false;
     }
     const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
     const turned = new Map(rotateGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), degrees).map((t) => [t.id, t]));
@@ -361,6 +372,7 @@
       return t ? { ...n, x: t.x, y: t.y, data: { ...n.data, rotation: t.rotation } } : n;
     });
     void post('rotateGroup', { id, degrees: String(degrees) });
+    return true;
   }
 
   function groupElements(ids: string[]) {
@@ -1012,6 +1024,8 @@
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       rotation: layoutOf(n.data).rotation,
       rotatable: motionOf(n)?.kind === FrameKind.Group,
+      behind: chrome.behind,
+      members: chrome.behind ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
@@ -1158,7 +1172,7 @@
    * cronologia, non due stack separati: creare un nodo dopo averne spostato un altro e poi
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture };
+  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | { source: 'turn'; turn: Turn };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -1622,6 +1636,27 @@
 
   let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
   const catalogPosters = new SvelteMap<string, string>();
+  let frameMedia = $state<LibraryMedia[]>([]);
+  const frameMediaUrls = $derived(Object.fromEntries(frameMedia.map((m) => [m.id, m.url ?? m.previewUrl])));
+  const uploadToFrameLibrary = canvasMediaUploader(supabase, { orgId: data.orgId, projectId: data.projectId, canvasId: data.canvas.id });
+  const uploadFrameMedia: MediaUploader = async (file, progress) => {
+    const outcome = await uploadToFrameLibrary(file, progress);
+    if (outcome.ok) {
+      frameMedia = [outcome.asset, ...frameMedia.filter((m) => m.id !== outcome.asset.id)];
+    }
+    return outcome;
+  };
+
+  $effect(() => {
+    if (frameLibraryAt) {
+      void projectMedia({ projectId: data.projectId, canvasId: data.canvas.id }).then((media) => (frameMedia = media));
+    }
+  });
+
+  function frameValues(templateId: string, draft: Instance | null): Record<string, string> {
+    const fresh = draft ? frameDraft(templateId, formatOf(draft.doc)) : null;
+    return draft && fresh ? changedRaw(templateFields(fresh.doc, fresh.clipId), templateFields(draft.doc, draft.clipId)) : {};
+  }
 
   function frameDraft(templateId: string, format: MotionFormat): Instance | null {
     const entry = data.componentTemplates.find((t) => t.id === templateId);
@@ -1646,12 +1681,13 @@
     const spot = placeNear(at, frameSize, occupiedRects());
     const id = crypto.randomUUID();
     const name = data.componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
-    const poster = item?.preview?.poster;
+    const values = frameValues(templateId, draft);
+    const poster = Object.keys(values).length ? null : item?.preview?.poster;
     if (poster) {
       catalogPosters.set(id, poster);
     }
     nodes = [...nodes, toTile(placedFrame({ id, canvasId: data.canvas.id, projectId: data.projectId, name, at: spot, doc }))];
-    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y, node_id: id });
+    const result = await post('frame_template', { template: templateId, format: formatOf(doc), values: JSON.stringify(values), x: spot.x, y: spot.y, node_id: id });
     const node = result?.node as CanvasNodeRecord | undefined;
     nodes = settle(nodes, id, node ? toTile(node) : null);
     if (!node) {
@@ -2118,14 +2154,54 @@
     }
     const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motionOf(row)?.kind);
     if (Math.abs(fit.h - row.h) > FIT_SLACK_PX) {
-      void resize(row.id, fit.w, fit.h);
+      void storeSize(row.id, fit.w, fit.h);
     }
   });
 
+  function framePlan(id: string, w: number, h: number): FrameResize | null {
+    const row = nodes.find((node) => node.id === id);
+    const motion = motionOf(row ?? { id, type: '', data: {} });
+    if (!motion || !row) {
+      return null;
+    }
+    const open = layersSource.video?.nodeId === id ? layersSource.video : null;
+    const shown = open ? { ...motion, format: formatOf(open.doc) } : motion;
+    const mode = id === inlineMotion ? NodeMode.Edit : NodeMode.Preview;
+    return frameResize(shown, { w, h }, open?.doc ?? PICTURE_OF_KIND[motion.kind](motion, row), mode);
+  }
+
+  async function sizeFrameDoc(id: string, picture: { width: number; height: number }) {
+    const open = layersSource.video;
+    if (open?.nodeId === id) {
+      open.edit(fitToNode(open.doc, picture), 'Resized the frame');
+      return;
+    }
+    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height });
+    if (result?.undo) {
+      pushGesture({ items: result.undo as UndoItem[] });
+    }
+  }
+
   async function resize(id: string, width: number, height: number) {
-    const fit = frameFit(id, width);
-    const w = fit?.w ?? width;
-    const h = fit?.h ?? height;
+    const group = nodes.find((n) => n.id === id);
+    if (group && motionOf(group)?.kind === FrameKind.Group) {
+      const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
+      const scaled = new Map(scaleGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), { w: width, h: height }).map((t) => [t.id, t]));
+      nodes = nodes.map((n) => {
+        const t = scaled.get(n.id);
+        return t ? { ...n, x: t.x, y: t.y, w: t.w, h: t.h, userHeight: t.h } : n;
+      });
+      await post('scaleGroup', { id, width: String(width), height: String(height) });
+      return;
+    }
+    const plan = framePlan(id, width, height);
+    await storeSize(id, plan?.w ?? width, plan?.h ?? height);
+    if (plan?.picture) {
+      await sizeFrameDoc(id, plan.picture);
+    }
+  }
+
+  async function storeSize(id: string, w: number, h: number) {
     nodes = nodes.map((n) => (n.id === id ? { ...n, w, h, userHeight: h } : n));
     const placed = places.resize(id, w, h);
     keepOutbox();
@@ -2924,6 +3000,11 @@
   async function undo() {
     const entry = undoStack.popUndo();
     if (!entry) { return; }
+    if (entry.source === 'turn') {
+      const back = undoTurn(entry.turn);
+      if (turnGroup(back)) { undoStack.pushRedo({ source: 'turn', turn: back }); }
+      return;
+    }
     if (entry.source === 'move') {
       await applyMoveUndo(entry.gesture, (redo) => undoStack.pushRedo({ source: 'move', gesture: redo }));
       return;
@@ -2934,6 +3015,11 @@
   async function redo() {
     const entry = undoStack.popRedo();
     if (!entry) { return; }
+    if (entry.source === 'turn') {
+      const back = undoTurn(entry.turn);
+      if (turnGroup(back)) { undoStack.pushUndo({ source: 'turn', turn: back }); }
+      return;
+    }
     if (entry.source === 'move') {
       await applyMoveUndo(entry.gesture, (redo) => undoStack.pushUndo({ source: 'move', gesture: redo }));
       return;
@@ -3337,7 +3423,9 @@
       items={componentItems}
       format={MotionFormat.Landscape}
       draftOf={frameDraft}
-      compose={(doc) => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })}
+      compose={(doc) => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: frameMediaUrls, target: Target.Screen })}
+      assets={frameMedia}
+      upload={uploadFrameMedia}
       target={AddTarget.Canvas}
       onpick={(templateId, _sounds, draft) => void addFrame(templateId, draft)}
       onclose={() => (frameLibraryAt = null)}

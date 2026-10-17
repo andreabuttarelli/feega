@@ -42,8 +42,8 @@ describe('le route del guscio leggono la stessa dichiarazione, non una copia', (
 		// perché entrare non chiede niente a nessuno. `TENANT_BRAND_ID` punta a una riga `brands`,
 		// quindi riguarda solo ciò che parla ancora di brand.
 		const sorgenti = [
-			'src/routes/p/[projectId]/settings/team/+page.server.ts',
-			'src/routes/p/[projectId]/settings/danger/+page.server.ts',
+			'src/lib/server/settings/pages/team.ts',
+			'src/lib/server/settings/pages/danger.ts',
 			'src/lib/server/settings-actions.ts'
 		];
 		for (const f of sorgenti) {

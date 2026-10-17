@@ -20,6 +20,10 @@ async function clickPart(page: Page, button: 'left' | 'right') {
   await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2, { button });
 }
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('feega.frame-edit-mode', 'design'));
+});
+
 test.describe('one bottom bar, by context @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
@@ -37,6 +41,7 @@ test.describe('one bottom bar, by context @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const bar = page.getByTestId('add-bar');
     await expect(bar).toHaveAttribute('data-context', 'canvas');
+    await bar.getByTestId('bar-mode').getByRole('radio', { name: 'Design' }).click();
     await expect(bar.getByRole('button', { name: 'Upload file' })).toBeVisible();
     await expect(page.getByTestId('draw-tools')).toHaveCount(1);
     await shoot(page, '1-canvas-tools');
@@ -91,7 +96,7 @@ test.describe('one bottom bar, by context @real', () => {
     await shoot(page, '6-back-to-canvas');
   });
 
-  test('a frame with a timeline keeps the bar right above it', async ({ page, session, admin, seedNode }) => {
+  test('a frame in Motion shows its timeline and stows the bar; Design brings the bar back', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(120_000);
     const node = await seedNode({ type: 'motion', x: 80, y: 80, data: LANDSCAPE });
     const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: motion, actor_kind: 'user', actor_id: session.userId });
@@ -101,14 +106,11 @@ test.describe('one bottom bar, by context @real', () => {
     await page.getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
     const bar = page.getByTestId('add-bar');
     await expect(bar).toHaveAttribute('data-context', 'frame', { timeout: 15_000 });
-    const timeline = page.locator('section[aria-label="Timeline"]');
-    await expect(timeline).toBeVisible({ timeout: 15_000 });
-    await expect
-      .poll(async () => {
-        const [b, t] = await Promise.all([bar.boundingBox(), timeline.boundingBox()]);
-        return b && t ? Math.round(t.y - (b.y + b.height)) : null;
-      }, { timeout: 5_000 })
-      .toBe(0);
-    await shoot(page, '7-above-timeline');
+    await page.getByTestId('edit-mode').locator('[data-mode="motion"]').click();
+    await expect(page.locator('section[aria-label="Timeline"]')).not.toHaveAttribute('inert', '');
+    await expect(bar).toHaveAttribute('inert', '');
+    await shoot(page, '7-motion-timeline-no-bar');
+    await page.getByTestId('edit-mode').locator('[data-mode="design"]').click();
+    await expect(bar).not.toHaveAttribute('inert', '');
   });
 });

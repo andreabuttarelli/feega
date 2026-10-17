@@ -1,4 +1,4 @@
-import type { PageServerLoad, Actions } from './$types';
+import type { SettingsActions, SettingsEvent } from '../event';
 import {
   updateProfile,
   uploadProfileAvatar,
@@ -13,7 +13,7 @@ function splitName(full: string | null | undefined): { firstName: string; lastNa
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
 }
 
-export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession } }) => {
+export const load = async ({ locals: { supabase, safeGetSession } }: SettingsEvent) => {
   const { user } = await safeGetSession();
   if (!user) return { firstName: '', lastName: '', email: null, avatarUrl: null, hasCustomAvatar: false };
 
@@ -41,7 +41,7 @@ export const load: PageServerLoad = async ({ locals: { supabase, safeGetSession 
   };
 };
 
-export const actions: Actions = {
+export const actions: SettingsActions = {
   updateProfile,
   uploadProfileAvatar,
   removeProfileAvatar,

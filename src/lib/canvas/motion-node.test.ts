@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, freshText, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -78,7 +78,7 @@ describe('a frame node follows the shape of its graphic', () => {
   it('a new frame made from an element takes the element shape, not a 16:9 box', () => {
     const made = frameNodeOf({ width: 1536, height: 432 });
 
-    expect(made.data.format).toBe('16:9');
+    expect(made.data.format).toBe('custom');
     expect(made.h - MOTION_NODE_BAR_H).toBe(Math.round((made.w * 432) / 1536));
   });
 
@@ -144,8 +144,32 @@ describe('a free element is a frame without chrome', () => {
     expect(openingFor({ id: 't', type: 'text', data: {} }, Opening.OnSelect)).toBe(Opening.OnSelect);
   });
 
+  it('a group draws behind everything, even when selected, so a click on a member reaches the member', () => {
+    expect(frameChrome(FrameKind.Group).behind).toBe(true);
+    expect(frameChrome(FrameKind.Element).behind).toBe(false);
+  });
+
   it('reads back as an element; an old frame without the field stays a frame', () => {
     expect(motionOf({ id: 'e', type: 'motion', data: elementNodeOf({ width: 10, height: 10 }).data })?.kind).toBe(FrameKind.Element);
     expect(motionOf({ id: 'f', type: 'motion', data: { format: '9:16', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } })?.kind).toBe(FrameKind.Frame);
+  });
+});
+
+describe('a custom frame takes the size the hand gives it', () => {
+  const custom = motionOf({ id: 'n', type: 'motion', data: newMotionData(MotionFormat.Custom) })!;
+  const preset = motionOf({ id: 'n', type: 'motion', data: newMotionData(MotionFormat.Landscape) })!;
+
+  it('keeps both sides and sizes the picture to the node, under the bar', () => {
+    expect(frameResize(custom, { w: 600, h: 300 + MOTION_NODE_BAR_H }, FORMATS[MotionFormat.Landscape])).toEqual({ w: 600, h: 300 + MOTION_NODE_BAR_H, picture: { width: 600, height: 300 } });
+  });
+
+  it('a preset keeps its aspect and asks for no picture change', () => {
+    expect(frameResize(preset, { w: 420, h: 900 }, FORMATS[MotionFormat.Landscape])).toEqual({ w: 420, h: 236 + MOTION_NODE_BAR_H, picture: null });
+  });
+
+  it('an element keeps the picture it is given', () => {
+    const element = { ...preset, kind: FrameKind.Element };
+
+    expect(frameResize(element, { w: 200, h: 999 }, { width: 100, height: 50 })).toEqual({ w: 200, h: 100, picture: null });
   });
 });

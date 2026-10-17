@@ -14,7 +14,7 @@ vi.mock('$lib/server/db/client', async (original) => ({
   createServiceRoleDb: () => writer.db
 }));
 
-const { actions } = await import('./+page.server');
+const { actions } = await import('$lib/server/settings/pages/project');
 
 const ORG = 'org-1';
 const PROJECT = 'proj-1';

@@ -1,5 +1,5 @@
 import { error, fail } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
+import type { SettingsActions, SettingsEvent } from '../event';
 import { readUploadImage } from '$lib/server/raster-image';
 import { setProjectBrand } from '$lib/server/repos/projects';
 import { brandIdOf } from '$lib/server/tenancy/brand-slug';
@@ -45,7 +45,7 @@ function slugify(name: string): string {
   return `${base || 'brand'}-${Date.now().toString(36)}`;
 }
 
-export const load: PageServerLoad = async ({ parent, locals: { supabase } }) => {
+export const load = async ({ parent, locals: { supabase } }: SettingsEvent) => {
   const { project, org, brand: brandOrNull } = await parent();
 
   const orgBrands = await supabase
@@ -91,7 +91,7 @@ async function orgIdOfProject(
   return data?.org_id ?? null;
 }
 
-export const actions: Actions = {
+export const actions: SettingsActions = {
   update: async ({ request, params, locals: { supabase } }) => {
     const brandId = await brandIdOf(supabase, params.projectId!);
     if (!brandId) return fail(400, { error: 'No brand selected for this project' });

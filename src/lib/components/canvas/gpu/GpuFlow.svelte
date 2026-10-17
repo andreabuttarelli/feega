@@ -51,6 +51,7 @@
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
   import { domPainted } from '$lib/canvas/gpu/paint';
   import { NameTag } from '$lib/canvas/node-label';
+  import { followGroup } from '$lib/canvas/node-layout';
   import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
 
   let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void } = $props();
@@ -101,7 +102,7 @@
   const assetBase = $derived(`/p/${page.params.projectId}/c/${page.params.canvasId}/assets/`);
   const assetUrl = (id: string) => `${assetBase}${id}`;
 
-  const placed = $derived(tiles.map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}) })));
+  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}) })));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
@@ -552,7 +553,10 @@
           }
         }
         const next = new Map(overrides);
-        for (const m of movedBy(a.origins, { x: w.x - a.start.x, y: w.y - a.start.y })) {
+        const moved = movedBy(a.origins, { x: w.x - a.start.x, y: w.y - a.start.y });
+        const all = new Map(tiles.map((t) => [t.id, { x: t.x, y: t.y }]));
+        const follow = moved.flatMap((m) => followGroup(all, m.id, m, byId.get(m.id)?.members ?? []));
+        for (const m of [...moved, ...follow]) {
           const t = byId.get(m.id);
           if (t) {
             next.set(m.id, { x: m.x, y: m.y, w: t.w, h: t.h });
@@ -804,6 +808,11 @@
   const KEY_RUN: Record<CanvasCommand['id'], (c: CanvasCommand) => void> = {
     add: (c) => c.id === 'add' && addAtCentre(c.what),
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
+    tool: (c) => {
+      if (c.id === 'tool') {
+        frameBar.tool = c.tool;
+      }
+    },
     delete: () => (selected.length || selectedEdge) && dropSelection(selected, selectedEdge ? [selectedEdge] : []),
     deselect: () => clearSelection(),
     'select-all': () => select(placed.map((t) => t.id)),

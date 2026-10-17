@@ -19,6 +19,6 @@ describe('the doc fields of a video started from a media component', () => {
     const body = render(DocFields, { props: { doc: placed.doc, assets: [PICTURE], onchange: () => {} } }).body;
 
     expect(body).toContain('Pictures and videos');
-    expect(body).toContain('/a1.png');
+    expect(body).toContain('data-testid="media-list"');
   });
 });
