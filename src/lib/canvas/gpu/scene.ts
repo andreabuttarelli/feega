@@ -40,6 +40,18 @@ const MAX_TEXT_CHARS = 1400;
 const TEXT_TIERS = [1, 2, 4] as const;
 const THUMB_COLUMNS = 3;
 const STAGE = '#000000';
+const BAR_BUTTON = 44;
+const BAR_ICON = 16;
+const BAR_ICON_SCALE = 2;
+const OPEN_LABEL = 'Open editor';
+const ICON_PATHS: { paths: string; dim?: boolean; accent?: boolean }[] = [
+  { paths: '<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/>' },
+  { paths: '<rect width="18" height="18" x="3" y="3" rx="2"/>', dim: true },
+  { paths: '<path d="M17.971 4.285A2 2 0 0 1 21 6v12a2 2 0 0 1-3.029 1.715l-9.997-5.998a2 2 0 0 1-.003-3.432z"/><path d="M3 20V4"/>' },
+  { paths: '<path d="M21 4v16"/><path d="M6.029 4.285A2 2 0 0 0 3 6v12a2 2 0 0 0 3.029 1.715l9.997-5.998a2 2 0 0 0 .003-3.432z"/>' },
+  { paths: '<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>' },
+  { paths: '<path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/>', accent: true }
+];
 const THUMB_GAP = 4;
 
 const tierFor = (zoom: number) => TEXT_TIERS.find((t) => t >= zoom * devicePixelRatio) ?? TEXT_TIERS[TEXT_TIERS.length - 1];
@@ -117,6 +129,7 @@ export class GpuScene {
   onReady: ((drawn: Set<string>) => void) | null = null;
   private ready = new Set<string>();
   private retiring = new Map<string, Built>();
+  private bar: Texture | null = null;
   private dim: { body: number; edges: number } | null = null;
 
   private constructor(app: Application, theme: Theme) {
@@ -409,6 +422,7 @@ export class GpuScene {
         if (media) {
           this.mediaSprite(root, b, media, stage, Fit.Contain);
         }
+        this.frameBar(root, b, c, stage.h, f.subtitle);
       },
       [Surface.Graphic]: () => f.media && this.mediaSprite(root, b, f.media, { x: 0, y: 0, w: c.w, h: c.h }, Fit.Contain),
       [Surface.Generate]: () => this.buildGenerate(root, b, c),
@@ -440,6 +454,54 @@ export class GpuScene {
     BUILD[f.surface]();
     this.cardLayer.addChild(holder);
     return b;
+  }
+
+  private barTexture(): Texture {
+    if (this.bar) {
+      return this.bar;
+    }
+    const scale = BAR_ICON_SCALE;
+    const w = BAR_BUTTON * ICON_PATHS.length * scale;
+    const h = BAR_BUTTON * scale;
+    const offset = ((BAR_BUTTON - BAR_ICON) / 2) * scale;
+    const icons = ICON_PATHS.map((icon, i) => {
+      const color = icon.accent ? this.theme.accent : this.theme.ink;
+      const opacity = icon.dim ? 0.35 : 1;
+      return `<g transform="translate(${i * BAR_BUTTON * scale + offset} ${offset}) scale(${(BAR_ICON * scale) / 24})" fill="none" stroke="${color}" stroke-opacity="${opacity}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon.paths}</g>`;
+    }).join('');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${icons}</svg>`;
+    const img = new Image(w, h);
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    this.bar = Texture.from(img);
+    img.onload = () => {
+      this.bar?.source.update();
+      this.invalidate();
+    };
+    return this.bar;
+  }
+
+  private frameBar(root: Container, b: Built, c: Card, top: number, rev: string) {
+    const g = new Graphics();
+    g.rect(0, top, c.w, MOTION_NODE_BAR_H).fill(this.theme.paper);
+    g.rect(0, top, c.w, 1).fill(this.theme.line);
+    root.addChild(g);
+    const icons = new Sprite(this.barTexture());
+    icons.position.set(0, top);
+    icons.width = BAR_BUTTON * ICON_PATHS.length;
+    icons.height = BAR_BUTTON;
+    root.addChild(icons);
+    const label = this.text(rev, BODY_SIZE - 2, this.theme.ink, null);
+    label.position.set(c.w - PAD / 2 - label.width, top + (MOTION_NODE_BAR_H - label.height) / 2);
+    root.addChild(label);
+    b.texts.push(label);
+    const open = this.text(OPEN_LABEL, BODY_SIZE - 2, this.theme.ink, null);
+    const pill = new Graphics();
+    const pw = open.width + 16;
+    const ph = open.height + 8;
+    pill.rect(c.w - 6 - pw, 6, pw, ph).fill(this.theme.paper).stroke({ width: 1, color: this.theme.line });
+    open.position.set(c.w - 6 - pw + 8, 10);
+    root.addChild(pill, open);
+    b.texts.push(open);
   }
 
   private thumbGrid(root: Container, urls: string[], c: Card, top: number) {

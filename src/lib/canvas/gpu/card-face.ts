@@ -64,8 +64,10 @@ const source =
 const motion: Draw = (d, asset, t) => {
   const kind = str(d.kind) || FrameKind.Frame;
   const live = str(d.lastRenderAssetId);
+  const rev = typeof d.docHeadRevision === 'number' && d.docHeadRevision ? `Rev ${d.docHeadRevision}` : 'Empty';
   return {
     surface: kind === FrameKind.Frame ? Surface.Frame : Surface.Graphic,
+    subtitle: rev,
     media: t.poster ? { url: t.poster.url, video: false } : null,
     live: live ? asset(live) : null
   };
