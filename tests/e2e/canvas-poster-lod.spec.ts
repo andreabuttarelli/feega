@@ -111,7 +111,7 @@ test('zoomed out, a pan takes the poster node shells out of layout and settles t
   await expect.poll(() => shellDisplays(page)).toEqual(['block']);
 });
 
-type Crossing = { crossedAt: number; switchedAt: number; endedAt: number };
+type Crossing = { crossedAt: number; switchedAt: number; endedAt: number; playersTouched: number };
 
 enum Zoom {
   In = -1,
@@ -121,20 +121,28 @@ enum Zoom {
 const WHEEL_STEPS = 60;
 const WHEEL_DELTA = 30;
 const WHEEL_EVERY_MS = 16;
-const SWITCH_BUDGET_MS = 100;
+const SETTLE_BUDGET_MS = 300;
 const GIVE_UP_MS = 3000;
 
 const zoomGesture = (page: Page, direction: Zoom) =>
   page.evaluate(
-    ({ direction, steps, delta, every, threshold, lodClass }) =>
+    ({ direction, steps, delta, every, threshold, lodClass, giveUp }) =>
       new Promise<Crossing>((resolve) => {
         const flow = document.querySelector<HTMLElement>('.svelte-flow')!;
         const viewport = document.querySelector<HTMLElement>('.svelte-flow__viewport')!;
         const pane = document.querySelector<HTMLElement>('.svelte-flow__pane')!;
         const box = pane.getBoundingClientRect();
         const outward = direction > 0;
-        const run = { crossedAt: 0, switchedAt: 0, endedAt: 0 };
+        const run = { crossedAt: 0, switchedAt: 0, endedAt: 0, playersTouched: 0 };
         let sent = 0;
+        const players = new MutationObserver((records) => {
+          if (run.endedAt) {
+            return;
+          }
+          const touched = (nodes: NodeList) => [...nodes].some((node) => node instanceof Element && (node.matches('.own') || !!node.querySelector('.own')));
+          run.playersTouched += records.filter((record) => touched(record.addedNodes) || touched(record.removedNodes)).length;
+        });
+        players.observe(viewport, { childList: true, subtree: true });
 
         const watch = () => {
           const zoom = new DOMMatrix(getComputedStyle(viewport).transform).a;
@@ -145,7 +153,8 @@ const zoomGesture = (page: Page, direction: Zoom) =>
           if (run.crossedAt && !run.switchedAt && flow.classList.contains(lodClass) === outward) {
             run.switchedAt = now;
           }
-          if (run.endedAt && (run.switchedAt || now - run.endedAt > GIVE_UP_MS)) {
+          if (run.endedAt && (run.switchedAt || now - run.endedAt > giveUp)) {
+            players.disconnect();
             resolve(run);
             return;
           }
@@ -163,28 +172,28 @@ const zoomGesture = (page: Page, direction: Zoom) =>
           run.endedAt = performance.now();
         }, every);
       }),
-    { direction, steps: WHEEL_STEPS, delta: WHEEL_DELTA, every: WHEEL_EVERY_MS, threshold: LOD_ZOOM, lodClass: LOD_CLASS }
+    { direction, steps: WHEEL_STEPS, delta: WHEEL_DELTA, every: WHEEL_EVERY_MS, threshold: LOD_ZOOM, lodClass: LOD_CLASS, giveUp: GIVE_UP_MS }
   );
 
-const expectLiveSwitch = (run: Crossing) => {
+const expectSettledSwitch = (run: Crossing) => {
   expect(run.crossedAt).toBeGreaterThan(0);
   expect(run.crossedAt).toBeLessThan(run.endedAt);
-  expect(run.switchedAt).toBeGreaterThan(0);
-  expect(run.switchedAt - run.crossedAt).toBeLessThan(SWITCH_BUDGET_MS);
-  expect(run.switchedAt).toBeLessThan(run.endedAt);
+  expect(run.switchedAt).toBeGreaterThan(run.endedAt);
+  expect(run.switchedAt - run.endedAt).toBeLessThan(SETTLE_BUDGET_MS);
+  expect(run.playersTouched).toBe(0);
 };
 
-test('zooming in, node details come back as the threshold is crossed, not after the gesture ends', async ({ page }) => {
+test('zooming in, node details come back once the gesture settles, not during it', async ({ page }) => {
   await mountZoomedOut(page);
   await expect(page.locator('.svelte-flow.poster-lod')).toHaveCount(1);
 
-  expectLiveSwitch(await zoomGesture(page, Zoom.In));
+  expectSettledSwitch(await zoomGesture(page, Zoom.In));
 });
 
-test('zooming out, nodes turn into posters as the threshold is crossed, not after the gesture ends', async ({ page }) => {
+test('zooming out, nodes turn into posters once the gesture settles, not during it', async ({ page }) => {
   await mountZoomedOut(page);
   await zoomGesture(page, Zoom.In);
   await expect(page.locator('.svelte-flow.poster-lod')).toHaveCount(0);
 
-  expectLiveSwitch(await zoomGesture(page, Zoom.Out));
+  expectSettledSwitch(await zoomGesture(page, Zoom.Out));
 });
