@@ -80,6 +80,10 @@
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
+  import { canvasMediaUploader, projectMedia } from '$lib/canvas/media-uploader';
+  import type { LibraryMedia, MediaUploader } from '$lib/components/motion/media-upload';
+  import { changedRaw } from '$lib/motion/template/raw-values';
+  import { templateFields } from '$lib/motion/template/library';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
@@ -1616,6 +1620,27 @@
 
   let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
   const catalogPosters = new SvelteMap<string, string>();
+  let frameMedia = $state<LibraryMedia[]>([]);
+  const frameMediaUrls = $derived(Object.fromEntries(frameMedia.map((m) => [m.id, m.url ?? m.previewUrl])));
+  const uploadToFrameLibrary = canvasMediaUploader(supabase, { orgId: data.orgId, projectId: data.projectId, canvasId: data.canvas.id });
+  const uploadFrameMedia: MediaUploader = async (file, progress) => {
+    const outcome = await uploadToFrameLibrary(file, progress);
+    if (outcome.ok) {
+      frameMedia = [outcome.asset, ...frameMedia.filter((m) => m.id !== outcome.asset.id)];
+    }
+    return outcome;
+  };
+
+  $effect(() => {
+    if (frameLibraryAt) {
+      void projectMedia({ projectId: data.projectId, canvasId: data.canvas.id }).then((media) => (frameMedia = media));
+    }
+  });
+
+  function frameValues(templateId: string, draft: Instance | null): Record<string, string> {
+    const fresh = draft ? frameDraft(templateId, formatOf(draft.doc)) : null;
+    return draft && fresh ? changedRaw(templateFields(fresh.doc, fresh.clipId), templateFields(draft.doc, draft.clipId)) : {};
+  }
 
   function frameDraft(templateId: string, format: MotionFormat): Instance | null {
     const entry = data.componentTemplates.find((t) => t.id === templateId);
@@ -1640,12 +1665,13 @@
     const spot = placeNear(at, frameSize, occupiedRects());
     const id = crypto.randomUUID();
     const name = data.componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
-    const poster = item?.preview?.poster;
+    const values = frameValues(templateId, draft);
+    const poster = Object.keys(values).length ? null : item?.preview?.poster;
     if (poster) {
       catalogPosters.set(id, poster);
     }
     nodes = [...nodes, toTile(placedFrame({ id, canvasId: data.canvas.id, projectId: data.projectId, name, at: spot, doc }))];
-    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y, node_id: id });
+    const result = await post('frame_template', { template: templateId, format: formatOf(doc), values: JSON.stringify(values), x: spot.x, y: spot.y, node_id: id });
     const node = result?.node as CanvasNodeRecord | undefined;
     nodes = settle(nodes, id, node ? toTile(node) : null);
     if (!node) {
@@ -3377,7 +3403,9 @@
       items={componentItems}
       format={MotionFormat.Landscape}
       draftOf={frameDraft}
-      compose={(doc) => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })}
+      compose={(doc) => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: frameMediaUrls, target: Target.Screen })}
+      assets={frameMedia}
+      upload={uploadFrameMedia}
       target={AddTarget.Canvas}
       onpick={(templateId, _sounds, draft) => void addFrame(templateId, draft)}
       onclose={() => (frameLibraryAt = null)}

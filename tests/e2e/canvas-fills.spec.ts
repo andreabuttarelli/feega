@@ -214,7 +214,9 @@ test.describe('fill stacks @real', () => {
     await photo.getByTestId('fill-add').click();
     await photo.getByTestId('fill-add-image').click();
     await photo.getByTestId('fill-swatch').first().click();
-    await photo.getByTestId('fill-asset').filter({ has: page.locator(`img[src$="/assets/${assetId}"]`) }).click();
+    await photo.getByTestId('media-add').click();
+    await photo.getByTestId('media-tab-library').click();
+    await photo.locator(`[data-testid=media-library-item][data-asset-id="${assetId}"]`).click();
     await expect.poll(async () => clipOf(await head(admin, node.id), 'poster')?.props.media?.[0], { timeout: 20_000 }).toMatchObject({ assetId, fills: [{ type: 'image', assetId }] });
 
     await photo.getByTestId('fill-add').click();

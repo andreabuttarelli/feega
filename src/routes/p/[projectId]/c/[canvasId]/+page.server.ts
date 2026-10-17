@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { MEDIA_UUID_RE } from '$lib/media-url';
 import { registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
@@ -293,6 +294,20 @@ function graphInputOf(fd: FormData, scope: Scope): GraphInput | null {
     nodeId: String(fd.get('node_id') ?? '') || undefined,
     nodeIds: nodeIds.length ? nodeIds : undefined
   };
+}
+
+const valuesSchema = z.record(z.string(), z.string().max(4000));
+
+function templateValues(raw: FormDataEntryValue | null): Record<string, string> | null {
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed = valuesSchema.safeParse(JSON.parse(String(raw)));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 export const actions: Actions = {
@@ -1377,6 +1392,11 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid frame' });
     }
 
+    const values = templateValues(fd.get('values'));
+    if (!values) {
+      return fail(400, { error: 'invalid values' });
+    }
+
     const actor = userActor(scope);
     const deps = { ...FROM_TEMPLATE_DEPS, listCanvases: async () => [scope.canvas] };
     const started = await phases.time('start', startFromTemplate(scope.db, deps, {
@@ -1387,6 +1407,7 @@ export const actions: Actions = {
       userId: scope.userId,
       templateId: String(fd.get('template') ?? ''),
       format,
+      values,
       at,
       actor
     }));

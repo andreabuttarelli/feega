@@ -4,10 +4,11 @@
   import { applyValues, fieldValues } from '$lib/motion/template/fields';
   import type { TemplateFieldValue } from '$lib/motion/template/library';
   import FieldForm from './FieldForm.svelte';
+  import type { MediaUploader } from './media-upload';
 
   type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
 
-  let { doc, assets, onchange }: { doc: MotionDoc; assets: Asset[]; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, assets, upload = null, onchange }: { doc: MotionDoc; assets: Asset[]; upload?: MediaUploader | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const fields = $derived(fieldValues(doc).filter((f) => !f.missing).map((f) => ({ ...f, docKey: f.key })));
 
@@ -17,7 +18,7 @@
 {#if fields.length}
   <section class="fields" data-testid="doc-fields">
     <header>Fields</header>
-    <FieldForm {doc} {fields} {assets} {setValue} {onchange} />
+    <FieldForm {doc} {fields} {assets} {upload} {setValue} {onchange} />
   </section>
 {/if}
 

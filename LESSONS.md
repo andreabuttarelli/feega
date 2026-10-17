@@ -2869,6 +2869,17 @@ check that only reads tool results misses it, the screenshot of the grid catches
 Signal: a server-side edit (a tool, a port) has no effect in agent turns, and nothing new lands in
 storage, while unit tests pass. The dev server kept the old module for turns running in the
 background. Move: restart `vite dev` after server edits before trusting a real-check run.
+In a worktree under `.claude/worktrees/` the watcher sees no edit at all, client files included
+(the path has a dot folder): `curl` the module from the dev server and grep the change before
+blaming the code. Also check who owns port 4173: `reuseExistingServer` runs your specs against
+another worktree's server (`lsof -a -d cwd -p <pid>`). Move: own port (`E2E_BASE_URL`), restart
+after every edit.
+
+## A side popover sits 2px off the clamp, only when it is tall
+
+Signal: `canvas-fills` popover check fails by exactly 2 once the popover content grows enough to
+be clamped to the viewport bottom. `bind:clientHeight` leaves the 1px borders out. Move: measure a
+box you place with `offsetHeight`.
 
 ## A zoomed-out canvas pans below 60 fps though its images are already on one canvas
 

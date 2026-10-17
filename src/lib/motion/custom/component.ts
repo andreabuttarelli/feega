@@ -19,7 +19,8 @@ export enum PropFormat {
   Textarea = 'textarea',
   Asset = 'asset',
   Font = 'font',
-  Media = 'media'
+  Media = 'media',
+  MediaItem = 'media-item'
 }
 
 export enum ComponentMode {
@@ -43,7 +44,7 @@ const propSpecSchema = z
     maximum: z.number().optional(),
     step: z.number().positive().optional(),
     enum: z.array(z.string().max(60)).min(1).max(20).optional(),
-    format: z.enum([PropFormat.Color, PropFormat.Textarea, PropFormat.Asset, PropFormat.Font, PropFormat.Media]).optional(),
+    format: z.enum([PropFormat.Color, PropFormat.Textarea, PropFormat.Asset, PropFormat.Font, PropFormat.Media, PropFormat.MediaItem]).optional(),
     assetKind: z.enum(['image', 'video', 'model3d']).optional(),
     group: z.enum(['Content', 'Style', 'Layout', 'Motion', 'Camera']).optional(),
     maxLength: z.number().int().positive().max(2000).optional()

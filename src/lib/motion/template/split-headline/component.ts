@@ -28,7 +28,7 @@ const colour = (title: string, value: string): PropSpec => ({ type: 'string', ti
 export const SPLIT_PROPS: Record<string, PropSpec> = {
   headline: text('Headline', 'your story in motion', { maxLength: 80 }),
   splitAt: number('Words before the image (0: middle)', 0, 0, 12, 'Content', 1),
-  media: text('Image or video (id or link; video:id)', '', { maxLength: 2000 }),
+  media: text('Image or video', '', { format: PropFormat.MediaItem, maxLength: 2000 }),
   lowercase: flag('Lowercase headline', true, 'Content'),
   font: { type: 'string', title: 'Font', format: PropFormat.Font, default: 'Inter Tight', group: 'Style' },
   fontSize: number('Headline size (% of the short side)', 13.5, 4, 30, 'Style', 0.5),
