@@ -5,7 +5,7 @@ export type Span = [number, number];
 
 export type Run = { clips: string[]; after: number; blend: string; span: Span };
 
-type Layered = { clip: string; paint: { kind: PaintKind }; blend: string; windows: Span[] };
+type Layered = { clip: string; paint: { kind: PaintKind }; blend: string; windows: Span[]; covers?: string[] };
 
 function spanOf(windows: Span[]): Span {
   return windows.length ? [Math.max(...windows.map((w) => w[0])), Math.min(...windows.map((w) => w[1]))] : [0, Number.POSITIVE_INFINITY];
@@ -25,11 +25,11 @@ export function runsOf(layers: readonly Layered[]): Run[] {
     }
     const span = spanOf(layer.windows);
     if (open && layer.blend === NORMAL && open.blend === NORMAL) {
-      open.clips.push(layer.clip);
+      open.clips.push(...(layer.covers ?? [layer.clip]));
       open.span = joined(open.span, span);
       return;
     }
-    open = { clips: [layer.clip], after: index, blend: layer.blend, span };
+    open = { clips: [...(layer.covers ?? [layer.clip])], after: index, blend: layer.blend, span };
     runs.push(open);
   });
   return runs;

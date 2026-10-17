@@ -45,6 +45,16 @@ describe('compileScene', () => {
   });
 });
 
+describe('backdrop groups', () => {
+  it('keeps a liquid blob and everything it refracts as one HTML layer', () => {
+    const blob = must(addClip(withCard, { component: 'LiquidBlob', from: 0, durationInFrames: 90 }, 'blob'));
+    const layers = scene(blob).layers.map((l) => [l.clip, l.paint.kind]);
+
+    expect(layers).toContainEqual(['blob', PaintKind.Html]);
+    expect(layers.map(([c]) => c)).not.toContain('card');
+  });
+});
+
 describe('text', () => {
   const twoLines = must(addClip(base, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'one\ntwo' } }, 'title'));
 

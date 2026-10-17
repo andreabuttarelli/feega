@@ -17,7 +17,7 @@ export type Paint =
 
 export type Link = { el: HTMLElement; size: Size; offset: Point; perspectiveFor: boolean };
 
-export type SceneLayer = { clip: string; paint: Paint; links: Link[]; windows: [number, number][]; z: number[]; order: number; content: Size; blend: string };
+export type SceneLayer = { clip: string; paint: Paint; links: Link[]; windows: [number, number][]; z: number[]; order: number; content: Size; blend: string; covers: string[] };
 
 type Timeline = { seek: (t: number) => void };
 
@@ -140,7 +140,7 @@ function windowsOf(chain: HTMLElement[], paint: Paint): [number, number][] {
   return paint.kind === PaintKind.Video ? [...timed, [paint.start, paint.start + paint.duration]] : timed;
 }
 
-const zOf = (chain: HTMLElement[]) => chain.filter((el) => el.classList.contains('layer')).map((el) => Number(el.style.zIndex) || 0);
+const zOf = (chain: HTMLElement[]) => chain.filter((el) => el.classList.contains('layer') || el.dataset.clip !== undefined).map((el) => Number(el.style.zIndex) || 0);
 
 const effectFree = (chain: HTMLElement[]) => chain.every((el) => !NO_EFFECT.test(el.getAttribute('style') ?? '') && !el.classList.contains('matte-src'));
 
@@ -158,20 +158,23 @@ export function compileScene(html: string): Scene {
   const root = doc.getElementById('root') as HTMLElement;
   const frame = { width: px(root.dataset.width), height: px(root.dataset.height) };
   const background = [...doc.querySelectorAll('style')].map((s) => ROOT_BG.exec(s.textContent ?? '')?.[1]).find(Boolean) ?? null;
-  const leaves = [...root.querySelectorAll('.layer[data-clip]')].filter((l) => !l.querySelector('.layer[data-clip]'));
+  const backdrops = [...root.querySelectorAll('[data-clip]:not(.layer)')].filter((g) => g.querySelector('.layer[data-clip]'));
+  const all = [...root.querySelectorAll('.layer[data-clip]'), ...backdrops].sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+  const leaves = all.filter((l) => (backdrops.includes(l) || !l.querySelector('.layer[data-clip]')) && !backdrops.some((b) => b !== l && b.contains(l)));
   let order = 0;
   const layers = leaves.flatMap((layer): SceneLayer[] => {
     const outer = chainOf(layer as HTMLElement, root);
     const blend = outer.map((el) => el.style.mixBlendMode).filter((b) => b && b !== 'normal').pop() ?? 'normal';
-    const single = paintOf(layer);
-    const found = single ? [single] : textParts(layer);
+    const backdrop = backdrops.includes(layer);
+    const single = backdrop ? null : paintOf(layer);
+    const found = backdrop ? [] : single ? [single] : textParts(layer);
     const native = found.filter((f) => effectFree(chainOf(f.el, root)));
     const parts = native.length === found.length && found.length ? native : [{ el: layer as HTMLElement, paint: { kind: PaintKind.Html } as Paint }];
     return parts.map((part) => {
       const chain = chainOf(part.el, root);
       const links = part.paint.kind === PaintKind.Html ? [] : linksOf(chain, frame, part.paint);
       const content = links.length ? links[links.length - 1].size : frame;
-      return { clip: (layer as HTMLElement).dataset.clip ?? '', paint: part.paint, links, windows: windowsOf(outer, part.paint), z: zOf(outer), order: order++, content, blend };
+      return { clip: (layer as HTMLElement).dataset.clip ?? '', paint: part.paint, links, windows: windowsOf(outer, part.paint), z: zOf(outer), order: order++, content, blend, covers: [layer, ...layer.querySelectorAll('[data-clip]')].map((e) => (e as HTMLElement).dataset.clip ?? '') };
     });
   });
   return { ...frame, background: background?.trim() ?? null, layers: layers.sort(compareZ), timeline: runTimeline(doc), duration: px(root.dataset.duration), doc };
