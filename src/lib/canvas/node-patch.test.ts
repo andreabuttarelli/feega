@@ -13,6 +13,13 @@ describe('diffNodeData: only the keys the caller changed', () => {
     expect(diffNodeData({ prompt: 'cat', error: 'boom' }, { prompt: 'cat', error: undefined })).toEqual({ error: null });
   });
 
+  it('params diff down to the leaf, at any depth', () => {
+    const saved = { params: { size: { w: 1, h: 2 }, seed: 1 } };
+    const next = { params: { size: { w: 1, h: 3 }, seed: 1 } };
+
+    expect(diffNodeData(saved, next)).toEqual({ params: { size: { h: 3 } } });
+  });
+
   it('params and filters diff one level down', () => {
     const saved = { params: { seed: 1, steps: 20 }, filters: { query: 'x', sort: 'new' } };
     const next = { params: { seed: 2, steps: 20 }, filters: { query: 'x' } };
@@ -48,11 +55,11 @@ describe('mergeNodeData: the patch lands on the current row', () => {
     expect(mergeNodeData({ prompt: 'cat', error: 'boom' }, { error: null })).toEqual({ prompt: 'cat' });
   });
 
-  it('params merge one level, their values replace', () => {
+  it('params merge at every depth: a peer\'s sibling field survives', () => {
     const current = { params: { seed: 1, steps: 20, size: { w: 1 } } };
 
     expect(mergeNodeData(current, { params: { seed: 2, size: { h: 2 }, steps: null } })).toEqual({
-      params: { seed: 2, size: { h: 2 } }
+      params: { seed: 2, size: { w: 1, h: 2 } }
     });
   });
 
@@ -61,31 +68,38 @@ describe('mergeNodeData: the patch lands on the current row', () => {
   });
 });
 
-describe('clashingKeys: a conflict is the same key moved by someone else', () => {
+describe('clashingKeys: last writer wins, except where it would lose a list', () => {
   it('disjoint keys never clash', () => {
     const current = { prompt: 'cat', refId: 'theirs' };
 
     expect(clashingKeys(current, { prompt: 'cat' }, { prompt: 'dog' })).toEqual([]);
   });
 
-  it('the same key moved underneath clashes', () => {
-    expect(clashingKeys({ prompt: 'theirs' }, { prompt: 'cat' }, { prompt: 'dog' })).toEqual(['prompt']);
+  it('the same scalar moved underneath is last-writer-wins, not a conflict', () => {
+    expect(clashingKeys({ prompt: 'theirs' }, { prompt: 'cat' }, { prompt: 'dog' })).toEqual([]);
+  });
+
+  it('a list moved underneath still clashes: replacing it would drop their items', () => {
+    expect(clashingKeys({ references: ['a', 'theirs'] }, { references: ['a'] }, { references: ['a', 'mine'] })).toEqual(['references']);
   });
 
   it('landing on the value already there is not a clash', () => {
     expect(clashingKeys({ prompt: 'dog' }, { prompt: 'cat' }, { prompt: 'dog' })).toEqual([]);
   });
 
-  it('params clash per sub-key', () => {
-    const current = { params: { seed: 9, steps: 30 } };
-    const base = { params: { seed: 1 } };
+  it('a nested list clashes by its path', () => {
+    const current = { params: { size: { stops: [1, 9] } } };
 
-    expect(clashingKeys(current, base, { params: { seed: 2 } })).toEqual(['params.seed']);
-    expect(clashingKeys(current, { params: { steps: 30 } }, { params: { steps: 40 } })).toEqual([]);
+    expect(clashingKeys(current, { params: { size: { stops: [1] } } }, { params: { size: { stops: [1, 2] } } })).toEqual(['params.size.stops']);
+    expect(clashingKeys({ params: { seed: 9 } }, { params: { seed: 1 } }, { params: { seed: 2 } })).toEqual([]);
   });
 });
 
 describe('baseOf: what the client believed before its patch', () => {
+  it('follows the patch to the leaf', () => {
+    expect(baseOf({ params: { size: { w: 1, h: 2 } } }, { params: { size: { h: 3 } } })).toEqual({ params: { size: { h: 2 } } });
+  });
+
   it('picks the patched keys, one level down for merged ones', () => {
     const saved = { prompt: 'cat', refId: 'a', params: { seed: 1, steps: 20 } };
 

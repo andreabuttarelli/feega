@@ -8,6 +8,7 @@ type PlaceOptions = {
   send: (action: string, fields: Fields) => Promise<ActionAnswer>;
   backoffMs: (failures: number) => number;
   onStatus?: (status: SaveStatus) => void;
+  announce?: { intent: (row: { id: string; x: number; y: number }) => void; refused: (id: string) => void };
 };
 
 enum Placement {
@@ -36,7 +37,11 @@ export function createPlaceSaves(options: PlaceOptions) {
     return createSaveScheduler({
       send: async (id, patch) => {
         const answer = await options.send(kind, FIELDS[kind](id, patch));
-        return answer.type === 'success' ? SendResult.Saved : sendResultOf(failureOf(answer));
+        const result = answer.type === 'success' ? SendResult.Saved : sendResultOf(failureOf(answer));
+        if (result === SendResult.Dropped) {
+          options.announce?.refused(id);
+        }
+        return result;
       },
       debounceMs: 0,
       maxWaitMs: 0,
@@ -69,7 +74,10 @@ export function createPlaceSaves(options: PlaceOptions) {
   }
 
   return {
-    move: (id: string, x: number, y: number) => queues[Placement.Move].schedule(id, { x, y }, SaveTiming.Now),
+    move: (id: string, x: number, y: number) => {
+      options.announce?.intent({ id, x, y });
+      return queues[Placement.Move].schedule(id, { x, y }, SaveTiming.Now);
+    },
     resize: (id: string, width: number, height: number) => queues[Placement.Resize].schedule(id, { width, height }, SaveTiming.Now),
     moveGroup: (id: string, x: number, y: number) => queues[Placement.MoveGroup].schedule(id, { x, y }, SaveTiming.Now),
     dirty: (id: string) => all.some((queue) => queue.dirtyKeys(id).length > 0),
