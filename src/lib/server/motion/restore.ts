@@ -1,8 +1,9 @@
 import type { Db } from '$lib/server/db/client';
 import type { MotionNode } from '$lib/canvas/motion-node';
-import { RevisionOutcome, readRevision, type MotionHead } from '$lib/server/repos/motion-revisions';
+import { readRevision, type MotionHead } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
-import { headOrNew, saveMotionDoc } from './editor';
+import { headOrNew } from './editor';
+import { OpsOutcome, commitDoc } from './frame-ops';
 
 export enum Restore {
   Restored = 'restored',
@@ -20,7 +21,7 @@ export async function restoreRevision(db: Db, input: { orgId: string; nodeId: st
   }
 
   const head = await headOrNew(db, scope, input.node);
-  const write = await saveMotionDoc(db, { ...scope, expectedVersion: head.version, doc: old.doc, actor: input.actor, summary: `Restored version ${input.version}` });
-  return write.outcome === RevisionOutcome.Written ? { outcome: Restore.Restored, head: write.head } : { outcome: Restore.Conflict };
+  const write = await commitDoc(db, { ...scope, node: input.node, base: head, doc: old.doc, actor: input.actor, summary: `Restored version ${input.version}` });
+  return write.outcome === OpsOutcome.Written ? { outcome: Restore.Restored, head: write.head } : { outcome: Restore.Conflict };
 }
 
