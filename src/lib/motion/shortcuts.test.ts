@@ -226,3 +226,21 @@ describe('Figma align keys', () => {
     expect(press('†', { mod: true, alt: true, code: 'KeyT' })).toBe(Command.TidyUp);
   });
 });
+
+describe('plain-letter tools in Design mode', () => {
+  const design = (key: string) => commandFor({ key, code: `Key${key.toUpperCase()}`, mod: false, shift: false }, EditMode.Design);
+  const motion = (key: string) => commandFor({ key, code: `Key${key.toUpperCase()}`, mod: false, shift: false }, EditMode.Motion);
+
+  it('T R O P pick text, rectangle, ellipse and pen, as in Figma', () => {
+    expect(design('t')).toBe(Command.ToolText);
+    expect(design('r')).toBe(Command.ToolRectangle);
+    expect(design('o')).toBe(Command.ToolEllipse);
+    expect(design('p')).toBe(Command.ToolPen);
+  });
+
+  it('in Motion the letters keep their timeline meaning', () => {
+    expect(motion('o')).toBe(Command.WorkOut);
+    expect(motion('t')).toBe(Command.RevealOpacity);
+    expect(motion('p')).toBe(Command.RevealPosition);
+  });
+});

@@ -96,6 +96,10 @@ export type KeyPress = { key: string; code?: string; mod: boolean; shift: boolea
 type Binding = { key: string; mod?: boolean; shift?: boolean; alt?: boolean; ctrlCmd?: boolean; mode?: EditMode; command: Command; label: string; does: string; group: ShortcutGroup };
 
 export const SHORTCUTS: readonly Binding[] = [
+  { key: 't', mode: EditMode.Design, command: Command.ToolText, label: 'T', does: 'Text tool: drag in the frame', group: ShortcutGroup.Draw },
+  { key: 'r', mode: EditMode.Design, command: Command.ToolRectangle, label: 'R', does: 'Rectangle tool', group: ShortcutGroup.Draw },
+  { key: 'o', mode: EditMode.Design, command: Command.ToolEllipse, label: 'O', does: 'Ellipse tool', group: ShortcutGroup.Draw },
+  { key: 'p', mode: EditMode.Design, command: Command.ToolPen, label: 'P', does: 'Pen tool: click points, drag for curves', group: ShortcutGroup.Draw },
   { key: ' ', command: Command.TogglePlay, label: 'Space', does: 'Play / pause', group: ShortcutGroup.Playback },
   { key: 'l', command: Command.Play, label: 'L', does: 'Play', group: ShortcutGroup.Playback },
   { key: 'k', command: Command.Pause, label: 'K', does: 'Pause', group: ShortcutGroup.Playback },
