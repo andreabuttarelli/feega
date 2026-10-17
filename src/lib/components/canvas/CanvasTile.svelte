@@ -29,6 +29,7 @@
   import { getTileRender } from '$lib/canvas/tile-render-context';
   import { getTileResize } from '$lib/canvas/tile-resize-context';
   import { getTileRotate } from '$lib/canvas/tile-rotate-context';
+  import { getTileLive } from '$lib/canvas/tile-live-context';
   import { dragAngle } from '$lib/canvas/node-layout';
   import { growthOf } from '$lib/canvas/settings-column';
   import { portOfHandle, type SelectOutput } from '$lib/canvas/select-outputs';
@@ -66,6 +67,7 @@
   const render = getTileRender();
   const resize = getTileResize();
   const rotate = getTileRotate();
+  const live = getTileLive();
   const SNAP_DEG = 15;
 
   function startRotate(e: PointerEvent) {
@@ -168,7 +170,8 @@
     color={selectionColor}
     handleStyle="border-radius:0;width:8px;height:8px;"
     lineStyle="border-radius:0;"
-    onResizeEnd={(_event, params) => resize()?.(tile.id, params.width - growth.w, params.height - growth.h)}
+    onResize={(_event, params) => live()?.([{ id: tile.id, x: params.x, y: params.y, w: params.width - growth.w, h: params.height - growth.h }])}
+    onResizeEnd={(_event, params) => { live()?.([]); resize()?.(tile.id, params.width - growth.w, params.height - growth.h); }}
   />
 {/if}
 

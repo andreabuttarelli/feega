@@ -8,17 +8,28 @@
 
   const OUTLINE_PX = 2;
 
-  const outlines = $derived(peers.flatMap((peer) => peer.selection.flatMap((id) => {
-    const rect = rectOf(id);
-    return rect ? [{ key: `${peer.sessionId}:${id}`, rect, colour: peer.colour }] : [];
-  })));
+  function boxesOf(peer: CanvasPeer) {
+    const moving = new Map(peer.live.map((box) => [box.id, box]));
+    return [...new Set([...peer.selection, ...moving.keys()])].flatMap((id) => {
+      const rect = rectOf(id);
+      const box = moving.get(id);
+      if (!rect && !(box?.w && box.h)) {
+        return [];
+      }
+      const at = { x: box?.x ?? rect!.x, y: box?.y ?? rect!.y, w: box?.w ?? rect!.w, h: box?.h ?? rect!.h };
+      return [{ key: `${peer.sessionId}:${id}`, rect: at, colour: peer.colour, live: !!box }];
+    });
+  }
+
+  const outlines = $derived(peers.flatMap(boxesOf));
 </script>
 
 <div class="peers" data-testid="peer-layer" style:--inverse={1 / zoom}>
   {#each outlines as outline (outline.key)}
     <div
       class="outline"
-      data-testid="peer-selection"
+      class:live={outline.live}
+      data-testid={outline.live ? 'peer-ghost' : 'peer-selection'}
       style:left="{outline.rect.x}px"
       style:top="{outline.rect.y}px"
       style:width="{outline.rect.w}px"
@@ -40,6 +51,7 @@
 <style>
   .peers { position: absolute; inset: 0; pointer-events: none; z-index: 1000; }
   .outline { position: absolute; border-style: solid; box-sizing: border-box; }
+  .outline.live { border-style: dashed; transition: left 50ms linear, top 50ms linear, width 50ms linear, height 50ms linear; }
   .cursor { position: absolute; left: 0; top: 0; transform-origin: 0 0; transition: transform 50ms linear; will-change: transform; }
   .name { position: absolute; left: 14px; top: 14px; padding: 2px 6px; color: #fff; font-size: 11px; line-height: 14px; white-space: nowrap; border-radius: 9999px; }
 </style>

@@ -38,7 +38,7 @@
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
-  import { canvasHub, canvasPeersOf, keepCanvasMark, type CanvasMark } from '$lib/realtime/canvas-presence';
+  import { canvasHub, canvasPeersOf, keepCanvasMark, landedAt, type HeldMark } from '$lib/realtime/canvas-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
@@ -1065,9 +1065,9 @@
   const cursorSession = crypto.randomUUID();
   const cursors = canvasHub({ sessionId: cursorSession, userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
   const PEER_SWEEP_MS = 1000;
-  let cursorMarks = $state(new Map<string, CanvasMark>());
+  let cursorMarks = $state(new Map<string, HeldMark>());
   let presenceNow = $state(0);
-  const canvasPeers = $derived(canvasPeersOf(cursorMarks, cursorSession, presenceNow));
+  const canvasPeers = $derived(canvasPeersOf(cursorMarks, cursorSession, presenceNow, (box) => tiles.some((t) => t.id === box.id && landedAt(t, box))));
   $effect(() => {
     const unlisten = cursors.port.listen((mark) => { cursorMarks = keepCanvasMark(untrack(() => cursorMarks), mark); presenceNow = Date.now(); });
     const sweep = setInterval(() => { presenceNow = Date.now(); }, PEER_SWEEP_MS);
@@ -1405,7 +1405,7 @@
       },
       onReconnect: () => { void checkStale(Trigger.Reconnect); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
-      onPeers: (value) => { peers = value; },
+      onPeers: (value) => { peers = value; cursors.port.crowd(value.length + 1); },
       onLink: (state) => { canvasLink.set(state); },
       frames: frames.line,
       cursors: cursors.line
@@ -3174,6 +3174,7 @@
     onSelectionChange={selectionChanged}
     peers={canvasPeers}
     onPointer={(cursor) => cursors.port.update({ cursor })}
+    onLive={(live) => cursors.port.update({ live })}
   >
     {#snippet tile({ id, selected })}
       {@const row = nodes.find((n) => n.id === id)}
