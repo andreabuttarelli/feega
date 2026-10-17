@@ -48,7 +48,8 @@
     "eval:motion": "vite-node --config scripts/vite-node.config.ts scripts/eval/motion-quality/run.ts --",
     "eval:people": "vite-node --config scripts/vite-node.config.ts scripts/eval/people-detector.ts",
     "docs:mcp-tools": "node scripts/mcp-inventory.mjs --write",
-    "bench:export": "vite-node --config scripts/vite-node.config.ts scripts/bench/export-bench.ts --"
+    "bench:export": "vite-node --config scripts/vite-node.config.ts scripts/bench/export-bench.ts --",
+    "bench:gpu-parity": "vite-node --config scripts/vite-node.config.ts scripts/gpu-parity/parity.ts --"
   },
   "devDependencies": {
     "@internationalized/date": "^3.12.0",
@@ -79,6 +80,7 @@
     "p5": "1.11.11",
     "patch-package": "^8.0.1",
     "pixi.js": "7.4.3",
+    "pixi8": "npm:pixi.js@^8.21.0",
     "svelte": "^5.2.7",
     "svelte-check": "^4.1.0",
     "tailwindcss": "^4.3.1",

@@ -4,6 +4,7 @@
   import type { ProductsNode } from '$lib/canvas/products-node';
   import type { Product } from '$lib/server/repos/products';
   import { saleLabel } from '$lib/canvas/product-discount';
+  import { productThumb } from '$lib/canvas/source-thumbs';
 
   let { node, products = [], total = 0 }: { node: ProductsNode; products?: Product[]; total?: number } = $props();
 
@@ -13,7 +14,7 @@
   const tiles = $derived<PreviewTile[]>(
     products.map((product) => ({
       key: product.id,
-      thumb: product.images[0]?.url ?? null,
+      thumb: productThumb(product),
       label: product.title,
       caption: priceOf(product),
       badge: product.images.length > 1 ? 'carousel' : null,
