@@ -9,6 +9,8 @@ const FRAME_COMMAND: Partial<Record<SelectionActionId, Command>> = {
   group: Command.Group,
   ungroup: Command.Ungroup,
   duplicate: Command.Duplicate,
+  'flip-horizontal': Command.FlipHorizontal,
+  'flip-vertical': Command.FlipVertical,
   'use-as-mask': Command.UseAsMask,
   'release-mask': Command.RemoveMask,
   delete: Command.Delete

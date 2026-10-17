@@ -40,6 +40,8 @@ export type SelectionActionId =
   | 'align-top'
   | 'align-middle'
   | 'align-bottom'
+  | 'flip-horizontal'
+  | 'flip-vertical'
   | 'use-as-mask'
   | 'release-mask'
   | 'delete';
@@ -73,6 +75,8 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'align-top', label: 'Align top', group: 'menu', minNodes: 1 },
   { id: 'align-middle', label: 'Align vertical centres', group: 'menu', minNodes: 1 },
   { id: 'align-bottom', label: 'Align bottom', group: 'menu', minNodes: 1 },
+  { id: 'flip-horizontal', label: 'Flip horizontal', group: 'menu', minNodes: 1, shortcut: 'Shift+H' },
+  { id: 'flip-vertical', label: 'Flip vertical', group: 'menu', minNodes: 1, shortcut: 'Shift+V' },
   { id: 'use-as-mask', label: 'Use as mask', group: 'menu', minNodes: 1, shortcut: 'Mod+Ctrl+M' },
   { id: 'release-mask', label: 'Remove mask', group: 'menu', minNodes: 1 },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
@@ -93,7 +97,7 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'use-as-mask', 'release-mask', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
@@ -109,11 +113,11 @@ export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): 
   return SHOWN[id]?.(summaries) ?? true;
 }
 
-export type FrameOnlyActionId = 'use-as-mask' | 'release-mask';
+export type FrameOnlyActionId = 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask';
 
 export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId>;
 
-const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['use-as-mask', 'release-mask']);
+const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask']);
 
 export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id);
 

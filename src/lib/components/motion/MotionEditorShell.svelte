@@ -72,6 +72,7 @@
   import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import { Flip, flipClips } from '$lib/motion/layer-props';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
   import { FRAME_MENU_IDS, frameLayers, frameMenuRun, frameSummaries, type FrameLayer } from '$lib/motion/frame-menu';
   import type { SelectionActionId } from '$lib/canvas/selection-actions';
@@ -1478,7 +1479,9 @@
     [Command.Ungroup]: ungroupSelection,
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
-    [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask')
+    [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask'),
+    [Command.FlipHorizontal]: () => selection.length && apply(flipClips(doc, selection, Flip.Horizontal), 'Flipped horizontally'),
+    [Command.FlipVertical]: () => selection.length && apply(flipClips(doc, selection, Flip.Vertical), 'Flipped vertically')
   };
 
   const TOOL_RUN: Partial<Record<ActionId, () => void>> = {

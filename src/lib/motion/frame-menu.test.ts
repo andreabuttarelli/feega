@@ -10,7 +10,7 @@ import { Edge } from './space';
 describe('the right-click menu inside a frame', () => {
   it('is the canvas menu table, limited to what a frame can run', () => {
     const ids = CANVAS_MENU.map((a) => a.id).filter((id) => FRAME_MENU_IDS.has(id));
-    expect(ids).toEqual(['group', 'ungroup', 'duplicate', 'align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'use-as-mask', 'release-mask', 'delete']);
+    expect(ids).toEqual(['group', 'ungroup', 'duplicate', 'align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'delete']);
   });
 
   it('aligns a single element to the frame, as Figma does', () => {
@@ -21,6 +21,7 @@ describe('the right-click menu inside a frame', () => {
   it('each item runs a frame command or an align edge', () => {
     expect(frameMenuRun('group')).toEqual({ command: Command.Group });
     expect(frameMenuRun('align-top')).toEqual({ edge: Edge.Top });
+    expect(frameMenuRun('flip-vertical')).toEqual({ command: Command.FlipVertical });
     expect(frameMenuRun('copy-id')).toBeNull();
   });
 });

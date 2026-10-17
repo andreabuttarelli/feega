@@ -1,5 +1,7 @@
 import type { Component } from 'svelte';
 import Play from '@lucide/svelte/icons/play';
+import FlipHorizontal2 from '@lucide/svelte/icons/flip-horizontal-2';
+import FlipVertical2 from '@lucide/svelte/icons/flip-vertical-2';
 import CornerRightDown from '@lucide/svelte/icons/corner-right-down';
 import CornerLeftUp from '@lucide/svelte/icons/corner-left-up';
 import Pipette from '@lucide/svelte/icons/pipette';
@@ -201,6 +203,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.FlipHorizontal]: { name: 'Flip horizontal', icon: FlipHorizontal2, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.FlipVertical]: { name: 'Flip vertical', icon: FlipVertical2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Tool.NullFromSelection]: { name: 'Null parent', icon: CircleDashed, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.StartHere]: { name: 'Move clip to start here', icon: AlignStart, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },
   [Command.EndHere]: { name: 'Move clip to end here', icon: AlignEnd, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },

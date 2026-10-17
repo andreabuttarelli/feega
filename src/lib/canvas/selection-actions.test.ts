@@ -32,6 +32,8 @@ describe('group and ungroup', () => {
       ['align-top', null],
       ['align-middle', null],
       ['align-bottom', null],
+      ['flip-horizontal', 'Shift+H'],
+      ['flip-vertical', 'Shift+V'],
       ['use-as-mask', 'Mod+Ctrl+M'],
       ['release-mask', null],
       ['delete', 'Backspace']
