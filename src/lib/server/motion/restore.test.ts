@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
-import { Restore, restoreRevision } from './editor';
+import { Restore, restoreRevision } from './restore';
 
 vi.mock('$lib/server/repos/canvas', async (real) => ({ ...(await real<object>()), patchNodeData: vi.fn(async () => ({ ok: true })) }));
 
