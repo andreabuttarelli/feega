@@ -1,10 +1,28 @@
 import { describe, expect, it } from 'vitest';
-import { RenderEngine, engineFlag } from './engine-flag';
+import { RenderEngine, engineFlag, killSwitch } from './engine-flag';
+
+const url = (q = '') => new URL(`https://feega.app/app/compose/x${q}`);
 
 describe('engineFlag', () => {
-  it('keeps the HTML engine unless the URL asks for the GPU one', () => {
-    expect(engineFlag(new URL('https://feega.app/app/compose/x'))).toBe(RenderEngine.Html);
-    expect(engineFlag(new URL('https://feega.app/app/compose/x?engine=gpu'))).toBe(RenderEngine.Gpu);
-    expect(engineFlag(new URL('https://feega.app/app/compose/x?engine=other'))).toBe(RenderEngine.Html);
+  it('draws on the GPU by default', () => {
+    expect(engineFlag(url(), false)).toBe(RenderEngine.Gpu);
+    expect(engineFlag(url('?engine=other'), false)).toBe(RenderEngine.Gpu);
+  });
+
+  it('keeps ?engine=html as an escape hatch', () => {
+    expect(engineFlag(url('?engine=html'), false)).toBe(RenderEngine.Html);
+  });
+
+  it('forces HTML for everyone when the kill switch is on', () => {
+    expect(engineFlag(url('?engine=gpu'), true)).toBe(RenderEngine.Html);
+  });
+});
+
+describe('killSwitch', () => {
+  it('trips on the env value or the PostHog flag', () => {
+    expect(killSwitch('html', false)).toBe(true);
+    expect(killSwitch(undefined, true)).toBe(true);
+    expect(killSwitch(undefined, false)).toBe(false);
+    expect(killSwitch('gpu', false)).toBe(false);
   });
 });
