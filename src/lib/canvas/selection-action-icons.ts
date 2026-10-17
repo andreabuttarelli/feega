@@ -19,6 +19,14 @@ import Clipboard from '@lucide/svelte/icons/clipboard';
 import ClipboardPaste from '@lucide/svelte/icons/clipboard-paste';
 import BringToFront from '@lucide/svelte/icons/bring-to-front';
 import SendToBack from '@lucide/svelte/icons/send-to-back';
+import AlignStartVertical from '@lucide/svelte/icons/align-start-vertical';
+import AlignCenterVertical from '@lucide/svelte/icons/align-center-vertical';
+import AlignEndVertical from '@lucide/svelte/icons/align-end-vertical';
+import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
+import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
+import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
+import SquareDashed from '@lucide/svelte/icons/square-dashed';
+import Square from '@lucide/svelte/icons/square';
 import type { Component } from 'svelte';
 import type { SelectionActionId } from './selection-actions';
 
@@ -38,5 +46,13 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   paste: ClipboardPaste,
   'bring-front': BringToFront,
   'send-back': SendToBack,
+  'align-left': AlignStartVertical,
+  'align-center': AlignCenterVertical,
+  'align-right': AlignEndVertical,
+  'align-top': AlignStartHorizontal,
+  'align-middle': AlignCenterHorizontal,
+  'align-bottom': AlignEndHorizontal,
+  'use-as-mask': SquareDashed,
+  'release-mask': Square,
   delete: Trash2
 };

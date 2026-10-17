@@ -236,6 +236,14 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   paste: CLIPBOARD,
   'bring-front': canvas('move_node'),
   'send-back': canvas('move_node'),
+  'align-left': canvas('move_node'),
+  'align-center': canvas('move_node'),
+  'align-right': canvas('move_node'),
+  'align-top': canvas('move_node'),
+  'align-middle': canvas('move_node'),
+  'align-bottom': canvas('move_node'),
+  'use-as-mask': motion('use_as_mask'),
+  'release-mask': motion('release_mask'),
   delete: canvas('delete_node')
 };
 
