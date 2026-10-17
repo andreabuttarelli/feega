@@ -100,7 +100,7 @@ const MODEL_CALLERS: Readonly<Record<string, string>> = {
   'src/lib/server/media-model-prefs.ts': 'reads video durations, calls no model',
   'src/lib/server/offerable-models.ts': 'reads video durations, calls no model',
   'src/lib/server/studio-actions.ts': 'reads video durations, calls no model',
-  'src/routes/p/[projectId]/settings/video/+page.server.ts': 'reads video durations, calls no model',
+  'src/lib/server/settings/pages/video.ts': 'reads video durations, calls no model',
   'src/lib/server/canvas/audio-description.ts': 'lists ElevenLabs voices',
   'src/routes/api/v1/org/audio/voices/+server.ts': 'lists ElevenLabs voices',
   'src/routes/p/[projectId]/c/[canvasId]/+page.server.ts': 'lists ElevenLabs voices; generation goes through runGenNode'

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
-import { actions, load } from './+page.server';
+import { actions, load } from '$lib/server/settings/pages/profile';
 
 const USER = { id: 'u-1', email: 'ada@example.com', user_metadata: {} };
 

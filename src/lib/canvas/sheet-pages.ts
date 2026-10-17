@@ -1,7 +1,8 @@
-import type { Component } from 'svelte';
+import type { Component, Snippet } from 'svelte';
 import { SETTINGS_HOME } from '$lib/components/settings/platforms';
 
 type PageModule = { default: Component<{ data: unknown; form: unknown }> };
+type LayoutModule = { default: Component<{ data: unknown; children: Snippet }> };
 
 /**
  * OGNI `+page.svelte` SOTTO `settings/`, CARICATA PIGRA E PER CARTELLA — non un elenco scritto a
@@ -17,7 +18,7 @@ export const SHEET_PAGE_LOADERS = {
   calendar: () => import('../../routes/p/[projectId]/calendar/+page.svelte') as Promise<PageModule>,
   ads: () => import('../../routes/p/[projectId]/ads/+page.svelte') as Promise<PageModule>,
   promote: () => import('../../routes/p/[projectId]/promote/+page.svelte') as Promise<PageModule>,
-  settingsLayout: () => import('../../routes/p/[projectId]/settings/+layout.svelte') as Promise<PageModule>
+  settingsLayout: () => import('../../routes/p/[projectId]/settings/+layout.svelte') as unknown as Promise<LayoutModule>
 };
 
 /** Il primo segmento sotto `settings/` — la sezione del GRUPPO, per evidenziare la voce attiva

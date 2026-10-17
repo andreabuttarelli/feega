@@ -17,10 +17,10 @@ vi.mock('$lib/server/email', () => ({
   brandInviteEmailText: () => 't'
 }));
 
-import { actions as apiKeyActions } from './api-keys/+page.server';
-import { actions as teamActions } from './team/+page.server';
+import { actions as apiKeyActions } from '$lib/server/settings/pages/api-keys';
+import { actions as teamActions } from '$lib/server/settings/pages/team';
 import { actions as accountActions } from './connected-accounts/+page.server';
-import { actions as dangerActions } from './danger/+page.server';
+import { actions as dangerActions } from '$lib/server/settings/pages/danger';
 
 const USER = 'user-1';
 const ORG = 'org-1';

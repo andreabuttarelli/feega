@@ -1,5 +1,5 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import type { Actions, PageServerLoad, RequestEvent } from './$types';
+import type { ProjectEvent, SettingsActions, SettingsEvent } from '../event';
 import type { Db } from '$lib/server/db/client';
 import { settingsScope } from '$lib/server/settings-actions';
 import {
@@ -23,7 +23,7 @@ const OPT_IN_ERRORS: Readonly<Record<string, string>> = {
   not_an_adult: 'Only influencers declared 18 or older can be marked.'
 };
 
-async function scopeOf(event: RequestEvent | Parameters<PageServerLoad>[0]) {
+async function scopeOf(event: ProjectEvent) {
   const { data: { user } } = await event.locals.supabase.auth.getUser();
   if (!user) {
     throw redirect(303, '/login');
@@ -35,7 +35,7 @@ async function scopeOf(event: RequestEvent | Parameters<PageServerLoad>[0]) {
   return { db: event.locals.supabase as unknown as Db, orgId: scope.orgId, userId: user.id };
 }
 
-export const load: PageServerLoad = async (event) => {
+export const load = async (event: SettingsEvent) => {
   const { db, orgId } = await scopeOf(event);
   const { data: personas } = await event.locals.supabase
     .from('influencers')
@@ -56,7 +56,7 @@ function answer(outcome: OptInOutcome) {
   return outcome.ok ? { saved: true } : fail(400, { error: OPT_IN_ERRORS[outcome.error] ?? outcome.error });
 }
 
-export const actions: Actions = {
+export const actions: SettingsActions = {
   enable: async (event) => {
     const { db, orgId, userId } = await scopeOf(event);
     const fd = await event.request.formData();

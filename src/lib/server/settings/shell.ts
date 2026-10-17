@@ -1,4 +1,4 @@
-import type { LayoutServerLoad } from './$types';
+import type { SettingsEvent } from './event';
 import { affordableSeats } from '$lib/server/social-connections';
 import { ACCOUNT_SEAT_USD } from '$lib/credit-ladder';
 import { orgCreditBalance } from '$lib/server/credits';
@@ -28,7 +28,7 @@ async function brandSeats(supabase: Db, brand: ProjectBrandShell) {
 
 const NO_SEATS = { accounts: [], limit: 0, used: 0, hasBilling: false };
 
-export const load: LayoutServerLoad = async ({ parent, url, locals: { supabase } }) => {
+export const load = async ({ parent, url, locals: { supabase } }: SettingsEvent) => {
   const { brand, org } = await parent();
   const brandGate = !brand && sectionRequiresBrand(url.pathname);
 

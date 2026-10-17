@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
+  import { enhance } from '$lib/settings/enhance';
   import { page } from '$app/state';
   import { Panel } from '$lib/components/ui/panel';
   import { Field } from '$lib/components/ui/field';
@@ -120,7 +120,7 @@
 {/if}
 
 <Panel title="Delete project" description="The project and its canvases disappear from your workspace. Brands and posts stay.">
-  <form method="POST" action="?/delete" class="flex flex-col items-start gap-3">
+  <form method="POST" action="?/delete" use:enhance class="flex flex-col items-start gap-3">
     <Field label={`Type ${data.project.name} to confirm`} for="confirm-project-name" class="w-full">
       <Input id="confirm-project-name" name="confirmName" type="text" bind:value={confirmName} autocomplete="off" class="h-9" />
     </Field>
