@@ -79,6 +79,7 @@
     "p5": "1.11.11",
     "patch-package": "^8.0.1",
     "pixi.js": "7.4.3",
+    "pixi8": "npm:pixi.js@^8.21.0",
     "svelte": "^5.2.7",
     "svelte-check": "^4.1.0",
     "tailwindcss": "^4.3.1",
