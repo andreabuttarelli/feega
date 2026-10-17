@@ -55,6 +55,22 @@ describe('backdrop groups', () => {
   });
 });
 
+describe('effects', () => {
+  it('draws a gaussian blur effect natively, in screen pixels', () => {
+    const blurred = withClip(withCard, 'card', { effects: [{ id: 'e1', kind: 'gaussian-blur', enabled: true, params: { radius: 12 } }] } as never);
+    const card = byClip(drawn(blurred, 0), 'card');
+
+    expect(card?.paint.kind).toBe(PaintKind.Shape);
+    expect(card?.blur).toBeGreaterThan(0);
+  });
+
+  it('skips a layer that paints nothing, like an audio clip', () => {
+    const audio = must(addClip(withCard, { component: 'Audio', from: 0, durationInFrames: 30 }, 'sound'));
+
+    expect(scene(audio).layers.map((l) => l.clip)).not.toContain('sound');
+  });
+});
+
 describe('text', () => {
   const twoLines = must(addClip(base, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'one\ntwo' } }, 'title'));
 

@@ -27,8 +27,10 @@ export type Drawn = { clip: string; layer: SceneLayer; paint: Paint; quad: Quad;
 
 const ROOT_BG = /#root\{background:([^};]+)/;
 const TIMELINE_MARK = `__timelines[${JSON.stringify(COMPOSITION_ID)}]=tl`;
-const INSET_CLASSES = ['layer', 'fx', 'kp', 'kf', 'ks', 'cc', 'kpc', 'kc', 'ksc'];
-const NO_EFFECT = /mask|url\(|backdrop/;
+const INSET_CLASSES = ['layer', 'fx', 'kp', 'kf', 'ks', 'cc', 'kpc', 'kc', 'ksc', 'ef'];
+const NO_EFFECT = /mask|backdrop/;
+const FILTER_REF = /url\("?#([^")]+)"?\)/;
+const PAINTS = 'img,svg:not(.efd),video,canvas,iframe,[style*="background"],[style*="border"]';
 
 const px = (v: string | null | undefined) => parseFloat(v ?? '') || 0;
 
@@ -142,7 +144,22 @@ function windowsOf(chain: HTMLElement[], paint: Paint): [number, number][] {
 
 const zOf = (chain: HTMLElement[]) => chain.filter((el) => el.classList.contains('layer') || el.dataset.clip !== undefined).map((el) => Number(el.style.zIndex) || 0);
 
-const effectFree = (chain: HTMLElement[]) => chain.every((el) => !NO_EFFECT.test(el.getAttribute('style') ?? '') && !el.classList.contains('matte-src'));
+function gaussianOf(el: HTMLElement): number | null {
+  const ref = FILTER_REF.exec(el.style.filter)?.[1];
+  if (!ref) {
+    return 0;
+  }
+  const filter = el.ownerDocument.getElementById(ref);
+  const steps = filter ? [...filter.children] : [];
+  if (!steps.length || steps.some((s) => s.tagName.toLowerCase() !== 'fegaussianblur' || (s.getAttribute('in') ?? 'SourceGraphic') !== 'SourceGraphic')) {
+    return null;
+  }
+  return steps.reduce((sum, s) => sum + (parseFloat(s.getAttribute('stdDeviation') ?? '0') || 0), 0);
+}
+
+const effectFree = (chain: HTMLElement[]) => chain.every((el) => !NO_EFFECT.test(el.getAttribute('style') ?? '') && !el.classList.contains('matte-src') && gaussianOf(el) !== null);
+
+const paintsNothing = (layer: Element) => !layer.textContent?.trim() && !layer.querySelector(PAINTS);
 
 function compareZ(a: SceneLayer, b: SceneLayer): number {
   for (let i = 0; i < Math.min(a.z.length, b.z.length); i++) {
@@ -160,7 +177,7 @@ export function compileScene(html: string): Scene {
   const background = [...doc.querySelectorAll('style')].map((s) => ROOT_BG.exec(s.textContent ?? '')?.[1]).find(Boolean) ?? null;
   const backdrops = [...root.querySelectorAll('[data-clip]:not(.layer)')].filter((g) => g.querySelector('.layer[data-clip]'));
   const all = [...root.querySelectorAll('.layer[data-clip]'), ...backdrops].sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
-  const leaves = all.filter((l) => (backdrops.includes(l) || !l.querySelector('.layer[data-clip]')) && !backdrops.some((b) => b !== l && b.contains(l)));
+  const leaves = all.filter((l) => !paintsNothing(l)).filter((l) => (backdrops.includes(l) || !l.querySelector('.layer[data-clip]')) && !backdrops.some((b) => b !== l && b.contains(l)));
   let order = 0;
   const layers = leaves.flatMap((layer): SceneLayer[] => {
     const outer = chainOf(layer as HTMLElement, root);
@@ -264,7 +281,7 @@ function drawnOf(layer: SceneLayer, t: number): Drawn | null {
     }
     m = multiply(m, linkMatrix(link, layer.links[i - 1] ?? null, vars));
     opacity *= style.opacity === '' ? 1 : Number(style.opacity);
-    blur += Number(BLUR.exec(style.filter)?.[1] ?? 0) * scaleOf(m);
+    blur += (Number(BLUR.exec(style.filter)?.[1] ?? 0) + (gaussianOf(link.el) ?? 0)) * scaleOf(m);
     blend = style.mixBlendMode && style.mixBlendMode !== 'normal' ? style.mixBlendMode : blend;
     const inset = insetOf(style.clipPath);
     if (inset) {
