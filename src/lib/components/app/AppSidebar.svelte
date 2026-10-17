@@ -1,6 +1,6 @@
 <script lang="ts">
   import { apiEnhance } from '$lib/dashboard/api-enhance';
-  import { chooseWorkspace } from '$lib/dashboard/api';
+  import { chooseWorkspace, createWorkspace } from '$lib/dashboard/api';
   import { goto } from '$app/navigation';
   import { _ } from 'svelte-i18n';
   import Folder from '@lucide/svelte/icons/folder';
@@ -65,8 +65,25 @@
       .join('') || profile.email[0]?.toUpperCase() || '?'
   );
 
+  let creating = $state(false);
+  let newName = $state('');
+  let createError = $state<string | null>(null);
+
+  async function submitWorkspace(e: SubmitEvent) {
+    e.preventDefault();
+    const sent = await createWorkspace(newName);
+    if (!sent.ok) {
+      createError = String(sent.body.message ?? sent.body.error ?? '');
+      return;
+    }
+    creating = false;
+    newName = '';
+    createError = null;
+    await goto('/app', { invalidateAll: true });
+  }
+
   async function switchWorkspace(orgId: string) {
-    chooseWorkspace(orgId);
+    await chooseWorkspace(orgId);
     await goto('/app', { invalidateAll: true });
   }
 </script>
@@ -166,18 +183,28 @@
       </span>
     </button>
 
-    {#if workspaces.length > 1}
-      <div class="workspace">
-          <div>
-            <label class="sr-only" for="workspace-select">Workspace</label>
-            <select id="workspace-select" name="orgId" value={org.id} onchange={(e) => switchWorkspace(e.currentTarget.value)}>
-              {#each workspaces as w (w.id)}
-                <option value={w.id}>{w.name}</option>
-              {/each}
-            </select>
-          </div>
-      </div>
-    {/if}
+    <div class="workspace">
+      <label class="sr-only" for="workspace-select">{$_('app.orgs.label')}</label>
+      <select id="workspace-select" name="orgId" value={org.id} onchange={(e) => switchWorkspace(e.currentTarget.value)} data-testid="org-switcher">
+        {#each workspaces as w (w.id)}
+          <option value={w.id}>{w.name}</option>
+        {/each}
+      </select>
+
+      {#if creating}
+        <form class="new-org" onsubmit={submitWorkspace}>
+          <input name="name" required maxlength="80" placeholder={$_('app.orgs.namePlaceholder')} bind:value={newName} data-testid="new-org-name" />
+          <button type="submit" class="row">{$_('app.orgs.create')}</button>
+          <button type="button" class="row" onclick={() => (creating = false)}>{$_('app.orgs.cancel')}</button>
+          {#if createError}<p class="new-org-error" role="alert">{createError}</p>{/if}
+        </form>
+      {:else}
+        <button type="button" class="row" onclick={() => (creating = true)} data-testid="new-org">
+          <Plus size={ICON} strokeWidth={STROKE} />
+          <span class="label">{$_('app.orgs.new')}</span>
+        </button>
+      {/if}
+    </div>
   </div>
 </nav>
 
@@ -416,7 +443,32 @@
   }
 
   .workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     padding: 0 var(--ui-space-2);
+  }
+
+  .new-org {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .new-org input {
+    height: var(--ui-row);
+    padding: 0 var(--ui-space-2);
+    border: 0;
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-input);
+    color: var(--ui-text);
+    font: inherit;
+  }
+
+  .new-org-error {
+    margin: 0;
+    color: var(--ui-danger);
+    font-size: var(--ui-type-caption);
   }
 
   .workspace select {
