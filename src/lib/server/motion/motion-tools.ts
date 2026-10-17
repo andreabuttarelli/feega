@@ -159,6 +159,7 @@ import { animateStill, setStill } from '$lib/motion/still';
 import { liftElement, type Element } from '$lib/motion/move-element';
 import { MoveOutcome, type FrameTarget, type Moved } from './move-element';
 import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '$lib/motion/still-model';
+import type { BreakdownAnswer } from '$lib/server/video-reference';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
 const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
@@ -190,6 +191,7 @@ export type MotionToolDeps = {
   seam?: () => Promise<number | null>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
   analysis?: (assetId: string) => Promise<AudioAnalysis | null>;
+  videoBreakdown?: (assetId: string) => Promise<BreakdownAnswer>;
   spawn?: { offers: readonly ModelOffer[]; run: (input: SpawnInput) => Promise<SpawnResult> };
   batch?: (input: { doc: MotionDoc; rows: { name: string; values: Record<string, string> }[] }) => Promise<Record<string, unknown>>;
   renderLink?: (quality: ExportQuality) => Promise<Record<string, unknown>>;
@@ -1032,6 +1034,19 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         }
         const { duration, bpm, beats, onsets, speech } = analysis;
         return { ok: true, duration, bpm, beats, onsets, speech };
+      }
+    }),
+
+    read_video_reference: tool({
+      description:
+        'Read a reference video asset (attached in chat or from list_assets): voice-over transcript, scenes with timestamps and durations, on-screen text, UI elements shown, camera moves, transitions, pacing, palette and typography. Use it to make a video like the reference — recreate its structure and rhythm with your own details, never a copy. The first read of a video costs credits; later reads are free.',
+      inputSchema: z.object({ asset_id: z.string() }),
+      execute: async (input) => {
+        if (!deps.videoBreakdown) {
+          return UNREADABLE('reading a reference video');
+        }
+        const answer = await deps.videoBreakdown(input.asset_id);
+        return answer.ok ? { ok: true, brief: answer.brief, breakdown: answer.breakdown } : { ok: false, error: answer.message };
       }
     }),
 

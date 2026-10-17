@@ -5,7 +5,7 @@
  * L'esclusione vive in UNA tabella, con la ragione accanto — mai uno `if` sparso per nome.
  */
 
-export type ParamSchemaEntry = { type: 'enum'; values: string[] } | { type: 'boolean' } | { type: 'range'; min: number; max: number };
+export type ParamSchemaEntry = { type: 'enum'; values: string[]; labels?: Readonly<Record<string, string>> } | { type: 'boolean' } | { type: 'range'; min: number; max: number };
 
 export type ModelParam =
   | { name: string; label: string; kind: 'enum'; values: string[]; optionLabels?: Readonly<Record<string, string>> }
@@ -26,6 +26,7 @@ const LABEL_OVERRIDES: Readonly<Record<string, string>> = {
   background: 'Background',
   output_compression: 'Compression',
   generate_audio: 'Audio',
+  preset_id: 'Style',
   seed: 'Seed'
 };
 
@@ -34,14 +35,14 @@ function humanize(name: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-function labelOf(name: string): string {
+export function labelOf(name: string): string {
   return LABEL_OVERRIDES[name] ?? humanize(name);
 }
 
 function paramOf(name: string, entry: ParamSchemaEntry): ModelParam | null {
   const label = labelOf(name);
 
-  if (entry.type === 'enum') return { name, label, kind: 'enum', values: entry.values };
+  if (entry.type === 'enum') return { name, label, kind: 'enum', values: entry.values, ...(entry.labels ? { optionLabels: entry.labels } : {}) };
   if (entry.type === 'boolean') return { name, label, kind: 'boolean' };
   if (entry.type === 'range') return { name, label, kind: 'number', min: entry.min, max: entry.max };
 

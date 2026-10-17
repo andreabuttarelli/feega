@@ -53,7 +53,7 @@ vi.mock('$lib/server/offerable-models', () => ({
   offerableModels: async () => ({ synced: true, choices: [primaryChoice] })
 }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
-vi.mock('./node-model', () => ({ resolveNodeModel: async (_m: string, model: string | null) => ({ ok: true, model }) }));
+vi.mock('./node-model', () => ({ resolveModelIn: async (_mode: string, _m: string, model: string | null) => ({ ok: true, model }) }));
 vi.mock('$lib/server/canvas/upstream', () => ({
   upstreamInputsFor: async () => ({
     text: [],
