@@ -81,7 +81,7 @@
   import { ReportChange, reportChange } from '$lib/canvas/selection-report';
   import { Stack } from '$lib/canvas/stacking';
   import CanvasContextMenu from './CanvasContextMenu.svelte';
-  import { alignTiles } from '$lib/canvas/align';
+  import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { NODE_KIND_LABEL } from '$lib/canvas/node-label';
 
@@ -624,13 +624,16 @@
    * `RUN` in `CanvasKeys.svelte`, qui perché lo stato della selezione (`selection.ids`) vive in
    * questo componente e non in quello.
    */
-  function alignSelection(ids: string[], edge: Edge) {
-    const placed = ids.flatMap((id) => {
+  const placedBoxes = (ids: string[]) =>
+    ids.flatMap((id) => {
       const n = nodes.find((node) => node.id === id);
       const t = tiles.find((tile) => tile.id === id);
       return n && t ? [{ id, x: n.position.x, y: n.position.y, width: t.w, height: t.h }] : [];
     });
-    const moves = alignTiles(placed, edge);
+
+  const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));
+
+  function placeTiles(moves: TileMove[]) {
     if (!moves.length) {
       return;
     }
@@ -648,6 +651,7 @@
   const alignRun = (id: AlignActionId) => (ids: string[]) => alignSelection(ids, ALIGN_EDGE[id]);
 
   const SELECTION_RUN: Record<CanvasActionId, (ids: string[]) => void> = {
+    'tidy-up': (ids) => placeTiles(tidyTiles(placedBoxes(ids))),
     ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => onDuplicate?.(ids),
     'connect-new': () => {

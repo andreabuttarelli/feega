@@ -214,3 +214,15 @@ describe('sibling keys', () => {
     expect(press('Tab', { shift: true })).toBe(Command.SelectPrevious);
   });
 });
+
+describe('Figma align keys', () => {
+  it('⌥A ⌥H ⌥D ⌥W ⌥V ⌥S align, ⌃⌥T tidies up, by physical key', () => {
+    expect(press('å', { alt: true, code: 'KeyA' })).toBe(Command.AlignLeft);
+    expect(press('˙', { alt: true, code: 'KeyH' })).toBe(Command.AlignCenter);
+    expect(press('∂', { alt: true, code: 'KeyD' })).toBe(Command.AlignRight);
+    expect(press('∑', { alt: true, code: 'KeyW' })).toBe(Command.AlignTop);
+    expect(press('√', { alt: true, code: 'KeyV' })).toBe(Command.AlignMiddle);
+    expect(press('ß', { alt: true, code: 'KeyS' })).toBe(Command.AlignBottom);
+    expect(press('†', { mod: true, alt: true, code: 'KeyT' })).toBe(Command.TidyUp);
+  });
+});

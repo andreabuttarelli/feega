@@ -43,6 +43,7 @@ import { isTypingTarget } from '$lib/shortcuts';
 import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
 import { Command, commandFor } from '$lib/motion/shortcuts';
+import { Edge } from '$lib/motion/space';
 
 /** Di quante unità di tela sposta una freccia, e quanto con Shift. */
 export const NUDGE_STEP = 8;
@@ -57,6 +58,8 @@ export type CanvasCommandId =
   | 'zoom-in'
   | 'zoom-out'
   | 'nudge'
+  | 'align'
+  | 'tidy'
   | 'enter'
   | 'select-next'
   | 'select-previous'
@@ -79,7 +82,8 @@ export type CanvasCommand =
   | { id: 'add'; what: Addable }
   | { id: 'nudge'; dx: number; dy: number }
   | { id: 'tool'; tool: DrawTool }
-  | { id: Exclude<CanvasCommandId, 'add' | 'nudge' | 'tool'> };
+  | { id: 'align'; edge: Edge }
+  | { id: Exclude<CanvasCommandId, 'add' | 'nudge' | 'tool' | 'align'> };
 
 const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
   [Command.ToolSelect]: DrawTool.Select,
@@ -119,9 +123,18 @@ const ZOOM_IN_KEYS = ['+', '='];
  * Da un evento al comando, o null. `null` non è «non so»: è «questo evento non è mio», e chi
  * ascolta deve lasciarlo passare intatto — dentro un campo di testo è l'unica risposta giusta.
  */
+const ALT_ALIGN: Record<string, Edge> = { KeyA: Edge.Left, KeyH: Edge.Center, KeyD: Edge.Right, KeyW: Edge.Top, KeyV: Edge.Middle, KeyS: Edge.Bottom };
+
+function altCommand(e: KeyboardEvent): CanvasCommand | null {
+  if (isTypingTarget(e.target) || e.shiftKey) return null;
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod) return e.code === 'KeyT' ? { id: 'tidy' } : null;
+  const edge = ALT_ALIGN[e.code];
+  return edge ? { id: 'align', edge } : null;
+}
+
 export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
-  // Alt fuori sempre: su macOS ⌥+lettera scrive un carattere vero, e intercettarlo lo mangia.
-  if (e.altKey) return null;
+  if (e.altKey) return altCommand(e);
 
   // Mentre si scrive nessun tasto è nostro, nemmeno quelli con modificatore: ⌘A dentro una
   // textarea seleziona il testo, ed è quello che l'utente sta chiedendo.
@@ -208,6 +221,8 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'send-back', keys: ['mod', '['], label: 'Send to back' },
   { id: 'copy', keys: ['mod', 'C'], label: 'Copy selection' },
   { id: 'paste', keys: ['mod', 'V'], label: 'Incolla' },
+  { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
+  { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },
   { id: 'fit', keys: ['0'], label: 'Inquadra tutto' },
   { id: 'zoom-in', keys: ['+'], label: 'Ingrandisci' },

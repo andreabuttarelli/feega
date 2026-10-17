@@ -69,7 +69,7 @@
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
   import CornerOverlay from '$lib/components/motion/CornerOverlay.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
-  import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
+  import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes, tidySpace } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
   import { Flip, flipClips } from '$lib/motion/layer-props';
@@ -1483,6 +1483,13 @@
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
     [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask'),
+    [Command.AlignLeft]: () => selection.length && alignTo(Edge.Left),
+    [Command.AlignCenter]: () => selection.length && alignTo(Edge.Center),
+    [Command.AlignRight]: () => selection.length && alignTo(Edge.Right),
+    [Command.AlignTop]: () => selection.length && alignTo(Edge.Top),
+    [Command.AlignMiddle]: () => selection.length && alignTo(Edge.Middle),
+    [Command.AlignBottom]: () => selection.length && alignTo(Edge.Bottom),
+    [Command.TidyUp]: () => selection.length > 1 && apply(tidySpace(doc, selection, frame, spaceBoxes(), editMode), 'Tidied up'),
     [Command.FlipHorizontal]: () => selection.length && apply(flipClips(doc, selection, Flip.Horizontal), 'Flipped horizontally'),
     [Command.FlipVertical]: () => selection.length && apply(flipClips(doc, selection, Flip.Vertical), 'Flipped vertically')
   };

@@ -11,6 +11,7 @@ import {
 } from './shortcuts';
 import { CANVAS_ADD_BAR } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
+import { Edge } from '$lib/motion/space';
 
 /** Un evento tastiera finto: bastano i campi che il registro guarda. */
 function ev(
@@ -241,5 +242,12 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('Enter'))).toEqual({ id: 'enter' });
     expect(matchCanvasShortcut(ev('Tab'))).toEqual({ id: 'select-next' });
     expect(matchCanvasShortcut(ev('Tab', { shiftKey: true }))).toEqual({ id: 'select-previous' });
+  });
+
+  it('⌥ letters align the selected tiles and ⌃⌥T tidies them up', () => {
+    expect(matchCanvasShortcut(ev('å', { altKey: true, code: 'KeyA' }))).toEqual({ id: 'align', edge: Edge.Left });
+    expect(matchCanvasShortcut(ev('ß', { altKey: true, code: 'KeyS' }))).toEqual({ id: 'align', edge: Edge.Bottom });
+    expect(matchCanvasShortcut(ev('†', { altKey: true, ctrlKey: true, code: 'KeyT' }))).toEqual({ id: 'tidy' });
+    expect(matchCanvasShortcut(ev('π', { altKey: true, code: 'KeyP' }))).toBeNull();
   });
 });
