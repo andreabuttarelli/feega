@@ -8,7 +8,7 @@ import { motionEngine } from '../engine/engine';
 import { addClip, setKeyframes, setTransition, Side, type OpResult } from '../timeline';
 import { composeHtml } from '../hyperframes/compose';
 import { PaintKind } from './paint-of';
-import { compileScene, frameAt, resolved, type Drawn } from './scene';
+import { compileScene, frameAt, resolved, strokePad, type Drawn } from './scene';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -52,6 +52,13 @@ describe('backdrop groups', () => {
 
     expect(layers).toContainEqual(['blob', PaintKind.Html]);
     expect(layers.map(([c]) => c)).not.toContain('card');
+  });
+});
+
+describe('strokePad', () => {
+  it('leaves room for half of the widest stroke around a shape', () => {
+    expect(strokePad('<svg><path style="stroke-width:12"/><path stroke-width="30"/></svg>')).toBe(16);
+    expect(strokePad('<svg><path/></svg>')).toBe(0);
   });
 });
 

@@ -8,7 +8,7 @@ export type Quad = [Point, Point, Point, Point];
 
 export type Paint =
   | { kind: PaintKind.Fill; color: string; pattern: string }
-  | { kind: PaintKind.Shape; markup: string; size: Size }
+  | { kind: PaintKind.Shape; markup: string; size: Size; pad: number }
   | { kind: PaintKind.Image; src: string; fit: string }
   | { kind: PaintKind.Video; src: string; fit: string; start: number; duration: number; mediaStart: number; rate: number; element: Element }
   | { kind: PaintKind.Logo; src: string }
@@ -51,6 +51,14 @@ function boxedChild(el: Element): boolean {
   return el.parentElement?.classList.contains('mv') === true && el.parentElement.parentElement?.classList.contains('box') === true;
 }
 
+const STROKE_WIDTH = /stroke-width[:=]\s*"?([\d.]+)/g;
+const STROKE_SLACK = 1;
+
+export function strokePad(markup: string): number {
+  const widths = [...markup.matchAll(STROKE_WIDTH)].map((m) => Number(m[1]));
+  return widths.length ? Math.ceil(Math.max(...widths) / 2) + STROKE_SLACK : 0;
+}
+
 const TEXT_EXTRAS = '.tu,.tw,.tg,img,svg,video,canvas';
 
 function textParts(layer: Element): { el: HTMLElement; paint: Paint }[] {
@@ -72,7 +80,7 @@ function paintOf(layer: Element): { el: HTMLElement; paint: Paint } | null {
   }
   const svg = layer.querySelector('svg[id^="sv-"]') as HTMLElement | null;
   if (svg && svg.parentElement?.id.startsWith('sh-') && boxedChild(svg.parentElement)) {
-    return { el: svg, paint: { kind: PaintKind.Shape, markup: svg.outerHTML, size: { width: px(svg.getAttribute('width')), height: px(svg.getAttribute('height')) } } };
+    return { el: svg, paint: { kind: PaintKind.Shape, markup: svg.outerHTML, size: { width: px(svg.getAttribute('width')), height: px(svg.getAttribute('height')) }, pad: strokePad(svg.outerHTML) } };
   }
   const img = layer.querySelector('img') as HTMLImageElement | null;
   if (img && boxedChild(img) && layer.querySelectorAll('img,video,svg').length === 1) {

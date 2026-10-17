@@ -28,12 +28,15 @@ function picture(src: string): Promise<HTMLImageElement> {
 
 const rasterScale = (d: Drawn) => Math.min(MAX_RASTER, Math.max(1, Math.ceil(scaleOf(d.matrix) * RASTER_STEPS) / RASTER_STEPS));
 
-function svgUrl(markup: string, size: Size, scale: number): string {
+function svgUrl(markup: string, size: Size, scale: number, pad: number): string {
   const doc = new DOMParser().parseFromString(markup, 'image/svg+xml');
   const svg = doc.documentElement;
+  const [x = 0, y = 0, w = size.width, h = size.height] = (svg.getAttribute('viewBox') ?? '').split(/\s+/).filter(Boolean).map(Number);
+  const unit = w / size.width;
   svg.setAttribute('xmlns', SVG_NS);
-  svg.setAttribute('width', String(size.width * scale));
-  svg.setAttribute('height', String(size.height * scale));
+  svg.setAttribute('viewBox', `${x - pad * unit} ${y - pad * unit} ${w + 2 * pad * unit} ${h + 2 * pad * unit}`);
+  svg.setAttribute('width', String((size.width + 2 * pad) * scale));
+  svg.setAttribute('height', String((size.height + 2 * pad) * scale));
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
 }
 
@@ -99,7 +102,7 @@ export function createPainter(): Painter {
     [PaintKind.Html]: async () => {},
     [PaintKind.Shape]: (d) => {
       const paint = d.paint as Of<PaintKind.Shape>;
-      return load(shapeKey(d), svgUrl(paint.markup, paint.size, rasterScale(d)));
+      return load(shapeKey(d), svgUrl(paint.markup, paint.size, rasterScale(d), paint.pad));
     },
     [PaintKind.Image]: (d) => load((d.paint as Of<PaintKind.Image>).src, (d.paint as Of<PaintKind.Image>).src),
     [PaintKind.Logo]: (d) => load((d.paint as Of<PaintKind.Logo>).src, (d.paint as Of<PaintKind.Logo>).src),
@@ -134,7 +137,8 @@ export function createPainter(): Painter {
     },
     [PaintKind.Shape]: (d) => {
       const entry = loaded.get(shapeKey(d));
-      return entry ? whole(entry.texture, d.content) : null;
+      const { pad } = d.paint as Of<PaintKind.Shape>;
+      return entry ? { texture: entry.texture, rect: [-pad, -pad, d.content.width + 2 * pad, d.content.height + 2 * pad] } : null;
     },
     [PaintKind.Image]: (d) => {
       const paint = d.paint as Of<PaintKind.Image>;
