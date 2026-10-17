@@ -51,7 +51,7 @@ describe('ChatUploads', () => {
     const p = ports();
     const uploads = new ChatUploads('p-1', p);
 
-    uploads.add([file('clip.mp4', 'video/mp4')]);
+    uploads.add([file('archive.zip', 'application/zip')]);
     await settle();
 
     expect(uploads.items[0]).toMatchObject({ status: UploadStatus.Failed, error: AttachmentError.Unsupported });

@@ -3026,3 +3026,12 @@ Signal: `[chat-reply] write failed Error: JWT expired`, `[motion-agent] turn fai
 
 ### The motion editor answers 500 only on a local dev server
 Signal: `/p/…/motion/<node>` renders "something broke on our side"; the error is `browserStore(...)?.getItem is not a function`; the log warns `--localstorage-file was provided without a valid path`. Cause: Node 25 ships a global `localStorage` without methods on the server. Move: start `vite dev` with `NODE_OPTIONS=--no-experimental-webstorage`.
+
+### An e2e fix "does nothing", or a red test passes without the fix
+Signal: a `@real` e2e gives the same result with and without your change. Cause: Playwright reuses whatever listens on 4173 (`reuseExistingServer`), often another worktree's dev server; and with `NO_HMR=1` your own server keeps the code it compiled first. Move: `lsof -iTCP:4173` and check the cwd; run your own `vite dev --port <free>` with `E2E_BASE_URL`, and restart it after every code change before trusting red or green.
+
+### A clip added to a still is invisible
+Signal: a new Text/Title/Line in a still frame renders with opacity 0 (or clipped) while its colour and fills are right. Cause: the template's intro tween starts at clip start = still frame. Move: inspect computed opacity/transform in the srcdoc iframe before suspecting paint; `settledBy` in `compose.ts` keeps unfinished template tweens out of stills.
+
+### A `{#key}` editor remounts on close although a "leaving" state keeps it
+Signal: deselecting a frame flashes "Opening the editor…" or a stale picture; a `console.log` in the editor's `onMount` fires unmount→mount→unmount within one click. Cause: the state that keeps the block alive (`inlineStage.leave`) was set in an `$effect` reacting to the selection; the `{#if}/{#key}` block had already re-rendered without it, and `earlyFetch.take` had emptied the session cache, so the remount loaded again. `$effect.pre` did not fix it. Move: set the keep-alive state synchronously in the handler that changes the selection (`selectionChanged` → `leaveNow`), and keep the effect only as fallback.

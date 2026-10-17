@@ -63,6 +63,7 @@ export function failureText(error: string): FailureText {
 }
 
 export const MAX_RETRIES = 2;
+const AUTO_RETRIES = 1;
 const BACKOFF_BASE_MS = 30_000;
 
 export type AfterFailure =
@@ -78,10 +79,13 @@ export function afterFailure(error: string, attempts: number): AfterFailure {
   if (kind === FailureKind.Transient && attempts <= MAX_RETRIES) {
     return { status: ItemStatus.Queued, delayMs: BACKOFF_BASE_MS * 2 ** (attempts - 1) };
   }
+  if (attempts <= AUTO_RETRIES) {
+    return { status: ItemStatus.Queued, delayMs: 0 };
+  }
   return { status: ItemStatus.Failed };
 }
 
-export const ORG_PARALLELISM = 4;
+export const ORG_PARALLELISM = 8;
 
 export type QueueEntry = { id: string; orgId: string; genNodeId: string | null };
 

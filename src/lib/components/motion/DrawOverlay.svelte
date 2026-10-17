@@ -28,7 +28,8 @@
     [DrawTool.Text]: 'Drew a text',
     [DrawTool.Rectangle]: 'Drew a rectangle',
     [DrawTool.Ellipse]: 'Drew an ellipse',
-    [DrawTool.Pen]: 'Drew a path'
+    [DrawTool.Pen]: 'Drew a path',
+    [DrawTool.Frame]: 'Drew a frame'
   };
 
   let host = $state<HTMLDivElement | null>(null);
@@ -36,7 +37,8 @@
   let outline = $state.raw<Outline>([]);
   let grab = $state<PointRef | null>(null);
 
-  const live = $derived(drag ? dragRect(drag.from, drag.to, drag.square) : null);
+  let held = $state.raw<DrawBox | null>(null);
+  const live = $derived(drag ? dragRect(drag.from, drag.to, drag.square) : held);
   const newId = () => crypto.randomUUID().slice(0, 8);
 
   function local(e: PointerEvent): DragPoint {
@@ -58,6 +60,7 @@
     e.stopPropagation();
     host?.setPointerCapture(e.pointerId);
     const at = local(e);
+    held = null;
     if (tool !== DrawTool.Pen) {
       drag = { from: at, to: at, square: e.shiftKey };
       return;
@@ -88,11 +91,12 @@
     if (!drag) {
       return;
     }
-    const box = live ?? (tool === DrawTool.Text ? { ...drag.from, width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height } : null);
+    const box = (drag ? live : null) ?? (tool === DrawTool.Text ? { ...drag.from, width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height } : null);
     drag = null;
     if (!box) {
       return;
     }
+    held = box;
     const id = newId();
     create(drawClip(doc, tool, unit(box), frame, id), id);
   }

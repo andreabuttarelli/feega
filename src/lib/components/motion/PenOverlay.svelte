@@ -1,12 +1,12 @@
 <script lang="ts">
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
-  import { boxOf } from '$lib/motion/layout';
   import { mapOutline, parsePath, pathData, type Outline, type Pt } from '$lib/motion/shape/geometry';
   import { Handle, Mirror, addPoint, deletePoint, dragHandle, insertPoint, movePoint, segmentHit, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
   import { setPath } from '$lib/motion/shape/ops';
+  import { pathSpace } from '$lib/motion/shape/space';
   import { isTyping } from '$lib/motion/shortcuts';
 
-  let { doc, clip, onchange }: { doc: MotionDoc; clip: MotionClip; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, clip, frame, onchange }: { doc: MotionDoc; clip: MotionClip; frame: number; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   type Grab = { kind: 'point'; ref: PointRef; from: Pt } | { kind: 'handle'; ref: PointRef; handle: Handle } | { kind: 'new'; ref: PointRef };
 
@@ -16,7 +16,7 @@
   let grab = $state<Grab | null>(null);
   let live = $state<Outline | null>(null);
 
-  const box = $derived(boxOf(clip.props as { x: number; y: number; width: number; height: number }, doc));
+  const space = $derived(pathSpace(doc, clip.id, frame));
   const saved = $derived.by(() => {
     const parsed = parsePath(String(clip.props.path ?? ''));
     return typeof parsed === 'string' ? [] : parsed;
@@ -24,9 +24,13 @@
   const outline = $derived(live ?? saved);
 
   const HIT_SCREEN_PX = 8;
-  const framed = $derived(mapOutline(outline, (p) => [box.left + p[0] * box.width, box.top + p[1] * box.height]));
+  const UNIT_BOX: Pt[] = [[0, 0], [1, 0], [1, 1], [0, 1]];
+  const framed = $derived(mapOutline(outline, space.toFrame));
 
-  const toFrame = (p: Pt) => ({ x: box.left + p[0] * box.width, y: box.top + p[1] * box.height });
+  const toFrame = (p: Pt) => {
+    const [x, y] = space.toFrame(p);
+    return { x, y };
+  };
   const pct = (p: Pt) => {
     const f = toFrame(p);
     return `left: ${(f.x / doc.width) * 100}%; top: ${(f.y / doc.height) * 100}%;`;
@@ -36,7 +40,7 @@
     const rect = host!.getBoundingClientRect();
     const fx = ((e.clientX - rect.left) / rect.width) * doc.width;
     const fy = ((e.clientY - rect.top) / rect.height) * doc.height;
-    return [(fx - box.left) / box.width, (fy - box.top) / box.height];
+    return space.toLocal([fx, fy]);
   }
 
   function commit(next: Outline, summary: string) {
@@ -132,7 +136,7 @@
 
 <div class="overlay" class:pen bind:this={host} data-testid="pen-overlay" role="presentation" onpointerdown={place} onpointermove={move} onpointerup={end} onpointercancel={end}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
-    <rect class="frame" x={box.left} y={box.top} width={box.width} height={box.height} />
+    <polygon class="frame" points={UNIT_BOX.map((p) => space.toFrame(p).join(',')).join(' ')} />
     <path class="outline" d={pathData(framed)} />
     <path class="hit" role="presentation" data-testid="pen-path" d={pathData(framed)} onpointerdown={insertOnPath} />
     {#if selected}

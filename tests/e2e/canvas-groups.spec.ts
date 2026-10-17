@@ -79,6 +79,40 @@ test.describe('groups @real', () => {
     await shoot(page, '3-ungrouped');
   });
 
+  test('the toolbar groups two elements and the right-click menu ungroups them', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    for (const [i, shape] of ['rect', 'ellipse'].entries()) {
+      const node = await seedNode({ type: 'motion', x: 120 + i * 220, y: 160, data: { ...LANDSCAPE, kind: 'element' } });
+      await admin.from('nodes').update({ width: 120, height: 120 }).eq('id', node.id);
+      const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: sheet(`t${i}`, shape), actor_kind: 'user', actor_id: session.userId });
+      expect(error).toBeNull();
+    }
+    const alive = async () => (await admin.from('nodes').select('id, display_name').eq('canvas_id', session.canvasId).is('deleted_at', null)).data ?? [];
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.keyboard.press('ControlOrMeta+a');
+    const toolbar = page.getByRole('toolbar', { name: 'Selection actions' });
+    await toolbar.getByRole('button', { name: 'Group', exact: true }).click();
+    await expect.poll(async () => (await alive()).map((n) => n.display_name), { timeout: 10_000 }).toEqual(['Group']);
+    const [group] = await alive();
+
+    await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.locator(`[data-motion-node="${group.id}"]`).click({ button: 'right' });
+    const menu = page.getByTestId('canvas-menu');
+    await expect(menu.getByRole('menuitem', { name: /Duplicate/ })).toBeVisible();
+    await shoot(page, '5-context-menu');
+    await menu.getByRole('menuitem', { name: /^Ungroup/ }).click();
+    await expect.poll(async () => (await alive()).map((n) => n.display_name).sort(), { timeout: 10_000 }).toEqual(['Box', 'Ellipse']);
+
+    const box = (await alive()).find((n) => n.display_name === 'Box')!;
+    await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.locator(`[data-motion-node="${box.id}"]`).click({ button: 'right' });
+    await menu.getByRole('menuitem', { name: /^Send to back/ }).click();
+    const zOf = async () => (await admin.from('nodes').select('id, z').eq('canvas_id', session.canvasId).is('deleted_at', null)).data ?? [];
+    await expect.poll(async () => { const rows = await zOf(); return rows.find((r) => r.id === box.id)!.z < Math.min(...rows.filter((r) => r.id !== box.id).map((r) => r.z)); }, { timeout: 10_000 }).toBe(true);
+  });
+
   test('inside a frame ⌘G makes a group clip and ⇧⌘G undoes it', async ({ page, session, admin, seedNode }) => {
     test.setTimeout(120_000);
     const frame = await seedNode({ type: 'motion', x: 80, y: 80, data: LANDSCAPE });

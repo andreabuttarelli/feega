@@ -7,13 +7,14 @@ import { jobPrefixOf, taskJobOf, taskProviderOf, TASK_PROVIDERS, TaskProviderNam
 import { taskUsdFor } from '$lib/server/generation/task-pricing';
 import { uncensoredRefusal, UNCENSORED_REFUSALS } from '$lib/server/generation/uncensored-guard';
 import { screenGeneration, type ScreenPorts } from '$lib/server/moderation/screen';
-import type { TaskProvider, TaskOutput, WireFields } from './task-provider';
-import { wireInputs } from '$lib/server/generation/wire-inputs';
+import { ProviderBusyError, type TaskProvider, type TaskOutput, type TaskWireRef, type WireFields } from './task-provider';
+import { wireInputs, type ListCaps } from '$lib/server/generation/wire-inputs';
 import type { Purgers } from './provider-purge';
 import { ProjectMode, STORAGE_FOLDER } from '$lib/project-mode';
 import { ModerationProfile, profileOf } from '$lib/server/moderation/profiles';
 import { likenessRefusal, type ProvenanceEntry } from './likeness-guard';
 import { MODEL3D_MIME } from '$lib/model3d-models';
+import { labelOf } from '$lib/canvas/model-params';
 
 const GENERATED_MEDIA_BUCKET = 'brand-knowledge';
 export const taskLabelOf = (provider: TaskProviderName): string => `canvas.${provider}`;
@@ -60,7 +61,9 @@ export const TASK_REFUSALS = {
   notEnabled: UNCENSORED_REFUSALS.disabled,
   noInputsAllowed: UNCENSORED_REFUSALS.inputs,
   noOutput: 'task_failed: no output',
-  needsImage: 'missing_input: this model needs an input image'
+  needsImage: 'missing_input: this model needs an input image',
+  needsVideo: 'missing_input: this model needs a source video',
+  unpriced: 'price_unavailable: the provider did not quote this request'
 } as const;
 
 export type TaskScope = { orgId: string; projectId: string; nodeId: string; userId: string; actor?: Actor };
@@ -71,7 +74,12 @@ export type TaskWireSpec = {
   fields: WireFields;
   fixed?: Readonly<Record<string, string>>;
   requiresImage?: boolean;
+  requiresVideo?: boolean;
+  quotedAtSubmit?: boolean;
+  requiredParams?: readonly string[];
+  menuGroup?: string;
   unrunnable?: string;
+  caps?: ListCaps;
 } & Readonly<Record<string, unknown>>;
 
 export type TaskModel = {
@@ -94,8 +102,16 @@ export type TaskBill = {
   scope: TaskScope;
 };
 
+export type ProviderLoad = { inFlight: number; waiting: number; cap: number | null };
+
+export enum QueuePlace {
+  New = 'new',
+  Waiting = 'waiting'
+}
+
 export type TaskRunDeps = {
   providers: Readonly<Partial<Record<TaskProviderName, TaskProvider>>>;
+  load?(provider: TaskProviderName): Promise<ProviderLoad>;
   model(id: string): Promise<TaskModel | null>;
   access(orgId: string): Promise<{ allowed: boolean }>;
   screen(scope: TaskScope, model: TaskModel): ScreenPorts;
@@ -111,8 +127,11 @@ export type TaskRequest = {
   params: GenParams;
   imageUrls: string[];
   lastFrameUrl: string | null;
+  videoUrls?: string[];
+  audioUrls?: string[];
   provenance: ProvenanceEntry[];
   idempotencyKey?: string;
+  place?: QueuePlace;
 };
 
 export enum RefusalStage {
@@ -120,10 +139,30 @@ export enum RefusalStage {
   Provider = 'provider'
 }
 
-export type TaskStart = { kind: 'job'; jobId: string } | { kind: 'refused'; error: string; stage: RefusalStage };
+export const QUOTED_USD_PARAM = 'quotedUsd';
 
-function carriesInputs(req: Pick<TaskRequest, 'imageUrls' | 'lastFrameUrl' | 'provenance'>): boolean {
-  return req.imageUrls.length > 0 || req.lastFrameUrl !== null || req.provenance.length > 0;
+export type TaskStart = { kind: 'job'; jobId: string; quotedUsd?: number } | { kind: 'waiting' } | { kind: 'refused'; error: string; stage: RefusalStage };
+
+const WAITING: TaskStart = { kind: 'waiting' };
+
+const AHEAD_OF: Readonly<Record<QueuePlace, (load: ProviderLoad) => number>> = {
+  [QueuePlace.New]: (load) => load.inFlight + load.waiting,
+  [QueuePlace.Waiting]: (load) => load.inFlight
+};
+
+async function slotFree(deps: TaskRunDeps, provider: TaskProviderName, place: QueuePlace): Promise<boolean> {
+  const load = await deps.load?.(provider);
+  return !load || load.cap === null || AHEAD_OF[place](load) < load.cap;
+}
+
+function carriesInputs(req: Pick<TaskRequest, 'imageUrls' | 'lastFrameUrl' | 'videoUrls' | 'audioUrls' | 'provenance'>): boolean {
+  const media = [req.imageUrls, req.videoUrls ?? [], req.audioUrls ?? [], req.provenance];
+  return media.some((list) => list.length > 0) || req.lastFrameUrl !== null;
+}
+
+function consumedBy(fields: WireFields, req: TaskRequest): TaskRequest {
+  const takesVideo = Boolean(fields.video || fields.videoList);
+  return { ...req, videoUrls: takesVideo ? req.videoUrls : [], audioUrls: fields.audioList ? req.audioUrls : [] };
 }
 
 const LIKENESS_GUARDED_IN_UNCENSORED_PROJECTS: ReadonlySet<TaskCatalogue> = new Set(['model3d']);
@@ -140,6 +179,11 @@ function refused(error: string, stage = RefusalStage.Policy): TaskStart {
   return { kind: 'refused', error, stage };
 }
 
+async function submitQuote(gateway: TaskProvider, ref: TaskWireRef, inputs: Record<string, unknown>): Promise<{ quotedUsd: number } | null> {
+  const usd = await gateway.quote?.(ref, inputs).catch(() => null);
+  return usd ? { quotedUsd: usd } : null;
+}
+
 export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise<TaskStart> {
   const model = await deps.model(req.modelId);
   const provider = taskProviderOf(req.modelId);
@@ -152,11 +196,18 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   if (model.spec.requiresImage && !req.imageUrls.length) {
     return refused(TASK_REFUSALS.needsImage);
   }
+  if (model.spec.requiresVideo && !req.videoUrls?.length) {
+    return refused(TASK_REFUSALS.needsVideo);
+  }
+  const unchosen = model.spec.requiredParams?.find((name) => !(req.params as Record<string, unknown>)[name]);
+  if (unchosen) {
+    return refused(`missing_input: choose a ${labelOf(unchosen).toLowerCase()}`);
+  }
 
   const uncensored = uncensoredRefusal({
     uncensored: model.uncensored,
     mode: req.mode,
-    carriesInputs: carriesInputs(req),
+    carriesInputs: carriesInputs(consumedBy(model.spec.fields, req)),
     accessAllowed: model.uncensored ? (await deps.access(req.scope.orgId)).allowed : true
   });
   if (uncensored) {
@@ -185,12 +236,22 @@ export async function startTaskRun(deps: TaskRunDeps, req: TaskRequest): Promise
   }
 
   const inputs = wireInputs(model.spec, req, model.paramSchema);
-  const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, unrunnable: _unrunnable, ...ref } = model.spec;
+  const { fields: _fields, fixed: _fixed, requiresImage: _requiresImage, requiresVideo: _requiresVideo, quotedAtSubmit: _quotedAtSubmit, requiredParams: _requiredParams, menuGroup: _menuGroup, unrunnable: _unrunnable, caps: _caps, ...ref } = model.spec;
+  if (!(await slotFree(deps, provider, req.place ?? QueuePlace.New))) {
+    return WAITING;
+  }
+  const quoted = model.spec.quotedAtSubmit ? await submitQuote(gateway, ref, inputs) : {};
+  if (quoted === null) {
+    return refused(TASK_REFUSALS.unpriced, RefusalStage.Provider);
+  }
   const startedAt = Date.now();
   try {
     const { taskId } = await gateway.run(ref, inputs, req.idempotencyKey);
-    return { kind: 'job', jobId: `${jobPrefixOf(provider)}${taskId}` };
+    return { kind: 'job', jobId: `${jobPrefixOf(provider)}${taskId}`, ...quoted };
   } catch (error) {
+    if (error instanceof ProviderBusyError) {
+      return WAITING;
+    }
     const message = error instanceof Error ? error.message : `${provider}_failed`;
     deps.bill({ provider, model: model.id, quotedUsd: quoteOf(model, inputs), ms: Date.now() - startedAt, costUsd: null, error: message, uncensored: model.uncensored, scope: req.scope });
     return refused(message, RefusalStage.Provider);
@@ -257,6 +318,10 @@ function outlivedFallback(provider: TaskProviderName, model: TaskModel, job: Tas
 }
 
 function jobQuote(model: TaskModel, job: TaskJob): number | null {
+  const quoted = Number((job.params as Record<string, unknown> | undefined)?.[QUOTED_USD_PARAM]);
+  if (Number.isFinite(quoted) && quoted > 0) {
+    return quoted;
+  }
   const inputs = wireInputs(model.spec, { prompt: '', params: job.params ?? {}, imageUrls: [], lastFrameUrl: null }, model.paramSchema);
   return quoteOf(model, inputs);
 }
