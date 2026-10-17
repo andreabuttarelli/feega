@@ -1,4 +1,5 @@
-import { failureOf, sendResultOf, type ActionAnswer } from './node-save';
+import { failureOf, keepDirty, sendResultOf, type ActionAnswer } from './node-save';
+import type { PlaceEntry } from './outbox';
 import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from './save-scheduler';
 
 type Fields = Record<string, string | number>;
@@ -52,12 +53,29 @@ export function createPlaceSaves(options: PlaceOptions) {
 
   const all = Object.values(queues);
 
+  function unsentEntries(): PlaceEntry[] {
+    return (Object.entries(queues) as [Placement, (typeof queues)[Placement]][]).flatMap(([action, queue]) =>
+      Object.entries(queue.unsentPatches()).map(([id, fields]) => ({ action, id, fields: fields as Record<string, number> }))
+    );
+  }
+
+  function restore(entries: PlaceEntry[]) {
+    for (const entry of entries) {
+      const queue = queues[entry.action as Placement];
+      if (queue) {
+        void queue.schedule(entry.id, entry.fields, SaveTiming.Now);
+      }
+    }
+  }
+
   return {
     move: (id: string, x: number, y: number) => queues[Placement.Move].schedule(id, { x, y }, SaveTiming.Now),
     resize: (id: string, width: number, height: number) => queues[Placement.Resize].schedule(id, { width, height }, SaveTiming.Now),
     moveGroup: (id: string, x: number, y: number) => queues[Placement.MoveGroup].schedule(id, { x, y }, SaveTiming.Now),
     dirty: (id: string) => all.some((queue) => queue.dirtyKeys(id).length > 0),
     unsent: () => all.some((queue) => queue.unsent()),
+    unsentEntries,
+    restore,
     flush: async () => { await Promise.all(all.map((queue) => queue.flush())); }
   };
 }
@@ -74,4 +92,10 @@ export function keepPlaced<T extends Boxed>(fresh: T[], local: T[], dirty: (id: 
     }
     return { ...tile, x: held.x, y: held.y, w: held.w, h: held.h, userHeight: held.userHeight };
   });
+}
+
+type PendingTile = Boxed & { version: number; data: Record<string, unknown> };
+
+export function keepPending<T extends PendingTile>(fresh: T[], local: T[], dirtyKeys: (id: string) => string[], placed: (id: string) => boolean): T[] {
+  return keepPlaced(keepDirty(fresh, local, dirtyKeys), local, placed);
 }

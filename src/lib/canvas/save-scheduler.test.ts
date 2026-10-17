@@ -178,3 +178,24 @@ describe('save scheduler', () => {
     await expect(saved).resolves.toBe(false);
   });
 });
+
+describe('unsentPatches: what a reload would lose', () => {
+  it('lists the in-flight and queued fields of every node, the newest value winning', async () => {
+    const { saves, sent } = harness();
+    saves.schedule('a', { prompt: 'one' }, SaveTiming.Now);
+    await settle();
+    saves.schedule('a', { prompt: 'two', model: 'm' });
+    saves.schedule('b', { limit: 3 });
+
+    expect(saves.unsentPatches()).toEqual({ a: { prompt: 'two', model: 'm' }, b: { limit: 3 } });
+
+    sent[0].resolve(SendResult.Saved);
+    await settle();
+    expect(saves.unsentPatches().a).toEqual({ prompt: 'two', model: 'm' });
+  });
+
+  it('is empty when everything landed', () => {
+    const { saves } = harness();
+    expect(saves.unsentPatches()).toEqual({});
+  });
+});

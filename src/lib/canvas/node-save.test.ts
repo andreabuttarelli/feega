@@ -137,6 +137,10 @@ describe('isOwnEcho: realtime does not refetch what this tab just wrote', () => 
     expect(isOwnEcho(update({ version: 6 }), tiles)).toBe(true);
   });
 
+  it('ignores the echo of an earlier own save the tab has already passed', () => {
+    expect(isOwnEcho(update({ version: 4, data: { prompt: 'h' } }), tiles)).toBe(true);
+  });
+
   it('refetches a newer update from someone else', () => {
     expect(isOwnEcho(update({ version: 6, data: { prompt: 'agent wrote this' } }), tiles)).toBe(false);
   });
