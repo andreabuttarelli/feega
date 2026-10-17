@@ -1,6 +1,6 @@
 import { sceneLine, type VideoBreakdown } from '$lib/video-reference';
 import type { Picture } from '$lib/server/chat-attachments/model-parts';
-import { denseTimes, similarity, spreadTimes, type GrabFrame } from './reference-frames';
+import { denseTimes, pairCheck, similarity, spreadTimes, type GrabFrame } from './reference-frames';
 
 export const MAX_SCENE_FIXES = 2;
 export const REVIEW_PAIRS = 6;
@@ -27,6 +27,10 @@ type Scene = VideoBreakdown['scenes'][number];
 
 type Pair = { time: number; reference: Buffer; ours: Buffer };
 
+type PairFinding = { time: number; mismatches: string[] };
+
+const findings = (pairs: readonly Pair[]): Promise<PairFinding[]> => Promise.all(pairs.map(async (p) => ({ time: p.time, mismatches: (await pairCheck(p.reference, p.ours).catch(() => ({ mismatches: [] }))).mismatches })));
+
 const at = (s: number) => Math.round(s * 100) / 100;
 const cents = (usd: number) => Math.round(usd * 100) / 100;
 
@@ -38,11 +42,26 @@ const buildText = (brief: string, scene: number, count: number, span: SceneSpan)
     'When the scene is built, stop: the server then shows you your frames next to the reference.'
   ].join('\n');
 
-const reviewText = (scene: number, span: SceneSpan) =>
+const REVIEW_CHECKLIST = [
+  'For every pair compare, one by one: text content and spelling (letter for letter); type size (cap height as % of the frame height, within 10%); weight; position (left/top and centre as % of the frame, within 5%); colours (background, text, gradients as hex); motion state at that time (what has entered, how far, blur, rotation).',
+  'Every item that differs beyond those tolerances must be edited.'
+];
+
+const measuredLines = (checks: readonly PairFinding[]) => {
+  const flagged = checks.filter((c) => c.mismatches.length);
+  return flagged.length ? ['Measured by the server (must be fixed):', ...flagged.map((c) => `- at ${c.time} s: ${c.mismatches.join('; ')}`)] : [];
+};
+
+const reviewText = (scene: number, span: SceneSpan, checks: readonly PairFinding[], forced: boolean) =>
   [
     `Scene ${scene} (${at(span.fromS)}–${at(span.toS)} s): the pictures pair each reference frame with your frame at the same time.`,
-    'Look at the pairs and fix the differences now; reply only with edits — no explanation. Edit only this scene. If the pairs already match, make no edit.'
-  ].join('\n');
+    ...REVIEW_CHECKLIST,
+    ...measuredLines(checks),
+    forced ? 'Your last review made no edit, but the measurements above still differ: the scene does not match yet.' : '',
+    'Look at the pairs and fix the differences now; reply only with edits — no explanation. Edit only this scene. Make no edit only if every item matches.'
+  ]
+    .filter(Boolean)
+    .join('\n');
 
 const pairPictures = (pairs: readonly Pair[]): Picture[] =>
   pairs.flatMap((p) => [
@@ -87,19 +106,23 @@ async function runScene(ports: LoopPorts, input: { scene: Scene; index: number; 
 
   let reviews = 0;
   let matched = false;
+  let forced = false;
   let pairs = await drawPairs(ports, references);
   while (pairs.length && reviews < MAX_SCENE_FIXES && (await used()) < input.shareUsd) {
     await ports.keep(number, keptOurs(pairs, reviews + 1)).catch(() => undefined);
-    const { edits, budgetSpent } = await ports.turn({ scene: number, span, text: reviewText(number, span), pictures: pairPictures(pairs), capUsd: input.shareUsd - (await used()), review: true });
+    const checks = await findings(pairs);
+    const { edits, budgetSpent } = await ports.turn({ scene: number, span, text: reviewText(number, span, checks, forced), pictures: pairPictures(pairs), capUsd: input.shareUsd - (await used()), review: true });
     reviews += 1;
     if (budgetSpent) {
       break;
     }
-    if (edits === 0) {
+    const flagged = checks.some((c) => c.mismatches.length);
+    if (edits === 0 && !flagged) {
       matched = true;
       break;
     }
-    pairs = await drawPairs(ports, references);
+    forced = edits === 0;
+    pairs = forced ? pairs : await drawPairs(ports, references);
   }
   return { scene: number, reviews, matched, similarity: await meanSimilarity(pairs), spentUsd: cents(await used()) };
 }

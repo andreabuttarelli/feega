@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { parseBreakdown } from '$lib/video-reference';
-import { MAX_REFERENCE_FRAMES, SCENE_FRAMES_CAP, denseTimes, spreadTimes, keyTimes, referenceFrames, sceneScores, similarity } from './reference-frames';
+import { pairCheck, MAX_REFERENCE_FRAMES, SCENE_FRAMES_CAP, denseTimes, spreadTimes, keyTimes, referenceFrames, sceneScores, similarity } from './reference-frames';
 
 const breakdown = parseBreakdown(
   JSON.stringify({
@@ -93,5 +93,39 @@ describe('dense frames of one scene', () => {
   it('the judge looks at a few of them, first and last included', () => {
     expect(spreadTimes([1, 2, 3, 4, 5, 6, 7, 8, 9], 4)).toEqual([1, 4, 6, 9]);
     expect(spreadTimes([1, 2], 4)).toEqual([1, 2]);
+  });
+});
+
+const card = (box: { left: number; top: number; width: number; height: number }, background = '#ff6a00') =>
+  sharp({ create: { width: 960, height: 540, channels: 3, background } })
+    .composite([{ input: { create: { width: box.width, height: box.height, channels: 3, background: '#ffffff' } }, left: box.left, top: box.top }])
+    .jpeg()
+    .toBuffer();
+
+describe('a cheap check of each reference/replica pair', () => {
+  it('the same layout passes', async () => {
+    const box = { left: 100, top: 200, width: 760, height: 140 };
+
+    expect((await pairCheck(await card(box), await card(box))).mismatches).toEqual([]);
+  });
+
+  it('text set far smaller than the reference is flagged with the numbers (live: CAUTIVA at a third of the size passed review)', async () => {
+    const check = await pairCheck(await card({ left: 100, top: 200, width: 760, height: 140 }), await card({ left: 330, top: 250, width: 300, height: 40 }));
+
+    expect(check.mismatches.join(' ')).toMatch(/height 26% .* 7%/);
+    expect(check.mismatches.join(' ')).toMatch(/width 79% .* 31%/);
+  });
+
+  it('content moved across the frame is flagged', async () => {
+    const check = await pairCheck(await card({ left: 40, top: 40, width: 200, height: 100 }), await card({ left: 700, top: 400, width: 200, height: 100 }));
+
+    expect(check.mismatches.join(' ')).toMatch(/centre/);
+  });
+
+  it('a different background colour is flagged (live: a red scene came out magenta)', async () => {
+    const box = { left: 100, top: 200, width: 760, height: 140 };
+    const check = await pairCheck(await card(box, '#c80010'), await card(box, '#d0207a'));
+
+    expect(check.mismatches.join(' ')).toMatch(/background #c.* vs #d/i);
   });
 });

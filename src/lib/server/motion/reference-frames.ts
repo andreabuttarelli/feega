@@ -84,6 +84,79 @@ export async function compareFrames(reference: readonly ReferenceFrame[], drawn:
   return { scenes: sceneScores(scored), times: scored };
 }
 
+const CHECK_SIZE = { width: 192, height: 108 };
+const FOREGROUND_DELTA = 96;
+const SIZE_TOLERANCE = 1.33;
+const CENTRE_TOLERANCE = 10;
+const BACKGROUND_DELTA = 40;
+const PERCENT = 100;
+
+type Rgb = [number, number, number];
+
+type Box = { left: number; top: number; width: number; height: number };
+
+type Layout = { background: Rgb; box: Box | null };
+
+export type PairCheck = { mismatches: string[] };
+
+const median = (values: number[]) => values.sort((a, b) => a - b)[Math.floor(values.length / 2)];
+
+const hex = (c: Rgb) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+
+const percent = (v: number, of: number) => Math.round((v / of) * PERCENT);
+
+async function layoutOf(picture: Buffer): Promise<Layout> {
+  const { width, height } = CHECK_SIZE;
+  const px = await sharp(picture).resize(width, height, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+  const at = (x: number, y: number): Rgb => {
+    const i = (y * width + x) * 3;
+    return [px[i], px[i + 1], px[i + 2]];
+  };
+  const all = Array.from({ length: width * height }, (_, i) => at(i % width, Math.floor(i / width)));
+  const background: Rgb = [0, 1, 2].map((c) => median(all.map((p) => p[c]))) as Rgb;
+
+  let [minX, minY, maxX, maxY] = [width, height, -1, -1];
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const p = at(x, y);
+      if (Math.max(...p.map((v, c) => Math.abs(v - background[c]))) <= FOREGROUND_DELTA) {
+        continue;
+      }
+      [minX, minY, maxX, maxY] = [Math.min(minX, x), Math.min(minY, y), Math.max(maxX, x), Math.max(maxY, y)];
+    }
+  }
+  const box = maxX < 0 ? null : { left: percent(minX, width), top: percent(minY, height), width: percent(maxX - minX + 1, width), height: percent(maxY - minY + 1, height) };
+  return { background, box };
+}
+
+const offScale = (reference: number, ours: number) => ours * SIZE_TOLERANCE < reference || reference * SIZE_TOLERANCE < ours;
+
+const centre = (b: Box) => [b.left + b.width / 2, b.top + b.height / 2];
+
+function boxMismatches(reference: Box | null, ours: Box | null): string[] {
+  if (!reference || !ours) {
+    return reference === ours ? [] : [`content ${reference ? 'missing in yours' : 'in yours where the reference shows none'}`];
+  }
+  const found: string[] = [];
+  if (offScale(reference.height, ours.height)) {
+    found.push(`content height ${reference.height}% of the frame in the reference vs ${ours.height}% in yours`);
+  }
+  if (offScale(reference.width, ours.width)) {
+    found.push(`content width ${reference.width}% vs ${ours.width}%`);
+  }
+  const [rc, oc] = [centre(reference), centre(ours)];
+  if (Math.hypot(rc[0] - oc[0], rc[1] - oc[1]) > CENTRE_TOLERANCE) {
+    found.push(`content centre at (${Math.round(rc[0])}%, ${Math.round(rc[1])}%) vs (${Math.round(oc[0])}%, ${Math.round(oc[1])}%)`);
+  }
+  return found;
+}
+
+export async function pairCheck(reference: Buffer, ours: Buffer): Promise<PairCheck> {
+  const [r, o] = await Promise.all([layoutOf(reference), layoutOf(ours)]);
+  const colour = Math.max(...r.background.map((v, c) => Math.abs(v - o.background[c]))) > BACKGROUND_DELTA ? [`background ${hex(r.background)} vs ${hex(o.background)}`] : [];
+  return { mismatches: [...colour, ...boxMismatches(r.box, o.box)] };
+}
+
 export function ffmpegGrab(bin: string, url: string): GrabFrame {
   return (time) =>
     new Promise((resolve) => {
