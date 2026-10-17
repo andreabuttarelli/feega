@@ -59,6 +59,7 @@ import { configuredVoiceDeps } from '$lib/server/voices/voices-config';
 import { cloneVoice, deleteVoice, designPreviews, saveDesignedVoice, voiceSlots, type Outcome, type VoiceDeps } from '$lib/server/voices/custom-voices';
 import { CONSENT_BASES, MIN_VOICE_DESCRIPTION, VOICE_REFUSAL_MESSAGE, type ConsentBasis } from '$lib/canvas/voices';
 import { ProjectMode } from '$lib/project-mode';
+import { assetBreakdown, breakdownPorts } from '$lib/server/video-reference';
 
 export type CanvasDeps = {
   db: Db;
@@ -166,7 +167,7 @@ const moveFrameElementInput = z.object({ frameId: z.string().describe('the Frame
 const placeInFrameInput = z.object({ nodeId: z.string().describe('the Generate image, Generate video or Generate text node'), ...frameTarget }).strict();
 
 const drawElementInput = z
-  .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse, box:{left,top,width,height}} in canvas units, or {tool:pen, path:SVG d in canvas units}') })
+  .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse, box:{left,top,width,height}}, or {tool:pen, path:SVG d}, in canvas units') })
   .strict();
 
 const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (frame nodes with data.kind element)') }).strict();
@@ -287,6 +288,7 @@ const nodeOnCanvasInput = z.object({ canvasId: z.string(), nodeId: z.string() })
 const INVALID_GESTURE = { error: 'invalid_gesture' };
 const CHAIN_INCOMPLETE = { error: 'chain_incomplete' };
 const galleryItemInput = z.object({ itemId: z.string() }).strict();
+const videoReferenceInput = z.object({ assetId: z.string().describe('A video asset of this project or the library: a video node data.assetId or a chat attachment.') }).strict();
 
 const MAX_VOICE_NAME = 100;
 const MAX_CLONE_SAMPLE_BYTES = 3 * 1024 * 1024;
@@ -1039,6 +1041,15 @@ export const CANVAS_OPS = {
       const out = await deleteVoice(deps, ctx.orgId, input.id);
       return out.ok ? { deleted: true } : voiceAnswer(out);
     })
+  }),
+
+  read_video_reference: op({
+    access: Access.Spend,
+    input: videoReferenceInput,
+    run: async (ctx, input) => {
+      const scope = { orgId: ctx.orgId, projectId: ctx.projectId, mode: await projectMode(ctx) };
+      return ctx.billed(() => assetBreakdown(ctx.db, breakdownPorts(scope), { ...scope, assetId: input.assetId }));
+    }
   }),
 
   withdraw_from_gallery: op({

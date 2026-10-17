@@ -224,6 +224,7 @@
     const request = { format, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
     return driver.exclusive(async () => {
       await driver.whenLive();
+      await driver.fresh(html);
       try {
         return (await shoot(time, request)).url ?? '';
       } finally {

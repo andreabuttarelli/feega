@@ -3037,3 +3037,6 @@ Signal: a `@real` e2e gives the same result with and without your change. Cause:
 
 ### A clip added to a still is invisible
 Signal: a new Text/Title/Line in a still frame renders with opacity 0 (or clipped) while its colour and fills are right. Cause: the template's intro tween starts at clip start = still frame. Move: inspect computed opacity/transform in the srcdoc iframe before suspecting paint; `settledBy` in `compose.ts` keeps unfinished template tweens out of stills.
+
+### A `{#key}` editor remounts on close although a "leaving" state keeps it
+Signal: deselecting a frame flashes "Opening the editor…" or a stale picture; a `console.log` in the editor's `onMount` fires unmount→mount→unmount within one click. Cause: the state that keeps the block alive (`inlineStage.leave`) was set in an `$effect` reacting to the selection; the `{#if}/{#key}` block had already re-rendered without it, and `earlyFetch.take` had emptied the session cache, so the remount loaded again. `$effect.pre` did not fix it. Move: set the keep-alive state synchronously in the handler that changes the selection (`selectionChanged` → `leaveNow`), and keep the effect only as fallback.

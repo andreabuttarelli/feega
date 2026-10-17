@@ -22,6 +22,18 @@ describe('modelGroupsOf: il menu del modello come gruppi di voci', () => {
     expect(groups[0].items).toEqual([{ value: 'top', label: 'Top', keywords: 'Google' }]);
   });
 
+  it('a model in a named mode gets its own group, before the providers', () => {
+    const transform = choice({ id: 'swap', label: 'Object swap', provider: 'higgsfield', providerLabel: 'Higgsfield', menuGroup: 'Transform video' });
+    const plain = choice({ id: 'plain', label: 'Plain', provider: 'higgsfield', providerLabel: 'Higgsfield' });
+
+    const groups = modelGroupsOf([plain, transform]);
+
+    expect(groups.map((g) => [g.id, g.label, g.items.map((i) => i.value)])).toEqual([
+      ['Transform video', 'Transform video', ['swap']],
+      ['higgsfield', 'Higgsfield', ['plain']]
+    ]);
+  });
+
   it("senza raccomandati non c'è la sezione", () => {
     expect(modelGroupsOf([choice({ id: 'x' })]).map((g) => g.id)).not.toContain('recommended');
   });

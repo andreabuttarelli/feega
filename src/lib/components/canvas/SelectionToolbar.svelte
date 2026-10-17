@@ -1,7 +1,7 @@
 <script lang="ts">
   import Ellipsis from '@lucide/svelte/icons/ellipsis';
   import Sparkles from '@lucide/svelte/icons/sparkles';
-  import { actionsIn, enabledFor, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import { actionsIn, enabledFor, shownFor, type SelectionAction, type SelectionActionId } from '$lib/canvas/selection-actions';
   import type { WorkflowEdge } from '$lib/canvas/workflow-plan';
   import { SELECTION_ACTION_ICON } from '$lib/canvas/selection-action-icons';
   import { commonPropertiesOf, dynamicParamsOf, type GenPropertyType } from '$lib/canvas/common-properties';
@@ -78,7 +78,7 @@
   const controls = $derived(nodeControlsOf(properties, choice, dynamicValues));
 
   const primary = $derived(actionsIn('primary', count));
-  const secondary = $derived(actionsIn('secondary', count));
+  const secondary = $derived(actionsIn('secondary', count).filter((a) => shownFor(a.id, nodeSummaries)));
   const overflow = $derived(actionsIn('overflow', count));
   const danger = $derived(actionsIn('danger', count));
 

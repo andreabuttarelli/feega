@@ -1,12 +1,13 @@
 <script lang="ts">
   import { clipChrome } from '$lib/canvas/selection-chrome';
-  import { untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
   import { DragPhase, isOutside, type ElementOut } from '$lib/canvas/canvas-drop';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { selectionView } from '$lib/motion/selection-context';
   import { reorderAt } from '$lib/motion/layout/guides';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
+  import { guessedBoxes } from '$lib/motion/move-element';
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
@@ -67,7 +68,7 @@
   type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; pointer: number };
 
   let host = $state<HTMLDivElement | null>(null);
-  let boxes = $state<Boxes>({});
+  let boxes = $state<Boxes>(untrack(() => guessedBoxes(withAutoLayout(doc))));
   let hover = $state<string | null>(null);
   let grab = $state<Grab | null>(null);
   let live = $state<{ doc: MotionDoc; patch: Transform; guides: Guide[]; gaps: Gap[] } | null>(null);
@@ -265,6 +266,8 @@
     pendingPick = null;
     step(Gesture.Click, at, levelOf({ open: true, clip: null, part: null }));
   }
+
+  onMount(pickPending);
 
   $effect(() => {
     void html;

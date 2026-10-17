@@ -2,6 +2,8 @@
   import { earlyFetch } from '$lib/canvas/early-fetch';
   import type { MotionEditorData } from '$lib/server/motion/editor-session';
 
+  const lastSessions = new Map<string, MotionEditorData>();
+
   const sessions = earlyFetch<MotionEditorData | null>({
     load: (url) => fetch(url).then((res) => (res.ok ? (res.json() as Promise<MotionEditorData>) : null)),
     now: () => performance.now()
@@ -9,7 +11,13 @@
 
   export const sessionUrl = (editorPath: string) => `${editorPath}/session`;
 
-  export const prefetchSession = (editorPath: string) => sessions.start(sessionUrl(editorPath));
+  export function prefetchSession(editorPath: string) {
+    const url = sessionUrl(editorPath);
+    if (lastSessions.has(url)) {
+      return;
+    }
+    sessions.start(url);
+  }
 
   let lastPress: number | null = null;
 
@@ -26,6 +34,8 @@
   import { DOCK_ATTR, freeArea, type Dock, type Insets } from '$lib/canvas/free-area';
   import { warmPlayer } from '$lib/motion/hyperframes/warm-player';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { frameDocs } from '$lib/canvas/frame-docs.svelte';
+  import { reopened } from '$lib/canvas/reopen-session';
   import { Paint } from '$lib/canvas/inline-motion';
   import { OpenMark, openTiming, tapTime } from '$lib/canvas/open-timing';
   import { engineOf } from '$lib/motion/engine';
@@ -35,7 +45,7 @@
   import { track } from '$lib/analytics';
   import type { CanvasUndo, MoveOut } from '$lib/canvas/canvas-drop';
 
-  let { projectId, canvasId, nodeId, onclose, onframe, onmoveout = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null } = $props();
+  let { projectId, canvasId, nodeId, revision = 0, leaving = false, onclose, onframe, onmoveout = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; revision?: number; leaving?: boolean; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null } = $props();
 
   const opensOn = untrack(() => (get(propertiesRequest) === nodeId ? OpensOn.Properties : OpensOn.Stage));
   propertiesRequest.set(null);
@@ -62,18 +72,37 @@
   $effect(() => {
     const url = sessionUrl(editorPath);
     let stale = false;
-    session = null;
+    const release = sessions.hold(url);
+    const reused = reopened(lastSessions.get(url) ?? null, frameDocs.headOf(nodeId) as MotionEditorData['head'] | null, untrack(() => revision));
+    if (reused) {
+      timing.mark(OpenMark.Session);
+      session = reused;
+      failed = false;
+      return release;
+    }
+    const landed = sessions.settled(url);
+    if (landed) {
+      lastSessions.set(url, landed);
+    }
+    session = landed ?? null;
     failed = false;
     void sessions.take(url).then((next) => {
+      if (landed) {
+        return;
+      }
       if (stale) {
         return;
       }
       timing.mark(OpenMark.Session);
+      if (next) {
+        lastSessions.set(url, next);
+      }
       session = next;
       failed = next === null;
     });
     return () => {
       stale = true;
+      release();
     };
   });
 
@@ -114,7 +143,9 @@
 </script>
 
 {#if session}
-  <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} {canvasundo} {opensOn} />
+  <div class="inline" class:leaving data-leaving={leaving || undefined}>
+    <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} {canvasundo} {opensOn} />
+  </div>
 {:else if failed}
   <p class="inline-status" role="status">This video could not be opened here. <a href={editorPath}>Open the editor</a></p>
 {:else}
@@ -122,6 +153,23 @@
 {/if}
 
 <style>
+  .inline {
+    display: contents;
+  }
+
+  .leaving {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .leaving :global([data-testid='editor-stage']) {
+    visibility: visible;
+  }
+
+  .leaving :global([data-testid='selection-overlay']) {
+    visibility: hidden;
+  }
+
   .inline-status {
     position: fixed;
     left: 50%;

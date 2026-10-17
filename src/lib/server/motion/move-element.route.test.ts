@@ -243,6 +243,23 @@ describe('drawElement action', () => {
     expect(revisions.map((r) => [r.version, r.doc.background, r.doc.tracks.flatMap((t) => t.clips).map((c) => c.component)])).toEqual([[1, 'transparent', ['Shape']]]);
   });
 
+  it('keeps the id the canvas already shows, so the drawn shape never leaves the screen', async () => {
+    const id = '7b0c2f0e-8a51-4d0e-9a8e-2f2f6c1b9a10';
+    const input = event({ drawn: JSON.stringify({ tool: 'ellipse', box: { left: 0, top: 0, width: 50, height: 50 } }), node_id: id });
+
+    expect(await actions.drawElement(input as never)).toMatchObject({ outcome: 'done' });
+    expect(inserted(input)).toMatchObject([{ id }]);
+  });
+
+  it('a text drawn on a dark canvas is written in light ink', async () => {
+    const input = event({ drawn: JSON.stringify({ tool: 'text', box: { left: 0, top: 0, width: 300, height: 100 }, theme: 'dark' }) });
+
+    await actions.drawElement(input as never);
+
+    const revisions = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => c.payload as { doc: MotionDoc });
+    expect(revisions.flatMap((r) => r.doc.tracks.flatMap((t) => t.clips).map((c) => c.props.color))).toEqual(['#f5f5f5']);
+  });
+
   it('a pen path is placed at the box of its points', async () => {
     const input = event({ drawn: JSON.stringify({ tool: 'pen', path: 'M 10 20 L 110 20 L 110 70' }) });
 
@@ -255,6 +272,30 @@ describe('drawElement action', () => {
     const input = event({ drawn: JSON.stringify({ tool: 'select', box: { left: 0, top: 0, width: 1, height: 1 } }) });
 
     expect(await actions.drawElement(input as never)).toMatchObject({ status: 400 });
+    expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
+  });
+});
+
+describe('drawFrame action', () => {
+  const inserted = (input: ReturnType<typeof event>) => input.calls.filter((c) => c.table === 'nodes' && c.op === 'insert').map((c) => c.payload as { id?: string; type: string; x: number; y: number; width: number; height: number; data: Record<string, unknown> });
+
+  it('a frame dragged on the canvas is one frame of the dragged size, under the id the canvas shows', async () => {
+    const id = '7b0c2f0e-8a51-4d0e-9a8e-2f2f6c1b9a11';
+    const input = event({ box: JSON.stringify({ left: 100, top: 50, width: 400, height: 300 }), node_id: id });
+
+    expect(await actions.drawFrame(input as never)).toMatchObject({ outcome: 'done', created: true });
+    const rows = inserted(input);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id, type: 'motion', x: 100, y: 50, width: 400 });
+    expect(rows[0].data.kind ?? 'frame').toBe('frame');
+    const revisions = input.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert').map((c) => c.payload as { doc: MotionDoc });
+    expect(revisions.map((r) => r.doc.width / r.doc.height)).toEqual([400 / 300]);
+  });
+
+  it('an unreadable box is a 400, nothing written', async () => {
+    const input = event({ box: JSON.stringify({ left: 0, top: 0, width: -1, height: 1 }) });
+
+    expect(await actions.drawFrame(input as never)).toMatchObject({ status: 400 });
     expect(input.calls.some((c) => c.op === 'insert')).toBe(false);
   });
 });

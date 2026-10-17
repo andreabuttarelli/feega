@@ -58,7 +58,7 @@ describe('il gesto di cancellare arriva fino alla riga', () => {
 
   it('e le linee della tela le può togliere davvero', () => {
     expect(page).toMatch(/onEdgeDelete=\{/);
-    expect(page).toMatch(/post\('disconnect'/);
+    expect(page).toMatch(/action: LineAction\.Disconnect/);
   });
 
   it('le action che cancellano ci sono entrambe, e il server le conosce', () => {

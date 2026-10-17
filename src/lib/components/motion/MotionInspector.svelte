@@ -107,7 +107,8 @@
     sharedWith = 0,
     partFill = null,
     lead,
-    mode = EditMode.Motion
+    mode = EditMode.Motion,
+    typeInto = null
   }: {
     doc: MotionDoc;
     analyses?: Record<string, AudioAnalysis>;
@@ -128,7 +129,21 @@
     partFill?: Snippet | null;
     lead?: Snippet;
     mode?: EditMode;
+    typeInto?: string | null;
   } = $props();
+
+  function typeHere(area: HTMLTextAreaElement, clipId: string | null) {
+    if (clipId !== null && clipId === clip.id) {
+      area.focus();
+      area.select();
+    }
+  }
+
+  function leaveOnEscape(e: KeyboardEvent) {
+    if (e.key === 'Escape') {
+      (e.currentTarget as HTMLTextAreaElement).blur();
+    }
+  }
 
   const ANCHOR_STOPS = [0, 0.5, 1] as const;
   const CORNER_NAMES = ['Top-left', 'Top-right', 'Bottom-right', 'Bottom-left'] as const;
@@ -556,7 +571,7 @@
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
   {:else if field.control === Control.Textarea}
     <div class="stack">
-      <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
+      <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} use:typeHere={typeInto} onkeydown={leaveOnEscape} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
     </div>
   {:else}
     <div class="line">

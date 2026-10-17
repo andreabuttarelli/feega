@@ -6,7 +6,7 @@ import { listItems } from '$lib/server/repos/product-batches';
 import { studioBatchOf, studioBatchSummary } from '$lib/canvas/studio-batch-node';
 import { findReferenceImages, signReferenceImages } from '$lib/server/repos/reference-images';
 import { referencesOf } from '$lib/canvas/node-references';
-import { itemsOf, outputsAt, syncedSourceItems, syncedSourceRows } from './synced-items';
+import { itemsOf, outputsAt, sourceOutputsOf, syncedSourceRows } from './synced-items';
 import { selectOf } from '$lib/canvas-node-data';
 import {
   resolveUpstreamInputs,
@@ -290,7 +290,8 @@ async function toUpstreamNode(
   }
 
   if (node.type === 'products' || node.type === 'social_account_feed') {
-    const items = await syncedSourceItems(db, orgId, node);
+    const synced = await syncedSourceRows(db, orgId, node);
+    const items = itemsOf(synced);
 
     // UN'ITERAZIONE DI LOOP VEDE UN VALORE SOLO — la stessa dottrina di `list` sopra, sulla stessa
     // `SelectableItem[]` che un `select` su questo nodo leggerebbe.
@@ -307,7 +308,16 @@ async function toUpstreamNode(
       };
     }
 
-    return { id: node.id, type: node.type, medium: 'text', model: null, text: null, mediaUrl: null };
+    return {
+      id: node.id,
+      type: node.type,
+      medium: 'image',
+      model: null,
+      text: null,
+      mediaUrl: null,
+      mediaUrls: items.flatMap((item) => item.mediaUrls),
+      outputs: sourceOutputsOf(synced)
+    };
   }
 
   if (node.type === 'select') {

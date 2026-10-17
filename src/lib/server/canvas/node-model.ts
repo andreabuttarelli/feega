@@ -7,6 +7,7 @@ import { tileNode } from '$lib/canvas/connect-rules';
 import type { Db } from '$lib/server/db/client';
 import { findNode } from '$lib/server/repos/canvas';
 import { isUncensoredModel } from '$lib/server/uncensored-access';
+import { catalogueIn, type ProjectMode } from '$lib/project-mode';
 
 export const UNCENSORED_NO_INPUTS_ERROR = 'uncensored_no_inputs';
 
@@ -76,6 +77,20 @@ export async function resolveNodeModel(
 
   const catalogue = await canvasModelCatalogue();
   return pickModel(medium, explicit, catalogue[medium] ?? NOTHING_OFFERED);
+}
+
+export async function resolveModelIn(
+  mode: ProjectMode,
+  medium: GenMedium,
+  explicit: string | null | undefined,
+  params: GenParams = {}
+): Promise<ModelPick> {
+  if (explicit || medium === 'audio') {
+    return resolveNodeModel(medium, explicit, params);
+  }
+
+  const catalogue = catalogueIn(mode, await canvasModelCatalogue());
+  return pickModel(medium, null, catalogue[medium] ?? NOTHING_OFFERED);
 }
 
 export async function nodeModelError(type: string, data: unknown): Promise<string | null> {

@@ -18,7 +18,8 @@ test('photo studio: upload, pick two styles, generate, pick one, download for Am
     await expect(page.getByText('Added to your products.')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'Blue vase' })).toHaveAttribute('aria-pressed', 'true');
 
-    await page.getByTestId('studio-next-style').click();
+    await page.getByTestId('studio-next-influencer').click();
+    await page.getByTestId('studio-skip-influencer').click();
     await page.getByTestId('studio-style-marble').click();
     await page.getByTestId('studio-next-generate').click();
     await page.getByRole('radio', { name: '1', exact: true }).click();

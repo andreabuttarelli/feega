@@ -1,5 +1,42 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry } from './node-save';
+import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, failureOf, isOwnEcho, keepDirty, orphanedEdits, keepLocal, saveBanner, saveMessage, writeWithRetry, actAtVersion, sendResultOf } from './node-save';
+import { SendResult } from './save-scheduler';
+
+describe('actAtVersion: an action on a node waits for my own writes and never conflicts with them', () => {
+  const ok = { type: 'success', data: {} };
+  const conflict = { type: 'failure', status: 409, data: { conflict: true } };
+
+  it('sends only after my pending writes landed, at the version they left', async () => {
+    let version = 3;
+    const steps: string[] = [];
+    const send = vi.fn(async (at: number) => { steps.push(`send@${at}`); return ok; });
+    const answer = await actAtVersion({
+      settle: async () => { steps.push('settle'); version = 4; },
+      version: () => version,
+      send,
+      reread: async () => {}
+    });
+    expect(answer).toBe(ok);
+    expect(steps).toEqual(['settle', 'send@4']);
+  });
+
+  it('a conflict from another actor rereads and retries once at the fresh version', async () => {
+    let version = 4;
+    const send = vi.fn(async (at: number) => (at === 4 ? conflict : ok));
+    const answer = await actAtVersion({ settle: async () => {}, version: () => version, send, reread: async () => { version = 5; } });
+    expect(answer).toBe(ok);
+    expect(send.mock.calls.map(([at]) => at)).toEqual([4, 5]);
+  });
+
+  it('any other failure is returned as is, without a retry', async () => {
+    const refused = { type: 'failure', status: 400, data: { error: 'no' } };
+    const send = vi.fn(async () => refused);
+    const reread = vi.fn(async () => {});
+    expect(await actAtVersion({ settle: async () => {}, version: () => 1, send, reread })).toBe(refused);
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(reread).not.toHaveBeenCalled();
+  });
+});
 
 describe('failureOf: every server answer has one reason', () => {
   it.each([
@@ -98,6 +135,10 @@ describe('isOwnEcho: realtime does not refetch what this tab just wrote', () => 
 
   it('ignores the echo of its own save, whatever version it carries', () => {
     expect(isOwnEcho(update({ version: 6 }), tiles)).toBe(true);
+  });
+
+  it('ignores the echo of an earlier own save the tab has already passed', () => {
+    expect(isOwnEcho(update({ version: 4, data: { prompt: 'h' } }), tiles)).toBe(true);
   });
 
   it('refetches a newer update from someone else', () => {
@@ -268,5 +309,15 @@ describe('adoptFrameHead: a frame saved by its editor moves its head without a c
     expect(adoptFrameHead(update({ id: 't', data: { prompt: 'agent' } }), tiles, clean)).toBeNull();
     expect(adoptFrameHead(update({}), tiles, () => ['data'])).toBeNull();
     expect(adoptFrameHead({ ...update({}), eventType: 'INSERT' }, tiles, clean)).toBeNull();
+  });
+});
+
+describe('sendResultOf: a queued edit is never dropped by a transient failure', () => {
+  it.each([SaveFailure.Network, SaveFailure.Server, SaveFailure.Busy, SaveFailure.Conflict])('%s keeps the edit queued for retry', (reason) => {
+    expect(sendResultOf(reason)).toBe(SendResult.Retry);
+  });
+
+  it.each([SaveFailure.Invalid, SaveFailure.Gone, SaveFailure.Credits, SaveFailure.Auth])('%s drops it', (reason) => {
+    expect(sendResultOf(reason)).toBe(SendResult.Dropped);
   });
 });
