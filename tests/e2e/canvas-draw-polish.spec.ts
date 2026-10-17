@@ -27,6 +27,10 @@ async function shoot(page: Page, name: string) {
   }
 }
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('feega.frame-edit-mode', 'design'));
+});
+
 test.describe('draw polish inside a frame @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 

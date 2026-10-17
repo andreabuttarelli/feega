@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BAR_SLOTS, BarContext, BarSlot, barContextOf, barHidden, barKeys, barLift, barShift } from './bottom-bar';
+import { EditMode } from '$lib/motion/edit-mode';
+import { BarContext, BarMode, barShown, BarSlot, barSlots, readBarMode, barContextOf, barHidden, barKeys, barLift, barShift } from './bottom-bar';
 import { CanvasState } from './inline-motion';
 import { Region } from './key-region.svelte';
 
@@ -9,14 +10,26 @@ describe('one bottom bar, its tools by context', () => {
     expect(barContextOf(CanvasState.Editing)).toBe(BarContext.Frame);
   });
 
-  it('canvas tools draw free elements and add nodes; frame tools draw inside the frame', () => {
-    expect(BAR_SLOTS[BarContext.Canvas]).toEqual([BarSlot.Draw, BarSlot.Upload, BarSlot.Nodes, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates]);
-    expect(BAR_SLOTS[BarContext.Frame]).toEqual([BarSlot.Draw, BarSlot.Image, BarSlot.FrameLibrary]);
+  it('on the canvas a switch picks one short set: Design draws, Generate adds generation nodes', () => {
+    expect(barSlots(BarContext.Canvas, BarMode.Design)).toEqual([BarSlot.Mode, BarSlot.Draw, BarSlot.Upload, BarSlot.FrameTemplates]);
+    expect(barSlots(BarContext.Canvas, BarMode.Generate)).toEqual([BarSlot.Mode, BarSlot.Select, BarSlot.Generate, BarSlot.More, BarSlot.Templates, BarSlot.FrameTemplates]);
   });
 
-  it('only the draw tools belong to both contexts', () => {
-    const canvas = new Set(BAR_SLOTS[BarContext.Canvas]);
-    expect(BAR_SLOTS[BarContext.Frame].filter((s) => canvas.has(s))).toEqual([BarSlot.Draw]);
+  it('the selection tool is reachable in both sets', () => {
+    expect(barSlots(BarContext.Canvas, BarMode.Design)).toContain(BarSlot.Draw);
+    expect(barSlots(BarContext.Canvas, BarMode.Generate)).toContain(BarSlot.Select);
+  });
+
+  it('with a frame open the bar shows frame tools and no switch, whatever mode was picked', () => {
+    for (const mode of Object.values(BarMode)) {
+      expect(barSlots(BarContext.Frame, mode)).toEqual([BarSlot.Draw, BarSlot.Image, BarSlot.FrameLibrary]);
+    }
+  });
+
+  it('reads a remembered mode, and opens on Generate for anything else', () => {
+    expect(readBarMode('generate')).toBe(BarMode.Generate);
+    expect(readBarMode(null)).toBe(BarMode.Generate);
+    expect(readBarMode('nope')).toBe(BarMode.Generate);
   });
 
   it('sits flush to the edge, above the timeline only while a frame shows one', () => {
@@ -40,5 +53,14 @@ describe('one bottom bar, its tools by context', () => {
     expect(barHidden(BarContext.Frame, true)).toBe(true);
     expect(barHidden(BarContext.Frame, false)).toBe(false);
     expect(barHidden(BarContext.Canvas, true)).toBe(false);
+  });
+});
+
+describe('a frame shows one tool strip at a time', () => {
+  it('Design shows the add bar; Motion hides it for the timeline; the canvas always shows it', () => {
+    expect(barShown(BarContext.Frame, EditMode.Design)).toBe(true);
+    expect(barShown(BarContext.Frame, EditMode.Motion)).toBe(false);
+    expect(barShown(BarContext.Canvas, EditMode.Motion)).toBe(true);
+    expect(barShown(BarContext.Canvas, EditMode.Design)).toBe(true);
   });
 });

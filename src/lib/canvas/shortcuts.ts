@@ -41,6 +41,8 @@
  */
 import { isTypingTarget } from '$lib/shortcuts';
 import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from './addable';
+import { DrawTool } from '$lib/motion/draw-tool';
+import { Command, commandFor } from '$lib/motion/shortcuts';
 
 /** Di quante unità di tela sposta una freccia, e quanto con Shift. */
 export const NUDGE_STEP = 8;
@@ -62,6 +64,7 @@ export type CanvasCommandId =
   | 'redo'
   | 'group'
   | 'ungroup'
+  | 'tool'
   | 'bring-front'
   | 'send-back';
 
@@ -72,7 +75,21 @@ export type CanvasCommandId =
 export type CanvasCommand =
   | { id: 'add'; what: Addable }
   | { id: 'nudge'; dx: number; dy: number }
-  | { id: Exclude<CanvasCommandId, 'add' | 'nudge'> };
+  | { id: 'tool'; tool: DrawTool }
+  | { id: Exclude<CanvasCommandId, 'add' | 'nudge' | 'tool'> };
+
+const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
+  [Command.ToolSelect]: DrawTool.Select,
+  [Command.ToolText]: DrawTool.Text,
+  [Command.ToolRectangle]: DrawTool.Rectangle,
+  [Command.ToolEllipse]: DrawTool.Ellipse,
+  [Command.ToolPen]: DrawTool.Pen
+};
+
+function toolFor(e: KeyboardEvent): DrawTool | null {
+  const command = commandFor({ key: e.key, mod: false, shift: e.shiftKey });
+  return command ? (TOOL_OF_COMMAND[command] ?? null) : null;
+}
 
 const PASTE_MOD_KEYS: Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
 
@@ -124,6 +141,9 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
     return null;
   }
 
+  const tool = toolFor(e);
+  if (tool) return { id: 'tool', tool };
+
   if (key === 'Backspace' || key === 'Delete') return { id: 'delete' };
   if (key === 'Escape') return { id: 'deselect' };
 
@@ -173,6 +193,7 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'undo', keys: ['mod', 'Z'], label: 'Undo' },
   { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Ripeti' },
   { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplicate selection' },
+  { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P'], label: 'Select, text, box, ellipse, pen' },
   { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
   { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
   { id: 'bring-front', keys: ['mod', ']'], label: 'Bring to front' },
