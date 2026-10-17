@@ -333,6 +333,22 @@ motion
     await cmdMotionRenderState(runId, opts);
   });
 
+const orgs = program
+  .command('orgs')
+  .description('List your organisations; * marks the active one')
+  .action(async () => {
+    const { cmdOrgs } = await import('./commands/orgs.ts');
+    await cmdOrgs();
+  });
+
+orgs
+  .command('use <orgId>')
+  .description('Make an organisation active for the web app, the CLI and agents')
+  .action(async (orgId: string) => {
+    const { cmdOrgsUse } = await import('./commands/orgs.ts');
+    await cmdOrgsUse(orgId);
+  });
+
 const gallery = program
   .command('gallery [query]')
   .description('Search the public gallery of free motion videos and compositions to remix')
