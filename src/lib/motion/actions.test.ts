@@ -68,8 +68,9 @@ describe('the action table', () => {
 
     expect(row(Command.PreviewZoomIn)).toMatchObject({ keys: '⌘+', gesture: 'Pinch the preview' });
     expect(row(Command.PreviewZoomOut)).toMatchObject({ keys: '⌘−', gesture: 'Pinch the preview' });
-    expect(row(Command.PreviewFit)).toMatchObject({ keys: '⌘0', gesture: 'Double-tap around the preview' });
-    expect(row(Command.PreviewActual)?.keys).toBe('⌘1');
+    expect(row(Command.PreviewFit)).toMatchObject({ keys: '⌘0 ⇧1', gesture: 'Double-tap around the preview' });
+    expect(row(Command.PreviewActual)?.keys).toBe('⌘1 ⇧0');
+    expect(row(Command.PreviewSelection)?.keys).toBe('⇧2');
   });
 });
 
