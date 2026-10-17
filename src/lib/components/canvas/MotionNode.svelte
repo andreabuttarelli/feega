@@ -47,6 +47,7 @@
   let root = $state<HTMLDivElement | null>(null);
   let player = $state<ReturnType<typeof MotionPreview> | null>(null);
   let sight = $state<Sight>(Sight.OutOfView);
+  let settledSight = $state<Sight>(Sight.OutOfView);
   let fetched = $state<Preview | null>(null);
   let previewRevision = $state(-1);
   let frame = $state(0);
@@ -69,7 +70,7 @@
   const layers = $derived(nodeLayers(nodeMode, paint));
   const chrome = $derived(frameChrome(node.kind));
   const previewing = $derived(nodeMode === NodeMode.Preview);
-  const liveHere = $derived(sight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending));
+  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending));
   const liveTile = $derived(liveHere && (!!local || node.docHeadRevision > 0) && (!previewing || tiles.live(node.id)));
   const capturable = $derived(nodeMode !== NodeMode.Edit && !liveTile);
   let ownDrawn = $state(false);
@@ -94,6 +95,12 @@
   });
 
   $effect(() => {
+    if (!canvasLod.moving) {
+      settledSight = sight;
+    }
+  });
+
+  $effect(() => {
     if (sight === Sight.OutOfView) {
       slots = stopIn(slots, node.id);
     }
@@ -101,7 +108,7 @@
 
   $effect(() => {
     const id = node.id;
-    if (sight === Sight.OutOfView || canvasLod.far) {
+    if (settledSight === Sight.OutOfView || canvasLod.far) {
       tiles.drop(id);
       return;
     }
