@@ -1038,7 +1038,7 @@
     return items.filter((url): url is string => !!url);
   }
 
-  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url) === Renderer.Gpu ? null : (CanvasFlow as unknown as typeof GpuFlow));
+  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Gpu ? null : (CanvasFlow as unknown as typeof GpuFlow));
   $effect(() => {
     if (Flow) {
       return;
@@ -3090,6 +3090,7 @@
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
     thumbsOf={sourceThumbs}
+    onfail={() => (Flow = CanvasFlow as unknown as typeof GpuFlow)}
   >
     {#snippet tile({ id, selected })}
       {@const row = nodes.find((n) => n.id === id)}

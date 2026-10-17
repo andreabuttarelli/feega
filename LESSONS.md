@@ -3029,3 +3029,6 @@ Signal: a new Text/Title/Line in a still frame renders with opacity 0 (or clippe
 
 ### A `{#key}` editor remounts on close although a "leaving" state keeps it
 Signal: deselecting a frame flashes "Opening the editor…" or a stale picture; a `console.log` in the editor's `onMount` fires unmount→mount→unmount within one click. Cause: the state that keeps the block alive (`inlineStage.leave`) was set in an `$effect` reacting to the selection; the `{#if}/{#key}` block had already re-rendered without it, and `earlyFetch.take` had emptied the session cache, so the remount loaded again. `$effect.pre` did not fix it. Move: set the keep-alive state synchronously in the handler that changes the selection (`selectionChanged` → `leaveNow`), and keep the effect only as fallback.
+
+### Edits in an agent worktree never reach the running dev server
+Signal: the page keeps old markup (a new attribute is `null`, a fix "does nothing") although the file is saved. Cause: `vite.config.ts` ignores `.claude/worktrees` in `server.watch`, so a dev server started from a worktree never recompiles. Move: restart your own `vite dev --port <free>` after every edit before reading red or green.

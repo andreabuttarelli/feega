@@ -1,17 +1,17 @@
 import { Application, Color, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite, VideoSource } from 'pixi8';
 import type { Viewport } from '../dot-grid';
-import { CONNECTOR_STYLE } from '../connectors';
 import { LOD_ZOOM } from '../poster-lod';
+import { MOTION_NODE_BAR_H } from '../motion-node';
 import { AssetSize, sized } from '../asset-url';
 import { Surface, type CardFace, type Media } from './card-face';
-import { cornersOf, curvePoint, PORT_SIZE, type Box, type Curve, type Port } from './geometry';
+import { cornersOf, curvePoint, type Box, type Curve } from './geometry';
 import { createTextureCache, type TextureCache } from './texture-cache';
 import { Backend } from './backend';
 
 export { Backend };
 
 
-export type Card = Box & { id: string; face: CardFace; rotation: number; ports: Port[]; hidden: boolean };
+export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean };
 export type Wire = { id: string; curve: Curve; iterate: boolean; selected: boolean };
 export type Peer = { id: string; name: string; color: string; at: { x: number; y: number } };
 export type Overlay = {
@@ -26,8 +26,6 @@ export type Overlay = {
 
 export type Theme = { canvas: string; dot: string; paper: string; line: string; ink: string; inkSoft: string; accent: string; iterate: string; wire: string; font: string };
 
-const LABEL_GAP = 6;
-const LABEL_SIZE = 12;
 const PAD = 14;
 const BODY_SIZE = 13;
 const CORNER_PX = 8;
@@ -41,11 +39,12 @@ const NEAR_TIER_ZOOM = 0.75;
 const MAX_TEXT_CHARS = 1400;
 const TEXT_TIERS = [1, 2, 4] as const;
 const THUMB_COLUMNS = 3;
+const STAGE = '#000000';
 const THUMB_GAP = 4;
 
 const tierFor = (zoom: number) => TEXT_TIERS.find((t) => t >= zoom * devicePixelRatio) ?? TEXT_TIERS[TEXT_TIERS.length - 1];
 
-type Built = { root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; label: Text | null; media: Media | null };
+type Built = { root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; media: Media | null };
 
 function dotTexture(theme: Theme): Texture {
   const c = document.createElement('canvas');
@@ -56,6 +55,26 @@ function dotTexture(theme: Theme): Texture {
   ctx.arc(DOT_TILE / 2, DOT_TILE / 2, 1, 0, Math.PI * 2);
   ctx.fill();
   return Texture.from(c);
+}
+
+export enum Fit {
+  Cover = 'cover',
+  Contain = 'contain'
+}
+
+function place(sprite: Sprite, tex: Texture, box: Box, fit: Fit) {
+  if (fit === Fit.Cover) {
+    sprite.texture = cover(tex, box.w, box.h);
+    sprite.position.set(box.x, box.y);
+    sprite.width = box.w;
+    sprite.height = box.h;
+    return;
+  }
+  const scale = Math.min(box.w / (tex.width || 1), box.h / (tex.height || 1));
+  sprite.texture = tex;
+  sprite.width = tex.width * scale;
+  sprite.height = tex.height * scale;
+  sprite.position.set(box.x + (box.w - sprite.width) / 2, box.y + (box.h - sprite.height) / 2);
 }
 
 function faceKey(c: Card): string {
@@ -95,6 +114,7 @@ export class GpuScene {
   private wiresIn: Wire[] = [];
   private overlayIn: Overlay | null = null;
   onFrame: ((ms: number) => void) | null = null;
+  private dim: { body: number; edges: number } | null = null;
 
   private constructor(app: Application, theme: Theme) {
     this.app = app;
@@ -159,10 +179,11 @@ export class GpuScene {
         b = this.build(c, key);
         this.built.set(c.id, b);
       }
-      b.root.position.set(c.x, c.y);
-      b.root.pivot.set(0, 0);
+      b.root.pivot.set(c.w / 2, c.h / 2);
+      b.root.position.set(c.x + c.w / 2, c.y + c.h / 2);
       b.root.angle = c.rotation;
       b.skin.visible = !c.hidden;
+      b.root.alpha = this.dim && !c.hidden ? this.dim.body : 1;
       this.cardLayer.setChildIndex(b.root, Math.min(i, this.cardLayer.children.length - 1));
     });
     for (const id of [...this.built.keys()]) {
@@ -174,6 +195,12 @@ export class GpuScene {
     this.drawWires();
     this.drawOverlay();
     this.invalidate();
+  }
+
+  setDim(dim: { body: number; edges: number } | null) {
+    this.dim = dim;
+    this.wires.alpha = dim ? dim.edges : 1;
+    this.setCards(this.cards);
   }
 
   setWires(wires: Wire[]) {
@@ -266,7 +293,7 @@ export class GpuScene {
     root.addChild(g);
   }
 
-  private mediaSprite(root: Container, b: Built, media: Media, box: Box) {
+  private mediaSprite(root: Container, b: Built, media: Media, box: Box, fit: Fit = Fit.Cover) {
     const sprite = new Sprite(Texture.EMPTY);
     sprite.position.set(box.x, box.y);
     sprite.width = box.w;
@@ -275,16 +302,14 @@ export class GpuScene {
     b.body = sprite;
     b.media = media;
     if (media.video) {
-      this.attachVideo(b, media.url, box);
+      this.attachVideo(b, media.url, box, fit);
       return;
     }
     this.textures.want(this.imageUrl(media.url), (tex) => {
       if (sprite.destroyed) {
         return;
       }
-      sprite.texture = cover(tex, box.w, box.h);
-      sprite.width = box.w;
-      sprite.height = box.h;
+      place(sprite, tex, box, fit);
     });
   }
 
@@ -292,7 +317,7 @@ export class GpuScene {
     return sized(url, this.view.zoom >= NEAR_TIER_ZOOM ? AssetSize.Px1024 : AssetSize.Px256);
   }
 
-  private attachVideo(b: Built, url: string, box: Box) {
+  private attachVideo(b: Built, url: string, box: Box, fit: Fit) {
     const video = document.createElement('video');
     video.muted = true;
     video.loop = true;
@@ -306,9 +331,7 @@ export class GpuScene {
         return;
       }
       const source = new VideoSource({ resource: video, autoPlay: false, autoLoad: true });
-      b.body.texture = cover(new Texture({ source }), box.w, box.h);
-      b.body.width = box.w;
-      b.body.height = box.h;
+      place(b.body, new Texture({ source }), box, fit);
       this.cull();
       this.invalidate();
     });
@@ -318,21 +341,28 @@ export class GpuScene {
     const holder = new Container();
     const root = new Container();
     holder.addChild(root);
-    const b: Built = { root: holder, skin: root, key, body: null, video: null, texts: [], label: null, media: null };
+    const b: Built = { root: holder, skin: root, key, body: null, video: null, texts: [], media: null };
     const f = c.face;
     const BUILD: Record<Surface, () => void> = {
-      [Surface.Media]: () => f.media && this.mediaSprite(root, b, f.media, { x: 0, y: 0, w: c.w, h: c.h }),
-      [Surface.Frame]: () => {
-        this.panel(root, c, false);
-        if (f.live) {
-          this.mediaSprite(root, b, { url: f.live, video: true }, { x: 0, y: 0, w: c.w, h: c.h });
-          return;
-        }
+      [Surface.Media]: () => {
+        this.panel(root, c);
         if (f.media) {
-          this.mediaSprite(root, b, f.media, { x: 0, y: 0, w: c.w, h: c.h });
+          this.mediaSprite(root, b, f.media, { x: 0, y: 0, w: c.w, h: c.h }, Fit.Contain);
         }
       },
-      [Surface.Graphic]: () => f.media && this.mediaSprite(root, b, f.media, { x: 0, y: 0, w: c.w, h: c.h }),
+      [Surface.Frame]: () => {
+        const stage = { x: 0, y: 0, w: c.w, h: Math.max(1, c.h - MOTION_NODE_BAR_H) };
+        this.panel(root, c, false);
+        const g = new Graphics();
+        g.rect(stage.x, stage.y, stage.w, stage.h).fill(STAGE);
+        g.rect(0, stage.h, c.w, 1).fill(this.theme.line);
+        root.addChild(g);
+        const media = f.live ? { url: f.live, video: true } : f.media;
+        if (media) {
+          this.mediaSprite(root, b, media, stage, Fit.Contain);
+        }
+      },
+      [Surface.Graphic]: () => f.media && this.mediaSprite(root, b, f.media, { x: 0, y: 0, w: c.w, h: c.h }, Fit.Contain),
       [Surface.Generate]: () => this.buildGenerate(root, b, c),
       [Surface.Text]: () => {
         this.panel(root, c);
@@ -360,14 +390,6 @@ export class GpuScene {
       [Surface.Blank]: () => this.panel(root, c)
     };
     BUILD[f.surface]();
-    if (f.label) {
-      const label = this.text(f.label, LABEL_SIZE, this.theme.inkSoft, null, '600');
-      label.position.set(0, -LABEL_SIZE * 1.4 - LABEL_GAP);
-      holder.addChild(label);
-      b.texts.push(label);
-      b.label = label;
-    }
-    this.drawPorts(holder, c);
     this.cardLayer.addChild(holder);
     return b;
   }
@@ -421,19 +443,6 @@ export class GpuScene {
     model.position.set(PAD + 12, c.h - footer / 2 - BODY_SIZE * 0.7);
     root.addChild(model);
     b.texts.push(model);
-  }
-
-  private drawPorts(root: Container, c: Card) {
-    const typed = c.ports.filter((p) => p.port);
-    if (!typed.length) {
-      return;
-    }
-    const g = new Graphics();
-    const half = PORT_SIZE / 2;
-    for (const p of typed) {
-      g.rect(p.x - c.x - half, p.y - c.y - half, PORT_SIZE, PORT_SIZE).fill(CONNECTOR_STYLE[p.port!].color);
-    }
-    root.addChild(g);
   }
 
   private visibleBox(): Box {

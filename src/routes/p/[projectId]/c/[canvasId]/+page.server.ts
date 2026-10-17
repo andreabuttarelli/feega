@@ -1,3 +1,4 @@
+import { rendererSwitch } from '$lib/server/canvas-renderer-switch';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { MEDIA_UUID_RE } from '$lib/media-url';
 import { registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
@@ -199,19 +200,21 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
     referenceLibrary(db, { orgId, projectId: canvas.projectId })
   ]);
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines, killSwitch] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
     firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length }),
     templateLibrary(db, { orgId, actor: userActor({ userId }) }).list(),
     chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
-    canvasOutlines(db, { orgId, nodes })
+    canvasOutlines(db, { orgId, nodes }),
+    rendererSwitch()
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
 
   return {
+    rendererSwitch: killSwitch,
     handoff,
     canvas,
     nodes,

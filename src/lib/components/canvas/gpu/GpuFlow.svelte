@@ -12,6 +12,8 @@
   import PageZoomLock from '../PageZoomLock.svelte';
   import NodeBoundary from '../NodeBoundary.svelte';
   import EdgePanel from '../EdgePanel.svelte';
+  import GpuTileChrome from './GpuTileChrome.svelte';
+  import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
   import { BarContext } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
@@ -46,13 +48,15 @@
   import { GpuScene, themeOf, type Card, type Wire } from '$lib/canvas/gpu/scene';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { recordFrame } from '$lib/canvas/gpu/frame-stats';
-  import { shelfIds } from '$lib/canvas/gpu/poster-shelf';
+  import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
+  import { domPainted } from '$lib/canvas/gpu/paint';
   import { NameTag } from '$lib/canvas/node-label';
   import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
 
-  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[] } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void } = $props();
 
   const DOM_CAP = 6;
+  const SHELF_TICK_MS = 5000;
   const MOVE_SLOP_PX = 3;
   const LONG_PRESS_MS = 500;
   const LABEL_CLEARANCE = 24;
@@ -77,6 +81,7 @@
   let scene = $state<GpuScene | null>(null);
   let failed = $state<string | null>(null);
   let view = $state<Viewport>({ x: 0, y: 0, zoom: 1 });
+  let area = $state({ width: 0, height: 0 });
   let selected = $state<string[]>([]);
   let selectedEdge = $state<string | null>(null);
   let hovered = $state<string | null>(null);
@@ -103,7 +108,7 @@
   const nodeOf = $derived(new Map(tiles.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
   const edges = $derived(focusEdges(props.edges ?? [], selected) ?? props.edges ?? []);
-  const domIds = $derived(new Set(selected.slice(0, DOM_CAP)));
+  const domIds = $derived(new Set([...selected.slice(0, DOM_CAP), ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area, canvasLod.far)]));
 
   function portFor(nodeId: string, side: PortSide, handle: string | null | undefined): Port | null {
     const own = ports.filter((p) => p.nodeId === nodeId && p.side === side);
@@ -128,7 +133,6 @@
         h: t.h,
         rotation: t.rotation ?? 0,
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
-        ports: portsOf(t),
         hidden: domIds.has(t.id)
       })
     )
@@ -148,8 +152,16 @@
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && spec.flow.nodesDraggable);
 
+  const editing = $derived(props.barContext === BarContext.Frame);
+
   $effect(() => {
     scene?.setCards(cards);
+  });
+
+  $effect(() => {
+    const css = wrap ? getComputedStyle(wrap) : null;
+    const level = (name: string) => Number(css?.getPropertyValue(name) || 1);
+    scene?.setDim(editing ? { body: level('--neighbour-body'), edges: level('--neighbour-edges') } : null);
   });
 
   $effect(() => {
@@ -355,6 +367,9 @@
     const target = e.target as HTMLElement;
     const inDom = target.closest('.gpu-dom-node');
     if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && target.closest(INTERACTIVE)) {
+      if (hit.kind === HitKind.Node && spec.flow.elementsSelectable && !selected.includes(hit.nodeId)) {
+        clickNode(hit.nodeId, e.shiftKey || e.metaKey || e.ctrlKey);
+      }
       return;
     }
     if (e.button === 2 && hit.kind !== HitKind.Empty) {
@@ -644,6 +659,7 @@
     e.preventDefault();
     const p = local(e);
     if (e.ctrlKey || e.metaKey) {
+      e.stopPropagation();
       view = zoomAt(view, p, Math.exp(-e.deltaY * WHEEL_ZOOM));
       return;
     }
@@ -865,7 +881,10 @@
   onMount(() => {
     let alive = true;
     let built: GpuScene | null = null;
-    const observer = new ResizeObserver(() => built?.resize());
+    const observer = new ResizeObserver(() => {
+      built?.resize();
+      area = { width: surface!.clientWidth, height: surface!.clientHeight };
+    });
     GpuScene.create(surface!, backendOf(page.url), themeOf(wrap!))
       .then((s) => {
         if (!alive) {
@@ -884,6 +903,7 @@
       })
       .catch((err: unknown) => {
         failed = err instanceof Error ? err.message : String(err);
+        props.onfail?.(failed);
       });
     return () => {
       alive = false;
@@ -900,16 +920,45 @@
   }
 
   const domTiles = $derived(placed.filter((t) => domIds.has(t.id)));
-  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds)));
+  let parked = $state(new Map<string, number>());
+  let shelfClock = $state(0);
+  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock)));
+  const shelfSince = new Map<string, number>();
+  $effect(() => {
+    const now = Date.now();
+    for (const id of shelf) {
+      if (!shelfSince.has(id)) {
+        shelfSince.set(id, now);
+      }
+    }
+    for (const id of [...shelfSince.keys()]) {
+      if (!shelf.has(id)) {
+        shelfSince.delete(id);
+      }
+    }
+  });
+  onMount(() => {
+    const timer = setInterval(() => {
+      shelfClock = Date.now();
+      const next = parkStuck(shelfSince, parked, shelfClock);
+      if (next.size !== parked.size || [...next].some(([id, at]) => parked.get(id) !== at)) {
+        for (const id of next.keys()) {
+          shelfSince.delete(id);
+        }
+        parked = next;
+      }
+    }, SHELF_TICK_MS);
+    return () => clearInterval(timer);
+  });
   const shelfTiles = $derived(placed.filter((t) => shelf.has(t.id)));
 </script>
 
 <svelte:window onkeydown={onKeydown} onkeyup={(e) => e.key === ' ' && (space = false)} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap" bind:this={wrap} ondragover={onDragOver} ondrop={onDrop} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" bind:this={wrap} ondragover={onDragOver} ondrop={onDrop} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-view={`${view.x},${view.y},${view.zoom}`}>
   <div
-    class="surface"
+    class="surface svelte-flow__pane"
     bind:this={surface}
     onpointerdown={onDown}
     onpointermove={onMove}
@@ -919,17 +968,41 @@
     oncontextmenu={onContextMenu}
     class:panning={space}
   >
-    <div class="dom-layer" style={`transform:translate(${view.x}px,${view.y}px) scale(${view.zoom})`}>
-      {#each domTiles as t (t.id)}
+    <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
+      {#each placed as t (t.id)}
+        {@const on = selected.includes(t.id)}
         <div
-          class="gpu-dom-node"
+          class="svelte-flow__node gpu-node"
+          class:selected={on}
+          class:has-dom={domIds.has(t.id)}
+          role="button"
+          tabindex="-1"
+          aria-label={t.displayName || t.kind || 'node'}
+          aria-pressed={on}
+          data-testid="gpu-node"
           data-id={t.id}
-          data-testid="gpu-dom-node"
-          style={`left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg` : ''}`}
+          data-kind={t.kind}
+          data-box={`${t.x},${t.y},${t.w},${t.h}`}
+          style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <NodeBoundary>
-            {@render props.tile({ id: t.id, selected: true })}
-          </NodeBoundary>
+          <GpuTileChrome tile={t} selected={on} onrotate={props.onRotate} />
+          {#if !domIds.has(t.id) && t.kind === 'motion'}
+            {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
+            <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
+              <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage>
+                {#if t.poster}
+                  <div class="frame-standin-poster" data-testid="motion-node-poster"></div>
+                {/if}
+              </div>
+            </div>
+          {/if}
+          {#if domIds.has(t.id)}
+            <div class="gpu-dom-node" data-testid="gpu-dom-node" data-id={t.id}>
+              <NodeBoundary>
+                {@render props.tile({ id: t.id, selected: on })}
+              </NodeBoundary>
+            </div>
+          {/if}
         </div>
       {/each}
     </div>
@@ -942,22 +1015,6 @@
           {@render props.tile({ id: t.id, selected: false })}
         </NodeBoundary>
       </div>
-    {/each}
-  </div>
-
-  <div class="a11y-mirror" role="application" aria-label="Canvas">
-    {#each placed as t (t.id)}
-      <button
-        type="button"
-        class="mirror-node"
-        data-testid="gpu-node"
-        data-id={t.id}
-        data-kind={t.kind}
-        data-box={`${t.x},${t.y},${t.w},${t.h}`}
-        aria-label={t.displayName || t.kind || 'node'}
-        aria-pressed={selected.includes(t.id)}
-        onclick={() => select([t.id])}
-      ></button>
     {/each}
   </div>
 
@@ -1075,18 +1132,41 @@
     display: block;
   }
 
-  .dom-layer {
+  .gpu-nodes {
     position: absolute;
     z-index: 1;
     left: 0;
     top: 0;
-    transform-origin: 0 0;
-    pointer-events: none;
+  }
+
+  .gpu-node {
+    left: 0;
+    top: 0;
+  }
+
+  .gpu-node :global(.svelte-flow__handle.typed-port) {
+    pointer-events: all;
+    cursor: crosshair;
+  }
+
+  .frame-standin {
+    position: absolute;
+    inset: 0;
+  }
+
+  .frame-standin-stage {
+    position: absolute;
+    inset: 0 0 var(--bar-h) 0;
+  }
+
+  .frame-standin-poster {
+    position: absolute;
+    inset: 0;
   }
 
   .gpu-dom-node {
     position: absolute;
-    pointer-events: auto;
+    inset: 0;
     user-select: text;
   }
 
@@ -1103,15 +1183,6 @@
     position: absolute;
     left: 0;
     top: 0;
-  }
-
-  .a11y-mirror {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
   }
 
   .edge-refusal {

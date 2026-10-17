@@ -1,0 +1,30 @@
+import { describe, expect, it } from 'vitest';
+import { NODE_TYPES } from '../node-data';
+import { PAINT, Paint, domPainted } from './paint';
+
+describe('paint — which node bodies the GPU draws and which stay DOM when readable', () => {
+  it('every node type has a row', () => {
+    expect(Object.keys(PAINT).sort()).toEqual([...NODE_TYPES].sort());
+  });
+
+  it('frames, free elements and uploaded images are GPU; everything with controls stays DOM', () => {
+    expect(PAINT.motion({})).toBe(Paint.Gpu);
+    expect(PAINT.image({ assetId: 'a' })).toBe(Paint.Gpu);
+    expect(PAINT.image({ prompt: 'x' })).toBe(Paint.Dom);
+    expect(PAINT.video({ assetId: 'a' })).toBe(Paint.Dom);
+    expect(PAINT.doc({})).toBe(Paint.Dom);
+    expect(PAINT.calendar({})).toBe(Paint.Dom);
+  });
+
+  it('a DOM-painted node mounts only when on screen and the view is not far', () => {
+    const tiles = [
+      { id: 'cal', kind: 'calendar', x: 0, y: 0, w: 100, h: 100 },
+      { id: 'off', kind: 'calendar', x: 5000, y: 0, w: 100, h: 100 },
+      { id: 'frame', kind: 'motion', x: 0, y: 0, w: 100, h: 100 }
+    ];
+    const data = () => ({});
+    const screen = { width: 800, height: 600 };
+    expect(domPainted(tiles, data, { x: 0, y: 0, zoom: 1 }, screen, false)).toEqual(['cal']);
+    expect(domPainted(tiles, data, { x: 0, y: 0, zoom: 1 }, screen, true)).toEqual([]);
+  });
+});

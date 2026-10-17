@@ -1,6 +1,6 @@
 const KEEP = 600;
 
-type Stats = { render: number[] };
+type Stats = { render: number[]; pending?: number };
 
 declare global {
   interface Window {
@@ -14,4 +14,9 @@ export function recordFrame(ms: number) {
   if (stats.render.length > KEEP) {
     stats.render.shift();
   }
+}
+
+export function reportPending(count: number) {
+  const stats = (window.__gpuCanvas ??= { render: [] });
+  stats.pending = count;
 }
