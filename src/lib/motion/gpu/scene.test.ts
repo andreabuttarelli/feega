@@ -55,6 +55,17 @@ describe('backdrop groups', () => {
   });
 });
 
+describe('particles', () => {
+  it('draws a particle clip from its own bake, sized to the frame', () => {
+    const sparks = must(addClip(base, { component: 'Particles', from: 0, durationInFrames: 30 }, 'sparks'));
+    const layer = scene(sparks).layers.find((l) => l.clip === 'sparks');
+
+    expect(layer?.paint.kind).toBe(PaintKind.Particles);
+    expect((layer?.paint as { bake: { id: string } }).bake.id).toBe('sparks');
+    expect(layer?.content).toEqual({ width: 1920, height: 1080 });
+  });
+});
+
 describe('strokePad', () => {
   it('leaves room for half of the widest stroke around a shape', () => {
     expect(strokePad('<svg><path style="stroke-width:12"/><path stroke-width="30"/></svg>')).toBe(16);

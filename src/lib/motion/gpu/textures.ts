@@ -1,6 +1,7 @@
 import { Texture } from 'pixi8';
 import { fitRect, logoRect } from './fit';
 import { PAINT_PATTERN, patternOf } from './fill-pattern';
+import { drawParticles, glowTiles, particlesAt, type ParticleMemo } from '../particles/simulate';
 import { scaleOf, type Size } from './matrix';
 import { PaintKind } from './paint-of';
 import type { Placement } from './renderer';
@@ -70,6 +71,17 @@ export function createPainter(): Painter {
   const videos = new Map<string, { el: HTMLVideoElement; texture: Texture | null }>();
   const fills = new Map<string, Texture>();
   const texts = new Map<SceneLayer, Texture>();
+  const glows = glowTiles(() => document.createElement('canvas'));
+  const swarms = new Map<string, { pen: CanvasRenderingContext2D; texture: Texture; memo: ParticleMemo }>();
+  const swarmOf = (paint: Of<PaintKind.Particles>) => {
+    let swarm = swarms.get(paint.bake.id);
+    if (!swarm) {
+      const canvas = Object.assign(document.createElement('canvas'), { width: paint.bake.width, height: paint.bake.height });
+      swarm = { pen: canvas.getContext('2d') as CanvasRenderingContext2D, texture: Texture.from(canvas), memo: new Map() };
+      swarms.set(paint.bake.id, swarm);
+    }
+    return swarm;
+  };
 
   const load = (key: string, src: string) => {
     if (!images.has(key)) {
@@ -99,6 +111,12 @@ export function createPainter(): Painter {
   const PREPARE: Record<PaintKind, (d: Drawn, t: number) => Promise<unknown>> = {
     [PaintKind.Fill]: async () => {},
     [PaintKind.Text]: async () => {},
+    [PaintKind.Particles]: async (d, t) => {
+      const paint = d.paint as Of<PaintKind.Particles>;
+      const swarm = swarmOf(paint);
+      drawParticles(swarm.pen, particlesAt(paint.bake, t * paint.bake.fps - paint.bake.from, swarm.memo), paint.bake.shape, null, glows);
+      swarm.texture.source.update();
+    },
     [PaintKind.Html]: async () => {},
     [PaintKind.Shape]: (d) => {
       const paint = d.paint as Of<PaintKind.Shape>;
@@ -127,6 +145,10 @@ export function createPainter(): Painter {
 
   const PLACE: Record<PaintKind, (d: Drawn) => Placement | null> = {
     [PaintKind.Html]: () => null,
+    [PaintKind.Particles]: (d) => {
+      const swarm = swarms.get((d.paint as Of<PaintKind.Particles>).bake.id);
+      return swarm ? whole(swarm.texture, d.content) : null;
+    },
     [PaintKind.Text]: (d) => {
       const texture = texts.get(d.layer);
       return texture ? whole(texture, d.content) : null;
