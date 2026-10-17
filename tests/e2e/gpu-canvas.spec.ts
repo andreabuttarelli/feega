@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated, type E2eSession } from './fixtures/session';
+import doc from './fixtures/motion-doc.json' with { type: 'json' };
 
 const RENDERER = process.env.GPU_RENDERER ?? 'webgpu';
 const ROW = { y: 80 };
@@ -106,5 +107,52 @@ test.describe('GPU canvas: the same gestures as the DOM canvas @real', () => {
     await page.mouse.wheel(0, -200);
     await page.keyboard.up('Control');
     await expect.poll(async () => (await view(page)).zoom).toBeGreaterThan(start.zoom);
+  });
+
+  test('a frame without a poster gets one shot off-screen, and a click opens the inline editor on it', async ({ page, session, admin, seedNode }) => {
+    const frame = await seedNode({ type: 'motion', x: 80, y: 120, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+    expect((await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: frame.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId })).error).toBeNull();
+    await open(page, session);
+
+    await expect
+      .poll(async () => ((await admin.from('nodes').select('data').eq('id', frame.id).single()).data?.data as { posterAssetId?: string | null }).posterAssetId ?? null, { timeout: 30_000, message: 'the shelf shoots the missing poster' })
+      .not.toBeNull();
+    await expect(page.getByTestId('gpu-poster-shelf')).toHaveCount(0);
+
+    const at = await centreOf(page, frame.id);
+    await page.mouse.click(at.x, at.y);
+    await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
+    await expect(page.locator(`[data-testid="gpu-dom-node"][data-id="${frame.id}"] [data-testid="motion-node-editing"]`)).toBeVisible();
+  });
+
+  test('the rectangle tool draws a free element on the GPU canvas, which opens and undoes like on the DOM one', async ({ page, session, admin }) => {
+    const elements = async () => ((await admin.from('nodes').select('id, data, width, height').eq('canvas_id', session.canvasId).is('deleted_at', null)).data ?? []).filter((n) => (n.data as { kind?: string }).kind === 'element');
+    await open(page, session);
+    const bar = page.getByTestId('add-bar');
+    await expect(bar).toHaveAttribute('data-context', 'canvas');
+    await bar.getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
+    await expect(page.getByTestId('canvas-draw')).toBeVisible();
+
+    const pane = (await page.locator('[data-canvas-surface]').boundingBox())!;
+    const from = { x: pane.x + pane.width * 0.35, y: pane.y + pane.height * 0.35 };
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(from.x + 120, from.y + 60);
+    await page.mouse.move(from.x + 240, from.y + 120);
+    await page.mouse.up();
+
+    await expect.poll(async () => (await elements()).length, { timeout: 10_000 }).toBe(1);
+    const [element] = await elements();
+    expect(element.width! / element.height!).toBeCloseTo(2, 1);
+    await expect(page.getByTestId('canvas-draw'), 'one shape per pick, then back to select').toHaveCount(0);
+    await expect(page.getByTestId('motion-editor'), 'the new element opens on its properties').toBeVisible({ timeout: 15_000 });
+
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await expect(bar).toHaveAttribute('data-context', 'canvas', { timeout: 10_000 });
+    await page.mouse.click(pane.x + 20, pane.y + pane.height - 120);
+    await page.keyboard.press('ControlOrMeta+z');
+    await expect.poll(async () => (await elements()).length, { timeout: 10_000 }).toBe(0);
   });
 });

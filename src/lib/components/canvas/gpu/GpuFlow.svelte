@@ -46,6 +46,8 @@
   import { GpuScene, themeOf, type Card, type Wire } from '$lib/canvas/gpu/scene';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { recordFrame } from '$lib/canvas/gpu/frame-stats';
+  import { shelfIds } from '$lib/canvas/gpu/poster-shelf';
+  import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
 
   let props: ComponentProps<typeof CanvasFlow> = $props();
 
@@ -168,6 +170,7 @@
 
   $effect(() => {
     scene?.setCamera(view);
+    canvasLod.view(view.zoom);
   });
 
   $effect(() => {
@@ -297,6 +300,7 @@
   let pinch: { dist: number; mid: Point } | null = null;
   let press: ReturnType<typeof setTimeout> | null = null;
   let suppressMenu = false;
+  let captureId: number | null = null;
 
   function local(e: { clientX: number; clientY: number }): Point {
     const s = screenSize();
@@ -357,7 +361,7 @@
     const kind = gestureFor(hit, { pointer: pointerOf(e), button: e.button, shift: e.shiftKey, space, mode });
     downAt = p;
     suppressMenu = false;
-    surface?.setPointerCapture(e.pointerId);
+    captureId = e.pointerId;
     menuAt = null;
     picked = null;
     startGesture(kind, hit, w, e);
@@ -441,6 +445,10 @@
       clearTimeout(press);
       press = null;
     }
+    if (far && captureId !== null) {
+      surface?.setPointerCapture(captureId);
+      captureId = null;
+    }
     const MOVE: Record<GestureKind, (a: Active) => void> = {
       [GestureKind.Pan]: (a) => {
         if (a.kind !== GestureKind.Pan) {
@@ -501,6 +509,7 @@
 
   function onUp(e: PointerEvent) {
     touches.delete(e.pointerId);
+    captureId = null;
     if (touches.size < 2) {
       pinch = null;
     }
@@ -889,9 +898,11 @@
   }
 
   const domTiles = $derived(placed.filter((t) => domIds.has(t.id)));
+  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds)));
+  const shelfTiles = $derived(placed.filter((t) => shelf.has(t.id)));
 </script>
 
-<svelte:window onkeydown={onKeydown} onkeyup={(e) => e.key === ' ' && (space = false)} />
+<svelte:window onkeydown={onKeydown} onkeyup={(e) => e.key === ' ' && (space = false)} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="wrap" bind:this={wrap} ondragover={onDragOver} ondrop={onDrop} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-view={`${view.x},${view.y},${view.zoom}`}>
@@ -920,6 +931,16 @@
         </div>
       {/each}
     </div>
+  </div>
+
+  <div class="poster-shelf" aria-hidden="true">
+    {#each shelfTiles as t (t.id)}
+      <div class="shelf-node" data-testid="gpu-poster-shelf" data-id={t.id} style={`width:${t.w}px;height:${t.h}px`}>
+        <NodeBoundary>
+          {@render props.tile({ id: t.id, selected: false })}
+        </NodeBoundary>
+      </div>
+    {/each}
   </div>
 
   <div class="a11y-mirror" role="application" aria-label="Canvas">
@@ -1064,6 +1085,21 @@
     position: absolute;
     pointer-events: auto;
     user-select: text;
+  }
+
+  .poster-shelf {
+    position: fixed;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .shelf-node {
+    position: absolute;
+    left: 0;
+    top: 0;
   }
 
   .a11y-mirror {
