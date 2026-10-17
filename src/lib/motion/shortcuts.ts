@@ -45,6 +45,7 @@ export enum Command {
   PreviewZoomOut = 'preview-zoom-out',
   PreviewFit = 'preview-fit',
   PreviewActual = 'preview-actual',
+  PreviewSelection = 'preview-selection',
   ToggleChat = 'toggle-chat',
   ToggleInspector = 'toggle-inspector',
   ToggleTimeline = 'toggle-timeline',
@@ -153,6 +154,9 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: '-', mod: true, command: Command.PreviewZoomOut, label: '⌘−', does: 'Zoom the preview out', group: ShortcutGroup.View },
   { key: '0', mod: true, command: Command.PreviewFit, label: '⌘0', does: 'Fit the preview', group: ShortcutGroup.View },
   { key: '1', mod: true, command: Command.PreviewActual, label: '⌘1', does: 'Preview at 100%', group: ShortcutGroup.View },
+  { key: '0', shift: true, command: Command.PreviewActual, label: '⇧0', does: 'Preview at 100%', group: ShortcutGroup.View },
+  { key: '1', shift: true, command: Command.PreviewFit, label: '⇧1', does: 'Fit the preview', group: ShortcutGroup.View },
+  { key: '2', shift: true, command: Command.PreviewSelection, label: '⇧2', does: 'Zoom the preview to the selection', group: ShortcutGroup.View },
   { key: 'b', mod: true, command: Command.ToggleChat, label: '⌘B', does: 'Show / hide the agent', group: ShortcutGroup.View },
   { key: 'b', mod: true, alt: true, command: Command.ToggleInspector, label: '⌥⌘B', does: 'Show / hide properties', group: ShortcutGroup.View },
   { key: 'j', mod: true, command: Command.ToggleTimeline, label: '⌘J', does: 'Show / hide the timeline', group: ShortcutGroup.View },
@@ -167,11 +171,16 @@ export const SHORTCUTS: readonly Binding[] = [
 
 const PHYSICAL_KEYS: Record<string, string> = { BracketLeft: '[', BracketRight: ']' };
 const LETTER_CODE = /^Key([A-Z])$/;
+const DIGIT_CODE = /^Digit([0-9])$/;
 
 function keyOf(press: KeyPress): string {
   const letter = LETTER_CODE.exec(press.code ?? '')?.[1];
   if (letter) {
     return letter.toLowerCase();
+  }
+  const digit = DIGIT_CODE.exec(press.code ?? '')?.[1];
+  if (digit) {
+    return digit;
   }
   const physical = PHYSICAL_KEYS[press.code ?? ''];
   if (physical) {
