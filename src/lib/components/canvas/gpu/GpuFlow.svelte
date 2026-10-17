@@ -19,7 +19,7 @@
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import { FocusMode, frameIn } from '$lib/canvas/free-area';
+  import { FocusMode, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
@@ -41,7 +41,7 @@
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
-  import { panBy, toWorld, zoomAt, type Point } from '$lib/canvas/gpu/camera';
+  import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
@@ -108,7 +108,57 @@
   const nodeOf = $derived(new Map(tiles.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
   const edges = $derived(focusEdges(props.edges ?? [], selected) ?? props.edges ?? []);
-  const domIds = $derived(new Set([...selected.slice(0, DOM_CAP), ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area, canvasLod.far)]));
+  const editIds = $derived(new Set(selected.slice(0, DOM_CAP)));
+  let drawn = $state(new Set<string>());
+  let sticky = $state(new Map<string, number>());
+  let wasEditing = new Set<string>();
+  $effect(() => {
+    const now = editIds;
+    const left = [...wasEditing].filter((id) => !now.has(id));
+    wasEditing = new Set(now);
+    if (left.length) {
+      untrack(() => (sticky = new Map([...sticky, ...left.map((id) => [id, Date.now()] as const)])));
+    }
+  });
+  $effect(() => {
+    const far = canvasLod.far;
+    const seen = visibleIds(placed.filter((t) => sticky.has(t.id)), view, area);
+    const keep = new Map([...sticky].filter(([id]) => !far && seen.has(id)));
+    if (keep.size !== untrack(() => sticky.size)) {
+      sticky = keep;
+    }
+  });
+  let parked = $state(new Map<string, number>());
+  let shelfClock = $state(0);
+  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], editIds, parked, shelfClock)));
+  const shelfSince = new Map<string, number>();
+  $effect(() => {
+    const now = Date.now();
+    for (const id of shelf) {
+      if (!shelfSince.has(id)) {
+        shelfSince.set(id, now);
+      }
+    }
+    for (const id of [...shelfSince.keys()]) {
+      if (!shelf.has(id)) {
+        shelfSince.delete(id);
+      }
+    }
+  });
+  onMount(() => {
+    const timer = setInterval(() => {
+      shelfClock = Date.now();
+      const next = parkStuck(shelfSince, parked, shelfClock);
+      if (next.size !== parked.size || [...next].some(([id, at]) => parked.get(id) !== at)) {
+        for (const id of next.keys()) {
+          shelfSince.delete(id);
+        }
+        parked = next;
+      }
+    }, SHELF_TICK_MS);
+    return () => clearInterval(timer);
+  });
+  const domIds = $derived(new Set([...editIds, ...sticky.keys(), ...shelf, ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area, canvasLod.far)]));
 
   function portFor(nodeId: string, side: PortSide, handle: string | null | undefined): Port | null {
     const own = ports.filter((p) => p.nodeId === nodeId && p.side === side);
@@ -281,23 +331,26 @@
     if (!ids?.length) {
       return;
     }
-    untrack(() => {
-      if (f?.mode === FocusMode.Select) {
-        select([...ids]);
-      }
-      const boxes = ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []));
-      const b = boundsOf(boxes);
-      if (!b) {
-        return;
-      }
-      if (f?.free) {
-        const s = screenSize();
-        animateTo(frameIn(b, { width: s.width, height: s.height }, f.free, EDIT_MAX_ZOOM));
-        return;
-      }
-      fitTo(boxes);
-    });
+    if (f?.mode === FocusMode.Select) {
+      untrack(() => select([...ids]));
+    }
+    const frame = requestAnimationFrame(() => requestAnimationFrame(() => untrack(() => focusOn(ids, f?.free ?? null))));
+    return () => cancelAnimationFrame(frame);
   });
+
+  function focusOn(ids: readonly string[], free: Insets | null) {
+    const boxes = ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []));
+    const b = boundsOf(boxes);
+    if (!b) {
+      return;
+    }
+    if (free) {
+      const s = screenSize();
+      animateTo(frameIn(b, { width: s.width, height: s.height }, free, EDIT_MAX_ZOOM));
+      return;
+    }
+    fitTo(boxes);
+  }
 
   type Active =
     | { kind: GestureKind.Pan; last: Point; moved: boolean }
@@ -350,6 +403,21 @@
     return edge ? { kind: HitKind.Edge, edgeId: edge } : { kind: HitKind.Empty };
   }
 
+  function boxHit(hit: Hit, target: HTMLElement): Hit {
+    const box = target.closest<HTMLElement>('.gpu-node')?.dataset.id;
+    const overridable = hit.kind === HitKind.Node || hit.kind === HitKind.Empty || hit.kind === HitKind.Edge;
+    return overridable && box ? { kind: HitKind.Node, nodeId: box } : hit;
+  }
+
+  function onClickInside(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    const id = target.closest<HTMLElement>('.gpu-dom-node')?.dataset.id;
+    if (!id || !target.closest(INTERACTIVE) || !spec.flow.elementsSelectable || selected.includes(id)) {
+      return;
+    }
+    clickNode(id, e.shiftKey || e.metaKey || e.ctrlKey);
+  }
+
   const pointerOf = (e: PointerEvent) => (e.pointerType === 'touch' ? Pointer.Touch : e.pointerType === 'pen' ? Pointer.Pen : Pointer.Mouse);
 
   function onDown(e: PointerEvent) {
@@ -363,13 +431,10 @@
       }
     }
     const w = toWorld(view, p);
-    const hit = hitAt(w);
     const target = e.target as HTMLElement;
+    const hit = boxHit(hitAt(w), target);
     const inDom = target.closest('.gpu-dom-node');
     if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && target.closest(INTERACTIVE)) {
-      if (hit.kind === HitKind.Node && spec.flow.elementsSelectable && !selected.includes(hit.nodeId)) {
-        clickNode(hit.nodeId, e.shiftKey || e.metaKey || e.ctrlKey);
-      }
       return;
     }
     if (e.button === 2 && hit.kind !== HitKind.Empty) {
@@ -893,6 +958,7 @@
         }
         built = s;
         s.onFrame = recordFrame;
+        s.onReady = (shown) => (drawn = shown);
         scene = s;
         props.onFlow?.(toFlow);
         observer.observe(surface!);
@@ -920,37 +986,6 @@
   }
 
   const domTiles = $derived(placed.filter((t) => domIds.has(t.id)));
-  let parked = $state(new Map<string, number>());
-  let shelfClock = $state(0);
-  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock)));
-  const shelfSince = new Map<string, number>();
-  $effect(() => {
-    const now = Date.now();
-    for (const id of shelf) {
-      if (!shelfSince.has(id)) {
-        shelfSince.set(id, now);
-      }
-    }
-    for (const id of [...shelfSince.keys()]) {
-      if (!shelf.has(id)) {
-        shelfSince.delete(id);
-      }
-    }
-  });
-  onMount(() => {
-    const timer = setInterval(() => {
-      shelfClock = Date.now();
-      const next = parkStuck(shelfSince, parked, shelfClock);
-      if (next.size !== parked.size || [...next].some(([id, at]) => parked.get(id) !== at)) {
-        for (const id of next.keys()) {
-          shelfSince.delete(id);
-        }
-        parked = next;
-      }
-    }, SHELF_TICK_MS);
-    return () => clearInterval(timer);
-  });
-  const shelfTiles = $derived(placed.filter((t) => shelf.has(t.id)));
 </script>
 
 <svelte:window onkeydown={onKeydown} onkeyup={(e) => e.key === ' ' && (space = false)} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
@@ -965,10 +1000,21 @@
     onpointerup={onUp}
     onpointercancel={onUp}
     onwheel={onWheel}
+    onclick={onClickInside}
     oncontextmenu={onContextMenu}
     class:panning={space}
   >
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
+      <svg class="gpu-edges" aria-hidden="true">
+        {#each curves as c (c.edge.id)}
+          <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
+            <path class="svelte-flow__edge-path" d={`M${c.curve.from.x},${c.curve.from.y} C${c.curve.c1.x},${c.curve.c1.y} ${c.curve.c2.x},${c.curve.c2.y} ${c.curve.to.x},${c.curve.to.y}`} />
+            {#if (c.edge.mode ?? 'fixed') === 'iterate'}
+              <g data-testid="wire-iterate-icon"></g>
+            {/if}
+          </g>
+        {/each}
+      </svg>
       {#each placed as t (t.id)}
         {@const on = selected.includes(t.id)}
         <div
@@ -990,6 +1036,7 @@
             {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
               <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage>
+                <div class="frame-standin-drawn" data-drawn={drawn.has(t.id)}></div>
                 {#if t.poster}
                   <div class="frame-standin-poster" data-testid="motion-node-poster"></div>
                 {/if}
@@ -1008,15 +1055,6 @@
     </div>
   </div>
 
-  <div class="poster-shelf" aria-hidden="true">
-    {#each shelfTiles as t (t.id)}
-      <div class="shelf-node" data-testid="gpu-poster-shelf" data-id={t.id} style={`width:${t.w}px;height:${t.h}px`}>
-        <NodeBoundary>
-          {@render props.tile({ id: t.id, selected: false })}
-        </NodeBoundary>
-      </div>
-    {/each}
-  </div>
 
   {#if failed}
     <p class="edge-refusal" role="alert">GPU renderer unavailable: {failed}</p>
@@ -1130,6 +1168,7 @@
     position: absolute;
     inset: 0;
     display: block;
+    pointer-events: none;
   }
 
   .gpu-nodes {
@@ -1147,6 +1186,21 @@
   .gpu-node :global(.svelte-flow__handle.typed-port) {
     pointer-events: all;
     cursor: crosshair;
+  }
+
+  .gpu-edges {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .gpu-edges path {
+    fill: none;
+    stroke: transparent;
   }
 
   .frame-standin {
@@ -1170,20 +1224,27 @@
     user-select: text;
   }
 
-  .poster-shelf {
-    position: fixed;
-    left: 0;
-    top: 0;
-    opacity: 0;
-    pointer-events: none;
-    z-index: -1;
+  .frame-standin {
+    position: absolute;
+    inset: 0;
   }
 
-  .shelf-node {
+  .frame-standin-stage {
     position: absolute;
-    left: 0;
-    top: 0;
+    inset: 0 0 var(--bar-h) 0;
   }
+
+  .frame-standin-poster {
+    position: absolute;
+    inset: 0;
+  }
+
+  .gpu-dom-node {
+    position: absolute;
+    inset: 0;
+    user-select: text;
+  }
+
 
   .edge-refusal {
     position: absolute;

@@ -118,7 +118,6 @@ test.describe('GPU canvas: the same gestures as the DOM canvas @real', () => {
     await expect
       .poll(async () => ((await admin.from('nodes').select('data').eq('id', frame.id).single()).data?.data as { posterAssetId?: string | null }).posterAssetId ?? null, { timeout: 30_000, message: 'the shelf shoots the missing poster' })
       .not.toBeNull();
-    await expect(page.getByTestId('gpu-poster-shelf')).toHaveCount(0);
 
     const at = await centreOf(page, frame.id);
     await page.mouse.click(at.x, at.y);

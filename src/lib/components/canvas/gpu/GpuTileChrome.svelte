@@ -4,6 +4,9 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { isNodeType } from '$lib/canvas/node-data';
   import { dragAngle } from '$lib/canvas/node-layout';
+  import { layersSource } from '$lib/canvas/layers-source.svelte';
+  import { tileHovered } from '$lib/canvas/layers';
+  import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
 
   let { tile, selected, onrotate }: { tile: Tile; selected: boolean; onrotate?: (id: string, degrees: number) => void } = $props();
 
@@ -13,6 +16,8 @@
   const Icon = $derived(kind ? NODE_KIND_ICON[kind] : null);
   const label = $derived(tile.tag === NameTag.Hidden ? null : tile.displayName?.trim() || (kind ? NODE_KIND_LABEL[kind] : null));
   const ports = $derived(tile.connectable === false ? [] : (tile.connectors ?? []));
+  const chrome = $derived(nodeChrome(tile.id, selected, layersSource.video));
+  const ringColor = $derived(tile.output ? CONNECTOR_STYLE[tile.output].color : 'var(--accent, #7c5cff)');
   const outputs = $derived(tile.connectable === false ? [] : (tile.outputs ?? []));
 
   function startRotate(e: PointerEvent) {
@@ -33,13 +38,21 @@
 </script>
 
 {#if label && Icon}
-  <div class="node-label" class:is-chosen={selected}>
+  <div class="node-label" class:is-chosen={chrome.ring === NodeChrome.Selected}>
     <Icon size={12} strokeWidth={1.8} />
     <span>{label}</span>
     {#if tile.inPost}
       <span class="in-post-marker" title="Used in a post">●</span>
     {/if}
   </div>
+{/if}
+
+{#if !selected && tileHovered(layersSource.hovered, tile.id, layersSource.video?.nodeId ?? null)}
+  <div class="tile-hover" data-testid="tile-hover" aria-hidden="true"></div>
+{/if}
+
+{#if chrome.ring !== NodeChrome.None}
+  <div class={`tile-selection ring-${chrome.ring}`} data-testid="tile-selection" data-ring={chrome.ring} style={`outline-color:${ringColor}`} aria-hidden="true"></div>
 {/if}
 
 {#each ports as connector, i (connector)}
@@ -62,6 +75,29 @@
 {/if}
 
 <style>
+  .tile-hover {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    outline: 2px solid var(--ui-hover-outline);
+    outline-offset: 1px;
+  }
+
+  .tile-selection {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    outline: 2px solid;
+    outline-offset: 1px;
+  }
+
+  .tile-selection.ring-editing {
+    outline: 1px dashed;
+    opacity: 0.5;
+  }
+
   .port-name {
     position: absolute;
     transform: translateY(-50%);

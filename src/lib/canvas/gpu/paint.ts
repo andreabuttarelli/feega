@@ -37,7 +37,7 @@ export const PAINT: Record<NodeType, (data: Data) => Paint> = {
 
 type Placed = { id: string; kind?: string; x: number; y: number; w: number; h: number };
 
-const paintOf = (kind: string | undefined, data: Data) => (kind && kind in PAINT ? PAINT[kind as NodeType](data) : Paint.Gpu);
+const paintOf = (kind: string | undefined, data: Data) => (kind && kind in PAINT ? PAINT[kind as NodeType](data) : Paint.Dom);
 
 export function domPainted(tiles: Placed[], dataOf: (id: string) => Data, view: Viewport, screen: Screen, far: boolean): string[] {
   if (far) {

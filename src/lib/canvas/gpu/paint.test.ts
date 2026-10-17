@@ -20,11 +20,12 @@ describe('paint — which node bodies the GPU draws and which stay DOM when read
     const tiles = [
       { id: 'cal', kind: 'calendar', x: 0, y: 0, w: 100, h: 100 },
       { id: 'off', kind: 'calendar', x: 5000, y: 0, w: 100, h: 100 },
-      { id: 'frame', kind: 'motion', x: 0, y: 0, w: 100, h: 100 }
+      { id: 'frame', kind: 'motion', x: 0, y: 0, w: 100, h: 100 },
+      { id: 'pending', kind: 'pending_frame', x: 0, y: 0, w: 100, h: 100 }
     ];
     const data = () => ({});
     const screen = { width: 800, height: 600 };
-    expect(domPainted(tiles, data, { x: 0, y: 0, zoom: 1 }, screen, false)).toEqual(['cal']);
+    expect(domPainted(tiles, data, { x: 0, y: 0, zoom: 1 }, screen, false)).toEqual(['cal', 'pending']);
     expect(domPainted(tiles, data, { x: 0, y: 0, zoom: 1 }, screen, true)).toEqual([]);
   });
 });

@@ -44,7 +44,7 @@ const THUMB_GAP = 4;
 
 const tierFor = (zoom: number) => TEXT_TIERS.find((t) => t >= zoom * devicePixelRatio) ?? TEXT_TIERS[TEXT_TIERS.length - 1];
 
-type Built = { root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; media: Media | null };
+type Built = { id: string; root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; media: Media | null };
 
 function dotTexture(theme: Theme): Texture {
   const c = document.createElement('canvas');
@@ -114,6 +114,9 @@ export class GpuScene {
   private wiresIn: Wire[] = [];
   private overlayIn: Overlay | null = null;
   onFrame: ((ms: number) => void) | null = null;
+  onReady: ((drawn: Set<string>) => void) | null = null;
+  private ready = new Set<string>();
+  private retiring = new Map<string, Built>();
   private dim: { body: number; edges: number } | null = null;
 
   private constructor(app: Application, theme: Theme) {
@@ -175,9 +178,10 @@ export class GpuScene {
       const key = faceKey(c);
       let b = this.built.get(c.id);
       if (!b || b.key !== key) {
-        this.drop(c.id);
+        const old = b;
         b = this.build(c, key);
         this.built.set(c.id, b);
+        this.retire(old, b);
       }
       b.root.pivot.set(c.w / 2, c.h / 2);
       b.root.position.set(c.x + c.w / 2, c.y + c.h / 2);
@@ -244,8 +248,29 @@ export class GpuScene {
     this.onFrame?.(performance.now() - t0);
   };
 
-  private drop(id: string) {
-    const b = this.built.get(id);
+  private report() {
+    this.onReady?.(new Set([...this.ready, ...this.retiring.keys()]));
+  }
+
+  private retire(old: Built | undefined, next: Built) {
+    if (!old) {
+      return;
+    }
+    if (!next.media) {
+      this.destroyBuilt(old);
+      return;
+    }
+    if (!this.ready.delete(old.id)) {
+      this.destroyBuilt(old);
+      this.report();
+      return;
+    }
+    this.destroyBuilt(this.retiring.get(old.id));
+    this.retiring.set(old.id, old);
+    this.report();
+  }
+
+  private destroyBuilt(b: Built | undefined) {
     if (!b) {
       return;
     }
@@ -255,9 +280,30 @@ export class GpuScene {
       b.video.removeAttribute('src');
       b.video.load();
     }
+    if (this.retiring.get(b.id) === b) {
+      this.retiring.delete(b.id);
+    }
     b.root.destroy({ children: true });
+  }
+
+  private markReady(b: Built) {
+    if (this.built.get(b.id) !== b) {
+      return;
+    }
+    this.destroyBuilt(this.retiring.get(b.id));
+    this.ready.add(b.id);
+    this.report();
+  }
+
+  private drop(id: string) {
+    this.destroyBuilt(this.retiring.get(id));
+    if (this.ready.delete(id)) {
+      this.report();
+    }
+    this.destroyBuilt(this.built.get(id));
     this.built.delete(id);
   }
+
 
   private text(s: string, size: number, color: string, width: number | null, weight: '400' | '600' = '400'): Text {
     const t = new Text({
@@ -310,6 +356,7 @@ export class GpuScene {
         return;
       }
       place(sprite, tex, box, fit);
+      this.markReady(b);
     });
   }
 
@@ -332,6 +379,7 @@ export class GpuScene {
       }
       const source = new VideoSource({ resource: video, autoPlay: false, autoLoad: true });
       place(b.body, new Texture({ source }), box, fit);
+      this.markReady(b);
       this.cull();
       this.invalidate();
     });
@@ -341,7 +389,7 @@ export class GpuScene {
     const holder = new Container();
     const root = new Container();
     holder.addChild(root);
-    const b: Built = { root: holder, skin: root, key, body: null, video: null, texts: [], media: null };
+    const b: Built = { id: c.id, root: holder, skin: root, key, body: null, video: null, texts: [], media: null };
     const f = c.face;
     const BUILD: Record<Surface, () => void> = {
       [Surface.Media]: () => {
@@ -558,7 +606,6 @@ export class GpuScene {
       g.rect(o.hovered.x, o.hovered.y, o.hovered.w, o.hovered.h).stroke({ width: line, color: this.theme.accent, alpha: 0.5 });
     }
     for (const s of o.selected) {
-      g.rect(s.x, s.y, s.w, s.h).stroke({ width: line * 1.4, color: this.theme.accent });
       if (!o.resizable) {
         continue;
       }
