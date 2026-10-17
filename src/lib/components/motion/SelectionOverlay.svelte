@@ -29,7 +29,8 @@
     onboxes = () => {},
     outlined = null,
     onhover = () => {},
-    ondragout = null
+    ondragout = null,
+    onmenu = null
   }: {
     doc: MotionDoc;
     frame: number;
@@ -46,6 +47,7 @@
     outlined?: string | null;
     onhover?: (id: string | null) => void;
     ondragout?: ((out: ElementOut, phase: DragPhase) => void) | null;
+    onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
   } = $props();
 
   const shared = selectionView()!;
@@ -207,11 +209,24 @@
     const hit = partHit(at) ?? part;
     const actions = clip && hit ? PART_ACTIONS[partKind(doc, clip, hit)] : [];
     if (!hit || !actions.length) {
+      openLayerMenu(e, at);
       return;
     }
     e.preventDefault();
     part = hit;
     menu = { at, part: hit, actions };
+  }
+
+  function openLayerMenu(e: MouseEvent, at: Pt) {
+    const layers = liveStack(at);
+    if (!onmenu || !layers.length) {
+      return;
+    }
+    e.preventDefault();
+    if (!selection.includes(layers[0])) {
+      onselect([layers[0]]);
+    }
+    onmenu({ client: [e.clientX, e.clientY], layers });
   }
 
   function runMenu(action: PartAction) {
