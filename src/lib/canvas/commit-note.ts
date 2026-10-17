@@ -48,7 +48,7 @@ export function adoptCommitted<T extends Held>(tiles: T[], rows: CommittedRow[],
   return { tiles: next, refetch };
 }
 
-const READS = new Set(['snapshot', 'revision', 'suggestNextStep', 'share']);
+const UNANNOUNCED = new Set(['snapshot', 'revision', 'suggestNextStep', 'share', 'move']);
 
 type Fields = Record<string, unknown>;
 
@@ -56,12 +56,11 @@ const ROWS: Record<string, (fields: Fields, data: Fields) => CommittedRow[]> = {
   write: (_fields, data) => {
     const node = rowSchema.safeParse(data.node);
     return node.success ? [node.data] : [];
-  },
-  move: (fields) => [{ id: String(fields.node_id), x: Number(fields.x), y: Number(fields.y) }]
+  }
 };
 
 export function rowsOf(action: string, fields: Fields, data: Fields): CommittedRow[] | null {
-  if (READS.has(action)) {
+  if (UNANNOUNCED.has(action)) {
     return null;
   }
   return ROWS[action]?.(fields, data) ?? [];
