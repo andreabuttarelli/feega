@@ -62,8 +62,9 @@
   import { ColumnAxis, withSettingsColumn } from '$lib/canvas/settings-column';
   import { MOBILE_QUERY } from '$lib/breakpoints';
   import type { SelectOutput } from '$lib/canvas/select-outputs';
-  import { CANVAS_EDGE_KINDS, EDGE_KIND_LABEL, WIRE_EDGE_TYPE, WIRE_MODES, WIRE_MODE_LABEL, WIRE_MODE_LOOK, wireEdge, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
+  import { CANVAS_EDGE_KINDS, WIRE_EDGE_TYPE, wireEdge, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
   import WireEdge from './WireEdge.svelte';
+  import EdgePanel from './EdgePanel.svelte';
   import { isAddable, type Addable } from '$lib/canvas/addable';
   import { edgeKindsFor } from '$lib/canvas/connect-rules';
   import type { ConnectorType } from '$lib/canvas/connectors';
@@ -899,50 +900,17 @@
   {/if}
 
   {#if picked && (onEdgeRetype || onEdgeDelete)}
-    <div class="gen-menu-veil" role="presentation" onclick={() => (picked = null)}></div>
-    <div
-      class="edge-panel"
-      role="menu"
-      tabindex="-1"
-      style={`left:${picked.screen.x}px; top:${picked.screen.y}px`}
-    >
-      {#if onEdgeRetype}
-        {#each pickedKinds as kind (kind)}
-          <button
-            type="button"
-            role="menuitemradio"
-            aria-checked={kind === picked.edge.kind}
-            class:is-on={kind === picked.edge.kind}
-            onclick={() => retype(kind)}
-          >
-            {EDGE_KIND_LABEL[kind]}
-          </button>
-        {/each}
-      {/if}
-
-      {#if onEdgeModeChange}
-        <div class="edge-panel-sep" role="separator"></div>
-        {#each WIRE_MODES as mode (mode)}
-          <button
-            type="button"
-            role="menuitemradio"
-            aria-checked={(picked.edge.mode ?? 'fixed') === mode}
-            class:is-on={(picked.edge.mode ?? 'fixed') === mode}
-            onclick={() => retypeMode(mode)}
-          >
-            {#if WIRE_MODE_LOOK[mode].icon}
-              {@const Icon = WIRE_MODE_LOOK[mode].icon}
-              <Icon class="edge-mode-icon" data-testid="wire-mode-icon-{mode}" size={12} />
-            {/if}
-            {WIRE_MODE_LABEL[mode]}
-          </button>
-        {/each}
-      {/if}
-
-      {#if onEdgeDelete}
-        <button type="button" role="menuitem" class="edge-drop" onclick={drop}>Togli</button>
-      {/if}
-    </div>
+    <EdgePanel
+      edge={picked.edge}
+      at={picked.screen}
+      kinds={onEdgeRetype ? pickedKinds : []}
+      modes={!!onEdgeModeChange}
+      deletable={!!onEdgeDelete}
+      onkind={retype}
+      onmode={retypeMode}
+      ondelete={drop}
+      onclose={() => (picked = null)}
+    />
   {/if}
 </div>
 
@@ -1015,15 +983,6 @@
     color: var(--ink-soft, #6e6e73);
   }
 
-  /* Lo sfondo cliccabile che chiude il pannello di una linea. `position: fixed` perché il punto
-     che lo colloca è quello dello SCHERMO: dentro il flusso si muoverebbe con la tela mentre lo
-     si guarda. */
-  .gen-menu-veil {
-    position: fixed;
-    inset: 0;
-    z-index: 20;
-  }
-
   /* Il motivo del rifiuto, sotto lo sguardo di chi sta tirando la linea e non in un angolo:
      `pointer-events: none` perché compare a metà gesto, e un riquadro che intercetta il puntatore
      lo interromperebbe proprio mentre spiega perché non si può. */
@@ -1060,53 +1019,5 @@
   }
   .wrap :global(.svelte-flow__handle.connectingto.valid) {
     background: var(--accent, #7c5cff);
-  }
-
-  .edge-panel {
-    position: fixed;
-    z-index: 21;
-    display: flex;
-    flex-direction: column;
-    min-width: 128px;
-    padding: 4px;
-    border-radius: 10px;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
-  }
-  .edge-panel button {
-    padding: 6px 10px;
-    font: inherit;
-    font-size: 12.5px;
-    text-align: left;
-    color: var(--ink, #1d1d1f);
-    background: none;
-    border: none;
-    border-radius: 7px;
-    cursor: pointer;
-  }
-  .edge-panel button:hover,
-  .edge-panel button:focus-visible {
-    background: var(--paper-2, #f9f9f9);
-  }
-  .edge-panel button.is-on {
-    color: var(--accent, #7c5cff);
-  }
-  .edge-panel button.edge-drop {
-    margin-top: 3px;
-    padding-top: 7px;
-    border-top: 1px solid var(--line, #e5e5e5);
-    border-radius: 0;
-    color: #c0392b;
-  }
-  .edge-panel :global(.edge-mode-icon) {
-    color: var(--ui-wire-iterate);
-    vertical-align: -2px;
-    margin-right: 4px;
-  }
-
-  .edge-panel-sep {
-    margin: 3px 0;
-    border-top: 1px solid var(--line, #e5e5e5);
   }
 </style>
