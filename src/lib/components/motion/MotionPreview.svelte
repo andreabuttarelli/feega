@@ -327,7 +327,7 @@
 <div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview">
   <div class="host" bind:this={host}></div>
   {#if engine === RenderEngine.Gpu}
-    <GpuLayer {html} time={() => (playing && player ? player.currentTime : frame / fps)} />
+    <GpuLayer {html} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={() => player && (player.style.visibility = '')} />
   {/if}
   {@render children?.()}
   {#if live}

@@ -6,7 +6,8 @@ import { frameOf } from '../export/webgl-device';
 import { IDENTITY_3D } from './matrix';
 import { PaintKind } from './paint-of';
 import { createRenderer, SlotKind, type Slot } from './renderer';
-import { runHtml, runsOf, type Run } from './runs';
+import { gpuEligible, runHtml, runsOf, type Run } from './runs';
+import { webglPerLane } from '../export/webgl-budget';
 import { compileScene, frameAt, type Drawn, type Scene } from './scene';
 import { createPainter } from './textures';
 
@@ -19,12 +20,21 @@ export type FrameStats = { evaluate: number; prepare: number; capture: number; d
 
 export type GpuEngine = { canvas: HTMLCanvasElement; backend: string; scene: Scene; runs: Run[]; renderAt: (t: number, freshness: Freshness) => Promise<FrameStats>; dispose: () => void };
 
+export class GpuIneligible extends Error {
+  constructor(runs: number, perRun: number) {
+    super(`${runs} HTML runs x ${perRun} WebGL contexts exceed the budget`);
+  }
+}
+
 const CAPTURE_WAIT_MS = 600_000;
 
 type RunState = { run: Run; html: string; player: Promise<CapturePlayer> | null; texture: Texture | null; at: number; busy: Promise<void> | null };
 
 export async function gpuEngine(html: string, host: HTMLElement, preference: Backend = Backend.WebGPU): Promise<GpuEngine> {
   const scene = compileScene(html);
+  if (!gpuEligible(runsOf(scene.layers), webglPerLane(html))) {
+    throw new GpuIneligible(runsOf(scene.layers).length, webglPerLane(html));
+  }
   const frame = { width: scene.width, height: scene.height };
   const renderer = await createRenderer(frame, preference);
   const painter = createPainter();

@@ -2,7 +2,7 @@
   import { onDestroy } from 'svelte';
   import { Freshness, gpuEngine, type GpuEngine } from '$lib/motion/gpu/engine';
 
-  let { html, time }: { html: string; time: () => number } = $props();
+  let { html, time, onfallback }: { html: string; time: () => number; onfallback: () => void } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
   let engine: GpuEngine | null = null;
@@ -38,7 +38,7 @@
       next.canvas.dataset.backend = next.backend;
       next.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
       target.appendChild(next.canvas);
-    });
+    }, onfallback);
     cancelAnimationFrame(loop);
     loop = requestAnimationFrame(tick);
     return () => {
