@@ -36,6 +36,8 @@
   import '@xyflow/svelte/dist/style.css';
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
+  import CanvasPeers from './CanvasPeers.svelte';
+  import type { CanvasPeer } from '$lib/realtime/canvas-presence';
   import CanvasAddBar from './CanvasAddBar.svelte';
   import { BarContext } from '$lib/canvas/bottom-bar';
   import CanvasDrawLayer from './CanvasDrawLayer.svelte';
@@ -181,6 +183,8 @@
     focus = null,
     onSelectionChange,
     mode = CanvasMode.Edit,
+    peers = [],
+    onPointer,
     tile
   }: {
     actionUrl?: (action: string) => string;
@@ -290,6 +294,8 @@
      *  tela. Assente = nessuna tile è ridimensionabile a mano (il resizer non compare). */
     onResize?: (id: string, w: number, h: number) => void;
     /** Cosa disegnare dentro una tile. La tela non sa cosa mostra: lo decide chi la usa. */
+    peers?: CanvasPeer[];
+    onPointer?: (at: { x: number; y: number } | null) => void;
     tile: import('svelte').Snippet<[{ id: string; selected: boolean }]>;
     mode?: CanvasMode;
   } = $props();
@@ -692,6 +698,9 @@
   }
 
   function movePress(e: PointerEvent) {
+    if (toFlow) {
+      onPointer?.(toFlow({ x: e.clientX, y: e.clientY }));
+    }
     if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > PRESS_SLOP_PX) {
       endPress();
     }
@@ -828,6 +837,9 @@
 
   let wrap = $state<HTMLDivElement | null>(null);
 
+  const tileRects = $derived(new Map(tiles.map((t) => [t.id, t])));
+  const tileRect = (id: string) => tileRects.get(id) ?? null;
+
   const tierBoard = provideTierBoard();
   const posters = $derived(new Map(tiles.flatMap((t) => (t.poster ? [[t.id, t.poster] as const] : []))));
 </script>
@@ -842,6 +854,7 @@
   onpointermove={movePress}
   onpointerup={endPress}
   onpointercancel={endPress}
+  onpointerleave={() => onPointer?.(null)}
   ondragover={onDragOver}
   ondrop={onDrop}
 >
@@ -922,6 +935,9 @@
     <CanvasImageTiers board={tierBoard} />
     <CanvasDots />
     <CanvasPosterLayer {posters} />
+    {#if peers.length}
+      <CanvasPeers {peers} rectOf={tileRect} />
+    {/if}
   </SvelteFlow>
 
   {#if refusal}
