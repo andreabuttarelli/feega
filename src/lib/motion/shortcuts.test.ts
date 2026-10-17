@@ -151,6 +151,13 @@ describe('preview zoom keys', () => {
     expect(press('=')).toBe(Command.ZoomIn);
     expect(press('-')).toBe(Command.ZoomOut);
   });
+
+  it('Figma keys: ⇧0 is 100%, ⇧1 fits, ⇧2 zooms to the selection, whatever the layout prints', () => {
+    expect(press(')', { shift: true, code: 'Digit0' })).toBe(Command.PreviewActual);
+    expect(press('!', { shift: true, code: 'Digit1' })).toBe(Command.PreviewFit);
+    expect(press('@', { shift: true, code: 'Digit2' })).toBe(Command.PreviewSelection);
+    expect(press('"', { shift: true, code: 'Digit2' })).toBe(Command.PreviewSelection);
+  });
 });
 
 
