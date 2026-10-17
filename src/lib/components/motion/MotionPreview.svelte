@@ -18,7 +18,7 @@
   import type { VarValues } from '$lib/motion/interactive/var-model';
   import { RenderEngine } from '$lib/motion/gpu/engine-flag';
   import GpuLayer from './GpuLayer.svelte';
-  import type { Compose } from '$lib/motion/gpu/engine';
+  import { GpuIneligible, gpuEngine, type Compose } from '$lib/motion/gpu/engine';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
 
@@ -264,8 +264,24 @@
     });
   }
 
-  export function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast): Promise<void> {
+  async function renderOnGpu(compose: Compose, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, lanes: number): Promise<boolean> {
+    const engine = host ? await gpuEngine(compose, host).catch((e) => (e instanceof GpuIneligible ? null : Promise.reject(e))) : null;
+    if (!engine) {
+      return false;
+    }
+    try {
+      await engine.renderFrames(times, onFrame, lanes, signal);
+      return true;
+    } finally {
+      engine.dispose();
+    }
+  }
+
+  export async function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast): Promise<void> {
     const { settle, lanes } = CAPTURE_PROFILES[profile];
+    if (engine === RenderEngine.Gpu && gpuCompose && source === html && size.width === width && size.height === height && (await renderOnGpu(gpuCompose, times, onFrame, signal, lanes()))) {
+      return;
+    }
     const request = { format: FrameFormat.Bitmap, settle, layering: exportLayering(), ...size };
     return borrowed(source, async () => {
       const extra = host ? await Promise.all(Array.from({ length: lanesWithin(lanes(), webglPerLane(source)) - 1 }, () => mountCapturePlayer(host!, source))) : [];

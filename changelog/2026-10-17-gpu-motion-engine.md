@@ -18,3 +18,17 @@ Discarded: a native doc→GPU compiler re-deriving vars/precomp flattening/junct
 `composeHtml`); driving the scene from the live iframe DOM (keeps style recalc per frame).
 
 No public changelog: invisible without the URL flag.
+
+## Phase 2
+
+- Fallback runs are composed with only their clips (`composeHtml({ only })`), so a run no longer
+  boots every 3D/particle/custom script. A doc goes to the HTML engine when two captures overlap
+  or captures cover half its length: measured, those exported slower than today.
+- Title/Text/Kicker/Caption are laid out once by the browser at rest (doc fonts, same `fitSize`)
+  and rasterised once per line/block; line reveals and fades then run on the GPU at display rate.
+- On the GPU too: gaussian-blur effects, brand background patterns, stroke overflow. Backdrop
+  groups (LiquidBlob/Glass) stay one capture with everything they cover.
+- Export with `?engine=gpu` at the doc's own size goes through `renderFrames`: runs shot ahead on
+  lanes, the GPU draws in order into the WebCodecs encoder.
+- Not done: masks, mattes, backdrop-filter, Adjustment, blend on a precomp group (all still an
+  HTML capture). Server rendering dropped by decision (client only).
