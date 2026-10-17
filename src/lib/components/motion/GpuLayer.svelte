@@ -1,8 +1,10 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
-  import { Freshness, gpuEngine, type Compose, type GpuEngine } from '$lib/motion/gpu/engine';
+  import { onMount } from 'svelte';
+  import type { Compose, GpuEngine } from '$lib/motion/gpu/engine';
 
-  let { html, compose, time, onfallback }: { html: string; compose: Compose; time: () => number; onfallback: () => void } = $props();
+  const gpu = () => import('$lib/motion/gpu/engine');
+
+  let { html, compose, time, onfallback }: { html: string; compose: Compose; time: () => number; onfallback: (reason: unknown) => void } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
   let engine: GpuEngine | null = null;
@@ -15,7 +17,10 @@
       return;
     }
     busy = true;
-    void engine.renderAt(time(), Freshness.Latest).finally(() => {
+    const running = engine;
+    void gpu()
+      .then(({ Freshness }) => running.renderAt(time(), Freshness.Latest))
+      .finally(() => {
       busy = false;
     });
   }
@@ -28,7 +33,7 @@
       return;
     }
     let cancelled = false;
-    void gpuEngine(source, target).then((next) => {
+    void gpu().then(({ gpuEngine }) => gpuEngine(source, target)).then((next) => {
       if (cancelled) {
         next.dispose();
         return;
@@ -47,7 +52,7 @@
     };
   });
 
-  onDestroy(() => {
+  onMount(() => () => {
     cancelAnimationFrame(loop);
     engine?.dispose();
   });

@@ -38,7 +38,7 @@ async function seededEditor(page: Page, doc: Doc, { session, admin, seedNode }: 
 }
 
 async function exported(page: Page, dir: string, name: string): Promise<{ file: string; engine: string | null }> {
-  await page.route('**/*?/exported', (route) => route.abort());
+  await page.route('**/*?/exported', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ type: 'failure', status: 400, data: '[{"error":1},"not saved in e2e"]' }) }));
   await page.getByTestId('export-open').click();
   const choose = page.getByTestId('export-mode-video');
   if (await choose.isVisible().catch(() => false)) {
@@ -87,8 +87,6 @@ test.describe('GPU motion engine is the default @real', () => {
     test(`${name}: previews and exports on the ${engine} engine, same video as the HTML engine`, async ({ page, session, admin, seedNode }) => {
       const dir = mkdtempSync(join(tmpdir(), `gpu-${name}-`));
       try {
-        page.on('pageerror', (e) => console.log('pageerror', e.message));
-        page.on('response', (r) => r.status() >= 500 && console.log('5xx', r.status(), r.url()));
         const url = await seededEditor(page, doc, { session, admin, seedNode });
         await gotoHydrated(page, url);
         await playPreview(page, engine);
@@ -103,7 +101,9 @@ test.describe('GPU motion engine is the default @real', () => {
         expect([made.width, made.height]).toEqual([doc.width, doc.height]);
         expect(made.fps).toBeCloseTo(doc.fps, 1);
         expect(Math.abs(made.duration - doc.durationInFrames / doc.fps)).toBeLessThan(DURATION_SLACK_S);
-        expect(ssimOf(gpu.file, html.file)).toBeGreaterThanOrEqual(MIN_SSIM);
+        const score = ssimOf(gpu.file, html.file);
+        test.info().annotations.push({ type: 'ssim', description: `${name} ${gpu.engine} ${score}` });
+        expect(score).toBeGreaterThanOrEqual(MIN_SSIM);
       } finally {
         rmSync(dir, { recursive: true, force: true });
       }
