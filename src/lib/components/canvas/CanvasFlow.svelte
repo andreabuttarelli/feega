@@ -61,13 +61,13 @@
   import { syncNodes } from '$lib/canvas/tile-sync';
   import { ColumnAxis, withSettingsColumn } from '$lib/canvas/settings-column';
   import { MOBILE_QUERY } from '$lib/breakpoints';
-  import { isOutputHandle, portOfHandle, unavailableOutput, type SelectOutput } from '$lib/canvas/select-outputs';
+  import type { SelectOutput } from '$lib/canvas/select-outputs';
   import { CANVAS_EDGE_KINDS, EDGE_KIND_LABEL, WIRE_EDGE_TYPE, WIRE_MODES, WIRE_MODE_LABEL, WIRE_MODE_LOOK, wireEdge, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
   import WireEdge from './WireEdge.svelte';
   import { isAddable, type Addable } from '$lib/canvas/addable';
-  import { DEFAULT_EDGE_KIND, edgeKindsFor, verdictBetween } from '$lib/canvas/connect-rules';
-  import { connectorAccepts, nodeAcceptsConnection } from '$lib/canvas/connector-ports';
-  import { anyPortAccepts, landingPort, portListValued, type ConnectorType } from '$lib/canvas/connectors';
+  import { edgeKindsFor } from '$lib/canvas/connect-rules';
+  import type { ConnectorType } from '$lib/canvas/connectors';
+  import { connectionRefusal, landingOf, type Connection } from '$lib/canvas/connection-verdict';
   import { setTileRender } from '$lib/canvas/tile-render-context';
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
@@ -413,11 +413,6 @@
 
   const lookup = (id: string) => nodeOf.get(id) ?? null;
 
-  /** Le porte tipizzate di una tile, per id — usate solo per rifiutare un secondo filo su un
-   *  connettore a valore singolo già occupato: `connect-rules.ts` non conosce i connettori, la
-   *  domanda "quale porta" è di questo file. */
-  const connectorsOf = $derived(new Map(tiles.map((t) => [t.id, t.connectors])));
-
   /**
    * IL RIFIUTO, MENTRE IL PUNTATORE È ANCORA IN ARIA. La libreria si ferma qui e domanda: tornare
    * `false` significa che la linea non si aggancia e l'attacco non si accende, senza che nessuno
@@ -429,79 +424,20 @@
    */
   let refusal = $state<string | null>(null);
 
-  function isValidConnection(c: {
-    source?: string | null;
-    target?: string | null;
-    sourceHandle?: string | null;
-    targetHandle?: string | null;
-  }): boolean {
-    const { source, target, sourceHandle, targetHandle } = c;
-    if (!source || !target) return false;
-
-    const verdict = verdictBetween(lookup, source, target, sourceHandle);
-    if (!verdict.ok) {
-      refusal = verdict.why;
-      return false;
-    }
-
-    const connector = targetHandle as ConnectorType | null | undefined;
-    const connectors = connectorsOf.get(target);
-    const sourceTile = tiles.find((t) => t.id === source);
-    if (sourceTile && unavailableOutput(sourceTile, sourceHandle)) {
-      refusal = 'This output is not available for the connected source';
-      return false;
-    }
-    const output = sourceTile ? portOfHandle(sourceTile, sourceHandle) : null;
-    const targetKind = tiles.find((t) => t.id === target)?.kind ?? '';
-    const portEdges = edges.map((e) => ({ id: e.id, target: e.target, targetHandle: e.targetHandle ?? null }));
-    if (!nodeAcceptsConnection(portEdges, target, targetKind)) {
-      refusal = 'An effects node takes one media input';
-      return false;
-    }
-    if (output && connectors?.length && !anyPortAccepts(connectors, output)) {
-      refusal = `No port accepts ${output}`;
-      return false;
-    }
-    if (connector && connectors?.includes(connector)) {
-      const free = connectorAccepts(portEdges, target, connector, portListValued(targetKind, connector));
-      if (!free) {
-        refusal = `Port ${connector} is already taken`;
-        return false;
-      }
-    }
-
-    refusal = null;
-    return true;
+  function isValidConnection(c: Connection): boolean {
+    const why = connectionRefusal(tiles, edges, lookup, c);
+    refusal = why || null;
+    return why === null;
   }
 
-  /**
-   * Una linea appena tirata. NON si aggiunge qui agli archi: la si annuncia e basta, e comparirà
-   * quando il server la restituisce con il suo id vero. Disegnarla subito con un id inventato
-   * significherebbe averla due volte appena i dati tornano — la copia ottimista e quella vera.
-   */
-  function onConnected(connection: { source?: string | null; target?: string | null; sourceHandle?: string | null; targetHandle?: string | null }) {
-    const { source, target } = connection;
-    if (!source || !target || source === target) return;
+  function onConnected(connection: Connection) {
+    const landing = landingOf(tiles, lookup, connection);
+    if (!landing) return;
 
     refusal = null;
-    const sourceTile = tiles.find((t) => t.id === source);
-    const output = sourceTile ? portOfHandle(sourceTile, connection.sourceHandle) : null;
-    const handle = landingPort((connection.targetHandle as ConnectorType | null) ?? null, output, connectorsOf.get(target) ?? []);
-    const outputHandle = isOutputHandle(connection.sourceHandle) ? connection.sourceHandle : null;
-    onConnect?.(source, target, edgeKindsFor(lookup, source, target, outputHandle)[0] ?? DEFAULT_EDGE_KIND, handle, outputHandle);
+    onConnect?.(landing.source, landing.target, landing.kind, landing.targetHandle, landing.sourceHandle);
   }
 
-  /**
-   * IL PANNELLO DI UNA LINEA, al clic su di lei.
-   *
-   * Un arco è largo un paio di pixel: un menù al tasto destro sarebbe il gesto giusto per un
-   * bersaglio grande, e su questo costringerebbe a centrarlo due volte. Il clic lo apre, un clic
-   * altrove lo chiude, ed è il solo posto in cui un arco si cambia o si toglie.
-   *
-   * I VERSI PROPOSTI SONO QUELLI CHE HANNO SENSO su quella coppia, letti dallo stesso
-   * `edgeKindsFor` che ha scelto il verso alla nascita: offrire «nasce da» fra due immagini
-   * sarebbe far scegliere un arco che il modello rifiuta.
-   */
   let picked = $state<{ edge: FlowEdge; screen: { x: number; y: number } } | null>(null);
 
   const pickedKinds = $derived(
