@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CANVAS_MENU, actionsIn, enabledFor, shownFor } from './selection-actions';
+import { CANVAS_MENU, actionsIn, enabledFor, menuFor, shownFor } from './selection-actions';
 
 describe('group and ungroup', () => {
   const box = { id: '1', type: 'motion', data: { kind: 'element' } };
@@ -26,8 +26,23 @@ describe('group and ungroup', () => {
       ['paste', 'Mod+V'],
       ['bring-front', 'Mod+]'],
       ['send-back', 'Mod+['],
+      ['align-left', 'Alt+A'],
+      ['align-center', 'Alt+H'],
+      ['align-right', 'Alt+D'],
+      ['align-top', 'Alt+W'],
+      ['align-middle', 'Alt+V'],
+      ['align-bottom', 'Alt+S'],
+      ['tidy-up', 'Mod+Alt+T'],
+      ['flip-horizontal', 'Shift+H'],
+      ['flip-vertical', 'Shift+V'],
+      ['use-as-mask', 'Mod+Ctrl+M'],
+      ['release-mask', null],
       ['delete', 'Backspace']
     ]);
+  });
+
+  it('each surface shows the shared menu, in its order, limited to what it can run', () => {
+    expect(menuFor(new Set(['delete', 'group', 'align-left']), [box, group]).map((a) => a.id)).toEqual(['group', 'align-left', 'delete']);
   });
 });
 

@@ -37,6 +37,8 @@
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
   import CanvasPeers from './CanvasPeers.svelte';
+  import CanvasMeasure from './CanvasMeasure.svelte';
+  import { tileGaps } from '$lib/canvas/measure';
   import type { CanvasPeer } from '$lib/realtime/canvas-presence';
   import CanvasAddBar from './CanvasAddBar.svelte';
   import { BarContext } from '$lib/canvas/bottom-bar';
@@ -55,7 +57,8 @@
   import ConnectPicker from './ConnectPicker.svelte';
   import CanvasFocus from './CanvasFocus.svelte';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import type { SelectionActionId } from '$lib/canvas/selection-actions';
+  import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import type { Edge } from '$lib/motion/space';
   import { reportHref } from '$lib/reports/report-link';
   import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
@@ -82,6 +85,9 @@
   import { ReportChange, reportChange } from '$lib/canvas/selection-report';
   import { Stack } from '$lib/canvas/stacking';
   import CanvasContextMenu from './CanvasContextMenu.svelte';
+  import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { tilesAt } from '$lib/canvas/tiles-at';
+  import { NODE_KIND_LABEL } from '$lib/canvas/node-label';
 
   /**
    * Dove sta una tile e quanto è grande, in unità di tela — le stesse di `brand_canvas_items`.
@@ -626,7 +632,35 @@
    * `RUN` in `CanvasKeys.svelte`, qui perché lo stato della selezione (`selection.ids`) vive in
    * questo componente e non in quello.
    */
-  const SELECTION_RUN: Record<SelectionActionId, (ids: string[]) => void> = {
+  const placedBoxes = (ids: string[]) =>
+    ids.flatMap((id) => {
+      const n = nodes.find((node) => node.id === id);
+      const t = tiles.find((tile) => tile.id === id);
+      return n && t ? [{ id, x: n.position.x, y: n.position.y, width: t.w, height: t.h }] : [];
+    });
+
+  const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));
+
+  function placeTiles(moves: TileMove[]) {
+    if (!moves.length) {
+      return;
+    }
+    const to = new Map(moves.map((m) => [m.id, m]));
+    nodes = nodes.map((n) => {
+      const m = to.get(n.id);
+      return m ? { ...n, position: { x: m.x, y: m.y } } : n;
+    });
+    for (const m of moves) {
+      onMove?.(m.id, m.x, m.y);
+    }
+    onMoveEnd?.(moves);
+  }
+
+  const alignRun = (id: AlignActionId) => (ids: string[]) => alignSelection(ids, ALIGN_EDGE[id]);
+
+  const SELECTION_RUN: Record<CanvasActionId, (ids: string[]) => void> = {
+    'tidy-up': (ids) => placeTiles(tidyTiles(placedBoxes(ids))),
+    ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => onDuplicate?.(ids),
     'connect-new': () => {
       if (!selection.box) return;
@@ -661,12 +695,31 @@
   const PRESS_SLOP_PX = 10;
 
   let menuAt = $state<{ x: number; y: number } | null>(null);
+  let menuLayers = $state<{ id: string; label: string }[]>([]);
+
+  const tileLabel = (t: Tile) => t.displayName || NODE_KIND_LABEL[t.kind as keyof typeof NODE_KIND_LABEL] || t.kind || t.id;
+
+  function layersAt(at: { x: number; y: number }) {
+    if (!toFlow) {
+      return [];
+    }
+    const ids = tilesAt(tiles, toFlow(at));
+    return ids.flatMap((id) => {
+      const t = tiles.find((tile) => tile.id === id);
+      return t ? [{ id, label: tileLabel(t) }] : [];
+    });
+  }
+
+  function selectLayer(id: string) {
+    nodes = nodes.map((n) => ({ ...n, selected: n.id === id }));
+  }
   let press: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | null = null;
 
   function openMenu(id: string, at: { x: number; y: number }) {
     if (!nodes.some((n) => n.id === id && n.selected)) {
       nodes = nodes.map((n) => ({ ...n, selected: n.id === id }));
     }
+    menuLayers = layersAt(at);
     menuAt = at;
   }
 
@@ -678,6 +731,7 @@
   function onSelectionMenu({ event }: { event: MouseEvent }) {
     event.preventDefault();
     menuAt = { x: event.clientX, y: event.clientY };
+    menuLayers = layersAt(menuAt);
   }
 
   function endPress() {
@@ -707,7 +761,7 @@
   }
 
   function runSelectionAction(id: SelectionActionId) {
-    if (!selection.ids.length) return;
+    if (!selection.ids.length || !isCanvasAction(id)) return;
     SELECTION_RUN[id](selection.ids);
   }
 
@@ -840,6 +894,13 @@
   const tileRects = $derived(new Map(tiles.map((t) => [t.id, t])));
   const tileRect = (id: string) => tileRects.get(id) ?? null;
 
+  let altHeld = $state(false);
+  let hoveredTile = $state<string | null>(null);
+  const measured = $derived.by(() => {
+    const hovered = hoveredTile && altHeld ? tileRect(hoveredTile) : null;
+    return hovered ? tileGaps(selection.ids.flatMap((id) => tileRect(id) ?? []), hovered) : [];
+  });
+
   const tierBoard = provideTierBoard();
   const posters = $derived(new Map(tiles.flatMap((t) => (t.poster ? [[t.id, t.poster] as const] : []))));
 </script>
@@ -877,7 +938,9 @@
     ed era invece una cancellazione a metà, locale e muta. ⌫ resta uno: lo riconosce
     `shortcuts.ts` e lo esegue `CanvasKeys`, che passa da chi la riga ce l'ha davvero.
   -->
-  <SvelteFlow
+<SvelteFlow
+    onnodepointerenter={({ node }) => (hoveredTile = node.id)}
+    onnodepointerleave={() => (hoveredTile = null)}
     minZoom={MIN_ZOOM}
     bind:nodes
     bind:edges
@@ -938,6 +1001,9 @@
     {#if peers.length}
       <CanvasPeers {peers} rectOf={tileRect} />
     {/if}
+    {#if measured.length}
+      <CanvasMeasure gaps={measured} />
+    {/if}
   </SvelteFlow>
 
   {#if refusal}
@@ -991,7 +1057,7 @@
   {/if}
 
   {#if menuAt && spec.chrome}
-    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} onpick={runSelectionAction} onclose={() => (menuAt = null)} />
+    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} available={canvasMenuIds(selection.ids.length)} layers={menuLayers} onpick={runSelectionAction} onlayer={selectLayer} onclose={() => (menuAt = null)} />
   {/if}
 
   {#if connectPickerAt}
@@ -1047,7 +1113,10 @@
 </div>
 
 <svelte:window
+  onkeyup={(e) => (altHeld = e.altKey)}
+  onblur={() => (altHeld = false)}
   onkeydown={(e) => {
+    altHeld = e.altKey;
     if (e.key !== 'Escape') return;
     picked = null;
     refusal = null;

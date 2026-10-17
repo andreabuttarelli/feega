@@ -22,6 +22,9 @@
   import { Stack } from '$lib/canvas/stacking';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
+  import { enterFrame } from '$lib/canvas/enter-frame';
+  import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { Direction, siblingOf } from '$lib/motion/siblings';
 
   let {
     onadd,
@@ -79,6 +82,23 @@
     }
   }
 
+  function selectSibling(direction: Direction) {
+    const all = getNodes();
+    const next = siblingOf(all.map((n) => n.id), selected().map((n) => n.id), direction);
+    for (const n of all) {
+      updateNode(n.id, { selected: n.id === next });
+    }
+  }
+
+  const boxes = () => selected().map((n) => ({ id: n.id, x: n.position.x, y: n.position.y, width: n.measured?.width ?? n.width ?? 0, height: n.measured?.height ?? n.height ?? 0 }));
+
+  function place(moves: TileMove[]) {
+    for (const m of moves) {
+      updateNode(m.id, { position: { x: m.x, y: m.y } });
+      onmove?.(m.id, m.x, m.y);
+    }
+  }
+
   function nudge(dx: number, dy: number) {
     for (const n of selected()) {
       const next = { x: n.position.x + dx, y: n.position.y + dy };
@@ -102,12 +122,20 @@
   const RUN: Record<CanvasCommand['id'], (c: CanvasCommand) => void> = {
     add: (c) => c.id === 'add' && onadd?.(c.what),
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
+    align: (c) => c.id === 'align' && place(alignTiles(boxes(), c.edge)),
+    tidy: () => place(tidyTiles(boxes())),
     delete: () => {
       const nodes = selected().map((n) => n.id);
       const edges = selectedEdges();
       if (nodes.length || edges.length) ondelete?.({ nodes, edges });
     },
     deselect: () => setSelection(false),
+    enter: () => {
+      const [only, ...rest] = selected();
+      if (only && !rest.length) enterFrame(only.id, only.data.kind as string | undefined);
+    },
+    'select-next': () => selectSibling(Direction.Next),
+    'select-previous': () => selectSibling(Direction.Previous),
     'select-all': () => setSelection(true),
     fit: () => void fitView(),
     'zoom-actual': () => void zoomTo(1),
