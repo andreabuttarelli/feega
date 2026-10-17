@@ -9,7 +9,7 @@ export const SETTLE_MS = 3000;
 const MS_PER_SECOND = 1000;
 const MAX_SELECTION = 200;
 
-export type LiveBox = { id: string; x: number; y: number; w?: number; h?: number };
+export type LiveBox = { id: string; x: number; y: number; w?: number; h?: number; r?: number };
 
 export type CanvasMark = { sessionId: string; userId: string; name: string; cursor: FrameCursor | null; selection: string[]; live: LiveBox[]; at: number };
 
@@ -40,7 +40,7 @@ const markSchema = z.object({
   name: z.string(),
   cursor: point.nullable(),
   selection: z.array(z.string()).max(MAX_SELECTION),
-  live: z.array(z.object({ id: z.string().min(1), x: z.number().finite(), y: z.number().finite(), w: z.number().finite().positive().optional(), h: z.number().finite().positive().optional() })).max(MAX_SELECTION).default([]),
+  live: z.array(z.object({ id: z.string().min(1), x: z.number().finite(), y: z.number().finite(), w: z.number().finite().positive().optional(), h: z.number().finite().positive().optional(), r: z.number().finite().optional() })).max(MAX_SELECTION).default([]),
   at: z.number().finite()
 });
 
@@ -71,10 +71,23 @@ export function canvasPeersOf(marks: Map<string, HeldMark>, selfSession: string,
 
 const LANDED_PX = 1;
 
+type Placed = { id: string; x: number; y: number; w: number; h: number; rotation?: number };
+
 const near = (a: number, b: number | undefined) => b === undefined || Math.abs(a - b) < LANDED_PX;
 
-export function landedAt(rect: { x: number; y: number; w: number; h: number }, box: LiveBox): boolean {
-  return near(rect.x, box.x) && near(rect.y, box.y) && near(rect.w, box.w) && near(rect.h, box.h);
+export function landedAt(rect: Placed, box: LiveBox): boolean {
+  return near(rect.x, box.x) && near(rect.y, box.y) && near(rect.w, box.w) && near(rect.h, box.h) && near(rect.rotation ?? 0, box.r);
+}
+
+export function withPeerMotion<T extends Placed>(tiles: T[], peers: CanvasPeer[], mine: Set<string>): T[] {
+  const moving = new Map(peers.flatMap((peer) => peer.live).filter((box) => !mine.has(box.id)).map((box) => [box.id, box]));
+  if (!moving.size) {
+    return tiles;
+  }
+  return tiles.map((tile) => {
+    const box = moving.get(tile.id);
+    return box ? { ...tile, x: box.x, y: box.y, w: box.w ?? tile.w, h: box.h ?? tile.h, rotation: box.r ?? tile.rotation } : tile;
+  });
 }
 
 export function canvasHub(self: CanvasSelf, now: () => number = Date.now): { port: CanvasPresence; line: CanvasLine } {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HEARTBEAT_MS, SETTLE_MS, TICK_MS, landedAt, canvasHub, canvasPeersOf, keepCanvasMark, toCanvasMark, type CanvasMark } from './canvas-presence';
+import { HEARTBEAT_MS, SETTLE_MS, TICK_MS, landedAt, withPeerMotion, canvasHub, canvasPeersOf, keepCanvasMark, toCanvasMark, type CanvasMark } from './canvas-presence';
 import { MARK_STALE_MS } from './frame-presence';
 
 const self = { sessionId: 's-me', userId: 'me', name: 'me' };
@@ -148,5 +148,23 @@ describe('landedAt', () => {
     expect(landedAt({ x: 300, y: 200, w: 10, h: 10 }, { id: 'n', x: 300.2, y: 200 })).toBe(true);
     expect(landedAt({ x: 300, y: 200, w: 10, h: 10 }, { id: 'n', x: 300, y: 200, w: 40, h: 10 })).toBe(false);
     expect(landedAt({ x: 0, y: 200, w: 10, h: 10 }, { id: 'n', x: 300, y: 200 })).toBe(false);
+  });
+});
+
+describe('withPeerMotion', () => {
+  const tile = { id: 'n', x: 0, y: 0, w: 10, h: 10, rotation: 0, kind: 'motion' };
+  const peer = (live: CanvasMark['live']) => ({ sessionId: 's', userId: 'u', name: 'u', cursor: null, selection: [], live, at: 0, colour: '#000' });
+
+  it('moves the real tile to where the peer is dragging it', () => {
+    expect(withPeerMotion([tile], [peer([{ id: 'n', x: 5, y: 6, w: 20, r: 45 }])], new Set())).toEqual([{ ...tile, x: 5, y: 6, w: 20, rotation: 45 }]);
+  });
+
+  it('leaves tiles I am moving myself alone', () => {
+    expect(withPeerMotion([tile], [peer([{ id: 'n', x: 5, y: 6 }])], new Set(['n']))).toEqual([tile]);
+  });
+
+  it('returns the same array when nobody is moving anything', () => {
+    const tiles = [tile];
+    expect(withPeerMotion(tiles, [peer([])], new Set())).toBe(tiles);
   });
 });

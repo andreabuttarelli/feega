@@ -38,7 +38,7 @@
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
-  import { canvasHub, canvasPeersOf, keepCanvasMark, landedAt, type HeldMark } from '$lib/realtime/canvas-presence';
+  import { canvasHub, canvasPeersOf, keepCanvasMark, landedAt, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
@@ -3128,7 +3128,7 @@
 
   <CanvasFlow
     actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
-    {tiles}
+    tiles={withPeerMotion(tiles, canvasPeers, new Set(selectedIds))}
     {edges}
     onMove={move}
     onMoveEnd={moveEnd}

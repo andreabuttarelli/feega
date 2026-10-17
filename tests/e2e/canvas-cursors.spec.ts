@@ -31,7 +31,7 @@ test.describe('canvas cursors across two tabs @real', () => {
     await expect(cursor).toHaveCount(0, { timeout: 15_000 });
   });
 
-  test('a drag in one tab moves a ghost in the other, and the node lands without the ghost jumping back', async ({ page, session, seedNode, admin }) => {
+  test('a drag in one tab moves the real node in the other, and it lands without jumping back', async ({ page, session, seedNode, admin }) => {
     const node = await seedNode({ type: 'motion', x: 120, y: 160, data: ELEMENT });
     await admin.from('nodes').update({ width: 120, height: 120 }).eq('id', node.id);
     await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
@@ -44,18 +44,23 @@ test.describe('canvas cursors across two tabs @real', () => {
     const tile = page.locator(`.svelte-flow__node[data-id="${node.id}"]`);
     const box = (await tile.boundingBox())!;
     const from = { x: box.x + 60, y: box.y + 60 };
+    const peerTile = other.locator(`.svelte-flow__node[data-id="${node.id}"]`);
+    const before = (await peerTile.boundingBox())!;
     await page.mouse.move(from.x, from.y);
     await page.mouse.down();
     const started = Date.now();
     await page.mouse.move(from.x + 200, from.y + 100, { steps: 20 });
-    const ghost = other.getByTestId('peer-ghost');
-    await expect(ghost).toBeVisible({ timeout: 5000 });
-    console.log(JSON.stringify({ ghostLatencyMs: Date.now() - started }));
+    await expect.poll(async () => (await peerTile.boundingBox())!.x - before.x, { timeout: 5000, intervals: [20] }).toBeGreaterThan(150);
+    console.log(JSON.stringify({ liveMoveLatencyMs: Date.now() - started }));
+    const mid = (await peerTile.boundingBox())!;
     await page.mouse.up();
+    const xs: number[] = [];
+    const sampling = (async () => { for (let i = 0; i < 40; i += 1) { xs.push((await peerTile.boundingBox())!.x); await other.waitForTimeout(50); } })();
 
     await expect.poll(async () => (await admin.from('nodes').select('x').eq('id', node.id).single()).data?.x, { timeout: 10_000 }).not.toBe(120);
-    await expect(ghost).toHaveCount(0, { timeout: 10_000 });
-    const peerTile = other.locator(`.svelte-flow__node[data-id="${node.id}"]`);
+    await sampling;
+    expect(Math.min(...xs), 'the node never jumps back to where it started').toBeGreaterThan(mid.x - 5);
+    await expect(other.getByTestId('peer-moving')).toHaveCount(0, { timeout: 10_000 });
     const landed = (await peerTile.boundingBox())!;
     const mine = (await tile.boundingBox())!;
     expect(Math.abs(landed.x - mine.x)).toBeLessThan(2);

@@ -77,8 +77,14 @@
     const centre = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
     const from = { x: e.clientX, y: e.clientY };
     handle.setPointerCapture(e.pointerId);
+    handle.onpointermove = (move) => {
+      const turn = dragAngle(centre, from, { x: move.clientX, y: move.clientY }, move.shiftKey ? SNAP_DEG : 0);
+      live()?.([{ id: tile.id, x: tile.x, y: tile.y, r: (tile.rotation ?? 0) + turn }]);
+    };
     handle.onpointerup = (up) => {
       handle.onpointerup = null;
+      handle.onpointermove = null;
+      live()?.([]);
       const degrees = dragAngle(centre, from, { x: up.clientX, y: up.clientY }, up.shiftKey ? SNAP_DEG : 0);
       if (degrees) {
         rotate()?.(tile.id, degrees);

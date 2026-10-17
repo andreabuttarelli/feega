@@ -29,7 +29,7 @@
     <div
       class="outline"
       class:live={outline.live}
-      data-testid={outline.live ? 'peer-ghost' : 'peer-selection'}
+      data-testid={outline.live ? 'peer-moving' : 'peer-selection'}
       style:left="{outline.rect.x}px"
       style:top="{outline.rect.y}px"
       style:width="{outline.rect.w}px"
@@ -51,7 +51,7 @@
 <style>
   .peers { position: absolute; inset: 0; pointer-events: none; z-index: 1000; }
   .outline { position: absolute; border-style: solid; box-sizing: border-box; }
-  .outline.live { border-style: dashed; transition: left 50ms linear, top 50ms linear, width 50ms linear, height 50ms linear; }
+  .outline.live { transition: left 50ms linear, top 50ms linear, width 50ms linear, height 50ms linear; }
   .cursor { position: absolute; left: 0; top: 0; transform-origin: 0 0; transition: transform 50ms linear; will-change: transform; }
   .name { position: absolute; left: 14px; top: 14px; padding: 2px 6px; color: #fff; font-size: 11px; line-height: 14px; white-space: nowrap; border-radius: 9999px; }
 </style>
