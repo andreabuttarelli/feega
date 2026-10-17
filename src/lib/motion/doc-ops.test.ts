@@ -141,3 +141,53 @@ describe('rebasing my ops onto a newer head', () => {
     expect(merged.background).toBe('transparent');
   });
 });
+
+describe('order survives concurrent inserts: ops anchor on a neighbour, not an index', () => {
+  const ids = (doc: MotionDoc) => doc.tracks.map((t) => t.id);
+  const clipIds = (doc: MotionDoc, trackId: string) => doc.tracks.find((t) => t.id === trackId)!.clips.map((c) => c.id);
+  const tracksAs = (doc: MotionDoc, order: string[], extra: MotionDoc['tracks'] = []): MotionDoc => {
+    const all = [...doc.tracks, ...extra];
+    return { ...doc, tracks: order.map((id) => all.find((t) => t.id === id)!) };
+  };
+  const clipsAs = (doc: MotionDoc, trackId: string, clips: MotionDoc['tracks'][number]['clips']): MotionDoc => ({
+    ...doc,
+    tracks: doc.tracks.map((t) => (t.id === trackId ? { ...t, clips } : t))
+  });
+
+  it('swapping two tracks does not push a peer\'s new first track to the bottom', () => {
+    const start = base();
+    const [first, second] = ids(start);
+    const peerTrack = { ...start.tracks[0], id: 'peer', clips: [] };
+    const theirs = tracksAs(start, ['peer', first, second], [peerTrack]);
+    const mine = tracksAs(start, [second, first]);
+
+    const merged = ids(rebase(start, mine, theirs));
+    expect(merged.indexOf(second)).toBeLessThan(merged.indexOf(first));
+    expect(merged.at(-1)).not.toBe('peer');
+  });
+
+  it('a clip I add after another stays after it when a peer inserts before both', () => {
+    const start = base();
+    const track = start.tracks[0];
+    const [a] = track.clips;
+    const fresh = (id: string) => ({ ...a, id });
+    const theirs = clipsAs(start, track.id, [fresh('peer'), ...track.clips]);
+    const mine = clipsAs(start, track.id, [a, fresh('mine'), ...track.clips.slice(1)]);
+
+    expect(clipIds(rebase(start, mine, theirs), track.id)).toEqual(['peer', a.id, 'mine', ...track.clips.slice(1).map((c) => c.id)]);
+  });
+
+  it('only the tracks that left their place emit a move', () => {
+    const start = base();
+    const [first, second] = ids(start);
+    const moves = diffDoc(start, tracksAs(start, [second, first])).filter((op) => op.kind === OpKind.TrackMove);
+
+    expect(moves).toHaveLength(1);
+  });
+
+  it('an op queued by an older client with an index still applies', () => {
+    const start = base();
+    const [first, second] = ids(start);
+    expect(ids(applyOps(start, [{ kind: OpKind.TrackMove, trackId: first, index: 1 } as never]))).toEqual([second, first]);
+  });
+});
