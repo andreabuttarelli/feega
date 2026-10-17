@@ -1103,7 +1103,8 @@
   const places = createPlaceSaves({
     send,
     backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
-    onStatus: (status) => { placeStatus = status; keepOutbox(); }
+    onStatus: (status) => { placeStatus = status; keepOutbox(); },
+    announce: { intent: (row) => commits.publish([row]), refused: () => commits.publish([]) }
   });
 
   const lines = createOpQueue({
