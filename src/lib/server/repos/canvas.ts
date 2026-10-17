@@ -228,6 +228,8 @@ export async function saveViewport(
   }
 }
 
+const byStack = (a: CanvasNodeRecord, b: CanvasNodeRecord) => a.position.z - b.position.z || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
 export async function listNodes(
   db: Db,
   scope: { orgId: string; canvasId: string }
@@ -243,7 +245,7 @@ export async function listNodes(
   if (error) {
     throw error;
   }
-  return (data ?? []).map(toNode);
+  return (data ?? []).map(toNode).sort(byStack);
 }
 
 /**
