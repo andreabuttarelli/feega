@@ -1,5 +1,5 @@
 import { Application, BitmapText, Container, Graphics, Sprite, Texture, TilingSprite } from 'pixi8';
-import { hitTop, panBy, toWorld, visibleIds, zoomAt, type Point, type Rect } from '$lib/canvas/webgl/camera';
+import { hitTop, panBy, toWorld, visibleIds, zoomAt, type Point, type Rect } from '$lib/canvas/gpu/camera';
 import type { Viewport } from '$lib/canvas/dot-grid';
 import { nodeSize } from '$lib/canvas/node-size';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
