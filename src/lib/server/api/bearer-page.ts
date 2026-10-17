@@ -75,3 +75,12 @@ export async function answerOf(run: () => Promise<unknown>): Promise<Response> {
     throw e;
   }
 }
+
+export async function bareAnswerOf(run: () => Promise<unknown>): Promise<Response> {
+  const enveloped = await answerOf(run);
+  if (enveloped.status !== OK) {
+    return enveloped;
+  }
+  const body = (await enveloped.json()) as { data?: unknown; redirect?: string };
+  return json(body.redirect ? { redirect: body.redirect } : (body.data ?? null), { status: OK });
+}
