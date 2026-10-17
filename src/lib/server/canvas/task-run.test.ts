@@ -1,7 +1,8 @@
 import { ProjectMode } from '$lib/project-mode';
 import { describe, expect, it, vi } from 'vitest';
 import { Provenance } from './likeness-guard';
-import { finishTaskJob, RefusalStage, startTaskRun, TASK_REFUSALS, TASK_TIMED_OUT, type TaskModel, type TaskRunDeps, type TaskRequest } from './task-run';
+import { ProviderBusyError } from './task-provider';
+import { finishTaskJob, QueuePlace, RefusalStage, startTaskRun, TASK_REFUSALS, TASK_TIMED_OUT, type TaskModel, type TaskRunDeps, type TaskRequest } from './task-run';
 
 const SCOPE = { orgId: 'org-1', projectId: 'p1', canvasId: 'c1', nodeId: 'n1', userId: 'u1' };
 
@@ -333,3 +334,159 @@ describe('startTaskRun — a request the provider would refuse never leaves', ()
     expect(gatewayRun.mock.calls[0][1]).toEqual({ prompt: 'a picture', ratio: '1:1', size: '1K' });
   });
 });
+
+const referenceVideo: TaskModel = {
+  id: 'higgsfield/bytedance/seedance-2.5/reference-to-video',
+  catalogue: 'video',
+  spec: { path: 'bytedance/seedance-2.5/reference-to-video', fields: { prompt: 'prompt', images: [], videoList: 'video_urls', audioList: 'audio_urls' }, caps: { video: 10 } },
+  uncensored: false,
+  paramSchema: {}
+};
+
+describe('startTaskRun — video and audio references', () => {
+  it('sends upstream videos and audios to the model, and nothing but the path as its ref', async () => {
+    const { deps, gatewayRun } = depsFor(referenceVideo);
+    deps.providers = { higgsfield: deps.providers.wiro };
+
+    await startTaskRun(deps, {
+      ...baseRequest,
+      mode: ProjectMode.Standard,
+      scope: SCOPE,
+      modelId: referenceVideo.id,
+      videoUrls: ['https://example.com/v.mp4'],
+      audioUrls: ['https://example.com/a.wav']
+    });
+
+    expect(gatewayRun).toHaveBeenCalledWith(
+      { path: 'bytedance/seedance-2.5/reference-to-video' },
+      { prompt: 'a picture', video_urls: ['https://example.com/v.mp4'], audio_urls: ['https://example.com/a.wav'] },
+      undefined
+    );
+  });
+
+  it('refuses a video reference to an uncensored model that takes videos', async () => {
+    const takesVideo = { ...uncensoredModel, spec: { ...uncensoredModel.spec, fields: { prompt: 'prompt', images: [], video: 'video_url' } } };
+    const { deps, gatewayRun } = depsFor(takesVideo);
+
+    const out = await startTaskRun(deps, { ...baseRequest, scope: SCOPE, modelId: takesVideo.id, videoUrls: ['https://example.com/v.mp4'] });
+
+    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.noInputsAllowed, stage: RefusalStage.Policy });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+
+  it('ignores a connected video an uncensored image model never receives', async () => {
+    const { deps, gatewayRun } = depsFor(uncensoredModel);
+
+    await startTaskRun(deps, { ...baseRequest, scope: SCOPE, modelId: uncensoredModel.id, videoUrls: ['https://example.com/v.mp4'] });
+
+    expect(gatewayRun).toHaveBeenCalled();
+  });
+});
+
+describe('startTaskRun — a provider with a concurrency cap', () => {
+  const busyDeps = (load: { inFlight: number; waiting: number; cap: number }) => {
+    const made = depsFor(referenceVideo);
+    made.deps.providers = { higgsfield: made.deps.providers.wiro };
+    made.deps.load = async () => load;
+    return made;
+  };
+  const request = (place?: QueuePlace) => ({ ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: referenceVideo.id, place });
+
+  it('waits instead of submitting when every slot is taken', async () => {
+    const { deps, gatewayRun } = busyDeps({ inFlight: 4, waiting: 0, cap: 4 });
+
+    expect(await startTaskRun(deps, request())).toEqual({ kind: 'waiting' });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+
+  it('queues a new run behind runs already waiting, even with a free slot', async () => {
+    const { deps, gatewayRun } = busyDeps({ inFlight: 3, waiting: 1, cap: 4 });
+
+    expect(await startTaskRun(deps, request(QueuePlace.New))).toEqual({ kind: 'waiting' });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+
+  it('submits a waiting run as soon as a slot frees', async () => {
+    const { deps, gatewayRun } = busyDeps({ inFlight: 3, waiting: 1, cap: 4 });
+
+    expect(await startTaskRun(deps, request(QueuePlace.Waiting))).toEqual({ kind: 'job', jobId: 'higgsfield:job-1' });
+    expect(gatewayRun).toHaveBeenCalled();
+  });
+
+  it('waits, unbilled, when the provider itself answers that it is busy', async () => {
+    const { deps } = busyDeps({ inFlight: 0, waiting: 0, cap: 4 });
+    (deps.providers.higgsfield!.run as ReturnType<typeof vi.fn>).mockRejectedValue(new ProviderBusyError('higgsfield_busy'));
+
+    expect(await startTaskRun(deps, request())).toEqual({ kind: 'waiting' });
+    expect(deps.bill).not.toHaveBeenCalled();
+  });
+});
+
+describe('startTaskRun — a model that edits a video', () => {
+  it('refuses before any call when no source video is wired', async () => {
+    const editor: TaskModel = { ...referenceVideo, spec: { ...referenceVideo.spec, fields: { prompt: 'prompt', images: [], video: 'video_url' }, requiresVideo: true } };
+    const { deps, gatewayRun } = depsFor(editor);
+    deps.providers = { higgsfield: deps.providers.wiro };
+
+    const out = await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: editor.id });
+
+    expect(out).toEqual({ kind: 'refused', error: TASK_REFUSALS.needsVideo, stage: RefusalStage.Policy });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+});
+
+describe('a model billed per source second, quoted on the real request', () => {
+  const restyle: TaskModel = {
+    id: 'higgsfield/higgsfield/genjutsu/restyle/v1.0',
+    catalogue: 'video',
+    spec: { path: 'higgsfield/genjutsu/restyle/v1.0', fields: { prompt: 'prompt', images: [], video: 'video_url' }, quotedAtSubmit: true },
+    uncensored: false,
+    paramSchema: {}
+  };
+  const quoting = (usd: number | null) => {
+    const made = depsFor(restyle);
+    const quote = vi.fn().mockResolvedValue(usd);
+    made.deps.providers = { higgsfield: { ...made.deps.providers.wiro!, quote } };
+    return { ...made, quote };
+  };
+  const request = { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: restyle.id, videoUrls: ['https://cdn.test/source.mp4'] };
+
+  it('asks the provider the price of these exact inputs and carries it with the job', async () => {
+    const { deps, quote } = quoting(13.6);
+
+    const out = await startTaskRun(deps, request);
+
+    expect(quote).toHaveBeenCalledWith({ path: 'higgsfield/genjutsu/restyle/v1.0' }, { prompt: 'a picture', video_url: 'https://cdn.test/source.mp4' });
+    expect(out).toEqual({ kind: 'job', jobId: 'higgsfield:job-1', quotedUsd: 13.6 });
+  });
+
+  it('never runs what it cannot price', async () => {
+    const { deps, gatewayRun } = quoting(null);
+
+    expect(await startTaskRun(deps, request)).toEqual({ kind: 'refused', error: TASK_REFUSALS.unpriced, stage: RefusalStage.Provider });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+
+  it('bills the finished task at the price quoted on submit', async () => {
+    const bill = vi.fn();
+    const providers = { higgsfield: { run: vi.fn(), task: vi.fn().mockResolvedValue({ state: 'failed', error: 'higgsfield_failed: x' }) } };
+
+    await finishTaskJob({} as never, { providers, model: async () => restyle, bill }, { externalJobId: 'higgsfield:r1', modelId: restyle.id, scope: SCOPE, mode: ProjectMode.Standard, params: { quotedUsd: 13.6 } as never });
+
+    expect(bill).toHaveBeenCalledWith(expect.objectContaining({ quotedUsd: 13.6 }));
+  });
+});
+
+describe('a model that needs a param the person must choose', () => {
+  it('refuses before any call when the style is not chosen', async () => {
+    const restyle: TaskModel = { ...referenceVideo, spec: { ...referenceVideo.spec, requiredParams: ['preset_id'] }, paramSchema: { preset_id: { type: 'enum', values: ['u1'] } } };
+    const { deps, gatewayRun } = depsFor(restyle);
+    deps.providers = { higgsfield: deps.providers.wiro };
+
+    const out = await startTaskRun(deps, { ...baseRequest, mode: ProjectMode.Standard, scope: SCOPE, modelId: restyle.id });
+
+    expect(out).toEqual({ kind: 'refused', error: 'missing_input: choose a style', stage: RefusalStage.Policy });
+    expect(gatewayRun).not.toHaveBeenCalled();
+  });
+});
+

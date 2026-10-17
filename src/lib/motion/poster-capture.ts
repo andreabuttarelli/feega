@@ -16,13 +16,14 @@ export function posterSecond(doc: { durationInFrames: number; fps: number }): nu
   return (doc.durationInFrames / doc.fps) * POSTER_SHARE;
 }
 
-export function posterJob(shoot: () => Promise<string>, send: (jpeg: string) => Promise<unknown>) {
+export function posterJob(shoot: () => Promise<string>, send: (jpeg: string, revision?: number) => Promise<unknown>, revision: () => number | undefined = () => undefined) {
   let timer: ReturnType<typeof setTimeout> | null = null;
 
   async function run() {
+    const shotAt = revision();
     const jpeg = await shoot().catch(() => '');
     if (jpeg) {
-      await send(jpeg).catch((e) => console.error('[motion] poster not saved', e));
+      await send(jpeg, shotAt).catch((e) => console.error('[motion] poster not saved', e));
     }
   }
 

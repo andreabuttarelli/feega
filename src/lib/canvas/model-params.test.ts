@@ -95,3 +95,12 @@ describe('snapDynamicParams — un cambio modello non deve mai lasciare un token
     expect(snapDynamicParams([QUALITY], {})).toEqual({});
   });
 });
+
+describe('an enum whose values are ids shows their names', () => {
+  it('carries the labels of the schema to the control', () => {
+    const params = modelParamsOf({ preset_id: { type: 'enum', values: ['u1', 'u2'], labels: { u1: 'Anime', u2: 'Clay' } } });
+
+    expect(params).toEqual([{ name: 'preset_id', label: 'Style', kind: 'enum', values: ['u1', 'u2'], optionLabels: { u1: 'Anime', u2: 'Clay' } }]);
+  });
+});
+

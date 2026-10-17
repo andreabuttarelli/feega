@@ -21,19 +21,22 @@ const TIMEOUT_MS = 10_000;
 // The fetch goes through safeFetchBytes rather than bare fetch: at least one caller (the chat's
 // style-reference tool) hands it a URL a model chose, and a plain fetch of a model-chosen URL is
 // a request forger with our network position.
-export async function archiveImageToBucket(
-  supabase: SupabaseClient,
-  path: string,
-  url: string,
-  bucket: string = DEFAULT_BUCKET
-): Promise<string | null> {
+const ARCHIVE_LIMITS = {
+  image: { mimePrefix: 'image/', maxBytes: MAX_BYTES, timeoutMs: TIMEOUT_MS },
+  video: { mimePrefix: 'video/', maxBytes: 50 * 1024 * 1024, timeoutMs: 60_000 }
+} as const;
+
+type ArchiveKind = keyof typeof ARCHIVE_LIMITS;
+
+async function archiveToBucket(supabase: SupabaseClient, path: string, url: string, bucket: string, kind: ArchiveKind): Promise<string | null> {
+  const limits = ARCHIVE_LIMITS[kind];
   try {
     const res = await safeFetchBytes(url, {
-      maxBytes: MAX_BYTES,
-      timeoutMs: TIMEOUT_MS,
+      maxBytes: limits.maxBytes,
+      timeoutMs: limits.timeoutMs,
       userAgent: ARCHIVE_USER_AGENT
     });
-    if (!res.ok || !res.mime.startsWith('image/') || !res.bytes.length) return null;
+    if (!res.ok || !res.mime.startsWith(limits.mimePrefix) || !res.bytes.length) return null;
 
     const { error } = await supabase.storage
       .from(bucket)
@@ -42,6 +45,14 @@ export async function archiveImageToBucket(
   } catch {
     return null;
   }
+}
+
+export function archiveImageToBucket(supabase: SupabaseClient, path: string, url: string, bucket: string = DEFAULT_BUCKET): Promise<string | null> {
+  return archiveToBucket(supabase, path, url, bucket, 'image');
+}
+
+export function archiveVideoToBucket(supabase: SupabaseClient, path: string, url: string, bucket: string): Promise<string | null> {
+  return archiveToBucket(supabase, path, url, bucket, 'video');
 }
 
 // Batch-sign brand-knowledge paths → path→signedUrl map (missing entries simply absent).

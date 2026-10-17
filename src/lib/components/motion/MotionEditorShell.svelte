@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { FrameKind, openingSelection } from '$lib/canvas/motion-node';
+  import { painted } from '$lib/canvas/paint-wait';
+  import { frameDocs } from '$lib/canvas/frame-docs.svelte';
+  import { FrameKind, freshText, openingSelection } from '$lib/canvas/motion-node';
+  import { DRAWN_TEXT } from '$lib/motion/draw-create';
   import { groupClips, ungroupClip } from '$lib/motion/group';
   import { onMount, tick, untrack } from 'svelte';
   import { clipSeek } from '$lib/motion/storyboard';
@@ -186,6 +189,7 @@
   let saving = false;
   let resave = false;
   let selection = $state<string[]>(openingSelection(data.node.kind ?? FrameKind.Frame, (data.head.doc as MotionDoc).tracks.flatMap((t) => t.clips.map((c) => c.id))));
+  let typeInto = $state<string | null>(freshText(data.node.kind ?? FrameKind.Frame, data.head.version, (data.head.doc as MotionDoc).tracks.flatMap((t) => t.clips)));
   let path = $state<{ comp: string; frame: number }[]>([]);
   let cameraOpen = $state(false);
   let keySelection = $state<KeyRef[]>([]);
@@ -438,6 +442,13 @@
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let unsavedSummary = '';
 
+  onMount(() => () => {
+    if (saveTimer && saveState === SaveState.Pending) {
+      clearTimeout(saveTimer);
+      void save();
+    }
+  });
+
   const compPath = $derived(path.map((p) => p.comp));
   const doc = $derived(viewOf(draft?.doc ?? history.present, compPath));
   const mode = $derived(docMode(history.present));
@@ -457,6 +468,10 @@
   let previewVars = $state<VarValues>({});
   let tiltY = $state(0);
   const html = $derived(composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: interactive ? Liveness.Live : Liveness.Baked, target: Target.Screen }));
+  $effect(() => {
+    const root = history.present;
+    frameDocs.put(data.node.id, { version, html: composeHtml({ doc: root, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen }), width: root.width, height: root.height, fps: root.fps, durationInFrames: root.durationInFrames, clean: !history.past.length && !history.future.length });
+  });
   const liveScene = $derived(liveComponents(doc));
   const selected = $derived(selection.length === 1 ? (findClip(doc, selection[0])?.clip ?? null) : null);
   const view = $derived(propertiesFor({ count: selection.length, clip: selected?.id ?? null, part: selectedPart }));
@@ -504,7 +519,8 @@
 
   const poster = posterJob(
     () => preview?.still(posterSecond(history.present), POSTER_WIDTH, posterFormat(history.present.background)) ?? Promise.resolve(''),
-    (jpeg) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)) })
+    (jpeg, shotAt) => sendPoster(`${editorUrl}?/poster`, jpeg, { width: String(POSTER_WIDTH), height: String(Math.round((POSTER_WIDTH * history.present.height) / history.present.width)), revision: String(shotAt) }),
+    () => version
   );
   let posterVersion = data.node.posterAssetId ? data.head.version : -1;
   $effect(() => {
@@ -620,6 +636,7 @@
   function follow(next: Synced) {
     baseDoc = next.base.doc;
     version = next.base.version;
+    frameDocs.saved(data.node.id, next.base);
     if (next.present === history.present) {
       return;
     }
@@ -631,6 +648,7 @@
     history = adoptHead(history, head.doc, version);
     baseDoc = head.doc;
     version = head.version;
+    frameDocs.saved(data.node.id, head);
   }
 
   async function save() {
@@ -645,14 +663,17 @@
     form.set('ops', JSON.stringify(outgoing({ version, doc: baseDoc }, sent)));
     form.set('version', String(version));
     form.set('summary', unsavedSummary);
+    frameDocs.sending(data.node.id);
     const res = await fetch(`${editorUrl}?/ops`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
     const result = deserialize(await res.text());
     saving = false;
 
     if (result.type === 'success') {
+      frameDocs.landed(data.node.id, version, Number(result.data?.version));
       follow(landed({ version, doc: baseDoc }, sent, history.present, { version: Number(result.data?.version), doc: result.data?.doc as MotionDoc }));
       saveState = SaveState.Saved;
     } else {
+      frameDocs.landed(data.node.id, version, version);
       saveState = SaveState.Failed;
       notice = result.type === 'failure' ? String(result.data?.error ?? '') : '';
     }
@@ -931,8 +952,12 @@
 
   const FRAME_ACTS: Record<FrameAction, () => void> = { [FrameAction.Image]: () => add('Image'), [FrameAction.Library]: () => (templating = true) };
 
-  function drawn(id: string) {
+  const DRAWN_SETTLE_FRAMES = 4;
+
+  async function drawn(id: string) {
     selection = [id];
+    typeInto = findClip(history.present, id)?.clip.component === DRAWN_TEXT ? id : null;
+    await painted(DRAWN_SETTLE_FRAMES);
     frameBar.tool = DrawTool.Select;
   }
 
@@ -1794,7 +1819,7 @@
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
         {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
-        {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} onchange={edit} />{/if}
+        {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={findClip(withAutoLayout(doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
         {#if selected?.autoLayout && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<AutoLayoutOverlay {doc} clip={{ ...selected, autoLayout: selected.autoLayout }} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -1840,7 +1865,7 @@
         {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
         {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
-        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        <MotionInspector {typeInto} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}

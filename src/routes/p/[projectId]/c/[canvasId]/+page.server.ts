@@ -1,4 +1,5 @@
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
+import { MEDIA_UUID_RE } from '$lib/media-url';
 import { registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
 import { isOutputHandle } from '$lib/canvas/select-outputs';
 import { error, fail, redirect } from '@sveltejs/kit';
@@ -72,9 +73,10 @@ import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib
 import { canvasPath } from '$lib/server/tenancy/entry';
 import { renameProject } from '$lib/server/repos/projects';
 import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
+import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
 import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
-import { MOVE_STATUS, MoveOutcome, drawElement, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { MOVE_STATUS, MoveOutcome, canvasBoxSchema, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -243,6 +245,7 @@ function jsonObject(value: FormDataEntryValue | null): Record<string, unknown> |
 }
 
 const HTTP_BAD_REQUEST = 400;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const HTTP_NOT_FOUND = 404;
 const HTTP_CONFLICT = 409;
 
@@ -1045,7 +1048,13 @@ export const actions: Actions = {
 
     const sourceNode = canvasNodes.find((node) => node.id === sourceNodeId);
     const targetNode = canvasNodes.find((node) => node.id === targetNodeId);
-    const existing = (await listConnections(scope.db, scope)).map((edge) => ({
+    const lines = await listConnections(scope.db, scope);
+    const chosenId = String(fd.get('connection_id') ?? '');
+    const replayed = lines.find((edge) => edge.id === chosenId);
+    if (replayed) {
+      return { connection: replayed, linked: null };
+    }
+    const existing = lines.map((edge) => ({
       id: edge.id,
       target: edge.targetNodeId,
       targetHandle: edge.targetHandle
@@ -1060,6 +1069,7 @@ export const actions: Actions = {
     }
 
     const connection = await createConnection(scope.db, {
+      id: MEDIA_UUID_RE.test(chosenId) ? chosenId : undefined,
       orgId: scope.orgId,
       canvasId: scope.canvasId,
       sourceNodeId,
@@ -1103,6 +1113,16 @@ export const actions: Actions = {
       return fail(400, { error: 'invalid group' });
     }
     return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids));
+  },
+
+  restack: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = restackAskSchema.safeParse({ ids: jsonField(fd, 'ids'), to: fd.get('to') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid restack' });
+    }
+    return { restacked: await restackNodes(scope.db, scope, userActor(scope), ask.data.ids, ask.data.to) };
   },
 
   rotateGroup: async ({ request, params, locals }) => {
@@ -1153,24 +1173,41 @@ export const actions: Actions = {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
     const ask = drawnSchema.safeParse(jsonField(fd, 'drawn'));
-    if (!ask.success) {
+    const id = String(fd.get('node_id') ?? '') || undefined;
+    if (!ask.success || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid drawing' });
     }
-    const drawn = await drawElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data);
+    const drawn = await drawElement(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, ask.data);
     if (drawn.outcome !== MoveOutcome.Done) {
       return movedAnswer(drawn);
     }
     return { ...drawn, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: drawn.frameId }) };
   },
 
-  placeOutput: async ({ request, params, locals }) => {
+  drawFrame: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
-    const ask = outputAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop') });
+    const box = canvasBoxSchema.safeParse(jsonField(fd, 'box'));
+    const id = String(fd.get('node_id') ?? '') || undefined;
+    if (!box.success || (id && !UUID.test(id))) {
+      return fail(400, { error: 'invalid frame' });
+    }
+    const drawn = await drawFrameAt(canvasFrames(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId, id }, box.data);
+    return { ...drawn, node: await findNode(scope.db, { orgId: scope.orgId, nodeId: drawn.frameId }) };
+  },
+
+  placeOutput: async ({ request, params, locals, setHeaders }) => {
+    const phases = serverTiming();
+    const scope = await phases.time('scope', scopeFor(locals, params.canvasId));
+    const fd = await request.formData();
+    const ask = outputAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop'), id: fd.get('node_id') ?? undefined });
     if (!ask.success) {
       return fail(400, { error: 'rilascio non valido' });
     }
-    return movedAnswer(await placeOutput(canvasFrames(scope), ask.data));
+    const placed = await phases.time('place', placeOutput(phases.port(canvasFrames(scope)), ask.data));
+    const node = placed.outcome === MoveOutcome.Done && placed.created ? await phases.time('read', findNode(scope.db, { orgId: scope.orgId, nodeId: placed.frameId })) : null;
+    setHeaders({ 'server-timing': phases.header() });
+    return placed.outcome === MoveOutcome.Done ? { ...placed, node } : movedAnswer(placed);
   },
 
   disconnect: async ({ request, params, locals }) => {
@@ -1183,7 +1220,7 @@ export const actions: Actions = {
     }
 
     if (!(await listConnections(scope.db, scope)).some((edge) => edge.id === connectionId)) {
-      return fail(404, { error: 'line not found' });
+      return { disconnected: true };
     }
     await deleteConnection(scope.db, { orgId: scope.orgId, connectionId, actor: userActor(scope) });
 
@@ -1323,12 +1360,15 @@ export const actions: Actions = {
 
     const at = { x: Number(fd.get('x')), y: Number(fd.get('y')) };
     const format = String(fd.get('format') ?? MotionFormat.Landscape) as MotionFormat;
-    if (!Number.isFinite(at.x) || !Number.isFinite(at.y) || !MOTION_FORMATS.includes(format)) {
+    const id = String(fd.get('node_id') ?? '') || undefined;
+    if (!Number.isFinite(at.x) || !Number.isFinite(at.y) || !MOTION_FORMATS.includes(format) || (id && !UUID.test(id))) {
       return fail(400, { error: 'invalid frame' });
     }
 
     const actor = userActor(scope);
-    const started = await phases.time('start', startFromTemplate(scope.db, FROM_TEMPLATE_DEPS, {
+    const deps = { ...FROM_TEMPLATE_DEPS, listCanvases: async () => [scope.canvas] };
+    const started = await phases.time('start', startFromTemplate(scope.db, deps, {
+      id,
       orgId: scope.orgId,
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
@@ -1342,7 +1382,7 @@ export const actions: Actions = {
       return fail(400, { error: started.outcome });
     }
 
-    const node = await phases.time('read', findNode(scope.db, { orgId: scope.orgId, nodeId: started.start.nodeId }));
+    const node = started.node;
     setHeaders({ 'server-timing': phases.header() });
     return { node };
   },

@@ -150,3 +150,18 @@ describe('commitHandleField: incollare un URL del feed capisce piattaforma e tip
     expect(data.sync_error).toBeNull();
   });
 });
+
+describe('patchWith: a field edit sends only what it changed', () => {
+  it('editing the limit of a products node leaves the filters out of the patch', () => {
+    const data = { ...newNodeRow('products'), limit: 3, filters: { query: 'stale here' } };
+    const patch = inspectorOf(row('products', data))?.patchWith('limit', 9);
+
+    expect(patch).toEqual({ limit: 9 });
+  });
+
+  it('editing a filter sends the filters, nothing else', () => {
+    const patch = inspectorOf(row('products', { ...newNodeRow('products'), limit: 3 }))?.patchWith('filters.query', 'shoes');
+
+    expect(Object.keys(patch ?? {})).toEqual(['filters']);
+  });
+});

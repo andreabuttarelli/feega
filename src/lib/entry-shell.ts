@@ -15,6 +15,10 @@ function inApp(pathname: string): boolean {
   return pathname.startsWith('/p/') || pathname === '/app' || pathname.startsWith('/app/');
 }
 
+function inDashboard(pathname: string): boolean {
+  return pathname === '/app' || pathname.startsWith('/app/');
+}
+
 function isLogin(pathname: string): boolean {
   return pathname === '/login' || pathname.startsWith('/login/');
 }
@@ -23,7 +27,7 @@ export function entryShell(nav: { from: string; to: string; signedIn: boolean })
   if (isLogin(nav.to)) {
     return nav.signedIn ? EntryShell.App : EntryShell.None;
   }
-  if (!inApp(nav.to)) {
+  if (!inApp(nav.to) || (inDashboard(nav.from) && inDashboard(nav.to))) {
     return EntryShell.None;
   }
 

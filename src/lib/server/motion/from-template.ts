@@ -4,16 +4,16 @@ import type { Db } from '$lib/server/db/client';
 import { agentActor, type Actor } from '$lib/server/repos/actor';
 import { findProjectById, listProjects } from '$lib/server/repos/projects';
 import { ProjectMode } from '$lib/project-mode';
-import { motionEditorPath } from '$lib/canvas/motion-node';
-import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
+import { FIRST_REVISION, motionEditorPath } from '$lib/canvas/motion-node';
+import { RevisionOutcome, appendRevision } from '$lib/server/repos/motion-revisions';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import { DocMode, docMode, setStill } from '$lib/motion/still';
 import { liftSoleClip } from '$lib/motion/precomp';
 import type { TemplateEntry } from '$lib/motion/template/library';
 import { composedTemplate } from '$lib/canvas/composition-template';
 import type { UpstreamCard } from '$lib/canvas/composition-node';
-import { MOTION_START_DEPS, startMotion, type CanvasPick, type MotionStart, type MotionStartDeps } from './start';
-import { saveMotionDoc } from './editor';
+import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
+import { MOTION_START_DEPS, placeMotion, type CanvasPick, type MotionStart, type MotionStartDeps } from './start';
 import { templateLibrary } from './templates';
 
 const ID_LENGTH = 8;
@@ -29,20 +29,20 @@ export enum FromTemplate {
 }
 
 export type FromTemplateResult =
-  | { outcome: FromTemplate.Started; start: MotionStart; version: number }
+  | { outcome: FromTemplate.Started; start: MotionStart; node: CanvasNodeRecord; version: number }
   | { outcome: FromTemplate.Unknown }
   | { outcome: FromTemplate.NoCanvas }
   | { outcome: FromTemplate.Invalid; error: string };
 
 export type FromTemplateDeps = MotionStartDeps & {
-  templates: (db: Db, scope: { orgId: string; actor: Actor }) => Promise<TemplateEntry[]>;
-  save: typeof saveMotionDoc;
+  template: (db: Db, scope: { orgId: string; actor: Actor }, id: string) => Promise<TemplateEntry | null>;
+  append: typeof appendRevision;
 };
 
 export const FROM_TEMPLATE_DEPS: FromTemplateDeps = {
   ...MOTION_START_DEPS,
-  templates: (db, scope) => templateLibrary(db, scope).list(),
-  save: saveMotionDoc
+  template: (db, scope, id) => templateLibrary(db, scope).find(id),
+  append: appendRevision
 };
 
 export const fromTemplateBody = z.object({
@@ -52,13 +52,13 @@ export const fromTemplateBody = z.object({
   still: z.number().min(0).optional()
 });
 
-type Input = { orgId: string; projectId: string; canvasId?: string | null; userId: string; templateId: string; format: MotionFormat; still?: number; values?: Record<string, string>; wired?: UpstreamCard[]; at?: { x: number; y: number }; actor?: Actor; pick?: CanvasPick };
+type Input = { orgId: string; projectId: string; canvasId?: string | null; userId: string; templateId: string; format: MotionFormat; still?: number; values?: Record<string, string>; wired?: UpstreamCard[]; at?: { x: number; y: number }; actor?: Actor; pick?: CanvasPick; id?: string };
 
 const newId = () => crypto.randomUUID().slice(0, ID_LENGTH);
 
 export async function startFromTemplate(db: Db, deps: FromTemplateDeps, input: Input): Promise<FromTemplateResult> {
   const actor = input.actor ?? { kind: 'user', id: input.userId };
-  const entry = (await deps.templates(db, { orgId: input.orgId, actor })).find((e) => e.id === input.templateId);
+  const entry = await deps.template(db, { orgId: input.orgId, actor }, input.templateId);
   if (!entry) {
     return { outcome: FromTemplate.Unknown };
   }
@@ -70,16 +70,17 @@ export async function startFromTemplate(db: Db, deps: FromTemplateDeps, input: I
     return { outcome: FromTemplate.Invalid, error: flat.error };
   }
 
-  const start = await startMotion(db, deps, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId ?? null, userId: input.userId, name: entry.template.name, format: input.format, at: input.at, picture: flat.doc, actor, pick: input.pick });
-  if (!start) {
+  const made = await placeMotion(db, deps, { orgId: input.orgId, projectId: input.projectId, canvasId: input.canvasId ?? null, userId: input.userId, name: entry.template.name, format: input.format, at: input.at, picture: flat.doc, actor, pick: input.pick, id: input.id, head: FIRST_REVISION });
+  if (!made) {
     return { outcome: FromTemplate.NoCanvas };
   }
+  const { start, node } = made;
 
-  const write = await deps.save(db, { orgId: input.orgId, nodeId: start.nodeId, expectedVersion: 0, doc: flat.doc, actor, summary: `Started from ${entry.template.name}` });
+  const write = await deps.append(db, { orgId: input.orgId, nodeId: start.nodeId, expectedVersion: 0, doc: flat.doc, actor, summary: `Started from ${entry.template.name}` });
   if (write.outcome !== RevisionOutcome.Written) {
     return { outcome: FromTemplate.Invalid, error: write.outcome === RevisionOutcome.Invalid ? write.error : 'conflict' };
   }
-  return { outcome: FromTemplate.Started, start, version: write.head.version };
+  return { outcome: FromTemplate.Started, start, node, version: write.head.version };
 }
 
 export const FROM_TEMPLATE_STATUS: Record<Exclude<FromTemplate, FromTemplate.Started>, number> = {

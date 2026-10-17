@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ProjectMode } from '$lib/project-mode';
-import { dashboardFor, videoPage, VIDEO_PAGE, type DashboardDeps } from './dashboard';
+import { dashboardFor, recentCanvasesFor, videoPage, VIDEO_PAGE, type DashboardDeps } from './dashboard';
 import type { Db } from '$lib/server/db/client';
 
 const db = {} as Db;
@@ -93,6 +93,20 @@ describe('the dashboard: projects, tool outputs, one org', () => {
     const { motions, moreVideos } = await dashboardFor(db, deps({ listRecentNodes: vi.fn(async () => many) }), 'org');
     expect(motions).toHaveLength(VIDEO_PAGE);
     expect(moreVideos).toBe(motions.at(-1)!.updatedAt);
+  });
+});
+
+describe('the canvases page', () => {
+  it('reads only canvases, projects and motion frames, signing posters once, never videos', async () => {
+    const reads = deps();
+    const canvases = await recentCanvasesFor(db, reads, 'org');
+
+    expect(canvases).toEqual((await dashboardFor(db, deps(), 'org')).canvases);
+    expect(reads.listRecentImages).not.toHaveBeenCalled();
+    expect(reads.listRecentBatches).not.toHaveBeenCalled();
+    expect(reads.signVideos).not.toHaveBeenCalled();
+    expect(reads.signImages).toHaveBeenCalledTimes(1);
+    expect(reads.signImages).toHaveBeenCalledWith(db, 'org', ['poster-1']);
   });
 });
 

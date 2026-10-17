@@ -1,14 +1,16 @@
 <script lang="ts" module>
   import { SvelteMap } from 'svelte/reactivity';
 
-  import type { Slots } from '$lib/canvas/motion-preview';
+  import type { Slots, MotionPreview as Preview } from '$lib/canvas/motion-preview';
 
   const posters = new SvelteMap<string, string>();
+  const previews = new Map<string, Preview>();
+  const shooting = new Set<string>();
   let slots = $state<Slots>({ playing: null, capturing: null });
 </script>
 
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, untrack } from 'svelte';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import Play from '@lucide/svelte/icons/play';
   import Pause from '@lucide/svelte/icons/pause';
@@ -23,11 +25,15 @@
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { Background, FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
-  import { NodeMode, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
+  import { NodeMode, Paint, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
+  import { DRAWN_EVENT } from '$lib/motion/hyperframes/measure';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
+  import { posterDue, tiles } from '$lib/canvas/live-tiles.svelte';
+  import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
   import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
   import { coverFrame } from '$lib/motion/still';
-  import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn, type MotionPreview as Preview } from '$lib/canvas/motion-preview';
+  import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn } from '$lib/canvas/motion-preview';
 
   let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null, onenter = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null; onenter?: (() => void) | null } = $props();
 
@@ -40,8 +46,10 @@
 
   let root = $state<HTMLDivElement | null>(null);
   let player = $state<ReturnType<typeof MotionPreview> | null>(null);
-  let sight = $state(Sight.OutOfView);
-  let preview = $state<Preview | null>(null);
+  let sight = $state<Sight>(Sight.OutOfView);
+  let settledSight = $state<Sight>(Sight.OutOfView);
+  let fetched = $state<Preview | null>(null);
+  let previewRevision = $state(-1);
   let frame = $state(0);
   let playing = $state(false);
   let looping = $state(false);
@@ -49,8 +57,11 @@
 
   const size = $derived(FORMATS[node.format]);
   const posterKey = $derived(`${node.id}:${node.docHeadRevision}`);
-  const poster = $derived(posterUrl ?? posters.get(posterKey) ?? null);
-  const still = $derived(posterUrl || posters.has(posterKey) ? Still.Ready : Still.Missing);
+  const local = $derived(frameDocs.latest(node.id, node.docHeadRevision));
+  let lastLocal = $state.raw<Preview | null>(null);
+  const preview = $derived(local ?? (previewRevision === node.docHeadRevision ? fetched : null) ?? lastLocal ?? fetched);
+  const poster = $derived(posterCurrent(local) ? (posterUrl ?? posters.get(posterKey) ?? null) : null);
+  const still = $derived(posterCurrent(local) && (posterUrl || posters.has(posterKey)) ? Still.Ready : Still.Missing);
   const intent = $derived(intentOf(slots, node.id));
   const mode = $derived(previewMode(sight, intent, still));
   const capturing = $derived(mode === PreviewMode.Capture && slots.capturing === node.id);
@@ -59,8 +70,15 @@
   const layers = $derived(nodeLayers(nodeMode, paint));
   const chrome = $derived(frameChrome(node.kind));
   const previewing = $derived(nodeMode === NodeMode.Preview);
-  const liveUntilPoster = $derived(chrome.liveWhileMissing && still === Still.Missing && sight === Sight.InView);
-  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveUntilPoster));
+  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending));
+  const liveTile = $derived(liveHere && (!!local || node.docHeadRevision > 0) && (!previewing || tiles.live(node.id)));
+  const capturable = $derived(nodeMode !== NodeMode.Edit && !liveTile);
+  let ownDrawn = $state(false);
+  let decodedPoster = $state<string | null>(untrack(() => poster));
+  const shownPoster = $derived(posterCurrent(local) && decodedPoster === poster ? decodedPoster : null);
+  const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster));
+  const playerUp = $derived(mounted && !!preview);
+  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));
@@ -77,9 +95,25 @@
   });
 
   $effect(() => {
+    if (!canvasLod.moving) {
+      settledSight = sight;
+    }
+  });
+
+  $effect(() => {
     if (sight === Sight.OutOfView) {
       slots = stopIn(slots, node.id);
     }
+  });
+
+  $effect(() => {
+    const id = node.id;
+    if (settledSight === Sight.OutOfView || canvasLod.far) {
+      tiles.drop(id);
+      return;
+    }
+    tiles.want(id);
+    return () => tiles.drop(id);
   });
 
   $effect(() => {
@@ -96,7 +130,7 @@
   });
 
   $effect(() => {
-    if (previewing && mode === PreviewMode.Capture && captureFree(slots)) {
+    if (capturable && mode === PreviewMode.Capture && captureFree(slots)) {
       slots = claimCapture(slots, node.id);
     }
   });
@@ -106,13 +140,28 @@
       playing = false;
       return;
     }
-    const url = `${previewUrl}?revision=${node.docHeadRevision}`;
+    if (local) {
+      return;
+    }
+    const revision = node.docHeadRevision;
+    const key = `${node.id}:${revision}`;
+    const cached = previews.get(key);
+    if (cached) {
+      fetched = cached;
+      previewRevision = revision;
+      return;
+    }
+    const url = `${previewUrl}?revision=${revision}`;
     let stale = false;
     void fetch(url)
       .then((res) => (res.ok ? (res.json() as Promise<Preview>) : null))
       .then((next) => {
+        if (next) {
+          previews.set(key, next);
+        }
         if (!stale && next) {
-          preview = next;
+          fetched = next;
+          previewRevision = revision;
         }
       });
     return () => {
@@ -121,18 +170,95 @@
   });
 
   $effect(() => {
-    if (capturing && player && preview) {
-      void captureCover(player, preview, posterKey);
+    const key = posterKey;
+    const ask = { live: liveTile && previewing, drawn: ownDrawn, unsaved: frameDocs.unsaved(node.id, node.docHeadRevision), atHead: local ? local.version === node.docHeadRevision : previewRevision === node.docHeadRevision, hasPoster: !!posterUrl || posters.has(key), shooting: shooting.has(key) };
+    if (!player || !preview || !posterDue(ask)) {
+      return;
+    }
+    shooting.add(key);
+    const shooter = player;
+    const source = preview;
+    whenIdle(() => void captureCover(shooter, source, key, node.docHeadRevision).finally(() => shooting.delete(key)));
+  });
+
+  $effect(() => {
+    if (capturing && player && preview && previewRevision === node.docHeadRevision) {
+      void captureCover(player, preview, posterKey, node.docHeadRevision);
     }
   });
 
-  async function captureCover(shooter: NonNullable<typeof player>, source: Preview, key: string) {
+  $effect(() => {
+    if (!(mounted && preview)) {
+      ownDrawn = false;
+    }
+  });
+
+  $effect(() => {
+    if (local) {
+      lastLocal = local;
+    }
+  });
+
+  $effect(() => {
+    const source = preview;
+    if (!source) {
+      return;
+    }
+    untrack(() => {
+      if (!playing && intent !== Intent.Play) {
+        frame = coverFrame(source);
+      }
+    });
+  });
+
+  $effect(() => {
+    if (nodeMode === NodeMode.Leaving && painted) {
+      inlineStage.landed(node.id);
+    }
+  });
+
+  $effect(() => {
+    const el = root;
+    if (!el) {
+      return;
+    }
+    const drawn = () => (ownDrawn = true);
+    el.addEventListener(DRAWN_EVENT, drawn);
+    return () => el.removeEventListener(DRAWN_EVENT, drawn);
+  });
+
+  $effect(() => {
+    const next = poster;
+    if (!next || next === decodedPoster) {
+      return;
+    }
+    let stale = false;
+    void decoded(next).then(() => {
+      if (!stale) {
+        decodedPoster = next;
+      }
+    });
+    return () => {
+      stale = true;
+    };
+  });
+
+  async function decoded(src: string) {
+    const img = new Image();
+    img.src = src;
+    await img.decode().catch(() => undefined);
+  }
+
+  async function captureCover(shooter: NonNullable<typeof player>, source: Preview, key: string, revision: number) {
     const width = Math.min(POSTER_WIDTH, source.width);
     const shot = await shooter.still(coverFrame(source) / source.fps, width, chrome.poster).catch(() => '');
+    if (shot) {
+      await decoded(shot);
+    }
     posters.set(key, shot);
     slots = releaseCapture(slots, node.id);
     if (shot) {
-      void sendPoster(`${href}?/poster`, shot, { width: String(width), height: String(Math.round((width * source.height) / source.width)) }).catch(() => undefined);
+      void sendPoster(`${href}?/poster`, shot, { width: String(width), height: String(Math.round((width * source.height) / source.width)), revision: String(revision) }).catch(() => undefined);
     }
   }
 
@@ -196,8 +322,11 @@
 >
   <div class="stage" data-testid="motion-node-stage" data-frame-stage>
     {#if layers.own}
+      {#if shownPoster && !(playerUp && ownDrawn)}
+        <img class="poster" class:under={playerUp} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" />
+      {/if}
       {#if mounted && preview}
-        <MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} />
+        <div class="own" data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} /></div>
         {#if previewing && chrome.bar}
           <span class="clock" data-testid="motion-node-timecode">{previewClock(frame, preview.fps, preview.durationInFrames)}</span>
           <input
@@ -213,8 +342,7 @@
             onclick={isolate}
           />
         {/if}
-      {:else if poster}
-        <img class="poster" src={poster} alt="" draggable="false" data-testid="motion-node-poster" loading="lazy" decoding="async" />
+      {:else if shownPoster}
       {:else if !previewing}
         <div class="skeleton" data-testid="motion-node-skeleton"></div>
       {:else if !chrome.bar}
@@ -277,6 +405,21 @@
     color: #f0eee9;
   }
 
+  .own {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .poster.under {
+    position: absolute;
+    inset: 0;
+  }
+
   .host {
     position: absolute;
     inset: 0;
@@ -337,6 +480,7 @@
 
   .open {
     position: absolute;
+    z-index: 2;
     right: 6px;
     top: 6px;
     padding: 4px 8px;
