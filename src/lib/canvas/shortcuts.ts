@@ -55,6 +55,8 @@ export type CanvasCommandId =
   | 'select-all'
   | 'add'
   | 'fit'
+  | 'zoom-actual'
+  | 'zoom-selection'
   | 'zoom-in'
   | 'zoom-out'
   | 'nudge'
@@ -119,6 +121,8 @@ const ARROWS: Record<string, { dx: number; dy: number }> = {
 
 const ZOOM_IN_KEYS = ['+', '='];
 
+const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'> = { Digit0: 'zoom-actual', Digit1: 'fit', Digit2: 'zoom-selection' };
+
 /**
  * Da un evento al comando, o null. `null` non è «non so»: è «questo evento non è mio», e chi
  * ascolta deve lasciarlo passare intatto — dentro un campo di testo è l'unica risposta giusta.
@@ -171,6 +175,8 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
     return { id: 'nudge', dx: arrow.dx * step, dy: arrow.dy * step };
   }
 
+  const shiftZoom = e.shiftKey ? SHIFT_DIGIT_ZOOM[e.code] : undefined;
+  if (shiftZoom) return { id: shiftZoom };
   if (key === '0') return { id: 'fit' };
   if (ZOOM_IN_KEYS.includes(key)) return { id: 'zoom-in' };
   if (key === '-') return { id: 'zoom-out' };
@@ -224,7 +230,9 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
   { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },
-  { id: 'fit', keys: ['0'], label: 'Inquadra tutto' },
+  { id: 'fit', keys: ['0', '⇧1'], label: 'Inquadra tutto' },
+  { id: 'zoom-actual', keys: ['⇧0'], label: 'Zoom to 100%' },
+  { id: 'zoom-selection', keys: ['⇧2'], label: 'Zoom to selection' },
   { id: 'zoom-in', keys: ['+'], label: 'Ingrandisci' },
   { id: 'zoom-out', keys: ['-'], label: 'Rimpicciolisci' }
 ];
