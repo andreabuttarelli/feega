@@ -131,6 +131,14 @@ describe('la lettura non esce dall org', () => {
     expect(filtersOf(calls, 'select')).toMatchObject({ org_id: ORG, canvas_id: CANVAS });
   });
 
+  it('two nodes brought to front at once get one stable order: z, then id', async () => {
+    const { db } = fakeDb({ nodes: [{ ...nodeRow, id: 'b', z: 5 }, { ...nodeRow, id: 'a', z: 5 }, { ...nodeRow, id: 'c', z: 1 }] });
+
+    const nodes = await listNodes(db, { orgId: ORG, canvasId: CANVAS });
+
+    expect(nodes.map((n) => n.id)).toEqual(['c', 'a', 'b']);
+  });
+
   it('esclude i nodi cancellati', async () => {
     const { db, calls } = fakeDb({ nodes: [] });
 
