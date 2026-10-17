@@ -38,6 +38,7 @@
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
+  import { adoptCommitted, commitHub, rowsOf } from '$lib/canvas/commit-note';
   import { canvasHub, canvasPeersOf, keepCanvasMark, landedAt, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import { Portal } from 'bits-ui';
@@ -1064,6 +1065,7 @@
   provideFramePresence(frames.port);
   const cursorSession = crypto.randomUUID();
   const cursors = canvasHub({ sessionId: cursorSession, userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
+  const commits = commitHub(cursorSession);
   const PEER_SWEEP_MS = 1000;
   let cursorMarks = $state(new Map<string, HeldMark>());
   let presenceNow = $state(0);
@@ -1408,9 +1410,16 @@
       onPeers: (value) => { peers = value; cursors.port.crowd(value.length + 1); },
       onLink: (state) => { canvasLink.set(state); },
       frames: frames.line,
-      cursors: cursors.line
+      cursors: cursors.line,
+      commits: commits.line
+    });
+    const unheard = commits.listen((note) => {
+      const adopted = adoptCommitted(nodes, note.rows, saves.dirtyKeys, places.dirty);
+      nodes = adopted.tiles;
+      if (adopted.refetch) { void refresh(); }
     });
     return () => {
+      unheard();
       disconnect();
       canvasLink.set(null);
     };
@@ -1471,6 +1480,12 @@
     return body;
   }
 
+  function announceCommit(action: string, fields: Record<string, unknown>, answer: ActionAnswer) {
+    if (answer.type !== 'success') { return; }
+    const rows = rowsOf(action, fields, (answer.data ?? {}) as Record<string, unknown>);
+    if (rows) { commits.publish(rows); }
+  }
+
   async function send(
     action: string,
     fields: Record<string, string | number | File | string[]>
@@ -1489,7 +1504,9 @@
 
     const text = await res.text();
     try {
-      return deserialize(text) as ActionAnswer;
+      const answer = deserialize(text) as ActionAnswer;
+      announceCommit(action, fields, answer);
+      return answer;
     } catch {
       console.warn(`canvas action ${action}: unreadable ${res.status}`, text.slice(0, 500));
       return { type: 'error', status: res.status };

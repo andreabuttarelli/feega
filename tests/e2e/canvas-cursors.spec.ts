@@ -3,6 +3,7 @@ import doc from './fixtures/motion-doc.json' with { type: 'json' };
 
 const DESKTOP = { width: 1280, height: 860 };
 const CURSOR_LATENCY_MS = 1000;
+const COMMIT_LATENCY_MS = 600;
 const ELEMENT = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null, kind: 'element' };
 
 test.use({ viewport: DESKTOP, actionTimeout: 15_000 });
@@ -64,5 +65,27 @@ test.describe('canvas cursors across two tabs @real', () => {
     const landed = (await peerTile.boundingBox())!;
     const mine = (await tile.boundingBox())!;
     expect(Math.abs(landed.x - mine.x)).toBeLessThan(2);
+  });
+
+  test('a committed move reaches the other tab in well under a second', async ({ page, session, seedNode, admin }) => {
+    const node = await seedNode({ type: 'motion', x: 120, y: 160, data: ELEMENT });
+    await admin.from('nodes').update({ width: 120, height: 120 }).eq('id', node.id);
+    await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
+    const path = `/p/${session.projectId}/c/${session.canvasId}`;
+    const other = await page.context().newPage();
+    await gotoHydrated(page, path);
+    await gotoHydrated(other, path);
+    await page.waitForTimeout(1500);
+
+    const peerTile = other.locator(`.svelte-flow__node[data-id="${node.id}"]`);
+    const before = (await peerTile.boundingBox())!;
+    await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.keyboard.press('ControlOrMeta+a');
+    const started = Date.now();
+    await page.keyboard.press('Shift+ArrowRight');
+    await expect.poll(async () => (await peerTile.boundingBox())!.x - before.x, { timeout: 5000, intervals: [10] }).toBeGreaterThan(0);
+    const latency = Date.now() - started;
+    console.log(JSON.stringify({ committedMoveLatencyMs: latency }));
+    expect(latency).toBeLessThan(COMMIT_LATENCY_MS);
   });
 });
