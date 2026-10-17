@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { Background, MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
 import { setStill } from './still';
+import { COMPONENTS } from './components';
 import { DrawTool } from './draw-tool';
-import { drawClip, drawnElement, penClip } from './draw-create';
+import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, penClip } from './draw-create';
 import { parsePath, type Outline } from './shape/geometry';
 import type { OpResult } from './timeline';
 
@@ -16,6 +17,7 @@ const ok = (r: OpResult): MotionDoc => {
 const video = () => ({ ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 300 });
 const still = () => ok(setStill(video(), 0));
 const BOX = { x: 0.4, y: 0.3, width: 0.2, height: 0.1 };
+const TEXT_LEADING = COMPONENTS.Text.schema.parse({}).leading;
 
 describe('creating an element by drawing inside a frame', () => {
   it('a rectangle is a rect Shape clip on the drawn box', () => {
@@ -102,5 +104,51 @@ describe('drawing an element on the canvas, outside any frame', () => {
 
     expect(drawn.doc.width).toBeLessThanOrEqual(1920);
     expect(drawn.doc.height).toBeLessThanOrEqual(1080);
+  });
+});
+
+describe('a drawn text shows settled', () => {
+  it('its still sits at the end of the clip, where the entrance has finished', () => {
+    const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 60 } }, 't1');
+    if (!drawn.ok) {
+      throw new Error(drawn.error);
+    }
+    const clip = findClip(drawn.doc, 't1')!.clip;
+    expect(drawn.doc.still?.frame).toBe(clip.from + clip.durationInFrames - 1);
+  });
+
+  it('its letters are dark ink, readable on the light canvas, not the brand text colour meant for a dark video', () => {
+    const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 60 } }, 't1');
+    if (!drawn.ok) {
+      throw new Error(drawn.error);
+    }
+    expect(findClip(drawn.doc, 't1')!.clip.props.color).toBe(CANVAS_INK[CanvasTheme.Light]);
+  });
+
+  it('on a dark canvas its letters are light ink', () => {
+    const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 200, height: 60 }, theme: CanvasTheme.Dark }, 't1');
+    if (!drawn.ok) {
+      throw new Error(drawn.error);
+    }
+    expect(findClip(drawn.doc, 't1')!.clip.props.color).toBe(CANVAS_INK[CanvasTheme.Dark]);
+  });
+
+  it('its type fills the drawn box height instead of a body size meant for a full video', () => {
+    const drawn = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 300, height: 100 } }, 't1');
+    if (!drawn.ok) {
+      throw new Error(drawn.error);
+    }
+    const props = findClip(drawn.doc, 't1')!.clip.props as { size: number };
+    const unit = Math.min(drawn.doc.width, drawn.doc.height);
+    expect(props.size * unit * TEXT_LEADING).toBeCloseTo(drawn.doc.height, 0);
+  });
+});
+
+describe('a text drawn inside a frame', () => {
+  it('its type fits the drawn box height', () => {
+    const doc = video();
+    const made = ok(drawClip(doc, DrawTool.Text, BOX, 0, 't1'));
+    const props = findClip(made, 't1')!.clip.props as { size: number };
+    expect(props.size * Math.min(doc.width, doc.height) * TEXT_LEADING).toBeCloseTo(BOX.height * doc.height, 0);
   });
 });

@@ -51,7 +51,7 @@ export function discountRouteFor(input: {
     return null;
   }
   const params = withDefaults(input.candidate, input.params);
-  const usd = taskUsdFor(input.candidate.pricing, wireInputs(input.candidate.fields, { prompt: '', params, imageUrls: [], lastFrameUrl: null }, {}));
+  const usd = taskUsdFor(input.candidate.pricing, wireInputs(input.candidate, { prompt: '', params, imageUrls: [], lastFrameUrl: null }, {}));
   if (usd === null) {
     return null;
   }

@@ -4,10 +4,13 @@ import { savePoster } from './poster';
 
 const NODE = '44444444-4444-4444-4444-444444444444';
 
-function save(file: File) {
+function save(file: File, revision?: string) {
   const fake = fakeDb({ nodes: [{ id: NODE, org_id: 'org', type: 'motion', data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null }, version: 1 }] }, { filter: true, newId: () => '99999999-9999-4999-8999-999999999999' });
   const form = new FormData();
   form.set('file', file);
+  if (revision) {
+    form.set('revision', revision);
+  }
   return { fake, result: savePoster(fake.db, { orgId: 'org', projectId: 'project', nodeId: NODE, actor: { kind: 'user', id: 'user' }, form }) };
 }
 
@@ -19,6 +22,14 @@ describe('a poster upload', () => {
     const upload = fake.calls.find((c) => c.op === 'upload');
     expect(String(upload?.filters[0]?.[1])).toMatch(/\.png$/);
     expect(fake.calls.find((c) => c.table === 'assets' && c.op === 'insert')?.payload).toMatchObject({ mime_type: 'image/png' });
+  });
+
+  it('records which revision it pictures, so the canvas can tell a stale poster from a fresh one', async () => {
+    const { fake, result } = save(new File([new Uint8Array([1, 2, 3])], 'poster.png', { type: 'image/png' }), '3');
+
+    await result;
+    const patched = fake.calls.filter((c) => c.table === 'nodes' && c.op === 'update').map((c) => (c.payload as { data: Record<string, unknown> }).data);
+    expect(patched.at(-1)).toMatchObject({ posterRevision: 3 });
   });
 
   it('refuses anything that is not a jpeg or png picture', async () => {

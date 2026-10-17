@@ -7,6 +7,7 @@ import {
   promptTooLong,
   runStateOf,
   promptRequired,
+  snapAspectRatio,
   snapResolution,
   startRun,
   unlockRun,
@@ -137,6 +138,20 @@ describe('la risoluzione video dopo un cambio di modello', () => {
 
   it('un modello senza selettore non ha nessuna risoluzione da imporre', () => {
     expect(snapResolution(choice(), '480p')).toBeUndefined();
+  });
+});
+
+describe('the aspect ratio after a model change', () => {
+  it('keeps the saved ratio when the new model offers it', () => {
+    expect(snapAspectRatio(choice({ aspectRatios: ['1:1', '21:9'] }), '21:9')).toBe('21:9');
+  });
+
+  it('falls to the model default when the new model does not take the saved ratio', () => {
+    expect(snapAspectRatio(choice({ aspectRatios: ['16:9', '9:16'] }), '21:9')).toBe('16:9');
+  });
+
+  it('a model that declares no ratio imposes none', () => {
+    expect(snapAspectRatio(choice({ aspectRatios: [] }), '1:1')).toBeUndefined();
   });
 });
 

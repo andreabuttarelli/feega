@@ -28,6 +28,7 @@ export type PreviewDriver = {
   load: (html: string) => void;
   update: (html: string) => void;
   loaded: (html: string) => Promise<void>;
+  fresh: (html: string) => Promise<void>;
   seek: (seconds: number) => void;
   shoot: (time: number, request: ShotRequest, waitMs?: number) => Promise<CaptureReply>;
   exclusive: <T>(work: () => Promise<T>) => Promise<T>;
@@ -115,9 +116,20 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
     });
   }
 
-  function seek(seconds: number) {
+  function fresh(html: string): Promise<void> {
+    return html === current && !reload ? Promise.resolve() : loaded(html);
+  }
+
+  function place(seconds: number) {
     port.seek(seconds);
     port.post(exactSeek(seconds));
+  }
+
+  function seek(seconds: number) {
+    place(seconds);
+    if (wanted === Playback.Playing) {
+      apply();
+    }
   }
 
   function shoot(time: number, request: ShotRequest, waitMs = timeoutMs): Promise<CaptureReply> {
@@ -135,7 +147,7 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
         settle();
       };
       const send = () => {
-        seek(time);
+        place(time);
         if (!port.post(message)) {
           done(() => reject(new Error('preview not ready')));
         }
@@ -165,5 +177,5 @@ export function previewDriver(port: PlayerPort, newId: () => string = () => cryp
     return run;
   }
 
-  return { load, update, loaded, seek, shoot, exclusive, whenLive: () => firstLive, ready, playback };
+  return { load, update, loaded, fresh, seek, shoot, exclusive, whenLive: () => firstLive, ready, playback };
 }

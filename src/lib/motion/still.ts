@@ -47,3 +47,9 @@ export function animateStill(doc: MotionDoc, seconds = ANIMATE_SECONDS): OpResul
   const sized = setCanvas(stretched, { durationInFrames });
   return sized.ok ? setStill(sized.doc, null) : sized;
 }
+
+export function settledStill(doc: MotionDoc): MotionDoc {
+  const ends = doc.tracks.flatMap((t) => t.clips.map((c) => c.from + c.durationInFrames - 1));
+  const frame = Math.max(0, Math.min(doc.durationInFrames - 1, ...(ends.length ? ends : [0])));
+  return doc.still ? { ...doc, still: { frame } } : doc;
+}

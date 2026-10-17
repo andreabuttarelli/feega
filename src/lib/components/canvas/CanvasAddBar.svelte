@@ -5,6 +5,7 @@
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
+  import Hash from '@lucide/svelte/icons/hash';
   import { BAR_SLOTS, BarContext, BarSlot, barHidden, barKeys, barLift, barShift } from '$lib/canvas/bottom-bar';
   import { KEY_REGION_ATTR } from '$lib/canvas/key-region.svelte';
   import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
@@ -84,7 +85,7 @@
     input.value = '';
   }
 
-  const TOOL_COMMAND: Record<DrawTool, Command> = {
+  const TOOL_COMMAND: Record<Exclude<DrawTool, DrawTool.Frame>, Command> = {
     [DrawTool.Select]: Command.ToolSelect,
     [DrawTool.Text]: Command.ToolText,
     [DrawTool.Rectangle]: Command.ToolRectangle,
@@ -92,10 +93,19 @@
     [DrawTool.Pen]: Command.ToolPen
   };
 
-  const DRAW_TOOLS = Object.values(DrawTool).map((tool) => {
-    const tip = tipText(TOOL_COMMAND[tool]);
-    return { tool, name: tip.name, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[TOOL_COMMAND[tool]].icon };
+  const SHAPE_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
+    const tip = tipText(command);
+    return { tool, name: tip.name, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[command].icon };
   });
+  const FRAME_TOOL = { tool: DrawTool.Frame, name: 'Frame', label: 'Frame', icon: Hash };
+  const DRAW_TOOLS = $derived(context === BarContext.Canvas ? [...SHAPE_TOOLS, FRAME_TOOL] : SHAPE_TOOLS);
+
+  let drawOpen = $state(false);
+
+  function pickTool(tool: DrawTool) {
+    drawOpen = frameBar.tool === tool && !drawOpen;
+    frameBar.tool = tool;
+  }
 
   const SLOT: Record<BarSlot, Snippet> = {
     [BarSlot.Upload]: uploadSlot,
@@ -189,10 +199,10 @@
 {/snippet}
 
 {#snippet drawSlot()}
-  <span class="draw" role="toolbar" aria-label="Draw" data-testid="draw-tools">
+  <span class="draw" class:open={drawOpen} role="toolbar" aria-label="Draw" data-testid="draw-tools">
     {#each DRAW_TOOLS as t (t.tool)}
       <span class="tool">
-        <button type="button" class="pick" class:on={frameBar.tool === t.tool} aria-pressed={frameBar.tool === t.tool} aria-label={t.label} title={t.label} data-tool={t.tool} onclick={() => (frameBar.tool = t.tool)}>
+        <button type="button" class="pick" class:on={frameBar.tool === t.tool} aria-pressed={frameBar.tool === t.tool} aria-label={t.label} title={t.label} data-tool={t.tool} onclick={() => pickTool(t.tool)}>
           <t.icon size={17} strokeWidth={1.7} />
         </button>
         <span class="add-tip" role="tooltip">{t.label}</span>
@@ -374,6 +384,18 @@
   }
 
   @media (max-width: 767px) {
+    .draw:not(.open) .tool:not(:has(.pick.on)) {
+      display: none;
+    }
+    .group:has(.draw.open) > :not(.draw),
+    .add-bar:has(.draw.open) .zoom {
+      display: none;
+    }
+    .draw.open {
+      border-right: 0;
+      margin-right: 0;
+      padding-right: 0;
+    }
     .add-bar {
       left: 50%;
       bottom: calc(var(--mobile-bar-inset) + env(safe-area-inset-bottom, 0px) + var(--lift, 0px));

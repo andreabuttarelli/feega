@@ -1,6 +1,7 @@
 <script lang="ts">
   import { afterNavigate } from '$app/navigation';
-  import { page } from '$app/state';
+  import { navigating, page } from '$app/state';
+  import WorkbenchPageShimmer from '$lib/components/WorkbenchPageShimmer.svelte';
   import Menu from '@lucide/svelte/icons/menu';
   import * as Sheet from '$lib/components/ui/sheet/index.js';
   import type { Snippet } from 'svelte';
@@ -12,6 +13,23 @@
   let drawerOpen = $state(false);
 
   const projectId = $derived(data.projects[0]?.id ?? null);
+
+  const SKELETON_AFTER_MS = 150;
+  const DASHBOARD_ROUTE = '/app';
+
+  let slowNav = $state(false);
+
+  $effect(() => {
+    if (!navigating.to?.route.id?.startsWith(DASHBOARD_ROUTE)) {
+      slowNav = false;
+      return;
+    }
+    const timer = setTimeout(() => (slowNav = true), SKELETON_AFTER_MS);
+    return () => {
+      clearTimeout(timer);
+      slowNav = false;
+    };
+  });
 
   afterNavigate(() => {
     drawerOpen = false;
@@ -48,8 +66,12 @@
     <a class="wordmark" href="/app">feega</a>
   </header>
 
-  <main class="app-main">
-    {@render children()}
+  <main class="app-main" aria-busy={slowNav}>
+    {#if slowNav}
+      <div data-testid="app-content-skeleton"><WorkbenchPageShimmer variant="page" /></div>
+    {:else}
+      {@render children()}
+    {/if}
   </main>
 </div>
 

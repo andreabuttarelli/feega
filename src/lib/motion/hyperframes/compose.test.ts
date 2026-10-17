@@ -101,6 +101,14 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(html).toContain('color:#123456');
   });
 
+  it('a fixed-width text wraps inside its box; an auto-width one keeps each line whole', () => {
+    const fixed = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'Body' } }, 'tx'));
+    const auto = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'Body', sizing: 'auto' } }, 'tx'));
+
+    expect(compose(fixed)).toContain('white-space:pre-wrap');
+    expect(compose(auto)).toContain('white-space:pre;');
+  });
+
   it('text with a stroke outlines its glyphs; text without one composes as before', () => {
     const strokes = [{ paint: { type: 'solid', color: '#ff0000' }, width: 0.002, align: 'outside' }];
     const titled = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Hi', strokes } }, 'tt'));

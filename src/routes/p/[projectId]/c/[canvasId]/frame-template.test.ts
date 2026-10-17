@@ -56,6 +56,38 @@ describe('actions.frame_template', () => {
     expect(chromium).not.toHaveBeenCalled();
   });
 
+  it('writes the node already pointing at its first revision, and reads nothing it already knows', async () => {
+    const fake = fakeDb({ canvases: [{ id: CANVAS, project_id: 'project-1', name: 'Board', viewport: null, org_id: ORG }], nodes: [], motion_templates: [], motion_revisions: [], canvas_events: [] });
+
+    const out = (await actions.frame_template(event({ template: POSTER, format: MotionFormat.Portrait, x: '0', y: '0' }, fake.db))) as { node: { id: string; data: Record<string, unknown> } };
+
+    const insert = fake.calls.find((c) => c.table === 'nodes' && c.op === 'insert');
+    expect((insert?.payload as { data: Record<string, unknown> }).data.docHeadRevision).toBe(1);
+    expect(fake.calls.filter((c) => c.table === 'nodes' && c.op !== 'insert')).toEqual([]);
+    expect(fake.calls.filter((c) => c.table === 'canvases' || c.table === 'motion_templates')).toEqual([]);
+    expect(fake.calls.filter((c) => c.table === 'motion_revisions' && c.op === 'insert')).toHaveLength(1);
+    expect(out.node.data.docHeadRevision).toBe(1);
+  });
+
+  it('keeps the id the tab placed the frame under, so the realtime echo is the same tile', async () => {
+    const fake = fakeDb({ canvases: [{ id: CANVAS, project_id: 'project-1', name: 'Board', viewport: null, org_id: ORG }], nodes: [], motion_templates: [], motion_revisions: [], canvas_events: [] });
+    const id = crypto.randomUUID();
+
+    const out = (await actions.frame_template(event({ template: POSTER, format: MotionFormat.Portrait, x: '0', y: '0', node_id: id }, fake.db))) as { node: { id: string } };
+
+    expect((fake.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload as { id: string }).id).toBe(id);
+    expect(out.node.id).toBe(id);
+  });
+
+  it('refuses an id that is not a uuid', async () => {
+    const fake = fakeDb({ canvases: [], nodes: [], motion_templates: [], motion_revisions: [], canvas_events: [] });
+
+    const out = (await actions.frame_template(event({ template: POSTER, format: MotionFormat.Portrait, x: '0', y: '0', node_id: 'not-an-id' }, fake.db))) as { status: number };
+
+    expect(out.status).toBe(400);
+    expect(fake.calls.filter((c) => c.op === 'insert')).toEqual([]);
+  });
+
   it('says where its time went', async () => {
     const fake = fakeDb({ canvases: [{ id: CANVAS, project_id: 'project-1', name: 'Board', viewport: null, org_id: ORG }], nodes: [], motion_templates: [], motion_revisions: [], canvas_events: [] });
     const setHeaders = vi.fn();

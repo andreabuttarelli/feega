@@ -98,6 +98,28 @@ export function selectOutputs(sourceType: string | null | undefined, custom: rea
 
 type RowFor = { products: ProductRow; social_account_feed: PostRow };
 
+const SOURCE_MEDIA_PORTS = [
+  { port: 'images', label: 'Images' },
+  { port: 'videos', label: 'Videos' }
+] as const;
+
+export function sourceOutputs(sourceType: SyncedSourceType): SelectOutput[] {
+  const outputs = SOURCE_MEDIA_PORTS.flatMap(({ port, label }) => {
+    const field = DEFAULT_FIELDS[sourceType][port];
+    return field ? [{ handle: portHandle(port), label, port, field, custom: null, incompatible: false }] : [];
+  });
+  return outputs.length > 1 ? outputs : [];
+}
+
+export function sourceOutputValues<T extends SyncedSourceType>(sourceType: T, rows: readonly RowFor[T][]): Record<string, OutputValue> {
+  const values: Record<string, OutputValue> = {};
+  for (const output of sourceOutputs(sourceType)) {
+    const field = fieldOf(sourceType, output.field)!;
+    values[output.handle] = { port: output.port, text: null, mediaUrls: rows.flatMap((row) => field.extract(row).mediaUrls) };
+  }
+  return values;
+}
+
 export function outputValues<T extends SyncedSourceType>(
   sourceType: T,
   row: RowFor[T],

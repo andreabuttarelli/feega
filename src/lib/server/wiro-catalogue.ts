@@ -37,6 +37,7 @@ type WiroParam = {
   id?: string;
   type?: string;
   required?: boolean;
+  value?: unknown;
   options?: Array<{ value?: unknown }> | null;
 };
 
@@ -50,7 +51,41 @@ export type WiroTool = {
   time?: string | number | null;
 };
 
-export type WiroWireSpec = { owner: string; project: string; fields: WireFields };
+export type WiroWireSpec = {
+  owner: string;
+  project: string;
+  fields: WireFields;
+  fixed?: Record<string, string>;
+  requiresImage?: true;
+  unrunnable?: string;
+};
+
+export const WIRO_UNRUNNABLE = {
+  requiredWithoutDefault: 'required_field_without_default',
+  uncensoredNeedsImage: 'uncensored_requires_image'
+} as const;
+
+function defaultOf(param: WiroParam): string {
+  const declared = param.value === undefined || param.value === null ? '' : String(param.value);
+  return declared || (optionValues(param)[0] ?? '');
+}
+
+const fillable = (param: WiroParam): boolean => Boolean(param.required) && !isFile(param) && param.id !== PROMPT_FIELD;
+
+function fixedOf(params: WiroParam[]): Record<string, string> {
+  return Object.fromEntries(params.filter((p) => fillable(p) && defaultOf(p)).map((p) => [p.id!, defaultOf(p)]));
+}
+
+function requiresImage(params: WiroParam[]): boolean {
+  return params.some((p) => p.required && isFile(p) && !NON_IMAGE_FILE.test(p.id!));
+}
+
+function unrunnableOf(params: WiroParam[], uncensored: boolean): string | undefined {
+  if (params.some((p) => fillable(p) && !defaultOf(p))) {
+    return WIRO_UNRUNNABLE.requiredWithoutDefault;
+  }
+  return uncensored && requiresImage(params) ? WIRO_UNRUNNABLE.uncensoredNeedsImage : undefined;
+}
 
 function paramsOf(tool: WiroTool): WiroParam[] {
   return (tool.parameters ?? []).flatMap((group) => group.items ?? []).filter((p) => typeof p.id === 'string');
@@ -153,6 +188,9 @@ export function wiroModelRow(tool: WiroTool, syncedAt: string): (AiModelRow & { 
 
   const resolutionParam = params.find((p) => p.id === wiring.fields.resolution);
   const label = tool.title?.trim() || `${tool.cleanslugowner}/${tool.cleanslugproject}`;
+  const uncensored = UNCENSORED.test(`${label} ${tool.cleanslugproject}`);
+  const fixed = fixedOf(params);
+  const unrunnable = unrunnableOf(params, uncensored);
   return {
     id: `${WIRO_ID_PREFIX}${tool.cleanslugowner}/${tool.cleanslugproject}`,
     catalogue,
@@ -169,8 +207,15 @@ export function wiroModelRow(tool: WiroTool, syncedAt: string): (AiModelRow & { 
     expires_at: null,
     context_length: null,
     intelligence_index: null,
-    uncensored: UNCENSORED.test(`${label} ${tool.cleanslugproject}`),
-    wire_spec: { owner: tool.cleanslugowner, project: tool.cleanslugproject, fields: wiring.fields }
+    uncensored,
+    wire_spec: {
+      owner: tool.cleanslugowner,
+      project: tool.cleanslugproject,
+      fields: wiring.fields,
+      ...(Object.keys(fixed).length ? { fixed } : {}),
+      ...(requiresImage(params) ? { requiresImage: true as const } : {}),
+      ...(unrunnable ? { unrunnable } : {})
+    }
   };
 }
 

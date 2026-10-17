@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Background } from '$lib/motion/doc';
   import { onMount, type Snippet } from 'svelte';
   import { FPS } from '$lib/motion/design';
   import { CAPTURE_REPLY, FrameFormat, type CaptureReply, type ClipError } from '$lib/motion/hyperframes/capture';
@@ -38,8 +39,9 @@
     vars = null,
     redraws = $bindable(0),
     ontap = null,
+    background = Background.Brand,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; children?: Snippet } = $props();
 
   let pointer = $state<InputValues>({});
 
@@ -60,6 +62,8 @@
 
   let host = $state<HTMLDivElement | null>(null);
   let shown = $state<HTMLIFrameElement | null>(null);
+  const PLAYER_BACKDROP: Record<Background, string> = { [Background.Brand]: '', [Background.Transparent]: 'transparent' };
+
   let player: Player | null = null;
   let reported = -1;
   let ready = false;
@@ -104,6 +108,7 @@
       el.setAttribute('disable-click-to-play', '');
       el.style.width = '100%';
       el.style.height = '100%';
+      el.style.background = PLAYER_BACKDROP[background];
       el.muted = muted;
       el.loop = loop;
       el.addEventListener('ready', () => {
@@ -219,6 +224,7 @@
     const request = { format, width: captureWidth, height: Math.round((captureWidth * height) / width), quality: CAPTURE_QUALITY };
     return driver.exclusive(async () => {
       await driver.whenLive();
+      await driver.fresh(html);
       try {
         return (await shoot(time, request)).url ?? '';
       } finally {
@@ -314,7 +320,7 @@
 
 <svelte:window onmessage={redrawn} />
 
-<div class="stage" style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview">
+<div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview">
   <div class="host" bind:this={host}></div>
   {@render children?.()}
   {#if live}
@@ -339,6 +345,10 @@
     flex-shrink: 0;
     background: #000;
     outline: 1px solid var(--ui-line);
+  }
+
+  .stage[data-backdrop='transparent'] {
+    background: transparent;
   }
 
   .host {
