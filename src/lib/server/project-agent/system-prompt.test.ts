@@ -42,6 +42,14 @@ describe('il prompt dichiara lo scope, non un brand obbligatorio', () => {
     expect(prompt).not.toContain('replaces the whole node data');
   });
 
+  it('a social post is an editable still frame, not a generated picture with baked-in text', () => {
+    const prompt = projectAgentPrompt({ project, canvases, brand: null });
+
+    expect(prompt).toContain('A social post, story or poster is an editable still frame');
+    expect(prompt).toContain('create_motion_video');
+    expect(prompt).toContain('one call per post');
+  });
+
   it('non inventa un bisogno di brand per lavorare sul progetto', () => {
     const prompt = projectAgentPrompt({ project, canvases, brand: null });
 

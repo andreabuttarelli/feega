@@ -93,7 +93,7 @@
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import { FrameKind, frameNodeSize, frameResize, motionEditorPath, type FrameResize, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
-  import { layoutOf, rotateGroup, type Placed } from '$lib/canvas/node-layout';
+  import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { fitToNode } from '$lib/motion/custom-size';
   import { barContextOf } from '$lib/canvas/bottom-bar';
@@ -348,9 +348,15 @@
   }
 
   function rotateGroupBy(id: string, degrees: number) {
+    if (turnGroup({ id, degrees })) {
+      undoStack.push({ source: 'turn', turn: { id, degrees } });
+    }
+  }
+
+  function turnGroup({ id, degrees }: Turn): boolean {
     const group = nodes.find((n) => n.id === id);
     if (!group) {
-      return;
+      return false;
     }
     const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
     const turned = new Map(rotateGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), degrees).map((t) => [t.id, t]));
@@ -359,6 +365,7 @@
       return t ? { ...n, x: t.x, y: t.y, data: { ...n.data, rotation: t.rotation } } : n;
     });
     void post('rotateGroup', { id, degrees: String(degrees) });
+    return true;
   }
 
   function groupElements(ids: string[]) {
@@ -1010,6 +1017,8 @@
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       rotation: layoutOf(n.data).rotation,
       rotatable: motionOf(n)?.kind === FrameKind.Group,
+      behind: chrome.behind,
+      members: chrome.behind ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
@@ -1143,7 +1152,7 @@
    * cronologia, non due stack separati: creare un nodo dopo averne spostato un altro e poi
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture };
+  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | { source: 'turn'; turn: Turn };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -2132,6 +2141,17 @@
   }
 
   async function resize(id: string, width: number, height: number) {
+    const group = nodes.find((n) => n.id === id);
+    if (group && motionOf(group)?.kind === FrameKind.Group) {
+      const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
+      const scaled = new Map(scaleGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), { w: width, h: height }).map((t) => [t.id, t]));
+      nodes = nodes.map((n) => {
+        const t = scaled.get(n.id);
+        return t ? { ...n, x: t.x, y: t.y, w: t.w, h: t.h, userHeight: t.h } : n;
+      });
+      await post('scaleGroup', { id, width: String(width), height: String(height) });
+      return;
+    }
     const plan = framePlan(id, width, height);
     await storeSize(id, plan?.w ?? width, plan?.h ?? height);
     if (plan?.picture) {
@@ -2938,6 +2958,11 @@
   async function undo() {
     const entry = undoStack.popUndo();
     if (!entry) { return; }
+    if (entry.source === 'turn') {
+      const back = undoTurn(entry.turn);
+      if (turnGroup(back)) { undoStack.pushRedo({ source: 'turn', turn: back }); }
+      return;
+    }
     if (entry.source === 'move') {
       await applyMoveUndo(entry.gesture, (redo) => undoStack.pushRedo({ source: 'move', gesture: redo }));
       return;
@@ -2948,6 +2973,11 @@
   async function redo() {
     const entry = undoStack.popRedo();
     if (!entry) { return; }
+    if (entry.source === 'turn') {
+      const back = undoTurn(entry.turn);
+      if (turnGroup(back)) { undoStack.pushUndo({ source: 'turn', turn: back }); }
+      return;
+    }
     if (entry.source === 'move') {
       await applyMoveUndo(entry.gesture, (redo) => undoStack.pushUndo({ source: 'move', gesture: redo }));
       return;
