@@ -30,20 +30,37 @@ function toOrg(row: Pick<OrgRow, 'id' | 'name' | 'slug'>): Org {
   return { id: row.id, name: row.name, slug: row.slug };
 }
 
+type MembershipRow = {
+  role: string;
+  created_at: string;
+  orgs: Pick<OrgRow, 'id' | 'name' | 'slug'>;
+  profiles: { active_org_id: string | null } | null;
+};
+
+function activeFirst(rows: MembershipRow[]): MembershipRow[] {
+  const isActive = (row: MembershipRow) => row.orgs.id === row.profiles?.active_org_id;
+  return [...rows].sort((a, b) => Number(isActive(b)) - Number(isActive(a)) || a.created_at.localeCompare(b.created_at));
+}
+
 export async function listMemberships(db: Db, userId: string): Promise<Membership[]> {
-  const { data, error } = await db
-    .from('orgs_members')
-    .select(`role, orgs!inner(${ORG_COLUMNS})`)
-    .eq('user_id', userId);
+  const { data, error } = await db.from('orgs_members').select('role, created_at, orgs!inner(id, name, slug), profiles!inner(active_org_id)').eq('user_id', userId);
 
   if (error) {
     throw error;
   }
 
-  return (data ?? []).map((row) => ({
-    org: toOrg(row.orgs as Pick<OrgRow, 'id' | 'name' | 'slug'>),
+  return activeFirst((data ?? []) as unknown as MembershipRow[]).map((row) => ({
+    org: toOrg(row.orgs),
     role: row.role as OrgRole
   }));
+}
+
+export async function setActiveOrg(db: Db, input: { userId: string; orgId: string }): Promise<void> {
+  const { error } = await db.from('profiles').update({ active_org_id: input.orgId }).eq('id', input.userId);
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function findOrgBySlug(

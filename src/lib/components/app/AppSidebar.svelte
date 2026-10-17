@@ -66,7 +66,7 @@
   );
 
   async function switchWorkspace(orgId: string) {
-    chooseWorkspace(orgId);
+    await chooseWorkspace(orgId);
     await goto('/app', { invalidateAll: true });
   }
 </script>

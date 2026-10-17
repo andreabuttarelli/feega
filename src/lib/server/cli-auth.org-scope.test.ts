@@ -11,8 +11,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const ensureOrgForUser = vi.fn();
 const gateOrgCredits = vi.fn();
+const listMemberships = vi.fn();
 
 vi.mock('$lib/server/org', () => ({ ensureOrgForUser: (...a: unknown[]) => ensureOrgForUser(...a) }));
+vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: (...a: unknown[]) => listMemberships(...a) }));
 vi.mock('./credits', () => ({
   gateOrgCredits: (...a: unknown[]) => gateOrgCredits(...a),
   CreditsExhaustedError: class CreditsExhaustedError extends Error {}
@@ -50,9 +52,19 @@ beforeEach(() => {
   vi.clearAllMocks();
   ensureOrgForUser.mockResolvedValue('org-1');
   gateOrgCredits.mockResolvedValue(undefined);
+  listMemberships.mockResolvedValue([]);
 });
 
 describe('orgScopeFor', () => {
+  it("un JWT lavora nell'org attiva dell'utente, non nella sua più vecchia", async () => {
+    listMemberships.mockResolvedValue([{ org: { id: 'org-active', name: 'Active', slug: 'a' }, role: 'member' }]);
+
+    const { scope } = await orgScopeFor(caller());
+
+    expect(scope?.orgId).toBe('org-active');
+    expect(ensureOrgForUser).not.toHaveBeenCalled();
+  });
+
   it('nomina chi paga, perché il chiamante non l ha scelto', async () => {
     const { scope } = await orgScopeFor(caller());
 
