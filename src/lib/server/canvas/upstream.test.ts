@@ -1174,3 +1174,189 @@ describe('upstreamInputsFor — a studio batch node hands on its approved photos
     expect(out.referenceImageUrls).toEqual([]);
   });
 });
+
+describe('upstreamInputsFor — a feed or catalogue wired straight into an image node', () => {
+  type Slide = { type: 'image' | 'video'; url: string; thumbnailUrl?: string; thumbnailPath?: string };
+
+  const feedPost = (id: string, postedAt: string, items: Slide[]) => ({
+    id,
+    org_id: ORG,
+    node_id: FEED_NODE,
+    project_id: 'p1',
+    platform: 'instagram',
+    external_id: id,
+    handle: 'acme',
+    caption: null,
+    media: { items },
+    metrics: {},
+    permalink: null,
+    posted_at: postedAt,
+    fetched_at: 'now'
+  });
+
+  const archivedPhoto = (id: string): Slide => ({
+    type: 'image',
+    url: `https://scontent.cdninstagram.com/${id}.jpg?oe=expired`,
+    thumbnailUrl: `https://scontent.cdninstagram.com/${id}_t.jpg`,
+    thumbnailPath: `u1/media/${id}.jpg`
+  });
+
+  const feedIntoImage = (posts: ReturnType<typeof feedPost>[]) =>
+    fakeDb({
+      nodes: [
+        nodeRow(FEED_NODE, 'social_account_feed', { platform: 'instagram', handle: 'acme' }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: 'use these photos', model: 'qwen3-pro' })
+      ],
+      nodes_connections: [
+        { id: 'e-feed-image', canvas_id: CANVAS, source_node_id: FEED_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }
+      ],
+      social_posts: posts,
+      assets: []
+    });
+
+  it('feeds the archived post photos as signed references, newest first, capped to the model', async () => {
+    const { db } = feedIntoImage([
+      feedPost('p4', '2026-10-04', [archivedPhoto('p4')]),
+      feedPost('p3', '2026-10-03', [archivedPhoto('p3')]),
+      feedPost('p2', '2026-10-02', [archivedPhoto('p2')]),
+      feedPost('p1', '2026-10-01', [archivedPhoto('p1')])
+    ]);
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.referenceImageUrls).toEqual([
+      'https://signed.example/canvas-assets/u1/media/p4.jpg',
+      'https://signed.example/canvas-assets/u1/media/p3.jpg',
+      'https://signed.example/canvas-assets/u1/media/p2.jpg'
+    ]);
+  });
+
+  it('passes only stills: a video post gives its cover, a video without one gives nothing', async () => {
+    modalitiesOf.mockResolvedValue({ input: ['text', 'image'], output: ['image'], synced_at: 'now', uncensored: false });
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(FEED_NODE, 'social_account_feed', { platform: 'instagram', handle: 'acme' }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: 'use these photos', model: 'gpt-image-2' })
+      ],
+      nodes_connections: [
+        { id: 'e-feed-image', canvas_id: CANVAS, source_node_id: FEED_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }
+      ],
+      social_posts: [
+        feedPost('v2', '2026-10-04', [{ type: 'video', url: 'https://cdn.example/v2.mp4' }]),
+        feedPost('v1', '2026-10-03', [{ type: 'video', url: 'https://cdn.example/v1.mp4', thumbnailUrl: 'https://cdn.example/v1_cover.jpg' }]),
+        feedPost('p2', '2026-10-02', [{ type: 'image', url: 'https://cdn.example/p2.jpg' }]),
+        feedPost('p1', '2026-10-01', [{ type: 'image', url: 'https://cdn.example/p1.jpg' }])
+      ],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'gpt-image-2', medium: 'image' });
+
+    expect(out.referenceImageUrls).toEqual(['https://cdn.example/v1_cover.jpg', 'https://cdn.example/p2.jpg', 'https://cdn.example/p1.jpg']);
+    expect(out.referenceVideoUrls).toEqual([]);
+  });
+
+  it('feeds the product photos of a catalogue', async () => {
+    const { db } = fakeDb({
+      nodes: [
+        nodeRow(PRODUCTS_NODE, 'products', { type: 'shopify', url: 'https://x.myshopify.com' }),
+        nodeRow(IMAGE_NODE, 'image', { prompt: 'use these products', model: 'qwen3-pro' })
+      ],
+      nodes_connections: [
+        { id: 'e-products-image', canvas_id: CANVAS, source_node_id: PRODUCTS_NODE, target_node_id: IMAGE_NODE, source_handle: null, target_handle: null }
+      ],
+      products: [
+        { id: 'pr1', org_id: ORG, node_id: PRODUCTS_NODE, project_id: 'p1', platform: 'shopify', external_id: '1', handle: 'a', title: 'Sedia', description: 'Rossa', price: 10, currency: 'EUR', url: null, images: [{ url: 'https://cdn.shopify.com/sedia.png' }], available: true, synced_at: 'now', created_at: 'now' },
+        { id: 'pr2', org_id: ORG, node_id: PRODUCTS_NODE, project_id: 'p1', platform: 'shopify', external_id: '2', handle: 'b', title: 'Tavolo', description: 'Blu', price: 20, currency: 'EUR', url: null, images: [{ url: 'https://cdn.shopify.com/tavolo.png' }], available: true, synced_at: 'now', created_at: 'now' }
+      ],
+      assets: []
+    });
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: IMAGE_NODE, model: 'qwen3-pro', medium: 'image' });
+
+    expect(out.referenceImageUrls).toEqual(['https://cdn.shopify.com/sedia.png', 'https://cdn.shopify.com/tavolo.png']);
+  });
+});
+
+describe('upstreamInputsFor — a feed hands its videos to a video input', () => {
+  const post = (id: string, postedAt: string, item: Record<string, unknown>) => ({
+    id,
+    org_id: ORG,
+    node_id: FEED_NODE,
+    project_id: 'p1',
+    platform: 'instagram',
+    external_id: id,
+    handle: 'acme',
+    caption: null,
+    media: { items: [item] },
+    metrics: {},
+    permalink: null,
+    posted_at: postedAt,
+    fetched_at: 'now'
+  });
+
+  const archivedVideo = (id: string) => ({
+    type: 'video',
+    url: `https://scontent.cdninstagram.com/${id}.mp4?oe=expired`,
+    thumbnailUrl: `https://scontent.cdninstagram.com/${id}.jpg`,
+    thumbnailPath: `${ORG}/${FEED_NODE}/${id}.jpg`,
+    videoPath: `${ORG}/${FEED_NODE}/${id}.mp4`
+  });
+
+  const archivedImage = (id: string) => ({
+    type: 'image',
+    url: `https://scontent.cdninstagram.com/${id}.jpg?oe=expired`,
+    thumbnailUrl: `https://scontent.cdninstagram.com/${id}.jpg`,
+    thumbnailPath: `${ORG}/${FEED_NODE}/${id}.jpg`
+  });
+
+  const feedInto = (sourceHandle: string | null) =>
+    fakeDb({
+      nodes: [
+        nodeRow(FEED_NODE, 'social_account_feed', { platform: 'instagram', handle: 'acme' }),
+        nodeRow(VIDEO_NODE, 'video', { prompt: 'turn this into something new', model: MODEL })
+      ],
+      nodes_connections: [
+        { id: 'e-feed-video', canvas_id: CANVAS, source_node_id: FEED_NODE, target_node_id: VIDEO_NODE, source_handle: sourceHandle, target_handle: null }
+      ],
+      social_posts: [
+        post('v2', '2026-10-04', archivedVideo('v2')),
+        post('i2', '2026-10-03', archivedImage('i2')),
+        post('v1', '2026-10-02', archivedVideo('v1')),
+        post('i1', '2026-10-01', archivedImage('i1'))
+      ],
+      assets: []
+    });
+
+  it('out:videos gives the archived videos, signed, newest first, and no images', async () => {
+    const { db } = feedInto('out:videos');
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: VIDEO_NODE, model: MODEL, medium: 'video' });
+
+    expect(out.referenceVideoUrls).toEqual([
+      `https://signed.example/canvas-assets/${ORG}/${FEED_NODE}/v2.mp4`,
+      `https://signed.example/canvas-assets/${ORG}/${FEED_NODE}/v1.mp4`
+    ]);
+    expect(out.referenceImageUrls).toEqual([]);
+  });
+
+  it('out:images gives only the stills', async () => {
+    const { db } = feedInto('out:images');
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: VIDEO_NODE, model: MODEL, medium: 'video' });
+
+    expect(out.referenceVideoUrls).toEqual([]);
+    expect(out.referenceImageUrls).toHaveLength(4);
+    expect(out.referenceImageUrls.every((url) => url.endsWith('.jpg'))).toBe(true);
+  });
+
+  it('a model without video input refuses out:videos instead of sending it', async () => {
+    modalitiesOf.mockResolvedValue({ input: ['text', 'image'], output: ['video'], synced_at: 'now', uncensored: false });
+    const { db } = feedInto('out:videos');
+
+    const out = await upstreamInputsFor(db, { orgId: ORG, canvasId: CANVAS, nodeId: VIDEO_NODE, model: MODEL, medium: 'video' });
+
+    expect(out.referenceVideoUrls).toEqual([]);
+    expect(out.referenceImageUrls).toEqual([]);
+  });
+});

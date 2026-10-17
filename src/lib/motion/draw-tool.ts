@@ -5,7 +5,8 @@ export enum DrawTool {
   Text = 'text',
   Rectangle = 'rectangle',
   Ellipse = 'ellipse',
-  Pen = 'pen'
+  Pen = 'pen',
+  Frame = 'frame'
 }
 
 export type DragPoint = { x: number; y: number };

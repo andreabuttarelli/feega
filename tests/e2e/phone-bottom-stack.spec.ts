@@ -68,6 +68,13 @@ test.describe('on a phone the bottom controls never cover each other @real', () 
         await page.screenshot({ path: `${SHOTS}/mobile-${process.env.DS_TAG ?? 'after'}-canvas-${phone.name}.png` });
       }
       await expectStackClear(page, page.getByTestId('mobile-view-switch'));
+      const draw = page.getByTestId('draw-tools');
+      await draw.locator('.pick.on').click();
+      const rectangle = draw.locator('[data-tool="rectangle"]');
+      await expect(rectangle, 'the folded draw tools open on a tap').toBeVisible();
+      expect(((await rectangle.boundingBox())!.x), 'an opened draw tool is on screen').toBeGreaterThanOrEqual(0);
+      await draw.locator('[data-tool="select"]').click();
+      await expect(rectangle, 'picking a tool folds them again').toBeHidden();
 
       await page.getByTestId('open-motion-editor').click();
       await expect(page.getByTestId('add-bar')).toHaveAttribute('data-context', 'frame', { timeout: 15_000 });

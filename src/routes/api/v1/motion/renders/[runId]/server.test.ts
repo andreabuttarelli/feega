@@ -5,6 +5,10 @@ const ORG = 'org-1';
 const store = vi.hoisted(() => ({ runs: [] as Record<string, unknown>[] }));
 
 const signed = { createSignedUrl: async (path: string) => ({ data: { signedUrl: `https://files/${path}?sig` } }) };
+vi.mock('$lib/server/uncensored-workspace/hidden-scope', async (importOriginal) => {
+  const real = await importOriginal<typeof import('$lib/server/uncensored-workspace/hidden-scope')>();
+  return { ...real, hiddenFor: async () => real.NOTHING_HIDDEN };
+});
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async () => ({ caller: { db: { storage: { from: () => signed } }, orgId: ORG, userId: 'user-1' } }) }));
 vi.mock('$lib/server/repos/node-runs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/node-runs')>()),

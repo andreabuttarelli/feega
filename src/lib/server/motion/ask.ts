@@ -148,6 +148,7 @@ export async function askStatus(db: Db, input: { orgId: string; runId: string })
     reference_pick: outcome.pick ?? null,
     cut_review: outcome.cut ? { ...outcome.cut, answers: cutAnswers(outcome.cut.fixes) } : null,
     video_budget: outcome.budget ?? null,
+    script_ready: outcome.scripted ?? false,
     cost_usd: run.costUsd,
     error: run.error,
     editor_url: editorUrl(motion.record),

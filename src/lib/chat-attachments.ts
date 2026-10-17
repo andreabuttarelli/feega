@@ -1,6 +1,7 @@
 export enum AttachmentKind {
   Image = 'image',
-  Document = 'document'
+  Document = 'document',
+  Video = 'video'
 }
 
 export enum AttachmentError {
@@ -24,9 +25,11 @@ const NAME_SEPARATOR = '__';
 
 const IMAGE_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const IMAGE_EXT = new Set(['png', 'jpg', 'jpeg', 'webp', 'gif']);
+const VIDEO_MIME = new Set(['video/mp4', 'video/quicktime', 'video/webm']);
+const VIDEO_EXT = new Set(['mp4', 'mov', 'webm']);
 const DOCUMENT_EXT = new Set(['pdf', 'docx', 'pptx', 'xlsx', 'csv', 'txt', 'md', 'markdown', 'html', 'htm']);
 
-export const CHAT_ATTACH_ACCEPT = [...IMAGE_MIME, ...[...IMAGE_EXT, ...DOCUMENT_EXT].map((e) => `.${e}`)].join(',');
+export const CHAT_ATTACH_ACCEPT = [...IMAGE_MIME, ...VIDEO_MIME, ...[...IMAGE_EXT, ...VIDEO_EXT, ...DOCUMENT_EXT].map((e) => `.${e}`)].join(',');
 
 export type ChatAttachment = { assetId: string; kind: AttachmentKind; name: string; mimeType: string; bytes: number };
 
@@ -41,6 +44,9 @@ function kindOf(mimeType: string, name: string): AttachmentKind | null {
   const ext = extOf(name);
   if (IMAGE_MIME.has(mimeType.toLowerCase()) || IMAGE_EXT.has(ext)) {
     return AttachmentKind.Image;
+  }
+  if (VIDEO_MIME.has(mimeType.toLowerCase()) || VIDEO_EXT.has(ext)) {
+    return AttachmentKind.Video;
   }
   if (DOCUMENT_EXT.has(ext)) {
     return AttachmentKind.Document;

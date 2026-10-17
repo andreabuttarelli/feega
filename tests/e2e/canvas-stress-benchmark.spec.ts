@@ -14,6 +14,20 @@ const THROTTLE = Number(process.env.CANVAS_PERF_THROTTLE ?? 1);
 const FORMATS = ['16:9', '9:16', '1:1', '4:5'];
 const POSTER_PX = { w: 1080, h: 1080 };
 const STEP = { x: 520, y: 640 };
+const LIVE_ZOOM = 0.4;
+
+async function zoomTo(page: Page, zoom: number) {
+  const size = page.viewportSize()!;
+  const scale = () => page.evaluate(() => Number(/scale\(([\d.]+)\)/.exec(document.querySelector('.svelte-flow__viewport')?.getAttribute('style') ?? '')?.[1] ?? 0));
+  await page.locator('.svelte-flow__viewport').waitFor();
+  await page.mouse.move(size.width / 2, size.height / 2);
+  await page.keyboard.down('Control');
+  while ((await scale()) < zoom) {
+    await page.mouse.wheel(0, -60);
+  }
+  await page.keyboard.up('Control');
+}
+
 const NODE = '.svelte-flow__node, .react-flow__node';
 
 type Subject = { name: string; button: 'left' | 'middle'; open: (page: Page, count: number) => Promise<void>; counts: number[] };
@@ -41,6 +55,18 @@ const SUBJECTS: Subject[] = [
       await page.goto(HOST_PAGE);
       await page.evaluate((path) => import(path), '/tests/e2e/fixtures/bare-flow-harness.ts');
       await page.evaluate((n) => window.bareFlow.mount(n), count);
+    }
+  },
+  {
+    name: 'feega-live',
+    button: 'middle',
+    counts: COUNTS,
+    open: async (page, count) => {
+      const { list } = await feegaNodes(count);
+      await page.goto(HOST_PAGE);
+      await page.evaluate((path) => import(path), '/tests/e2e/fixtures/motion-canvas-harness.ts');
+      await page.evaluate((nodes) => window.motionCanvas.mount(nodes.map((n) => ({ ...n, source: 'live' }))), list);
+      await zoomTo(page, LIVE_ZOOM);
     }
   },
   {
@@ -81,6 +107,7 @@ test.describe('stress benchmark: React Flow demo, bare Svelte Flow, feega nodes 
         await page.waitForTimeout(SETTLE_MS);
 
         const mounted = await page.locator(NODE).count();
+        const live = await page.locator('[data-drawn="true"]').count();
         const corner = { x: 12, y: DESKTOP.height - 12 };
         const pan = await measure(page, SWEEP_MS, (until) => dragPan(page, until, corner, subject.button));
         const zoom = await measure(page, SWEEP_MS, (until) => wheelZoom(page, until));
@@ -90,7 +117,7 @@ test.describe('stress benchmark: React Flow demo, bare Svelte Flow, feega nodes 
         const from = await firstNodeCentre(page);
         const drag = await measure(page, 0, () => dragFrom(page, from));
 
-        console.log(`[canvas-stress] ${test.info().project.name} ${subject.name} ${count} ${JSON.stringify({ mounted, pan, zoom, drag })}`);
+        console.log(`[canvas-stress] ${test.info().project.name} ${subject.name} ${count} ${JSON.stringify({ mounted, live, pan, zoom, drag })}`);
       });
     }
   }

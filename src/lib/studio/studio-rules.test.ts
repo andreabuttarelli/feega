@@ -28,11 +28,13 @@ describe('rule tables', () => {
 
 describe('casting', () => {
   it.each([
-    [{ orgId: null, source: 'catalogue', age: 30 }, ModelVerdict.RealPerson],
-    [{ orgId: 'o', source: 'upload', age: 30 }, ModelVerdict.UploadedPhotos],
-    [{ orgId: 'o', source: 'generated', age: null }, ModelVerdict.UnknownAge],
-    [{ orgId: 'o', source: 'generated', age: STUDIO_MIN_AGE - 1 }, ModelVerdict.UnderAge],
-    [{ orgId: 'o', source: 'generated', age: STUDIO_MIN_AGE }, ModelVerdict.Allowed]
+    [{ source: 'catalogue', age: 30 }, ModelVerdict.Allowed],
+    [{ source: 'catalogue', age: STUDIO_MIN_AGE - 1 }, ModelVerdict.UnderAge],
+    [{ source: 'catalogue', age: null }, ModelVerdict.UnknownAge],
+    [{ source: 'upload', age: 30 }, ModelVerdict.UploadedPhotos],
+    [{ source: 'generated', age: null }, ModelVerdict.UnknownAge],
+    [{ source: 'generated', age: STUDIO_MIN_AGE - 1 }, ModelVerdict.UnderAge],
+    [{ source: 'generated', age: STUDIO_MIN_AGE }, ModelVerdict.Allowed]
   ])('%o → %s', (facts, verdict) => {
     expect(castingVerdict(facts)).toBe(verdict);
   });
@@ -83,8 +85,9 @@ describe('planBatch', () => {
     expect(plan.items.map((i) => i.variation)).toEqual([3, 4]);
   });
 
-  it('una cella è ambiente + inquadratura + modello', () => {
-    expect(cellKey({ environment: Environment.Beach, shot: Shot.Detail, influencerId: null })).toBe('beach|detail|-');
+  it('ogni foto ha la sua cella, così le foto di un lotto girano insieme', () => {
+    const plan = planBatch({ products: [shirt, { ...shirt, index: 3, title: 'Mug' }], models: [], environments: [Environment.WhiteEcom], shots: [Shot.Packshot], variations: 6 });
+    expect(new Set(plan.items.map(cellKey)).size).toBe(12);
   });
 });
 
@@ -132,6 +135,11 @@ describe('macchina a stati', () => {
     expect(afterFailure('timeout', 1)).toEqual({ status: ItemStatus.Queued, delayMs: 30_000 });
     expect(afterFailure('timeout', 2)).toEqual({ status: ItemStatus.Queued, delayMs: 60_000 });
     expect(afterFailure('timeout', MAX_RETRIES + 1)).toEqual({ status: ItemStatus.Failed });
+  });
+
+  it('un errore qualsiasi si ritenta una volta, subito', () => {
+    expect(afterFailure('no image returned', 1)).toEqual({ status: ItemStatus.Queued, delayMs: 0 });
+    expect(afterFailure('no image returned', 2)).toEqual({ status: ItemStatus.Failed });
   });
 
   it('un blocco di moderazione non si ritenta mai', () => {

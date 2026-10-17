@@ -1,17 +1,16 @@
 import { json } from '@sveltejs/kit';
-import { resolveOrgCaller } from '$lib/server/org-data/auth';
+import { reachableCaller } from '$lib/server/org-data/reach';
 import { addTemplate } from '$lib/server/motion/template-api';
 import type { RequestHandler } from './$types';
 
 const HTTP_FORBIDDEN = 403;
 
 export const POST: RequestHandler = async ({ request, params, url }) => {
-  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
-  const resolved = await resolveOrgCaller(bearer, url.searchParams.get('org') ?? undefined);
-  if ('error' in resolved) {
-    return json(resolved.error.body, { status: resolved.error.status });
+  const caller = await reachableCaller(request, url, { nodes: [params.nodeId ?? ''] });
+  if (caller instanceof Response) {
+    return caller;
   }
-  const { db, orgId, userId, writeAllowed } = resolved.caller;
+  const { db, orgId, userId, writeAllowed } = caller;
   if (!writeAllowed) {
     return json({ error: 'api_key_read_only' }, { status: HTTP_FORBIDDEN });
   }

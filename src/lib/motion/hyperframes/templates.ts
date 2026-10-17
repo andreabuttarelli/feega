@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { COMPONENTS, ComponentId } from '../components';
+import type { COMPONENTS, ComponentId, TextSizing } from '../components';
 import { Ease } from '../design';
 import { boxOf, type Box } from '../layout';
 import { safeBox } from '../fit';
@@ -72,6 +72,7 @@ const JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' } as c
 const REVEAL = 16;
 const LINE_STAGGER = 5;
 const FADE = 18;
+const WHITE_SPACE: Record<TextSizing, string> = { fixed: 'pre-wrap', auto: 'pre' };
 
 type Placed = Pick<PropsOf<'Title'>, 'x' | 'y' | 'width' | 'height' | 'align' | 'opacity' | 'scale' | 'rotation'>;
 
@@ -149,7 +150,7 @@ const Text: Template<'Text'> = {
   html: (ctx) => {
     const size = typeSize(ctx);
     const paint = glyphPaint(ctx, 'Text');
-    const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: 'pre-wrap', ...ctx.text.vars });
+    const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: WHITE_SPACE[ctx.p.sizing], ...ctx.text.vars });
     return placed(ctx, ctx.p, `<div id="tx-${ctx.id}" data-fit="${size}" style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${ctx.text.lines(ctx.p.text).join('\n')}</span></div>`);
   },
   tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]

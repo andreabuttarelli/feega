@@ -96,6 +96,8 @@ export const TITLE_LOOK = { weight: SEMIBOLD, tracking: -0.05 } as const;
 export const TITLE_RANGE = { weight: [MEDIUM, SEMIBOLD], tracking: [-0.07, -0.04] } as const;
 export const ALIGNS = ['left', 'center', 'right'] as const;
 export const TEXT_CASES = ['as-typed', 'upper', 'lower'] as const;
+export const TEXT_SIZINGS = ['fixed', 'auto'] as const;
+export type TextSizing = (typeof TEXT_SIZINGS)[number];
 export type TextCase = (typeof TEXT_CASES)[number];
 export const MOVES = ['none', 'drift-up', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'] as const;
 export type Move = (typeof MOVES)[number];
@@ -128,13 +130,14 @@ export const AXES = /^('[A-Za-z0-9]{4}' -?\d+(\.\d+)?)(, '[A-Za-z0-9]{4}' -?\d+(
 type Look = { weight?: number; tracking: number; leading: number };
 
 const POSTER_TYPE_MAX = 1.2;
+export const TYPE_SIZE = { min: 0.01, max: POSTER_TYPE_MAX } as const;
 
 const typography = (size: number, fallbackColor: string, look: Look) => ({
   color: color(fallbackColor, 'Colour'),
   font: font(),
   weight: range(TYPE.weight.min, TYPE.weight.max, TYPE.weight.step, look.weight ?? REGULAR, 'Weight', Group.Style),
   italic: toggle(false, 'Italic', Group.Style),
-  size: range(0.01, POSTER_TYPE_MAX, 0.005, size, 'Size', Group.Style),
+  size: range(TYPE_SIZE.min, TYPE_SIZE.max, 0.005, size, 'Size', Group.Style),
   tracking: range(TYPE.tracking.min, TYPE.tracking.max, TYPE.tracking.step, look.tracking, 'Tracking', Group.Style),
   leading: range(TYPE.leading.min, TYPE.leading.max, TYPE.leading.step, look.leading, 'Leading', Group.Style),
   textCase: choice(TEXT_CASES, 'as-typed', 'Case', Group.Style),
@@ -273,7 +276,9 @@ export const COMPONENTS = {
     description: 'Body copy that fades up.',
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
-    schema: z.object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), ...layout({ y: 0.65, height: 0.2 }) }).strict()
+    schema: z
+      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, 'fixed', 'Box width', Group.Style), ...layout({ y: 0.65, height: 0.2 }) })
+      .strict()
   },
   Kicker: {
     label: 'Kicker',

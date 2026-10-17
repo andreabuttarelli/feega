@@ -25,7 +25,7 @@ import type { FrameBucket } from '$lib/server/motion/frame-store';
 import { openAgentTools } from '$lib/server/project-agent/tool-surface';
 import { createWebTools } from '$lib/server/web/web-tools';
 import { liveWebDeps, productImport, productsNodePlacer, webImageImport } from '$lib/server/web/live';
-import { projectAgentPrompt } from '$lib/server/project-agent/system-prompt';
+import { projectAgentPrompt, selectedNodes } from '$lib/server/project-agent/system-prompt';
 import { AGENT_MAX_DURATION_S, AGENT_TURN_CAP_USD, agentStopWhen, overTurnCap } from '$lib/server/project-agent/limits';
 import { spentUsd } from '$lib/server/motion/model-route';
 import { ensureGatewayModels, gatewayRate } from '$lib/server/openrouter-models';
@@ -35,6 +35,7 @@ import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { runInBackground } from '$lib/server/background-work';
 import { askedAttachments } from '$lib/server/chat-attachments/route-scope';
 import { canvasPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
+import { breakdownReader } from '$lib/server/video-reference';
 import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, rejectedRounds, shownRefs } from '$lib/reference-pick';
 import type { RequestHandler } from './$types';
 
@@ -89,7 +90,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const gated = brand ? await gateAiAction(brand, undefined) : await gateOrgAiAction(orgId, undefined);
   if (gated) return gated;
 
-  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown };
+  const { message, model: askedModel, reasoning: askedReasoning, canvasId: openCanvas, attachments: askedFiles, frame: askedFrame, selection } = (await request.json()) as { message?: string; model?: unknown; reasoning?: unknown; canvasId?: unknown; attachments?: unknown; frame?: unknown; selection?: unknown };
   const parsedFrame = openFrameSchema.safeParse(askedFrame);
   const frame: OpenFrame | null = parsedFrame.success ? parsedFrame.data : null;
   const text = message?.trim() ?? '';
@@ -133,7 +134,7 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
   const actor = agentActor(user.id, SIDEBAR_AGENT_KEY);
   const userActor = { kind: 'user' as const, id: user.id };
   await saveTurn(db, { orgId, threadId, role: 'user', content: text, attachments, actor: userActor });
-  const opening = await userContent(db, { orgId, text, attachments, hint: canvasPlaceHint(project.id) });
+  const opening = await userContent(db, { orgId, text, attachments, hint: canvasPlaceHint(project.id), breakdown: breakdownReader(db, { orgId, projectId: project.id, mode: project.mode }) });
   const reply = await openReply(db, { orgId, threadId, actor });
   const steps: Parameters<typeof finishedTurn>[0][number][] = [];
 
@@ -196,7 +197,8 @@ export const POST: RequestHandler = async ({ request, url, params, locals }) => 
       canvases: canvases.map((c) => ({ id: c.id, name: c.name })),
       brand: brand ? { name: brand.name, slug: brand.slug } : null,
       openCanvasId: canvasId,
-      frame
+      frame,
+      selectedNodeIds: selectedNodes(selection)
     }),
     allowSystemInMessages: true,
     messages: [...history, { role: 'user', content: opening }] as ModelMessage[],

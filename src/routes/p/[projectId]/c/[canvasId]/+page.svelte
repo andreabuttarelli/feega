@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { Stack } from '$lib/canvas/stacking';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
   import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
@@ -23,9 +24,13 @@
   import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
   import { SaveStatus, SaveTiming, SendResult, createSaveScheduler } from '$lib/canvas/save-scheduler';
+  import { createPlaceSaves, keepPending } from '$lib/canvas/place-save';
+  import { LineAction, createOpQueue, keepLines } from '$lib/canvas/op-queue';
+  import { idbShelf, openOutbox, type Outbox } from '$lib/canvas/outbox';
+  import { syncOf } from '$lib/canvas/sync-status';
   import { canvasActionUrl } from '$lib/canvas/canvas-action-url';
   import { baseOf, diffNodeData } from '$lib/canvas/node-patch';
-  import { ActionKind, SaveFailure, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
+  import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
@@ -77,19 +82,23 @@
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
+  import { defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
+  import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
   import { FORMAT_OF_ASPECT, aspectOf, composedTemplate, editedValues, sequentialIds } from '$lib/canvas/composition-template';
   import { Target, composeHtml } from '$lib/motion/hyperframes/compose';
   import { FEEGA_TOKENS } from '$lib/motion/brand';
   import { AssetKind } from '$lib/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
-  import type { DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, openingFor, tileChromeOf } from '$lib/canvas/motion-node';
+  import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
+  import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, type Placed } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { barContextOf } from '$lib/canvas/bottom-bar';
-  import { CanvasState, NodeMode, Opening, Reframe, dismissedAfterClick, inlineMotionTarget, neighbourStyle, openingOf, reframesOn } from '$lib/canvas/inline-motion';
+  import { CanvasState, NodeMode, Opening, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
+  import { inlineStage } from '$lib/canvas/inline-stage.svelte';
+  import { decoded, painted } from '$lib/canvas/paint-wait';
   import { viewportOf } from '$lib/motion/editor-layout';
   import { FocusMode, type FocusRequest, type Insets } from '$lib/canvas/free-area';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -99,6 +108,7 @@
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
+  import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
   import { inputChanged } from '$lib/canvas/effects/editor';
   import { cutoutTwin, upstreamMedia } from '$lib/canvas/effects-node';
@@ -107,7 +117,7 @@
   import { upstreamCards as compositionCards, cardAssetIds } from '$lib/canvas/composition-node';
   import { listFeedingSelect } from '$lib/canvas/select-node';
   import { fieldValue, productItem, socialPostItem } from '$lib/canvas/select-sources';
-  import { isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
+  import { isOutputHandle, outputValues, portOfOutputHandle, selectOutputs, sourceOutputs, type OutputValue, type SelectOutput } from '$lib/canvas/select-outputs';
   import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
   import { hasInspector, inspectorOf } from '$lib/canvas/node-inspector';
   import SourceSettingsFrame from '$lib/components/canvas/SourceSettingsFrame.svelte';
@@ -130,7 +140,7 @@
   import { hasUpstreamText } from '$lib/canvas/upstream-inputs';
   import { effectiveModel } from '$lib/canvas/default-models';
   import { nearestVideoDuration } from '$lib/video-models';
-  import { snapResolution } from '$lib/canvas/gen-node';
+  import { snapAspectRatio, snapResolution } from '$lib/canvas/gen-node';
   import { snapDynamicParams } from '$lib/canvas/model-params';
   import { type IframeNode as IframeNodeState } from '$lib/canvas/iframe-node';
   import { shareUrlOf } from '$lib/canvas/doc-node';
@@ -362,23 +372,93 @@
     }
   }
 
-  async function drawElement(drawn: DrawnWire) {
-    const res = await post('drawElement', { drawn: JSON.stringify(drawn) });
-    if (res?.outcome !== 'done') {
-      return;
-    }
-    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
-    const node = res.node as CanvasNodeRecord | null;
-    if (node) {
-      nodes = [...nodes.filter((n) => n.id !== node.id), toTile(node, { select: true })];
+  async function restack(ids: string[], to: Stack) {
+    const res = await post('restack', { ids: JSON.stringify(ids), to });
+    if (res) {
+      await refresh();
     }
   }
 
+  async function drawElement(drawn: DrawnWire) {
+    const id = crypto.randomUUID();
+    const ghost = drawnTile(id, drawn);
+    if (!ghost) {
+      void saveDrawn(id, drawn);
+      return;
+    }
+    await decoded(ghost.look);
+    catalogPosters.set(id, ghost.look);
+    nodes = [...nodes, toTile(ghost.node)];
+    void saveDrawn(id, drawn);
+    await painted();
+  }
+
+  async function drawFrame(target: { box: CanvasBox } | { at: { x: number; y: number } }) {
+    const box = 'box' in target ? target.box : defaultFrameBox(target.at);
+    const id = crypto.randomUUID();
+    nodes = [...nodes, toTile(drawnFrameTile(id, box))];
+    void saveFrame(id, box);
+    await painted();
+  }
+
+  async function saveFrame(id: string, box: CanvasBox) {
+    const res = await post('drawFrame', { box: JSON.stringify(box), node_id: id });
+    const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+    if (!node) {
+      nodes = settle(nodes, id, null);
+      return;
+    }
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    nodes = settle(nodes, id, toTile(node));
+    focusOn([id], undefined, FocusMode.Select);
+  }
+
+  async function saveDrawn(id: string, drawn: DrawnWire) {
+    const res = await post('drawElement', { drawn: JSON.stringify(drawn), node_id: id });
+    const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+    if (!node) {
+      catalogPosters.delete(id);
+      nodes = settle(nodes, id, null);
+      return;
+    }
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
+    nodes = settle(nodes, id, toTile(node));
+    focusOn([id], undefined, FocusMode.Select);
+  }
+
+  $effect(() => {
+    const id = inlineMotion;
+    if (id && catalogPosters.has(id) && inlineStage.paintOf(id) === Paint.Swapped) {
+      catalogPosters.delete(id);
+    }
+  });
+
   async function dropOutput(nodeId: string, client: PointerPoint) {
     const drop = dropAt(client, null);
-    if (drop) {
-      landed(await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
+    if (!drop) {
+      return;
     }
+    if (drop.on !== DropOn.Canvas) {
+      landed(await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop) }));
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    const source = nodes.find((n) => n.id === nodeId);
+    const file = source?.data.refId ?? source?.data.assetId;
+    const picture = assetUrl(typeof file === 'string' ? file : null);
+    if (picture) {
+      catalogPosters.set(id, picture);
+    }
+    nodes = [...nodes, toTile(pendingOutput(id, drop))];
+    const res = await post('placeOutput', { source: nodeId, drop: JSON.stringify(drop), node_id: id });
+    const node = res?.outcome === 'done' ? (res.node as CanvasNodeRecord | null) : null;
+    nodes = settle(nodes, id, node ? toTile(node) : null);
+    if (!node) {
+      catalogPosters.delete(id);
+      return;
+    }
+    pushGesture({ items: (res?.undo ?? []) as UndoItem[] });
   }
 
   /** Una riga come la pagina la tiene: quel che il database ha, più dove sta sullo schermo. */
@@ -867,8 +947,13 @@
     return audioInputKindOf(wired.filter((port): port is ConnectorType => port !== null));
   }
 
+  const NAMED_OUTPUTS: Partial<Record<string, (n: Tile) => SelectOutput[]>> = {
+    audio: (n) => audioNamedOutputs(audioOperationOfTile(n), audioInputOfTile(n)),
+    social_account_feed: () => sourceOutputs('social_account_feed')
+  };
+
   function outputsOfTile(n: Tile): SelectOutput[] {
-    return n.type === 'audio' ? audioNamedOutputs(audioOperationOfTile(n), audioInputOfTile(n)) : selectOutputsOf(n);
+    return (NAMED_OUTPUTS[n.type] ?? selectOutputsOf)(n);
   }
 
   function audioUrlsOf(n: Tile): { videoUrl: string | null; audioUrl: string | null } {
@@ -969,18 +1054,79 @@
   const SAVE_MAX_WAIT_MS = 2000;
   const SAVE_BACKOFF_CAP_MS = 30000;
   const REMOTE_REFRESH_MS = 250;
+  const WARM_AFTER_MS = 500;
+  const WARM_ON_LOAD = 6;
   let saveStatus = $state(SaveStatus.Saved);
-  const SAVE_LABEL: Record<SaveStatus, string> = {
-    [SaveStatus.Saved]: 'Saved',
-    [SaveStatus.Saving]: 'Saving…',
-    [SaveStatus.Retrying]: 'Offline — retrying'
-  };
+  let placeStatus = $state(SaveStatus.Saved);
+  let unsentCount = $state(0);
+  let online = $state(typeof navigator === 'undefined' ? true : navigator.onLine);
+  const syncShown = $derived(syncOf({ nodes: saveStatus, places: placeStatus, unsent: unsentCount, online }));
+  const OFFLINE_RUN_NOTICE = 'Offline: generating needs a connection. Your edits are kept and will save when you are back.';
+  const LINE_REFUSED_NOTICE = 'A line change was refused by the canvas and was undone.';
+  let outbox: Outbox | null = null;
   const saves = createSaveScheduler({
     send: sendSave,
     debounceMs: SAVE_DEBOUNCE_MS,
     maxWaitMs: SAVE_MAX_WAIT_MS,
     backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
-    onStatus: (status) => { saveStatus = status; }
+    onStatus: (status) => { saveStatus = status; keepOutbox(); }
+  });
+
+  const places = createPlaceSaves({
+    send,
+    backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
+    onStatus: (status) => { placeStatus = status; keepOutbox(); }
+  });
+
+  const lines = createOpQueue({
+    send: async (op) => {
+      const answer = await send(op.action, op.fields);
+      return answer.type === 'success' ? SendResult.Saved : sendResultOf(failureOf(answer));
+    },
+    store: { save: (ops) => { void outbox?.save({ ops }); countUnsent(); } },
+    backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
+    onDropped: () => { failed = LINE_REFUSED_NOTICE; refreshSoon(); }
+  });
+
+  function countUnsent() {
+    unsentCount = Object.keys(saves.unsentPatches()).length + places.unsentEntries().length + lines.size();
+  }
+
+  function keepOutbox() {
+    countUnsent();
+    void outbox?.save({ nodes: saves.unsentPatches(), places: places.unsentEntries() });
+  }
+
+  async function reopenOutbox(key: string) {
+    const opened = await openOutbox(idbShelf(), key);
+    outbox = opened;
+    for (const [id, patch] of Object.entries(opened.nodes)) {
+      if (nodes.some((node) => node.id === id)) {
+        void write(id, patch, SaveTiming.Now);
+      }
+    }
+    places.restore(opened.places);
+    lines.restore(opened.ops);
+    keepOutbox();
+  }
+
+  $effect(() => {
+    const user = data.session?.user?.id;
+    if (!user || typeof indexedDB === 'undefined') {
+      return;
+    }
+    void untrack(() => reopenOutbox(`${user}:${data.canvas.id}`));
+  });
+
+  $effect(() => {
+    const on = () => { online = true; };
+    const off = () => { online = false; };
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
   });
 
   /**
@@ -1026,7 +1172,16 @@
 
   function selectionChanged(ids: string[]) {
     if (ids.join() !== untrack(() => selectedIds.join())) { void saves.flush(); }
+    const before = untrack(() => inlineMotion);
     selectedIds = ids;
+    leaveNow(before);
+  }
+
+  function leaveNow(before: string | null) {
+    const after = untrack(() => inlineMotion);
+    if (before && before !== after) {
+      inlineStage.leave(before);
+    }
   }
 
   let dismissedMotion = $state<string | null>(null);
@@ -1038,6 +1193,22 @@
     return row ? openingFor(row, opening) : opening;
   });
   const inlineMotion = $derived(inlineMotionTarget(selectedIds, nodes, dismissedMotion, openingHere, requestedMotion));
+  const editingMotion = $derived(editorOn(inlineMotion, inlineStage.leaving));
+  let lastOpen: string | null = null;
+
+  $effect(() => {
+    const open = inlineMotion;
+    const closed = lastOpen;
+    lastOpen = open;
+    untrack(() => {
+      if (open && open === inlineStage.leaving) {
+        inlineStage.landed(open);
+      }
+      if (closed && closed !== open && nodes.some((n) => n.id === closed)) {
+        inlineStage.leave(closed);
+      }
+    });
+  });
 
   $effect(() => {
     if (selectedIds.length !== 1 || selectedIds[0] !== untrack(() => dismissedMotion)) {
@@ -1055,6 +1226,33 @@
     }
   });
 
+  function headRevisionOf(id: string): number {
+    const row = nodes.find((n) => n.id === id);
+    return row && row.type === 'motion' ? (motionOf(row)?.docHeadRevision ?? 0) : 0;
+  }
+
+  function warmMotion(id: string) {
+    if (!nodes.some((n) => n.id === id && n.version > 0)) {
+      return;
+    }
+    prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
+  }
+
+  function warmHovered(e: PointerEvent) {
+    const id = (e.target as Element | null)?.closest?.('[data-motion-node]')?.getAttribute('data-motion-node');
+    if (id) {
+      warmMotion(id);
+    }
+  }
+
+  const motionIds = $derived(nodes.filter((n) => n.type === 'motion').slice(0, WARM_ON_LOAD).map((n) => n.id).join());
+
+  $effect(() => {
+    const ids = motionIds.split(',').filter(Boolean);
+    const timer = setTimeout(() => ids.forEach(warmMotion), WARM_AFTER_MS);
+    return () => clearTimeout(timer);
+  });
+
   function reframe(id: string | null, free: Insets) {
     if (id && reframesOn(viewportOf(pageWidth)) === Reframe.Frame) {
       focusOn([id], free);
@@ -1069,6 +1267,17 @@
   $effect(() => {
     canvasSelection.set(selectedIds);
     return () => canvasSelection.set([]);
+  });
+
+  $effect(() => {
+    propertiesTarget.set(targetOf(selectedIds, nodes));
+    return () => propertiesTarget.set(null);
+  });
+
+  $effect(() => {
+    if ($propertiesRequest) {
+      requestMotion($propertiesRequest);
+    }
   });
 
   let seenRevision = '';
@@ -1100,8 +1309,8 @@
     }
     const now = Date.now();
     const before = nodes;
-    nodes = keepSame(nodes, keepDirty((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys), now);
-    edges = keepSame(edges, (snapshot.connections as Connection[]).map(toEdge), now);
+    nodes = keepSame(nodes, keepPending((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty), now);
+    edges = keepSame(edges, keepLines((snapshot.connections as Connection[]).map(toEdge), edges, lines.pending()), now);
     productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
     socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
     influencersOverride = keepSame(influencersByNode, (snapshot.influencers ?? {}) as Record<string, InfluencerTile>, now);
@@ -1146,7 +1355,7 @@
   function openCanvas(loaded: CanvasNodeRecord[]) {
     snapshotVersion += 1;
     runsOverride = null;
-    nodes = loaded.map((n) => toTile(n));
+    nodes = keepPending(loaded.map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty);
     edges = (data.connections as Connection[]).map(toEdge);
     seenRevision = data.revision;
     const carried = takeNotice();
@@ -1201,10 +1410,10 @@
   }
 
   $effect(() => {
-    const flushAll = () => { void saves.flush(); };
+    const flushAll = () => { void saves.flush(); void places.flush(); void lines.drain(); };
     const flushHidden = () => { if (document.visibilityState === 'hidden') { flushAll(); } };
     const warnUnsent = (event: BeforeUnloadEvent) => {
-      if (!saves.unsent()) { return; }
+      if (!saves.unsent() && !places.unsent() && !lines.size()) { return; }
       flushAll();
       event.preventDefault();
     };
@@ -1220,7 +1429,7 @@
     };
   });
 
-  beforeNavigate(() => { void saves.flush(); });
+  beforeNavigate(() => { void saves.flush(); void places.flush(); });
 
   function formOf(fields: Record<string, string | number | File | string[]>): FormData {
     const body = new FormData();
@@ -1273,14 +1482,28 @@
     announce(action, failureOf(result), result.data ?? result);
   }
 
-  async function post(
-    action: string,
-    fields: Record<string, string | number | File | string[]>
-  ): Promise<Record<string, unknown> | null> {
+  type Fields = Record<string, string | number | File | string[]>;
+
+  function post(action: string, fields: Fields): Promise<Record<string, unknown> | null> {
+    return answered(action, () => send(action, fields));
+  }
+
+  function postAtVersion(action: string, id: string, fields: Fields): Promise<Record<string, unknown> | null> {
+    let release = () => {};
+    const asked = actAtVersion({
+      settle: async () => { await saves.flush(id); release = saves.hold(id); },
+      version: () => nodes.find((node) => node.id === id)?.version ?? 0,
+      send: (version) => send(action, { ...fields, node_id: id, version }),
+      reread: refresh
+    });
+    return answered(action, () => asked).finally(() => release());
+  }
+
+  async function answered(action: string, ask: () => Promise<ActionAnswer>): Promise<Record<string, unknown> | null> {
     const mutating = actionKind(action) === ActionKind.Write;
     if (mutating) { pending += 1; snapshotVersion += 1; }
     try {
-      const result = await send(action, fields);
+      const result = await ask();
       if (result.type !== 'success') {
         report(action, result);
         return null;
@@ -1382,6 +1605,7 @@
   }
 
   let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
+  const catalogPosters = new SvelteMap<string, string>();
 
   function frameDraft(templateId: string, format: MotionFormat): Instance | null {
     const entry = data.componentTemplates.find((t) => t.id === templateId);
@@ -1404,13 +1628,18 @@
     const probe = pendingFrame(at, doc);
     const frameSize = { w: probe.size.width ?? 0, h: probe.size.height ?? 0 };
     const spot = placeNear(at, frameSize, occupiedRects());
-    const shown = pendingFrame(spot, doc);
-    nodes = [...nodes, toTile(shown)];
-    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y });
+    const id = crypto.randomUUID();
+    const name = data.componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
+    const poster = item?.preview?.poster;
+    if (poster) {
+      catalogPosters.set(id, poster);
+    }
+    nodes = [...nodes, toTile(placedFrame({ id, canvasId: data.canvas.id, projectId: data.projectId, name, at: spot, doc }))];
+    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y, node_id: id });
     const node = result?.node as CanvasNodeRecord | undefined;
-    nodes = nodes.filter((n) => n.id !== shown.id);
-    if (node && !nodes.some((n) => n.id === node.id)) {
-      nodes = [...nodes, toTile(node)];
+    nodes = settle(nodes, id, node ? toTile(node) : null);
+    if (!node) {
+      catalogPosters.delete(id);
     }
     if (node && offCentre(at, spot, frameSize)) {
       focusOn([node.id]);
@@ -1581,27 +1810,20 @@
     if (gen.running) {
       return;
     }
-
-    nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
-
-    await saves.flush(id);
-
-    const before = nodes.find((node) => node.id === id);
-    if (!before) {
+    if (!online) {
+      failed = OFFLINE_RUN_NOTICE;
       return;
     }
 
-    pending += 1;
-    const release = saves.hold(id);
+    nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, ...genData(startRun(gen)) } } : node));
 
-    const result = await post('run', {
-      node_id: id,
+    pending += 1;
+    const result = await postAtVersion('run', id, {
       medium: gen.medium,
       prompt: gen.prompt,
       model: effectiveModel(gen.medium, gen.model, catalogue[gen.medium] ?? []) ?? '',
-      params: JSON.stringify(gen.params),
-      version: before.version
-    }).finally(release);
+      params: JSON.stringify(gen.params)
+    });
     pending -= 1;
 
     if (!result) {
@@ -1800,11 +2022,15 @@
   async function sync(id: string) {
     const before = nodes.find((node) => node.id === id);
     if (!before) { return; }
+    if (!online) {
+      failed = OFFLINE_RUN_NOTICE;
+      return;
+    }
 
     nodes = nodes.map((node) => (node.id === id ? { ...node, data: { ...node.data, sync_status: 'running' } } : node));
     pending += 1;
 
-    const result = await post('sync', { node_id: id, version: before.version });
+    const result = await postAtVersion('sync', id, {});
     pending -= 1;
 
     if (!result) {
@@ -1831,15 +2057,15 @@
     if (before && motionOf(before)?.kind === FrameKind.Group) {
       const delta = { dx: x - before.x, dy: y - before.y };
       nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : layoutOf(n.data).groupId === id ? { ...n, x: n.x + delta.dx, y: n.y + delta.dy } : n));
-      await post('moveGroup', { id, x, y });
+      const placed = places.moveGroup(id, x, y);
+      keepOutbox();
+      await placed;
       return;
     }
     nodes = nodes.map((n) => (n.id === id ? { ...n, x, y } : n));
-
-    const result = await post('move', { node_id: id, x, y });
-    if (!result && before) {
-      nodes = nodes.map((node) => node.id === id ? { ...node, x: before.x, y: before.y } : node);
-    }
+    const placed = places.move(id, x, y);
+    keepOutbox();
+    await placed;
   }
 
   /**
@@ -1884,13 +2110,10 @@
     const fit = frameFit(id, width);
     const w = fit?.w ?? width;
     const h = fit?.h ?? height;
-    const before = nodes.find((node) => node.id === id);
     nodes = nodes.map((n) => (n.id === id ? { ...n, w, h, userHeight: h } : n));
-
-    const result = await post('resize', { node_id: id, width: w, height: h });
-    if (!result && before) {
-      nodes = nodes.map((node) => (node.id === id ? { ...node, w: before.w, h: before.h, userHeight: before.userHeight } : node));
-    }
+    const placed = places.resize(id, w, h);
+    keepOutbox();
+    await placed;
   }
 
   /**
@@ -1942,16 +2165,6 @@
     return out;
   }
 
-  const SEND_RESULT: Record<SaveFailure, SendResult> = {
-    [SaveFailure.Network]: SendResult.Retry,
-    [SaveFailure.Server]: SendResult.Retry,
-    [SaveFailure.Conflict]: SendResult.Dropped,
-    [SaveFailure.Invalid]: SendResult.Dropped,
-    [SaveFailure.Gone]: SendResult.Dropped,
-    [SaveFailure.Credits]: SendResult.Dropped,
-    [SaveFailure.Auth]: SendResult.Dropped
-  };
-
   async function sendSave(id: string, touched: Record<string, unknown>): Promise<SendResult> {
     const current = nodes.find((node) => node.id === id);
     if (!current) { return SendResult.Dropped; }
@@ -1959,7 +2172,7 @@
     if (!Object.keys(change).length) { return SendResult.Saved; }
 
     const out = await saveNode(id, change, baseOf(current.saved, change));
-    if (!out.ok) { return SEND_RESULT[out.reason]; }
+    if (!out.ok) { return sendResultOf(out.reason); }
 
     const written = out.node;
     nodes = nodes.map((node) => node.id === id
@@ -1983,7 +2196,9 @@
     const current = nodes.find((node) => node.id === id);
     if (!current) { return Promise.resolve(false); }
     nodes = nodes.map((node) => node.id === id ? { ...node, data: { ...node.data, ...patch } } : node);
-    return saves.schedule(id, patch, timing);
+    const saved = saves.schedule(id, patch, timing);
+    keepOutbox();
+    return saved;
   }
 
   function changeGen(id: string, gen: GenNodeState, patch: Partial<GenNodeState>) {
@@ -2037,7 +2252,30 @@
    * per averla due volte appena la vera arriva. Il verso l'ha già scelto la tela guardando i due
    * estremi — `edgeKindsFor` — e qui si salva quello, non un `derives_from` fisso.
    */
+  function link(source: string, target: string, kind: CanvasEdgeKind, targetHandle: ConnectorType | null, sourceHandle: string | null = null): Connection {
+    const line: Connection = { id: crypto.randomUUID(), canvasId: data.canvas.id, sourceNodeId: source, targetNodeId: target, sourceHandle: sourceHandle ?? kind, targetHandle, mode: 'fixed' };
+    edges = [...edges, toEdge(line)];
+    lines.push({
+      opId: line.id,
+      action: LineAction.Connect,
+      fields: {
+        connection_id: line.id,
+        source_node_id: source,
+        target_node_id: target,
+        kind,
+        ...(targetHandle ? { target_handle: targetHandle } : {}),
+        ...(sourceHandle ? { source_handle: sourceHandle } : {})
+      }
+    });
+    return line;
+  }
+
   async function connect(source: string, target: string, kind: CanvasEdgeKind, targetHandle: ConnectorType | null, sourceHandle: string | null = null) {
+    if (nodes.find((n) => n.id === target)?.type !== 'motion') {
+      const line = link(source, target, kind, targetHandle, sourceHandle);
+      pushGesture({ items: [{ kind: 'edge.create', edgeId: line.id, sourceNodeId: source, targetNodeId: target }] });
+      return;
+    }
     const res = await post('connect', {
       source_node_id: source,
       target_node_id: target,
@@ -2083,7 +2321,7 @@
 
   function frameLook(n: { id: string; type: string; data: Record<string, unknown> }) {
     const motion = motionOf(n);
-    return motion ? { poster: assetUrl(motion.posterAssetId), still: motion.format === MotionFormat.Poster } : {};
+    return motion ? { poster: assetUrl(motion.posterAssetId), still: motion.format === MotionFormat.Poster, element: motion.kind === FrameKind.Element } : {};
   }
 
   $effect(() =>
@@ -2179,17 +2417,8 @@
     const plan = planConnectSelection({ sources, target: { kind: target.type, modalities } });
     const items: UndoItem[] = [];
     for (const wire of plan.wires) {
-      const res = await post('connect', {
-        source_node_id: wire.sourceId,
-        target_node_id: targetId,
-        kind: 'derives_from',
-        target_handle: wire.connector
-      });
-      const connection = (res?.connection ?? null) as Connection | null;
-      if (connection) {
-        edges = [...edges.filter((e) => e.id !== connection.id), toEdge(connection)];
-        items.push({ kind: 'edge.create', edgeId: connection.id, sourceNodeId: connection.sourceNodeId, targetNodeId: connection.targetNodeId });
-      }
+      const line = link(wire.sourceId, targetId, 'derives_from', wire.connector);
+      items.push({ kind: 'edge.create', edgeId: line.id, sourceNodeId: line.sourceNodeId, targetNodeId: line.targetNodeId });
     }
     if (plan.rejected.length) {
       failed = `Not connected: ${plan.rejected.map((r) => r.why).join('; ')}`;
@@ -2350,6 +2579,16 @@
       // Un modello nuovo può non fare più il gradino di durata o la risoluzione salvati: si
       // scivola al più vicino fra quelli che offre — mai una durata o un token di risoluzione che
       // quel modello rifiuta (`happyhorse-1.0` non fa 480p, `video_renders` cb1de6e2).
+      if (model !== undefined && (n.type === 'video' || n.type === 'image')) {
+        const nextModel = catalogue[n.type]?.find((c) => c.id === model);
+        const aspectRatio = nextModel ? snapAspectRatio(nextModel, nextParams.aspectRatio as string | undefined) : undefined;
+        if (nextModel && aspectRatio) {
+          nextParams.aspectRatio = aspectRatio;
+        } else if (nextModel) {
+          delete nextParams.aspectRatio;
+        }
+      }
+
       if (model !== undefined && n.type === 'video') {
         const nextModel = catalogue.video?.find((c) => c.id === model);
         const options = nextModel?.durationOptions;
@@ -2456,12 +2695,7 @@
     }
 
     edges = edges.filter((e) => e.id !== connectionId);
-
-    const done = await post('disconnect', { connection_id: connectionId });
-    if (!done) {
-      edges = [...edges, removed];
-      return null;
-    }
+    lines.push({ opId: crypto.randomUUID(), action: LineAction.Disconnect, fields: { connection_id: connectionId } });
 
     const item: UndoItem = { kind: 'edge.delete', edgeId: removed.id, sourceNodeId: removed.source, targetNodeId: removed.target };
     if (recordUndo) { pushGesture({ items: [item] }); }
@@ -2628,6 +2862,7 @@
    * — `failed` dice perché, in chiaro.
    */
   async function applyUndo(gesture: Gesture, onAccepted: (redo: Gesture) => void) {
+    await Promise.all([lines.drain(), places.flush(), saves.flush()]);
     const result = await post('undo', { items: JSON.stringify(gesture.items) });
     if (!result) {
       failed = 'Undo failed: try again';
@@ -2739,7 +2974,7 @@
 
 <svelte:window bind:innerWidth={pageWidth} />
 
-<div class="canvas" class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
+<div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
   {#if peers.length}
     {#if topPeers}
       <Portal to={topPeers}><PeerAvatars {peers} /></Portal>
@@ -2747,7 +2982,7 @@
       <div class="peers"><PeerAvatars {peers} /></div>
     {/if}
   {/if}
-  <p class="save-status" role="status" data-status={saveStatus}>{SAVE_LABEL[saveStatus]}</p>
+  <p class="save-status" role="status" data-status={syncShown.state} aria-label={syncShown.label} title={syncShown.label}></p>
   {#if failed}
     <!-- Un salvataggio perso in silenzio si scopre alla prossima apertura, quando quel che si era
          scritto non c'è più e nessuno sa perché. -->
@@ -2806,9 +3041,11 @@
     onCreateFilled={createFilled}
     onDropOutput={dropOutput}
     onDraw={drawElement}
+    onDrawFrame={drawFrame}
     onRotate={rotateGroupBy}
     onGroup={groupElements}
     onUngroup={ungroupElements}
+    onRestack={restack}
     onTileDragOver={tileDragOver}
     onTileDrop={tileDrop}
     onFlow={(fn) => (toFlow = fn)}
@@ -3037,10 +3274,11 @@
             onpickcomponent={() => (componentPickFor = id)}
           />
         {:else if row.type === PENDING_FRAME_TYPE}
-          <div class="pending-frame" data-testid="motion-node-pending" aria-busy="true"></div>
+          {@const look = catalogPosters.get(id)}
+          <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}</div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={assetUrl(motion.posterAssetId)} nodeMode={inlineMotion === id ? NodeMode.Edit : NodeMode.Preview} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} onenter={() => requestMotion(id)} />
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} nodeMode={tileMode(id, inlineMotion, inlineStage.leaving)} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} onenter={() => requestMotion(id)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}
@@ -3052,9 +3290,9 @@
   {#if showsEmptyState(nodes.length, inlineMotion)}
     <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
   {/if}
-  {#if inlineMotion}
-    {#key inlineMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={inlineMotion} onclose={() => (dismissedMotion = inlineMotion)} onframe={(free) => reframe(inlineMotion, free)} onmoveout={moveOut} {canvasundo} />
+  {#if editingMotion}
+    {#key editingMotion}
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} {canvasundo} />
     {/key}
   {/if}
 
@@ -3142,6 +3380,17 @@
     animation: pending-pulse 1.2s ease-in-out infinite alternate;
   }
 
+  .pending-frame.shown {
+    background: none;
+    animation: none;
+  }
+
+  .pending-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
   @keyframes pending-pulse {
     to {
       opacity: 0.5;
@@ -3225,17 +3474,24 @@
     z-index: 10;
     left: 16px;
     bottom: 16px;
+    width: 6px;
+    height: 6px;
     margin: 0;
-    font-size: 11px;
-    color: var(--muted-foreground, #888);
-    pointer-events: none;
+    border-radius: 9999px;
+    background: var(--muted-foreground, #888);
+    opacity: 0;
+    transition: opacity 300ms ease;
   }
+
+  .save-status:not([data-status='saved']) { opacity: 0.8; }
+
+  .save-status[data-status='offline'] { background: #d4a017; }
 
   @media (max-width: 767px) {
     .save-status { bottom: var(--mobile-switch-bottom, 16px); }
   }
 
-  .save-status[data-status='retrying'] { color: #c0392b; }
+  .save-status[data-status='retrying'] { background: #c0392b; }
 
   .warning {
     position: absolute;

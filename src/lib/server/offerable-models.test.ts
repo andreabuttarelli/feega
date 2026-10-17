@@ -109,6 +109,23 @@ describe('offerableModels — cosa un nodo può davvero scegliere', () => {
     expect(ids).not.toContain('kie/nano-banana-2');
   });
 
+  it('hides a model whose published schema no node request can satisfy', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'wiro/wiro/train-flux-lora',
+        catalogue: 'image',
+        input_modalities: ['text'],
+        output_modalities: ['image'],
+        provider: 'wiro',
+        wire_spec: { owner: 'wiro', project: 'train-flux-lora', fields: { prompt: 'prompt', images: [] }, unrunnable: 'required_field_without_default' }
+      } as never
+    ]);
+
+    const out = await offerableModels(admin, 'image');
+
+    expect(out.choices.map((c) => c.id)).not.toContain('wiro/wiro/train-flux-lora');
+  });
+
   it('hides a provider whose key is missing instead of offering a model that cannot run', async () => {
     delete testEnv.WIRO_API_KEY;
     const admin = fakeAdmin([
@@ -574,6 +591,26 @@ describe('offerableModels video — durata e risoluzione', () => {
     const choice = out.choices.find((c) => c.id === 'alibaba/happyhorse-1.0');
     expect(choice?.resolutions).toEqual(['720p', '1080p']);
     expect(choice?.resolutions).not.toContain('480p');
+  });
+
+  it('un video senza spec offre le durate che la sua riga dichiara, non il pavimento di prodotto', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'alibaba/wan-2.6',
+        catalogue: 'video',
+        input_modalities: ['text', 'image'],
+        output_modalities: ['video'],
+        supported_resolutions: ['720p', '1080p'],
+        param_schema: { duration: { type: 'enum', values: ['5', '10'] } }
+      }
+    ]);
+
+    const out = await offerableModels(admin, 'video');
+
+    const choice = out.choices.find((c) => c.id === 'alibaba/wan-2.6');
+    expect(choice?.durationOptions).toEqual([5, 10]);
+    expect(choice?.minDuration).toBe(5);
+    expect(choice?.maxDuration).toBe(10);
   });
 
   it('una riga sincronizzata senza supported_resolutions ripiega sul tetto misurato del trasporto', async () => {

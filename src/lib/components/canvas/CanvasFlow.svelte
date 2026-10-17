@@ -42,8 +42,9 @@
   import type { NameTag } from '$lib/canvas/node-label';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
-  import type { DrawnWire } from '$lib/motion/draw-create';
+  import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
   import CanvasKeys from './CanvasKeys.svelte';
+  import CanvasZoomLock from './CanvasZoomLock.svelte';
   import CanvasSelectionBridge from './CanvasSelectionBridge.svelte';
   import CanvasImageTiers from './CanvasImageTiers.svelte';
   import { provideTierBoard } from '$lib/canvas/tier-board.svelte';
@@ -61,7 +62,8 @@
   import { ColumnAxis, withSettingsColumn } from '$lib/canvas/settings-column';
   import { MOBILE_QUERY } from '$lib/breakpoints';
   import { isOutputHandle, portOfHandle, unavailableOutput, type SelectOutput } from '$lib/canvas/select-outputs';
-  import { CANVAS_EDGE_KINDS, EDGE_KIND_LABEL, WIRE_MODES, WIRE_MODE_LABEL, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
+  import { CANVAS_EDGE_KINDS, EDGE_KIND_LABEL, WIRE_EDGE_TYPE, WIRE_MODES, WIRE_MODE_LABEL, WIRE_MODE_LOOK, wireEdge, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
+  import WireEdge from './WireEdge.svelte';
   import { isAddable, type Addable } from '$lib/canvas/addable';
   import { DEFAULT_EDGE_KIND, edgeKindsFor, verdictBetween } from '$lib/canvas/connect-rules';
   import { connectorAccepts, nodeAcceptsConnection } from '$lib/canvas/connector-ports';
@@ -75,6 +77,8 @@
   import { GraphScope } from '$lib/canvas/run-graph';
   import { DropVerdict, pointOf, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { ReportChange, reportChange } from '$lib/canvas/selection-report';
+  import { Stack } from '$lib/canvas/stacking';
+  import CanvasContextMenu from './CanvasContextMenu.svelte';
 
   /**
    * Dove sta una tile e quanto è grande, in unità di tela — le stesse di `brand_canvas_items`.
@@ -153,9 +157,11 @@
     onNodeClicked,
     barContext,
     onDraw,
+    onDrawFrame,
     onRotate,
     onGroup,
     onUngroup,
+    onRestack,
     onUndo,
     onRedo,
     onConnectNew,
@@ -234,10 +240,12 @@
     onFrameTemplates?: (at: { x: number; y: number }) => void;
     onNodeClicked?: (id: string) => void;
     barContext?: BarContext;
-    onDraw?: (drawn: DrawnWire) => void;
+    onDraw?: (drawn: DrawnWire) => Promise<void>;
+    onDrawFrame?: (target: { box: CanvasBox } | { at: { x: number; y: number } }) => Promise<void>;
     onRotate?: (id: string, degrees: number) => void;
     onGroup?: (ids: string[]) => void;
     onUngroup?: (ids: string[]) => void;
+    onRestack?: (ids: string[], to: Stack) => void;
     /** ⌘Z: annulla l'ultimo gesto di questa scheda. */
     onUndo?: () => void;
     /** ⇧⌘Z: ripete l'ultimo gesto annullato. */
@@ -289,6 +297,7 @@
   // Un tipo di nodo solo: la tela non ha tipi di NODO, ha tipi di CONTENUTO, e quelli li decide
   // lo snippet di chi la usa.
   const nodeTypes = { tile: CanvasTile };
+  const edgeTypes = { [WIRE_EDGE_TYPE]: WireEdge };
 
   // IL COSTO DELLA LIBRERIA, IN UNA RIGA. SvelteFlow tiene il proprio stato dei nodi, quindi la
   // posizione esiste in due posti: qui e in `brand_canvas_items`. Il compilatore lo dice da solo —
@@ -330,7 +339,7 @@
   let nodes = $state.raw<Node[]>(tiles.map(toNode));
   // svelte-ignore state_referenced_locally -- stessa cattura iniziale dei nodi, e stesso motivo:
   // da qui in poi gli archi sono di SvelteFlow, e l'effetto sotto ci porta dentro solo i NUOVI.
-  let edges = $state.raw<FlowEdge[]>($state.snapshot(incomingEdges) as FlowEdge[]);
+  let edges = $state.raw<FlowEdge[]>(($state.snapshot(incomingEdges) as FlowEdge[]).map(wireEdge));
 
   // Le tile che arrivano dal server entrano, quelle sparite escono, e quelle che l'utente sta
   // muovendo restano dove le ha lasciate — la riconciliazione sta in `syncNodes`, col suo test.
@@ -353,7 +362,7 @@
 
   // Gli archi seguono la stessa riconciliazione dei nodi: entrano i nuovi, escono quelli tolti.
   $effect(() => {
-    const next = syncNodes(untrack(() => edges), $state.snapshot(incomingEdges) as FlowEdge[], (e) => e);
+    const next = syncNodes(untrack(() => edges), $state.snapshot(incomingEdges) as FlowEdge[], wireEdge);
     if (next) edges = next;
   });
 
@@ -609,8 +618,64 @@
     report: (ids) => {
       window.open(reportHref({ node: ids[0] }), '_blank', 'noopener');
     },
+    group: (ids) => onGroup?.(ids),
+    ungroup: (ids) => onUngroup?.(ids),
+    copy: (ids) => onCopy?.(ids),
+    paste: () => {
+      if (menuAt && toFlow) {
+        onPaste?.(toFlow(menuAt));
+      }
+    },
+    'bring-front': (ids) => onRestack?.(ids, Stack.Front),
+    'send-back': (ids) => onRestack?.(ids, Stack.Back),
     delete: (ids) => onDelete?.(ids)
   };
+
+  const LONG_PRESS_MS = 500;
+  const PRESS_SLOP_PX = 10;
+
+  let menuAt = $state<{ x: number; y: number } | null>(null);
+  let press: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | null = null;
+
+  function openMenu(id: string, at: { x: number; y: number }) {
+    if (!nodes.some((n) => n.id === id && n.selected)) {
+      nodes = nodes.map((n) => ({ ...n, selected: n.id === id }));
+    }
+    menuAt = at;
+  }
+
+  function onNodeMenu({ node, event }: { node: Node; event: MouseEvent }) {
+    event.preventDefault();
+    openMenu(node.id, { x: event.clientX, y: event.clientY });
+  }
+
+  function onSelectionMenu({ event }: { event: MouseEvent }) {
+    event.preventDefault();
+    menuAt = { x: event.clientX, y: event.clientY };
+  }
+
+  function endPress() {
+    if (press) {
+      clearTimeout(press.timer);
+      press = null;
+    }
+  }
+
+  function startPress(e: PointerEvent) {
+    const id = (e.target as HTMLElement).closest<HTMLElement>('.svelte-flow__node')?.dataset.id;
+    if (e.pointerType !== 'touch' || !id) {
+      return;
+    }
+    endPress();
+    const at = { x: e.clientX, y: e.clientY };
+    press = { ...at, timer: setTimeout(() => openMenu(id, at), LONG_PRESS_MS) };
+  }
+
+  function movePress(e: PointerEvent) {
+    if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > PRESS_SLOP_PX) {
+      endPress();
+    }
+  }
 
   function runSelectionAction(id: SelectionActionId) {
     if (!selection.ids.length) return;
@@ -753,6 +818,10 @@
   class="wrap"
   class:moving
   bind:this={wrap}
+  onpointerdowncapture={startPress}
+  onpointermove={movePress}
+  onpointerup={endPress}
+  onpointercancel={endPress}
   ondragover={onDragOver}
   ondrop={onDrop}
 >
@@ -780,12 +849,15 @@
     bind:nodes
     bind:edges
     {nodeTypes}
+    {edgeTypes}
     onnodedragstart={onNodeDragStart}
     onnodedrag={onNodeDrag}
     onnodedragstop={onNodeDragStop}
     onconnect={onConnected}
     onedgeclick={onEdgeClick}
     onnodeclick={onNodeClick}
+    onnodecontextmenu={onNodeMenu}
+    onselectioncontextmenu={onSelectionMenu}
     {isValidConnection}
     onconnectend={() => (refusal = null)}
     {...spec.flow}
@@ -798,6 +870,7 @@
   >
     <CanvasPointer onready={(fn) => { toFlow = fn; onFlow?.(fn); }} />
     <CanvasFocus {focus} />
+    <CanvasZoomLock />
     {#if spec.chrome}
     <CanvasKeys
       onadd={addAtCentre}
@@ -810,6 +883,7 @@
       onredo={onRedo}
       ongroup={onGroup}
       onungroup={onUngroup}
+      onrestack={onRestack}
     />
     {/if}
     <CanvasSelectionBridge
@@ -844,9 +918,13 @@
     <CanvasDrawLayer
       tool={frameBar.tool}
       {toFlow}
-      ondraw={(drawn) => {
+      ondraw={async (drawn) => {
+        await onDraw(drawn);
         frameBar.tool = DrawTool.Select;
-        onDraw(drawn);
+      }}
+      onframe={async (target) => {
+        await onDrawFrame?.(target);
+        frameBar.tool = DrawTool.Select;
       }}
     />
   {/if}
@@ -874,6 +952,10 @@
   {#if actionUrl}
     <NextStepChips {actionUrl} box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
   {/if}
+  {/if}
+
+  {#if menuAt && spec.chrome}
+    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} onpick={runSelectionAction} onclose={() => (menuAt = null)} />
   {/if}
 
   {#if connectPickerAt}
@@ -912,6 +994,10 @@
             class:is-on={(picked.edge.mode ?? 'fixed') === mode}
             onclick={() => retypeMode(mode)}
           >
+            {#if WIRE_MODE_LOOK[mode].icon}
+              {@const Icon = WIRE_MODE_LOOK[mode].icon}
+              <Icon class="edge-mode-icon" data-testid="wire-mode-icon-{mode}" size={12} />
+            {/if}
             {WIRE_MODE_LABEL[mode]}
           </button>
         {/each}
@@ -1077,6 +1163,12 @@
     border-radius: 0;
     color: #c0392b;
   }
+  .edge-panel :global(.edge-mode-icon) {
+    color: var(--ui-wire-iterate);
+    vertical-align: -2px;
+    margin-right: 4px;
+  }
+
   .edge-panel-sep {
     margin: 3px 0;
     border-top: 1px solid var(--line, #e5e5e5);

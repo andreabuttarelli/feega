@@ -29,6 +29,7 @@
   import { deserialize } from '$app/forms';
   import type { ShareState } from '$lib/canvas/shared-view';
   import { handoffOf } from '$lib/canvas/chat-handoff';
+  import { editingLabel, propertiesRequest, propertiesTarget } from '$lib/canvas/phone-properties';
 
   let { data, children } = $props();
 
@@ -154,8 +155,17 @@
     }
   }
 
+  function openProperties() {
+    const target = $propertiesTarget;
+    if (!target) {
+      return;
+    }
+    onMobileView('canvas');
+    propertiesRequest.set(target.id);
+  }
+
   const viewSwitch = $derived(
-    onCanvasRoute && !inlineStage.editing ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView } : null
+    onCanvasRoute && !inlineStage.editing ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView, properties: { target: $propertiesTarget?.name ?? null, onopen: openProperties } } : null
   );
 </script>
 
@@ -189,6 +199,7 @@
       </div>
       <div class="mobile-chat" class:is-hidden={mobileView.view !== 'chat'} data-testid="mobile-chat">
         <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={true} />
+        {#if $propertiesTarget}<span class="editing" data-testid="canvas-chat-editing">{editingLabel($propertiesTarget.name)}</span>{/if}
       </div>
       {#if viewSwitch && !typing}
         <MobileViewSwitch {...viewSwitch} />
@@ -330,6 +341,24 @@
   .mobile-view.is-hidden {
     visibility: hidden;
   }
+  .editing {
+    position: absolute;
+    z-index: 2;
+    top: var(--ui-space-2);
+    left: 50%;
+    transform: translateX(-50%);
+    max-width: calc(100% - 32px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 2px 10px;
+    border-radius: var(--ui-radius-full);
+    background: var(--ui-accent-wash);
+    color: var(--ui-accent);
+    font-size: var(--ui-text-xs);
+    font-weight: 500;
+  }
+
   .mobile-chat.is-hidden {
     display: none;
   }

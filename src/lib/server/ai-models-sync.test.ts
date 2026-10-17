@@ -318,12 +318,16 @@ describe('syncAiModels — dai tre listini del gateway alla tabella', () => {
     const seedance = upserts.find(
       (r) => (r as Record<string, unknown>).id === 'bytedance/seedance-2.5' && (r as Record<string, unknown>).catalogue === 'video'
     ) as Record<string, unknown>;
-    expect(seedance.param_schema).toEqual({ generate_audio: { type: 'boolean' }, seed: { type: 'boolean' } });
+    expect(seedance.param_schema).toEqual({
+      generate_audio: { type: 'boolean' },
+      seed: { type: 'boolean' },
+      duration: { type: 'enum', values: ['4', '5', '30'] }
+    });
 
     const grok = upserts.find(
       (r) => (r as Record<string, unknown>).id === 'x-ai/grok-imagine-video-1.5' && (r as Record<string, unknown>).catalogue === 'video'
     ) as Record<string, unknown>;
-    expect(grok.param_schema).toEqual({ generate_audio: { type: 'boolean' } });
+    expect(grok.param_schema).toEqual({ generate_audio: { type: 'boolean' }, duration: { type: 'enum', values: ['5', '15'] } });
   });
 
   it('an upscaler carries its factor and creativity windows as ranges the toolbar can show', async () => {
@@ -353,6 +357,21 @@ describe('syncAiModels — dai tre listini del gateway alla tabella', () => {
       creativity: { type: 'range', min: 0, max: 1 }
     });
     expect(row.input_modalities).toEqual(['text', 'video']);
+  });
+
+  it('le durate che /videos/models elenca diventano un enum di duration nello schema', async () => {
+    const { admin, upserts } = fakeAdmin();
+    const wan = { id: 'alibaba/wan-2.6', name: 'Wan 2.6', supported_durations: [5, 10] };
+    const fetchImpl = fetchImplFor({
+      '/models': { body: CHAT_MODELS },
+      '/images/models': { body: IMAGE_MODELS },
+      '/videos/models': { body: { data: [wan] } }
+    });
+
+    await syncAiModels(admin, { fetchImpl, baseUrl: 'https://openrouter.ai/api/v1' });
+
+    const row = upserts.find((r) => (r as Record<string, unknown>).id === wan.id) as Record<string, unknown>;
+    expect(row.param_schema).toEqual({ duration: { type: 'enum', values: ['5', '10'] } });
   });
 
   it('quando la colonna param_schema non esiste ancora, riprova senza e scrive comunque', async () => {

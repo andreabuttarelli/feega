@@ -60,7 +60,8 @@ import { canvasModelCatalogue } from '$lib/server/canvas-catalogue';
 import { estimateCanvasTextCost } from './text-cost-estimate';
 import { creditsForRun } from '$lib/canvas/gen-cost';
 import { decideWithJev } from '$lib/server/jev';
-import { resolveNodeModel } from './node-model';
+import { resolveModelIn } from './node-model';
+import { canvasModeOf, projectModeOf } from '$lib/server/uncensored-workspace/workspace-server';
 import { resolvedListValues, upstreamInputsFor } from './upstream';
 import { syncedSourceItems } from './synced-items';
 import type { Connection } from '$lib/server/repos/canvas';
@@ -149,7 +150,8 @@ async function loopCreditsFor(
   combinations: PlannedCombination[]
 ): Promise<LoopCostPreview> {
   const medium = (node.type === 'text' || node.type === 'video' ? node.type : 'image') as GenMedium;
-  const pick = await resolveNodeModel(medium, typeof node.data.model === 'string' ? node.data.model : null);
+  const mode = await canvasModeOf(db, { orgId: scope.orgId, canvasId: scope.canvasId });
+  const pick = await resolveModelIn(mode, medium, typeof node.data.model === 'string' ? node.data.model : null);
   const model = pick.ok ? pick.model : null;
   if (medium !== 'text') {
     return estimateLoopCredits({ medium, model, count: combinations.length });
@@ -410,7 +412,8 @@ async function runOneCombination(
   | { outcome: 'failed'; error: string }
 > {
   const medium = (node.type === 'text' || node.type === 'video' ? node.type : 'image') as GenMedium;
-  const pick = await resolveNodeModel(medium, typeof node.data.model === 'string' ? node.data.model : null);
+  const mode = await projectModeOf(db, { orgId: ctx.orgId, projectId: ctx.projectId });
+  const pick = await resolveModelIn(mode, medium, typeof node.data.model === 'string' ? node.data.model : null);
   if (!pick.ok) {
     return { outcome: 'failed', error: pick.error };
   }

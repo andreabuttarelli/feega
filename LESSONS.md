@@ -3017,3 +3017,21 @@ Signal: `Timed out waiting 120000ms from config.webServer` while `curl http://lo
 
 ### "504 (Outdated Optimize Dep)" and a bare 500 page in a worktree
 Signal: `@real` specs fail on their first locator; the page shows a bare `500`; the console fills with `504 (Outdated Optimize Dep)`. Cause: worktrees symlink the main `node_modules`, so they share `node_modules/.vite`; another worktree's server re-optimized the deps under yours. Move: give your server its own cache: an untracked `vite.agent.config.ts` that spreads `vite.config.ts` and sets `cacheDir` to a scratch folder, started with `--config vite.agent.config.ts`.
+
+### Every project-scoped route resolves scope through `reachableCaller`/`callerReach`
+Signal: a Bearer route under `/api/v1` looks a node, run, asset or project up "by org and id" and answers for an uncensored project the caller cannot open. RLS and `org_id` say the row is the org's; the uncensored lock is a per-user rule neither knows. Move: resolve the caller with `reachableCaller(request, url, { nodes | runs | assets | project })` (`src/lib/server/org-data/reach.ts`), or `callerReach(caller, …)` once the ids are in the body; lists filter with `callerHidden`. Session routes use `findReachableProject` / `motionScope`. Never a per-route `canvasReachable`. Guard: `src/routes/api/v1/uncensored-lock.test.ts` — a new route gets a row there.
+
+### `new row violates row-level security policy` on a Storage upsert that worked once
+Signal: the first `upload(..., { upsert: true })` to a path succeeds, every later one to the same path fails with RLS. Cause: overwriting needs an UPDATE policy on `storage.objects`; `canvas-assets` has SELECT/INSERT/DELETE only. A fake bucket in unit tests overwrites happily. Move: reproduce with the test account's JWT (two uploads to one path), then either write to a fresh path or `remove` before `upload`; a fake bucket for a private bucket refuses overwrites.
+
+### A sub-agent round answers the user instead of doing its step
+Signal: an agent reply says it "only has tools to read/research/import" or "can't build" while the run summary shows it wrote something. Cause: a role round with a narrow tool set (researcher) got the user's raw request and no brief, so it answered it; its text leads the turn's reply. Move: every narrowed round gets its own brief message (like `crewBrief`, `RESEARCH_BRIEF`), and a turn that stops by design returns a field the caller can relay (`script_ready`).
+
+### An e2e fix "does nothing", or a red test passes without the fix
+Signal: a `@real` e2e gives the same result with and without your change. Cause: Playwright reuses whatever listens on 4173 (`reuseExistingServer`), often another worktree's dev server; and with `NO_HMR=1` your own server keeps the code it compiled first. Move: `lsof -iTCP:4173` and check the cwd; run your own `vite dev --port <free>` with `E2E_BASE_URL`, and restart it after every code change before trusting red or green.
+
+### A clip added to a still is invisible
+Signal: a new Text/Title/Line in a still frame renders with opacity 0 (or clipped) while its colour and fills are right. Cause: the template's intro tween starts at clip start = still frame. Move: inspect computed opacity/transform in the srcdoc iframe before suspecting paint; `settledBy` in `compose.ts` keeps unfinished template tweens out of stills.
+
+### A `{#key}` editor remounts on close although a "leaving" state keeps it
+Signal: deselecting a frame flashes "Opening the editor…" or a stale picture; a `console.log` in the editor's `onMount` fires unmount→mount→unmount within one click. Cause: the state that keeps the block alive (`inlineStage.leave`) was set in an `$effect` reacting to the selection; the `{#if}/{#key}` block had already re-rendered without it, and `earlyFetch.take` had emptied the session cache, so the remount loaded again. `$effect.pre` did not fix it. Move: set the keep-alive state synchronously in the handler that changes the selection (`selectionChanged` → `leaveNow`), and keep the effect only as fallback.
