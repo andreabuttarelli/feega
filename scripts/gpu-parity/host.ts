@@ -3,7 +3,7 @@ import { FrameFormat, Layering, Settle } from '$lib/motion/hyperframes/capture';
 import { shootInLanes } from '$lib/motion/export/lanes';
 import { encodeMp4 } from '$lib/motion/export/encode';
 import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
-import { Freshness, gpuEngine } from '$lib/motion/gpu/engine';
+import { Freshness, GpuIneligible, gpuEngine } from '$lib/motion/gpu/engine';
 import type { Backend } from '$lib/canvas/gpu/backend';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { composeHtml } from '$lib/motion/hyperframes/compose';
@@ -73,13 +73,11 @@ async function htmlExport(input: ExportInput): Promise<ExportResult> {
 }
 
 async function gpuExport(input: ExportInput): Promise<ExportResult> {
-  const engine = await gpuEngine(composer(input.spec), host(), input.preference as Backend);
-  const out = await encode(input, async (onFrame) => {
-    for (let i = 0; i < input.times.length; i++) {
-      await engine.renderAt(input.times[i], Freshness.Exact);
-      await onFrame(await createImageBitmap(engine.canvas), i);
-    }
-  });
+  const engine = await gpuEngine(composer(input.spec), host(), input.preference as Backend).catch((e) => (e instanceof GpuIneligible ? null : Promise.reject(e)));
+  if (!engine) {
+    return { ...(await htmlExport(input)), fallback: true };
+  }
+  const out = await encode(input, (onFrame) => engine.renderFrames(input.times, onFrame, input.lanes, new AbortController().signal));
   engine.dispose();
   return out;
 }

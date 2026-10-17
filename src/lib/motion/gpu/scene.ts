@@ -261,7 +261,7 @@ function insetQuad(m: Mat4, size: Size, inset: string[]): Quad {
 
 const BLUR = /blur\(([\d.]+)px\)/;
 
-const visibleAt = (layer: SceneLayer, t: number) => layer.windows.every(([a, b]) => t >= a && t < b);
+export const visibleAt = (layer: SceneLayer, t: number) => layer.windows.every(([a, b]) => t >= a && t < b);
 
 function drawnOf(layer: SceneLayer, t: number): Drawn | null {
   if (!visibleAt(layer, t)) {

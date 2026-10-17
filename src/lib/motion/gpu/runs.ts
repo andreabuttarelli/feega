@@ -43,7 +43,8 @@ export function runHtml(page: string, run: Run): string {
 }
 
 const GPU_CONTEXTS = 1;
-const MAX_CAPTURES = 2;
+const MAX_CAPTURES = 1;
+const MAX_CAPTURED_SHARE = 0.5;
 
 function peak(runs: readonly Run[], weight: (i: number) => number): number {
   const edges = runs.flatMap((r, i) => [[r.span[0], weight(i)], [r.span[1], -weight(i)]] as [number, number][]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -56,8 +57,19 @@ function peak(runs: readonly Run[], weight: (i: number) => number): number {
   return most;
 }
 
-export function gpuEligible(runs: readonly Run[], webglPerRun: readonly number[]): boolean {
+function capturedShare(runs: readonly Run[], duration: number): number {
+  const spans = runs.map((r) => [Math.max(0, r.span[0]), Math.min(duration, r.span[1])]).filter(([a, b]) => b > a).sort((x, y) => x[0] - y[0]);
+  let covered = 0;
+  let end = 0;
+  for (const [a, b] of spans) {
+    covered += Math.max(0, b - Math.max(a, end));
+    end = Math.max(end, b);
+  }
+  return duration ? covered / duration : 0;
+}
+
+export function gpuEligible(runs: readonly Run[], webglPerRun: readonly number[], duration: number): boolean {
   const captures = peak(runs, () => 1);
   const contexts = peak(runs, (i) => webglPerRun[i]) + GPU_CONTEXTS;
-  return captures <= MAX_CAPTURES && contexts <= WEBGL_CONTEXT_BUDGET - WEBGL_PAGE_CONTEXTS;
+  return captures <= MAX_CAPTURES && capturedShare(runs, duration) < MAX_CAPTURED_SHARE && contexts <= WEBGL_CONTEXT_BUDGET - WEBGL_PAGE_CONTEXTS;
 }

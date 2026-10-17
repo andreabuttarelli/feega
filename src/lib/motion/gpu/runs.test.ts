@@ -40,19 +40,22 @@ describe('runHtml', () => {
 
 describe('gpuEligible', () => {
   const run = (from: number, to: number) => ({ clips: ['a'], after: 0, blend: 'normal', span: [from, to] as [number, number] });
+  const DURATION = 10;
 
-  it('takes a doc that never needs more than two captures at once', () => {
-    expect(gpuEligible([run(0, 1), run(0, 1)], [3, 3])).toBe(true);
-    expect(gpuEligible([run(0, 1), run(1, 2), run(2, 3), run(3, 4)], [0, 0, 0, 0])).toBe(true);
-    expect(gpuEligible([], [])).toBe(true);
+  it('takes a doc that needs at most one capture at a time, for under half of its length', () => {
+    expect(gpuEligible([run(0, 2), run(5, 7)], [3, 3], DURATION)).toBe(true);
+    expect(gpuEligible([], [], DURATION)).toBe(true);
   });
 
-  it('hands back to the HTML engine when three captures overlap, they cost more than the HTML engine', () => {
-    expect(gpuEligible([run(0, 2), run(1, 3), run(1.5, 2)], [0, 0, 0])).toBe(false);
+  it('hands back to the HTML engine when two captures overlap, they cost more than the HTML engine', () => {
+    expect(gpuEligible([run(0, 2), run(1, 3)], [0, 0], DURATION)).toBe(false);
   });
 
-  it('hands back to the HTML engine when overlapping captures need more WebGL contexts than the page has', () => {
-    expect(gpuEligible([run(0, 1), run(0, 1)], [7, 7])).toBe(false);
-    expect(gpuEligible([run(0, 1), run(1, 2)], [7, 7])).toBe(true);
+  it('hands back to the HTML engine when captures cover most of the video, the GPU would only add work', () => {
+    expect(gpuEligible([run(0, 6)], [0], DURATION)).toBe(false);
+  });
+
+  it('hands back to the HTML engine when the captures need more WebGL contexts than the page has', () => {
+    expect(gpuEligible([run(0, 1)], [15], DURATION)).toBe(false);
   });
 });

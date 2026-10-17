@@ -174,7 +174,7 @@ if (mode === Mode.Export) {
       writeFileSync(join(dir, `export-${label}.mp4`), Buffer.from(r.mp4, 'base64'));
     }
   }
-  const line = `| ${name} | ${times.length} | ${input.lanes} | ${(today.wallMs / times.length).toFixed(0)} | ${(gpu.wallMs / times.length).toFixed(0)} | ${(today.wallMs / gpu.wallMs).toFixed(2)}x |`;
+  const line = `| ${name} | ${times.length} | ${input.lanes} | ${(today.wallMs / times.length).toFixed(0)} | ${(gpu.wallMs / times.length).toFixed(0)} | ${(today.wallMs / gpu.wallMs).toFixed(2)}x${gpu.fallback ? ' (HTML fallback)' : ''} |`;
   writeFileSync(join(dir, 'export.md'), `| doc | frames | html lanes | html ms/frame | gpu ms/frame | speed-up |\n|---|---|---|---|---|---|\n${line}\n`);
   console.log(line);
 }
