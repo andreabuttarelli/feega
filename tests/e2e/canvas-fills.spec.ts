@@ -181,7 +181,7 @@ test.describe('fill stacks @real', () => {
     const fillHead = page.getByTestId('motion-inspector').locator('[data-section="fill"]');
     await fillHead.getByTestId('fill-add').click();
     await shoot(page, 'fill-add-menu');
-    await page.getByRole('menuitem', { name: 'Solid', exact: true }).dispatchEvent('click');
+    await page.getByRole('menuitem', { name: 'Solid', exact: true }).click();
     await expect.poll(async () => clipOf(await head(admin, node.id), 'box')?.props.fills?.map((f) => f.type), { timeout: 10_000 }).toEqual(['linear-gradient', 'image', 'solid', 'solid']);
   });
 
