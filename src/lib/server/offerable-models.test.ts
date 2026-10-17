@@ -593,6 +593,26 @@ describe('offerableModels video — durata e risoluzione', () => {
     expect(choice?.resolutions).not.toContain('480p');
   });
 
+  it('un video senza spec offre le durate che la sua riga dichiara, non il pavimento di prodotto', async () => {
+    const admin = fakeAdmin([
+      {
+        id: 'alibaba/wan-2.6',
+        catalogue: 'video',
+        input_modalities: ['text', 'image'],
+        output_modalities: ['video'],
+        supported_resolutions: ['720p', '1080p'],
+        param_schema: { duration: { type: 'enum', values: ['5', '10'] } }
+      }
+    ]);
+
+    const out = await offerableModels(admin, 'video');
+
+    const choice = out.choices.find((c) => c.id === 'alibaba/wan-2.6');
+    expect(choice?.durationOptions).toEqual([5, 10]);
+    expect(choice?.minDuration).toBe(5);
+    expect(choice?.maxDuration).toBe(10);
+  });
+
   it('una riga sincronizzata senza supported_resolutions ripiega sul tetto misurato del trasporto', async () => {
     const admin = fakeAdmin([
       {

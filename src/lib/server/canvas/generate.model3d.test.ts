@@ -62,7 +62,7 @@ vi.mock('./sign-media', () => ({
 }));
 vi.mock('$lib/server/task-providers-config', () => ({ taskRunDeps: (db: Db) => deps.current!(db) }));
 vi.mock('$env/dynamic/private', () => ({ env: {} }));
-vi.mock('./node-model', () => ({ resolveNodeModel: async (_m: string, model: string | null) => ({ ok: true, model }) }));
+vi.mock('./node-model', () => ({ resolveModelIn: async (_mode: string, _m: string, model: string | null) => ({ ok: true, model }) }));
 vi.mock('$lib/server/canvas/upstream', () => ({
   upstreamInputsFor: async () => ({
     text: upstream.text,

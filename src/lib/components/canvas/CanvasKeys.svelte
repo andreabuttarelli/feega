@@ -19,6 +19,7 @@
   import { useSvelteFlow, type Node } from '@xyflow/svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
   import type { Addable } from '$lib/canvas/addable';
+  import { Stack } from '$lib/canvas/stacking';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
 
@@ -32,7 +33,8 @@
     onundo,
     onredo,
     ongroup,
-    onungroup
+    onungroup,
+    onrestack
   }: {
     /** Aggiungi una tile del tipo chiesto, dove chi monta la tela decide. */
     onadd?: (what: Addable) => void;
@@ -59,6 +61,7 @@
     onredo?: () => void;
     ongroup?: (ids: string[]) => void;
     onungroup?: (ids: string[]) => void;
+    onrestack?: (ids: string[], to: Stack) => void;
   } = $props();
 
   const { fitView, zoomIn, zoomOut, getNodes, getEdges, updateNode, screenToFlowPosition } = useSvelteFlow();
@@ -126,7 +129,9 @@
       }
     },
     group: () => ongroup?.(selected().map((n) => n.id)),
-    ungroup: () => onungroup?.(selected().map((n) => n.id))
+    ungroup: () => onungroup?.(selected().map((n) => n.id)),
+    'bring-front': () => onrestack?.(selected().map((n) => n.id), Stack.Front),
+    'send-back': () => onrestack?.(selected().map((n) => n.id), Stack.Back)
   };
 
   function onKeydown(e: KeyboardEvent) {

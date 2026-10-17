@@ -64,7 +64,9 @@ export type CanvasCommandId =
   | 'redo'
   | 'group'
   | 'ungroup'
-  | 'tool';
+  | 'tool'
+  | 'bring-front'
+  | 'send-back';
 
 /**
  * Il comando riconosciuto. `add` e `nudge` portano con sé il loro argomento perché è il tasto a
@@ -89,7 +91,7 @@ function toolFor(e: KeyboardEvent): DrawTool | null {
   return command ? (TOOL_OF_COMMAND[command] ?? null) : null;
 }
 
-const PASTE_MOD_KEYS: Record<string, 'duplicate' | 'copy' | 'paste'> = { d: 'duplicate', c: 'copy', v: 'paste' };
+const PASTE_MOD_KEYS: Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
 
 /** L'argomento di `add`, per chi ha in mano un comando e non sa ancora quale sia. */
 export function addableOf(c: CanvasCommand): Addable | null {
@@ -194,6 +196,8 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P'], label: 'Select, text, box, ellipse, pen' },
   { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
   { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
+  { id: 'bring-front', keys: ['mod', ']'], label: 'Bring to front' },
+  { id: 'send-back', keys: ['mod', '['], label: 'Send to back' },
   { id: 'copy', keys: ['mod', 'C'], label: 'Copy selection' },
   { id: 'paste', keys: ['mod', 'V'], label: 'Incolla' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },

@@ -47,7 +47,7 @@ const { deps } = vi.hoisted(() => ({ deps: { current: null as null | ((db: Db) =
 vi.mock('$lib/server/task-providers-config', () => ({ taskRunDeps: (db: Db) => deps.current!(db) }));
 vi.mock('$app/environment', () => ({ dev: true, browser: false, building: false }));
 vi.mock('$env/dynamic/private', () => ({ env: { UNCENSORED_DEV_MANUAL_VERIFICATION: 'true' } }));
-vi.mock('./node-model', () => ({ resolveNodeModel: async (_m: string, model: string | null) => ({ ok: true, model }) }));
+vi.mock('./node-model', () => ({ resolveModelIn: async (_mode: string, _m: string, model: string | null) => ({ ok: true, model }) }));
 const { refs, detect } = vi.hoisted(() => ({ refs: { images: [] as string[] }, detect: { verdict: (_r: { url: string }) => Promise.resolve('absent') } }));
 vi.mock('./sign-media', () => ({ signMediaPaths: async (_db: unknown, paths: string[]) => paths.map((p) => `https://signed/${p}`) }));
 vi.mock('$lib/server/moderation/moderation-config', () => ({ peopleDetector: () => (r: { url: string }) => detect.verdict(r) }));

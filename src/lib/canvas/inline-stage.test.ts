@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
-import { anchoredTo, inlineStage } from './inline-stage.svelte';
+import { LEAVE_CAP_MS, anchoredTo, inlineStage } from './inline-stage.svelte';
 import { Paint } from './inline-motion';
 
 describe('inline stage', () => {
@@ -114,4 +114,20 @@ describe('inline stage', () => {
     expect([bar.style.left, bar.style.top, bar.style.width, bar.style.height]).toEqual(['300px', '0px', '600px', '52px']);
     anchor.destroy();
   });
+
+  it('a closing frame is let go once its tile has drawn, or after a cap', async () => {
+    vi.useFakeTimers();
+    inlineStage.leave('m1');
+    expect(inlineStage.leaving).toBe('m1');
+    inlineStage.landed('m2');
+    expect(inlineStage.leaving).toBe('m1');
+    inlineStage.landed('m1');
+    expect(inlineStage.leaving).toBeNull();
+
+    inlineStage.leave('m1');
+    await vi.advanceTimersByTimeAsync(LEAVE_CAP_MS);
+    expect(inlineStage.leaving).toBeNull();
+    vi.useRealTimers();
+  });
 });
+

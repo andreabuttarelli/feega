@@ -5,6 +5,7 @@
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import ImagePlus from '@lucide/svelte/icons/image-plus';
+  import Hash from '@lucide/svelte/icons/hash';
   import { BAR_MODE_KEY, BarContext, BarMode, BarSlot, barHidden, barKeys, barLift, barShift, barShown, barSlots, readBarMode } from '$lib/canvas/bottom-bar';
   import PenTool from '@lucide/svelte/icons/pen-tool';
   import Sparkles from '@lucide/svelte/icons/sparkles';
@@ -88,7 +89,7 @@
     input.value = '';
   }
 
-  const TOOL_COMMAND: Record<DrawTool, Command> = {
+  const TOOL_COMMAND: Record<Exclude<DrawTool, DrawTool.Frame>, Command> = {
     [DrawTool.Select]: Command.ToolSelect,
     [DrawTool.Text]: Command.ToolText,
     [DrawTool.Rectangle]: Command.ToolRectangle,
@@ -96,10 +97,12 @@
     [DrawTool.Pen]: Command.ToolPen
   };
 
-  const DRAW_TOOLS = Object.values(DrawTool).map((tool) => {
-    const tip = tipText(TOOL_COMMAND[tool]);
-    return { tool, name: tip.name, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[TOOL_COMMAND[tool]].icon };
+  const SHAPE_TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([tool, command]) => {
+    const tip = tipText(command);
+    return { tool, name: tip.name, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[command].icon };
   });
+  const FRAME_TOOL = { tool: DrawTool.Frame, name: 'Frame', label: 'Frame', icon: Hash };
+  const DRAW_TOOLS = $derived(context === BarContext.Canvas ? [...SHAPE_TOOLS, FRAME_TOOL] : SHAPE_TOOLS);
 
   let drawOpen = $state(false);
 
@@ -134,7 +137,7 @@
     { mode: BarMode.Generate, label: 'Generate', icon: Sparkles }
   ];
 
-  const SELECT_TOOL = DRAW_TOOLS.find((t) => t.tool === DrawTool.Select)!;
+  const SELECT_TOOL = SHAPE_TOOLS.find((t) => t.tool === DrawTool.Select)!;
 
   const SLOT: Record<BarSlot, Snippet> = {
     [BarSlot.Mode]: modeSlot,

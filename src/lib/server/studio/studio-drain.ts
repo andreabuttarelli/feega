@@ -8,6 +8,7 @@ import { STUDIO_AGENT_KEY } from './studio-batch';
 const QUEUE_WINDOW = 50;
 const STALE_RUNNING_MS = 10 * 60_000;
 const STALE_ERROR = 'timeout: run never came back';
+const DRAIN_BUDGET_MS = 240_000;
 
 type ItemResult = { status: ItemStatus };
 
@@ -66,11 +67,11 @@ async function reapStale(db: Db, running: BatchItem[]): Promise<BatchItem[]> {
 
 export type DrainOutcome = { claimed: number; done: number; failed: number; blocked: number; requeued: number };
 
-export async function drainStudio(db: Db, scope: { batchId?: string; perOrg?: number } = {}): Promise<DrainOutcome> {
+async function claimDue(db: Db, scope: { batchId?: string; perOrg: number }): Promise<BatchItem[]> {
   const queued = await dueItems(db, { batchId: scope.batchId, limit: QUEUE_WINDOW });
   const orgIds = [...new Set(queued.map((q) => q.orgId))];
   const running = await reapStale(db, await runningItems(db, { orgIds }));
-  const picked = pickRunnable(queued, running, scope.perOrg ?? ORG_PARALLELISM);
+  const picked = pickRunnable(queued, running, scope.perOrg);
 
   const claimed: BatchItem[] = [];
   for (const entry of picked) {
@@ -85,11 +86,35 @@ export async function drainStudio(db: Db, scope: { batchId?: string; perOrg?: nu
       claimed.push(won);
     }
   }
+  return claimed;
+}
 
-  const results = await Promise.all(claimed.map((item) => runItem(db, item)));
+export async function drainStudio(db: Db, scope: { batchId?: string; perOrg?: number } = {}): Promise<DrainOutcome> {
+  const startedAt = Date.now();
+  const perOrg = scope.perOrg ?? ORG_PARALLELISM;
+  const inFlight = new Set<Promise<void>>();
+  const results: ItemResult[] = [];
+  let claimed = 0;
+
+  for (;;) {
+    const fresh = Date.now() - startedAt < DRAIN_BUDGET_MS ? await claimDue(db, { batchId: scope.batchId, perOrg }) : [];
+    claimed += fresh.length;
+    for (const item of fresh) {
+      const running: Promise<void> = runItem(db, item).then((result) => {
+        results.push(result);
+        inFlight.delete(running);
+      });
+      inFlight.add(running);
+    }
+    if (!inFlight.size) {
+      break;
+    }
+    await Promise.race(inFlight);
+  }
+
   const count = (status: ItemStatus) => results.filter((r) => r.status === status).length;
   return {
-    claimed: claimed.length,
+    claimed,
     done: count(ItemStatus.Done),
     failed: count(ItemStatus.Failed),
     blocked: count(ItemStatus.Blocked),

@@ -26,7 +26,7 @@ export enum CanvasPick {
   New = 'new'
 }
 
-type StartInput = { orgId: string; projectId: string; canvasId: string | null; userId: string; name: string; format?: MotionFormat; near?: string[]; at?: { x: number; y: number }; picture?: Picture; actor?: Actor; pick?: CanvasPick };
+type StartInput = { orgId: string; projectId: string; canvasId: string | null; userId: string; name: string; format?: MotionFormat; near?: string[]; at?: { x: number; y: number }; picture?: Picture; actor?: Actor; pick?: CanvasPick; id?: string; head?: number };
 
 type Picture = { width: number; height: number };
 
@@ -70,7 +70,12 @@ export function frameShape(picture: Picture): { data: Record<string, unknown>; w
   return { data: shaped.data, width: shaped.w, height: shaped.h };
 }
 
-const shapeOf = (input: StartInput) => (input.picture ? frameShape(input.picture) : { data: newMotionData(input.format) });
+const bareShape = (input: StartInput) => (input.picture ? frameShape(input.picture) : { data: newMotionData(input.format) });
+
+function shapeOf(input: StartInput): { data: Record<string, unknown>; width?: number; height?: number } {
+  const shape = bareShape(input);
+  return input.head ? { ...shape, data: { ...shape.data, docHeadRevision: input.head } } : shape;
+}
 
 function sizeOf(shape: { data: Record<string, unknown>; width?: number; height?: number }): { w: number; h: number } {
   const fallback = nodeSize('motion', shape.data);
@@ -78,12 +83,17 @@ function sizeOf(shape: { data: Record<string, unknown>; width?: number; height?:
 }
 
 export async function startMotion(db: Db, deps: MotionStartDeps, input: StartInput): Promise<MotionStart | null> {
+  return (await placeMotion(db, deps, input))?.start ?? null;
+}
+
+export async function placeMotion(db: Db, deps: MotionStartDeps, input: StartInput): Promise<{ start: MotionStart; node: CanvasNodeRecord } | null> {
   const canvasId = await motionCanvasId(db, deps, input);
   if (!canvasId) {
     return null;
   }
 
   const node = await deps.createNode(db, {
+    ...(input.id ? { id: input.id } : {}),
     orgId: input.orgId,
     projectId: input.projectId,
     canvasId,
@@ -94,5 +104,5 @@ export async function startMotion(db: Db, deps: MotionStartDeps, input: StartInp
     actor: input.actor ?? { kind: 'user', id: input.userId }
   });
 
-  return { projectId: input.projectId, canvasId, nodeId: node.id };
+  return { start: { projectId: input.projectId, canvasId, nodeId: node.id }, node };
 }

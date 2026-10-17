@@ -2,23 +2,37 @@ type Ports<T> = { load: (url: string) => Promise<T>; now: () => number };
 
 const FRESH_MS = 15_000;
 
+type Held<T> = { at: number; result: Promise<T>; value?: T };
+
 export function earlyFetch<T>({ load, now }: Ports<T>) {
-  const started = new Map<string, { at: number; result: Promise<T> }>();
+  const started = new Map<string, Held<T>>();
+  const open = new Set<string>();
+  const fresh = (held: Held<T> | undefined): held is Held<T> => !!held && now() - held.at < FRESH_MS;
 
   return {
     start(url: string) {
-      const held = started.get(url);
-      if (held && now() - held.at < FRESH_MS) {
+      if (open.has(url) || fresh(started.get(url))) {
         return;
       }
-      const result = load(url);
-      result.catch(() => undefined);
-      started.set(url, { at: now(), result });
+      const held: Held<T> = { at: now(), result: load(url) };
+      held.result.then((value) => (held.value = value)).catch(() => undefined);
+      started.set(url, held);
+    },
+    settled(url: string): T | undefined {
+      const held = started.get(url);
+      return fresh(held) ? held.value : undefined;
+    },
+    hold(url: string): () => void {
+      open.add(url);
+      return () => {
+        open.delete(url);
+        started.delete(url);
+      };
     },
     take(url: string): Promise<T> {
       const held = started.get(url);
       started.delete(url);
-      return held && now() - held.at < FRESH_MS ? held.result : load(url);
+      return fresh(held) ? held.result : load(url);
     }
   };
 }

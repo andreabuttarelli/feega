@@ -70,14 +70,19 @@ function toSocialPost(row: SocialPostColumns): SocialPost {
  * volo come ogni altro file di `canvas-assets` (`asset-storage.ts::signAssetFiles`) — mai salvato
  * firmato, perché un URL firmato scritto in una riga scadrebbe comunque.
  */
+const ARCHIVED_PATH_KEYS = ['thumbnailPath', 'videoPath'] as const;
+
+function signedPath(item: Record<string, unknown>, key: (typeof ARCHIVED_PATH_KEYS)[number], signed: Map<string, string>): string | undefined {
+  const path = item[key];
+  return typeof path === 'string' ? signed.get(path) : undefined;
+}
+
 function resolveItem(item: Record<string, unknown>, signed: Map<string, string>): Record<string, unknown> {
-  const path = typeof item.thumbnailPath === 'string' ? item.thumbnailPath : null;
-  const signedUrl = path ? signed.get(path) : undefined;
-  if (!signedUrl) {
-    return item;
-  }
-  const isThumbnail = item.url === item.thumbnailUrl;
-  return { ...item, thumbnailUrl: signedUrl, url: isThumbnail ? signedUrl : item.url };
+  const signedThumbnail = signedPath(item, 'thumbnailPath', signed);
+  const signedVideo = signedPath(item, 'videoPath', signed);
+  const urlIsStill = item.type !== 'video' || item.url === item.thumbnailUrl;
+  const url = signedVideo ?? (urlIsStill ? signedThumbnail : undefined) ?? item.url;
+  return { ...item, thumbnailUrl: signedThumbnail ?? item.thumbnailUrl, url };
 }
 
 function resolveMedia(media: Record<string, unknown> | null, signed: Map<string, string>): Record<string, unknown> | null {
@@ -113,7 +118,7 @@ export async function listNodeSocialPosts(
     const items = post.media?.items;
     return Array.isArray(items)
       ? items
-          .map((item) => (item as Record<string, unknown>).thumbnailPath)
+          .flatMap((item) => ARCHIVED_PATH_KEYS.map((key) => (item as Record<string, unknown>)[key]))
           .filter((p): p is string => typeof p === 'string')
       : [];
   });
@@ -122,16 +127,19 @@ export async function listNodeSocialPosts(
   return posts.map((post) => ({ ...post, media: resolveMedia(post.media, signed) }));
 }
 
-function mediaItemOf(item: MediaItem & { thumbnailPath?: string }): Json {
+type ArchivedMediaItem = MediaItem & { thumbnailPath?: string; videoPath?: string };
+
+function mediaItemOf(item: ArchivedMediaItem): Json {
   return {
     type: item.type,
     url: item.url,
     thumbnailUrl: item.thumbnailUrl,
-    ...(item.thumbnailPath ? { thumbnailPath: item.thumbnailPath } : {})
+    ...(item.thumbnailPath ? { thumbnailPath: item.thumbnailPath } : {}),
+    ...(item.videoPath ? { videoPath: item.videoPath } : {})
   } as Json;
 }
 
-type ArchivedPost = Omit<NormalizedPost, 'items'> & { items?: (MediaItem & { thumbnailPath?: string })[] };
+type ArchivedPost = Omit<NormalizedPost, 'items'> & { items?: ArchivedMediaItem[] };
 
 function mediaOf(post: ArchivedPost): Json {
   const items = post.items ?? [];

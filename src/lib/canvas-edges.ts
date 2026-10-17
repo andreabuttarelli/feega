@@ -11,6 +11,8 @@
  * che deve restare leggibile con molti archi insieme.
  */
 
+import Repeat from '@lucide/svelte/icons/repeat';
+
 /** Gli stessi tre valori del check in migrazione: due elenchi divergerebbero al primo verso nuovo. */
 export const CANVAS_EDGE_KINDS = ['derives_from', 'responds_to', 'groups_with'] as const;
 
@@ -61,6 +63,17 @@ export const WIRE_MODE_LABEL: Record<WireMode, string> = {
   iterate: 'iterate'
 };
 
+export const WIRE_EDGE_TYPE = 'wire';
+
+export type WireLook = { edgeClass: string | null; icon: typeof Repeat | null };
+
+export const WIRE_MODE_LOOK: Record<WireMode, WireLook> = {
+  fixed: { edgeClass: null, icon: null },
+  iterate: { edgeClass: 'wire-iterate', icon: Repeat }
+};
+
+export type WireEdgeData = { mode: WireMode };
+
 export type FlowEdge = {
   id: string;
   source: string;
@@ -80,7 +93,13 @@ export type FlowEdge = {
    *  sull'unico attacco generico di prima, o su un arco verso un nodo senza porte tipizzate. */
   targetHandle?: string | null;
   sourceHandle?: string | null;
+  type?: typeof WIRE_EDGE_TYPE;
+  data?: WireEdgeData;
 };
+
+export function wireEdge<E extends FlowEdge>(edge: E): E & { type: typeof WIRE_EDGE_TYPE; data: WireEdgeData } {
+  return { ...edge, type: WIRE_EDGE_TYPE, data: { mode: edge.mode ?? 'fixed' } };
+}
 
 export function toFlowEdges(rows: CanvasEdgeRow[]): FlowEdge[] {
   return rows.map((row) => ({

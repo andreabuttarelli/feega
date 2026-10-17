@@ -135,7 +135,12 @@ export type InspectorView = {
   syncCredits: number;
   syncSummary: string | null;
   dataWith: (path: string, value: unknown) => Record<string, unknown>;
+  patchWith: (path: string, value: unknown) => Record<string, unknown>;
 };
+
+function changedFrom(before: Record<string, unknown>, after: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(after).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(before[key])));
+}
 
 function view<N extends SyncNode>(
   title: string,
@@ -153,7 +158,8 @@ function view<N extends SyncNode>(
     canSync: ready && canStartSync(node),
     syncCredits: 0,
     syncSummary,
-    dataWith: (path, value) => toData(withValue(node, path, value))
+    dataWith: (path, value) => toData(withValue(node, path, value)),
+    patchWith: (path, value) => changedFrom(toData(node), toData(withValue(node, path, value)))
   };
 }
 
