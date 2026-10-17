@@ -33,6 +33,7 @@ export type PricedInputs = { inputs: Record<string, string>; credits: number };
 export type ModelChoice = {
   id: string;
   label: string;
+  menuGroup?: string;
   aspectRatios: string[];
   /** Chi ha fatto questo modello (`model-provider.ts::providerOf`), dall'id sul filo — mai
    *  ricalcolato lato client dall'id interno, che per immagine e video non ha il prefisso. */
@@ -222,6 +223,14 @@ export function snapResolution(choice: ModelChoice, saved: string | undefined): 
   if (!options?.length) return undefined;
   if (saved && options.includes(saved)) return saved;
   return options[0];
+}
+
+export function snapAspectRatio(choice: ModelChoice, saved: string | undefined): string | undefined {
+  const options = choice.aspectRatios;
+  if (!options.length) {
+    return undefined;
+  }
+  return saved && options.includes(saved) ? saved : options[0];
 }
 
 /** Il provider rifiuterebbe questo prompt? Si chiede prima di spendere il giro. */

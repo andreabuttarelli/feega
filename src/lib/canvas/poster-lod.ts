@@ -6,6 +6,9 @@ export const THUMB_WIDTH = 160;
 
 export const lodWanted = (zoom: number) => zoom < LOD_ZOOM;
 export const LOD_SETTLE_MS = 150;
+export const LOD_EXIT_ZOOM = LOD_ZOOM * 1.05;
+
+export const lodNext = (active: boolean, zoom: number) => (active ? zoom < LOD_EXIT_ZOOM : lodWanted(zoom));
 
 export type PlacedNode = { id: string; x: number; y: number; w: number; h: number };
 export type ScreenRect = { id: string; x: number; y: number; w: number; h: number };

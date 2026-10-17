@@ -68,28 +68,56 @@ export function profileFromAuthUser(user: User): Profile {
   };
 }
 
-export async function ensureProfile(db: Db, user: User): Promise<Profile> {
-  const profile = profileFromAuthUser(user);
-
-  const { data, error } = await db
-    .from('profiles')
-    .upsert(
-      {
-        id: profile.id,
-        email: profile.email,
-        name: profile.name,
-        avatar_url: profile.avatarUrl,
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: 'id' }
-    )
-    .select(PROFILE_COLUMNS)
-    .single();
-
+async function readProfile(db: Db, userId: string): Promise<ProfileColumns | null> {
+  const { data, error } = await db.from('profiles').select(PROFILE_COLUMNS).eq('id', userId).maybeSingle();
   if (error) {
     throw error;
   }
-  return toProfile(data);
+  return data;
+}
+
+async function createProfile(db: Db, profile: Profile): Promise<ProfileColumns> {
+  const { error } = await db
+    .from('profiles')
+    .upsert({ id: profile.id, email: profile.email, name: profile.name, avatar_url: profile.avatarUrl }, { onConflict: 'id', ignoreDuplicates: true });
+  if (error) {
+    throw error;
+  }
+  const created = await readProfile(db, profile.id);
+  if (!created) {
+    throw new Error(`profilo non creato (${profile.id})`);
+  }
+  return created;
+}
+
+function emptyFilled(row: ProfileColumns, fromAuth: Profile): Partial<Pick<ProfileColumns, 'name' | 'avatar_url'>> {
+  const patch: Partial<Pick<ProfileColumns, 'name' | 'avatar_url'>> = {};
+  if (!row.name && fromAuth.name) {
+    patch.name = fromAuth.name;
+  }
+  if (!row.avatar_url && fromAuth.avatarUrl) {
+    patch.avatar_url = fromAuth.avatarUrl;
+  }
+  return patch;
+}
+
+export async function ensureProfile(db: Db, user: User): Promise<Profile> {
+  const fromAuth = profileFromAuthUser(user);
+  const row = (await readProfile(db, user.id)) ?? (await createProfile(db, fromAuth));
+
+  const patch = emptyFilled(row, fromAuth);
+  if (Object.keys(patch).length === 0) {
+    return toProfile(row);
+  }
+
+  const { error } = await db
+    .from('profiles')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', user.id);
+  if (error) {
+    throw error;
+  }
+  return toProfile({ ...row, ...patch });
 }
 
 export async function recordTermsAcceptance(db: Db, userId: string, version: string): Promise<void> {

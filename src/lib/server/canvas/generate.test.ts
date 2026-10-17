@@ -464,6 +464,39 @@ describe('un nodo senza prompt proprio ma con un testo a monte collegato gira lo
     );
   });
 
+  it.each([
+    [{}, 5],
+    [{ duration: 13 }, 10]
+  ])('la durata che arriva al fornitore è quella che la barra mostra per il modello scelto (%o → %is)', async (params, sent) => {
+    generateVideoWithoutBrand.mockReset();
+    generateVideoWithoutBrand.mockResolvedValue({ ok: true, jobId: 'job-1' });
+    offerableSpy.mockResolvedValueOnce({
+      choices: [{ id: 'alibaba/wan-2.6', label: 'Wan 2.6', durationOptions: [5, 10], params: [] }],
+      recommended: []
+    });
+
+    const videoNodeRow = { ...freshNodeRow, type: 'video' };
+    const { db } = fakeDb(
+      { nodes: [videoNodeRow], assets: [] },
+      { updateRows: { nodes: [{ ...videoNodeRow, version: 2 }] } }
+    );
+
+    await runGenNode(db, {
+      orgId: ORG,
+      projectId: PROJECT,
+      canvasId: CANVAS,
+      nodeId: NODE,
+      userId: USER,
+      medium: 'video',
+      prompt: 'a dancing cat',
+      model: 'alibaba/wan-2.6',
+      params,
+      expectedVersion: 1
+    });
+
+    expect(generateVideoWithoutBrand).toHaveBeenCalledWith(expect.objectContaining({ durationSeconds: sent }));
+  });
+
   it('params.resolution scelto nella barra raggiunge generateImagesWithoutBrand', async () => {
     generateImagesWithoutBrand.mockReset();
     generateImagesWithoutBrand.mockResolvedValue({

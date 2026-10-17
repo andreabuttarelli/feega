@@ -21,11 +21,12 @@ export default defineConfig({
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: BASE_URL,
-    trace: 'on-first-retry'
+    trace: 'on-first-retry',
+    video: process.env.E2E_VIDEO === '1' ? 'on' : 'off'
   },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    ...(process.env.E2E_REAL_STACK === '1' ? [{ name: 'webkit-iphone', testMatch: /canvas-motion-(webgl|open)/, use: { ...devices['iPhone 15'] } }, { name: 'webkit', testMatch: /selection-outline/, use: { ...devices['Desktop Safari'] } }] : []),
+    ...(process.env.E2E_REAL_STACK === '1' ? [{ name: 'webkit-iphone', testMatch: /canvas-motion-(webgl|open)/, use: { ...devices['iPhone 15'] } }, { name: 'webkit', testMatch: /selection-outline|dashboard-nav|page-zoom-lock/, use: { ...devices['Desktop Safari'] } }] : []),
     ...(process.env.E2E_PERF === '1' ? [{ name: 'webkit-perf', testMatch: /canvas-frame-budget|canvas-stress|editor-scrub/, use: { ...devices['Desktop Safari'] } }] : [])
   ],
   webServer: {

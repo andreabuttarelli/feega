@@ -38,10 +38,10 @@ const STATUS_OF: Record<AttachmentError, number> = {
 const MESSAGE_OF: Record<AttachmentError, string> = {
   [AttachmentError.Empty]: 'The file is empty.',
   [AttachmentError.TooLarge]: `Files can be at most ${CHAT_ATTACHMENT_MAX_BYTES / 1024 / 1024} MB.`,
-  [AttachmentError.Unsupported]: 'Unsupported file: attach an image (PNG, JPG, WebP, GIF) or a PDF, DOCX, PPTX, XLSX, CSV, TXT, MD or HTML file.',
+  [AttachmentError.Unsupported]: 'Unsupported file: attach an image (PNG, JPG, WebP, GIF), a video (MP4, MOV, WebM) or a PDF, DOCX, PPTX, XLSX, CSV, TXT, MD or HTML file.',
   [AttachmentError.TooMany]: 'Too many attachments for one message.',
   [AttachmentError.Unreadable]: 'No text could be read from this file.',
-  [AttachmentError.Refused]: 'This image was refused by the safety review.',
+  [AttachmentError.Refused]: 'This file was refused by the safety review.',
   [AttachmentError.NotFound]: 'The uploaded file was not found.',
   [AttachmentError.InvalidPath]: 'Invalid attachment path.'
 };
@@ -55,9 +55,16 @@ export class AttachmentFailure extends Error {
 }
 
 export type AttachmentScope = { orgId: string; projectId: string; mode: ProjectMode };
-export type AttachmentPorts = { screenImage: (input: { orgId: string; mode: ProjectMode; url: string }) => Promise<ScreenOutcome> };
+type Screen = (input: { orgId: string; mode: ProjectMode; url: string }) => Promise<ScreenOutcome>;
+export type AttachmentPorts = { screenImage: Screen; screenVideo: Screen };
 
-const ASSET_KIND: Record<string, AttachmentKind | undefined> = { image: AttachmentKind.Image, document: AttachmentKind.Document };
+const ASSET_KIND: Record<string, AttachmentKind | undefined> = { image: AttachmentKind.Image, document: AttachmentKind.Document, video: AttachmentKind.Video };
+
+const SCREEN_OF: Record<AttachmentKind, ((ports: AttachmentPorts) => Screen) | null> = {
+  [AttachmentKind.Image]: (ports) => ports.screenImage,
+  [AttachmentKind.Video]: (ports) => ports.screenVideo,
+  [AttachmentKind.Document]: null
+};
 
 function verdictOrThrow(mimeType: string, name: string, bytes: number): AttachmentKind {
   const verdict = attachmentVerdict(mimeType, name, bytes);
@@ -77,8 +84,8 @@ export async function signAttachment(db: Db, scope: Omit<AttachmentScope, 'mode'
   return { path, uploadUrl: data.signedUrl, token: data.token };
 }
 
-async function screened(db: Db, scope: AttachmentScope, path: string, ports: AttachmentPorts) {
-  const outcome = await ports.screenImage({ orgId: scope.orgId, mode: scope.mode, url: await signAssetFile(db, path) });
+async function screened(db: Db, scope: AttachmentScope, path: string, screen: Screen) {
+  const outcome = await screen({ orgId: scope.orgId, mode: scope.mode, url: await signAssetFile(db, path) });
   if (outcome.ok) {
     return;
   }
@@ -95,6 +102,7 @@ const CONTENTS_OF: Record<AttachmentKind, (input: { buf: ArrayBuffer; mimeType: 
     });
     return { content: null, width: meta.width ?? null, height: meta.height ?? null };
   },
+  [AttachmentKind.Video]: async () => ({ content: null, width: null, height: null }),
   [AttachmentKind.Document]: async ({ buf, mimeType, name }) => {
     const content = await attachmentMarkdown(buf, mimeType, name).catch((e: unknown) => {
       throw new AttachmentFailure(AttachmentError.Unreadable, `No text could be read from ${name}: ${e instanceof Error ? e.message : String(e)}`);
@@ -116,8 +124,9 @@ export async function registerAttachment(db: Db, scope: AttachmentScope, file: {
   const buf = await download.data.arrayBuffer();
   const kind = verdictOrThrow(file.mimeType, name, buf.byteLength);
 
-  if (kind === AttachmentKind.Image) {
-    await screened(db, scope, file.path, ports);
+  const screen = SCREEN_OF[kind]?.(ports);
+  if (screen) {
+    await screened(db, scope, file.path, screen);
   }
   const contents = await CONTENTS_OF[kind]({ buf, mimeType: file.mimeType, name });
 
@@ -191,6 +200,11 @@ export const ATTACHMENT_PORTS: AttachmentPorts = {
     const { screenModelReferences } = await import('$lib/server/moderation/model-input');
     const { ReferenceMedium } = await import('$lib/server/moderation/people');
     return screenModelReferences({ orgId, mode, references: [{ medium: ReferenceMedium.Image, url }] });
+  },
+  screenVideo: async ({ orgId, mode, url }) => {
+    const { screenModelReferences } = await import('$lib/server/moderation/model-input');
+    const { ReferenceMedium } = await import('$lib/server/moderation/people');
+    return screenModelReferences({ orgId, mode, references: [{ medium: ReferenceMedium.Video, url }] });
   }
 };
 
@@ -200,7 +214,7 @@ async function resolveSource(db: Db, scope: AttachmentScope, source: AttachmentS
   if ('asset_id' in source) {
     const [found] = await loadAttachments(db, { orgId: scope.orgId, projectId: scope.projectId, ids: [source.asset_id] });
     if (!found) {
-      throw new AttachmentFailure(AttachmentError.NotFound, `Asset ${source.asset_id} is not an image or document of this project.`);
+      throw new AttachmentFailure(AttachmentError.NotFound, `Asset ${source.asset_id} is not an image, video or document of this project.`);
     }
     return found;
   }

@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, setKeyframes, setTransform } from './timeline';
 import { Ease } from './design';
 import { DocMode, docMode, setStill } from './still';
-import { frameOf, liftElement, linkOutput, mediaElement, placeElement, OutputKind } from './move-element';
+import { frameOf, guessedBoxes, liftElement, linkOutput, mediaElement, placeElement, OutputKind } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
 const VIDEO_ID = '99999999-2222-4333-8444-555555555555';
@@ -210,5 +210,17 @@ describe('an output linked to a frame', () => {
     const emptied = { ...first, tracks: first.tracks.map((t) => ({ ...t, clips: [] })) };
 
     expect(must(linkOutput(emptied, 'gen-node', mediaElement({ kind: OutputKind.Image, assetId: IMAGE_ID, name: 'a' }), ids())).tracks.flatMap((t) => t.clips)).toHaveLength(1);
+  });
+});
+
+describe('the boxes the stage draws before the player measures', () => {
+  it('a laid-out clip gets its box from its own props, in frame pixels', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'hi', x: 0.5, y: 0.5, width: 0.8, height: 0.4 } }, 'box'));
+
+    const box = guessedBoxes(doc).box;
+    expect(box.left).toBeCloseTo(0.1 * doc.width);
+    expect(box.top).toBeCloseTo(0.3 * doc.height);
+    expect(box.width).toBeCloseTo(0.8 * doc.width);
+    expect(box.height).toBeCloseTo(0.4 * doc.height);
   });
 });

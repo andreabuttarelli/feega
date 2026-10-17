@@ -16,6 +16,11 @@ describe('entryShell', () => {
     expect(entryShell({ from: '/p/p1/c/c1', to: MOTION, signedIn: true })).toBe(EntryShell.None);
   });
 
+  it('dentro la dashboard non copre la shell già montata', () => {
+    expect(entryShell({ from: '/app', to: '/app/canvases', signedIn: true })).toBe(EntryShell.None);
+    expect(entryShell({ from: '/app/canvases', to: '/app', signedIn: true })).toBe(EntryShell.None);
+  });
+
   it("verso /app mostra la shell dell'app", () => {
     expect(entryShell({ from: '/', to: '/app/upscale', signedIn: false })).toBe(EntryShell.App);
   });

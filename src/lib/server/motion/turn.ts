@@ -76,6 +76,7 @@ import { renderPagePath } from '$lib/motion/render-link';
 import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
 import type { ChatAttachment } from '$lib/chat-attachments';
 import { motionPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
+import { breakdownReader } from '$lib/server/video-reference';
 
 export const MOTION_AGENT_KEY = 'motion';
 const CHECK_WAIT_MS = 90_000;
@@ -321,7 +322,8 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const openingRound = role === StudioRole.Director ? Round.Research : Round.Edit;
   const memory = role === StudioRole.Director ? await projectMemory(db, { orgId, projectId: project.id, nodeId: motion.record.id }).catch(() => '') : '';
   const openingText = [message, note, picked.note, memory].filter(Boolean).join('\n\n');
-  const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint });
+  const videoBreakdown = breakdownReader(db, { orgId, projectId: project.id, mode: project.mode });
+  const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint, breakdown: videoBreakdown });
   let seamDraws = 0;
   const drawTurnFrames = async (callId: string, times: number[]) => {
     const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
@@ -349,6 +351,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     templates: templateLibrary(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
     revisions: { list: () => listRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null },
     ...sources,
+    videoBreakdown,
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
     voiceover: (voice) => withOrgContext(orgId, () => speakVoiceover(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, voice)),
     music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),

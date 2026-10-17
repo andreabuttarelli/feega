@@ -28,6 +28,7 @@ import { physicsSchema } from './physics/model';
 import { MOTION_STYLES } from './style-model';
 import { referenceLookSchema } from './reference-look-model';
 import { stillSchema } from './still-model';
+import { partStylesSchema } from './part-style-model';
 import { autoLayoutSchema, layoutItemSchema } from './layout/model';
 
 export enum MotionFormat {
@@ -109,7 +110,8 @@ const clipSchema = z.object({
   clipContent: z.boolean().optional(),
   markers: z.array(markerSchema).max(MAX_MARKERS).optional(),
   autoLayout: autoLayoutSchema.nullable().optional(),
-  layoutItem: layoutItemSchema.optional()
+  layoutItem: layoutItemSchema.optional(),
+  partStyles: partStylesSchema.optional()
 });
 
 const trackSchema = z.object({

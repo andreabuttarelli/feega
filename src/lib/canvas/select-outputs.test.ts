@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addOutput, outputValues, portOfHandle, removeOutput, renameOutput, selectOutputs, unavailableOutput } from './select-outputs';
+import { addOutput, outputValues, portOfHandle, removeOutput, renameOutput, selectOutputs, sourceOutputs, unavailableOutput } from './select-outputs';
 import type { PostRow } from './select-sources';
 
 const POST: PostRow = {
@@ -86,5 +86,18 @@ describe('porta di una maniglia', () => {
   it('una porta segnalata non si collega', () => {
     expect(unavailableOutput(tile, 'out:field:likes')).toBe(true);
     expect(unavailableOutput(tile, 'out:text')).toBe(false);
+  });
+});
+
+describe('sourceOutputs — the ports a synced source itself offers', () => {
+  it('a feed offers its stills and its videos apart', () => {
+    expect(sourceOutputs('social_account_feed').map((o) => [o.handle, o.port])).toEqual([
+      ['out:images', 'images'],
+      ['out:videos', 'videos']
+    ]);
+  });
+
+  it('a catalogue has only images: one plain port, no named outputs', () => {
+    expect(sourceOutputs('products')).toEqual([]);
   });
 });

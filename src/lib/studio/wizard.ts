@@ -1,11 +1,13 @@
 export enum Step {
   Photo = 'photo',
+  Influencer = 'influencer',
   Style = 'style',
   Generate = 'generate'
 }
 
 export const STEPS: readonly { id: Step; label: string }[] = [
   { id: Step.Photo, label: 'Photo' },
+  { id: Step.Influencer, label: 'Influencer' },
   { id: Step.Style, label: 'Style' },
   { id: Step.Generate, label: 'Generate' }
 ];
