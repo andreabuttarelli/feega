@@ -38,6 +38,7 @@
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
+  import { canvasHub, canvasPeersOf, keepCanvasMark, type CanvasMark } from '$lib/realtime/canvas-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
@@ -1061,6 +1062,17 @@
   });
   const frames = frameHub({ userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
   provideFramePresence(frames.port);
+  const cursorSession = crypto.randomUUID();
+  const cursors = canvasHub({ sessionId: cursorSession, userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
+  const PEER_SWEEP_MS = 1000;
+  let cursorMarks = $state(new Map<string, CanvasMark>());
+  let presenceNow = $state(0);
+  const canvasPeers = $derived(canvasPeersOf(cursorMarks, cursorSession, presenceNow));
+  $effect(() => {
+    const unlisten = cursors.port.listen((mark) => { cursorMarks = keepCanvasMark(untrack(() => cursorMarks), mark); presenceNow = Date.now(); });
+    const sweep = setInterval(() => { presenceNow = Date.now(); }, PEER_SWEEP_MS);
+    return () => { unlisten(); clearInterval(sweep); cursors.port.stop(); };
+  });
   let pending = 0;
   let snapshotMissed = false;
   let snapshotVersion = 0;
@@ -1188,6 +1200,7 @@
     if (ids.join() !== untrack(() => selectedIds.join())) { void saves.flush(); }
     const before = untrack(() => inlineMotion);
     selectedIds = ids;
+    cursors.port.update({ selection: ids });
     leaveNow(before);
   }
 
@@ -1394,7 +1407,8 @@
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
       onPeers: (value) => { peers = value; },
       onLink: (state) => { canvasLink.set(state); },
-      frames: frames.line
+      frames: frames.line,
+      cursors: cursors.line
     });
     return () => {
       disconnect();
@@ -3158,6 +3172,8 @@
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
+    peers={canvasPeers}
+    onPointer={(cursor) => cursors.port.update({ cursor })}
   >
     {#snippet tile({ id, selected })}
       {@const row = nodes.find((n) => n.id === id)}

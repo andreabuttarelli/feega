@@ -71,6 +71,7 @@
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
   import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
+  import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
   import { Flip, flipClips } from '$lib/motion/layer-props';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
@@ -1369,6 +1370,14 @@
     }
     COMMANDS[run.command]();
   }
+
+  function zoomToSelection() {
+    const boxes = spaceBoxes();
+    const around = boxAround(selection.flatMap((id) => (boxes[id] ? [boxes[id]] : [])));
+    if (around) {
+      zoomStage?.toBox(around);
+    }
+  }
   const nudgeBy = (dx: number, dy: number) => selection.length && apply(moveBy(doc, selection, frame, [dx, dy], editMode), 'Moved with the arrows');
   const alignTo = (edge: Edge) => apply(alignSpace(doc, selection, frame, spaceBoxes(), edge, editMode), `Aligned ${edge}`);
   const distribute = (axis: Axis) => apply(distributeSpace(doc, selection, frame, spaceBoxes(), axis, editMode), `Distributed along ${axis}`);
@@ -1439,6 +1448,7 @@
     [Command.PreviewZoomOut]: () => zoomStage?.zoomOut(),
     [Command.PreviewFit]: () => zoomStage?.fit(),
     [Command.PreviewActual]: () => zoomStage?.actual(),
+    [Command.PreviewSelection]: () => zoomToSelection(),
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
     [Command.SelectChild]: () => overlay?.key(Gesture.Enter),
     [Command.SelectParent]: selectParent,

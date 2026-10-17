@@ -157,6 +157,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.PreviewZoomOut]: VIEW,
   [Command.PreviewFit]: VIEW,
   [Command.PreviewActual]: VIEW,
+  [Command.PreviewSelection]: VIEW,
   [Command.ToggleChat]: VIEW,
   [Command.ToggleInspector]: VIEW,
   [Command.ToggleTimeline]: VIEW,
