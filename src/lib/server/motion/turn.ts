@@ -701,6 +701,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       void reply
         .finish(finishedTurn(steps), ReplyStatus.Failed)
         .then(land)
+        .catch((unsaved) => console.error('[motion-agent] failed turn not saved', unsaved))
         .finally(() => abandon(e));
       return 'The agent could not finish this turn.';
     }
