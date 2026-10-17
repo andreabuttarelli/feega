@@ -76,6 +76,7 @@ import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
 import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
 import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
+import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
 import { MOVE_STATUS, MoveOutcome, canvasBoxSchema, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -1084,6 +1085,17 @@ export const actions: Actions = {
 
     const linked = targetNode?.type === 'motion' ? await linkFrame(canvasFrames(scope), { sourceNodeId, frameNodeId: targetNodeId }) : null;
     return { connection, linked: linked?.outcome === MoveOutcome.Done ? linked : null };
+  },
+
+  frameSize: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = sizeAskSchema.safeParse({ nodeId: fd.get('node_id'), width: fd.get('width') ?? undefined, height: fd.get('height') ?? undefined });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid frame size' });
+    }
+    const sized = await sizeFrame(canvasFrames(scope), ask.data);
+    return sized.outcome === SizeOutcome.Done ? sized : fail(SIZE_STATUS[sized.outcome], { error: sized.outcome, detail: sized.detail });
   },
 
   moveElement: async ({ request, params, locals }) => {

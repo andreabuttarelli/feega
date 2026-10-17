@@ -91,10 +91,11 @@
   import { AssetKind } from '$lib/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, frameNodeSize, frameResize, motionEditorPath, type FrameResize, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
+  import { fitToNode } from '$lib/motion/custom-size';
   import { barContextOf } from '$lib/canvas/bottom-bar';
   import { CanvasState, NodeMode, Opening, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
@@ -2111,9 +2112,33 @@
     }
     const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motionOf(row)?.kind);
     if (Math.abs(fit.h - row.h) > FIT_SLACK_PX) {
-      void resize(row.id, fit.w, fit.h);
+      void storeSize(row.id, fit.w, fit.h);
     }
   });
+
+  function framePlan(id: string, w: number, h: number): FrameResize | null {
+    const row = nodes.find((node) => node.id === id);
+    const motion = motionOf(row ?? { id, type: '', data: {} });
+    if (!motion || !row) {
+      return null;
+    }
+    const open = layersSource.video?.nodeId === id ? layersSource.video : null;
+    const shown = open ? { ...motion, format: formatOf(open.doc) } : motion;
+    const mode = id === inlineMotion ? NodeMode.Edit : NodeMode.Preview;
+    return frameResize(shown, { w, h }, open?.doc ?? PICTURE_OF_KIND[motion.kind](motion, row), mode);
+  }
+
+  async function sizeFrameDoc(id: string, picture: { width: number; height: number }) {
+    const open = layersSource.video;
+    if (open?.nodeId === id) {
+      open.edit(fitToNode(open.doc, picture), 'Resized the frame');
+      return;
+    }
+    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height });
+    if (result?.undo) {
+      pushGesture({ items: result.undo as UndoItem[] });
+    }
+  }
 
   async function resize(id: string, width: number, height: number) {
     const group = nodes.find((n) => n.id === id);
@@ -2127,9 +2152,14 @@
       await post('scaleGroup', { id, width: String(width), height: String(height) });
       return;
     }
-    const fit = frameFit(id, width);
-    const w = fit?.w ?? width;
-    const h = fit?.h ?? height;
+    const plan = framePlan(id, width, height);
+    await storeSize(id, plan?.w ?? width, plan?.h ?? height);
+    if (plan?.picture) {
+      await sizeFrameDoc(id, plan.picture);
+    }
+  }
+
+  async function storeSize(id: string, w: number, h: number) {
     nodes = nodes.map((n) => (n.id === id ? { ...n, w, h, userHeight: h } : n));
     const placed = places.resize(id, w, h);
     keepOutbox();

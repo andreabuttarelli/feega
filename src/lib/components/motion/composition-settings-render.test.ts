@@ -28,3 +28,13 @@ describe('composition settings for a still', () => {
     expect(body).toMatch(/value="1\.5/);
   });
 });
+
+describe('composition settings for the size', () => {
+  it('lists custom and shows the size, editable', () => {
+    const body = render(CompositionSettings, { props: { doc: { ...newMotionDoc(MotionFormat.Landscape), width: 1200, height: 900, freeSize: true }, onchange: () => {} } }).body;
+
+    expect(body).toContain('Custom · 1200×900');
+    expect(body).toMatch(/value="1200"[^>]*data-testid="frame-width"/);
+    expect(body).toMatch(/value="900"[^>]*data-testid="frame-height"/);
+  });
+});
