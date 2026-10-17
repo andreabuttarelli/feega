@@ -10,7 +10,7 @@ export type TextureCache = {
 };
 
 async function load(url: string): Promise<ImageBitmap> {
-  const res = await fetch(url, { credentials: 'same-origin' });
+  const res = await fetch(url, { credentials: 'same-origin', mode: 'cors' });
   if (!res.ok) {
     throw new Error(`${res.status} ${url}`);
   }

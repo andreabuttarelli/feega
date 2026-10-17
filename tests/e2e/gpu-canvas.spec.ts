@@ -58,9 +58,10 @@ test.describe('GPU canvas: the same gestures as the DOM canvas @real', () => {
     await expect(page.getByRole('toolbar', { name: 'Selection actions' })).toBeVisible();
 
     const before = await row(admin, doc.id);
-    const from = await centreOf(page, doc.id);
+    const docBox = await boxOf(page, doc.id);
+    const from = await screen(page, { x: docBox.x + 30, y: docBox.y - 10 });
     const textBox = await boxOf(page, text.id);
-    await page.mouse.move(from.x, from.y - 60);
+    await page.mouse.move(from.x, from.y);
     await page.mouse.down();
     await page.mouse.move(from.x + 40, from.y + 20, { steps: 8 });
     await page.mouse.up();
@@ -154,5 +155,31 @@ test.describe('GPU canvas: the same gestures as the DOM canvas @real', () => {
     await page.mouse.click(pane.x + 20, pane.y + pane.height - 120);
     await page.keyboard.press('ControlOrMeta+z');
     await expect.poll(async () => (await elements()).length, { timeout: 10_000 }).toBe(0);
+  });
+
+  test('another actor moving a node shows up on the GPU canvas through realtime', async ({ page, session, admin, seedNode }) => {
+    const doc = await seedNode({ type: 'doc', x: 0, y: 0, data: { content: 'x', public: false } });
+    await seedNode({ type: 'doc', x: 600, y: 0, data: { content: 'y', public: false } });
+    await open(page, session);
+    await expect(page.getByRole('status', { name: /Live/ })).toBeAttached({ timeout: 15_000 });
+    await admin.from('nodes').update({ x: 333, y: 222 }).eq('id', doc.id);
+    await expect.poll(async () => (await boxOf(page, doc.id)).x, { timeout: 15_000 }).toBe(333);
+  });
+
+  test('prompt typed offline in the GPU canvas overlay lands once back online', async ({ page, session, admin, seedNode }) => {
+    const text = await seedNode({ type: 'text', x: 0, y: 0, data: { prompt: 'before' } });
+    await open(page, session);
+    const at = await centreOf(page, text.id);
+    await page.mouse.click(at.x, at.y);
+    const field = page.locator(`[data-testid="gpu-dom-node"][data-id="${text.id}"] textarea.gen-prompt`);
+    await expect(field).toBeVisible();
+    await page.context().setOffline(true);
+    await field.click();
+    await page.keyboard.press('End');
+    await field.pressSequentially(' offline', { delay: 25 });
+    await expect(page.locator('.save-status')).toHaveAttribute('data-status', 'offline', { timeout: 15_000 });
+    expect((await admin.from('nodes').select('data').eq('id', text.id).single()).data!.data.prompt).toBe('before');
+    await page.context().setOffline(false);
+    await expect.poll(async () => (await admin.from('nodes').select('data').eq('id', text.id).single()).data!.data.prompt, { timeout: 30_000 }).toBe('before offline');
   });
 });

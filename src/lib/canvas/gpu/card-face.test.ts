@@ -45,4 +45,9 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
   it('an unknown kind falls back to a plain card, never throws', () => {
     expect(faceOf({ id: 'z', tag: NameTag.Shown }, {}, asset)).toMatchObject({ surface: Surface.Blank, label: null });
   });
+
+  it('a source carries the thumbs of what it read', () => {
+    expect(faceOf({ id: 'f', kind: 'social_account_feed', tag: NameTag.Shown }, { platform: 'instagram', handle: 'nike' }, asset, ['t1', 't2']).thumbs).toEqual(['t1', 't2']);
+    expect(faceOf({ id: 'd', kind: 'doc', tag: NameTag.Shown }, { content: '' }, asset).thumbs).toEqual([]);
+  });
 });

@@ -47,9 +47,10 @@
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { shelfIds } from '$lib/canvas/gpu/poster-shelf';
+  import { NameTag } from '$lib/canvas/node-label';
   import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
 
-  let props: ComponentProps<typeof CanvasFlow> = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[] } = $props();
 
   const DOM_CAP = 6;
   const MOVE_SLOP_PX = 3;
@@ -126,7 +127,7 @@
         w: t.w,
         h: t.h,
         rotation: t.rotation ?? 0,
-        face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl),
+        face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
         ports: portsOf(t),
         hidden: domIds.has(t.id)
       })
@@ -310,7 +311,8 @@
   function topNodeAt(w: Point): string | null {
     for (let i = placed.length - 1; i >= 0; i--) {
       const t = placed[i];
-      if (w.x >= t.x && w.y >= t.y && w.x <= t.x + t.w && w.y <= t.y + t.h) {
+      const top = t.tag === NameTag.Hidden ? t.y : t.y - LABEL_CLEARANCE;
+      if (w.x >= t.x && w.y >= top && w.x <= t.x + t.w && w.y <= t.y + t.h) {
         return t.id;
       }
     }
@@ -1075,6 +1077,7 @@
 
   .dom-layer {
     position: absolute;
+    z-index: 1;
     left: 0;
     top: 0;
     transform-origin: 0 0;

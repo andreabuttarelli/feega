@@ -40,6 +40,8 @@ const LIVE_VIDEO_CAP = 4;
 const NEAR_TIER_ZOOM = 0.75;
 const MAX_TEXT_CHARS = 1400;
 const TEXT_TIERS = [1, 2, 4] as const;
+const THUMB_COLUMNS = 3;
+const THUMB_GAP = 4;
 
 const tierFor = (zoom: number) => TEXT_TIERS.find((t) => t >= zoom * devicePixelRatio) ?? TEXT_TIERS[TEXT_TIERS.length - 1];
 
@@ -342,12 +344,18 @@ export class GpuScene {
           this.mediaSprite(root, b, f.media, { x: 0, y: 0, w: c.w, h: c.h });
           return;
         }
-        const title = this.text(f.title || f.label || '', BODY_SIZE + 2, this.theme.ink, c.w - PAD * 2, '600');
+        const title = this.text(f.title || f.label || '', BODY_SIZE, this.theme.ink, c.w - PAD * 2, '600');
         title.position.set(PAD, PAD);
+        root.addChild(title);
+        b.texts.push(title);
+        if (f.thumbs.length) {
+          this.thumbGrid(root, f.thumbs, c, PAD + BODY_SIZE * 2);
+          return;
+        }
         const sub = this.text(f.subtitle, BODY_SIZE - 1, this.theme.inkSoft, c.w - PAD * 2);
         sub.position.set(PAD, PAD + BODY_SIZE * 2);
-        root.addChild(title, sub);
-        b.texts.push(title, sub);
+        root.addChild(sub);
+        b.texts.push(sub);
       },
       [Surface.Blank]: () => this.panel(root, c)
     };
@@ -362,6 +370,29 @@ export class GpuScene {
     this.drawPorts(holder, c);
     this.cardLayer.addChild(holder);
     return b;
+  }
+
+  private thumbGrid(root: Container, urls: string[], c: Card, top: number) {
+    const cell = (c.w - PAD * 2 - THUMB_GAP * (THUMB_COLUMNS - 1)) / THUMB_COLUMNS;
+    const rows = Math.max(0, Math.floor((c.h - top - PAD + THUMB_GAP) / (cell + THUMB_GAP)));
+    const shown = urls.slice(0, rows * THUMB_COLUMNS);
+    const wells = new Graphics();
+    root.addChild(wells);
+    shown.forEach((url, i) => {
+      const box = { x: PAD + (i % THUMB_COLUMNS) * (cell + THUMB_GAP), y: top + Math.floor(i / THUMB_COLUMNS) * (cell + THUMB_GAP), w: cell, h: cell };
+      wells.rect(box.x, box.y, box.w, box.h).fill(this.theme.line);
+      const sprite = new Sprite(Texture.EMPTY);
+      sprite.position.set(box.x, box.y);
+      root.addChild(sprite);
+      this.textures.want(url, (tex) => {
+        if (sprite.destroyed) {
+          return;
+        }
+        sprite.texture = cover(tex, cell, cell);
+        sprite.width = cell;
+        sprite.height = cell;
+      });
+    });
   }
 
   private body(root: Container, b: Built, s: string, c: Card, top: number, bottom = PAD) {
@@ -561,6 +592,14 @@ export class GpuScene {
 const WIRE_INK_SHARE = 0.45;
 
 function mix(a: string, b: string, share: number): string {
+  try {
+    return blend(a, b, share);
+  } catch {
+    return a;
+  }
+}
+
+function blend(a: string, b: string, share: number): string {
   const ca = new Color(a).toRgb();
   const cb = new Color(b).toRgb();
   return new Color({ r: (ca.r * share + cb.r * (1 - share)) * 255, g: (ca.g * share + cb.g * (1 - share)) * 255, b: (ca.b * share + cb.b * (1 - share)) * 255 }).toHex();

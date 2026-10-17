@@ -30,6 +30,7 @@ export type CardFace = {
   text: string;
   title: string;
   subtitle: string;
+  thumbs: string[];
 };
 
 type Data = Record<string, unknown>;
@@ -103,7 +104,8 @@ const BLANK: CardFace = {
   error: null,
   text: '',
   title: '',
-  subtitle: ''
+  subtitle: '',
+  thumbs: []
 };
 
 function labelOf(t: FaceTile, kind: NodeType): string | null {
@@ -113,7 +115,7 @@ function labelOf(t: FaceTile, kind: NodeType): string | null {
   return t.displayName?.trim() || NODE_KIND_LABEL[kind];
 }
 
-export function faceOf(t: FaceTile, data: Data, asset: AssetUrl): CardFace {
+export function faceOf(t: FaceTile, data: Data, asset: AssetUrl, thumbs: string[] = []): CardFace {
   if (!t.kind || !isNodeType(t.kind)) {
     return BLANK;
   }
@@ -122,5 +124,5 @@ export function faceOf(t: FaceTile, data: Data, asset: AssetUrl): CardFace {
   if (isUploadedNodeRow({ type: kind, data })) {
     return { ...BLANK, surface: Surface.Media, label, media: { url: asset(str(data.assetId)), video: kind === 'video' } };
   }
-  return { ...BLANK, label, ...FACES[kind](data, asset, t) };
+  return { ...BLANK, label, thumbs, ...FACES[kind](data, asset, t) };
 }
