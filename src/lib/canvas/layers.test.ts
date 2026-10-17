@@ -46,6 +46,21 @@ describe('layer rows', () => {
     expect(rows.some((r) => r.nodeId === 'm2' && r.depth > 0)).toBe(false);
   });
 
+  it('shows a free element as one row, never a frame with the element inside', () => {
+    const doc = video();
+    const rows = layerRows([{ id: 'e1', type: 'motion', name: 'Rectangle', element: true }], { nodeId: 'e1', doc }, { e1: frameRows(doc, 'e1') });
+
+    expect(rows.map((r) => [r.id, r.kind, r.label, r.nodeId])).toEqual([['e1', LayerKind.Node, 'Rectangle', 'e1']]);
+  });
+
+  it('picks the one element row while its shape is selected inside it', () => {
+    const doc = video();
+    const [row] = layerRows([{ id: 'e1', type: 'motion', name: 'Rectangle', element: true }], { nodeId: 'e1', doc });
+
+    expect(rowPicked(row, { canvas: [], video: { nodeId: 'e1', selection: ['t1'], part: null } })).toBe(true);
+    expect(rowPicked(row, { canvas: [], video: { nodeId: 'e2', selection: ['t1'], part: null } })).toBe(false);
+  });
+
   it('shows a template instance as one locked group, not its insides', () => {
     const doc = video();
     const withTemplate: MotionDoc = {

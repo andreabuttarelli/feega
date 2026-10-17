@@ -42,13 +42,20 @@ describe('il nome di una porta si vede solo quando serve', () => {
   });
 });
 
-describe('una porta è solo il quadrato pieno e il suo nome', () => {
+describe("l'Handle è solo il quadrato: il filo finisce lì, non oltre il nome", () => {
   const chip = style.slice(style.indexOf(':global(.svelte-flow__handle.typed-port) {'));
   const rule = chip.slice(0, chip.indexOf('}'));
 
-  it('senza bordo e senza sfondo', () => {
+  it('un quadrato pieno di 10px, senza bordo', () => {
+    expect(rule).toMatch(/width:\s*10px;/);
+    expect(rule).toMatch(/height:\s*10px;/);
     expect(rule).toMatch(/border:\s*none;/);
-    expect(rule).toMatch(/background:\s*transparent;/);
+    expect(rule).toMatch(/background:\s*var\(--port\);/);
+  });
+
+  it('il nome è un fratello, fuori dal Handle', () => {
+    expect(tile).not.toContain('</Handle>');
+    expect(tile.match(/\/>\s*<span class=\{?[`"]port-name/g)?.length).toBe(3);
   });
 
   it('nessun contorno doppio quando accetta un filo', () => {

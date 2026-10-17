@@ -253,14 +253,29 @@ export function placeElement(doc: MotionDoc, element: Element, place: Placement,
   return { ok: true, clipId: clip.id, doc: { ...doc, ...merged(doc, element.carried, element), tracks, durationInFrames: grown(doc, clip) } };
 }
 
-export function elementBox(element: Element): Box {
-  const { props } = element.clip;
-  if (!laidOut(element.clip.component) || typeof props.width !== 'number' || typeof props.height !== 'number') {
-    return FULL;
+function ownBox(clip: MotionClip): Box | null {
+  const { props } = clip;
+  if (!laidOut(clip.component) || typeof props.width !== 'number' || typeof props.height !== 'number') {
+    return null;
   }
   const x = typeof props.x === 'number' ? props.x : CENTRE.x;
   const y = typeof props.y === 'number' ? props.y : CENTRE.y;
   return { left: x - props.width / 2, top: y - props.height / 2, width: props.width, height: props.height };
+}
+
+export function elementBox(element: Element): Box {
+  return ownBox(element.clip) ?? FULL;
+}
+
+export function guessedBoxes(doc: MotionDoc): Record<string, Box> {
+  const boxes: Record<string, Box> = {};
+  for (const clip of doc.tracks.flatMap((t) => t.clips)) {
+    const box = ownBox(clip);
+    if (box) {
+      boxes[clip.id] = { left: box.left * doc.width, top: box.top * doc.height, width: box.width * doc.width, height: box.height * doc.height };
+    }
+  }
+  return boxes;
 }
 
 const even = (value: number) => Math.max(MIN_SIDE, Math.round(value / 2) * 2);

@@ -13,7 +13,7 @@ import { AttachmentFailure, importAttachment, loadAttachments, registerAttachmen
 
 const scope = { orgId: 'org-1', projectId: 'p-1', mode: ProjectMode.Standard };
 const prefix = chatAttachmentPrefix('org-1', 'p-1');
-const clear = { screenImage: vi.fn(async () => ({ ok: true as const })) };
+const clear = { screenImage: vi.fn(async () => ({ ok: true as const })), screenVideo: vi.fn(async () => ({ ok: true as const })) };
 const png = async () => new Uint8Array(await sharp({ create: { width: 40, height: 20, channels: 3, background: '#0a0' } }).png().toBuffer());
 
 const assetRow = (over: Record<string, unknown> = {}) => ({
@@ -57,7 +57,7 @@ describe('registerAttachment', () => {
   it('un\'immagine porta le dimensioni e passa dal controllo dei riferimenti', async () => {
     const path = `${prefix}u__logo.png`;
     const { db, calls } = fakeDb({ assets: [assetRow()] }, { files: { [path]: await png() } });
-    const screen = { screenImage: vi.fn(async () => ({ ok: true as const })) };
+    const screen = { ...clear, screenImage: vi.fn(async () => ({ ok: true as const })) };
     await registerAttachment(db, { ...scope, mode: ProjectMode.Uncensored }, { path, mimeType: 'image/png' }, screen);
     expect(screen.screenImage).toHaveBeenCalledWith({ orgId: 'org-1', mode: ProjectMode.Uncensored, url: expect.stringContaining(path) });
     expect(calls.find((c) => c.op === 'insert')!.payload).toMatchObject({ type: 'image', width: 40, height: 20 });
@@ -66,12 +66,33 @@ describe('registerAttachment', () => {
   it('un\'immagine rifiutata non diventa asset e il file sparisce', async () => {
     const path = `${prefix}u__face.png`;
     const { db, calls } = fakeDb({}, { files: { [path]: await png() } });
-    const refused = { screenImage: async () => ({ ok: false as const, error: 'Refused: people' }) };
+    const refused = { ...clear, screenImage: async () => ({ ok: false as const, error: 'Refused: people' }) };
     const e = await failure(registerAttachment(db, scope, { path, mimeType: 'image/png' }, refused));
     expect(e.code).toBe(AttachmentError.Refused);
     expect(e.message).toBe('Refused: people');
     expect(calls.some((c) => c.op === 'insert')).toBe(false);
     expect(calls.some((c) => c.op === 'remove')).toBe(true);
+  });
+
+  it('a video becomes a video asset after the reference review', async () => {
+    const path = `${prefix}u__ref.mp4`;
+    const { db, calls } = fakeDb({ assets: [assetRow({ type: 'video', url: path, mime_type: 'video/mp4' })] }, { files: { [path]: new Uint8Array([0, 0, 0, 24]) } });
+    const screen = { ...clear, screenVideo: vi.fn(async () => ({ ok: true as const })) };
+
+    const made = await registerAttachment(db, { ...scope, mode: ProjectMode.Uncensored }, { path, mimeType: 'video/mp4' }, screen);
+
+    expect(screen.screenVideo).toHaveBeenCalledWith({ orgId: 'org-1', mode: ProjectMode.Uncensored, url: expect.stringContaining(path) });
+    expect(calls.find((c) => c.op === 'insert')!.payload).toMatchObject({ type: 'video', url: path, mime_type: 'video/mp4' });
+    expect(made).toMatchObject({ kind: AttachmentKind.Video, name: 'ref.mp4' });
+  });
+
+  it('a video refused by the reference review is removed', async () => {
+    const path = `${prefix}u__face.mp4`;
+    const { db, calls } = fakeDb({}, { files: { [path]: new Uint8Array([1]) } });
+    const refused = { ...clear, screenVideo: async () => ({ ok: false as const, error: 'Refused: people' }) };
+
+    expect((await failure(registerAttachment(db, scope, { path, mimeType: 'video/mp4' }, refused))).code).toBe(AttachmentError.Refused);
+    expect(calls.some((c) => c.op === 'insert')).toBe(false);
   });
 
   it('un percorso fuori dalla cartella chat del progetto è rifiutato', async () => {
@@ -121,5 +142,11 @@ describe('loadAttachments', () => {
     const loaded = await loadAttachments(db, { orgId: 'org-1', projectId: 'p-1', ids: ['a-1', 'a-2'] });
     expect(loaded).toEqual([{ assetId: 'a-1', kind: AttachmentKind.Image, name: 'logo.png', mimeType: 'image/png', bytes: 10 }]);
     expect(calls[0].filters).toContainEqual(['org_id', 'org-1']);
+  });
+
+  it('a library video can be attached by asset id', async () => {
+    const { db } = fakeDb({ assets: [assetRow({ type: 'video', url: `${prefix}u__ref.mp4`, mime_type: 'video/mp4' })] });
+    const loaded = await loadAttachments(db, { orgId: 'org-1', projectId: 'p-1', ids: ['a-1'] });
+    expect(loaded).toEqual([{ assetId: 'a-1', kind: AttachmentKind.Video, name: 'ref.mp4', mimeType: 'video/mp4', bytes: 10 }]);
   });
 });

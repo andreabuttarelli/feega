@@ -16,7 +16,31 @@ const INFLUENCER_NODE = '77777777-7777-7777-7777-777777777777';
 const UNCENSORED = 'wiro/wiro-partners/z-image-uncensored';
 const SAFE = 'wiro/alibaba/qwen-image-3-0-pro';
 
+const REFERENCE_VIDEO = 'higgsfield/bytedance/seedance-2.5/reference-to-video';
+
+const VIDEO_EDIT = 'higgsfield/bytedance/seedance-2.5/video-edit';
+
 const models: Record<string, TaskModel> = {
+  [VIDEO_EDIT]: {
+    id: VIDEO_EDIT,
+    catalogue: 'video',
+    uncensored: false,
+    spec: {
+      path: 'bytedance/seedance-2.5/video-edit',
+      numeric: ['duration'],
+      fields: { prompt: 'prompt', resolution: 'resolution', images: [], video: 'video_url', imageList: 'image_urls', videoList: 'video_urls', audioList: 'audio_urls' },
+      requiresVideo: true,
+      caps: { image: 30, video: 9, audio: 10 }
+    },
+    paramSchema: {}
+  },
+  [REFERENCE_VIDEO]: {
+    id: REFERENCE_VIDEO,
+    catalogue: 'video',
+    uncensored: false,
+    spec: { path: 'bytedance/seedance-2.5/reference-to-video', fields: { prompt: 'prompt', images: [], imageList: 'image_urls', videoList: 'video_urls', audioList: 'audio_urls' } },
+    paramSchema: {}
+  },
   [UNCENSORED]: {
     id: UNCENSORED,
     catalogue: 'image',
@@ -33,7 +57,7 @@ const models: Record<string, TaskModel> = {
   }
 };
 
-const gateway = { run: vi.fn(), task: vi.fn(), purge: vi.fn() };
+const gateway = { run: vi.fn(), task: vi.fn(), purge: vi.fn(), quote: vi.fn() };
 const bill = vi.fn();
 const decide = vi.fn();
 const judge = vi.fn();
@@ -42,11 +66,15 @@ const judgeIdentifiability = vi.fn();
 const record = vi.fn();
 const screen: ScreenPorts = { decide, judge, decideIdentifiability, judgeIdentifiability, record };
 
-const { deps } = vi.hoisted(() => ({ deps: { current: null as null | ((db: Db) => TaskRunDeps) } }));
+const { deps, upstreamMedia, providerLoad } = vi.hoisted(() => ({
+  deps: { current: null as null | ((db: Db) => TaskRunDeps) },
+  upstreamMedia: { current: {} as Record<string, unknown> },
+  providerLoad: { current: undefined as TaskRunDeps['load'] }
+}));
 vi.mock('$lib/server/task-providers-config', () => ({ taskRunDeps: (db: Db) => deps.current!(db) }));
 vi.mock('$app/environment', () => ({ dev: true, browser: false, building: false }));
 vi.mock('$env/dynamic/private', () => ({ env: { UNCENSORED_DEV_MANUAL_VERIFICATION: 'true' } }));
-vi.mock('./node-model', () => ({ resolveNodeModel: async (_m: string, model: string | null) => ({ ok: true, model }) }));
+vi.mock('./node-model', () => ({ resolveModelIn: async (_mode: string, _m: string, model: string | null) => ({ ok: true, model }) }));
 vi.mock('$lib/server/canvas/upstream', () => ({
   upstreamInputsFor: async () => ({
     text: [],
@@ -58,21 +86,25 @@ vi.mock('$lib/server/canvas/upstream', () => ({
     startFrameUrl: null,
     endFrameUrl: null,
     blocked: null,
-    rejected: []
+    rejected: [],
+    ...upstreamMedia.current
   })
 }));
 
 beforeEach(async () => {
-  for (const fn of [gateway.run, gateway.task, gateway.purge, bill, decide, judge, decideIdentifiability, judgeIdentifiability, record]) {
+  for (const fn of [gateway.run, gateway.task, gateway.purge, gateway.quote, bill, decide, judge, decideIdentifiability, judgeIdentifiability, record]) {
     fn.mockReset();
   }
   decide.mockResolvedValue({ choice: 'safe', probabilities: { safe: 0.999 } });
   decideIdentifiability.mockResolvedValue({ choice: 'generic', probabilities: { generic: 0.999 } });
   judgeIdentifiability.mockResolvedValue({ allowed: true, category: 'generic', reason: '' });
   gateway.run.mockResolvedValue({ taskId: '2221' });
+  upstreamMedia.current = {};
+  providerLoad.current = undefined;
   const { uncensoredAccess } = await import('$lib/server/uncensored-access');
   deps.current = (db) => ({
-    providers: { wiro: gateway },
+    providers: { wiro: gateway, higgsfield: gateway },
+    load: providerLoad.current,
     model: async (id) => models[id] ?? null,
     access: (orgId) => uncensoredAccess(db, orgId),
     screen: () => screen,
@@ -328,3 +360,130 @@ describe('taskPurgers', () => {
     expect(gateway.purge).toHaveBeenCalledWith('2221');
   });
 });
+
+describe('a video node on a model that takes video and audio references', () => {
+  it('sends the connected videos and audios, signed, to the provider', async () => {
+    upstreamMedia.current = { referenceVideoUrls: ['https://cdn.test/clip.mp4'], referenceAudioUrls: ['https://cdn.test/voice.wav'] };
+    const { db } = fakeDb(
+      { nodes: [{ ...imageNode(), type: 'video' }], nodes_connections: [], assets: [], orgs: [paidOrg], projects: [{ id: PROJECT, org_id: ORG, mode: 'standard' }] },
+      { updateRows: { nodes: [{ ...imageNode(), type: 'video', version: 2 }] } }
+    );
+
+    const out = await runGenNode(db, { ...start(REFERENCE_VIDEO, 'dance'), medium: 'video' });
+
+    expect(out.kind).toBe('queued');
+    expect(gateway.run).toHaveBeenCalledWith(
+      { path: 'bytedance/seedance-2.5/reference-to-video' },
+      expect.objectContaining({ video_urls: ['https://cdn.test/clip.mp4'], audio_urls: ['https://cdn.test/voice.wav'] }),
+      expect.any(String)
+    );
+  });
+});
+
+describe('a Higgsfield run when the account is at its concurrency cap', () => {
+  const videoCanvas = (extra: Record<string, unknown[]> = {}) =>
+    fakeDb(
+      { nodes: [{ ...imageNode({ running: true, runId: RUN }), type: 'video' }], nodes_connections: [], assets: [], orgs: [paidOrg], projects: [{ id: PROJECT, org_id: ORG, mode: 'standard' }], ...extra },
+      { updateRows: { nodes: [{ ...imageNode(), type: 'video', version: 2 }] } }
+    );
+
+  it('queues locally instead of failing, and the node keeps running', async () => {
+    providerLoad.current = async () => ({ inFlight: 4, waiting: 0, cap: 4 });
+    const { db, calls } = videoCanvas();
+
+    const out = await runGenNode(db, { ...start(REFERENCE_VIDEO, 'dance'), medium: 'video' });
+
+    expect(out.kind).toBe('queued');
+    expect(gateway.run).not.toHaveBeenCalled();
+    expect(externalJobOf(calls)).toBe('higgsfield:waiting');
+  });
+
+  const waitingRun = {
+    id: RUN,
+    org_id: ORG,
+    node_id: NODE,
+    prompt: 'dance',
+    model: REFERENCE_VIDEO,
+    params: {},
+    status: 'running',
+    error: null,
+    output_asset_id: null,
+    external_job_id: 'higgsfield:waiting',
+    cost_usd: null,
+    attempts: 0,
+    started_at: new Date().toISOString(),
+    finished_at: null,
+    actor_id: USER
+  };
+
+  it('submits a waiting run once a slot frees, never polling the placeholder', async () => {
+    providerLoad.current = async () => ({ inFlight: 3, waiting: 1, cap: 4 });
+    upstreamMedia.current = { referenceVideoUrls: ['https://cdn.test/clip.mp4'] };
+    const { db, calls } = videoCanvas({ node_runs: [waitingRun] });
+
+    expect(await reconcileTaskNodeRuns(db)).toMatchObject({ checked: 1, pending: 1 });
+
+    expect(gateway.task).not.toHaveBeenCalled();
+    expect(gateway.run).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ prompt: 'dance', video_urls: ['https://cdn.test/clip.mp4'] }), RUN);
+    expect(externalJobOf(calls)).toBe('higgsfield:2221');
+  });
+
+  it('leaves a waiting run waiting while the account stays full', async () => {
+    providerLoad.current = async () => ({ inFlight: 4, waiting: 1, cap: 4 });
+    const { db } = videoCanvas({ node_runs: [waitingRun] });
+
+    expect(await reconcileTaskNodeRuns(db)).toMatchObject({ checked: 1, pending: 1 });
+    expect(gateway.run).not.toHaveBeenCalled();
+    expect(gateway.task).not.toHaveBeenCalled();
+  });
+});
+
+describe('a video node editing a wired video with Seedance 2.5', () => {
+  const editCanvas = () =>
+    fakeDb(
+      { nodes: [{ ...imageNode(), type: 'video' }], nodes_connections: [], assets: [], orgs: [paidOrg], projects: [{ id: PROJECT, org_id: ORG, mode: 'standard' }] },
+      { updateRows: { nodes: [{ ...imageNode(), type: 'video', version: 2 }] } }
+    );
+
+  it('sends the first wired video as the source, the others as references, at the chosen resolution', async () => {
+    upstreamMedia.current = { referenceVideoUrls: ['https://cdn.test/source.mp4', 'https://cdn.test/style.mp4'] };
+    const { db } = editCanvas();
+
+    const out = await runGenNode(db, { ...start(VIDEO_EDIT, 'make it night', { resolution: '1080p' }), medium: 'video' });
+
+    expect(out.kind).toBe('queued');
+    expect(gateway.run).toHaveBeenCalledWith(
+      { path: 'bytedance/seedance-2.5/video-edit', numeric: ['duration'] },
+      { prompt: 'make it night', resolution: '1080p', video_url: 'https://cdn.test/source.mp4', video_urls: ['https://cdn.test/style.mp4'] },
+      expect.any(String)
+    );
+  });
+
+  it('refuses without a wired video, before any provider call', async () => {
+    const { db } = editCanvas();
+
+    const out = await runGenNode(db, { ...start(VIDEO_EDIT, 'make it night'), medium: 'video' });
+
+    expect(out).toEqual({ kind: 'refused', error: 'missing_input: this model needs a source video' });
+    expect(gateway.run).not.toHaveBeenCalled();
+  });
+});
+
+describe('a run quoted on submit', () => {
+  it('stores the provider quote on the run, so the finished task bills that price', async () => {
+    models[VIDEO_EDIT].spec.quotedAtSubmit = true;
+    gateway.quote.mockResolvedValue(8.2);
+    upstreamMedia.current = { referenceVideoUrls: ['https://cdn.test/source.mp4'] };
+    const { db, calls } = fakeDb(
+      { nodes: [{ ...imageNode(), type: 'video' }], nodes_connections: [], assets: [], orgs: [paidOrg], projects: [{ id: PROJECT, org_id: ORG, mode: 'standard' }] },
+      { updateRows: { nodes: [{ ...imageNode(), type: 'video', version: 2 }] } }
+    );
+
+    await runGenNode(db, { ...start(VIDEO_EDIT, 'restyle', { resolution: '720p' }), medium: 'video' });
+    models[VIDEO_EDIT].spec.quotedAtSubmit = false;
+
+    const stored = calls.find((c) => c.table === 'node_runs' && c.op === 'update' && (c.payload as { params?: Record<string, unknown> }).params?.quotedUsd);
+    expect((stored?.payload as { params: Record<string, unknown> }).params).toEqual({ resolution: '720p', quotedUsd: 8.2 });
+  });
+});
+

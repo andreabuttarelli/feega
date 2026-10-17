@@ -7,6 +7,7 @@
   import PageHead from '$lib/components/PageHead.svelte';
   import CreditAmount from '$lib/components/CreditAmount.svelte';
   import PhotoDrop, { type Checked } from '$lib/components/studio/PhotoDrop.svelte';
+  import InfluencerPicker from '$lib/components/studio/InfluencerPicker.svelte';
   import NodeReferences from '$lib/components/canvas/NodeReferences.svelte';
   import type { NodeReference } from '$lib/canvas/node-references';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
@@ -41,7 +42,6 @@
   let quote = $state<Quote | null>(null);
 
   const products = $derived<Product[]>([...uploaded, ...data.products.filter((p) => !uploaded.some((u) => u.id === p.id))]);
-  const castable = $derived(data.models.filter((m) => m.allowed));
   const qualities = $derived(
     [
       { id: data.previewModel, label: 'Draft', hint: 'Fast and cheap. Good to try styles.' },
@@ -196,7 +196,7 @@
             </select>
           </label>
         {/if}
-        <button type="button" class="primary" disabled={!productIds.length || busy} onclick={() => (step = Step.Style)} data-testid="studio-next-style">Next: choose a style</button>
+        <button type="button" class="primary" disabled={!productIds.length || busy} onclick={() => (step = Step.Influencer)} data-testid="studio-next-influencer">Next: choose an influencer</button>
       </footer>
     </section>
 
@@ -210,10 +210,25 @@
         </ul>
       </section>
     {/if}
-  {:else if step === Step.Style}
+  {:else if step === Step.Influencer}
     <section class="panel">
       <header>
         <button type="button" class="back" onclick={() => (step = Step.Photo)}><ArrowLeft size={16} /> Photo</button>
+        <PageTitle text="Choose your influencer" />
+        <p>Optional. Pick one or more to shoot your product on a person, or skip for product-only photos.</p>
+      </header>
+
+      <InfluencerPicker models={data.models} selected={modelIds} createHref={`/p/${data.projectId}/influencers`} onchange={(next) => (modelIds = next)} />
+
+      <footer class="next">
+        <button type="button" class="secondary" onclick={() => ((modelIds = []), (step = Step.Style))} data-testid="studio-skip-influencer">Skip</button>
+        <button type="button" class="primary" disabled={!modelIds.length} onclick={() => (step = Step.Style)} data-testid="studio-next-style">Next: choose a style</button>
+      </footer>
+    </section>
+  {:else if step === Step.Style}
+    <section class="panel">
+      <header>
+        <button type="button" class="back" onclick={() => (step = Step.Influencer)}><ArrowLeft size={16} /> Influencer</button>
         <PageTitle text="Pick a style" />
         <p>Each style you pick becomes its own photo. White is ready for Amazon and most marketplaces.</p>
       </header>
@@ -241,18 +256,6 @@
                 <button type="button" class="chip" class:on={shots.includes(shot.id)} onclick={() => (shots = toggle(shots, shot.id))}>{shot.label}</button>
               {/each}
             </div>
-          </div>
-          <div>
-            <h3>Models <span class="muted">synthetic people only, 21+</span></h3>
-            {#if castable.length}
-              <div class="chips">
-                {#each castable as m (m.id)}
-                  <button type="button" class="chip" class:on={modelIds.includes(m.id)} onclick={() => (modelIds = toggle(modelIds, m.id))}>{m.name}</button>
-                {/each}
-              </div>
-            {:else}
-              <p class="muted">None yet. <a href={`/p/${data.projectId}/influencers`}>Create one with AI</a> to shoot on a person.</p>
-            {/if}
           </div>
           <div>
             <h3>Style references <span class="muted">scene, light, mood</span></h3>
@@ -644,12 +647,24 @@
     cursor: pointer;
     border-radius: var(--ui-radius-sm);
   }
+  .secondary {
+    min-height: 44px;
+    padding: 0 var(--ui-space-6);
+    font-size: var(--ui-type-body);
+    font-weight: 600;
+    border: 1px solid var(--ui-divider-strong);
+    background: var(--ui-panel);
+    color: var(--ui-text);
+    cursor: pointer;
+    border-radius: var(--ui-radius-sm);
+  }
   .primary:disabled {
     opacity: 0.45;
     cursor: not-allowed;
   }
   @media (max-width: 560px) {
-    .next .primary {
+    .next .primary,
+    .next .secondary {
       flex: 1;
     }
   }

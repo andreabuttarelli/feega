@@ -112,5 +112,10 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     path: 'src/lib/server/reports/report-deps.ts — segnalazioni DSA/DMCA (rotte /report, /report/counter/[id], /admin/reports, tick)',
     why: "Chi segnala da un link condiviso non ha sessione, e content_reports/account_strikes non hanno policy per nessun JWT: le legge e le scrive solo questo percorso. L'invio risolve org e autore dal token di condivisione o dall'id del nodo, senza restituire nulla a chi chiama. Le decisioni passano solo dopo isInternalEmail sulla sessione (/admin/reports) o dal cron (restauro dopo una contro-notifica); agiscono sulla riga del report, non su un org_id scelto da fuori. La sospensione usa auth.admin (ban) sull'utente letto dal report. La contro-notifica è autorizzata dall'impronta del token mandato all'autore. Una rimozione sposta i file del nodo (assets della sua org, letti da nodes.data e node_runs) nel bucket privato quarantine sotto <orgId>/<reportId>/, così gli URL già firmati muoiono subito; il ripristino li riporta indietro.",
     tables: ['content_reports', 'account_strikes', 'canvases', 'nodes', 'node_runs', 'assets', 'orgs_members', 'profiles', 'auth.users', 'storage.objects']
+  },
+  {
+    path: 'src/lib/server/task-providers-config.ts — loadOf (cap di concorrenza per account del fornitore)',
+    why: "Il limite di richieste simultanee di Higgsfield è per account feega, non per org: contarle richiede i giri di ogni org. Si legge solo `external_job_id` dei giri vivi con il prefisso del fornitore, un numero e nient'altro esce; nessun org_id arriva da chi chiama.",
+    tables: ['node_runs']
   }
 ] as const;

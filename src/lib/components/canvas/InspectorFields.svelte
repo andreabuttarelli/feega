@@ -32,7 +32,7 @@
     if (value === undefined) {
       return;
     }
-    onfield(view.dataWith(field.path, value));
+    onfield(view.patchWith(field.path, value));
   }
 
   function text(field: FieldSpec): string {

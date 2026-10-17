@@ -4,18 +4,17 @@ import type { Db } from '$lib/server/db/client';
 import { createNode, deleteNode, findNode, listConnections, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
 import type { Actor } from '$lib/server/repos/actor';
-import { FrameKind, elementNodeOf, frameChrome, motionNodeSize } from '$lib/canvas/motion-node';
-import { blankElement, canvasReady, drawnElement, type Drawn } from '$lib/motion/draw-create';
+import { FrameKind, atFirstRevision, drawnFrameNodeOf, elementNodeOf, frameChrome, motionNodeSize } from '$lib/canvas/motion-node';
+import { CanvasTheme, blankElement, canvasReady, drawnElement, drawnFrame, drawnOf, type CanvasBox } from '$lib/motion/draw-create';
 import { elementName } from '$lib/motion/element-name';
 import { DrawTool } from '$lib/motion/draw-tool';
-import { parsePath } from '$lib/motion/shape/geometry';
 import { frameShape } from './start';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
 import { saveMotionDoc } from './editor';
 import { DocMode, docMode } from '$lib/motion/still';
 import { DropOn, OutputKind, clipCentre, elementBox, frameOf, liftElement, linkOutput, mediaElement, placeElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
-import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
+import { RevisionOutcome, appendRevision, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { UndoItem } from '$lib/canvas/undo-plan';
 
 export enum MoveOutcome {
@@ -45,7 +44,7 @@ export const moveAskSchema = z.object({ sourceNodeId: z.string().min(1), clipId:
 
 export const freeAskSchema = z.object({ sourceNodeId: z.string().min(1), drop: dropSchema }).strict();
 
-export const outputAskSchema = z.object({ sourceNodeId: z.string().min(1), drop: dropSchema }).strict();
+export const outputAskSchema = z.object({ sourceNodeId: z.string().min(1), drop: dropSchema, id: z.string().uuid().optional() }).strict();
 
 export const MOVE_STATUS: Record<Exclude<MoveOutcome, MoveOutcome.Done>, number> = {
   [MoveOutcome.NotFound]: 404,
@@ -67,7 +66,7 @@ export type NodeShape = { data: Record<string, unknown>; width: number; height: 
 export type FrameStore = {
   read: (nodeId: string) => Promise<StoredFrame | null>;
   write: (nodeId: string, expectedVersion: number, doc: MotionDoc, summary: string) => Promise<RevisionWrite>;
-  create: (at: Place & { x: number; y: number }, doc: MotionDoc, shape?: NodeShape) => Promise<string>;
+  create: (at: Place & { x: number; y: number; id?: string }, doc: MotionDoc, shape?: NodeShape) => Promise<string>;
   remove: (nodeId: string) => Promise<void>;
   output: (nodeId: string) => Promise<(Place & { output: Output }) | null>;
   fedFrames: (nodeId: string) => Promise<string[]>;
@@ -79,7 +78,7 @@ export type Moved =
 
 export type MoveAsk = { sourceNodeId: string; clipId: string; drop: Drop; box?: Box | null; versions?: Record<string, number> };
 
-export type OutputAsk = { sourceNodeId: string; drop: Drop };
+export type OutputAsk = { sourceNodeId: string; drop: Drop; id?: string };
 
 const SUMMARY = {
   movedOut: 'Moved an element to another frame',
@@ -156,7 +155,7 @@ enum StillAt {
 
 const STILL_AT: Record<StillAt, (doc: MotionDoc) => MotionDoc> = { [StillAt.Kept]: (doc) => doc, [StillAt.Settled]: canvasReady };
 
-async function landFree(store: FrameStore, place: Place, element: Element, drop: Extract<Drop, { on: DropOn.Canvas }>, mode: DocMode, box: Box | null, stage: Stage, stillAt: StillAt = StillAt.Kept): Promise<Landing> {
+async function landFree(store: FrameStore, place: Place & { id?: string }, element: Element, drop: Extract<Drop, { on: DropOn.Canvas }>, mode: DocMode, box: Box | null, stage: Stage, stillAt: StillAt = StillAt.Kept): Promise<Landing> {
   const area = box ?? elementBox(element);
   const shaped = elementNodeOf({ width: area.width * stage.width, height: area.height * stage.height });
   const at = { x: drop.x - shaped.w / 2, y: drop.y - shaped.h / 2 };
@@ -320,7 +319,7 @@ export async function placeOutput(store: FrameStore, ask: OutputAsk): Promise<Mo
   const element = mediaElement(found.output, target?.doc.fps);
   const landing = target
     ? await landInFrame(store, target, element, ask.drop as Extract<Drop, { on: DropOn.Frame }>, SUMMARY.placed)
-    : await landFree(store, found, element, ask.drop as Extract<Drop, { on: DropOn.Canvas }>, FRAME_OF_OUTPUT[found.output.kind], null, outputStage(element), StillAt.Settled);
+    : await landFree(store, { ...found, id: ask.id }, element, ask.drop as Extract<Drop, { on: DropOn.Canvas }>, FRAME_OF_OUTPUT[found.output.kind], null, outputStage(element), StillAt.Settled);
   if (!isLanding(landing)) {
     return landing;
   }
@@ -412,8 +411,9 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor; project
     },
     write: (nodeId, expectedVersion, doc, summary) => saveMotionDoc(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
     create: async (at, doc, shape) => {
-      const node = await createNode(db, { orgId, projectId: at.projectId, canvasId: at.canvasId, type: 'motion', x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...(shape ?? frameShape(doc)), actor });
-      await saveMotionDoc(db, { orgId, nodeId: node.id, expectedVersion: 0, doc, actor, summary: SUMMARY.movedIn });
+      const { data, ...size } = shape ?? frameShape(doc);
+      const node = await createNode(db, { id: at.id, orgId, projectId: at.projectId, canvasId: at.canvasId, type: 'motion', x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...size, data: { ...atFirstRevision(data), format: formatOf(doc) }, actor });
+      await appendRevision(db, { orgId, nodeId: node.id, expectedVersion: 0, doc, actor, summary: SUMMARY.movedIn });
       return node.id;
     },
     remove: (nodeId) => deleteNode(db, { orgId, nodeId, actor }),
@@ -466,22 +466,14 @@ export function frameRequest(store: FrameStore, ask: z.infer<typeof frameRequest
   return ask.node_id ? placeOutput(store, { sourceNodeId: ask.node_id, drop }) : moveElement(store, { sourceNodeId: ask.frame_id ?? '', clipId: ask.element_id ?? '', drop });
 }
 
-const canvasBoxSchema = z.object({ left: z.number().finite(), top: z.number().finite(), width: z.number().positive(), height: z.number().positive() }).strict();
+export const canvasBoxSchema = z.object({ left: z.number().finite(), top: z.number().finite(), width: z.number().positive(), height: z.number().positive() }).strict();
 
 export const drawnSchema = z.discriminatedUnion('tool', [
-  z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse]), box: canvasBoxSchema }).strict(),
+  z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse]), box: canvasBoxSchema, theme: z.enum(CanvasTheme).optional() }).strict(),
   z.object({ tool: z.literal(DrawTool.Pen), path: z.string().min(1).max(20_000) }).strict()
 ]);
 
-function drawnOf(wire: z.infer<typeof drawnSchema>): Drawn | string {
-  if (wire.tool !== DrawTool.Pen) {
-    return wire;
-  }
-  const outline = parsePath(wire.path);
-  return typeof outline === 'string' ? outline : { tool: DrawTool.Pen, outline };
-}
-
-export async function drawElement(store: FrameStore, place: Place, wire: z.infer<typeof drawnSchema>): Promise<Moved> {
+export async function drawElement(store: FrameStore, place: Place & { id?: string }, wire: z.infer<typeof drawnSchema>): Promise<Moved> {
   const drawn = drawnOf(wire);
   if (typeof drawn === 'string') {
     return refused(MoveOutcome.Invalid, drawn);
@@ -497,4 +489,11 @@ export async function drawElement(store: FrameStore, place: Place, wire: z.infer
   const frameId = await store.create({ ...place, ...at }, made.doc, { data: shaped.data, width: shaped.w, height: shaped.h, ...(first ? { displayName: elementName(first) } : {}) });
   const clipId = first?.id ?? '';
   return { outcome: MoveOutcome.Done, frameId, clipId, created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
+}
+
+export async function drawFrameAt(store: FrameStore, place: Place & { id?: string }, box: CanvasBox): Promise<Extract<Moved, { outcome: MoveOutcome.Done }>> {
+  const shaped = drawnFrameNodeOf(box);
+  const at = { x: box.left, y: box.top };
+  const frameId = await store.create({ ...place, ...at }, drawnFrame(box), { data: shaped.data, width: shaped.w, height: shaped.h });
+  return { outcome: MoveOutcome.Done, frameId, clipId: '', created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
 }

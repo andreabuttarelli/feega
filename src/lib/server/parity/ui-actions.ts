@@ -65,8 +65,10 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   moveElement: canvas('move_frame_element'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),
+  drawFrame: canvas('create_node'),
   moveFree: canvas('move_frame_element'),
   groupElements: canvas('group_elements'),
+  restack: canvas('move_node'),
   ungroupElement: canvas('ungroup_element'),
   rotateGroup: canvas('rotate_group'),
   moveGroup: canvas('move_group'),
@@ -226,6 +228,12 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'run-stale': canvas('run_graph'),
   'copy-id': CLIPBOARD,
   report: uiOnly('a person reports abuse to us; not an edit'),
+  group: canvas('group_elements'),
+  ungroup: canvas('ungroup_element'),
+  copy: CLIPBOARD,
+  paste: CLIPBOARD,
+  'bring-front': canvas('move_node'),
+  'send-back': canvas('move_node'),
   delete: canvas('delete_node')
 };
 

@@ -100,7 +100,7 @@ async function expectFramed(page: Page, node: Locator) {
   await expect
     .poll(
       async () => {
-        const [picture, body] = [await page.getByTestId('motion-preview').boundingBox(), await node.getByTestId('motion-node-editing').boundingBox()];
+        const [picture, body] = [await page.getByTestId('editor-stage').getByTestId('motion-preview').boundingBox(), await node.getByTestId('motion-node-editing').boundingBox()];
         return picture && body ? Math.max(Math.abs(picture.width - body.width), Math.abs(picture.height - body.height)) : Infinity;
       },
       { timeout: 10_000, message: 'the node takes the shape of the graphic: the picture fills its body, no bands' }
@@ -173,7 +173,8 @@ test.describe('motion editor inside the canvas @real', () => {
     const editor = page.getByTestId('motion-editor');
     await expect(editor).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
     await expectOnNode(page, nodeOf(first));
-    await expect(page.getByTestId('motion-preview')).toHaveCount(1);
+    await expect(page.getByTestId('editor-stage').getByTestId('motion-preview')).toHaveCount(1);
+    await expect(nodeOf(first).getByTestId('motion-preview')).toHaveCount(0);
     await expect(page).toHaveURL(new RegExp(`/c/${session.canvasId}$`));
     await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible();
     await expect(page.getByLabel('Agent', { exact: true })).toBeVisible();
@@ -209,7 +210,8 @@ test.describe('motion editor inside the canvas @real', () => {
 
     await nodeOf(second).getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
     await expectOnNode(page, nodeOf(second));
-    await expect(page.getByTestId('motion-preview')).toHaveCount(1);
+    await expect(page.getByTestId('editor-stage').getByTestId('motion-preview')).toHaveCount(1);
+    await expect(nodeOf(second).getByTestId('motion-preview')).toHaveCount(0);
     await shoot(page, '5-switched');
 
     const empty = await emptyCanvasPoint(page);
@@ -294,7 +296,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
     await page.waitForTimeout(2500);
 
-    const player = (await page.getByTestId('motion-preview').boundingBox())!;
+    const player = (await page.getByTestId('editor-stage').getByTestId('motion-preview').boundingBox())!;
     const onScreen = await sharp(await page.screenshot()).extract({ left: Math.ceil(player.x), top: Math.ceil(player.y), width: Math.floor(player.width) - 1, height: Math.floor(player.height) - 1 }).png().toBuffer();
     expect(await sharpestEdge(onScreen), 'the title is drawn sharp, not scaled up').toBeGreaterThan(SHARP_EDGE);
   });

@@ -612,7 +612,7 @@
         "error": {
           "attachment_empty": "The file is empty.",
           "attachment_too_large": "Too large: 20 MB at most.",
-          "attachment_unsupported": "Not supported: images, PDF, DOCX, PPTX, XLSX, CSV, TXT, MD or HTML.",
+          "attachment_unsupported": "Not supported: images, videos (MP4, MOV, WebM), PDF, DOCX, PPTX, XLSX, CSV, TXT, MD or HTML.",
           "too_many_attachments": "10 attachments per message at most.",
           "attachment_unreadable": "No text could be read from this file.",
           "attachment_refused": "Refused by the safety review.",

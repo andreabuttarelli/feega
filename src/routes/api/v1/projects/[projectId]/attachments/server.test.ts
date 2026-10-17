@@ -40,7 +40,7 @@ describe('POST /api/v1/projects/[projectId]/attachments/sign', () => {
   });
 
   it('tipo e dimensione: errori chiari', async () => {
-    const wrong = await sign(event({ name: 'a.mp4', mimeType: 'video/mp4', bytes: 1 }));
+    const wrong = await sign(event({ name: 'a.zip', mimeType: 'application/zip', bytes: 1 }));
     expect(wrong.status).toBe(400);
     expect(await wrong.json()).toMatchObject({ code: 'attachment_unsupported' });
     expect((await sign(event({ name: 'a.png', mimeType: 'image/png', bytes: CHAT_ATTACHMENT_MAX_BYTES + 1 }))).status).toBe(413);

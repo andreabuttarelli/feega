@@ -322,6 +322,7 @@ export async function findNode(
 export async function createNode(
   db: Db,
   input: {
+    id?: string;
     orgId: string;
     projectId: string;
     canvasId: string;
@@ -341,6 +342,7 @@ export async function createNode(
    * per l'MCP, non qui. Il cast dichiara l'onestà del confine, non una garanzia che non c'è.
    */
   const row: NodeInsert = {
+    ...(input.id ? { id: input.id } : {}),
     org_id: input.orgId,
     project_id: input.projectId,
     canvas_id: input.canvasId,
@@ -646,6 +648,7 @@ export async function listConnections(
 export async function createConnection(
   db: Db,
   input: {
+    id?: string;
     orgId: string;
     canvasId: string;
     sourceNodeId: string;
@@ -659,6 +662,7 @@ export async function createConnection(
   const { data, error } = await db
     .from('nodes_connections')
     .insert({
+      ...(input.id ? { id: input.id } : {}),
       org_id: input.orgId,
       canvas_id: input.canvasId,
       source_node_id: input.sourceNodeId,
