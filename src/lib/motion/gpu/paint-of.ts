@@ -7,6 +7,7 @@ export enum PaintKind {
   Video = 'video',
   Logo = 'logo',
   Text = 'text',
+  Particles = 'particles',
   Html = 'html'
 }
 
@@ -38,7 +39,7 @@ export const SUPPORT: Record<ComponentId, Support> = {
   Logo3D: Support.HtmlTexture,
   Device3D: Support.HtmlTexture,
   Composition: Support.HtmlTexture,
-  Particles: Support.HtmlTexture,
+  Particles: Support.Native,
   LiquidGlass: Support.HtmlTexture,
   LiquidBlob: Support.HtmlTexture,
   ShaderEffect: Support.HtmlTexture,
@@ -52,7 +53,8 @@ export const NATIVE_PAINT: Partial<Record<ComponentId, PaintKind>> = {
   Shape: PaintKind.Shape,
   Image: PaintKind.Image,
   Video: PaintKind.Video,
-  Logo: PaintKind.Logo
+  Logo: PaintKind.Logo,
+  Particles: PaintKind.Particles
 };
 
 export const isNative = (component: string) => SUPPORT[component as ComponentId] === Support.Native;
