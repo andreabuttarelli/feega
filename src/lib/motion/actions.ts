@@ -1,5 +1,14 @@
 import type { Component } from 'svelte';
 import Play from '@lucide/svelte/icons/play';
+import AlignStartVertical from '@lucide/svelte/icons/align-start-vertical';
+import AlignCenterVertical from '@lucide/svelte/icons/align-center-vertical';
+import AlignEndVertical from '@lucide/svelte/icons/align-end-vertical';
+import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
+import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
+import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
+import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+import FlipHorizontal2 from '@lucide/svelte/icons/flip-horizontal-2';
+import FlipVertical2 from '@lucide/svelte/icons/flip-vertical-2';
 import CornerRightDown from '@lucide/svelte/icons/corner-right-down';
 import CornerLeftUp from '@lucide/svelte/icons/corner-left-up';
 import Pipette from '@lucide/svelte/icons/pipette';
@@ -194,6 +203,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.SelectAll]: { name: 'Select all clips', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Deselect]: { name: 'Deselect', icon: X, group: GuideGroup.Edit, gesture: 'Tap an empty lane', menu: MenuSection.Layer },
   [Command.SelectChild]: { name: 'Select inside', icon: CornerRightDown, group: GuideGroup.Edit, gesture: 'Double-click', menu: MenuSection.Layer },
+  [Command.SelectNext]: { name: 'Select the next layer', icon: CornerRightDown, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.SelectPrevious]: { name: 'Select the previous layer', icon: CornerLeftUp, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.SelectParent]: { name: 'Select the parent', icon: CornerLeftUp, group: GuideGroup.Edit, gesture: 'Esc', menu: MenuSection.Layer },
   [Command.Precompose]: { name: 'Precompose', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Group]: { name: 'Group', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
@@ -201,6 +212,15 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.AlignLeft]: { name: 'Align left', icon: AlignStartVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.AlignCenter]: { name: 'Align horizontal centres', icon: AlignCenterVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.AlignRight]: { name: 'Align right', icon: AlignEndVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.AlignTop]: { name: 'Align top', icon: AlignStartHorizontal, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.AlignMiddle]: { name: 'Align vertical centres', icon: AlignCenterHorizontal, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.AlignBottom]: { name: 'Align bottom', icon: AlignEndHorizontal, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.TidyUp]: { name: 'Tidy up', icon: LayoutGrid, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.FlipHorizontal]: { name: 'Flip horizontal', icon: FlipHorizontal2, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.FlipVertical]: { name: 'Flip vertical', icon: FlipVertical2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Tool.NullFromSelection]: { name: 'Null parent', icon: CircleDashed, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.StartHere]: { name: 'Move clip to start here', icon: AlignStart, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },
   [Command.EndHere]: { name: 'Move clip to end here', icon: AlignEnd, group: GuideGroup.Edit, gesture: 'Drag the clip', menu: MenuSection.Layer },

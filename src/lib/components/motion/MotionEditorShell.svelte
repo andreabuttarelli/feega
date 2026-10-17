@@ -69,10 +69,15 @@
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
   import CornerOverlay from '$lib/components/motion/CornerOverlay.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
-  import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
+  import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes, tidySpace } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import { Flip, flipClips } from '$lib/motion/layer-props';
+  import { Direction as SiblingDirection, layerOrder, siblingOf } from '$lib/motion/siblings';
+  import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
+  import { FRAME_MENU_IDS, frameLayers, frameMenuRun, frameSummaries, type FrameLayer } from '$lib/motion/frame-menu';
+  import type { SelectionActionId } from '$lib/canvas/selection-actions';
   import { Gesture } from '$lib/motion/drill';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
@@ -1353,6 +1358,20 @@
   const NUDGE_MORE_PX = 10;
   const spaceBoxes = () => ({ ...propBoxes(doc), ...stageBoxes });
 
+  let layerMenu = $state<{ at: { x: number; y: number }; layers: FrameLayer[] } | null>(null);
+
+  function runLayerMenu(id: SelectionActionId) {
+    const run = frameMenuRun(id);
+    if (!run) {
+      return;
+    }
+    if ('edge' in run) {
+      alignTo(run.edge);
+      return;
+    }
+    COMMANDS[run.command]();
+  }
+
   function zoomToSelection() {
     const boxes = spaceBoxes();
     const around = boxAround(selection.flatMap((id) => (boxes[id] ? [boxes[id]] : [])));
@@ -1434,6 +1453,8 @@
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
     [Command.SelectChild]: () => overlay?.key(Gesture.Enter),
     [Command.SelectParent]: selectParent,
+    [Command.SelectNext]: () => selectSibling(SiblingDirection.Next),
+    [Command.SelectPrevious]: () => selectSibling(SiblingDirection.Previous),
     [Command.Deselect]: () => {
       if (overlay?.key(Gesture.Leave)) {
         return;
@@ -1471,7 +1492,16 @@
     [Command.Ungroup]: ungroupSelection,
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
-    [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask')
+    [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask'),
+    [Command.AlignLeft]: () => selection.length && alignTo(Edge.Left),
+    [Command.AlignCenter]: () => selection.length && alignTo(Edge.Center),
+    [Command.AlignRight]: () => selection.length && alignTo(Edge.Right),
+    [Command.AlignTop]: () => selection.length && alignTo(Edge.Top),
+    [Command.AlignMiddle]: () => selection.length && alignTo(Edge.Middle),
+    [Command.AlignBottom]: () => selection.length && alignTo(Edge.Bottom),
+    [Command.TidyUp]: () => selection.length > 1 && apply(tidySpace(doc, selection, frame, spaceBoxes(), editMode), 'Tidied up'),
+    [Command.FlipHorizontal]: () => selection.length && apply(flipClips(doc, selection, Flip.Horizontal), 'Flipped horizontally'),
+    [Command.FlipVertical]: () => selection.length && apply(flipClips(doc, selection, Flip.Vertical), 'Flipped vertically')
   };
 
   const TOOL_RUN: Partial<Record<ActionId, () => void>> = {
@@ -1574,7 +1604,14 @@
 
   function askedDrill() {
     const asked = frameDrill.take(data.node.id);
-    return asked ? { at: [asked.at.x * doc.width, asked.at.y * doc.height] as [number, number], gesture: asked.gesture } : null;
+    return asked ? { at: asked.at ? ([asked.at.x * doc.width, asked.at.y * doc.height] as [number, number]) : null, gesture: asked.gesture, from: asked.from } : null;
+  }
+
+  function selectSibling(direction: SiblingDirection) {
+    const next = siblingOf(layerOrder(doc), selection, direction);
+    if (next) {
+      selection = [next];
+    }
   }
 
   function selectParent() {
@@ -1842,7 +1879,8 @@
       <MotionPreview bind:this={preview} bind:redraws {html} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
-        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
+        {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={findClip(withAutoLayout(doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
