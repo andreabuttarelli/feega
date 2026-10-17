@@ -157,7 +157,7 @@ test.describe('GPU canvas against the DOM canvas on a real canvas @perf @real', 
       writeFileSync(join(OUT, `compare-${count}.json`), JSON.stringify(runs, null, 2));
       if (videos.length > 1) {
         const inputs = videos.flatMap((v) => ['-i', v]);
-        const labels = videos.map((_, i) => `[${i}:v]scale=960:-2,drawtext=text='${RENDERERS[i]}':x=20:y=20:fontsize=36:fontcolor=white:box=1:boxcolor=black@0.6[v${i}]`).join(';');
+        const labels = videos.map((_, i) => `[${i}:v]scale=960:-2[v${i}]`).join(';');
         const stack = `${videos.map((_, i) => `[v${i}]`).join('')}hstack=inputs=${videos.length}[out]`;
         execFileSync('ffmpeg', ['-loglevel', 'error', '-y', ...inputs, '-filter_complex', `${labels};${stack}`, '-map', '[out]', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', join(OUT, `side-by-side-${count}.mp4`)]);
       }
