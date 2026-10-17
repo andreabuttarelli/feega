@@ -1,5 +1,6 @@
 import { Texture } from 'pixi8';
 import { fitRect, logoRect } from './fit';
+import { PAINT_PATTERN, patternOf } from './fill-pattern';
 import { scaleOf, type Size } from './matrix';
 import { PaintKind } from './paint-of';
 import type { Placement } from './renderer';
@@ -36,14 +37,15 @@ function svgUrl(markup: string, size: Size, scale: number): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
 }
 
-const PATTERN: Record<string, (pen: CanvasRenderingContext2D, size: Size, accent: string) => void> = {};
-
 function fillCanvas(color: string, pattern: string, size: Size): HTMLCanvasElement {
   const canvas = Object.assign(document.createElement('canvas'), { width: size.width, height: size.height });
   const pen = canvas.getContext('2d') as CanvasRenderingContext2D;
   pen.fillStyle = color || 'transparent';
   pen.fillRect(0, 0, size.width, size.height);
-  PATTERN[pattern]?.(pen, size, color);
+  const found = patternOf(pattern);
+  if (found) {
+    PAINT_PATTERN[found.kind](pen, size, found.color);
+  }
   return canvas;
 }
 
