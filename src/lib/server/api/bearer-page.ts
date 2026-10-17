@@ -48,8 +48,8 @@ export function bearerEvent(bearer: Bearer, request: Request, apiUrl: URL, pageP
   return { request, url, params, locals, cookies, route: { id: null }, depends: () => {}, untrack: <T>(fn: () => T) => fn(), setHeaders: () => {} };
 }
 
-export function pageEvent(bearer: Bearer, request: Request, apiUrl: URL, pagePath: string) {
-  const event = bearerEvent(bearer, request, apiUrl, pagePath);
+export function pageEvent(bearer: Bearer, request: Request, apiUrl: URL, pagePath: string, params: Record<string, string> = {}) {
+  const event = bearerEvent(bearer, request, apiUrl, pagePath, params);
   return { ...event, parent: () => appShell(event as never) };
 }
 
@@ -74,4 +74,13 @@ export async function answerOf(run: () => Promise<unknown>): Promise<Response> {
     }
     throw e;
   }
+}
+
+export async function bareAnswerOf(run: () => Promise<unknown>): Promise<Response> {
+  const enveloped = await answerOf(run);
+  if (enveloped.status !== OK) {
+    return enveloped;
+  }
+  const body = (await enveloped.json()) as { data?: unknown; redirect?: string };
+  return json(body.redirect ? { redirect: body.redirect } : (body.data ?? null), { status: OK });
 }

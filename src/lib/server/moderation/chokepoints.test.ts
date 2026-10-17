@@ -103,7 +103,7 @@ const MODEL_CALLERS: Readonly<Record<string, string>> = {
   'src/lib/server/settings/pages/video.ts': 'reads video durations, calls no model',
   'src/lib/server/canvas/audio-description.ts': 'lists ElevenLabs voices',
   'src/routes/api/v1/org/audio/voices/+server.ts': 'lists ElevenLabs voices',
-  'src/routes/p/[projectId]/c/[canvasId]/+page.server.ts': 'lists ElevenLabs voices; generation goes through runGenNode'
+  'src/lib/server/canvas/canvas-page.ts': 'lists ElevenLabs voices; generation goes through runGenNode'
 };
 
 describe('every path to a model provider goes through the moderation chokepoint', () => {
