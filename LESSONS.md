@@ -2869,6 +2869,17 @@ check that only reads tool results misses it, the screenshot of the grid catches
 Signal: a server-side edit (a tool, a port) has no effect in agent turns, and nothing new lands in
 storage, while unit tests pass. The dev server kept the old module for turns running in the
 background. Move: restart `vite dev` after server edits before trusting a real-check run.
+In a worktree under `.claude/worktrees/` the watcher sees no edit at all, client files included
+(the path has a dot folder): `curl` the module from the dev server and grep the change before
+blaming the code. Also check who owns port 4173: `reuseExistingServer` runs your specs against
+another worktree's server (`lsof -a -d cwd -p <pid>`). Move: own port (`E2E_BASE_URL`), restart
+after every edit.
+
+## A side popover sits 2px off the clamp, only when it is tall
+
+Signal: `canvas-fills` popover check fails by exactly 2 once the popover content grows enough to
+be clamped to the viewport bottom. `bind:clientHeight` leaves the 1px borders out. Move: measure a
+box you place with `offsetHeight`.
 
 ## A zoomed-out canvas pans below 60 fps though its images are already on one canvas
 
@@ -3026,6 +3037,14 @@ Signal: the first `upload(..., { upsert: true })` to a path succeeds, every late
 
 ### A sub-agent round answers the user instead of doing its step
 Signal: an agent reply says it "only has tools to read/research/import" or "can't build" while the run summary shows it wrote something. Cause: a role round with a narrow tool set (researcher) got the user's raw request and no brief, so it answered it; its text leads the turn's reply. Move: every narrowed round gets its own brief message (like `crewBrief`, `RESEARCH_BRIEF`), and a turn that stops by design returns a field the caller can relay (`script_ready`).
+## A settings action in the canvas sheet changes nothing on screen
+
+Signal: the action answers 200, a full reload shows the change, the open sheet does not (or
+closes). Cause: `invalidateAll()` resets `page.state`, and the sheet lives in `page.state.sheet`
+(shallow routing); its data is a `preloadData` snapshot nobody refreshes. Move: read the sheet
+before invalidating and reopen it with fresh data (`refreshSheet` in `sheet-nav.ts`). A spec that
+passes only after `page.reload()` does not prove the sheet works.
+
 
 ### A long agent turn dies with `JWT expired` and the dev server exits
 Signal: `[chat-reply] write failed Error: JWT expired`, `[motion-agent] turn failed { code: 'PGRST303' }`, then `UnhandledPromiseRejection … #<Object>` and the process is gone. Cause: the turn's db carries the request's access token; a turn started late in the token's hour outlives it, and the failed-turn save rejected with nobody listening. Move: `outlivesTurn` in the session hook refreshes a token that would expire inside a turn; every background promise chain ends in a `.catch`.

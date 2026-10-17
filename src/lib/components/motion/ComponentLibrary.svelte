@@ -7,6 +7,7 @@
   import { FIELD_INPUT, FOCUS_RING, IconButton, IconSize, Kbd, Panel, PanelHeader, SegmentedControl, Surface, Tone, type SegmentOption } from '$lib/components/ui/shell';
   import { cn } from '$lib/utils.js';
   import ComponentDetail from './ComponentDetail.svelte';
+  import type { MediaUploader } from './media-upload';
   import { FORMATS, MotionFormat } from '$lib/motion/doc';
   import { Dismiss, dismissFrom, spatialStep } from '$lib/motion/template/browser';
   import { DocMode } from '$lib/motion/still';
@@ -14,7 +15,7 @@
   import { ADD_TARGET, AddTarget, byShape, matching, metaLine, rolesIn, type CatalogueItem } from '$lib/motion/template/catalogue';
   import type { Instance } from '$lib/motion/template/library';
 
-  type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
+  type Asset = { id: string; kind: string; label: string; previewUrl: string };
 
   let {
     items,
@@ -22,6 +23,7 @@
     draftOf,
     compose = null,
     assets = [],
+    upload = null,
     target = AddTarget.Video,
     onpick,
     onclose
@@ -31,6 +33,7 @@
     draftOf: (id: string, format: MotionFormat) => Instance | null;
     compose?: ((doc: Instance['doc']) => string) | null;
     assets?: Asset[];
+    upload?: MediaUploader | null;
     target?: AddTarget;
     onpick: (id: string, sounds: boolean, draft: Instance | null) => void;
     onclose: () => void;
@@ -290,7 +293,7 @@
   {#if open}
     <div class="absolute inset-0 z-1 bg-black/40 sm:hidden" role="presentation" onclick={closeDetail}></div>
     {#key open.id}
-      <ComponentDetail item={open} {format} {draftOf} {compose} {assets} {target} onadd={(sounds, draft) => onpick(open.id, sounds, draft)} onclose={closeDetail} />
+      <ComponentDetail item={open} {format} {draftOf} {compose} {assets} {upload} {target} onadd={(sounds, draft) => onpick(open.id, sounds, draft)} onclose={closeDetail} />
     {/key}
   {/if}
 </Panel>

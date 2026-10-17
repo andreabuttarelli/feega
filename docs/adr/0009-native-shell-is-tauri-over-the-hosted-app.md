@@ -167,3 +167,38 @@ Consequences:
 - The server knows one thing about the shell: the `FeegaNative` user-agent mark, read in one module.
 - The shell never exposes Tauri IPC to the remote origin (no `remote` capability) until a native
   feature needs it; then only that command, only for the app host.
+
+## Settings on the API, and what stays server-only (2026-10-15)
+
+Settings sections `project`, `brand`, `video`, `profile`, `content`, `team`, `api-keys`, `danger`
+render on the client (`ssr = false`) from `/api/v1/me/projects/<id>/settings` (the settings shell)
+and `/settings/<section>` (`GET` load, `POST ?action=`). The endpoint runs the same functions the
+pages ran (`$lib/server/settings/`), with the project shell from `p/[projectId]/+layout.server.ts`
+as parent. `src/routes/api/v1/me/projects/[projectId]/settings/server.test.ts` holds parity: every
+load and every action answers and writes the same as calling the function directly.
+
+The `/p/[projectId]` layout itself (project shell, canvases) still loads on the server: it belongs
+to the canvas move.
+
+Inventory of the remaining server-only routes:
+
+| Route | Recommendation | Why |
+|---|---|---|
+| `/app/studio`, `/app/studio/[batchId]` (`/p/…/studio` redirects there) | Migrate | Signed-in dashboard surface; plain loads and actions (upload, quote, generate, run, approve…), same pattern as `/me/pages`. |
+| `/app/upscale` | Migrate | One load, one action; cheapest of the lot. |
+| `/app/compose` | Migrate | List + create; dashboard surface. |
+| `/app/compose/[nodeId]` | Migrate with the editor | An editor surface (layout, gallery publish); belongs to the editor's API move. |
+| `/p/…/assets` | Migrate | Project library; signed URLs are made server-side and travel fine as data. |
+| `/p/…/influencers` | Migrate | Loads + generate/upload/template actions; no cookie-only dependency. |
+| `/p/…/brands`, `/brands/new`, `/brands/[slug]` | Migrate | Brand kit; the wizard's analyze/sync are server calls the API can run. |
+| `/p/…/settings/products` | Migrate | Brand kit, read-only list; next to `brand`. |
+| `/p/…/settings/billing` | Keep | A redirect to `/app/credits`, already client-rendered. |
+| `/p/…/promote`, `/p/…/calendar`, `/p/…/ads`, `/settings/connected-accounts` | Keep web-only, then remove | Social publishing (Zernio, Meta ads) is behind the off `social_publishing` flag and is being removed (focus on motion); moving it would build an API for code on its way out. |
+| `/p/…/settings/facebook`, `/linkedin`, `/connect/[platform]` | Keep web-only | Provider OAuth returns to the hosted origin with cookies; same fate as social publishing. |
+| `/s/[token]` (share) | Keep web-only | Public, no session; server-rendered for link previews. |
+| `/render/[token]` | Keep web-only | Token page the render farm loads headless; not a user surface. |
+| `/oauth/authorize`, `/register`, `/token` | Keep web-only | OAuth authorization server for MCP clients: browser redirects and the cookie session are the protocol. |
+| `/admin/reports` | Keep web-only | Internal moderation, no native use. |
+| `/report`, `/report/counter` | Keep web-only | Public abuse form, no account. |
+| `/gallery`, `/gallery/[id]` | Keep web-only | Public and indexed; in-app reads already use `/api/v1/gallery`. |
+| `/a/[id]`, `/d/[token]`, `/e/[id]` | Keep web-only | Public embeds and downloads. |

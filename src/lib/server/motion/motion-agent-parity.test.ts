@@ -33,6 +33,7 @@ const DOC: Record<string, Access> = {
   script: { write: ['write_script'], read: 'script' },
   referenceLook: { write: ['set_reference_look'], read: 'referenceLook' },
   still: { write: ['set_canvas'], read: 'still' },
+  freeSize: { write: ['set_canvas'], read: 'format' },
   links: { fixed: 'written by the canvas when a generative node is connected to the frame (connect_nodes)' }
 };
 

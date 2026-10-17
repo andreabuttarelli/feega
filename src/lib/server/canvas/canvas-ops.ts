@@ -243,6 +243,7 @@ const addFrameInput = z
     canvasId: z.string(),
     templateId: z.string().describe('a motion template id (list_motion_templates)'),
     format: z.enum(MOTION_FORMATS).default(MotionFormat.Landscape),
+    values: z.record(z.string(), z.string().max(4000)).optional().describe('field key → value, as set_template_values takes them'),
     x: z.number(),
     y: z.number()
   })
@@ -881,6 +882,7 @@ export const CANVAS_OPS = {
         userId: ctx.userId,
         templateId: input.templateId,
         format: input.format,
+        values: input.values,
         at: { x: input.x, y: input.y },
         actor: ctx.actor
       });

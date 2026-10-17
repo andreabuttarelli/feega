@@ -37,7 +37,8 @@ export enum MotionFormat {
   Square = '1:1',
   Portrait = '4:5',
   SquareLarge = '1:1 1440',
-  Poster = 'A poster'
+  Poster = 'A poster',
+  Custom = 'custom'
 }
 
 export const FORMATS: Record<MotionFormat, { width: number; height: number; label: string }> = {
@@ -46,7 +47,8 @@ export const FORMATS: Record<MotionFormat, { width: number; height: number; labe
   [MotionFormat.Square]: { width: 1080, height: 1080, label: '1:1' },
   [MotionFormat.Portrait]: { width: 1080, height: 1350, label: '4:5' },
   [MotionFormat.SquareLarge]: { width: 1440, height: 1440, label: '1:1 1440' },
-  [MotionFormat.Poster]: { width: 1080, height: 1527, label: 'A poster' }
+  [MotionFormat.Poster]: { width: 1080, height: 1527, label: 'A poster' },
+  [MotionFormat.Custom]: { width: 1920, height: 1080, label: 'Custom' }
 };
 
 export const MOTION_FORMATS = Object.values(MotionFormat) as [MotionFormat, ...MotionFormat[]];
@@ -150,6 +152,17 @@ const assetRefSchema = z.object({
   name: z.string().max(200).default('')
 });
 
+export const MIN_SIDE = 16;
+export const RESOLUTION_PROBLEM = 'resolution above 1080p (a 1440 square is the one exception)';
+
+export function fitsResolution(d: { width: number; height: number }): boolean {
+  const sides = [d.width, d.height];
+  if (sides.some((side) => !Number.isInteger(side) || side < MIN_SIDE || side > MAX_SIDE)) {
+    return false;
+  }
+  return Math.min(d.width, d.height) <= MAX_SHORT_SIDE || (d.width === d.height && d.width <= LARGE_SQUARE);
+}
+
 export const motionDocSchema = z
   .object({
     version: z.literal(DOC_VERSION),
@@ -178,9 +191,10 @@ export const motionDocSchema = z
     script: scriptSchema.optional(),
     referenceLook: referenceLookSchema.optional(),
     still: stillSchema.optional(),
+    freeSize: z.boolean().optional(),
     links: z.record(z.string().min(1), z.string().min(1)).optional()
   })
-  .refine((d) => Math.min(d.width, d.height) <= MAX_SHORT_SIDE || (d.width === d.height && d.width <= LARGE_SQUARE), 'resolution above 1080p (a 1440 square is the one exception)')
+  .refine(fitsResolution, RESOLUTION_PROBLEM)
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] })
   .refine((d) => !d.still || d.still.frame < d.durationInFrames, { message: 'the still frame is past the end of the doc', path: ['still'] });
 
@@ -193,12 +207,14 @@ export type TemplateMark = NonNullable<MotionComp['template']>;
 
 export type DocVerdict = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
-type Raw = Record<string, unknown> & { tracks?: { clips?: Record<string, unknown>[] }[] };
+type Raw = Record<string, unknown> & { tracks?: unknown };
+
+const listOr = (value: unknown, apply: (item: Record<string, unknown>) => unknown): unknown => (Array.isArray(value) ? value.map((item) => (item && typeof item === 'object' ? apply(item) : item)) : value);
 
 const withClips = (doc: Raw, version: number, defaults: Record<string, unknown>): Raw => ({
   ...doc,
   version,
-  tracks: (doc.tracks ?? []).map((t) => ({ ...t, clips: (t.clips ?? []).map((c) => ({ ...defaults, ...c })) }))
+  tracks: listOr(doc.tracks ?? [], (t) => ({ ...t, clips: listOr(t.clips ?? [], (c) => ({ ...defaults, ...c })) }))
 });
 
 const MIGRATIONS: Record<number, (doc: Raw) => Raw> = {
@@ -402,9 +418,18 @@ export function newClip(fields: Pick<MotionClip, 'id' | 'from' | 'durationInFram
   };
 }
 
-export function formatOf(doc: Pick<MotionDoc, 'width' | 'height'>): MotionFormat {
-  const match = MOTION_FORMATS.find((f) => FORMATS[f].width === doc.width && FORMATS[f].height === doc.height);
-  return match ?? MotionFormat.Landscape;
+export const PRESET_FORMATS = MOTION_FORMATS.filter((f) => f !== MotionFormat.Custom);
+
+export function formatOf(doc: Pick<MotionDoc, 'width' | 'height'> & { freeSize?: boolean }): MotionFormat {
+  if (doc.freeSize) {
+    return MotionFormat.Custom;
+  }
+  const match = PRESET_FORMATS.find((f) => FORMATS[f].width === doc.width && FORMATS[f].height === doc.height);
+  return match ?? MotionFormat.Custom;
+}
+
+export function formatSize(format: MotionFormat, doc: Pick<MotionDoc, 'width' | 'height'>): { width: number; height: number } {
+  return format === MotionFormat.Custom ? { width: doc.width, height: doc.height } : FORMATS[format];
 }
 
 export function clipsOf(doc: MotionDoc): MotionClip[] {

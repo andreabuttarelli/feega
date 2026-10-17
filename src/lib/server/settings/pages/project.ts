@@ -1,6 +1,5 @@
 import { error, fail, redirect } from '@sveltejs/kit';
-import type { RequestEvent } from '@sveltejs/kit';
-import type { Actions, PageServerLoad } from './$types';
+import type { ProjectEvent, SettingsActions, SettingsEvent } from '../event';
 import { archiveProject, renameProject, setProjectBrand } from '$lib/server/repos/projects';
 import { findBrand, listOrgBrands } from '$lib/server/repos/brands';
 import type { Db } from '$lib/server/db/client';
@@ -19,7 +18,7 @@ function refusalText(error: string): string {
   return SWITCH_REFUSAL_TEXT[error] ?? UNCENSORED_LOCK_TEXT[error as UncensoredLock] ?? error;
 }
 
-async function userIdOf(event: RequestEvent): Promise<string> {
+async function userIdOf(event: ProjectEvent): Promise<string> {
   const { user } = await event.locals.safeGetSession();
   if (!user) {
     throw redirect(303, '/login');
@@ -29,7 +28,7 @@ async function userIdOf(event: RequestEvent): Promise<string> {
 
 type OwnedProject = { db: Db; orgId: string; projectId: string; name: string };
 
-async function ownedProject(event: RequestEvent): Promise<OwnedProject> {
+async function ownedProject(event: ProjectEvent): Promise<OwnedProject> {
   const db = await event.locals.db();
   if (!db) {
     throw error(500, 'sessione senza client');
@@ -50,7 +49,7 @@ function returnPathWithin(projectId: string, raw: FormDataEntryValue | null): st
   return path.startsWith(`/p/${projectId}/`) ? path : null;
 }
 
-export const load: PageServerLoad = async ({ parent, locals }) => {
+export const load = async ({ parent, locals }: SettingsEvent) => {
   const { project, org, brand, uncensored } = await parent();
   const db = await locals.db();
   if (!db) {
@@ -67,7 +66,7 @@ export const load: PageServerLoad = async ({ parent, locals }) => {
   };
 };
 
-export const actions: Actions = {
+export const actions: SettingsActions = {
   setMode: async (event) => {
     const { db, orgId, projectId } = await ownedProject(event);
     const userId = await userIdOf(event);

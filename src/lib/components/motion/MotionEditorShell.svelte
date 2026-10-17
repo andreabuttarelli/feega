@@ -13,6 +13,8 @@
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { headMoved, watchMotionNode } from '$lib/realtime/motion-channel';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
+  import { canvasMediaUploader } from '$lib/canvas/media-uploader';
+  import type { MediaUploader } from './media-upload';
   import { registerUpload } from '$lib/motion/fonts/ops';
   import Plus from '@lucide/svelte/icons/plus';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
@@ -210,6 +212,14 @@
   let notice = $state('');
   const supabase = createSupabaseBrowserClient();
   const UPLOAD_WEIGHT = 400;
+  const uploadToProject = canvasMediaUploader(supabase, { orgId: data.orgId, projectId: data.projectId, canvasId: data.canvas.id });
+  const uploadMedia: MediaUploader = async (file, progress) => {
+    const outcome = await uploadToProject(file, progress);
+    if (outcome.ok) {
+      madeAssets = [{ seconds: null, width: null, height: null, ...outcome.asset, url: outcome.asset.url ?? null } as unknown as MotionEditorData['assets'][number], ...madeAssets];
+    }
+    return outcome;
+  };
   let adding = $state(false);
   let exporting = $state(false);
   let templating = $state(false);
@@ -272,6 +282,11 @@
 
   let editMode = $state(timelineFits(history.present) ? readMode(browserStore()?.getItem(EDIT_MODE_KEY) ?? null) : EditMode.Design);
 
+  $effect(() => {
+    if (rules.tools === ToolsPlace.CanvasBar) {
+      frameBar.editMode = editMode;
+    }
+  });
   const unanimated = $derived(editMode === EditMode.Motion && doc.tracks.every((t) => t.clips.every((c) => !Object.keys(c.keyframes).length)));
 
   function setMode(next: EditMode) {
@@ -1790,7 +1805,7 @@
   {/if}
 
   {#if componentsOpen}
-    <ComponentLibrary items={components} format={starterFormatOf(doc)} draftOf={componentDraft} compose={composeDraft} {assets} onpick={insertComponent} onclose={() => (componentsOpen = false)} />
+    <ComponentLibrary items={components} format={starterFormatOf(doc)} draftOf={componentDraft} compose={composeDraft} {assets} upload={uploadMedia} onpick={insertComponent} onclose={() => (componentsOpen = false)} />
   {/if}
 
   {#if templating}
@@ -1860,12 +1875,12 @@
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector {doc} onchange={edit} />
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
-        <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
+        <TemplateInspector {doc} clip={selected} {assets} upload={uploadMedia} onchange={edit} />
       {:else if selected}
-        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
+        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} upload={uploadMedia} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
-        {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
-        <MotionInspector {typeInto} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
+        <MotionInspector {typeInto} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
@@ -1874,7 +1889,7 @@
         <MultiInspector {doc} ids={selection} {frame} mode={editMode} onchange={edit} />
       {:else}
         <header class="frame-head" data-testid="selection-head"><FamilyIcon /><span>Frame</span></header>
-        <DocFields {doc} {assets} onchange={edit} />
+        <DocFields {doc} {assets} upload={uploadMedia} onchange={edit} />
         <div class="composition" data-testid="composition-inspector">
           <header class="composition-head"><span>Frame</span></header>
           <CompositionSettings {doc} onchange={apply} />

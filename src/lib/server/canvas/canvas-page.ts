@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { MEDIA_UUID_RE } from '$lib/media-url';
 import { registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
@@ -76,6 +77,7 @@ import { canvasRevision, recordsRevision } from '$lib/server/canvas/revision';
 import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes';
 import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
+import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
 import { MOVE_STATUS, MoveOutcome, canvasBoxSchema, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -294,6 +296,20 @@ function graphInputOf(fd: FormData, scope: Scope): GraphInput | null {
     nodeId: String(fd.get('node_id') ?? '') || undefined,
     nodeIds: nodeIds.length ? nodeIds : undefined
   };
+}
+
+const valuesSchema = z.record(z.string(), z.string().max(4000));
+
+function templateValues(raw: FormDataEntryValue | null): Record<string, string> | null {
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed = valuesSchema.safeParse(JSON.parse(String(raw)));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 export const actions: Actions<CanvasParams> = {
@@ -1088,6 +1104,17 @@ export const actions: Actions<CanvasParams> = {
     return { connection, linked: linked?.outcome === MoveOutcome.Done ? linked : null };
   },
 
+  frameSize: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = sizeAskSchema.safeParse({ nodeId: fd.get('node_id'), width: fd.get('width') ?? undefined, height: fd.get('height') ?? undefined });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid frame size' });
+    }
+    const sized = await sizeFrame(canvasFrames(scope), ask.data);
+    return sized.outcome === SizeOutcome.Done ? sized : fail(SIZE_STATUS[sized.outcome], { error: sized.outcome, detail: sized.detail });
+  },
+
   moveElement: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const fd = await request.formData();
@@ -1367,6 +1394,11 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'invalid frame' });
     }
 
+    const values = templateValues(fd.get('values'));
+    if (!values) {
+      return fail(400, { error: 'invalid values' });
+    }
+
     const actor = userActor(scope);
     const deps = { ...FROM_TEMPLATE_DEPS, listCanvases: async () => [scope.canvas] };
     const started = await phases.time('start', startFromTemplate(scope.db, deps, {
@@ -1377,6 +1409,7 @@ export const actions: Actions<CanvasParams> = {
       userId: scope.userId,
       templateId: String(fd.get('template') ?? ''),
       format,
+      values,
       at,
       actor
     }));

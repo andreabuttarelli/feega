@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
+  import { enhance } from '$lib/settings/enhance';
   import { RASTER_IMAGE_ACCEPT } from '$lib/raster-image';
   import { Panel } from '$lib/components/ui/panel';
   import { Field } from '$lib/components/ui/field';

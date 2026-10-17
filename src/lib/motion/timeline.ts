@@ -3,7 +3,7 @@ import { Strictness } from './custom/component';
 import { withParams } from './custom/params';
 import { FPS, MAX_SECONDS, TransitionKind, maxFrames, type Edge } from './design';
 import { MAX_JUNCTION_FRAMES, junctionProblem, type Junction } from './junctions';
-import { FORMATS, byFrame, cloneDoc, clipsOf, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
+import { FORMATS, MotionFormat, RESOLUTION_PROBLEM, byFrame, fitsResolution, cloneDoc, clipsOf, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import { Ease } from './design';
 import { Matte, isMaskKey, maskSchema, maskStackSchema, type MaskInput } from './mask';
 import { matteSource } from './matte';
@@ -302,8 +302,28 @@ function endSoundsAt(doc: MotionDoc, end: number): MotionDoc {
   return { ...doc, tracks: doc.tracks.map((t) => (t.kind === TrackKind.Audio ? { ...t, clips: t.clips.map(fit) } : t)) };
 }
 
-export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durationInFrames?: number; background?: Background }): OpResult {
-  const size = input.format ? FORMATS[input.format] : { width: doc.width, height: doc.height };
+export type CanvasSize = { width: number; height: number };
+
+type Sizing = { width: number; height: number; freeSize: boolean };
+
+function sizingOf(doc: MotionDoc, input: { format?: MotionFormat; size?: CanvasSize }): Sizing {
+  if (input.size) {
+    return { ...input.size, freeSize: true };
+  }
+  if (input.format === MotionFormat.Custom) {
+    return { width: doc.width, height: doc.height, freeSize: true };
+  }
+  if (input.format) {
+    return { width: FORMATS[input.format].width, height: FORMATS[input.format].height, freeSize: false };
+  }
+  return { width: doc.width, height: doc.height, freeSize: doc.freeSize ?? false };
+}
+
+export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; size?: CanvasSize; durationInFrames?: number; background?: Background }): OpResult {
+  const { freeSize, ...size } = sizingOf(doc, input);
+  if (!fitsResolution(size)) {
+    return fail(`${size.width}×${size.height}: ${RESOLUTION_PROBLEM}`);
+  }
   const durationInFrames = Math.round(input.durationInFrames ?? doc.durationInFrames);
   const fitted = endSoundsAt(doc, durationInFrames);
   const end = Math.max(0, ...fitted.tracks.flatMap((t) => t.clips.map(clipEnd)));
@@ -315,7 +335,9 @@ export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durati
     return fail(`the video can be at most ${MAX_SECONDS} seconds`);
   }
   const still = fitted.still ? { still: { frame: Math.min(fitted.still.frame, durationInFrames - 1) } } : {};
-  return { ok: true, doc: { ...fitted, width: size.width, height: size.height, durationInFrames, background: input.background ?? fitted.background, ...still } };
+  const { freeSize: _, ...rest } = fitted;
+  const free = freeSize ? { freeSize } : {};
+  return { ok: true, doc: { ...rest, width: size.width, height: size.height, durationInFrames, background: input.background ?? fitted.background, ...still, ...free } };
 }
 
 export function snapFrame(frame: number, targets: readonly number[], threshold: number): number {
