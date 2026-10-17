@@ -1,5 +1,6 @@
 import { invalidate } from '$app/navigation';
-import { env as publicEnv } from '$env/dynamic/public';
+import { HOSTED_ORIGIN, RUNTIME, Runtime } from '$lib/runtime';
+import { hostedAssets } from '$lib/native/static-assets';
 import type { ActionResult } from '@sveltejs/kit';
 import { createSupabaseBrowserClient } from '$lib/supabase/client';
 import { SwrCache } from './swr';
@@ -21,7 +22,7 @@ const cache = new SwrCache();
 let supabase: ReturnType<typeof createSupabaseBrowserClient> | null = null;
 
 function apiUrl(path: string): string {
-  return `${publicEnv.PUBLIC_API_BASE ?? ''}${path}`;
+  return `${HOSTED_ORIGIN}${path}`;
 }
 
 async function token(): Promise<string | null> {
@@ -30,17 +31,36 @@ async function token(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
+const ORG_STORAGE_KEY = 'feega:org';
+
+function storedOrg(): string | null {
+  try {
+    return localStorage.getItem(ORG_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function orgHint(): string | null {
   const match = document.cookie.match(new RegExp(`(?:^|; )${ORG_COOKIE}=([^;]*)`));
-  return match ? decodeURIComponent(match[1]) : null;
+  return match ? decodeURIComponent(match[1]) : storedOrg();
 }
 
 export function chooseWorkspace(orgId: string): void {
   document.cookie = `${ORG_COOKIE}=${encodeURIComponent(orgId)}; path=/; max-age=${ORG_COOKIE_MAX_AGE_S}; samesite=lax`;
+  rememberOrg(orgId);
   cache.clear();
 }
 
-function withOrg(path: string, query: URLSearchParams = new URLSearchParams()): string {
+function rememberOrg(orgId: string): void {
+  try {
+    localStorage.setItem(ORG_STORAGE_KEY, orgId);
+  } catch {
+    return;
+  }
+}
+
+export function withOrg(path: string, query: URLSearchParams = new URLSearchParams()): string {
   const params = new URLSearchParams(query);
   const org = orgHint();
   if (org) {
@@ -50,7 +70,7 @@ function withOrg(path: string, query: URLSearchParams = new URLSearchParams()): 
   return search ? `${path}${path.includes('?') ? '&' : '?'}${search}` : path;
 }
 
-async function call(path: string, init: RequestInit = {}): Promise<{ status: number; body: Answer }> {
+export async function call(path: string, init: RequestInit = {}): Promise<{ status: number; body: Answer }> {
   const bearer = await token();
   if (!bearer) {
     return { status: UNAUTHORIZED, body: { error: 'missing_bearer' } };
@@ -66,7 +86,8 @@ function keyOf(path: string): `api:${string}` {
 function reader(path: string): () => Promise<unknown> {
   return async () => {
     const { status, body } = await call(path);
-    return loadedOf(status, body);
+    const data = loadedOf(status, body);
+    return RUNTIME === Runtime.Bundle ? hostedAssets(data, HOSTED_ORIGIN) : data;
   };
 }
 

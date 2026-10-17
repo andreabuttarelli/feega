@@ -104,3 +104,5 @@ bun.lock
 
 /static/motion-libs/
 tests/e2e/.auth/
+.native/
+apps/native/bundle-dist/

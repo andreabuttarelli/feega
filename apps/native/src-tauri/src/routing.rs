@@ -6,6 +6,7 @@ const DEEP_LINK_SCHEME: &str = "feega";
 const AUTH_HOST: &str = "auth";
 const AUTH_CALLBACK_PATH: &str = "/callback";
 const SHELL_SCHEMES: [&str; 3] = ["tauri", "about", "data"];
+const BUNDLE_HOST: &str = "tauri.localhost";
 
 #[derive(Debug, PartialEq)]
 pub enum Start {
@@ -24,6 +25,11 @@ pub fn start(configured: Option<&str>) -> Start {
     }
 }
 
+pub fn hosted_app(configured: Option<&str>) -> Url {
+    let production = || Url::parse(PRODUCTION_URL).expect("production url parses");
+    configured.map(str::trim).filter(|v| !v.is_empty()).and_then(|v| Url::parse(v).ok()).unwrap_or_else(production)
+}
+
 pub fn auth_return(deep: &Url, app: &Url) -> Option<Url> {
     if deep.scheme() != DEEP_LINK_SCHEME || deep.host_str() != Some(AUTH_HOST) || deep.path() != AUTH_CALLBACK_PATH {
         return None;
@@ -34,7 +40,7 @@ pub fn auth_return(deep: &Url, app: &Url) -> Option<Url> {
 }
 
 pub fn stays_inside(target: &Url, app: &Url) -> bool {
-    if SHELL_SCHEMES.contains(&target.scheme()) {
+    if SHELL_SCHEMES.contains(&target.scheme()) || target.host_str() == Some(BUNDLE_HOST) {
         return true;
     }
     target.origin() == app.origin()
@@ -71,6 +77,21 @@ mod tests {
         let app = url("https://oh.feega.app");
         assert_eq!(auth_return(&url("feega://p/123"), &app), None);
         assert_eq!(auth_return(&url("other://auth/callback?code=x"), &app), None);
+    }
+
+    #[test]
+    fn the_bundle_talks_to_production_unless_told_otherwise() {
+        assert_eq!(hosted_app(None), url(PRODUCTION_URL));
+        assert_eq!(hosted_app(Some("http://localhost:5173")), url("http://localhost:5173"));
+        assert_eq!(hosted_app(Some("not a url")), url(PRODUCTION_URL));
+    }
+
+    #[test]
+    fn the_bundle_origin_stays_in_the_window_on_every_platform() {
+        let app = url("https://oh.feega.app");
+        assert!(stays_inside(&url("tauri://localhost/app"), &app));
+        assert!(stays_inside(&url("http://tauri.localhost/app"), &app));
+        assert!(!stays_inside(&url("http://evil.localhost/app"), &app));
     }
 
     #[test]

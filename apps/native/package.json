@@ -7,6 +7,7 @@
     "dev": "tauri dev",
     "build": "tauri build",
     "build:mac": "tauri build --bundles app",
+    "build:mac:bundle": "FEEGA_URL=bundle tauri build --bundles app --config '{\"build\":{\"frontendDist\":\"../bundle-dist\"}}'",
     "ios:init": "tauri ios init",
     "ios:dev": "tauri ios dev",
     "android:init": "tauri android init",

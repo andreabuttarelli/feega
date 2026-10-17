@@ -1,6 +1,6 @@
 mod routing;
 
-use routing::{auth_return, start, stays_inside, Start};
+use routing::{auth_return, hosted_app, start, stays_inside, Start};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_opener::OpenerExt;
@@ -8,6 +8,7 @@ use url::Url;
 
 const MAIN: &str = "main";
 const START_URL_ENV: &str = "FEEGA_URL";
+const HOSTED_URL_ENV: &str = "FEEGA_HOSTED";
 #[cfg(target_os = "ios")]
 const PLATFORM_AGENT: &str = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148";
 #[cfg(target_os = "android")]
@@ -24,6 +25,11 @@ fn user_agent() -> String {
 fn configured_start() -> Start {
     let runtime = std::env::var(START_URL_ENV).ok();
     start(runtime.as_deref().or(option_env!("FEEGA_URL")))
+}
+
+fn configured_hosted() -> Url {
+    let runtime = std::env::var(HOSTED_URL_ENV).ok();
+    hosted_app(runtime.as_deref().or(option_env!("FEEGA_HOSTED")))
 }
 
 fn app_url(app: &AppHandle) -> Option<Url> {
@@ -65,7 +71,7 @@ pub fn run() {
         .setup(|app| {
             let (webview_url, home) = match configured_start() {
                 Start::Hosted(url) => (WebviewUrl::External(url.clone()), Some(url)),
-                Start::Bundle => (WebviewUrl::App("index.html".into()), None),
+                Start::Bundle => (WebviewUrl::App("index.html".into()), Some(configured_hosted())),
             };
 
             let opener = app.handle().clone();
@@ -76,6 +82,9 @@ pub fn run() {
 
             #[cfg(feature = "bench")]
             let window = window.initialization_script(include_str!("../../bench/tauri-loader.js"));
+
+            #[cfg(feature = "e2e")]
+            let window = window.initialization_script(include_str!("../../e2e/tauri-loader.js"));
 
             window
                 .on_navigation(move |target| {

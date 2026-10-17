@@ -1,12 +1,36 @@
 import { readFileSync } from 'node:fs';
 import vercelAdapter from '@sveltejs/adapter-vercel';
 import nodeAdapter from '@sveltejs/adapter-node';
+import staticAdapter from '@sveltejs/adapter-static';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
 
 const NODE_DEPLOY_TARGET = 'node';
 const deployTarget = process.env.DEPLOY_TARGET ?? '';
+const nativeBundle = process.env.FEEGA_TARGET === 'bundle';
+const NATIVE_OUT = 'apps/native/bundle-dist';
+const NATIVE_SRC = '.native';
+const NATIVE_FILES = {
+  src: NATIVE_SRC,
+  routes: `${NATIVE_SRC}/routes`,
+  lib: 'src/lib',
+  params: 'src/params',
+  assets: `${NATIVE_SRC}/static`,
+  appTemplate: 'src/app.html',
+  hooks: { client: 'src/hooks.client', server: `${NATIVE_SRC}/hooks.server`, universal: `${NATIVE_SRC}/hooks` },
+  serviceWorker: `${NATIVE_SRC}/service-worker`
+};
+
+function adapterFor() {
+  if (nativeBundle) {
+    return staticAdapter({ pages: NATIVE_OUT, assets: NATIVE_OUT, fallback: 'index.html', strict: false });
+  }
+  if (deployTarget === NODE_DEPLOY_TARGET) {
+    return nodeAdapter();
+  }
+  return vercelAdapter({ runtime: 'nodejs22.x', maxDuration: 300, regions: ['lhr1'] });
+}
 
 // Release tag: `<semver>+<commit>` (see src/lib/release.ts for the full rationale).
 // The semver half is bumped by a person via `npm run release`; the commit half is automatic.
@@ -21,11 +45,11 @@ const VERSION_POLL_MS = 60_000;
 const config = {
   preprocess: vitePreprocess(),
   kit: {
-    adapter:
-      deployTarget === NODE_DEPLOY_TARGET
-        ? nodeAdapter()
-        : // Pin the Vercel runtime so local builds don't depend on the local Node version.
-          vercelAdapter({ runtime: 'nodejs22.x', maxDuration: 300, regions: ['lhr1'] }),
+    adapter: adapterFor(),
+
+    alias: { $web: 'src/routes' },
+
+    ...(nativeBundle ? { files: NATIVE_FILES } : {}),
 
     version: { name: releaseName, pollInterval: VERSION_POLL_MS },
 
@@ -41,15 +65,17 @@ const config = {
     // request path (own Vercel function) or kit has to grow per-route opt-out.
     csrf: { checkOrigin: false },
 
-    experimental: {
-      tracing: {
-        server: true
-      },
+    experimental: nativeBundle
+      ? {}
+      : {
+          tracing: {
+            server: true
+          },
 
-      instrumentation: {
-        server: true
-      }
-    }
+          instrumentation: {
+            server: true
+          }
+        }
   }
 };
 

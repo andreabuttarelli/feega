@@ -3,6 +3,8 @@
 // these with a `disallowed_useragent` error, so we need to bounce the user out into their
 // real default browser before starting the OAuth flow.
 
+import { isNativeShell } from '$lib/native-shell';
+
 export type InAppBrowser = {
   /** True when we believe the page is running inside a native app's embedded webview. */
   isInApp: boolean;
@@ -42,6 +44,9 @@ export function detectInAppBrowser(ua: string = typeof navigator !== 'undefined'
   }
 
   let isInApp = app !== null;
+  if (isNativeShell(ua)) {
+    return { isInApp: false, os, app: null };
+  }
 
   // Generic heuristics for in-app browsers that don't name themselves in the UA:
   // - Android System WebView injects "; wv)" into the UA.
