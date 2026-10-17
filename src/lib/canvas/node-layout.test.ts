@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { validateNewNodeData, validateNodeData } from './node-data';
-import { dragAngle, rotateGroup, translateGroup, layoutOf } from './node-layout';
+import { dragAngle, followGroup, undoTurn, scaleGroup, rotateGroup, translateGroup, layoutOf } from './node-layout';
 
 describe('every node carries its own layout: rotation and group', () => {
   it('keeps rotation and groupId through validation, for any type', () => {
@@ -52,5 +52,29 @@ describe('the rotate handle', () => {
     const centre = { x: 0, y: 0 };
     expect(dragAngle(centre, { x: 0, y: -10 }, { x: 10, y: 0 })).toBeCloseTo(90, 5);
     expect(dragAngle(centre, { x: 0, y: -10 }, { x: 10, y: -1 }, 15)).toBe(90);
+  });
+});
+
+describe('scaling a group', () => {
+  it('scales each member about the group corner, sizes included', () => {
+    const [g, f] = scaleGroup(group, [frame], { w: 400, h: 50 });
+
+    expect(g).toMatchObject({ x: 0, y: 0, w: 400, h: 50 });
+    expect(f).toMatchObject({ id: 'f', x: 300, y: 12.5, w: 80, h: 25 });
+  });
+});
+
+describe('members follow a group while it is dragged', () => {
+  it('shift each member by how far the group has moved from where the drag began', () => {
+    const origins = new Map([['g', { x: 0, y: 0 }], ['f', { x: 150, y: 25 }]]);
+
+    expect(followGroup(origins, 'g', { x: 30, y: -10 }, ['f'])).toEqual([{ id: 'f', x: 180, y: 15 }]);
+  });
+});
+
+describe('undoing a turn', () => {
+  it('is the same turn the other way, and undoing that gives the turn back', () => {
+    expect(undoTurn({ id: 'g', degrees: 30 })).toEqual({ id: 'g', degrees: -30 });
+    expect(undoTurn(undoTurn({ id: 'g', degrees: 30 }))).toEqual({ id: 'g', degrees: 30 });
   });
 });

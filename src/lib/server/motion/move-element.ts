@@ -73,7 +73,7 @@ export type FrameStore = {
 };
 
 export type Moved =
-  | { outcome: MoveOutcome.Done; frameId: string; clipId: string; created: boolean; versions: Record<string, number>; undo: UndoItem[] }
+  | { outcome: MoveOutcome.Done; frameId: string; clipId: string; created: boolean; versions: Record<string, number>; undo: UndoItem[]; turn?: { id: string; degrees: number } }
   | { outcome: Exclude<MoveOutcome, MoveOutcome.Done>; detail?: string };
 
 export type MoveAsk = { sourceNodeId: string; clipId: string; drop: Drop; box?: Box | null; versions?: Record<string, number> };

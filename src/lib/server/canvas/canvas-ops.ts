@@ -1,4 +1,4 @@
-import { groupElements, moveNodeGroup, rotateNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
@@ -174,6 +174,7 @@ const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.s
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
 const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
+const scaleGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), width: z.number().positive(), height: z.number().positive() }).strict();
 const moveGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), x: z.number().finite(), y: z.number().finite() }).strict();
 const membersOf = (ctx: CanvasCtx, canvasId: string) => nodeMembers(ctx.db, { orgId: ctx.orgId, canvasId, actor: ctx.actor });
 
@@ -595,6 +596,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: rotateGroupInput,
     run: async (ctx, input) => frameAnswer(await rotateNodeGroup(framesOf(ctx), membersOf(ctx, input.canvasId), input.nodeId, input.degrees))
+  }),
+
+  scale_group: op({
+    access: Access.Write,
+    input: scaleGroupInput,
+    run: async (ctx, input) => frameAnswer(await scaleNodeGroup(membersOf(ctx, input.canvasId), input.nodeId, { w: input.width, h: input.height }))
   }),
 
   move_group: op({

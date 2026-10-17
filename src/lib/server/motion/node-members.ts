@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
-import { DataCheck, findNode, listNodes, moveNode, patchNodeData, type CanvasNodeRecord } from '$lib/server/repos/canvas';
+import { DataCheck, findNode, listNodes, moveNode, patchNodeData, resizeNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { layoutOf } from '$lib/canvas/node-layout';
 import { nodeSize } from '$lib/canvas/node-size';
 import type { Member, Members } from './element-groups';
@@ -38,6 +38,10 @@ export function nodeMembers(db: Db, scope: { orgId: string; canvasId: string; ac
       if (node) {
         await moveNode(db, { orgId, nodeId, x: node.position.x, y: node.position.y, z: BEHIND_Z, actor });
       }
+    },
+    resize: async (nodeId, at) => {
+      await moveNode(db, { orgId, nodeId, x: at.x, y: at.y, actor });
+      await resizeNode(db, { orgId, nodeId, width: at.w, height: at.h });
     },
     place: async (nodeId, at) => {
       await moveNode(db, { orgId, nodeId, x: at.x, y: at.y, actor });

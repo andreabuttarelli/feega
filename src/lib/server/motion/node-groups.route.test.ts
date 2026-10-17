@@ -87,6 +87,20 @@ describe('rotating a group', () => {
     expect(frame.y + 25).toBeCloseTo(120, 5);
   });
 
+  it('a rotation answers its own undo: the same turn the other way', async () => {
+    const input = event({ id: GROUP, degrees: '90' }, grouped());
+
+    expect(await actions.rotateGroup(input as never)).toMatchObject({ outcome: 'done', turn: { id: GROUP, degrees: 90 } });
+  });
+
+  it('scaling a group scales its frame: place and size', async () => {
+    const input = event({ id: GROUP, width: '400', height: '50' }, grouped());
+
+    expect(await actions.scaleGroup(input as never)).toMatchObject({ outcome: 'done' });
+    expect(nodesOf(input).find((n) => n.id === FRAME)).toMatchObject({ x: 300, y: 12.5, width: 80, height: 25 });
+    expect(nodesOf(input).find((n) => n.id === GROUP)).toMatchObject({ width: 400, height: 50 });
+  });
+
   it('moving a group moves its frame by the same amount', async () => {
     const input = event({ id: GROUP, x: '30', y: '-10' }, grouped());
 
