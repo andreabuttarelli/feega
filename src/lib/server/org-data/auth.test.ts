@@ -150,3 +150,25 @@ describe('resolveOrgCaller: un JWT senza org nominata lavora in quella attiva', 
     expect('caller' in resolved && resolved.caller.orgId).toBe('org-active');
   });
 });
+
+describe('resolveOrgCaller: un viewer legge, non scrive', () => {
+  it('un JWT di un viewer ha writeAllowed false', async () => {
+    vi.resetModules();
+    const { fakeDb } = await import('$lib/server/db/fake-db');
+    const { db } = fakeDb(
+      {
+        orgs_members: [
+          { user_id: 'user-1', org_id: 'org-1', role: 'viewer', created_at: '2026-01-01T00:00:00Z', orgs: { id: 'org-1', name: 'o', slug: 'o' }, profiles: { active_org_id: null } }
+        ]
+      },
+      { filter: true }
+    );
+    Object.assign(db, { auth: { getUser: async () => ({ data: { user: { id: 'user-1' } }, error: null }) } });
+    vi.doMock('$lib/server/db/client', () => ({ createUserDb: () => db, createServiceRoleDb: () => db }));
+
+    const { resolveOrgCaller } = await import('./auth');
+    const resolved = await resolveOrgCaller('jwt-token');
+
+    expect('caller' in resolved && resolved.caller.writeAllowed).toBe(false);
+  });
+});

@@ -23,6 +23,7 @@ import { env } from '$env/dynamic/private';
 import { createUserDb, createServiceRoleDb, type Db } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { listMemberships } from '$lib/server/repos/orgs';
+import { can, OrgAction } from '$lib/org-roles';
 import type { OrgQueryAuthority } from './query-tool';
 
 export type OrgCaller = {
@@ -129,13 +130,15 @@ async function resolveJwt(token: string, orgId?: string): Promise<{ caller: OrgC
     return { error: { status: 404, body: { error: 'org_not_found' } } };
   }
 
+  const role = memberships.find((m) => m.org.id === chosen)?.role;
+
   return {
     caller: {
       authority: { kind: 'rls', supabase: db as unknown as SupabaseClient },
       db,
       orgId: chosen,
       userId: userData.user.id,
-      writeAllowed: true
+      writeAllowed: role ? can(role, OrgAction.Edit) : false
     }
   };
 }
