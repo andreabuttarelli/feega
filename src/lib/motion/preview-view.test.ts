@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FIT, ZOOM_PRESETS, fitScale, panBy, scaleOf, zoomAt, zoomLabel, zoomStep, type View } from './preview-view';
+import { FIT, ZOOM_PRESETS, fitScale, panBy, scaleOf, zoomAt, zoomLabel, zoomStep, zoomToBox, boxAround, type View } from './preview-view';
 
 const frame = { width: 1080, height: 1920 };
 const box = { width: 800, height: 600 };
@@ -51,5 +51,21 @@ describe('preview view', () => {
 
   it('a view is only scale and offset: zooming never reaches the document', () => {
     expect(Object.keys(zoomAt(FIT, 2, { x: 0, y: 0 }, frame, box)).sort()).toEqual(['scale', 'x', 'y']);
+  });
+
+  it('zooming to a box centres it and fills the view with it', () => {
+    const view = zoomToBox({ left: 400, top: 800, width: 200, height: 150 }, frame, box);
+    expect(view.scale).toBeCloseTo(4 * 0.9);
+    const centreOnScreen = (500 - frame.width / 2) * view.scale! + view.x;
+    expect(centreOnScreen).toBeCloseTo(0);
+  });
+
+  it('a box bigger than the view never zooms past fit', () => {
+    expect(zoomToBox({ left: 0, top: 0, width: 1080, height: 1920 }, frame, box).scale).toBeCloseTo(fitScale(frame, box) * 0.9);
+  });
+
+  it('the box around a selection spans every box, and nothing selected has none', () => {
+    expect(boxAround([{ left: 10, top: 20, width: 30, height: 40 }, { left: 100, top: 0, width: 10, height: 10 }])).toEqual({ left: 10, top: 0, width: 100, height: 60 });
+    expect(boxAround([])).toBeNull();
   });
 });
