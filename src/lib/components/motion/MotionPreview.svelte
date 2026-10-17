@@ -16,6 +16,8 @@
   import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
   import { INPUT_MESSAGE } from '$lib/motion/interactive/runtime';
   import type { VarValues } from '$lib/motion/interactive/var-model';
+  import { RenderEngine } from '$lib/motion/gpu/engine-flag';
+  import GpuLayer from './GpuLayer.svelte';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
 
@@ -40,8 +42,9 @@
     redraws = $bindable(0),
     ontap = null,
     background = Background.Brand,
+    engine = RenderEngine.Html,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; children?: Snippet } = $props();
 
   let pointer = $state<InputValues>({});
 
@@ -109,6 +112,7 @@
       el.style.width = '100%';
       el.style.height = '100%';
       el.style.background = PLAYER_BACKDROP[background];
+      el.style.visibility = engine === RenderEngine.Gpu ? 'hidden' : '';
       el.muted = muted;
       el.loop = loop;
       el.addEventListener('ready', () => {
@@ -322,6 +326,9 @@
 
 <div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview">
   <div class="host" bind:this={host}></div>
+  {#if engine === RenderEngine.Gpu}
+    <GpuLayer {html} time={() => (playing && player ? player.currentTime : frame / fps)} />
+  {/if}
   {@render children?.()}
   {#if live}
     <div

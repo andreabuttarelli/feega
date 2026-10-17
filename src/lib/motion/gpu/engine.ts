@@ -69,7 +69,7 @@ export async function gpuEngine(html: string, host: HTMLElement, preference: Bac
       return [];
     }
     const quad = [[0, 0], [frame.width, 0], [frame.width, frame.height], [0, frame.height]] as Drawn['quad'];
-    const drawn: Drawn = { clip: '', layer: null as never, paint: { kind: PaintKind.Fill, color: scene.background, pattern: '' }, quad, matrix: IDENTITY_3D, opacity: 1, blur: 0, blend: 'normal', clips: [], content: frame };
+    const drawn: Drawn = { clip: '', layer: null as never, paint: { kind: PaintKind.Fill, color: scene.background, pattern: '' }, quad, matrix: IDENTITY_3D, opacity: 1, blur: 0, blend: 'normal', clips: [], content: frame, focus: [0.5, 0.5] };
     return [{ kind: SlotKind.Native, drawn, placement: { texture: painter.fill(scene.background, frame), rect: [0, 0, frame.width, frame.height] } }];
   };
 

@@ -48,7 +48,8 @@
     "eval:motion": "vite-node --config scripts/vite-node.config.ts scripts/eval/motion-quality/run.ts --",
     "eval:people": "vite-node --config scripts/vite-node.config.ts scripts/eval/people-detector.ts",
     "docs:mcp-tools": "node scripts/mcp-inventory.mjs --write",
-    "bench:export": "vite-node --config scripts/vite-node.config.ts scripts/bench/export-bench.ts --"
+    "bench:export": "vite-node --config scripts/vite-node.config.ts scripts/bench/export-bench.ts --",
+    "bench:gpu-parity": "vite-node --config scripts/vite-node.config.ts scripts/gpu-parity/parity.ts --"
   },
   "devDependencies": {
     "@internationalized/date": "^3.12.0",

@@ -136,6 +136,7 @@ if (mode === Mode.Parity) {
   const times = spread(doc, frames);
   const shots: ShotsInput = { html, times, ...size, preference };
   const before = await call<ShotsInput, ShotsResult>('htmlShots', shots);
+  console.log(`html engine ${(before.ms / times.length).toFixed(0)} ms/frame`);
   const after = await call<ShotsInput, ShotsResult>('gpuShots', shots);
   const framesDir = join(dir, 'frames');
   rmSync(framesDir, { recursive: true, force: true });

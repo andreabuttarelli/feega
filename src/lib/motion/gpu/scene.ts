@@ -9,7 +9,7 @@ export type Quad = [Point, Point, Point, Point];
 export type Paint =
   | { kind: PaintKind.Fill; color: string; pattern: string }
   | { kind: PaintKind.Shape; markup: string; size: Size }
-  | { kind: PaintKind.Image; src: string; fit: string; focus: Point }
+  | { kind: PaintKind.Image; src: string; fit: string }
   | { kind: PaintKind.Video; src: string; fit: string; start: number; duration: number; mediaStart: number; rate: number; element: Element }
   | { kind: PaintKind.Logo; src: string }
   | { kind: PaintKind.Html };
@@ -22,7 +22,7 @@ type Timeline = { seek: (t: number) => void };
 
 export type Scene = { width: number; height: number; background: string | null; layers: SceneLayer[]; timeline: Timeline; duration: number; doc: Document };
 
-export type Drawn = { clip: string; layer: SceneLayer; paint: Paint; quad: Quad; matrix: Mat4; opacity: number; blur: number; blend: string; clips: Quad[]; content: Size };
+export type Drawn = { clip: string; layer: SceneLayer; paint: Paint; quad: Quad; matrix: Mat4; opacity: number; blur: number; blend: string; clips: Quad[]; content: Size; focus: Point };
 
 const ROOT_BG = /#root\{background:([^};]+)/;
 const TIMELINE_MARK = `__timelines[${JSON.stringify(COMPOSITION_ID)}]=tl`;
@@ -61,10 +61,8 @@ function paintOf(layer: Element): { el: HTMLElement; paint: Paint } | null {
   const img = layer.querySelector('img') as HTMLImageElement | null;
   if (img && boxedChild(img) && layer.querySelectorAll('img,video,svg').length === 1) {
     const zoomed = img.style.transform.includes('--kc-zoom');
-    const [fx = '50%', fy = '50%'] = resolved(img.style.objectPosition, new Map()).split(/\s+/);
-    const point: Point = [parseFloat(fx) / 100, parseFloat(fy) / 100];
     const src = img.getAttribute('src') ?? '';
-    return { el: img, paint: zoomed ? { kind: PaintKind.Image, src, fit: img.style.objectFit || 'cover', focus: point } : { kind: PaintKind.Logo, src } };
+    return { el: img, paint: zoomed ? { kind: PaintKind.Image, src, fit: img.style.objectFit || 'cover' } : { kind: PaintKind.Logo, src } };
   }
   const video = layer.querySelector('video') as HTMLVideoElement | null;
   if (video && boxedChild(video) && layer.querySelectorAll('img,video,svg').length === 1) {
@@ -168,23 +166,32 @@ function originOf(el: HTMLElement, size: Size, prop: 'transformOrigin' | 'perspe
   return [axis(raw[0], size.width), axis(raw[1], size.height)];
 }
 
-type Vars = Map<string, string>;
+type Vars = Map<string, string> | ((name: string) => string | undefined);
 
-const VAR = /var\((--[\w-]+)(?:,\s*([^()]*))?\)/g;
+const VAR = /var\((--[\w-]+)(?:,\s*([^()]*))?\)/;
 const CALC_PERCENT = /calc\(\s*([-\d.]+)\s*\*\s*100%\s*\)/g;
+const MAX_DEPTH = 8;
+
+const lookup = (vars: Vars, name: string) => (typeof vars === 'function' ? vars(name) : vars.get(name));
 
 export function resolved(value: string, vars: Vars): string {
-  return value.replace(VAR, (_, name: string, fallback = '') => vars.get(name) ?? fallback.trim()).replace(CALC_PERCENT, (_, n: string) => `${Number(n) * 100}%`);
+  let out = value;
+  for (let i = 0; i < MAX_DEPTH && VAR.test(out); i++) {
+    out = out.replace(/var\((--[\w-]+)(?:,\s*((?:[^()]|\([^()]*\))*))?\)/g, (_, name: string, fallback = '') => lookup(vars, name) ?? fallback.trim());
+  }
+  return out.replace(CALC_PERCENT, (_, n: string) => `${Number(n) * 100}%`);
 }
 
-function collectVars(el: HTMLElement, vars: Vars): Vars {
-  const own = [...Array(el.style.length).keys()].map((i) => el.style.item(i)).filter((name) => name.startsWith('--'));
-  if (!own.length) {
-    return vars;
-  }
-  const next = new Map(vars);
-  own.forEach((name) => next.set(name, el.style.getPropertyValue(name).trim()));
-  return next;
+function varsUpTo(links: Link[], index: number): Vars {
+  return (name) => {
+    for (let i = index; i >= 0; i--) {
+      const v = links[i].el.style.getPropertyValue(name).trim();
+      if (v && !v.includes(`var(${name}`)) {
+        return v;
+      }
+    }
+    return undefined;
+  };
 }
 
 function linkMatrix(link: Link, parent: Link | null, vars: Vars): Mat4 {
@@ -227,11 +234,10 @@ function drawnOf(layer: SceneLayer, t: number): Drawn | null {
   let blur = 0;
   let blend = 'normal';
   const clips: Quad[] = [];
-  let vars: Vars = new Map();
   for (let i = 0; i < layer.links.length; i++) {
     const link = layer.links[i];
     const style = link.el.style;
-    vars = collectVars(link.el, vars);
+    const vars = varsUpTo(layer.links, i);
     if (style.visibility === 'hidden' || style.display === 'none') {
       return null;
     }
@@ -248,15 +254,18 @@ function drawnOf(layer: SceneLayer, t: number): Drawn | null {
     }
   }
   const { width, height } = layer.content;
+  const last = layer.links.length - 1;
+  const [fx = '50%', fy = '50%'] = last >= 0 ? resolved(layer.links[last].el.style.objectPosition || '50% 50%', varsUpTo(layer.links, last)).split(/\s+/) : [];
+  const focus: Point = [(parseFloat(fx) || 50) / 100, (parseFloat(fy) || 50) / 100];
   const quad: Quad = [project(m, 0, 0), project(m, width, 0), project(m, width, height), project(m, 0, height)];
-  return { clip: layer.clip, layer, paint: layer.paint, quad, matrix: m, opacity, blur, blend, clips, content: layer.content };
+  return { clip: layer.clip, layer, paint: layer.paint, quad, matrix: m, opacity, blur, blend, clips, content: layer.content, focus };
 }
 
 export function frameAt(scene: Scene, t: number): Drawn[] {
   scene.timeline.seek(t);
   return scene.layers.flatMap((layer) => {
     if (layer.paint.kind === PaintKind.Html) {
-      return visibleAt(layer, t) ? [{ clip: layer.clip, layer, paint: layer.paint, quad: [[0, 0], [scene.width, 0], [scene.width, scene.height], [0, scene.height]] as Quad, matrix: IDENTITY_3D, opacity: 1, blur: 0, blend: 'normal', clips: [], content: layer.content }] : [];
+      return visibleAt(layer, t) ? [{ clip: layer.clip, layer, paint: layer.paint, quad: [[0, 0], [scene.width, 0], [scene.width, scene.height], [0, scene.height]] as Quad, matrix: IDENTITY_3D, opacity: 1, blur: 0, blend: 'normal', clips: [], content: layer.content, focus: [0.5, 0.5] as Point }] : [];
     }
     const d = drawnOf(layer, t);
     return d ? [d] : [];

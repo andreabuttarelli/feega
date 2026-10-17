@@ -130,7 +130,7 @@ export function createPainter(): Painter {
     [PaintKind.Image]: (d) => {
       const paint = d.paint as Of<PaintKind.Image>;
       const entry = loaded.get(paint.src);
-      return entry ? { texture: entry.texture, rect: fitRect(paint.fit, d.content, entry.natural, paint.focus) } : null;
+      return entry ? { texture: entry.texture, rect: fitRect(paint.fit, d.content, entry.natural, d.focus) } : null;
     },
     [PaintKind.Logo]: (d) => {
       const entry = loaded.get((d.paint as Of<PaintKind.Logo>).src);
