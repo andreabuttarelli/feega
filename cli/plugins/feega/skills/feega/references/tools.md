@@ -368,6 +368,7 @@ permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publisha
 |---|---|
 | `list_orgs` | `feega orgs` |
 | `team_op` `switch_org` | `feega orgs use <orgId>` |
+| `team_op` `create_org` | `feega orgs create <name>` |
 
 ## Ads
 

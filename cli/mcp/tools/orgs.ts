@@ -3,6 +3,13 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { orgsApi } from '../../lib/orgs.ts';
 import { withAuth } from '../util.ts';
 
+type TeamInput = { org_id?: string; name?: string };
+
+const TEAM_OPS: Record<string, (token: string, input: TeamInput) => Promise<unknown>> = {
+  switch_org: (token, input) => orgsApi.switch(token, input.org_id ?? ''),
+  create_org: (token, input) => orgsApi.create(token, input.name ?? '')
+};
+
 export function registerOrgTools(server: McpServer) {
   server.registerTool(
     'list_orgs',
@@ -19,10 +26,10 @@ export function registerOrgTools(server: McpServer) {
     'team_op',
     {
       title: 'Change organisations and teams',
-      description: 'One organisation or team change, only when the user asks. `op`: `switch_org` makes `org_id` (from `list_orgs`) active for the web app, the CLI and agents.',
-      inputSchema: z.object({ op: z.enum(['switch_org']), org_id: z.string() }),
+      description: 'One organisation or team change, only when the user asks. `op`: `switch_org` makes `org_id` (from `list_orgs`) active for the web app, the CLI and agents; `create_org` creates `name`, owned by the user, and makes it active.',
+      inputSchema: z.object({ op: z.enum(['switch_org', 'create_org']), org_id: z.string().optional(), name: z.string().optional() }),
       annotations: { readOnlyHint: false, destructiveHint: false }
     },
-    async ({ org_id }) => withAuth((token) => orgsApi.switch(token, org_id))
+    async (input) => withAuth((token) => TEAM_OPS[input.op](token, input))
   );
 }

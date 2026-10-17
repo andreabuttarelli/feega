@@ -21,3 +21,8 @@ export async function cmdOrgsUse(orgId: string) {
   await orgsApi.switch(await token(), orgId);
   console.log(`Active organisation: ${orgId}. The web app, the CLI and agents now work there.`);
 }
+
+export async function cmdOrgsCreate(name: string) {
+  const { org_id } = await orgsApi.create(await token(), name);
+  console.log(`Created "${name}" (${org_id}); it is now your active organisation.`);
+}

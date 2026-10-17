@@ -41,6 +41,27 @@ export async function chooseWorkspace(orgId: string): Promise<void> {
   await call('/api/v1/orgs/active', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ org_id: orgId }) });
 }
 
+export type Sent = { ok: boolean; status: number; body: Record<string, unknown> };
+
+export async function sendJson(path: string, method: string, payload: unknown = {}): Promise<Sent> {
+  const { status, body } = await call(path, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+  cache.clear();
+  return { ok: status < 300, status, body: body as Record<string, unknown> };
+}
+
+export async function readJson<T>(path: string): Promise<T> {
+  const { body } = await call(path);
+  return body as T;
+}
+
+export async function createWorkspace(name: string): Promise<Sent> {
+  const sent = await sendJson('/api/v1/orgs', 'POST', { name });
+  if (sent.ok) {
+    await chooseWorkspace(String(sent.body.org_id));
+  }
+  return sent;
+}
+
 function withOrg(path: string, query: URLSearchParams = new URLSearchParams()): string {
   const params = new URLSearchParams(query);
   const org = orgHint();
