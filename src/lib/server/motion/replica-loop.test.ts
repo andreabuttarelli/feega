@@ -18,7 +18,7 @@ const breakdown = parseBreakdown(
 const orange = await sharp({ create: { width: 16, height: 9, channels: 3, background: '#ff6a00' } }).jpeg().toBuffer();
 const black = await sharp({ create: { width: 16, height: 9, channels: 3, background: '#000000' } }).jpeg().toBuffer();
 
-function fakePorts(editsPerTurn: number[], costPerTurn = 0.5) {
+function fakePorts(editsPerTurn: number[], costPerTurn = 0.5, stoppedAt = -1) {
   const steps: SceneStep[] = [];
   const kept: { scene: number; frames: KeptFrame[] }[] = [];
   let spent = 0;
@@ -27,7 +27,7 @@ function fakePorts(editsPerTurn: number[], costPerTurn = 0.5) {
     turn: async (step) => {
       steps.push(step);
       spent += costPerTurn;
-      return { edits: editsPerTurn.shift() ?? 0 };
+      return { edits: editsPerTurn.shift() ?? 0, budgetSpent: steps.length - 1 === stoppedAt };
     },
     draw: async (times) => times.map((time) => ({ time, bytes: black })),
     spent: async () => spent,
@@ -124,6 +124,14 @@ describe('the replica is built scene by scene by the server, and Opus reviews ea
     const report = await runReplicaLoop(breakdown, ports, { capUsd: 6 });
 
     expect(report[0].similarity).toBeLessThan(0.6);
+  });
+
+  it('a review turn refused for budget is not a match (live: "This video has used its budget" counted as scene 2 matching)', async () => {
+    const { ports } = fakePorts([3, 0, 3, 0], 0.5, 1);
+
+    const report = await runReplicaLoop(breakdown, ports, { capUsd: 6 });
+
+    expect(report[0]).toMatchObject({ reviews: 1, matched: false });
   });
 
   it('reviews up to a handful of pairs', () => {

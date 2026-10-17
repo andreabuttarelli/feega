@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MotionFormat, newMotionDoc } from './doc';
 import { addClip } from './timeline';
-import { REPLICA_BRIEF, VideoKind, asksReplica, kindTools, replicaCanvas, replicaFormat, kindOf, lockBreach, replicaSource } from './replica';
+import { REPLICA_BRIEF, VideoKind, asksReplica, kindTools, replicaCanvas, replicaFormat, kindOf, lockBreach, replicaSource, gateFor } from './replica';
+import { Quality } from './direction';
 
 describe('a request to recreate a reference video', () => {
   it.each(['Recreate this video as faithfully as possible', 'replicate it', 'remake this one', 'ricrea questo video', 'Recrea este vídeo', 'refais cette vidéo'])('"%s" asks for a replica', (message) => {
@@ -102,5 +103,33 @@ describe('a replica is built one scene at a time: earlier scenes are locked', ()
 
   it('a new clip outside the current scene is refused', () => {
     expect(lockBreach(first, add(first, 200, 'later'), span)).toMatch(/later/);
+  });
+});
+
+describe('a replica is judged against its reference, not against the launch-film rules (live: scene 1 was told to write a script and add music)', () => {
+  const problems = [
+    { kind: Quality.NoScript, detail: 'no script' },
+    { kind: Quality.Silent, detail: 'no music' },
+    { kind: Quality.BlankFrame, detail: 'blank' }
+  ];
+
+  it('a replica drops the script and music rules, keeps the rest', () => {
+    expect(gateFor(VideoKind.Replica, problems).map((p) => p.kind)).toEqual([Quality.BlankFrame]);
+  });
+
+  it('a standard video keeps them', () => {
+    expect(gateFor(VideoKind.Standard, problems)).toEqual(problems);
+  });
+});
+
+describe('a scene step is not blocked for the scenes not built yet', () => {
+  it('empty time after the current scene is dropped; an empty span inside it is kept', () => {
+    const problems = [
+      { kind: Quality.TrailingEmpty, at: 2.8, detail: 'tail' },
+      { kind: Quality.EmptyFrames, at: 3.5, detail: 'later' },
+      { kind: Quality.EmptyFrames, at: 0, detail: 'leading black' }
+    ];
+
+    expect(gateFor(VideoKind.Replica, problems, 2.8).map((p) => p.detail)).toEqual(['leading black']);
   });
 });

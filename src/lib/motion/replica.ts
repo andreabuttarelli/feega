@@ -1,3 +1,4 @@
+import { Quality } from './direction';
 import { FORMATS, MAX_SECONDS, MotionFormat, type MotionDoc } from './doc';
 import { setCanvas } from './timeline';
 
@@ -25,6 +26,17 @@ const OFFERED: Record<VideoKind, (name: string) => boolean> = {
   [VideoKind.Standard]: () => true,
   [VideoKind.Replica]: (name) => !KIT_TOOLS.has(name)
 };
+
+const WAIVED: Record<VideoKind, ReadonlySet<Quality>> = {
+  [VideoKind.Standard]: new Set(),
+  [VideoKind.Replica]: new Set([Quality.NoScript, Quality.Silent])
+};
+
+const UNBUILT: ReadonlySet<Quality> = new Set([Quality.EmptyFrames, Quality.TrailingEmpty]);
+
+const notYetBuilt = (p: { kind: Quality; at?: number }, unbuiltFromS: number | undefined) => unbuiltFromS !== undefined && UNBUILT.has(p.kind) && (p.at ?? 0) >= unbuiltFromS;
+
+export const gateFor = <P extends { kind: Quality; at?: number }>(kind: VideoKind, problems: readonly P[], unbuiltFromS?: number): P[] => problems.filter((p) => !WAIVED[kind].has(p.kind) && !notYetBuilt(p, unbuiltFromS));
 
 export const kindTools = (kind: VideoKind, names: readonly string[]) => names.filter(OFFERED[kind]);
 

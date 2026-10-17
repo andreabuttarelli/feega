@@ -297,7 +297,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const raisedUsd = motion.node.budgetRaisedUsd ?? 0;
   const videoBreakdown = onceEach(breakdownReader(db, { orgId, projectId: project.id, mode: project.mode }));
   const grabber = (assetId: string) => videoGrabber(db, { orgId, projectId: project.id, assetId });
-  const replica = await replicaTurn({ message, attachments, replicaOf: motion.node.replicaOf }, { read: videoBreakdown, grabber });
+  const replica = await replicaTurn({ message, attachments, replicaOf: motion.node.replicaOf ?? input.step?.replicaOf }, { read: videoBreakdown, grabber });
   if (replica.replicaOf && replica.replicaOf !== motion.node.replicaOf) {
     await patchNodeData(db, { ...nodeScope, patch: { replicaOf: replica.replicaOf }, check: DataCheck.Schema, actor }).catch(() => null);
   }
@@ -315,7 +315,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
 
   const knownAssets = assets.length;
   const replicaDoc = replica.canvas ? replicaCanvas(head.doc, replica.canvas) : null;
-  const session: MotionSession = { doc: replicaDoc ?? head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick, lock: input.step ? spanFrames(input.step.span, head.doc.fps) : undefined };
+  const session: MotionSession = { doc: replicaDoc ?? head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick, lock: input.step ? spanFrames(input.step.span, head.doc.fps) : undefined, kind: replica.kind };
   const moderationScope = { orgId, userId, projectId: project.id, nodeId: motion.record.id, actor };
   const bucket = db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket;
   const frameScope = { orgId, projectId: project.id, nodeId: motion.record.id };

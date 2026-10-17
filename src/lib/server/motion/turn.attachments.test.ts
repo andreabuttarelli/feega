@@ -136,4 +136,18 @@ describe('a motion turn with attachments', () => {
     expect(commits.at(-1)?.doc).toMatchObject({ width: 1920, height: 1080 });
     expect(commits.at(-1)?.doc.durationInFrames).toBe(Math.round(10.1 * commits.at(-1)!.doc.fps));
   });
+
+  it('a review step of a replica stays a replica even when its text never says "recreate" (live: the review turn fell back to the $3 cap and the kit)', async () => {
+    head.format = 'landscape';
+    prompts.length = 0;
+    offered.length = 0;
+    const { db } = fakeDb({ assets: [] });
+    const motion = { record: { id: 'n-3', canvasId: 'c-1' }, node: { id: 'n-3', format: MotionFormat.Landscape, docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } as never;
+    const step = { scene: 2, span: { fromS: 2.8, toS: 4.2 }, text: 'Scene 2: the pictures pair each reference frame with your frame.', pictures: [], capUsd: 1, review: true, replicaOf: 'a-vid' };
+
+    await drain(await startMotionTurn({ db, userId: 'u-1', orgId: 'o-1', project: { id: 'p-1', brandId: null, mode: 'standard' } as never, motion, message: step.text, step, attachments: [], selection: [], model: 'm', reasoning: null, requester: { kind: 'user', id: 'u-1' }, browser: Browser.Absent }));
+
+    expect(offered[0]).toBeDefined();
+    expect(offered[0]).not.toContain('add_template');
+  });
 });

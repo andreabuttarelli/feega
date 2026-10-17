@@ -46,7 +46,7 @@ async function keepFrames(db: Db, scope: Scope, scene: number, frames: readonly 
   await Promise.all(frames.map((f) => bucket.upload(keptPath(scope, scene, f), f.bytes, { contentType: JPEG, upsert: true })));
 }
 
-export async function buildReplica(db: Db, scope: Scope, plan: ReplicaPlan, turn: (step: SceneStep) => Promise<{ edits: number }>): Promise<SceneReport[] | null> {
+export async function buildReplica(db: Db, scope: Scope, plan: ReplicaPlan, turn: (step: SceneStep) => Promise<{ edits: number; budgetSpent: boolean }>): Promise<SceneReport[] | null> {
   const breakdown = await breakdownReader(db, scope)(plan.referenceId);
   const grab = await videoGrabber(db, { orgId: scope.orgId, projectId: scope.projectId, assetId: plan.referenceId });
   if (!breakdown.ok || !grab) {

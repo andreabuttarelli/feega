@@ -7,7 +7,7 @@ export const REVIEW_PAIRS = 6;
 
 export type SceneSpan = { fromS: number; toS: number };
 
-export type SceneStep = { scene: number; span: SceneSpan; text: string; pictures: Picture[]; capUsd: number; review: boolean };
+export type SceneStep = { scene: number; span: SceneSpan; text: string; pictures: Picture[]; capUsd: number; review: boolean; replicaOf?: string };
 
 export type Shot = { time: number; bytes: Buffer };
 
@@ -15,7 +15,7 @@ export type KeptFrame = Shot & { kind: 'reference' | 'ours'; round: number };
 
 export type LoopPorts = {
   grab: GrabFrame;
-  turn: (step: SceneStep) => Promise<{ edits: number }>;
+  turn: (step: SceneStep) => Promise<{ edits: number; budgetSpent: boolean }>;
   draw: (times: number[]) => Promise<Shot[] | null>;
   spent: () => Promise<number>;
   keep: (scene: number, frames: KeptFrame[]) => Promise<void>;
@@ -90,8 +90,11 @@ async function runScene(ports: LoopPorts, input: { scene: Scene; index: number; 
   let pairs = await drawPairs(ports, references);
   while (pairs.length && reviews < MAX_SCENE_FIXES && (await used()) < input.shareUsd) {
     await ports.keep(number, keptOurs(pairs, reviews + 1)).catch(() => undefined);
-    const { edits } = await ports.turn({ scene: number, span, text: reviewText(number, span), pictures: pairPictures(pairs), capUsd: input.shareUsd - (await used()), review: true });
+    const { edits, budgetSpent } = await ports.turn({ scene: number, span, text: reviewText(number, span), pictures: pairPictures(pairs), capUsd: input.shareUsd - (await used()), review: true });
     reviews += 1;
+    if (budgetSpent) {
+      break;
+    }
     if (edits === 0) {
       matched = true;
       break;

@@ -161,14 +161,14 @@ import { MoveOutcome, type FrameTarget, type Moved } from './move-element';
 import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '$lib/motion/still-model';
 import type { BreakdownAnswer } from '$lib/server/video-reference';
 import { CLOSE_TO_REFERENCE, type Comparison } from './reference-frames';
-import { lockBreach, type FrameSpan } from '$lib/motion/replica';
+import { VideoKind, gateFor, lockBreach, type FrameSpan } from '$lib/motion/replica';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
 const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
 
 const copyTexts = (slots: Record<string, unknown>) => Object.entries(slots).flatMap(([k, v]) => (COPY_SLOTS.has(k) && typeof v === 'string' ? v.split('|').map((s) => s.trim()).filter(Boolean) : []));
 
-export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[]; look?: Viewing; looks?: Looks; lock?: FrameSpan };
+export type MotionSession = { doc: MotionDoc; baseVersion: number; edits: string[]; selection: string[]; frames: Map<string, Frame[]>; views: number; checkedAt: number; codeWrites: number; guides?: GuideTopic[]; effectFailures?: number; gate?: QualityProblem[]; references?: Reference[]; pick?: PickAnswer | null; pickAssets?: string[]; look?: Viewing; looks?: Looks; lock?: FrameSpan; kind?: VideoKind };
 
 export type CheckResult = { ok: boolean; problems: string[]; frames: Frame[] };
 
@@ -2382,7 +2382,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const pixels = assetPixels();
         const seam = deps.seam && seamChecked(session.doc) ? await deps.seam() : null;
         const jump = seam === null ? null : loopJump(session.doc, seam);
-        session.gate = [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos], referencesSeen: Boolean(session.references?.length) }), ...frameProblems(stats), ...(jump ? [{ kind: Quality.LoopJump, at: end, detail: jump }] : [])];
+        session.gate = gateFor(session.kind ?? VideoKind.Standard, [...docProblems(session.doc, { audioAssets, pixels, logos: [...brandLogos], referencesSeen: Boolean(session.references?.length) }), ...frameProblems(stats), ...(jump ? [{ kind: Quality.LoopJump, at: end, detail: jump }] : [])], session.lock ? session.lock.to / session.doc.fps : undefined);
         session.look = { times: frames.map((f) => f.time), described: false };
         const quality = session.gate.map((p) => p.detail);
         const open = blocking(session.gate).map((p) => p.detail);

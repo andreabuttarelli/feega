@@ -105,12 +105,13 @@ export async function askMotion(db: Db, input: { orgId: string; userId: string; 
   if (plan) {
     const run = await createRun(db, { orgId, nodeId, prompt, model: choice.choice.model, params: { kind: MOTION_ASK_KIND }, actorKind: 'agent', actorId: userId });
     const step = async (s: SceneStep) => {
-      const started = await turnFor(s.text, attachments, s);
+      const started = await turnFor(s.text, attachments, { ...s, replicaOf: plan.referenceId });
       if (started instanceof Response) {
-        return { edits: 0 };
+        return { edits: 0, budgetSpent: true };
       }
       await started.stream.pipeTo(new WritableStream());
-      return { edits: (await started.done).edits };
+      const outcome = await started.done;
+      return { edits: outcome.edits, budgetSpent: outcome.budget !== null };
     };
     const replicaScope = { orgId, projectId: project.id, nodeId, runId: run.id, mode: project.mode };
     runInBackground(() => settleReplica(db, run, keptPrefix(replicaScope), buildReplica(db, replicaScope, plan, step)), MOTION_ASK_KIND);
