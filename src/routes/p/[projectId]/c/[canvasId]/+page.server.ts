@@ -1,4 +1,5 @@
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
+import { MEDIA_UUID_RE } from '$lib/media-url';
 import { registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
 import { isOutputHandle } from '$lib/canvas/select-outputs';
 import { error, fail, redirect } from '@sveltejs/kit';
@@ -1047,7 +1048,13 @@ export const actions: Actions = {
 
     const sourceNode = canvasNodes.find((node) => node.id === sourceNodeId);
     const targetNode = canvasNodes.find((node) => node.id === targetNodeId);
-    const existing = (await listConnections(scope.db, scope)).map((edge) => ({
+    const lines = await listConnections(scope.db, scope);
+    const chosenId = String(fd.get('connection_id') ?? '');
+    const replayed = lines.find((edge) => edge.id === chosenId);
+    if (replayed) {
+      return { connection: replayed, linked: null };
+    }
+    const existing = lines.map((edge) => ({
       id: edge.id,
       target: edge.targetNodeId,
       targetHandle: edge.targetHandle
@@ -1062,6 +1069,7 @@ export const actions: Actions = {
     }
 
     const connection = await createConnection(scope.db, {
+      id: MEDIA_UUID_RE.test(chosenId) ? chosenId : undefined,
       orgId: scope.orgId,
       canvasId: scope.canvasId,
       sourceNodeId,
@@ -1200,7 +1208,7 @@ export const actions: Actions = {
     }
 
     if (!(await listConnections(scope.db, scope)).some((edge) => edge.id === connectionId)) {
-      return fail(404, { error: 'line not found' });
+      return { disconnected: true };
     }
     await deleteConnection(scope.db, { orgId: scope.orgId, connectionId, actor: userActor(scope) });
 

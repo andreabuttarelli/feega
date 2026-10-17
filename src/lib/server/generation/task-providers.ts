@@ -1,4 +1,5 @@
 import { providerName } from '$lib/canvas/model-provider';
+import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 
 export enum TaskProviderName {
   Wiro = 'wiro',
@@ -20,6 +21,8 @@ type ProviderFacts = {
   priceSource: string;
   storageFolder: string;
   fallbackAfterMs?: Readonly<Record<TaskMedium, number>>;
+  inputTtlS?: number;
+  maxInFlight?: { fallback: number; envKey: string };
 };
 
 const MINUTE_MS = 60_000;
@@ -45,7 +48,9 @@ export const TASK_PROVIDERS: Readonly<Record<TaskProviderName, ProviderFacts>> =
     role: RouteRole.Primary,
     envKeys: ['HIGGSFIELD_API_KEY_ID', 'HIGGSFIELD_API_KEY_SECRET'],
     priceSource: 'Higgsfield POST /estimate/<model>, per variant',
-    storageFolder: 'higgsfield'
+    storageFolder: 'higgsfield',
+    inputTtlS: SIGNED_URL_TTL_S.queuedProviderInput,
+    maxInFlight: { fallback: 4, envKey: 'HIGGSFIELD_MAX_CONCURRENCY' }
   }
 };
 
@@ -54,6 +59,10 @@ const PROVIDER_NAMES = Object.values(TaskProviderName);
 export const idPrefixOf = (provider: TaskProviderName): string => `${provider}/`;
 
 export const jobPrefixOf = (provider: TaskProviderName): string => `${provider}:`;
+
+export const WAITING_TASK_ID = 'waiting';
+
+export const waitingJobOf = (provider: TaskProviderName): string => `${jobPrefixOf(provider)}${WAITING_TASK_ID}`;
 
 export const TASK_JOB_PREFIXES: readonly string[] = PROVIDER_NAMES.map(jobPrefixOf);
 
@@ -68,4 +77,8 @@ export function taskJobOf(externalJobId: string): { provider: TaskProviderName; 
 
 export function configuredIn(env: Readonly<Record<string, string | undefined>>): ReadonlySet<TaskProviderName> {
   return new Set(PROVIDER_NAMES.filter((provider) => TASK_PROVIDERS[provider].envKeys.every((key) => env[key]?.trim())));
+}
+
+export function inputTtlOf(provider: TaskProviderName | null): number {
+  return (provider && TASK_PROVIDERS[provider].inputTtlS) || SIGNED_URL_TTL_S.providerInput;
 }

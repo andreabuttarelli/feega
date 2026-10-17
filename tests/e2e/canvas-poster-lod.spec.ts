@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { test, expect, type Page } from '@playwright/test';
+import { LOD_CLASS, LOD_ZOOM } from '../../src/lib/canvas/poster-lod';
 
 const HARNESS = '/tests/e2e/fixtures/motion-canvas-harness.ts';
 const NODES = 300;
@@ -25,6 +26,8 @@ async function mountZoomedOut(page: Page, source = 'image') {
       window.motionCanvas.mount(Array.from({ length: count }, (_, i) => ({ id: `n${i}`, x: (i % columns) * step.x, y: Math.floor(i / columns) * step.y, format: '1:1', poster: art, source }))),
     { art: poster, source, count: NODES, columns: COLUMNS, step: STEP }
   );
+  await expect(page.locator('.svelte-flow')).toHaveCount(1);
+  await expect(page.locator('.moving')).toHaveCount(0);
 }
 
 const shellDisplays = (page: Page) => page.locator('.svelte-flow__node.has-poster').evaluateAll((nodes) => [...new Set(nodes.map((node) => getComputedStyle(node).display))]);
@@ -106,4 +109,91 @@ test('zoomed out, a pan takes the poster node shells out of layout and settles t
 
   expect(await shellDisplays(page)).toEqual(['none']);
   await expect.poll(() => shellDisplays(page)).toEqual(['block']);
+});
+
+type Crossing = { crossedAt: number; switchedAt: number; endedAt: number; playersTouched: number };
+
+enum Zoom {
+  In = -1,
+  Out = 1
+}
+
+const WHEEL_STEPS = 60;
+const WHEEL_DELTA = 30;
+const WHEEL_EVERY_MS = 16;
+const SETTLE_BUDGET_MS = 300;
+const GIVE_UP_MS = 3000;
+
+const zoomGesture = (page: Page, direction: Zoom) =>
+  page.evaluate(
+    ({ direction, steps, delta, every, threshold, lodClass, giveUp }) =>
+      new Promise<Crossing>((resolve) => {
+        const flow = document.querySelector<HTMLElement>('.svelte-flow')!;
+        const viewport = document.querySelector<HTMLElement>('.svelte-flow__viewport')!;
+        const pane = document.querySelector<HTMLElement>('.svelte-flow__pane')!;
+        const box = pane.getBoundingClientRect();
+        const outward = direction > 0;
+        const run = { crossedAt: 0, switchedAt: 0, endedAt: 0, playersTouched: 0 };
+        let sent = 0;
+        const players = new MutationObserver((records) => {
+          if (run.endedAt) {
+            return;
+          }
+          const touched = (nodes: NodeList) => [...nodes].some((node) => node instanceof Element && (node.matches('.own') || !!node.querySelector('.own')));
+          run.playersTouched += records.filter((record) => touched(record.addedNodes) || touched(record.removedNodes)).length;
+        });
+        players.observe(viewport, { childList: true, subtree: true });
+
+        const watch = () => {
+          const zoom = new DOMMatrix(getComputedStyle(viewport).transform).a;
+          const now = performance.now();
+          if (!run.crossedAt && outward === zoom < threshold) {
+            run.crossedAt = now;
+          }
+          if (run.crossedAt && !run.switchedAt && flow.classList.contains(lodClass) === outward) {
+            run.switchedAt = now;
+          }
+          if (run.endedAt && (run.switchedAt || now - run.endedAt > giveUp)) {
+            players.disconnect();
+            resolve(run);
+            return;
+          }
+          requestAnimationFrame(watch);
+        };
+        requestAnimationFrame(watch);
+
+        const tick = setInterval(() => {
+          pane.dispatchEvent(new WheelEvent('wheel', { deltaY: direction * delta, ctrlKey: true, clientX: box.left + box.width / 2, clientY: box.top + box.height / 2, bubbles: true, cancelable: true }));
+          sent += 1;
+          if (sent < steps) {
+            return;
+          }
+          clearInterval(tick);
+          run.endedAt = performance.now();
+        }, every);
+      }),
+    { direction, steps: WHEEL_STEPS, delta: WHEEL_DELTA, every: WHEEL_EVERY_MS, threshold: LOD_ZOOM, lodClass: LOD_CLASS, giveUp: GIVE_UP_MS }
+  );
+
+const expectSettledSwitch = (run: Crossing) => {
+  expect(run.crossedAt).toBeGreaterThan(0);
+  expect(run.crossedAt).toBeLessThan(run.endedAt);
+  expect(run.switchedAt).toBeGreaterThan(run.endedAt);
+  expect(run.switchedAt - run.endedAt).toBeLessThan(SETTLE_BUDGET_MS);
+  expect(run.playersTouched).toBe(0);
+};
+
+test('zooming in, node details come back once the gesture settles, not during it', async ({ page }) => {
+  await mountZoomedOut(page);
+  await expect(page.locator('.svelte-flow.poster-lod')).toHaveCount(1);
+
+  expectSettledSwitch(await zoomGesture(page, Zoom.In));
+});
+
+test('zooming out, nodes turn into posters once the gesture settles, not during it', async ({ page }) => {
+  await mountZoomedOut(page);
+  await zoomGesture(page, Zoom.In);
+  await expect(page.locator('.svelte-flow.poster-lod')).toHaveCount(0);
+
+  expectSettledSwitch(await zoomGesture(page, Zoom.Out));
 });

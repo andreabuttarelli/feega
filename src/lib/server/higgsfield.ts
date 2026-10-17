@@ -1,9 +1,13 @@
-import type { TaskOutput, TaskProvider, TaskState } from './canvas/task-provider';
+import { ProviderBusyError, type TaskOutput, type TaskProvider, type TaskState } from './canvas/task-provider';
 import { mimeOfOutputUrl, numericKeysOf, withNumbers } from './generation/wire-values';
 
 export const DEFAULT_HIGGSFIELD_BASE_URL = 'https://api.higgsfield.ai';
 
 const CANCEL_ACCEPTED = 202;
+
+const BAD_REQUEST = 400;
+
+const CONCURRENCY_REACHED = /maximum number of concurrent requests/i;
 
 const RUNNING_STATUSES = new Set(['queued', 'in_progress']);
 
@@ -65,6 +69,9 @@ function client(config: HiggsfieldConfig) {
 async function failure(res: Response): Promise<Error> {
   const body = (await res.json().catch(() => ({}))) as { detail?: unknown };
   const detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail ?? '');
+  if (res.status === BAD_REQUEST && CONCURRENCY_REACHED.test(detail)) {
+    return new ProviderBusyError(`higgsfield_busy: ${detail}`);
+  }
   return new Error(`higgsfield_failed: HTTP ${res.status} ${detail}`.trim());
 }
 
@@ -75,7 +82,7 @@ async function ok<T>(res: Response): Promise<T> {
   return (await res.json()) as T;
 }
 
-export function higgsfield(config: HiggsfieldConfig): TaskProvider & Required<Pick<TaskProvider, 'cancel'>> {
+export function higgsfield(config: HiggsfieldConfig): TaskProvider & Required<Pick<TaskProvider, 'cancel' | 'quote'>> {
   const call = client(config);
 
   return {
@@ -96,8 +103,19 @@ export function higgsfield(config: HiggsfieldConfig): TaskProvider & Required<Pi
     async cancel(taskId) {
       const res = await call(`requests/${encodeURIComponent(taskId)}/cancel`, { method: 'POST' });
       return res.status === CANCEL_ACCEPTED;
+    },
+
+    quote(model, inputs) {
+      return higgsfieldEstimate(config, String(model.path), withNumbers(inputs, numericKeysOf(model)));
     }
   };
+}
+
+export type HiggsfieldOption = { id: string; name: string };
+
+export async function higgsfieldOptions(config: HiggsfieldConfig, path: string): Promise<HiggsfieldOption[]> {
+  const reply = await ok<{ items?: Array<Partial<HiggsfieldOption>> }>(await client(config)(path, { method: 'GET' }));
+  return (reply.items ?? []).filter((item): item is HiggsfieldOption => Boolean(item.id && item.name)).map(({ id, name }) => ({ id, name }));
 }
 
 export async function higgsfieldEstimate(config: HiggsfieldConfig, path: string, inputs: Record<string, unknown>): Promise<number | null> {

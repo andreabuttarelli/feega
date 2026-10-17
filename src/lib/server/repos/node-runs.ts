@@ -499,3 +499,23 @@ export async function markProviderPurged(db: Db, input: { orgId: string; runId: 
     throw error;
   }
 }
+
+const PROVIDER_LOAD_LIMIT = 1000;
+
+const LIVE_STATUSES = ['running', 'finishing'];
+
+export async function providerLoad(db: Db, input: { prefix: string; waitingJobId: string }): Promise<{ inFlight: number; waiting: number }> {
+  const { data, error } = await db
+    .from('node_runs')
+    .select('external_job_id')
+    .in('status', LIVE_STATUSES)
+    .like('external_job_id', `${input.prefix}%`)
+    .limit(PROVIDER_LOAD_LIMIT);
+
+  if (error) {
+    throw error;
+  }
+  const waiting = (data ?? []).filter((row) => row.external_job_id === input.waitingJobId).length;
+  return { inFlight: (data ?? []).length - waiting, waiting };
+}
+

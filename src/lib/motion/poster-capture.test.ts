@@ -22,7 +22,7 @@ describe('the poster of a composition', () => {
     await vi.advanceTimersByTimeAsync(POSTER_DEBOUNCE_MS);
 
     expect(shoot).toHaveBeenCalledTimes(1);
-    expect(send).toHaveBeenCalledWith('data:image/jpeg;base64,AA==');
+    expect(send).toHaveBeenCalledWith('data:image/jpeg;base64,AA==', undefined);
   });
 
   it('an empty capture sends nothing', async () => {
@@ -33,6 +33,21 @@ describe('the poster of a composition', () => {
     await vi.advanceTimersByTimeAsync(POSTER_DEBOUNCE_MS);
 
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it('a poster is labelled with the revision it was shot at, not one saved while shooting', async () => {
+    let revision = 3;
+    const shoot = vi.fn(async () => {
+      revision = 4;
+      return 'data:image/jpeg;base64,AA==';
+    });
+    const send = vi.fn(async () => {});
+    const job = posterJob(shoot, send, () => revision);
+
+    job.schedule();
+    await vi.advanceTimersByTimeAsync(POSTER_DEBOUNCE_MS);
+
+    expect(send).toHaveBeenCalledWith('data:image/jpeg;base64,AA==', 3);
   });
 });
 

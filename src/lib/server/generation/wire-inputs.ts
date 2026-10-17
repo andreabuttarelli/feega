@@ -3,9 +3,11 @@ import type { WireFields } from '$lib/server/canvas/task-provider';
 
 const CONTROLLED_SCHEMA_KEYS = new Set(['aspect_ratio', 'resolution', 'duration']);
 
-export type WireInput = { prompt: string; params: GenParams; imageUrls: string[]; lastFrameUrl: string | null };
+export type WireInput = { prompt: string; params: GenParams; imageUrls: string[]; lastFrameUrl: string | null; videoUrls?: string[]; audioUrls?: string[] };
 
-export type WireShape = { fields: WireFields; fixed?: Readonly<Record<string, string>>; maxRefs?: unknown };
+export type ListCaps = Readonly<Partial<Record<'image' | 'video' | 'audio', number>>>;
+
+export type WireShape = { fields: WireFields; fixed?: Readonly<Record<string, string>>; maxRefs?: unknown; caps?: ListCaps };
 
 type Control = { wireId: string | undefined; schemaKey: string; value: unknown; fit: (value: string, allowed: string[]) => string | undefined };
 
@@ -47,9 +49,18 @@ function extraInputs(params: GenParams, schema: Record<string, unknown>): Record
   );
 }
 
-function refsCap(shape: WireShape): number {
-  const cap = Number(shape.maxRefs);
+function capOf(value: unknown): number {
+  const cap = Number(value);
   return Number.isFinite(cap) && cap > 0 ? cap : Infinity;
+}
+
+function listsOf(shape: WireShape, input: WireInput): Array<[string | undefined, string[], number]> {
+  const { fields, caps } = shape;
+  return [
+    [fields.imageList, input.imageUrls, capOf(caps?.image ?? shape.maxRefs)],
+    [fields.videoList, (input.videoUrls ?? []).slice(fields.video ? 1 : 0), capOf(caps?.video)],
+    [fields.audioList, input.audioUrls ?? [], capOf(caps?.audio)]
+  ];
 }
 
 export function wireInputs(shape: WireShape, input: WireInput, schema: Record<string, unknown>): Record<string, unknown> {
@@ -71,8 +82,13 @@ export function wireInputs(shape: WireShape, input: WireInput, schema: Record<st
       inputs[wireId] = input.imageUrls[index];
     }
   });
-  if (fields.imageList && input.imageUrls.length) {
-    inputs[fields.imageList] = input.imageUrls.slice(0, refsCap(shape));
+  for (const [wireId, urls, cap] of listsOf(shape, input)) {
+    if (wireId && urls.length) {
+      inputs[wireId] = urls.slice(0, cap);
+    }
+  }
+  if (fields.video && input.videoUrls?.length) {
+    inputs[fields.video] = input.videoUrls[0];
   }
   if (fields.lastFrame && input.lastFrameUrl) {
     inputs[fields.lastFrame] = input.lastFrameUrl;

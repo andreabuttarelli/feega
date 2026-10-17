@@ -1,6 +1,7 @@
 import { baseOf, type NodeData } from './node-patch';
 import { SERVER_WRITTEN_FIELDS } from './node-data';
 import { DB_BUSY, isStatementTimeout } from '$lib/db-busy';
+import { SendResult } from './save-scheduler';
 
 export enum SaveFailure {
   Conflict = 'conflict',
@@ -152,7 +153,7 @@ export function orphanedEdits(local: { id: string }[], server: { id: string }[],
 
 type RealtimeChange = { table: string; eventType: string; new: unknown };
 
-type ShownTile = { id: string; data: Record<string, unknown>; x?: number; y?: number; displayName?: string | null };
+type ShownTile = { id: string; version?: number; data: Record<string, unknown>; x?: number; y?: number; displayName?: string | null };
 
 type ChangedRow = {
   id?: string;
@@ -188,7 +189,11 @@ export function isOwnEcho(change: RealtimeChange, tiles: ShownTile[]): boolean {
   if (!tile || row.deleted_at) {
     return false;
   }
-  return samePlace(row, tile) && canonical(row.data ?? {}) === canonical(tile.data);
+  if (!samePlace(row, tile)) {
+    return false;
+  }
+  const passed = row.version !== undefined && tile.version !== undefined && row.version < tile.version;
+  return passed || canonical(row.data ?? {}) === canonical(tile.data);
 }
 
 type HeadTile = ShownTile & { type: string; version: number; saved: Record<string, unknown> };
@@ -228,6 +233,24 @@ function written(result: ActionAnswer): Written | null {
   return ((result.data ?? {}) as { node?: Written }).node ?? null;
 }
 
+export type VersionedAction = {
+  settle: () => Promise<void>;
+  version: () => number;
+  send: (version: number) => Promise<ActionAnswer>;
+  reread: () => Promise<unknown>;
+};
+
+export async function actAtVersion(action: VersionedAction): Promise<ActionAnswer> {
+  await action.settle();
+  const first = await action.send(action.version());
+  if (first.type === 'success' || failureOf(first) !== SaveFailure.Conflict) {
+    return first;
+  }
+
+  await action.reread();
+  return action.send(action.version());
+}
+
 export async function writeWithRetry(attempt: WriteAttempt): Promise<WriteOutcome> {
   const tried = await attempt.send(attempt.patch, attempt.base);
   const first = failureOf(tried) === SaveFailure.Busy ? await attempt.send(attempt.patch, attempt.base) : tried;
@@ -252,4 +275,19 @@ export async function writeWithRetry(attempt: WriteAttempt): Promise<WriteOutcom
     return { ok: true, node: retried };
   }
   return { ok: false, reason: failureOf(second), patch: attempt.patch, detail: dataOf(second) };
+}
+
+const SEND_RESULT: Record<SaveFailure, SendResult> = {
+  [SaveFailure.Network]: SendResult.Retry,
+  [SaveFailure.Server]: SendResult.Retry,
+  [SaveFailure.Busy]: SendResult.Retry,
+  [SaveFailure.Conflict]: SendResult.Retry,
+  [SaveFailure.Invalid]: SendResult.Dropped,
+  [SaveFailure.Gone]: SendResult.Dropped,
+  [SaveFailure.Credits]: SendResult.Dropped,
+  [SaveFailure.Auth]: SendResult.Dropped
+};
+
+export function sendResultOf(reason: SaveFailure): SendResult {
+  return SEND_RESULT[reason];
 }

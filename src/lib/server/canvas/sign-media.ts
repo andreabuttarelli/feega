@@ -17,11 +17,11 @@ function assetSigningUse(): ServiceRoleUse {
 const ABSOLUTE_URL = /^https?:\/\//;
 const PROVIDER_INPUT_TTL_S = SIGNED_URL_TTL_S.providerInput;
 
-export async function signMediaPaths(db: Db, paths: string[]): Promise<string[]> {
+export async function signMediaPaths(db: Db, paths: string[], ttlSeconds: number = PROVIDER_INPUT_TTL_S): Promise<string[]> {
   const stored = paths.filter((p) => !ABSOLUTE_URL.test(p));
   const [rendered, uploaded] = await Promise.all([
-    signKnowledgePaths(db as never, stored, PROVIDER_INPUT_TTL_S),
-    signAssetFiles(db, stored, PROVIDER_INPUT_TTL_S)
+    signKnowledgePaths(db as never, stored, ttlSeconds),
+    signAssetFiles(db, stored, ttlSeconds)
   ]);
 
   return paths

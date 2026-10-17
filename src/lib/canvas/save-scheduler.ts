@@ -187,6 +187,16 @@ export function createSaveScheduler(options: SchedulerOptions) {
     return [...new Set([...Object.keys(state.inflight ?? {}), ...Object.keys(state.pending ?? {})])];
   }
 
+  function unsentPatches(): Record<string, NodeData> {
+    const out: Record<string, NodeData> = {};
+    for (const [id, state] of nodes) {
+      if (state.inflight || state.pending) {
+        out[id] = { ...(state.inflight ?? {}), ...(state.pending ?? {}) };
+      }
+    }
+    return out;
+  }
+
   function sending(id: string): boolean {
     return Boolean(nodes.get(id)?.inflight);
   }
@@ -218,5 +228,5 @@ export function createSaveScheduler(options: SchedulerOptions) {
     announce();
   }
 
-  return { schedule, flush, dirtyKeys, sending, unsent, status, hold, discard };
+  return { schedule, flush, dirtyKeys, sending, unsent, unsentPatches, status, hold, discard };
 }

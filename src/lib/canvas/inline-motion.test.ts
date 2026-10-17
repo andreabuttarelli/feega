@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Reframe, reframesOn, NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, dismissedAfterClick, inlineMotionTarget, nodeLayers, openingOf, ownPlayer } from './inline-motion';
+import { Reframe, reframesOn, NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, dismissedAfterClick, editorOn, inlineMotionTarget, nodeLayers, openingOf, ownPlayer, tileMode } from './inline-motion';
 import { Viewport } from '$lib/motion/editor-layout';
 
 const rows = [
@@ -84,5 +84,21 @@ describe('a frame closed and clicked again', () => {
 
   it('a click on another node leaves the closed frame closed', () => {
     expect(dismissedAfterClick('m1', 'other')).toBe('m1');
+  });
+});
+
+describe('a frame being closed', () => {
+  it('keeps its editor on the tile until the tile has drawn itself, and the next frame waits', () => {
+    expect(editorOn('m2', 'm1')).toBe('m1');
+    expect(editorOn('m2', null)).toBe('m2');
+    expect(tileMode('m1', 'm2', 'm1')).toBe(NodeMode.Leaving);
+    expect(tileMode('m2', 'm2', 'm1')).toBe(NodeMode.Preview);
+    expect(tileMode('m2', 'm2', null)).toBe(NodeMode.Edit);
+    expect(tileMode('m3', 'm2', null)).toBe(NodeMode.Preview);
+  });
+
+  it('draws both its own picture and the editor over it', () => {
+    expect(nodeLayers(NodeMode.Leaving, Paint.Swapped)).toEqual({ own: true, editor: true });
+    expect(nodeLayers(NodeMode.Leaving, Paint.Pending)).toEqual({ own: true, editor: true });
   });
 });
