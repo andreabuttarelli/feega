@@ -123,6 +123,36 @@ export async function videoPage(db: Db, deps: DashboardDeps, orgId: string, befo
   return { videos: visible.map((n) => cardOf(n, names.get(n.projectId)!, images, videos)), more };
 }
 
+type RecentCanvasRow = Awaited<ReturnType<typeof listRecentCanvases>>[number];
+
+function canvasCardsOf(canvases: RecentCanvasRow[], names: Map<string, string>, framesOf: Map<string, RecentNode[]>, urls: Signed): DashboardCanvas[] {
+  return canvases
+    .filter((c) => names.has(c.projectId))
+    .slice(0, RECENT_CANVASES)
+    .map((c) => ({
+      id: c.id,
+      name: c.name,
+      projectName: names.get(c.projectId)!,
+      updatedAt: c.updatedAt,
+      href: canvasPath(c.projectId, c.id),
+      thumbs: (framesOf.get(c.id) ?? []).map((n) => urls[posterIdOf(n)!]).filter(present)
+    }));
+}
+
+export async function recentCanvasesFor(db: Db, deps: DashboardDeps, orgId: string): Promise<DashboardCanvas[]> {
+  const [allProjects, canvases, motionNodes] = await Promise.all([
+    deps.listProjects(db, orgId),
+    deps.listRecentCanvases(db, { orgId, limit: CANVAS_SCAN }),
+    deps.listRecentNodes(db, { orgId, type: 'motion', limit: MOTION_SCAN })
+  ]);
+
+  const names = new Map(allProjects.filter((p) => p.mode === ProjectMode.Standard).slice(0, PROJECT_LIMIT).map((p) => [p.id, p.name]));
+  const shown = new Set(canvases.filter((c) => names.has(c.projectId)).slice(0, RECENT_CANVASES).map((c) => c.id));
+  const framesOf = firstPer(motionNodes.filter((n) => shown.has(n.canvasId) && posterIdOf(n)), byCanvas, THUMBS_PER_CANVAS);
+  const urls = await deps.signImages(db, orgId, [...framesOf.values()].flat().map(posterIdOf).filter(present));
+  return canvasCardsOf(canvases, names, framesOf, urls);
+}
+
 export async function dashboardFor(db: Db, deps: DashboardDeps, orgId: string): Promise<Dashboard> {
   const [allProjects, canvases, images, batches, motionNodes] = await Promise.all([
     deps.listProjects(db, orgId),
@@ -142,7 +172,6 @@ export async function dashboardFor(db: Db, deps: DashboardDeps, orgId: string): 
   const { page, more } = pageOf(motionNodes);
   const motions = page.filter((n) => names.has(n.projectId));
   const postersOf = firstPer(ownMotions.filter((n) => posterIdOf(n)), byProject, POSTERS_PER_PROJECT);
-  const recentCanvases = canvases.filter((c) => names.has(c.projectId)).slice(0, RECENT_CANVASES);
   const framesOf = firstPer(ownMotions.filter((n) => posterIdOf(n)), byCanvas, THUMBS_PER_CANVAS);
   const posterIds = [...motions, ...[...postersOf.values()].flat(), ...[...framesOf.values()].flat()].map(posterIdOf).filter(present);
   const [urls, videos] = await Promise.all([
@@ -151,14 +180,7 @@ export async function dashboardFor(db: Db, deps: DashboardDeps, orgId: string): 
   ]);
 
   return {
-    canvases: recentCanvases.map((c) => ({
-      id: c.id,
-      name: c.name,
-      projectName: names.get(c.projectId)!,
-      updatedAt: c.updatedAt,
-      href: canvasPath(c.projectId, c.id),
-      thumbs: (framesOf.get(c.id) ?? []).map((n) => urls[posterIdOf(n)!]).filter(present)
-    })),
+    canvases: canvasCardsOf(canvases, names, framesOf, urls),
     projects: projects.map((p) => ({
       id: p.id,
       name: p.name,

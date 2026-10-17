@@ -75,7 +75,7 @@ export const TONE: Record<Tone, string> = {
   [Tone.Accent]: 'bg-ui-accent-solid text-ui-on-accent hover:brightness-110 active:brightness-95'
 };
 
-export const MENU_CONTENT = 'z-50 min-w-48 overflow-hidden rounded-md bg-ui-raised p-1 text-ui-text shadow-ui-float outline-none';
+export const MENU_CONTENT = 'z-[70] min-w-48 overflow-hidden rounded-md bg-ui-raised p-1 text-ui-text shadow-ui-float outline-none';
 
 export const MENU_ITEM = `flex h-(--ui-row) pointer-coarse:h-11 w-full cursor-default select-none items-center gap-2 rounded-md px-2 text-left text-ui-body text-ui-text outline-none data-highlighted:bg-ui-wash hover:bg-ui-wash focus-visible:bg-ui-wash data-disabled:pointer-events-none data-disabled:text-ui-text-off [&_svg]:size-(--ui-icon-sm) [&_svg]:shrink-0 [&_svg]:text-ui-icon`;
 

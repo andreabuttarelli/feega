@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Db } from '$lib/server/db/client';
 import { fetchSocialFeed, fetchClassifiedEntry } from '$lib/server/social-feed-fetch';
 import { upsertNodeSocialPosts } from '$lib/server/repos/social-posts';
-import { archiveImageToBucket } from '$lib/server/media-archive';
+import { archiveImageToBucket, archiveVideoToBucket } from '$lib/server/media-archive';
 import type { MediaItem, NormalizedPost } from '$lib/server/scrapecreators';
 import { classifySocialLines, type SocialEntry, type ClassifyFailureReason } from '$lib/canvas/social-url-classifier';
 
@@ -24,19 +24,32 @@ export type SocialFeedSyncOutcome =
   | { ok: true; synced: number }
   | { ok: false; error: string };
 
-export type ArchivedItem = MediaItem & { thumbnailPath?: string };
+export type ArchivedItem = MediaItem & { thumbnailPath?: string; videoPath?: string };
 export type ArchivedPost = Omit<NormalizedPost, 'items'> & { items?: ArchivedItem[] };
 
 const CANVAS_ASSET_BUCKET = 'canvas-assets';
 
-async function archiveItem(db: Db, orgId: string, nodeId: string, item: MediaItem): Promise<ArchivedItem> {
-  if (!item.thumbnailUrl) {
-    return item;
-  }
+const archiveKey = (url: string) => createHash('sha1').update(url).digest('hex').slice(0, 16);
 
-  const key = createHash('sha1').update(item.thumbnailUrl).digest('hex').slice(0, 16);
-  const path = await archiveImageToBucket(db, `${orgId}/${nodeId}/${key}.jpg`, item.thumbnailUrl, CANVAS_ASSET_BUCKET);
-  return path ? { ...item, thumbnailPath: path } : item;
+async function archivedThumbnail(db: Db, orgId: string, nodeId: string, item: MediaItem): Promise<{ thumbnailPath?: string }> {
+  if (!item.thumbnailUrl) {
+    return {};
+  }
+  const path = await archiveImageToBucket(db, `${orgId}/${nodeId}/${archiveKey(item.thumbnailUrl)}.jpg`, item.thumbnailUrl, CANVAS_ASSET_BUCKET);
+  return path ? { thumbnailPath: path } : {};
+}
+
+async function archivedVideo(db: Db, orgId: string, nodeId: string, item: MediaItem): Promise<{ videoPath?: string }> {
+  if (item.type !== 'video' || !item.url) {
+    return {};
+  }
+  const path = await archiveVideoToBucket(db, `${orgId}/${nodeId}/${archiveKey(item.url)}.mp4`, item.url, CANVAS_ASSET_BUCKET);
+  return path ? { videoPath: path } : {};
+}
+
+async function archiveItem(db: Db, orgId: string, nodeId: string, item: MediaItem): Promise<ArchivedItem> {
+  const [thumbnail, video] = await Promise.all([archivedThumbnail(db, orgId, nodeId, item), archivedVideo(db, orgId, nodeId, item)]);
+  return { ...item, ...thumbnail, ...video };
 }
 
 async function archivePosts(db: Db, orgId: string, nodeId: string, posts: NormalizedPost[]): Promise<ArchivedPost[]> {

@@ -35,7 +35,7 @@ describe('premere Genera fa partire qualcosa', () => {
   });
 
   it('la chiamata arriva a una action che esiste', () => {
-    expect(page).toMatch(/post\('run'/);
+    expect(page).toMatch(/postAtVersion\('run'/);
     expect(server).toMatch(/\brun:\s*async/);
   });
 });
@@ -46,7 +46,7 @@ describe('un giro non si paga due volte', () => {
     // render sono due addebiti veri di cui uno viene sovrascritto dall altro atterrando.
     const body = page.slice(page.indexOf('async function run('));
     const raised = body.indexOf('startRun(');
-    const called = body.indexOf("post('run'");
+    const called = body.indexOf("postAtVersion('run'");
 
     expect(raised).toBeGreaterThan(-1);
     expect(called).toBeGreaterThan(-1);

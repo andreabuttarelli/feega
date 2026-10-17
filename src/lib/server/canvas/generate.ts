@@ -5,7 +5,7 @@ import { releaseHold } from '$lib/server/motion/render-run';
 import { MOTION_ASK_KIND } from '$lib/server/motion/ask-kind';
 import { AGENT_STALE_MS } from '$lib/server/brand-agent/limits';
 import { promptRequired, type GenMedium, type GenParams } from '$lib/canvas/gen-node';
-import { upscaleLimitsOf } from '$lib/video-models';
+import { nearestVideoDuration, upscaleLimitsOf } from '$lib/video-models';
 import { findAsset, insertAsset, type Asset } from '$lib/server/repos/assets';
 import {
   AUDIO_JOB_PREFIX,
@@ -24,6 +24,7 @@ import {
   retryClaim,
   runningRuns,
   setExternalJob,
+  setRunParams,
   setRunPrompt,
   setRunRoute,
   type NodeRun
@@ -35,15 +36,15 @@ import { signMediaPaths } from './sign-media';
 import { peopleScreened, ReferenceMedium } from '$lib/server/moderation/people';
 import { composePrompt } from '$lib/canvas/compose-prompt';
 import { textRequest } from '$lib/canvas/text-request';
-import { resolveNodeModel } from './node-model';
+import { resolveModelIn } from './node-model';
 import { finishAudioJob, outputRefsOf, runAudio, type AudioScope } from './audio-run';
 import { audioOperationOf, defaultAudioModel, operationSpec, voiceIdOf } from '$lib/canvas/audio-operations';
 import type { UpstreamInputs } from '$lib/canvas/upstream-inputs';
-import { RouteRole, TASK_PROVIDERS, taskJobOf, taskProviderOf } from '$lib/server/generation/task-providers';
+import { inputTtlOf, RouteRole, TASK_PROVIDERS, taskJobOf, taskProviderOf, WAITING_TASK_ID, waitingJobOf } from '$lib/server/generation/task-providers';
 import { AUTO_ROUTE } from '$lib/canvas/model-routes';
 import { kieTextModel } from '$lib/server/kie-chat';
 import { PRIMARY_ROUTE } from '$lib/server/generation/discount-routes';
-import { RefusalStage, type TaskStart } from './task-run';
+import { QUOTED_USD_PARAM, QueuePlace, RefusalStage, type TaskStart } from './task-run';
 import { model3dParamsOf } from '$lib/model3d-models';
 import { cheapestImageChoice, Model3dPath, model3dPathOf, productShotPrompt } from '$lib/canvas/model3d-run';
 
@@ -311,7 +312,7 @@ const TASK_IMAGE_PATHS: Readonly<Record<string, (upstream: UpstreamInputs) => st
   model3d: (upstream) => upstream.referenceImageUrls
 };
 
-async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<TaskStart> {
+async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string, place = QueuePlace.New): Promise<Exclude<TaskStart, { kind: 'waiting' }>> {
   const [{ taskRunDeps }, { startTaskRun }, { upstreamProvenance }, { projectModeOf }] = await Promise.all([
     import('$lib/server/task-providers-config'),
     import('./task-run'),
@@ -319,13 +320,17 @@ async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: Upstre
     import('$lib/server/uncensored-workspace/workspace-server')
   ]);
   const node = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId }).catch(() => null);
-  const [imageUrls, lastFrame, provenance] = await Promise.all([
-    signMediaPaths(db, TASK_IMAGE_PATHS[input.medium]?.(upstream) ?? []),
-    signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : []),
+  const ttl = inputTtlOf(taskProviderOf(input.model));
+  const [imageUrls, lastFrame, videoUrls, audioUrls, provenance] = await Promise.all([
+    signMediaPaths(db, TASK_IMAGE_PATHS[input.medium]?.(upstream) ?? [], ttl),
+    signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : [], ttl),
+    signMediaPaths(db, upstream.referenceVideoUrls, ttl),
+    signMediaPaths(db, upstream.referenceAudioUrls, ttl),
     upstreamProvenance(db, { orgId: input.orgId, canvasId: input.canvasId, nodeId: input.nodeId, data: node?.data ?? {} })
   ]);
 
-  return startTaskRun(taskRunDeps(db), {
+  const out = await startTaskRun(taskRunDeps(db), {
+    place,
     scope: audioScopeOf(input),
     mode: await projectModeOf(db, input),
     modelId: input.model ?? '',
@@ -333,14 +338,39 @@ async function startTask(db: Db, input: StartRun, run: NodeRun, upstream: Upstre
     params: input.params,
     imageUrls,
     lastFrameUrl: lastFrame[0] ?? null,
+    videoUrls,
+    audioUrls,
     provenance,
     idempotencyKey: run.id
   });
+  return out.kind === 'waiting' ? { kind: 'job', jobId: waitingJobOf(taskProviderOf(input.model)!) } : out;
 }
 
-async function queueTask(db: Db, input: StartRun, run: NodeRun, jobId: string): Promise<RunOutcome> {
-  await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: jobId });
-  return { kind: 'queued', run: { ...run, externalJobId: jobId } };
+async function resubmitWaiting(db: Db, shape: StartRun, run: NodeRun): Promise<void> {
+  const { upstreamInputsFor } = await import('$lib/server/canvas/upstream');
+  const upstream = await upstreamInputsFor(db, { orgId: shape.orgId, canvasId: shape.canvasId, nodeId: shape.nodeId, model: shape.model, medium: shape.medium });
+  const out = await startTask(db, shape, run, upstream, shape.prompt, QueuePlace.Waiting);
+  if (out.kind === 'refused') {
+    await giveUp(db, shape, { ...run, status: 'finishing' }, out.error);
+    return;
+  }
+  await keepQuote(db, run, shape.params as Record<string, unknown>, out.quotedUsd);
+  if (out.jobId !== run.externalJobId) {
+    await setExternalJob(db, { orgId: run.orgId, runId: run.id, externalJobId: out.jobId });
+  }
+  await releaseClaim(db, { orgId: run.orgId, runId: run.id });
+}
+
+async function keepQuote(db: Db, run: NodeRun, params: Record<string, unknown>, quotedUsd: number | undefined): Promise<void> {
+  if (quotedUsd) {
+    await setRunParams(db, { orgId: run.orgId, runId: run.id, params: { ...params, [QUOTED_USD_PARAM]: quotedUsd } });
+  }
+}
+
+async function queueTask(db: Db, input: StartRun, run: NodeRun, job: { jobId: string; quotedUsd?: number }): Promise<RunOutcome> {
+  await keepQuote(db, run, input.params as Record<string, unknown>, job.quotedUsd);
+  await setExternalJob(db, { orgId: input.orgId, runId: run.id, externalJobId: job.jobId });
+  return { kind: 'queued', run: { ...run, externalJobId: job.jobId } };
 }
 
 async function runTaskNode(db: Db, input: StartRun, run: NodeRun, upstream: UpstreamInputs, prompt: string): Promise<RunOutcome> {
@@ -349,7 +379,7 @@ async function runTaskNode(db: Db, input: StartRun, run: NodeRun, upstream: Upst
     await giveUp(db, input, run, out.error);
     return { kind: 'refused', error: out.error };
   }
-  return queueTask(db, input, run, out.jobId);
+  return queueTask(db, input, run, out);
 }
 
 const DISCOUNTED_MEDIA: ReadonlySet<GenMedium> = new Set(['image', 'video']);
@@ -381,7 +411,7 @@ async function runDiscountRoute(db: Db, input: StartRun, run: NodeRun, upstream:
   await setRunRoute(db, { orgId: input.orgId, runId: run.id, model: route.modelId, params: { ...route.params, ...fallback } });
   const out = await startTask(db, routed, run, upstream, prompt);
   if (out.kind === 'job') {
-    return queueTask(db, routed, run, out.jobId);
+    return queueTask(db, routed, run, out);
   }
   if (out.stage === RefusalStage.Policy) {
     await giveUp(db, input, run, out.error);
@@ -513,14 +543,22 @@ async function screenRunReferences(db: Db, input: StartRun, upstream: UpstreamIn
   return screenModelReferences({ orgId: input.orgId, mode, references: signed.flat() });
 }
 
+function offeredDuration(options: readonly number[] | undefined, wanted: number | undefined): number | undefined {
+  if (!options?.length) {
+    return wanted;
+  }
+  return nearestVideoDuration(options, wanted ?? options[0]);
+}
+
 export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcome> {
-  const pick = await resolveNodeModel(requested.medium, requested.model, requested.params);
+  const { generationRefusal, projectModeOf } = await import('$lib/server/uncensored-workspace/workspace-server');
+  const mode = await projectModeOf(db, { orgId: requested.orgId, projectId: requested.projectId });
+  const pick = await resolveModelIn(mode, requested.medium, requested.model, requested.params);
   if (!pick.ok) {
     return { kind: 'refused', error: pick.error };
   }
   const input: StartRun = { ...requested, model: pick.model };
 
-  const { generationRefusal } = await import('$lib/server/uncensored-workspace/workspace-server');
   const refusal = await generationRefusal(db, { orgId: input.orgId, projectId: input.projectId, userId: input.userId, model: input.model });
   if (refusal) {
     return { kind: 'refused', error: refusal };
@@ -707,22 +745,23 @@ export async function runGenNode(db: Db, requested: StartRun): Promise<RunOutcom
     const { generateVideoWithoutBrand } = await import('$lib/server/media-generate');
     const { offerableModels } = await import('$lib/server/offerable-models');
     const { extraParamsOf } = await import('$lib/canvas/model-params');
-    const [referenceImageUrls, referenceVideoUrls, referenceAudioUrls, lastFrame, videoDeclared] = await Promise.all([
+    const [referenceImageUrls, referenceVideoUrls, referenceAudioUrls, lastFrame, videoChoice] = await Promise.all([
       signMediaPaths(db, upstream.referenceImageUrls),
       signMediaPaths(db, upstream.referenceVideoUrls),
       signMediaPaths(db, upstream.referenceAudioUrls),
       signMediaPaths(db, upstream.endFrameUrl ? [upstream.endFrameUrl] : []),
       input.model
-        ? offerableModels(db, 'video').then((m) => m.choices.find((c) => c.id === input.model)?.params ?? [])
-        : Promise.resolve([])
+        ? offerableModels(db, 'video').then((m) => m.choices.find((c) => c.id === input.model))
+        : Promise.resolve(undefined)
     ]);
+    const videoDeclared = videoChoice?.params ?? [];
     const out = await generateVideoWithoutBrand({
       orgId: input.orgId,
       userId: input.userId,
       prompt: sentPrompt,
       model: input.model ?? undefined,
       aspectRatio: input.params.aspectRatio as never,
-      durationSeconds: input.params.duration,
+      durationSeconds: offeredDuration(videoChoice?.durationOptions, input.params.duration),
       resolution: input.params.resolution,
       baseMediaId: upstream.startFrameUrl ?? undefined,
       lastFrameUrl: lastFrame[0],
@@ -1136,6 +1175,11 @@ export async function reconcileTaskNodeRuns(db: Db): Promise<VideoReconcileOutco
     const shape: StartRun = { ...toStartRunShape(run), medium: node.type as GenMedium, projectId: node.projectId, canvasId: node.canvasId };
     const finishing: NodeRun = { ...run, status: 'finishing' };
     try {
+      if (taskJobOf(run.externalJobId)?.taskId === WAITING_TASK_ID) {
+        await resubmitWaiting(db, shape, run);
+        outcome.pending += 1;
+        continue;
+      }
       const mode = await projectModeOf(db, shape);
       const progress = await finishTaskJob(db, deps, {
         externalJobId: run.externalJobId,

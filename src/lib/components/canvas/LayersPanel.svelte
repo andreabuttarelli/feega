@@ -40,7 +40,8 @@
   let folds = $state.raw<Set<string>>(typeof localStorage === 'undefined' ? new Set() : readFolds(localStorage));
 
   const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts, mode: video.mode } : null, outlinesFor(heads, known), folds));
-  const frames = $derived(new Set([...heads.map((h) => h.nodeId), ...(video ? [video.nodeId] : [])]));
+  const elements = $derived(new Set((canvas?.nodes ?? []).filter((n) => n.element).map((n) => n.id)));
+  const frames = $derived(new Set([...heads.map((h) => h.nodeId), ...(video ? [video.nodeId] : [])].filter((id) => !elements.has(id))));
   const fold = (nodeId: string) => (folds = toggleFold(localStorage, folds, nodeId));
 
   let probed = $state.raw<ReadonlySet<string>>(new Set());

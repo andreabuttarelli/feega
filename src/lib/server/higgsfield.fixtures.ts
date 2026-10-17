@@ -23,3 +23,14 @@ export const HF_NSFW = { status: 'nsfw', request_id: REQUEST_ID };
 export const HF_UNAUTHORIZED = { detail: 'Invalid credentials' };
 
 export const HF_ESTIMATE = { credits: '1.500', usd: '0.094' };
+
+export const HF_CONCURRENCY_REACHED = { detail: 'Maximum number of concurrent requests (4) has been reached' };
+
+export const HF_RESTYLE_PRESETS = {
+  model: 'higgsfield/genjutsu/restyle/v1.0',
+  items: [
+    { id: 'c2143317-f28d-4c3c-a0b8-39bd547e08a7', name: 'Cel-Shaded CG Anime', preview_url: 'https://cdn.higgsfield.ai/restyle_presets/259d7ddb-4201-49f7-8a91-cee5bce28715.webp' },
+    { id: '5b0f6a52-3d0e-4b8e-9a51-2f1c3e7d9a10', name: 'Claymation', preview_url: 'https://cdn.higgsfield.ai/restyle_presets/clay.webp' }
+  ]
+};
+

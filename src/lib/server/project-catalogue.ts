@@ -1,5 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import type { ModelChoice } from '$lib/canvas/gen-node';
+import type { ModelParam } from '$lib/canvas/model-params';
 import { listedCredits } from '$lib/canvas/gen-cost';
 import { catalogueIn, type ProjectMode } from '$lib/project-mode';
 import { canvasModelCatalogue } from './canvas-catalogue';
@@ -21,8 +22,17 @@ export type ListedModel = {
   inputs: string[];
   resolutions: string[];
   durations: number[];
+  group: string | null;
+  params: Array<{ name: string; label: string; values?: string[]; labels?: Readonly<Record<string, string>> }>;
   routes: Array<{ provider: string; label: string; credits: number | null; healthy: boolean | null }>;
 };
+
+function listedParam(param: ModelParam): ListedModel['params'][number] {
+  if (param.kind !== 'enum') {
+    return { name: param.name, label: param.label };
+  }
+  return { name: param.name, label: param.label, values: param.values, ...(param.optionLabels ? { labels: param.optionLabels } : {}) };
+}
 
 export function listedModel(choice: ModelChoice): ListedModel {
   return {
@@ -36,6 +46,8 @@ export function listedModel(choice: ModelChoice): ListedModel {
     inputs: choice.inputModalities ?? [],
     resolutions: choice.resolutions ?? [],
     durations: choice.durationOptions ?? [],
+    group: choice.menuGroup ?? null,
+    params: (choice.params ?? []).map(listedParam),
     routes: (choice.routes ?? []).map((route) => ({
       provider: route.provider,
       label: route.label,
