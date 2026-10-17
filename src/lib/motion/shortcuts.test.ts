@@ -206,3 +206,18 @@ describe('mask keys', () => {
     expect(press('m')).toBe(Command.AddMarker);
   });
 });
+
+describe('flip keys', () => {
+  it('⇧H flips horizontally and ⇧V vertically, as in Figma', () => {
+    expect(press('H', { shift: true, code: 'KeyH' })).toBe(Command.FlipHorizontal);
+    expect(press('V', { shift: true, code: 'KeyV' })).toBe(Command.FlipVertical);
+    expect(press('v', { code: 'KeyV' })).toBe(Command.ToolSelect);
+  });
+});
+
+describe('sibling keys', () => {
+  it('Tab selects the next layer and ⇧Tab the previous one', () => {
+    expect(press('Tab')).toBe(Command.SelectNext);
+    expect(press('Tab', { shift: true })).toBe(Command.SelectPrevious);
+  });
+});

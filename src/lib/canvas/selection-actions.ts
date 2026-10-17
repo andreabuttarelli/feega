@@ -16,6 +16,7 @@
 
 import type { PostCompositionNode } from './post-composition';
 import { FrameKind } from './motion-node';
+import { Edge } from '$lib/motion/space';
 import { GENERATIVE_TYPES, planWorkflow, type WorkflowEdge } from './workflow-plan';
 
 export type SelectionActionId =
@@ -33,6 +34,16 @@ export type SelectionActionId =
   | 'paste'
   | 'bring-front'
   | 'send-back'
+  | 'align-left'
+  | 'align-center'
+  | 'align-right'
+  | 'align-top'
+  | 'align-middle'
+  | 'align-bottom'
+  | 'flip-horizontal'
+  | 'flip-vertical'
+  | 'use-as-mask'
+  | 'release-mask'
   | 'delete';
 
 export type SelectionActionGroup = 'primary' | 'secondary' | 'overflow' | 'menu' | 'danger';
@@ -58,12 +69,35 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'paste', label: 'Paste', group: 'menu', minNodes: 1, shortcut: 'Mod+V' },
   { id: 'bring-front', label: 'Bring to front', group: 'menu', minNodes: 1, shortcut: 'Mod+]' },
   { id: 'send-back', label: 'Send to back', group: 'menu', minNodes: 1, shortcut: 'Mod+[' },
+  { id: 'align-left', label: 'Align left', group: 'menu', minNodes: 1 },
+  { id: 'align-center', label: 'Align horizontal centres', group: 'menu', minNodes: 1 },
+  { id: 'align-right', label: 'Align right', group: 'menu', minNodes: 1 },
+  { id: 'align-top', label: 'Align top', group: 'menu', minNodes: 1 },
+  { id: 'align-middle', label: 'Align vertical centres', group: 'menu', minNodes: 1 },
+  { id: 'align-bottom', label: 'Align bottom', group: 'menu', minNodes: 1 },
+  { id: 'flip-horizontal', label: 'Flip horizontal', group: 'menu', minNodes: 1, shortcut: 'Shift+H' },
+  { id: 'flip-vertical', label: 'Flip vertical', group: 'menu', minNodes: 1, shortcut: 'Shift+V' },
+  { id: 'use-as-mask', label: 'Use as mask', group: 'menu', minNodes: 1, shortcut: 'Mod+Ctrl+M' },
+  { id: 'release-mask', label: 'Remove mask', group: 'menu', minNodes: 1 },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
   { id: 'report', label: 'Report content', group: 'overflow', minNodes: 1 },
   { id: 'delete', label: 'Delete', group: 'danger', minNodes: 1, shortcut: 'Backspace' }
 ];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'copy', 'paste', 'bring-front', 'send-back', 'delete'];
+export const ALIGN_EDGE = {
+  'align-left': Edge.Left,
+  'align-center': Edge.Center,
+  'align-right': Edge.Right,
+  'align-top': Edge.Top,
+  'align-middle': Edge.Middle,
+  'align-bottom': Edge.Bottom
+} as const satisfies Partial<Record<SelectionActionId, Edge>>;
+
+export type AlignActionId = keyof typeof ALIGN_EDGE;
+
+export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
+
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
@@ -77,6 +111,25 @@ const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) =
 
 export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): boolean {
   return SHOWN[id]?.(summaries) ?? true;
+}
+
+export type FrameOnlyActionId = 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask';
+
+export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId>;
+
+const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask']);
+
+export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id);
+
+const MIN_ALIGNED_TILES = 2;
+
+export function canvasMenuIds(count: number): ReadonlySet<SelectionActionId> {
+  const aligns = count >= MIN_ALIGNED_TILES;
+  return new Set(MENU_ORDER.filter((id) => !FRAME_ONLY.has(id) && (aligns || !(id in ALIGN_EDGE))));
+}
+
+export function menuFor(available: ReadonlySet<SelectionActionId>, summaries: readonly Summary[]): SelectionAction[] {
+  return CANVAS_MENU.filter((a) => available.has(a.id) && summaries.length >= a.minNodes && shownFor(a.id, summaries));
 }
 
 export function actionsIn(group: SelectionActionGroup, count: number): SelectionAction[] {
