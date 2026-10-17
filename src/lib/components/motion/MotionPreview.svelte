@@ -49,6 +49,7 @@
   }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; children?: Snippet } = $props();
 
   let pointer = $state<InputValues>({});
+  let exportedOn = $state<RenderEngine | null>(null);
 
   function sendInputs(values: InputValues) {
     player?.iframeElement?.contentWindow?.postMessage({ type: INPUT_MESSAGE, values, ...(vars ? { vars } : {}) }, '*');
@@ -279,9 +280,11 @@
 
   export async function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast, prefer: RenderEngine = engine): Promise<void> {
     const { settle, lanes } = CAPTURE_PROFILES[profile];
+    exportedOn = RenderEngine.Gpu;
     if (prefer === RenderEngine.Gpu && gpuCompose && source === html && size.width === width && size.height === height && (await renderOnGpu(gpuCompose, times, onFrame, signal, lanes()))) {
       return;
     }
+    exportedOn = RenderEngine.Html;
     const request = { format: FrameFormat.Bitmap, settle, layering: exportLayering(), ...size };
     return borrowed(source, async () => {
       const extra = host ? await Promise.all(Array.from({ length: lanesWithin(lanes(), webglPerLane(source)) - 1 }, () => mountCapturePlayer(host!, source))) : [];
@@ -342,7 +345,7 @@
 
 <svelte:window onmessage={redrawn} />
 
-<div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview">
+<div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview" data-export-engine={exportedOn}>
   <div class="host" bind:this={host}></div>
   {#if engine === RenderEngine.Gpu && gpuCompose}
     <GpuLayer {html} compose={gpuCompose} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={() => player && (player.style.visibility = '')} />

@@ -32,3 +32,12 @@ No public changelog: invisible without the URL flag.
   lanes, the GPU draws in order into the WebCodecs encoder.
 - Not done: masks, mattes, backdrop-filter, Adjustment, blend on a precomp group (all still an
   HTML capture). Server rendering dropped by decision (client only).
+
+## Default
+
+The GPU engine is now the default for the editor preview and the in-browser export.
+`?engine=html` forces the old engine for one page; `PUBLIC_MOTION_ENGINE=html` or the PostHog
+flag `motion-engine-html` force it for everyone. A doc the engine refuses, an interactive doc, an
+export at another size, or any GPU failure during an export (redone from scratch on HTML via
+`orFallback` in `renderInBrowser`) stays on the HTML engine. Real-stack e2e:
+`tests/e2e/motion-gpu-export.spec.ts`.

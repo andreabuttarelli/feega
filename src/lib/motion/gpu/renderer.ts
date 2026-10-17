@@ -56,6 +56,7 @@ function styled(node: Container, d: Drawn): Container {
 export async function createRenderer(frame: Size, preference: Backend = Backend.WebGPU): Promise<GpuRenderer> {
   const app = new Application();
   await app.init({ preference, width: frame.width, height: frame.height, backgroundAlpha: 0, antialias: true, useBackBuffer: true, preserveDrawingBuffer: true, autoStart: false, resolution: 1 });
+  app.canvas.dataset.engine = 'gpu';
   const NODE: Record<SlotKind, (slot: Slot) => Container> = {
     [SlotKind.Native]: (slot) => {
       const { drawn, placement } = slot as Extract<Slot, { kind: SlotKind.Native }>;

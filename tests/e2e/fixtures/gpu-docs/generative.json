@@ -1,0 +1,1809 @@
+{
+ "version": 5,
+ "fps": 24,
+ "width": 1920,
+ "height": 1080,
+ "durationInFrames": 824,
+ "tracks": [
+  {
+   "id": "field-blob-track",
+   "kind": "visual",
+   "name": "Liquid",
+   "clips": [
+    {
+     "id": "field-blob",
+     "from": 642,
+     "durationInFrames": 91,
+     "trimStart": 0,
+     "component": "LiquidBlob",
+     "props": {
+      "centerX": 0.5,
+      "centerY": 1.4814814814814814,
+      "diameter": 0.48148148148148145,
+      "drops": 1,
+      "split": 0,
+      "splitAngle": 0,
+      "presence": 1,
+      "ior": 1.5,
+      "dispersion": 0.1,
+      "frost": 0,
+      "reflection": 0.9,
+      "tintAmount": 0.08,
+      "blend": 0.6,
+      "viscosity": 0.5,
+      "wobble": 0.35,
+      "wobbleSpeed": 0.5,
+      "stretch": 1.2,
+      "seed": 7,
+      "tint": "#0099ff"
+     },
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transform": {},
+     "keyframes": {},
+     "mask": null,
+     "maskStack": [],
+     "matte": "none",
+     "depth": 0,
+     "space": "world",
+     "parent": null,
+     "parentOpacity": "inherit",
+     "expressions": {
+      "centerX": "spring([[0, 0.5], [0.6, 0.5], [1.4, 0.5]], time, 140, 24)",
+      "centerY": "spring([[0, 1.4815], [0.6, 1.4815], [1.4, 0.5]], time, 140, 24)"
+     },
+     "effects": [],
+     "shaders": [],
+     "blend": "normal",
+     "animators": [],
+     "textPath": null,
+     "motionBlur": true,
+     "path": null
+    }
+   ]
+  },
+  {
+   "id": "stage",
+   "kind": "visual",
+   "name": "Stage",
+   "clips": [
+    {
+     "id": "shot-code",
+     "from": 0,
+     "durationInFrames": 98,
+     "trimStart": 0,
+     "component": "Precomp",
+     "props": {
+      "comp": "comp-code",
+      "loop": false,
+      "hold": false
+     },
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transform": {},
+     "keyframes": {},
+     "mask": null,
+     "maskStack": [],
+     "matte": "none",
+     "depth": 0,
+     "space": "world",
+     "parent": null,
+     "parentOpacity": "inherit",
+     "expressions": {},
+     "effects": [],
+     "shaders": [],
+     "blend": "normal",
+     "animators": [],
+     "textPath": null,
+     "motionBlur": true,
+     "path": null
+    },
+    {
+     "id": "shot-flow",
+     "from": 98,
+     "durationInFrames": 91,
+     "trimStart": 0,
+     "component": "Precomp",
+     "props": {
+      "comp": "comp-flow",
+      "loop": false,
+      "hold": false
+     },
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "junction": {
+      "kind": "blur",
+      "durationInFrames": 10
+     },
+     "transform": {},
+     "keyframes": {},
+     "mask": null,
+     "maskStack": [],
+     "matte": "none",
+     "depth": 0,
+     "space": "world",
+     "parent": null,
+     "parentOpacity": "inherit",
+     "expressions": {},
+     "effects": [],
+     "shaders": [],
+     "blend": "normal",
+     "animators": [],
+     "textPath": null,
+     "motionBlur": true,
+     "path": null
+    },
+    {
+     "id": "shot-grows",
+     "from": 189,
+     "durationInFrames": 90,
+     "trimStart": 0,
+     "component": "Precomp",
+     "props": {
+      "comp": "comp-grows",
+      "loop": false,
+      "hold": false
+     },
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "junction": {
+      "kind": "blur",
+      "durationInFrames": 10
+     },
+     "transform": {},
+     "keyframes": {},
+     "mask": null,
+     "maskStack": [],
+     "matte": "none",
+     "depth": 0,
+     "space": "world",
+     "parent": null,
+     "parentOpacity": "inherit",
+     "expressions": {},
+     "effects": [],
+     "shaders": [],
+     "blend": "normal",
+     "animators": [],
+     "textPath": null,
+     "motionBlur": true,
+     "path": null
+    },
+    {
+     "id": "shot-mesh",
+     "from": 279,
+     "durationInFrames": 91,
+     "trimStart": 0,
+     "component": "Precomp",
+     "props": {
+      "comp": "comp-mesh",
+      "loop": false,
+      "hold": false
+     },
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "junction": {
+      "kind": "blur",
+      "durationInFrames": 10
+     },
+     "transform": {},
+     "keyframes": {},
+     "mask": null,
+     "maskStack": [],
+     "matte": "none",
+     "depth": 0,
+     "space": "world",
+     "parent": null,
+     "parentOpacity": "inherit",
+     "expressions": {},
+     "effects": [],
+     "shaders": [],
+     "blend": "normal",
+     "animators": [],
+     "textPath": null,
+     "motionBlur": true,
+     "path": null
+    },
+    {
+     "id": "shot-data",
+     "from": 370,
+     "durationInFrames": 91,
+     "trimStart": 0,
+     "component": "Precomp",
+     "props": {
+      "comp": "comp-data",
+      "loop": false,
+      "hold": false
+     },
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "junction": {
+      "kind": "zoom",
+      "durationInFrames": 10
+     },
+     "transform": {},
+     "keyframes": {},
+     "mask": null,
+     "maskStack": [],
+     "matte": "none",
+     "depth": 0,
+     "space": "world",
+     "parent": null,
+     "parentOpacity": "inherit",
+     "expressions": {},
+     "effects": [],
+     "shaders": [],
+     "blend": "normal",
+     "animators": [],
+     "textPath": null,
+     "motionBlur": true,
+     "path": null
+    },
+    {
+     "id": "shot-moves",
+     "from": 461,
+     "durationInFrames": 90,
+     "trimStart": 0,
+     "component": "Precomp",
+     "props": {
+      "comp": "comp-moves",
+      "loop": false,
+      "hold": false
+     },
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "junction": {
+      "kind": "blur",
+      "durationInFrames": 10
+     },
+     "transform": {},
+     "keyframes": {},
+     "mask": null,
+     "maskStack": [],
+     "matte": "none",
+     "depth": 0,
+     "space": "world",
+     "parent": null,
+     "parentOpacity": "inherit",
+     "expressions": {},
+     "effects": [],
+     "shaders": [],
+     "blend": "normal",
+     "animators": [],
+     "textPath": null,
+     "motionBlur": true,
+     "path": null
+    },
+    {
+     "id": "shot-drop",
+     "from": 551,
+     "durationInFrames": 91,
+     "trimStart": 0,
+     "component": "Precomp",
+     "props": {
+      "comp": "comp-drop",
+      "loop": false,
+      "hold": false
+     },
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "junction": {
+      "kind": "blur",
+      "durationInFrames": 10
+     },
+     "transform": {},
+     "keyframes": {
+      "scale": [
+       {
+        "frame": 0,
+        "value": 1.6,
+        "ease": [
+         0.16,
+         1,
+         0.3,
+         1
+        ]
+       },
+       {
+        "frame": 17,
+        "value": 1,
+        "ease": "linear"
+       }
+      ]
+     },
+     "mask": null,
+     "maskStack": [],
+     "matte": "none",
+     "depth": 0,
+     "space": "world",
+     "parent": null,
+     "parentOpacity": "inherit",
+     "expressions": {},
+     "effects": [],
+     "shaders": [],
+     "blend": "normal",
+     "animators": [],
+     "textPath": null,
+     "motionBlur": true,
+     "path": null
+    },
+    {
+     "id": "shot-field",
+     "from": 642,
+     "durationInFrames": 91,
+     "trimStart": 0,
+     "component": "Precomp",
+     "props": {
+      "comp": "comp-field",
+      "loop": false,
+      "hold": false
+     },
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "junction": {
+      "kind": "zoom",
+      "durationInFrames": 10
+     },
+     "transform": {},
+     "keyframes": {},
+     "mask": null,
+     "maskStack": [],
+     "matte": "none",
+     "depth": 0,
+     "space": "world",
+     "parent": null,
+     "parentOpacity": "inherit",
+     "expressions": {},
+     "effects": [],
+     "shaders": [],
+     "blend": "normal",
+     "animators": [],
+     "textPath": null,
+     "motionBlur": true,
+     "path": null
+    },
+    {
+     "id": "shot-sign",
+     "from": 733,
+     "durationInFrames": 91,
+     "trimStart": 0,
+     "component": "Precomp",
+     "props": {
+      "comp": "comp-sign",
+      "loop": false,
+      "hold": false
+     },
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "junction": {
+      "kind": "blur",
+      "durationInFrames": 10
+     },
+     "transform": {},
+     "keyframes": {},
+     "mask": null,
+     "maskStack": [],
+     "matte": "none",
+     "depth": 0,
+     "space": "world",
+     "parent": null,
+     "parentOpacity": "inherit",
+     "expressions": {},
+     "effects": [],
+     "shaders": [],
+     "blend": "normal",
+     "animators": [],
+     "textPath": null,
+     "motionBlur": true,
+     "path": null
+    }
+   ]
+  },
+  {
+   "id": "v1",
+   "kind": "visual",
+   "name": "Video 1",
+   "clips": []
+  },
+  {
+   "id": "a1",
+   "kind": "audio",
+   "name": "Audio 1",
+   "clips": [
+    {
+     "id": "music-clip",
+     "from": 0,
+     "durationInFrames": 824,
+     "trimStart": 0,
+     "component": "Audio",
+     "props": {
+      "assetId": "music",
+      "volume": 1,
+      "pan": 0,
+      "fadeIn": 0,
+      "fadeOut": 0
+     },
+     "transitionIn": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transitionOut": {
+      "kind": "none",
+      "durationInFrames": 0
+     },
+     "transform": {},
+     "keyframes": {},
+     "mask": null,
+     "maskStack": [],
+     "matte": "none",
+     "depth": 0,
+     "space": "world",
+     "parent": null,
+     "parentOpacity": "inherit",
+     "expressions": {},
+     "effects": [],
+     "shaders": [],
+     "blend": "normal",
+     "animators": [],
+     "textPath": null,
+     "motionBlur": true,
+     "path": null
+    }
+   ]
+  }
+ ],
+ "comps": {
+  "comp-code": {
+   "name": "code",
+   "durationInFrames": 98,
+   "frame": {
+    "width": 1920,
+    "height": 1080
+   },
+   "tracks": [
+    {
+     "id": "v1",
+     "kind": "visual",
+     "name": "Video 1",
+     "clips": [
+      {
+       "id": "code-bg",
+       "from": 0,
+       "durationInFrames": 98,
+       "trimStart": 0,
+       "component": "Shape",
+       "props": {
+        "shape": "rect",
+        "path": "",
+        "roundness": 0,
+        "sides": 6,
+        "points": 5,
+        "innerRadius": 0.5,
+        "morphs": [],
+        "morph": 0,
+        "morphStart": 0,
+        "modifiers": [],
+        "fillKind": "solid",
+        "fill": "#000000",
+        "fill2": "brand.primary",
+        "gradientAngle": 90,
+        "fillRule": "nonzero",
+        "strokeKind": "none",
+        "stroke": "brand.text",
+        "strokeWidth": 0.01,
+        "dash": 0,
+        "gap": 0,
+        "cap": "butt",
+        "join": "miter",
+        "x": 0.5,
+        "y": 0.5,
+        "width": 1,
+        "height": 1,
+        "align": "center",
+        "opacity": 1,
+        "scale": 1,
+        "rotation": 0,
+        "move": "none",
+        "easing": "standard"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {},
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [
+        {
+         "id": "code-grain",
+         "kind": "noise",
+         "enabled": true,
+         "params": {
+          "amount": 0.04,
+          "size": 1.2,
+          "evolve": 0.3
+         }
+        }
+       ],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      },
+      {
+       "id": "code-t",
+       "from": 0,
+       "durationInFrames": 98,
+       "trimStart": 0,
+       "component": "Text",
+       "props": {
+        "text": "code.",
+        "color": "#f5f5f5",
+        "font": "DM Sans",
+        "weight": 600,
+        "italic": false,
+        "size": 0.2777777777777778,
+        "tracking": -0.04,
+        "leading": 0.95,
+        "stretch": 100,
+        "slant": 0,
+        "axes": "",
+        "x": 0.5,
+        "y": 0.5,
+        "width": 0.9,
+        "height": 0.3611111111111111,
+        "align": "center",
+        "opacity": 1,
+        "scale": 1,
+        "rotation": 0,
+        "move": "none",
+        "easing": "standard"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {
+        "ta.code-a.offset": [
+         {
+          "frame": 1,
+          "value": 9.999999999999998,
+          "ease": "linear"
+         },
+         {
+          "frame": 23,
+          "value": 50,
+          "ease": "linear"
+         }
+        ]
+       },
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [
+        {
+         "id": "code-a",
+         "unit": "line",
+         "shape": "smooth",
+         "seed": null,
+         "start": 0,
+         "end": 200,
+         "offset": 0,
+         "softness": 0.4,
+         "values": {
+          "y": 1.2
+         }
+        }
+       ],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      }
+     ]
+    }
+   ]
+  },
+  "comp-flow": {
+   "name": "flow",
+   "durationInFrames": 91,
+   "frame": {
+    "width": 1920,
+    "height": 1080
+   },
+   "tracks": [
+    {
+     "id": "v1",
+     "kind": "visual",
+     "name": "Video 1",
+     "clips": [
+      {
+       "id": "flow-code",
+       "from": 0,
+       "durationInFrames": 91,
+       "trimStart": 0,
+       "component": "Custom",
+       "props": {
+        "name": "Flow"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {},
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      }
+     ]
+    }
+   ]
+  },
+  "comp-grows": {
+   "name": "grows",
+   "durationInFrames": 90,
+   "frame": {
+    "width": 1920,
+    "height": 1080
+   },
+   "tracks": [
+    {
+     "id": "v1",
+     "kind": "visual",
+     "name": "Video 1",
+     "clips": [
+      {
+       "id": "grows-bg",
+       "from": 0,
+       "durationInFrames": 90,
+       "trimStart": 0,
+       "component": "Shape",
+       "props": {
+        "shape": "rect",
+        "path": "",
+        "roundness": 0,
+        "sides": 6,
+        "points": 5,
+        "innerRadius": 0.5,
+        "morphs": [],
+        "morph": 0,
+        "morphStart": 0,
+        "modifiers": [],
+        "fillKind": "solid",
+        "fill": "#000000",
+        "fill2": "brand.primary",
+        "gradientAngle": 90,
+        "fillRule": "nonzero",
+        "strokeKind": "none",
+        "stroke": "brand.text",
+        "strokeWidth": 0.01,
+        "dash": 0,
+        "gap": 0,
+        "cap": "butt",
+        "join": "miter",
+        "x": 0.5,
+        "y": 0.5,
+        "width": 1,
+        "height": 1,
+        "align": "center",
+        "opacity": 1,
+        "scale": 1,
+        "rotation": 0,
+        "move": "none",
+        "easing": "standard"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {},
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [
+        {
+         "id": "grows-grain",
+         "kind": "noise",
+         "enabled": true,
+         "params": {
+          "amount": 0.04,
+          "size": 1.2,
+          "evolve": 0.3
+         }
+        }
+       ],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      },
+      {
+       "id": "grows-t",
+       "from": 0,
+       "durationInFrames": 90,
+       "trimStart": 0,
+       "component": "Text",
+       "props": {
+        "text": "grows.",
+        "color": "#f5f5f5",
+        "font": "DM Sans",
+        "weight": 600,
+        "italic": false,
+        "size": 0.2777777777777778,
+        "tracking": -0.04,
+        "leading": 0.95,
+        "stretch": 100,
+        "slant": 0,
+        "axes": "",
+        "x": 0.5,
+        "y": 0.5,
+        "width": 0.9,
+        "height": 0.3611111111111111,
+        "align": "center",
+        "opacity": 1,
+        "scale": 1,
+        "rotation": 0,
+        "move": "none",
+        "easing": "standard"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {
+        "ta.grows-a.offset": [
+         {
+          "frame": 1,
+          "value": 9.999999999999998,
+          "ease": "linear"
+         },
+         {
+          "frame": 23,
+          "value": 50,
+          "ease": "linear"
+         }
+        ]
+       },
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [
+        {
+         "id": "grows-a",
+         "unit": "line",
+         "shape": "smooth",
+         "seed": null,
+         "start": 0,
+         "end": 200,
+         "offset": 0,
+         "softness": 0.4,
+         "values": {
+          "y": 1.2
+         }
+        }
+       ],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      }
+     ]
+    }
+   ]
+  },
+  "comp-mesh": {
+   "name": "mesh",
+   "durationInFrames": 91,
+   "frame": {
+    "width": 1920,
+    "height": 1080
+   },
+   "tracks": [
+    {
+     "id": "v1",
+     "kind": "visual",
+     "name": "Video 1",
+     "clips": [
+      {
+       "id": "mesh-code",
+       "from": 0,
+       "durationInFrames": 91,
+       "trimStart": 0,
+       "component": "Custom",
+       "props": {
+        "name": "Mesh"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {},
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      }
+     ]
+    }
+   ]
+  },
+  "comp-data": {
+   "name": "data",
+   "durationInFrames": 91,
+   "frame": {
+    "width": 1920,
+    "height": 1080
+   },
+   "tracks": [
+    {
+     "id": "v1",
+     "kind": "visual",
+     "name": "Video 1",
+     "clips": [
+      {
+       "id": "data-code",
+       "from": 0,
+       "durationInFrames": 91,
+       "trimStart": 0,
+       "component": "Custom",
+       "props": {
+        "name": "Data"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {},
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      }
+     ]
+    }
+   ]
+  },
+  "comp-moves": {
+   "name": "moves",
+   "durationInFrames": 90,
+   "frame": {
+    "width": 1920,
+    "height": 1080
+   },
+   "tracks": [
+    {
+     "id": "v1",
+     "kind": "visual",
+     "name": "Video 1",
+     "clips": [
+      {
+       "id": "moves-bg",
+       "from": 0,
+       "durationInFrames": 90,
+       "trimStart": 0,
+       "component": "Shape",
+       "props": {
+        "shape": "rect",
+        "path": "",
+        "roundness": 0,
+        "sides": 6,
+        "points": 5,
+        "innerRadius": 0.5,
+        "morphs": [],
+        "morph": 0,
+        "morphStart": 0,
+        "modifiers": [],
+        "fillKind": "solid",
+        "fill": "#000000",
+        "fill2": "brand.primary",
+        "gradientAngle": 90,
+        "fillRule": "nonzero",
+        "strokeKind": "none",
+        "stroke": "brand.text",
+        "strokeWidth": 0.01,
+        "dash": 0,
+        "gap": 0,
+        "cap": "butt",
+        "join": "miter",
+        "x": 0.5,
+        "y": 0.5,
+        "width": 1,
+        "height": 1,
+        "align": "center",
+        "opacity": 1,
+        "scale": 1,
+        "rotation": 0,
+        "move": "none",
+        "easing": "standard"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {},
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [
+        {
+         "id": "moves-grain",
+         "kind": "noise",
+         "enabled": true,
+         "params": {
+          "amount": 0.04,
+          "size": 1.2,
+          "evolve": 0.3
+         }
+        }
+       ],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      },
+      {
+       "id": "moves-t",
+       "from": 0,
+       "durationInFrames": 90,
+       "trimStart": 0,
+       "component": "Text",
+       "props": {
+        "text": "moves.",
+        "color": "#f5f5f5",
+        "font": "DM Sans",
+        "weight": 600,
+        "italic": false,
+        "size": 0.2777777777777778,
+        "tracking": -0.04,
+        "leading": 0.95,
+        "stretch": 100,
+        "slant": 0,
+        "axes": "",
+        "x": 0.5,
+        "y": 0.5,
+        "width": 0.9,
+        "height": 0.3611111111111111,
+        "align": "center",
+        "opacity": 1,
+        "scale": 1,
+        "rotation": 0,
+        "move": "none",
+        "easing": "standard"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {
+        "ta.moves-a.offset": [
+         {
+          "frame": 1,
+          "value": 9.999999999999998,
+          "ease": "linear"
+         },
+         {
+          "frame": 23,
+          "value": 50,
+          "ease": "linear"
+         }
+        ]
+       },
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [
+        {
+         "id": "moves-a",
+         "unit": "line",
+         "shape": "smooth",
+         "seed": null,
+         "start": 0,
+         "end": 200,
+         "offset": 0,
+         "softness": 0.4,
+         "values": {
+          "y": 1.2
+         }
+        }
+       ],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      }
+     ]
+    }
+   ]
+  },
+  "comp-drop": {
+   "name": "drop",
+   "durationInFrames": 91,
+   "frame": {
+    "width": 1920,
+    "height": 1080
+   },
+   "tracks": [
+    {
+     "id": "v1",
+     "kind": "visual",
+     "name": "Video 1",
+     "clips": [
+      {
+       "id": "drop-code",
+       "from": 0,
+       "durationInFrames": 91,
+       "trimStart": 0,
+       "component": "Custom",
+       "props": {
+        "name": "Drop"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {},
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      }
+     ]
+    }
+   ]
+  },
+  "comp-field": {
+   "name": "field",
+   "durationInFrames": 91,
+   "frame": {
+    "width": 1920,
+    "height": 1080
+   },
+   "tracks": [
+    {
+     "id": "v1",
+     "kind": "visual",
+     "name": "Video 1",
+     "clips": [
+      {
+       "id": "field-code",
+       "from": 0,
+       "durationInFrames": 91,
+       "trimStart": 0,
+       "component": "Custom",
+       "props": {
+        "name": "Field"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {},
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      }
+     ]
+    }
+   ]
+  },
+  "comp-sign": {
+   "name": "sign",
+   "durationInFrames": 91,
+   "frame": {
+    "width": 1920,
+    "height": 1080
+   },
+   "tracks": [
+    {
+     "id": "v1",
+     "kind": "visual",
+     "name": "Video 1",
+     "clips": [
+      {
+       "id": "sign-code",
+       "from": 0,
+       "durationInFrames": 91,
+       "trimStart": 0,
+       "component": "Custom",
+       "props": {
+        "name": "Sign"
+       },
+       "transitionIn": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transitionOut": {
+        "kind": "none",
+        "durationInFrames": 0
+       },
+       "transform": {},
+       "keyframes": {},
+       "mask": null,
+       "maskStack": [],
+       "matte": "none",
+       "depth": 0,
+       "space": "world",
+       "parent": null,
+       "parentOpacity": "inherit",
+       "expressions": {},
+       "effects": [],
+       "shaders": [],
+       "blend": "normal",
+       "animators": [],
+       "textPath": null,
+       "motionBlur": true,
+       "path": null
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "assets": [
+  {
+   "id": "music",
+   "kind": "audio",
+   "name": "music drive-128 (CC0-1.0)"
+  }
+ ],
+ "camera": null,
+ "look": null,
+ "fonts": [
+  {
+   "family": "DM Sans",
+   "source": "google",
+   "category": "sans",
+   "weights": [
+    100,
+    200,
+    300,
+    400,
+    500,
+    600,
+    700,
+    800,
+    900,
+    1000
+   ],
+   "italic": true,
+   "axes": [
+    [
+     "opsz",
+     9,
+     40
+    ],
+    [
+     "wght",
+     100,
+     1000
+    ]
+   ]
+  }
+ ],
+ "background": "brand",
+ "motionBlur": {
+  "enabled": false,
+  "shutterAngle": 180,
+  "shutterPhase": -90,
+  "samples": 8
+ },
+ "fields": [],
+ "components": {
+  "Flow": {
+   "source": {
+    "html": "",
+    "css": ":scope{background:#000} canvas{position:absolute;inset:0}",
+    "js": "const W = root.clientWidth || 1920, H = root.clientHeight || 1080, D = Math.min(W, H);\nconst N = Math.round(W * H / 2400), STEPS = 64, STEP = D / 170, GROW = 2.2;\nconst grow = motion.parseEase('power2.inOut');\np5((p) => {\n  p.setup = () => { p.createCanvas(W, H); p.pixelDensity(1); };\n  p.draw = () => {\n    const t = p.frameCount / fps;\n    p.background(0);\n    p.randomSeed(11);\n    p.noiseSeed(11);\n    const steps = Math.max(1, Math.floor(STEPS * grow(Math.min(1, t / GROW))));\n    const drift = t * 0.05;\n    p.noFill();\n    for (let i = 0; i < N; i++) {\n      let x = p.random(-0.05, 1.05) * W, y = p.random(-0.05, 1.05) * H;\n      const hot = p.random() < 0.05;\n      p.stroke(hot ? p.color(0, 153, 255, 235) : p.color(245, 245, 245, 64));\n      p.strokeWeight(hot ? 2.2 : 1.1);\n      p.beginShape();\n      for (let s = 0; s < steps; s++) {\n        p.vertex(x, y);\n        const a = p.noise(x * 0.0014, y * 0.0014, drift) * p.TWO_PI * 2;\n        x += Math.cos(a) * STEP;\n        y += Math.sin(a) * STEP;\n      }\n      p.endShape();\n    }\n  };\n});\nfx.grain(root, { opacity: 0.1, boil: 12 });"
+   },
+   "propsSchema": {
+    "type": "object",
+    "properties": {}
+   },
+   "version": 1,
+   "check": null
+  },
+  "Mesh": {
+   "source": {
+    "html": "<canvas class=\"c\"></canvas>",
+    "css": ":scope{background:#000} .c{position:absolute;inset:0;width:100%;height:100%}",
+    "js": "const W = root.clientWidth || 1920, H = root.clientHeight || 1080, D = Math.min(W, H);\nconst clamp = (v) => Math.max(0, Math.min(1, v));\nconst cv = root.querySelector('.c');\ncv.width = W;\ncv.height = H;\nconst g = cv.getContext('2d');\nconst seeds = gen.poisson({ shape: [W * 1.1, H * 1.1], minDistance: D * 0.065, maxDistance: D * 0.11 }).fill().map(([x, y]) => [x - W * 0.05, y - H * 0.05]);\nconst noise = gen.noise3D();\nconst far = Math.hypot(W, H) / 2;\nconst rank = seeds.map(([x, y]) => Math.hypot(x - W / 2, y - H / 2) / far);\nconst hot = seeds.map(() => rand() < 0.06);\nconst ease = motion.parseEase('power3.out');\ntl.to({}, { duration, ease: 'none', onUpdate() {\n  const t = this.time();\n  const amp = D * 0.03 * (0.4 + 0.6 * ease(clamp(t / 2)));\n  const moved = seeds.map(([x, y]) => [x + noise(x / 420, y / 420, t * 0.3) * amp, y + noise(y / 420, x / 420, t * 0.3 + 7) * amp]);\n  const delaunay = gen.Delaunay.from(moved);\n  const voronoi = delaunay.voronoi([0, 0, W, H]);\n  g.fillStyle = '#000';\n  g.fillRect(0, 0, W, H);\n  const fill = ease(clamp((t - 1.5) / 0.7));\n  g.fillStyle = 'rgba(0, 153, 255, ' + fill + ')';\n  for (let i = 0; i < moved.length; i++) {\n    if (!hot[i]) { continue; }\n    g.beginPath();\n    voronoi.renderCell(i, g);\n    g.fill();\n  }\n  const reach = ease(clamp((t - 0.6) / 1.2)) * far * 1.05;\n  g.save();\n  g.beginPath();\n  g.arc(W / 2, H / 2, Math.max(0.1, reach), 0, Math.PI * 2);\n  g.clip();\n  g.strokeStyle = 'rgba(245, 245, 245, 0.32)';\n  g.lineWidth = 1.2;\n  g.beginPath();\n  delaunay.render(g);\n  g.stroke();\n  g.restore();\n  for (let i = 0; i < moved.length; i++) {\n    const r = ease(clamp((t - rank[i] * 0.8) / 0.4)) * D * 0.0055;\n    if (r <= 0) { continue; }\n    g.fillStyle = hot[i] ? '#0099ff' : '#f5f5f5';\n    g.beginPath();\n    g.arc(moved[i][0], moved[i][1], r, 0, Math.PI * 2);\n    g.fill();\n  }\n} }, 0);\nfx.grain(root, { opacity: 0.1, boil: 12 });"
+   },
+   "propsSchema": {
+    "type": "object",
+    "properties": {}
+   },
+   "version": 1,
+   "check": null
+  },
+  "Data": {
+   "source": {
+    "html": "<svg class=\"s\"><g class=\"bars\"></g><path class=\"line\"></path><line class=\"base\"></line></svg>",
+    "css": ":scope{background:#000} .s{position:absolute;inset:0;width:100%;height:100%} .line{fill:none;stroke:#f5f5f5;stroke-width:3} .base{stroke:#f5f5f5;stroke-opacity:0.25;stroke-width:1}",
+    "js": "const W = root.clientWidth || 1920, H = root.clientHeight || 1080, D = Math.min(W, H);\nconst clamp = (v) => Math.max(0, Math.min(1, v));\nconst svg = d3.select(root.querySelector('.s')).attr('viewBox', '0 0 ' + W + ' ' + H);\nconst N = 40;\nconst noise = gen.noise2D();\nconst data = d3.range(N).map((i) => 0.25 + 0.45 * (i / (N - 1)) + 0.18 * noise(i * 0.22, 4));\nconst peak = d3.maxIndex(data);\nconst left = W * 0.1, right = W * 0.9, top = H * 0.18, bottom = H * 0.8;\nconst x = d3.scaleBand().domain(d3.range(N)).range([left, right]).padding(0.35);\nconst y = d3.scaleLinear().domain([0, 1]).range([bottom, top]);\nconst bars = svg.select('.bars').selectAll('rect').data(data).join('rect')\n  .attr('x', (_, i) => x(i)).attr('width', x.bandwidth())\n  .attr('fill', (_, i) => (i === peak ? '#0099ff' : '#f5f5f5')).attr('fill-opacity', (_, i) => (i === peak ? 1 : 0.85));\nsvg.select('.base').attr('x1', left).attr('x2', right).attr('y1', bottom).attr('y2', bottom);\nconst line = d3.line().x((_, i) => x(i) + x.bandwidth() / 2).y((d) => y(d) - D * 0.05).curve(d3.curveMonotoneX);\nconst path = root.querySelector('.line');\npath.setAttribute('d', line(data));\nconst ease = d3.easeCubicOut;\ntl.to({}, { duration, ease: 'none', onUpdate() {\n  const t = this.time();\n  bars.each(function (d, i) {\n    const k = ease(clamp((t - 0.1 - i * (1.1 / N)) / 0.7));\n    const h = (bottom - y(d)) * k;\n    this.setAttribute('y', bottom - h);\n    this.setAttribute('height', h);\n  });\n} }, 0);\nconst draw = motion.drawPath(path);\ntl.fromTo(draw, { draw: 0 }, { draw: 1, duration: 1.1, ease: 'power2.inOut' }, 1.1);\nfx.grain(root, { opacity: 0.1, boil: 12 });"
+   },
+   "propsSchema": {
+    "type": "object",
+    "properties": {}
+   },
+   "version": 1,
+   "check": null
+  },
+  "Drop": {
+   "source": {
+    "html": "",
+    "css": ":scope{background:#000;overflow:hidden} .b{position:absolute;left:0;top:0;will-change:transform;box-sizing:border-box} .floor{position:absolute;left:0;right:0;height:1px;background:rgba(245,245,245,0.25)}",
+    "js": "const W = root.clientWidth || 1920, H = root.clientHeight || 1080, D = Math.min(W, H);\nconst engine = Matter.Engine.create();\nengine.gravity.y = 1.6;\nconst FLOOR = H - D * 0.12;\nconst floor = Matter.Bodies.rectangle(W / 2, FLOOR + 50, W * 3, 100, { isStatic: true });\nconst walls = [Matter.Bodies.rectangle(W * 0.12 - 50, H / 2, 100, H * 4, { isStatic: true }), Matter.Bodies.rectangle(W * 0.88 + 50, H / 2, 100, H * 4, { isStatic: true })];\nconst N = 46;\nconst spec = Array.from({ length: N }, (_, i) => ({ s: D * (0.05 + rand() * 0.07), round: rand() < 0.45, x: W * 0.16 + rand() * W * 0.68, y: -D * 0.1 - (i / N) * H * 0.9, look: rand() < 0.3 ? 'line' : 'solid' }));\nspec.push({ s: D * 0.2, round: true, x: W / 2, y: -H * 1.25, look: 'hot' });\nconst pieces = spec.map((p) => {\n  const body = p.round ? Matter.Bodies.circle(p.x, p.y, p.s / 2, { restitution: 0.3, friction: 0.5 }) : Matter.Bodies.rectangle(p.x, p.y, p.s, p.s, { restitution: 0.2, friction: 0.6, angle: rand() * Math.PI });\n  const el = document.createElement('div');\n  el.className = 'b';\n  el.style.width = p.s + 'px';\n  el.style.height = p.s + 'px';\n  el.style.borderRadius = p.round ? '50%' : '0';\n  el.style.background = p.look === 'hot' ? '#0099ff' : p.look === 'solid' ? '#f5f5f5' : 'transparent';\n  el.style.border = p.look === 'line' ? '2px solid #f5f5f5' : '0';\n  root.appendChild(el);\n  return { body, el, s: p.s };\n});\nconst ground = document.createElement('div');\nground.className = 'floor';\nground.style.top = FLOOR + 'px';\nroot.appendChild(ground);\nMatter.Composite.add(engine.world, [floor, ...walls, ...pieces.map((p) => p.body)]);\nconst at = Matter.seekable(engine);\ntl.to({}, { duration, ease: 'none', onUpdate() {\n  const poses = at(this.time());\n  for (const p of pieces) {\n    const pose = poses.get(p.body);\n    p.el.style.transform = 'translate(' + (pose.x - p.s / 2) + 'px,' + (pose.y - p.s / 2) + 'px) rotate(' + pose.angle + 'rad)';\n  }\n} }, 0);\nfx.grain(root, { opacity: 0.1, boil: 12 });"
+   },
+   "propsSchema": {
+    "type": "object",
+    "properties": {}
+   },
+   "version": 1,
+   "check": null
+  },
+  "Field": {
+   "source": {
+    "html": "<canvas class=\"gl\"></canvas>",
+    "css": ":scope{background:#000} .gl{position:absolute;inset:0;width:100%;height:100%}",
+    "js": "const W = root.clientWidth || 1920, H = root.clientHeight || 1080, D = Math.min(W, H);\nconst canvas = root.querySelector('.gl');\ncanvas.width = W;\ncanvas.height = H;\nconst gl = twgl.webgl(canvas);\nconst vs = '#version 300 es\\nin vec4 position; void main() { gl_Position = position; }';\nconst fs = '#version 300 es\\nprecision highp float; uniform vec2 size; uniform float t; uniform float reveal; out vec4 color;' +\n  'float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }' +\n  'float n(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), u.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), u.x), u.y); }' +\n  'float fbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++) { v += a * n(p); p *= 2.03; a *= 0.5; } return v; }' +\n  'void main(){ vec2 p = (gl_FragCoord.xy - 0.5 * size) / min(size.x, size.y) * 1.3;' +\n  'vec2 q = vec2(fbm(p + 0.08 * t), fbm(p + vec2(5.2, 1.3) - 0.06 * t));' +\n  'float f = fbm(p + 2.6 * q);' +\n  'float c = abs(fract(f * 14.0) - 0.5);' +\n  'float w = fwidth(f * 14.0);' +\n  'float line = 1.0 - smoothstep(w * 0.6, w * 1.6, 0.5 - c);' +\n  'float hot = smoothstep(0.58, 0.7, f);' +\n  'vec3 ink = mix(vec3(0.55), vec3(0.0, 0.6, 1.0), hot);' +\n  'float r = length(p) / 1.6;' +\n  'float shown = 1.0 - smoothstep(reveal - 0.15, reveal, r);' +\n  'color = vec4((ink * line + vec3(0.0, 0.6, 1.0) * hot * 0.12) * shown, 1.0); }';\nconst program = twgl.createProgramInfo(gl, [vs, fs]);\nconst quad = twgl.createBufferInfoFromArrays(gl, { position: { numComponents: 2, data: [-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1] } });\nconst ease = motion.parseEase('power2.out');\ntl.to({}, { duration, ease: 'none', onUpdate() {\n  const t = this.time();\n  gl.viewport(0, 0, canvas.width, canvas.height);\n  gl.useProgram(program.program);\n  twgl.setBuffersAndAttributes(gl, program, quad);\n  twgl.setUniforms(program, { size: [canvas.width, canvas.height], t: 1 + t, reveal: 1.35 * ease(Math.min(1, t / 1.4)) });\n  twgl.drawBufferInfo(gl, quad);\n} }, 0);\nfx.grain(root, { opacity: 0.1, boil: 12 });"
+   },
+   "propsSchema": {
+    "type": "object",
+    "properties": {}
+   },
+   "version": 1,
+   "check": null
+  },
+  "Sign": {
+   "source": {
+    "html": "<svg class=\"s\" viewBox=\"0 0 1920 1080\"><path class=\"frame\" d=\"M850 430 H1070 V650 H850 Z\"></path><path class=\"seed\" d=\"M850 430 H1070 V650 H850 Z\"></path><g transform=\"translate(595.9303199999999 605.52)\"><path class=\"word\" d=\"M25.48 0L25.48 -151.32Q25.48 -163.8 29.64 -171.73Q33.8 -179.66 41.99 -183.43Q50.18 -187.2 62.14 -187.2L76.96 -187.2L76.96 -168.48L65.52 -168.48Q55.9 -168.48 51.61 -164.58Q47.32 -160.68 47.32 -150.8L47.32 0ZM5.46 -112.58L5.46 -131.04L80.34 -131.04L80.34 -112.58Z M148.46 3.12Q130 3.12 115.83 -5.46Q101.66 -14.04 93.6 -29.51Q85.54 -44.98 85.54 -65.52Q85.54 -86.32 93.47 -101.66Q101.4 -117 115.83 -125.58Q130.26 -134.16 148.98 -134.16Q168.22 -134.16 181.61 -125.58Q195 -117 202.15 -103.09Q209.3 -89.18 209.3 -72.54Q209.3 -69.94 209.3 -67.08Q209.3 -64.22 209.04 -60.58L101.92 -60.58L101.92 -77.48L187.98 -77.48Q187.2 -95.42 176.15 -105.56Q165.1 -115.7 148.46 -115.7Q137.28 -115.7 127.79 -110.63Q118.3 -105.56 112.58 -95.81Q106.86 -86.06 106.86 -71.5L106.86 -64.22Q106.86 -48.1 112.71 -37.18Q118.56 -26.26 128.05 -20.8Q137.54 -15.34 148.46 -15.34Q162.24 -15.34 171.21 -21.45Q180.18 -27.56 184.08 -37.96L205.66 -37.96Q202.54 -26.26 194.74 -16.9Q186.94 -7.54 175.37 -2.21Q163.8 3.12 148.46 3.12Z M285.74 3.12Q267.28 3.12 253.11 -5.46Q238.94 -14.04 230.88 -29.51Q222.82 -44.98 222.82 -65.52Q222.82 -86.32 230.75 -101.66Q238.68 -117 253.11 -125.58Q267.54 -134.16 286.26 -134.16Q305.5 -134.16 318.89 -125.58Q332.28 -117 339.43 -103.09Q346.58 -89.18 346.58 -72.54Q346.58 -69.94 346.58 -67.08Q346.58 -64.22 346.32 -60.58L239.2 -60.58L239.2 -77.48L325.26 -77.48Q324.48 -95.42 313.43 -105.56Q302.38 -115.7 285.74 -115.7Q274.56 -115.7 265.07 -110.63Q255.58 -105.56 249.86 -95.81Q244.14 -86.06 244.14 -71.5L244.14 -64.22Q244.14 -48.1 249.99 -37.18Q255.84 -26.26 265.33 -20.8Q274.82 -15.34 285.74 -15.34Q299.52 -15.34 308.49 -21.45Q317.46 -27.56 321.36 -37.96L342.94 -37.96Q339.82 -26.26 332.02 -16.9Q324.22 -7.54 312.65 -2.21Q301.08 3.12 285.74 3.12Z M416.52 60.32Q398.84 60.32 385.19 55.77Q371.54 51.22 364 41.86Q356.46 32.5 356.46 18.72Q356.46 12.74 358.93 5.98Q361.4 -0.78 367.51 -7.28Q373.62 -13.78 384.8 -18.98L399.88 -10.14Q386.1 -4.42 381.94 2.99Q377.78 10.4 377.78 16.64Q377.78 25.22 382.72 30.94Q387.66 36.66 396.5 39.52Q405.34 42.38 416.52 42.38Q427.7 42.38 435.76 39.26Q443.82 36.14 448.24 30.42Q452.66 24.7 452.66 16.9Q452.66 7.8 445.9 1.69Q439.14 -4.42 420.16 -5.46Q404.82 -6.5 394.42 -8.32Q384.02 -10.14 377.26 -12.61Q370.5 -15.08 365.95 -18.2Q361.4 -21.32 357.76 -24.7L357.76 -30.68L382.98 -55.64L401.96 -48.88L375.96 -25.48L379.34 -34.58Q382.2 -32.5 384.8 -30.68Q387.4 -28.86 391.82 -27.56Q396.24 -26.26 404.17 -25.22Q412.1 -24.18 425.1 -23.14Q443.04 -21.84 453.83 -16.9Q464.62 -11.96 469.43 -3.64Q474.24 4.68 474.24 16.12Q474.24 27.3 468.13 37.31Q462.02 47.32 449.28 53.82Q436.54 60.32 416.52 60.32ZM416.26 -41.08Q399.88 -41.08 388.31 -47.32Q376.74 -53.56 370.76 -64.09Q364.78 -74.62 364.78 -87.62Q364.78 -100.62 370.89 -111.02Q377 -121.42 388.44 -127.79Q399.88 -134.16 416.26 -134.16Q432.64 -134.16 444.08 -127.79Q455.52 -121.42 461.5 -111.02Q467.48 -100.62 467.48 -87.62Q467.48 -74.62 461.5 -64.09Q455.52 -53.56 444.08 -47.32Q432.64 -41.08 416.26 -41.08ZM416.26 -59.02Q430.3 -59.02 438.36 -66.3Q446.42 -73.58 446.42 -87.62Q446.42 -101.4 438.36 -108.68Q430.3 -115.96 416.26 -115.96Q402.48 -115.96 394.03 -108.68Q385.58 -101.4 385.58 -87.62Q385.58 -73.58 393.9 -66.3Q402.22 -59.02 416.26 -59.02ZM437.58 -112.58L431.08 -131.04L484.64 -131.04L484.64 -114.66Z M542.1 3.12Q526.24 3.12 515.58 -2.47Q504.92 -8.06 499.72 -17.29Q494.52 -26.52 494.52 -37.44Q494.52 -50.7 501.41 -59.93Q508.3 -69.16 520.91 -73.97Q533.52 -78.78 550.68 -78.78L585.26 -78.78Q585.26 -91 581.49 -99.19Q577.72 -107.38 570.57 -111.54Q563.42 -115.7 552.76 -115.7Q540.28 -115.7 531.18 -109.46Q522.08 -103.22 520 -91L497.64 -91Q499.2 -105.04 507.13 -114.53Q515.06 -124.02 527.28 -129.09Q539.5 -134.16 552.76 -134.16Q570.96 -134.16 583.05 -127.53Q595.14 -120.9 601.12 -109.07Q607.1 -97.24 607.1 -81.12L607.1 0L587.6 0L586.3 -23.14L586.3 -23.14Q583.7 -17.68 579.67 -12.87Q575.64 -8.06 570.18 -4.55Q564.72 -1.04 557.83 1.04Q550.94 3.12 542.1 3.12ZM545.48 -15.34Q554.58 -15.34 561.99 -19.11Q569.4 -22.88 574.6 -29.51Q579.8 -36.14 582.53 -44.2Q585.26 -52.26 585.26 -61.1L585.26 -61.88L552.5 -61.88Q539.76 -61.88 531.96 -58.89Q524.16 -55.9 520.78 -50.57Q517.4 -45.24 517.4 -38.48Q517.4 -31.46 520.65 -26.26Q523.9 -21.06 530.27 -18.2Q536.64 -15.34 545.48 -15.34Z\"></path></g></svg>",
+    "css": ":scope{background:#000} .s{position:absolute;inset:0;width:100%;height:100%} .frame{fill:none;stroke:#f5f5f5;stroke-width:3} .seed{fill:#0099ff} .word{fill:#f5f5f5;stroke:#f5f5f5;stroke-width:5;stroke-linejoin:round}",
+    "js": "const frame = root.querySelector('.frame');\nconst seed = root.querySelector('.seed');\nconst word = root.querySelector('.word');\nconst outline = motion.drawPath(frame);\ntl.fromTo(outline, { draw: 0 }, { draw: 1, duration: 0.8, ease: 'power2.inOut' }, 0.1);\ntl.fromTo(seed, { fillOpacity: 0 }, { fillOpacity: 1, duration: 0.3, ease: 'power1.out' }, 0.9);\ntl.to(frame, { opacity: 0, duration: 0.3, ease: 'power1.out' }, 0.9);\nconst round = motion.morph(seed, 'M850 540 A110 110 0 1 1 1070 540 A110 110 0 1 1 850 540 Z');\ntl.fromTo(round, { morph: 0 }, { morph: 1, duration: 0.6, ease: 'power3.inOut' }, 0.9);\nconst land = motion.morph(seed, 'M1221.5964 560.9664 A44.5536 44.5536 0 1 1 1310.7035999999998 560.9664 A44.5536 44.5536 0 1 1 1221.5964 560.9664 Z');\ntl.fromTo(land, { morph: 0 }, { morph: 1, duration: 0.7, ease: 'power3.inOut' }, 1.5);\nconst pen = motion.drawPath(word);\ntl.fromTo(pen, { draw: 0 }, { draw: 1, duration: 0.9, ease: 'power2.inOut' }, 1.5);\ntl.fromTo(word, { fillOpacity: 0 }, { fillOpacity: 1, duration: 0.4, ease: 'power2.out' }, 2.1);\nfx.grain(root, { opacity: 0.1, boil: 12 });"
+   },
+   "propsSchema": {
+    "type": "object",
+    "properties": {}
+   },
+   "version": 1,
+   "check": null
+  }
+ },
+ "shaders": {},
+ "markers": [
+  {
+   "frame": 0,
+   "label": "story: problem"
+  },
+  {
+   "frame": 7,
+   "label": "beat 1"
+  },
+  {
+   "frame": 19,
+   "label": "beat 2"
+  },
+  {
+   "frame": 30,
+   "label": "beat 3"
+  },
+  {
+   "frame": 41,
+   "label": "beat 4"
+  },
+  {
+   "frame": 53,
+   "label": "beat 5"
+  },
+  {
+   "frame": 64,
+   "label": "beat 6"
+  },
+  {
+   "frame": 75,
+   "label": "beat 7"
+  },
+  {
+   "frame": 87,
+   "label": "beat 8"
+  },
+  {
+   "frame": 98,
+   "label": "beat 9"
+  },
+  {
+   "frame": 109,
+   "label": "beat 10"
+  },
+  {
+   "frame": 121,
+   "label": "beat 11"
+  },
+  {
+   "frame": 132,
+   "label": "beat 12"
+  },
+  {
+   "frame": 143,
+   "label": "beat 13"
+  },
+  {
+   "frame": 155,
+   "label": "beat 14"
+  },
+  {
+   "frame": 166,
+   "label": "beat 15"
+  },
+  {
+   "frame": 177,
+   "label": "beat 16"
+  },
+  {
+   "frame": 189,
+   "label": "beat 17"
+  },
+  {
+   "frame": 189,
+   "label": "story: solution"
+  },
+  {
+   "frame": 200,
+   "label": "beat 18"
+  },
+  {
+   "frame": 211,
+   "label": "beat 19"
+  },
+  {
+   "frame": 223,
+   "label": "beat 20"
+  },
+  {
+   "frame": 234,
+   "label": "beat 21"
+  },
+  {
+   "frame": 245,
+   "label": "beat 22"
+  },
+  {
+   "frame": 257,
+   "label": "beat 23"
+  },
+  {
+   "frame": 268,
+   "label": "beat 24"
+  },
+  {
+   "frame": 279,
+   "label": "beat 25"
+  },
+  {
+   "frame": 291,
+   "label": "beat 26"
+  },
+  {
+   "frame": 302,
+   "label": "beat 27"
+  },
+  {
+   "frame": 313,
+   "label": "beat 28"
+  },
+  {
+   "frame": 325,
+   "label": "beat 29"
+  },
+  {
+   "frame": 336,
+   "label": "beat 30"
+  },
+  {
+   "frame": 347,
+   "label": "beat 31"
+  },
+  {
+   "frame": 359,
+   "label": "beat 32"
+  },
+  {
+   "frame": 370,
+   "label": "beat 33"
+  },
+  {
+   "frame": 381,
+   "label": "beat 34"
+  },
+  {
+   "frame": 393,
+   "label": "beat 35"
+  },
+  {
+   "frame": 404,
+   "label": "beat 36"
+  },
+  {
+   "frame": 415,
+   "label": "beat 37"
+  },
+  {
+   "frame": 427,
+   "label": "beat 38"
+  },
+  {
+   "frame": 438,
+   "label": "beat 39"
+  },
+  {
+   "frame": 449,
+   "label": "beat 40"
+  },
+  {
+   "frame": 461,
+   "label": "beat 41"
+  },
+  {
+   "frame": 461,
+   "label": "story: proof"
+  },
+  {
+   "frame": 472,
+   "label": "beat 42"
+  },
+  {
+   "frame": 483,
+   "label": "beat 43"
+  },
+  {
+   "frame": 495,
+   "label": "beat 44"
+  },
+  {
+   "frame": 506,
+   "label": "beat 45"
+  },
+  {
+   "frame": 517,
+   "label": "beat 46"
+  },
+  {
+   "frame": 529,
+   "label": "beat 47"
+  },
+  {
+   "frame": 540,
+   "label": "beat 48"
+  },
+  {
+   "frame": 551,
+   "label": "beat 49"
+  },
+  {
+   "frame": 563,
+   "label": "beat 50"
+  },
+  {
+   "frame": 574,
+   "label": "beat 51"
+  },
+  {
+   "frame": 585,
+   "label": "beat 52"
+  },
+  {
+   "frame": 597,
+   "label": "beat 53"
+  },
+  {
+   "frame": 608,
+   "label": "beat 54"
+  },
+  {
+   "frame": 619,
+   "label": "beat 55"
+  },
+  {
+   "frame": 631,
+   "label": "beat 56"
+  },
+  {
+   "frame": 642,
+   "label": "beat 57"
+  },
+  {
+   "frame": 654,
+   "label": "beat 58"
+  },
+  {
+   "frame": 665,
+   "label": "beat 59"
+  },
+  {
+   "frame": 676,
+   "label": "beat 60"
+  },
+  {
+   "frame": 688,
+   "label": "beat 61"
+  },
+  {
+   "frame": 699,
+   "label": "beat 62"
+  },
+  {
+   "frame": 710,
+   "label": "beat 63"
+  },
+  {
+   "frame": 722,
+   "label": "beat 64"
+  },
+  {
+   "frame": 733,
+   "label": "beat 65"
+  },
+  {
+   "frame": 733,
+   "label": "story: claim"
+  },
+  {
+   "frame": 744,
+   "label": "beat 66"
+  },
+  {
+   "frame": 756,
+   "label": "beat 67"
+  },
+  {
+   "frame": 767,
+   "label": "beat 68"
+  },
+  {
+   "frame": 778,
+   "label": "beat 69"
+  },
+  {
+   "frame": 790,
+   "label": "beat 70"
+  },
+  {
+   "frame": 801,
+   "label": "beat 71"
+  },
+  {
+   "frame": 812,
+   "label": "beat 72"
+  },
+  {
+   "frame": 824,
+   "label": "beat 73"
+  },
+  {
+   "frame": 835,
+   "label": "beat 74"
+  },
+  {
+   "frame": 846,
+   "label": "beat 75"
+  },
+  {
+   "frame": 858,
+   "label": "beat 76"
+  }
+ ],
+ "style": "launch-film"
+}
