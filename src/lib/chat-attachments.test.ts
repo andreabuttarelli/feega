@@ -19,8 +19,13 @@ describe('attachmentVerdict', () => {
     expect(attachmentVerdict('text/csv', 'rows.csv', 10)).toEqual({ ok: true, kind: AttachmentKind.Document });
   });
 
+  it('accepts a video as a reference', () => {
+    expect(attachmentVerdict('video/mp4', 'clip.mp4', 10)).toEqual({ ok: true, kind: AttachmentKind.Video });
+    expect(attachmentVerdict('', 'ref.mov', 10)).toEqual({ ok: true, kind: AttachmentKind.Video });
+    expect(attachmentVerdict('video/webm', 'ref.webm', 10)).toEqual({ ok: true, kind: AttachmentKind.Video });
+  });
+
   it('rifiuta formati fuori lista, file vuoti e oltre il tetto', () => {
-    expect(attachmentVerdict('video/mp4', 'clip.mp4', 10)).toEqual({ ok: false, error: AttachmentError.Unsupported });
     expect(attachmentVerdict('application/zip', 'a.zip', 10)).toEqual({ ok: false, error: AttachmentError.Unsupported });
     expect(attachmentVerdict('image/png', 'a.png', 0)).toEqual({ ok: false, error: AttachmentError.Empty });
     expect(attachmentVerdict('image/png', 'a.png', CHAT_ATTACHMENT_MAX_BYTES + 1)).toEqual({ ok: false, error: AttachmentError.TooLarge });

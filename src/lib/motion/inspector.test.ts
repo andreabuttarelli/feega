@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { COMPONENTS, COMPONENT_IDS, AssetKind, Control, Group, defaultProps } from './components';
 import { Ease } from './design';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from './doc';
-import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, partFieldKeys, partFocus, secondsLabel, toggleKey, valueAt } from './inspector';
+import { clipFieldGroups, editAt, fieldGroups, fieldsOf, keyAt, keyedField, parseDecimal, partFields, partFocus, partShared, secondsLabel, toggleKey, valueAt } from './inspector';
 import { addClip, setKeyframes, setTransform, type OpResult } from './timeline';
 import { writeComponent } from './custom/ops';
 import { PropFormat } from './custom/component';
@@ -219,59 +219,16 @@ describe('fields shown for a selected poster part', () => {
     return { doc: withClip, clip: findClip(withClip, 'k')!.clip };
   }
 
-  it('its own text field plus every poster-wide style and layout field', () => {
+  it('a poster with no usage table: its own text and the fields named after it, never poster-wide ones', () => {
     const { doc, clip } = posterClip();
-    expect(partFieldKeys(doc, clip, 'title')).toEqual(['title', 'titleColour', 'titleSize', 'titleX', 'font', 'ink', 'margin']);
+    expect(partFields(doc, clip, 'title')).toEqual({ own: ['title', 'titleColour', 'titleSize', 'titleX'], shared: [] });
   });
 
-  it("never another part's own size or weight", () => {
+  it("never another part's own size, weight or text", () => {
     const { doc, clip } = posterClip();
-    expect(partFieldKeys(doc, clip, 'title')).not.toContain('captionSize');
-    expect(partFieldKeys(doc, clip, 'caption')).toEqual(['caption', 'captionWeight', 'captionSize', 'font', 'ink', 'margin']);
-  });
-
-  it('a part also claims its text, background, border and tag colours and its height', () => {
-    const doc = must(
-      writeComponent(newMotionDoc(MotionFormat.Landscape), 'Pills', {
-        source: { html: '', css: '', js: '' },
-        propsSchema: {
-          type: 'object',
-          properties: {
-            pills: { type: 'string', title: 'Pills', default: 'A', group: 'Content' },
-            pillsTextColor: { type: 'string', title: 'Text', format: PropFormat.Color, default: '#000', group: 'Style' },
-            pillsBgColor: { type: 'string', title: 'Bg', format: PropFormat.Color, default: '#000', group: 'Style' },
-            pillsHeight: { type: 'number', title: 'Height', default: 3, group: 'Layout' },
-            paper: { type: 'string', title: 'Paper', format: PropFormat.Color, default: '#fff', group: 'Style' }
-          }
-        }
-      })
-    );
-    const withClip = must(addClip(doc, { component: 'Custom', from: 0, props: { name: 'Pills' } }, 'k'));
-    expect(partFieldKeys(withClip, findClip(withClip, 'k')!.clip, 'pills')).toEqual(['pills', 'pillsTextColor', 'pillsBgColor', 'pillsHeight', 'paper']);
-  });
-
-  it('a poster whose field names break the convention claims them through its table row', () => {
-    const doc = must(
-      writeComponent(newMotionDoc(MotionFormat.Landscape), 'CircleEventPoster', {
-        source: { html: '', css: '', js: '' },
-        propsSchema: {
-          type: 'object',
-          properties: {
-            heading: { type: 'string', title: 'Name', default: 'A', group: 'Content' },
-            nameSize: { type: 'number', title: 'Name size', default: 8, group: 'Layout' },
-            ink: { type: 'string', title: 'Ink', format: PropFormat.Color, default: '#000', group: 'Style' }
-          }
-        }
-      })
-    );
-    const withClip = must(addClip(doc, { component: 'Custom', from: 0, props: { name: 'CircleEventPoster' } }, 'k'));
-    const clip = findClip(withClip, 'k')!.clip;
-    expect(partFieldKeys(withClip, clip, 'heading')).toEqual(['heading', 'nameSize', 'ink']);
-  });
-
-  it("never another part's own text field", () => {
-    const { doc, clip } = posterClip();
-    expect(partFieldKeys(doc, clip, 'title')).not.toContain('caption');
+    expect(partFields(doc, clip, 'title').own).not.toContain('captionSize');
+    expect(partFields(doc, clip, 'title').own).not.toContain('caption');
+    expect(partFields(doc, clip, 'caption').own).toEqual(['caption', 'captionWeight', 'captionSize']);
   });
 });
 
@@ -288,7 +245,12 @@ describe('a selected poster part shows only its own fields', () => {
 
   it('a marked line leaves the raw multi-line field out: its text has its own field', () => {
     expect(partFocus(doc, clip, 'lines:1')).not.toContain('lines');
-    expect(partFocus(doc, clip, 'lines:1')).toContain('ink');
+  });
+
+  it('the type colour every line shares sits under shared, the poster colour nowhere', () => {
+    expect(partFocus(doc, clip, 'lines:1')).not.toContain('ink');
+    expect(partShared(doc, clip, 'lines:1')).toContain('ink');
+    expect(partShared(doc, clip, 'lines:1')).not.toContain('paper');
   });
 
   it('a whole text field keeps its own field', () => {

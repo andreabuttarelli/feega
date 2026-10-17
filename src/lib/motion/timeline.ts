@@ -11,6 +11,7 @@ import { CAMERA_LANE, type CameraKey } from './camera';
 import { editCameraLane } from './camera-ops';
 import { Around, EASE_PRESETS, Half, presetEase, withHalf, type EasePreset } from './graph';
 import { Interp, keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
+import { partStylesSchema, type PartStyle } from './part-style-model';
 
 export type OpResult = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
@@ -205,6 +206,18 @@ export function setProps(doc: MotionDoc, clipId: string, patch: Record<string, u
     }
     const next = { component: clip.component, props: verdict.props };
     return fontsOfClip(doc, next) ?? compRefProblem(doc, next) ?? { ...clip, props: verdict.props };
+  });
+}
+
+export function setPartStyle(doc: MotionDoc, clipId: string, part: string, style: PartStyle | null): OpResult {
+  return editClip(doc, clipId, (clip) => {
+    const rest = Object.fromEntries(Object.entries(clip.partStyles ?? {}).filter(([id]) => id !== part));
+    const partStyles = style ? { ...rest, [part]: style } : rest;
+    const parsed = partStylesSchema.safeParse(partStyles);
+    if (!parsed.success) {
+      return parsed.error.issues[0].message;
+    }
+    return { ...clip, partStyles: Object.keys(parsed.data).length ? parsed.data : undefined };
   });
 }
 

@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { LOD_ZOOM, lodWanted, mediaPoster, oncePerUrl, posterRects, PosterSource, THUMB_WIDTH } from './poster-lod';
+import { LOD_EXIT_ZOOM, LOD_ZOOM, lodNext, lodWanted, mediaPoster, oncePerUrl, posterRects, PosterSource, THUMB_WIDTH } from './poster-lod';
 
 const screen = { width: 1000, height: 800 };
 const node = (id: string, x: number, y: number) => ({ id, x, y, w: 400, h: 300 });
+
+describe('lodNext', () => {
+  it('enters below the threshold and leaves only past the exit band', () => {
+    expect(lodNext(false, LOD_ZOOM * 0.99)).toBe(true);
+    expect(lodNext(true, LOD_ZOOM)).toBe(true);
+    expect(lodNext(true, LOD_EXIT_ZOOM)).toBe(false);
+    expect(lodNext(false, LOD_ZOOM)).toBe(false);
+  });
+});
 
 describe('posterRects', () => {
   it('wants posters only below the readable threshold', () => {

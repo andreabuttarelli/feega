@@ -7,7 +7,7 @@
 
   const ICON = 15;
 
-  const TOOL_COMMAND: Record<DrawTool, Command> = {
+  const TOOL_COMMAND: Record<Exclude<DrawTool, DrawTool.Frame>, Command> = {
     [DrawTool.Select]: Command.ToolSelect,
     [DrawTool.Text]: Command.ToolText,
     [DrawTool.Rectangle]: Command.ToolRectangle,
@@ -15,9 +15,9 @@
     [DrawTool.Pen]: Command.ToolPen
   };
 
-  const TOOLS = Object.values(DrawTool).map((t) => {
-    const tip = tipText(TOOL_COMMAND[t]);
-    return { tool: t, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[TOOL_COMMAND[t]].icon };
+  const TOOLS = (Object.entries(TOOL_COMMAND) as [DrawTool, Command][]).map(([t, command]) => {
+    const tip = tipText(command);
+    return { tool: t, label: `${tip.name} (${tip.keys})`, icon: ACTIONS[command].icon };
   });
 </script>
 

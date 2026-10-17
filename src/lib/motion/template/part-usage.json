@@ -1,0 +1,3547 @@
+{
+  "AcidStrokesPoster": {
+    "parts": {
+      "strokes": 12,
+      "bursts": 3,
+      "title": 1,
+      "script": 1,
+      "dates": 1,
+      "heading": 1,
+      "venue": 1,
+      "marker": 1,
+      "index": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "titleColor": [
+        "title"
+      ],
+      "titleFont": [
+        "title"
+      ],
+      "titleSize": [
+        "script",
+        "title"
+      ],
+      "titleWeight": [
+        "title"
+      ],
+      "titleX": [
+        "title"
+      ],
+      "titleY": [
+        "title"
+      ],
+      "script": [
+        "script"
+      ],
+      "scriptColor": [
+        "script"
+      ],
+      "scriptFont": [
+        "script"
+      ],
+      "scriptX": [
+        "script"
+      ],
+      "scriptY": [
+        "script"
+      ],
+      "strokes": [
+        "strokes"
+      ],
+      "strokesColor": [
+        "strokes"
+      ],
+      "bursts": [
+        "bursts"
+      ],
+      "burstsColor": [
+        "bursts"
+      ],
+      "dates": [
+        "dates"
+      ],
+      "datesColor": [
+        "dates"
+      ],
+      "datesX": [
+        "dates"
+      ],
+      "datesY": [
+        "dates"
+      ],
+      "heading": [
+        "heading"
+      ],
+      "headingColor": [
+        "heading"
+      ],
+      "headingX": [
+        "heading"
+      ],
+      "headingY": [
+        "heading"
+      ],
+      "venue": [
+        "venue"
+      ],
+      "venueColor": [
+        "venue"
+      ],
+      "venueX": [
+        "venue"
+      ],
+      "venueY": [
+        "venue"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "smallFont": [
+        "bursts",
+        "dates",
+        "heading",
+        "index",
+        "marker",
+        "script",
+        "strokes",
+        "title",
+        "venue"
+      ],
+      "smallSize": [
+        "dates",
+        "heading",
+        "index",
+        "marker",
+        "script",
+        "venue"
+      ],
+      "paper": [
+        "@page",
+        "marker"
+      ]
+    }
+  },
+  "BarcodeTablePoster": {
+    "parts": {
+      "barcode": 1,
+      "titlePrimary": 1,
+      "titleSecondary": 1,
+      "eventLines": 4,
+      "footer": 1,
+      "partners": 3,
+      "counter": 1,
+      "index": 1
+    },
+    "fields": {
+      "titlePrimary": [
+        "titlePrimary"
+      ],
+      "titlePrimaryColor": [
+        "titlePrimary"
+      ],
+      "titlePrimarySize": [
+        "titlePrimary",
+        "titleSecondary"
+      ],
+      "titlePrimaryWeight": [
+        "titlePrimary"
+      ],
+      "titlePrimaryX": [
+        "titlePrimary"
+      ],
+      "titlePrimaryY": [
+        "titlePrimary"
+      ],
+      "titleSecondary": [
+        "titleSecondary"
+      ],
+      "titleSecondaryColor": [
+        "titleSecondary"
+      ],
+      "titleSecondaryX": [
+        "titleSecondary"
+      ],
+      "titleSecondaryY": [
+        "titleSecondary"
+      ],
+      "eventLines": [
+        "eventLines"
+      ],
+      "eventLinesColor": [
+        "eventLines"
+      ],
+      "eventLinesX": [
+        "eventLines"
+      ],
+      "eventLinesY": [
+        "eventLines"
+      ],
+      "footer": [
+        "footer"
+      ],
+      "footerColor": [
+        "footer"
+      ],
+      "footerX": [
+        "footer"
+      ],
+      "footerY": [
+        "footer"
+      ],
+      "partners": [
+        "partners"
+      ],
+      "partnersColor": [
+        "partners"
+      ],
+      "partnersX": [
+        "partners"
+      ],
+      "partnersY": [
+        "partners"
+      ],
+      "counter": [
+        "counter"
+      ],
+      "counterColor": [
+        "counter"
+      ],
+      "counterX": [
+        "counter"
+      ],
+      "counterY": [
+        "counter"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "barcodeColor": [
+        "barcode"
+      ],
+      "barcodeX": [
+        "barcode"
+      ],
+      "barcodeY": [
+        "barcode"
+      ],
+      "barcodeW": [
+        "barcode"
+      ],
+      "barcodeH": [
+        "barcode"
+      ],
+      "paper": [
+        "@page",
+        "barcode",
+        "counter"
+      ],
+      "font": [
+        "@page",
+        "barcode",
+        "counter",
+        "eventLines",
+        "footer",
+        "index",
+        "partners",
+        "titlePrimary",
+        "titleSecondary"
+      ],
+      "gridColor": [
+        "@page"
+      ],
+      "gridCols": [
+        "@page"
+      ]
+    }
+  },
+  "BlockTitlePoster": {
+    "parts": {
+      "caption": 1
+    },
+    "fields": {
+      "title": [
+        "@page"
+      ],
+      "byline": [
+        "@page"
+      ],
+      "names": [
+        "@page"
+      ],
+      "body": [
+        "@page"
+      ],
+      "blockNumber": [
+        "@page"
+      ],
+      "blockLabel": [
+        "@page"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "@page"
+      ],
+      "textFont": [
+        "@page",
+        "caption"
+      ],
+      "fontWeight": [
+        "@page"
+      ],
+      "paper": [
+        "@page"
+      ],
+      "ink": [
+        "@page",
+        "caption"
+      ],
+      "block": [
+        "@page"
+      ],
+      "wear": [
+        "@page"
+      ],
+      "fill": [
+        "@page"
+      ],
+      "leading": [
+        "@page"
+      ],
+      "overlap": [
+        "@page"
+      ],
+      "bylineSize": [
+        "@page",
+        "caption"
+      ],
+      "namesSize": [
+        "@page"
+      ],
+      "bodySize": [
+        "@page"
+      ]
+    }
+  },
+  "BlueTrailsPoster": {
+    "parts": {
+      "dots": 21,
+      "words": 4,
+      "title": 1,
+      "tagline": 1,
+      "topic": 1,
+      "brand": 1,
+      "tool": 1,
+      "index": 1,
+      "marker": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "titleColor": [
+        "title",
+        "words"
+      ],
+      "titleFont": [
+        "title"
+      ],
+      "titleSize": [
+        "title"
+      ],
+      "titleWeight": [
+        "title"
+      ],
+      "titleX": [
+        "title"
+      ],
+      "titleY": [
+        "title"
+      ],
+      "titleShift": [
+        "title"
+      ],
+      "dots": [
+        "dots"
+      ],
+      "dotsColor": [
+        "@page",
+        "dots"
+      ],
+      "dotsTailColor": [
+        "@page"
+      ],
+      "words": [
+        "words"
+      ],
+      "tagline": [
+        "tagline"
+      ],
+      "taglineColor": [
+        "tagline"
+      ],
+      "taglineX": [
+        "tagline"
+      ],
+      "taglineY": [
+        "tagline"
+      ],
+      "topic": [
+        "topic"
+      ],
+      "topicColor": [
+        "topic"
+      ],
+      "topicX": [
+        "topic"
+      ],
+      "topicY": [
+        "topic"
+      ],
+      "brand": [
+        "brand"
+      ],
+      "brandColor": [
+        "brand"
+      ],
+      "brandX": [
+        "brand"
+      ],
+      "brandY": [
+        "brand"
+      ],
+      "tool": [
+        "tool"
+      ],
+      "toolColor": [
+        "tool"
+      ],
+      "toolX": [
+        "tool"
+      ],
+      "toolY": [
+        "tool"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "smallFont": [
+        "brand",
+        "dots",
+        "index",
+        "marker",
+        "tagline",
+        "title",
+        "tool",
+        "topic",
+        "words"
+      ],
+      "smallSize": [
+        "brand",
+        "index",
+        "tagline",
+        "tool",
+        "topic",
+        "words"
+      ],
+      "paper": [
+        "@page"
+      ]
+    }
+  },
+  "BoxedTypePoster": {
+    "parts": {
+      "caption": 1
+    },
+    "fields": {
+      "title": [
+        "@page"
+      ],
+      "word": [
+        "@page"
+      ],
+      "statement": [
+        "@page"
+      ],
+      "note": [
+        "@page"
+      ],
+      "tag1": [
+        "@page"
+      ],
+      "tag2": [
+        "@page"
+      ],
+      "tag3": [
+        "@page"
+      ],
+      "counter": [
+        "@page"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "@page",
+        "caption"
+      ],
+      "fontWeight": [
+        "@page",
+        "caption"
+      ],
+      "paper": [
+        "@page"
+      ],
+      "ink": [
+        "@page",
+        "caption"
+      ],
+      "highlight": [
+        "@page"
+      ],
+      "light": [
+        "@page"
+      ],
+      "rule": [
+        "@page"
+      ],
+      "titleSize": [
+        "@page",
+        "caption"
+      ],
+      "wordSize": [
+        "@page",
+        "caption"
+      ],
+      "statementSize": [
+        "@page"
+      ],
+      "tagSize": [
+        "@page",
+        "caption"
+      ],
+      "wordLeft": [
+        "@page"
+      ]
+    }
+  },
+  "BrickCapsPoster": {
+    "parts": {
+      "bars": 4,
+      "corners": 4,
+      "marker": 1,
+      "index": 1
+    },
+    "fields": {
+      "bars": [
+        "bars"
+      ],
+      "barsColor": [
+        "bars"
+      ],
+      "barsTextColor": [
+        "bars"
+      ],
+      "barsFont": [
+        "bars"
+      ],
+      "barsSize": [
+        "bars"
+      ],
+      "barsX": [
+        "@page",
+        "bars"
+      ],
+      "barsY": [
+        "@page",
+        "bars"
+      ],
+      "corners": [
+        "corners"
+      ],
+      "cornersColor": [
+        "corners"
+      ],
+      "cornersFont": [
+        "corners"
+      ],
+      "cornersSize": [
+        "corners"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerFont": [
+        "marker"
+      ],
+      "markerSize": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexFont": [
+        "index"
+      ],
+      "indexSize": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "paper": [
+        "@page",
+        "marker"
+      ],
+      "brickLineColor": [
+        "@page"
+      ],
+      "brickCols": [
+        "@page"
+      ],
+      "brickRowHeight": [
+        "@page"
+      ]
+    }
+  },
+  "CheckerStepsPoster": {
+    "parts": {
+      "title": 5,
+      "body": 1,
+      "index": 1,
+      "marker": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "body": [
+        "body"
+      ],
+      "index": [
+        "index"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "font": [
+        "@page",
+        "body",
+        "index",
+        "marker",
+        "title"
+      ],
+      "fontWeight": [
+        "title"
+      ],
+      "tracking": [
+        "title"
+      ],
+      "checker": [
+        "@page"
+      ],
+      "paper": [
+        "@page",
+        "marker"
+      ],
+      "ink": [
+        "@page",
+        "body",
+        "index",
+        "marker",
+        "title"
+      ],
+      "wear": [
+        "@page"
+      ],
+      "columns": [
+        "@page",
+        "marker",
+        "title"
+      ],
+      "cellAspect": [
+        "@page",
+        "marker",
+        "title"
+      ],
+      "shift": [
+        "@page",
+        "title"
+      ],
+      "top": [
+        "@page",
+        "marker",
+        "title"
+      ],
+      "titleSize": [
+        "title"
+      ],
+      "bodySize": [
+        "body",
+        "index"
+      ]
+    }
+  },
+  "CircleEventPoster": {
+    "parts": {
+      "caption": 1
+    },
+    "fields": {
+      "heading": [
+        "@page"
+      ],
+      "title": [
+        "@page"
+      ],
+      "date": [
+        "@page"
+      ],
+      "info": [
+        "@page"
+      ],
+      "body": [
+        "@page"
+      ],
+      "marker": [
+        "@page"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "@page",
+        "caption"
+      ],
+      "fontWeight": [
+        "@page",
+        "caption"
+      ],
+      "paper": [
+        "@page"
+      ],
+      "ink": [
+        "@page",
+        "caption"
+      ],
+      "accent": [
+        "@page"
+      ],
+      "nameSize": [
+        "@page"
+      ],
+      "titleSize": [
+        "@page"
+      ],
+      "dateSize": [
+        "@page"
+      ],
+      "infoSize": [
+        "@page"
+      ],
+      "infoX": [
+        "@page"
+      ],
+      "circleSize": [
+        "@page"
+      ],
+      "circleX": [
+        "@page"
+      ],
+      "circleY": [
+        "@page"
+      ]
+    }
+  },
+  "CuratedBoardPoster": {
+    "parts": {
+      "slots": 8,
+      "captions": 8,
+      "title": 1,
+      "marker": 1,
+      "tags": 3,
+      "issue": 1,
+      "caption": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "tags": [
+        "tags"
+      ],
+      "slots": [
+        "captions",
+        "slots"
+      ],
+      "captions": [
+        "captions"
+      ],
+      "issue": [
+        "issue"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "font": [
+        "marker",
+        "title"
+      ],
+      "mono": [
+        "caption",
+        "captions",
+        "issue",
+        "marker",
+        "slots",
+        "tags",
+        "title"
+      ],
+      "paper": [
+        "@page",
+        "marker"
+      ],
+      "ink": [
+        "caption",
+        "captions",
+        "issue",
+        "marker",
+        "slots",
+        "tags",
+        "title"
+      ],
+      "accent": [
+        "marker"
+      ],
+      "titleSize": [
+        "marker",
+        "tags",
+        "title"
+      ],
+      "thumbSize": [
+        "captions",
+        "slots"
+      ]
+    }
+  },
+  "DarkTagsPoster": {
+    "parts": {
+      "title": 1,
+      "tags": 8,
+      "marker": 1,
+      "index": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "titleColor": [
+        "title"
+      ],
+      "titleFont": [
+        "title"
+      ],
+      "titleSize": [
+        "title"
+      ],
+      "titleWeight": [
+        "title"
+      ],
+      "titleX": [
+        "title"
+      ],
+      "titleY": [
+        "title"
+      ],
+      "tags": [
+        "tags"
+      ],
+      "tagsTextColor": [
+        "tags"
+      ],
+      "tagsFont": [
+        "tags"
+      ],
+      "tagsSize": [
+        "tags"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerBorderColor": [
+        "marker"
+      ],
+      "markerFont": [
+        "marker"
+      ],
+      "markerSize": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexFont": [
+        "index"
+      ],
+      "indexSize": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "paper": [
+        "@page"
+      ]
+    }
+  },
+  "DiagonalPillsPoster": {
+    "parts": {
+      "pills": 12,
+      "title": 1,
+      "brand": 1,
+      "tagline": 1,
+      "credit": 1,
+      "role": 1,
+      "index": 1,
+      "marker": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "titleColor": [
+        "pills",
+        "title"
+      ],
+      "titleFont": [
+        "title"
+      ],
+      "titleSize": [
+        "title"
+      ],
+      "titleWeight": [
+        "title"
+      ],
+      "titleX": [
+        "title"
+      ],
+      "titleY": [
+        "title"
+      ],
+      "pills": [
+        "pills"
+      ],
+      "pillsColor": [
+        "@page",
+        "pills"
+      ],
+      "pillsTailColor": [
+        "@page"
+      ],
+      "pillsWidth": [
+        "pills"
+      ],
+      "pillsAngle": [
+        "pills",
+        "title"
+      ],
+      "brand": [
+        "brand"
+      ],
+      "brandColor": [
+        "brand"
+      ],
+      "brandX": [
+        "brand"
+      ],
+      "brandY": [
+        "brand"
+      ],
+      "tagline": [
+        "tagline"
+      ],
+      "taglineColor": [
+        "tagline"
+      ],
+      "taglineX": [
+        "tagline"
+      ],
+      "taglineY": [
+        "tagline"
+      ],
+      "credit": [
+        "credit"
+      ],
+      "creditColor": [
+        "credit"
+      ],
+      "creditX": [
+        "credit"
+      ],
+      "creditY": [
+        "credit"
+      ],
+      "role": [
+        "role"
+      ],
+      "roleColor": [
+        "role"
+      ],
+      "roleX": [
+        "role"
+      ],
+      "roleY": [
+        "role"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "smallFont": [
+        "brand",
+        "credit",
+        "index",
+        "marker",
+        "pills",
+        "role",
+        "tagline",
+        "title"
+      ],
+      "smallSize": [
+        "brand",
+        "credit",
+        "index",
+        "pills",
+        "role",
+        "tagline"
+      ],
+      "paper": [
+        "@page"
+      ]
+    }
+  },
+  "FestivalGridPoster": {
+    "parts": {
+      "photos": 1,
+      "title": 1,
+      "info": 1,
+      "edition": 1,
+      "season": 1,
+      "programme1": 1,
+      "programme2": 1,
+      "programme3": 1,
+      "partners": 4,
+      "dotLabel": 4,
+      "counter": 1,
+      "caption": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "info": [
+        "info"
+      ],
+      "edition": [
+        "edition"
+      ],
+      "season": [
+        "season"
+      ],
+      "programme1": [
+        "programme1"
+      ],
+      "programme2": [
+        "programme2"
+      ],
+      "programme3": [
+        "programme3"
+      ],
+      "partners": [
+        "partners"
+      ],
+      "dots": [
+        "@page",
+        "dotLabel"
+      ],
+      "dotLabel": [
+        "dotLabel"
+      ],
+      "counter": [
+        "counter"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "counter",
+        "title"
+      ],
+      "bodyFont": [
+        "@page",
+        "caption",
+        "counter",
+        "dotLabel",
+        "edition",
+        "info",
+        "partners",
+        "photos",
+        "programme1",
+        "programme2",
+        "programme3",
+        "season",
+        "title"
+      ],
+      "paper": [
+        "@page",
+        "counter"
+      ],
+      "ink": [
+        "@page",
+        "caption",
+        "counter",
+        "dotLabel",
+        "edition",
+        "info",
+        "partners",
+        "photos",
+        "programme1",
+        "programme2",
+        "programme3",
+        "season",
+        "title"
+      ],
+      "gridColour": [
+        "@page"
+      ],
+      "accent": [
+        "counter"
+      ],
+      "rows": [
+        "@page",
+        "caption",
+        "counter",
+        "dotLabel",
+        "edition",
+        "info",
+        "partners",
+        "photos",
+        "programme1",
+        "programme2",
+        "programme3",
+        "season",
+        "title"
+      ],
+      "titleSize": [
+        "title"
+      ]
+    }
+  },
+  "FlowQuotePoster": {
+    "parts": {
+      "pills": 7,
+      "marker": 1,
+      "index": 1
+    },
+    "fields": {
+      "pills": [
+        "pills"
+      ],
+      "pillsColor": [
+        "pills"
+      ],
+      "pillsTextColor": [
+        "pills"
+      ],
+      "pillsFont": [
+        "pills"
+      ],
+      "pillsHeight": [
+        "@page",
+        "pills"
+      ],
+      "authorFrom": [
+        "@page"
+      ],
+      "connectorColor": [
+        "@page"
+      ],
+      "connectorWidth": [
+        "@page"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerFont": [
+        "marker"
+      ],
+      "markerSize": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexFont": [
+        "index"
+      ],
+      "indexSize": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "paper": [
+        "@page",
+        "index",
+        "marker"
+      ]
+    }
+  },
+  "GlyphSpecimenPoster": {
+    "parts": {
+      "rules": 1,
+      "glyphs": 6,
+      "side": 1,
+      "footer": 1,
+      "features": 1,
+      "index": 1,
+      "marker": 1,
+      "chain": 62,
+      "dates": 1
+    },
+    "fields": {
+      "glyphs": [
+        "glyphs"
+      ],
+      "glyphsColor": [
+        "@page",
+        "glyphs"
+      ],
+      "glyphsFont": [
+        "glyphs"
+      ],
+      "glyphsSize": [
+        "glyphs"
+      ],
+      "rules": [
+        "rules"
+      ],
+      "rulesColor": [
+        "rules"
+      ],
+      "chain": [
+        "chain"
+      ],
+      "chainColor": [
+        "chain"
+      ],
+      "side": [
+        "side"
+      ],
+      "sideColor": [
+        "side"
+      ],
+      "sideX": [
+        "side"
+      ],
+      "sideY": [
+        "side"
+      ],
+      "dates": [
+        "dates"
+      ],
+      "datesColor": [
+        "dates"
+      ],
+      "datesX": [
+        "dates"
+      ],
+      "datesY": [
+        "dates"
+      ],
+      "footer": [
+        "footer"
+      ],
+      "footerColor": [
+        "footer"
+      ],
+      "footerX": [
+        "footer"
+      ],
+      "footerY": [
+        "footer"
+      ],
+      "features": [
+        "features"
+      ],
+      "featuresColor": [
+        "features"
+      ],
+      "featuresX": [
+        "features"
+      ],
+      "featuresY": [
+        "features"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "smallFont": [
+        "chain",
+        "dates",
+        "features",
+        "footer",
+        "glyphs",
+        "index",
+        "marker",
+        "rules",
+        "side"
+      ],
+      "smallSize": [
+        "dates",
+        "features",
+        "footer",
+        "index",
+        "marker",
+        "side"
+      ],
+      "paper": [
+        "@page"
+      ]
+    }
+  },
+  "HazeGridPoster": {
+    "parts": {
+      "haze": 1,
+      "rows": 4,
+      "marks": 6,
+      "note": 1,
+      "body": 1,
+      "issue": 1,
+      "marker": 1,
+      "caption": 1
+    },
+    "fields": {
+      "rows": [
+        "rows"
+      ],
+      "rowsColor": [
+        "marks",
+        "rows"
+      ],
+      "rowsSize": [
+        "marks",
+        "rows"
+      ],
+      "rowsWeight": [
+        "marks",
+        "rows"
+      ],
+      "rowsX": [
+        "marks",
+        "rows"
+      ],
+      "rowsY": [
+        "marks",
+        "rows"
+      ],
+      "marks": [
+        "marks",
+        "rows"
+      ],
+      "marksColor": [
+        "marks"
+      ],
+      "note": [
+        "note"
+      ],
+      "noteColor": [
+        "note"
+      ],
+      "noteX": [
+        "note"
+      ],
+      "noteY": [
+        "note"
+      ],
+      "body": [
+        "body"
+      ],
+      "bodyColor": [
+        "body"
+      ],
+      "bodyX": [
+        "body"
+      ],
+      "bodyY": [
+        "body"
+      ],
+      "issue": [
+        "issue"
+      ],
+      "issueColor": [
+        "issue"
+      ],
+      "issueX": [
+        "issue"
+      ],
+      "issueY": [
+        "issue"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerSize": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "captionColor": [
+        "caption"
+      ],
+      "captionX": [
+        "caption"
+      ],
+      "captionY": [
+        "caption"
+      ],
+      "hazeColor": [
+        "haze"
+      ],
+      "hazeX": [
+        "haze"
+      ],
+      "hazeY": [
+        "haze"
+      ],
+      "paper": [
+        "@page",
+        "marker"
+      ],
+      "font": [
+        "@page",
+        "body",
+        "caption",
+        "haze",
+        "issue",
+        "marker",
+        "marks",
+        "note",
+        "rows"
+      ],
+      "gridColor": [
+        "@page"
+      ],
+      "gridCols": [
+        "@page"
+      ],
+      "gridRows": [
+        "@page"
+      ]
+    }
+  },
+  "IsoBlocksPoster": {
+    "parts": {
+      "blocks": 3,
+      "lineup": 3,
+      "marker": 1,
+      "header": 1,
+      "info": 1,
+      "caption": 1
+    },
+    "fields": {
+      "header": [
+        "header"
+      ],
+      "lineup": [
+        "lineup"
+      ],
+      "blocks": [
+        "@page",
+        "blocks",
+        "lineup",
+        "marker"
+      ],
+      "info": [
+        "info"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "@page",
+        "blocks",
+        "caption",
+        "header",
+        "info",
+        "lineup",
+        "marker"
+      ],
+      "blockFont": [
+        "lineup"
+      ],
+      "paper": [
+        "@page",
+        "lineup"
+      ],
+      "ink": [
+        "@page",
+        "blocks",
+        "caption",
+        "header",
+        "info",
+        "lineup",
+        "marker"
+      ],
+      "accent": [
+        "@page",
+        "marker"
+      ],
+      "accentBlock": [
+        "@page",
+        "marker"
+      ],
+      "headerSize": [
+        "header"
+      ]
+    }
+  },
+  "MetaballListingPoster": {
+    "parts": {
+      "blobs": 17,
+      "events": 9,
+      "words": 3,
+      "footer": 1,
+      "marker": 1,
+      "index": 1
+    },
+    "fields": {
+      "events": [
+        "events"
+      ],
+      "eventsColor": [
+        "events"
+      ],
+      "eventsMuteColor": [
+        "events"
+      ],
+      "eventsColumns": [
+        "events"
+      ],
+      "words": [
+        "words"
+      ],
+      "wordsColor": [
+        "words"
+      ],
+      "wordsFont": [
+        "words"
+      ],
+      "wordsSize": [
+        "words"
+      ],
+      "wordsWeight": [
+        "words"
+      ],
+      "blobs": [
+        "@page",
+        "blobs"
+      ],
+      "blobsColor": [
+        "blobs"
+      ],
+      "halftoneColor": [
+        "@page"
+      ],
+      "footer": [
+        "footer"
+      ],
+      "footerColor": [
+        "footer"
+      ],
+      "footerX": [
+        "footer"
+      ],
+      "footerY": [
+        "footer"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "smallFont": [
+        "blobs",
+        "events",
+        "footer",
+        "index",
+        "marker",
+        "words"
+      ],
+      "smallSize": [
+        "events",
+        "footer",
+        "index",
+        "marker"
+      ],
+      "paper": [
+        "@page"
+      ]
+    }
+  },
+  "MonthGridPoster": {
+    "parts": {
+      "label": 1,
+      "months": 4,
+      "cards": 6,
+      "note": 1,
+      "marker": 1,
+      "index": 1
+    },
+    "fields": {
+      "label": [
+        "@page"
+      ],
+      "labelColor": [
+        "@page"
+      ],
+      "labelBgColor": [
+        "label"
+      ],
+      "labelX": [
+        "@page",
+        "label"
+      ],
+      "labelY": [
+        "@page",
+        "label"
+      ],
+      "months": [
+        "months"
+      ],
+      "monthsColor": [
+        "months"
+      ],
+      "monthsSize": [
+        "months"
+      ],
+      "monthsWeight": [
+        "months"
+      ],
+      "monthsX": [
+        "months"
+      ],
+      "monthsY": [
+        "months"
+      ],
+      "cardsPos": [
+        "cards"
+      ],
+      "cards": [
+        "cards"
+      ],
+      "cardsColor": [
+        "cards"
+      ],
+      "cardsTagColor": [
+        "cards"
+      ],
+      "cardsTextColor": [
+        "cards"
+      ],
+      "note": [
+        "note"
+      ],
+      "noteColor": [
+        "note"
+      ],
+      "noteX": [
+        "note"
+      ],
+      "noteY": [
+        "note"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerSize": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "paper": [
+        "@page",
+        "marker"
+      ],
+      "font": [
+        "@page",
+        "cards",
+        "index",
+        "label",
+        "marker",
+        "months",
+        "note"
+      ]
+    }
+  },
+  "OverlayGridPoster": {
+    "parts": {
+      "caption": 1
+    },
+    "fields": {
+      "head1": [
+        "@page"
+      ],
+      "head2": [
+        "@page"
+      ],
+      "head3": [
+        "@page"
+      ],
+      "note1": [
+        "@page"
+      ],
+      "note2": [
+        "@page"
+      ],
+      "foot1": [
+        "@page"
+      ],
+      "foot2": [
+        "@page"
+      ],
+      "overlay": [
+        "@page"
+      ],
+      "overlayLow": [
+        "@page"
+      ],
+      "issue": [
+        "@page"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "@page",
+        "caption"
+      ],
+      "fontWeight": [
+        "@page",
+        "caption"
+      ],
+      "paper": [
+        "@page"
+      ],
+      "ink": [
+        "@page",
+        "caption"
+      ],
+      "yellow": [
+        "@page"
+      ],
+      "bigSize": [
+        "@page"
+      ],
+      "smallSize": [
+        "@page"
+      ],
+      "footSize": [
+        "@page",
+        "caption"
+      ],
+      "overlaySize": [
+        "@page"
+      ],
+      "overlayLeading": [
+        "@page"
+      ],
+      "overlayX": [
+        "@page"
+      ],
+      "overlayY": [
+        "@page"
+      ],
+      "lowX": [
+        "@page"
+      ],
+      "lowY": [
+        "@page"
+      ],
+      "row2": [
+        "@page"
+      ],
+      "row3": [
+        "@page"
+      ],
+      "footer": [
+        "@page"
+      ]
+    }
+  },
+  "PhotoGridPoster": {
+    "parts": {
+      "tiles": 40,
+      "accentCells": 2,
+      "title": 1,
+      "counter": 1,
+      "notes": 3,
+      "coords": 3,
+      "index": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "tiles": [
+        "@page",
+        "tiles"
+      ],
+      "notes": [
+        "notes"
+      ],
+      "notePlaces": [
+        "notes"
+      ],
+      "coords": [
+        "coords"
+      ],
+      "counter": [
+        "counter"
+      ],
+      "index": [
+        "index"
+      ],
+      "accentCells": [
+        "accentCells",
+        "counter"
+      ],
+      "font": [
+        "@page",
+        "accentCells",
+        "coords",
+        "counter",
+        "index",
+        "notes",
+        "tiles",
+        "title"
+      ],
+      "fontWeight": [
+        "title"
+      ],
+      "tracking": [
+        "title"
+      ],
+      "paper": [
+        "@page",
+        "counter"
+      ],
+      "ink": [
+        "@page",
+        "accentCells",
+        "coords",
+        "counter",
+        "index",
+        "notes",
+        "tiles",
+        "title"
+      ],
+      "gridColour": [
+        "@page"
+      ],
+      "accent": [
+        "accentCells"
+      ],
+      "columns": [
+        "@page",
+        "accentCells",
+        "coords",
+        "counter",
+        "index",
+        "notes",
+        "tiles",
+        "title"
+      ],
+      "grain": [
+        "@page"
+      ]
+    }
+  },
+  "PixelBurstPoster": {
+    "parts": {
+      "title": 1,
+      "burst": 1,
+      "photo": 1,
+      "stack": 1,
+      "details": 1,
+      "index": 1,
+      "button": 1,
+      "marker": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "titleColor": [
+        "title"
+      ],
+      "titleFont": [
+        "title"
+      ],
+      "titleSize": [
+        "title"
+      ],
+      "titleWeight": [
+        "title"
+      ],
+      "titleX": [
+        "title"
+      ],
+      "titleY": [
+        "title"
+      ],
+      "burstColor": [
+        "burst"
+      ],
+      "burstX": [
+        "@page",
+        "burst",
+        "photo"
+      ],
+      "burstY": [
+        "@page",
+        "burst",
+        "photo"
+      ],
+      "burstSize": [
+        "@page",
+        "burst",
+        "photo"
+      ],
+      "burstPoints": [
+        "@page",
+        "burst"
+      ],
+      "stack": [
+        "stack"
+      ],
+      "stackColor": [
+        "stack"
+      ],
+      "stackSize": [
+        "stack"
+      ],
+      "stackWeight": [
+        "stack"
+      ],
+      "stackX": [
+        "stack"
+      ],
+      "stackY": [
+        "stack"
+      ],
+      "details": [
+        "details"
+      ],
+      "detailsColor": [
+        "details"
+      ],
+      "detailsX": [
+        "details"
+      ],
+      "detailsY": [
+        "details"
+      ],
+      "button": [
+        "button"
+      ],
+      "buttonColor": [
+        "button"
+      ],
+      "buttonX": [
+        "button"
+      ],
+      "buttonY": [
+        "button"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "smallFont": [
+        "burst",
+        "button",
+        "details",
+        "index",
+        "marker",
+        "photo",
+        "stack",
+        "title"
+      ],
+      "smallSize": [
+        "button",
+        "details",
+        "index",
+        "marker"
+      ],
+      "paper": [
+        "@page",
+        "marker"
+      ]
+    }
+  },
+  "PixelCapsPoster": {
+    "parts": {
+      "blackBlocks": 2,
+      "title": 1,
+      "columns": 2,
+      "index": 2,
+      "slots": 2,
+      "blockNumber": 1,
+      "blockLabel": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "titleColor": [
+        "title"
+      ],
+      "titleSize": [
+        "title"
+      ],
+      "titleWeight": [
+        "title"
+      ],
+      "titleX": [
+        "title"
+      ],
+      "titleY": [
+        "title"
+      ],
+      "columns": [
+        "columns"
+      ],
+      "columnsColor": [
+        "columns"
+      ],
+      "columnsX": [
+        "columns"
+      ],
+      "columnsY": [
+        "columns"
+      ],
+      "slots": [
+        "index",
+        "slots"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "blackBlocks": [
+        "blackBlocks"
+      ],
+      "blackBlocksColor": [
+        "blackBlocks"
+      ],
+      "blockNumber": [
+        "blockNumber"
+      ],
+      "blockNumberColor": [
+        "blockNumber"
+      ],
+      "blockNumberX": [
+        "blockNumber"
+      ],
+      "blockNumberY": [
+        "blockNumber"
+      ],
+      "blockLabel": [
+        "blockLabel"
+      ],
+      "blockLabelColor": [
+        "blockLabel"
+      ],
+      "blockLabelX": [
+        "blockLabel"
+      ],
+      "blockLabelY": [
+        "blockLabel"
+      ],
+      "pixelsColor": [
+        "@page"
+      ],
+      "pixelsX": [
+        "@page"
+      ],
+      "pixelsY": [
+        "@page"
+      ],
+      "pixelsW": [
+        "@page"
+      ],
+      "pixelsH": [
+        "@page"
+      ],
+      "pixelCount": [
+        "@page"
+      ],
+      "paper": [
+        "@page",
+        "slots"
+      ],
+      "font": [
+        "@page",
+        "blackBlocks",
+        "blockLabel",
+        "blockNumber",
+        "columns",
+        "index",
+        "slots",
+        "title"
+      ]
+    }
+  },
+  "RedNumberPoster": {
+    "parts": {
+      "title": 1,
+      "index": 1,
+      "columns": 2,
+      "photos": 1,
+      "words": 5,
+      "sides": 3,
+      "number": 1,
+      "marker": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "columns": [
+        "columns"
+      ],
+      "words": [
+        "words"
+      ],
+      "number": [
+        "number"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "font": [
+        "columns",
+        "index",
+        "marker",
+        "number",
+        "photos",
+        "sides",
+        "title",
+        "words"
+      ],
+      "paper": [
+        "@page"
+      ],
+      "ink": [
+        "columns",
+        "index",
+        "marker",
+        "number",
+        "photos",
+        "sides",
+        "title",
+        "words"
+      ],
+      "tint": [
+        "marker",
+        "photos"
+      ],
+      "numberColour": [
+        "number"
+      ],
+      "photoSize": [
+        "marker",
+        "number",
+        "photos",
+        "sides",
+        "words"
+      ]
+    }
+  },
+  "RepeatLineupPoster": {
+    "parts": {
+      "labels": 1,
+      "lineup": 3,
+      "marker": 1,
+      "index": 1,
+      "info": 1,
+      "caption": 1
+    },
+    "fields": {
+      "lineup": [
+        "lineup"
+      ],
+      "info": [
+        "info"
+      ],
+      "labels": [
+        "labels"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "@page",
+        "caption",
+        "index",
+        "info",
+        "labels",
+        "lineup",
+        "marker"
+      ],
+      "paper": [
+        "@page",
+        "index",
+        "marker"
+      ],
+      "ink": [
+        "@page",
+        "caption",
+        "index",
+        "info",
+        "labels",
+        "lineup",
+        "marker"
+      ],
+      "blocks": [
+        "@page"
+      ],
+      "bars": [
+        "@page",
+        "lineup"
+      ],
+      "lines": [
+        "@page"
+      ],
+      "guides": [
+        "@page"
+      ],
+      "accent": [
+        "marker"
+      ],
+      "repeatSize": [
+        "@page",
+        "index",
+        "info",
+        "labels",
+        "lineup",
+        "marker"
+      ],
+      "nameSize": [
+        "index",
+        "lineup",
+        "marker"
+      ]
+    }
+  },
+  "RotatedCardsPoster": {
+    "parts": {
+      "title": 1,
+      "cards": 5,
+      "yearTag": 1,
+      "wordmark": 1,
+      "marker": 1,
+      "index": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "titleColor": [
+        "title"
+      ],
+      "titleSize": [
+        "title"
+      ],
+      "titleWeight": [
+        "title"
+      ],
+      "titleX": [
+        "title"
+      ],
+      "titleY": [
+        "title"
+      ],
+      "cardsPos": [
+        "cards"
+      ],
+      "cards": [
+        "cards"
+      ],
+      "cardsTextColor": [
+        "cards"
+      ],
+      "yearTag": [
+        "yearTag"
+      ],
+      "yearTagColor": [
+        "yearTag"
+      ],
+      "yearTagX": [
+        "yearTag"
+      ],
+      "yearTagY": [
+        "yearTag"
+      ],
+      "wordmark": [
+        "wordmark"
+      ],
+      "wordmarkColor": [
+        "wordmark"
+      ],
+      "wordmarkX": [
+        "wordmark"
+      ],
+      "wordmarkY": [
+        "wordmark"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerSize": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "paper": [
+        "@page",
+        "cards",
+        "marker"
+      ],
+      "font": [
+        "title",
+        "wordmark"
+      ]
+    }
+  },
+  "ScatteredTypePoster": {
+    "parts": {
+      "index": 1,
+      "slots": 4,
+      "blocks": 6,
+      "tags": 2,
+      "marker": 1,
+      "dates": 1,
+      "caption": 1,
+      "corner": 1,
+      "time": 1,
+      "label": 1
+    },
+    "fields": {
+      "dates": [
+        "dates"
+      ],
+      "corner": [
+        "corner"
+      ],
+      "blocks": [
+        "blocks"
+      ],
+      "places": [
+        "blocks"
+      ],
+      "slots": [
+        "index",
+        "slots"
+      ],
+      "tags": [
+        "marker",
+        "tags"
+      ],
+      "tagText": [
+        "tags"
+      ],
+      "time": [
+        "time"
+      ],
+      "label": [
+        "label"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "blocks",
+        "caption",
+        "corner",
+        "dates",
+        "index",
+        "label",
+        "marker",
+        "slots",
+        "tags",
+        "time"
+      ],
+      "paper": [
+        "@page",
+        "label",
+        "marker",
+        "tags"
+      ],
+      "ink": [
+        "blocks",
+        "caption",
+        "corner",
+        "dates",
+        "index",
+        "label",
+        "marker",
+        "slots",
+        "tags",
+        "time"
+      ],
+      "tint": [
+        "slots"
+      ],
+      "accent": [
+        "marker"
+      ],
+      "textSize": [
+        "blocks",
+        "corner",
+        "label"
+      ]
+    }
+  },
+  "SlicedPhotoPoster": {
+    "parts": {
+      "photos": 1,
+      "strips": 7,
+      "phrases": 6,
+      "index": 1,
+      "marker": 1,
+      "code": 1,
+      "caption": 1
+    },
+    "fields": {
+      "phrases": [
+        "phrases"
+      ],
+      "strips": [
+        "@page",
+        "index",
+        "strips"
+      ],
+      "code": [
+        "code"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "@page",
+        "caption",
+        "code",
+        "index",
+        "marker",
+        "photos",
+        "phrases",
+        "strips"
+      ],
+      "paper": [
+        "@page"
+      ],
+      "ink": [
+        "@page",
+        "caption",
+        "code",
+        "index",
+        "marker",
+        "photos",
+        "phrases",
+        "strips"
+      ],
+      "phraseSize": [
+        "marker",
+        "phrases"
+      ],
+      "photoSize": [
+        "@page",
+        "index",
+        "photos",
+        "strips"
+      ]
+    }
+  },
+  "SquareWordsPoster": {
+    "parts": {
+      "caption": 1
+    },
+    "fields": {
+      "words": [
+        "@page"
+      ],
+      "places": [
+        "@page"
+      ],
+      "front": [
+        "@page"
+      ],
+      "body": [
+        "@page"
+      ],
+      "dotLabel": [
+        "@page"
+      ],
+      "index": [
+        "@page"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "@page",
+        "caption"
+      ],
+      "fontWeight": [
+        "@page",
+        "caption"
+      ],
+      "paper": [
+        "@page"
+      ],
+      "tint": [
+        "@page"
+      ],
+      "ink": [
+        "@page",
+        "caption"
+      ],
+      "square": [
+        "@page"
+      ],
+      "dot": [
+        "@page"
+      ],
+      "wordSize": [
+        "@page"
+      ],
+      "bodySize": [
+        "@page",
+        "caption"
+      ],
+      "squareX": [
+        "@page"
+      ],
+      "squareY": [
+        "@page"
+      ],
+      "squareW": [
+        "@page"
+      ],
+      "squareH": [
+        "@page"
+      ],
+      "dotSize": [
+        "@page"
+      ],
+      "dotY": [
+        "@page"
+      ]
+    }
+  },
+  "StackedPlusPoster": {
+    "parts": {
+      "plus": 1,
+      "quarter": 1,
+      "rect": 1,
+      "rows": 5,
+      "marker": 1,
+      "index": 1,
+      "caption": 1
+    },
+    "fields": {
+      "rows": [
+        "rows"
+      ],
+      "rowsColor": [
+        "rows"
+      ],
+      "rowsSize": [
+        "rows"
+      ],
+      "rowsWeight": [
+        "rows"
+      ],
+      "rowsX": [
+        "rows"
+      ],
+      "rowsY": [
+        "rows"
+      ],
+      "noteColor": [
+        "rows"
+      ],
+      "plusColor": [
+        "plus"
+      ],
+      "plusX": [
+        "plus"
+      ],
+      "plusY": [
+        "plus"
+      ],
+      "plusSize": [
+        "plus"
+      ],
+      "quarterColor": [
+        "quarter"
+      ],
+      "quarterX": [
+        "quarter"
+      ],
+      "quarterY": [
+        "quarter"
+      ],
+      "quarterSize": [
+        "quarter"
+      ],
+      "rectColor": [
+        "rect"
+      ],
+      "rectX": [
+        "rect"
+      ],
+      "rectY": [
+        "rect"
+      ],
+      "rectW": [
+        "rect"
+      ],
+      "rectH": [
+        "rect"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerSize": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "captionColor": [
+        "caption"
+      ],
+      "captionX": [
+        "caption"
+      ],
+      "captionY": [
+        "caption"
+      ],
+      "paper": [
+        "@page",
+        "marker"
+      ],
+      "font": [
+        "caption",
+        "index",
+        "marker",
+        "plus",
+        "quarter",
+        "rect",
+        "rows"
+      ]
+    }
+  },
+  "StencilStepsPoster": {
+    "parts": {
+      "rects": 12,
+      "syllables": 6,
+      "tags": 3,
+      "title": 1,
+      "dates": 1,
+      "program": 1,
+      "marker": 1,
+      "index": 1
+    },
+    "fields": {
+      "rects": [
+        "rects"
+      ],
+      "syllables": [
+        "syllables"
+      ],
+      "syllablesColor": [
+        "syllables"
+      ],
+      "syllablesFont": [
+        "syllables"
+      ],
+      "syllablesSize": [
+        "syllables"
+      ],
+      "syllablesCut": [
+        "syllables"
+      ],
+      "tags": [
+        "tags"
+      ],
+      "tagsColor": [
+        "dates",
+        "index",
+        "marker",
+        "program",
+        "tags",
+        "title"
+      ],
+      "tagsTextColor": [
+        "tags"
+      ],
+      "title": [
+        "title"
+      ],
+      "titleColor": [
+        "title"
+      ],
+      "titleX": [
+        "title"
+      ],
+      "titleY": [
+        "title"
+      ],
+      "dates": [
+        "dates"
+      ],
+      "datesColor": [
+        "dates"
+      ],
+      "datesX": [
+        "dates"
+      ],
+      "datesY": [
+        "dates"
+      ],
+      "program": [
+        "program"
+      ],
+      "programColor": [
+        "program"
+      ],
+      "programX": [
+        "program"
+      ],
+      "programY": [
+        "program"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "smallFont": [
+        "dates",
+        "index",
+        "marker",
+        "program",
+        "rects",
+        "syllables",
+        "tags",
+        "title"
+      ],
+      "smallSize": [
+        "dates",
+        "index",
+        "marker",
+        "program",
+        "tags",
+        "title"
+      ],
+      "paper": [
+        "@page"
+      ]
+    }
+  },
+  "StepBlobsPoster": {
+    "parts": {
+      "grid": 1,
+      "blobs": 4,
+      "title": 1,
+      "number": 1,
+      "specs": 5,
+      "contents": 1,
+      "notes": 1,
+      "index": 1,
+      "marker": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "titleColor": [
+        "title"
+      ],
+      "titleFont": [
+        "number",
+        "title"
+      ],
+      "titleSize": [
+        "title"
+      ],
+      "titleWeight": [
+        "number",
+        "title"
+      ],
+      "titleX": [
+        "title"
+      ],
+      "titleY": [
+        "title"
+      ],
+      "number": [
+        "number"
+      ],
+      "numberColor": [
+        "number"
+      ],
+      "numberSize": [
+        "number"
+      ],
+      "numberX": [
+        "number"
+      ],
+      "numberY": [
+        "number"
+      ],
+      "blobs": [
+        "blobs"
+      ],
+      "blobsColor": [
+        "blobs"
+      ],
+      "blobsRound": [
+        "blobs"
+      ],
+      "grid": [
+        "grid"
+      ],
+      "gridColor": [
+        "grid"
+      ],
+      "specs": [
+        "specs"
+      ],
+      "specsColor": [
+        "specs"
+      ],
+      "contents": [
+        "contents"
+      ],
+      "contentsColor": [
+        "contents"
+      ],
+      "contentsX": [
+        "contents"
+      ],
+      "contentsY": [
+        "contents"
+      ],
+      "notes": [
+        "notes"
+      ],
+      "notesColor": [
+        "notes"
+      ],
+      "notesX": [
+        "notes"
+      ],
+      "notesY": [
+        "notes"
+      ],
+      "index": [
+        "index"
+      ],
+      "indexColor": [
+        "index"
+      ],
+      "indexX": [
+        "index"
+      ],
+      "indexY": [
+        "index"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "markerColor": [
+        "marker"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ],
+      "smallFont": [
+        "blobs",
+        "contents",
+        "grid",
+        "index",
+        "marker",
+        "notes",
+        "number",
+        "specs",
+        "title"
+      ],
+      "smallSize": [
+        "contents",
+        "index",
+        "marker",
+        "notes"
+      ],
+      "paper": [
+        "@page"
+      ]
+    }
+  },
+  "TypeGridPoster": {
+    "parts": {
+      "lines": 6,
+      "photos": 3,
+      "arrow": 1,
+      "footer1": 1,
+      "footer2": 1,
+      "footer3": 1,
+      "footer4": 1
+    },
+    "fields": {
+      "lines": [
+        "@page",
+        "lines"
+      ],
+      "footer1": [
+        "footer1"
+      ],
+      "footer2": [
+        "footer2"
+      ],
+      "footer3": [
+        "footer3"
+      ],
+      "footer4": [
+        "footer4"
+      ],
+      "issue": [
+        "@page"
+      ],
+      "caption": [
+        "@page"
+      ],
+      "font": [
+        "@page",
+        "arrow",
+        "footer1",
+        "footer2",
+        "footer3",
+        "footer4",
+        "lines",
+        "photos"
+      ],
+      "fontWeight": [
+        "@page",
+        "arrow",
+        "footer1",
+        "footer2",
+        "footer3",
+        "footer4",
+        "lines",
+        "photos"
+      ],
+      "tracking": [
+        "@page",
+        "arrow",
+        "lines",
+        "photos"
+      ],
+      "paper": [
+        "@page"
+      ],
+      "ink": [
+        "@page",
+        "arrow",
+        "footer1",
+        "footer2",
+        "footer3",
+        "footer4",
+        "lines",
+        "photos"
+      ],
+      "arrowColor": [
+        "arrow"
+      ],
+      "photoTint": [
+        "photos"
+      ],
+      "leading": [
+        "arrow",
+        "lines",
+        "photos"
+      ],
+      "margin": [
+        "@page",
+        "arrow",
+        "footer1",
+        "footer2",
+        "footer3",
+        "footer4",
+        "lines",
+        "photos"
+      ],
+      "footerSize": [
+        "@page",
+        "arrow",
+        "footer1",
+        "footer2",
+        "footer3",
+        "footer4",
+        "lines",
+        "photos"
+      ],
+      "photoGrain": [
+        "photos"
+      ]
+    }
+  },
+  "VerticalTypePoster": {
+    "parts": {
+      "blackCells": 3,
+      "accentCells": 1,
+      "photoCells": 2,
+      "words": 3,
+      "counter": 1,
+      "caption": 1,
+      "list": 1
+    },
+    "fields": {
+      "words": [
+        "words"
+      ],
+      "wordPlaces": [
+        "words"
+      ],
+      "photoCells": [
+        "photoCells"
+      ],
+      "blackCells": [
+        "blackCells"
+      ],
+      "list": [
+        "list"
+      ],
+      "counter": [
+        "counter"
+      ],
+      "accentCells": [
+        "accentCells"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "counter",
+        "words"
+      ],
+      "paper": [
+        "@page",
+        "counter"
+      ],
+      "ink": [
+        "@page",
+        "accentCells",
+        "blackCells",
+        "caption",
+        "counter",
+        "list",
+        "photoCells",
+        "words"
+      ],
+      "accent": [
+        "accentCells"
+      ],
+      "columns": [
+        "@page",
+        "accentCells",
+        "blackCells",
+        "caption",
+        "counter",
+        "list",
+        "photoCells",
+        "words"
+      ],
+      "wordSize": [
+        "words"
+      ],
+      "grain": [
+        "photoCells"
+      ]
+    }
+  },
+  "WhiteShapesPoster": {
+    "parts": {
+      "shapes": 8,
+      "title": 1,
+      "titleAlt": 1,
+      "info": 6,
+      "marker": 1,
+      "index": 1,
+      "caption": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "titleAlt": [
+        "titleAlt"
+      ],
+      "shapes": [
+        "shapes"
+      ],
+      "info": [
+        "info"
+      ],
+      "places": [
+        "info"
+      ],
+      "marker": [
+        "marker"
+      ],
+      "index": [
+        "index"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "caption",
+        "index",
+        "info",
+        "marker",
+        "shapes",
+        "title",
+        "titleAlt"
+      ],
+      "paper": [
+        "@page",
+        "marker"
+      ],
+      "shape": [
+        "shapes"
+      ],
+      "accent": [
+        "caption",
+        "index",
+        "info",
+        "marker",
+        "shapes",
+        "title",
+        "titleAlt"
+      ],
+      "titleSize": [
+        "title",
+        "titleAlt"
+      ],
+      "infoSize": [
+        "caption",
+        "index",
+        "info"
+      ],
+      "markerX": [
+        "marker"
+      ],
+      "markerY": [
+        "marker"
+      ]
+    }
+  },
+  "WideFilmstripPoster": {
+    "parts": {
+      "title": 1,
+      "left": 1,
+      "notes": 2,
+      "photos": 1,
+      "counter": 1,
+      "index": 1,
+      "dates": 1,
+      "venue": 1,
+      "address": 1,
+      "caption": 1
+    },
+    "fields": {
+      "title": [
+        "title"
+      ],
+      "left": [
+        "left"
+      ],
+      "notes": [
+        "notes"
+      ],
+      "dates": [
+        "dates"
+      ],
+      "venue": [
+        "venue"
+      ],
+      "address": [
+        "address"
+      ],
+      "counter": [
+        "counter"
+      ],
+      "index": [
+        "index"
+      ],
+      "caption": [
+        "caption"
+      ],
+      "font": [
+        "@page",
+        "address",
+        "caption",
+        "counter",
+        "dates",
+        "index",
+        "left",
+        "notes",
+        "photos",
+        "title",
+        "venue"
+      ],
+      "titleWeight": [
+        "dates",
+        "title"
+      ],
+      "paper": [
+        "@page",
+        "counter",
+        "photos"
+      ],
+      "ink": [
+        "@page",
+        "address",
+        "caption",
+        "counter",
+        "dates",
+        "index",
+        "left",
+        "notes",
+        "photos",
+        "title",
+        "venue"
+      ],
+      "strip": [
+        "photos"
+      ],
+      "tint": [
+        "photos"
+      ]
+    }
+  }
+}

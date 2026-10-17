@@ -6,6 +6,10 @@ import { TaskProviderName } from '$lib/server/generation/task-providers';
 import { KIE_TEXT_MODELS } from '$lib/server/kie-chat';
 import { kieTextDeps, runKieText } from '$lib/server/kie-text-run';
 import type { AiCallLog } from '$lib/server/ai-log';
+import { kieModelRows } from '$lib/server/kie-catalogue';
+import { taskChoice, wireSpecOf } from '$lib/server/task-choice';
+import { wireInputs } from '$lib/server/generation/wire-inputs';
+import { defaultParamsFor } from '$lib/canvas/gen-node';
 import { nextFits, overspent, planFits, SMOKE_CAP_USD, type SmokeCase } from './provider-smoke-budget';
 
 const SPEND_FLAG = '--spend';
@@ -21,6 +25,7 @@ type Outcome = { costUsd: number | null; bytes: number };
 enum SmokeMedium {
   Text = 'text',
   Image = 'image',
+  ImageWithReference = 'image+reference',
   Video = 'video'
 }
 
@@ -65,6 +70,20 @@ function taskCase(provider: TaskProviderName, medium: SmokeMedium, maxUsd: numbe
       return untilSettled(gateway, taskId);
     }
   };
+}
+
+const REFERENCE_IMAGE = 'https://cdn.wiro.ai/uploads/sampleinputs/nano-banana-2-1-advanced-sampleinput-1.webp';
+
+function nodeCase(kieModel: string, medium: SmokeMedium, maxUsd: number, prompt: string, imageUrls: string[]): ProviderCase {
+  const row = kieModelRows(new Date().toISOString()).find((r) => r.wire_spec?.model === kieModel);
+  const spec = wireSpecOf(row?.wire_spec);
+  if (!row || !spec) {
+    throw new Error(`kie catalogue has no ${kieModel}`);
+  }
+  const params = defaultParamsFor(taskChoice(row));
+  const inputs = wireInputs(spec, { prompt, params, imageUrls, lastFrameUrl: null }, row.param_schema ?? {});
+  const { fields: _fields, ...ref } = spec;
+  return taskCase(TaskProviderName.Kie, medium, maxUsd, ref, inputs);
 }
 
 const openrouterCase: ProviderCase = {
@@ -131,8 +150,9 @@ function flag(prefix: string): string | undefined {
 const CASES: readonly ProviderCase[] = [
   openrouterCase,
   taskCase(TaskProviderName.Wiro, SmokeMedium.Image, 0.02, { owner: 'wiro-partners', project: 'z-image-uncensored' }, { prompt: PROMPT, ratio: '1:1', promptExtend: 'false' }),
-  taskCase(TaskProviderName.Kie, SmokeMedium.Image, 0.05, { model: 'nano-banana-2' }, { prompt: PROMPT, resolution: '1K', aspect_ratio: '1:1' }),
-  taskCase(TaskProviderName.Kie, SmokeMedium.Video, 0.08, { model: 'grok-imagine/text-to-video', numeric: ['duration'] }, { prompt: VIDEO_PROMPT, resolution: '480p', duration: '6', aspect_ratio: '9:16' }),
+  nodeCase('nano-banana-2', SmokeMedium.Image, 0.05, PROMPT, []),
+  { ...nodeCase('nano-banana-2', SmokeMedium.Image, 0.05, PROMPT, [REFERENCE_IMAGE]), medium: SmokeMedium.ImageWithReference },
+  nodeCase('grok-imagine/text-to-video', SmokeMedium.Video, 0.08, VIDEO_PROMPT, []),
   kieTextCase(0.001),
   higgsfieldCase(0.15)
 ];

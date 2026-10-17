@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { PropFormat, customValues, Strictness } from '$lib/motion/custom/component';
 import { composeHtml } from '$lib/motion/hyperframes/compose';
-import { partFieldKeys } from '$lib/motion/inspector';
+import { partUsage } from '$lib/motion/part-usage';
 import { PartEdit, editablePart, parsePart } from '$lib/motion/poster-parts';
 import type { MotionClip } from '$lib/motion/doc';
 import { POSTER_BATCH_6 } from './poster-batch-6';
@@ -47,10 +47,11 @@ describe.each(POSTER_BATCH_6)('the %s poster', (_id, entry, name) => {
     expect(text.filter((p) => editablePart(doc, clip, p) !== PartEdit.Text)).toEqual([]);
   });
 
-  it('gives every part its own colour, or a photo fill', () => {
+  it('gives every part a colour that reaches it, or a photo fill', () => {
+    const usage = partUsage(name)!;
     const colourless = fields.filter((field) => {
-      const own = partFieldKeys(doc, clip, field).filter((k) => k !== field && schema[k]?.format === PropFormat.Color);
-      return schema[field]?.format !== PropFormat.Media && !own.length;
+      const reaching = Object.keys(schema).filter((k) => schema[k]?.format === PropFormat.Color && usage.fields[k]?.includes(field));
+      return schema[field]?.format !== PropFormat.Media && !reaching.length && !(`${field}Color` in schema);
     });
     expect(colourless).toEqual([]);
   });

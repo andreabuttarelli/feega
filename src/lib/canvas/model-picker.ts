@@ -51,7 +51,12 @@ function itemsOf(choices: ModelChoice[]): ModelMenuGroup['items'] {
 export function modelGroupsOf(choices: ModelChoice[]): ModelMenuGroup[] {
   const recommended = recommendedFirst(choices);
   const head = recommended.length ? [{ id: RECOMMENDED_GROUP, label: 'Recommended', items: itemsOf(recommended) }] : [];
-  const providers = groupByProvider(choices).map((g) => ({ id: g.provider, label: g.providerLabel, items: itemsOf(g.choices) }));
+  const modes = [...new Set(choices.map((c) => c.menuGroup).filter((g): g is string => Boolean(g)))].map((group) => ({
+    id: group,
+    label: group,
+    items: itemsOf(choices.filter((c) => c.menuGroup === group))
+  }));
+  const providers = groupByProvider(choices.filter((c) => !c.menuGroup)).map((g) => ({ id: g.provider, label: g.providerLabel, items: itemsOf(g.choices) }));
 
-  return [...head, ...providers];
+  return [...head, ...modes, ...providers];
 }

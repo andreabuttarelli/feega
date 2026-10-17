@@ -80,8 +80,8 @@ export function planBatch(input: PlanInput): BatchPlan {
   return { items, skipped, overLimit: items.length > BATCH_MAX };
 }
 
-export function cellKey(item: Pick<PlannedItem, 'environment' | 'shot' | 'influencerId'>): string {
-  return `${item.environment}|${item.shot}|${item.influencerId ?? '-'}`;
+export function cellKey(item: Pick<PlannedItem, 'productIndex' | 'environment' | 'shot' | 'influencerId' | 'variation'>): string {
+  return `${item.productIndex}|${item.environment}|${item.shot}|${item.influencerId ?? '-'}|${item.variation}`;
 }
 
 const FIDELITY =

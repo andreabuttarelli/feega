@@ -4,9 +4,9 @@ import { CUSTOM_CLIP } from '$lib/motion/poster-parts';
 import type { MotionDoc } from '$lib/motion/doc';
 
 type Parts = Record<string, string[]>;
-type Schema = { properties?: Record<string, { default?: unknown }> };
+export type Schema = { properties?: Record<string, { default?: unknown }> };
 
-const PART_ATTR = 'data-part';
+export const PART_ATTR = 'data-part';
 const CONTEXT = 'root,props,tl,duration,fps,assets,brand,rand,param,format,motion';
 
 let trusted: ReadonlySet<string> | null = null;
@@ -18,18 +18,27 @@ function builtinSources(): ReadonlySet<string> {
 
 const inert: object = new Proxy(() => inert, { get: () => inert, apply: () => inert });
 
-const defaultsOf = (schema: Schema) => Object.fromEntries(Object.entries(schema.properties ?? {}).map(([key, spec]) => [key, spec.default]));
+export const defaultsOf = (schema: Schema) => Object.fromEntries(Object.entries(schema.properties ?? {}).map(([key, spec]) => [key, spec.default]));
 
-function renderedParts(js: string, props: Record<string, unknown>, size: { width: number; height: number }): string[] {
+export type Size = { width: number; height: number };
+
+export function renderRoot(js: string, props: Record<string, unknown>, size: Size): HTMLElement | null {
   const { document } = parseHTML(`<html><body><div style="width:${size.width}px;height:${size.height}px"></div></body></html>`);
   const root = document.body.firstElementChild as unknown as HTMLElement;
   const run = new Function('ctx', 'document', 'window', `"use strict";const {${CONTEXT}}=ctx;{\n${js}\n}`);
   try {
     run({ root, props, tl: inert, duration: 1, fps: 30, assets: {}, brand: { name: '', colors: {}, logoUrl: null }, rand: () => 0.5, param: inert, format: inert, motion: inert }, document, undefined);
   } catch {
-    return [];
+    return null;
   }
-  return [...root.querySelectorAll(`[${PART_ATTR}]`)].map((el) => el.getAttribute(PART_ATTR) ?? '').filter(Boolean);
+  return root;
+}
+
+export const partIdsIn = (root: HTMLElement): string[] => [...root.querySelectorAll(`[${PART_ATTR}]`)].map((el) => el.getAttribute(PART_ATTR) ?? '').filter(Boolean);
+
+function renderedParts(js: string, props: Record<string, unknown>, size: Size): string[] {
+  const root = renderRoot(js, props, size);
+  return root ? partIdsIn(root) : [];
 }
 
 export function staticParts(doc: MotionDoc): Parts {

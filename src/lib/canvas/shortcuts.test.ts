@@ -219,3 +219,10 @@ describe('la scheda che le elenca', () => {
     }
   });
 });
+
+describe('stacking order', () => {
+  it('⌘] brings the selection to the front and ⌘[ sends it to the back', () => {
+    expect(matchCanvasShortcut(ev(']', { metaKey: true }))).toEqual({ id: 'bring-front' });
+    expect(matchCanvasShortcut(ev('[', { ctrlKey: true }))).toEqual({ id: 'send-back' });
+  });
+});

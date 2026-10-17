@@ -7,7 +7,7 @@ import { creditsForRun } from '$lib/canvas/gen-cost';
 const rowOf = (title: string) => wiroModelRow(fixture.tool.find((t) => t.title === title)!, '2026-09-29T00:00:00.000Z')!;
 
 describe('a synced Wiro row becomes a model choice', () => {
-  it('groups under Wiro, carries the uncensored flag and the controls it declares', () => {
+  it('groups under Wiro, carries the uncensored flag and the controls it declares, and takes no image', () => {
     const choice = taskChoice(rowOf('Wan 3.0 Uncensored Video Generator'));
 
     expect(choice).toMatchObject({
@@ -19,7 +19,7 @@ describe('a synced Wiro row becomes a model choice', () => {
       durationOptions: [5, 10, 15, 20, 25, 30],
       minDuration: 5,
       maxDuration: 30,
-      maxRefs: 1
+      maxRefs: 0
     });
     expect(choice.aspectRatios).toContain('9:16');
     expect(choice.params?.map((p) => p.name)).toEqual(expect.arrayContaining(['audioEnabled', 'promptExtend']));

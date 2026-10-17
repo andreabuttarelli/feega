@@ -39,7 +39,7 @@ export enum NodeIcon {
   Video = 'video'
 }
 
-export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean };
+export type CanvasLayer = { id: string; type: string; name: string | null; head?: number | null; poster?: string | null; still?: boolean; element?: boolean };
 export type OpenVideo = { nodeId: string; doc: MotionDoc; parts?: Record<string, readonly string[]>; mode?: EditMode };
 
 const FRAME_TYPE = 'motion';
@@ -60,6 +60,7 @@ export type LayerRow = {
   nested: boolean;
   thumb?: string | null;
   foldable?: boolean;
+  element?: boolean;
 };
 
 type Track = MotionDoc['tracks'][number];
@@ -177,8 +178,8 @@ function childRows(nodeId: string, open: OpenVideo | null, outlines: FrameOutlin
 
 export function layerRows(nodes: readonly CanvasLayer[], open: OpenVideo | null, outlines: FrameOutlines = {}, folded: ReadonlySet<string> = new Set()): LayerRow[] {
   return nodes.flatMap((node) => {
-    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null };
-    return folded.has(node.id) ? [row] : [row, ...childRows(node.id, open, outlines, folded)];
+    const row: LayerRow = { id: node.id, key: node.id, kind: LayerKind.Node, depth: NODE_DEPTH, label: node.name || NODE_KIND_LABEL[node.type as NodeType] || node.type, type: nodeIcon(node), nodeId: node.id, hidden: false, locked: false, nested: false, thumb: node.poster ?? null, element: node.element || undefined };
+    return folded.has(node.id) || node.element ? [row] : [row, ...childRows(node.id, open, outlines, folded)];
   });
 }
 
@@ -350,8 +351,10 @@ export function selectedLayers({ canvas, video }: LayerSelection): readonly stri
   return video?.selection.length ? video.selection : canvas;
 }
 
+const elementPicked = (row: LayerRow, selection: LayerSelection): boolean => selection.video?.nodeId === row.id || selection.canvas.includes(row.id);
+
 export const rowPicked = (row: LayerRow, selection: LayerSelection): boolean =>
-  selectedLayers(selection).includes(row.id) && (row.kind === LayerKind.Node || row.nodeId === selection.video?.nodeId);
+  row.element ? elementPicked(row, selection) : selectedLayers(selection).includes(row.id) && (row.kind === LayerKind.Node || row.nodeId === selection.video?.nodeId);
 
 export type LayerHover = { nodeId: string; id: string } | null;
 

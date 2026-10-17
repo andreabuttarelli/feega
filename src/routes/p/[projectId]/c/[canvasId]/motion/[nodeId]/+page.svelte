@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import MotionEditorShell from '$lib/components/motion/MotionEditorShell.svelte';
+  import PageZoomLock from '$lib/components/canvas/PageZoomLock.svelte';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
@@ -35,4 +36,5 @@
   });
 </script>
 
+<PageZoomLock />
 <MotionEditorShell {data} />

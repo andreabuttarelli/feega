@@ -27,12 +27,11 @@ async function syncProducts(db: Db, orgId: string, projectId: string | null, nod
     platform: parsed.platform,
     storeUrl,
     limit: parsed.limit,
-    after: parsed.after,
     onlyFirstPhoto: parsed.onlyFirstPhoto,
     category: parsed.category
   });
 
-  return outcome.ok ? { ok: true, synced: outcome.synced, extra: { after: outcome.after, sync_summary: outcome.summary } } : outcome;
+  return outcome.ok ? { ok: true, synced: outcome.synced, extra: { sync_summary: outcome.summary } } : outcome;
 }
 
 const PLATFORM_LABELS: Record<string, string> = {

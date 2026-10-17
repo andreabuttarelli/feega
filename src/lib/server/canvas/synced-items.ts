@@ -3,7 +3,7 @@ import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { listNodeProducts } from '$lib/server/repos/products';
 import { listNodeSocialPosts } from '$lib/server/repos/social-posts';
 import { productItem, socialPostItem, type PostRow, type ProductRow, type SelectableItem } from '$lib/canvas/select-sources';
-import { outputValues, type CustomOutput, type OutputValue } from '$lib/canvas/select-outputs';
+import { outputValues, sourceOutputValues, type CustomOutput, type OutputValue } from '$lib/canvas/select-outputs';
 import { feedFiltersOf, filterPosts, filterProducts, productFiltersOf } from '$lib/canvas/source-filters';
 
 export type SyncedRows =
@@ -34,4 +34,8 @@ export function outputsAt(synced: SyncedRows, index: number, custom: readonly Cu
   return synced.type === 'products'
     ? outputValues('products', synced.rows[index - 1], custom)
     : outputValues('social_account_feed', synced.rows[index - 1], custom);
+}
+
+export function sourceOutputsOf(synced: SyncedRows): Record<string, OutputValue> {
+  return synced.type === 'products' ? sourceOutputValues('products', synced.rows) : sourceOutputValues('social_account_feed', synced.rows);
 }

@@ -3,6 +3,7 @@ import { THREE_D_COMPONENTS, type ComponentId } from '../components';
 import { Ease, TransitionKind, type Edge } from '../design';
 import { EASE_NAME, easeName } from '../keyframes';
 import { Background, clipsOf, type MotionClip, type MotionDoc } from '../doc';
+import { stillSeconds } from '../still';
 import { resolveColor, type BrandTokens } from '../brand';
 import { css, esc, js, seconds } from './html';
 import { DEVICE_OVERSCAN, TEMPLATES, Timing, type PropsOf, type TemplateCtx, type Tween, type Vars } from './templates';
@@ -39,6 +40,7 @@ import { STAGE_CSS, stageRootStyle, stageScript } from './stage';
 import { shapeScript, shapeStudy, type ShapeBake } from './shapes';
 import { photoFills } from '../fill/model';
 import { resolveFills } from '../fill/render';
+import { partStyleTag } from './part-styles';
 import type { Extent } from '../shape/render';
 import { TEXT_PATH_CSS, textPathBake, textPathScript, textPathTemplate, type TextPathBake } from './text-path';
 import { particleBake, particleScript } from './particles';
@@ -352,6 +354,10 @@ function untrimmed(tweens: Tween[], clipStart: number, trimmed: number): Tween[]
     }
     return at >= clipStart ? [{ ...t, at }] : [{ ...t, at: clipStart, duration: end - clipStart }];
   });
+}
+
+function settledBy(tweens: Tween[], still: number | null): Tween[] {
+  return still === null ? tweens : tweens.filter((t) => t.at + t.duration <= still);
 }
 
 function heldUntilStart(tweens: Tween[], clipStart: number): Hold[] {
@@ -676,7 +682,7 @@ export function composeHtml(raw: ComposeInput): string {
       const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(filtered, ctx, placed, template.html(ctx as never));
       (onStage.has(clip.id) && !group && !hidden.has(clip.id) ? world : layers).push(html);
       effectSets.push(...(group ? group.effects(clip, ctx) : effectTimeline(filtered, ctx, ctx.color, paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null))));
-      const own = untrimmed(template.tweens?.(ctx as never) ?? [], ctx.start, ctx.mediaStart);
+      const own = settledBy(untrimmed(template.tweens?.(ctx as never) ?? [], ctx.start, ctx.mediaStart), stillSeconds(doc));
       tweens.push(...edgeTweens(clip, doc.fps), ...moveTweens(clip, doc.fps), ...own);
       holds.push(...heldUntilStart(own, ctx.start));
       if (THREE_D_COMPONENTS.includes(clip.component)) {
@@ -755,6 +761,7 @@ export function composeHtml(raw: ComposeInput): string {
     HOT_OPEN,
     stage ? `<style>${stageRootStyle(stage)}</style><div id="world" class="world">${world.join('')}</div><!--/world-->` : '',
     layers.join(''),
+    partStyleTag(clips, (v) => resolveColor(v, tokens), (id) => (id ? (input.assets[id] ?? null) : null)),
     fontProbe(doc),
     HOT_CLOSE,
     '</div>',

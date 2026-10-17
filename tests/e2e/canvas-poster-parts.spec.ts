@@ -7,6 +7,24 @@ const SHOTS = process.env.CANVAS_MOTION_SHOTS;
 const TITLE_LINE = 'lines:0';
 const TYPED = 'HELLO';
 
+const PINK_RGB = 'rgb(255, 0, 170)';
+const INK_RGB = 'rgb(22, 22, 22)';
+
+async function previewColours(page: Page): Promise<(string | null)[][]> {
+  const previews = page.frames().filter((f) => f !== page.mainFrame());
+  const colours = await Promise.all(
+    previews.map((frame) =>
+      frame
+        .evaluate((ids) => ids.map((id) => {
+          const word = document.querySelector(`[data-part="${id}"] .tg-word`);
+          return word ? getComputedStyle(word).color : null;
+        }), [TITLE_LINE, 'lines:1'])
+        .catch(() => [])
+    )
+  );
+  return colours.filter((c) => c.length && c[0]);
+}
+
 async function shoot(page: Page, name: string) {
   if (SHOTS) {
     await page.screenshot({ path: `${SHOTS}/${name}.png` });
@@ -49,23 +67,30 @@ test.describe('poster parts on the canvas @real', () => {
     const inspector = page.getByTestId('motion-inspector');
     await expect(page.getByTestId('part-text'), 'a line shows only its own text').toHaveValue('STUDIO');
     await expect(inspector.locator('#f-lines'), 'never the raw lines with their markers').toHaveCount(0);
-    await expect(inspector.locator('#f-ink')).toBeVisible();
-    await expect(inspector.locator('[data-prop="fill"]')).toBeVisible();
+    await expect(inspector.locator('#f-paper'), 'never the poster background').toHaveCount(0);
+    await expect(inspector.locator('#f-ink'), 'the colour every line shares hides behind its subsection').toBeHidden();
+    await expect(inspector.getByTestId('part-shared')).toContainText('Shared with');
+    await expect(inspector.getByTestId('part-fill').getByTestId('fill-row')).toHaveCount(1);
     await shoot(page, '8b-poster-part-properties');
 
-    const ink = '#ff00aa';
-    await inspector.locator('#f-ink').evaluate((el: HTMLInputElement, value: string) => {
-      el.value = value;
-      el.dispatchEvent(new Event('change', { bubbles: true }));
-    }, ink);
+    const pink = '#ff00aa';
+    await inspector.getByTestId('part-fill').getByTestId('fill-swatch').click();
+    const hex = inspector.getByTestId('part-fill').getByTestId('fill-editor').locator('input.hex');
+    await hex.fill(pink);
+    await hex.press('Enter');
 
     await expect
       .poll(async () => {
         const { data } = await admin.from('motion_revisions').select('doc').eq('node_id', node.id).order('version', { ascending: false }).limit(1);
-        const doc = data?.[0]?.doc as { tracks: { clips: { id: string; props: { ink?: string } }[] }[] } | undefined;
-        return doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'poster')?.props.ink;
+        const doc = data?.[0]?.doc as { tracks: { clips: { id: string; props: { ink?: string }; partStyles?: Record<string, { fills: { color?: string }[] }> }[] }[] } | undefined;
+        const clip = doc?.tracks.flatMap((t) => t.clips).find((c) => c.id === 'poster');
+        return [clip?.partStyles?.[TITLE_LINE]?.fills[0]?.color, clip?.props.ink];
       }, { timeout: 10_000 })
-      .toBe(ink);
+      .toEqual([pink, poster.tracks.flatMap((t) => t.clips).find((c) => c.id === 'poster')?.props.ink]);
+    await expect
+      .poll(async () => (await previewColours(page)).find(([title]) => title === PINK_RGB), { timeout: 15_000 })
+      .toEqual([PINK_RGB, INK_RGB]);
+    await shoot(page, '8c-poster-part-recoloured');
     await expect(page.getByTestId('editor-stage'), 'an edit never hides the stage behind the old picture').toHaveAttribute('data-shown', 'true');
     await expect(part, 'an edit keeps the part selected while the preview reloads').toHaveAttribute('data-part', TITLE_LINE, { timeout: 500 });
 
