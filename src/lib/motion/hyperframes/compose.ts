@@ -110,7 +110,7 @@ export enum Target {
 
 export type Inlined = Partial<Record<Script, string>>;
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery; vars?: VarValues };
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery; vars?: VarValues; only?: ReadonlySet<string> };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -631,10 +631,20 @@ function zoomed(doc: MotionDoc, scale: number): string {
   return `#root{width:${doc.width}px;height:${doc.height}px${scale === 1 ? '' : `;zoom:${scale}`}}`;
 }
 
+const SKELETON: ReadonlySet<ComponentId> = new Set(['Precomp', 'Null', 'Audio']);
+
+function onlyClips(doc: MotionDoc, only: ReadonlySet<string> | undefined): MotionDoc {
+  if (!only) {
+    return doc;
+  }
+  const kept = (c: MotionClip) => only.has(c.id) || SKELETON.has(c.component);
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).filter(kept) })) };
+}
+
 export function composeHtml(raw: ComposeInput): string {
   const shown = withAutoLayout(withoutHidden(boundDoc(withVars(raw.doc, raw.vars))));
   const junctions = junctionTweens(shown, junctionPairs(shown));
-  const prepared = bakePaths(withoutBackdrop(flattenComps(withJunctions(shown))));
+  const prepared = bakePaths(withoutBackdrop(onlyClips(flattenComps(withJunctions(shown)), raw.only)));
   const input = { ...raw, doc: bakePhysics(bakeExpressions(prepared, raw.analyses)) };
   const { doc, tokens } = input;
   const delivery: Delivery = { origin: raw.origin ?? defaultOrigin(), inlined: raw.inlined ?? {}, modules: raw.modules ?? {}, runtime: raw.runtime ?? RuntimeDelivery.Inline };

@@ -1,9 +1,11 @@
 import { Texture } from 'pixi8';
 import { fitRect, logoRect } from './fit';
+import { PAINT_PATTERN, patternOf } from './fill-pattern';
 import { scaleOf, type Size } from './matrix';
 import { PaintKind } from './paint-of';
 import type { Placement } from './renderer';
-import type { Drawn, Paint } from './scene';
+import type { Drawn, Paint, SceneLayer } from './scene';
+import type { TextRaster } from './text-layout';
 
 type Of<K extends PaintKind> = Extract<Paint, { kind: K }>;
 
@@ -12,7 +14,7 @@ const MAX_RASTER = 3;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const VIDEO_TIMEOUT_MS = 3000;
 
-export type Painter = { prepare: (items: Drawn[], t: number) => Promise<void>; place: (d: Drawn) => Placement | null; fill: (color: string, size: Size) => Texture };
+export type Painter = { texts: (rasters: Map<SceneLayer, TextRaster>) => void; prepare: (items: Drawn[], t: number) => Promise<void>; place: (d: Drawn) => Placement | null; fill: (color: string, size: Size) => Texture };
 
 function picture(src: string): Promise<HTMLImageElement> {
   return new Promise((ok, ko) => {
@@ -26,23 +28,27 @@ function picture(src: string): Promise<HTMLImageElement> {
 
 const rasterScale = (d: Drawn) => Math.min(MAX_RASTER, Math.max(1, Math.ceil(scaleOf(d.matrix) * RASTER_STEPS) / RASTER_STEPS));
 
-function svgUrl(markup: string, size: Size, scale: number): string {
+function svgUrl(markup: string, size: Size, scale: number, pad: number): string {
   const doc = new DOMParser().parseFromString(markup, 'image/svg+xml');
   const svg = doc.documentElement;
+  const [x = 0, y = 0, w = size.width, h = size.height] = (svg.getAttribute('viewBox') ?? '').split(/\s+/).filter(Boolean).map(Number);
+  const unit = w / size.width;
   svg.setAttribute('xmlns', SVG_NS);
-  svg.setAttribute('width', String(size.width * scale));
-  svg.setAttribute('height', String(size.height * scale));
+  svg.setAttribute('viewBox', `${x - pad * unit} ${y - pad * unit} ${w + 2 * pad * unit} ${h + 2 * pad * unit}`);
+  svg.setAttribute('width', String((size.width + 2 * pad) * scale));
+  svg.setAttribute('height', String((size.height + 2 * pad) * scale));
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(svg))}`;
 }
-
-const PATTERN: Record<string, (pen: CanvasRenderingContext2D, size: Size, accent: string) => void> = {};
 
 function fillCanvas(color: string, pattern: string, size: Size): HTMLCanvasElement {
   const canvas = Object.assign(document.createElement('canvas'), { width: size.width, height: size.height });
   const pen = canvas.getContext('2d') as CanvasRenderingContext2D;
   pen.fillStyle = color || 'transparent';
   pen.fillRect(0, 0, size.width, size.height);
-  PATTERN[pattern]?.(pen, size, color);
+  const found = patternOf(pattern);
+  if (found) {
+    PAINT_PATTERN[found.kind](pen, size, found.color);
+  }
   return canvas;
 }
 
@@ -63,6 +69,7 @@ export function createPainter(): Painter {
   const loaded = new Map<string, { texture: Texture; natural: Size }>();
   const videos = new Map<string, { el: HTMLVideoElement; texture: Texture | null }>();
   const fills = new Map<string, Texture>();
+  const texts = new Map<SceneLayer, Texture>();
 
   const load = (key: string, src: string) => {
     if (!images.has(key)) {
@@ -91,10 +98,11 @@ export function createPainter(): Painter {
 
   const PREPARE: Record<PaintKind, (d: Drawn, t: number) => Promise<unknown>> = {
     [PaintKind.Fill]: async () => {},
+    [PaintKind.Text]: async () => {},
     [PaintKind.Html]: async () => {},
     [PaintKind.Shape]: (d) => {
       const paint = d.paint as Of<PaintKind.Shape>;
-      return load(shapeKey(d), svgUrl(paint.markup, paint.size, rasterScale(d)));
+      return load(shapeKey(d), svgUrl(paint.markup, paint.size, rasterScale(d), paint.pad));
     },
     [PaintKind.Image]: (d) => load((d.paint as Of<PaintKind.Image>).src, (d.paint as Of<PaintKind.Image>).src),
     [PaintKind.Logo]: (d) => load((d.paint as Of<PaintKind.Logo>).src, (d.paint as Of<PaintKind.Logo>).src),
@@ -119,13 +127,18 @@ export function createPainter(): Painter {
 
   const PLACE: Record<PaintKind, (d: Drawn) => Placement | null> = {
     [PaintKind.Html]: () => null,
+    [PaintKind.Text]: (d) => {
+      const texture = texts.get(d.layer);
+      return texture ? whole(texture, d.content) : null;
+    },
     [PaintKind.Fill]: (d) => {
       const paint = d.paint as Of<PaintKind.Fill>;
       return whole(fill(paint.color, d.content, paint.pattern), d.content);
     },
     [PaintKind.Shape]: (d) => {
       const entry = loaded.get(shapeKey(d));
-      return entry ? whole(entry.texture, d.content) : null;
+      const { pad } = d.paint as Of<PaintKind.Shape>;
+      return entry ? { texture: entry.texture, rect: [-pad, -pad, d.content.width + 2 * pad, d.content.height + 2 * pad] } : null;
     },
     [PaintKind.Image]: (d) => {
       const paint = d.paint as Of<PaintKind.Image>;
@@ -144,6 +157,7 @@ export function createPainter(): Painter {
   };
 
   return {
+    texts: (rasters) => rasters.forEach((r, layer) => texts.set(layer, Texture.from(r.canvas))),
     prepare: async (items, t) => {
       await Promise.all(items.map((d) => PREPARE[d.paint.kind](d, t).catch(() => null)));
     },

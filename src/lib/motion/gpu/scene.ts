@@ -8,15 +8,16 @@ export type Quad = [Point, Point, Point, Point];
 
 export type Paint =
   | { kind: PaintKind.Fill; color: string; pattern: string }
-  | { kind: PaintKind.Shape; markup: string; size: Size }
+  | { kind: PaintKind.Shape; markup: string; size: Size; pad: number }
   | { kind: PaintKind.Image; src: string; fit: string }
   | { kind: PaintKind.Video; src: string; fit: string; start: number; duration: number; mediaStart: number; rate: number; element: Element }
   | { kind: PaintKind.Logo; src: string }
+  | { kind: PaintKind.Text; box: HTMLElement; leaf: HTMLElement }
   | { kind: PaintKind.Html };
 
-type Link = { el: HTMLElement; size: Size; offset: Point; perspectiveFor: boolean };
+export type Link = { el: HTMLElement; size: Size; offset: Point; perspectiveFor: boolean };
 
-export type SceneLayer = { clip: string; paint: Paint; links: Link[]; windows: [number, number][]; z: number[]; order: number; content: Size; blend: string };
+export type SceneLayer = { clip: string; paint: Paint; links: Link[]; windows: [number, number][]; z: number[]; order: number; content: Size; blend: string; covers: string[] };
 
 type Timeline = { seek: (t: number) => void };
 
@@ -26,8 +27,10 @@ export type Drawn = { clip: string; layer: SceneLayer; paint: Paint; quad: Quad;
 
 const ROOT_BG = /#root\{background:([^};]+)/;
 const TIMELINE_MARK = `__timelines[${JSON.stringify(COMPOSITION_ID)}]=tl`;
-const INSET_CLASSES = ['layer', 'fx', 'kp', 'kf', 'ks', 'cc', 'kpc', 'kc', 'ksc'];
-const NO_EFFECT = /mask|url\(|backdrop/;
+const INSET_CLASSES = ['layer', 'fx', 'kp', 'kf', 'ks', 'cc', 'kpc', 'kc', 'ksc', 'ef'];
+const NO_EFFECT = /mask|backdrop/;
+const FILTER_REF = /url\("?#([^")]+)"?\)/;
+const PAINTS = 'img,svg:not(.efd),video,canvas,iframe,[style*="background"],[style*="border"]';
 
 const px = (v: string | null | undefined) => parseFloat(v ?? '') || 0;
 
@@ -48,6 +51,27 @@ function boxedChild(el: Element): boolean {
   return el.parentElement?.classList.contains('mv') === true && el.parentElement.parentElement?.classList.contains('box') === true;
 }
 
+const STROKE_WIDTH = /stroke-width[:=]\s*"?([\d.]+)/g;
+const STROKE_SLACK = 1;
+
+export function strokePad(markup: string): number {
+  const widths = [...markup.matchAll(STROKE_WIDTH)].map((m) => Number(m[1]));
+  return widths.length ? Math.ceil(Math.max(...widths) / 2) + STROKE_SLACK : 0;
+}
+
+const TEXT_EXTRAS = '.tu,.tw,.tg,img,svg,video,canvas';
+
+function textParts(layer: Element): { el: HTMLElement; paint: Paint }[] {
+  const block = layer.querySelector('[data-fit]') as HTMLElement | null;
+  if (!block || !boxedChild(block) || block.querySelector(TEXT_EXTRAS) || layer.querySelectorAll('[data-fit]').length !== 1) {
+    return [];
+  }
+  const box = block.parentElement!.parentElement as HTMLElement;
+  const lines = [...block.querySelectorAll('.li')] as HTMLElement[];
+  const whole = block.tagName === 'SPAN' ? block.parentElement! : block;
+  return (lines.length ? lines : [whole]).map((leaf) => ({ el: leaf, paint: { kind: PaintKind.Text, box, leaf } }));
+}
+
 function paintOf(layer: Element): { el: HTMLElement; paint: Paint } | null {
   const fx = layer.querySelector(':scope > .fx');
   const fill = fx?.querySelector(':scope > div:not([class])') as HTMLElement | null;
@@ -56,7 +80,7 @@ function paintOf(layer: Element): { el: HTMLElement; paint: Paint } | null {
   }
   const svg = layer.querySelector('svg[id^="sv-"]') as HTMLElement | null;
   if (svg && svg.parentElement?.id.startsWith('sh-') && boxedChild(svg.parentElement)) {
-    return { el: svg, paint: { kind: PaintKind.Shape, markup: svg.outerHTML, size: { width: px(svg.getAttribute('width')), height: px(svg.getAttribute('height')) } } };
+    return { el: svg, paint: { kind: PaintKind.Shape, markup: svg.outerHTML, size: { width: px(svg.getAttribute('width')), height: px(svg.getAttribute('height')) }, pad: strokePad(svg.outerHTML) } };
   }
   const img = layer.querySelector('img') as HTMLImageElement | null;
   if (img && boxedChild(img) && layer.querySelectorAll('img,video,svg').length === 1) {
@@ -87,6 +111,7 @@ const insetFull = (el: HTMLElement) => INSET_CLASSES.some((c) => el.classList.co
 function contentSize(paint: Paint, parent: Size): Size {
   const SIZE: Record<PaintKind, () => Size> = {
     [PaintKind.Fill]: () => parent,
+    [PaintKind.Text]: () => parent,
     [PaintKind.Shape]: () => (paint as Extract<Paint, { kind: PaintKind.Shape }>).size,
     [PaintKind.Image]: () => parent,
     [PaintKind.Video]: () => parent,
@@ -125,9 +150,24 @@ function windowsOf(chain: HTMLElement[], paint: Paint): [number, number][] {
   return paint.kind === PaintKind.Video ? [...timed, [paint.start, paint.start + paint.duration]] : timed;
 }
 
-const zOf = (chain: HTMLElement[]) => chain.filter((el) => el.classList.contains('layer')).map((el) => Number(el.style.zIndex) || 0);
+const zOf = (chain: HTMLElement[]) => chain.filter((el) => el.classList.contains('layer') || el.dataset.clip !== undefined).map((el) => Number(el.style.zIndex) || 0);
 
-const effectFree = (chain: HTMLElement[]) => chain.every((el) => !NO_EFFECT.test(el.getAttribute('style') ?? '') && !el.classList.contains('matte-src'));
+function gaussianOf(el: HTMLElement): number | null {
+  const ref = FILTER_REF.exec(el.style.filter)?.[1];
+  if (!ref) {
+    return 0;
+  }
+  const filter = el.ownerDocument.getElementById(ref);
+  const steps = filter ? [...filter.children] : [];
+  if (!steps.length || steps.some((s) => s.tagName.toLowerCase() !== 'fegaussianblur' || (s.getAttribute('in') ?? 'SourceGraphic') !== 'SourceGraphic')) {
+    return null;
+  }
+  return steps.reduce((sum, s) => sum + (parseFloat(s.getAttribute('stdDeviation') ?? '0') || 0), 0);
+}
+
+const effectFree = (chain: HTMLElement[]) => chain.every((el) => !NO_EFFECT.test(el.getAttribute('style') ?? '') && !el.classList.contains('matte-src') && gaussianOf(el) !== null);
+
+const paintsNothing = (layer: Element) => !layer.textContent?.trim() && !layer.querySelector(PAINTS);
 
 function compareZ(a: SceneLayer, b: SceneLayer): number {
   for (let i = 0; i < Math.min(a.z.length, b.z.length); i++) {
@@ -143,18 +183,24 @@ export function compileScene(html: string): Scene {
   const root = doc.getElementById('root') as HTMLElement;
   const frame = { width: px(root.dataset.width), height: px(root.dataset.height) };
   const background = [...doc.querySelectorAll('style')].map((s) => ROOT_BG.exec(s.textContent ?? '')?.[1]).find(Boolean) ?? null;
-  const leaves = [...root.querySelectorAll('.layer[data-clip]')].filter((l) => !l.querySelector('.layer[data-clip]'));
-  const layers = leaves.flatMap((layer, order): SceneLayer[] => {
-    const found = paintOf(layer);
-    const anchor = (found?.el ?? layer) as HTMLElement;
-    const chain = chainOf(anchor, root);
-    const native = found && effectFree(chain) ? found : null;
-    const paint: Paint = native?.paint ?? { kind: PaintKind.Html };
-    const links = native ? linksOf(chain, frame, paint) : [];
-    const content = links.length ? links[links.length - 1].size : frame;
+  const backdrops = [...root.querySelectorAll('[data-clip]:not(.layer)')].filter((g) => g.querySelector('.layer[data-clip]'));
+  const all = [...root.querySelectorAll('.layer[data-clip]'), ...backdrops].sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+  const leaves = all.filter((l) => !paintsNothing(l)).filter((l) => (backdrops.includes(l) || !l.querySelector('.layer[data-clip]')) && !backdrops.some((b) => b !== l && b.contains(l)));
+  let order = 0;
+  const layers = leaves.flatMap((layer): SceneLayer[] => {
     const outer = chainOf(layer as HTMLElement, root);
     const blend = outer.map((el) => el.style.mixBlendMode).filter((b) => b && b !== 'normal').pop() ?? 'normal';
-    return [{ clip: (layer as HTMLElement).dataset.clip ?? '', paint, links, windows: windowsOf(outer, paint), z: zOf(outer), order, content, blend }];
+    const backdrop = backdrops.includes(layer);
+    const single = backdrop ? null : paintOf(layer);
+    const found = backdrop ? [] : single ? [single] : textParts(layer);
+    const native = found.filter((f) => effectFree(chainOf(f.el, root)));
+    const parts = native.length === found.length && found.length ? native : [{ el: layer as HTMLElement, paint: { kind: PaintKind.Html } as Paint }];
+    return parts.map((part) => {
+      const chain = chainOf(part.el, root);
+      const links = part.paint.kind === PaintKind.Html ? [] : linksOf(chain, frame, part.paint);
+      const content = links.length ? links[links.length - 1].size : frame;
+      return { clip: (layer as HTMLElement).dataset.clip ?? '', paint: part.paint, links, windows: windowsOf(outer, part.paint), z: zOf(outer), order: order++, content, blend, covers: [layer, ...layer.querySelectorAll('[data-clip]')].map((e) => (e as HTMLElement).dataset.clip ?? '') };
+    });
   });
   return { ...frame, background: background?.trim() ?? null, layers: layers.sort(compareZ), timeline: runTimeline(doc), duration: px(root.dataset.duration), doc };
 }
@@ -223,7 +269,7 @@ function insetQuad(m: Mat4, size: Size, inset: string[]): Quad {
 
 const BLUR = /blur\(([\d.]+)px\)/;
 
-const visibleAt = (layer: SceneLayer, t: number) => layer.windows.every(([a, b]) => t >= a && t < b);
+export const visibleAt = (layer: SceneLayer, t: number) => layer.windows.every(([a, b]) => t >= a && t < b);
 
 function drawnOf(layer: SceneLayer, t: number): Drawn | null {
   if (!visibleAt(layer, t)) {
@@ -243,7 +289,7 @@ function drawnOf(layer: SceneLayer, t: number): Drawn | null {
     }
     m = multiply(m, linkMatrix(link, layer.links[i - 1] ?? null, vars));
     opacity *= style.opacity === '' ? 1 : Number(style.opacity);
-    blur += Number(BLUR.exec(style.filter)?.[1] ?? 0) * scaleOf(m);
+    blur += (Number(BLUR.exec(style.filter)?.[1] ?? 0) + (gaussianOf(link.el) ?? 0)) * scaleOf(m);
     blend = style.mixBlendMode && style.mixBlendMode !== 'normal' ? style.mixBlendMode : blend;
     const inset = insetOf(style.clipPath);
     if (inset) {

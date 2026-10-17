@@ -1,15 +1,17 @@
 import { Texture } from 'pixi8';
 import { Backend } from '../../canvas/gpu/backend';
-import { FrameFormat, Layering, Settle } from '../hyperframes/capture';
+import { FrameFormat, Settle } from '../hyperframes/capture';
 import { mountCapturePlayer, type CapturePlayer } from '../hyperframes/capture-player';
-import { frameOf } from '../export/webgl-device';
+import { exportLayering, frameOf } from '../export/webgl-device';
 import { IDENTITY_3D } from './matrix';
 import { PaintKind } from './paint-of';
 import { createRenderer, SlotKind, type Slot } from './renderer';
 import { gpuEligible, runHtml, runsOf, type Run } from './runs';
-import { webglPerLane } from '../export/webgl-budget';
-import { compileScene, frameAt, type Drawn, type Scene } from './scene';
+import { lanesWithin, webglPerLane } from '../export/webgl-budget';
+import { shootInLanes } from '../export/lanes';
+import { compileScene, frameAt, visibleAt, type Drawn, type Scene } from './scene';
 import { createPainter } from './textures';
+import { layoutText } from './text-layout';
 
 export enum Freshness {
   Exact = 'exact',
@@ -18,11 +20,11 @@ export enum Freshness {
 
 export type FrameStats = { evaluate: number; prepare: number; capture: number; draw: number; captures: number };
 
-export type GpuEngine = { canvas: HTMLCanvasElement; backend: string; scene: Scene; runs: Run[]; renderAt: (t: number, freshness: Freshness) => Promise<FrameStats>; dispose: () => void };
+export type GpuEngine = { canvas: HTMLCanvasElement; backend: string; scene: Scene; runs: Run[]; renderAt: (t: number, freshness: Freshness) => Promise<FrameStats>; renderFrames: (times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, lanes: number, signal: AbortSignal) => Promise<void>; dispose: () => void };
 
 export class GpuIneligible extends Error {
   constructor(runs: number, perRun: number) {
-    super(`${runs} HTML runs x ${perRun} WebGL contexts exceed the budget`);
+    super(`HTML captures (${runs} runs, up to ${perRun} WebGL contexts each) would cost more than the HTML engine`);
   }
 }
 
@@ -30,19 +32,23 @@ const CAPTURE_WAIT_MS = 600_000;
 
 type RunState = { run: Run; html: string; player: Promise<CapturePlayer> | null; texture: Texture | null; at: number; busy: Promise<void> | null };
 
-export async function gpuEngine(html: string, host: HTMLElement, preference: Backend = Backend.WebGPU): Promise<GpuEngine> {
-  const scene = compileScene(html);
-  if (!gpuEligible(runsOf(scene.layers), webglPerLane(html))) {
-    throw new GpuIneligible(runsOf(scene.layers).length, webglPerLane(html));
+export type Compose = (only?: ReadonlySet<string>) => string;
+
+export async function gpuEngine(compose: Compose, host: HTMLElement, preference: Backend = Backend.WebGPU): Promise<GpuEngine> {
+  const scene = compileScene(compose());
+  const runs = runsOf(scene.layers);
+  const pages = runs.map((run) => runHtml(compose(new Set(run.clips)), run));
+  const contexts = pages.map(webglPerLane);
+  if (!gpuEligible(runs, contexts, scene.duration)) {
+    throw new GpuIneligible(runs.length, Math.max(0, ...contexts));
   }
   const frame = { width: scene.width, height: scene.height };
   const renderer = await createRenderer(frame, preference);
   const painter = createPainter();
-  const runs = runsOf(scene.layers);
-  const painted = scene.layers.map((l) => l.clip);
-  const states: RunState[] = runs.map((run) => ({ run, html: runHtml(html, run, painted), player: null, texture: null, at: Number.NaN, busy: null }));
+  painter.texts(await layoutText(scene, host));
+  const states: RunState[] = runs.map((run, i) => ({ run, html: pages[i], player: null, texture: null, at: Number.NaN, busy: null }));
   const runOf = new Map(runs.flatMap((run, i) => run.clips.map((clip) => [clip, i] as const)));
-  const request = { format: FrameFormat.Bitmap, settle: Settle.Seek, layering: Layering.Flat, ...frame };
+  const request = { format: FrameFormat.Bitmap, settle: Settle.Seek, layering: exportLayering(), ...frame };
 
   const capture = (state: RunState, t: number) => {
     state.player ??= mountCapturePlayer(host, state.html);
@@ -111,6 +117,13 @@ export async function gpuEngine(html: string, host: HTMLElement, preference: Bac
     await painter.prepare(items, t);
     const t2 = performance.now();
     const visible = new Set(items.map((d) => runOf.get(d.clip)).filter((r): r is number => r !== undefined));
+    states.forEach((state, i) => {
+      if (!visible.has(i) && state.player && !state.busy) {
+        void state.player.then((p) => p.dispose());
+        state.player = null;
+        state.at = Number.NaN;
+      }
+    });
     const waits = [...visible].map((i) => ensureRun(states[i], t, freshness)).filter(Boolean);
     await Promise.all(waits);
     const t3 = performance.now();
@@ -119,10 +132,51 @@ export async function gpuEngine(html: string, host: HTMLElement, preference: Bac
     return { evaluate: t1 - t0, prepare: t2 - t1, capture: t3 - t2, draw: t4 - t3, captures: waits.length };
   };
 
+  const runsAt = (t: number) => runs.flatMap((run, i) => (scene.layers.some((l) => run.clips.includes(l.clip) && visibleAt(l, t)) ? [i] : []));
+
+  const renderFrames: GpuEngine['renderFrames'] = async (times, onFrame, wanted, signal) => {
+    const lanes = lanesWithin(wanted, contexts.reduce((a, b) => a + b, 0));
+    const players = Array.from({ length: lanes }, () => new Map<number, Promise<CapturePlayer>>());
+    const shooter = (lane: number) => async (t: number) => {
+      const shots = await Promise.all(
+        runsAt(t).map(async (r) => {
+          const player = players[lane].get(r) ?? mountCapturePlayer(host, pages[r]);
+          players[lane].set(r, player);
+          return [r, frameOf(await (await player).shoot(t, request, CAPTURE_WAIT_MS))] as const;
+        })
+      );
+      return new Map(shots);
+    };
+    try {
+      await shootInLanes(
+        times,
+        players.map((_, lane) => shooter(lane)),
+        async (shots, index) => {
+          const t = times[index];
+          states.forEach((state, r) => {
+            const bitmap = shots.get(r);
+            if (bitmap) {
+              state.texture?.destroy(true);
+              state.texture = Texture.from(bitmap);
+              state.at = t;
+            }
+          });
+          const items = frameAt(scene, t);
+          await painter.prepare(items, t);
+          renderer.draw(slotsOf(items));
+          await onFrame(await createImageBitmap(renderer.canvas), index);
+        },
+        signal
+      );
+    } finally {
+      players.forEach((lane) => lane.forEach((p) => void p.then((x) => x.dispose())));
+    }
+  };
+
   const dispose = () => {
     renderer.destroy();
     states.forEach((s) => void s.player?.then((p) => p.dispose()));
   };
 
-  return { canvas: renderer.canvas, backend: renderer.backend, scene, runs, renderAt, dispose };
+  return { canvas: renderer.canvas, backend: renderer.backend, scene, runs, renderAt, renderFrames, dispose };
 }

@@ -8,7 +8,7 @@ import { motionEngine } from '../engine/engine';
 import { addClip, setKeyframes, setTransition, Side, type OpResult } from '../timeline';
 import { composeHtml } from '../hyperframes/compose';
 import { PaintKind } from './paint-of';
-import { compileScene, frameAt, resolved, type Drawn } from './scene';
+import { compileScene, frameAt, resolved, strokePad, type Drawn } from './scene';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -36,12 +36,62 @@ describe('compileScene', () => {
     expect(kinds).toEqual([
       ['bg', PaintKind.Fill],
       ['card', PaintKind.Shape],
-      ['title', PaintKind.Html]
+      ['title', PaintKind.Text]
     ]);
   });
 
   it('reads the root background from the composed page', () => {
     expect(scene(base).background).toBe(FEEGA_TOKENS.colors['brand.background']);
+  });
+});
+
+describe('backdrop groups', () => {
+  it('keeps a liquid blob and everything it refracts as one HTML layer', () => {
+    const blob = must(addClip(withCard, { component: 'LiquidBlob', from: 0, durationInFrames: 90 }, 'blob'));
+    const layers = scene(blob).layers.map((l) => [l.clip, l.paint.kind]);
+
+    expect(layers).toContainEqual(['blob', PaintKind.Html]);
+    expect(layers.map(([c]) => c)).not.toContain('card');
+  });
+});
+
+describe('strokePad', () => {
+  it('leaves room for half of the widest stroke around a shape', () => {
+    expect(strokePad('<svg><path style="stroke-width:12"/><path stroke-width="30"/></svg>')).toBe(16);
+    expect(strokePad('<svg><path/></svg>')).toBe(0);
+  });
+});
+
+describe('effects', () => {
+  it('draws a gaussian blur effect natively, in screen pixels', () => {
+    const blurred = withClip(withCard, 'card', { effects: [{ id: 'e1', kind: 'gaussian-blur', enabled: true, params: { radius: 12 } }] } as never);
+    const card = byClip(drawn(blurred, 0), 'card');
+
+    expect(card?.paint.kind).toBe(PaintKind.Shape);
+    expect(card?.blur).toBeGreaterThan(0);
+  });
+
+  it('skips a layer that paints nothing, like an audio clip', () => {
+    const audio = must(addClip(withCard, { component: 'Audio', from: 0, durationInFrames: 30 }, 'sound'));
+
+    expect(scene(audio).layers.map((l) => l.clip)).not.toContain('sound');
+  });
+});
+
+describe('text', () => {
+  const twoLines = must(addClip(base, { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'one\ntwo' } }, 'title'));
+
+  it('draws each revealed line of a title as its own part, so lines move on their own', () => {
+    const parts = scene(twoLines).layers.filter((l) => l.clip === 'title');
+
+    expect(parts.map((p) => p.paint.kind)).toEqual([PaintKind.Text, PaintKind.Text]);
+    expect(parts.map((p) => p.links[p.links.length - 1].el.id)).toEqual(['li-title-0', 'li-title-1']);
+  });
+
+  it('draws a paragraph as one part', () => {
+    const text = must(addClip(base, { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'a paragraph' } }, 'body'));
+
+    expect(scene(text).layers.filter((l) => l.clip === 'body').map((l) => l.paint.kind)).toEqual([PaintKind.Text]);
   });
 });
 

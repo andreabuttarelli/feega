@@ -3,9 +3,14 @@ import { FrameFormat, Layering, Settle } from '$lib/motion/hyperframes/capture';
 import { shootInLanes } from '$lib/motion/export/lanes';
 import { encodeMp4 } from '$lib/motion/export/encode';
 import { exportLayering, frameOf } from '$lib/motion/export/webgl-device';
-import { Freshness, gpuEngine } from '$lib/motion/gpu/engine';
+import { Freshness, GpuIneligible, gpuEngine } from '$lib/motion/gpu/engine';
 import type { Backend } from '$lib/canvas/gpu/backend';
-import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult } from './probe';
+import { FEEGA_TOKENS } from '$lib/motion/brand';
+import { composeHtml } from '$lib/motion/hyperframes/compose';
+import type { MotionDoc } from '$lib/motion/doc';
+import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
+
+const composer = (spec: Spec) => (only?: ReadonlySet<string>) => composeHtml({ doc: spec.doc as MotionDoc, tokens: FEEGA_TOKENS, assets: spec.assets, origin: spec.origin, only });
 
 const CAPTURE_WAIT_MS = 600_000;
 const QUALITY = 'high' as never;
@@ -39,7 +44,7 @@ async function htmlShots(input: ShotsInput): Promise<ShotsResult> {
 }
 
 async function gpuShots(input: ShotsInput): Promise<ShotsResult> {
-  const engine = await gpuEngine(input.html, host(), input.preference as Backend);
+  const engine = await gpuEngine(composer(input.spec), host(), input.preference as Backend);
   const pngs: string[] = [];
   const stats = [];
   const start = performance.now();
@@ -68,13 +73,11 @@ async function htmlExport(input: ExportInput): Promise<ExportResult> {
 }
 
 async function gpuExport(input: ExportInput): Promise<ExportResult> {
-  const engine = await gpuEngine(input.html, host(), input.preference as Backend);
-  const out = await encode(input, async (onFrame) => {
-    for (let i = 0; i < input.times.length; i++) {
-      await engine.renderAt(input.times[i], Freshness.Exact);
-      await onFrame(await createImageBitmap(engine.canvas), i);
-    }
-  });
+  const engine = await gpuEngine(composer(input.spec), host(), input.preference as Backend).catch((e) => (e instanceof GpuIneligible ? null : Promise.reject(e)));
+  if (!engine) {
+    return { ...(await htmlExport(input)), fallback: true };
+  }
+  const out = await encode(input, (onFrame) => engine.renderFrames(input.times, onFrame, input.lanes, new AbortController().signal));
   engine.dispose();
   return out;
 }
@@ -122,7 +125,7 @@ async function htmlPreview(input: PreviewInput): Promise<PreviewResult> {
 }
 
 async function gpuPreview(input: PreviewInput): Promise<PreviewResult> {
-  const engine = await gpuEngine(input.html, host(), input.preference as Backend);
+  const engine = await gpuEngine(composer(input.spec), host(), input.preference as Backend);
   engine.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%';
   host().appendChild(engine.canvas);
   await engine.renderAt(0, Freshness.Exact);
