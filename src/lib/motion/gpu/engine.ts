@@ -22,7 +22,7 @@ export type GpuEngine = { canvas: HTMLCanvasElement; backend: string; scene: Sce
 
 export class GpuIneligible extends Error {
   constructor(runs: number, perRun: number) {
-    super(`${runs} HTML runs x ${perRun} WebGL contexts exceed the budget`);
+    super(`${runs} HTML captures (up to ${perRun} WebGL contexts each) cost more than the HTML engine`);
   }
 }
 
@@ -30,17 +30,20 @@ const CAPTURE_WAIT_MS = 600_000;
 
 type RunState = { run: Run; html: string; player: Promise<CapturePlayer> | null; texture: Texture | null; at: number; busy: Promise<void> | null };
 
-export async function gpuEngine(html: string, host: HTMLElement, preference: Backend = Backend.WebGPU): Promise<GpuEngine> {
-  const scene = compileScene(html);
-  if (!gpuEligible(runsOf(scene.layers), webglPerLane(html))) {
-    throw new GpuIneligible(runsOf(scene.layers).length, webglPerLane(html));
+export type Compose = (only?: ReadonlySet<string>) => string;
+
+export async function gpuEngine(compose: Compose, host: HTMLElement, preference: Backend = Backend.WebGPU): Promise<GpuEngine> {
+  const scene = compileScene(compose());
+  const runs = runsOf(scene.layers);
+  const pages = runs.map((run) => runHtml(compose(new Set(run.clips)), run));
+  const contexts = pages.map(webglPerLane);
+  if (!gpuEligible(runs, contexts)) {
+    throw new GpuIneligible(runs.length, Math.max(0, ...contexts));
   }
   const frame = { width: scene.width, height: scene.height };
   const renderer = await createRenderer(frame, preference);
   const painter = createPainter();
-  const runs = runsOf(scene.layers);
-  const painted = scene.layers.map((l) => l.clip);
-  const states: RunState[] = runs.map((run) => ({ run, html: runHtml(html, run, painted), player: null, texture: null, at: Number.NaN, busy: null }));
+  const states: RunState[] = runs.map((run, i) => ({ run, html: pages[i], player: null, texture: null, at: Number.NaN, busy: null }));
   const runOf = new Map(runs.flatMap((run, i) => run.clips.map((clip) => [clip, i] as const)));
   const request = { format: FrameFormat.Bitmap, settle: Settle.Seek, layering: Layering.Flat, ...frame };
 
@@ -111,6 +114,13 @@ export async function gpuEngine(html: string, host: HTMLElement, preference: Bac
     await painter.prepare(items, t);
     const t2 = performance.now();
     const visible = new Set(items.map((d) => runOf.get(d.clip)).filter((r): r is number => r !== undefined));
+    states.forEach((state, i) => {
+      if (!visible.has(i) && state.player && !state.busy) {
+        void state.player.then((p) => p.dispose());
+        state.player = null;
+        state.at = Number.NaN;
+      }
+    });
     const waits = [...visible].map((i) => ensureRun(states[i], t, freshness)).filter(Boolean);
     await Promise.all(waits);
     const t3 = performance.now();

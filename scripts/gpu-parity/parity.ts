@@ -121,6 +121,7 @@ const server = await serve(await hostBundle(), assetFiles);
 const assets = Object.fromEntries([...ids].map((id) => [id, `${server.origin}/assets/${id}.png`]));
 const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets, origin: server.origin });
 const size = { width: doc.width, height: doc.height };
+const spec = { doc, assets, origin: server.origin };
 const dir = join(OUT, name);
 mkdirSync(dir, { recursive: true });
 
@@ -134,7 +135,7 @@ const call = <I, O>(fn: string, input: I) => page.evaluate(([f, i]) => (window a
 
 if (mode === Mode.Parity) {
   const times = spread(doc, frames);
-  const shots: ShotsInput = { html, times, ...size, preference };
+  const shots: ShotsInput = { html, spec, times, ...size, preference };
   const before = await call<ShotsInput, ShotsResult>('htmlShots', shots);
   console.log(`html engine ${(before.ms / times.length).toFixed(0)} ms/frame`);
   const after = await call<ShotsInput, ShotsResult>('gpuShots', shots);
@@ -165,7 +166,7 @@ if (mode === Mode.Parity) {
 
 if (mode === Mode.Export) {
   const times = Array.from({ length: Math.min(frames, doc.durationInFrames) }, (_, i) => i / doc.fps);
-  const input: ExportInput = { html, times, ...size, fps: doc.fps, lanes: lanesWithin(APP_LANES, webglPerLane(html)), preference, keep: true };
+  const input: ExportInput = { html, spec, times, ...size, fps: doc.fps, lanes: lanesWithin(APP_LANES, webglPerLane(html)), preference, keep: true };
   const today = await call<ExportInput, ExportResult>('htmlExport', input);
   const gpu = await call<ExportInput, ExportResult>('gpuExport', input);
   for (const [label, r] of [['html', today], ['gpu', gpu]] as const) {
@@ -179,7 +180,7 @@ if (mode === Mode.Export) {
 }
 
 if (mode === Mode.Preview) {
-  const input: PreviewInput = { html, seconds, warmMs: 2000, preference };
+  const input: PreviewInput = { html, spec, seconds, warmMs: 2000, preference };
   const today = await call<PreviewInput, PreviewResult>('htmlPreview', input);
   const gpu = await call<PreviewInput, PreviewResult>('gpuPreview', input);
   const row = (label: string, r: PreviewResult) => `| ${name} | ${label} | ${r.frames} | ${r.p50.toFixed(1)} | ${r.p95.toFixed(1)} | ${r.dropped} | ${r.workP50.toFixed(1)} | ${r.workP95.toFixed(1)} |`;

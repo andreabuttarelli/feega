@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { Freshness, gpuEngine, type GpuEngine } from '$lib/motion/gpu/engine';
+  import { Freshness, gpuEngine, type Compose, type GpuEngine } from '$lib/motion/gpu/engine';
 
-  let { html, time, onfallback }: { html: string; time: () => number; onfallback: () => void } = $props();
+  let { html, compose, time, onfallback }: { html: string; compose: Compose; time: () => number; onfallback: () => void } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
   let engine: GpuEngine | null = null;
@@ -21,7 +21,8 @@
   }
 
   $effect(() => {
-    const source = html;
+    void html;
+    const source = compose;
     const target = host;
     if (!target) {
       return;

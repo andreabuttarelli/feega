@@ -18,6 +18,7 @@
   import type { VarValues } from '$lib/motion/interactive/var-model';
   import { RenderEngine } from '$lib/motion/gpu/engine-flag';
   import GpuLayer from './GpuLayer.svelte';
+  import type { Compose } from '$lib/motion/gpu/engine';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
 
@@ -43,8 +44,9 @@
     ontap = null,
     background = Background.Brand,
     engine = RenderEngine.Html,
+    gpuCompose = null,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; children?: Snippet } = $props();
 
   let pointer = $state<InputValues>({});
 
@@ -326,8 +328,8 @@
 
 <div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview">
   <div class="host" bind:this={host}></div>
-  {#if engine === RenderEngine.Gpu}
-    <GpuLayer {html} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={() => player && (player.style.visibility = '')} />
+  {#if engine === RenderEngine.Gpu && gpuCompose}
+    <GpuLayer {html} compose={gpuCompose} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={() => player && (player.style.visibility = '')} />
   {/if}
   {@render children?.()}
   {#if live}
