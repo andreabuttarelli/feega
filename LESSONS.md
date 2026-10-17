@@ -3023,6 +3023,12 @@ Signal: a clip with a track matte (or a Figma mask) is invisible everywhere; its
 ### ⌘Z of a delete answers "node_deleted_by_peer"
 Signal: undoing a canvas delete is refused with `node_deleted_by_peer` on the real stack; `undo.test.ts` stays green. Cause: the precondition looked the node up with `findNode`, which filters `deleted_at is null`, so a soft-deleted row is never found; `fakeDb` without `{ filter: true }` ignores that filter. Move: a test about soft deletes seeds `deleted_at` and uses `fakeDb(rows, { filter: true })`; a precondition on a deleted row reads it with `nodeRowExists`.
 
+### Playwright waits 120 s for a dev server that is already up
+Signal: `Timed out waiting 120000ms from config.webServer` while `curl http://localhost:4173` answers and `curl http://127.0.0.1:4173` gets nothing. Cause: `localhost` resolves to `::1` only, vite listens on IPv6, Playwright probes IPv4. Move: start vite with `--host 127.0.0.1` and run Playwright with `E2E_BASE_URL=http://127.0.0.1:4173`.
+
+### "504 (Outdated Optimize Dep)" and a bare 500 page in a worktree
+Signal: `@real` specs fail on their first locator; the page shows a bare `500`; the console fills with `504 (Outdated Optimize Dep)`. Cause: worktrees symlink the main `node_modules`, so they share `node_modules/.vite`; another worktree's server re-optimized the deps under yours. Move: give your server its own cache: an untracked `vite.agent.config.ts` that spreads `vite.config.ts` and sets `cacheDir` to a scratch folder, started with `--config vite.agent.config.ts`.
+
 ### Every project-scoped route resolves scope through `reachableCaller`/`callerReach`
 Signal: a Bearer route under `/api/v1` looks a node, run, asset or project up "by org and id" and answers for an uncensored project the caller cannot open. RLS and `org_id` say the row is the org's; the uncensored lock is a per-user rule neither knows. Move: resolve the caller with `reachableCaller(request, url, { nodes | runs | assets | project })` (`src/lib/server/org-data/reach.ts`), or `callerReach(caller, …)` once the ids are in the body; lists filter with `callerHidden`. Session routes use `findReachableProject` / `motionScope`. Never a per-route `canvasReachable`. Guard: `src/routes/api/v1/uncensored-lock.test.ts` — a new route gets a row there.
 
@@ -3031,6 +3037,12 @@ Signal: the first `upload(..., { upsert: true })` to a path succeeds, every late
 
 ### A sub-agent round answers the user instead of doing its step
 Signal: an agent reply says it "only has tools to read/research/import" or "can't build" while the run summary shows it wrote something. Cause: a role round with a narrow tool set (researcher) got the user's raw request and no brief, so it answered it; its text leads the turn's reply. Move: every narrowed round gets its own brief message (like `crewBrief`, `RESEARCH_BRIEF`), and a turn that stops by design returns a field the caller can relay (`script_ready`).
+
+### A long agent turn dies with `JWT expired` and the dev server exits
+Signal: `[chat-reply] write failed Error: JWT expired`, `[motion-agent] turn failed { code: 'PGRST303' }`, then `UnhandledPromiseRejection … #<Object>` and the process is gone. Cause: the turn's db carries the request's access token; a turn started late in the token's hour outlives it, and the failed-turn save rejected with nobody listening. Move: `outlivesTurn` in the session hook refreshes a token that would expire inside a turn; every background promise chain ends in a `.catch`.
+
+### The motion editor answers 500 only on a local dev server
+Signal: `/p/…/motion/<node>` renders "something broke on our side"; the error is `browserStore(...)?.getItem is not a function`; the log warns `--localstorage-file was provided without a valid path`. Cause: Node 25 ships a global `localStorage` without methods on the server. Move: start `vite dev` with `NODE_OPTIONS=--no-experimental-webstorage`.
 
 ### An e2e fix "does nothing", or a red test passes without the fix
 Signal: a `@real` e2e gives the same result with and without your change. Cause: Playwright reuses whatever listens on 4173 (`reuseExistingServer`), often another worktree's dev server; and with `NO_HMR=1` your own server keeps the code it compiled first. Move: `lsof -iTCP:4173` and check the cwd; run your own `vite dev --port <free>` with `E2E_BASE_URL`, and restart it after every code change before trusting red or green.

@@ -51,3 +51,23 @@ export function dragAngle(centre: Point, from: Point, to: Point, snap = 0): numb
   const wrapped = wrapAngle(swept);
   return snap ? Math.round(wrapped / snap) * snap : wrapped;
 }
+
+export function scaleGroup(group: Placed, members: readonly Placed[], to: { w: number; h: number }): Placed[] {
+  const sx = to.w / group.w;
+  const sy = to.h / group.h;
+  const scale = (n: Placed): Placed => ({ ...n, x: group.x + (n.x - group.x) * sx, y: group.y + (n.y - group.y) * sy, w: n.w * sx, h: n.h * sy });
+  return [{ ...group, w: to.w, h: to.h }, ...members.map(scale)];
+}
+
+export function followGroup(origins: ReadonlyMap<string, { x: number; y: number }>, groupId: string, at: { x: number; y: number }, members: readonly string[]): { id: string; x: number; y: number }[] {
+  const start = origins.get(groupId);
+  if (!start) {
+    return [];
+  }
+  const delta = { dx: at.x - start.x, dy: at.y - start.y };
+  return translateGroup(members.flatMap((id) => (origins.has(id) ? [{ id, ...origins.get(id)! }] : [])), delta);
+}
+
+export type Turn = { id: string; degrees: number };
+
+export const undoTurn = (turn: Turn): Turn => ({ id: turn.id, degrees: -turn.degrees || 0 });

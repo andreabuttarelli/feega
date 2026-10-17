@@ -71,6 +71,7 @@
   import { setTileRender } from '$lib/canvas/tile-render-context';
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
+  import { followGroup } from '$lib/canvas/node-layout';
   import type { CanvasNode } from '$lib/canvas/graph';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import type { RunQuote } from '$lib/canvas/run-quote';
@@ -103,6 +104,8 @@
     tag?: NameTag;
     rotation?: number;
     rotatable?: boolean;
+    members?: string[];
+    behind?: boolean;
     node?: CanvasNode;
     /** La taglia minima di QUESTO tipo di nodo (`nodeSize`, `node-size.ts`) — `NodeResizer` non
      *  lascia stringere sotto. Assente = non ridimensionabile a mano (il resize resta spento). */
@@ -314,6 +317,7 @@
     id: t.id,
     position: { x: t.x, y: t.y },
     selected: t.select === true,
+    ...(t.behind ? { zIndex: GROUP_BEHIND_Z } : {}),
     data: {
       id: t.id,
       connectable: t.connectable !== false,
@@ -376,11 +380,27 @@
    */
   let dragOrigin = new Map<string, { x: number; y: number }>();
 
+  const GROUP_BEHIND_Z = -2000;
+
   function onNodeDragStart({ nodes: dragged }: { nodes: Node[] }) {
     dragOrigin = new Map(dragged.map((n) => [n.id, { ...n.position }]));
+    followOrigin = new Map(nodes.map((n) => [n.id, { ...n.position }]));
+  }
+
+  let followOrigin = new Map<string, { x: number; y: number }>();
+
+  function followMembers(dragged: Node[]) {
+    const membersOf = new Map(tiles.filter((t) => t.members?.length).map((t) => [t.id, t.members!]));
+    const moves = dragged.flatMap((n) => followGroup(followOrigin, n.id, n.position, membersOf.get(n.id) ?? []));
+    if (!moves.length) {
+      return;
+    }
+    const at = new Map(moves.map((m) => [m.id, { x: m.x, y: m.y }]));
+    nodes = nodes.map((n) => (at.has(n.id) ? { ...n, position: at.get(n.id)! } : n));
   }
 
   function onNodeDrag({ nodes: dragged, event }: { nodes: Node[]; event: MouseEvent | TouchEvent }) {
+    followMembers(dragged);
     onTileDragOver?.(dragged.map((n) => n.id), pointOf(event));
   }
 

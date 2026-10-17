@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, freshText, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, freshText, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -142,6 +142,11 @@ describe('a free element is a frame without chrome', () => {
     expect(openingFor(group, Opening.OnSelect)).toBe(Opening.OnRequest);
     expect(openingFor({ id: 'e', type: 'motion', data: elementNodeOf({ width: 10, height: 10 }).data }, Opening.OnSelect)).toBe(Opening.OnSelect);
     expect(openingFor({ id: 't', type: 'text', data: {} }, Opening.OnSelect)).toBe(Opening.OnSelect);
+  });
+
+  it('a group draws behind everything, even when selected, so a click on a member reaches the member', () => {
+    expect(frameChrome(FrameKind.Group).behind).toBe(true);
+    expect(frameChrome(FrameKind.Element).behind).toBe(false);
   });
 
   it('reads back as an element; an old frame without the field stays a frame', () => {
