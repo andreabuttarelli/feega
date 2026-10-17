@@ -207,3 +207,10 @@ describe('flip keys', () => {
     expect(press('v', { code: 'KeyV' })).toBe(Command.ToolSelect);
   });
 });
+
+describe('sibling keys', () => {
+  it('Tab selects the next layer and ⇧Tab the previous one', () => {
+    expect(press('Tab')).toBe(Command.SelectNext);
+    expect(press('Tab', { shift: true })).toBe(Command.SelectPrevious);
+  });
+});

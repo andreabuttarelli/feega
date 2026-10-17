@@ -57,6 +57,9 @@ export type CanvasCommandId =
   | 'zoom-in'
   | 'zoom-out'
   | 'nudge'
+  | 'enter'
+  | 'select-next'
+  | 'select-previous'
   | 'duplicate'
   | 'copy'
   | 'paste'
@@ -146,6 +149,8 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
 
   if (key === 'Backspace' || key === 'Delete') return { id: 'delete' };
   if (key === 'Escape') return { id: 'deselect' };
+  if (key === 'Enter' && !e.shiftKey) return { id: 'enter' };
+  if (key === 'Tab') return { id: e.shiftKey ? 'select-previous' : 'select-next' };
 
   const arrow = ARROWS[key];
   if (arrow) {
@@ -190,6 +195,9 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'delete', keys: ['⌫'], label: 'Delete selection' },
   { id: 'select-all', keys: ['mod', 'A'], label: 'Seleziona tutto' },
   { id: 'deselect', keys: ['Esc'], label: 'Deseleziona' },
+  { id: 'enter', keys: ['↵'], label: 'Select inside the frame' },
+  { id: 'select-next', keys: ['Tab'], label: 'Select the next tile' },
+  { id: 'select-previous', keys: ['⇧Tab'], label: 'Select the previous tile' },
   { id: 'undo', keys: ['mod', 'Z'], label: 'Undo' },
   { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Ripeti' },
   { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplicate selection' },

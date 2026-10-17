@@ -236,4 +236,10 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev(']', { metaKey: true }))).toEqual({ id: 'bring-front' });
     expect(matchCanvasShortcut(ev('[', { ctrlKey: true }))).toEqual({ id: 'send-back' });
   });
+
+  it('Enter goes into the selected frame, Tab and ⇧Tab walk the tiles', () => {
+    expect(matchCanvasShortcut(ev('Enter'))).toEqual({ id: 'enter' });
+    expect(matchCanvasShortcut(ev('Tab'))).toEqual({ id: 'select-next' });
+    expect(matchCanvasShortcut(ev('Tab', { shiftKey: true }))).toEqual({ id: 'select-previous' });
+  });
 });

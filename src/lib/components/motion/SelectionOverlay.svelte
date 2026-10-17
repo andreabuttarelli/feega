@@ -40,7 +40,7 @@
     onpreview: (doc: MotionDoc | null) => void;
     onchange: (doc: MotionDoc, summary: string) => void;
     pickAt?: Pt | null;
-    ask?: () => { at: Pt; gesture: Gesture } | null;
+    ask?: () => { at: Pt | null; gesture: Gesture; from: Depth } | null;
     part?: string | null;
     onparts?: (parts: Record<string, string[]>) => void;
     onboxes?: (boxes: Boxes) => void;
@@ -271,7 +271,7 @@
     const asked = asking ? ask() : null;
     asking = false;
     if (asked && !selection.length) {
-      step(asked.gesture, asked.at, levelOf({ open: false, clip: null, part: null }));
+      step(asked.gesture, asked.at, { depth: asked.from, clip: null, part: null });
       return;
     }
     if (!pendingPick) {

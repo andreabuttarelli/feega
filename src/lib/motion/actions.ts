@@ -196,6 +196,8 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.SelectAll]: { name: 'Select all clips', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Deselect]: { name: 'Deselect', icon: X, group: GuideGroup.Edit, gesture: 'Tap an empty lane', menu: MenuSection.Layer },
   [Command.SelectChild]: { name: 'Select inside', icon: CornerRightDown, group: GuideGroup.Edit, gesture: 'Double-click', menu: MenuSection.Layer },
+  [Command.SelectNext]: { name: 'Select the next layer', icon: CornerRightDown, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.SelectPrevious]: { name: 'Select the previous layer', icon: CornerLeftUp, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.SelectParent]: { name: 'Select the parent', icon: CornerLeftUp, group: GuideGroup.Edit, gesture: 'Esc', menu: MenuSection.Layer },
   [Command.Precompose]: { name: 'Precompose', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Group]: { name: 'Group', icon: Group, group: GuideGroup.Edit, menu: MenuSection.Layer },

@@ -138,6 +138,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.Deselect]: VIEW,
   [Command.SelectChild]: VIEW,
   [Command.SelectParent]: VIEW,
+  [Command.SelectNext]: VIEW,
+  [Command.SelectPrevious]: VIEW,
   [Command.StartHere]: motion('set_timing'),
   [Command.EndHere]: motion('set_timing'),
   [Command.TrimIn]: motion('trim_clip'),
