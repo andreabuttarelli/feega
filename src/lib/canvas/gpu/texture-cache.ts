@@ -1,4 +1,4 @@
-import { Texture } from 'pixi8';
+import { ImageSource, Texture } from 'pixi8';
 import { createLru } from './lru';
 import { reportPending } from './frame-stats';
 
@@ -38,7 +38,7 @@ export function createTextureCache(changed: () => void): TextureCache {
       reportPending(pending.size);
       load(url)
         .then((bitmap) => {
-          const tex = Texture.from(bitmap);
+          const tex = new Texture({ source: new ImageSource({ resource: bitmap, autoGenerateMipmaps: true }) });
           lru.set(url, tex, bitmap.width * bitmap.height * RGBA);
           for (const r of pending.get(url) ?? []) {
             r(tex);

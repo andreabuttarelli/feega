@@ -52,7 +52,6 @@
   import { domPainted } from '$lib/canvas/gpu/paint';
   import { NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
-  import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
 
   let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void } = $props();
 
@@ -122,9 +121,8 @@
     }
   });
   $effect(() => {
-    const far = canvasLod.far;
     const seen = visibleIds(placed.filter((t) => sticky.has(t.id)), view, area);
-    const keep = new Map([...sticky].filter(([id]) => !far && seen.has(id)));
+    const keep = new Map([...sticky].filter(([id]) => seen.has(id)));
     if (keep.size !== untrack(() => sticky.size)) {
       sticky = keep;
     }
@@ -159,7 +157,7 @@
     }, SHELF_TICK_MS);
     return () => clearInterval(timer);
   });
-  const domIds = $derived(new Set([...editIds, ...sticky.keys(), ...shelf, ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area, canvasLod.far)]));
+  const domIds = $derived(new Set([...editIds, ...sticky.keys(), ...shelf, ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)]));
 
   function portFor(nodeId: string, side: PortSide, handle: string | null | undefined): Port | null {
     const own = ports.filter((p) => p.nodeId === nodeId && p.side === side);
@@ -234,7 +232,6 @@
 
   $effect(() => {
     scene?.setCamera(view);
-    canvasLod.view(view.zoom);
   });
 
   $effect(() => {

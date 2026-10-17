@@ -14,7 +14,7 @@ const gpu = () => Paint.Gpu;
 const dom = () => Paint.Dom;
 
 export const PAINT: Record<NodeType, (data: Data) => Paint> = {
-  motion: gpu,
+  motion: (data) => (typeof data.posterAssetId === 'string' && data.posterAssetId && data.posterRevision === data.docHeadRevision ? Paint.Gpu : Paint.Dom),
   image: (data) => (isUploadedNodeRow({ type: 'image', data }) ? Paint.Gpu : Paint.Dom),
   text: dom,
   video: dom,
@@ -39,10 +39,7 @@ type Placed = { id: string; kind?: string; x: number; y: number; w: number; h: n
 
 const paintOf = (kind: string | undefined, data: Data) => (kind && kind in PAINT ? PAINT[kind as NodeType](data) : Paint.Dom);
 
-export function domPainted(tiles: Placed[], dataOf: (id: string) => Data, view: Viewport, screen: Screen, far: boolean): string[] {
-  if (far) {
-    return [];
-  }
+export function domPainted(tiles: Placed[], dataOf: (id: string) => Data, view: Viewport, screen: Screen): string[] {
   const dom = tiles.filter((t) => paintOf(t.kind, dataOf(t.id)) === Paint.Dom);
   const seen = visibleIds(dom, view, screen);
   return dom.filter((t) => seen.has(t.id)).map((t) => t.id);

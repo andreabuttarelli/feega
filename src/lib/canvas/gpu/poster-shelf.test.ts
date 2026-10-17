@@ -4,9 +4,10 @@ import { RETRY_MS, SHELF_CAP, parkStuck, shelfIds } from './poster-shelf';
 const frame = (id: string, data: Record<string, unknown>) => ({ id, type: 'motion', data: { docHeadRevision: 2, ...data } });
 
 describe('shelfIds — frames whose GPU texture needs the DOM tile to shoot a poster', () => {
-  it('a frame with no poster, or one behind its doc, goes on the shelf', () => {
-    const rows = [frame('none', {}), frame('old', { posterAssetId: 'p', posterRevision: 1 }), frame('ok', { posterAssetId: 'p', posterRevision: 2 }), { id: 'img', type: 'image', data: {} }];
+  it('a frame with no poster, one behind its doc, or one of unknown revision goes on the shelf', () => {
+    const rows = [frame('none', {}), frame('old', { posterAssetId: 'p', posterRevision: 1 }), frame('ok', { posterAssetId: 'p', posterRevision: 2 }), frame('unknown', { posterAssetId: 'p' }), { id: 'img', type: 'image', data: {} }];
     expect(shelfIds(rows, new Set(), new Map(), 0)).toEqual(['none', 'old']);
+    expect(shelfIds(rows.slice(2), new Set(), new Map(), 0)).toEqual(['unknown']);
   });
 
   it('a frame already mounted for editing is not shelved twice', () => {

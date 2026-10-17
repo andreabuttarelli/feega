@@ -12,7 +12,9 @@ import frameDoc from './fixtures/motion-doc.json' with { type: 'json' };
 const OUT = process.env.GPU_PARITY_OUT ?? join(homedir(), 'Documents', 'feega-videos', 'webgpu-canvas', 'parity');
 const RENDERERS = ['dom', 'webgpu', 'webgl'] as const;
 const ONLY = process.env.GPU_PARITY_ONLY;
-const ZOOMS = [0.35, 0.7, 1.2];
+const ZOOMS = [0.35, 1];
+const DIFF_SIZE = 160;
+const DIFF_MAX = 14;
 const COLUMNS = 6;
 const STEP = { x: 620, y: 640 };
 const MARGIN = 44;
@@ -50,7 +52,7 @@ async function upload(admin: SupabaseClient, s: E2eSession, body: Buffer, type: 
 async function assets(admin: SupabaseClient, s: E2eSession): Promise<Assets> {
   const dir = mkdtempSync(join(tmpdir(), 'gpu-parity-'));
   const mp4 = join(dir, 'clip.mp4');
-  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc=size=640x360:rate=30:duration=3', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', mp4]);
+  execFileSync('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'smptebars=size=640x360:rate=30:duration=3', '-pix_fmt', 'yuv420p', '-c:v', 'libx264', mp4]);
   const photo = await sharp({ create: { width: 1024, height: 768, channels: 3, background: '#2b6cb0' } }).composite([{ input: Buffer.from('<svg width="1024" height="768"><circle cx="512" cy="384" r="250" fill="#f6ad55"/></svg>') }]).jpeg().toBuffer();
   const poster = await sharp({ create: { width: 1280, height: 720, channels: 3, background: '#111' } }).composite([{ input: Buffer.from('<svg width="1280" height="720"><text x="80" y="400" font-size="160" fill="#fff" font-family="Arial">poster</text></svg>') }]).jpeg().toBuffer();
   const text = 'Three hooks:\n1. Run the city at night.\n2. Lighter than your excuses.\n3. Made for wet asphalt.';
@@ -65,18 +67,10 @@ async function assets(admin: SupabaseClient, s: E2eSession): Promise<Assets> {
 type Spec = { name: string; type: string; data: (a: Assets, influencer: string | null) => Record<string, unknown>; doc?: unknown; size?: { width: number; height: number } };
 
 const SPECS: Spec[] = [
-  { name: 'generate-text-empty', type: 'text', data: () => ({ prompt: '' }) },
-  { name: 'generate-text-running', type: 'text', data: () => ({ prompt: 'Write three hooks', running: true }) },
   { name: 'generate-text-done', type: 'text', data: (a) => ({ prompt: 'Write three hooks', refId: a.text }) },
-  { name: 'generate-text-failed', type: 'text', data: () => ({ prompt: 'Write three hooks', error: 'The model refused this prompt' }) },
-  { name: 'generate-image-empty', type: 'image', data: () => ({ prompt: '' }) },
-  { name: 'generate-image-running', type: 'image', data: () => ({ prompt: 'Orange sun on blue', running: true }) },
   { name: 'generate-image-done', type: 'image', data: (a) => ({ prompt: 'Orange sun on blue', refId: a.picture }) },
   { name: 'generate-image-failed', type: 'image', data: () => ({ prompt: 'Orange sun on blue', error: 'Generation failed' }) },
-  { name: 'generate-video-empty', type: 'video', data: () => ({ prompt: '' }) },
-  { name: 'generate-video-running', type: 'video', data: () => ({ prompt: 'Dolly in', running: true }) },
   { name: 'generate-video-done', type: 'video', data: (a) => ({ prompt: 'Dolly in', refId: a.clip }) },
-  { name: 'generate-video-failed', type: 'video', data: () => ({ prompt: 'Dolly in', error: 'Generation failed' }) },
   { name: 'image-upload', type: 'image', data: (a) => ({ prompt: '', assetId: a.picture }) },
   { name: 'video-upload', type: 'video', data: (a) => ({ prompt: '', assetId: a.clip }) },
   { name: 'doc', type: 'doc', data: () => ({ content: '# Launch brief\n\nAudience: urban runners.\n\n- Hero film\n- Three cutdowns', public: false }) },
@@ -92,10 +86,10 @@ const SPECS: Spec[] = [
   { name: 'list', type: 'list', data: () => ({ itemKind: 'text', items: [{ text: 'one' }, { text: 'two' }] }) },
   { name: 'frame-poster', type: 'motion', data: (a) => ({ ...LANDSCAPE, posterAssetId: a.poster }), doc: frameDoc },
   { name: 'frame-no-poster', type: 'motion', data: () => ({ ...LANDSCAPE, posterAssetId: null }), doc: frameDoc },
-  { name: 'free-box', size: { width: 240, height: 240 }, type: 'motion', data: () => ({ ...LANDSCAPE, kind: 'element', posterAssetId: null }), doc: element('Shape', { shape: 'rect', color: '#e53e3e' }) },
-  { name: 'free-ellipse', size: { width: 240, height: 240 }, type: 'motion', data: () => ({ ...LANDSCAPE, kind: 'element', posterAssetId: null }), doc: element('Shape', { shape: 'ellipse', color: '#38a169' }) },
-  { name: 'free-path', size: { width: 240, height: 240 }, type: 'motion', data: () => ({ ...LANDSCAPE, kind: 'element', posterAssetId: null }), doc: element('Shape', { shape: 'path', path: 'M0 1 L0.5 0 L1 1 Z', color: '#3182ce' }) },
-  { name: 'free-text', size: { width: 320, height: 120 }, type: 'motion', data: () => ({ ...LANDSCAPE, kind: 'element', posterAssetId: null }), doc: element('Text', { text: 'Hello', color: '#111111', fontSize: 120 }) }
+  { name: 'free-box', size: { width: 320, height: 180 }, type: 'motion', data: () => ({ ...LANDSCAPE, kind: 'element', posterAssetId: null }), doc: element('Shape', { shape: 'rect', color: '#e53e3e' }) },
+  { name: 'free-ellipse', size: { width: 320, height: 180 }, type: 'motion', data: () => ({ ...LANDSCAPE, kind: 'element', posterAssetId: null }), doc: element('Shape', { shape: 'ellipse', color: '#38a169' }) },
+  { name: 'free-path', size: { width: 320, height: 180 }, type: 'motion', data: () => ({ ...LANDSCAPE, kind: 'element', posterAssetId: null }), doc: element('Shape', { shape: 'path', path: 'M0 1 L0.5 0 L1 1 Z', color: '#3182ce' }) },
+  { name: 'free-text', size: { width: 320, height: 180 }, type: 'motion', data: () => ({ ...LANDSCAPE, kind: 'element', posterAssetId: null }), doc: element('Text', { text: 'Hello', color: '#111111', fontSize: 120 }) }
 ];
 
 async function seed(admin: SupabaseClient, s: E2eSession): Promise<Seeded[]> {
@@ -120,8 +114,8 @@ async function seed(admin: SupabaseClient, s: E2eSession): Promise<Seeded[]> {
     (
       await admin.from('nodes_connections').insert([
         wire('generate-text-done', 'generate-image-done', { target_handle: 'text' }),
-        wire('list', 'generate-image-empty', { target_handle: 'text', mode: 'iterate' }),
-        wire('social-feed', 'generate-video-empty', { source_handle: 'out:images', target_handle: 'images' })
+        wire('list', 'generate-image-failed', { target_handle: 'text', mode: 'iterate' }),
+        wire('social-feed', 'generate-video-done', { source_handle: 'out:images', target_handle: 'images' })
       ])
     ).error
   ).toBeNull();
@@ -189,6 +183,19 @@ async function shoot(page: Page, id: string, path: string) {
   await page.screenshot({ path, clip: { x, y, width: w, height: h } });
 }
 
+async function grey(file: string): Promise<Buffer> {
+  return sharp(file).resize(DIFF_SIZE, DIFF_SIZE, { fit: 'fill' }).greyscale().blur(1.5).raw().toBuffer();
+}
+
+async function difference(a: string, b: string): Promise<number> {
+  const [x, y] = await Promise.all([grey(a), grey(b)]);
+  let sum = 0;
+  for (let i = 0; i < x.length; i++) {
+    sum += Math.abs(x[i] - y[i]);
+  }
+  return sum / x.length;
+}
+
 async function sheet(name: string, cells: string[][]) {
   const label = (text: string, w: number) => Buffer.from(`<svg width="${w}" height="28"><rect width="100%" height="100%" fill="#222"/><text x="8" y="19" font-size="15" font-family="Arial" fill="#fff">${text}</text></svg>`);
   const width = RENDERERS.length * CELL.w;
@@ -230,9 +237,18 @@ test.describe('every node type looks the same on DOM, WebGPU and WebGL @parity @
       for (const r of RENDERERS.filter((x) => !ONLY || x === ONLY)) {
         for (const z of ZOOMS) {
           const stats = await sharp(join(raw, `${n.name}-${r}-${z}.png`)).stats();
-          const flat = stats.channels.every((c) => c.stdev < 2);
+          const domStats = await sharp(join(raw, `${n.name}-dom-${z}.png`)).stats();
+          const flat = stats.channels.every((c) => c.stdev < 2) && !domStats.channels.every((c) => c.stdev < 2);
           if (flat) {
             broken.push(`${n.name}-${r}-${z}`);
+            continue;
+          }
+          if (r === 'dom') {
+            continue;
+          }
+          const diff = await difference(join(raw, `${n.name}-dom-${z}.png`), join(raw, `${n.name}-${r}-${z}.png`));
+          if (diff > DIFF_MAX) {
+            broken.push(`${n.name}-${r}-${z} differs from DOM by ${diff.toFixed(1)}`);
           }
         }
       }

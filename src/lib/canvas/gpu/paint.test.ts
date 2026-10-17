@@ -8,7 +8,10 @@ describe('paint — which node bodies the GPU draws and which stay DOM when read
   });
 
   it('frames, free elements and uploaded images are GPU; everything with controls stays DOM', () => {
-    expect(PAINT.motion({})).toBe(Paint.Gpu);
+    expect(PAINT.motion({ posterAssetId: 'p', posterRevision: 2, docHeadRevision: 2 })).toBe(Paint.Gpu);
+    expect(PAINT.motion({ posterAssetId: 'p', docHeadRevision: 2 })).toBe(Paint.Dom);
+    expect(PAINT.motion({ posterAssetId: 'p', posterRevision: 1, docHeadRevision: 2 })).toBe(Paint.Dom);
+    expect(PAINT.motion({})).toBe(Paint.Dom);
     expect(PAINT.image({ assetId: 'a' })).toBe(Paint.Gpu);
     expect(PAINT.image({ prompt: 'x' })).toBe(Paint.Dom);
     expect(PAINT.video({ assetId: 'a' })).toBe(Paint.Dom);
@@ -16,16 +19,16 @@ describe('paint — which node bodies the GPU draws and which stay DOM when read
     expect(PAINT.calendar({})).toBe(Paint.Dom);
   });
 
-  it('a DOM-painted node mounts only when on screen and the view is not far', () => {
+  it('a DOM-painted node mounts whenever it is on screen, at any zoom', () => {
     const tiles = [
       { id: 'cal', kind: 'calendar', x: 0, y: 0, w: 100, h: 100 },
       { id: 'off', kind: 'calendar', x: 5000, y: 0, w: 100, h: 100 },
       { id: 'frame', kind: 'motion', x: 0, y: 0, w: 100, h: 100 },
       { id: 'pending', kind: 'pending_frame', x: 0, y: 0, w: 100, h: 100 }
     ];
-    const data = () => ({});
+    const data = (id: string) => (id === 'frame' ? { posterAssetId: 'p', posterRevision: 1, docHeadRevision: 1 } : {});
     const screen = { width: 800, height: 600 };
-    expect(domPainted(tiles, data, { x: 0, y: 0, zoom: 1 }, screen, false)).toEqual(['cal', 'pending']);
-    expect(domPainted(tiles, data, { x: 0, y: 0, zoom: 1 }, screen, true)).toEqual([]);
+    expect(domPainted(tiles, data, { x: 0, y: 0, zoom: 1 }, screen)).toEqual(['cal', 'pending']);
+    expect(domPainted(tiles, data, { x: 0, y: 0, zoom: 0.1 }, screen)).toEqual(['cal', 'off', 'pending']);
   });
 });

@@ -1,6 +1,5 @@
 import { Application, Color, Container, Graphics, Rectangle, Sprite, Text, Texture, TilingSprite, VideoSource } from 'pixi8';
 import type { Viewport } from '../dot-grid';
-import { LOD_ZOOM } from '../poster-lod';
 import { MOTION_NODE_BAR_H } from '../motion-node';
 import { AssetSize, sized } from '../asset-url';
 import { Surface, type CardFace, type Media } from './card-face';
@@ -32,10 +31,14 @@ const CORNER_PX = 8;
 const DOT_TILE = 24;
 const DASH = 6;
 const GAP = 4;
-const DASH_SAMPLES = 64;
+const DASH_SAMPLES = 400;
+const WIRE_WIDTH = 1;
+const BADGE_STROKE = 1.5;
 const ITERATE_BADGE_R = 11;
 const LIVE_VIDEO_CAP = 4;
 const NEAR_TIER_ZOOM = 0.75;
+const TEXT_FADE_FROM_PX = 3;
+const TEXT_FADE_PX = 3;
 const MAX_TEXT_CHARS = 1400;
 const TEXT_TIERS = [1, 2, 4] as const;
 const THUMB_COLUMNS = 3;
@@ -562,7 +565,6 @@ export class GpuScene {
 
   private cull() {
     const v = this.visibleBox();
-    const near = this.view.zoom >= LOD_ZOOM;
     let live = 0;
     for (const c of this.cards) {
       const b = this.built.get(c.id);
@@ -573,12 +575,12 @@ export class GpuScene {
       const seen = c.x + c.w > v.x - margin && c.y + c.h > v.y - margin && c.x < v.x + v.w + margin && c.y < v.y + v.h + margin;
       b.root.visible = seen;
       for (const t of b.texts) {
-        t.visible = near;
+        t.alpha = Math.max(0, Math.min(1, (Number(t.style.fontSize) * this.view.zoom - TEXT_FADE_FROM_PX) / TEXT_FADE_PX));
       }
       if (!b.video) {
         continue;
       }
-      const play = seen && near && !c.hidden && live < LIVE_VIDEO_CAP;
+      const play = seen && !c.hidden && live < LIVE_VIDEO_CAP;
       live += play ? 1 : 0;
       this.setPlaying(b.video, play);
     }
@@ -610,43 +612,46 @@ export class GpuScene {
   }
 
   private dashed(g: Graphics, c: Curve, color: string, width: number) {
-    const step = 1 / DASH_SAMPLES;
-    let drawn = 0;
+    let run = 0;
     let on = true;
     let prev = c.from;
     g.moveTo(prev.x, prev.y);
-    for (let t = step; t <= 1 + 1e-9; t += step) {
-      const p = curvePoint(c, t);
-      drawn += Math.hypot(p.x - prev.x, p.y - prev.y) * this.view.zoom;
+    for (let i = 1; i <= DASH_SAMPLES; i++) {
+      const p = curvePoint(c, i / DASH_SAMPLES);
+      run += Math.hypot(p.x - prev.x, p.y - prev.y);
       if (on) {
         g.lineTo(p.x, p.y);
       } else {
         g.moveTo(p.x, p.y);
       }
-      if (drawn >= (on ? DASH : GAP)) {
+      if (run >= (on ? DASH : GAP)) {
+        if (on) {
+          g.stroke({ width, color });
+        }
         on = !on;
-        drawn = 0;
+        run = 0;
+        g.moveTo(p.x, p.y);
       }
       prev = p;
     }
-    g.stroke({ width, color });
+    if (on) {
+      g.stroke({ width, color });
+    }
   }
 
   private drawWires() {
     const g = this.wires;
     g.clear();
-    const width = 1.5 / this.view.zoom;
     for (const w of this.wiresIn) {
       const color = w.iterate ? this.theme.iterate : w.selected ? this.theme.inkSoft : this.theme.wire;
       if (w.iterate) {
-        this.dashed(g, w.curve, color, width);
-        const r = ITERATE_BADGE_R / this.view.zoom;
-        g.circle(w.curve.mid.x, w.curve.mid.y, r).fill(this.theme.paper).stroke({ width, color });
-        this.repeatGlyph(g, w.curve.mid, r * 0.5, color, width);
+        this.dashed(g, w.curve, color, WIRE_WIDTH);
+        g.circle(w.curve.mid.x, w.curve.mid.y, ITERATE_BADGE_R).fill(this.theme.paper).stroke({ width: BADGE_STROKE, color });
+        this.repeatGlyph(g, w.curve.mid, ITERATE_BADGE_R * 0.5, color, BADGE_STROKE);
         continue;
       }
       const c = w.curve;
-      g.moveTo(c.from.x, c.from.y).bezierCurveTo(c.c1.x, c.c1.y, c.c2.x, c.c2.y, c.to.x, c.to.y).stroke({ width: w.selected ? width * 1.6 : width, color });
+      g.moveTo(c.from.x, c.from.y).bezierCurveTo(c.c1.x, c.c1.y, c.c2.x, c.c2.y, c.to.x, c.to.y).stroke({ width: WIRE_WIDTH, color });
     }
   }
 

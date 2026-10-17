@@ -8,7 +8,7 @@ type Row = { id: string; type: string; data: Record<string, unknown> };
 
 function needsPoster(row: Row): boolean {
   const motion = motionOf(row);
-  return !!motion && (!motion.posterAssetId || !posterFresh(motion));
+  return !!motion && (!motion.posterAssetId || motion.posterRevision === undefined || !posterFresh(motion));
 }
 
 export function shelfIds(rows: Row[], mounted: Set<string>, parked: Map<string, number>, now: number): string[] {
