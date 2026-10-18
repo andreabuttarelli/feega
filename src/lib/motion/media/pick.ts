@@ -9,11 +9,6 @@ export enum MediaAccept {
   Any = 'any'
 }
 
-export enum LinkUse {
-  Keep = 'keep',
-  Import = 'import'
-}
-
 export enum PickFrom {
   Upload = 'upload',
   Link = 'link',

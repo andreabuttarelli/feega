@@ -2,7 +2,7 @@ import { rendererSwitch } from '$lib/server/canvas-renderer-switch';
 import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { MEDIA_UUID_RE } from '$lib/media-url';
-import { registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
+import { importCanvasLink, registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
 import { isOutputHandle } from '$lib/canvas/select-outputs';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoadEvent } from '@sveltejs/kit';
@@ -507,6 +507,21 @@ export const actions: Actions<CanvasParams> = {
         path, fileName, mimeType, bytes,
         x: coord(fd.get('x')) ?? 0, y: coord(fd.get('y')) ?? 0
       });
+    } catch (cause) {
+      if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }
+      throw cause;
+    }
+  },
+  importLink: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const url = String((await request.formData()).get('url') ?? '');
+    if (!url) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    try {
+      const { asset } = await importCanvasLink(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, url });
+      return { asset };
     } catch (cause) {
       if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }
       throw cause;

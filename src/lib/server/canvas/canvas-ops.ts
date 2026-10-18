@@ -52,7 +52,7 @@ import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import { cancelRender } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { withdrawFromGallery } from '$lib/server/gallery/publish';
-import { registerCanvasUpload, UploadError } from '$lib/server/canvas/upload';
+import { importCanvasLink, registerCanvasUpload, UploadError } from '$lib/server/canvas/upload';
 import { canvasUploadPrefix, verdictForUpload } from '$lib/canvas/upload-kind';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { findProjectById } from '$lib/server/repos/projects';
@@ -299,6 +299,8 @@ const MAX_VOICE_NAME = 100;
 const MAX_CLONE_SAMPLE_BYTES = 3 * 1024 * 1024;
 
 const requestUploadInput = z.object({ fileName: z.string().min(1), mimeType: z.string().min(1), bytes: z.number().int().positive() }).strict();
+const importLinkInput = z.object({ url: z.string().url().describe('https link to a picture or video') }).strict();
+
 const registerUploadInput = z
   .object({
     canvasId: z.string(),
@@ -1006,6 +1008,12 @@ export const CANVAS_OPS = {
       }
       return uploadAnswer(() => registerCanvasUpload(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, ...input }));
     }
+  }),
+
+  import_link: op({
+    access: Access.Write,
+    input: importLinkInput,
+    run: async (ctx, input) => uploadAnswer(async () => ({ asset: (await importCanvasLink(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, url: input.url })).asset }))
   }),
 
   list_voices: op({

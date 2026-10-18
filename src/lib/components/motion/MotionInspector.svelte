@@ -81,7 +81,7 @@
   import { propsOwner, sliderOf, toShown, toStored, type Ranged } from '$lib/motion/units';
   import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '$lib/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
-  import { LinkUse, MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
+  import { MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
   import MediaPicker from './MediaPicker.svelte';
   import MediaListField from './MediaListField.svelte';
   import type { MediaUploader } from './media-upload';
@@ -581,9 +581,9 @@
         {:else if field.control === Control.Color}
           <ColorField id={`f-${field.key}`} name={field.label} value={value(field)} {tokens} onchange={(v) => setProp(field, v)} />
         {:else if field.control === Control.Asset}
-          <MediaPicker label={field.label} value={typeof value(field) === 'string' && value(field) ? { kind: field.assetKind === AssetKind.Video ? MediaKind.Video : MediaKind.Image, assetId: String(value(field)) } : null} {assets} accept={acceptOf(field.assetKind)} links={LinkUse.Import} uploader={upload} onpick={(pick) => setProp(field, pick?.assetId ?? null)} />
+          <MediaPicker label={field.label} value={typeof value(field) === 'string' && value(field) ? { kind: field.assetKind === AssetKind.Video ? MediaKind.Video : MediaKind.Image, assetId: String(value(field)) } : null} {assets} accept={acceptOf(field.assetKind)} uploader={upload} onpick={(pick) => setProp(field, pick?.assetId ?? null)} />
         {:else if field.control === Control.MediaItem}
-          <MediaPicker label={field.label} value={pickOfItem(value(field))} {assets} accept={acceptOf(field.assetKind)} links={LinkUse.Keep} uploader={upload} onpick={(pick) => setProp(field, itemOfPick(pick))} />
+          <MediaPicker label={field.label} value={pickOfItem(value(field))} {assets} accept={acceptOf(field.assetKind)} uploader={upload} onpick={(pick) => setProp(field, itemOfPick(pick))} />
         {:else if field.control === Control.MediaList}
           <MediaListField label={field.label} value={value(field)} {assets} {upload} onchange={(list) => setProp(field, list)} />
         {:else if field.control === Control.Font}

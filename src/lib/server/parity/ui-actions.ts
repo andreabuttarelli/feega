@@ -38,6 +38,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   voice_delete: canvas('delete_voice'),
   estimate_text_cost: canvas('estimate_text_cost'),
   upload: canvas('register_upload'),
+  importLink: canvas('import_link'),
   snapshot: canvas('canvas_snapshot'),
   revision: canvas('canvas_revision'),
   run: canvas('run_node'),
