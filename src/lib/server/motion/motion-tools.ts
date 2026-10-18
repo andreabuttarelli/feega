@@ -5,6 +5,8 @@ import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
 import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
+import { HORIZONTALS, VERTICALS } from '$lib/motion/constraints/model';
+import { setConstraints, withConstraints } from '$lib/motion/constraints/constraints';
 import { setPartFills } from '$lib/motion/part-style';
 import { staticParts } from './static-parts';
 import { strokesSchema } from '$lib/motion/stroke/model';
@@ -352,6 +354,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         parentOpacity: c.parentOpacity,
         autoLayout: c.autoLayout ?? null,
         layoutItem: c.layoutItem ?? null,
+        constraints: c.constraints ?? null,
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
         styleRef: c.styleRef ?? null,
@@ -1567,9 +1570,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_layout_item: tool({
-      description: 'How a clip sizes inside its auto layout, per axis: fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; on a clip not yet in a container it applies once it is parented). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this.',
-      inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string() }),
-      execute: async ({ clip_id, ...patch }) => apply(setLayoutItem(session.doc, clip_id, patch), `sized ${clip_id} in its auto layout`)
+      description: 'How a clip sizes inside its auto layout, per axis: fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; on a clip not yet in a container it applies once it is parented). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this. constraints pins a clip to the frame for when the frame is resized (set_canvas, the frame on the canvas): horizontal left, right, left_right (stretch), center or scale (default); vertical top, bottom, top_bottom, center or scale.',
+      inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string(), constraints: z.object({ horizontal: z.enum(HORIZONTALS).optional(), vertical: z.enum(VERTICALS).optional() }).optional() }),
+      execute: async ({ clip_id, constraints, ...patch }) => {
+        const pinned = constraints ? setConstraints(session.doc, [clip_id], constraints) : ({ ok: true, doc: session.doc } as OpResult);
+        const sized = pinned.ok && Object.keys(patch).length ? setLayoutItem(pinned.doc, clip_id, patch) : pinned;
+        return apply(sized, `sized ${clip_id} in its layout`);
+      }
     }),
 
     set_part_fill: tool({
@@ -2095,7 +2102,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const early = typeof input.still === 'number' ? designStill(session.doc, input.still) : ({ ok: true, doc: session.doc } as OpResult);
         const animated = !early.ok || input.still !== false ? early : animateStill(early.doc, input.duration);
         const paced = !animated.ok || input.fps === undefined ? animated : setFrameRate(animated.doc, input.fps);
-        const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, size: input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
+        const sized = !paced.ok ? paced : withConstraints(paced.doc, setCanvas(paced.doc, { format: input.format, size: input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }));
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
         return apply(pinned, 'changed the canvas');
       }
