@@ -201,6 +201,26 @@ describe('layout and layer tools through the endpoint', () => {
   });
 });
 
+describe('auto layout sizing through the endpoint', () => {
+  it('set_layout_item fill on a clip not yet parented is kept', async () => {
+    const a = await shape({ x: 300, y: 675, width: 100, height: 100 });
+
+    expect((await tool('set_layout_item', { clip_id: a, width: 'fill' })).ok).toBe(true);
+  });
+
+  it('add_auto_layout takes the children with their sizing in one call', async () => {
+    const a = await shape({ x: 300, y: 675, width: 100, height: 100 });
+    const b = await shape({ x: 600, y: 675, width: 100, height: 100 });
+
+    const out = await tool('add_auto_layout', { children: [{ clip_id: a, width: 'fill' }, { clip_id: b, height: 'hug' }] });
+
+    expect(out.ok).toBe(true);
+    expect((await clipOf(a)).layoutItem).toMatchObject({ width: 'fill' });
+    expect((await clipOf(b)).layoutItem).toMatchObject({ height: 'hug' });
+    expect((await clipOf(out.container_id)).autoLayout).toMatchObject({ align: 'start' });
+  });
+});
+
 describe('GET /api/v1/motion/tools lists them', () => {
   const get = (query = '') => {
     const url = new URL(`https://feega.test/api/v1/motion/tools${query}`);
