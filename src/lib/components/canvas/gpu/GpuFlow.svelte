@@ -39,7 +39,8 @@
   import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
-  import { snapDrag, type SnapGuide } from '$lib/canvas/snap';
+  import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
+
   import { dragOffset } from '$lib/canvas/duplicate-plan';
   import { enterFrame } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
@@ -722,6 +723,7 @@
 
   function endDrag(ids: string[], e: PointerEvent) {
     snapGuides = [];
+    snapSpacing = [];
     props.onLive?.([]);
     if (props.onTileDrop?.(ids, pointOf(e)) === DropVerdict.Taken) {
       settleOverrides();
@@ -764,6 +766,7 @@
 
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
+  let snapSpacing = $state<SpacingGap[]>([]);
   let altHeld = $state(false);
 
   function snapMoves(raw: TileMove[]): TileMove[] {
@@ -772,6 +775,7 @@
     const others = tiles.filter((t) => !ids.has(t.id)).map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }));
     const snap = snapDrag(rects, others, SNAP_SCREEN_PX / view.zoom);
     snapGuides = snap.guides;
+    snapSpacing = snap.spacing;
     const at = new Map(snap.moves.map((m) => [m.id, m]));
     return raw.map((m) => at.get(m.id) ?? m);
   }
@@ -1178,8 +1182,8 @@
         </div>
       {/each}
       <PeerLayer peers={props.peers ?? []} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
-      {#if measured.length || snapGuides.length}
-        <MeasureLayer gaps={measured} guides={snapGuides} zoom={view.zoom} />
+      {#if measured.length || snapGuides.length || snapSpacing.length}
+        <MeasureLayer gaps={[...measured, ...snapSpacing]} guides={snapGuides} zoom={view.zoom} />
       {/if}
     </div>
   </div>
