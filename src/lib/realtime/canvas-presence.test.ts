@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { HEARTBEAT_MS, SETTLE_MS, TICK_MS, landedAt, withPeerMotion, canvasHub, canvasPeersOf, keepCanvasMark, toCanvasMark, type CanvasMark } from './canvas-presence';
+import { CHAT_MAX, HEARTBEAT_MS, SETTLE_MS, TICK_MS, centreOf, followed, landedAt, presenterOf, withPeerMotion, canvasHub, canvasPeersOf, keepCanvasMark, toCanvasMark, type CanvasMark } from './canvas-presence';
 import { MARK_STALE_MS } from './frame-presence';
 
 const self = { sessionId: 's-me', userId: 'me', name: 'me' };
@@ -93,12 +93,12 @@ describe('canvasHub receiver', () => {
     port.listen((mark) => got.push(mark));
     line.receive({ nope: true });
     line.receive({ sessionId: 's-u', userId: 'u', name: 'u', cursor: null, selection: [], live: [], at: 1 });
-    expect(got).toEqual([{ sessionId: 's-u', userId: 'u', name: 'u', cursor: null, selection: [], live: [], at: 42 }]);
+    expect(got).toEqual([{ sessionId: 's-u', userId: 'u', name: 'u', cursor: null, selection: [], live: [], view: null, presenting: false, chat: null, at: 42 }]);
   });
 });
 
 describe('canvasPeersOf', () => {
-  const mark = (userId: string, at: number, sessionId = `s-${userId}`): CanvasMark => ({ sessionId, userId, name: userId, cursor: { x: 0, y: 0 }, selection: [], live: [], at });
+  const mark = (userId: string, at: number, sessionId = `s-${userId}`): CanvasMark => ({ sessionId, userId, name: userId, cursor: { x: 0, y: 0 }, selection: [], live: [], view: null, presenting: false, chat: null, at });
 
   it('hides self and stale peers, colours the rest', () => {
     let marks = new Map<string, CanvasMark>();
@@ -121,7 +121,7 @@ describe('canvasPeersOf', () => {
 });
 
 describe('a dropped ghost stays until the commit lands', () => {
-  const at = (live: CanvasMark['live'], when: number): CanvasMark => ({ sessionId: 's-bo', userId: 'bo', name: 'bo', cursor: null, selection: [], live, at: when });
+  const at = (live: CanvasMark['live'], when: number): CanvasMark => ({ sessionId: 's-bo', userId: 'bo', name: 'bo', cursor: null, selection: [], live, view: null, presenting: false, chat: null, at: when });
   const box = { id: 'n', x: 300, y: 200 };
 
   it('keeps the last box after the drop while the node still sits at its old place', () => {
@@ -153,7 +153,7 @@ describe('landedAt', () => {
 
 describe('withPeerMotion', () => {
   const tile = { id: 'n', x: 0, y: 0, w: 10, h: 10, rotation: 0, kind: 'motion' };
-  const peer = (live: CanvasMark['live']) => ({ sessionId: 's', userId: 'u', name: 'u', cursor: null, selection: [], live, at: 0, colour: '#000' });
+  const peer = (live: CanvasMark['live']) => ({ sessionId: 's', userId: 'u', name: 'u', cursor: null, selection: [], live, view: null, presenting: false, chat: null, at: 0, colour: '#000' });
 
   it('moves the real tile to where the peer is dragging it', () => {
     expect(withPeerMotion([tile], [peer([{ id: 'n', x: 5, y: 6, w: 20, r: 45 }])], new Set())).toEqual([{ ...tile, x: 5, y: 6, w: 20, rotation: 45 }]);
@@ -166,5 +166,36 @@ describe('withPeerMotion', () => {
   it('returns the same array when nobody is moving anything', () => {
     const tiles = [tile];
     expect(withPeerMotion(tiles, [peer([])], new Set())).toBe(tiles);
+  });
+});
+
+describe('follow and spotlight', () => {
+  const peer = (userId: string, at: number, over: Partial<CanvasMark> = {}) => ({ sessionId: `s-${userId}-${at}`, userId, name: userId, cursor: null, selection: [], live: [], view: { cx: at, cy: 0, zoom: 1 }, presenting: false, chat: null, at, colour: '#000', ...over });
+
+  it('a viewport travels as its centre in canvas units, so screen sizes do not matter', () => {
+    expect(centreOf({ x: -100, y: -50, zoom: 2 }, { width: 800, height: 600 })).toEqual({ cx: 250, cy: 175, zoom: 2 });
+  });
+
+  it('following a person tracks their most recent tab', () => {
+    expect(followed([peer('bo', 1), peer('bo', 5), peer('al', 9)], 'bo')).toEqual({ cx: 5, cy: 0, zoom: 1 });
+    expect(followed([peer('al', 9)], 'bo')).toBeNull();
+  });
+
+  it('the presenter is whoever spotlights themselves', () => {
+    expect(presenterOf([peer('al', 1), peer('bo', 2, { presenting: true })])?.userId).toBe('bo');
+    expect(presenterOf([peer('al', 1)])).toBeNull();
+  });
+
+  it('marks from older clients read as not presenting, no view', () => {
+    expect(toCanvasMark({ sessionId: 's', userId: 'u', name: 'u', cursor: null, selection: [], at: 1 })).toMatchObject({ view: null, presenting: false });
+  });
+});
+
+describe('cursor chat', () => {
+  it('a short message rides the mark, a long one is refused', () => {
+    const base = { sessionId: 's', userId: 'u', name: 'u', cursor: { x: 1, y: 1 }, selection: [], at: 1 };
+    expect(toCanvasMark({ ...base, chat: 'hello' })?.chat).toBe('hello');
+    expect(toCanvasMark({ ...base, chat: 'x'.repeat(CHAT_MAX + 1) })).toBeNull();
+    expect(toCanvasMark(base)?.chat).toBeNull();
   });
 });
