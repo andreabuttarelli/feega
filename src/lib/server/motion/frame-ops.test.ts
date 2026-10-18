@@ -126,3 +126,15 @@ describe('committing a whole doc edited from an older head', () => {
     expect([textOf(head?.doc, 'a'), textOf(head?.doc, 'b')]).toEqual(['agent', 'typed by hand']);
   });
 });
+
+describe('committing a whole doc on a current head', () => {
+  it('writes without reading the head it already holds', async () => {
+    const { db } = await seeded();
+    const from = vi.spyOn(db, 'from');
+
+    const out = await commitDoc(db, { ...scope, base: { version: 1, doc: start() }, doc: retext(start(), 'a', 'A'), actor: ana, summary: 'Edited' });
+
+    expect(out).toMatchObject({ outcome: OpsOutcome.Written, rebased: false, head: { version: 2 } });
+    expect(from).toHaveBeenCalledTimes(1);
+  });
+});
