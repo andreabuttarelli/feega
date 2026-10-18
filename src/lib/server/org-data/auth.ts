@@ -22,6 +22,8 @@ import { env as publicEnv } from '$env/dynamic/public';
 import { env } from '$env/dynamic/private';
 import { createUserDb, createServiceRoleDb, type Db } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
+import { listMemberships } from '$lib/server/repos/orgs';
+import { can, OrgAction } from '$lib/org-roles';
 import type { OrgQueryAuthority } from './query-tool';
 
 export type OrgCaller = {
@@ -112,15 +114,11 @@ async function resolveJwt(token: string, orgId?: string): Promise<{ caller: OrgC
     return { error: { status: 401, body: { error: 'invalid_token' } } };
   }
 
-  const { data: memberships, error: memberError } = await db
-    .from('orgs_members')
-    .select('org_id')
-    .eq('user_id', userData.user.id);
-
-  if (memberError) {
+  const memberships = await listMemberships(db, userData.user.id).catch(() => null);
+  if (!memberships) {
     return { error: { status: 500, body: { error: 'membership_lookup_failed' } } };
   }
-  const orgIds = (memberships ?? []).map((m) => m.org_id);
+  const orgIds = memberships.map((m) => m.org.id);
   if (!orgIds.length) {
     return { error: { status: 404, body: { error: 'no_organization' } } };
   }
@@ -132,13 +130,15 @@ async function resolveJwt(token: string, orgId?: string): Promise<{ caller: OrgC
     return { error: { status: 404, body: { error: 'org_not_found' } } };
   }
 
+  const role = memberships.find((m) => m.org.id === chosen)?.role;
+
   return {
     caller: {
       authority: { kind: 'rls', supabase: db as unknown as SupabaseClient },
       db,
       orgId: chosen,
       userId: userData.user.id,
-      writeAllowed: true
+      writeAllowed: role ? can(role, OrgAction.Edit) : false
     }
   };
 }

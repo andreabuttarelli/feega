@@ -31,7 +31,8 @@
       onCanvasList: ignore,
       onPeers: ignore,
       onLink: ignore,
-      frames: frames.line
+      frames: frames.line,
+      frameHeads: frames.heads
     });
   });
 </script>

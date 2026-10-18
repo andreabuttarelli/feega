@@ -67,7 +67,7 @@
     onrestack?: (ids: string[], to: Stack) => void;
   } = $props();
 
-  const { fitView, zoomIn, zoomOut, zoomTo, getNodes, getEdges, updateNode, screenToFlowPosition } = useSvelteFlow();
+  const { fitView, zoomIn, zoomOut, setZoom, getNodes, getEdges, updateNode, screenToFlowPosition } = useSvelteFlow();
 
   const selected = (): Node[] => getNodes().filter((n) => n.selected);
 
@@ -138,7 +138,7 @@
     'select-previous': () => selectSibling(Direction.Previous),
     'select-all': () => setSelection(true),
     fit: () => void fitView(),
-    'zoom-actual': () => void zoomTo(1),
+    'zoom-actual': () => void setZoom(1),
     'zoom-selection': () => {
       const nodes = selected().map((n) => ({ id: n.id }));
       if (nodes.length) void fitView({ nodes });

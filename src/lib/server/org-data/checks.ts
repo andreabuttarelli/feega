@@ -41,8 +41,8 @@ export const ORG_TABLE_CHECKS: Record<string, string> = {
   nodes_lock_actor_kind_check: "lock_actor_kind in ('user', 'agent', 'system')",
   nodes_type_check:
     "type in ('text', 'image', 'video', 'doc', 'iframe', 'social_account_feed', 'social_post_mockup', 'products', 'ads', 'influencer', 'list', 'select', 'effects', 'composition', 'calendar', 'audio', 'model3d', 'motion', 'studio_batch')",
-  orgs_invites_role_check: "role in ('owner', 'admin', 'member')",
-  orgs_members_role_check: "role in ('owner', 'admin', 'member')",
+  orgs_invites_role_check: "role in ('owner', 'admin', 'member', 'viewer')",
+  orgs_members_role_check: "role in ('owner', 'admin', 'member', 'viewer')",
   post_sources_role_check: "role in ('caption', 'media', 'reference')",
   posts_actor_kind_check: "actor_kind in ('user', 'agent', 'system')",
   posts_status_check: "status in ('draft', 'ready', 'archived')",
