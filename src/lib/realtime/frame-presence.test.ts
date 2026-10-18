@@ -101,3 +101,23 @@ describe('frame heads: a saved revision reaches peers without polling', () => {
     expect(() => port.landed({ nodeId: 'n1', version: 4, doc })).not.toThrow();
   });
 });
+
+describe('frame drafts: unsaved ops stream to peers', () => {
+  const ops = [{ kind: 'clip.entry', clipId: 'a', field: 'props', key: 'text', value: 'A' }];
+
+  it('sends my draft with my tab id and hears only other tabs, with valid ops', () => {
+    const mine = frameHub({ userId: 'me', name: 'Me' });
+    const sent: { sessionId: string }[] = [];
+    const heard: unknown[] = [];
+    mine.drafts.attach((d) => sent.push(d));
+    mine.port.onDraft((d) => heard.push(d));
+
+    mine.port.draft({ nodeId: 'n1', baseVersion: 2, ops: ops as never });
+    mine.drafts.receive(sent[0]);
+    mine.drafts.receive({ nodeId: 'n1', sessionId: 'other', baseVersion: 2, ops: [{ kind: 'nope' }] });
+    mine.drafts.receive({ nodeId: 'n1', sessionId: 'other', baseVersion: 2, ops });
+
+    expect(sent).toHaveLength(1);
+    expect(heard).toEqual([{ nodeId: 'n1', sessionId: 'other', baseVersion: 2, ops }]);
+  });
+});

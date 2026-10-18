@@ -32,7 +32,8 @@
       onPeers: ignore,
       onLink: ignore,
       frames: frames.line,
-      frameHeads: frames.heads
+      frameHeads: frames.heads,
+      frameDrafts: frames.drafts
     });
   });
 </script>

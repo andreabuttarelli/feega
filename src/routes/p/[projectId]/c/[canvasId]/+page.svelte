@@ -1411,6 +1411,7 @@
       onLink: (state) => { canvasLink.set(state); },
       frames: frames.line,
       frameHeads: frames.heads,
+      frameDrafts: frames.drafts,
       cursors: cursors.line,
       commits: commits.line
     });
