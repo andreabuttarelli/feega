@@ -136,6 +136,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.Copy]: CLIPBOARD,
   [Command.Paste]: motion('set_keyframes'),
   [Command.SelectAll]: VIEW,
+  [Command.SelectMatching]: VIEW,
   [Command.Deselect]: VIEW,
   [Command.SelectChild]: VIEW,
   [Command.SelectParent]: VIEW,

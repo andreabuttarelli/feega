@@ -207,6 +207,13 @@ describe('mask keys', () => {
   });
 });
 
+describe('select matching key', () => {
+  it('⌥⌘A selects every layer like the selected ones', () => {
+    expect(press('å', { mod: true, alt: true, code: 'KeyA' })).toBe(Command.SelectMatching);
+    expect(press('a', { mod: true, code: 'KeyA' })).toBe(Command.SelectAll);
+  });
+});
+
 describe('flip keys', () => {
   it('⇧H flips horizontally and ⇧V vertically', () => {
     expect(press('H', { shift: true, code: 'KeyH' })).toBe(Command.FlipHorizontal);
