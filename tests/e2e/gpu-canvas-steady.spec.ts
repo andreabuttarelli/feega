@@ -169,6 +169,34 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
     expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
   });
 
+  test('an ⌥-drag leaves the original in place and drags its copy', async ({ page, session, admin, seedNode }) => {
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    const box = await frame(admin, session, seedNode, 80, { kind: 'element', posterAssetId: null }, sheet('rect'));
+    await admin.from('nodes').update({ width: 200, height: 120 }).eq('id', box.id);
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+    const tile = page.locator(`.svelte-flow__node[data-id="${box.id}"]`);
+    await expect(tile).toBeVisible();
+    const place = async () => (await tile.getAttribute('data-box'))!.split(',').slice(0, 2).join(',');
+    const origin = await place();
+
+    const b = (await tile.boundingBox())!;
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+    await page.keyboard.down('Alt');
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2 + 60, b.y + b.height / 2 + 200, { steps: 10 });
+    expect(await place(), 'the original stays while the copy moves').toBe(origin);
+    await expect(page.getByTestId('gpu-copy-ghost')).toBeVisible();
+    await page.mouse.up();
+    await page.keyboard.up('Alt');
+
+    await expect.poll(async () => (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).is('deleted_at', null)).data!.length, { timeout: 10_000 }).toBe(2);
+    expect(await place(), 'the original never moved').toBe(origin);
+    await expect(page.getByTestId('gpu-copy-ghost')).toHaveCount(0);
+    await page.waitForTimeout(2000);
+    await expect(page.locator('.svelte-flow__node[data-id]'), 'the copy stays on the canvas').toHaveCount(2);
+  });
+
   test('a wire ends on its ports at every zoom', async ({ page, session, admin, seedNode }) => {
     await page.setViewportSize({ width: 1600, height: 1000 });
     const text = await seedNode({ type: 'text', x: 0, y: 0, data: { prompt: 'a' } });
