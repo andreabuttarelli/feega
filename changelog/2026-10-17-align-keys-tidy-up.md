@@ -1,9 +1,9 @@
 # ⌥-letter align and Tidy up
 
-Figma (help.figma.com 360039956914): ⌥A left, ⌥H horizontal centres, ⌥D right, ⌥W top,
+Expected keys: ⌥A left, ⌥H horizontal centres, ⌥D right, ⌥W top,
 ⌥V vertical centres, ⌥S bottom. Tidy up: a row or column keeps its first layer and takes the
 most common gap; a grid is laid from the top-left corner on both axes. The help page gives no
-Tidy up shortcut: ⌃⌥T is Figma's from memory (UNVERIFIED), used as the sensible standard.
+Tidy up shortcut: ⌃⌥T is unconfirmed, used as the sensible standard.
 
 - `tidyMoves` (`motion/tidy.ts`) is the one geometry; `tidySpace` (frame, `space.ts`) and
   `tidyTiles` (canvas, `canvas/align.ts`) feed it. Ties on the common gap take the smaller.

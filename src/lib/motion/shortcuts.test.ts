@@ -208,7 +208,7 @@ describe('mask keys', () => {
 });
 
 describe('flip keys', () => {
-  it('⇧H flips horizontally and ⇧V vertically, as in Figma', () => {
+  it('⇧H flips horizontally and ⇧V vertically', () => {
     expect(press('H', { shift: true, code: 'KeyH' })).toBe(Command.FlipHorizontal);
     expect(press('V', { shift: true, code: 'KeyV' })).toBe(Command.FlipVertical);
     expect(press('v', { code: 'KeyV' })).toBe(Command.ToolSelect);
@@ -222,7 +222,7 @@ describe('sibling keys', () => {
   });
 });
 
-describe('Figma align keys', () => {
+describe('align keys', () => {
   it('⌥A ⌥H ⌥D ⌥W ⌥V ⌥S align, ⌃⌥T tidies up, by physical key', () => {
     expect(press('å', { alt: true, code: 'KeyA' })).toBe(Command.AlignLeft);
     expect(press('˙', { alt: true, code: 'KeyH' })).toBe(Command.AlignCenter);
