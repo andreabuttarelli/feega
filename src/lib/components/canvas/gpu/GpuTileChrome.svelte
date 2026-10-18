@@ -8,7 +8,7 @@
   import { tileHovered } from '$lib/canvas/layers';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
 
-  let { tile, selected, resizable = false, onrotate }: { tile: Tile; selected: boolean; resizable?: boolean; onrotate?: (id: string, degrees: number) => void } = $props();
+  let { tile, selected, full, resizable = false, onrotate }: { tile: Tile; selected: boolean; full: boolean; resizable?: boolean; onrotate?: (id: string, degrees: number) => void } = $props();
 
   const CORNERS = ['top left', 'top right', 'bottom left', 'bottom right'] as const;
 
@@ -39,7 +39,7 @@
   }
 </script>
 
-{#if label && Icon}
+{#if full && label && Icon}
   <div class="node-label" class:is-chosen={chrome.ring === NodeChrome.Selected}>
     <Icon size={12} strokeWidth={1.8} />
     <span>{label}</span>
@@ -57,6 +57,7 @@
   <div class={`tile-selection ring-${chrome.ring}`} data-testid="tile-selection" data-ring={chrome.ring} style={`outline-color:${ringColor}`} aria-hidden="true"></div>
 {/if}
 
+{#if full}
 {#each ports as connector, i (connector)}
   <div class="svelte-flow__handle typed-port port-in target" data-handleid={connector} data-nodeid={tile.id} style={`top:${spaced(i, ports.length)};--port:${CONNECTOR_STYLE[connector].color}`} title={CONNECTOR_STYLE[connector].label} aria-label={CONNECTOR_STYLE[connector].label}></div>
   <span class="port-name port-name-in" style={`top:${spaced(i, ports.length)};--port:${CONNECTOR_STYLE[connector].color}`}>{CONNECTOR_STYLE[connector].label}</span>
@@ -71,6 +72,8 @@
   <div class="svelte-flow__handle typed-port port-out source" data-handleid={out.handle} data-nodeid={tile.id} style={`top:${spaced(i, outputs.length)};--port:${CONNECTOR_STYLE[out.port].color}`} title={out.label} aria-label={out.label}></div>
   <span class={`port-name port-name-out ${out.incompatible ? 'port-name-flagged' : ''}`} style={`top:${spaced(i, outputs.length)};--port:${CONNECTOR_STYLE[out.port].color}`}>{out.label}</span>
 {/each}
+
+{/if}
 
 {#if resizable}
   {#each CORNERS as corner (corner)}

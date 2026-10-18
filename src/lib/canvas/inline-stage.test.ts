@@ -127,6 +127,25 @@ describe('inline stage', () => {
     anchor.destroy();
   });
 
+  it('a leaving frame that hands over its body again keeps its editor drawn, never black', async () => {
+    vi.useFakeTimers();
+    const take = inlineStage.offer('m1', document.createElement('div'));
+    inlineStage.ready('m1');
+    await vi.runAllTimersAsync();
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Swapped);
+
+    inlineStage.leave('m1');
+    take();
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Swapped);
+    const retake = inlineStage.offer('m1', document.createElement('div'));
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Swapped);
+
+    inlineStage.landed('m1');
+    retake();
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Pending);
+    vi.useRealTimers();
+  });
+
   it('a closing frame is let go once its tile has drawn, or after a cap', async () => {
     vi.useFakeTimers();
     inlineStage.leave('m1');
