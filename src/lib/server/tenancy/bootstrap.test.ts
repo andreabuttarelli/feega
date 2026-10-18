@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { acceptInviteWith, createFirstOrgWith, orgSlugFrom } from '$lib/server/tenancy/bootstrap';
-import { hashInviteToken } from '$lib/server/repos/invites';
+import { hashInviteToken, LINK_INVITE_EMAIL } from '$lib/server/repos/invites';
 import { fakeDb, filtersOf, type Call } from '$lib/server/db/fake-db';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { FreeOrgLimitReachedError } from '$lib/server/tenancy/free-org-limit';
@@ -302,5 +302,19 @@ describe('ogni scavalco della RLS sta nel registro', () => {
 
     expect(entry, "accettare un invito scavalca la RLS e non è dichiarato").toBeDefined();
     expect(entry!.why.length).toBeGreaterThan(20);
+  });
+});
+
+describe("il link d'invito vale per chiunque lo apra, più volte", () => {
+  const linkRow = { ...inviteRow, email: LINK_INVITE_EMAIL, role: 'viewer' };
+
+  it('entra come viewer qualunque sia la sua email, e il link resta vivo', async () => {
+    const { db, calls } = fakeDb({ orgs_invites: [linkRow], orgs_members: [], credit_ledger: [] });
+
+    const result = await acceptInviteWith(db, { token: 'segreto', userId: USER, email: 'altro@x.it', now: NOW });
+
+    expect(result).toEqual({ outcome: 'accepted', orgId: ORG, role: 'viewer' });
+    expect(opsOn(calls, 'orgs_members')).toContain('insert');
+    expect(opsOn(calls, 'orgs_invites')).not.toContain('update');
   });
 });

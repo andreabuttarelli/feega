@@ -11,6 +11,7 @@ import {
   revokeInvite,
   type Invite
 } from '$lib/server/repos/invites';
+import { editorSeatsLeft, needsSeat, seatLimitDetail, seatPlanOf } from '$lib/server/team/seats';
 import { INVITE_PARAM } from '$lib/server/tenancy/landing';
 
 export type InviteMail = { to: string; orgName: string; inviterId: string; acceptUrl: string };
@@ -38,7 +39,8 @@ export enum TeamRefusal {
   AlreadyMember = 'already_member',
   NotFound = 'not_found',
   OwnerProtected = 'owner_protected',
-  Self = 'self'
+  Self = 'self',
+  SeatLimit = 'seat_limit'
 }
 
 export type TeamRequest =
@@ -48,7 +50,7 @@ export type TeamRequest =
   | { op: TeamOp.SetRole; userId: string; role: string }
   | { op: TeamOp.RemoveMember | TeamOp.TransferOwnership; userId: string };
 
-export type TeamResult = { ok: true; data: Record<string, unknown> } | { ok: false; refusal: TeamRefusal };
+export type TeamResult = { ok: true; data: Record<string, unknown> } | { ok: false; refusal: TeamRefusal; detail?: Record<string, unknown> };
 
 export type TeamMember = { userId: string; email: string; name: string | null; role: OrgRole };
 
@@ -94,6 +96,19 @@ export async function listTeam(ctx: TeamCtx): Promise<Team | null> {
   };
 }
 
+async function seatRefusal(ctx: TeamCtx, role: string): Promise<TeamResult | null> {
+  if (!needsSeat(role)) {
+    return null;
+  }
+
+  const [plan, members, invites] = await Promise.all([seatPlanOf(ctx.db, ctx.orgId), listMembers(ctx.db, ctx.orgId), listInvites(ctx.db, ctx.orgId)]);
+  const pendingInviteRoles = invites.filter((i) => i.status === 'pending' && i.email !== LINK_INVITE_EMAIL).map((i) => i.role);
+  if (editorSeatsLeft(plan, { members: members.map((m) => m.role), pendingInviteRoles }) > 0) {
+    return null;
+  }
+  return { ok: false, refusal: TeamRefusal.SeatLimit, detail: seatLimitDetail(plan) };
+}
+
 async function sendInvite(ctx: TeamCtx, to: string, token: string): Promise<Record<string, unknown>> {
   const url = acceptUrl(ctx, token);
   const name = (await orgName(ctx.db, ctx.orgId)) ?? 'feega';
@@ -113,6 +128,11 @@ async function invite(ctx: TeamCtx, actor: OrgRole, input: { email: string; role
   const members = await listMembers(ctx.db, ctx.orgId);
   if (members.some((m) => m.email.toLowerCase() === email)) {
     return refused(TeamRefusal.AlreadyMember);
+  }
+
+  const noSeat = await seatRefusal(ctx, input.role);
+  if (noSeat) {
+    return noSeat;
   }
 
   try {
@@ -160,6 +180,11 @@ async function setRole(ctx: TeamCtx, actor: OrgRole, input: { userId: string; ro
   }
   if (!isOrgRole(input.role) || !assignableRoles(actor).includes(input.role)) {
     return refused(TeamRefusal.InvalidRole);
+  }
+
+  const noSeat = needsSeat(current) ? null : await seatRefusal(ctx, input.role);
+  if (noSeat) {
+    return noSeat;
   }
 
   await setMemberRole(ctx.db, { orgId: ctx.orgId, userId: input.userId, role: input.role });

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fakeDb } from '$lib/server/db/fake-db';
+import { fakeDb, type Call } from '$lib/server/db/fake-db';
 import { listTeam, runTeamOp, TeamOp, TeamRefusal, type TeamCtx } from '$lib/server/team/team';
 import { LINK_INVITE_EMAIL } from '$lib/server/repos/invites';
 
@@ -45,7 +45,7 @@ function ctxFor(userId: string, extra: Record<string, unknown[]> = {}) {
   return { ctx, calls, mail, rpc };
 }
 
-const written = (calls: { table: string; op: string }[], table: string, op: string) => calls.filter((c) => c.table === table && c.op === op);
+const written = (calls: Call[], table: string, op: string) => calls.filter((c) => c.table === table && c.op === op);
 
 describe('invitare', () => {
   it('un admin invita per email con un ruolo, e parte la mail con il link', async () => {
@@ -109,6 +109,29 @@ describe('invitare', () => {
     expect(result).toMatchObject({ ok: true, data: { url: expect.stringContaining('https://feega.app/login?invite_token=') } });
     expect(written(calls, 'orgs_invites', 'delete')[0].filters).toEqual(expect.arrayContaining([['email', LINK_INVITE_EMAIL], ['org_id', ORG]]));
     expect(written(calls, 'orgs_invites', 'insert')[0].payload).toEqual(expect.objectContaining({ email: LINK_INVITE_EMAIL, role: 'viewer' }));
+  });
+});
+
+describe('i posti da editor', () => {
+  it("un'org gratuita piena non accetta un altro editor, e dice come fare", async () => {
+    const { ctx, calls } = ctxFor(OWNER, { credit_ledger: [] });
+
+    const result = await runTeamOp(ctx, { op: TeamOp.Invite, email: 'new@x.it', role: 'member' });
+
+    expect(result).toMatchObject({ ok: false, refusal: TeamRefusal.SeatLimit, detail: { upgrade_path: '/app/credits' } });
+    expect(written(calls, 'orgs_invites', 'insert')).toHaveLength(0);
+  });
+
+  it('promuovere un viewer a editor in un org piena è rifiutato', async () => {
+    const { ctx } = ctxFor(OWNER, { credit_ledger: [] });
+
+    expect(await runTeamOp(ctx, { op: TeamOp.SetRole, userId: VIEWER, role: 'member' })).toMatchObject({ ok: false, refusal: TeamRefusal.SeatLimit });
+  });
+
+  it("un'org che ha pagato invita editor senza limite", async () => {
+    const { ctx } = ctxFor(OWNER, { credit_ledger: [{ org_id: ORG, source: 'one_time_purchase' }] });
+
+    expect((await runTeamOp(ctx, { op: TeamOp.Invite, email: 'new@x.it', role: 'member' })).ok).toBe(true);
   });
 });
 

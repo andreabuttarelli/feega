@@ -34,7 +34,7 @@ const MCP_INSTRUCTION_LINES = [
   ADS_INSTRUCTION,
   'A project needs no brand; never guess one: attach one only to publish.',
   '`get_media`: show `preview_url`, give `full_url`.',
-  '`list_motion_videos`/`list_shader_effects`; `ask_motion_agent`/`get_motion_run`/`get_motion_summary`/`motion_budget`; `render_video`/`get_render`; `publish_motion_embed`/`get_motion_embed`; `view_motion_frames`/`list_motion_revisions`/`restore_motion_revision`; `list_motion_templates`/`add_motion_template`/`new_motion_from_template`/`motion_tool`/`motion_editor_op`; `get_storyboard`/`write_storyboard`/`edit_storyboard_card`; `search_gallery`/`remix_gallery_item`/`publish_to_gallery`; `write_layout`/`patch_layout`/`list_layouts`; `get_app_account`/`forget_app_account`; `list_orgs`/`team_op`.',
+  '`list_motion_videos`/`list_shader_effects`; `ask_motion_agent`/`get_motion_run`/`get_motion_summary`/`motion_budget`; `render_video`/`get_render`; `publish_motion_embed`/`get_motion_embed`; `view_motion_frames`/`list_motion_revisions`/`restore_motion_revision`; `list_motion_templates`/`add_motion_template`/`new_motion_from_template`/`motion_tool`/`motion_editor_op`; `get_storyboard`/`write_storyboard`/`edit_storyboard_card`; `search_gallery`/`remix_gallery_item`/`publish_to_gallery`; `write_layout`/`patch_layout`/`list_layouts`; `get_app_account`/`forget_app_account`; `list_orgs`/`list_team`/`team_op`.',
   'Signing in is no tool: HTTP hosts send the Bearer; locally `feega login`.'
 ];
 

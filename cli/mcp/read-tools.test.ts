@@ -97,6 +97,7 @@ const RESTANO = [
   'render_video',
   'get_render',
   'list_orgs',
+  'list_team',
   'team_op'
 ];
 
