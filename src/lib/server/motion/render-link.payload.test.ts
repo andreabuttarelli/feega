@@ -9,7 +9,7 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
 vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'project-1', brandId: null }) }));
 vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/motion-revisions')>()),
-  readRevision: async () => {
+  readCheckpoint: async () => {
     const { newMotionDoc, MotionFormat } = await import('$lib/motion/doc');
     return { version: 2, doc: newMotionDoc(MotionFormat.Landscape), summary: null, actorKind: 'user' };
   }

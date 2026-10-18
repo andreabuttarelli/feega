@@ -146,6 +146,7 @@ export function fakeDb(rows: Record<string, unknown[]>, options: FakeOptions = {
       update: (payload: unknown) => builder(table, 'update', payload),
       delete: () => builder(table, 'delete')
     }),
+    rpc: async (name: string) => ({ data: null, error: { code: 'PGRST202', message: `no function ${name}` } }),
     storage: {
       from: (bucket: string) => ({
         createSignedUrl: async (path: string, _ttl?: number, transformOptions?: unknown) => {
