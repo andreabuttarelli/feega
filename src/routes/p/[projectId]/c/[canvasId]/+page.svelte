@@ -1444,6 +1444,7 @@
 
   async function refresh(): Promise<boolean> {
     const version = ++snapshotVersion;
+    const asked = places.mark();
     const snapshot = await post('snapshot', {});
     if (!snapshot) {
       return false;
@@ -1458,7 +1459,7 @@
     }
     const now = Date.now();
     const before = nodes;
-    nodes = keepSame(nodes, keepPending((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty), now);
+    nodes = keepSame(nodes, keepPending((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys, (id) => places.dirty(id) || places.placedAfter(id, asked)), now);
     edges = keepSame(edges, keepLines((snapshot.connections as Connection[]).map(toEdge), edges, lines.pending()), now);
     productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
     socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
