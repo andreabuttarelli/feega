@@ -19,7 +19,8 @@ enum Start {
 const FRAMES = [
   { name: 'a video frame', doc: video },
   { name: 'a template frame', doc: template },
-  { name: 'an interactive template frame', doc: interactive }
+  { name: 'an interactive template frame', doc: interactive },
+  { name: 'a frame saved with a one-frame work area', doc: { ...video, workArea: { from: 0, to: 1 } } }
 ] as const;
 
 const START_PLAY: Record<Start, (page: Page) => Promise<void>> = {
