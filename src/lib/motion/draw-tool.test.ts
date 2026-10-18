@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Corner, closesOnFirst, cornerAt, cornerInset, dragRect, nudge, resizeFromCorner, roundnessFromInset } from './draw-tool';
+import { Corner, clickBox, closesOnFirst, cornerAt, cornerInset, dragRect, nudge, resizeFromCorner, roundnessFromInset } from './draw-tool';
 
 describe('dragging a box to create an element inside a frame', () => {
   it('centers the box between the two drag points', () => {
@@ -102,5 +102,11 @@ describe('corner radius handles', () => {
 
   it('dragging outward is no inset', () => {
     expect(cornerInset(box, 1, [320, 30])).toBe(0);
+  });
+});
+
+describe('a click with a box tool', () => {
+  it('starts the box at the click, top-left, not centred on it', () => {
+    expect(clickBox({ x: 100, y: 50 }, { width: 200, height: 40 })).toEqual({ x: 200, y: 70, width: 200, height: 40 });
   });
 });
