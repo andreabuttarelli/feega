@@ -1,6 +1,7 @@
 import { Background, DocMode, RESOLUTION_PROBLEM, docMode, fitsResolution, type MotionDoc } from './doc';
 import { setCanvas, type OpResult } from './timeline';
 import { timelineFits } from './editor-mount';
+import { EditMode, readMode } from './edit-mode';
 
 export const ANIMATE_SECONDS = 5;
 
@@ -22,6 +23,10 @@ const CONTROLS: Record<DocMode, ReadonlySet<VideoControl>> = {
 
 export function controlShown(doc: Pick<MotionDoc, 'still'>, control: VideoControl): boolean {
   return CONTROLS[docMode(doc)].has(control);
+}
+
+export function startMode(doc: MotionDoc, stored: string | null): EditMode {
+  return controlShown(doc, VideoControl.EditMode) && timelineFits(doc) ? readMode(stored) : EditMode.Design;
 }
 
 export function stillFrame(doc: Pick<MotionDoc, 'still'>): number | null {

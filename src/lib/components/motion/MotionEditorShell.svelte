@@ -96,7 +96,7 @@
   import { Align, addMarker, alignClips, allMarkers, clipName, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import StillExport from '$lib/components/motion/StillExport.svelte';
-  import { animateStill, controlShown, DocMode, docMode, stillFrame, VideoControl } from '$lib/motion/still';
+  import { animateStill, controlShown, DocMode, docMode, startMode, stillFrame, VideoControl } from '$lib/motion/still';
   import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
   import { Liveness, interactiveOf } from '$lib/motion/interactive/settings';
   import { defaultsOf, type VarValues } from '$lib/motion/interactive/var-model';
@@ -169,7 +169,7 @@
   import { frameHover } from '$lib/canvas/layers';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
-  import { EDIT_MODE_KEY, EditMode, nextMode, readMode } from '$lib/motion/edit-mode';
+  import { EDIT_MODE_KEY, EditMode, nextMode } from '$lib/motion/edit-mode';
   import DrawOverlay from './DrawOverlay.svelte';
   import DrawTools from './DrawTools.svelte';
   import { PART_SEP, PartAction, runPart } from '$lib/motion/poster-parts';
@@ -288,7 +288,7 @@
   let pressAt: { x: number; y: number } | null = null;
   let pressedMenu: unknown = null;
 
-  let editMode = $state(timelineFits(history.present) ? readMode(localStore()?.getItem(EDIT_MODE_KEY) ?? null) : EditMode.Design);
+  let editMode = $state(startMode(history.present, localStore()?.getItem(EDIT_MODE_KEY) ?? null));
 
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
