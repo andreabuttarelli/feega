@@ -1,6 +1,6 @@
 # Tab / ⇧Tab siblings, Enter into a frame from the canvas
 
-Figma: Enter one level down, ⇧Enter parent, Tab / ⇧Tab siblings (help.figma.com 360040449873).
+Expected keys: Enter one level down, ⇧Enter parent, Tab / ⇧Tab siblings.
 Enter/⇧Enter already worked inside an open frame; missing were Tab and Enter on the canvas.
 
 - Frame: Tab / ⇧Tab → `Command.SelectNext/SelectPrevious` → `siblingOf(layerOrder(doc))`
