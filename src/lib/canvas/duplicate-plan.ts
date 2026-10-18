@@ -71,3 +71,33 @@ export function planDuplicate(input: {
 
 /** Il passo di ogni duplicato successivo: visibile accanto all'originale, non sopra di lui. */
 export const DUPLICATE_OFFSET = { dx: 32, dy: 32 };
+
+export function offsetFrom(dx: unknown, dy: unknown): { dx: number; dy: number } | undefined {
+  if (dx === null || dy === null) {
+    return undefined;
+  }
+
+  const offset = { dx: Number(dx), dy: Number(dy) };
+  return Number.isFinite(offset.dx) && Number.isFinite(offset.dy) ? offset : undefined;
+}
+
+export type Offset = { dx: number; dy: number };
+export type LastDuplicate = { ids: string[]; offset: Offset };
+
+export function dragOffset(origin: Map<string, { x: number; y: number }>, grabbed: { id: string; position: { x: number; y: number } }): Offset | undefined {
+  const from = origin.get(grabbed.id);
+  if (!from) {
+    return undefined;
+  }
+
+  return { dx: grabbed.position.x - from.x, dy: grabbed.position.y - from.y };
+}
+
+export function repeatOffset(last: LastDuplicate | null, ids: string[]): Offset | undefined {
+  if (!last || last.ids.length !== ids.length) {
+    return undefined;
+  }
+
+  const made = new Set(last.ids);
+  return ids.every((id) => made.has(id)) ? last.offset : undefined;
+}
