@@ -8,6 +8,8 @@ const STEP = 70;
 const QUICK_MS = 150;
 const SETTLE_MS = 1500;
 const DRIFT_PX = 3;
+const TURN_DEGREES = 30;
+const TURN_STEPS = 6;
 
 type Sample = { frame: number; present: boolean; same: boolean; x: number; y: number };
 
@@ -167,6 +169,38 @@ test.describe('a free box stays fluid @real', () => {
     await expect
       .poll(async () => (await admin.from('nodes').select('width').eq('id', nodeId).single()).data?.width ?? 0, { message: 'the bigger node is saved', timeout: 10_000 })
       .toBeGreaterThan(start.data!.width + STEP / 4);
+  });
+
+  test('turned by a corner, the node turns with the shape and the shape stays upright inside it', async ({ page, session, admin }) => {
+    test.setTimeout(120_000);
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const nodeId = await drawBox(page);
+    const tile = page.locator(`.svelte-flow__node[data-id="${nodeId}"]`);
+    await expectFilled(page, tile);
+    const docBefore = await headDoc(admin, nodeId);
+    const centre = await tile.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    });
+    const grip = (await page.getByTestId('selection-overlay').getByRole('button', { name: 'Rotate' }).nth(2).boundingBox())!;
+    const from = { x: grip.x + grip.width / 2, y: grip.y + grip.height / 2 };
+    const radius = Math.hypot(from.x - centre.x, from.y - centre.y);
+    const start = Math.atan2(from.y - centre.y, from.x - centre.x);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    for (let step = 1; step <= TURN_STEPS; step++) {
+      const angle = start + (TURN_DEGREES * Math.PI * step) / (180 * TURN_STEPS);
+      await page.mouse.move(centre.x + radius * Math.cos(angle), centre.y + radius * Math.sin(angle));
+    }
+    await page.mouse.up();
+
+    await expect
+      .poll(async () => Math.round(Number(((await admin.from('nodes').select('data').eq('id', nodeId).single()).data?.data as { rotation?: number })?.rotation ?? 0)), { message: 'the node is saved turned', timeout: 10_000 })
+      .toBeGreaterThan(TURN_DEGREES - 5);
+    expect(await headDoc(admin, nodeId), 'the shape never turned inside its node').toEqual(docBefore);
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    expect(await tile.evaluate((el) => parseFloat(getComputedStyle(el).rotate) || 0), 'turned after a reload').toBeGreaterThan(TURN_DEGREES - 5);
   });
 
   test('recoloured then deselected, nothing reloads: same box, no fetch, no blank frame', async ({ page, session }) => {

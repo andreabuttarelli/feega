@@ -2,7 +2,7 @@
   import { clipChrome } from '$lib/canvas/selection-chrome';
   import { onMount, untrack } from 'svelte';
   import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-  import { DragPhase, isOutside, type ElementOut, type HostDrag, type HostShift, hostShift } from '$lib/canvas/canvas-drop';
+  import { DragPhase, isOutside, type ElementOut, type HostDrag, type HostMove, hostShift, hostTurn } from '$lib/canvas/canvas-drop';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { selectionView } from '$lib/motion/selection-context';
   import { reorderAt } from '$lib/motion/layout/guides';
@@ -369,7 +369,7 @@
     }
     const hosted = hostGesture(grab, e);
     if (hosted) {
-      onhostdrag!(hosted.shift, hosted.to, DragPhase.Over);
+      onhostdrag!(hosted.move, hosted.to, DragPhase.Over);
       return;
     }
     const outside = leaving(e);
@@ -396,15 +396,20 @@
     onpreview(result.doc);
   }
 
-  const HOST_GRIPS = new Set<Grip>([Grip.Move, Grip.Scale]);
+  const HOST_GRIPS = new Set<Grip>([Grip.Move, Grip.Scale, Grip.Rotate]);
+  const STILL = { dx: 0, dy: 0, dw: 0, dh: 0 };
 
-  function hostGesture(g: Grab | null, e: PointerEvent | null): { shift: HostShift; to: ClientPt } | null {
+  function hostGesture(g: Grab | null, e: PointerEvent | null): { move: HostMove; to: ClientPt } | null {
     if (!onhostdrag || !g || !HOST_GRIPS.has(g.grip)) {
       return null;
     }
     const to = e ? client(e) : g.start;
+    if (g.grip === Grip.Rotate) {
+      const rect = host!.getBoundingClientRect();
+      return { move: { ...STILL, turn: hostTurn({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, g.start, to) }, to };
+    }
     const unit = g.grip === Grip.Scale && quad ? handlesOf(quad)[g.handle].unit : null;
-    return { shift: hostShift(unit, g.start, to), to };
+    return { move: { ...hostShift(unit, g.start, to), turn: 0 }, to };
   }
 
   function end(e: PointerEvent | null) {
@@ -418,7 +423,7 @@
     live = null;
     onpreview(null);
     if (hosting) {
-      onhostdrag!(hosting.shift, hosting.to, DragPhase.Drop);
+      onhostdrag!(hosting.move, hosting.to, DragPhase.Drop);
       return;
     }
     if (outside) {

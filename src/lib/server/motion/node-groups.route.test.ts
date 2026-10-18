@@ -87,6 +87,21 @@ describe('rotating a group', () => {
     expect(frame.y + 25).toBeCloseTo(120, 5);
   });
 
+  it('a free shape turns as one canvas object: its node takes the angle, its place stays', async () => {
+    const input = event({ id: BOX, degrees: '30' }, { nodes: [row(BOX, { x: 10, y: 20, w: 100, h: 100 }, { kind: 'element' })], motion_revisions: [revision(BOX, boxDoc())] });
+
+    expect(await actions.rotateGroup(input as never)).toMatchObject({ outcome: 'done', turn: { id: BOX, degrees: 30 } });
+    const box = nodesOf(input).find((n) => n.id === BOX)!;
+    expect(box.data.rotation).toBe(30);
+    expect([box.x, box.y]).toEqual([10, 20]);
+  });
+
+  it('a frame does not turn on the canvas', async () => {
+    const input = event({ id: FRAME, degrees: '30' }, { nodes: [row(FRAME, { x: 0, y: 0, w: 200, h: 100 }, {})], motion_revisions: [revision(FRAME, newMotionDoc(MotionFormat.Landscape))] });
+
+    expect(await actions.rotateGroup(input as never)).not.toMatchObject({ outcome: 'done' });
+  });
+
   it('a rotation answers its own undo: the same turn the other way', async () => {
     const input = event({ id: GROUP, degrees: '90' }, grouped());
 
