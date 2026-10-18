@@ -3,7 +3,8 @@ import type { Db } from '$lib/server/db/client';
 import { createNode } from '$lib/server/repos/canvas';
 import { deleteAsset, insertAsset, type AssetType } from '$lib/server/repos/assets';
 import { removeAssetFile } from '$lib/server/repos/asset-storage';
-import { verdictForUpload, canvasUploadPrefix, type UploadKind } from '$lib/canvas/upload-kind';
+import { verdictForUpload, canvasUploadPrefix, UPLOAD_MAX_BYTES, type UploadKind } from '$lib/canvas/upload-kind';
+import { SafeFetchError, safeFetchBytes } from '$lib/server/tool-guard';
 import { convertFileToMarkdown } from '$lib/server/file-to-markdown';
 
 /**
@@ -159,6 +160,36 @@ export async function registerCanvasUpload(db: Db, input: {
  * (per esempio se l'utente annulla prima di registrare), ma non è automatico qui — vedi il
  * commento sopra `registerCanvasUpload`.
  */
+const LINK_MEDIA: ReadonlySet<UploadKind> = new Set(['image', 'video']);
+const LINK_TIMEOUT_MS = 20_000;
+const LINK_REDIRECTS = 4;
+const UNSAFE_NAME = /[^\w.-]+/g;
+
+const linkName = (url: string) => decodeURIComponent(new URL(url).pathname.split('/').pop() || 'link').replace(UNSAFE_NAME, '_');
+
+export async function importCanvasLink(db: Db, input: { orgId: string; projectId: string; url: string }) {
+  const fetched = await safeFetchBytes(input.url, { maxBytes: UPLOAD_MAX_BYTES.video, timeoutMs: LINK_TIMEOUT_MS, maxRedirects: LINK_REDIRECTS, scheme: 'https-only' }).catch((cause: unknown) => {
+    throw new UploadError(400, cause instanceof SafeFetchError ? cause.message : 'That link could not be fetched');
+  });
+  if (!fetched.ok) {
+    throw new UploadError(400, 'That link could not be fetched');
+  }
+
+  const fileName = linkName(fetched.url);
+  const verdict = verdictForUpload(fetched.mime, fileName, fetched.bytes.length);
+  if (!verdict.ok || !LINK_MEDIA.has(verdict.kind)) {
+    throw new UploadError(400, verdict.ok ? 'That link is not a picture or a video' : verdict.why);
+  }
+
+  const path = `${canvasUploadPrefix(input.orgId, input.projectId)}${randomUUID()}-${fileName}`;
+  const stored = await db.storage.from('canvas-assets').upload(path, fetched.bytes, { contentType: fetched.mime });
+  if (stored.error) {
+    throw new UploadError(400, 'The copy could not be stored');
+  }
+
+  return registerUploadedAsset(db, { ...input, path, fileName, mimeType: fetched.mime, bytes: fetched.bytes.length });
+}
+
 export async function discardCanvasUpload(db: Db, input: { path: string }): Promise<void> {
   await removeAssetFile(db, input.path);
 }

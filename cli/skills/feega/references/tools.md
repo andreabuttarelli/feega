@@ -194,7 +194,7 @@ through the same code: `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas
 `show_run`, `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
 `retry_loop_combination`, `preview_workflow`, `run_workflow`, `cancel_workflow`,
 `preview_run_graph`, `run_graph`, `cancel_render`, `withdraw_from_gallery`, `request_upload`,
-`register_upload`, `list_voices`, `voice_library`, `use_library_voice`, `design_voice`,
+`register_upload`, `import_link`, `list_voices`, `voice_library`, `use_library_voice`, `design_voice`,
 `save_voice`, `clone_voice`, `delete_voice`. Every write a person
 makes on the canvas has an op here (`src/lib/server/parity/ui-actions.ts` holds the map). Reads
 are free; writes need a write key; `run_node`, `run_node_loop`, `retry_loop_combination`,

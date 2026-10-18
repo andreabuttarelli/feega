@@ -3074,3 +3074,9 @@ Signal: the page keeps old markup (a new attribute is `null`, a fix "does nothin
 
 ### A drag e2e on a canvas node does not move it
 Signal: `mouse.down/move/up` on a seeded node leaves `boundingBox().x` unchanged; a text node's textbox gets the pointer. Cause: text/doc bodies take the pointer for editing, and a click first on a motion node opens the inline editor. Move: seed a `motion` element with `width/height` and a `motion_revisions` row, then press on it without a prior click; measure the peer's box BEFORE `mouse.down`, not after the moves.
+
+### A template prop edit saves but the frame keeps the old picture
+Signal: the DB holds the new value of a Custom clip prop, the inspector shows it, the frame still draws the old one (or an empty slot). Cause: the clip has a `varPrefix`; at runtime a declared variable (`<prefix>_<prop>`) wins over the prop, and its default was not moved. Move: `setProps` keeps driven variable defaults in step (`drivenVars`); check `interactive.vars` before suspecting assets or CSP.
+
+### Image export answers "needs the server renderer" or times out locally
+Signal: Export image fails with "not available here" or "Waiting failed: 20000ms exceeded". Cause: the server renderer is off without `CHROMIUM_PATH`, and it loads runtime scripts from `PUBLIC_APP_URL` (production by default), whose integrity hashes do not match your build. Move: start `vite dev` with `CHROMIUM_PATH=<Playwright Chrome for Testing binary>` and `PUBLIC_APP_URL=http://localhost:<port>`.

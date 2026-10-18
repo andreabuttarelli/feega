@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { LinkUse, MediaAccept, setSlot, slotPick, type MediaPick, type MediaSlot } from '$lib/motion/media/pick';
+  import { MediaAccept, setSlot, slotPick, type MediaPick, type MediaSlot } from '$lib/motion/media/pick';
   import MediaPicker from './MediaPicker.svelte';
   import type { LibraryMedia, MediaUploader } from './media-upload';
 
@@ -11,9 +11,9 @@
 
 <div class="flex flex-col gap-1.5" data-testid="media-list">
   {#each list as slot, i (i)}
-    <MediaPicker label={`${label} ${i + 1}`} value={slotPick(slot)} {assets} accept={MediaAccept.Any} links={LinkUse.Import} uploader={upload} onpick={(pick) => set(i, pick)} />
+    <MediaPicker label={`${label} ${i + 1}`} value={slotPick(slot)} {assets} accept={MediaAccept.Any} uploader={upload} onpick={(pick) => set(i, pick)} />
   {/each}
   {#key list.length}
-    <MediaPicker label={`Add to ${label}`} value={null} {assets} accept={MediaAccept.Any} links={LinkUse.Import} uploader={upload} onpick={(pick) => set(list.length, pick)} />
+    <MediaPicker label={`Add to ${label}`} value={null} {assets} accept={MediaAccept.Any} uploader={upload} onpick={(pick) => set(list.length, pick)} />
   {/key}
 </div>

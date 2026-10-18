@@ -12,6 +12,7 @@ import { editCameraLane } from './camera-ops';
 import { Around, EASE_PRESETS, Half, presetEase, withHalf, type EasePreset } from './graph';
 import { Interp, keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
 import { partStylesSchema, type PartStyle } from './part-style-model';
+import { drivenVars } from './interactive/driven-vars';
 
 export type OpResult = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
@@ -199,6 +200,12 @@ export function removeClips(doc: MotionDoc, ids: readonly string[]): OpResult {
 }
 
 export function setProps(doc: MotionDoc, clipId: string, patch: Record<string, unknown>): OpResult {
+  const edited = propsEdited(doc, clipId, patch);
+  const clip = edited.ok ? findClip(edited.doc, clipId)?.clip : undefined;
+  return edited.ok && clip ? { ok: true, doc: drivenVars(edited.doc, [clip]) } : edited;
+}
+
+function propsEdited(doc: MotionDoc, clipId: string, patch: Record<string, unknown>): OpResult {
   return editClip(doc, clipId, (clip) => {
     const verdict = clipProps(doc.components, clip.component, { ...clip.props, ...patch }, Strictness.Strict);
     if (!verdict.ok) {

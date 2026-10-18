@@ -6,7 +6,7 @@
   import type { TemplateFieldValue } from '$lib/motion/template/library';
   import { FieldLayout } from '$lib/motion/template/key-fields';
   import { PropFormat } from '$lib/motion/custom/component';
-  import { LinkUse, MediaAccept, MediaKind, acceptOf, itemOfPick, pickOfItem, type MediaPick } from '$lib/motion/media/pick';
+  import { MediaAccept, MediaKind, acceptOf, itemOfPick, pickOfItem, type MediaPick } from '$lib/motion/media/pick';
   import MediaPicker from './MediaPicker.svelte';
   import MediaListField from './MediaListField.svelte';
   import type { MediaUploader } from './media-upload';
@@ -36,9 +36,9 @@
   const CROPPABLE = new Set(['Image', 'Video']);
   const MEDIA_FIELDS = new Set([FieldType.Asset, FieldType.MediaList]);
 
-  type Slot = { accept: MediaAccept; links: LinkUse; read: (v: unknown) => MediaPick | null; write: (p: MediaPick | null) => string };
-  const ASSET_SLOT = (accept: MediaAccept): Slot => ({ accept, links: LinkUse.Import, read: (v) => (typeof v === 'string' && v ? { kind: accept === MediaAccept.Video ? MediaKind.Video : MediaKind.Image, assetId: v } : null), write: (p) => p?.assetId ?? '' });
-  const ITEM_SLOT = (accept: MediaAccept): Slot => ({ accept, links: LinkUse.Keep, read: pickOfItem, write: itemOfPick });
+  type Slot = { accept: MediaAccept; read: (v: unknown) => MediaPick | null; write: (p: MediaPick | null) => string };
+  const ASSET_SLOT = (accept: MediaAccept): Slot => ({ accept, read: (v) => (typeof v === 'string' && v ? { kind: accept === MediaAccept.Video ? MediaKind.Video : MediaKind.Image, assetId: v } : null), write: (p) => p?.assetId ?? '' });
+  const ITEM_SLOT = (accept: MediaAccept): Slot => ({ accept, read: pickOfItem, write: itemOfPick });
 
   function slotOf(f: TemplateFieldValue): Slot {
     const clip = target(f);
@@ -99,7 +99,7 @@
       <input type="checkbox" checked={Boolean(f.value)} onchange={(e) => set(f, e.currentTarget.checked ? 'yes' : 'no')} />
     {:else if f.type === FieldType.Asset}
       {@const slot = slotOf(f)}
-      <MediaPicker label={f.label} value={slot.read(f.value)} {assets} accept={slot.accept} links={slot.links} uploader={upload} onpick={(pick) => set(f, slot.write(pick))} />
+      <MediaPicker label={f.label} value={slot.read(f.value)} {assets} accept={slot.accept} uploader={upload} onpick={(pick) => set(f, slot.write(pick))} />
       {#if CROPPABLE.has(target(f)?.component ?? '') && f.value}
         {@const t = target(f)}
         <div class="crop" style={`aspect-ratio: ${f.aspect ?? 1};`}>

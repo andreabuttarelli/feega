@@ -1,15 +1,14 @@
 <script lang="ts">
   import { cn } from '$lib/utils.js';
   import { FIELD_INPUT, FOCUS_RING } from '$lib/components/ui/shell/styles';
-  import { LinkUse, MediaAccept, MediaKind, accepts, kindOfFile, linkOf, PickFrom, type MediaPick } from '$lib/motion/media/pick';
-  import type { LibraryMedia, MediaUploader } from './media-upload';
+  import { MediaAccept, MediaKind, accepts, kindOfFile, linkOf, PickFrom, type MediaPick } from '$lib/motion/media/pick';
+  import type { LibraryMedia, MediaSource, MediaUploader } from './media-upload';
 
   let {
     value,
     assets,
     label,
     accept = MediaAccept.Image,
-    links = LinkUse.Keep,
     uploader = null,
     onpick
   }: {
@@ -17,7 +16,6 @@
     assets: LibraryMedia[];
     label: string;
     accept?: MediaAccept;
-    links?: LinkUse;
     uploader?: MediaUploader | null;
     onpick: (pick: MediaPick | null) => void;
   } = $props();
@@ -58,8 +56,9 @@
     link = '';
   }
 
-  async function upload(file: File) {
-    const kind = kindOfFile(file.type);
+  const upload = (file: File) => send(file, kindOfFile(file.type));
+
+  async function send(source: MediaSource, kind: MediaKind | null) {
     if (!kind || !accepts(accept, kind)) {
       error = `This slot takes an ${NOUN[accept]}.`;
       return;
@@ -70,7 +69,7 @@
     }
     error = '';
     progress = 0;
-    const outcome = await uploader(file, (fraction) => (progress = fraction));
+    const outcome = await uploader(source, (fraction) => (progress = fraction));
     progress = null;
     if (!outcome.ok) {
       error = outcome.error;
@@ -110,26 +109,10 @@
     checked = { url: verdict.url, kind: verdict.kind };
   }
 
-  async function importLink(url: string, kind: MediaKind) {
-    const res = await fetch(url).catch(() => null);
-    if (!res?.ok) {
-      error = 'That link could not be copied into the project. Download the file and upload it instead.';
-      return;
-    }
-    const blob = await res.blob();
-    const name = url.split('/').pop()?.split(/[?#]/)[0] || kind;
-    await upload(new File([blob], name, { type: blob.type || `${kind}/*` }));
-  }
-
   function useLink() {
-    if (!checked) {
-      return;
+    if (checked) {
+      void send(new URL(checked.url), checked.kind);
     }
-    if (links === LinkUse.Import) {
-      void importLink(checked.url, checked.kind);
-      return;
-    }
-    choose({ kind: checked.kind, url: checked.url });
   }
 
   function reopen() {
