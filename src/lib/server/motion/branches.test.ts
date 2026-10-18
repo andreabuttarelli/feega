@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 import { Side } from '$lib/motion/branch-merge';
-import { BranchOutcome, createBranch, listBranches, mergeBranchBack, reviewBranch, type BranchStore, type Fork } from './branches';
+import { BranchOutcome, createBranch, dropBranch, listBranches, mergeBranchBack, reviewBranch, type BranchStore, type Fork } from './branches';
 
 function must(result: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
   if (!result.ok) {
@@ -87,5 +87,11 @@ describe('frame branches', () => {
 
   it('a node that is not a branch cannot be merged', async () => {
     expect((await mergeBranchBack(memory(), 'frame', {})).outcome).toBe(BranchOutcome.NotABranch);
+  });
+
+  it('dropping refuses anything that is not a branch, so a frame is never deleted by it', async () => {
+    const store = memory();
+    expect(await dropBranch(store, 'frame')).toBe(BranchOutcome.NotABranch);
+    expect(store.dropped).toEqual([]);
   });
 });

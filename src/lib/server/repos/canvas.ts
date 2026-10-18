@@ -230,7 +230,23 @@ export async function saveViewport(
   }
 }
 
+const isBranch = (node: CanvasNodeRecord) => node.data.branchOf !== undefined && node.data.branchOf !== null;
+
 export async function listNodes(
+  db: Db,
+  scope: { orgId: string; canvasId: string }
+): Promise<CanvasNodeRecord[]> {
+  return (await canvasRows(db, scope)).filter((node) => !isBranch(node));
+}
+
+export async function listBranchNodes(
+  db: Db,
+  scope: { orgId: string; canvasId: string }
+): Promise<CanvasNodeRecord[]> {
+  return (await canvasRows(db, scope)).filter(isBranch);
+}
+
+async function canvasRows(
   db: Db,
   scope: { orgId: string; canvasId: string }
 ): Promise<CanvasNodeRecord[]> {

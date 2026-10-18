@@ -3,6 +3,7 @@ import { branchDiff, mergeBranch, type Choices, type Conflict } from '$lib/motio
 
 export enum BranchOutcome {
   Merged = 'merged',
+  Dropped = 'dropped',
   NotABranch = 'not_a_branch',
   FrameGone = 'frame_gone'
 }
@@ -44,7 +45,11 @@ export async function reviewBranch(store: BranchStore, branchId: string): Promis
   return { fork, base, branch, main, conflicts: branchDiff(base, branch.doc, main.doc).conflicts };
 }
 
-export async function mergeBranchBack(store: BranchStore, branchId: string, choices: Choices): Promise<{ outcome: BranchOutcome; version?: number }> {
+export type Refusal = BranchOutcome.NotABranch | BranchOutcome.FrameGone;
+
+export type Merge = { outcome: BranchOutcome.Merged; version: number } | { outcome: Refusal };
+
+export async function mergeBranchBack(store: BranchStore, branchId: string, choices: Choices): Promise<Merge> {
   const fork = await store.forkOf(branchId);
   if (!fork) {
     return { outcome: BranchOutcome.NotABranch };
@@ -59,6 +64,10 @@ export async function mergeBranchBack(store: BranchStore, branchId: string, choi
   return { outcome: BranchOutcome.Merged, version };
 }
 
-export function dropBranch(store: BranchStore, branchId: string): Promise<void> {
-  return store.drop(branchId);
+export async function dropBranch(store: BranchStore, branchId: string): Promise<BranchOutcome> {
+  if (!(await store.forkOf(branchId))) {
+    return BranchOutcome.NotABranch;
+  }
+  await store.drop(branchId);
+  return BranchOutcome.Dropped;
 }
