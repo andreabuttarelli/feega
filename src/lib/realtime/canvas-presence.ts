@@ -100,6 +100,10 @@ export function centreOf(viewport: { x: number; y: number; zoom: number }, size:
   return { cx: (size.width / 2 - viewport.x) / viewport.zoom, cy: (size.height / 2 - viewport.y) / viewport.zoom, zoom: viewport.zoom };
 }
 
+export function viewportCentredOn(view: View, size: { width: number; height: number }): { x: number; y: number; zoom: number } {
+  return { x: size.width / 2 - view.cx * view.zoom, y: size.height / 2 - view.cy * view.zoom, zoom: view.zoom };
+}
+
 export function followed(peers: CanvasPeer[], userId: string): View | null {
   const latest = peers.filter((p) => p.userId === userId && p.view).sort((a, b) => b.at - a.at)[0];
   return latest?.view ?? null;

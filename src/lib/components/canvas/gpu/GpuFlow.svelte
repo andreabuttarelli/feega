@@ -19,6 +19,7 @@
   import { dev } from '$app/environment';
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
+  import { centreOf, viewportCentredOn } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
   import { BarContext } from '$lib/canvas/bottom-bar';
@@ -105,6 +106,18 @@
   let failed = $state<string | null>(null);
   let lossNote = $state<string | null>(null);
   let view = $state<Viewport>({ x: 0, y: 0, zoom: 1 });
+
+  $effect(() => {
+    const at = view;
+    untrack(() => props.onView?.(centreOf(at, screenSize())));
+  });
+
+  $effect(() => {
+    const target = props.follow;
+    if (target) {
+      view = viewportCentredOn(target, untrack(() => screenSize()));
+    }
+  });
   let area = $state({ width: 0, height: 0 });
   let selected = $state<string[]>([]);
   let selectedEdge = $state<string | null>(null);
@@ -731,6 +744,7 @@
       touches.set(e.pointerId, p);
       if (pinch && touches.size === 2) {
         const next = pinchOf();
+        props.onUserPan?.();
         view = panBy(zoomAt(view, next.mid, next.dist / pinch.dist), { x: next.mid.x - pinch.mid.x, y: next.mid.y - pinch.mid.y });
         pinch = next;
         return;
@@ -755,6 +769,7 @@
         if (a.kind !== GestureKind.Pan) {
           return;
         }
+        props.onUserPan?.();
         view = panBy(view, { x: p.x - a.last.x, y: p.y - a.last.y });
         a.last = p;
         a.moved ||= far;
@@ -951,6 +966,7 @@
   }
 
   function onWheel(e: WheelEvent) {
+    props.onUserPan?.();
     const target = e.target as HTMLElement;
     if (target.closest('.gpu-dom-node .nowheel')) {
       return;
