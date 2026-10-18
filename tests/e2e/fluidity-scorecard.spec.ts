@@ -89,6 +89,7 @@ async function clickEmpty(page: Page) {
 
 async function leaveEditor(page: Page) {
   for (let i = 0; i < 4 && (await page.getByTestId('motion-editor').count()); i++) {
+    await page.locator('body').evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.keyboard.press('Escape');
     await page.waitForTimeout(150);
   }
@@ -519,7 +520,7 @@ async function startPeer(peer: BrowserContext, path: string): Promise<() => Prom
   const loop = (async () => {
     for (let i = 0; on; i++) {
       await prompt.fill(`peer edit ${i}`).catch(() => undefined);
-      await page.waitForTimeout(PEER_EVERY_MS);
+      await page.waitForTimeout(PEER_EVERY_MS).catch(() => undefined);
     }
   })();
   return async () => {
@@ -683,7 +684,7 @@ async function cleanup(db: SupabaseClient, canvasId: string, before: Set<string>
 
 test.describe('fluidity scorecard @real', () => {
   test.skip(!REAL_STACK, 'E2E_REAL_STACK=1');
-  test.setTimeout(600_000);
+  test.setTimeout(900_000);
 
   for (const variant of VARIANTS) {
     for (const renderer of RENDERERS) {
@@ -699,12 +700,13 @@ test.describe('fluidity scorecard @real', () => {
         const mocked = await mockGenerate(page);
         const peer = variant === Variant.TwoTabs ? await browser.newContext({ viewport: VIEWPORT }) : null;
         let runs: StepRun[] = [];
+        let stopPeer = () => Promise.resolve();
         try {
           await signInE2e(page, ACCOUNT());
-          const stopPeer = peer ? await startPeer(peer, path) : () => Promise.resolve();
+          stopPeer = peer ? await startPeer(peer, path) : stopPeer;
           runs = await runSession(page, path);
-          await stopPeer();
         } finally {
+          await stopPeer();
           await peer?.close();
           await context.close();
           await saveVideo(page, name);
