@@ -160,7 +160,7 @@ describe('undo action: node.update is undone by writing before back, with the ex
 });
 
 describe('undo action: refuses instead of clobbering a peer change', () => {
-  it('refuses a node.update whose expected version no longer matches, with a readable reason', async () => {
+  it('leaves a field a peer overwrote since: nothing is written, the undo is not refused', async () => {
     const input = event(
       {
         items: JSON.stringify([
@@ -180,8 +180,8 @@ describe('undo action: refuses instead of clobbering a peer change', () => {
         ]
       }
     );
-    const result = (await actions.undo(input as never)) as unknown as { data: { reason: string } };
-    expect(result).toMatchObject({ status: 409, data: { reason: 'node_changed_by_peer' } });
+    const result = (await actions.undo(input as never)) as unknown as { status?: number };
+    expect(result.status).not.toBe(409);
     expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'update')).toBe(false);
   });
 

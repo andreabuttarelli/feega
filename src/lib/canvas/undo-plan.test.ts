@@ -28,23 +28,6 @@ describe('inverseOf: una riga per kind, non un if sparso', () => {
     expect(inverseOf(item)).toEqual({ op: 'restore_node', nodeId: NODE, data: { x: 10, y: 20 } });
   });
 
-  it('node.update si disfa riscrivendo before, con la versione attesa che porta con sé', () => {
-    const item: UndoItem = {
-      kind: 'node.update',
-      nodeId: NODE,
-      before: { prompt: 'vecchio' },
-      after: { prompt: 'nuovo' },
-      expectedVersion: 5
-    };
-
-    expect(inverseOf(item)).toEqual({
-      op: 'write_node_data',
-      nodeId: NODE,
-      data: { prompt: 'vecchio' },
-      expectedVersion: 5
-    });
-  });
-
   it('edge.create si disfa cancellando l arco', () => {
     const item: UndoItem = { kind: 'edge.create', edgeId: EDGE, sourceNodeId: NODE, targetNodeId: OTHER_NODE };
 
@@ -62,6 +45,7 @@ const liveNode = (overrides: Partial<Extract<CurrentNodeState, { exists: true }>
   exists: true,
   version: 5,
   connectedBy: [],
+  data: {},
   ...overrides
 });
 
@@ -76,12 +60,10 @@ describe('checkPrecondition: le premesse che possono essere cadute mentre il ges
     expect(checkPrecondition(item, { node: liveNode({ version: 5 }) })).toEqual({ outcome: 'ok' });
   });
 
-  it('node.update: un collega ha scritto lo stesso nodo nel frattempo → stale, mai forzato', () => {
+  it('node.update: a peer writing the same node since is not a refusal', () => {
     const item: UndoItem = { kind: 'node.update', nodeId: NODE, before: {}, after: {}, expectedVersion: 5 };
 
-    const result = checkPrecondition(item, { node: liveNode({ version: 6 }) });
-
-    expect(result).toEqual({ outcome: 'stale', reason: 'node_changed_by_peer' });
+    expect(checkPrecondition(item, { node: liveNode({ version: 6 }) })).toEqual({ outcome: 'ok' });
   });
 
   it('node.update: il nodo è già sparito → stale, non un errore generico', () => {
@@ -145,12 +127,12 @@ describe('checkGesture: il cambio di modello che sgancia connessioni si annulla 
   it('nessun item caduto: tutte le inverse tornano, nell ordine del gesto', () => {
     const gesture: Gesture = {
       items: [
-        { kind: 'node.update', nodeId: NODE, before: { model: 'old' }, after: { model: 'new' }, expectedVersion: 3 },
+        { kind: 'node.update', nodeId: NODE, before: { data: { model: 'old' } }, after: { data: { model: 'new' } }, expectedVersion: 3 },
         { kind: 'edge.delete', edgeId: 'e1', sourceNodeId: 'a', targetNodeId: NODE },
         { kind: 'edge.delete', edgeId: 'e2', sourceNodeId: 'b', targetNodeId: NODE }
       ]
     };
-    const states: Record<string, CurrentNodeState> = { [NODE]: liveNode({ version: 3 }) };
+    const states: Record<string, CurrentNodeState> = { [NODE]: liveNode({ version: 3, data: { model: 'new' } }) };
 
     const result = checkGesture(gesture, (item) =>
       item.kind === 'node.update' || item.kind === 'node.create' || item.kind === 'node.delete'
@@ -161,32 +143,38 @@ describe('checkGesture: il cambio di modello che sgancia connessioni si annulla 
     expect(result).toEqual({
       outcome: 'ok',
       writes: [
-        { op: 'write_node_data', nodeId: NODE, data: { model: 'old' }, expectedVersion: 3 },
+        { op: 'patch_node_data', nodeId: NODE, patch: { model: 'old' } },
         { op: 'restore_edge', edgeId: 'e1' },
         { op: 'restore_edge', edgeId: 'e2' }
       ]
     });
   });
 
-  it('un item caduto rifiuta l intero gesto PRIMA di scrivere qualunque cosa: mai metà applicato', () => {
-    const gesture: Gesture = {
-      items: [
-        { kind: 'node.update', nodeId: NODE, before: { model: 'old' }, after: { model: 'new' }, expectedVersion: 3 },
-        { kind: 'edge.delete', edgeId: 'e1', sourceNodeId: 'a', targetNodeId: NODE }
-      ]
-    };
-    // Il nodo è stato riscritto da un collega nel frattempo: versione avanzata a 4.
-    const states: Record<string, CurrentNodeState> = { [NODE]: liveNode({ version: 4 }) };
+  it('undo takes back only my keys: a peer edit on another key survives', () => {
+    const gesture: Gesture = { items: [{ kind: 'node.update', nodeId: NODE, before: { data: { prompt: 'a' } }, after: { data: { prompt: 'b' } }, expectedVersion: 3 }] };
+    const states: Record<string, CurrentNodeState> = { [NODE]: liveNode({ version: 4, data: { prompt: 'b', seed: 9 } }) };
 
-    const result = checkGesture(gesture, (item) =>
-      item.kind === 'node.update' ? { node: states[item.nodeId] } : { edge: liveEdge }
-    );
+    const result = checkGesture(gesture, (item) => ({ node: states[(item as { nodeId: string }).nodeId] }));
 
-    expect(result).toEqual({
-      outcome: 'stale',
-      reason: 'node_changed_by_peer',
-      item: gesture.items[0]
-    });
+    expect(result).toEqual({ outcome: 'ok', writes: [{ op: 'patch_node_data', nodeId: NODE, patch: { prompt: 'a' } }] });
+  });
+
+  it('a key a peer overwrote since is theirs now: undo leaves it and writes nothing for it', () => {
+    const gesture: Gesture = { items: [{ kind: 'node.update', nodeId: NODE, before: { data: { prompt: 'a', seed: 1 } }, after: { data: { prompt: 'b', seed: 2 } }, expectedVersion: 3 }] };
+    const states: Record<string, CurrentNodeState> = { [NODE]: liveNode({ version: 4, data: { prompt: 'peer', seed: 2 } }) };
+
+    const result = checkGesture(gesture, (item) => ({ node: states[(item as { nodeId: string }).nodeId] }));
+
+    expect(result).toEqual({ outcome: 'ok', writes: [{ op: 'patch_node_data', nodeId: NODE, patch: { seed: 1 } }] });
+  });
+
+  it('a key that did not exist before my edit goes away again', () => {
+    const gesture: Gesture = { items: [{ kind: 'node.update', nodeId: NODE, before: { data: {} }, after: { data: { refId: 'x' } }, expectedVersion: 3 }] };
+    const states: Record<string, CurrentNodeState> = { [NODE]: liveNode({ data: { refId: 'x' } }) };
+
+    const result = checkGesture(gesture, (item) => ({ node: states[(item as { nodeId: string }).nodeId] }));
+
+    expect(result).toEqual({ outcome: 'ok', writes: [{ op: 'patch_node_data', nodeId: NODE, patch: { refId: null } }] });
   });
 
   it('il secondo item di un gesto può essere quello caduto, e il gesto resta rifiutato per intero', () => {
@@ -230,8 +218,8 @@ describe('doc.revision: a frame doc written by a move', () => {
   });
 
   it('a frame written again since is stale, never overwritten', () => {
-    expect(checkPrecondition(item, { node: { exists: true, version: 6, connectedBy: [] } })).toEqual({ outcome: 'stale', reason: 'node_changed_by_peer' });
-    expect(checkPrecondition(item, { node: { exists: true, version: 5, connectedBy: [] } })).toEqual({ outcome: 'ok' });
+    expect(checkPrecondition(item, { node: { exists: true, version: 6, connectedBy: [], data: {} } })).toEqual({ outcome: 'stale', reason: 'node_changed_by_peer' });
+    expect(checkPrecondition(item, { node: { exists: true, version: 5, connectedBy: [], data: {} } })).toEqual({ outcome: 'ok' });
     expect(checkPrecondition(item, { node: { exists: false } })).toEqual({ outcome: 'stale', reason: 'node_deleted_by_peer' });
   });
 });

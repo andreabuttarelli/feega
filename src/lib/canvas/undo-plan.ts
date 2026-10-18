@@ -1,3 +1,4 @@
+import { sameValue } from './node-patch';
 /**
  * L'INVERSA DI UN GESTO, E SE VALE ANCORA APPLICARLA — PURO, SENZA DATABASE.
  *
@@ -54,7 +55,7 @@ export const writesFrameAt = (gesture: Gesture, nodeId: string, version: number)
 export type InverseWrite =
   | { op: 'delete_node'; nodeId: string }
   | { op: 'restore_node'; nodeId: string; data: Record<string, unknown> }
-  | { op: 'write_node_data'; nodeId: string; data: Record<string, unknown>; expectedVersion: number }
+  | { op: 'patch_node_data'; nodeId: string; patch: Record<string, unknown> }
   | { op: 'delete_edge'; edgeId: string }
   | { op: 'restore_edge'; edgeId: string }
   | { op: 'restore_doc'; nodeId: string; version: number; expectedVersion: number };
@@ -63,7 +64,7 @@ export type InverseWrite =
  * OGNI RIGA È L'INVERSA DI UN `kind`, IN UN POSTO SOLO — la tabella che CLAUDE.md chiede invece
  * di un `if (kind === …)` sparso. Un gesto nuovo è una riga qui, non una catena di condizioni.
  */
-export function inverseOf(item: UndoItem): InverseWrite {
+export function inverseOf(item: Exclude<UndoItem, { kind: 'node.update' }>): InverseWrite {
   switch (item.kind) {
     case 'node.create':
       // Disfare una nascita è farla sparire di nuovo: soft-delete, non hard — la stessa regola
@@ -71,8 +72,6 @@ export function inverseOf(item: UndoItem): InverseWrite {
       return { op: 'delete_node', nodeId: item.nodeId };
     case 'node.delete':
       return { op: 'restore_node', nodeId: item.nodeId, data: item.before };
-    case 'node.update':
-      return { op: 'write_node_data', nodeId: item.nodeId, data: item.before, expectedVersion: item.expectedVersion };
     case 'edge.create':
       return { op: 'delete_edge', edgeId: item.edgeId };
     case 'edge.delete':
@@ -83,7 +82,7 @@ export function inverseOf(item: UndoItem): InverseWrite {
 }
 
 /** Lo stato fresco che una precondizione confronta con quello che il gesto ricordava. */
-export type CurrentNodeState = { exists: true; version: number; connectedBy: string[] } | { exists: false };
+export type CurrentNodeState = { exists: true; version: number; connectedBy: string[]; data: Record<string, unknown> } | { exists: false };
 export type CurrentEdgeState = { exists: boolean };
 
 export type PreconditionResult = { outcome: 'ok' } | { outcome: 'stale'; reason: StaleReason };
@@ -124,9 +123,6 @@ export function checkPrecondition(
       const node = current.node;
       if (!node || !node.exists) {
         return { outcome: 'stale', reason: 'node_deleted_by_peer' };
-      }
-      if (node.version !== item.expectedVersion) {
-        return { outcome: 'stale', reason: 'node_changed_by_peer' };
       }
       return { outcome: 'ok' };
     }
@@ -171,6 +167,24 @@ export function checkPrecondition(
   }
 }
 
+const dataOf = (side: Record<string, unknown>) => (side.data ?? {}) as Record<string, unknown>;
+
+function ownKeysBack(item: Extract<UndoItem, { kind: 'node.update' }>, current: Record<string, unknown>): Record<string, unknown> {
+  const before = dataOf(item.before);
+  const after = dataOf(item.after);
+  const mine = Object.keys(after).filter((key) => sameValue(current[key], after[key]));
+  const gone = Object.keys(before).filter((key) => !(key in after) && current[key] === undefined);
+  return Object.fromEntries([...mine, ...gone].map((key) => [key, before[key] ?? null]));
+}
+
+function inverseWith(item: UndoItem, node: CurrentNodeState | undefined): InverseWrite[] {
+  if (item.kind !== 'node.update') {
+    return [inverseOf(item)];
+  }
+  const patch = ownKeysBack(item, node?.exists ? node.data : {});
+  return Object.keys(patch).length ? [{ op: 'patch_node_data', nodeId: item.nodeId, patch }] : [];
+}
+
 export type GestureCheck =
   | { outcome: 'ok'; writes: InverseWrite[] }
   | { outcome: 'stale'; reason: StaleReason; item: UndoItem };
@@ -191,7 +205,7 @@ export function checkGesture(
       return { outcome: 'stale', reason: result.reason, item };
     }
   }
-  return { outcome: 'ok', writes: gesture.items.map(inverseOf) };
+  return { outcome: 'ok', writes: gesture.items.flatMap((item) => inverseWith(item, currentOf(item).node)) };
 }
 
 export function parseUndoItem(raw: unknown): UndoItem | null {
