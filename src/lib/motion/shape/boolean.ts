@@ -1,6 +1,6 @@
 import { findClip, type MotionClip, type MotionDoc } from '../doc';
 import { removeClips, setProps, type OpResult } from '../timeline';
-import { flatten, pathData, polyline, type Pt } from './geometry';
+import { flatten, mapOutline, pathData, polyline, type Pt } from './geometry';
 import { baseOutline, type ShapeLook } from './render';
 import { ShapeKind } from './schema';
 import { pathSpace } from './space';
@@ -49,7 +49,7 @@ function polygonsInFrame(doc: MotionDoc, clip: MotionClip, frame: number): Pt[][
   return baseOutline(clip.props as unknown as ShapeLook, UNIT).map((contour) => flatten(contour).map(space.toFrame));
 }
 
-function shapesOf(doc: MotionDoc, ids: readonly string[]): MotionClip[] | string {
+function shapesOf(doc: MotionDoc, ids: readonly string[], least: number): MotionClip[] | string {
   const clips: MotionClip[] = [];
   for (const id of ids) {
     const clip = findClip(doc, id)?.clip;
@@ -58,7 +58,7 @@ function shapesOf(doc: MotionDoc, ids: readonly string[]): MotionClip[] | string
     }
     clips.push(clip);
   }
-  return clips.length < MIN_SHAPES ? `a boolean needs at least ${MIN_SHAPES} shapes` : clips;
+  return clips.length < least ? `this needs at least ${least} shapes` : clips;
 }
 
 function combined(doc: MotionDoc, shapes: MotionClip[], op: BooleanOp, frame: number): Pt[][] {
@@ -71,7 +71,7 @@ function combined(doc: MotionDoc, shapes: MotionClip[], op: BooleanOp, frame: nu
 }
 
 export function combineShapes(doc: MotionDoc, ids: readonly string[], op: BooleanOp, frame: number): OpResult {
-  const shapes = shapesOf(doc, ids);
+  const shapes = shapesOf(doc, ids, MIN_SHAPES);
   if (typeof shapes === 'string') {
     return { ok: false, error: shapes };
   }
@@ -86,5 +86,22 @@ export function combineShapes(doc: MotionDoc, ids: readonly string[], op: Boolea
   const local = pathSpace(doc, bottom.id, frame);
   const path = pathData(result.map((poly) => polyline(poly.map(local.toLocal), true)));
   const reshaped = setProps(doc, bottom.id, { shape: ShapeKind.Path, path, morphs: [] });
+  return reshaped.ok ? removeClips(reshaped.doc, ordered.slice(1).map((c) => c.id)) : reshaped;
+}
+
+export function flattenShapes(doc: MotionDoc, ids: readonly string[], frame: number): OpResult {
+  const shapes = shapesOf(doc, ids, 1);
+  if (typeof shapes === 'string') {
+    return { ok: false, error: shapes };
+  }
+
+  const ordered = [...shapes].sort(bottomFirst(doc));
+  const bottom = ordered[0];
+  const local = pathSpace(doc, bottom.id, frame);
+  const outline = ordered.flatMap((clip) => {
+    const space = pathSpace(doc, clip.id, frame);
+    return mapOutline(baseOutline(clip.props as unknown as ShapeLook, UNIT), (p) => local.toLocal(space.toFrame(p)));
+  });
+  const reshaped = setProps(doc, bottom.id, { shape: ShapeKind.Path, path: pathData(outline), morphs: [] });
   return reshaped.ok ? removeClips(reshaped.doc, ordered.slice(1).map((c) => c.id)) : reshaped;
 }
