@@ -6,6 +6,11 @@ export type StepResult = { name: string; facts: StepFacts | null; error: string 
 export type SessionRun = { browser: string; renderer: string; variant: string; steps: StepResult[]; mockedCalls: number; at: string };
 
 const GATED_FRAME_TIME = new Set(['chromium']);
+const VIDEO_KEEPS_FRAME_RATE = new Set(['chromium']);
+
+export function recordsVideo(browser: string): boolean {
+  return VIDEO_KEEPS_FRAME_RATE.has(browser);
+}
 
 export function failuresOf(step: StepResult, browser = 'chromium'): string[] {
   if (step.error) {
@@ -68,7 +73,7 @@ export function scorecard(runs: SessionRun[]): string {
     '',
     `Thresholds: ${THRESHOLDS.remounts} remounts of untouched nodes, ${THRESHOLDS.flashes} flashes, ${THRESHOLDS.reverts} reverts, input→paint p95 ≤ ${THRESHOLDS.latencyP95Ms} ms, frame p95 ≤ ${THRESHOLDS.frameP95Ms} ms (frame time gated on Chromium only; WebKit reported).`,
     '',
-    'Method: headed browser, heavy canvas copy, one chained session, no reloads. Remounts = node or player DOM elements removed during the step while the node still exists and was not touched by the step. Player mounts in view = a player mounted in an untouched node that was already on screen when the step began (gated); entering view = a lazy first mount of a node the camera brought on screen (reported, not gated). Flashes = a 1–2 frame transient in a CDP screencast frame of the touched node or of up to 6 untouched nodes in view (Chromium only; not measured on WebKit, not measured during pan/zoom). Reverts = an on-screen value returning to an earlier one inside the step (per animation frame), or the final value differing from the last one set. Input→paint = Event Timing duration of interactions plus input-timestamp-to-next-frame for every input event. Frame p95 = rAF deltas during the step.',
+    'Method: headed browser, heavy canvas copy, one chained session, no reloads. Remounts = node or player DOM elements removed during the step while the node still exists and was not touched by the step. Player mounts in view = a player mounted in an untouched node that was already on screen when the step began (gated); entering view = a lazy first mount of a node the camera brought on screen (reported, not gated). Flashes = a 1–2 frame transient in a CDP screencast frame of the touched node or of up to 6 untouched nodes in view (Chromium only; not measured on WebKit, not measured during pan/zoom). Reverts = an on-screen value returning to an earlier one inside the step (per animation frame), or the final value differing from the last one set. Input→paint = on Chromium, the trace EventLatency of every input (OS timestamp → frame presented, µs precision); on WebKit, Event Timing duration (8 ms granularity) plus input-timestamp-to-next-frame. Frame p95 = rAF deltas during the step.',
     '',
     '| browser | renderer | variant | verdict | at |',
     '|---|---|---|---|---|',

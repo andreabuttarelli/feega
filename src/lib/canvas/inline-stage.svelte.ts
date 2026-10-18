@@ -5,6 +5,7 @@ type Offer = { nodeId: string; el: HTMLElement };
 let offered = $state.raw<Offer | null>(null);
 let paint = $state(Paint.Pending);
 let leaving = $state<string | null>(null);
+let leavingNow: string | null = null;
 let leaveCap: ReturnType<typeof setTimeout> | null = null;
 
 export const LEAVE_CAP_MS = 3000;
@@ -15,6 +16,7 @@ function letGo() {
     leaveCap = null;
   }
   leaving = null;
+  leavingNow = null;
 }
 
 const SWAP_GRACE_MS = 300;
@@ -38,10 +40,13 @@ async function reveal(offer: Offer) {
 export const inlineStage = {
   offer(nodeId: string, el: HTMLElement) {
     const mine = { nodeId, el };
+    const handedBack = leavingNow === nodeId;
     offered = mine;
-    paint = Paint.Pending;
+    if (!handedBack) {
+      paint = Paint.Pending;
+    }
     return () => {
-      if (offered === mine) {
+      if (offered === mine && leavingNow !== nodeId) {
         offered = null;
         paint = Paint.Pending;
       }
@@ -58,6 +63,7 @@ export const inlineStage = {
   leave(nodeId: string) {
     letGo();
     leaving = nodeId;
+    leavingNow = nodeId;
     leaveCap = setTimeout(letGo, LEAVE_CAP_MS);
   },
   landed(nodeId: string) {
