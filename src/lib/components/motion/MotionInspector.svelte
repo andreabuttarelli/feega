@@ -58,6 +58,7 @@
   import LutPicker from './LutPicker.svelte';
   import TextPathSection from './TextPathSection.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
+  import StyleSection from './StyleSection.svelte';
   import { registerFont, setFont } from '$lib/motion/fonts/ops';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
@@ -474,6 +475,7 @@
         {#each sharedFields as field (field.key)}{@render fieldRow(field)}{/each}
       </details>
     {/if}
+    {#if visual}<StyleSection {doc} {clip} {commit} />{/if}
     {#if visual}<AutoLayoutSection {doc} {clip} {commit} />{/if}
   {/if}
 

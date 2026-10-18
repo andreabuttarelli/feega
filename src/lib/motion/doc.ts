@@ -15,6 +15,7 @@ import { DEPTH, SPACES, Space, cameraSchema, depthSchema } from './camera';
 import { PARENT_OPACITIES, ParentOpacity, parentProblem } from './parent';
 import { expressionsSchema, expressionsProblem } from './expression/schema';
 import { fontRefProblem, fontsSchema, usedFaces } from './fonts/model';
+import { stylesSchema } from './styles-model';
 import { effectsSchema, effectsProblem } from './effects/model';
 import { clipShadersSchema, clipShadersProblem, shadersSchema } from './shaders/model';
 import { BLEND_MODES, BlendMode } from './blend';
@@ -114,7 +115,8 @@ const clipSchema = z.object({
   markers: z.array(markerSchema).max(MAX_MARKERS).optional(),
   autoLayout: autoLayoutSchema.nullable().optional(),
   layoutItem: layoutItemSchema.optional(),
-  partStyles: partStylesSchema.optional()
+  partStyles: partStylesSchema.optional(),
+  styleRef: z.string().min(1).optional()
 });
 
 const trackSchema = z.object({
@@ -193,7 +195,8 @@ export const motionDocSchema = z
     referenceLook: referenceLookSchema.optional(),
     still: stillSchema.optional(),
     freeSize: z.boolean().optional(),
-    links: z.record(z.string().min(1), z.string().min(1)).optional()
+    links: z.record(z.string().min(1), z.string().min(1)).optional(),
+    styles: stylesSchema
   })
   .refine(fitsResolution, RESOLUTION_PROBLEM)
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] })

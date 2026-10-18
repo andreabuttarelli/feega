@@ -312,6 +312,8 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'edit text': motion('set_props'),
   'fill, stroke, corner radius (also per corner)': motion('set_props'),
   'font family and weight': motion('set_font'),
+  'apply or detach a named style': motion('apply_style'),
+  'save a clip look as a named style': motion('define_style'),
   'pen path points and handles': motion('set_path'),
   'align and distribute': motion('arrange_space'),
   'reorder layers': motion('set_track'),

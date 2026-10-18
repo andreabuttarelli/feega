@@ -229,6 +229,12 @@ video pinned to one frame: `set_canvas` `{ format: "A poster", still: 2 }`, then
 `{ format: "png", scale: 2 }` returns the image `url`. CLI: `feega motion tool <nodeId> <tool>
 --input '{...}'`, `feega motion tools [name]`, `feega motion still <nodeId> --scale 2 --out poster.png`.
 
+Named styles keep a video consistent: `define_style` `{ name, style: { kind: "text", font, size,
+weight, tracking, leading, color } }` or `{ kind: "colour", color }` creates or edits one,
+`apply_style` `{ clip_ids, name }` links clips (a colour style paints text colour or shape fill;
+`detach: true` unlinks), `list_styles` lists them with their clips, `remove_style` deletes one.
+Editing a style restyles every linked clip. All through `motion_tool`.
+
 The frame editor page's own actions (read the head, save the whole doc, apply doc ops, render and
 batch status) run through `motion_editor_op` `{ node_id, op, input }` with the same answers as
 the page. CLI: `feega motion op <nodeId> <op> --input '{...}'`.

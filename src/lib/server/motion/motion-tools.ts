@@ -1,4 +1,6 @@
 import { ungroupClip } from '$lib/motion/group';
+import { StyleKind, applyStyle, defineStyle, detachStyle, removeStyle, stylesOf } from '$lib/motion/styles';
+import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
 import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
@@ -343,6 +345,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         layoutItem: c.layoutItem ?? null,
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
+        styleRef: c.styleRef ?? null,
         expressions: c.expressions,
         effects: c.effects,
         shaders: c.shaders,
@@ -363,6 +366,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     fields: doc.fields,
     referenceLook: doc.referenceLook ?? null,
     fonts: doc.fonts,
+    styles: stylesOf(doc),
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
     interactive: interactiveOf(doc),
@@ -1853,6 +1857,30 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Set the font of a text clip (Title, Text, Kicker, Caption, ProductCard): any Google Fonts family (registered in the video automatically), an uploaded font, or a built-in (${Object.values(BuiltinFont).join(', ')}). weight ${FONT_WEIGHTS[0]}..${FONT_WEIGHTS[FONT_WEIGHTS.length - 1]}; the nearest weight the family has is used.`,
       inputSchema: z.object({ clip_id: z.string(), family: z.string().max(64), weight: z.number().int().min(100).max(900).optional(), italic: z.boolean().optional() }),
       execute: async (input) => apply(setFont(session.doc, input.clip_id, { family: input.family, weight: input.weight, italic: input.italic }, GOOGLE_FONTS), `font ${input.family} on ${input.clip_id}`)
+    }),
+
+    define_style: tool({
+      description: `Create or edit a named style of the video. kind ${StyleKind.Text}: font, size (share of frame height), weight, tracking (em), leading, color; kind ${StyleKind.Colour}: color. Editing a style updates every clip that uses it.`,
+      inputSchema: z.object({ name: z.string().regex(STYLE_NAME), style: styleSchema }),
+      execute: async (input) => apply(defineStyle(session.doc, input.name, input.style), `style ${input.name}`)
+    }),
+
+    apply_style: tool({
+      description: 'Apply a named style to clips: a text style to text clips, a colour style to the text colour or the shape fill. The clips then follow the style when it changes; detach true unlinks them and keeps their current look.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), name: z.string().optional(), detach: z.boolean().optional() }),
+      execute: async (input) => (input.detach || !input.name ? apply(detachStyle(session.doc, input.clip_ids), `detached ${input.clip_ids.join(', ')}`) : apply(applyStyle(session.doc, input.clip_ids, input.name), `style ${input.name} on ${input.clip_ids.join(', ')}`))
+    }),
+
+    list_styles: tool({
+      description: 'The named styles of the video, each with the clips that use it.',
+      inputSchema: z.object({}).strict(),
+      execute: async () => ({ styles: stylesOf(session.doc) })
+    }),
+
+    remove_style: tool({
+      description: 'Delete a named style. Its clips keep their current look and stop following it.',
+      inputSchema: z.object({ name: z.string() }),
+      execute: async (input) => apply(removeStyle(session.doc, input.name), `removed style ${input.name}`)
     }),
 
     register_font: tool({
