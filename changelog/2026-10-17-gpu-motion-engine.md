@@ -41,3 +41,10 @@ flag `motion-engine-html` force it for everyone. A doc the engine refuses, an in
 export at another size, or any GPU failure during an export (redone from scratch on HTML via
 `orFallback` in `renderInBrowser`) stays on the HTML engine. Real-stack e2e:
 `tests/e2e/motion-gpu-export.spec.ts`.
+
+## Back behind the flag (2026-10-18)
+
+On real videos in Safari the GPU preview looked grainy and some animations differed from the
+HTML engine; `?engine=html` looked right. The HTML engine is the default again; the GPU engine
+runs only with `?engine=gpu` (the kill switch still forces HTML). The public changelog entry is
+withdrawn until the GPU engine passes parity on real videos at preview size × DPR.

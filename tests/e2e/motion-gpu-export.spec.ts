@@ -134,7 +134,7 @@ async function playPreview(page: Page, engine: Engine) {
 
 test.use(process.env.E2E_HEADED ? { headless: false, launchOptions: { args: ['--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-webgpu'] } } : {});
 
-test.describe('GPU motion engine is the default @real', () => {
+test.describe('GPU motion engine behind ?engine=gpu @real', () => {
   test.skip(!REAL_STACK, 'richiede lo stack reale: E2E_REAL_STACK=1');
   test.setTimeout(EXPORT_TIMEOUT_MS * 3);
 
@@ -145,7 +145,7 @@ test.describe('GPU motion engine is the default @real', () => {
       try {
         page.on('console', (m) => m.text().includes('GPU engine') && console.log(name, m.text().slice(0, 300)));
         const url = await seededEditor(page, seeded, { session, admin, seedNode });
-        await gotoHydrated(page, url);
+        await gotoHydrated(page, `${url}?engine=gpu`);
         await playPreview(page, engine);
         await expect(page.getByTestId('motion-preview')).toHaveAttribute('data-engine', 'gpu');
         if (proof === Proof.Preview) {
@@ -188,7 +188,7 @@ test.describe('GPU motion engine is the default @real', () => {
         }) as typeof createImageBitmap;
       }, SABOTAGE_AFTER_FRAMES);
       const url = await seededEditor(page, easing as Doc, { session, admin, seedNode });
-      await gotoHydrated(page, url);
+      await gotoHydrated(page, `${url}?engine=gpu`);
       const out = await exported(page, dir, 'fallback');
       expect(out.engine).toBe('html');
       const made = probe(out.file);
