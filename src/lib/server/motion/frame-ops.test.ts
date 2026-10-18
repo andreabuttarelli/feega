@@ -66,18 +66,13 @@ describe('committing ops to a frame', () => {
     const { db, rows } = await seeded();
     let raced = false;
     const racing = {
-      from: (table: string) => {
-        const real = db.from(table as never) as unknown as { insert: (row: unknown) => Promise<unknown> };
-        return {
-          ...real,
-          insert: async (row: unknown) => {
-            if (!raced) {
-              raced = true;
-              await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 1, doc: retext(start(), 'b', 'B'), actor: bo });
-            }
-            return real.insert(row);
-          }
-        };
+      from: db.from,
+      rpc: async (name: string, args: unknown) => {
+        if (!raced) {
+          raced = true;
+          await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 1, doc: retext(start(), 'b', 'B'), actor: bo });
+        }
+        return (db as unknown as { rpc: (n: string, a: unknown) => Promise<unknown> }).rpc(name, args);
       }
     } as unknown as Db;
 
@@ -135,6 +130,6 @@ describe('committing a whole doc on a current head', () => {
     const out = await commitDoc(db, { ...scope, base: { version: 1, doc: start() }, doc: retext(start(), 'a', 'A'), actor: ana, summary: 'Edited' });
 
     expect(out).toMatchObject({ outcome: OpsOutcome.Written, rebased: false, head: { version: 2 } });
-    expect(from).toHaveBeenCalledTimes(1);
+    expect(from).not.toHaveBeenCalled();
   });
 });

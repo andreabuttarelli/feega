@@ -2,7 +2,7 @@ import type { Db } from '$lib/server/db/client';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { findBrandLook } from '$lib/server/repos/brands';
 import { DataCheck, findNode, patchNodeData, resizeNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
-import { appendRevision, readHead, RevisionOutcome, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
+import { appendRevision, readHead, RevisionOutcome, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
 import { docNodeSize, motionOf, type MotionNode } from '$lib/canvas/motion-node';
@@ -108,7 +108,7 @@ export function assetUrls(assets: MotionAsset[]): Record<string, string> {
 
 export async function saveMotionDoc(
   db: Db,
-  input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null; known?: CanvasNodeRecord }
+  input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null; known?: CanvasNodeRecord; checkpoint?: Checkpoint }
 ): Promise<RevisionWrite> {
   const write = await appendRevision(db, input);
   if (write.outcome !== RevisionOutcome.Written) {

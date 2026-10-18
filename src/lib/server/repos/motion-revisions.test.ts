@@ -1,40 +1,85 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '$lib/server/db/client';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { RevisionOutcome, appendRevision, listRevisions, readHead } from './motion-revisions';
+import { CHECKPOINT_IDLE_MS, Checkpoint, RevisionOutcome, appendRevision, listRevisions, readCheckpoint, readHead, readRevision, sealRevision } from './motion-revisions';
 
 type Row = Record<string, unknown>;
 
-export function revisionsDb(seed: Row[] = []) {
+export function revisionsDb(seed: Row[] = [], schema: { checkpoints: boolean } = { checkpoints: true }) {
   const rows: Row[] = [...seed];
 
   const query = () => {
+    const filters: [string, unknown][] = [];
+    const floors: [string, number][] = [];
+    let ascending = false;
+    const chain = {
+      eq(column: string, value: unknown) {
+        filters.push([column, value]);
+        return chain;
+      },
+      gte(column: string, value: number) {
+        floors.push([column, value]);
+        return chain;
+      },
+      order: (_column: string, options?: { ascending?: boolean }) => ((ascending = options?.ascending ?? true), chain),
+      limit: () => chain,
+      maybeSingle: async () => ({ data: hits()[0] ?? null, error: null }),
+      then: (resolve: (r: { data: Row[]; error: null }) => unknown) => resolve({ data: hits(), error: null })
+    };
+    const hits = () =>
+      rows
+        .filter((r) => filters.every(([c, v]) => r[c] === v) && floors.every(([c, v]) => Number(r[c]) >= v))
+        .sort((a, b) => (ascending ? 1 : -1) * (Number(a.version) - Number(b.version)));
+    return chain;
+  };
+
+  const insert = (row: Row) => {
+    if (rows.some((r) => r.node_id === row.node_id && r.version === row.version)) {
+      return { code: '23505', message: 'duplicate key' };
+    }
+    rows.push({ created_at: new Date().toISOString(), sealed: false, ...row });
+    return null;
+  };
+
+  const update = (patch: Row) => {
     const filters: [string, unknown][] = [];
     const chain = {
       eq(column: string, value: unknown) {
         filters.push([column, value]);
         return chain;
       },
-      order: () => chain,
-      limit: () => chain,
-      maybeSingle: async () => ({ data: hits()[0] ?? null, error: null }),
-      then: (resolve: (r: { data: Row[]; error: null }) => unknown) => resolve({ data: hits(), error: null })
+      then: (resolve: (r: { error: null }) => unknown) => {
+        rows.filter((r) => filters.every(([c, v]) => r[c] === v)).forEach((r) => Object.assign(r, patch));
+        return resolve({ error: null });
+      }
     };
-    const hits = () => rows.filter((r) => filters.every(([c, v]) => r[c] === v)).sort((a, b) => Number(b.version) - Number(a.version));
     return chain;
+  };
+
+  const commit = (a: Record<string, unknown>) => {
+    const head = rows.filter((r) => r.node_id === a.p_node_id && r.org_id === a.p_org_id).sort((x, y) => Number(y.version) - Number(x.version))[0];
+    if (Number(head?.version ?? 0) !== a.p_expected) {
+      return { data: null, error: null };
+    }
+    const version = Number(a.p_expected) + 1;
+    const fields = { version, doc: a.p_doc, summary: a.p_summary, created_at: new Date().toISOString() };
+    const sameActor = head && head.actor_kind === a.p_actor_kind && (head.actor_id ?? null) === a.p_actor_id && (head.agent_key ?? null) === a.p_agent_key;
+    const recent = head && Date.parse(String(head.created_at)) > Date.now() - Number(a.p_coalesce_ms);
+    if (Number(a.p_coalesce_ms) > 0 && sameActor && recent && !head.sealed) {
+      Object.assign(head, fields);
+      return { data: version, error: null };
+    }
+    const error = insert({ org_id: a.p_org_id, node_id: a.p_node_id, actor_kind: a.p_actor_kind, actor_id: a.p_actor_id, agent_key: a.p_agent_key, ...fields });
+    return { data: error ? null : version, error: null };
   };
 
   const db = {
     from: () => ({
       select: query,
-      insert: async (row: Row) => {
-        if (rows.some((r) => r.node_id === row.node_id && r.version === row.version)) {
-          return { error: { code: '23505', message: 'duplicate key' } };
-        }
-        rows.push(row);
-        return { error: null };
-      }
-    })
+      insert: async (row: Row) => ({ error: insert(row) }),
+      update
+    }),
+    rpc: async (name: string, args: Record<string, unknown>) => (schema.checkpoints && name === 'commit_motion_revision' ? commit(args) : { data: null, error: { code: 'PGRST202', message: 'no function' } })
   } as unknown as Db;
 
   return { db, rows };
@@ -103,5 +148,80 @@ describe('motion revisions', () => {
     const { db } = revisionsDb([{ org_id: 'org-b', node_id: NODE, version: 1, doc: newMotionDoc(MotionFormat.Square), summary: null, actor_kind: 'user' }]);
 
     expect(await readHead(db, { orgId: ORG, nodeId: NODE })).toBeNull();
+  });
+});
+
+describe('revisions are checkpoints, not one row per edit', () => {
+  afterEach(() => vi.useRealTimers());
+
+  const doc = (height: number) => ({ ...newMotionDoc(MotionFormat.Square), height });
+  const write = (db: Db, expectedVersion: number, actor: typeof user | typeof agent, checkpoint = Checkpoint.Coalesce, height = 1080) =>
+    appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion, doc: doc(height), actor, checkpoint });
+
+  it('consecutive edits by one actor land on the head: the version moves, the rows do not', async () => {
+    const { db, rows } = revisionsDb();
+    await write(db, 0, user);
+    await write(db, 1, user);
+    const third = await write(db, 2, user, Checkpoint.Coalesce, 900);
+
+    expect(third).toMatchObject({ outcome: RevisionOutcome.Written, head: { version: 3 } });
+    expect(rows).toHaveLength(1);
+    expect((await readHead(db, { orgId: ORG, nodeId: NODE }))?.doc.height).toBe(900);
+  });
+
+  it('an edit after the actor went idle cuts a new revision', async () => {
+    vi.useFakeTimers();
+    const { db, rows } = revisionsDb();
+    await write(db, 0, user);
+    vi.advanceTimersByTime(CHECKPOINT_IDLE_MS + 1);
+    await write(db, 1, user);
+
+    expect(rows.map((r) => r.version)).toEqual([1, 2]);
+  });
+
+  it('another actor never edits inside someone else\'s checkpoint', async () => {
+    const { db, rows } = revisionsDb();
+    await write(db, 0, user);
+    await write(db, 1, agent);
+
+    expect(rows.map((r) => [r.version, r.actor_kind])).toEqual([[1, 'user'], [2, 'agent']]);
+  });
+
+  it('a cut always writes a new revision, and the next edit does not swallow a sealed one', async () => {
+    const { db, rows } = revisionsDb();
+    await write(db, 0, user);
+    await write(db, 1, user, Checkpoint.Cut);
+    await sealRevision(db, { orgId: ORG, nodeId: NODE, version: 2 });
+    await write(db, 2, user);
+
+    expect(rows.map((r) => r.version)).toEqual([1, 2, 3]);
+    expect(await readRevision(db, { orgId: ORG, nodeId: NODE, version: 2 })).not.toBeNull();
+  });
+
+  it('a stale version is a conflict even when the version it names was folded away', async () => {
+    const { db } = revisionsDb();
+    await write(db, 0, user);
+    await write(db, 1, user);
+
+    expect((await write(db, 1, user)).outcome).toBe(RevisionOutcome.Conflict);
+    expect((await write(db, 1, agent)).outcome).toBe(RevisionOutcome.Conflict);
+  });
+
+  it('before the migration lands, every edit still saves as its own revision', async () => {
+    const { db, rows } = revisionsDb([], { checkpoints: false });
+    await write(db, 0, user);
+    await write(db, 1, user);
+
+    expect(rows.map((r) => r.version)).toEqual([1, 2]);
+    expect((await write(db, 1, user)).outcome).toBe(RevisionOutcome.Conflict);
+  });
+
+  it('a version folded into a later checkpoint reads as that checkpoint', async () => {
+    const { db } = revisionsDb();
+    await write(db, 0, user);
+    await write(db, 1, user, Checkpoint.Coalesce, 900);
+
+    expect(await readRevision(db, { orgId: ORG, nodeId: NODE, version: 1 })).toBeNull();
+    expect(await readCheckpoint(db, { orgId: ORG, nodeId: NODE, version: 1 })).toMatchObject({ version: 2, doc: { height: 900 } });
   });
 });

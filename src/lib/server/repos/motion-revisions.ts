@@ -81,6 +81,23 @@ export async function readRevision(db: Db, input: { orgId: string; nodeId: strin
   return data ? headOf(data as RevisionRow) : null;
 }
 
+export async function readCheckpoint(db: Db, input: { orgId: string; nodeId: string; version: number }): Promise<MotionHead | null> {
+  const { data, error } = await db
+    .from('motion_revisions')
+    .select('version, doc, summary, actor_kind')
+    .eq('org_id', input.orgId)
+    .eq('node_id', input.nodeId)
+    .gte('version', input.version)
+    .order('version', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return data ? headOf(data as RevisionRow) : null;
+}
+
 export const REVISION_LIST_LIMIT = 30;
 
 export type RevisionListing = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
@@ -108,31 +125,75 @@ export async function listRevisions(db: Db, input: { orgId: string; nodeId: stri
   }));
 }
 
+export enum Checkpoint {
+  Coalesce = 'coalesce',
+  Cut = 'cut'
+}
+
+export const CHECKPOINT_IDLE_MS = 3_000;
+
+const COALESCE_MS: Record<Checkpoint, number> = { [Checkpoint.Coalesce]: CHECKPOINT_IDLE_MS, [Checkpoint.Cut]: 0 };
+
+const FUNCTION_MISSING = 'PGRST202';
+
+type CommitArgs = { orgId: string; nodeId: string; expectedVersion: number; doc: MotionDoc; actor: Actor; summary: string | null; checkpoint: Checkpoint };
+
+async function insertRevision(db: Db, input: CommitArgs): Promise<boolean> {
+  const { error } = await db.from('motion_revisions').insert({
+    org_id: input.orgId,
+    node_id: input.nodeId,
+    version: input.expectedVersion + 1,
+    doc: input.doc,
+    summary: input.summary,
+    ...actorCols(input.actor)
+  } as never);
+  if (error?.code === UNIQUE_VIOLATION) {
+    return false;
+  }
+  if (error) {
+    throw error;
+  }
+  return true;
+}
+
+async function commitRevision(db: Db, input: CommitArgs): Promise<boolean> {
+  const { data, error } = await (db as unknown as { rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { code?: string } | null }> }).rpc('commit_motion_revision', {
+    p_org_id: input.orgId,
+    p_node_id: input.nodeId,
+    p_expected: input.expectedVersion,
+    p_doc: input.doc,
+    p_summary: input.summary,
+    p_actor_kind: input.actor.kind,
+    p_actor_id: input.actor.id ?? null,
+    p_agent_key: input.actor.agentKey ?? null,
+    p_coalesce_ms: COALESCE_MS[input.checkpoint]
+  });
+  if (error?.code === FUNCTION_MISSING) {
+    return insertRevision(db, input);
+  }
+  if (error) {
+    throw error;
+  }
+  return data !== null;
+}
+
 export async function appendRevision(
   db: Db,
-  input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null }
+  input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null; checkpoint?: Checkpoint }
 ): Promise<RevisionWrite> {
   const parsed = parseMotionDoc(input.doc);
   if (!parsed.ok) {
     return { outcome: RevisionOutcome.Invalid, error: parsed.error };
   }
 
-  const version = input.expectedVersion + 1;
   const summary = input.summary?.slice(0, SUMMARY_MAX) ?? null;
-  const { error } = await db.from('motion_revisions').insert({
-    org_id: input.orgId,
-    node_id: input.nodeId,
-    version,
-    doc: parsed.doc,
-    summary,
-    ...actorCols(input.actor)
-  } as never);
-
-  if (error?.code === UNIQUE_VIOLATION) {
+  const written = await commitRevision(db, { ...input, doc: parsed.doc, summary, checkpoint: input.checkpoint ?? Checkpoint.Cut });
+  if (!written) {
     return { outcome: RevisionOutcome.Conflict };
   }
-  if (error) {
-    throw error;
-  }
-  return { outcome: RevisionOutcome.Written, head: { version, doc: parsed.doc, summary, actorKind: input.actor.kind } };
+  return { outcome: RevisionOutcome.Written, head: { version: input.expectedVersion + 1, doc: parsed.doc, summary, actorKind: input.actor.kind } };
+}
+
+export async function sealRevision(db: Db, input: { orgId: string; nodeId: string; version: number }): Promise<void> {
+  await db.from('motion_revisions').update({ sealed: true } as never).eq('org_id', input.orgId).eq('node_id', input.nodeId).eq('version', input.version);
 }

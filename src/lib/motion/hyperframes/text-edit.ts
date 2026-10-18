@@ -47,6 +47,7 @@ export function installTextEdit(win: Window, doc: Document, send: (message: unkn
     el.removeEventListener('input', onInput);
     el.removeEventListener('keydown', onKey, true);
     el.removeEventListener('blur', finish);
+    win.removeEventListener('blur', finish);
     send({ type: names.end, id: session, text: textOf(el), end: names.commit });
     el.blur();
     if (win.parent !== win) {
@@ -103,6 +104,7 @@ export function installTextEdit(win: Window, doc: Document, send: (message: unkn
     el.addEventListener('input', onInput);
     el.addEventListener('keydown', onKey, true);
     el.addEventListener('blur', finish);
+    win.addEventListener('blur', finish);
     el.focus();
     caretAt(el, m.x, m.y);
     watcher = new MutationObserver(() => {

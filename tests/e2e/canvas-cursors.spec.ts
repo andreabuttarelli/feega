@@ -89,8 +89,9 @@ test.describe('canvas cursors across two tabs @real', () => {
     expect(latency).toBeLessThan(COMMIT_LATENCY_MS);
   });
 
-  test('spotlight: the other person is offered to follow, and their view then tracks mine', async ({ page, browser, session }) => {
-    const path = `/p/${session.projectId}/c/${session.canvasId}`;
+  for (const renderer of ['gpu', 'dom']) {
+  test(`spotlight on the ${renderer} canvas: the other person is offered to follow, and their view then tracks mine`, async ({ page, browser, session }) => {
+    const path = `/p/${session.projectId}/c/${session.canvasId}?renderer=${renderer}`;
     const elsewhere = await browser.newContext({ viewport: DESKTOP });
     const other = await elsewhere.newPage();
     await signInE2e(other, { email: session.email, password: session.password });
@@ -110,6 +111,7 @@ test.describe('canvas cursors across two tabs @real', () => {
     await expect(other.getByTestId('presenter-prompt')).toHaveCount(0);
     await elsewhere.close();
   });
+  }
 
   test('cursor chat: what I type next to my cursor shows next to it in the other tab, and goes away', async ({ page, session }) => {
     const path = `/p/${session.projectId}/c/${session.canvasId}`;

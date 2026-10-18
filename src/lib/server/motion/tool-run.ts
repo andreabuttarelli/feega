@@ -3,7 +3,7 @@ import { nameVersion, namedRevisions } from './version-names';
 import type { Db } from '$lib/server/db/client';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { agentActor } from '$lib/server/repos/actor';
-import { readRevision } from '$lib/server/repos/motion-revisions';
+import { Checkpoint, readRevision } from '$lib/server/repos/motion-revisions';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { savedMotionWith } from './agent-embed';
@@ -15,6 +15,7 @@ import { exportStill } from './still-export';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
 import { frameMover } from './move-element';
 import { drawFrames, firstFrames } from './server-frames';
+import { fontAdvance } from './font-advance';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
 import type { Frame } from './frames';
 import type { MotionDoc } from '$lib/motion/doc';
@@ -43,6 +44,8 @@ export const TOOL_RUN_AGENT_KEY = 'mcp';
 const ID_LENGTH = 8;
 const HEADLESS = 'needs a chat turn in the editor: ask the motion agent instead';
 
+const readFontAdvance = fontAdvance();
+
 function once<T>(make: () => Promise<T>): () => Promise<T> {
   let made: Promise<T> | null = null;
   return () => (made ??= make());
@@ -57,7 +60,7 @@ const freshSession = (doc: MotionSession['doc'], version: number): MotionSession
 const noFrames: MotionToolDeps['frames'] = async () => null;
 
 function toolsFor(deps: Omit<MotionToolDeps, 'voiceover' | 'frames' | 'check' | 'newId'>, frames = noFrames): Record<string, Tool> {
-  return createMotionTools({ ...deps, newId, voiceover: offTurn, frames, check: async () => null });
+  return createMotionTools({ ...deps, newId, voiceover: offTurn, frames, check: async () => null, fontAdvance: readFontAdvance });
 }
 
 function carried(turn: ToolRunTurn | undefined, nodeId: string, doc: MotionDoc, version: number): MotionSession {
@@ -175,7 +178,7 @@ async function commit(db: Db, ready: Prepared, summary: string): Promise<{ versi
   if (session.doc === saved.doc) {
     return { version: saved.version, saved: false };
   }
-  const written = await commitDoc(db, { ...ready.nodeScope, node: saved.node, record: saved.record, base: saved, doc: session.doc, actor: ready.actor, summary: session.edits.join('; ') || summary });
+  const written = await commitDoc(db, { ...ready.nodeScope, node: saved.node, record: saved.record, checkpoint: Checkpoint.Coalesce, base: saved, doc: session.doc, actor: ready.actor, summary: session.edits.join('; ') || summary });
   if (written.outcome === OpsOutcome.Invalid) {
     return { outcome: ToolRun.Invalid, detail: written.error };
   }

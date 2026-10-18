@@ -330,7 +330,6 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'remove a keyframe': motion('remove_keyframes'),
   'element to another frame or a new frame': canvas('move_frame_element'),
   'generative output into a frame': canvas('place_in_frame'),
-  'connect a generative node to a frame': canvas('connect_nodes'),
   'export PNG': motion('export_image'),
   'export MP4': tool('render_video'),
   'restore a revision': tool('restore_motion_revision'),
