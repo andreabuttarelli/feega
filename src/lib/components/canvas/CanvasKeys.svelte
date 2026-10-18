@@ -22,6 +22,8 @@
   import { Stack } from '$lib/canvas/stacking';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
+  import { enterFrame } from '$lib/canvas/enter-frame';
+  import { Direction, siblingOf } from '$lib/motion/siblings';
 
   let {
     onadd,
@@ -79,6 +81,14 @@
     }
   }
 
+  function selectSibling(direction: Direction) {
+    const all = getNodes();
+    const next = siblingOf(all.map((n) => n.id), selected().map((n) => n.id), direction);
+    for (const n of all) {
+      updateNode(n.id, { selected: n.id === next });
+    }
+  }
+
   function nudge(dx: number, dy: number) {
     for (const n of selected()) {
       const next = { x: n.position.x + dx, y: n.position.y + dy };
@@ -108,6 +118,12 @@
       if (nodes.length || edges.length) ondelete?.({ nodes, edges });
     },
     deselect: () => setSelection(false),
+    enter: () => {
+      const [only, ...rest] = selected();
+      if (only && !rest.length) enterFrame(only.id, only.data.kind as string | undefined);
+    },
+    'select-next': () => selectSibling(Direction.Next),
+    'select-previous': () => selectSibling(Direction.Previous),
     'select-all': () => setSelection(true),
     fit: () => void fitView(),
     'zoom-actual': () => void setZoom(1),

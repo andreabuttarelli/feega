@@ -26,6 +26,8 @@ export enum Command {
   Deselect = 'deselect',
   SelectChild = 'select-child',
   SelectParent = 'select-parent',
+  SelectNext = 'select-next',
+  SelectPrevious = 'select-previous',
   StartHere = 'start-here',
   EndHere = 'end-here',
   TrimIn = 'trim-in',
@@ -133,6 +135,8 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'a', mod: true, command: Command.SelectAll, label: '⌘A', does: 'Select all clips', group: ShortcutGroup.Editing },
   { key: 'Escape', command: Command.Deselect, label: 'Esc', does: 'Select the parent, then deselect', group: ShortcutGroup.Editing },
   { key: 'Enter', command: Command.SelectChild, label: '↵', does: 'Select inside', group: ShortcutGroup.Editing },
+  { key: 'Tab', command: Command.SelectNext, label: 'Tab', does: 'Select the next layer', group: ShortcutGroup.Editing },
+  { key: 'Tab', shift: true, command: Command.SelectPrevious, label: '⇧Tab', does: 'Select the previous layer', group: ShortcutGroup.Editing },
   { key: 'Enter', shift: true, command: Command.SelectParent, label: '⇧↵', does: 'Select the parent', group: ShortcutGroup.Editing },
 
   { key: '[', command: Command.StartHere, label: '[', does: 'Move the clip to start here', group: ShortcutGroup.Layers },

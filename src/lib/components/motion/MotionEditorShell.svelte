@@ -74,6 +74,7 @@
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
   import { Flip, flipClips } from '$lib/motion/layer-props';
+  import { Direction as SiblingDirection, layerOrder, siblingOf } from '$lib/motion/siblings';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
   import { FRAME_MENU_IDS, frameLayers, frameMenuRun, frameSummaries, type FrameLayer } from '$lib/motion/frame-menu';
   import type { SelectionActionId } from '$lib/canvas/selection-actions';
@@ -1452,6 +1453,8 @@
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
     [Command.SelectChild]: () => overlay?.key(Gesture.Enter),
     [Command.SelectParent]: selectParent,
+    [Command.SelectNext]: () => selectSibling(SiblingDirection.Next),
+    [Command.SelectPrevious]: () => selectSibling(SiblingDirection.Previous),
     [Command.Deselect]: () => {
       if (overlay?.key(Gesture.Leave)) {
         return;
@@ -1594,7 +1597,14 @@
 
   function askedDrill() {
     const asked = frameDrill.take(data.node.id);
-    return asked ? { at: [asked.at.x * doc.width, asked.at.y * doc.height] as [number, number], gesture: asked.gesture } : null;
+    return asked ? { at: asked.at ? ([asked.at.x * doc.width, asked.at.y * doc.height] as [number, number]) : null, gesture: asked.gesture, from: asked.from } : null;
+  }
+
+  function selectSibling(direction: SiblingDirection) {
+    const next = siblingOf(layerOrder(doc), selection, direction);
+    if (next) {
+      selection = [next];
+    }
   }
 
   function selectParent() {

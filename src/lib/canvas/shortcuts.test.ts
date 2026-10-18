@@ -237,6 +237,12 @@ describe('stacking order', () => {
     expect(matchCanvasShortcut(ev('[', { ctrlKey: true }))).toEqual({ id: 'send-back' });
   });
 
+  it('Enter goes into the selected frame, Tab and ⇧Tab walk the tiles', () => {
+    expect(matchCanvasShortcut(ev('Enter'))).toEqual({ id: 'enter' });
+    expect(matchCanvasShortcut(ev('Tab'))).toEqual({ id: 'select-next' });
+    expect(matchCanvasShortcut(ev('Tab', { shiftKey: true }))).toEqual({ id: 'select-previous' });
+  });
+
   it('Figma zoom keys by physical digit: ⇧0 is 100%, ⇧1 fits everything, ⇧2 zooms to the selection', () => {
     expect(matchCanvasShortcut(ev(')', { shiftKey: true, code: 'Digit0' }))).toEqual({ id: 'zoom-actual' });
     expect(matchCanvasShortcut(ev('!', { shiftKey: true, code: 'Digit1' }))).toEqual({ id: 'fit' });
