@@ -4,7 +4,7 @@ import doc from './fixtures/motion-doc.json' with { type: 'json' };
 
 const DESKTOP = { width: 1280, height: 860 };
 const FRAME_DATA = { format: 'landscape', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
-const PEER_LATENCY_MS = 1000;
+const DRAFT_LATENCY_MS = 600;
 
 test.use({ viewport: DESKTOP, actionTimeout: 15_000 });
 
@@ -22,7 +22,7 @@ test.describe('a frame edit in one tab reaches the other @real', () => {
   test.skip(!REAL_STACK, 'richiede lo stack vero: E2E_REAL_STACK=1');
   test.setTimeout(120_000);
 
-  test('the saved revision is announced, not polled', async ({ page, browser, session, admin, seedNode }) => {
+  test('an unsaved edit shows in the other browser before it is saved', async ({ page, browser, session, admin, seedNode }) => {
     const node = await seedNode({ type: 'motion', data: FRAME_DATA });
     expect((await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc, actor_kind: 'user', actor_id: session.userId })).error).toBeNull();
     const clipId = doc.tracks[0].clips[0].id;
@@ -42,7 +42,7 @@ test.describe('a frame edit in one tab reaches the other @real', () => {
     await expect(watched).toHaveValue(/^40/, { timeout: 10_000 });
     const latency = Date.now() - started;
     console.log(JSON.stringify({ frameEditPeerLatencyMs: latency }));
-    expect(latency).toBeLessThan(PEER_LATENCY_MS);
+    expect(latency).toBeLessThan(DRAFT_LATENCY_MS);
     await elsewhere.close();
   });
 });

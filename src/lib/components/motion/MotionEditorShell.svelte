@@ -83,6 +83,7 @@
   import { frameDrill } from '$lib/canvas/frame-drill';
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
+  import { ownEdit, withDrafts, type Draft } from '$lib/motion/frame-drafts';
   import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
   import MotionPathOverlay from '$lib/components/motion/MotionPathOverlay.svelte';
   import TextPathOverlay from '$lib/components/motion/TextPathOverlay.svelte';
@@ -472,7 +473,9 @@
   });
 
   const compPath = $derived(path.map((p) => p.comp));
-  const doc = $derived(viewOf(draft?.doc ?? history.present, compPath));
+  let peerDrafts = $state(new Map<string, Draft>());
+  const shown = $derived(withDrafts({ version, doc: baseDoc }, history.present, [...peerDrafts.values()]));
+  const doc = $derived(viewOf(draft?.doc ?? shown, compPath));
   const mode = $derived(docMode(history.present));
 
   $effect(() => {
@@ -631,11 +634,32 @@
 
   function edit(next: MotionDoc, summary: string) {
     const now = Date.now();
-    const root = mergeView(history.present, compPath, next);
+    const mine = shown === history.present || draft ? next : ownEdit(doc, next, viewOf(history.present, compPath));
+    const root = mergeView(history.present, compPath, mine);
     history = summary === lastEdit.summary && now - lastEdit.at < COALESCE_MS ? amend(history, root) : record(history, root);
     lastEdit = { summary, at: now };
     scheduleSave(summary);
+    shareDraft();
   }
+
+  const DRAFT_EVERY_MS = 100;
+  let draftTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function shareDraft() {
+    if (draftTimer) {
+      return;
+    }
+    draftTimer = setTimeout(() => {
+      draftTimer = null;
+      presence?.draft({ nodeId: data.node.id, baseVersion: version, ops: outgoing({ version, doc: baseDoc }, history.present) });
+    }, DRAFT_EVERY_MS);
+  }
+
+  $effect(() => presence?.onDraft((incoming) => {
+    if (incoming.nodeId === data.node.id) {
+      peerDrafts = new Map(untrack(() => peerDrafts)).set(incoming.sessionId, incoming);
+    }
+  }));
 
   function apply(result: OpResult, summary: string) {
     if (!result.ok) {
@@ -693,6 +717,7 @@
     if (result.type === 'success') {
       frameDocs.landed(data.node.id, version, Number(result.data?.version));
       presence?.landed({ nodeId: data.node.id, version: Number(result.data?.version), doc: result.data?.doc });
+      presence?.draft({ nodeId: data.node.id, baseVersion: Number(result.data?.version), ops: [] });
       follow(landed({ version, doc: baseDoc }, sent, history.present, { version: Number(result.data?.version), doc: result.data?.doc as MotionDoc }));
       saveState = SaveState.Saved;
     } else {

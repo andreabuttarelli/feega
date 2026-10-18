@@ -1,5 +1,6 @@
 import { getContext, setContext } from 'svelte';
 import { z } from 'zod';
+import { parseOps, type DocOp } from '$lib/motion/doc-ops';
 
 export type FrameCursor = { x: number; y: number };
 
@@ -13,16 +14,21 @@ export type FrameState = Pick<FrameMark, 'nodeId' | 'cursor' | 'selection'>;
 
 export type FrameHead = { nodeId: string; version: number; doc: unknown };
 
+export type FrameDraft = { nodeId: string; sessionId: string; baseVersion: number; ops: DocOp[] };
+
 export type FramePresence = {
   self: FrameSelf;
   send: (state: FrameState) => void;
   listen: (on: (mark: FrameMark) => void) => () => void;
   landed: (head: FrameHead) => void;
   onHead: (on: (head: FrameHead) => void) => () => void;
+  draft: (draft: Omit<FrameDraft, 'sessionId'>) => void;
+  onDraft: (on: (draft: FrameDraft) => void) => () => void;
 };
 
 export const FRAME_EVENT = 'frame';
 export const FRAME_HEAD_EVENT = 'frame-head';
+export const FRAME_DRAFT_EVENT = 'frame-draft';
 export const MARK_STALE_MS = 10_000;
 export const PEER_COLOURS = ['#e5484d', '#0090ff', '#30a46c', '#f76b15', '#8e4ec6', '#d6409f', '#12a594', '#ffc53d'];
 
@@ -73,7 +79,20 @@ export type FrameLine = { receive: (payload: unknown) => void; attach: (send: ((
 
 export type HeadLine = { receive: (payload: unknown) => void; attach: (send: ((head: FrameHead) => void) | null) => void };
 
-export function frameHub(self: FrameSelf, now: () => number = Date.now): { port: FramePresence; line: FrameLine; heads: HeadLine } {
+export type DraftLine = { receive: (payload: unknown) => void; attach: (send: ((draft: FrameDraft) => void) | null) => void };
+
+const draftSchema = z.object({ nodeId: z.string().min(1), sessionId: z.string().min(1), baseVersion: z.number().int().min(0), ops: z.unknown() });
+
+function toDraft(raw: unknown): FrameDraft | null {
+  const parsed = draftSchema.safeParse(raw);
+  const ops = parsed.success ? parseOps(parsed.data.ops) : null;
+  return parsed.success && ops ? { ...parsed.data, ops } : null;
+}
+
+export function frameHub(self: FrameSelf, now: () => number = Date.now): { port: FramePresence; line: FrameLine; heads: HeadLine; drafts: DraftLine } {
+  const sessionId = crypto.randomUUID();
+  const draftListeners = new Set<(draft: FrameDraft) => void>();
+  let sendDraft: ((draft: FrameDraft) => void) | null = null;
   const listeners = new Set<(mark: FrameMark) => void>();
   const headListeners = new Set<(head: FrameHead) => void>();
   let transmit: ((mark: FrameMark) => void) | null = null;
@@ -87,6 +106,11 @@ export function frameHub(self: FrameSelf, now: () => number = Date.now): { port:
       return () => listeners.delete(on);
     },
     landed: (head) => announce?.(head),
+    draft: (draft) => sendDraft?.({ ...draft, sessionId }),
+    onDraft: (on) => {
+      draftListeners.add(on);
+      return () => draftListeners.delete(on);
+    },
     onHead: (on) => {
       headListeners.add(on);
       return () => headListeners.delete(on);
@@ -114,7 +138,18 @@ export function frameHub(self: FrameSelf, now: () => number = Date.now): { port:
       }
     }
   };
-  return { port, line, heads };
+  const drafts: DraftLine = {
+    attach: (send) => {
+      sendDraft = send;
+    },
+    receive: (raw) => {
+      const draft = toDraft(raw);
+      if (draft && draft.sessionId !== sessionId) {
+        draftListeners.forEach((on) => on(draft));
+      }
+    }
+  };
+  return { port, line, heads, drafts };
 }
 
 const CONTEXT = Symbol('frame-presence');
