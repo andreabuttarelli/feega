@@ -29,4 +29,9 @@ describe('nextSnapshot — which node to picture next', () => {
   it('nothing left, nothing to do', () => {
     expect(nextSnapshot([tile('a')], () => 'k', new Map([['a', 'k']]), new Set(['a']), new Set())).toBeNull();
   });
+
+  it('among visible nodes, the one nearest the view centre goes first', () => {
+    const tiles = [tile('edge', 0), tile('middle', 400), tile('right', 900)];
+    expect(nextSnapshot(tiles, (id) => id, new Map(), new Set(['edge', 'middle', 'right']), new Set(), { x: 450, y: 50 })).toBe('middle');
+  });
 });
