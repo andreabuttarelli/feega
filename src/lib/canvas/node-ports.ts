@@ -48,7 +48,7 @@ export const NODE_PORTS: Record<NodeType, Ports> = {
   calendar: { inputs: ['images', 'videos', 'audios', 'text'], output: null },
   audio: { inputs: InputRule.Audio, output: OutputRule.Audio },
   model3d: { inputs: ['images', 'text'], output: null },
-  motion: { inputs: ['images', 'videos', 'text'], output: 'motions' },
+  motion: { inputs: NONE, output: 'motions' },
   studio_batch: { inputs: NONE, output: 'images' }
 };
 

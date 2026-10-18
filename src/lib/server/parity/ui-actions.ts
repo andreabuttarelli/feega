@@ -66,10 +66,11 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   moveElement: canvas('move_frame_element'),
   copyElement: canvas('copy_frame_element'),
   frameSize: motion('set_canvas'),
+  exportSelection: canvas('export_selection'),
   createFormats: canvas('create_formats'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),
-  drawFrame: canvas('create_node'),
+  drawFrame: canvas('draw_frame'),
   moveFree: canvas('move_frame_element'),
   copyFree: canvas('copy_frame_element'),
   groupElements: canvas('group_elements'),
@@ -274,6 +275,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'use-as-mask': motion('use_as_mask'),
   'release-mask': motion('release_mask'),
   'create-formats': canvas('create_formats'),
+  export: canvas('export_selection'),
   delete: canvas('delete_node')
 };
 
@@ -330,7 +332,6 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'remove a keyframe': motion('remove_keyframes'),
   'element to another frame or a new frame': canvas('move_frame_element'),
   'generative output into a frame': canvas('place_in_frame'),
-  'connect a generative node to a frame': canvas('connect_nodes'),
   'export PNG': motion('export_image'),
   'export MP4': tool('render_video'),
   'restore a revision': tool('restore_motion_revision'),

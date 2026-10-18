@@ -120,7 +120,10 @@ export function blankElement(box: CanvasBox): OpResult {
   return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box), background: Background.Transparent }, 0);
 }
 
-export function drawnFrame(box: CanvasBox): MotionDoc {
+export function drawnFrame(box: CanvasBox, format: MotionFormat = MotionFormat.Custom): MotionDoc {
+  if (format !== MotionFormat.Custom) {
+    return newMotionDoc(format);
+  }
   return { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box) };
 }
 

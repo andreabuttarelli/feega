@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { versionNamesSchema, type VersionNames } from '$lib/motion/version-names';
 import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$lib/motion/doc';
-import { NodeMode, Opening, Under } from './inline-motion';
+import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '$lib/motion/hyperframes/capture';
 import { DRAWN_TEXT } from '$lib/motion/draw-create';
 
@@ -11,12 +11,12 @@ export enum FrameKind {
   Group = 'group'
 }
 
-type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean; under: Under; ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean };
+type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean };
 
 const CHROME: Record<FrameKind, Chrome> = {
-  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, under: Under.Released, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false },
-  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, under: Under.Kept, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false },
-  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, under: Under.Released, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true }
+  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false },
+  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false },
+  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true }
 };
 
 export const frameChrome = (kind: FrameKind): Chrome => CHROME[kind];
@@ -93,6 +93,19 @@ export function frameNodeSize(width: number, picture: { width: number; height: n
   return { w, h: Math.round((w * picture.height) / picture.width) + BAR_H[kind][mode] };
 }
 
+type Picture = { width: number; height: number };
+
+type NodeBox = { kind: FrameKind; width: number | null; height: number | null };
+
+export function docNodeSize(node: NodeBox, doc: Picture & { freeSize?: boolean }): { w: number; h: number } | null {
+  if (node.kind !== FrameKind.Frame) {
+    return null;
+  }
+  const w = Math.round(node.width ?? MOTION_STAGE_WIDTH[docFormat(doc)]);
+  const h = Math.round((w * doc.height) / doc.width);
+  return w === node.width && h === node.height ? null : { w, h };
+}
+
 enum Sizing {
   Fixed = 'fixed',
   Free = 'free'
@@ -101,8 +114,6 @@ enum Sizing {
 const FREE_KIND: ReadonlySet<FrameKind> = new Set([FrameKind.Element]);
 
 const sizingOf = (node: Pick<MotionNode, 'kind' | 'format'>): Sizing => ((node.kind === FrameKind.Frame && node.format === MotionFormat.Custom) || FREE_KIND.has(node.kind) ? Sizing.Free : Sizing.Fixed);
-
-type Picture = { width: number; height: number };
 
 export type FrameResize = { w: number; h: number; picture: Picture | null };
 

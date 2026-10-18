@@ -27,9 +27,9 @@
 
   const writeMedia = (next: unknown, summary: string) => poster && apply(setProps(doc, clip.id, { [poster.media]: next }), summary);
 
-  const BODY: Record<PartKind, Snippet | null> = { [PartKind.Line]: lineBody, [PartKind.Photo]: photoBody, [PartKind.Arrow]: arrowBody, [PartKind.Text]: null, [PartKind.Other]: null };
+  const BODY: Record<PartKind, Snippet | null> = { [PartKind.Line]: lineBody, [PartKind.Photo]: photoBody, [PartKind.Arrow]: arrowBody, [PartKind.Text]: null, [PartKind.Shape]: null, [PartKind.Other]: null };
   const body = $derived(BODY[kind]);
-  const PART_KIND_LABEL: Record<PartKind, string> = { [PartKind.Line]: 'Line', [PartKind.Photo]: 'Photo', [PartKind.Arrow]: 'Arrow', [PartKind.Text]: 'Text', [PartKind.Other]: 'Part' };
+  const PART_KIND_LABEL: Record<PartKind, string> = { [PartKind.Line]: 'Line', [PartKind.Photo]: 'Photo', [PartKind.Arrow]: 'Arrow', [PartKind.Text]: 'Text', [PartKind.Shape]: 'Shape', [PartKind.Other]: 'Part' };
 
   const remove = () => apply(runPart(doc, clip, part, PartAction.Delete), `Delete ${partLabel(doc, clip, part)}`);
 </script>

@@ -54,7 +54,7 @@
     ondragout?: ((out: ElementOut, phase: DragPhase) => void) | null;
     onhostdrag?: HostDrag | null;
     onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
-    edittext?: ((selector: string, at: { x: number; y: number } | null) => Promise<string | null>) | null;
+    edittext?: ((selector: string, at: { x: number; y: number } | null, oninput: (text: string) => void) => Promise<string | null>) | null;
   } = $props();
 
   const shared = selectionView()!;
@@ -222,19 +222,36 @@
     const clipId = clip.id;
     const turn = ++editTurn;
     inPlace = true;
-    void edittext(textTarget(clipId, target), point).then((typed) => {
-      if (turn === editTurn) {
-        inPlace = false;
-      }
-      if (typed === null || typed === text) {
+    const typedInto = (typed: string) => {
+      if (typed === text) {
         return;
       }
       const result = writePartText(doc, clipId, target, typed);
       if (result.ok) {
         onchange(result.doc, 'Edited text on the canvas');
       }
+    };
+    typing = null;
+    void edittext(textTarget(clipId, target), point, (typed) => (typing = () => typedInto(typed))).then((typed) => {
+      typing = null;
+      if (turn === editTurn) {
+        inPlace = false;
+      }
+      if (typed !== null) {
+        typedInto(typed);
+      }
     });
   }
+
+  let typing: (() => void) | null = null;
+
+  export function flushTyping() {
+    const pending = typing;
+    typing = null;
+    pending?.();
+  }
+
+  onMount(() => flushTyping);
 
   function commitPart(text: string) {
     const was = editing;

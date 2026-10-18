@@ -51,6 +51,10 @@ function isRoot(clip: MotionClip, byId: Clips): boolean {
   return isContainer(clip) && (!isContainer(byId.get(clip.parent ?? '')) || !!clip.layoutItem?.absolute);
 }
 
+const ONE_LINE_WHEN_HUGGED: Partial<Record<MotionClip['component'], Record<string, unknown>>> = { Text: { sizing: 'auto' } };
+
+const huggedText = (clip: MotionClip) => ((clip.layoutItem ?? DEFAULT_LAYOUT_ITEM).width === Sizing.Hug ? (ONE_LINE_WHEN_HUGGED[clip.component] ?? {}) : {});
+
 const placedProps = (box: Box, size: Size) => ({
   x: (box.left + box.width / 2) / size.width,
   y: (box.top + box.height / 2) / size.height,
@@ -73,7 +77,7 @@ function laidOut(tracks: MotionTrack[], size: Size): MotionTrack[] {
   }
   const place = (clip: MotionClip): MotionClip => {
     const box = boxes.get(clip.id);
-    return box ? { ...clip, props: { ...clip.props, ...placedProps(box, size) } } : clip;
+    return box ? { ...clip, props: { ...clip.props, ...huggedText(clip), ...placedProps(box, size) } } : clip;
   };
   return tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).map(place) }));
 }

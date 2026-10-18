@@ -7,11 +7,13 @@ import type { Box, Curve } from './geometry';
 import { createTextureCache, type TextureCache } from './texture-cache';
 import { Counter, count } from './frame-stats';
 import { Backend } from './backend';
+import { ChromeLayer } from './chrome-layer';
+import type { IdleChrome } from './idle-chrome';
 
 export { Backend };
 
 
-export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean; snapshot: string | null; running: boolean };
+export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean; snapshot: string | null; running: boolean; chrome: IdleChrome | null };
 export type Peer = { id: string; name: string; color: string; at: { x: number; y: number } };
 export type Overlay = {
   selected: (Box & { id: string })[];
@@ -26,6 +28,7 @@ export type Overlay = {
 export type Theme = { canvas: string; dot: string; paper: string; line: string; ink: string; inkSoft: string; accent: string; iterate: string; wire: string; font: string };
 
 const PAD = 14;
+const LABEL_SIZE = 12;
 const BODY_SIZE = 13;
 const DOT_TILE = 24;
 const LIVE_VIDEO_CAP = 4;
@@ -45,7 +48,7 @@ const THUMB_GAP = 4;
 
 const tierFor = (zoom: number) => TEXT_TIERS.find((t) => t >= zoom * devicePixelRatio) ?? TEXT_TIERS[TEXT_TIERS.length - 1];
 
-type Built = { id: string; root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; skeletons: Graphics[]; media: Media | null };
+type Built = { id: string; root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; skeletons: Graphics[]; media: Media | null; releases: (() => void)[] };
 
 function dotTexture(theme: Theme): Texture {
   const c = document.createElement('canvas');
@@ -101,6 +104,7 @@ export class GpuScene {
   private grid: TilingSprite;
   private world = new Container();
   private cardLayer = new Container();
+  private chrome: ChromeLayer;
   private overlay = new Graphics();
   private peerLayer = new Container();
   private built = new Map<string, Built>();
@@ -128,7 +132,8 @@ export class GpuScene {
     this.backend = app.renderer.name === 'webgpu' ? Backend.WebGPU : Backend.WebGL;
     this.grid = new TilingSprite({ texture: dotTexture(theme), width: app.screen.width, height: app.screen.height });
     this.textures = createTextureCache(() => this.invalidate());
-    this.world.addChild(this.cardLayer, this.overlay, this.peerLayer);
+    this.chrome = new ChromeLayer({ font: theme.font, ink: theme.inkSoft, size: LABEL_SIZE });
+    this.world.addChild(this.cardLayer, this.chrome.root, this.overlay, this.peerLayer);
     app.stage.addChild(this.grid, this.world);
     this.watchLoss();
     this.loop();
@@ -224,6 +229,22 @@ export class GpuScene {
     this.invalidate();
   }
 
+  awaitsMedia(id: string): boolean {
+    const b = this.built.get(id);
+    return !b || (!!b.media && !this.ready.has(id) && !this.retiring.has(id));
+  }
+
+  setIcon(kind: string, source: ImageBitmap) {
+    this.chrome.setIcon(kind, source);
+    this.setCards(this.cards);
+  }
+
+  private seen(c: Box) {
+    const v = this.visibleBox();
+    const margin = 40 / this.view.zoom;
+    return c.x + c.w > v.x - margin && c.y + c.h > v.y - margin && c.x < v.x + v.w + margin && c.y < v.y + v.h + margin;
+  }
+
   setSnapshot(id: string, key: string, bitmap: ImageBitmap) {
     const old = this.snapshots.get(id);
     this.snapshots.set(id, { key, tex: Texture.from(bitmap) });
@@ -315,6 +336,9 @@ export class GpuScene {
     if (this.retiring.get(b.id) === b) {
       this.retiring.delete(b.id);
     }
+    for (const release of b.releases) {
+      release();
+    }
     b.root.destroy({ children: true });
   }
 
@@ -388,13 +412,13 @@ export class GpuScene {
       this.attachVideo(b, media.url, box, fit);
       return;
     }
-    this.textures.want(this.imageUrl(media.url), (tex) => {
+    b.releases.push(this.textures.want(this.imageUrl(media.url), (tex) => {
       if (sprite.destroyed) {
         return;
       }
       place(sprite, tex, box, fit);
       this.markReady(b);
-    });
+    }));
   }
 
   private imageUrl(url: string): string {
@@ -427,7 +451,7 @@ export class GpuScene {
     const holder = new Container();
     const root = new Container();
     holder.addChild(root);
-    const b: Built = { id: c.id, root: holder, skin: root, key, body: null, video: null, texts: [], skeletons: [], media: null };
+    const b: Built = { id: c.id, root: holder, skin: root, key, body: null, video: null, texts: [], skeletons: [], media: null, releases: [] };
     const f = c.face;
     const BUILD: Record<Surface, () => void> = {
       [Surface.Media]: () => {
@@ -466,7 +490,7 @@ export class GpuScene {
         root.addChild(title);
         b.texts.push(title);
         if (f.thumbs.length) {
-          this.thumbGrid(root, f.thumbs, c, PAD + BODY_SIZE * 2);
+          this.thumbGrid(root, b, f.thumbs, c, PAD + BODY_SIZE * 2);
           return;
         }
         this.skeleton(root, b, c, PAD + BODY_SIZE * 2);
@@ -504,7 +528,7 @@ export class GpuScene {
     b.texts.push(open);
   }
 
-  private thumbGrid(root: Container, urls: string[], c: Card, top: number) {
+  private thumbGrid(root: Container, b: Built, urls: string[], c: Card, top: number) {
     const cell = (c.w - PAD * 2 - THUMB_GAP * (THUMB_COLUMNS - 1)) / THUMB_COLUMNS;
     const rows = Math.max(0, Math.floor((c.h - top - PAD + THUMB_GAP) / (cell + THUMB_GAP)));
     const shown = urls.slice(0, rows * THUMB_COLUMNS);
@@ -516,14 +540,16 @@ export class GpuScene {
       const sprite = new Sprite(Texture.EMPTY);
       sprite.position.set(box.x, box.y);
       root.addChild(sprite);
-      this.textures.want(url, (tex) => {
-        if (sprite.destroyed) {
-          return;
-        }
-        sprite.texture = cover(tex, cell, cell);
-        sprite.width = cell;
-        sprite.height = cell;
-      });
+      b.releases.push(
+        this.textures.want(url, (tex) => {
+          if (sprite.destroyed) {
+            return;
+          }
+          sprite.texture = cover(tex, cell, cell);
+          sprite.width = cell;
+          sprite.height = cell;
+        })
+      );
     });
   }
 
@@ -573,15 +599,14 @@ export class GpuScene {
   }
 
   private cull() {
-    const v = this.visibleBox();
+    this.chrome.set(this.cards, (c) => this.seen(c));
     let live = 0;
     for (const c of this.cards) {
       const b = this.built.get(c.id);
       if (!b) {
         continue;
       }
-      const margin = 40 / this.view.zoom;
-      const seen = c.x + c.w > v.x - margin && c.y + c.h > v.y - margin && c.x < v.x + v.w + margin && c.y < v.y + v.h + margin;
+      const seen = this.seen(c);
       b.root.visible = seen;
       for (const t of b.texts) {
         t.alpha = Math.max(0, Math.min(1, (Number(t.style.fontSize) * this.view.zoom - TEXT_FADE_FROM_PX) / TEXT_FADE_PX));
@@ -617,6 +642,7 @@ export class GpuScene {
       return;
     }
     this.tier = tier;
+    this.chrome.setTier(tier);
     for (const b of this.built.values()) {
       for (const t of b.texts) {
         t.resolution = tier;
