@@ -45,7 +45,7 @@
   import { track } from '$lib/analytics';
   import type { CanvasUndo, HostDrag, MoveOut } from '$lib/canvas/canvas-drop';
 
-  let { projectId, canvasId, nodeId, revision = 0, leaving = false, onclose, onframe, onmoveout = null, onhostdrag = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; revision?: number; leaving?: boolean; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; canvasundo?: CanvasUndo | null } = $props();
+  let { projectId, canvasId, nodeId, revision = 0, leaving = false, onclose, onframe, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; revision?: number; leaving?: boolean; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: { width: number; height: number }) => void) | null; canvasundo?: CanvasUndo | null } = $props();
 
   const opensOn = untrack(() => (get(propertiesRequest) === nodeId ? OpensOn.Properties : OpensOn.Stage));
   propertiesRequest.set(null);
@@ -144,7 +144,7 @@
 
 {#if session}
   <div class="inline" class:leaving data-leaving={leaving || undefined}>
-    <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} {onhostdrag} {canvasundo} {opensOn} />
+    <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} {onhostdrag} {onhostfit} {canvasundo} {opensOn} />
   </div>
 {:else if failed}
   <p class="inline-status" role="status">This video could not be opened here. <a href={editorPath}>Open the editor</a></p>

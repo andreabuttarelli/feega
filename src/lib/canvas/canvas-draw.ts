@@ -1,4 +1,5 @@
 import { DrawTool } from '$lib/motion/draw-tool';
+import { TEXT_SIZINGS } from '$lib/motion/text-sizing';
 import { CanvasTheme, type CanvasBox, type DrawnWire } from '$lib/motion/draw-create';
 import { mapOutline, parsePath, pathData } from '$lib/motion/shape/geometry';
 
@@ -31,7 +32,8 @@ export function drawnOnCanvas(clip: DrawnClip, host: CanvasBox, toFlow: ToFlow, 
   }
   const box = flowBox(clip, host, toFlow);
   if (tool !== DrawTool.Pen) {
-    return { tool, box, theme };
+    const sizing = TEXT_SIZINGS.find((v) => v === clip.props.sizing);
+    return { tool, box, theme, sizing } as DrawnWire;
   }
   const outline = parsePath(String(clip.props.path ?? ''));
   if (typeof outline === 'string') {

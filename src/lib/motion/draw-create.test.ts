@@ -6,6 +6,7 @@ import { DrawTool } from './draw-tool';
 import { CANVAS_INK, CanvasTheme, drawClip, drawnElement, penClip } from './draw-create';
 import { parsePath, type Outline } from './shape/geometry';
 import type { OpResult } from './timeline';
+import { TextSizing } from './text-sizing';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -150,5 +151,23 @@ describe('a text drawn inside a frame', () => {
     const made = ok(drawClip(doc, DrawTool.Text, BOX, 0, 't1'));
     const props = findClip(made, 't1')!.clip.props as { size: number };
     expect(props.size * Math.min(doc.width, doc.height) * TEXT_LEADING).toBeCloseTo(BOX.height * doc.height, 0);
+  });
+});
+
+describe('the resizing a drawn text starts with', () => {
+  const box = { x: 0.5, y: 0.5, width: 0.3, height: 0.1 };
+  const sizingOf = (r: OpResult) => (r.ok ? findClip(r.doc, 'tx')?.clip.props.sizing : null);
+
+  it('a dragged text keeps its width and grows in height', () => {
+    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx'))).toBe('auto-height');
+  });
+
+  it('a clicked text grows with its line', () => {
+    expect(sizingOf(drawClip(newMotionDoc(MotionFormat.Landscape), DrawTool.Text, box, 0, 'tx', TextSizing.AutoWidth))).toBe('auto');
+  });
+
+  it('a free text drawn on the canvas keeps the resizing it was drawn with', () => {
+    const made = drawnElement({ tool: DrawTool.Text, box: { left: 0, top: 0, width: 300, height: 80 }, sizing: TextSizing.AutoWidth }, 'tx');
+    expect(made.ok && made.doc.tracks.flatMap((t) => t.clips)[0].props.sizing).toBe('auto');
   });
 });

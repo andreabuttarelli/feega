@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { keepTextSize } from '$lib/motion/text-fit';
   import { localStore } from '$lib/browser-storage';
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
@@ -379,6 +380,19 @@
     if (turn !== 0) {
       rotateGroupBy(id, turn);
     }
+  }
+
+  const fittedHosts = new Map<string, string>();
+
+  function fitHost(id: string | null, share: { width: number; height: number }) {
+    const row = id ? nodes.find((n) => n.id === id) : null;
+    const settled = row ? `${row.w}x${row.h}@${motionOf(row)?.docHeadRevision ?? 0}` : "";
+    if (!row || fittedHosts.get(row.id) === settled) {
+      return;
+    }
+    const next = { w: Math.round(row.w * share.width), h: Math.round(row.h * share.height) };
+    fittedHosts.set(row.id, `${next.w}x${next.h}@${motionOf(row)?.docHeadRevision ?? 0}`);
+    void resize(row.id, next.w, next.h);
   }
 
   function hostDrag({ turn, ...shift }: HostMove, to: PointerPoint, phase: DragPhase) {
@@ -2287,10 +2301,10 @@
     return frameResize(shown, { w, h }, open?.doc ?? PICTURE_OF_KIND[motion.kind](motion, row), mode);
   }
 
-  async function sizeFrameDoc(id: string, picture: { width: number; height: number }) {
+  async function sizeFrameDoc(id: string, picture: { width: number; height: number }, was: { width: number; height: number } | null = null) {
     const open = layersSource.video;
     if (open?.nodeId === id) {
-      open.edit(fitToNode(open.doc, picture), 'Resized the frame');
+      open.edit(fitToNode(was ? keepTextSize(open.doc, was, picture) : open.doc, picture), 'Resized the frame');
       return;
     }
     const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height });
@@ -2312,9 +2326,11 @@
       return;
     }
     const plan = framePlan(id, width, height);
+    const before = nodes.find((n) => n.id === id);
+    const was = before && motionOf(before)?.kind === FrameKind.Element ? { width: before.w, height: before.h } : null;
     await storeSize(id, plan?.w ?? width, plan?.h ?? height);
     if (plan?.picture) {
-      await sizeFrameDoc(id, plan.picture);
+      await sizeFrameDoc(id, plan.picture, was);
     }
   }
 
@@ -3584,7 +3600,7 @@
   {/if}
   {#if editingMotion}
     {#key editingMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} onhostdrag={hostDrag} {canvasundo} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} onhostdrag={hostDrag} onhostfit={(share) => fitHost(editingMotion, share)} {canvasundo} />
     {/key}
   {/if}
 

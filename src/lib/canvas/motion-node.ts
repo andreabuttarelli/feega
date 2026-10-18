@@ -98,7 +98,9 @@ enum Sizing {
   Free = 'free'
 }
 
-const sizingOf = (node: Pick<MotionNode, 'kind' | 'format'>): Sizing => (node.kind === FrameKind.Frame && node.format === MotionFormat.Custom ? Sizing.Free : Sizing.Fixed);
+const FREE_KIND: ReadonlySet<FrameKind> = new Set([FrameKind.Element]);
+
+const sizingOf = (node: Pick<MotionNode, 'kind' | 'format'>): Sizing => ((node.kind === FrameKind.Frame && node.format === MotionFormat.Custom) || FREE_KIND.has(node.kind) ? Sizing.Free : Sizing.Fixed);
 
 type Picture = { width: number; height: number };
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TEXT_SIZINGS } from '$lib/motion/text-sizing';
 import { Background, formatOf, type MotionDoc } from '$lib/motion/doc';
 import type { Db } from '$lib/server/db/client';
 import { createNode, deleteNode, findNode, listConnections, type CanvasNodeRecord } from '$lib/server/repos/canvas';
@@ -503,7 +504,7 @@ export function frameRequest(store: FrameStore, ask: z.infer<typeof frameRequest
 export const canvasBoxSchema = z.object({ left: z.number().finite(), top: z.number().finite(), width: z.number().positive(), height: z.number().positive() }).strict();
 
 export const drawnSchema = z.discriminatedUnion('tool', [
-  z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse]), box: canvasBoxSchema, theme: z.enum(CanvasTheme).optional() }).strict(),
+  z.object({ tool: z.enum([DrawTool.Text, DrawTool.Rectangle, DrawTool.Ellipse]), box: canvasBoxSchema, theme: z.enum(CanvasTheme).optional(), sizing: z.enum(TEXT_SIZINGS).optional() }).strict(),
   z.object({ tool: z.literal(DrawTool.Pen), path: z.string().min(1).max(20_000) }).strict()
 ]);
 
