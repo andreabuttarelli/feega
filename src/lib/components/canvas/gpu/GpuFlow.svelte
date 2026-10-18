@@ -1,5 +1,9 @@
 <script lang="ts">
   import { onMount, untrack, type ComponentProps } from 'svelte';
+  import { iconBitmap } from './icon-bitmap';
+  import { idleChrome } from '$lib/canvas/gpu/idle-chrome';
+  import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
+  import { isNodeType } from '$lib/canvas/node-data';
   import { page } from '$app/state';
   import type CanvasFlow from '../CanvasFlow.svelte';
   import type { Tile } from '../CanvasFlow.svelte';
@@ -69,7 +73,7 @@
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, latestSnapshot, storeSnapshot } from '$lib/canvas/gpu/snapshot-cache';
   import { getFontEmbedCSS, toCanvas } from 'html-to-image';
-  import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
+  import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
   let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void } = $props();
@@ -155,6 +159,13 @@
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
+  let hoverChrome = $state<string | null>(null);
+  const chromeIds = $derived(new Set([...selected, ...domIds, ...(hoverChrome ? [hoverChrome] : []), ...(ghost ? [ghost.from.nodeId] : [])]));
+  const labelOf = (t: Tile) => {
+    const kind = t.kind && isNodeType(t.kind) ? t.kind : null;
+    return t.tag === NameTag.Hidden ? null : t.displayName?.trim() || (kind ? NODE_KIND_LABEL[kind] : null);
+  };
+  const chromeOf = (t: Tile) => (chromeIds.has(t.id) ? null : idleChrome(t, labelOf(t), t.kind && isNodeType(t.kind) ? t.kind : null, (port) => CONNECTOR_STYLE[port].color));
   const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
 
   const SNAPSHOT_SETTLE_MS = 120;
@@ -394,7 +405,8 @@
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
         hidden: domIds.has(t.id),
         snapshot: shotOf(t.id),
-        running: isRunning(summaries.get(t.id)?.data ?? {})
+        running: isRunning(summaries.get(t.id)?.data ?? {}),
+        chrome: chromeOf(t)
       })
     )
   );
@@ -406,6 +418,22 @@
 
   $effect(() => {
     scene?.setCards(cards);
+  });
+
+  const iconed = new Set<string>();
+  $effect(() => {
+    const target = scene;
+    if (!target) {
+      return;
+    }
+    for (const t of placed) {
+      const kind = t.kind && isNodeType(t.kind) ? t.kind : null;
+      if (!kind || iconed.has(kind)) {
+        continue;
+      }
+      iconed.add(kind);
+      void iconBitmap(NODE_KIND_ICON[kind] as never).then((bitmap) => target.setIcon(kind, bitmap)).catch(() => iconed.delete(kind));
+    }
   });
 
   $effect(() => {
@@ -716,6 +744,7 @@
     const w = toWorld(view, p);
     if (!active) {
       hovered = e.pointerType === 'mouse' ? topNodeAt(w) : null;
+      hoverChrome = e.pointerType === 'mouse' ? (hovered ?? portAt(ports, w, view.zoom)?.nodeId ?? null) : null;
       return;
     }
     const far = Math.hypot(p.x - downAt.x, p.y - downAt.y) > MOVE_SLOP_PX;
@@ -1350,7 +1379,7 @@
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} resizable={resizable && on} onrotate={props.onRotate} />
+          <GpuTileChrome tile={t} selected={on} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} />
           {#if !domIds.has(t.id) && t.kind === 'motion'}
             {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>

@@ -163,6 +163,8 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
     await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
     const pane = (await page.locator('[data-canvas-surface]').boundingBox())!;
     const zoomOf = async () => Number(((await page.locator('[data-canvas-surface]').getAttribute('data-view')) ?? '0,0,1').split(',')[2]);
+    await page.locator('[data-canvas-surface]').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('ControlOrMeta+a');
     for (const target of [0.2, 1, 2]) {
       await page.mouse.move(pane.x + pane.width / 2, pane.y + pane.height / 2);
       await page.keyboard.down('Control');
