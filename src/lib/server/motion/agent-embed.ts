@@ -1,11 +1,12 @@
 import type { Db } from '$lib/server/db/client';
 import { findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findProjectById, type Project } from '$lib/server/repos/projects';
+import { readHead } from '$lib/server/repos/motion-revisions';
 import { motionOf, type MotionNode } from '$lib/canvas/motion-node';
 import { embedUrl, interactiveBundle, BUNDLE_FILE } from '$lib/motion/interactive/bundle';
 import { embedSnippets } from '$lib/motion/interactive/loader';
 import type { MotionDoc } from '$lib/motion/doc';
-import { assetUrls, headOrNew, motionAssets, motionTokens, type AssetSigner } from './editor';
+import { assetUrls, newHead, motionAssets, motionTokens, type AssetSigner } from './editor';
 import { embedPublished, isRefused, publishEmbed, removeEmbed } from './embed';
 import { libsOrigin } from './libs-origin';
 
@@ -26,15 +27,22 @@ const fetchBlob = (url: string) => fetch(url).then((r) => r.blob());
 
 const failed = (failure: EmbedFailure, body: Record<string, unknown> = {}): EmbedAnswer => ({ ok: false, failure, body: { error: failure, ...body } });
 
-export async function savedMotion(db: Db, scope: Scope): Promise<Saved | null> {
-  const record = await findNode(db, scope);
+export async function savedMotionWith<T>(db: Db, scope: Scope, alongside: (record: CanvasNodeRecord) => Promise<T>): Promise<(Saved & { alongside: T }) | null> {
+  const [record, head] = await Promise.all([findNode(db, scope), readHead(db, scope)]);
   const node = record ? motionOf(record) : null;
-  const project = record && node ? await findProjectById(db, { orgId: scope.orgId, projectId: record.projectId }) : null;
-  if (!record || !node || !project) {
+  if (!record || !node) {
     return null;
   }
-  const head = await headOrNew(db, scope, node);
-  return { record, node, project, version: head.version, doc: head.doc };
+  const [project, extra] = await Promise.all([findProjectById(db, { orgId: scope.orgId, projectId: record.projectId }), alongside(record)]);
+  if (!project) {
+    return null;
+  }
+  const { version, doc } = head ?? newHead(node);
+  return { record, node, project, version, doc, alongside: extra };
+}
+
+export async function savedMotion(db: Db, scope: Scope): Promise<Saved | null> {
+  return savedMotionWith(db, scope, async () => null);
 }
 
 async function bundleInput(db: Db, scope: PublishScope, saved: Saved) {

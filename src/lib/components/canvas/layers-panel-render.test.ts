@@ -36,3 +36,13 @@ describe('a frame row in Layers', () => {
     expect(render(LayersPanel).body).toContain('data-layer="t1"');
   });
 });
+
+describe('a long Layers list', () => {
+  it('renders a window of rows, not every one of 500', () => {
+    unpublish = canvasWith(Array.from({ length: 500 }, (_, i) => ({ id: `n${i}`, type: 'image', name: `Image ${i}` })));
+    const rows = render(LayersPanel).body.match(/role="treeitem"/g) ?? [];
+
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.length).toBeLessThan(100);
+  });
+});

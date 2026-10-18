@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { MotionDoc } from '$lib/motion/doc';
-  import { DrawTool, closesOnFirst, dragRect, type DragPoint, type DrawBox } from '$lib/motion/draw-tool';
+  import { DrawTool, clickBox, closesOnFirst, dragRect, type DragPoint, type DrawBox } from '$lib/motion/draw-tool';
   import { drawClip, penClip } from '$lib/motion/draw-create';
   import { mapOutline, pathData, type Outline, type Pt } from '$lib/motion/shape/geometry';
   import { Handle, Mirror, addPoint, dragHandle, toggleClosed, type PointRef } from '$lib/motion/shape/pen';
@@ -91,7 +91,7 @@
     if (!drag) {
       return;
     }
-    const box = (drag ? live : null) ?? (tool === DrawTool.Text ? { ...drag.from, width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height } : null);
+    const box = (drag ? live : null) ?? (tool === DrawTool.Text ? clickBox(drag.from, { width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height }) : null);
     drag = null;
     if (!box) {
       return;

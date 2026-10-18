@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { frameDrill } from '$lib/canvas/frame-drill';
+  import { Gesture } from '$lib/motion/drill';
   import { onMount, untrack, type ComponentProps } from 'svelte';
   import { page } from '$app/state';
   import type CanvasFlow from '../CanvasFlow.svelte';
@@ -24,7 +26,7 @@
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import { FocusMode, frameIn, type Insets } from '$lib/canvas/free-area';
+  import { FocusMode, inView, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
@@ -66,8 +68,8 @@
   import { Counter, count, exposeLoss, recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
-  import { nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
-  import { cachedSnapshot, storeSnapshot } from '$lib/canvas/gpu/snapshot-cache';
+  import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
+  import { cachedSnapshot, latestSnapshot, storeSnapshot } from '$lib/canvas/gpu/snapshot-cache';
   import { getFontEmbedCSS, toCanvas } from 'html-to-image';
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
@@ -159,6 +161,23 @@
 
   const SNAPSHOT_SETTLE_MS = 120;
   const SNAPSHOT_TIMEOUT_MS = 4000;
+  const IDLE_WAIT_MS = 200;
+  const crossOrigin = (src: string) => {
+    try {
+      return new URL(src, location.href).origin !== location.origin;
+    } catch {
+      return false;
+    }
+  };
+  const tainted = (canvas: HTMLCanvasElement) => {
+    try {
+      canvas.getContext('2d')?.getImageData(0, 0, 1, 1);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  const idle = () => new Promise<void>((r) => ('requestIdleCallback' in window ? requestIdleCallback(() => r(), { timeout: IDLE_WAIT_MS }) : setTimeout(r, 0)));
   const withTimeout = <T,>(work: Promise<T>, ms: number) => Promise.race([work, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('snapshot timed out')), ms))]);
   const HOVER_INTENT_MS = 150;
   const SNAPSHOT_PIXEL_RATIO = 2;
@@ -175,7 +194,35 @@
     const t = byId.get(id);
     return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.thumbsOf?.(id) ?? []) : '';
   };
-  const shotOf = (id: string) => pictured.get(id) ?? null;
+  let shown = $state(new Map<string, string>());
+  const shotOf = (id: string) => shown.get(id) ?? null;
+  const showSnapshot = (id: string, key: string, bitmap: ImageBitmap) => {
+    scene?.setSnapshot(id, key, bitmap);
+    shown = new Map(shown).set(id, key);
+  };
+  const preloaded = new Set<string>();
+
+  $effect(() => {
+    if (!scene) {
+      return;
+    }
+    for (const t of placed) {
+      if (preloaded.has(t.id) || !snapshotKind(t)) {
+        continue;
+      }
+      preloaded.add(t.id);
+      void latestSnapshot(t.id).then((hit) => {
+        if (!hit || shown.has(t.id)) {
+          return;
+        }
+        showSnapshot(t.id, hit.key, hit.bitmap);
+        if (hit.key === shotKeyOf(t.id)) {
+          pictured = new Map(pictured).set(t.id, hit.key);
+          count(Counter.CachedSnapshot);
+        }
+      });
+    }
+  });
 
   $effect(() => {
     const id = hovered;
@@ -204,7 +251,8 @@
     }
     const due = placed.filter(snapshotKind);
     const seen = visibleIds(due, view, area);
-    const next = nextSnapshot(due, shotKeyOf, untrack(() => pictured), seen, domIds);
+    const s = screenSize();
+    const next = nextSnapshot(due, shotKeyOf, untrack(() => pictured), seen, domIds, toWorld(view, { x: s.width / 2, y: s.height / 2 }));
     if (next) {
       shotJob = next;
     }
@@ -231,7 +279,7 @@
         return;
       }
       if (bitmap && scene) {
-        scene.setSnapshot(id, key, bitmap);
+        showSnapshot(id, key, bitmap);
         count(Counter.CachedSnapshot);
         finish();
         return;
@@ -253,6 +301,7 @@
     let cancelled = false;
     void (async () => {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await idle();
       for (const img of host.querySelectorAll('img')) {
         img.loading = 'eager';
       }
@@ -265,9 +314,16 @@
       try {
         if (el && scene) {
           fontCss ??= await withTimeout(getFontEmbedCSS(el), SNAPSHOT_TIMEOUT_MS);
-          const canvas = await withTimeout(toCanvas(el, { pixelRatio: SNAPSHOT_PIXEL_RATIO, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL }), SNAPSHOT_TIMEOUT_MS);
-          scene.setSnapshot(id, key, await createImageBitmap(canvas));
-          void storeSnapshot(key, canvas);
+          const options = { pixelRatio: SNAPSHOT_PIXEL_RATIO, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL };
+          let canvas = await withTimeout(toCanvas(el, options), SNAPSHOT_TIMEOUT_MS);
+          if (tainted(canvas)) {
+            canvas = await withTimeout(toCanvas(el, { ...options, filter: (n) => !(n instanceof HTMLImageElement && crossOrigin(n.currentSrc || n.src)) }), SNAPSHOT_TIMEOUT_MS);
+          }
+          if (tainted(canvas)) {
+            throw new Error('tainted snapshot');
+          }
+          showSnapshot(id, key, await createImageBitmap(canvas));
+          void storeSnapshot(id, key, canvas);
           count(Counter.Snapshot);
         }
       } catch (err) {
@@ -339,7 +395,8 @@
         rotation: t.rotation ?? 0,
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
         hidden: domIds.has(t.id),
-        snapshot: shotOf(t.id)
+        snapshot: shotOf(t.id),
+        running: isRunning(summaries.get(t.id)?.data ?? {})
       })
     )
   );
@@ -474,6 +531,13 @@
     if (f?.mode === FocusMode.Select) {
       untrack(() => select([...ids]));
     }
+    if (f?.mode !== FocusMode.Frame) {
+      const b = untrack(() => boundsOf(ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []))));
+      const s = untrack(() => screenSize());
+      if (b && untrack(() => inView(b, view, { width: s.width, height: s.height }, f?.free))) {
+        return;
+      }
+    }
     const frame = requestAnimationFrame(() => requestAnimationFrame(() => untrack(() => focusOn(ids, f?.free ?? null))));
     return () => cancelAnimationFrame(frame);
   });
@@ -556,6 +620,20 @@
       return;
     }
     clickNode(id, e.shiftKey || e.metaKey || e.ctrlKey);
+  }
+
+  function onDouble(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (target.closest('.gpu-dom-node [data-motion-node]')) {
+      return;
+    }
+    const hit = hitAt(toWorld(view, local(e as PointerEvent)));
+    const id = hit.kind === HitKind.Node ? hit.nodeId : null;
+    const stage = id ? wrap?.querySelector<HTMLElement>(`[data-motion-node="${id}"] [data-frame-stage]`)?.getBoundingClientRect() : null;
+    if (!id || !stage || stage.width <= 0 || stage.height <= 0) {
+      return;
+    }
+    frameDrill.request(id, { x: (e.clientX - stage.left) / stage.width, y: (e.clientY - stage.top) / stage.height }, Gesture.Double);
   }
 
   const pointerOf = (e: PointerEvent) => (e.pointerType === 'touch' ? Pointer.Touch : e.pointerType === 'pen' ? Pointer.Pen : Pointer.Mouse);
@@ -1200,9 +1278,9 @@
           props.onFlow?.(toFlow);
           observer.observe(surface!);
           if (!fitted && tiles.length) {
-            fitted = true;
             view = fitView(tiles);
           }
+          fitted = true;
         })
         .catch((err: unknown) => {
           failed = err instanceof Error ? err.message : String(err);
@@ -1261,6 +1339,7 @@
     onpointercancel={onUp}
     onwheel={onWheel}
     onclick={onClickInside}
+    ondblclick={onDouble}
     oncontextmenu={onContextMenu}
     onpointerleave={() => props.onPointer?.(null)}
     class:panning={space}

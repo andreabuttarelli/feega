@@ -21,7 +21,11 @@ let shared: Promise<Browser> | null = null;
 
 async function launch(): Promise<Browser> {
   const [{ default: chromium }, { default: puppeteer }] = await Promise.all([import('@sparticuz/chromium-min'), import('puppeteer-core')]);
-  const executablePath = process.env.CHROMIUM_PATH ?? (await chromium.executablePath(process.env.CHROMIUM_PACK_URL ?? CHROMIUM_PACK));
+  const local = process.env.CHROMIUM_PATH;
+  if (local) {
+    return puppeteer.launch({ executablePath: local, headless: 'shell' });
+  }
+  const executablePath = await chromium.executablePath(process.env.CHROMIUM_PACK_URL ?? CHROMIUM_PACK);
   return puppeteer.launch({ executablePath, args: chromium.args, headless: 'shell' });
 }
 

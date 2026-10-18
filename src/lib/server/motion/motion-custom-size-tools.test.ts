@@ -35,6 +35,13 @@ describe('set_canvas with a custom size', () => {
     expect(session.doc.width).toBe(1920);
   });
 
+  it('a still with the size makes a 1440×6000 page in one call', async () => {
+    const { run, session } = setup();
+
+    expect(await run('set_canvas', { width: 1440, height: 6000, still: 0 })).toMatchObject({ ok: true });
+    expect([session.doc.width, session.doc.height, session.doc.still]).toEqual([1440, 6000, { frame: 0 }]);
+  });
+
   it('get_motion_doc reports the custom size', async () => {
     const { run } = setup();
     await run('set_canvas', { width: 1000, height: 1000 });

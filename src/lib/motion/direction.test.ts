@@ -474,9 +474,9 @@ describe('a live scene in a video', () => {
 
 describe('a still shows one frame', () => {
   const poster = (shapeFrames: number): MotionDoc => {
-    const doc = { ...calm(), durationInFrames: 108, still: { frame: 90 } };
-    const shaped = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: shapeFrames, props: {} }, 'split'));
-    return must(addClip(shaped, { component: 'Title', from: 0, durationInFrames: 108, props: { text: 'LIME.' } }, 'title'));
+    const video = { ...calm(), durationInFrames: 108 };
+    const shaped = must(addClip(video, { component: 'Shape', from: 0, durationInFrames: shapeFrames, props: {} }, 'split'));
+    return { ...must(addClip(shaped, { component: 'Title', from: 0, durationInFrames: 108, props: { text: 'LIME.' } }, 'title')), still: { frame: 90 } };
   };
   const hidden = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.HiddenInStill);
 

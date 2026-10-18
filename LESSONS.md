@@ -550,6 +550,15 @@ non fa niente) e `curl http://localhost:<porta>/src/<file>` non contiene il codi
 Vite non sempre vede i file cambiati in blocco da un cambio di branch. Mossa: dopo ogni cambio di
 branch riavvia il dev server e controlla col `curl` del modulo prima di credere a un rosso e2e.
 
+Anche senza checkout il watcher a volte smette di vedere i file salvati: il `curl` del modulo
+mostra il codice vecchio. Stessa mossa, riavvio prima di ogni giro e2e.
+
+### Un `ondblclick` di Svelte che non scatta mai
+Segnale: il listener in cattura su `document` vede il dblclick sul tuo elemento, il gestore Svelte
+no. Svelte 5 delega `dblclick`/`click` alla radice; un antenato (la tela, un nodo) ferma la
+propagazione prima. Mossa: `addEventListener('dblclick', …)` diretto sull'elemento in un
+`$effect`, e un test e2e che fa il gesto vero.
+
 ## Test: distinguere il tuo difetto dal rumore
 
 ### CI rossa con zero test falliti è una promessa non attesa, non un test tuo

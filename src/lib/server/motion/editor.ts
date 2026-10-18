@@ -108,7 +108,7 @@ export function assetUrls(assets: MotionAsset[]): Record<string, string> {
 
 export async function saveMotionDoc(
   db: Db,
-  input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null }
+  input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null; known?: CanvasNodeRecord }
 ): Promise<RevisionWrite> {
   const write = await appendRevision(db, input);
   if (write.outcome !== RevisionOutcome.Written) {
@@ -120,7 +120,8 @@ export async function saveMotionDoc(
     nodeId: input.nodeId,
     patch: { docHeadRevision: write.head.version, format: formatOf(write.head.doc as MotionDoc) },
     check: DataCheck.Schema,
-    actor: input.actor
+    actor: input.actor,
+    known: input.known
   });
   if (patched.outcome === 'written') {
     await followDoc(db, input.orgId, patched.node, write.head.doc as MotionDoc);

@@ -1383,8 +1383,9 @@
   });
 
   function reframe(id: string | null, free: Insets) {
+    const row = id ? nodes.find((n) => n.id === id) : null;
     if (id && reframesOn(viewportOf(pageWidth)) === Reframe.Frame) {
-      focusOn([id], free);
+      focusOn([id], free, row && !tileChromeOf(row).bar ? FocusMode.Reveal : FocusMode.Frame);
     }
   }
 

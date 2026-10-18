@@ -48,32 +48,28 @@ export function measureClips(root: HTMLElement, kinds: Kinds = KINDS): Record<st
   const frame = root.getBoundingClientRect();
   const boxes: Record<string, MeasuredBox> = {};
 
-  for (const layer of root.querySelectorAll<HTMLElement>('[data-clip]')) {
-    let left = Infinity;
-    let top = Infinity;
-    let right = -Infinity;
-    let bottom = -Infinity;
-
-    for (const el of layer.querySelectorAll('*')) {
+  const inkRects = (layer: HTMLElement): DOMRect[] =>
+    [...layer.querySelectorAll('*')].flatMap((el) => {
       const solid = kinds.solid.includes(el.tagName.toLowerCase());
       if (!solid && el.children.length) {
-        continue;
+        return [];
       }
       if (el.parentElement && el.parentElement !== layer && kinds.solid.includes(el.parentElement.tagName.toLowerCase())) {
-        continue;
+        return [];
       }
       const text = !solid && el.textContent?.trim() ? document.createRange() : null;
       text?.selectNodeContents(el);
       const inked = text?.getBoundingClientRect?.();
-      const r = inked && inked.width > 0 && inked.height > 0 ? inked : el.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0) {
-        continue;
-      }
-      left = Math.min(left, r.left);
-      top = Math.min(top, r.top);
-      right = Math.max(right, r.left + r.width);
-      bottom = Math.max(bottom, r.top + r.height);
-    }
+      return [inked && inked.width > 0 && inked.height > 0 ? inked : el.getBoundingClientRect()];
+    });
+
+  for (const layer of root.querySelectorAll<HTMLElement>('[data-clip]')) {
+    const own = layer.querySelector('[data-box]');
+    const rects = (own ? [own.getBoundingClientRect()] : inkRects(layer)).filter((r) => r.width > 0 && r.height > 0);
+    const left = Math.min(...rects.map((r) => r.left));
+    const top = Math.min(...rects.map((r) => r.top));
+    const right = Math.max(...rects.map((r) => r.left + r.width));
+    const bottom = Math.max(...rects.map((r) => r.top + r.height));
 
     if (left === Infinity || frame.width <= 0 || frame.height <= 0) {
       continue;

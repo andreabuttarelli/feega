@@ -1,6 +1,7 @@
 import { TrackKind } from './components';
-import { findClip, type MotionDoc } from './doc';
-import { addTrack, moveClip, moveTrack, type OpResult } from './timeline';
+import { findClip, type MotionDoc, type MotionTrack } from './doc';
+import { layerOrder } from './siblings';
+import { moveTrack, type OpResult } from './timeline';
 
 export enum Arrange {
   Front = 'front',
@@ -9,40 +10,56 @@ export enum Arrange {
   Back = 'back'
 }
 
-type Owned = { doc: MotionDoc; trackId: string; anchor: string; shared: boolean };
+type Isolated = { doc: MotionDoc; trackId: string };
 
-function ownTrack(doc: MotionDoc, clipId: string, newId: () => string): Owned | string {
+function isolate(doc: MotionDoc, clipId: string, newId: () => string): Isolated | string {
   const found = findClip(doc, clipId);
   if (!found) {
     return `no clip ${clipId}`;
   }
-  if (found.track.clips.length === 1) {
-    return { doc, trackId: found.track.id, anchor: found.track.id, shared: false };
+  const { track } = found;
+  const at = track.clips.findIndex((c) => c.id === clipId);
+  const below = track.clips.slice(0, at);
+  const above = track.clips.slice(at + 1);
+  if (!below.length && !above.length) {
+    return { doc, trackId: track.id };
   }
 
-  const trackId = newId();
-  const added = addTrack(doc, found.track.kind as TrackKind, trackId);
-  if (!added.ok) {
-    return added.error;
-  }
-  const moved = moveClip(added.doc, clipId, { from: found.clip.from, trackId });
-  return moved.ok ? { doc: moved.doc, trackId, anchor: found.track.id, shared: true } : moved.error;
+  const part = (clips: MotionTrack['clips']): MotionTrack => ({ ...track, id: newId(), clips });
+  const own = below.length ? part([found.clip]) : { ...track, clips: [found.clip] };
+  const split = [...(above.length ? [part(above)] : []), own, ...(below.length ? [{ ...track, clips: below }] : [])];
+  const index = doc.tracks.indexOf(track);
+  return { doc: { ...doc, tracks: [...doc.tracks.slice(0, index), ...split, ...doc.tracks.slice(index + 1)] }, trackId: own.id };
 }
 
 function lastVisualIndex(doc: MotionDoc): number {
   return doc.tracks.filter((t) => t.kind === TrackKind.Visual).length - 1;
 }
 
-function anchorIndex(own: Owned): number {
-  const tracks = own.shared ? own.doc.tracks.filter((t) => t.id !== own.trackId) : own.doc.tracks;
-  return tracks.findIndex((t) => t.id === own.anchor);
+type Step = (own: Isolated, newId: () => string) => OpResult | string;
+
+function stepPast(offset: number, landing: number): Step {
+  return (own, newId) => {
+    const order = layerOrder({ ...own.doc, tracks: own.doc.tracks.filter((t) => t.kind === TrackKind.Visual) });
+    const clipId = own.doc.tracks.find((t) => t.id === own.trackId)!.clips[0].id;
+    const neighbour = order[order.indexOf(clipId) + offset];
+    if (!neighbour) {
+      return { ok: true, doc: own.doc };
+    }
+    const next = isolate(own.doc, neighbour, newId);
+    if (typeof next === 'string') {
+      return next;
+    }
+    const rest = next.doc.tracks.filter((t) => t.id !== own.trackId);
+    return moveTrack(next.doc, own.trackId, rest.findIndex((t) => t.id === next.trackId) + landing);
+  };
 }
 
-const TARGET: Record<Arrange, (own: Owned) => number> = {
-  [Arrange.Front]: () => 0,
-  [Arrange.Forward]: (own) => Math.max(0, anchorIndex(own) - (own.shared ? 0 : 1)),
-  [Arrange.Backward]: (own) => Math.min(lastVisualIndex(own.doc), anchorIndex(own) + 1),
-  [Arrange.Back]: (own) => lastVisualIndex(own.doc)
+const STEPS: Record<Arrange, Step> = {
+  [Arrange.Front]: (own) => moveTrack(own.doc, own.trackId, 0),
+  [Arrange.Forward]: stepPast(-1, 0),
+  [Arrange.Backward]: stepPast(1, 1),
+  [Arrange.Back]: (own) => moveTrack(own.doc, own.trackId, lastVisualIndex(own.doc))
 };
 
 const LAST_FIRST: ReadonlySet<Arrange> = new Set([Arrange.Front, Arrange.Forward]);
@@ -52,11 +69,14 @@ export function arrangeLayers(doc: MotionDoc, ids: readonly string[], to: Arrang
   const order = LAST_FIRST.has(to) ? [...ids].reverse() : ids;
 
   for (const id of order) {
-    const own = ownTrack(next, id, newId);
+    const own = isolate(next, id, newId);
     if (typeof own === 'string') {
       return { ok: false, error: own };
     }
-    const moved = moveTrack(own.doc, own.trackId, TARGET[to](own));
+    const moved = STEPS[to](own, newId);
+    if (typeof moved === 'string') {
+      return { ok: false, error: moved };
+    }
     if (!moved.ok) {
       return moved;
     }
