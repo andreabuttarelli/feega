@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { pickBarTool } from './fixtures/canvas-bar';
 import sharp from 'sharp';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
@@ -48,7 +49,7 @@ test.describe('rapid frame edits survive a reload @real', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     const canvas = `/p/${session.projectId}/c/${session.canvasId}`;
     await gotoHydrated(page, canvas);
-    await page.getByTestId('add-bar').getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
+    await pickBarTool(page, 'rectangle');
     const pane = (await page.locator('.svelte-flow').boundingBox())!;
     const from = { x: pane.x + pane.width * 0.35, y: pane.y + pane.height * 0.35 };
     await page.mouse.move(from.x, from.y);

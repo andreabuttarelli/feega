@@ -1,14 +1,22 @@
 import type { Locator, Page } from '@playwright/test';
 
+async function pickRadio(radio: Locator): Promise<void> {
+  if ((await radio.getAttribute('aria-checked')) !== 'true') {
+    await radio.click();
+  }
+}
+
 export async function barTool(page: Page, tool: string): Promise<Locator> {
   const bar = page.getByTestId('add-bar');
-  const design = bar.getByTestId('bar-mode').getByRole('radio', { name: 'Design' });
-  if ((await design.getAttribute('aria-checked')) !== 'true') {
-    await design.click();
-  }
+  await pickRadio(bar.getByTestId('bar-mode').getByRole('radio', { name: 'Design' }));
   return bar.getByTestId('draw-tools').locator(`[data-tool="${tool}"]`);
 }
 
 export async function pickBarTool(page: Page, tool: string): Promise<void> {
   await (await barTool(page, tool)).click();
+}
+
+export async function pickFrameTool(page: Page, tool: string): Promise<void> {
+  await pickRadio(page.getByTestId('edit-mode').locator('[data-mode="design"]'));
+  await page.getByTestId('draw-tools').locator(`[data-tool="${tool}"]`).click();
 }

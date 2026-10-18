@@ -6,6 +6,7 @@ import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 const TOLERANCE_PX = 2;
 const PORT_SQUARE_PX = 10;
 const SHOTS = `${homedir()}/Documents/feega-videos/edge-ports`;
+const KEYED_PROVIDER = /^(wiro|kie|higgsfield)\//;
 
 type Point = { x: number; y: number };
 
@@ -46,9 +47,10 @@ test.describe('edges end on the port square @real', () => {
   test.setTimeout(90_000);
 
   test('before and after a model change moves the ports', async ({ page, session, seedNode, admin }) => {
-    const { data: models } = await admin.from('ai_models').select('id, input_modalities, uncensored').eq('catalogue', 'image').eq('uncensored', false);
-    const textOnly = (models ?? []).find((m) => m.input_modalities.includes('text') && !m.input_modalities.includes('image'));
-    const withImages = (models ?? []).find((m) => m.input_modalities.includes('text') && m.input_modalities.includes('image'));
+    const { data: rows } = await admin.from('ai_models').select('id, input_modalities, uncensored, wire_spec').eq('catalogue', 'image').eq('uncensored', false);
+    const models = (rows ?? []).filter((m) => !KEYED_PROVIDER.test(m.id) && !m.wire_spec?.unrunnable && !m.wire_spec?.discountFor);
+    const textOnly = models.find((m) => m.input_modalities.includes('text') && !m.input_modalities.includes('image'));
+    const withImages = models.find((m) => m.input_modalities.includes('text') && m.input_modalities.includes('image'));
     expect(textOnly && withImages, 'catalogue has a text-only and a text+image image model').toBeTruthy();
 
     const source = await seedNode({ type: 'text', x: 0, y: 0, data: { prompt: 'A lighthouse.' } });
