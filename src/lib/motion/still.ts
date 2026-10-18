@@ -1,17 +1,10 @@
-import { RESOLUTION_PROBLEM, fitsResolution, type MotionDoc } from './doc';
+import { RESOLUTION_PROBLEM, docMode, fitsResolution, type MotionDoc } from './doc';
 import { setCanvas, type OpResult } from './timeline';
 import { timelineFits } from './editor-mount';
 
 export const ANIMATE_SECONDS = 5;
 
-export enum DocMode {
-  Video = 'video',
-  Still = 'still'
-}
-
-export function docMode(doc: Pick<MotionDoc, 'still'>): DocMode {
-  return doc.still ? DocMode.Still : DocMode.Video;
-}
+export { DocMode, docMode } from './doc';
 
 export function stillFrame(doc: Pick<MotionDoc, 'still'>): number | null {
   return doc.still?.frame ?? null;
