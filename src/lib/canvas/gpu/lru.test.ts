@@ -20,4 +20,17 @@ describe('createLru — a byte budget that evicts the least recently used', () =
     lru.set('big', 'X', 50);
     expect(lru.get('big')).toBe('X');
   });
+
+  it('never evicts an entry still on screen, and evicts it once it is let go', () => {
+    const released: string[] = [];
+    const shown = new Set(['a']);
+    const lru = createLru<string>(100, (_k, v) => released.push(v), (k) => shown.has(k));
+    lru.set('a', 'A', 60);
+    lru.set('b', 'B', 60);
+    expect(released).toEqual([]);
+    expect(lru.get('a')).toBe('A');
+    shown.delete('a');
+    lru.set('c', 'C', 60);
+    expect(released).toContain('A');
+  });
 });

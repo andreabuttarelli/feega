@@ -154,6 +154,21 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
     expect(shown[0], 'no revert after reload').toBe(settled.x);
   });
 
+  test('a marquee across nodes selects them, never their text', async ({ page, session, seedNode }) => {
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    await seedNode({ type: 'text', x: 200, y: 200, data: { prompt: 'Some words to highlight' } });
+    await seedNode({ type: 'text', x: 700, y: 200, data: { prompt: 'More words to highlight' } });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+    await page.waitForTimeout(1500);
+    const pane = (await page.locator('[data-canvas-surface]').boundingBox())!;
+    await page.mouse.move(pane.x + 20, pane.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(pane.x + pane.width - 40, pane.y + pane.height - 40, { steps: 20 });
+    await page.mouse.up();
+    expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
+  });
+
   test('a wire ends on its ports at every zoom', async ({ page, session, admin, seedNode }) => {
     await page.setViewportSize({ width: 1600, height: 1000 });
     const text = await seedNode({ type: 'text', x: 0, y: 0, data: { prompt: 'a' } });

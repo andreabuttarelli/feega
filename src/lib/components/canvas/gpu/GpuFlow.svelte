@@ -662,6 +662,7 @@
     downAt = p;
     suppressMenu = false;
     captureId = e.pointerId;
+    holdSelection(true);
     menuAt = null;
     picked = null;
     startGesture(kind, hit, w, e);
@@ -813,7 +814,15 @@
     MOVE[active.kind](active);
   }
 
+  function holdSelection(on: boolean) {
+    document.documentElement.classList.toggle('canvas-gesture', on);
+    if (on) {
+      getSelection()?.removeAllRanges();
+    }
+  }
+
   function onUp(e: PointerEvent) {
+    holdSelection(false);
     touches.delete(e.pointerId);
     captureId = null;
     if (touches.size < 2) {
@@ -1519,6 +1528,12 @@
 </div>
 
 <style>
+  :global(html.canvas-gesture),
+  :global(html.canvas-gesture *) {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+  }
+
   .wrap {
     position: relative;
     width: 100%;
