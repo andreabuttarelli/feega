@@ -26,7 +26,7 @@
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import { FocusMode, frameIn, type Insets } from '$lib/canvas/free-area';
+  import { FocusMode, inView, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
@@ -530,6 +530,13 @@
     }
     if (f?.mode === FocusMode.Select) {
       untrack(() => select([...ids]));
+    }
+    if (f?.mode !== FocusMode.Frame) {
+      const b = untrack(() => boundsOf(ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []))));
+      const s = untrack(() => screenSize());
+      if (b && untrack(() => inView(b, view, { width: s.width, height: s.height }, f?.free))) {
+        return;
+      }
     }
     const frame = requestAnimationFrame(() => requestAnimationFrame(() => untrack(() => focusOn(ids, f?.free ?? null))));
     return () => cancelAnimationFrame(frame);
@@ -1271,9 +1278,9 @@
           props.onFlow?.(toFlow);
           observer.observe(surface!);
           if (!fitted && tiles.length) {
-            fitted = true;
             view = fitView(tiles);
           }
+          fitted = true;
         })
         .catch((err: unknown) => {
           failed = err instanceof Error ? err.message : String(err);

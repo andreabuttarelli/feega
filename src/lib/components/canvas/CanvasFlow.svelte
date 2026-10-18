@@ -369,6 +369,7 @@
   // sono di SvelteFlow, e l'effetto sotto ci porta dentro solo le tile NUOVE. È il warning che
   // nomina il costo della libreria, non un difetto da togliere.
   let nodes = $state.raw<Node[]>(tiles.map(toNode));
+  const fitsOnOpen = untrack(() => tiles.length > 0);
   // svelte-ignore state_referenced_locally -- stessa cattura iniziale dei nodi, e stesso motivo:
   // da qui in poi gli archi sono di SvelteFlow, e l'effetto sotto ci porta dentro solo i NUOVI.
   let edges = $state.raw<FlowEdge[]>(($state.snapshot(incomingEdges) as FlowEdge[]).map(wireEdge));
@@ -948,7 +949,7 @@
     {...spec.flow}
     onmovestart={(event) => { moving = true; if (event) { onUserPan?.(); } }}
     onmoveend={() => (moving = false)}
-    fitView
+    fitView={fitsOnOpen}
     fitViewOptions={{ padding: FIT_PADDING, maxZoom: READABLE_ZOOM }}
     proOptions={ATTRIBUTION_IN_CREDITS_PAGE}
     multiSelectionKey={['Meta', 'Control', 'Shift']}
