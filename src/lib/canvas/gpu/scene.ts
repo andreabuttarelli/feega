@@ -229,6 +229,11 @@ export class GpuScene {
     this.invalidate();
   }
 
+  awaitsMedia(id: string): boolean {
+    const b = this.built.get(id);
+    return !b || (!!b.media && !this.ready.has(id) && !this.retiring.has(id));
+  }
+
   setIcon(kind: string, source: ImageBitmap) {
     this.chrome.setIcon(kind, source);
     this.setCards(this.cards);
