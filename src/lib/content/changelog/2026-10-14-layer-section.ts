@@ -2,7 +2,7 @@ import type { ChangelogEntry } from './index';
 
 export default {
   date: '2026-10-14',
-  title: 'A Layer section like Figma and Framer',
+  title: 'A Layer section',
   items: [
     'Blend and opacity sit on one row; opacity has a number and a slider.',
     'Flip any layer horizontally or vertically.',

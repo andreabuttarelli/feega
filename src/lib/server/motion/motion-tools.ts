@@ -875,7 +875,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_visibility: tool({
-      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it. clip_content true on a clip crops its children (set_parent) to its box at rest, like a Figma frame.',
+      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it. clip_content true on a clip crops its children (set_parent) to its box at rest, like a frame in a design tool.',
       inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional(), bleed: z.boolean().optional(), clip_content: z.boolean().optional() }),
       execute: async (input) => {
         const flags = { ...(input.hidden === undefined ? {} : { hidden: input.hidden }), ...(input.locked === undefined ? {} : { locked: input.locked }), ...(input.bleed === undefined || !input.clip_id ? {} : { bleed: input.bleed }), ...(input.clip_content === undefined || !input.clip_id ? {} : { clipContent: input.clip_content }) };
@@ -1135,7 +1135,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     use_as_mask: tool({
       description:
-        'Figma "Use as mask": of clip_ids, the bottom-most clip (lowest track) becomes the mask of the others, which must sit on tracks above it. The mask is drawn nowhere; its alpha as rendered cuts every masked clip: a Shape rect, ellipse or path with its corner radius and smoothing, a gradient fill fading to transparent gives a soft mask, its keyframes move the mask. Hide the mask clip (set_visibility) to turn masking off; release_mask removes it.',
+        '"Use as mask": of clip_ids, the bottom-most clip (lowest track) becomes the mask of the others, which must sit on tracks above it. The mask is drawn nowhere; its alpha as rendered cuts every masked clip: a Shape rect, ellipse or path with its corner radius and smoothing, a gradient fill fading to transparent gives a soft mask, its keyframes move the mask. Hide the mask clip (set_visibility) to turn masking off; release_mask removes it.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(2) }),
       execute: async (input) => apply(useAsMask(session.doc, input.clip_ids), `masked ${input.clip_ids.length - 1} clip(s)`)
     }),
@@ -1455,7 +1455,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_auto_layout: tool({
-      description: 'Auto layout (Figma-style flexbox). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (its fill is the frame background, set_props to colour it) on a track below them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
+      description: 'Auto layout (flexbox-style). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (its fill is the frame background, set_props to colour it) on a track below them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1).optional(), clip_id: z.string().optional() }),
       execute: async (input) => {
         if (input.clip_id) {

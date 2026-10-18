@@ -14,7 +14,7 @@ async function shoot(page: Page, name: string) {
 
 test.use({ video: process.env.E2E_VIDEO ? 'on' : 'off' });
 
-test.describe('groups behave like Figma groups @real', () => {
+test.describe('groups behave like design-tool groups @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
   test('undo a turn, members follow a drag live, a click on a member picks it, a resize scales it, previews show at once', async ({ page, session, admin, seedNode }) => {
