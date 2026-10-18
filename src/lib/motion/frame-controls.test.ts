@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, newMotionDoc } from './doc';
-import { VideoControl, controlShown, startMode } from './still';
-import { EditMode } from './edit-mode';
+import { VideoControl, controlShown } from './still';
+import { EditMode, startMode } from './edit-mode';
 
 const video = newMotionDoc(MotionFormat.Landscape);
 const still = { ...video, still: { frame: 0 } };
