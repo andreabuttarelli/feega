@@ -1412,6 +1412,7 @@
       onPeers: (value) => { peers = value; cursors.port.crowd(value.length + 1); },
       onLink: (state) => { canvasLink.set(state); },
       frames: frames.line,
+      frameHeads: frames.heads,
       cursors: cursors.line,
       commits: commits.line
     });
