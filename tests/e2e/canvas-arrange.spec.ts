@@ -64,4 +64,25 @@ test.describe('arrange on the canvas @real', () => {
     await expect(page.getByTestId('snap-guide')).toHaveCount(0);
     await expect.poll(async () => (await positions(admin, session.canvasId)).get(ids[2])!.y, { timeout: 10_000 }).toBe(160);
   });
+
+  test('⌥-drag leaves the tile in place and drops a copy where it was released', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const node = await seedNode({ type: 'motion', x: 100, y: 160, data: { ...LANDSCAPE, kind: 'element' } });
+    await admin.from('nodes').update({ width: SIDE, height: SIDE }).eq('id', node.id);
+    await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: sheet('s'), actor_kind: 'user', actor_id: session.userId });
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    const box = (await page.locator(`[data-motion-node="${node.id}"]`).boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.keyboard.down('Alt');
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 300, box.y + box.height / 2, { steps: 10 });
+    await page.mouse.up();
+    await page.keyboard.up('Alt');
+
+    await expect.poll(async () => (await positions(admin, session.canvasId)).size, { timeout: 10_000 }).toBe(2);
+    const at = await positions(admin, session.canvasId);
+    expect(at.get(node.id)).toEqual({ x: 100, y: 160 });
+    expect([...at.entries()].find(([id]) => id !== node.id)![1].x).toBeGreaterThan(300);
+  });
 });

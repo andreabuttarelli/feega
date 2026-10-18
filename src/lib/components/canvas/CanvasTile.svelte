@@ -344,7 +344,7 @@
   }
 
   /*
-   * LA TARGHETTA, FUORI DAL CORPO DEL NODO — come il nome di un frame in Figma.
+   * LA TARGHETTA, FUORI DAL CORPO DEL NODO — come il nome di un frame negli strumenti di design.
    *
    * `bottom: 100%` e non `top` negativo: ancora il basso della targhetta al TOP del nodo, quindi
    * cresce verso l'alto e non si sposta se il testo va a capo diversamente. Il piccolo margine

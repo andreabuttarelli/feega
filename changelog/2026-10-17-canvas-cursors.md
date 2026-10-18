@@ -11,7 +11,7 @@ heartbeat; 10 s without a mark hides the peer. It rides the existing
 canvas-peer) instead of one hardcoded event.
 
 Marks are keyed by a per-tab `sessionId`, not `userId`: two tabs of the
-same person see each other, as in Figma, which also makes the two-tab
+same person see each other, which also makes the two-tab
 real-stack test possible on production with the test account.
 
 `PeerLayer.svelte` draws cursors and selection outlines in flow

@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { pickBarTool } from './fixtures/canvas-bar';
 import sharp from 'sharp';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
@@ -17,7 +18,7 @@ async function headDoc(admin: SupabaseClient, nodeId: string): Promise<Doc | nul
 const boxColour = (doc: Doc | null) => doc?.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Shape')?.props.fills?.[0]?.color ?? null;
 
 async function drawBox(page: Page, tool = 'rectangle') {
-  await page.getByTestId('add-bar').getByTestId('draw-tools').locator(`[data-tool="${tool}"]`).click();
+  await pickBarTool(page, tool);
   const pane = (await page.locator('.svelte-flow').boundingBox())!;
   const from = { x: pane.x + pane.width * 0.35, y: pane.y + pane.height * 0.35 };
   await page.mouse.move(from.x, from.y);

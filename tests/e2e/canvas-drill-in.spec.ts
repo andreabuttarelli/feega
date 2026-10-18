@@ -21,7 +21,7 @@ async function at(target: Locator, share: { x: number; y: number }) {
 
 test.use({ video: SHOTS ? 'on' : 'off' });
 
-test.describe('drill into a frame like Figma @real', () => {
+test.describe('drill into a frame @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
   test('hover and one click select a closed frame\'s child, double-click to a part, Esc back up, cmd-click deep, Layers in sync', async ({ page, session, admin, seedNode }) => {

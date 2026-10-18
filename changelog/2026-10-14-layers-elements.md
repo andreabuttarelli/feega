@@ -1,6 +1,6 @@
 # Layers: elements, not tracks
 
-Users read the Layers tree as Figma's: one row per element. It listed
+Users read the Layers tree as in design tools: one row per element. It listed
 timeline tracks ("Video 1", empty "Audio 1") as rows, and frame rows
 showed a generic clapperboard.
 

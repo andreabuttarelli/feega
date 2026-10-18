@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated, type E2eSession } from './fixtures/session';
 import type { Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -53,7 +54,7 @@ async function inkPixels(page: Page, nodeId: string): Promise<{ count: number; h
 }
 
 async function draw(page: Page, gesture: Gesture) {
-  await page.getByTestId('add-bar').getByTestId('draw-tools').locator('[data-tool="text"]').click();
+  await pickBarTool(page, 'text');
   await expect(page.getByTestId('canvas-draw')).toBeVisible();
   const pane = (await page.locator('.svelte-flow').boundingBox())!;
   const from = { x: pane.x + pane.width * 0.3, y: pane.y + pane.height * 0.35 };

@@ -4,13 +4,14 @@ import { RenderEngine, engineFlag, killSwitch } from './engine-flag';
 const url = (q = '') => new URL(`https://feega.app/app/compose/x${q}`);
 
 describe('engineFlag', () => {
-  it('draws on the GPU by default', () => {
-    expect(engineFlag(url(), false)).toBe(RenderEngine.Gpu);
-    expect(engineFlag(url('?engine=other'), false)).toBe(RenderEngine.Gpu);
+  it('draws with the HTML engine by default', () => {
+    expect(engineFlag(url(), false)).toBe(RenderEngine.Html);
+    expect(engineFlag(url('?engine=other'), false)).toBe(RenderEngine.Html);
+    expect(engineFlag(url('?engine=html'), false)).toBe(RenderEngine.Html);
   });
 
-  it('keeps ?engine=html as an escape hatch', () => {
-    expect(engineFlag(url('?engine=html'), false)).toBe(RenderEngine.Html);
+  it('draws on the GPU only when the URL asks for it', () => {
+    expect(engineFlag(url('?engine=gpu'), false)).toBe(RenderEngine.Gpu);
   });
 
   it('forces HTML for everyone when the kill switch is on', () => {

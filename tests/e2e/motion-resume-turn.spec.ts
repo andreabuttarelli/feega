@@ -11,7 +11,7 @@ test.describe('motion agent turn resumed after a reload @real', () => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });
     let running = true;
 
-    await page.route(/\/motion\/[^/]+\/agent$/, (route) => {
+    await page.route(/\/api\/v1\/projects\/[^/]+\/(motion\/[^/]+\/)?agent$/, (route) => {
       if (route.request().method() !== 'GET') {
         return route.fallback();
       }

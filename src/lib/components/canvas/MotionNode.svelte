@@ -25,7 +25,7 @@
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { Background, FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
-  import { NodeMode, Paint, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
+  import { NodeMode, Paint, Under, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
   import { DRAWN_EVENT } from '$lib/motion/hyperframes/measure';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
@@ -70,7 +70,7 @@
   const layers = $derived(nodeLayers(nodeMode, paint));
   const chrome = $derived(frameChrome(node.kind));
   const previewing = $derived(nodeMode === NodeMode.Preview);
-  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending));
+  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending && chrome.under === Under.Released));
   const liveTile = $derived(liveHere && (!!local || node.docHeadRevision > 0) && (!previewing || tiles.live(node.id)));
   const capturable = $derived(nodeMode !== NodeMode.Edit && !liveTile);
   let ownDrawn = $state(false);
@@ -78,7 +78,7 @@
   const shownPoster = $derived(posterCurrent(local) && decodedPoster === poster ? decodedPoster : null);
   const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster));
   const playerUp = $derived(mounted && !!preview);
-  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
+  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile, chrome.under));
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));
@@ -321,12 +321,12 @@
   bind:this={root}
 >
   <div class="stage" data-testid="motion-node-stage" data-frame-stage>
-    {#if layers.own}
+    {#if layers.own || mounted}
       {#if shownPoster && !(playerUp && ownDrawn)}
-        <img class="poster" class:under={playerUp} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" />
+        <img class="poster" class:under={playerUp} class:kept={!layers.own} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" />
       {/if}
       {#if mounted && preview}
-        <div class="own" data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} /></div>
+        <div class="own" class:kept={!layers.own} data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} /></div>
         {#if previewing && chrome.bar}
           <span class="clock" data-testid="motion-node-timecode">{previewClock(frame, preview.fps, preview.durationInFrames)}</span>
           <input
@@ -354,7 +354,7 @@
         </div>
       {/if}
     {/if}
-    {#if !previewing}<div class="host nodrag nopan" data-testid="motion-node-editing" bind:this={host}></div>{/if}
+    {#if !previewing}<div class="host" class:nodrag={layers.editor} class:nopan={layers.editor} data-testid="motion-node-editing" bind:this={host}></div>{/if}
     {#if previewing && node.docHeadRevision}<FrameHover nodeId={node.id} revision={node.docHeadRevision} {previewUrl} width={size.width} height={size.height} />{/if}
     {#if previewing && chrome.bar}<a class="open nodrag" {href} data-testid="open-motion-editor" data-sveltekit-preload-data={onopen ? 'off' : 'hover'} onclick={open}>Open editor</a>{/if}
   </div>
@@ -403,6 +403,10 @@
     container-type: size;
     background: #000;
     color: #f0eee9;
+  }
+
+  .kept {
+    visibility: hidden;
   }
 
   .own {

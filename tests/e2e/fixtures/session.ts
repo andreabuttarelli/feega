@@ -262,8 +262,12 @@ async function gotoOnce(page: Page, path: string) {
   }
 }
 
+const RENDERER = process.env.E2E_RENDERER;
+
+const withRenderer = (path: string) => (RENDERER && !path.includes('renderer=') ? `${path}${path.includes('?') ? '&' : '?'}renderer=${RENDERER}` : path);
+
 export async function gotoHydrated(page: Page, path: string): Promise<import('@playwright/test').Response | null> {
-  const response = await gotoOnce(page, path);
+  const response = await gotoOnce(page, withRenderer(path));
   await page.waitForLoadState('networkidle');
   return response;
 }

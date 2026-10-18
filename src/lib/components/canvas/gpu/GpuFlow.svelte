@@ -40,6 +40,7 @@
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, type SnapGuide } from '$lib/canvas/snap';
+  import { dragOffset } from '$lib/canvas/duplicate-plan';
   import { enterFrame } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
   import type { Edge } from '$lib/motion/space';
@@ -724,6 +725,13 @@
     props.onLive?.([]);
     if (props.onTileDrop?.(ids, pointOf(e)) === DropVerdict.Taken) {
       settleOverrides();
+      return;
+    }
+    const grabbed = overrides.get(ids[0]);
+    const copyOffset = e.altKey && grabbed ? dragOffset(new Map(tiles.map((t) => [t.id, { x: t.x, y: t.y }])), { id: ids[0], position: grabbed }) : undefined;
+    if (copyOffset && props.onDuplicate) {
+      settleOverrides();
+      props.onDuplicate(ids, copyOffset);
       return;
     }
     const moves = ids.flatMap((id) => (overrides.get(id) ? [{ id, x: overrides.get(id)!.x, y: overrides.get(id)!.y }] : []));

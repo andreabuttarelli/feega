@@ -19,7 +19,7 @@ const clipOf = (doc: MotionDoc) => findClip(doc, 'card')!.clip;
 const frame = { width: 1920, height: 1080, fps: 30 };
 const plain = (c: string) => c;
 
-describe('figma effects', () => {
+describe('layer effects', () => {
   it('an inner shadow paints inside the layer alpha, offset and softened, over the layer', () => {
     const doc = ok(addEffect(base(), 'card', EffectKind.InnerShadow, 'in', { distance: 10, angle: 90, blur: 8, color: '#ff0000', opacity: 0.5 }));
     const html = effectLayer(clipOf(doc), frame, plain, '<i></i>');
@@ -66,7 +66,7 @@ describe('figma effects', () => {
     expect(editedParams(EffectKind.GaussianBlur).map((p) => p.key)).toEqual(['radius']);
   });
 
-  it('defaults read like Figma: a soft black shadow and a 4px background blur', () => {
+  it('defaults: a soft black shadow and a 4px background blur', () => {
     expect(defaultValues(EffectKind.InnerShadow)).toMatchObject({ color: '#000000', opacity: 0.25 });
     expect(defaultValues(EffectKind.BackgroundBlur)).toEqual({ radius: 4 });
   });

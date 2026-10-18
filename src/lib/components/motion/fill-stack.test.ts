@@ -61,7 +61,7 @@ describe('the fill stack in Properties', () => {
   it('+ opens a menu of fill types and adds the picked one on top', () => {
     const onchange = show(TWO);
     click(byId('fill-add'));
-    expect([...document.querySelectorAll('[data-testid="fill-add-menu"] [role="menuitem"]')].map((b) => b.textContent)).toEqual(['Solid', 'Linear', 'Radial', 'Image']);
+    expect([...document.querySelectorAll('[data-testid="fill-add-menu"] [role="menuitem"]')].map((b) => b.textContent)).toEqual(['Solid', 'Linear', 'Radial', 'Angular', 'Diamond', 'Image']);
     click(byId('fill-add-linear-gradient'));
     expect(sent(onchange)).toHaveLength(3);
     expect(sent(onchange).slice(0, 2)).toEqual(TWO);

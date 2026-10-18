@@ -7,6 +7,10 @@ import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
 import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
 import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+import SquaresUnite from '@lucide/svelte/icons/squares-unite';
+import SquaresSubtract from '@lucide/svelte/icons/squares-subtract';
+import SquaresIntersect from '@lucide/svelte/icons/squares-intersect';
+import SquaresExclude from '@lucide/svelte/icons/squares-exclude';
 import FlipHorizontal2 from '@lucide/svelte/icons/flip-horizontal-2';
 import FlipVertical2 from '@lucide/svelte/icons/flip-vertical-2';
 import CornerRightDown from '@lucide/svelte/icons/corner-right-down';
@@ -213,6 +217,10 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.Union]: { name: 'Union', icon: SquaresUnite, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.Subtract]: { name: 'Subtract', icon: SquaresSubtract, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.Intersect]: { name: 'Intersect', icon: SquaresIntersect, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.Exclude]: { name: 'Exclude', icon: SquaresExclude, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignLeft]: { name: 'Align left', icon: AlignStartVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignCenter]: { name: 'Align horizontal centres', icon: AlignCenterVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignRight]: { name: 'Align right', icon: AlignEndVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },

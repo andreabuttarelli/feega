@@ -1,8 +1,9 @@
 import { z } from 'zod';
-import { Align, Direction, Justify, Sizing } from './auto-layout';
+import { Align, DEFAULT_COLUMNS, Direction, Justify, Sizing } from './auto-layout';
 
 export const MAX_LAYOUT_PX = 4000;
 export const MAX_LAYOUT_CHILDREN = 200;
+export const MAX_GRID_COLUMNS = 24;
 
 const DIRECTIONS = Object.values(Direction) as [Direction, ...Direction[]];
 const JUSTIFIES = Object.values(Justify) as [Justify, ...Justify[]];
@@ -21,6 +22,7 @@ export const autoLayoutSchema = z.object({
   padding: paddingSchema.default({ top: 0, right: 0, bottom: 0, left: 0 }),
   justify: z.enum(JUSTIFIES).default(Justify.Start),
   align: z.enum(ALIGNS).default(Align.Start),
+  columns: z.number().int().min(1).max(MAX_GRID_COLUMNS).default(DEFAULT_COLUMNS),
   order: z.array(z.string().min(1)).max(MAX_LAYOUT_CHILDREN).default([])
 });
 
