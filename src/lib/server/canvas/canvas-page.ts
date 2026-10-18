@@ -80,6 +80,7 @@ import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes
 import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
+import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
 import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -1106,6 +1107,17 @@ export const actions: Actions<CanvasParams> = {
 
     const linked = targetNode?.type === 'motion' ? await linkFrame(canvasFrames(scope), { sourceNodeId, frameNodeId: targetNodeId }) : null;
     return { connection, linked: linked?.outcome === MoveOutcome.Done ? linked : null };
+  },
+
+  createFormats: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = formatsAskSchema.safeParse({ nodeId: fd.get('node_id'), targets: jsonField(fd, 'targets') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid formats' });
+    }
+    const made = await createFormats(canvasFrames(scope), ask.data);
+    return made.outcome === FormatsOutcome.Done ? made : fail(FORMATS_STATUS[made.outcome], { error: made.outcome, detail: made.detail });
   },
 
   frameSize: async ({ request, params, locals }) => {

@@ -65,6 +65,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   moveElement: canvas('move_frame_element'),
   copyElement: canvas('copy_frame_element'),
   frameSize: motion('set_canvas'),
+  createFormats: canvas('create_formats'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),
   drawFrame: canvas('create_node'),
@@ -266,6 +267,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'flip-vertical': motion('set_transform'),
   'use-as-mask': motion('use_as_mask'),
   'release-mask': motion('release_mask'),
+  'create-formats': canvas('create_formats'),
   delete: canvas('delete_node')
 };
 

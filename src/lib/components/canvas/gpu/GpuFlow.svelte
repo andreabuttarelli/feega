@@ -969,6 +969,7 @@
     paste: () => menuAt && props.onPaste?.(toFlow(menuAt)),
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
+    'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
     delete: (ids) => props.onDelete?.(ids)
   };
 

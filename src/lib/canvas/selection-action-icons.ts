@@ -30,6 +30,7 @@ import FlipHorizontal2 from '@lucide/svelte/icons/flip-horizontal-2';
 import FlipVertical2 from '@lucide/svelte/icons/flip-vertical-2';
 import SquareDashed from '@lucide/svelte/icons/square-dashed';
 import Square from '@lucide/svelte/icons/square';
+import Proportions from '@lucide/svelte/icons/proportions';
 import type { Component } from 'svelte';
 import type { SelectionActionId } from './selection-actions';
 
@@ -60,5 +61,6 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'flip-vertical': FlipVertical2,
   'use-as-mask': SquareDashed,
   'release-mask': Square,
+  'create-formats': Proportions,
   delete: Trash2
 };

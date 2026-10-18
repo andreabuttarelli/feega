@@ -175,6 +175,8 @@
   import { portsOf } from '$lib/canvas/node-ports';
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
+  import type { FormatTarget } from '$lib/motion/reformat';
   import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
   import { GraphScope, nodeOutputs, recentRuns, staleIds } from '$lib/canvas/run-graph';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
@@ -2956,6 +2958,12 @@
     };
   }
 
+  let formatsFor = $state<string | null>(null);
+
+  async function createFormats(nodeId: string, targets: FormatTarget[]) {
+    landed(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
+  }
+
   let lastDuplicate: LastDuplicate | null = null;
 
   async function duplicate(ids: string[], dragged?: Offset) {
@@ -3242,6 +3250,9 @@
 
   <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />
 
+  {#if formatsFor}
+    <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
+  {/if}
   <ConfirmDialog
     bind:open={confirmingUncensoredSwitch}
     title="Uncensored model"
@@ -3272,6 +3283,7 @@
     onResize={resize}
     onConnect={connect}
     onDelete={remove}
+    onCreateFormats={(id) => (formatsFor = id)}
     onEdgeDelete={disconnect}
     onEdgeModeChange={setEdgeMode}
     onCreate={create}
