@@ -2,6 +2,7 @@
   import ArrowRight from '@lucide/svelte/icons/arrow-right';
   import ArrowDown from '@lucide/svelte/icons/arrow-down';
   import WrapText from '@lucide/svelte/icons/wrap-text';
+  import LayoutGrid from '@lucide/svelte/icons/layout-grid';
   import Plus from '@lucide/svelte/icons/plus';
   import Minus from '@lucide/svelte/icons/minus';
   import ChevronUp from '@lucide/svelte/icons/chevron-up';
@@ -13,7 +14,7 @@
   import type { MotionClip, MotionDoc } from '$lib/motion/doc';
   import type { OpResult } from '$lib/motion/timeline';
   import { Align, Direction, Justify, Sizing } from '$lib/motion/layout/auto-layout';
-  import { DEFAULT_LAYOUT_ITEM, type AutoLayout, type LayoutItem, type Padding } from '$lib/motion/layout/model';
+  import { DEFAULT_LAYOUT_ITEM, MAX_GRID_COLUMNS, type AutoLayout, type LayoutItem, type Padding } from '$lib/motion/layout/model';
   import { hasBox, layoutParent, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem } from '$lib/motion/layout/ops';
   import { childrenInOrder } from '$lib/motion/layout/resolve';
   import { Answer, YES_NO, answerOf } from '$lib/motion/segments';
@@ -21,19 +22,21 @@
 
   let { doc, clip, commit }: { doc: MotionDoc; clip: MotionClip; commit: (result: OpResult, summary: string) => void } = $props();
 
-  const Flow = { Row: 'row', Column: 'column', Wrap: 'wrap' } as const;
+  const Flow = { Row: 'row', Column: 'column', Wrap: 'wrap', Grid: 'grid' } as const;
   type Flow = (typeof Flow)[keyof typeof Flow];
 
   const FLOWS: SegmentOption[] = [
     { value: Flow.Row, label: 'Horizontal', icon: ArrowRight },
     { value: Flow.Column, label: 'Vertical', icon: ArrowDown },
-    { value: Flow.Wrap, label: 'Wrap', icon: WrapText }
+    { value: Flow.Wrap, label: 'Wrap', icon: WrapText },
+    { value: Flow.Grid, label: 'Grid', icon: LayoutGrid }
   ];
 
   const FLOW_PATCH: Record<Flow, Partial<AutoLayout>> = {
     [Flow.Row]: { direction: Direction.Horizontal, wrap: false },
     [Flow.Column]: { direction: Direction.Vertical, wrap: false },
-    [Flow.Wrap]: { direction: Direction.Horizontal, wrap: true }
+    [Flow.Wrap]: { direction: Direction.Horizontal, wrap: true },
+    [Flow.Grid]: { direction: Direction.Grid, wrap: false }
   };
 
   const SIZING_LABEL: Record<Sizing, string> = { [Sizing.Fixed]: 'Fixed', [Sizing.Hug]: 'Fit', [Sizing.Fill]: 'Fill' };
@@ -48,7 +51,9 @@
   const perSide = $derived(splitPadding || !evenPadding);
   const parent = $derived(layoutParent(doc, clip));
   const item = $derived(clip.layoutItem ?? DEFAULT_LAYOUT_ITEM);
-  const flow = $derived(layout?.wrap ? Flow.Wrap : layout?.direction === Direction.Vertical ? Flow.Column : Flow.Row);
+  const FLOW_OF: Record<Direction, Flow> = { [Direction.Horizontal]: Flow.Row, [Direction.Vertical]: Flow.Column, [Direction.Grid]: Flow.Grid };
+  const flow = $derived(layout?.wrap ? Flow.Wrap : FLOW_OF[layout?.direction ?? Direction.Horizontal]);
+  const lined = $derived(!!layout && (layout.wrap || layout.direction === Direction.Grid));
   const siblings = $derived(parent ? childrenInOrder(doc.tracks.flatMap((t) => t.clips as MotionClip[]), parent).map((c) => c.id) : []);
   const place = $derived(siblings.indexOf(clip.id));
   const sizings = $derived((parent ? [Sizing.Fixed, Sizing.Hug, Sizing.Fill] : [Sizing.Fixed, Sizing.Hug]).map((value) => ({ value, label: SIZING_LABEL[value] })));
@@ -85,6 +90,11 @@
       <Field label="Direction">
         <SegmentedControl label="Direction" options={FLOWS} value={flow} onchange={(v) => set(FLOW_PATCH[v as Flow], 'Changed the direction')} />
       </Field>
+      {#if layout.direction === Direction.Grid}
+        <Field label="Columns" id="auto-layout-columns">
+          <input id="auto-layout-columns" class={cn(FIELD_INPUT, 'w-full')} type="number" min="1" max={MAX_GRID_COLUMNS} value={layout.columns} data-testid="auto-layout-columns" onchange={(e) => set({ columns: Math.min(MAX_GRID_COLUMNS, Math.max(1, px(e.currentTarget.value))) }, 'Changed the columns')} />
+        </Field>
+      {/if}
       <Field label="Align">
         <div class="grid grid-cols-3 gap-1 rounded-sm bg-ui-sunken p-1.5" role="group" aria-label="Alignment" data-testid="auto-layout-align">
           {#each SPOTS as row (row)}
@@ -97,7 +107,7 @@
       </Field>
       <Field label="Gap" id="auto-layout-gap">
         <input id="auto-layout-gap" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.gap} data-testid="auto-layout-gap" onchange={(e) => set({ gap: px(e.currentTarget.value) }, 'Changed the gap')} />
-        {#if layout.wrap}
+        {#if lined}
           <input aria-label="Gap between lines" class={cn(FIELD_INPUT, 'w-full')} type="number" min="0" value={layout.crossGap} onchange={(e) => set({ crossGap: px(e.currentTarget.value) }, 'Changed the gap between lines')} />
         {/if}
       </Field>
