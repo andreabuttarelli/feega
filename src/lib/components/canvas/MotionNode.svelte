@@ -10,16 +10,10 @@
 </script>
 
 <script lang="ts">
+  import { frameDrill } from '$lib/canvas/frame-drill';
+  import { Gesture } from '$lib/motion/drill';
   import { onMount, tick, untrack } from 'svelte';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
-  import Play from '@lucide/svelte/icons/play';
-  import Pause from '@lucide/svelte/icons/pause';
-  import Square from '@lucide/svelte/icons/square';
-  import SkipBack from '@lucide/svelte/icons/skip-back';
-  import SkipForward from '@lucide/svelte/icons/skip-forward';
-  import Repeat from '@lucide/svelte/icons/repeat';
-  import Volume2 from '@lucide/svelte/icons/volume-2';
-  import VolumeX from '@lucide/svelte/icons/volume-x';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import FrameHover from './FrameHover.svelte';
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
@@ -33,7 +27,7 @@
   import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
   import { POSTER_WIDTH, sendPoster } from '$lib/motion/poster-capture';
   import { coverFrame } from '$lib/motion/still';
-  import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, play, previewClock, previewMode, releaseCapture, scrubFrame, stop as stopIn } from '$lib/canvas/motion-preview';
+  import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, previewMode, releaseCapture, stop as stopIn } from '$lib/canvas/motion-preview';
 
   let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null, onenter = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null; onenter?: (() => void) | null } = $props();
 
@@ -41,8 +35,6 @@
   const nodeId = $derived(node.id);
 
   $effect(() => (host ? inlineStage.offer(nodeId, host) : undefined));
-
-  const ICON = 16;
 
   let root = $state<HTMLDivElement | null>(null);
   let player = $state<ReturnType<typeof MotionPreview> | null>(null);
@@ -52,8 +44,6 @@
   let previewRevision = $state(-1);
   let frame = $state(0);
   let playing = $state(false);
-  let looping = $state(false);
-  let muted = $state(true);
 
   const size = $derived(FORMATS[node.format]);
   const posterKey = $derived(`${node.id}:${node.docHeadRevision}`);
@@ -76,7 +66,8 @@
   let ownDrawn = $state(false);
   let decodedPoster = $state<string | null>(untrack(() => poster));
   const shownPoster = $derived(posterCurrent(local) && decodedPoster === poster ? decodedPoster : null);
-  const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster));
+  let loadedPoster = $state<string | null>(null);
+  const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster && loadedPoster === poster));
   const playerUp = $derived(mounted && !!preview);
   const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
 
@@ -262,43 +253,6 @@
     }
   }
 
-  async function seek(target: number) {
-    const resume = playing;
-    playing = false;
-    frame = target;
-    await tick();
-    playing = resume;
-  }
-
-  function toggle() {
-    slots = play(slots, node.id);
-    if (!playing && frame >= last) {
-      frame = 0;
-    }
-    playing = !playing;
-  }
-
-  function stop() {
-    playing = false;
-    frame = 0;
-    slots = stopIn(slots, node.id);
-  }
-
-  function end() {
-    playing = false;
-    frame = last;
-  }
-
-  function scrub(e: Event) {
-    const ratio = Number((e.currentTarget as HTMLInputElement).value);
-    playing = false;
-    frame = scrubFrame(ratio, preview?.durationInFrames ?? 1);
-  }
-
-  function isolate(e: Event) {
-    e.stopPropagation();
-  }
-
   function open(e: MouseEvent) {
     if (!onopen) {
       return;
@@ -306,6 +260,23 @@
     e.preventDefault();
     onopen();
   }
+  function enter(e: MouseEvent) {
+    const stage = root?.querySelector<HTMLElement>('[data-frame-stage]')?.getBoundingClientRect();
+    const inEditor = (e.target as HTMLElement | null)?.closest?.("[data-testid=selection-overlay]");
+    if (stage && !inEditor && stage.width > 0 && stage.height > 0) {
+      frameDrill.request(node.id, { x: (e.clientX - stage.left) / stage.width, y: (e.clientY - stage.top) / stage.height }, Gesture.Double);
+    }
+    onenter?.();
+  }
+
+  $effect(() => {
+    const el = root;
+    if (!el) {
+      return;
+    }
+    el.addEventListener('dblclick', enter);
+    return () => el.removeEventListener('dblclick', enter);
+  });
 </script>
 
 <div
@@ -313,7 +284,6 @@
   class:editing={!previewing}
   class:bare={!chrome.bar}
   data-kind={node.kind}
-  ondblclick={() => onenter?.()}
   data-testid="motion-node"
   data-motion-node={node.id}
   data-mode={mode}
@@ -321,27 +291,12 @@
   bind:this={root}
 >
   <div class="stage" data-testid="motion-node-stage" data-frame-stage>
-    {#if layers.own}
+    {#if layers.own || mounted}
       {#if shownPoster && !(playerUp && ownDrawn)}
-        <img class="poster" class:under={playerUp} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" />
+        <img class="poster" class:under={playerUp} class:kept={!layers.own} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" onload={() => (loadedPoster = shownPoster)} />
       {/if}
       {#if mounted && preview}
-        <div class="own" data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing {muted} loop={looping} /></div>
-        {#if previewing && chrome.bar}
-          <span class="clock" data-testid="motion-node-timecode">{previewClock(frame, preview.fps, preview.durationInFrames)}</span>
-          <input
-            class="scrub nodrag nopan"
-            type="range"
-            min="0"
-            max="1"
-            step="any"
-            aria-label="Seek"
-            value={frame / Math.max(1, preview.durationInFrames)}
-            oninput={scrub}
-            onpointerdown={isolate}
-            onclick={isolate}
-          />
-        {/if}
+        <div class="own" class:kept={!layers.own} data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing muted={true} loop={false} /></div>
       {:else if shownPoster}
       {:else if !previewing}
         <div class="skeleton" data-testid="motion-node-skeleton"></div>
@@ -354,26 +309,11 @@
         </div>
       {/if}
     {/if}
-    {#if !previewing}<div class="host nodrag nopan" data-testid="motion-node-editing" bind:this={host}></div>{/if}
+    {#if !previewing}<div class="host" class:nodrag={layers.editor} class:nopan={layers.editor} data-testid="motion-node-editing" bind:this={host}></div>{/if}
     {#if previewing && node.docHeadRevision}<FrameHover nodeId={node.id} revision={node.docHeadRevision} {previewUrl} width={size.width} height={size.height} />{/if}
     {#if previewing && chrome.bar}<a class="open nodrag" {href} data-testid="open-motion-editor" data-sveltekit-preload-data={onopen ? 'off' : 'hover'} onclick={open}>Open editor</a>{/if}
   </div>
 
-  {#if previewing && chrome.bar}
-  <div class="bar nodrag nopan" onpointerdown={isolate} onclick={isolate} ondblclick={isolate}>
-    <button type="button" aria-label={playing ? 'Pause' : 'Play'} onclick={toggle}>
-      {#if playing}<Pause size={ICON} />{:else}<Play size={ICON} />{/if}
-    </button>
-    <button type="button" aria-label="Stop" disabled={intent !== Intent.Play} onclick={stop}><Square size={ICON} /></button>
-    <button type="button" aria-label="Go to start" disabled={!preview} onclick={() => seek(0)}><SkipBack size={ICON} /></button>
-    <button type="button" aria-label="Go to end" disabled={!preview} onclick={end}><SkipForward size={ICON} /></button>
-    <button type="button" aria-label="Loop" aria-pressed={looping} onclick={() => (looping = !looping)}><Repeat size={ICON} /></button>
-    <button type="button" aria-label={muted ? 'Unmute' : 'Mute'} aria-pressed={muted} onclick={() => (muted = !muted)}>
-      {#if muted}<VolumeX size={ICON} />{:else}<Volume2 size={ICON} />{/if}
-    </button>
-    <span class="rev">{node.docHeadRevision ? `Rev ${node.docHeadRevision}` : 'Empty'}</span>
-  </div>
-  {/if}
 </div>
 
 <style>
@@ -403,6 +343,10 @@
     container-type: size;
     background: #000;
     color: #f0eee9;
+  }
+
+  .kept {
+    visibility: hidden;
   }
 
   .own {
@@ -443,7 +387,7 @@
   .poster {
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
   }
 
   .skeleton {
@@ -459,23 +403,13 @@
     gap: 6px;
   }
 
-  .format,
-  .clock {
+  .format {
     font-family: var(--ui-mono);
     font-size: var(--ui-text-xs);
   }
 
   .format {
     color: var(--ui-accent);
-  }
-
-  .clock {
-    position: absolute;
-    left: 6px;
-    top: 6px;
-    padding: 2px 4px;
-    background: rgb(0 0 0 / 0.6);
-    pointer-events: none;
   }
 
   .open {
@@ -489,67 +423,5 @@
     color: var(--ui-ink);
     border: 1px solid var(--ui-line);
     border-radius: 0;
-  }
-
-  .scrub {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 44px;
-    margin: 0;
-    padding: 0 6px;
-    background: linear-gradient(transparent, rgb(0 0 0 / 0.5));
-    accent-color: var(--ui-accent);
-    cursor: pointer;
-  }
-
-  .bar {
-    display: flex;
-    align-items: center;
-    height: var(--bar-h);
-    flex-shrink: 0;
-    border-top: 1px solid var(--ui-line);
-    color: var(--ui-ink);
-  }
-
-  .bar button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-  }
-
-  .bar button:hover:not(:disabled) {
-    background: var(--ui-hover);
-  }
-
-  .bar button:focus-visible {
-    outline: 2px solid var(--ui-focus);
-    outline-offset: -2px;
-  }
-
-  .bar button:disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-
-  .bar button[aria-pressed='true'] {
-    color: var(--ui-accent);
-  }
-
-  .rev {
-    margin-left: auto;
-    padding: 0 8px;
-    font-size: var(--ui-text-xs);
-    white-space: nowrap;
-    overflow: hidden;
   }
 </style>

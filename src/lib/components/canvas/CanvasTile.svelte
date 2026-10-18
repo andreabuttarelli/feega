@@ -29,6 +29,7 @@
   import { getTileRender } from '$lib/canvas/tile-render-context';
   import { getTileResize } from '$lib/canvas/tile-resize-context';
   import { getTileRotate } from '$lib/canvas/tile-rotate-context';
+  import { getTileLive } from '$lib/canvas/tile-live-context';
   import { dragAngle } from '$lib/canvas/node-layout';
   import { growthOf } from '$lib/canvas/settings-column';
   import { portOfHandle, type SelectOutput } from '$lib/canvas/select-outputs';
@@ -66,6 +67,7 @@
   const render = getTileRender();
   const resize = getTileResize();
   const rotate = getTileRotate();
+  const live = getTileLive();
   const SNAP_DEG = 15;
 
   function startRotate(e: PointerEvent) {
@@ -75,8 +77,14 @@
     const centre = { x: box.left + box.width / 2, y: box.top + box.height / 2 };
     const from = { x: e.clientX, y: e.clientY };
     handle.setPointerCapture(e.pointerId);
+    handle.onpointermove = (move) => {
+      const turn = dragAngle(centre, from, { x: move.clientX, y: move.clientY }, move.shiftKey ? SNAP_DEG : 0);
+      live()?.([{ id: tile.id, x: tile.x, y: tile.y, r: (tile.rotation ?? 0) + turn }]);
+    };
     handle.onpointerup = (up) => {
       handle.onpointerup = null;
+      handle.onpointermove = null;
+      live()?.([]);
       const degrees = dragAngle(centre, from, { x: up.clientX, y: up.clientY }, up.shiftKey ? SNAP_DEG : 0);
       if (degrees) {
         rotate()?.(tile.id, degrees);
@@ -168,7 +176,8 @@
     color={selectionColor}
     handleStyle="border-radius:0;width:8px;height:8px;"
     lineStyle="border-radius:0;"
-    onResizeEnd={(_event, params) => resize()?.(tile.id, params.width - growth.w, params.height - growth.h)}
+    onResize={(_event, params) => live()?.([{ id: tile.id, x: params.x, y: params.y, w: params.width - growth.w, h: params.height - growth.h }])}
+    onResizeEnd={(_event, params) => { live()?.([]); resize()?.(tile.id, params.width - growth.w, params.height - growth.h); }}
   />
 {/if}
 
@@ -335,7 +344,7 @@
   }
 
   /*
-   * LA TARGHETTA, FUORI DAL CORPO DEL NODO — come il nome di un frame in Figma.
+   * LA TARGHETTA, FUORI DAL CORPO DEL NODO — come il nome di un frame negli strumenti di design.
    *
    * `bottom: 100%` e non `top` negativo: ancora il basso della targhetta al TOP del nodo, quindi
    * cresce verso l'alto e non si sposta se il testo va a capo diversamente. Il piccolo margine

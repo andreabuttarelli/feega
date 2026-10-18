@@ -5,6 +5,7 @@ type Offer = { nodeId: string; el: HTMLElement };
 let offered = $state.raw<Offer | null>(null);
 let paint = $state(Paint.Pending);
 let leaving = $state<string | null>(null);
+let leavingNow: string | null = null;
 let leaveCap: ReturnType<typeof setTimeout> | null = null;
 
 export const LEAVE_CAP_MS = 3000;
@@ -15,6 +16,7 @@ function letGo() {
     leaveCap = null;
   }
   leaving = null;
+  leavingNow = null;
 }
 
 const SWAP_GRACE_MS = 300;
@@ -38,10 +40,13 @@ async function reveal(offer: Offer) {
 export const inlineStage = {
   offer(nodeId: string, el: HTMLElement) {
     const mine = { nodeId, el };
+    const handedBack = leavingNow === nodeId;
     offered = mine;
-    paint = Paint.Pending;
+    if (!handedBack) {
+      paint = Paint.Pending;
+    }
     return () => {
-      if (offered === mine) {
+      if (offered === mine && leavingNow !== nodeId) {
         offered = null;
         paint = Paint.Pending;
       }
@@ -58,6 +63,7 @@ export const inlineStage = {
   leave(nodeId: string) {
     letGo();
     leaving = nodeId;
+    leavingNow = nodeId;
     leaveCap = setTimeout(letGo, LEAVE_CAP_MS);
   },
   landed(nodeId: string) {
@@ -90,6 +96,34 @@ function ancestors(el: HTMLElement): HTMLElement[] {
   return chain;
 }
 
+type Box = { left: number; top: number; width: number; height: number };
+
+const RADIANS_PER_DEGREE = Math.PI / 180;
+const PRECISION = 1000;
+const exact = (n: number) => Math.round(n * PRECISION) / PRECISION;
+
+export function stageOver(onScreen: Box, size: { width: number; height: number }, degrees: number): Box & { rotate: number } {
+  const turn = degrees * RADIANS_PER_DEGREE;
+  const spans = size.width * Math.abs(Math.cos(turn)) + size.height * Math.abs(Math.sin(turn));
+  if (spans === 0) {
+    return { ...onScreen, rotate: degrees };
+  }
+  const scale = onScreen.width / spans;
+  const width = size.width * scale;
+  const height = size.height * scale;
+  return {
+    left: exact(onScreen.left + onScreen.width / 2 - width / 2),
+    top: exact(onScreen.top + onScreen.height / 2 - height / 2),
+    width: exact(width),
+    height: exact(height),
+    rotate: degrees
+  };
+}
+
+function turnOf(el: HTMLElement): number {
+  return ancestors(el).reduce((sum, at) => sum + (parseFloat(getComputedStyle(at).rotate) || 0), 0);
+}
+
 export function anchoredTo(stage: HTMLElement, host: Anchor) {
   let target = host;
 
@@ -103,7 +137,8 @@ export function anchoredTo(stage: HTMLElement, host: Anchor) {
       return;
     }
     const r = target.getBoundingClientRect();
-    Object.assign(stage.style, { visibility: '', left: px(r.left - layer.left), top: px(r.top - layer.top), width: px(r.width), height: px(r.height) });
+    const box = stageOver({ left: r.left - layer.left, top: r.top - layer.top, width: r.width, height: r.height }, { width: target.offsetWidth, height: target.offsetHeight }, turnOf(target));
+    Object.assign(stage.style, { visibility: '', left: px(box.left), top: px(box.top), width: px(box.width), height: px(box.height), rotate: box.rotate ? `${box.rotate}deg` : '' });
   }
 
   const moves = new MutationObserver(place);

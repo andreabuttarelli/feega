@@ -1,13 +1,17 @@
 import type { RealtimeChannel, RealtimePostgresChangesPayload, SupabaseClient } from '@supabase/supabase-js';
 import { dedupePresence, type PresencePeer } from './presence-peers';
 import { ChannelStatus, createLink, type LinkPort, type LinkState } from './connection-link';
-import { FRAME_EVENT, type FrameLine } from './frame-presence';
+import { FRAME_EVENT, FRAME_HEAD_EVENT, type FrameLine, type HeadLine } from './frame-presence';
+import { CANVAS_PEER_EVENT, type CanvasLine } from './canvas-presence';
+import { COMMIT_EVENT, type CommitLine } from '$lib/canvas/commit-note';
 
 export type CanvasChange = RealtimePostgresChangesPayload<Record<string, unknown>>;
 
 export type LinkEnvironment = Pick<LinkPort, 'online' | 'random' | 'schedule'> & {
 	watch: (on: { online: () => void; offline: () => void; visible: () => void }) => () => void;
 };
+
+type BroadcastLine = { receive: (payload: unknown) => void; attach(send: ((payload: object) => void) | null): void };
 
 type CanvasConnection = {
 	client: SupabaseClient;
@@ -20,6 +24,9 @@ type CanvasConnection = {
 	onCanvasList: () => void;
 	onLink: (state: LinkState) => void;
 	frames?: FrameLine;
+	frameHeads?: HeadLine;
+	cursors?: CanvasLine;
+	commits?: CommitLine;
 	environment?: LinkEnvironment;
 };
 
@@ -52,6 +59,8 @@ export function connectCanvas(options: CanvasConnection): () => void {
 	const environment = options.environment ?? browserEnvironment;
 	let closed = false;
 	let channel: RealtimeChannel | null = null;
+	const lines = ([[FRAME_EVENT, options.frames], [CANVAS_PEER_EVENT, options.cursors], [COMMIT_EVENT, options.commits], [FRAME_HEAD_EVENT, options.frameHeads]] as const)
+		.flatMap(([event, line]) => (line ? [{ event, line: line as BroadcastLine }] : []));
 
 	const link = createLink({
 		...environment,
@@ -98,11 +107,13 @@ export function connectCanvas(options: CanvasConnection): () => void {
 			}
 		});
 
-		joined.on('broadcast', { event: FRAME_EVENT }, (message) => {
-			if (!closed && channel === joined) {
-				options.frames?.receive(message.payload);
-			}
-		});
+		for (const { event, line } of lines) {
+			joined.on('broadcast', { event }, (message) => {
+				if (!closed && channel === joined) {
+					line.receive(message.payload);
+				}
+			});
+		}
 
 		joined.on('presence', { event: 'sync' }, () => {
 			if (!closed && channel === joined) {
@@ -117,7 +128,9 @@ export function connectCanvas(options: CanvasConnection): () => void {
 			const status = String(raw) as ChannelStatus;
 			if (status === ChannelStatus.Subscribed) {
 				void joined.track(peer).catch(() => {});
-				options.frames?.attach((mark) => void joined.send({ type: 'broadcast', event: FRAME_EVENT, payload: mark }).catch(() => {}));
+				for (const { event, line } of lines) {
+					line.attach((payload) => void joined.send({ type: 'broadcast', event, payload }).catch(() => {}));
+				}
 			}
 			link.channel(status);
 		});
@@ -125,7 +138,7 @@ export function connectCanvas(options: CanvasConnection): () => void {
 
 	function leave() {
 		onPeers([]);
-		options.frames?.attach(null);
+		lines.forEach(({ line }) => line.attach(null));
 		const dead = channel;
 		channel = null;
 		if (dead) {

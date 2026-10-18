@@ -4,6 +4,8 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { fillsSchema, type Fill } from '$lib/motion/fill/model';
+import { MediaKind } from '$lib/motion/media/pick';
+import type { MediaUploader } from './media-upload';
 import FillStack from './FillStack.svelte';
 
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -21,9 +23,9 @@ const ASSETS = [{ id: 'pic', kind: 'image' as const, label: 'Pic', previewUrl: '
 
 let app: Record<string, unknown> | null = null;
 
-function show(fills: Fill[]) {
+function show(fills: Fill[], upload: MediaUploader | null = null) {
   const onchange = vi.fn();
-  app = mount(FillStack, { target: document.body, props: { fills, assets: ASSETS, tokens: FEEGA_TOKENS, onchange } });
+  app = mount(FillStack, { target: document.body, props: { fills, assets: ASSETS, tokens: FEEGA_TOKENS, onchange, upload } });
   flushSync();
   return onchange;
 }
@@ -61,7 +63,7 @@ describe('the fill stack in Properties', () => {
   it('+ opens a menu of fill types and adds the picked one on top', () => {
     const onchange = show(TWO);
     click(byId('fill-add'));
-    expect([...document.querySelectorAll('[data-testid="fill-add-menu"] [role="menuitem"]')].map((b) => b.textContent)).toEqual(['Solid', 'Linear', 'Radial', 'Image']);
+    expect([...document.querySelectorAll('[data-testid="fill-add-menu"] [role="menuitem"]')].map((b) => b.textContent)).toEqual(['Solid', 'Linear', 'Radial', 'Angular', 'Diamond', 'Image']);
     click(byId('fill-add-linear-gradient'));
     expect(sent(onchange)).toHaveLength(3);
     expect(sent(onchange).slice(0, 2)).toEqual(TWO);
@@ -186,9 +188,27 @@ describe('the fill stack in Properties', () => {
   it('an image layer picks a picture and a fit', () => {
     const onchange = show(stack([{ type: 'image' }]));
     click(rows()[0]);
-    click(byId('fill-asset'));
+    click(byId('media-add'));
+    click(byId('media-tab-library'));
+    click(byId('media-library-item'));
     expect(sent(onchange)[0]).toMatchObject({ type: 'image', assetId: 'pic' });
     change(byId<HTMLSelectElement>('fill-fit'), 'tile');
     expect(sent(onchange)[0]).toMatchObject({ fit: 'tile' });
+  });
+
+  it('an image layer takes a link, copied into the project as a picture', async () => {
+    const upload = vi.fn(async () => ({ ok: true as const, asset: { id: 'copied', kind: MediaKind.Image, label: 'b.jpg', previewUrl: '/a/copied' } }));
+    const onchange = show(stack([{ type: 'image', assetId: 'pic' }]), upload);
+    click(rows()[0]);
+    expect(document.body.textContent?.toLowerCase()).not.toContain('id or link');
+    click(byId('media-replace'));
+    click(byId('media-tab-link'));
+    const link = byId<HTMLInputElement>('media-link');
+    link.value = 'https://cdn.test/b.jpg';
+    link.dispatchEvent(new Event('input', { bubbles: true }));
+    click(byId('media-link-check'));
+    click(byId('media-link-use'));
+    await vi.waitFor(() => expect(sent(onchange)[0]).toMatchObject({ type: 'image', assetId: 'copied' }));
+    expect(upload).toHaveBeenCalledWith(new URL('https://cdn.test/b.jpg'), expect.any(Function));
   });
 });

@@ -28,6 +28,7 @@ import { MASK_CSS, MaskScope, maskArea, maskLayer, startValues } from './masks';
 import { COMPOSITION_ID, captureScript, contentStamp } from './capture';
 import { cspMeta } from './csp';
 import { measureScript } from './measure';
+import { textEditScript } from './text-edit';
 import { frameTapScript } from './frame-tap';
 import { exactSeekScript } from './exact-seek';
 import { Library, Play, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
@@ -110,7 +111,7 @@ export enum Target {
 
 export type Inlined = Partial<Record<Script, string>>;
 
-export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery; vars?: VarValues };
+export type ComposeInput = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; scale?: number; analyses?: Record<string, AudioAnalysis>; liveness?: Liveness; target?: Target; origin?: string; inlined?: Inlined; modules?: InlinedModules; runtime?: RuntimeDelivery; vars?: VarValues; only?: ReadonlySet<string> };
 
 function pick(vars: Vars, keys: string[]): Vars {
   return Object.fromEntries(keys.map((k) => [k, vars[k]]));
@@ -474,7 +475,8 @@ const RESOLVE: Record<PropFormat, ValueResolver> = {
   [PropFormat.Asset]: (v, ctx) => ctx.asset(typeof v === 'string' ? v : null),
   [PropFormat.Textarea]: (v) => v,
   [PropFormat.Font]: (v, ctx) => ctx.font(String(v)),
-  [PropFormat.Media]: (v, ctx) => resolveMedia(v, ctx.asset, ctx.color)
+  [PropFormat.Media]: (v, ctx) => resolveMedia(v, ctx.asset, ctx.color),
+  [PropFormat.MediaItem]: (v) => v
 };
 
 const ENV_LOAD: Record<Target, EnvLoad> = { [Target.Video]: EnvLoad.Wait, [Target.Screen]: EnvLoad.Swap };
@@ -631,10 +633,20 @@ function zoomed(doc: MotionDoc, scale: number): string {
   return `#root{width:${doc.width}px;height:${doc.height}px${scale === 1 ? '' : `;zoom:${scale}`}}`;
 }
 
+const SKELETON: ReadonlySet<ComponentId> = new Set(['Precomp', 'Null', 'Audio']);
+
+function onlyClips(doc: MotionDoc, only: ReadonlySet<string> | undefined): MotionDoc {
+  if (!only) {
+    return doc;
+  }
+  const kept = (c: MotionClip) => only.has(c.id) || SKELETON.has(c.component);
+  return { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: (t.clips as MotionClip[]).filter(kept) })) };
+}
+
 export function composeHtml(raw: ComposeInput): string {
   const shown = withAutoLayout(withoutHidden(boundDoc(withVars(raw.doc, raw.vars))));
   const junctions = junctionTweens(shown, junctionPairs(shown));
-  const prepared = bakePaths(withoutBackdrop(flattenComps(withJunctions(shown))));
+  const prepared = bakePaths(withoutBackdrop(onlyClips(flattenComps(withJunctions(shown)), raw.only)));
   const input = { ...raw, doc: bakePhysics(bakeExpressions(prepared, raw.analyses)) };
   const { doc, tokens } = input;
   const delivery: Delivery = { origin: raw.origin ?? defaultOrigin(), inlined: raw.inlined ?? {}, modules: raw.modules ?? {}, runtime: raw.runtime ?? RuntimeDelivery.Inline };
@@ -781,7 +793,7 @@ export function composeHtml(raw: ComposeInput): string {
     hotScript(shaderScript(shaderClips, Number(duration))),
     ...[...cardBakes].map(([layout, bakes]) => hotScript(layout.script(bakes as never[], doc.fps, Number(duration))))
   ].join('');
-  return `${page}${live}${captureScript(frame, contentStamp(page), screenshotSrc)}${measureScript()}${exactSeekScript()}${frameTapScript()}</body></html>`;
+  return `${page}${live}${captureScript(frame, contentStamp(page), screenshotSrc)}${measureScript()}${textEditScript()}${exactSeekScript()}${frameTapScript()}</body></html>`;
 }
 
 const LIVE_SCRIPT: Record<Liveness, (input: SpecInput, delivery: Delivery) => string> = {

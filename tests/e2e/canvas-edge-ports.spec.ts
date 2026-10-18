@@ -4,8 +4,11 @@ import { homedir } from 'node:os';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
 const TOLERANCE_PX = 2;
-const PORT_SQUARE_PX = 10;
 const SHOTS = `${homedir()}/Documents/feega-videos/edge-ports`;
+const ZOOM_STEPS = 14;
+const ZOOM_SETTLE_MS = 300;
+const MAX_ZOOM = 2;
+const KEYED_PROVIDER = /^(wiro|kie|higgsfield)\//;
 
 type Point = { x: number; y: number };
 
@@ -24,7 +27,7 @@ async function squareEdge(page: Page, selector: string, side: 'in' | 'out'): Pro
   if (!box) {
     throw new Error(`${selector} not rendered`);
   }
-  const x = side === 'in' ? box.x + box.width - PORT_SQUARE_PX : box.x + PORT_SQUARE_PX;
+  const x = side === 'in' ? box.x : box.x + box.width;
   return { x, y: box.y + box.height / 2 };
 }
 
@@ -46,9 +49,10 @@ test.describe('edges end on the port square @real', () => {
   test.setTimeout(90_000);
 
   test('before and after a model change moves the ports', async ({ page, session, seedNode, admin }) => {
-    const { data: models } = await admin.from('ai_models').select('id, input_modalities, uncensored').eq('catalogue', 'image').eq('uncensored', false);
-    const textOnly = (models ?? []).find((m) => m.input_modalities.includes('text') && !m.input_modalities.includes('image'));
-    const withImages = (models ?? []).find((m) => m.input_modalities.includes('text') && m.input_modalities.includes('image'));
+    const { data: rows } = await admin.from('ai_models').select('id, input_modalities, uncensored, wire_spec').eq('catalogue', 'image').eq('uncensored', false);
+    const models = (rows ?? []).filter((m) => !KEYED_PROVIDER.test(m.id) && !m.wire_spec?.unrunnable && !m.wire_spec?.discountFor);
+    const textOnly = models.find((m) => m.input_modalities.includes('text') && !m.input_modalities.includes('image'));
+    const withImages = models.find((m) => m.input_modalities.includes('text') && m.input_modalities.includes('image'));
     expect(textOnly && withImages, 'catalogue has a text-only and a text+image image model').toBeTruthy();
 
     const source = await seedNode({ type: 'text', x: 0, y: 0, data: { prompt: 'A lighthouse.' } });
@@ -61,8 +65,9 @@ test.describe('edges end on the port square @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
 
     const ports = page.locator(`.svelte-flow__node[data-id="${target.id}"] .svelte-flow__handle.port-in`);
-    await expect(ports).toHaveCount(1);
     await page.locator(`.svelte-flow__node[data-id="${target.id}"]`).click({ position: { x: 24, y: 12 } });
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect(ports).toHaveCount(1);
     await expectEdgeOnPorts(page, source.id, target.id);
     await page.screenshot({ path: `${SHOTS}/before.png` });
 
@@ -71,5 +76,30 @@ test.describe('edges end on the port square @real', () => {
     await expect(ports).toHaveCount(2);
     await expectEdgeOnPorts(page, source.id, target.id);
     await page.screenshot({ path: `${SHOTS}/after.png` });
+  });
+
+  test('the wire stays on its ports at every zoom step from far out to 2x', async ({ page, session, seedNode, admin }) => {
+    const source = await seedNode({ type: 'text', x: 0, y: 0, data: { prompt: 'A lighthouse.' } });
+    const target = await seedNode({ type: 'text', x: 520, y: 0, data: { prompt: 'It at dusk.' } });
+    const edge = await admin.from('nodes_connections').insert({ org_id: session.orgId, canvas_id: session.canvasId, source_node_id: source.id, target_node_id: target.id, target_handle: 'text', actor_kind: 'user', actor_id: session.userId });
+    expect(edge.error).toBeNull();
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await expect(page.locator('.svelte-flow__edge path.svelte-flow__edge-path')).toHaveCount(1);
+    await page.locator('.svelte-flow__pane').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('ControlOrMeta+a');
+
+    const widthOf = async () => (await page.locator(`.svelte-flow__node[data-id="${source.id}"]`).boundingBox())?.width ?? 0;
+    const base = await widthOf();
+    for (let i = 0; i < ZOOM_STEPS; i++) {
+      await page.keyboard.press('-');
+    }
+    await page.waitForTimeout(ZOOM_SETTLE_MS);
+    for (let i = 0; i < ZOOM_STEPS * 2 && (await widthOf()) < base * MAX_ZOOM; i++) {
+      await expectEdgeOnPorts(page, source.id, target.id);
+      await page.keyboard.press('+');
+      await page.waitForTimeout(ZOOM_SETTLE_MS);
+    }
+    await expectEdgeOnPorts(page, source.id, target.id);
   });
 });

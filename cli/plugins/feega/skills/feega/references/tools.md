@@ -194,7 +194,7 @@ through the same code: `list_canvases`, `list_nodes`, `canvas_snapshot`, `canvas
 `show_run`, `sync_node`, `run_node`, `preview_node_loop`, `run_node_loop`, `cancel_node_loop`,
 `retry_loop_combination`, `preview_workflow`, `run_workflow`, `cancel_workflow`,
 `preview_run_graph`, `run_graph`, `cancel_render`, `withdraw_from_gallery`, `request_upload`,
-`register_upload`, `list_voices`, `voice_library`, `use_library_voice`, `design_voice`,
+`register_upload`, `import_link`, `list_voices`, `voice_library`, `use_library_voice`, `design_voice`,
 `save_voice`, `clone_voice`, `delete_voice`. Every write a person
 makes on the canvas has an op here (`src/lib/server/parity/ui-actions.ts` holds the map). Reads
 are free; writes need a write key; `run_node`, `run_node_loop`, `retry_loop_combination`,
@@ -361,6 +361,19 @@ original keeps its count of remixes; withdrawing it later never touches the copi
 `motion` node: its files are copied to a public folder, so the item never depends on the author's
 permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publishable`,
 `brand_logo_not_publishable`, `site_material_not_publishable` or `moderated`. Free.
+
+## Organisations and teams
+
+| Tool | CLI |
+|---|---|
+| `list_orgs` | `feega orgs` |
+| `team_op` `switch_org` | `feega orgs use <orgId>` |
+| `team_op` `create_org` | `feega orgs create <name>` |
+| `list_team` | `feega team` |
+| `team_op` `invite` / `resend_invite` / `revoke_invite` | `feega team invite <email> [--role]` / `resend <id>` / `revoke <id>` |
+| `team_op` `invite_link` / `disable_invite_link` | `feega team link` / `link-off` |
+| `team_op` `set_role` / `remove_member` | `feega team role <userId> <role>` / `remove <userId>` |
+| `team_op` `leave` / `transfer_ownership` | `feega team leave` / `transfer <userId>` |
 
 ## Ads
 

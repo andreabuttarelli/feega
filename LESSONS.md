@@ -544,6 +544,21 @@ non fidarsi del proprio ramo stava per essere depositata sulla base di un loop m
 Questa lezione è più forte delle altre due che l'hanno accompagnata, perché quelle dipendono da
 qualcuno che si ricordi di controllare; questa toglie la possibilità che il taglio sia dannoso.
 
+### Il dev server serve il branch di prima dopo un checkout nello stesso worktree
+Segnale: una spec e2e fallisce come se la modifica non ci fosse (voce di menu assente, gesto che
+non fa niente) e `curl http://localhost:<porta>/src/<file>` non contiene il codice appena scritto.
+Vite non sempre vede i file cambiati in blocco da un cambio di branch. Mossa: dopo ogni cambio di
+branch riavvia il dev server e controlla col `curl` del modulo prima di credere a un rosso e2e.
+
+Anche senza checkout il watcher a volte smette di vedere i file salvati: il `curl` del modulo
+mostra il codice vecchio. Stessa mossa, riavvio prima di ogni giro e2e.
+
+### Un `ondblclick` di Svelte che non scatta mai
+Segnale: il listener in cattura su `document` vede il dblclick sul tuo elemento, il gestore Svelte
+no. Svelte 5 delega `dblclick`/`click` alla radice; un antenato (la tela, un nodo) ferma la
+propagazione prima. Mossa: `addEventListener('dblclick', …)` diretto sull'elemento in un
+`$effect`, e un test e2e che fa il gesto vero.
+
 ## Test: distinguere il tuo difetto dal rumore
 
 ### CI rossa con zero test falliti è una promessa non attesa, non un test tuo
@@ -2869,6 +2884,17 @@ check that only reads tool results misses it, the screenshot of the grid catches
 Signal: a server-side edit (a tool, a port) has no effect in agent turns, and nothing new lands in
 storage, while unit tests pass. The dev server kept the old module for turns running in the
 background. Move: restart `vite dev` after server edits before trusting a real-check run.
+In a worktree under `.claude/worktrees/` the watcher sees no edit at all, client files included
+(the path has a dot folder): `curl` the module from the dev server and grep the change before
+blaming the code. Also check who owns port 4173: `reuseExistingServer` runs your specs against
+another worktree's server (`lsof -a -d cwd -p <pid>`). Move: own port (`E2E_BASE_URL`), restart
+after every edit.
+
+## A side popover sits 2px off the clamp, only when it is tall
+
+Signal: `canvas-fills` popover check fails by exactly 2 once the popover content grows enough to
+be clamped to the viewport bottom. `bind:clientHeight` leaves the 1px borders out. Move: measure a
+box you place with `offsetHeight`.
 
 ## A zoomed-out canvas pans below 60 fps though its images are already on one canvas
 
@@ -3007,10 +3033,16 @@ Signal: WebKit zoom p5 ~10 fps while Chromium holds 60/60 and per-frame JS stays
 Signal: a button or hint has the right size but the default text colour (white on white, grey on grey); `buttonVariants(...)` output lacks `text-ui-on-accent`. Cause: `tailwind-variants` merges with its own tailwind-merge, which reads `text-ui-label` as a colour and keeps only the last `text-*`. `cn()` knows the type roles; `tv()` does not unless told. Move: every `tv()` takes `{ twMergeConfig: TW_MERGE_CONFIG }` from `$lib/utils`.
 
 ### A matted clip renders nothing in preview, still and video
-Signal: a clip with a track matte (or a Figma mask) is invisible everywhere; its `.kt` wrapper has a `mask:url(data:image/svg+xml…)` that, opened alone, shows the right shape. Cause: `.kt` was `position:absolute` with no box, 0×0, so `mask-size:100% 100%` covered nothing. Markup tests and the fast-vs-exact PSNR spec stayed green: black equals black. Move: look at pixels, not markup — `npm run bench:export -- --doc=<{doc,assets}.json> --engines=chromium --lanes=1 --keep` writes the real export mp4, `--parity --live` the preview frames; check `getBoundingClientRect()` of the wrapper.
+Signal: a clip with a track matte (or a shape mask) is invisible everywhere; its `.kt` wrapper has a `mask:url(data:image/svg+xml…)` that, opened alone, shows the right shape. Cause: `.kt` was `position:absolute` with no box, 0×0, so `mask-size:100% 100%` covered nothing. Markup tests and the fast-vs-exact PSNR spec stayed green: black equals black. Move: look at pixels, not markup — `npm run bench:export -- --doc=<{doc,assets}.json> --engines=chromium --lanes=1 --keep` writes the real export mp4, `--parity --live` the preview frames; check `getBoundingClientRect()` of the wrapper.
 
 ### ⌘Z of a delete answers "node_deleted_by_peer"
 Signal: undoing a canvas delete is refused with `node_deleted_by_peer` on the real stack; `undo.test.ts` stays green. Cause: the precondition looked the node up with `findNode`, which filters `deleted_at is null`, so a soft-deleted row is never found; `fakeDb` without `{ filter: true }` ignores that filter. Move: a test about soft deletes seeds `deleted_at` and uses `fakeDb(rows, { filter: true })`; a precondition on a deleted row reads it with `nodeRowExists`.
+
+### Playwright waits 120 s for a dev server that is already up
+Signal: `Timed out waiting 120000ms from config.webServer` while `curl http://localhost:4173` answers and `curl http://127.0.0.1:4173` gets nothing. Cause: `localhost` resolves to `::1` only, vite listens on IPv6, Playwright probes IPv4. Move: start vite with `--host 127.0.0.1` and run Playwright with `E2E_BASE_URL=http://127.0.0.1:4173`.
+
+### "504 (Outdated Optimize Dep)" and a bare 500 page in a worktree
+Signal: `@real` specs fail on their first locator; the page shows a bare `500`; the console fills with `504 (Outdated Optimize Dep)`. Cause: worktrees symlink the main `node_modules`, so they share `node_modules/.vite`; another worktree's server re-optimized the deps under yours. Move: give your server its own cache: an untracked `vite.agent.config.ts` that spreads `vite.config.ts` and sets `cacheDir` to a scratch folder, started with `--config vite.agent.config.ts`.
 
 ### Every project-scoped route resolves scope through `reachableCaller`/`callerReach`
 Signal: a Bearer route under `/api/v1` looks a node, run, asset or project up "by org and id" and answers for an uncensored project the caller cannot open. RLS and `org_id` say the row is the org's; the uncensored lock is a per-user rule neither knows. Move: resolve the caller with `reachableCaller(request, url, { nodes | runs | assets | project })` (`src/lib/server/org-data/reach.ts`), or `callerReach(caller, …)` once the ids are in the body; lists filter with `callerHidden`. Session routes use `findReachableProject` / `motionScope`. Never a per-route `canvasReachable`. Guard: `src/routes/api/v1/uncensored-lock.test.ts` — a new route gets a row there.
@@ -3020,6 +3052,20 @@ Signal: the first `upload(..., { upsert: true })` to a path succeeds, every late
 
 ### A sub-agent round answers the user instead of doing its step
 Signal: an agent reply says it "only has tools to read/research/import" or "can't build" while the run summary shows it wrote something. Cause: a role round with a narrow tool set (researcher) got the user's raw request and no brief, so it answered it; its text leads the turn's reply. Move: every narrowed round gets its own brief message (like `crewBrief`, `RESEARCH_BRIEF`), and a turn that stops by design returns a field the caller can relay (`script_ready`).
+## A settings action in the canvas sheet changes nothing on screen
+
+Signal: the action answers 200, a full reload shows the change, the open sheet does not (or
+closes). Cause: `invalidateAll()` resets `page.state`, and the sheet lives in `page.state.sheet`
+(shallow routing); its data is a `preloadData` snapshot nobody refreshes. Move: read the sheet
+before invalidating and reopen it with fresh data (`refreshSheet` in `sheet-nav.ts`). A spec that
+passes only after `page.reload()` does not prove the sheet works.
+
+
+### A long agent turn dies with `JWT expired` and the dev server exits
+Signal: `[chat-reply] write failed Error: JWT expired`, `[motion-agent] turn failed { code: 'PGRST303' }`, then `UnhandledPromiseRejection … #<Object>` and the process is gone. Cause: the turn's db carries the request's access token; a turn started late in the token's hour outlives it, and the failed-turn save rejected with nobody listening. Move: `outlivesTurn` in the session hook refreshes a token that would expire inside a turn; every background promise chain ends in a `.catch`.
+
+### The motion editor answers 500 only on a local dev server
+Signal: `/p/…/motion/<node>` renders "something broke on our side"; the error is `browserStore(...)?.getItem is not a function`; the log warns `--localstorage-file was provided without a valid path`. Cause: Node 25 ships a global `localStorage` without methods on the server. Move: start `vite dev` with `NODE_OPTIONS=--no-experimental-webstorage`.
 
 ### An e2e fix "does nothing", or a red test passes without the fix
 Signal: a `@real` e2e gives the same result with and without your change. Cause: Playwright reuses whatever listens on 4173 (`reuseExistingServer`), often another worktree's dev server; and with `NO_HMR=1` your own server keeps the code it compiled first. Move: `lsof -iTCP:4173` and check the cwd; run your own `vite dev --port <free>` with `E2E_BASE_URL`, and restart it after every code change before trusting red or green.
@@ -3029,3 +3075,26 @@ Signal: a new Text/Title/Line in a still frame renders with opacity 0 (or clippe
 
 ### A `{#key}` editor remounts on close although a "leaving" state keeps it
 Signal: deselecting a frame flashes "Opening the editor…" or a stale picture; a `console.log` in the editor's `onMount` fires unmount→mount→unmount within one click. Cause: the state that keeps the block alive (`inlineStage.leave`) was set in an `$effect` reacting to the selection; the `{#if}/{#key}` block had already re-rendered without it, and `earlyFetch.take` had emptied the session cache, so the remount loaded again. `$effect.pre` did not fix it. Move: set the keep-alive state synchronously in the handler that changes the selection (`selectionChanged` → `leaveNow`), and keep the effect only as fallback.
+
+### A route answers 500 "Internal Error" and nothing is logged
+Signal: a page that loads fine on dev 500s on your branch; `__data.json` for the same URL has no error; no stack in the `vite dev` output. Cause: a component threw during server render (here `onDestroy` calling `cancelAnimationFrame`, which runs on the server too), and the error reached `handleError` but never the terminal. Move: write the error to a file from `handleError` in a throwaway local patch (or render with `ssrLoadModule` + props), and keep browser-only cleanup in `onMount`'s return, browser-only libraries (Pixi) behind a dynamic `import()`.
+### Edits in an agent worktree never reach the running dev server
+Signal: the page keeps old markup (a new attribute is `null`, a fix "does nothing") although the file is saved. Cause: `vite.config.ts` ignores `.claude/worktrees` in `server.watch`, so a dev server started from a worktree never recompiles. Move: restart your own `vite dev --port <free>` after every edit before reading red or green.
+
+### A drag e2e on a canvas node does not move it
+Signal: `mouse.down/move/up` on a seeded node leaves `boundingBox().x` unchanged; a text node's textbox gets the pointer. Cause: text/doc bodies take the pointer for editing, and a click first on a motion node opens the inline editor. Move: seed a `motion` element with `width/height` and a `motion_revisions` row, then press on it without a prior click; measure the peer's box BEFORE `mouse.down`, not after the moves.
+
+### A template prop edit saves but the frame keeps the old picture
+Signal: the DB holds the new value of a Custom clip prop, the inspector shows it, the frame still draws the old one (or an empty slot). Cause: the clip has a `varPrefix`; at runtime a declared variable (`<prefix>_<prop>`) wins over the prop, and its default was not moved. Move: `setProps` keeps driven variable defaults in step (`drivenVars`); check `interactive.vars` before suspecting assets or CSP.
+
+### Image export answers "needs the server renderer" or times out locally
+Signal: Export image fails with "not available here" or "Waiting failed: 20000ms exceeded". Cause: the server renderer is off without `CHROMIUM_PATH`, and it loads runtime scripts from `PUBLIC_APP_URL` (production by default), whose integrity hashes do not match your build. Move: start `vite dev` with `CHROMIUM_PATH=<Playwright Chrome for Testing binary>` and `PUBLIC_APP_URL=http://localhost:<port>`.
+
+### A canvas 500s only once it holds a group (DOM renderer)
+Signal: `?renderer=dom` answers 500 on a canvas that has a group; the same page without groups loads; `handleError` (logged locally) says `Cannot access X before initialization` inside `CanvasFlow.svelte`. Cause: a component-scope `const` declared below the function that the first render already calls, so only data that reaches that branch hits the TDZ. Move: declare the constant above its first use; `canvas-dom-group-ssr.spec.ts` guards it.
+
+### Play jumps to the start and never gets past frame 1
+Signal: Space or Play moves the playhead to a fixed frame, and the timecode flips between it and the next frame; the player is not paused. Cause: the doc has a `workArea` one frame long (an out point set at frame 0), and playback loops inside it. Move: read `workArea` in the doc before suspecting the player, the GPU engine or the interactive runtime.
+
+### Every e2e spec fails at collection with "needs an import attribute of type: json"
+Signal: `npx playwright test` lists 0 tests; the error names a `.json` under `src/lib`. Cause: a spec imports an app module (`frame-custom-size.spec.ts` → `timeline`/`editor-mount` → `still.ts`), and a new import in that chain reaches a module that imports JSON without `with { type: 'json' }`, which Playwright's Node loader rejects. Move: keep modules that e2e specs import free of JSON-importing dependencies; check with `npx playwright test --list` before pushing.

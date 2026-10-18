@@ -6,6 +6,7 @@ const findCanvasForUser = vi.fn();
 const runGenNode = vi.fn();
 const registerCanvasUpload = vi.fn();
 const registerUploadedAsset = vi.fn();
+const importCanvasLink = vi.fn();
 
 vi.mock('$lib/server/cli-auth', () => ({
 	gateOrgAiActionForForm: (...a: unknown[]) => gateOrgAiActionForForm(...a)
@@ -23,6 +24,7 @@ vi.mock('$lib/server/canvas/generate', () => ({
 vi.mock('$lib/server/canvas/upload', () => ({
 	registerCanvasUpload: (...a: unknown[]) => registerCanvasUpload(...a),
 	registerUploadedAsset: (...a: unknown[]) => registerUploadedAsset(...a),
+	importCanvasLink: (...a: unknown[]) => importCanvasLink(...a),
 	UploadError: class extends Error {}
 }));
 vi.mock('$lib/server/canvas/loop', () => ({ planLoop: vi.fn(), runLoop: vi.fn() }));
@@ -89,5 +91,23 @@ describe('actions.upload', () => {
 			orgId: 'org-1', projectId: 'project-1', path: FILE.path
 		}));
 		expect(result).toEqual({ asset: { id: 'a1' } });
+	});
+});
+
+describe('actions.importLink', () => {
+	it('copies the link into the project library and returns the asset', async () => {
+		importCanvasLink.mockResolvedValue({ asset: { id: 'a2' }, kind: 'image' });
+
+		const result = await actions.importLink(fakeEvent({ url: 'https://cdn.test/a.png' }));
+
+		expect(importCanvasLink).toHaveBeenCalledWith(expect.anything(), { orgId: 'org-1', projectId: 'project-1', url: 'https://cdn.test/a.png' });
+		expect(result).toEqual({ asset: { id: 'a2' } });
+	});
+
+	it('refuses a request without a link', async () => {
+		const result = await actions.importLink(fakeEvent({}));
+
+		expect(importCanvasLink).not.toHaveBeenCalled();
+		expect(result).toMatchObject({ status: 400 });
 	});
 });

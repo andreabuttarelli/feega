@@ -77,3 +77,27 @@ describe('the hub between one channel and the editors that use it', () => {
     expect(heard).toEqual([mark()]);
   });
 });
+
+describe('frame heads: a saved revision reaches peers without polling', () => {
+  const doc = { tracks: [], fps: 30 };
+
+  it('announces the landed head and hears only well-formed heads', () => {
+    const { port, heads } = frameHub({ userId: 'me', name: 'Me' });
+    const sent: unknown[] = [];
+    const heard: unknown[] = [];
+    heads.attach((head) => sent.push(head));
+    port.onHead((head) => heard.push(head));
+
+    port.landed({ nodeId: 'n1', version: 4, doc });
+    heads.receive({ nodeId: 'n1', version: 'x', doc });
+    heads.receive({ nodeId: 'n1', version: 5, doc });
+
+    expect(sent).toEqual([{ nodeId: 'n1', version: 4, doc }]);
+    expect(heard).toEqual([{ nodeId: 'n1', version: 5, doc }]);
+  });
+
+  it('says nothing while detached', () => {
+    const { port } = frameHub({ userId: 'me', name: 'Me' });
+    expect(() => port.landed({ nodeId: 'n1', version: 4, doc })).not.toThrow();
+  });
+});

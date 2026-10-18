@@ -2,13 +2,15 @@
   import { FRAME_RATES, type FrameRate } from '$lib/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
   import { setMotionBlur } from '$lib/motion/motion-blur-ops';
-  import { Background, FORMATS, MOTION_FORMATS, MAX_SECONDS, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import { Background, FORMATS, MOTION_FORMATS, sideRange, MAX_SECONDS, formatOf, formatSize, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import { setCanvas, type OpResult } from '$lib/motion/timeline';
   import { parseDecimal, secondsLabel } from '$lib/motion/inspector';
   import { fitDuration } from '$lib/motion/fit-duration';
-  import { DocMode, docMode, setStill } from '$lib/motion/still';
+  import { DocMode, designStill, docMode, setStill } from '$lib/motion/still';
 
   let { doc, onchange }: { doc: MotionDoc; onchange: (result: OpResult, summary: string) => void } = $props();
+
+  const sides = $derived(sideRange(doc));
 
   function setDuration(text: string) {
     const seconds = parseDecimal(text);
@@ -16,6 +18,14 @@
       return;
     }
     onchange(setCanvas(doc, { durationInFrames: Math.round(seconds * doc.fps) }), 'Changed duration');
+  }
+
+  function setSide(side: 'width' | 'height', text: string) {
+    const pixels = Math.round(Number(text));
+    if (!Number.isFinite(pixels)) {
+      return;
+    }
+    onchange(setCanvas(doc, { size: { width: doc.width, height: doc.height, [side]: pixels } }), 'Changed frame size');
   }
 
   function setStillAt(text: string) {
@@ -31,12 +41,20 @@
   <label>
     <span>Format</span>
     <select value={formatOf(doc)} onchange={(e) => onchange(setCanvas(doc, { format: e.currentTarget.value as MotionFormat }), 'Changed format')}>
-      {#each MOTION_FORMATS as format (format)}<option value={format}>{FORMATS[format].label} · {FORMATS[format].width}×{FORMATS[format].height}</option>{/each}
+      {#each MOTION_FORMATS as format (format)}<option value={format}>{FORMATS[format].label} · {formatSize(format, doc).width}×{formatSize(format, doc).height}</option>{/each}
     </select>
+  </label>
+  <label>
+    <span>Size</span>
+    <span class="size-field">
+      <input type="number" min={sides.min} max={sides.max} step="1" aria-label="Width" title="Width in pixels" value={doc.width} onchange={(e) => setSide('width', e.currentTarget.value)} data-testid="frame-width" />
+      <em>×</em>
+      <input type="number" min={sides.min} max={sides.max} step="1" aria-label="Height" title="Height in pixels" value={doc.height} onchange={(e) => setSide('height', e.currentTarget.value)} data-testid="frame-height" />
+    </span>
   </label>
   <label class="toggle" title="One frame: a post or a poster exported as an image, no timeline">
     <span>Still</span>
-    <input type="checkbox" checked={docMode(doc) === DocMode.Still} onchange={(e) => onchange(setStill(doc, e.currentTarget.checked ? 0 : null), e.currentTarget.checked ? 'Made a still' : 'Made a video')} data-testid="still" />
+    <input type="checkbox" checked={docMode(doc) === DocMode.Still} onchange={(e) => onchange(e.currentTarget.checked ? designStill(doc, 0) : setStill(doc, null), e.currentTarget.checked ? 'Made a still' : 'Made a video')} data-testid="still" />
   </label>
   {#if doc.still}
     <label>
@@ -147,6 +165,18 @@
 
   .fit:hover {
     background: var(--ui-hover);
+  }
+
+  .size-field {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 4px;
+  }
+
+  .size-field em {
+    font-style: normal;
+    color: var(--ui-ink-3);
   }
 
   .unit-field {

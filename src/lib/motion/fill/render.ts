@@ -1,5 +1,5 @@
 import { BlendMode } from '../blend';
-import { FillType, ImageFit, colourAlpha, withAlpha, type Fill, type FillOf, type Stop } from './model';
+import { FillType, ImageFit, PAINTED_AS, PaintedAs, colourAlpha, withAlpha, type Fill, type FillOf, type Stop } from './model';
 
 export type FillPaint = {
   id: string;
@@ -23,6 +23,14 @@ const RESOLVE: {
     stops: resolveStops(f.stops, color)
   }),
   [FillType.Radial]: (f, color) => ({
+    ...f,
+    stops: resolveStops(f.stops, color)
+  }),
+  [FillType.Angular]: (f, color) => ({
+    ...f,
+    stops: resolveStops(f.stops, color)
+  }),
+  [FillType.Diamond]: (f, color) => ({
     ...f,
     stops: resolveStops(f.stops, color)
   }),
@@ -92,6 +100,19 @@ export function fillLayersHtml(fills: readonly HtmlFill[]): string {
     if (f.type === 'radial-gradient') {
       return layer(f, 'radial', 'background:radial-gradient(circle calc(max(100cqw,100cqh) * ' + r(f.radius! / 2) + ') at ' + at(f.center!) + ',' + stopList(f.stops!) + ')');
     }
+    if (f.type === 'angular-gradient') {
+      return layer(f, 'angular', 'background:conic-gradient(from ' + r(f.angle!) + 'deg at ' + at(f.center!) + ',' + stopList(f.stops!) + ')');
+    }
+    if (f.type === 'diamond-gradient') {
+      const half = stopList(f.stops!.map((s) => ({ color: s.color, pos: s.pos / 2 })));
+      const corners: [string, string][] = [
+        ['to bottom right', '100% 100%'],
+        ['to bottom left', '0% 100%'],
+        ['to top right', '100% 0%'],
+        ['to top left', '0% 0%']
+      ];
+      return layer(f, 'diamond', 'background:' + corners.map(([to, where]) => 'linear-gradient(' + to + ',' + half + ') ' + where + '/50% 50% no-repeat').join(','));
+    }
     return image(f);
   };
   return '<div class="fls" style="position:absolute;inset:0;overflow:hidden;container-type:size">' + fills.map(html).join('') + '</div>';
@@ -116,11 +137,22 @@ const IMAGE_SIZE: Record<ImageFit, (scale: number) => string> = {
   [ImageFit.Tile]: (scale) => `${round(scale * TEXT_TILE_SHARE)}% auto`
 };
 
-const TEXT_LAYER: { [T in FillType]: (f: FillOf<T>) => TextLayer } = {
-  [FillType.Solid]: (f) => flat(`linear-gradient(${faded(f.color, f.opacity)},${faded(f.color, f.opacity)})`),
-  [FillType.Linear]: (f) => flat(`linear-gradient(${round(f.angle + 90)}deg,${cssStops(f.stops, f.opacity)})`),
-  [FillType.Radial]: (f) => flat(`radial-gradient(${round(f.radius * 50)}% ${round(f.radius * 50)}% at ${cssAt(f.center)},${cssStops(f.stops, f.opacity)})`),
-  [FillType.Image]: (f) => ({ image: fadedPicture(`url('${quotedUrl(f.src ?? '')}')`, f.opacity), size: IMAGE_SIZE[f.fit](f.scale), position: cssAt(f.focus), repeat: f.fit === ImageFit.Tile ? 'repeat' : 'no-repeat' })
+const QUADRANT = '50% 50%';
+const DIAMOND_CORNERS: [string, string][] = [
+  ['to bottom right', '100% 100%'],
+  ['to bottom left', '0% 100%'],
+  ['to top right', '100% 0%'],
+  ['to top left', '0% 0%']
+];
+const halfway = (stops: Stop[]) => stops.map((s) => ({ ...s, pos: s.pos / 2 }));
+
+const TEXT_LAYER: { [T in FillType]: (f: FillOf<T>) => TextLayer[] } = {
+  [FillType.Solid]: (f) => [flat(`linear-gradient(${faded(f.color, f.opacity)},${faded(f.color, f.opacity)})`)],
+  [FillType.Linear]: (f) => [flat(`linear-gradient(${round(f.angle + 90)}deg,${cssStops(f.stops, f.opacity)})`)],
+  [FillType.Radial]: (f) => [flat(`radial-gradient(${round(f.radius * 50)}% ${round(f.radius * 50)}% at ${cssAt(f.center)},${cssStops(f.stops, f.opacity)})`)],
+  [FillType.Angular]: (f) => [flat(`conic-gradient(from ${round(f.angle)}deg at ${cssAt(f.center)},${cssStops(f.stops, f.opacity)})`)],
+  [FillType.Diamond]: (f) => DIAMOND_CORNERS.map(([to, position]) => ({ image: `linear-gradient(${to},${cssStops(halfway(f.stops), f.opacity)})`, size: QUADRANT, position, repeat: 'no-repeat' })),
+  [FillType.Image]: (f) => [{ image: fadedPicture(`url('${quotedUrl(f.src ?? '')}')`, f.opacity), size: IMAGE_SIZE[f.fit](f.scale), position: cssAt(f.focus), repeat: f.fit === ImageFit.Tile ? 'repeat' : 'no-repeat' }]
 };
 
 const plainColour = (fills: Fill[]) => fills.length === 1 && fills[0].type === FillType.Solid && fills[0].opacity === 1 && fills[0].blend === BlendMode.Normal;
@@ -134,13 +166,15 @@ export function textPaint(fills: readonly Fill[], color: FillPaint['color'], ass
     return { color: (shown[0] as FillOf<FillType.Solid>).color };
   }
   const top = [...shown].reverse();
-  const layers = top.map((f) => (TEXT_LAYER[f.type] as (f: Fill) => TextLayer)(f));
+  const perFill = top.map((f) => (TEXT_LAYER[f.type] as (f: Fill) => TextLayer[])(f));
+  const layers = perFill.flat();
+  const blends = top.flatMap((f, i) => perFill[i].map(() => f.blend));
   return {
     backgroundImage: layers.map((l) => l.image).join(','),
     backgroundSize: layers.map((l) => l.size).join(','),
     backgroundPosition: layers.map((l) => l.position).join(','),
     backgroundRepeat: layers.map((l) => l.repeat).join(','),
-    backgroundBlendMode: top.map((f) => f.blend).join(','),
+    backgroundBlendMode: blends.join(','),
     WebkitBackgroundClip: 'text',
     backgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
@@ -174,7 +208,9 @@ function radial(f: FillOf<FillType.Radial>, paint: FillPaint, i: number): SvgLay
   return { def, fill: `url(#${gradientId(paint.id, i)})` };
 }
 
-const PAINTED: Record<Exclude<FillType, FillType.Image>, (f: never, paint: FillPaint, i: number) => SvgLayer> = {
+type SvgPainted = FillType.Solid | FillType.Linear | FillType.Radial;
+
+const PAINTED: Record<SvgPainted, (f: never, paint: FillPaint, i: number) => SvgLayer> = {
   [FillType.Solid]: (f: FillOf<FillType.Solid>, paint) => ({
     def: '',
     fill: paint.color(f.color)
@@ -183,14 +219,14 @@ const PAINTED: Record<Exclude<FillType, FillType.Image>, (f: never, paint: FillP
   [FillType.Radial]: radial
 };
 
-export const svgPaint = (f: Exclude<Fill, FillOf<FillType.Image>>, paint: FillPaint, i: number): SvgLayer => PAINTED[f.type](f as never, paint, i);
+export const svgPaint = (f: FillOf<SvgPainted>, paint: FillPaint, i: number): SvgLayer => PAINTED[f.type](f as never, paint, i);
 
 export const opacityAttr = (f: Fill) => (f.opacity < 1 ? ` opacity="${round(f.opacity)}"` : '');
 export const blendStyle = (f: Fill) => (f.blend === BlendMode.Normal ? '' : `;mix-blend-mode:${f.blend}`);
 
-function imageLayer(f: FillOf<FillType.Image>, paint: FillPaint, paths: string, rule: string, i: number): { def: string; body: string } {
+function htmlLayer(f: Fill, paint: FillPaint, paths: string, rule: string, i: number): { def: string; body: string } {
   const [resolved] = resolveFills([{ ...f, opacity: 1, blend: BlendMode.Normal }], paint.color, paint.asset);
-  if (!(resolved as FillOf<FillType.Image>).src) {
+  if (resolved.type === FillType.Image && !resolved.src) {
     return { def: '', body: '' };
   }
   const { w, h } = paint.size;
@@ -206,10 +242,10 @@ export function svgFills(fills: readonly Fill[], paint: FillPaint, paths: string
     if (!f.visible) {
       return { def: '', body: '' };
     }
-    if (f.type === FillType.Image) {
-      return imageLayer(f, paint, paths, rule, i);
+    if (PAINTED_AS[f.type] === PaintedAs.Html) {
+      return htmlLayer(f, paint, paths, rule, i);
     }
-    const { def, fill } = PAINTED[f.type](f as never, paint, i);
+    const { def, fill } = PAINTED[f.type as SvgPainted](f as never, paint, i);
     return {
       def,
       body: `<g style="fill:${fill};fill-rule:${rule};stroke:none${blendStyle(f)}"${opacityAttr(f)}>${paths}</g>`

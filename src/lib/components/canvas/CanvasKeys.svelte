@@ -21,6 +21,10 @@
   import type { Addable } from '$lib/canvas/addable';
   import { Stack } from '$lib/canvas/stacking';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
+  import { frameBar } from '$lib/canvas/frame-bar.svelte';
+  import { enterFrame } from '$lib/canvas/enter-frame';
+  import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { Direction, siblingOf } from '$lib/motion/siblings';
 
   let {
     onadd,
@@ -63,7 +67,7 @@
     onrestack?: (ids: string[], to: Stack) => void;
   } = $props();
 
-  const { fitView, zoomIn, zoomOut, getNodes, getEdges, updateNode, screenToFlowPosition } = useSvelteFlow();
+  const { fitView, zoomIn, zoomOut, setZoom, getNodes, getEdges, updateNode, screenToFlowPosition } = useSvelteFlow();
 
   const selected = (): Node[] => getNodes().filter((n) => n.selected);
 
@@ -75,6 +79,23 @@
   function setSelection(on: boolean) {
     for (const n of getNodes()) {
       updateNode(n.id, { selected: on });
+    }
+  }
+
+  function selectSibling(direction: Direction) {
+    const all = getNodes();
+    const next = siblingOf(all.map((n) => n.id), selected().map((n) => n.id), direction);
+    for (const n of all) {
+      updateNode(n.id, { selected: n.id === next });
+    }
+  }
+
+  const boxes = () => selected().map((n) => ({ id: n.id, x: n.position.x, y: n.position.y, width: n.measured?.width ?? n.width ?? 0, height: n.measured?.height ?? n.height ?? 0 }));
+
+  function place(moves: TileMove[]) {
+    for (const m of moves) {
+      updateNode(m.id, { position: { x: m.x, y: m.y } });
+      onmove?.(m.id, m.x, m.y);
     }
   }
 
@@ -101,14 +122,27 @@
   const RUN: Record<CanvasCommand['id'], (c: CanvasCommand) => void> = {
     add: (c) => c.id === 'add' && onadd?.(c.what),
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
+    align: (c) => c.id === 'align' && place(alignTiles(boxes(), c.edge)),
+    tidy: () => place(tidyTiles(boxes())),
     delete: () => {
       const nodes = selected().map((n) => n.id);
       const edges = selectedEdges();
       if (nodes.length || edges.length) ondelete?.({ nodes, edges });
     },
     deselect: () => setSelection(false),
+    enter: () => {
+      const [only, ...rest] = selected();
+      if (only && !rest.length) enterFrame(only.id, only.data.kind as string | undefined);
+    },
+    'select-next': () => selectSibling(Direction.Next),
+    'select-previous': () => selectSibling(Direction.Previous),
     'select-all': () => setSelection(true),
     fit: () => void fitView(),
+    'zoom-actual': () => void setZoom(1),
+    'zoom-selection': () => {
+      const nodes = selected().map((n) => ({ id: n.id }));
+      if (nodes.length) void fitView({ nodes });
+    },
     'zoom-in': () => zoomIn(),
     'zoom-out': () => zoomOut(),
     duplicate: () => {
@@ -122,6 +156,11 @@
     paste: () => onpaste?.(screenCentre()),
     undo: () => onundo?.(),
     redo: () => onredo?.(),
+    tool: (c) => {
+      if (c.id === 'tool') {
+        frameBar.tool = c.tool;
+      }
+    },
     group: () => ongroup?.(selected().map((n) => n.id)),
     ungroup: () => onungroup?.(selected().map((n) => n.id)),
     'bring-front': () => onrestack?.(selected().map((n) => n.id), Stack.Front),

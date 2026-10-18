@@ -1,6 +1,6 @@
 # Auto layout in frames: the model, the renderer and the agent
 
-Frames placed every clip by hand. Auto layout (Figma-style flexbox) lands as two optional clip
+Frames placed every clip by hand. Auto layout (flexbox-style) lands as two optional clip
 fields, `autoLayout` on a container and `layoutItem` on a child; membership is the existing
 `parent`. ADR 0008 has the reasons.
 

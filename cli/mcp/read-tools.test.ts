@@ -95,7 +95,10 @@ const RESTANO = [
   'remix_gallery_item',
   'publish_to_gallery',
   'render_video',
-  'get_render'
+  'get_render',
+  'list_orgs',
+  'list_team',
+  'team_op'
 ];
 
 describe('la superficie MCP è le quaranta dichiarate', () => {

@@ -26,6 +26,8 @@ export enum Command {
   Deselect = 'deselect',
   SelectChild = 'select-child',
   SelectParent = 'select-parent',
+  SelectNext = 'select-next',
+  SelectPrevious = 'select-previous',
   StartHere = 'start-here',
   EndHere = 'end-here',
   TrimIn = 'trim-in',
@@ -45,6 +47,7 @@ export enum Command {
   PreviewZoomOut = 'preview-zoom-out',
   PreviewFit = 'preview-fit',
   PreviewActual = 'preview-actual',
+  PreviewSelection = 'preview-selection',
   ToggleChat = 'toggle-chat',
   ToggleInspector = 'toggle-inspector',
   ToggleTimeline = 'toggle-timeline',
@@ -55,6 +58,24 @@ export enum Command {
   AutoLayout = 'auto-layout',
   UseAsMask = 'use-as-mask',
   RemoveMask = 'remove-mask',
+  SelectMatching = 'select-matching',
+  BringForward = 'bring-forward',
+  SendBackward = 'send-backward',
+  BringToFront = 'bring-to-front',
+  SendToBack = 'send-to-back',
+  Union = 'union',
+  Subtract = 'subtract',
+  Intersect = 'intersect',
+  Exclude = 'exclude',
+  AlignLeft = 'align-left',
+  AlignCenter = 'align-center',
+  AlignRight = 'align-right',
+  AlignTop = 'align-top',
+  AlignMiddle = 'align-middle',
+  AlignBottom = 'align-bottom',
+  TidyUp = 'tidy-up',
+  FlipHorizontal = 'flip-horizontal',
+  FlipVertical = 'flip-vertical',
   ToolSelect = 'tool-select',
   ToolText = 'tool-text',
   ToolRectangle = 'tool-rectangle',
@@ -85,6 +106,10 @@ export type KeyPress = { key: string; code?: string; mod: boolean; shift: boolea
 type Binding = { key: string; mod?: boolean; shift?: boolean; alt?: boolean; ctrlCmd?: boolean; mode?: EditMode; command: Command; label: string; does: string; group: ShortcutGroup };
 
 export const SHORTCUTS: readonly Binding[] = [
+  { key: 't', mode: EditMode.Design, command: Command.ToolText, label: 'T', does: 'Text tool: drag in the frame', group: ShortcutGroup.Draw },
+  { key: 'r', mode: EditMode.Design, command: Command.ToolRectangle, label: 'R', does: 'Rectangle tool', group: ShortcutGroup.Draw },
+  { key: 'o', mode: EditMode.Design, command: Command.ToolEllipse, label: 'O', does: 'Ellipse tool', group: ShortcutGroup.Draw },
+  { key: 'p', mode: EditMode.Design, command: Command.ToolPen, label: 'P', does: 'Pen tool: click points, drag for curves', group: ShortcutGroup.Draw },
   { key: ' ', command: Command.TogglePlay, label: 'Space', does: 'Play / pause', group: ShortcutGroup.Playback },
   { key: 'l', command: Command.Play, label: 'L', does: 'Play', group: ShortcutGroup.Playback },
   { key: 'k', command: Command.Pause, label: 'K', does: 'Pause', group: ShortcutGroup.Playback },
@@ -120,16 +145,36 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: 'z', mod: true, shift: true, command: Command.Redo, label: '⇧⌘Z', does: 'Redo', group: ShortcutGroup.Editing },
   { key: 'a', shift: true, command: Command.AutoLayout, label: '⇧A', does: 'Add auto layout to the selection', group: ShortcutGroup.Layers },
   { key: 'm', mod: true, ctrlCmd: true, command: Command.UseAsMask, label: '⌃⌘M', does: 'Use the bottom-most selected layer as mask', group: ShortcutGroup.Layers },
+  { key: 'u', alt: true, shift: true, command: Command.Union, label: '⌥⇧U', does: 'Unite the selected shapes', group: ShortcutGroup.Layers },
+  { key: 's', alt: true, shift: true, command: Command.Subtract, label: '⌥⇧S', does: 'Subtract the upper shapes from the bottom one', group: ShortcutGroup.Layers },
+  { key: 'i', alt: true, shift: true, command: Command.Intersect, label: '⌥⇧I', does: 'Keep where the shapes overlap', group: ShortcutGroup.Layers },
+  { key: 'e', alt: true, shift: true, command: Command.Exclude, label: '⌥⇧E', does: 'Keep where the shapes do not overlap', group: ShortcutGroup.Layers },
+  { key: 'a', alt: true, command: Command.AlignLeft, label: '⌥A', does: 'Align left', group: ShortcutGroup.Layers },
+  { key: 'h', alt: true, command: Command.AlignCenter, label: '⌥H', does: 'Align horizontal centres', group: ShortcutGroup.Layers },
+  { key: 'd', alt: true, command: Command.AlignRight, label: '⌥D', does: 'Align right', group: ShortcutGroup.Layers },
+  { key: 'w', alt: true, command: Command.AlignTop, label: '⌥W', does: 'Align top', group: ShortcutGroup.Layers },
+  { key: 'v', alt: true, command: Command.AlignMiddle, label: '⌥V', does: 'Align vertical centres', group: ShortcutGroup.Layers },
+  { key: 's', alt: true, command: Command.AlignBottom, label: '⌥S', does: 'Align bottom', group: ShortcutGroup.Layers },
+  { key: 't', mod: true, alt: true, command: Command.TidyUp, label: '⌃⌥T', does: 'Tidy up', group: ShortcutGroup.Layers },
+  { key: 'h', shift: true, command: Command.FlipHorizontal, label: '⇧H', does: 'Flip horizontally', group: ShortcutGroup.Layers },
+  { key: 'v', shift: true, command: Command.FlipVertical, label: '⇧V', does: 'Flip vertically', group: ShortcutGroup.Layers },
   { key: 'g', mod: true, command: Command.Group, label: '⌘G', does: 'Group the selection', group: ShortcutGroup.Layers },
   { key: 'g', mod: true, shift: true, command: Command.Ungroup, label: '⇧⌘G', does: 'Ungroup', group: ShortcutGroup.Layers },
   { key: 'c', mod: true, shift: true, command: Command.Precompose, label: '⇧⌘C', does: 'Precompose the selection', group: ShortcutGroup.Layers },
-  { key: 'c', mod: true, command: Command.Copy, label: '⌘C', does: 'Copy keyframes', group: ShortcutGroup.Editing },
-  { key: 'v', mod: true, command: Command.Paste, label: '⌘V', does: 'Paste keyframes', group: ShortcutGroup.Editing },
+  { key: 'c', mod: true, command: Command.Copy, label: '⌘C', does: 'Copy keyframes or elements', group: ShortcutGroup.Editing },
+  { key: 'v', mod: true, command: Command.Paste, label: '⌘V', does: 'Paste keyframes or elements', group: ShortcutGroup.Editing },
+  { key: 'a', mod: true, alt: true, command: Command.SelectMatching, label: '⌥⌘A', does: 'Select matching layers', group: ShortcutGroup.Editing },
   { key: 'a', mod: true, command: Command.SelectAll, label: '⌘A', does: 'Select all clips', group: ShortcutGroup.Editing },
   { key: 'Escape', command: Command.Deselect, label: 'Esc', does: 'Select the parent, then deselect', group: ShortcutGroup.Editing },
   { key: 'Enter', command: Command.SelectChild, label: '↵', does: 'Select inside', group: ShortcutGroup.Editing },
+  { key: 'Tab', command: Command.SelectNext, label: 'Tab', does: 'Select the next layer', group: ShortcutGroup.Editing },
+  { key: 'Tab', shift: true, command: Command.SelectPrevious, label: '⇧Tab', does: 'Select the previous layer', group: ShortcutGroup.Editing },
   { key: 'Enter', shift: true, command: Command.SelectParent, label: '⇧↵', does: 'Select the parent', group: ShortcutGroup.Editing },
 
+  { key: ']', mod: true, command: Command.BringForward, label: '⌘]', does: 'Bring forward', group: ShortcutGroup.Layers },
+  { key: '[', mod: true, command: Command.SendBackward, label: '⌘[', does: 'Send backward', group: ShortcutGroup.Layers },
+  { key: ']', mod: true, alt: true, command: Command.BringToFront, label: '⌥⌘]', does: 'Bring to front', group: ShortcutGroup.Layers },
+  { key: '[', mod: true, alt: true, command: Command.SendToBack, label: '⌥⌘[', does: 'Send to back', group: ShortcutGroup.Layers },
   { key: '[', command: Command.StartHere, label: '[', does: 'Move the clip to start here', group: ShortcutGroup.Layers },
   { key: ']', command: Command.EndHere, label: ']', does: 'Move the clip to end here', group: ShortcutGroup.Layers },
   { key: '[', alt: true, command: Command.TrimIn, label: '⌥[', does: 'Trim the clip start to here', group: ShortcutGroup.Layers },
@@ -153,6 +198,9 @@ export const SHORTCUTS: readonly Binding[] = [
   { key: '-', mod: true, command: Command.PreviewZoomOut, label: '⌘−', does: 'Zoom the preview out', group: ShortcutGroup.View },
   { key: '0', mod: true, command: Command.PreviewFit, label: '⌘0', does: 'Fit the preview', group: ShortcutGroup.View },
   { key: '1', mod: true, command: Command.PreviewActual, label: '⌘1', does: 'Preview at 100%', group: ShortcutGroup.View },
+  { key: '0', shift: true, command: Command.PreviewActual, label: '⇧0', does: 'Preview at 100%', group: ShortcutGroup.View },
+  { key: '1', shift: true, command: Command.PreviewFit, label: '⇧1', does: 'Fit the preview', group: ShortcutGroup.View },
+  { key: '2', shift: true, command: Command.PreviewSelection, label: '⇧2', does: 'Zoom the preview to the selection', group: ShortcutGroup.View },
   { key: 'b', mod: true, command: Command.ToggleChat, label: '⌘B', does: 'Show / hide the agent', group: ShortcutGroup.View },
   { key: 'b', mod: true, alt: true, command: Command.ToggleInspector, label: '⌥⌘B', does: 'Show / hide properties', group: ShortcutGroup.View },
   { key: 'j', mod: true, command: Command.ToggleTimeline, label: '⌘J', does: 'Show / hide the timeline', group: ShortcutGroup.View },
@@ -167,11 +215,16 @@ export const SHORTCUTS: readonly Binding[] = [
 
 const PHYSICAL_KEYS: Record<string, string> = { BracketLeft: '[', BracketRight: ']' };
 const LETTER_CODE = /^Key([A-Z])$/;
+const DIGIT_CODE = /^Digit([0-9])$/;
 
 function keyOf(press: KeyPress): string {
   const letter = LETTER_CODE.exec(press.code ?? '')?.[1];
   if (letter) {
     return letter.toLowerCase();
+  }
+  const digit = DIGIT_CODE.exec(press.code ?? '')?.[1];
+  if (digit) {
+    return digit;
   }
   const physical = PHYSICAL_KEYS[press.code ?? ''];
   if (physical) {

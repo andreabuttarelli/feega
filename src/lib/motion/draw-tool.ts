@@ -16,6 +16,10 @@ const MIN_SIZE = 0.001;
 const PRECISION = 10000;
 const round = (n: number) => Math.round(n * PRECISION) / PRECISION;
 
+export function clickBox(at: DragPoint, size: { width: number; height: number }): DrawBox {
+  return { x: round(at.x + size.width / 2), y: round(at.y + size.height / 2), width: round(size.width), height: round(size.height) };
+}
+
 export function dragRect(from: DragPoint, to: DragPoint, lockRatio: boolean): DrawBox | null {
   const dx = to.x - from.x;
   const dy = to.y - from.y;

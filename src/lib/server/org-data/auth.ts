@@ -22,6 +22,8 @@ import { env as publicEnv } from '$env/dynamic/public';
 import { env } from '$env/dynamic/private';
 import { createUserDb, createServiceRoleDb, type Db } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
+import { listMemberships } from '$lib/server/repos/orgs';
+import { can, OrgAction } from '$lib/org-roles';
 import type { OrgQueryAuthority } from './query-tool';
 
 export type OrgCaller = {
@@ -105,22 +107,44 @@ async function resolveApiKey(token: string): Promise<{ caller: OrgCaller } | { e
   };
 }
 
-async function resolveJwt(token: string, orgId?: string): Promise<{ caller: OrgCaller } | { error: AuthFailure }> {
-  const db: Db = createUserDb(token);
+export const CALLER_BURST_MS = 5_000;
+const CALLER_BURST_MAX = 1_000;
+
+type Identity = { userId: string; memberships: Awaited<ReturnType<typeof listMemberships>> };
+
+const identities = new Map<string, { identity: Identity; until: number }>();
+
+async function identityOf(db: Db, token: string): Promise<Identity | AuthFailure> {
+  const hit = identities.get(token);
+  if (hit && hit.until > Date.now()) {
+    return hit.identity;
+  }
+
   const { data: userData, error: userError } = await db.auth.getUser(token);
   if (userError || !userData.user) {
-    return { error: { status: 401, body: { error: 'invalid_token' } } };
+    return { status: 401, body: { error: 'invalid_token' } };
+  }
+  const memberships = await listMemberships(db, userData.user.id).catch(() => null);
+  if (!memberships) {
+    return { status: 500, body: { error: 'membership_lookup_failed' } };
   }
 
-  const { data: memberships, error: memberError } = await db
-    .from('orgs_members')
-    .select('org_id')
-    .eq('user_id', userData.user.id);
-
-  if (memberError) {
-    return { error: { status: 500, body: { error: 'membership_lookup_failed' } } };
+  if (identities.size >= CALLER_BURST_MAX) {
+    identities.clear();
   }
-  const orgIds = (memberships ?? []).map((m) => m.org_id);
+  const identity = { userId: userData.user.id, memberships };
+  identities.set(token, { identity, until: Date.now() + CALLER_BURST_MS });
+  return identity;
+}
+
+async function resolveJwt(token: string, orgId?: string): Promise<{ caller: OrgCaller } | { error: AuthFailure }> {
+  const db: Db = createUserDb(token);
+  const known = await identityOf(db, token);
+  if ('status' in known) {
+    return { error: known };
+  }
+  const { userId, memberships } = known;
+  const orgIds = memberships.map((m) => m.org.id);
   if (!orgIds.length) {
     return { error: { status: 404, body: { error: 'no_organization' } } };
   }
@@ -132,13 +156,15 @@ async function resolveJwt(token: string, orgId?: string): Promise<{ caller: OrgC
     return { error: { status: 404, body: { error: 'org_not_found' } } };
   }
 
+  const role = memberships.find((m) => m.org.id === chosen)?.role;
+
   return {
     caller: {
       authority: { kind: 'rls', supabase: db as unknown as SupabaseClient },
       db,
       orgId: chosen,
-      userId: userData.user.id,
-      writeAllowed: true
+      userId,
+      writeAllowed: role ? can(role, OrgAction.Edit) : false
     }
   };
 }

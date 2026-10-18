@@ -9,7 +9,9 @@ test.describe('canvas bar icons @real', () => {
   test('the Text tool and Generate text do not share an icon', async ({ page, session }) => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     const bar = page.getByTestId('add-bar');
+    await bar.getByTestId('bar-mode').getByRole('radio', { name: 'Design' }).click();
     const textTool = await bar.locator('[data-tool="text"] svg').innerHTML();
+    await bar.getByTestId('bar-mode').getByRole('radio', { name: 'Generate' }).click();
     const generate = await bar.getByRole('button', { name: 'Generate text', exact: true }).locator('svg').first().innerHTML();
     if (SHOTS) {
       await bar.screenshot({ path: `${SHOTS}/${process.env.SHOT_NAME ?? 'bar'}.png` });

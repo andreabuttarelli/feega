@@ -70,6 +70,7 @@ export function tileMode(id: string, current: string | null, leaving: string | n
 
 export const nodeLayers = (mode: NodeMode, paint: Paint): Layers => LAYERS[mode][paint];
 
+
 export const ownPlayer = (mode: NodeMode, paint: Paint, live: boolean): boolean => live && nodeLayers(mode, paint).own;
 
 export enum Part {

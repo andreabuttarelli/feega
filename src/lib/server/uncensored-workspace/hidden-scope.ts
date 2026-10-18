@@ -52,10 +52,13 @@ async function idsOf(db: Db, table: string, column: string, values: string[]): P
 }
 
 export async function hiddenFor(db: Db, input: { orgId: string; userId: string }): Promise<HiddenScope> {
-  if ((await uncensoredLockFor(db, input)) === UncensoredLock.Open) {
+  const [lock, { data }] = await Promise.all([
+    uncensoredLockFor(db, input),
+    (db as unknown as SupabaseClient).from('projects').select('id').eq('org_id', input.orgId).eq('mode', ProjectMode.Uncensored)
+  ]);
+  if (lock === UncensoredLock.Open) {
     return NOTHING_HIDDEN;
   }
-  const { data } = await (db as unknown as SupabaseClient).from('projects').select('id').eq('org_id', input.orgId).eq('mode', ProjectMode.Uncensored);
   const projectIds = ((data ?? []) as { id: string }[]).map((r) => r.id);
   const [canvasIds, nodeIds] = await Promise.all([idsOf(db, 'canvases', 'project_id', projectIds), idsOf(db, 'nodes', 'project_id', projectIds)]);
   return { projectIds, canvasIds, nodeIds };

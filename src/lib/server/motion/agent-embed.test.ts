@@ -9,8 +9,9 @@ vi.mock('./editor', () => ({
   motionAssets,
   assetUrls: () => ({}),
   motionTokens: async () => ({}),
-  headOrNew: async () => ({ version: 2, doc: { assets: [] } })
+  newHead: () => ({ version: 0, doc: { assets: [] } })
 }));
+vi.mock('$lib/server/repos/motion-revisions', () => ({ readHead: async () => ({ version: 2, doc: { assets: [] } }) }));
 vi.mock('./embed', () => ({ publishEmbed: async () => ({ ok: true, url: 'u', snippet: 's' }), embedPublished: async () => true, isRefused: () => false, removeEmbed: async () => ({ ok: true }) }));
 
 const { publishMotionEmbed } = await import('./agent-embed');

@@ -1,4 +1,5 @@
 import { styleOf } from '$lib/motion/style';
+import { nameVersion, namedRevisions } from './version-names';
 import { briefAwaits, promptTexts } from '$lib/motion/script-brief';
 import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, rejectedRounds, shownRefs, savedPick, type PickAnswer, type PickAsk } from '$lib/reference-pick';
 import { createUIMessageStream, streamText, type ModelMessage, type Tool, type UIMessageChunk } from 'ai';
@@ -23,6 +24,7 @@ import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { blockedPrompt } from '$lib/server/moderation/blocked-response';
 import { drawFrames, firstFrames } from '$lib/server/motion/server-frames';
+import { fontAdvance } from '$lib/server/motion/font-advance';
 import { chromiumFrames, chromiumGl, serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { effectStore } from '$lib/server/effects/store';
 import { layoutStore } from '$lib/server/layouts/store';
@@ -55,7 +57,7 @@ import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { layMusic } from '$lib/server/motion/music';
 import { laySfx } from '$lib/server/motion/sfx';
-import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/motion-revisions';
+import { RevisionOutcome, readRevision } from '$lib/server/repos/motion-revisions';
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
@@ -79,6 +81,7 @@ import { motionPlaceHint, userContent } from '$lib/server/chat-attachments/model
 import { breakdownReader } from '$lib/server/video-reference';
 
 export const MOTION_AGENT_KEY = 'motion';
+const readFontAdvance = fontAdvance();
 const CHECK_WAIT_MS = 90_000;
 const NEEDS_EDITOR = 'this needs the motion editor open in a browser to draw frames: nobody has it open for this turn';
 
@@ -349,7 +352,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
     templates: templateLibrary(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
-    revisions: { list: () => listRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null },
+    revisions: { list: () => namedRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null, name: async (version, name) => (await nameVersion(db, { ...nodeScope, version, name, actor })).named },
     ...sources,
     videoBreakdown,
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,
@@ -357,6 +360,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
     sfx: (sound) => withOrgContext(orgId, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
     frames: drawTurnFrames,
+    fontAdvance: readFontAdvance,
     inspect: frameStats,
     seam: async () => {
       const end = session.doc.durationInFrames / session.doc.fps;
@@ -701,6 +705,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
       void reply
         .finish(finishedTurn(steps), ReplyStatus.Failed)
         .then(land)
+        .catch((unsaved) => console.error('[motion-agent] failed turn not saved', unsaved))
         .finally(() => abandon(e));
       return 'The agent could not finish this turn.';
     }

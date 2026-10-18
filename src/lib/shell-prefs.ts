@@ -1,3 +1,4 @@
+import { localStore } from '$lib/browser-storage';
 /** Persistent shell layout prefs (sidebar). Browser localStorage. */
 
 export const SHELL_PREF_KEYS = {
@@ -37,7 +38,7 @@ const SIDEBAR_W_MIN = 220;
 const SIDEBAR_W_MAX = 420;
 
 function canUseStorage(): boolean {
-  return typeof localStorage !== 'undefined';
+  return localStore() !== null;
 }
 
 const LEGACY_BY_KEY = new Map<string, string>(

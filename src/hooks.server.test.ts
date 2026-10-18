@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('$env/static/public', () => ({
 	PUBLIC_SUPABASE_URL: 'http://localhost:8000',
@@ -29,12 +29,14 @@ vi.mock('@sveltejs/kit/hooks', () => ({
 }));
 
 let mockSession: { session: unknown; user: unknown } = { session: null, user: null };
+let refreshed: unknown = null;
 
 vi.mock('@supabase/ssr', async (orig) => ({
 	...(await orig<object>()),
 	createServerClient: () => ({
 		auth: {
 			getSession: async () => ({ data: { session: mockSession.session } }),
+			refreshSession: async () => ({ data: { session: refreshed }, error: null }),
 			getUser: async () => ({ data: { user: mockSession.user }, error: null })
 		}
 	})
@@ -46,7 +48,7 @@ vi.mock('$lib/server/nav-cache', () => ({
 
 vi.mock('$lib/server/db/client', async (orig) => ({
 	...(await orig<object>()),
-	createUserDb: () => ({ mocked: true })
+	createUserDb: (token: string) => ({ mocked: true, token })
 }));
 
 vi.mock('$lib/server/tenancy/entry', async (orig) => ({
@@ -79,6 +81,42 @@ vi.mock('$lib/server/social-publishing', () => ({
 
 const { handle } = await import('./hooks.server');
 const { logAiCall } = await import('$lib/server/ai-log');
+
+const nowS = () => Math.floor(Date.now() / 1000);
+const statusEvent = () => ({
+	request: new Request('http://localhost/status'),
+	url: new URL('http://localhost/status'),
+	route: { id: '/status' },
+	params: {},
+	cookies: { getAll: () => [], get: () => undefined, set: vi.fn() },
+	locals: {}
+});
+
+describe('a session about to expire is refreshed before a long turn runs on it', () => {
+	afterEach(() => {
+		mockSession = { session: null, user: null };
+	});
+
+	it('a token with five minutes left is swapped for a fresh one, as when a 20-minute trailer build died on "JWT expired"', async () => {
+		mockSession = { session: { access_token: 'old', expires_at: nowS() + 300 }, user: { id: 'u1' } };
+		refreshed = { access_token: 'fresh', expires_at: nowS() + 3600 };
+		let db: unknown = null;
+
+		await handle({ event: statusEvent(), resolve: async (event: any) => { db = await event.locals.db(); return new Response('ok'); } } as any);
+
+		expect(db).toEqual({ mocked: true, token: 'fresh' });
+	});
+
+	it('a token with most of its hour left is used as it is', async () => {
+		mockSession = { session: { access_token: 'young', expires_at: nowS() + 3500 }, user: { id: 'u1' } };
+		refreshed = { access_token: 'fresh', expires_at: nowS() + 3600 };
+		let db: unknown = null;
+
+		await handle({ event: statusEvent(), resolve: async (event: any) => { db = await event.locals.db(); return new Response('ok'); } } as any);
+
+		expect(db).toEqual({ mocked: true, token: 'young' });
+	});
+});
 
 describe('server session recovery', () => {
 	it('serves the request when the session cookie is invalid Base64-URL', async () => {

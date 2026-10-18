@@ -262,8 +262,30 @@ async function gotoOnce(page: Page, path: string) {
   }
 }
 
+const MODEL_SPEND = /\/api\/v1\/projects\/[^/]+\/(motion\/[^/]+\/)?agent$|\/api\/v1\/org\/nodes\/[^/]+\/generate$|\/prompts\/enhance$|\?\/run$/;
+const SPEND_ALLOWED = process.env.E2E_ALLOW_SPEND === '1';
+
+export async function refuseModelSpend(page: Page): Promise<string[]> {
+  const refused: string[] = [];
+  if (SPEND_ALLOWED) {
+    return refused;
+  }
+  await page.route(MODEL_SPEND, (route) => {
+    if (route.request().method() !== 'POST') {
+      return route.fallback();
+    }
+    refused.push(route.request().url());
+    return route.abort();
+  });
+  return refused;
+}
+
+const RENDERER = process.env.E2E_RENDERER;
+
+const withRenderer = (path: string) => (RENDERER && !path.includes('renderer=') ? `${path}${path.includes('?') ? '&' : '?'}renderer=${RENDERER}` : path);
+
 export async function gotoHydrated(page: Page, path: string): Promise<import('@playwright/test').Response | null> {
-  const response = await gotoOnce(page, path);
+  const response = await gotoOnce(page, withRenderer(path));
   await page.waitForLoadState('networkidle');
   return response;
 }
@@ -350,11 +372,13 @@ export const test = base.extend<{
   },
 
   page: async ({ page, session }, use) => {
+    const unmocked = await refuseModelSpend(page);
     if (!(await reuseSignIn(page, session))) {
       await signInE2e(page, session);
       await saveSignIn(page, session);
     }
     await use(page);
+    expect(unmocked, 'requests that would have spent on a real model; mock them, or set E2E_ALLOW_SPEND=1').toEqual([]);
   },
 
   seedNode: async ({ session, admin }, use) => {

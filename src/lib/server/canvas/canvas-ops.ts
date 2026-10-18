@@ -1,4 +1,4 @@
-import { groupElements, moveNodeGroup, rotateNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
@@ -24,12 +24,13 @@ import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPU
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
-import { MoveOutcome, drawElement, drawnSchema, dropFor, frameAnswer, frameStore, linkFrame, moveElement, placeOutput } from '$lib/server/motion/move-element';
+import { drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
 import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
@@ -47,11 +48,12 @@ import { CANVAS_TEMPLATES } from '$lib/canvas/templates';
 import { WIRE_MODES } from '$lib/canvas-edges';
 import { cancelWorkflow, enqueueWorkflow, planWorkflowDryRun, workflowCredits } from '$lib/server/canvas/workflow';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
-import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { motionNodeSize } from '$lib/canvas/motion-node';
 import { cancelRender } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { withdrawFromGallery } from '$lib/server/gallery/publish';
-import { registerCanvasUpload, UploadError } from '$lib/server/canvas/upload';
+import { importCanvasLink, registerCanvasUpload, UploadError } from '$lib/server/canvas/upload';
 import { canvasUploadPrefix, verdictForUpload } from '$lib/canvas/upload-kind';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { findProjectById } from '$lib/server/repos/projects';
@@ -170,10 +172,39 @@ const drawElementInput = z
   .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse, box:{left,top,width,height}}, or {tool:pen, path:SVG d}, in canvas units') })
   .strict();
 
+const drawFrameInput = z
+  .object({
+    canvasId: z.string(),
+    x: z.number().finite(),
+    y: z.number().finite(),
+    w: z.number().positive(),
+    h: z.number().positive().optional(),
+    format: z.enum(MOTION_FORMATS).optional()
+  })
+  .strict()
+  .refine((a) => a.h !== undefined || (a.format && a.format !== MotionFormat.Custom), 'h or a preset');
+
+function frameBox(input: z.infer<typeof drawFrameInput>) {
+  const preset = input.format && input.format !== MotionFormat.Custom ? FORMATS[input.format] : null;
+  const height = preset ? (input.w * preset.height) / preset.width : (input.h as number);
+  return { left: input.x, top: input.y, width: input.w, height };
+}
+
+const MOTION_TYPE = 'motion';
+
+const createdSize = (type: string, data: Record<string, unknown>) => {
+  if (type !== MOTION_TYPE) {
+    return {};
+  }
+  const size = motionNodeSize(MOTION_FORMATS.find((f) => f === data.format) ?? MotionFormat.Vertical);
+  return { width: size.w, height: size.h };
+};
+
 const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (frame nodes with data.kind element)') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
 const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
+const scaleGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), width: z.number().positive(), height: z.number().positive() }).strict();
 const moveGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), x: z.number().finite(), y: z.number().finite() }).strict();
 const membersOf = (ctx: CanvasCtx, canvasId: string) => nodeMembers(ctx.db, { orgId: ctx.orgId, canvasId, actor: ctx.actor });
 
@@ -234,6 +265,9 @@ const connectionIdInput = z.object({ connectionId: z.string().describe('from lis
 const edgeModeInput = z.object({ connectionId: z.string(), mode: z.enum(WIRE_MODES).describe('iterate makes the line a loop axis') }).strict();
 const resizeNodeInput = z.object({ nodeId: z.string(), width: z.number().positive(), height: z.number().positive() }).strict();
 const nodeIdsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1) }).strict();
+const duplicateInput = nodeIdsInput
+  .extend({ offset: z.object({ dx: z.number(), dy: z.number() }).optional().describe('where the copies land relative to the originals; omitted = a small step') })
+  .strict();
 const shareCanvasInput = z.object({ canvasId: z.string(), on: z.boolean().describe('true mints a view-only link; false revokes it') }).strict();
 const shareDocInput = z.object({ nodeId: z.string().describe('a doc node'), on: z.boolean() }).strict();
 const insertTemplateInput = z.object({ canvasId: z.string(), templateId: z.string().describe('from list_templates'), x: z.number(), y: z.number() }).strict();
@@ -242,6 +276,7 @@ const addFrameInput = z
     canvasId: z.string(),
     templateId: z.string().describe('a motion template id (list_motion_templates)'),
     format: z.enum(MOTION_FORMATS).default(MotionFormat.Landscape),
+    values: z.record(z.string(), z.string().max(4000)).optional().describe('field key → value, as set_template_values takes them'),
     x: z.number(),
     y: z.number()
   })
@@ -293,6 +328,8 @@ const MAX_VOICE_NAME = 100;
 const MAX_CLONE_SAMPLE_BYTES = 3 * 1024 * 1024;
 
 const requestUploadInput = z.object({ fileName: z.string().min(1), mimeType: z.string().min(1), bytes: z.number().int().positive() }).strict();
+const importLinkInput = z.object({ url: z.string().url().describe('https link to a picture or video') }).strict();
+
 const registerUploadInput = z
   .object({
     canvasId: z.string(),
@@ -418,6 +455,7 @@ export const CANVAS_OPS = {
         y: input.y,
         displayName: input.displayName ?? null,
         data: verdict.data,
+        ...createdSize(input.type, verdict.data),
         actor: ctx.actor
       });
       return { outcome: 'written', node };
@@ -562,9 +600,14 @@ export const CANVAS_OPS = {
         targetHandle: input.targetHandle ?? null,
         actor: ctx.actor
       });
-      const linked = await linkFrame(framesOf(ctx), { sourceNodeId: input.sourceNodeId, frameNodeId: input.targetNodeId });
-      return { connection, ...(linked.outcome === MoveOutcome.Done ? { placed_in_frame: { clip_id: linked.clipId, revision: linked.versions[linked.frameId] } } : {}) };
+      return { connection };
     }
+  }),
+
+  create_formats: op({
+    access: Access.Write,
+    input: z.object({ frameId: z.string(), targets: z.array(formatTargetSchema).min(1).max(8).describe('each {format: 1:1 | 4:5 | 9:16 | 16:9 …} or {size: {width, height}} px') }).strict(),
+    run: async (ctx, input) => createFormats(framesOf(ctx), { nodeId: input.frameId, targets: input.targets })
   }),
 
   move_frame_element: op({
@@ -573,10 +616,22 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => frameAnswer(await moveElement(framesOf(ctx), { sourceNodeId: input.frameId, clipId: input.elementId, drop: dropFor(input) }))
   }),
 
+  copy_frame_element: op({
+    access: Access.Write,
+    input: moveFrameElementInput,
+    run: async (ctx, input) => frameAnswer(await copyElement(framesOf(ctx), { sourceNodeId: input.frameId, clipId: input.elementId, drop: dropFor(input) }))
+  }),
+
   draw_element: op({
     access: Access.Write,
     input: drawElementInput,
     run: async (ctx, input) => frameAnswer(await drawElement(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.drawn))
+  }),
+
+  draw_frame: op({
+    access: Access.Write,
+    input: drawFrameInput,
+    run: async (ctx, input) => frameAnswer(await drawFrameAt(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, frameBox(input), input.format))
   }),
 
   group_elements: op({
@@ -595,6 +650,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: rotateGroupInput,
     run: async (ctx, input) => frameAnswer(await rotateNodeGroup(framesOf(ctx), membersOf(ctx, input.canvasId), input.nodeId, input.degrees))
+  }),
+
+  scale_group: op({
+    access: Access.Write,
+    input: scaleGroupInput,
+    run: async (ctx, input) => frameAnswer(await scaleNodeGroup(membersOf(ctx, input.canvasId), input.nodeId, { w: input.width, h: input.height }))
   }),
 
   move_group: op({
@@ -822,7 +883,7 @@ export const CANVAS_OPS = {
 
   duplicate_nodes: op({
     access: Access.Write,
-    input: nodeIdsInput,
+    input: duplicateInput,
     run: async (ctx, input) => duplicateNodes(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, ...input, actor: ctx.actor })
   }),
 
@@ -874,6 +935,7 @@ export const CANVAS_OPS = {
         userId: ctx.userId,
         templateId: input.templateId,
         format: input.format,
+        values: input.values,
         at: { x: input.x, y: input.y },
         actor: ctx.actor
       });
@@ -981,6 +1043,12 @@ export const CANVAS_OPS = {
       }
       return uploadAnswer(() => registerCanvasUpload(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, ...input }));
     }
+  }),
+
+  import_link: op({
+    access: Access.Write,
+    input: importLinkInput,
+    run: async (ctx, input) => uploadAnswer(async () => ({ asset: (await importCanvasLink(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, url: input.url })).asset }))
   }),
 
   list_voices: op({

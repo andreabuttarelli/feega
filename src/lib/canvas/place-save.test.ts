@@ -5,14 +5,14 @@ import type { ActionAnswer } from './node-save';
 const ok: ActionAnswer = { type: 'success', data: {} };
 const offline: ActionAnswer = { type: 'network' };
 
-function harness(answers: ActionAnswer[]) {
+function harness(answers: ActionAnswer[], announce = { intent: vi.fn(), refused: vi.fn() }) {
   const sent: { action: string; fields: Record<string, string | number> }[] = [];
   const send = vi.fn(async (action: string, fields: Record<string, string | number>) => {
     sent.push({ action, fields });
     return answers.shift() ?? ok;
   });
-  const places = createPlaceSaves({ send, backoffMs: () => 0 });
-  return { sent, places };
+  const places = createPlaceSaves({ send, backoffMs: () => 0, announce });
+  return { sent, places, announce };
 }
 
 describe('placement saves: a move or resize is never rolled back, it is retried until it lands', () => {
@@ -69,6 +69,34 @@ describe('placement saves: a move or resize is never rolled back, it is retried 
   });
 });
 
+describe('placement saves tell peers before the server answers', () => {
+  it('announces a move the moment it is scheduled', () => {
+    const { places, announce } = harness([new Promise<never>(() => {}) as unknown as ActionAnswer]);
+
+    places.move('a', 1, 2);
+
+    expect(announce.intent).toHaveBeenCalledWith({ id: 'a', x: 1, y: 2 });
+  });
+
+  it('a refused move tells peers to take the confirmed state again', async () => {
+    const { places, announce } = harness([{ type: 'failure', status: 404 }]);
+
+    places.move('a', 1, 2);
+    await places.flush();
+
+    expect(announce.refused).toHaveBeenCalledWith('a');
+  });
+
+  it('a move that lands is not a refusal', async () => {
+    const { places, announce } = harness([ok]);
+
+    places.move('a', 1, 2);
+    await places.flush();
+
+    expect(announce.refused).not.toHaveBeenCalled();
+  });
+});
+
 describe('keepPlaced: a resync never moves a tile whose placement is still being saved', () => {
   const server = [{ id: 'a', x: 0, y: 0, w: 100, h: 100, userHeight: null }, { id: 'b', x: 0, y: 0, w: 100, h: 100, userHeight: null }];
   const local = [{ id: 'a', x: 50, y: 60, w: 300, h: 200, userHeight: 200 }, { id: 'b', x: 9, y: 9, w: 9, h: 9, userHeight: null }];
@@ -114,5 +142,22 @@ describe('placement entries survive a reload', () => {
     reopened.places.restore(entries);
     await reopened.places.flush();
     expect(reopened.sent.map((s) => s.action).sort()).toEqual(['move', 'resize']);
+  });
+});
+
+describe('a snapshot asked for before a move never undoes it', () => {
+  it('a move saved while a snapshot was in flight still counts as placed for that snapshot', async () => {
+    const { places } = harness([]);
+    places.move('a', 1, 1);
+    await places.flush();
+
+    const asked = places.mark();
+    places.move('a', 50, 60);
+    await places.flush();
+
+    expect(places.dirty('a')).toBe(false);
+    expect(places.placedAfter('a', asked)).toBe(true);
+    expect(places.placedAfter('a', places.mark())).toBe(false);
+    expect(places.placedAfter('b', asked)).toBe(false);
   });
 });

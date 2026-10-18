@@ -16,6 +16,10 @@
   import { InputKey, type InputValues } from '$lib/motion/expression/inputs';
   import { INPUT_MESSAGE } from '$lib/motion/interactive/runtime';
   import type { VarValues } from '$lib/motion/interactive/var-model';
+  import { RenderEngine } from '$lib/motion/gpu/engine-flag';
+  import { EditEnd, TEXT_EDIT, type TextEditMessage } from '$lib/motion/hyperframes/text-edit';
+  import GpuLayer from './GpuLayer.svelte';
+  import type { Compose } from '$lib/motion/gpu/engine';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
 
@@ -40,10 +44,13 @@
     redraws = $bindable(0),
     ontap = null,
     background = Background.Brand,
+    engine = RenderEngine.Html,
+    gpuCompose = null,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; children?: Snippet } = $props();
 
   let pointer = $state<InputValues>({});
+  let exportedOn = $state<RenderEngine | null>(null);
 
   function sendInputs(values: InputValues) {
     player?.iframeElement?.contentWindow?.postMessage({ type: INPUT_MESSAGE, values, ...(vars ? { vars } : {}) }, '*');
@@ -67,6 +74,21 @@
   let player: Player | null = null;
   let reported = -1;
   let ready = false;
+  let readyWaiters: (() => void)[] = [];
+  const READY_WAIT_MS = 5000;
+
+  function whenReady(): Promise<boolean> {
+    if (ready) {
+      return Promise.resolve(true);
+    }
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(false), READY_WAIT_MS);
+      readyWaiters.push(() => {
+        clearTimeout(timer);
+        resolve(true);
+      });
+    });
+  }
   let pending: number | null = null;
   let capturing = false;
   let drawnDue: ReturnType<typeof setTimeout> | null = null;
@@ -109,6 +131,7 @@
       el.style.width = '100%';
       el.style.height = '100%';
       el.style.background = PLAYER_BACKDROP[background];
+      el.style.opacity = engine === RenderEngine.Gpu ? '0' : '';
       el.muted = muted;
       el.loop = loop;
       el.addEventListener('ready', () => {
@@ -116,6 +139,9 @@
         shown = el.iframeElement;
         crisp = shown ? crispFor(engineOf(navigator.userAgent), shown) : () => {};
         ready = true;
+        const waiting = readyWaiters;
+        readyWaiters = [];
+        waiting.forEach((wake) => wake());
         drawnDue = setTimeout(announceDrawn, frame === 0 ? 0 : DRAWN_FALLBACK_MS);
         driver.seek(frame / fps);
         driver.ready();
@@ -258,8 +284,82 @@
     });
   }
 
-  export function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast): Promise<void> {
+  let textEditing = $state(false);
+  let editSession = '';
+
+  export async function editText(selector: string, at: FramePoint | null, oninput: (text: string) => void): Promise<string | null> {
+    const target = (await whenReady()) ? player?.iframeElement?.contentWindow : null;
+    if (!target) {
+      return null;
+    }
+    const id = crypto.randomUUID();
+    editSession = id;
+    textEditing = true;
+    if (player) {
+      player.style.opacity = '';
+    }
+    player?.iframeElement?.focus();
+    return new Promise((resolve) => {
+      const onMessage = (e: MessageEvent) => {
+        const m = e.data as TextEditMessage;
+        if (e.source !== target || !m || m.id !== id) {
+          return;
+        }
+        if (m.type === TEXT_EDIT.input) {
+          oninput(m.text);
+          return;
+        }
+        if (m.type !== TEXT_EDIT.end) {
+          return;
+        }
+        window.removeEventListener('message', onMessage);
+        if (editSession === id) {
+          textEditing = false;
+          player?.iframeElement?.blur();
+          window.focus();
+          if (player && engine === RenderEngine.Gpu) {
+            player.style.opacity = '0';
+          }
+        }
+        resolve(m.end === EditEnd.Commit ? m.text : null);
+      };
+      window.addEventListener('message', onMessage);
+      target.postMessage({ type: TEXT_EDIT.start, id, selector, ...(at ?? {}) }, '*');
+    });
+  }
+
+  export function stopTextEdit() {
+    player?.iframeElement?.contentWindow?.postMessage({ type: TEXT_EDIT.stop }, '*');
+  }
+
+  function showPlayer(reason: unknown) {
+    console.warn('motion preview: GPU engine unavailable, HTML engine shown', reason);
+    if (player) {
+      player.style.opacity = '';
+    }
+  }
+
+  async function renderOnGpu(compose: Compose, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, lanes: number): Promise<boolean> {
+    const { gpuEngine, GpuIneligible } = await import('$lib/motion/gpu/engine');
+    const engine = host ? await gpuEngine(compose, host).catch((e) => (e instanceof GpuIneligible ? null : Promise.reject(e))) : null;
+    if (!engine) {
+      return false;
+    }
+    try {
+      await engine.renderFrames(times, onFrame, lanes, signal);
+      return true;
+    } finally {
+      engine.dispose();
+    }
+  }
+
+  export async function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast, prefer: RenderEngine = engine): Promise<void> {
     const { settle, lanes } = CAPTURE_PROFILES[profile];
+    exportedOn = RenderEngine.Gpu;
+    if (prefer === RenderEngine.Gpu && gpuCompose && source === html && size.width === width && size.height === height && width % 2 === 0 && height % 2 === 0 && (await renderOnGpu(gpuCompose, times, onFrame, signal, lanes()))) {
+      return;
+    }
+    exportedOn = RenderEngine.Html;
     const request = { format: FrameFormat.Bitmap, settle, layering: exportLayering(), ...size };
     return borrowed(source, async () => {
       const extra = host ? await Promise.all(Array.from({ length: lanesWithin(lanes(), webglPerLane(source)) - 1 }, () => mountCapturePlayer(host!, source))) : [];
@@ -320,8 +420,13 @@
 
 <svelte:window onmessage={redrawn} />
 
-<div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview">
+<div class="stage" data-backdrop={background} style={`aspect-ratio: ${width} / ${height}; width: var(--preview-w, min(100cqw, calc(100cqh * ${width / height})));`} data-testid="motion-preview" data-engine={engine} data-export-engine={exportedOn}>
   <div class="host" bind:this={host}></div>
+  {#if engine === RenderEngine.Gpu && gpuCompose}
+    <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
+      <GpuLayer {html} compose={gpuCompose} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+    </div>
+  {/if}
   {@render children?.()}
   {#if live}
     <div
@@ -340,6 +445,10 @@
 </div>
 
 <style>
+  .gpu-wrap {
+    display: contents;
+  }
+
   .stage {
     position: relative;
     flex-shrink: 0;

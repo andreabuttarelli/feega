@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localStore } from '$lib/browser-storage';
   import { onMount } from 'svelte';
   import { BRAND_COLORS } from '$lib/motion/components';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
@@ -38,16 +39,8 @@
   const shown = $derived(resolveColor(raw || undefined, tokens));
   const pickerValue = $derived(HEX.test(shown) ? shown : NONE);
 
-  function store(): LayoutStore | null {
-    try {
-      return localStorage;
-    } catch {
-      return null;
-    }
-  }
-
   onMount(() => {
-    recent = readRecent(store());
+    recent = readRecent(localStore());
     dropper = (window as unknown as { EyeDropper?: EyeDropperCtor }).EyeDropper ?? null;
   });
 
@@ -81,7 +74,7 @@
 
   function pick(next: string) {
     if (HEX.test(next)) {
-      recent = remember(recent, next.toLowerCase(), store());
+      recent = remember(recent, next.toLowerCase(), localStore());
     }
     onchange(next);
   }

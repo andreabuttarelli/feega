@@ -1,7 +1,19 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
-import { LEAVE_CAP_MS, anchoredTo, inlineStage } from './inline-stage.svelte';
+import { LEAVE_CAP_MS, anchoredTo, inlineStage, stageOver } from './inline-stage.svelte';
 import { Paint } from './inline-motion';
+
+describe('the stage over a turned node', () => {
+  it('takes the node size and angle, centred on its on-screen box, not the box itself', () => {
+    const quarter = stageOver({ left: 0, top: 0, width: 50, height: 100 }, { width: 100, height: 50 }, 90);
+    expect(quarter).toEqual({ left: -25, top: 25, width: 100, height: 50, rotate: 90 });
+  });
+
+  it('scales with the zoom the box shows', () => {
+    const turned = stageOver({ left: 10, top: 10, width: 200, height: 100 }, { width: 100, height: 50 }, 0);
+    expect(turned).toEqual({ left: 10, top: 10, width: 200, height: 100, rotate: 0 });
+  });
+});
 
 describe('inline stage', () => {
   it('the editor shows only once its player has drawn, and the node keeps its picture a beat longer', async () => {
@@ -113,6 +125,25 @@ describe('inline stage', () => {
 
     expect([bar.style.left, bar.style.top, bar.style.width, bar.style.height]).toEqual(['300px', '0px', '600px', '52px']);
     anchor.destroy();
+  });
+
+  it('a leaving frame that hands over its body again keeps its editor drawn, never black', async () => {
+    vi.useFakeTimers();
+    const take = inlineStage.offer('m1', document.createElement('div'));
+    inlineStage.ready('m1');
+    await vi.runAllTimersAsync();
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Swapped);
+
+    inlineStage.leave('m1');
+    take();
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Swapped);
+    const retake = inlineStage.offer('m1', document.createElement('div'));
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Swapped);
+
+    inlineStage.landed('m1');
+    retake();
+    expect(inlineStage.paintOf('m1')).toBe(Paint.Pending);
+    vi.useRealTimers();
   });
 
   it('a closing frame is let go once its tile has drawn, or after a cap', async () => {

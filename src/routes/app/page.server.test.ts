@@ -36,7 +36,8 @@ const listMemberships = vi.fn(async () => [
   { org: { id: 'org-a', name: 'A', slug: 'a' }, role: 'owner' },
   { org: { id: 'org-b', name: 'B', slug: 'b' }, role: 'member' }
 ]);
-vi.mock('$lib/server/repos/orgs', () => ({ listMemberships }));
+const setActiveOrg = vi.fn(async () => {});
+vi.mock('$lib/server/repos/orgs', () => ({ listMemberships, setActiveOrg }));
 
 const loadAttachments = vi.fn(async (_db: unknown, input: { ids: string[] }) => input.ids.filter((id) => id !== 'stranger').map((id) => ({ assetId: id, kind: 'image', name: `${id}.png`, mimeType: 'image/png', bytes: 1 })));
 vi.mock('$lib/server/chat-attachments/register', () => ({ loadAttachments }));
@@ -196,6 +197,7 @@ describe('/app is the dashboard for a returning user', () => {
   it('switching workspace remembers a membership, never a stranger org', async () => {
     const jar = cookieJar();
     await thrown(() => actions.workspace({ locals, cookies: jar, request: form({ orgId: 'org-b' }) } as never));
+    expect(setActiveOrg).toHaveBeenCalledWith(expect.anything(), { userId: expect.any(String), orgId: 'org-b' });
     expect(jar.set).toHaveBeenCalledWith('dz-org', 'org-b', expect.objectContaining({ path: '/' }));
 
     const stranger = cookieJar();

@@ -11,7 +11,7 @@ with `padding-right: 72px` on a header so the tag wouldn't sit on top of it.
 The label — icon + node name — is now drawn once, by `CanvasTile.svelte`, the shared
 wrapper every node type goes through. It sits `position: absolute; bottom: 100%; left: 0`
 relative to the node's own DOM box (`.svelte-flow__node`, which is `position: absolute`
-already), with a 4px gap: outside and above the top-left corner, like a Figma frame
+already), with a 4px gap: outside and above the top-left corner, like a frame name in design tools
 name. The seven internal tags and their CSS are deleted, along with the header padding
 that existed only to dodge them.
 

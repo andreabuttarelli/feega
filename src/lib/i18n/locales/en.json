@@ -344,17 +344,7 @@
     },
     "settings": {
       "team": {
-        "title": "Team",
-        "subtitle": "Invite someone to work on this brand with you. They see and manage everything except billing.",
-        "emailPlaceholder": "name@company.com",
-        "invite": "Send invite",
-        "invited": "Invite sent.",
-        "invitedNoEmail": "Invite created, but the email could not be sent — they'll see it in their dashboard under Invites.",
-        "revoked": "Access removed.",
-        "pending": "Invite pending",
-        "member": "Member",
-        "revoke": "Remove",
-        "empty": "Only you have access to this brand."
+        "title": "Team"
       },
       "linkedin": {
         "title": "Connect LinkedIn",
@@ -555,6 +545,13 @@
     },
     "ads": {
       "syncing": "Syncing…"
+    },
+    "orgs": {
+      "label": "Organisation",
+      "new": "New organisation",
+      "namePlaceholder": "Organisation name",
+      "create": "Create",
+      "cancel": "Cancel"
     }
   },
   "cookie": {

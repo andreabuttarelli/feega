@@ -65,7 +65,16 @@ export function frameIn(node: Bounds, screen: Screen, free: Insets, maxZoom: num
 
 export enum FocusMode {
   Frame = 'frame',
-  Select = 'select'
+  Select = 'select',
+  Reveal = 'reveal'
 }
 
 export type FocusRequest = { ids: string[]; key: number; free?: Insets; mode?: FocusMode };
+
+const NO_INSETS: Insets = { top: 0, right: 0, bottom: 0, left: 0 };
+
+export function inView(node: Bounds, view: Viewport, screen: Screen, free: Insets = NO_INSETS): boolean {
+  const left = node.x * view.zoom + view.x;
+  const top = node.y * view.zoom + view.y;
+  return left >= free.left && top >= free.top && left + node.width * view.zoom <= screen.width - free.right && top + node.height * view.zoom <= screen.height - free.bottom;
+}

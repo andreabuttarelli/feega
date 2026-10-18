@@ -24,6 +24,11 @@ type WithPosition = WithId & { position: unknown };
 type WithSelected = WithId & { selected?: boolean };
 type WithDragging = WithId & { dragging?: boolean };
 
+function withoutHandSize<N>(node: N): N {
+  const { width: _w, height: _h, ...rest } = node as N & { width?: number; height?: number };
+  return rest as N;
+}
+
 export function syncNodes<N extends WithId, T extends WithId>(
   current: N[],
   tiles: T[],
@@ -54,9 +59,11 @@ export function syncNodes<N extends WithId, T extends WithId>(
     const freshComparable = fresh as { data?: unknown; style?: unknown; class?: unknown };
     const currentComparable = n as { data?: unknown; style?: unknown; class?: unknown };
     differs ||= JSON.stringify(freshComparable.data) !== JSON.stringify(currentComparable.data);
-    differs ||= freshComparable.style !== currentComparable.style;
+    const restyled = freshComparable.style !== currentComparable.style;
+    differs ||= restyled;
     differs ||= freshComparable.class !== currentComparable.class;
-    kept.push(differs ? { ...n, ...next } : n);
+    const base = restyled ? withoutHandSize(n) : n;
+    kept.push(differs ? { ...base, ...next } : n);
     changed ||= differs;
   }
 

@@ -1,11 +1,13 @@
 <script lang="ts">
+  import { textTarget } from '$lib/motion/hyperframes/text-edit';
   import { clipChrome } from '$lib/canvas/selection-chrome';
   import { onMount, untrack } from 'svelte';
   import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-  import { DragPhase, isOutside, type ElementOut } from '$lib/canvas/canvas-drop';
+  import { DragPhase, isOutside, type ElementOut, type HostDrag, type HostMove, hostShift, hostTurn } from '$lib/canvas/canvas-drop';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { selectionView } from '$lib/motion/selection-context';
   import { reorderAt } from '$lib/motion/layout/guides';
+  import { measureGaps } from '$lib/motion/measure-gaps';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
   import { guessedBoxes } from '$lib/motion/move-element';
   import type { ComponentId } from '$lib/motion/components';
@@ -29,7 +31,10 @@
     onboxes = () => {},
     outlined = null,
     onhover = () => {},
-    ondragout = null
+    ondragout = null,
+    onhostdrag = null,
+    onmenu = null,
+    edittext = null
   }: {
     doc: MotionDoc;
     frame: number;
@@ -39,13 +44,16 @@
     onpreview: (doc: MotionDoc | null) => void;
     onchange: (doc: MotionDoc, summary: string) => void;
     pickAt?: Pt | null;
-    ask?: () => { at: Pt; gesture: Gesture } | null;
+    ask?: () => { at: Pt | null; gesture: Gesture; from: Depth } | null;
     part?: string | null;
     onparts?: (parts: Record<string, string[]>) => void;
     onboxes?: (boxes: Boxes) => void;
     outlined?: string | null;
     onhover?: (id: string | null) => void;
     ondragout?: ((out: ElementOut, phase: DragPhase) => void) | null;
+    onhostdrag?: HostDrag | null;
+    onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
+    edittext?: ((selector: string, at: { x: number; y: number } | null, oninput: (text: string) => void) => Promise<string | null>) | null;
   } = $props();
 
   const shared = selectionView()!;
@@ -65,7 +73,8 @@
   };
 
   const chrome = $derived(clipChrome(part));
-  type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; pointer: number };
+  type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; start: ClientPt; pointer: number };
+  type ClientPt = { x: number; y: number };
 
   let host = $state<HTMLDivElement | null>(null);
   let boxes = $state<Boxes>(untrack(() => guessedBoxes(withAutoLayout(doc))));
@@ -82,6 +91,8 @@
   const hoverQuad = $derived(hover && hover !== selected && !hover.includes(PART_SEP) && boxes[hover] ? quadOf(shown, hover, frame, boxes[hover]) : null);
   const hoverPart = $derived(hover && hover.includes(PART_SEP) && hover !== `${selected}${PART_SEP}${part}` ? (boxes[hover] ?? null) : null);
   const anchor = $derived(quad && clip ? anchorOf(shown, clip.id, frame) : null);
+  let altHeld = $state(false);
+  const measured = $derived(altHeld && quad && hoverQuad && !grab ? measureGaps(aabb(quad), aabb(hoverQuad)) : []);
   const outlinedPart = $derived(outlined?.includes(PART_SEP) ? (boxes[outlined] ?? null) : null);
   const outlinedQuad = $derived(outlined && !outlinedPart && boxes[outlined] && findClip(shown, outlined) ? quadOf(shown, outlined, frame, boxes[outlined]) : null);
 
@@ -93,6 +104,9 @@
   const ownParts = $derived(selected ? (split.parts[selected] ?? []) : []);
   const partBox = $derived(part ? (ownParts.find((p) => p.part === part)?.box ?? null) : null);
   let editing = $state<{ part: string; text: string } | null>(null);
+  let inPlace = $state(false);
+  let editTurn = 0;
+  let editAt: { x: number; y: number } | null = null;
   const editBox = $derived(part ? partBox : clip ? (boxes[clip.id] ?? null) : null);
   let partOf = '';
 
@@ -158,7 +172,7 @@
     const { level: next, edit } = drill(from, gesture, probe(p, picked));
     land(next);
     if (edit) {
-      editPart();
+      editPart(next);
     }
     return next;
   }
@@ -176,17 +190,67 @@
 
   let froms: Level[] = [];
 
+  $effect(() => {
+    const el = host;
+    if (!el) {
+      return;
+    }
+    el.addEventListener('dblclick', double);
+    return () => el.removeEventListener('dblclick', double);
+  });
+
   function double(e: MouseEvent) {
+    const [x, y] = local(e as PointerEvent);
+    editAt = { x: x / doc.width, y: y / doc.height };
     step(Gesture.Double, local(e as PointerEvent), froms[0] ?? level());
   }
 
-  function editPart() {
-    const target = part ?? CLIP_TEXT;
+  function editPart(at: Level) {
+    const target = at.part ?? CLIP_TEXT;
+    const clip = at.clip ? findClip(doc, at.clip)?.clip : null;
     if (!clip || editablePart(doc, clip, target) !== PartEdit.Text) {
       return;
     }
-    editing = { part: target, text: partText(clip, target) };
+    const text = partText(clip, target);
+    const point = editAt;
+    editAt = null;
+    if (!edittext) {
+      editing = { part: target, text };
+      return;
+    }
+    const clipId = clip.id;
+    const turn = ++editTurn;
+    inPlace = true;
+    const typedInto = (typed: string) => {
+      if (typed === text) {
+        return;
+      }
+      const result = writePartText(doc, clipId, target, typed);
+      if (result.ok) {
+        onchange(result.doc, 'Edited text on the canvas');
+      }
+    };
+    typing = null;
+    void edittext(textTarget(clipId, target), point, (typed) => (typing = () => typedInto(typed))).then((typed) => {
+      typing = null;
+      if (turn === editTurn) {
+        inPlace = false;
+      }
+      if (typed !== null) {
+        typedInto(typed);
+      }
+    });
   }
+
+  let typing: (() => void) | null = null;
+
+  export function flushTyping() {
+    const pending = typing;
+    typing = null;
+    pending?.();
+  }
+
+  onMount(() => flushTyping);
 
   function commitPart(text: string) {
     const was = editing;
@@ -207,11 +271,24 @@
     const hit = partHit(at) ?? part;
     const actions = clip && hit ? PART_ACTIONS[partKind(doc, clip, hit)] : [];
     if (!hit || !actions.length) {
+      openLayerMenu(e, at);
       return;
     }
     e.preventDefault();
     part = hit;
     menu = { at, part: hit, actions };
+  }
+
+  function openLayerMenu(e: MouseEvent, at: Pt) {
+    const layers = liveStack(at);
+    if (!onmenu || !layers.length) {
+      return;
+    }
+    e.preventDefault();
+    if (!selection.includes(layers[0])) {
+      onselect([layers[0]]);
+    }
+    onmenu({ client: [e.clientX, e.clientY], layers });
   }
 
   function runMenu(action: PartAction) {
@@ -249,14 +326,27 @@
   let pendingPick = pickAt;
   let asking = true;
 
+  export function editClip(clipId: string) {
+    editAt = null;
+    if (!selection.includes(clipId)) {
+      onselect([clipId]);
+    }
+    editPart({ depth: Depth.Clip, clip: clipId, part: null });
+  }
+
+  export function drillAsked(asked: { at: Pt | null; gesture: Gesture; from: Depth }) {
+    editAt = asked.at ? { x: asked.at[0] / doc.width, y: asked.at[1] / doc.height } : null;
+    step(asked.gesture, asked.at, { depth: asked.from, clip: null, part: null });
+  }
+
   function pickPending() {
     if (!Object.keys(boxes).length) {
       return;
     }
     const asked = asking ? ask() : null;
     asking = false;
-    if (asked && !selection.length) {
-      step(asked.gesture, asked.at, levelOf({ open: false, clip: null, part: null }));
+    if (asked && (!selection.length || asked.gesture === Gesture.Double)) {
+      drillAsked(asked);
       return;
     }
     if (!pendingPick) {
@@ -278,6 +368,8 @@
     return () => clearTimeout(later);
   });
 
+  const client = (e: PointerEvent): ClientPt => ({ x: e.clientX, y: e.clientY });
+
   function local(e: PointerEvent): Pt {
     const rect = host!.getBoundingClientRect();
     return [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height];
@@ -295,7 +387,7 @@
       return;
     }
     host!.setPointerCapture(e.pointerId);
-    grab = { grip, handle, clipId, from: local(e), pointer: e.pointerId };
+    grab = { grip, handle, clipId, from: local(e), start: client(e), pointer: e.pointerId };
   }
 
   let lastPress: Pt | null = null;
@@ -344,6 +436,11 @@
       hover = e.pointerType === 'mouse' ? hoverAt(local(e)) : null;
       return;
     }
+    const hosted = hostGesture(grab, e);
+    if (hosted) {
+      onhostdrag!(hosted.move, hosted.to, DragPhase.Over);
+      return;
+    }
     const outside = leaving(e);
     if (outside || out) {
       ondragout?.(outside ?? { clipId: grab.clipId, client: { x: e.clientX, y: e.clientY }, box: null }, outside ? DragPhase.Over : DragPhase.Back);
@@ -368,15 +465,36 @@
     onpreview(result.doc);
   }
 
+  const HOST_GRIPS = new Set<Grip>([Grip.Move, Grip.Scale, Grip.Rotate]);
+  const STILL = { dx: 0, dy: 0, dw: 0, dh: 0 };
+
+  function hostGesture(g: Grab | null, e: PointerEvent | null): { move: HostMove; to: ClientPt } | null {
+    if (!onhostdrag || !g || !HOST_GRIPS.has(g.grip)) {
+      return null;
+    }
+    const to = e ? client(e) : g.start;
+    if (g.grip === Grip.Rotate) {
+      const rect = host!.getBoundingClientRect();
+      return { move: { ...STILL, turn: hostTurn({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, g.start, to) }, to };
+    }
+    const unit = g.grip === Grip.Scale && quad ? handlesOf(quad)[g.handle].unit : null;
+    return { move: { ...hostShift(unit, g.start, to), turn: 0 }, to };
+  }
+
   function end(e: PointerEvent | null) {
     const done = live;
     const grip = grab?.grip;
+    const hosting = hostGesture(grab, e);
     const reordered = done && grip === Grip.Move && grab && e ? reorderAt(doc, grab.clipId, local(e)) : null;
     const outside = grab && e ? leaving(e) : null;
     out = false;
     grab = null;
     live = null;
     onpreview(null);
+    if (hosting) {
+      onhostdrag!(hosting.move, hosting.to, DragPhase.Drop);
+      return;
+    }
     if (outside) {
       ondragout?.(outside, DragPhase.Drop);
       return;
@@ -401,12 +519,17 @@
   }
 </script>
 
-<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={double} oncontextmenu={openMenu} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
+<svelte:window onkeydown={(e) => (altHeld = e.altKey)} onkeyup={(e) => (altHeld = e.altKey)} onblur={() => (altHeld = false)} />
+
+<div class="overlay" class:typing={inPlace} bind:this={host} data-testid="selection-overlay" role="presentation" oncontextmenu={openMenu} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} data-testid="hover-box" />{/if}
     {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}
     {#if quad}<polygon class="box" class:passive={!chrome.handles} points={points(quad)} data-testid="selection-box" data-ring={chrome.ring} />{/if}
     {#each live?.gaps ?? [] as g (g.axis + g.from + g.to)}
+      {#if g.axis === 'x'}<line class="gap" x1={g.from} y1={g.at} x2={g.to} y2={g.at} />{:else}<line class="gap" x1={g.at} y1={g.from} x2={g.at} y2={g.to} />{/if}
+    {/each}
+    {#each measured as g (g.axis + g.from + g.to + g.at)}
       {#if g.axis === 'x'}<line class="gap" x1={g.from} y1={g.at} x2={g.to} y2={g.at} />{:else}<line class="gap" x1={g.at} y1={g.from} x2={g.at} y2={g.to} />{/if}
     {/each}
     {#each live?.guides ?? [] as g (g.axis + g.at)}
@@ -415,6 +538,9 @@
   </svg>
   {#each live?.gaps ?? [] as g (g.axis + g.from + g.to)}
     <span class="gap-label" data-testid="gap-label" style={pct(g.axis === 'x' ? [(g.from + g.to) / 2, g.at] : [g.at, (g.from + g.to) / 2])}>{Math.round(g.to - g.from)}</span>
+  {/each}
+  {#each measured as g (g.axis + g.from + g.to + g.at)}
+    <span class="gap-label" data-testid="measure-label" style={pct(g.axis === 'x' ? [(g.from + g.to) / 2, g.at] : [g.at, (g.from + g.to) / 2])}>{Math.round(g.to - g.from)}</span>
   {/each}
   {#if hoverPart && !grab}
     <div class="outlined-part hover-part" data-testid="hover-part" style={boxStyle(hoverPart)}></div>
@@ -430,7 +556,7 @@
     {#each handles as h, i (i)}
       <button type="button" class="target scale" aria-label="Scale" data-handle={i} style={pct(h.at)} onpointerdown={(e) => begin(e, Grip.Scale, i, clip.id)}><span></span></button>
     {/each}
-    {#if anchor && chrome.handles}
+    {#if anchor && chrome.handles && !onhostdrag}
       <button type="button" class="target anchor" aria-label="Anchor point" data-testid="selection-anchor" style={pct(anchor)} onpointerdown={(e) => begin(e, Grip.Anchor, 0, clip.id)}><span></span></button>
     {/if}
     {#if partBox && part}
@@ -472,6 +598,10 @@
 </div>
 
 <style>
+  .overlay.typing {
+    pointer-events: none;
+  }
+
   .overlay {
     position: absolute;
     inset: 0;

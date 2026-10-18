@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { localStore } from '$lib/browser-storage';
   import { painted } from '$lib/canvas/paint-wait';
   import { frameDocs } from '$lib/canvas/frame-docs.svelte';
-  import { FrameKind, freshText, openingSelection } from '$lib/canvas/motion-node';
+  import { FrameKind, frameChrome, freshText, openingSelection } from '$lib/canvas/motion-node';
   import { DRAWN_TEXT } from '$lib/motion/draw-create';
   import { groupClips, ungroupClip } from '$lib/motion/group';
   import { onMount, tick, untrack } from 'svelte';
@@ -10,9 +11,14 @@
   import { deserialize } from '$app/forms';
   import { replaceState } from '$app/navigation';
   import { page } from '$app/state';
+  import { RenderEngine, engineFlag } from '$lib/motion/gpu/engine-flag';
+  import { engineKilled } from '$lib/motion/gpu/kill';
+  import { CaptureProfile } from '$lib/motion/export/capture-profile';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { headMoved, watchMotionNode } from '$lib/realtime/motion-channel';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
+  import { canvasMediaUploader } from '$lib/canvas/media-uploader';
+  import type { MediaUploader } from './media-upload';
   import { registerUpload } from '$lib/motion/fonts/ops';
   import Plus from '@lucide/svelte/icons/plus';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
@@ -67,11 +73,21 @@
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
   import CornerOverlay from '$lib/components/motion/CornerOverlay.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
-  import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
+  import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes, tidySpace } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
+  import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import { Flip, flipClips } from '$lib/motion/layer-props';
+  import { matchingLayers } from '$lib/motion/select-matching';
+  import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
+  import { Copied, elementClipboard } from '$lib/canvas/element-clipboard.svelte';
+  import { Direction as SiblingDirection, layerOrder, siblingOf } from '$lib/motion/siblings';
+  import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
+  import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
+  import { FRAME_MENU_IDS, frameLayers, frameMenuRun, frameSummaries, type FrameLayer } from '$lib/motion/frame-menu';
+  import type { SelectionActionId } from '$lib/canvas/selection-actions';
   import { Gesture } from '$lib/motion/drill';
-  import { frameDrill } from '$lib/canvas/frame-drill';
+  import { frameDrill, type DrillAsk } from '$lib/canvas/frame-drill';
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
   import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
@@ -80,7 +96,7 @@
   import { Align, addMarker, alignClips, allMarkers, clipName, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import StillExport from '$lib/components/motion/StillExport.svelte';
-  import { animateStill, DocMode, docMode, stillFrame } from '$lib/motion/still';
+  import { animateStill, controlShown, DocMode, docMode, stillFrame, VideoControl } from '$lib/motion/still';
   import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
   import { Liveness, interactiveOf } from '$lib/motion/interactive/settings';
   import { defaultsOf, type VarValues } from '$lib/motion/interactive/var-model';
@@ -92,6 +108,8 @@
   import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
   import { carryEdits, insertTemplate, isLockedComp, type Inserted, type Instance, type TemplateEntry } from '$lib/motion/template/library';
+  import IconMenu from './IconMenu.svelte';
+  import { addIcon } from '$lib/motion/icons/icons';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
@@ -116,8 +134,8 @@
     type KeyRef,
     type OpResult
   } from '$lib/motion/timeline';
-  import { DragPhase, UndoRoute, type CanvasUndo, type ElementOut, type MoveOut } from '$lib/canvas/canvas-drop';
-  import { liftElement } from '$lib/motion/move-element';
+  import { DragPhase, UndoRoute, type CanvasUndo, type ElementOut, type HostDrag, type MoveOut } from '$lib/canvas/canvas-drop';
+  import { copyElements, liftElement, pasteElements } from '$lib/motion/move-element';
   import { adoptHead, amend, canRedo, canUndo, followHead, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
   import { landed, outgoing, remote, type Synced } from '$lib/motion/frame-sync';
   import { Reveal, Snap, clampZoom } from '$lib/motion/timeline-view';
@@ -151,7 +169,7 @@
   import { frameHover } from '$lib/canvas/layers';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
-  import { EDIT_MODE_KEY, EditMode, nextMode, readMode } from '$lib/motion/edit-mode';
+  import { EDIT_MODE_KEY, EditMode, nextMode, startMode } from '$lib/motion/edit-mode';
   import DrawOverlay from './DrawOverlay.svelte';
   import DrawTools from './DrawTools.svelte';
   import { PART_SEP, PartAction, runPart } from '$lib/motion/poster-parts';
@@ -164,7 +182,7 @@
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 
-  const SAVE_DEBOUNCE_MS = 700;
+  const SAVE_DEBOUNCE_MS = 250;
   const CHECK_WIDTH = 480;
   const CHECK_DEBOUNCE_MS = 900;
   const COALESCE_MS = 800;
@@ -180,7 +198,7 @@
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
-  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
+  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, onhostdrag = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
   const rules = $derived(MOUNT[mount]);
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
@@ -210,6 +228,14 @@
   let notice = $state('');
   const supabase = createSupabaseBrowserClient();
   const UPLOAD_WEIGHT = 400;
+  const uploadToProject = canvasMediaUploader(supabase, { orgId: data.orgId, projectId: data.projectId, canvasId: data.canvas.id });
+  const uploadMedia: MediaUploader = async (file, progress) => {
+    const outcome = await uploadToProject(file, progress);
+    if (outcome.ok) {
+      madeAssets = [{ seconds: null, width: null, height: null, ...outcome.asset, url: outcome.asset.url ?? null } as unknown as MotionEditorData['assets'][number], ...madeAssets];
+    }
+    return outcome;
+  };
   let adding = $state(false);
   let exporting = $state(false);
   let templating = $state(false);
@@ -262,16 +288,13 @@
   let pressAt: { x: number; y: number } | null = null;
   let pressedMenu: unknown = null;
 
-  function browserStore(): LayoutStore | null {
-    try {
-      return localStorage;
-    } catch {
-      return null;
+  let editMode = $state(startMode(history.present, localStore()?.getItem(EDIT_MODE_KEY) ?? null));
+
+  $effect(() => {
+    if (rules.tools === ToolsPlace.CanvasBar) {
+      frameBar.editMode = editMode;
     }
-  }
-
-  let editMode = $state(timelineFits(history.present) ? readMode(browserStore()?.getItem(EDIT_MODE_KEY) ?? null) : EditMode.Design);
-
+  });
   const unanimated = $derived(editMode === EditMode.Motion && doc.tracks.every((t) => t.clips.every((c) => !Object.keys(c.keyframes).length)));
 
   function setMode(next: EditMode) {
@@ -280,7 +303,7 @@
     }
     editMode = next;
     try {
-      browserStore()?.setItem(EDIT_MODE_KEY, next);
+      localStore()?.setItem(EDIT_MODE_KEY, next);
     } catch {
       return;
     }
@@ -326,6 +349,7 @@
   const dockOf = (part: Part) => ({ [DOCK_ATTR]: PART_DOCK[viewport][part] });
   const stageHost = $derived(rules.stage === Stage.Node ? inlineStage.of(data.node.id) : undefined);
   const stageShown = $derived(rules.stage === Stage.Node ? nodeLayers(NodeMode.Edit, inlineStage.paintOf(data.node.id)).editor : true);
+  const stageTakesPointer = $derived(stageShown && inlineStage.leaving !== data.node.id);
 
   const PANELS_LATE_MS = 4000;
   let panelsLate = $state(false);
@@ -353,7 +377,7 @@
     if (at !== null) {
       seekTo(at);
     }
-    layout = readLayout(browserStore(), firstLayout());
+    layout = readLayout(localStore(), firstLayout());
     if (selection.length) {
       relayout({ side: Side.Properties, inspector: Panel.Open });
     }
@@ -378,7 +402,7 @@
 
   function relayout(next: Partial<EditorLayout>) {
     layout = { ...layout, ...next };
-    writeLayout(browserStore(), layout);
+    writeLayout(localStore(), layout);
   }
 
   function startResize(e: PointerEvent) {
@@ -443,6 +467,7 @@
   let unsavedSummary = '';
 
   onMount(() => () => {
+    overlay?.flushTyping();
     if (saveTimer && saveState === SaveState.Pending) {
       clearTimeout(saveTimer);
       void save();
@@ -670,6 +695,7 @@
 
     if (result.type === 'success') {
       frameDocs.landed(data.node.id, version, Number(result.data?.version));
+      presence?.landed({ nodeId: data.node.id, version: Number(result.data?.version), doc: result.data?.doc });
       follow(landed({ version, doc: baseDoc }, sent, history.present, { version: Number(result.data?.version), doc: result.data?.doc as MotionDoc }));
       saveState = SaveState.Saved;
     } else {
@@ -744,6 +770,12 @@
   }
 
   let missedRemote = false;
+
+  $effect(() => presence?.onHead((head) => {
+    if (head.nodeId === data.node.id) {
+      takeRemote({ version: head.version, doc: head.doc as MotionDoc });
+    }
+  }));
 
   function takeRemote(head: SavedHead | null): boolean {
     if (saving) {
@@ -917,7 +949,7 @@
 
   const newId = () => crypto.randomUUID().slice(0, 8);
 
-  const timelineHidden = $derived(layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design);
+  const timelineHidden = $derived(layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline));
   $effect(() => (rules.tools === ToolsPlace.CanvasBar ? frameBar.attach({ act: (action) => FRAME_ACTS[action]() }) : undefined));
   let timelineShownPx = $state(0);
   let timelineEl = $state<HTMLElement | null>(null);
@@ -954,6 +986,14 @@
 
   const DRAWN_SETTLE_FRAMES = 4;
 
+  $effect(() => {
+    const id = typeInto;
+    if (id && overlay) {
+      typeInto = null;
+      overlay.editClip(id);
+    }
+  });
+
   async function drawn(id: string) {
     selection = [id];
     typeInto = findClip(history.present, id)?.clip.component === DRAWN_TEXT ? id : null;
@@ -971,6 +1011,16 @@
     adding = false;
     const id = newId();
     apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame }, id), `Added ${COMPONENTS[component].label}`);
+    selection = [id];
+  }
+
+  const ICON_SIZE = 0.12;
+  const ICON_COLOR = '#ffffff';
+
+  function addIconOf(name: string) {
+    adding = false;
+    const id = newId();
+    apply(addIcon(doc, { name, x: 0.5, y: 0.5, size: ICON_SIZE, color: ICON_COLOR, from: frame }, id), `Added the ${name} icon`);
     selection = [id];
   }
 
@@ -1173,7 +1223,7 @@
     clipOp(ClipOp.Delete);
   }
 
-  type Revision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
+  type Revision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number; name: string | null };
   let revisionsOpen = $state(false);
   let revisions = $state<Revision[]>([]);
 
@@ -1187,8 +1237,21 @@
     if (!revisionsOpen) {
       return;
     }
+    await loadRevisions();
+  }
+
+  async function loadRevisions() {
     const result = await editorAction('revisions');
     revisions = result.type === 'success' ? ((result.data?.revisions as Revision[]) ?? []) : [];
+  }
+
+  async function nameCurrent(name: string) {
+    const form = new FormData();
+    form.set('version', String(version));
+    form.set('name', name);
+    const result = await editorAction('nameVersion', form);
+    notice = result.type === 'success' ? '' : 'The version could not be named: reload and try again.';
+    await loadRevisions();
   }
 
   async function restoreTo(target: number) {
@@ -1262,10 +1325,22 @@
   function copyKeys() {
     if (keySelection.length) {
       keyBoard = copyKeyframes(doc, keySelection);
+      elementClipboard.copyKeyframes();
+      return;
+    }
+    if (selection.length) {
+      elementClipboard.copyElements(data.node.id, [...selection], copyElements(doc, selection));
     }
   }
 
   function pasteKeys() {
+    const copied = elementClipboard.elements;
+    if (elementClipboard.kind === Copied.Elements && copied) {
+      const pasted = pasteElements(doc, copied.elements, newId);
+      apply(pasted, 'Pasted elements');
+      selection = pasted.ok ? pasted.ids : selection;
+      return;
+    }
     const target = selected;
     if (!target || !keyBoard.length) {
       return;
@@ -1283,6 +1358,13 @@
       return Promise.reject(new Error('the preview is still loading'));
     }
     return preview.render(...args);
+  }
+
+  function htmlExportFrames(...[times, size, onFrame, signal]: Parameters<MotionPreview['render']>) {
+    if (!preview) {
+      return Promise.reject(new Error('the preview is still loading'));
+    }
+    return preview.render(times, size, onFrame, signal, html, CaptureProfile.Fast, RenderEngine.Html);
   }
 
   const NUDGE_MORE = 10;
@@ -1336,7 +1418,42 @@
   const NUDGE_PX = 1;
   const NUDGE_MORE_PX = 10;
   const spaceBoxes = () => ({ ...propBoxes(doc), ...stageBoxes });
+
+  let layerMenu = $state<{ at: { x: number; y: number }; layers: FrameLayer[] } | null>(null);
+
+  function runLayerMenu(id: SelectionActionId) {
+    const run = frameMenuRun(id);
+    if (!run) {
+      return;
+    }
+    if ('edge' in run) {
+      alignTo(run.edge);
+      return;
+    }
+    if ('arrange' in run) {
+      arrangeTo(run.arrange);
+      return;
+    }
+    COMMANDS[run.command]();
+  }
+
+  function zoomToSelection() {
+    const boxes = spaceBoxes();
+    const around = boxAround(selection.flatMap((id) => (boxes[id] ? [boxes[id]] : [])));
+    if (around) {
+      zoomStage?.toBox(around);
+    }
+  }
   const nudgeBy = (dx: number, dy: number) => selection.length && apply(moveBy(doc, selection, frame, [dx, dy], editMode), 'Moved with the arrows');
+  const arrangeTo = (to: Arrange) => apply(arrangeLayers(doc, selection, to, newId), `Arranged ${to}`);
+  function combine(op: BooleanOp) {
+    const result = combineShapes(doc, selection, op, frame);
+    apply(result, `Combined shapes: ${op}`);
+    if (result.ok) {
+      selection = selection.filter((id) => findClip(result.doc, id));
+    }
+  }
+
   const alignTo = (edge: Edge) => apply(alignSpace(doc, selection, frame, spaceBoxes(), edge, editMode), `Aligned ${edge}`);
   const distribute = (axis: Axis) => apply(distributeSpace(doc, selection, frame, spaceBoxes(), axis, editMode), `Distributed along ${axis}`);
 
@@ -1371,7 +1488,7 @@
   const toggleInspector = () => relayout(docked ? toggleSide(layout, Side.Properties) : { inspector: flip(layout.inspector) });
 
   const COMMANDS: Record<Command, () => void> = {
-    [Command.TogglePlay]: () => (playing = !playing),
+    [Command.TogglePlay]: () => (playing = controlShown(doc, VideoControl.Playback) && !playing),
     [Command.ToolSelect]: () => (frameBar.tool = DrawTool.Select),
     [Command.ToolText]: () => (frameBar.tool = DrawTool.Text),
     [Command.ToolRectangle]: () => (frameBar.tool = DrawTool.Rectangle),
@@ -1391,7 +1508,7 @@
     [Command.Duplicate]: duplicate,
     [Command.Undo]: undoEdit,
     [Command.Redo]: redoEdit,
-    [Command.Play]: () => (playing = true),
+    [Command.Play]: () => (playing = controlShown(doc, VideoControl.Playback)),
     [Command.Pause]: () => (playing = false),
     [Command.Rewind]: () => step(-doc.fps),
     [Command.GoStart]: () => seekTo(0),
@@ -1406,9 +1523,13 @@
     [Command.PreviewZoomOut]: () => zoomStage?.zoomOut(),
     [Command.PreviewFit]: () => zoomStage?.fit(),
     [Command.PreviewActual]: () => zoomStage?.actual(),
+    [Command.PreviewSelection]: () => zoomToSelection(),
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
+    [Command.SelectMatching]: () => (selection = matchingLayers(doc, selection)),
     [Command.SelectChild]: () => overlay?.key(Gesture.Enter),
     [Command.SelectParent]: selectParent,
+    [Command.SelectNext]: () => selectSibling(SiblingDirection.Next),
+    [Command.SelectPrevious]: () => selectSibling(SiblingDirection.Previous),
     [Command.Deselect]: () => {
       if (overlay?.key(Gesture.Leave)) {
         return;
@@ -1446,7 +1567,24 @@
     [Command.Ungroup]: ungroupSelection,
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
-    [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask')
+    [Command.BringForward]: () => arrangeTo(Arrange.Forward),
+    [Command.SendBackward]: () => arrangeTo(Arrange.Backward),
+    [Command.BringToFront]: () => arrangeTo(Arrange.Front),
+    [Command.SendToBack]: () => arrangeTo(Arrange.Back),
+    [Command.Union]: () => combine(BooleanOp.Union),
+    [Command.Subtract]: () => combine(BooleanOp.Subtract),
+    [Command.Intersect]: () => combine(BooleanOp.Intersect),
+    [Command.Exclude]: () => combine(BooleanOp.Exclude),
+    [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask'),
+    [Command.AlignLeft]: () => selection.length && alignTo(Edge.Left),
+    [Command.AlignCenter]: () => selection.length && alignTo(Edge.Center),
+    [Command.AlignRight]: () => selection.length && alignTo(Edge.Right),
+    [Command.AlignTop]: () => selection.length && alignTo(Edge.Top),
+    [Command.AlignMiddle]: () => selection.length && alignTo(Edge.Middle),
+    [Command.AlignBottom]: () => selection.length && alignTo(Edge.Bottom),
+    [Command.TidyUp]: () => selection.length > 1 && apply(tidySpace(doc, selection, frame, spaceBoxes(), editMode), 'Tidied up'),
+    [Command.FlipHorizontal]: () => selection.length && apply(flipClips(doc, selection, Flip.Horizontal), 'Flipped horizontally'),
+    [Command.FlipVertical]: () => selection.length && apply(flipClips(doc, selection, Flip.Vertical), 'Flipped vertically')
   };
 
   const TOOL_RUN: Partial<Record<ActionId, () => void>> = {
@@ -1458,7 +1596,7 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.Union, Action.SelectMatching, Action.BringForward, Action.SendBackward, Action.BringToFront, Action.SendToBack, Action.Subtract, Action.Intersect, Action.Exclude, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
@@ -1547,9 +1685,20 @@
   let caughtAt = $state<[number, number] | null>(null);
   let overlay = $state<ReturnType<typeof SelectionOverlay> | null>(null);
 
+  const inFrame = (asked: DrillAsk) => ({ at: asked.at ? ([asked.at.x * doc.width, asked.at.y * doc.height] as [number, number]) : null, gesture: asked.gesture, from: asked.from });
+
+  $effect(() => frameDrill.listen(data.node.id, (asked) => overlay?.drillAsked(inFrame(asked))));
+
   function askedDrill() {
-    const asked = frameDrill.take(data.node.id);
-    return asked ? { at: [asked.at.x * doc.width, asked.at.y * doc.height] as [number, number], gesture: asked.gesture } : null;
+    const asked = frameDrill.take(data.node.id, (late) => overlay?.drillAsked(inFrame(late)));
+    return asked ? inFrame(asked) : null;
+  }
+
+  function selectSibling(direction: SiblingDirection) {
+    const next = siblingOf(layerOrder(doc), selection, direction);
+    if (next) {
+      selection = [next];
+    }
   }
 
   function selectParent() {
@@ -1633,13 +1782,16 @@
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
       <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
       <span class="save-dot" data-tone={SAVE_TONE[saveState]} role="status" aria-label={`${saveState} · v${version}`}></span>
+      {#if controlShown(doc, VideoControl.EditMode)}
       <div class="mode-switch" role="radiogroup" aria-label="Edit mode" data-testid="edit-mode" title="Design edits the base, Motion keys at the playhead (E)">
         {#each [EditMode.Design, EditMode.Motion] as m (m)}
           <button type="button" role="radio" aria-checked={editMode === m} class:on={editMode === m} data-mode={m} onclick={() => setMode(m)}>{m === EditMode.Design ? 'Design' : 'Motion'}</button>
         {/each}
       </div>
+      {/if}
     </div>
 
+    {#if controlShown(doc, VideoControl.Transport)}
     <div class="group transport" bind:this={transportEl} {...dockOf(Part.Transport)} role="group" aria-label="Transport">
       <IconButton action={Action.GoStart} onclick={COMMANDS[Command.GoStart]} />
       <IconButton action={Action.StepBack} class="step" onclick={COMMANDS[Command.StepBack]} />
@@ -1660,6 +1812,7 @@
         {/if}
       </div>
     </div>
+    {/if}
 
     <div class="group trail" {...dockOf(Part.Bar)} data-testid="bar-trail">
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
@@ -1668,8 +1821,9 @@
         <button type="button" class="clock" aria-haspopup="menu" aria-expanded={revisionsOpen} aria-label="Version history" title="Version history" disabled={agent === Agent.Working} data-testid="revisions-open" onclick={() => void toggleRevisions()}><HistoryIcon size={16} /></button>
         {#if revisionsOpen}
           <div class="menu more" role="menu" data-testid="revisions">
+            <input class="version-name" aria-label="Name the current version" placeholder="Name the current version" data-testid="version-name" onkeydown={(e) => e.key === 'Enter' && void nameCurrent(e.currentTarget.value)} />
             {#each revisions as r (r.version)}
-              <button type="button" role="menuitem" disabled={r.version === version} onclick={() => void restoreTo(r.version)}><span>v{r.version} · {r.actorKind === 'agent' ? 'Agent' : 'You'} · {r.clips} clips</span><kbd>{r.version === version ? 'Current' : 'Restore'}</kbd></button>
+              <button type="button" role="menuitem" disabled={r.version === version} onclick={() => void restoreTo(r.version)}><span>{r.name ? `${r.name} · v${r.version}` : `v${r.version}`} · {r.actorKind === 'agent' ? 'Agent' : 'You'} · {r.clips} clips</span><kbd>{r.version === version ? 'Current' : 'Restore'}</kbd></button>
             {:else}
               <span class="empty">No saved versions yet</span>
             {/each}
@@ -1765,6 +1919,7 @@
       {editorUrl}
       fileName={data.node.name ?? 'motion'}
       render={exportFrames}
+      fallbackRender={htmlExportFrames}
       tokens={data.tokens}
       {analyses}
       server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}` }}
@@ -1790,7 +1945,7 @@
   {/if}
 
   {#if componentsOpen}
-    <ComponentLibrary items={components} format={starterFormatOf(doc)} draftOf={componentDraft} compose={composeDraft} {assets} onpick={insertComponent} onclose={() => (componentsOpen = false)} />
+    <ComponentLibrary items={components} format={starterFormatOf(doc)} draftOf={componentDraft} compose={composeDraft} {assets} upload={uploadMedia} onpick={insertComponent} onclose={() => (componentsOpen = false)} />
   {/if}
 
   {#if templating}
@@ -1811,13 +1966,14 @@
     />
   {/if}
 
-  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
-    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
+  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
+    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
-      <MotionPreview bind:this={preview} bind:redraws {html} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
+      <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
-        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
+        {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={findClip(withAutoLayout(doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
@@ -1860,12 +2016,12 @@
         <CameraInspector {doc} {frame} onchange={edit} />
         <LookInspector {doc} onchange={edit} />
       {:else if selected?.component === 'Precomp' && isLockedComp(doc, String(selected.props.comp))}
-        <TemplateInspector {doc} clip={selected} {assets} onchange={edit} />
+        <TemplateInspector {doc} clip={selected} {assets} upload={uploadMedia} onchange={edit} />
       {:else if selected}
-        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
+        {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} upload={uploadMedia} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
-        {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
-        <MotionInspector {typeInto} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
+        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
@@ -1874,7 +2030,7 @@
         <MultiInspector {doc} ids={selection} {frame} mode={editMode} onchange={edit} />
       {:else}
         <header class="frame-head" data-testid="selection-head"><FamilyIcon /><span>Frame</span></header>
-        <DocFields {doc} {assets} onchange={edit} />
+        <DocFields {doc} {assets} upload={uploadMedia} onchange={edit} />
         <div class="composition" data-testid="composition-inspector">
           <header class="composition-head"><span>Frame</span></header>
           <CompositionSettings {doc} onchange={apply} />
@@ -1891,7 +2047,7 @@
     {/snippet}
     </SideColumn>
 
-    <section class="timeline-area" bind:this={timelineEl} bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
+    <section class="timeline-area" class:gone={!controlShown(doc, VideoControl.Timeline)} bind:this={timelineEl} bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
 
       {#if unanimated}<p class="animate-hint" data-testid="animate-hint">Animate this frame — add keyframes at the playhead</p>{/if}
@@ -1928,6 +2084,7 @@
                 <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Visual)}>Video track</button>
                 <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Audio)}>Audio track</button>
               </div>
+              <IconMenu onpick={addIconOf} />
             </div>
           {/if}
         </div>
@@ -2495,8 +2652,7 @@
     flex-direction: column;
   }
 
-  [data-mode='still'] .transport,
-  [data-mode='still'] .timeline-area {
+  .timeline-area.gone {
     display: none;
   }
 
@@ -2641,6 +2797,16 @@
     left: auto;
     right: 0;
     grid-template-columns: 220px;
+  }
+
+  .version-name {
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    border: 1px solid var(--ui-divider, #e3e3e6);
+    background: transparent;
+    color: inherit;
   }
 
   .menu.more button {

@@ -36,7 +36,7 @@ test.describe('the first press on the editor preview @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await page.getByTestId('motion-node-stage').click({ position: { x: 60, y: 10 } });
     await expect(page.getByTestId('selection-overlay')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId('motion-preview').locator('hyperframes-player')).toBeAttached();
+    await expect(page.getByTestId('motion-preview').locator('hyperframes-player').first()).toBeAttached();
     await page.waitForTimeout(1500);
   });
 

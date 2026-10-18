@@ -1,14 +1,7 @@
+import { sessionStore } from '$lib/browser-storage';
 const PREFIX = 'feega:chat-draft:';
 
-function tabStorage(): Storage | null {
-  try {
-    return globalThis.sessionStorage ?? null;
-  } catch {
-    return null;
-  }
-}
-
-export function keptDraft(endpoint: string, store: Storage | null = tabStorage()): string {
+export function keptDraft(endpoint: string, store: Storage | null = sessionStore()): string {
   try {
     return store?.getItem(PREFIX + endpoint) ?? '';
   } catch {
@@ -16,7 +9,7 @@ export function keptDraft(endpoint: string, store: Storage | null = tabStorage()
   }
 }
 
-export function keepDraft(endpoint: string, text: string, store: Storage | null = tabStorage()) {
+export function keepDraft(endpoint: string, text: string, store: Storage | null = sessionStore()) {
   try {
     if (text) {
       store?.setItem(PREFIX + endpoint, text);

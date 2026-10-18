@@ -68,6 +68,7 @@ test.describe('on a phone the bottom controls never cover each other @real', () 
         await page.screenshot({ path: `${SHOTS}/mobile-${process.env.DS_TAG ?? 'after'}-canvas-${phone.name}.png` });
       }
       await expectStackClear(page, page.getByTestId('mobile-view-switch'));
+      await page.getByTestId('add-bar').getByTestId('bar-mode').getByRole('radio', { name: 'Design' }).click();
       const draw = page.getByTestId('draw-tools');
       await draw.locator('.pick.on').click();
       const rectangle = draw.locator('[data-tool="rectangle"]');
@@ -79,9 +80,8 @@ test.describe('on a phone the bottom controls never cover each other @real', () 
       await page.getByTestId('open-motion-editor').click();
       await expect(page.getByTestId('add-bar')).toHaveAttribute('data-context', 'frame', { timeout: 15_000 });
       const timeline = page.locator('section[aria-label="Timeline"]');
-      await expect
-        .poll(async () => (await boxOf(timeline)).y - ((await boxOf(page.getByTestId('add-bar'))).y + (await boxOf(page.getByTestId('add-bar'))).height), { timeout: 5_000, message: 'the bar settles right above the timeline' })
-        .toBeGreaterThanOrEqual(0);
+      await expect(timeline, 'Motion shows the timeline').not.toHaveAttribute('inert', '');
+      await expect(page.getByTestId('add-bar'), 'and stows the bar, so the two never stack').toHaveAttribute('inert', '');
       if (SHOTS) {
         await page.screenshot({ path: `${SHOTS}/mobile-${process.env.DS_TAG ?? 'after'}-frame-${phone.name}.png` });
       }
@@ -90,7 +90,19 @@ test.describe('on a phone the bottom controls never cover each other @real', () 
       expect(lead.x, 'Design is on screen, not pushed past the left edge').toBeGreaterThanOrEqual(0);
       const close = (await page.getByTestId('inline-close').boundingBox())!;
       expect(close.x + close.width, 'closing the frame is always one tap away').toBeLessThanOrEqual(phone.width);
-      await expectStackClear(page, page.locator('section[aria-label="Timeline"]'));
+      await page.getByTestId('editor-bar').locator('[data-mode="design"]').click();
+      await expect(page.getByTestId('editor-bar').locator('[data-mode="design"]')).toHaveAttribute('aria-checked', 'true');
+      await page.waitForTimeout(800);
+      const bar = page.getByTestId('add-bar');
+      await expect(bar, 'Design brings the bar back').not.toHaveAttribute('inert', '');
+      await expect(timeline, 'and hides the timeline').toHaveAttribute('inert', '');
+      const shown = await boxOf(bar);
+      if (SHOTS) {
+        await page.screenshot({ path: `${SHOTS}/mobile-after-frame-design-${phone.name}.png` });
+      }
+      console.log('SHOWN', JSON.stringify(shown));
+      expect(shown.y + shown.height, 'the bar is on screen').toBeLessThanOrEqual(phone.height);
+      expect(shown.x + shown.width).toBeLessThanOrEqual(phone.width);
     });
   }
 });

@@ -6,8 +6,6 @@ import { syncBrandAccounts, disconnectAccount } from '$lib/server/zernio';
 import { canAffordSeat } from '$lib/server/social-connections';
 import { rungFor } from '$lib/credit-ladder';
 import { generateApiKey } from '$lib/server/cli-auth';
-import { sendEmail, brandInviteEmailSubject, brandInviteEmailHtml, brandInviteEmailText } from '$lib/server/email';
-import { emailLocale } from '$lib/server/email-i18n';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { RequestEvent } from '@sveltejs/kit';
 import { invalidateBrandNav } from '$lib/server/nav-cache';
@@ -306,70 +304,6 @@ export async function disconnect(event: Ev) {
   await supabase.from('social_accounts').delete().eq('id', acc.id).eq('brand_id', brand.id);
   invalidateBrandNav(brand.slug);
   return { disconnected: true };
-}
-
-export async function invite(event: Ev) {
-  const { request, url, cookies, locals: { supabase } } = event;
-  const fd = await request.formData();
-  const email = String(fd.get('email') ?? '').trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(400, { teamError: 'Invalid email' });
-
-  const scope = await scopeOf(event);
-  if (!scope) return fail(404, { teamError: 'Project not found' });
-
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-  if (!user) return fail(401, { teamError: 'Not authenticated' });
-  if (email === user.email?.toLowerCase()) return fail(400, { teamError: 'That’s you' });
-
-  const { createInvite } = await import('$lib/server/repos/invites');
-  let token: string;
-  try {
-    ({ token } = await createInvite(supabase, {
-      orgId: scope.orgId,
-      email,
-      role: 'member',
-      invitedBy: user.id
-    }));
-  } catch (e) {
-    const code = (e as { code?: string } | null)?.code;
-    const message = e instanceof Error ? e.message : 'Could not create the invite';
-    return fail(400, { teamError: code === '23505' ? 'Already invited' : message });
-  }
-
-  let emailSent = true;
-  try {
-    const locale = emailLocale(cookies.get('locale'));
-    const inviter = user.email ?? 'A teammate';
-    const teamName = scope.brand?.name ?? 'feega';
-    const acceptUrl = `${url.origin}/login?invite_token=${encodeURIComponent(token)}`;
-    await sendEmail({
-      to: email,
-      subject: brandInviteEmailSubject(locale, teamName, inviter),
-      html: brandInviteEmailHtml(locale, teamName, inviter, email, acceptUrl, url.origin),
-      text: brandInviteEmailText(locale, teamName, inviter, email, acceptUrl)
-    });
-  } catch {
-    emailSent = false;
-  }
-  return { teamInvited: true, emailSent };
-}
-
-export async function revokeInvite(event: Ev) {
-  const id = String((await event.request.formData()).get('invite_id') ?? '');
-  if (!id) return fail(400, { teamError: 'Missing invite' });
-
-  const scope = await scopeOf(event);
-  if (!scope) return fail(404, { teamError: 'Project not found' });
-
-  const { revokeInvite: revokeInviteRepo } = await import('$lib/server/repos/invites');
-  try {
-    await revokeInviteRepo(event.locals.supabase, { orgId: scope.orgId, inviteId: id });
-  } catch (e) {
-    return fail(500, { teamError: e instanceof Error ? e.message : 'Could not revoke the invite' });
-  }
-  return { teamRevoked: true };
 }
 
 export async function createApiKey(event: Ev) {

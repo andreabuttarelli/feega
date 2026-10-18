@@ -7,18 +7,23 @@
   import ColorField from './ColorField.svelte';
   import { Adder } from './stack-adder';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
+  import MediaPicker from './MediaPicker.svelte';
+  import type { MediaUploader } from './media-upload';
+  import { MediaKind, type MediaPick } from '$lib/motion/media/pick';
 
   type Asset = { id: string; kind: string; label: string; previewUrl: string };
 
-  let { fills, assets, tokens, title = '', adder = Adder.Own, onchange }: { fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; onchange: (fills: Fill[], summary: string) => void } = $props();
+  let { fills, assets, tokens, title = '', adder = Adder.Own, upload = null, onchange }: { fills: Fill[]; assets: Asset[]; tokens: BrandTokens; title?: string; adder?: Adder; upload?: MediaUploader | null; onchange: (fills: Fill[], summary: string) => void } = $props();
 
   const PERCENT = 100;
-  const IMAGE = 'image';
   const ICON = cn('inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-ui-icon hover:bg-ui-wash hover:text-ui-text', FOCUS_RING);
   const LABEL = 'text-ui-label text-ui-text-2';
   const FIELD_ROW = 'flex items-center justify-between gap-2';
 
   const TYPE_LABEL = FILL_LABEL;
+
+  const imagePick = (f: FillOf<FillType.Image>): MediaPick | null => (f.src ? { kind: MediaKind.Image, url: f.src } : f.assetId ? { kind: MediaKind.Image, assetId: f.assetId } : null);
+  const IMAGE_PATCH = (pick: MediaPick | null): FillPatch => ({ assetId: pick?.assetId ?? '', src: pick?.url });
 
   let open = $state<number | null>(null);
   let adding = $state(false);
@@ -36,6 +41,8 @@
     [FillType.Solid]: (f) => color((f as FillOf<FillType.Solid>).color),
     [FillType.Linear]: (f) => `linear-gradient(${(f as FillOf<FillType.Linear>).angle + 90}deg,${stopCss((f as FillOf<FillType.Linear>).stops)})`,
     [FillType.Radial]: (f) => `radial-gradient(circle,${stopCss((f as FillOf<FillType.Radial>).stops)})`,
+    [FillType.Angular]: (f) => `conic-gradient(from ${(f as FillOf<FillType.Angular>).angle}deg,${stopCss((f as FillOf<FillType.Angular>).stops)})`,
+    [FillType.Diamond]: (f) => `radial-gradient(closest-side,${stopCss((f as FillOf<FillType.Diamond>).stops)})`,
     [FillType.Image]: (f) => {
       const preview = assets.find((a) => a.id === (f as FillOf<FillType.Image>).assetId)?.previewUrl ?? (f as FillOf<FillType.Image>).src;
       return preview ? `center / cover no-repeat url("${preview}")` : 'var(--ui-input)';
@@ -199,7 +206,7 @@
         </label>
         {#if fill.type === FillType.Solid}
           {@render colour('Fill colour', fill.color, (next) => patch(index, { color: next }, 'Fill colour'))}
-        {:else if fill.type === FillType.Linear || fill.type === FillType.Radial}
+        {:else if fill.type !== FillType.Image}
           {@const at = Math.min(stopAt, fill.stops.length - 1)}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
           <div class="relative mx-2 my-1 h-4 cursor-copy rounded-xs border border-ui-divider" data-testid="fill-bar" title="Click to add a stop" style={`background:linear-gradient(90deg,${stopCss(fill.stops)})`} onclick={(e) => addStopAt(index, e)}>
@@ -237,19 +244,17 @@
           </div>
           {#if fill.type === FillType.Linear}
             <label class={FIELD_ROW}><span class={LABEL}>Angle</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></label>
-          {:else}
+          {:else if fill.type === FillType.Angular}
+            <label class={FIELD_ROW}><span class={LABEL}>Angle</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Centre X</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Centre Y</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></label>
+          {:else if fill.type === FillType.Radial}
             <label class={FIELD_ROW}><span class={LABEL}>Centre X</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></label>
             <label class={FIELD_ROW}><span class={LABEL}>Centre Y</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></label>
             <label class={FIELD_ROW}><span class={LABEL}>Radius</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="1" max="400" step="1" data-testid="fill-radius" value={pct(fill.radius)} onchange={(e) => patch(index, { radius: Math.max(1, Number(e.currentTarget.value)) / PERCENT }, 'Gradient radius')} /></label>
           {/if}
         {:else}
-          <div class="grid grid-cols-4 gap-1">
-            {#each assets.filter((a) => a.kind === IMAGE) as asset (asset.id)}
-              <button type="button" class={cn('aspect-square overflow-hidden rounded-xs border border-ui-divider p-0.5', fill.assetId === asset.id && 'ring-2 ring-ui-accent-solid', FOCUS_RING)} data-testid="fill-asset" title={asset.label} onclick={() => patch(index, { assetId: asset.id, src: undefined }, 'Fill image')}><img class="size-full object-cover" src={asset.previewUrl} alt={asset.label} /></button>
-            {:else}
-              <span class="col-span-4 text-ui-caption text-ui-text-3">No images in this project yet.</span>
-            {/each}
-          </div>
+          <MediaPicker label="Fill image" value={imagePick(fill)} {assets} uploader={upload} onpick={(pick) => patch(index, IMAGE_PATCH(pick), 'Fill image')} />
           <label class={FIELD_ROW}
             ><span class={LABEL}>Fit</span>
             <select class={cn(FIELD_INPUT, 'w-28')} data-testid="fill-fit" value={fill.fit} onchange={(e) => patch(index, { fit: e.currentTarget.value }, 'Image fit')}>

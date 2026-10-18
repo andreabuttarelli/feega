@@ -22,6 +22,7 @@
     "release": "node scripts/release.mjs",
     "test:unit": "vitest run",
     "test:e2e": "playwright test",
+    "test:gate": "E2E_REAL_STACK=1 E2E_PERF=1 playwright test canvas-edits-kept canvas-frame-edits-reload canvas-own-writes canvas-tile-never-blank gpu-canvas-no-scroll canvas-dom-group-ssr poster-text-kept canvas-inline-play gpu-canvas-cold fluidity-scorecard --workers=1 --headed --project=chromium --project=webkit-perf",
     "import:anomalia-talents": "vite-node --config scripts/vite-node.config.ts scripts/import-anomalia-talents.ts",
     "db:migrate": "node --env-file-if-exists=.env scripts/db-migrate.mjs",
     "test:realtime-policies": "node scripts/realtime-policy-harness.mjs",
@@ -37,6 +38,7 @@
     "import:showcase": "vite-node --config scripts/vite-node.config.ts scripts/import-showcase.ts",
     "db:types": "supabase gen types typescript --project-id klnswzhhgrqvbfjzioul > src/lib/database.types.ts",
     "eval:canvas": "vite-node --config scripts/vite-node.config.ts scripts/eval/canvas.ts",
+    "eval:realtime-load": "vite-node --config scripts/vite-node.config.ts scripts/eval/realtime-load.ts --",
     "eval:image-node": "vite-node --config scripts/vite-node.config.ts scripts/eval/image-node.ts",
     "eval:provider-smoke": "vite-node --config scripts/vite-node.config.ts scripts/eval/provider-smoke.ts --",
     "embed:report": "vite-node --config scripts/vite-node.config.ts scripts/embed-report.ts",
@@ -48,7 +50,8 @@
     "eval:motion": "vite-node --config scripts/vite-node.config.ts scripts/eval/motion-quality/run.ts --",
     "eval:people": "vite-node --config scripts/vite-node.config.ts scripts/eval/people-detector.ts",
     "docs:mcp-tools": "node scripts/mcp-inventory.mjs --write",
-    "bench:export": "vite-node --config scripts/vite-node.config.ts scripts/bench/export-bench.ts --"
+    "bench:export": "vite-node --config scripts/vite-node.config.ts scripts/bench/export-bench.ts --",
+    "bench:gpu-parity": "vite-node --config scripts/vite-node.config.ts scripts/gpu-parity/parity.ts --"
   },
   "devDependencies": {
     "@internationalized/date": "^3.12.0",
@@ -79,6 +82,7 @@
     "p5": "1.11.11",
     "patch-package": "^8.0.1",
     "pixi.js": "7.4.3",
+    "pixi8": "npm:pixi.js@^8.21.0",
     "svelte": "^5.2.7",
     "svelte-check": "^4.1.0",
     "tailwindcss": "^4.3.1",

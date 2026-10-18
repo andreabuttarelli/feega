@@ -183,7 +183,7 @@ test.describe('moving elements between frames @real', () => {
 
     const made = async () => (await admin.from('nodes').select('id, data').eq('canvas_id', session.canvasId).eq('type', 'motion').is('deleted_at', null)).data ?? [];
     await expect.poll(async () => (await made()).map((n) => (n.data as { kind?: string }).kind), { timeout: 10_000 }).toEqual(['element']);
-    expect(clipIds(await head(admin, (await made())[0].id))).toEqual([expect.stringMatching(/^Image:/)]);
+    await expect.poll(async () => clipIds(await head(admin, (await made())[0].id)), { timeout: 10_000 }).toEqual([expect.stringMatching(/^Image:/)]);
   });
 
   test('an image node connected to a frame shows its picture as an element in it', async ({ page, session, admin, seedNode }) => {

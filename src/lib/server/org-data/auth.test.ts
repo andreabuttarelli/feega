@@ -124,3 +124,87 @@ describe('resolveOrgCaller: una chiave API non sceglie mai la sua org', () => {
     if ('error' in result) expect(result.error.status).toBe(401);
   });
 });
+
+describe('resolveOrgCaller: un JWT senza org nominata lavora in quella attiva', () => {
+  it("sceglie l'org attiva del profilo, non la prima che il database restituisce", async () => {
+    vi.resetModules();
+    const member = (orgId: string, createdAt: string) => ({
+      user_id: 'user-1',
+      org_id: orgId,
+      role: 'member',
+      created_at: createdAt,
+      orgs: { id: orgId, name: orgId, slug: orgId },
+      profiles: { active_org_id: 'org-active' }
+    });
+    const { fakeDb } = await import('$lib/server/db/fake-db');
+    const { db } = fakeDb(
+      { orgs_members: [member('org-old', '2026-01-01T00:00:00Z'), member('org-active', '2026-06-01T00:00:00Z')] },
+      { filter: true }
+    );
+    Object.assign(db, { auth: { getUser: async () => ({ data: { user: { id: 'user-1' } }, error: null }) } });
+    vi.doMock('$lib/server/db/client', () => ({ createUserDb: () => db, createServiceRoleDb: () => db }));
+
+    const { resolveOrgCaller } = await import('./auth');
+    const resolved = await resolveOrgCaller('jwt-token');
+
+    expect('caller' in resolved && resolved.caller.orgId).toBe('org-active');
+  });
+});
+
+describe('resolveOrgCaller: un viewer legge, non scrive', () => {
+  it('un JWT di un viewer ha writeAllowed false', async () => {
+    vi.resetModules();
+    const { fakeDb } = await import('$lib/server/db/fake-db');
+    const { db } = fakeDb(
+      {
+        orgs_members: [
+          { user_id: 'user-1', org_id: 'org-1', role: 'viewer', created_at: '2026-01-01T00:00:00Z', orgs: { id: 'org-1', name: 'o', slug: 'o' }, profiles: { active_org_id: null } }
+        ]
+      },
+      { filter: true }
+    );
+    Object.assign(db, { auth: { getUser: async () => ({ data: { user: { id: 'user-1' } }, error: null }) } });
+    vi.doMock('$lib/server/db/client', () => ({ createUserDb: () => db, createServiceRoleDb: () => db }));
+
+    const { resolveOrgCaller } = await import('./auth');
+    const resolved = await resolveOrgCaller('jwt-token');
+
+    expect('caller' in resolved && resolved.caller.writeAllowed).toBe(false);
+  });
+});
+
+describe('resolveOrgCaller: a burst of calls with one JWT', () => {
+  async function counted() {
+    vi.resetModules();
+    const { fakeDb } = await import('$lib/server/db/fake-db');
+    const { db } = fakeDb(
+      { orgs_members: [{ user_id: 'user-1', org_id: 'org-1', role: 'owner', created_at: '2026-01-01T00:00:00Z', orgs: { id: 'org-1', name: 'o', slug: 'o' }, profiles: { active_org_id: null } }] },
+      { filter: true }
+    );
+    const getUser = vi.fn(async (token: string) => (token === 'bad' ? { data: { user: null }, error: { message: 'bad' } } : { data: { user: { id: 'user-1' } }, error: null }));
+    Object.assign(db, { auth: { getUser } });
+    vi.doMock('$lib/server/db/client', () => ({ createUserDb: () => db, createServiceRoleDb: () => db }));
+    const { resolveOrgCaller } = await import('./auth');
+    return { resolveOrgCaller, getUser };
+  }
+
+  it('asks the auth server once, not once per call', async () => {
+    const { resolveOrgCaller, getUser } = await counted();
+
+    await resolveOrgCaller('jwt-a');
+    const again = await resolveOrgCaller('jwt-a');
+
+    expect(getUser).toHaveBeenCalledTimes(1);
+    expect('caller' in again && again.caller.userId).toBe('user-1');
+  });
+
+  it('a refused token is asked again every time', async () => {
+    const { resolveOrgCaller, getUser } = await counted();
+
+    await resolveOrgCaller('bad');
+    const again = await resolveOrgCaller('bad');
+
+    expect(getUser).toHaveBeenCalledTimes(2);
+    expect('error' in again).toBe(true);
+  });
+});

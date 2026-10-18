@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { enhance } from '$lib/settings/enhance';
+
   let {
     projectId,
     returnTo,
@@ -13,7 +15,7 @@
   <p class="gate-hint">This section belongs to a brand. Link an existing brand or create one.</p>
 
   {#if orgBrands.length}
-    <form method="POST" action={`/p/${projectId}/settings/project?/linkBrand`} class="gate-form">
+    <form method="POST" action={`/p/${projectId}/settings/project?/linkBrand`} use:enhance class="gate-form">
       <input type="hidden" name="returnTo" value={returnTo} />
       <select name="brandId" required>
         <option value="" disabled selected>Choose a brand</option>

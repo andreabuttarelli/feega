@@ -5,8 +5,24 @@ export enum FillType {
   Solid = 'solid',
   Linear = 'linear-gradient',
   Radial = 'radial-gradient',
+  Angular = 'angular-gradient',
+  Diamond = 'diamond-gradient',
   Image = 'image'
 }
+
+export enum PaintedAs {
+  Svg = 'svg',
+  Html = 'html'
+}
+
+export const PAINTED_AS: Record<FillType, PaintedAs> = {
+  [FillType.Solid]: PaintedAs.Svg,
+  [FillType.Linear]: PaintedAs.Svg,
+  [FillType.Radial]: PaintedAs.Svg,
+  [FillType.Angular]: PaintedAs.Html,
+  [FillType.Diamond]: PaintedAs.Html,
+  [FillType.Image]: PaintedAs.Html
+};
 
 export enum ImageFit {
   Cover = 'cover',
@@ -20,6 +36,8 @@ export const FILL_LABEL: Record<FillType, string> = {
   [FillType.Solid]: 'Solid',
   [FillType.Linear]: 'Linear',
   [FillType.Radial]: 'Radial',
+  [FillType.Angular]: 'Angular',
+  [FillType.Diamond]: 'Diamond',
   [FillType.Image]: 'Image'
 };
 export const IMAGE_FITS = Object.values(ImageFit) as [ImageFit, ...ImageFit[]];
@@ -58,6 +76,18 @@ export const fillSchema = z.discriminatedUnion('type', [
     stops,
     center: point.default({ x: CENTRE, y: CENTRE }),
     radius: z.number().min(0.01).max(4).default(1),
+    ...base
+  }),
+  z.object({
+    type: z.literal(FillType.Angular),
+    stops,
+    angle: z.number().min(-360).max(360).default(0),
+    center: point.default({ x: CENTRE, y: CENTRE }),
+    ...base
+  }),
+  z.object({
+    type: z.literal(FillType.Diamond),
+    stops,
     ...base
   }),
   z.object({
@@ -152,22 +182,17 @@ const colorOf = (fill: Fill | undefined): string => {
   return fill.type === FillType.Image ? DEFAULT_COLOR : fill.stops[0].color;
 };
 
+const freshStops = (color: string) => [
+  { color, pos: 0 },
+  { color: DEFAULT_END, pos: 1 }
+];
+
 const FRESH: Record<FillType, (color: string) => unknown> = {
   [FillType.Solid]: (color) => ({ type: FillType.Solid, color }),
-  [FillType.Linear]: (color) => ({
-    type: FillType.Linear,
-    stops: [
-      { color, pos: 0 },
-      { color: DEFAULT_END, pos: 1 }
-    ]
-  }),
-  [FillType.Radial]: (color) => ({
-    type: FillType.Radial,
-    stops: [
-      { color, pos: 0 },
-      { color: DEFAULT_END, pos: 1 }
-    ]
-  }),
+  [FillType.Linear]: (color) => ({ type: FillType.Linear, stops: freshStops(color) }),
+  [FillType.Radial]: (color) => ({ type: FillType.Radial, stops: freshStops(color) }),
+  [FillType.Angular]: (color) => ({ type: FillType.Angular, stops: freshStops(color) }),
+  [FillType.Diamond]: (color) => ({ type: FillType.Diamond, stops: freshStops(color) }),
   [FillType.Image]: () => ({ type: FillType.Image })
 };
 

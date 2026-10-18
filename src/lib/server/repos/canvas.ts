@@ -4,6 +4,8 @@ import type { NarrowedDatabase } from '$lib/server/db/typed-database';
 import { actorCols, edgeActorCols, type Actor } from './actor';
 import { recordEvent } from './canvas-events';
 import { clashingKeys, mergeNodeData } from '$lib/canvas/node-patch';
+import { nestsInItself } from '$lib/canvas/group-cycle';
+import { layoutOf } from '$lib/canvas/node-layout';
 import { validateNodeData } from '$lib/canvas/node-data';
 
 /**
@@ -238,7 +240,8 @@ export async function listNodes(
     .eq('org_id', scope.orgId)
     .eq('canvas_id', scope.canvasId)
     .is('deleted_at', null)
-    .order('z', { ascending: true });
+    .order('z', { ascending: true })
+    .order('id', { ascending: true });
 
   if (error) {
     throw error;
@@ -498,6 +501,16 @@ export type PatchWrite =
   | { outcome: 'gone' };
 
 const PATCH_MAX_ATTEMPTS = 5;
+const NESTED_IN_ITSELF = 'a node cannot join a group it contains';
+
+async function joinsOwnDescendant(db: Db, orgId: string, node: CanvasNodeRecord, patch: Record<string, unknown>): Promise<boolean> {
+  if (typeof patch.groupId !== 'string') {
+    return false;
+  }
+  const nodes = await listNodes(db, { orgId, canvasId: node.canvasId });
+  const parents = new Map(nodes.map((n) => [n.id, layoutOf(n.data).groupId]));
+  return nestsInItself(parents, node.id, patch.groupId);
+}
 
 export async function patchNodeData(
   db: Db,
@@ -508,12 +521,17 @@ export async function patchNodeData(
     base?: Record<string, unknown>;
     check: DataCheck;
     actor?: Actor;
+    known?: CanvasNodeRecord;
   }
 ): Promise<PatchWrite> {
   for (let attempt = 0; attempt < PATCH_MAX_ATTEMPTS; attempt++) {
-    const before = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId });
+    const before = attempt === 0 && input.known ? input.known : await findNode(db, { orgId: input.orgId, nodeId: input.nodeId });
     if (!before) {
       return { outcome: 'gone' };
+    }
+
+    if (await joinsOwnDescendant(db, input.orgId, before, input.patch)) {
+      return { outcome: 'invalid', error: NESTED_IN_ITSELF };
     }
 
     const keys = input.base ? clashingKeys(before.data, input.base, input.patch) : [];

@@ -3,7 +3,7 @@ import { Strictness } from './custom/component';
 import { withParams } from './custom/params';
 import { FPS, MAX_SECONDS, TransitionKind, maxFrames, type Edge } from './design';
 import { MAX_JUNCTION_FRAMES, junctionProblem, type Junction } from './junctions';
-import { FORMATS, byFrame, cloneDoc, clipsOf, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionFormat, type MotionTrack } from './doc';
+import { DocMode, FORMATS, MotionFormat, RESOLUTION_PROBLEM, docMode, byFrame, fitsResolution, cloneDoc, clipsOf, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import { Ease } from './design';
 import { Matte, isMaskKey, maskSchema, maskStackSchema, type MaskInput } from './mask';
 import { matteSource } from './matte';
@@ -12,6 +12,7 @@ import { editCameraLane } from './camera-ops';
 import { Around, EASE_PRESETS, Half, presetEase, withHalf, type EasePreset } from './graph';
 import { Interp, keyframesProblem, transformSchema, type EaseSpec, type KeyValue, type Keyframe, type Keyframes, type Transform } from './keyframes';
 import { partStylesSchema, type PartStyle } from './part-style-model';
+import { drivenVars } from './interactive/driven-vars';
 
 export type OpResult = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
@@ -84,6 +85,13 @@ export type NewClip = {
   transitionOut?: Edge;
 };
 
+type Span = { from: number; durationInFrames?: number };
+
+const CLIP_SPAN: Record<DocMode, (doc: MotionDoc, input: NewClip) => Span> = {
+  [DocMode.Video]: (_, input) => input,
+  [DocMode.Still]: (doc) => ({ from: 0, durationInFrames: doc.durationInFrames })
+};
+
 export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
   const spec = COMPONENTS[input.component];
   const track = trackFor(doc, spec.track, input.trackId);
@@ -100,10 +108,11 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     return fail(missing);
   }
 
+  const span = CLIP_SPAN[docMode(doc)](doc, input);
   const clip = newClip({
     id,
-    from: Math.max(0, Math.round(input.from)),
-    durationInFrames: Math.max(MIN_FRAMES, Math.round(input.durationInFrames ?? (spec.durationInFrames * doc.fps) / FPS)),
+    from: Math.max(0, Math.round(span.from)),
+    durationInFrames: Math.max(MIN_FRAMES, Math.round(span.durationInFrames ?? (spec.durationInFrames * doc.fps) / FPS)),
     component: input.component,
     props: props.props,
     transitionIn: input.transitionIn ?? NO_EDGE,
@@ -199,6 +208,12 @@ export function removeClips(doc: MotionDoc, ids: readonly string[]): OpResult {
 }
 
 export function setProps(doc: MotionDoc, clipId: string, patch: Record<string, unknown>): OpResult {
+  const edited = propsEdited(doc, clipId, patch);
+  const clip = edited.ok ? findClip(edited.doc, clipId)?.clip : undefined;
+  return edited.ok && clip ? { ok: true, doc: drivenVars(edited.doc, [clip]) } : edited;
+}
+
+function propsEdited(doc: MotionDoc, clipId: string, patch: Record<string, unknown>): OpResult {
   return editClip(doc, clipId, (clip) => {
     const verdict = clipProps(doc.components, clip.component, { ...clip.props, ...patch }, Strictness.Strict);
     if (!verdict.ok) {
@@ -302,8 +317,28 @@ function endSoundsAt(doc: MotionDoc, end: number): MotionDoc {
   return { ...doc, tracks: doc.tracks.map((t) => (t.kind === TrackKind.Audio ? { ...t, clips: t.clips.map(fit) } : t)) };
 }
 
-export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durationInFrames?: number; background?: Background }): OpResult {
-  const size = input.format ? FORMATS[input.format] : { width: doc.width, height: doc.height };
+export type CanvasSize = { width: number; height: number };
+
+type Sizing = { width: number; height: number; freeSize: boolean };
+
+function sizingOf(doc: MotionDoc, input: { format?: MotionFormat; size?: CanvasSize }): Sizing {
+  if (input.size) {
+    return { ...input.size, freeSize: true };
+  }
+  if (input.format === MotionFormat.Custom) {
+    return { width: doc.width, height: doc.height, freeSize: true };
+  }
+  if (input.format) {
+    return { width: FORMATS[input.format].width, height: FORMATS[input.format].height, freeSize: false };
+  }
+  return { width: doc.width, height: doc.height, freeSize: doc.freeSize ?? false };
+}
+
+export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; size?: CanvasSize; durationInFrames?: number; background?: Background }): OpResult {
+  const { freeSize, ...size } = sizingOf(doc, input);
+  if (!fitsResolution({ ...size, still: doc.still })) {
+    return fail(`${size.width}×${size.height}: ${RESOLUTION_PROBLEM}`);
+  }
   const durationInFrames = Math.round(input.durationInFrames ?? doc.durationInFrames);
   const fitted = endSoundsAt(doc, durationInFrames);
   const end = Math.max(0, ...fitted.tracks.flatMap((t) => t.clips.map(clipEnd)));
@@ -315,7 +350,9 @@ export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; durati
     return fail(`the video can be at most ${MAX_SECONDS} seconds`);
   }
   const still = fitted.still ? { still: { frame: Math.min(fitted.still.frame, durationInFrames - 1) } } : {};
-  return { ok: true, doc: { ...fitted, width: size.width, height: size.height, durationInFrames, background: input.background ?? fitted.background, ...still } };
+  const { freeSize: _, ...rest } = fitted;
+  const free = freeSize ? { freeSize } : {};
+  return { ok: true, doc: { ...rest, width: size.width, height: size.height, durationInFrames, background: input.background ?? fitted.background, ...still, ...free } };
 }
 
 export function snapFrame(frame: number, targets: readonly number[], threshold: number): number {

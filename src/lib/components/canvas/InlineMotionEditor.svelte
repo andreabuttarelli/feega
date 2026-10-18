@@ -43,9 +43,9 @@
   import { propertiesRequest } from '$lib/canvas/phone-properties';
   import { get } from 'svelte/store';
   import { track } from '$lib/analytics';
-  import type { CanvasUndo, MoveOut } from '$lib/canvas/canvas-drop';
+  import type { CanvasUndo, HostDrag, MoveOut } from '$lib/canvas/canvas-drop';
 
-  let { projectId, canvasId, nodeId, revision = 0, leaving = false, onclose, onframe, onmoveout = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; revision?: number; leaving?: boolean; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null } = $props();
+  let { projectId, canvasId, nodeId, revision = 0, leaving = false, onclose, onframe, onmoveout = null, onhostdrag = null, canvasundo = null }: { projectId: string; canvasId: string; nodeId: string; revision?: number; leaving?: boolean; onclose: () => void; onframe: (free: Insets) => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; canvasundo?: CanvasUndo | null } = $props();
 
   const opensOn = untrack(() => (get(propertiesRequest) === nodeId ? OpensOn.Properties : OpensOn.Stage));
   propertiesRequest.set(null);
@@ -128,7 +128,7 @@
       return;
     }
     const timer = setTimeout(() => {
-      const flow = document.querySelector('.svelte-flow')?.getBoundingClientRect();
+      const flow = document.querySelector('.svelte-flow, [data-canvas-surface]')?.getBoundingClientRect();
       if (!flow) {
         return;
       }
@@ -144,7 +144,7 @@
 
 {#if session}
   <div class="inline" class:leaving data-leaving={leaving || undefined}>
-    <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} {canvasundo} {opensOn} />
+    <MotionEditorShell data={session} mount={Mount.Canvas} fullHref={editorPath} {onclose} onstageready={stageReady} {onmoveout} {onhostdrag} {canvasundo} {opensOn} />
   </div>
 {:else if failed}
   <p class="inline-status" role="status">This video could not be opened here. <a href={editorPath}>Open the editor</a></p>

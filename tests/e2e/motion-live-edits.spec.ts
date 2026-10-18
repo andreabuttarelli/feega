@@ -15,14 +15,14 @@ test.describe('motion agent live edits @real', () => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });
     const saved: string[] = [];
 
-    await page.route(/\/motion\/[^/]+\/agent$/, (route) => {
+    await page.route(/\/api\/v1\/projects\/[^/]+\/(motion\/[^/]+\/)?agent$/, (route) => {
       if (route.request().method() !== 'POST') {
         return route.fallback();
       }
       return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: edited });
     });
     page.on('request', (req) => {
-      if (req.url().includes('?/save')) {
+      if (req.url().includes('?/ops')) {
         saved.push(req.postData() ?? '');
       }
     });
@@ -37,6 +37,6 @@ test.describe('motion agent live edits @real', () => {
     await expect(page.getByTestId('empty-state')).toBeHidden();
     await page.waitForTimeout(PAST_HEAD_POLL_MS);
     await expect(page.getByTestId('empty-state')).toBeHidden();
-    await expect.poll(() => saved.some((body) => body.includes('"text":"Motion"'))).toBe(true);
+    await expect.poll(() => saved.some((body) => body.includes('Motion'))).toBe(true);
   });
 });

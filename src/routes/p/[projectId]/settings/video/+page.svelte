@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
+  import { enhance } from '$lib/settings/enhance';
   import { _ } from 'svelte-i18n';
   import { Panel } from '$lib/components/ui/panel';
   import { Field, FieldLayout } from '$lib/components/ui/field';

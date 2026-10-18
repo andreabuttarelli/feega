@@ -5,6 +5,7 @@ import { isLocked } from './organize';
 import { pivotBox, transformAt } from './parent';
 import { Grip, aabb, dragPatch, quadOf, writePatch, type Bounds, type Boxes, type Pt } from './scene-select';
 import { setKeyframes, setTransform, type OpResult } from './timeline';
+import { tidyMoves } from './tidy';
 
 export enum Edge {
   Left = 'left',
@@ -143,4 +144,21 @@ export function distributeSpace(doc: MotionDoc, ids: readonly string[], frame: n
     return [id, along(axis, wanted - start(bounds.get(id)!))];
   });
   return moveEach(doc, moves, frame, mode);
+}
+
+export function tidySpace(doc: MotionDoc, ids: readonly string[], frame: number, boxes: Boxes, mode: EditMode): OpResult {
+  const bounds = boundsOf(doc, ids, frame, boxes);
+  if (typeof bounds === 'string') {
+    return fail(bounds);
+  }
+  const rects = ids.map((id) => {
+    const b = bounds.get(id)!;
+    return { id, left: b.left, top: b.top, width: b.right - b.left, height: b.bottom - b.top };
+  });
+  return moveEach(
+    doc,
+    tidyMoves(rects).map((m): [string, Pt] => [m.id, [m.dx, m.dy]]),
+    frame,
+    mode
+  );
 }

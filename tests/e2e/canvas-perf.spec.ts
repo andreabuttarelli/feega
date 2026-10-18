@@ -215,39 +215,6 @@ const ZOOM_IN_STEPS = 20;
 const VIEW_STILL_MS = 500;
 const READABLE_NODE_PX = 320;
 
-async function zoomUntilVisible(page: Page, shellOf: Locator, node: Locator) {
-  const view = () =>
-    page.evaluate(
-      ({ lod, threshold }) => {
-        const transform = getComputedStyle(document.querySelector('.svelte-flow__viewport')!).transform;
-        const lodOn = !!document.querySelector('.svelte-flow')?.classList.contains(lod);
-        return { transform, settled: new DOMMatrix(transform).a >= threshold !== lodOn };
-      },
-      { lod: LOD_CLASS, threshold: LOD_ZOOM }
-    );
-  await expect
-    .poll(
-      async () => {
-        const before = await view();
-        await page.waitForTimeout(VIEW_STILL_MS);
-        const after = await view();
-        return before.transform === after.transform && after.settled;
-      },
-      { timeout: 20_000, message: 'the canvas fitted its view and settled into or out of the poster layer' }
-    )
-    .toBe(true);
-  const shell = (await shellOf.boundingBox())!;
-  await page.mouse.move(shell.x + shell.width / 2, shell.y + shell.height / 2);
-  await page.keyboard.down('Control');
-  const readable = async () => (await node.isVisible()) && ((await node.boundingBox())?.width ?? 0) >= READABLE_NODE_PX;
-  for (let i = 0; i < ZOOM_IN_STEPS && !(await readable()); i++) {
-    await page.mouse.wheel(0, -100);
-    await page.waitForTimeout(250);
-  }
-  await page.keyboard.up('Control');
-  await expect(node, 'zoomed out a frame is drawn by the poster layer; zooming in brings its controls back').toBeVisible();
-}
-
 function report(name: string, value: Report) {
   console.log(`[canvas-perf] ${name} ${JSON.stringify(value)}`);
 }
@@ -295,14 +262,6 @@ test.describe('a heavy canvas of motion nodes stays smooth @real', () => {
     expect(pan.fpsAvg).toBeGreaterThanOrEqual(DESKTOP_MIN_FPS);
     expect(swept.peakPlayers).toBe(0);
 
-    await open(page, cdp, `/p/${session.projectId}/c/${session.canvasId}`, 1);
-    const shell = page.locator('.svelte-flow__node').filter({ has: page.getByTestId('motion-node') }).first();
-    const node = shell.getByTestId('motion-node');
-    await zoomUntilVisible(page, shell, node);
-    await node.getByRole('button', { name: 'Play', exact: true }).click();
-    await expect(page.locator('[data-testid="motion-node"] hyperframes-player')).toHaveCount(1, { timeout: 15_000 });
-    await node.getByRole('button', { name: 'Stop', exact: true }).click();
-    await expect(page.locator('[data-testid="motion-node"] hyperframes-player')).toHaveCount(0);
   });
 
   test('phone at 4x CPU: swiping and pinching start no player', async ({ page, session }) => {

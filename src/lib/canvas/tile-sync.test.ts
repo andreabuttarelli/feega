@@ -118,3 +118,14 @@ describe('tenere i nodi della tela allineati alle tile', () => {
     expect(out?.[0]).toBe(still);
   });
 });
+
+describe('a size the tile states wins over the one the resizer left', () => {
+  it('a new tile height drops the width and height the resize handle wrote on the node', () => {
+    const styled = (t: { id: string; h: number }) => ({ ...node(t.id), style: `width:10px;height:${t.h}px` });
+    const resized = { ...styled({ id: 'a', h: 392 }), width: 564, height: 392 };
+
+    const out = syncNodes([resized], [{ ...tile('a'), h: 436 }], styled) as (MeasuredNode & { width?: number; height?: number })[];
+
+    expect([out[0].style, out[0].width, out[0].height]).toEqual(['width:10px;height:436px', undefined, undefined]);
+  });
+});

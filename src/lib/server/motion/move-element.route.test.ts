@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { actions } from '../../../routes/p/[projectId]/c/[canvasId]/+page.server';
 import { fakeDb } from '$lib/server/db/fake-db';
+import { listConnections, listNodes } from '$lib/server/repos/canvas';
+import { canvasFrameInputs } from './move-element';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { addClip } from '$lib/motion/timeline';
 
@@ -173,21 +175,36 @@ describe('undo of a move', () => {
 });
 
 describe('connect action', () => {
-  it('a generated image connected to a frame shows up in it as an image element', async () => {
+  it('a line into a frame is refused and the frame is left alone', async () => {
     const input = event(
       { source_node_id: GEN, target_node_id: TARGET, kind: 'derives_from' },
-      {
-        nodes: [frameRow(TARGET), { ...frameRow(GEN), type: 'image', data: { prompt: 'a cat', refId: ASSET } }],
-        assets: [{ id: ASSET, org_id: 'org', project_id: 'project', type: 'image', url: 'x.png', content: null, mime_type: 'image/png', bytes: 1, width: 512, height: 512, duration_s: null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' }]
-      }
+      { nodes: [frameRow(TARGET), { ...frameRow(GEN), type: 'image', data: { prompt: 'a cat', refId: ASSET } }] }
     );
 
     const result = await actions.connect(input as never);
 
-    expect(result).toMatchObject({ linked: { outcome: 'done', frameId: TARGET } });
-    const doc = written(input, TARGET)[0].doc;
-    expect(doc.tracks[0].clips[0]).toMatchObject({ component: 'Image', props: { assetId: ASSET } });
-    expect(doc.links).toEqual({ [GEN]: doc.tracks[0].clips[0].id });
+    expect(result).toMatchObject({ status: 400 });
+    expect(written(input, TARGET)).toEqual([]);
+  });
+});
+
+describe('opening a canvas with an old line into a frame', () => {
+  it('places the source output in the frame, then removes the line', async () => {
+    const input = event(
+      {},
+      {
+        nodes: [frameRow(TARGET), { ...frameRow(GEN), type: 'image', data: { prompt: 'a cat', refId: ASSET } }],
+        nodes_connections: [{ id: 'line', org_id: 'org', canvas_id: 'canvas', source_node_id: GEN, target_node_id: TARGET, source_handle: null, target_handle: null, mode: 'fixed', deleted_at: null }],
+        assets: [{ id: ASSET, org_id: 'org', project_id: 'project', type: 'image', url: 'x.png', content: null, mime_type: 'image/png', bytes: 1, width: 512, height: 512, duration_s: null, source: 'generated', source_node_id: GEN, uncensored: false, created_at: '' }]
+      }
+    );
+
+    const scope = { orgId: 'org', canvasId: 'canvas' };
+    const kept = await canvasFrameInputs(input.db, { orgId: 'org', projectId: 'project', actor: { kind: 'user', id: 'user' } }, await listNodes(input.db, scope), await listConnections(input.db, scope));
+
+    expect(kept).toEqual([]);
+    expect(written(input, TARGET)[0].doc.tracks[0].clips[0]).toMatchObject({ component: 'Image', props: { assetId: ASSET } });
+    expect(input.calls.some((c) => c.table === 'nodes_connections' && c.op === 'update')).toBe(true);
   });
 });
 
@@ -226,6 +243,18 @@ describe('elements in and out of frames', () => {
 
     expect(await actions.moveFree(input as never)).toMatchObject({ outcome: 'done', frameId: TARGET });
     expect(written(input, TARGET).map((r) => clipIds(r.doc))).toEqual([['txt']]);
+  });
+
+  it('copyFree pastes a free element into a frame and keeps the free element', async () => {
+    const element = { ...frameRow(SOURCE), width: 200, height: 45, data: { ...frameRow(SOURCE).data, kind: 'element' } };
+    const input = event({ source: SOURCE, drop: JSON.stringify({ on: 'frame', nodeId: TARGET, at: { x: 0.3, y: 0.6 } }) }, { nodes: [element, frameRow(TARGET)] });
+
+    const result = await actions.copyFree(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', frameId: TARGET });
+    expect(written(input, TARGET)).toHaveLength(1);
+    expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'update' && (c.payload as { deleted_at?: string }).deleted_at)).toBe(false);
+    expect((result as { undo: { kind: string }[] }).undo.map((u) => u.kind)).toEqual(['doc.revision']);
   });
 });
 

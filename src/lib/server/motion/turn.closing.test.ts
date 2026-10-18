@@ -18,6 +18,8 @@ const world = vi.hoisted(() => ({
   rate: 1,
   models: [] as string[],
   visionFails: false,
+  allFail: false,
+  saveExpired: false,
   seesImages: false,
   viewsWhileEditing: false,
   blankViews: 0,
@@ -163,6 +165,9 @@ function scripted() {
       const call = { prompt: options.prompt as unknown as Message[], toolChoice: options.toolChoice as Call['toolChoice'] };
       world.tools.push((options.tools ?? []).map((t) => (t as { name: string }).name));
       world.calls.push(call);
+      if (world.allFail && world.calls.length > 1) {
+        throw new Error('JWT expired');
+      }
       if (world.hangsAfterEdit && lastMessage(call.prompt).role === 'tool') {
         return { stream: new ReadableStream({ start() {} }) };
       }
@@ -246,6 +251,9 @@ vi.mock('$lib/server/motion/editor', () => ({
   assetUrls: () => ({}),
   saveMotionDoc: async (_db: unknown, input: { expectedVersion: number }) => {
     world.writes.push(input);
+    if (world.saveExpired) {
+      throw { code: 'PGRST303', message: 'JWT expired' };
+    }
     if (world.conflicts > 0) {
       world.conflicts--;
       return { outcome: 'conflict' };
@@ -324,6 +332,8 @@ describe('a motion turn closes on a look and a summary', () => {
     world.rate = 1;
     world.models = [];
     world.visionFails = false;
+    world.allFail = false;
+    world.saveExpired = false;
     world.seesImages = false;
     world.viewsWhileEditing = false;
     world.blankViews = 0;
@@ -608,6 +618,20 @@ describe('a motion turn closes on a look and a summary', () => {
     expect(world.views).toBe(1);
     expect(summed.some(hasImage) || JSON.stringify(summed).includes('"type":"file"')).toBe(true);
     expect(outcome.reply.trim().length).toBeGreaterThan(0);
+  });
+
+  it('a failed turn whose save also fails does not take the server down (dev: "JWT expired" became an unhandled rejection and killed the process)', async () => {
+    const unhandled: unknown[] = [];
+    const record = (e: unknown) => void unhandled.push(e);
+    process.on('unhandledRejection', record);
+    world.allFail = true;
+    world.saveExpired = true;
+
+    await turn().catch(() => {});
+    await new Promise((r) => setTimeout(r, 50));
+    process.off('unhandledRejection', record);
+
+    expect(unhandled).toEqual([]);
   });
 
   it('a step that fails after the edits keeps them in the conversation: the summary sees the work', async () => {

@@ -127,7 +127,8 @@ const SHAPE_RANK: Record<MotionFormat, number> = {
   [MotionFormat.Portrait]: 2,
   [MotionFormat.Poster]: 3,
   [MotionFormat.Square]: 4,
-  [MotionFormat.SquareLarge]: 5
+  [MotionFormat.SquareLarge]: 5,
+  [MotionFormat.Custom]: 6
 };
 
 const SHAPE_ORDER = (Object.keys(SHAPE_RANK) as MotionFormat[]).sort((a, b) => SHAPE_RANK[a] - SHAPE_RANK[b]);

@@ -1,4 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
+import { pickBarTool } from './fixtures/canvas-bar';
+import { hoverTile } from './fixtures/canvas-tile';
 import sharp from 'sharp';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
@@ -17,7 +19,7 @@ async function headDoc(admin: SupabaseClient, nodeId: string): Promise<Doc | nul
 const boxColour = (doc: Doc | null) => doc?.tracks.flatMap((t) => t.clips).find((c) => c.component === 'Shape')?.props.fills?.[0]?.color ?? null;
 
 async function drawBox(page: Page, tool = 'rectangle') {
-  await page.getByTestId('add-bar').getByTestId('draw-tools').locator(`[data-tool="${tool}"]`).click();
+  await pickBarTool(page, tool);
   const pane = (await page.locator('.svelte-flow').boundingBox())!;
   const from = { x: pane.x + pane.width * 0.35, y: pane.y + pane.height * 0.35 };
   await page.mouse.move(from.x, from.y);
@@ -189,7 +191,7 @@ test.describe('edits are never lost @real', () => {
     await expect(prompt).toHaveValue(expected);
     await expect.poll(async () => (await admin.from('nodes').select('data').eq('id', typed.id).single()).data?.data?.prompt, { timeout: 10_000 }).toBe(expected);
     await page.reload();
-    await expect(page.locator(`.svelte-flow__node[data-id="${typed.id}"]`).getByPlaceholder(PROMPT_PLACEHOLDER)).toHaveValue(expected, { timeout: 15_000 });
+    await expect((await hoverTile(page, typed.id)).getByPlaceholder(PROMPT_PLACEHOLDER)).toHaveValue(expected, { timeout: 15_000 });
   });
 
   test('two tabs: tab A edits reach tab B without reverting what B is typing', async ({ page, session, seedNode }) => {
@@ -212,7 +214,9 @@ test.describe('edits are never lost @real', () => {
     const sentence = WORD.repeat(6);
     await Promise.all([promptIn(page, mine.id).pressSequentially(sentence, { delay: KEY_DELAY_MS }), promptIn(other, theirs.id).pressSequentially(sentence, { delay: KEY_DELAY_MS })]);
 
+    await hoverTile(other, mine.id);
     await expect(promptIn(other, mine.id)).toHaveValue(sentence, { timeout: 15_000 });
+    await hoverTile(page, theirs.id);
     await expect(promptIn(page, theirs.id)).toHaveValue(sentence, { timeout: 15_000 });
     await expect(promptIn(other, theirs.id)).toHaveValue(sentence);
     await expect(promptIn(page, mine.id)).toHaveValue(sentence);
@@ -238,13 +242,13 @@ test.describe('edits are never lost @real', () => {
       await expect(page.getByTestId('motion-editor')).toHaveCount(0);
       const tile = page.locator(`[data-motion-node="${nodeId}"]`);
       await expect(tile.getByText('Frame', { exact: true }), 'an element has no frame chrome').toHaveCount(0);
-      await expect(tile.locator('[data-drawn="true"], [data-testid=motion-node-poster]').first()).toBeVisible({ timeout: 15_000 });
+      await expect(tile.locator('[data-drawn="true"], [data-testid=motion-node-poster]:visible').first()).toBeAttached({ timeout: 15_000 });
       await stillRed(page, tile);
 
       await page.reload();
       await expect(tile).toBeVisible({ timeout: 15_000 });
       await expect(tile.getByText('Frame', { exact: true })).toHaveCount(0);
-      await expect(tile.locator('[data-drawn="true"], [data-testid=motion-node-poster]').first()).toBeVisible({ timeout: 15_000 });
+      await expect(tile.locator('[data-drawn="true"], [data-testid=motion-node-poster]:visible').first()).toBeAttached({ timeout: 15_000 });
       await stillRed(page, tile);
     });
   }

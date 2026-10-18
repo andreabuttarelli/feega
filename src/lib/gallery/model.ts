@@ -149,7 +149,7 @@ export type SearchParams = Partial<Record<FilterKey, string | undefined>>;
 
 export type FilterGroup = { key: 'format' | 'kind'; label: string; options: { value: string; label: string }[] };
 
-const LISTED_FORMATS = MOTION_FORMATS.filter((f) => f !== MotionFormatEnum.SquareLarge);
+const LISTED_FORMATS = MOTION_FORMATS.filter((f) => f !== MotionFormatEnum.SquareLarge && f !== MotionFormatEnum.Custom);
 
 export const FILTER_GROUPS: readonly FilterGroup[] = [
   { key: 'kind', label: 'Type', options: (Object.keys(KIND_LABEL) as GalleryKind[]).map((k) => ({ value: k, label: KIND_LABEL[k] })) },

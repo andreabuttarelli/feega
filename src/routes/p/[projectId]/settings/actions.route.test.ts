@@ -17,10 +17,9 @@ vi.mock('$lib/server/email', () => ({
   brandInviteEmailText: () => 't'
 }));
 
-import { actions as apiKeyActions } from './api-keys/+page.server';
-import { actions as teamActions } from './team/+page.server';
+import { actions as apiKeyActions } from '$lib/server/settings/pages/api-keys';
 import { actions as accountActions } from './connected-accounts/+page.server';
-import { actions as dangerActions } from './danger/+page.server';
+import { actions as dangerActions } from '$lib/server/settings/pages/danger';
 
 const USER = 'user-1';
 const ORG = 'org-1';
@@ -86,21 +85,6 @@ describe('le azioni delle impostazioni leggono il progetto, non un params.brand 
 
     expect(result).toMatchObject({ apiKeyRevoked: true });
     expect(writes(calls, 'api_keys', 'delete')[0].filters).toContainEqual(['org_id', ORG]);
-  });
-
-  it.each([null, BRAND.id])('invita nell org del progetto (brand %s)', async (brandId) => {
-    const { ev, calls } = event(baseRows(brandId), { email: 'new@y.com' });
-
-    const result = await run(teamActions.invite, ev);
-
-    expect(result).toMatchObject({ teamInvited: true });
-    expect(writes(calls, 'orgs_invites', 'insert')[0].payload).toMatchObject({ org_id: ORG, email: 'new@y.com' });
-  });
-
-  it('revoca un invito dell org del progetto', async () => {
-    const { ev } = event(baseRows(null), { invite_id: 'inv-1' });
-
-    await expect(run(teamActions.revokeInvite, ev)).resolves.toMatchObject({ teamRevoked: true });
   });
 
   it('sincronizza gli account del brand del progetto', async () => {

@@ -1,5 +1,6 @@
 <script lang="ts">
   const MIN_ZOOM = 0.05;
+  import { dragOffset, type Offset } from '$lib/canvas/duplicate-plan';
   import { focusEdges } from '$lib/canvas/edge-focus';
   import type { FocusRequest } from '$lib/canvas/free-area';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
@@ -36,6 +37,13 @@
   import '@xyflow/svelte/dist/style.css';
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
+  import CanvasPeers from './CanvasPeers.svelte';
+  import CanvasMeasure from './CanvasMeasure.svelte';
+  import { tileGaps } from '$lib/canvas/measure';
+  import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
+  import CanvasFollow from './CanvasFollow.svelte';
+  import type { CanvasPeer, LiveBox, View } from '$lib/realtime/canvas-presence';
+  import { setTileLive } from '$lib/canvas/tile-live-context';
   import CanvasAddBar from './CanvasAddBar.svelte';
   import { BarContext } from '$lib/canvas/bottom-bar';
   import CanvasDrawLayer from './CanvasDrawLayer.svelte';
@@ -53,7 +61,8 @@
   import ConnectPicker from './ConnectPicker.svelte';
   import CanvasFocus from './CanvasFocus.svelte';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import type { SelectionActionId } from '$lib/canvas/selection-actions';
+  import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import type { Edge } from '$lib/motion/space';
   import { reportHref } from '$lib/reports/report-link';
   import type { GenMedium, ModelChoice } from '$lib/canvas/gen-node';
   import { CANVAS_DRAG_MEDIUM } from '$lib/canvas/new-node';
@@ -61,16 +70,18 @@
   import { syncNodes } from '$lib/canvas/tile-sync';
   import { ColumnAxis, withSettingsColumn } from '$lib/canvas/settings-column';
   import { MOBILE_QUERY } from '$lib/breakpoints';
-  import { isOutputHandle, portOfHandle, unavailableOutput, type SelectOutput } from '$lib/canvas/select-outputs';
-  import { CANVAS_EDGE_KINDS, EDGE_KIND_LABEL, WIRE_EDGE_TYPE, WIRE_MODES, WIRE_MODE_LABEL, WIRE_MODE_LOOK, wireEdge, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
+  import type { SelectOutput } from '$lib/canvas/select-outputs';
+  import { CANVAS_EDGE_KINDS, WIRE_EDGE_TYPE, wireEdge, type CanvasEdgeKind, type FlowEdge, type WireMode } from '$lib/canvas-edges';
   import WireEdge from './WireEdge.svelte';
+  import EdgePanel from './EdgePanel.svelte';
   import { isAddable, type Addable } from '$lib/canvas/addable';
-  import { DEFAULT_EDGE_KIND, edgeKindsFor, verdictBetween } from '$lib/canvas/connect-rules';
-  import { connectorAccepts, nodeAcceptsConnection } from '$lib/canvas/connector-ports';
-  import { anyPortAccepts, landingPort, portListValued, type ConnectorType } from '$lib/canvas/connectors';
+  import { edgeKindsFor } from '$lib/canvas/connect-rules';
+  import type { ConnectorType } from '$lib/canvas/connectors';
+  import { connectionRefusal, landingOf, type Connection } from '$lib/canvas/connection-verdict';
   import { setTileRender } from '$lib/canvas/tile-render-context';
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
+  import { followGroup } from '$lib/canvas/node-layout';
   import type { CanvasNode } from '$lib/canvas/graph';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import type { RunQuote } from '$lib/canvas/run-quote';
@@ -79,6 +90,9 @@
   import { ReportChange, reportChange } from '$lib/canvas/selection-report';
   import { Stack } from '$lib/canvas/stacking';
   import CanvasContextMenu from './CanvasContextMenu.svelte';
+  import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { tilesAt } from '$lib/canvas/tiles-at';
+  import { NODE_KIND_LABEL } from '$lib/canvas/node-label';
 
   /**
    * Dove sta una tile e quanto è grande, in unità di tela — le stesse di `brand_canvas_items`.
@@ -103,6 +117,8 @@
     tag?: NameTag;
     rotation?: number;
     rotatable?: boolean;
+    members?: string[];
+    behind?: boolean;
     node?: CanvasNode;
     /** La taglia minima di QUESTO tipo di nodo (`nodeSize`, `node-size.ts`) — `NodeResizer` non
      *  lascia stringere sotto. Assente = non ridimensionabile a mano (il resize resta spento). */
@@ -143,6 +159,7 @@
     onResize,
     onConnect,
     onDelete,
+    onCreateFormats,
     onEdgeDelete,
     onEdgeRetype,
     onEdgeModeChange,
@@ -178,6 +195,12 @@
     focus = null,
     onSelectionChange,
     mode = CanvasMode.Edit,
+    peers = [],
+    onPointer,
+    onLive,
+    onView,
+    onUserPan,
+    follow = null,
     tile
   }: {
     actionUrl?: (action: string) => string;
@@ -208,6 +231,7 @@
      * `tiles` le contiene ancora — il difetto era esattamente il nodo che torna in scena.
      */
     onDelete?: (ids: string[]) => void;
+    onCreateFormats?: (frameId: string) => void;
     /** "Crea post" dalla barra della selezione: gli id scelti, così com'è per `onDelete`. */
     /** Una linea da togliere. Senza, il primo errore resta sulla tela per sempre. */
     onEdgeDelete?: (edgeId: string) => void;
@@ -231,7 +255,7 @@
     /** Un file scelto dalla barra: la tela non lo carica da sé, lo passa a chi la monta. */
     onUpload?: (file: File) => void;
     /** ⌘D: duplica la selezione, con gli id come SvelteFlow li conosce. */
-    onDuplicate?: (ids: string[]) => void;
+    onDuplicate?: (ids: string[], offset?: Offset) => void;
     /** ⌘C: copia la selezione negli appunti di chi monta la tela. */
     onCopy?: (ids: string[]) => void;
     /** ⌘V: incolla, al centro di quel che si sta guardando adesso. */
@@ -287,6 +311,12 @@
      *  tela. Assente = nessuna tile è ridimensionabile a mano (il resizer non compare). */
     onResize?: (id: string, w: number, h: number) => void;
     /** Cosa disegnare dentro una tile. La tela non sa cosa mostra: lo decide chi la usa. */
+    peers?: CanvasPeer[];
+    onPointer?: (at: { x: number; y: number } | null) => void;
+    onLive?: (boxes: LiveBox[]) => void;
+    onView?: (view: View) => void;
+    onUserPan?: () => void;
+    follow?: View | null;
     tile: import('svelte').Snippet<[{ id: string; selected: boolean }]>;
     mode?: CanvasMode;
   } = $props();
@@ -309,11 +339,15 @@
   setTileRender(() => tile);
   setTileResize(() => onResize);
   setTileRotate(() => onRotate);
+  setTileLive(() => onLive);
+
+  const GROUP_BEHIND_Z = -2000;
 
   const toNode = (t: Tile): Node => ({
     id: t.id,
     position: { x: t.x, y: t.y },
     selected: t.select === true,
+    ...(t.behind ? { zIndex: GROUP_BEHIND_Z } : {}),
     data: {
       id: t.id,
       connectable: t.connectable !== false,
@@ -337,6 +371,7 @@
   // sono di SvelteFlow, e l'effetto sotto ci porta dentro solo le tile NUOVE. È il warning che
   // nomina il costo della libreria, non un difetto da togliere.
   let nodes = $state.raw<Node[]>(tiles.map(toNode));
+  const fitsOnOpen = untrack(() => tiles.length > 0);
   // svelte-ignore state_referenced_locally -- stessa cattura iniziale dei nodi, e stesso motivo:
   // da qui in poi gli archi sono di SvelteFlow, e l'effetto sotto ci porta dentro solo i NUOVI.
   let edges = $state.raw<FlowEdge[]>(($state.snapshot(incomingEdges) as FlowEdge[]).map(wireEdge));
@@ -376,11 +411,51 @@
    */
   let dragOrigin = new Map<string, { x: number; y: number }>();
 
+
   function onNodeDragStart({ nodes: dragged }: { nodes: Node[] }) {
     dragOrigin = new Map(dragged.map((n) => [n.id, { ...n.position }]));
+    followOrigin = new Map(nodes.map((n) => [n.id, { ...n.position }]));
   }
 
-  function onNodeDrag({ nodes: dragged, event }: { nodes: Node[]; event: MouseEvent | TouchEvent }) {
+  let followOrigin = new Map<string, { x: number; y: number }>();
+
+  function followMembers(dragged: Node[]) {
+    const membersOf = new Map(tiles.filter((t) => t.members?.length).map((t) => [t.id, t.members!]));
+    const moves = dragged.flatMap((n) => followGroup(followOrigin, n.id, n.position, membersOf.get(n.id) ?? []));
+    if (!moves.length) {
+      return;
+    }
+    const at = new Map(moves.map((m) => [m.id, { x: m.x, y: m.y }]));
+    nodes = nodes.map((n) => (at.has(n.id) ? { ...n, position: at.get(n.id)! } : n));
+  }
+
+  const SNAP_SCREEN_PX = 6;
+  let snapGuides = $state<SnapGuide[]>([]);
+  let snapSpacing = $state<SpacingGap[]>([]);
+
+  function snapped(dragged: Node[]): Node[] {
+    const ids = new Set(dragged.map((n) => n.id));
+    const size = (id: string) => tiles.find((t) => t.id === id);
+    const rects = dragged.flatMap((n) => {
+      const t = size(n.id);
+      return t ? [{ id: n.id, x: n.position.x, y: n.position.y, w: t.w, h: t.h }] : [];
+    });
+    const others = nodes.flatMap((n) => {
+      const t = ids.has(n.id) ? null : size(n.id);
+      return t ? [{ x: n.position.x, y: n.position.y, w: t.w, h: t.h }] : [];
+    });
+    const snap = snapDrag(rects, others, SNAP_SCREEN_PX / selection.zoom);
+    snapGuides = snap.guides;
+    snapSpacing = snap.spacing;
+    const at = new Map(snap.moves.map((m) => [m.id, { x: m.x, y: m.y }]));
+    nodes = nodes.map((n) => (at.has(n.id) ? { ...n, position: at.get(n.id)! } : n));
+    return dragged.map((n) => (at.has(n.id) ? { ...n, position: at.get(n.id)! } : n));
+  }
+
+  function onNodeDrag({ nodes: moving, event }: { nodes: Node[]; event: MouseEvent | TouchEvent }) {
+    const dragged = snapped(moving);
+    followMembers(dragged);
+    onLive?.(dragged.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y })));
     onTileDragOver?.(dragged.map((n) => n.id), pointOf(event));
   }
 
@@ -391,8 +466,19 @@
     });
   }
 
-  function onNodeDragStop({ targetNode, nodes: dragged, event }: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
+  function onNodeDragStop({ targetNode, nodes: moving, event }: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
+    onLive?.([]);
     if (!targetNode) return;
+    const dragged = snapped(moving);
+    snapGuides = [];
+    snapSpacing = [];
+    const grabbed = dragged.find((n) => n.id === targetNode.id) ?? targetNode;
+    const copyOffset = event.altKey ? dragOffset(dragOrigin, grabbed) : undefined;
+    if (copyOffset && onDuplicate) {
+      returnToOrigin();
+      onDuplicate(dragged.map((n) => n.id), copyOffset);
+      return;
+    }
     if (onTileDrop?.(dragged.map((n) => n.id), pointOf(event)) === DropVerdict.Taken) {
       returnToOrigin();
       return;
@@ -413,11 +499,6 @@
 
   const lookup = (id: string) => nodeOf.get(id) ?? null;
 
-  /** Le porte tipizzate di una tile, per id — usate solo per rifiutare un secondo filo su un
-   *  connettore a valore singolo già occupato: `connect-rules.ts` non conosce i connettori, la
-   *  domanda "quale porta" è di questo file. */
-  const connectorsOf = $derived(new Map(tiles.map((t) => [t.id, t.connectors])));
-
   /**
    * IL RIFIUTO, MENTRE IL PUNTATORE È ANCORA IN ARIA. La libreria si ferma qui e domanda: tornare
    * `false` significa che la linea non si aggancia e l'attacco non si accende, senza che nessuno
@@ -429,79 +510,20 @@
    */
   let refusal = $state<string | null>(null);
 
-  function isValidConnection(c: {
-    source?: string | null;
-    target?: string | null;
-    sourceHandle?: string | null;
-    targetHandle?: string | null;
-  }): boolean {
-    const { source, target, sourceHandle, targetHandle } = c;
-    if (!source || !target) return false;
-
-    const verdict = verdictBetween(lookup, source, target, sourceHandle);
-    if (!verdict.ok) {
-      refusal = verdict.why;
-      return false;
-    }
-
-    const connector = targetHandle as ConnectorType | null | undefined;
-    const connectors = connectorsOf.get(target);
-    const sourceTile = tiles.find((t) => t.id === source);
-    if (sourceTile && unavailableOutput(sourceTile, sourceHandle)) {
-      refusal = 'This output is not available for the connected source';
-      return false;
-    }
-    const output = sourceTile ? portOfHandle(sourceTile, sourceHandle) : null;
-    const targetKind = tiles.find((t) => t.id === target)?.kind ?? '';
-    const portEdges = edges.map((e) => ({ id: e.id, target: e.target, targetHandle: e.targetHandle ?? null }));
-    if (!nodeAcceptsConnection(portEdges, target, targetKind)) {
-      refusal = 'An effects node takes one media input';
-      return false;
-    }
-    if (output && connectors?.length && !anyPortAccepts(connectors, output)) {
-      refusal = `No port accepts ${output}`;
-      return false;
-    }
-    if (connector && connectors?.includes(connector)) {
-      const free = connectorAccepts(portEdges, target, connector, portListValued(targetKind, connector));
-      if (!free) {
-        refusal = `Port ${connector} is already taken`;
-        return false;
-      }
-    }
-
-    refusal = null;
-    return true;
+  function isValidConnection(c: Connection): boolean {
+    const why = connectionRefusal(tiles, edges, lookup, c);
+    refusal = why || null;
+    return why === null;
   }
 
-  /**
-   * Una linea appena tirata. NON si aggiunge qui agli archi: la si annuncia e basta, e comparirà
-   * quando il server la restituisce con il suo id vero. Disegnarla subito con un id inventato
-   * significherebbe averla due volte appena i dati tornano — la copia ottimista e quella vera.
-   */
-  function onConnected(connection: { source?: string | null; target?: string | null; sourceHandle?: string | null; targetHandle?: string | null }) {
-    const { source, target } = connection;
-    if (!source || !target || source === target) return;
+  function onConnected(connection: Connection) {
+    const landing = landingOf(tiles, lookup, connection);
+    if (!landing) return;
 
     refusal = null;
-    const sourceTile = tiles.find((t) => t.id === source);
-    const output = sourceTile ? portOfHandle(sourceTile, connection.sourceHandle) : null;
-    const handle = landingPort((connection.targetHandle as ConnectorType | null) ?? null, output, connectorsOf.get(target) ?? []);
-    const outputHandle = isOutputHandle(connection.sourceHandle) ? connection.sourceHandle : null;
-    onConnect?.(source, target, edgeKindsFor(lookup, source, target, outputHandle)[0] ?? DEFAULT_EDGE_KIND, handle, outputHandle);
+    onConnect?.(landing.source, landing.target, landing.kind, landing.targetHandle, landing.sourceHandle);
   }
 
-  /**
-   * IL PANNELLO DI UNA LINEA, al clic su di lei.
-   *
-   * Un arco è largo un paio di pixel: un menù al tasto destro sarebbe il gesto giusto per un
-   * bersaglio grande, e su questo costringerebbe a centrarlo due volte. Il clic lo apre, un clic
-   * altrove lo chiude, ed è il solo posto in cui un arco si cambia o si toglie.
-   *
-   * I VERSI PROPOSTI SONO QUELLI CHE HANNO SENSO su quella coppia, letti dallo stesso
-   * `edgeKindsFor` che ha scelto il verso alla nascita: offrire «nasce da» fra due immagini
-   * sarebbe far scegliere un arco che il modello rifiuta.
-   */
   let picked = $state<{ edge: FlowEdge; screen: { x: number; y: number } } | null>(null);
 
   const pickedKinds = $derived(
@@ -600,7 +622,35 @@
    * `RUN` in `CanvasKeys.svelte`, qui perché lo stato della selezione (`selection.ids`) vive in
    * questo componente e non in quello.
    */
-  const SELECTION_RUN: Record<SelectionActionId, (ids: string[]) => void> = {
+  const placedBoxes = (ids: string[]) =>
+    ids.flatMap((id) => {
+      const n = nodes.find((node) => node.id === id);
+      const t = tiles.find((tile) => tile.id === id);
+      return n && t ? [{ id, x: n.position.x, y: n.position.y, width: t.w, height: t.h }] : [];
+    });
+
+  const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));
+
+  function placeTiles(moves: TileMove[]) {
+    if (!moves.length) {
+      return;
+    }
+    const to = new Map(moves.map((m) => [m.id, m]));
+    nodes = nodes.map((n) => {
+      const m = to.get(n.id);
+      return m ? { ...n, position: { x: m.x, y: m.y } } : n;
+    });
+    for (const m of moves) {
+      onMove?.(m.id, m.x, m.y);
+    }
+    onMoveEnd?.(moves);
+  }
+
+  const alignRun = (id: AlignActionId) => (ids: string[]) => alignSelection(ids, ALIGN_EDGE[id]);
+
+  const SELECTION_RUN: Record<CanvasActionId, (ids: string[]) => void> = {
+    'tidy-up': (ids) => placeTiles(tidyTiles(placedBoxes(ids))),
+    ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => onDuplicate?.(ids),
     'connect-new': () => {
       if (!selection.box) return;
@@ -628,6 +678,7 @@
     },
     'bring-front': (ids) => onRestack?.(ids, Stack.Front),
     'send-back': (ids) => onRestack?.(ids, Stack.Back),
+    'create-formats': (ids) => onCreateFormats?.(ids[0]),
     delete: (ids) => onDelete?.(ids)
   };
 
@@ -635,12 +686,31 @@
   const PRESS_SLOP_PX = 10;
 
   let menuAt = $state<{ x: number; y: number } | null>(null);
+  let menuLayers = $state<{ id: string; label: string }[]>([]);
+
+  const tileLabel = (t: Tile) => t.displayName || NODE_KIND_LABEL[t.kind as keyof typeof NODE_KIND_LABEL] || t.kind || t.id;
+
+  function layersAt(at: { x: number; y: number }) {
+    if (!toFlow) {
+      return [];
+    }
+    const ids = tilesAt(tiles, toFlow(at));
+    return ids.flatMap((id) => {
+      const t = tiles.find((tile) => tile.id === id);
+      return t ? [{ id, label: tileLabel(t) }] : [];
+    });
+  }
+
+  function selectLayer(id: string) {
+    nodes = nodes.map((n) => ({ ...n, selected: n.id === id }));
+  }
   let press: { timer: ReturnType<typeof setTimeout>; x: number; y: number } | null = null;
 
   function openMenu(id: string, at: { x: number; y: number }) {
     if (!nodes.some((n) => n.id === id && n.selected)) {
       nodes = nodes.map((n) => ({ ...n, selected: n.id === id }));
     }
+    menuLayers = layersAt(at);
     menuAt = at;
   }
 
@@ -652,6 +722,7 @@
   function onSelectionMenu({ event }: { event: MouseEvent }) {
     event.preventDefault();
     menuAt = { x: event.clientX, y: event.clientY };
+    menuLayers = layersAt(menuAt);
   }
 
   function endPress() {
@@ -672,13 +743,16 @@
   }
 
   function movePress(e: PointerEvent) {
+    if (toFlow) {
+      onPointer?.(toFlow({ x: e.clientX, y: e.clientY }));
+    }
     if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > PRESS_SLOP_PX) {
       endPress();
     }
   }
 
   function runSelectionAction(id: SelectionActionId) {
-    if (!selection.ids.length) return;
+    if (!selection.ids.length || !isCanvasAction(id)) return;
     SELECTION_RUN[id](selection.ids);
   }
 
@@ -808,6 +882,16 @@
 
   let wrap = $state<HTMLDivElement | null>(null);
 
+  const tileRects = $derived(new Map(tiles.map((t) => [t.id, t])));
+  const tileRect = (id: string) => tileRects.get(id) ?? null;
+
+  let altHeld = $state(false);
+  let hoveredTile = $state<string | null>(null);
+  const measured = $derived.by(() => {
+    const hovered = hoveredTile && altHeld ? tileRect(hoveredTile) : null;
+    return hovered ? tileGaps(selection.ids.flatMap((id) => tileRect(id) ?? []), hovered) : [];
+  });
+
   const tierBoard = provideTierBoard();
   const posters = $derived(new Map(tiles.flatMap((t) => (t.poster ? [[t.id, t.poster] as const] : []))));
 </script>
@@ -822,8 +906,9 @@
   onpointermove={movePress}
   onpointerup={endPress}
   onpointercancel={endPress}
+  onpointerleave={() => onPointer?.(null)}
   ondragover={onDragOver}
-  ondrop={onDrop}
+  ondrop={spec.chrome ? onDrop : undefined}
 >
   <!--
     I gesti che ci si aspetta da una tela, e qui sono quattro flag: due dita spostano
@@ -844,7 +929,9 @@
     ed era invece una cancellazione a metà, locale e muta. ⌫ resta uno: lo riconosce
     `shortcuts.ts` e lo esegue `CanvasKeys`, che passa da chi la riga ce l'ha davvero.
   -->
-  <SvelteFlow
+<SvelteFlow
+    onnodepointerenter={({ node }) => (hoveredTile = node.id)}
+    onnodepointerleave={() => (hoveredTile = null)}
     minZoom={MIN_ZOOM}
     bind:nodes
     bind:edges
@@ -861,9 +948,9 @@
     {isValidConnection}
     onconnectend={() => (refusal = null)}
     {...spec.flow}
-    onmovestart={() => (moving = true)}
+    onmovestart={(event) => { moving = true; if (event) { onUserPan?.(); } }}
     onmoveend={() => (moving = false)}
-    fitView
+    fitView={fitsOnOpen}
     fitViewOptions={{ padding: FIT_PADDING, maxZoom: READABLE_ZOOM }}
     proOptions={ATTRIBUTION_IN_CREDITS_PAGE}
     multiSelectionKey={['Meta', 'Control', 'Shift']}
@@ -902,6 +989,13 @@
     <CanvasImageTiers board={tierBoard} />
     <CanvasDots />
     <CanvasPosterLayer {posters} />
+    {#if peers.length}
+      <CanvasPeers {peers} rectOf={tileRect} />
+    {/if}
+    {#if measured.length || snapGuides.length || snapSpacing.length}
+      <CanvasMeasure gaps={[...measured, ...snapSpacing]} guides={snapGuides} />
+    {/if}
+    <CanvasFollow view={follow} {onView} />
   </SvelteFlow>
 
   {#if refusal}
@@ -955,7 +1049,7 @@
   {/if}
 
   {#if menuAt && spec.chrome}
-    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} onpick={runSelectionAction} onclose={() => (menuAt = null)} />
+    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} available={canvasMenuIds(selection.ids.length)} layers={menuLayers} onpick={runSelectionAction} onlayer={selectLayer} onclose={() => (menuAt = null)} />
   {/if}
 
   {#if connectPickerAt}
@@ -963,55 +1057,25 @@
   {/if}
 
   {#if picked && (onEdgeRetype || onEdgeDelete)}
-    <div class="gen-menu-veil" role="presentation" onclick={() => (picked = null)}></div>
-    <div
-      class="edge-panel"
-      role="menu"
-      tabindex="-1"
-      style={`left:${picked.screen.x}px; top:${picked.screen.y}px`}
-    >
-      {#if onEdgeRetype}
-        {#each pickedKinds as kind (kind)}
-          <button
-            type="button"
-            role="menuitemradio"
-            aria-checked={kind === picked.edge.kind}
-            class:is-on={kind === picked.edge.kind}
-            onclick={() => retype(kind)}
-          >
-            {EDGE_KIND_LABEL[kind]}
-          </button>
-        {/each}
-      {/if}
-
-      {#if onEdgeModeChange}
-        <div class="edge-panel-sep" role="separator"></div>
-        {#each WIRE_MODES as mode (mode)}
-          <button
-            type="button"
-            role="menuitemradio"
-            aria-checked={(picked.edge.mode ?? 'fixed') === mode}
-            class:is-on={(picked.edge.mode ?? 'fixed') === mode}
-            onclick={() => retypeMode(mode)}
-          >
-            {#if WIRE_MODE_LOOK[mode].icon}
-              {@const Icon = WIRE_MODE_LOOK[mode].icon}
-              <Icon class="edge-mode-icon" data-testid="wire-mode-icon-{mode}" size={12} />
-            {/if}
-            {WIRE_MODE_LABEL[mode]}
-          </button>
-        {/each}
-      {/if}
-
-      {#if onEdgeDelete}
-        <button type="button" role="menuitem" class="edge-drop" onclick={drop}>Togli</button>
-      {/if}
-    </div>
+    <EdgePanel
+      edge={picked.edge}
+      at={picked.screen}
+      kinds={onEdgeRetype ? pickedKinds : []}
+      modes={!!onEdgeModeChange}
+      deletable={!!onEdgeDelete}
+      onkind={retype}
+      onmode={retypeMode}
+      ondelete={drop}
+      onclose={() => (picked = null)}
+    />
   {/if}
 </div>
 
 <svelte:window
+  onkeyup={(e) => (altHeld = e.altKey)}
+  onblur={() => (altHeld = false)}
   onkeydown={(e) => {
+    altHeld = e.altKey;
     if (e.key !== 'Escape') return;
     picked = null;
     refusal = null;
@@ -1079,15 +1143,6 @@
     color: var(--ink-soft, #6e6e73);
   }
 
-  /* Lo sfondo cliccabile che chiude il pannello di una linea. `position: fixed` perché il punto
-     che lo colloca è quello dello SCHERMO: dentro il flusso si muoverebbe con la tela mentre lo
-     si guarda. */
-  .gen-menu-veil {
-    position: fixed;
-    inset: 0;
-    z-index: 20;
-  }
-
   /* Il motivo del rifiuto, sotto lo sguardo di chi sta tirando la linea e non in un angolo:
      `pointer-events: none` perché compare a metà gesto, e un riquadro che intercetta il puntatore
      lo interromperebbe proprio mentre spiega perché non si può. */
@@ -1124,53 +1179,5 @@
   }
   .wrap :global(.svelte-flow__handle.connectingto.valid) {
     background: var(--accent, #7c5cff);
-  }
-
-  .edge-panel {
-    position: fixed;
-    z-index: 21;
-    display: flex;
-    flex-direction: column;
-    min-width: 128px;
-    padding: 4px;
-    border-radius: 10px;
-    background: var(--paper, #fff);
-    border: 1px solid var(--line-2, #d2d2d7);
-    box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
-  }
-  .edge-panel button {
-    padding: 6px 10px;
-    font: inherit;
-    font-size: 12.5px;
-    text-align: left;
-    color: var(--ink, #1d1d1f);
-    background: none;
-    border: none;
-    border-radius: 7px;
-    cursor: pointer;
-  }
-  .edge-panel button:hover,
-  .edge-panel button:focus-visible {
-    background: var(--paper-2, #f9f9f9);
-  }
-  .edge-panel button.is-on {
-    color: var(--accent, #7c5cff);
-  }
-  .edge-panel button.edge-drop {
-    margin-top: 3px;
-    padding-top: 7px;
-    border-top: 1px solid var(--line, #e5e5e5);
-    border-radius: 0;
-    color: #c0392b;
-  }
-  .edge-panel :global(.edge-mode-icon) {
-    color: var(--ui-wire-iterate);
-    vertical-align: -2px;
-    margin-right: 4px;
-  }
-
-  .edge-panel-sep {
-    margin: 3px 0;
-    border-top: 1px solid var(--line, #e5e5e5);
   }
 </style>

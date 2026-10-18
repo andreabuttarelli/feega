@@ -472,6 +472,25 @@ describe('a live scene in a video', () => {
   });
 });
 
+describe('a still shows one frame', () => {
+  const poster = (shapeFrames: number): MotionDoc => {
+    const video = { ...calm(), durationInFrames: 108 };
+    const shaped = must(addClip(video, { component: 'Shape', from: 0, durationInFrames: shapeFrames, props: {} }, 'split'));
+    return { ...must(addClip(shaped, { component: 'Title', from: 0, durationInFrames: 108, props: { text: 'LIME.' } }, 'title')), still: { frame: 90 } };
+  };
+  const hidden = (doc: MotionDoc) => docProblems(doc, { audioAssets: 0 }).filter((p) => p.kind === Quality.HiddenInStill);
+
+  it('blocks a clip that ends at the still frame, as when a poster lost its split and sneaker to a fence-post', () => {
+    const problems = hidden(poster(90));
+
+    expect(problems.map((p) => p.detail.split(' ')[0])).toEqual(['split']);
+    expect(blocking(problems)).toHaveLength(1);
+  });
+
+  it('stays quiet when every clip is on screen at the still frame', () => {
+    expect(hidden(poster(91))).toEqual([]);
+  });
+});
 
 describe('the script gate', () => {
   const titled = (style: MotionStyle) => must(addClip({ ...newMotionDoc(MotionFormat.Portrait), style }, { component: 'Title', from: 0, durationInFrames: SCENE, props: { text: 'Forma' } }, 't'));

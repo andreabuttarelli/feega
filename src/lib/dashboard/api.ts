@@ -35,9 +35,31 @@ export function orgHint(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-export function chooseWorkspace(orgId: string): void {
+export async function chooseWorkspace(orgId: string): Promise<void> {
   document.cookie = `${ORG_COOKIE}=${encodeURIComponent(orgId)}; path=/; max-age=${ORG_COOKIE_MAX_AGE_S}; samesite=lax`;
   cache.clear();
+  await call('/api/v1/orgs/active', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ org_id: orgId }) });
+}
+
+export type Sent = { ok: boolean; status: number; body: Record<string, unknown> };
+
+export async function sendJson(path: string, method: string, payload: unknown = {}): Promise<Sent> {
+  const { status, body } = await call(path, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+  cache.clear();
+  return { ok: status < 300, status, body: body as Record<string, unknown> };
+}
+
+export async function readJson<T>(path: string): Promise<T> {
+  const { body } = await call(path);
+  return body as T;
+}
+
+export async function createWorkspace(name: string): Promise<Sent> {
+  const sent = await sendJson('/api/v1/orgs', 'POST', { name });
+  if (sent.ok) {
+    await chooseWorkspace(String(sent.body.org_id));
+  }
+  return sent;
 }
 
 function withOrg(path: string, query: URLSearchParams = new URLSearchParams()): string {
@@ -102,9 +124,17 @@ export function warmDashboard(url: URL): void {
   }
 }
 
-export async function postAction(page: DashboardPage, action: string, form: FormData): Promise<ActionResult> {
+export async function loadApi<T>(path: string, query: URLSearchParams, depends: Depends): Promise<T> {
+  return (await cachedLoad(withOrg(path, query), depends)) as T;
+}
+
+export async function postApi(path: string, action: string, form: FormData): Promise<ActionResult> {
   const query = new URLSearchParams({ action });
-  const { status, body } = await call(withOrg(`/api/v1/me/pages/${page}`, query), { method: 'POST', body: form });
+  const { status, body } = await call(withOrg(path, query), { method: 'POST', body: form });
   cache.clear();
   return actionResultOf(status, body);
+}
+
+export function postAction(page: DashboardPage, action: string, form: FormData): Promise<ActionResult> {
+  return postApi(`/api/v1/me/pages/${page}`, action, form);
 }

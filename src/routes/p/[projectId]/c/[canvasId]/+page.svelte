@@ -1,6 +1,10 @@
 <script lang="ts">
+  import { localStore } from '$lib/browser-storage';
+  import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
+  import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
   import type { Stack } from '$lib/canvas/stacking';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
+  import { CanvasMode, canvasModeFor } from '$lib/canvas/canvas-mode';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
   import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
   /**
@@ -33,12 +37,17 @@
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
+  import { repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
+  import { adoptCommitted, commitHub, rowsOf } from '$lib/canvas/commit-note';
+  import { peerTracks } from '$lib/realtime/peer-tracks';
+  import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
+  import CursorChat from '$lib/components/canvas/CursorChat.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
@@ -55,6 +64,11 @@
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { untrack } from 'svelte';
   import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
+  import { Renderer, Switch, rendererOf } from '$lib/canvas/gpu/renderer-flag';
+  import RendererBadge from '$lib/components/canvas/gpu/RendererBadge.svelte';
+  import { dev } from '$app/environment';
+  import { postThumb, productThumb } from '$lib/canvas/source-thumbs';
+  import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
   import DocNode from '$lib/components/canvas/DocNode.svelte';
@@ -80,6 +94,10 @@
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
+  import { canvasMediaUploader, projectMedia } from '$lib/canvas/media-uploader';
+  import type { LibraryMedia, MediaUploader } from '$lib/components/motion/media-upload';
+  import { changedRaw } from '$lib/motion/template/raw-values';
+  import { templateFields } from '$lib/motion/template/library';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
@@ -91,10 +109,11 @@
   import { AssetKind } from '$lib/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, frameNodeSize, frameResize, motionEditorPath, type FrameResize, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
-  import { layoutOf, rotateGroup, type Placed } from '$lib/canvas/node-layout';
+  import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
+  import { fitToNode } from '$lib/motion/custom-size';
   import { barContextOf } from '$lib/canvas/bottom-bar';
   import { CanvasState, NodeMode, Opening, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
@@ -106,7 +125,7 @@
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
-  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type HostMove, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
@@ -160,6 +179,8 @@
   import { portsOf } from '$lib/canvas/node-ports';
   import { needsUncensoredConfirm } from '$lib/canvas/uncensored-switch';
   import ConfirmDialog from '$lib/components/ConfirmDialog.svelte';
+  import FormatsDialog from '$lib/components/canvas/FormatsDialog.svelte';
+  import type { FormatTarget } from '$lib/motion/reformat';
   import RunsPanel from '$lib/components/canvas/RunsPanel.svelte';
   import { GraphScope, nodeOutputs, recentRuns, staleIds } from '$lib/canvas/run-graph';
   import { planConnectSelection, type ConnectSource } from '$lib/canvas/connect-selection-plan';
@@ -337,6 +358,70 @@
     return DropVerdict.Taken;
   }
 
+  type HostBox = { id: string; x: number; y: number; w: number; h: number };
+  const HOST_MIN_PX = 4;
+  let hostOrigin: HostBox | null = null;
+
+  const placeHost = (box: HostBox) => (nodes = nodes.map((n) => (n.id !== box.id ? n : n.w === box.w && n.h === box.h ? { ...n, x: box.x, y: box.y } : { ...n, x: box.x, y: box.y, w: box.w, h: box.h, userHeight: box.h })));
+
+  let turnFrom: { id: string; rotation: number } | null = null;
+
+  const turnTo = (id: string, rotation: number) => (nodes = nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, rotation } } : n)));
+
+  function hostTurn(id: string, rotation: number, turn: number, phase: DragPhase) {
+    turnFrom = turnFrom?.id === id ? turnFrom : { id, rotation };
+    const from = turnFrom.rotation;
+    if (phase !== DragPhase.Drop) {
+      turnTo(id, from + turn);
+      return;
+    }
+    turnFrom = null;
+    turnTo(id, from);
+    if (turn !== 0) {
+      rotateGroupBy(id, turn);
+    }
+  }
+
+  function hostDrag({ turn, ...shift }: HostMove, to: PointerPoint, phase: DragPhase) {
+    const id = inlineMotion;
+    const row = id ? nodes.find((n) => n.id === id) : null;
+    if (id && row && (turn !== 0 || turnFrom)) {
+      hostTurn(id, layoutOf(row.data).rotation, turn, phase);
+      return;
+    }
+    const zero = toFlow?.({ x: 0, y: 0 });
+    const unit = toFlow?.({ x: 1, y: 1 });
+    if (!id || !row || !zero || !unit) {
+      return;
+    }
+    const scale = unit.x - zero.x;
+    const origin = hostOrigin?.id === id ? hostOrigin : { id, x: row.x, y: row.y, w: row.w, h: row.h };
+    hostOrigin = origin;
+    const next = { id, x: origin.x + shift.dx * scale, y: origin.y + shift.dy * scale, w: Math.max(HOST_MIN_PX, origin.w + shift.dw * scale), h: Math.max(HOST_MIN_PX, origin.h + shift.dh * scale) };
+    const sized = next.w !== origin.w || next.h !== origin.h;
+    if (phase !== DragPhase.Drop) {
+      placeHost(next);
+      cursors.port.update({ live: [{ id, x: next.x, y: next.y }] });
+      if (!sized) {
+        tileDragOver([id], to);
+      }
+      return;
+    }
+    hostOrigin = null;
+    cursors.port.update({ live: [] });
+    placeHost(origin);
+    if (!sized && tileDrop([id], to) === DropVerdict.Taken) {
+      return;
+    }
+    if (next.x !== origin.x || next.y !== origin.y) {
+      void moveEnd([{ id, x: next.x, y: next.y }]);
+      void move(id, next.x, next.y);
+    }
+    if (sized) {
+      void resize(id, next.w, next.h);
+    }
+  }
+
   async function regroup(action: string, fields: Record<string, string>) {
     const res = await post(action, fields);
     if (res?.outcome !== 'done') {
@@ -347,9 +432,15 @@
   }
 
   function rotateGroupBy(id: string, degrees: number) {
+    if (turnGroup({ id, degrees })) {
+      undoStack.push({ source: 'turn', turn: { id, degrees } });
+    }
+  }
+
+  function turnGroup({ id, degrees }: Turn): boolean {
     const group = nodes.find((n) => n.id === id);
     if (!group) {
-      return;
+      return false;
     }
     const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
     const turned = new Map(rotateGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), degrees).map((t) => [t.id, t]));
@@ -358,6 +449,7 @@
       return t ? { ...n, x: t.x, y: t.y, data: { ...n.data, rotation: t.rotation } } : n;
     });
     void post('rotateGroup', { id, degrees: String(degrees) });
+    return true;
   }
 
   function groupElements(ids: string[]) {
@@ -523,7 +615,7 @@
    */
   let textViewModes = $state<Record<string, TextViewMode>>({});
 
-  const clientStorage = typeof localStorage === 'undefined' ? undefined : localStorage;
+  const clientStorage = localStore() ?? undefined;
 
   function textViewModeOf(nodeId: string): TextViewMode {
     return textViewModes[nodeId] ?? loadTextViewMode(clientStorage, nodeId);
@@ -1009,6 +1101,8 @@
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       rotation: layoutOf(n.data).rotation,
       rotatable: motionOf(n)?.kind === FrameKind.Group,
+      behind: chrome.behind,
+      members: chrome.behind ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
@@ -1030,6 +1124,20 @@
   /** `type`/`data` grezzi di ogni tile — la forma che `commonPropertiesOf` legge, per la barra
    *  della selezione: `tiles` porta già `node: CanvasNode`, un'astrazione diversa che non ha
    *  `model`/`params` come campi diretti. */
+  function sourceThumbs(id: string): string[] {
+    const items = [...(shownPosts[id] ?? []).map(postThumb), ...(shownProducts[id] ?? []).map(productThumb), ...(influencersByNode[id]?.views ?? []).map((v) => v.url)];
+    return items.filter((url): url is string => !!url);
+  }
+
+  let domReason = $state<string | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Dom ? (data.rendererSwitch === Switch.ForceDom ? 'kill switch' : '?renderer=dom') : null);
+  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Gpu ? null : (CanvasFlow as unknown as typeof GpuFlow));
+  $effect(() => {
+    if (Flow) {
+      return;
+    }
+    void import('$lib/components/canvas/gpu/GpuFlow.svelte').then((m) => (Flow = m.default));
+  });
+
   const nodeSummaries = $derived(nodes.map((n) => ({ id: n.id, type: n.type, data: n.data })));
 
   const DYNAMIC_PARAM_TYPES: ReadonlySet<string> = new Set<GenMedium>(['image', 'video', 'model3d']);
@@ -1047,6 +1155,44 @@
   });
   const frames = frameHub({ userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
   provideFramePresence(frames.port);
+  const cursorSession = crypto.randomUUID();
+  const cursors = canvasHub({ sessionId: cursorSession, userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
+  const commits = commitHub(cursorSession);
+  const PEER_SWEEP_MS = 1000;
+  let cursorMarks = $state(new Map<string, HeldMark>());
+  let presenceNow = $state(0);
+  const peerPaths = peerTracks();
+  let peerFrame = $state(0);
+  let peerFrameId = 0;
+  function wakePeerFrames() {
+    if (peerFrameId) { return; }
+    const step = () => {
+      peerFrame = Date.now();
+      peerFrameId = peerPaths.moving(peerFrame) ? requestAnimationFrame(step) : 0;
+    };
+    peerFrameId = requestAnimationFrame(step);
+  }
+  const canvasPeers = $derived(canvasPeersOf(cursorMarks, cursorSession, presenceNow, (box) => tiles.some((t) => t.id === box.id && landedAt(t, box))));
+  const drawnPeers = $derived(peerFrame ? peerPaths.smooth(canvasPeers, peerFrame) : canvasPeers);
+  let following = $state<string | null>(null);
+  let presenting = $state(false);
+  const followView = $derived(following ? followed(canvasPeers, following) : null);
+  const presenter = $derived(presenterOf(canvasPeers));
+  function spotlight(on: boolean) {
+    presenting = on;
+    cursors.port.update({ presenting: on });
+  }
+  $effect(() => {
+    const unlisten = cursors.port.listen((mark, sentAt) => {
+      cursorMarks = keepCanvasMark(untrack(() => cursorMarks), mark);
+      presenceNow = Date.now();
+      peerPaths.heard(mark, sentAt, presenceNow);
+      if (document.visibilityState === 'hidden') { peerFrame = 0; return; }
+      wakePeerFrames();
+    });
+    const sweep = setInterval(() => { presenceNow = Date.now(); }, PEER_SWEEP_MS);
+    return () => { unlisten(); clearInterval(sweep); cursors.port.stop(); };
+  });
   let pending = 0;
   let snapshotMissed = false;
   let snapshotVersion = 0;
@@ -1075,7 +1221,8 @@
   const places = createPlaceSaves({
     send,
     backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
-    onStatus: (status) => { placeStatus = status; keepOutbox(); }
+    onStatus: (status) => { placeStatus = status; keepOutbox(); },
+    announce: { intent: (row) => commits.publish([row]), refused: () => commits.publish([]) }
   });
 
   const lines = createOpQueue({
@@ -1142,7 +1289,7 @@
    * cronologia, non due stack separati: creare un nodo dopo averne spostato un altro e poi
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture };
+  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | { source: 'turn'; turn: Turn };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -1174,6 +1321,7 @@
     if (ids.join() !== untrack(() => selectedIds.join())) { void saves.flush(); }
     const before = untrack(() => inlineMotion);
     selectedIds = ids;
+    cursors.port.update({ selection: ids });
     leaveNow(before);
   }
 
@@ -1254,8 +1402,9 @@
   });
 
   function reframe(id: string | null, free: Insets) {
+    const row = id ? nodes.find((n) => n.id === id) : null;
     if (id && reframesOn(viewportOf(pageWidth)) === Reframe.Frame) {
-      focusOn([id], free);
+      focusOn([id], free, row && !tileChromeOf(row).bar ? FocusMode.Reveal : FocusMode.Frame);
     }
   }
 
@@ -1295,6 +1444,7 @@
 
   async function refresh(): Promise<boolean> {
     const version = ++snapshotVersion;
+    const asked = places.mark();
     const snapshot = await post('snapshot', {});
     if (!snapshot) {
       return false;
@@ -1309,7 +1459,7 @@
     }
     const now = Date.now();
     const before = nodes;
-    nodes = keepSame(nodes, keepPending((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty), now);
+    nodes = keepSame(nodes, keepPending((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys, (id) => places.dirty(id) || places.placedAfter(id, asked)), now);
     edges = keepSame(edges, keepLines((snapshot.connections as Connection[]).map(toEdge), edges, lines.pending()), now);
     productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
     socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
@@ -1378,11 +1528,20 @@
       },
       onReconnect: () => { void checkStale(Trigger.Reconnect); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
-      onPeers: (value) => { peers = value; },
+      onPeers: (value) => { peers = value; cursors.port.crowd(value.length + 1); },
       onLink: (state) => { canvasLink.set(state); },
-      frames: frames.line
+      frames: frames.line,
+      frameHeads: frames.heads,
+      cursors: cursors.line,
+      commits: commits.line
+    });
+    const unheard = commits.listen((note) => {
+      const adopted = adoptCommitted(nodes, note.rows, saves.dirtyKeys, places.dirty);
+      nodes = adopted.tiles;
+      if (adopted.refetch) { void refresh(); }
     });
     return () => {
+      unheard();
       disconnect();
       canvasLink.set(null);
     };
@@ -1443,6 +1602,12 @@
     return body;
   }
 
+  function announceCommit(action: string, fields: Record<string, unknown>, answer: ActionAnswer) {
+    if (answer.type !== 'success') { return; }
+    const rows = rowsOf(action, fields, (answer.data ?? {}) as Record<string, unknown>);
+    if (rows) { commits.publish(rows); }
+  }
+
   async function send(
     action: string,
     fields: Record<string, string | number | File | string[]>
@@ -1461,7 +1626,9 @@
 
     const text = await res.text();
     try {
-      return deserialize(text) as ActionAnswer;
+      const answer = deserialize(text) as ActionAnswer;
+      announceCommit(action, fields, answer);
+      return answer;
     } catch {
       console.warn(`canvas action ${action}: unreadable ${res.status}`, text.slice(0, 500));
       return { type: 'error', status: res.status };
@@ -1606,6 +1773,27 @@
 
   let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
   const catalogPosters = new SvelteMap<string, string>();
+  let frameMedia = $state<LibraryMedia[]>([]);
+  const frameMediaUrls = $derived(Object.fromEntries(frameMedia.map((m) => [m.id, m.url ?? m.previewUrl])));
+  const uploadToFrameLibrary = canvasMediaUploader(supabase, { orgId: data.orgId, projectId: data.projectId, canvasId: data.canvas.id });
+  const uploadFrameMedia: MediaUploader = async (file, progress) => {
+    const outcome = await uploadToFrameLibrary(file, progress);
+    if (outcome.ok) {
+      frameMedia = [outcome.asset, ...frameMedia.filter((m) => m.id !== outcome.asset.id)];
+    }
+    return outcome;
+  };
+
+  $effect(() => {
+    if (frameLibraryAt) {
+      void projectMedia({ projectId: data.projectId, canvasId: data.canvas.id }).then((media) => (frameMedia = media));
+    }
+  });
+
+  function frameValues(templateId: string, draft: Instance | null): Record<string, string> {
+    const fresh = draft ? frameDraft(templateId, formatOf(draft.doc)) : null;
+    return draft && fresh ? changedRaw(templateFields(fresh.doc, fresh.clipId), templateFields(draft.doc, draft.clipId)) : {};
+  }
 
   function frameDraft(templateId: string, format: MotionFormat): Instance | null {
     const entry = data.componentTemplates.find((t) => t.id === templateId);
@@ -1630,12 +1818,13 @@
     const spot = placeNear(at, frameSize, occupiedRects());
     const id = crypto.randomUUID();
     const name = data.componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
-    const poster = item?.preview?.poster;
+    const values = frameValues(templateId, draft);
+    const poster = Object.keys(values).length ? null : item?.preview?.poster;
     if (poster) {
       catalogPosters.set(id, poster);
     }
     nodes = [...nodes, toTile(placedFrame({ id, canvasId: data.canvas.id, projectId: data.projectId, name, at: spot, doc }))];
-    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y, node_id: id });
+    const result = await post('frame_template', { template: templateId, format: formatOf(doc), values: JSON.stringify(values), x: spot.x, y: spot.y, node_id: id });
     const node = result?.node as CanvasNodeRecord | undefined;
     nodes = settle(nodes, id, node ? toTile(node) : null);
     if (!node) {
@@ -2102,14 +2291,54 @@
     }
     const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motionOf(row)?.kind);
     if (Math.abs(fit.h - row.h) > FIT_SLACK_PX) {
-      void resize(row.id, fit.w, fit.h);
+      void storeSize(row.id, fit.w, fit.h);
     }
   });
 
+  function framePlan(id: string, w: number, h: number): FrameResize | null {
+    const row = nodes.find((node) => node.id === id);
+    const motion = motionOf(row ?? { id, type: '', data: {} });
+    if (!motion || !row) {
+      return null;
+    }
+    const open = layersSource.video?.nodeId === id ? layersSource.video : null;
+    const shown = open ? { ...motion, format: formatOf(open.doc) } : motion;
+    const mode = id === inlineMotion ? NodeMode.Edit : NodeMode.Preview;
+    return frameResize(shown, { w, h }, open?.doc ?? PICTURE_OF_KIND[motion.kind](motion, row), mode);
+  }
+
+  async function sizeFrameDoc(id: string, picture: { width: number; height: number }) {
+    const open = layersSource.video;
+    if (open?.nodeId === id) {
+      open.edit(fitToNode(open.doc, picture), 'Resized the frame');
+      return;
+    }
+    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height });
+    if (result?.undo) {
+      pushGesture({ items: result.undo as UndoItem[] });
+    }
+  }
+
   async function resize(id: string, width: number, height: number) {
-    const fit = frameFit(id, width);
-    const w = fit?.w ?? width;
-    const h = fit?.h ?? height;
+    const group = nodes.find((n) => n.id === id);
+    if (group && motionOf(group)?.kind === FrameKind.Group) {
+      const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
+      const scaled = new Map(scaleGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), { w: width, h: height }).map((t) => [t.id, t]));
+      nodes = nodes.map((n) => {
+        const t = scaled.get(n.id);
+        return t ? { ...n, x: t.x, y: t.y, w: t.w, h: t.h, userHeight: t.h } : n;
+      });
+      await post('scaleGroup', { id, width: String(width), height: String(height) });
+      return;
+    }
+    const plan = framePlan(id, width, height);
+    await storeSize(id, plan?.w ?? width, plan?.h ?? height);
+    if (plan?.picture) {
+      await sizeFrameDoc(id, plan.picture);
+    }
+  }
+
+  async function storeSize(id: string, w: number, h: number) {
     nodes = nodes.map((n) => (n.id === id ? { ...n, w, h, userHeight: h } : n));
     const placed = places.resize(id, w, h);
     keepOutbox();
@@ -2776,10 +3005,21 @@
     };
   }
 
-  async function duplicate(ids: string[]) {
-    const result = await post('duplicate', { node_ids: ids.join(',') });
+  let formatsFor = $state<string | null>(null);
+
+  async function createFormats(nodeId: string, targets: FormatTarget[]) {
+    landed(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
+  }
+
+  let lastDuplicate: LastDuplicate | null = null;
+
+  async function duplicate(ids: string[], dragged?: Offset) {
+    const offset = dragged ?? repeatOffset(lastDuplicate, ids);
+    const fields: Fields = offset ? { node_ids: ids.join(','), dx: offset.dx, dy: offset.dy } : { node_ids: ids.join(',') };
+    const result = await post('duplicate', fields);
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];
     const connected = (result?.connections ?? []) as Connection[];
+    lastDuplicate = offset && created.length ? { ids: created.map((n) => n.id), offset } : null;
     if (created.length) { nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))]; }
     if (connected.length) { edges = [...edges, ...connected.map(toEdge)]; }
     if (created.length) { pushGesture(createManyGesture(created, connected)); }
@@ -2796,18 +3036,21 @@
   type Clipboard = {
     nodes: { type: string; data: Record<string, unknown>; dx: number; dy: number }[];
     edges: { sourceIndex: number; targetIndex: number; sourceHandle: string | null; targetHandle: string | null }[];
+    freeIds: string[];
   };
   let clipboard = $state<Clipboard | null>(null);
 
   function copy(ids: string[]) {
     const chosen = nodes.filter((n) => ids.includes(n.id));
     if (!chosen.length) { return; }
+    elementClipboard.copyTiles();
 
     const indexOf = new Map(chosen.map((n, i) => [n.id, i]));
     const cx = chosen.reduce((sum, n) => sum + n.x, 0) / chosen.length;
     const cy = chosen.reduce((sum, n) => sum + n.y, 0) / chosen.length;
 
     clipboard = {
+      freeIds: chosen.flatMap((n) => freeElement([n.id]) ?? []),
       nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy })),
       edges: edges
         .filter((e) => indexOf.has(e.source) && indexOf.has(e.target))
@@ -2823,8 +3066,34 @@
   }
 
   /** ⌘V: quel che `copy` ha in mano, riposato attorno al punto dato — vuoto se non si è mai copiato. */
+  const PASTE_STAGGER = 24;
+
+  async function pasteElementsAt(at: { x: number; y: number }, copied: CopiedElements) {
+    for (const [i, clip] of copied.clipIds.entries()) {
+      landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify({ on: DropOn.Canvas, x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER }) }));
+    }
+  }
+
+  const FRAME_CENTRE = { x: 0.5, y: 0.5 };
+
+  async function pasteFreeInto(frameId: string, freeIds: string[]) {
+    for (const source of freeIds) {
+      landed(await post('copyFree', { source, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frameId, at: FRAME_CENTRE }) }));
+    }
+  }
+
   async function paste(at: { x: number; y: number }) {
+    const copied = elementClipboard.elements;
+    if (elementClipboard.kind === Copied.Elements && copied) {
+      await pasteElementsAt(at, copied);
+      return;
+    }
     if (!clipboard) { return; }
+    const frameId = pasteIntoFrame(nodes.filter((n) => selectedIds.includes(n.id)).map((n) => ({ id: n.id, takesDrops: tileChromeOf(n).takesDrops })), clipboard.freeIds);
+    if (frameId) {
+      await pasteFreeInto(frameId, clipboard.freeIds);
+      return;
+    }
 
     const result = await post('paste', {
       nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy }))),
@@ -2908,6 +3177,11 @@
   async function undo() {
     const entry = undoStack.popUndo();
     if (!entry) { return; }
+    if (entry.source === 'turn') {
+      const back = undoTurn(entry.turn);
+      if (turnGroup(back)) { undoStack.pushRedo({ source: 'turn', turn: back }); }
+      return;
+    }
     if (entry.source === 'move') {
       await applyMoveUndo(entry.gesture, (redo) => undoStack.pushRedo({ source: 'move', gesture: redo }));
       return;
@@ -2918,6 +3192,11 @@
   async function redo() {
     const entry = undoStack.popRedo();
     if (!entry) { return; }
+    if (entry.source === 'turn') {
+      const back = undoTurn(entry.turn);
+      if (turnGroup(back)) { undoStack.pushUndo({ source: 'turn', turn: back }); }
+      return;
+    }
     if (entry.source === 'move') {
       await applyMoveUndo(entry.gesture, (redo) => undoStack.pushUndo({ source: 'move', gesture: redo }));
       return;
@@ -2968,19 +3247,29 @@
     [EmptyAction.Image]: () => void create('image', EMPTY_ORIGIN),
     [EmptyAction.Video]: () => void create('video', EMPTY_ORIGIN)
   };
+
+  const canvasMode = $derived(canvasModeFor(data.org.role));
+  const viewOnly = $derived(canvasMode === CanvasMode.View);
 </script>
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
 
 <svelte:window bind:innerWidth={pageWidth} />
 
-<div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
-  {#if peers.length}
+<div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} class:view-only={viewOnly} style={inlineMotion ? neighbourStyle() : undefined}>
+  {#if peers.length || canvasPeers.length}
     {#if topPeers}
-      <Portal to={topPeers}><PeerAvatars {peers} /></Portal>
+      <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></Portal>
     {:else}
-      <div class="peers"><PeerAvatars {peers} /></div>
+      <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></div>
     {/if}
+  {/if}
+  <CursorChat onchat={(chat) => cursors.port.update({ chat })} />
+  {#if presenter && following !== presenter.userId}
+    <div class="presenting" role="status" data-testid="presenter-prompt">
+      {displayName(presenter.name)} is presenting
+      <button type="button" onclick={() => (following = presenter.userId)}>Follow</button>
+    </div>
   {/if}
   <p class="save-status" role="status" data-status={syncShown.state} aria-label={syncShown.label} title={syncShown.label}></p>
   {#if failed}
@@ -3008,6 +3297,9 @@
 
   <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />
 
+  {#if formatsFor}
+    <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
+  {/if}
   <ConfirmDialog
     bind:open={confirmingUncensoredSwitch}
     title="Uncensored model"
@@ -3026,15 +3318,19 @@
     onConfirm={onAudioOperationSwitchConfirmed}
   />
 
-  <CanvasFlow
+  {#if viewOnly}<p class="view-only-badge" data-testid="view-only">View only</p>{/if}
+  {#if Flow}
+  <Flow
+    mode={canvasMode}
     actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
-    {tiles}
+    tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
     {edges}
     onMove={move}
     onMoveEnd={moveEnd}
     onResize={resize}
     onConnect={connect}
     onDelete={remove}
+    onCreateFormats={(id) => (formatsFor = id)}
     onEdgeDelete={disconnect}
     onEdgeModeChange={setEdgeMode}
     onCreate={create}
@@ -3072,6 +3368,20 @@
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
+    thumbsOf={sourceThumbs}
+    cardPreviews={data.cardPreviews}
+    previewsAt={`/p/${data.projectId}/c/${data.canvas.id}/card-previews`}
+    onfail={(why) => {
+      console.warn(`[canvas] GPU renderer failed: ${why} → dom`);
+      domReason = why;
+      Flow = CanvasFlow as unknown as typeof GpuFlow;
+    }}
+    peers={drawnPeers}
+    onPointer={(cursor) => cursors.port.update({ cursor })}
+    onLive={(live) => cursors.port.update({ live })}
+    onView={(view) => cursors.port.update({ view })}
+    onUserPan={() => (following = null)}
+    follow={followView}
   >
     {#snippet tile({ id, selected })}
       {@const row = nodes.find((n) => n.id === id)}
@@ -3286,13 +3596,17 @@
         {/if}
       {/if}
     {/snippet}
-  </CanvasFlow>
-  {#if showsEmptyState(nodes.length, inlineMotion)}
+  </Flow>
+  {/if}
+  {#if dev && domReason}
+    <RendererBadge renderer="dom" reason={domReason} />
+  {/if}
+  {#if !viewOnly && showsEmptyState(nodes.length, inlineMotion)}
     <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
   {/if}
   {#if editingMotion}
     {#key editingMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} {canvasundo} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} onhostdrag={hostDrag} {canvasundo} />
     {/key}
   {/if}
 
@@ -3317,7 +3631,9 @@
       items={componentItems}
       format={MotionFormat.Landscape}
       draftOf={frameDraft}
-      compose={(doc) => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })}
+      compose={(doc) => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: frameMediaUrls, target: Target.Screen })}
+      assets={frameMedia}
+      upload={uploadFrameMedia}
       target={AddTarget.Canvas}
       onpick={(templateId, _sounds, draft) => void addFrame(templateId, draft)}
       onclose={() => (frameLibraryAt = null)}
@@ -3351,6 +3667,24 @@
 </div>
 
 <style>
+  .view-only :global(.svelte-flow__node) {
+    pointer-events: none;
+  }
+
+  .view-only-badge {
+    position: absolute;
+    top: var(--ui-space-3);
+    left: 50%;
+    z-index: 5;
+    margin: 0;
+    padding: var(--ui-space-1) var(--ui-space-3);
+    border-radius: 9999px;
+    background: var(--ui-panel-raised);
+    color: var(--ui-text);
+    font-size: var(--ui-type-caption);
+    transform: translateX(-50%);
+  }
+
   .canvas.editing :global([role='toolbar'][aria-label='Selection actions']) {
     display: none;
   }
@@ -3467,6 +3801,8 @@
     margin-bottom: 0;
   }
 
+  .presenting { position: absolute; z-index: 10; left: 50%; top: 16px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 6px 12px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 9999px; font-size: 13px; }
+  .presenting button { border: 0; background: var(--ui-accent, #0090ff); color: white; border-radius: 9999px; padding: 2px 10px; cursor: pointer; }
   .peers { position: absolute; z-index: 10; right: 16px; top: 16px; }
 
   .save-status {

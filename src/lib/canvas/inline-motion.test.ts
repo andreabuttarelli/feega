@@ -57,6 +57,7 @@ describe('the node player while the editor opens', () => {
     expect(ownPlayer(NodeMode.Preview, Paint.Pending, true)).toBe(true);
     expect(ownPlayer(NodeMode.Edit, Paint.Pending, false)).toBe(false);
   });
+
 });
 
 describe('the other nodes while a frame is edited on a phone', () => {
