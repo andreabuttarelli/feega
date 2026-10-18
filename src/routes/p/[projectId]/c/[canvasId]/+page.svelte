@@ -42,6 +42,7 @@
   import { adoptCommitted, commitHub, rowsOf } from '$lib/canvas/commit-note';
   import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
+  import CursorChat from '$lib/components/canvas/CursorChat.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
@@ -3140,6 +3141,7 @@
       <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></div>
     {/if}
   {/if}
+  <CursorChat onchat={(chat) => cursors.port.update({ chat })} />
   {#if presenter && following !== presenter.userId}
     <div class="presenting" role="status" data-testid="presenter-prompt">
       {displayName(presenter.name)} is presenting

@@ -6,6 +6,7 @@ export const CANVAS_PEER_EVENT = 'canvas-peer';
 export const TICK_MS = 50;
 export const HEARTBEAT_MS = 3000;
 export const SETTLE_MS = 3000;
+export const CHAT_MAX = 120;
 const MS_PER_SECOND = 1000;
 const MAX_SELECTION = 200;
 
@@ -13,11 +14,11 @@ export type View = { cx: number; cy: number; zoom: number };
 
 export type LiveBox = { id: string; x: number; y: number; w?: number; h?: number; r?: number };
 
-export type CanvasMark = { sessionId: string; userId: string; name: string; cursor: FrameCursor | null; selection: string[]; live: LiveBox[]; view: View | null; presenting: boolean; at: number };
+export type CanvasMark = { sessionId: string; userId: string; name: string; cursor: FrameCursor | null; selection: string[]; live: LiveBox[]; view: View | null; presenting: boolean; chat: string | null; at: number };
 
 export type CanvasSelf = Pick<CanvasMark, 'sessionId' | 'userId' | 'name'>;
 
-export type CanvasState = Pick<CanvasMark, 'cursor' | 'selection' | 'live' | 'view' | 'presenting'>;
+export type CanvasState = Pick<CanvasMark, 'cursor' | 'selection' | 'live' | 'view' | 'presenting' | 'chat'>;
 
 export type CanvasPeer = CanvasMark & { colour: string };
 
@@ -45,6 +46,7 @@ const markSchema = z.object({
   live: z.array(z.object({ id: z.string().min(1), x: z.number().finite(), y: z.number().finite(), w: z.number().finite().positive().optional(), h: z.number().finite().positive().optional(), r: z.number().finite().optional() })).max(MAX_SELECTION).default([]),
   view: z.object({ cx: z.number().finite(), cy: z.number().finite(), zoom: z.number().finite().positive() }).nullable().default(null),
   presenting: z.boolean().default(false),
+  chat: z.string().max(CHAT_MAX).nullable().default(null),
   at: z.number().finite()
 });
 
@@ -110,7 +112,7 @@ export function presenterOf(peers: CanvasPeer[]): CanvasPeer | null {
 export function canvasHub(self: CanvasSelf, now: () => number = Date.now): { port: CanvasPresence; line: CanvasLine } {
   const listeners = new Set<(mark: CanvasMark) => void>();
   let transmit: ((mark: CanvasMark) => void) | null = null;
-  let state: CanvasState = { cursor: null, selection: [], live: [], view: null, presenting: false };
+  let state: CanvasState = { cursor: null, selection: [], live: [], view: null, presenting: false, chat: null };
   let dirty = false;
   let lastSent = 0;
 
