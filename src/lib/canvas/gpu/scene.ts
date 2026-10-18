@@ -48,7 +48,7 @@ const THUMB_GAP = 4;
 
 const tierFor = (zoom: number) => TEXT_TIERS.find((t) => t >= zoom * devicePixelRatio) ?? TEXT_TIERS[TEXT_TIERS.length - 1];
 
-type Built = { id: string; root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; skeletons: Graphics[]; media: Media | null };
+type Built = { id: string; root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; skeletons: Graphics[]; media: Media | null; releases: (() => void)[] };
 
 function dotTexture(theme: Theme): Texture {
   const c = document.createElement('canvas');
@@ -331,6 +331,9 @@ export class GpuScene {
     if (this.retiring.get(b.id) === b) {
       this.retiring.delete(b.id);
     }
+    for (const release of b.releases) {
+      release();
+    }
     b.root.destroy({ children: true });
   }
 
@@ -404,13 +407,13 @@ export class GpuScene {
       this.attachVideo(b, media.url, box, fit);
       return;
     }
-    this.textures.want(this.imageUrl(media.url), (tex) => {
+    b.releases.push(this.textures.want(this.imageUrl(media.url), (tex) => {
       if (sprite.destroyed) {
         return;
       }
       place(sprite, tex, box, fit);
       this.markReady(b);
-    });
+    }));
   }
 
   private imageUrl(url: string): string {
@@ -443,7 +446,7 @@ export class GpuScene {
     const holder = new Container();
     const root = new Container();
     holder.addChild(root);
-    const b: Built = { id: c.id, root: holder, skin: root, key, body: null, video: null, texts: [], skeletons: [], media: null };
+    const b: Built = { id: c.id, root: holder, skin: root, key, body: null, video: null, texts: [], skeletons: [], media: null, releases: [] };
     const f = c.face;
     const BUILD: Record<Surface, () => void> = {
       [Surface.Media]: () => {
@@ -482,7 +485,7 @@ export class GpuScene {
         root.addChild(title);
         b.texts.push(title);
         if (f.thumbs.length) {
-          this.thumbGrid(root, f.thumbs, c, PAD + BODY_SIZE * 2);
+          this.thumbGrid(root, b, f.thumbs, c, PAD + BODY_SIZE * 2);
           return;
         }
         this.skeleton(root, b, c, PAD + BODY_SIZE * 2);
@@ -520,7 +523,7 @@ export class GpuScene {
     b.texts.push(open);
   }
 
-  private thumbGrid(root: Container, urls: string[], c: Card, top: number) {
+  private thumbGrid(root: Container, b: Built, urls: string[], c: Card, top: number) {
     const cell = (c.w - PAD * 2 - THUMB_GAP * (THUMB_COLUMNS - 1)) / THUMB_COLUMNS;
     const rows = Math.max(0, Math.floor((c.h - top - PAD + THUMB_GAP) / (cell + THUMB_GAP)));
     const shown = urls.slice(0, rows * THUMB_COLUMNS);
@@ -532,14 +535,16 @@ export class GpuScene {
       const sprite = new Sprite(Texture.EMPTY);
       sprite.position.set(box.x, box.y);
       root.addChild(sprite);
-      this.textures.want(url, (tex) => {
-        if (sprite.destroyed) {
-          return;
-        }
-        sprite.texture = cover(tex, cell, cell);
-        sprite.width = cell;
-        sprite.height = cell;
-      });
+      b.releases.push(
+        this.textures.want(url, (tex) => {
+          if (sprite.destroyed) {
+            return;
+          }
+          sprite.texture = cover(tex, cell, cell);
+          sprite.width = cell;
+          sprite.height = cell;
+        })
+      );
     });
   }
 
