@@ -375,14 +375,15 @@ describe('frame elements, the same op the canvas drag uses', () => {
     expect(calls.some((c) => c.table === 'nodes' && c.op === 'update' && c.filters.some(([k, v]) => k === 'id' && v === GEN))).toBe(false);
   });
 
-  it('connect_nodes from a generated image to a frame places the picture in it', async () => {
+  it('connect_nodes into a frame is refused and writes nothing in it', async () => {
     const { db, calls } = fakeDb(rows(), { filter: true });
     const tools = createProjectTools({ db, orgId: ORG, projectId: PROJECT, userId: USER });
 
     const out = await run(tools.connect_nodes, { canvasId: CANVAS, sourceNodeId: GEN, targetNodeId: B });
 
-    expect(out).toMatchObject({ placed_in_frame: { clip_id: expect.any(String) } });
-    expect(revisionsOf(calls, B)[0].map((c) => c.component)).toEqual(['Image']);
+    expect(out).toMatchObject({ error: 'edge_refused' });
+    expect(revisionsOf(calls, B)).toEqual([]);
+    expect(calls.some((c) => c.table === 'nodes_connections' && c.op === 'insert')).toBe(false);
   });
 });
 
