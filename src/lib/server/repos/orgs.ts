@@ -10,8 +10,8 @@ import type { Database } from '$lib/database.types';
  */
 type OrgRow = Database['public']['Tables']['orgs']['Row'];
 
-export const ORG_ROLES = ['owner', 'admin', 'member'] as const;
-export type OrgRole = (typeof ORG_ROLES)[number];
+export { ORG_ROLES, type OrgRole } from '$lib/org-roles';
+import type { OrgRole } from '$lib/org-roles';
 
 export type Org = {
   id: string;
