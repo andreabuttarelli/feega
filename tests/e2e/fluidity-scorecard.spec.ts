@@ -7,7 +7,7 @@ import { test, expect, type Browser, type BrowserContext, type Page } from '@pla
 import { REAL_STACK, signInE2e } from './fixtures/session';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { FluidProbe, Read, type Box, type PixelWatch, type Watch } from './fixtures/fluidity-probe';
-import { scorecard, verdictOf, type SessionRun, type StepResult } from './fixtures/fluidity-report';
+import { recordsVideo, scorecard, verdictOf, type SessionRun, type StepResult } from './fixtures/fluidity-report';
 
 const OUT = process.env.FLUID_OUT ?? join(homedir(), 'Documents', 'feega-videos', 'fluidity');
 const SLUG = process.env.FLUID_PROJECT_SLUG ?? 'gpu-fixture-0aef6d1a';
@@ -20,6 +20,9 @@ const SURFACE = '[data-canvas-surface], .svelte-flow';
 const STEP_MS = 45_000;
 const MOVE_PX = 36;
 const UNTOUCHED_SAMPLES = 6;
+const ROTATION = 15;
+const TEXT_SIZE = '72';
+const FRAME_FILL = '14b8a6';
 const PROMPT = 'Moody product shot, rim light';
 const TYPED = 'Fluid';
 
@@ -29,6 +32,7 @@ type Step = { name: string; drive: (c: Ctx) => Promise<Outcome> };
 type StepRun = StepResult;
 
 const nodeSel = (id: string) => `.svelte-flow__node[data-id="${id}"]`;
+const contentSel = (id: string) => `[data-id="${id}"]`;
 const fillHex = (page: Page) => page.getByTestId('fill-editor').locator('input.hex').first();
 
 async function testAccount(): Promise<{ db: SupabaseClient; userId: string }> {
@@ -85,24 +89,120 @@ async function clickEmpty(page: Page) {
 
 async function leaveEditor(page: Page) {
   for (let i = 0; i < 4 && (await page.getByTestId('motion-editor').count()); i++) {
+    await page.locator('body').evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await page.keyboard.press('Escape');
     await page.waitForTimeout(150);
   }
   await expect(page.getByTestId('motion-editor')).toHaveCount(0, { timeout: OPEN_MS });
 }
 
-const GEN_NODE = ['text', 'image', 'video'].map((t) => `.svelte-flow__node[data-kind="${t}"], .svelte-flow__node-${t}`).join(', ');
+const GEN_NODE = [...['text', 'image', 'video'].map((t) => `.svelte-flow__node[data-kind="${t}"]`), '.svelte-flow__node-tile:has(.gen)'].join(', ');
 const FRAME_NODE = '[data-motion-node]:not([data-kind="element"])';
 
-async function bringIntoView(page: Page, selector: string, idOf: (el: Element) => string): Promise<string> {
+enum Open {
+  Single = 'single',
+  Double = 'double'
+}
+
+const centre = (b: Box) => ({ x: b.x + b.width / 2, y: b.y + b.height / 2 });
+const MARQUEE_PAD = 3;
+const IN_VIEW = { left: 60, top: 70, right: 420, bottom: 110 };
+
+function visible(b: Box | null): boolean {
+  return !!b && b.width > 8 && b.x > IN_VIEW.left && b.y > IN_VIEW.top && b.x + b.width < VIEWPORT.width - IN_VIEW.right && b.y + b.height < VIEWPORT.height - IN_VIEW.bottom;
+}
+
+async function inView(page: Page, id: string): Promise<Box> {
+  const now = await page.locator(nodeSel(id)).boundingBox({ timeout: 1000 }).catch(() => null);
+  if (visible(now)) {
+    return now!;
+  }
   await page.keyboard.press('Shift+Digit1');
-  await page.waitForTimeout(600);
-  const id = await page.locator(selector).first().evaluate(idOf);
-  await page.locator(selector).first().click({ position: { x: 8, y: 8 } });
+  await page.waitForTimeout(700);
+  const tiny = (await page.locator(nodeSel(id)).boundingBox())!;
+  await drag(page, { x: tiny.x - MARQUEE_PAD, y: tiny.y - MARQUEE_PAD }, { x: tiny.x + tiny.width + MARQUEE_PAD, y: tiny.y + tiny.height + MARQUEE_PAD }, 4);
+  await page.waitForTimeout(300);
   await page.keyboard.press('Shift+Digit2');
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(500);
   await page.keyboard.press('Minus');
-  await page.waitForTimeout(600);
+  await page.keyboard.press('Minus');
+  await page.waitForTimeout(700);
+  await leaveEditor(page);
+  return (await page.locator(nodeSel(id)).boundingBox())!;
+}
+
+async function clickNode(page: Page, id: string) {
+  const b = await inView(page, id);
+  await page.mouse.click(b.x + Math.min(20, b.width / 4), b.y + Math.min(12, b.height / 4));
+}
+
+async function openNode(page: Page, id: string, how = Open.Single) {
+  if (await page.getByTestId('motion-editor').count()) {
+    return;
+  }
+  const at = centre(await inView(page, id));
+  await (how === Open.Double ? page.mouse.dblclick(at.x, at.y) : page.mouse.click(at.x, at.y));
+  await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: OPEN_MS });
+}
+
+async function pickFilledLayer(page: Page, only?: string): Promise<string> {
+  const layers = page.getByTestId('layers');
+  if (!(await layers.isVisible())) {
+    await page.getByRole('button', { name: 'Layers', exact: true }).click();
+  }
+  const swatch = page.getByTestId('motion-inspector').getByTestId('fill-swatch').first();
+  if (only) {
+    await layers.locator(`[data-layer="${only}"]`).first().click();
+    await expect(swatch).toBeVisible({ timeout: OPEN_MS });
+    return only;
+  }
+  const count = await layers.locator('[data-layer]').count();
+  for (let i = count - 1; i >= 0; i--) {
+    const layer = layers.locator('[data-layer]').nth(i);
+    const name = (await layer.getAttribute('data-layer'))!;
+    if (only && name !== only) {
+      continue;
+    }
+    await layer.click();
+    if (await swatch.isVisible({ timeout: 500 }).catch(() => false)) {
+      return name;
+    }
+  }
+  throw new Error(only ? `layer ${only} not found among ${count}` : 'no layer with a fill in this frame');
+}
+
+async function marquee(page: Page, ids: string[]) {
+  await inView(page, ids[0]);
+  const boxes = await Promise.all(ids.map((id) => boxOf(page, id)));
+  const left = Math.min(...boxes.map((b) => b.x)) - 16;
+  const top = Math.min(...boxes.map((b) => b.y)) - 16;
+  const right = Math.max(...boxes.map((b) => b.x + b.width)) + 16;
+  const bottom = Math.max(...boxes.map((b) => b.y + b.height)) + 16;
+  await drag(page, { x: left, y: top }, { x: right, y: bottom }, 8);
+}
+
+const FRAME_TRIES = 6;
+
+async function frameWithFill(page: Page): Promise<{ id: string; layer: string }> {
+  await page.keyboard.press('Shift+Digit1');
+  await page.waitForTimeout(700);
+  const frames = await page.locator(FRAME_NODE).evaluateAll((all) => all.map((e) => (e as HTMLElement).dataset.motionNode!).filter((id) => document.querySelector(`.svelte-flow__node[data-id="${id}"]`)));
+  for (const id of frames.slice(0, FRAME_TRIES)) {
+    await openNode(page, id, Open.Double);
+    const layer = await pickFilledLayer(page).catch(() => null);
+    if (layer) {
+      return { id, layer };
+    }
+    await leaveEditor(page);
+  }
+  throw new Error(`none of the first ${FRAME_TRIES} frames has a layer with a fill`);
+}
+
+async function anyInView(page: Page, selector: string, idOf: (el: Element) => string): Promise<string> {
+  await page.keyboard.press('Shift+Digit1');
+  await page.waitForTimeout(700);
+  const id = await page.locator(selector).first().evaluate(idOf);
+  await inView(page, id);
   return id;
 }
 
@@ -134,14 +234,15 @@ async function openFill(page: Page) {
 }
 
 const FILL_WATCH: Watch = { id: 'fill hex', selector: '[data-testid="fill-editor"] input.hex', read: Read.Value };
-const ROTATE_WATCH: Watch = { id: 'rotate', selector: 'aside.props input.num[aria-label="Rotate"]', read: Read.Value };
-const OPACITY_WATCH: Watch = { id: 'opacity', selector: 'aside.props input.num[aria-label="Opacity"]', read: Read.Value };
+const ROTATE_WATCH: Watch = { id: 'rotate', selector: 'aside.props input.num[aria-label="Rotate Z"]', read: Read.Value };
+const WIDTH_WATCH: Watch = { id: 'width', selector: 'aside.props input.num[aria-label="Width"]', read: Read.Value };
+const RESIZE_BY = 60;
 const FRAME_FILL_WATCH: Watch = { ...FILL_WATCH, id: 'frame fill' };
 const TEXT_WATCHES: Watch[] = [
   { id: 'text', selector: 'aside.props textarea', read: Read.Value },
   { id: 'size', selector: 'aside.props [data-field="Size"] input', read: Read.Value }
 ];
-const promptWatch = (id: string): Watch => ({ id: 'prompt', selector: `${nodeSel(id)} textarea`, read: Read.Value });
+const promptWatch = (id: string): Watch => ({ id: 'prompt', selector: `${contentSel(id)} textarea`, read: Read.Value });
 const boxWatch = (id: string, key = id): Watch => ({ id: `${key} box`, selector: nodeSel(id), read: Read.Box });
 const pixel = async (page: Page, id: string): Promise<PixelWatch> => ({ id, box: await boxOf(page, id), touched: true });
 
@@ -177,12 +278,12 @@ const STEPS: Step[] = [
     name: 'move 5×',
     drive: async ({ page, ids, watch }) => {
       const id = ids.get('box')!;
-      await watch([boxWatch(id, 'box')]);
       await leaveEditor(page);
-      await page.locator(nodeSel(id)).click({ position: { x: 6, y: 6 } });
+      await inView(page, id);
+      await watch([boxWatch(id, 'box')]);
       for (let i = 0; i < 5; i++) {
         const b = await boxOf(page, id);
-        await drag(page, { x: b.x + b.width / 2, y: b.y + b.height / 2 }, { x: b.x + b.width / 2 - MOVE_PX, y: b.y + b.height / 2 + (i % 2 ? -MOVE_PX : MOVE_PX) / 2 }, 6);
+        await drag(page, centre(b), { x: b.x + b.width / 2 - MOVE_PX, y: b.y + b.height / 2 + MOVE_PX / 2 }, 6);
       }
       return { touched: [id], watches: [boxWatch(id, 'box')] };
     }
@@ -191,38 +292,41 @@ const STEPS: Step[] = [
     name: 'resize',
     drive: async ({ page, ids, watch }) => {
       const id = ids.get('box')!;
+      await openNode(page, id);
       await watch([boxWatch(id, 'box')]);
-      const handle = page.locator(`${nodeSel(id)} .svelte-flow__resize-control.handle.bottom.right, .svelte-flow__resize-control.handle.bottom.right`).first();
-      await expect(handle).toBeVisible({ timeout: 5000 });
-      const h = (await handle.boundingBox())!;
-      await drag(page, { x: h.x + h.width / 2, y: h.y + h.height / 2 }, { x: h.x + 60, y: h.y + 40 });
-      return { touched: [id], watches: [boxWatch(id, 'box')] };
+      const handle = page.locator('.svelte-flow__resize-control.handle.bottom.right').first();
+      if (await handle.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const h = (await handle.boundingBox())!;
+        await drag(page, centre(h), { x: h.x + 60, y: h.y + 40 });
+        return { touched: [id], watches: [boxWatch(id, 'box')] };
+      }
+      const width = page.locator(WIDTH_WATCH.selector).first();
+      const wider = String(Number(await width.inputValue()) + RESIZE_BY);
+      await watch([WIDTH_WATCH]);
+      await width.fill(wider);
+      await width.press('Enter');
+      return { touched: [id], watches: [boxWatch(id, 'box'), WIDTH_WATCH], expected: [{ id: 'width', value: wider }] };
     }
   },
   {
     name: 'rotate',
-    drive: async ({ page, ids }) => {
+    drive: async ({ page, ids, watch }) => {
       const id = ids.get('box')!;
-      const handle = page.getByTestId('rotate-handle').first();
-      if (await handle.isVisible()) {
-        const h = (await handle.boundingBox())!;
-        const b = await boxOf(page, id);
-        await drag(page, { x: h.x + h.width / 2, y: h.y + h.height / 2 }, { x: b.x + b.width + 60, y: b.y + b.height / 2 }, 10);
-        return { touched: [id] };
-      }
-      const rotate = page.locator('aside.props input.num[aria-label="Rotate"]').first();
-      await rotate.fill('15');
+      await openNode(page, id);
+      await watch([ROTATE_WATCH]);
+      const rotate = page.locator(ROTATE_WATCH.selector).first();
+      await rotate.fill(String(ROTATION));
       await rotate.press('Enter');
-      return { touched: [id], watches: [ROTATE_WATCH], expected: [{ id: 'rotate', value: '15' }] };
+      return { touched: [id], watches: [ROTATE_WATCH], expected: [{ id: 'rotate', value: String(ROTATION) }] };
     }
   },
   {
     name: 'duplicate with ⌥-drag',
     drive: async ({ page, ids, watch }) => {
       const id = ids.get('box')!;
-      await watch([boxWatch(id, 'box')]);
       await leaveEditor(page);
-      await clickEmpty(page);
+      await inView(page, id);
+      await watch([boxWatch(id, 'box')]);
       const before = await domIds(page);
       const b = await boxOf(page, id);
       await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
@@ -240,11 +344,9 @@ const STEPS: Step[] = [
     name: 'align with ⌥ keys',
     drive: async ({ page, ids, watch }) => {
       const [a, b] = [ids.get('box')!, ids.get('copy')!];
-      await watch([boxWatch(a, 'box'), boxWatch(b, 'copy')]);
       await leaveEditor(page);
-      await clickEmpty(page);
-      await page.locator(nodeSel(a)).click({ position: { x: 6, y: 6 } });
-      await page.locator(nodeSel(b)).click({ position: { x: 6, y: 6 }, modifiers: ['Shift'] });
+      await marquee(page, [a, b]);
+      await watch([boxWatch(a, 'box'), boxWatch(b, 'copy')]);
       await page.keyboard.press('Alt+KeyA');
       await page.waitForTimeout(300);
       await page.keyboard.press('Alt+KeyH');
@@ -264,12 +366,16 @@ const STEPS: Step[] = [
   {
     name: 'change a prop on the group',
     drive: async ({ page, ids, watch }) => {
-      const opacity = page.locator('aside.props input.num[aria-label="Opacity"]').first();
-      await expect(opacity).toBeVisible({ timeout: 5000 });
-      await watch([OPACITY_WATCH]);
-      await opacity.fill('60');
-      await opacity.press('Enter');
-      return { touched: [ids.get('box')!, ids.get('copy')!, ids.get('group')!], watches: [OPACITY_WATCH], expected: [{ id: 'opacity', value: '60' }] };
+      const group = ids.get('group')!;
+      await leaveEditor(page);
+      await marquee(page, [group]);
+      const g = await boxOf(page, group);
+      await watch([boxWatch(group, 'group')]);
+      const handle = page.getByTestId('rotate-handle').first();
+      await expect(handle).toBeVisible({ timeout: 5000 });
+      const h = (await handle.boundingBox())!;
+      await drag(page, centre(h), { x: g.x + g.width + 80, y: g.y + g.height / 2 }, 10);
+      return { touched: [ids.get('box')!, ids.get('copy')!, group], watches: [boxWatch(group, 'group')] };
     }
   },
   {
@@ -296,46 +402,26 @@ const STEPS: Step[] = [
       await expect(page.locator('aside.props textarea').first()).toBeFocused({ timeout: OPEN_MS });
       await watch(TEXT_WATCHES);
       await page.keyboard.type(TYPED, { delay: 40 });
-      const size = page.locator('aside.props [data-field="Size"] input').first();
-      await size.fill('72');
+      const size = page.locator(TEXT_WATCHES[1].selector).first();
+      await size.fill(TEXT_SIZE);
       await size.press('Enter');
-      await page.getByTestId('font-picker').first().click().catch(() => undefined);
-      const font = page.getByTestId('font-results').locator('li, button').nth(2);
-      if (await font.isVisible().catch(() => false)) {
-        await font.click();
-      }
-      return {
-        touched: [id],
-        watches: TEXT_WATCHES,
-        expected: [{ id: 'text', value: TYPED }, { id: 'size', value: '72' }]
-      };
+      return { touched: [id], watches: TEXT_WATCHES, expected: [{ id: 'text', value: TYPED }, { id: 'size', value: TEXT_SIZE }] };
     }
   },
   {
     name: 'open a frame, edit fill and position, close',
     drive: async ({ page, ids }) => {
       await leaveEditor(page);
-      await clickEmpty(page);
-      const id = await bringIntoView(page, FRAME_NODE, (e) => (e as HTMLElement).dataset.motionNode!);
+      const { id, layer } = await frameWithFill(page);
       ids.set('frame', id);
-      const stage = page.locator(`[data-motion-node="${id}"]`).first();
-      await stage.dblclick();
-      await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: OPEN_MS });
-      const layers = page.getByTestId('layers');
-      if (!(await layers.isVisible().catch(() => false))) {
-        await page.getByRole('button', { name: 'Layers', exact: true }).click().catch(() => undefined);
-      }
-      await layers.locator('[data-layer]').first().click();
+      ids.set('frameLayer', layer);
       await openFill(page);
-      await fillHex(page).fill('14b8a6');
+      await fillHex(page).fill(FRAME_FILL);
       await fillHex(page).press('Enter');
       const x = page.locator('aside.props input.num[aria-label="X"]').first();
-      if (await x.isVisible().catch(() => false)) {
-        await x.fill(String(Number((await x.inputValue()) || 0) + 12));
-        await x.press('Enter');
-      }
+      await x.fill(String(Number((await x.inputValue()) || 0) + 12));
+      await x.press('Enter');
       await leaveEditor(page);
-      await clickEmpty(page);
       return { touched: [id], pixels: [await pixel(page, id)] };
     }
   },
@@ -344,11 +430,10 @@ const STEPS: Step[] = [
     drive: async ({ page, ids, watch }) => {
       const id = ids.get('frame')!;
       await watch([FRAME_FILL_WATCH]);
-      await page.locator(`[data-motion-node="${id}"]`).first().dblclick();
-      await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: OPEN_MS });
-      await openFill(page).catch(() => undefined);
-      const expected = (await fillHex(page).isVisible().catch(() => false)) ? [{ id: 'frame fill', value: '14b8a6' }] : [];
-      return { touched: [id], watches: [FRAME_FILL_WATCH], expected, pixels: [await pixel(page, id)] };
+      await openNode(page, id, Open.Double);
+      await pickFilledLayer(page, ids.get('frameLayer'));
+      await openFill(page);
+      return { touched: [id], watches: [FRAME_FILL_WATCH], expected: [{ id: 'frame fill', value: FRAME_FILL }], pixels: [await pixel(page, id)] };
     }
   },
   {
@@ -372,13 +457,18 @@ const STEPS: Step[] = [
   {
     name: 'edit a generate prompt and Generate (mocked)',
     drive: async ({ page, ids, watch }) => {
-      const id = await bringIntoView(page, GEN_NODE, (e) => (e as HTMLElement).dataset.id!);
+      const id = await anyInView(page, GEN_NODE, (e) => (e as HTMLElement).dataset.id!);
       ids.set('gen', id);
-      const prompt = page.locator(`${nodeSel(id)} textarea`).first();
+      await clickNode(page, id);
+      const prompt = page.locator(`${contentSel(id)} textarea`).first();
       await expect(prompt).toBeVisible({ timeout: OPEN_MS });
       await watch([promptWatch(id)]);
       await prompt.fill(PROMPT);
-      await page.locator(nodeSel(id)).getByRole('button', { name: /generate/i }).first().click();
+      const run = page.locator(contentSel(id)).getByRole('button', { name: /^(generate|redo)/i }).first();
+      if (!(await run.isEnabled())) {
+        throw new Error('Generate is disabled on this node');
+      }
+      await run.click();
       return { touched: [id], watches: [promptWatch(id)], expected: [{ id: 'prompt', value: PROMPT }] };
     }
   },
@@ -388,7 +478,7 @@ const STEPS: Step[] = [
       const gen = ids.get('gen')!;
       await watch([promptWatch(gen)]);
       const other = await page.locator('.svelte-flow__node[data-id]').evaluateAll(
-        (all, skip) => all.map((e) => ({ id: (e as HTMLElement).dataset.id!, r: e.getBoundingClientRect() })).find(({ id, r }) => id !== skip && r.width > 40 && r.x > 50 && r.y > 60 && r.x + 20 < innerWidth - 400 && r.y + 20 < innerHeight - 100),
+        (all, skip) => all.map((e) => ({ id: (e as HTMLElement).dataset.id!, r: e.getBoundingClientRect() })).find(({ id, r }) => id !== skip && r.width > 40 && r.x > 60 && r.y > 70 && r.x + 20 < innerWidth - 420 && r.y + 20 < innerHeight - 110),
         gen
       );
       if (!other) {
@@ -396,7 +486,8 @@ const STEPS: Step[] = [
       }
       await page.mouse.click(other.r.x + 8, other.r.y + 8);
       await page.waitForTimeout(300);
-      await page.locator(nodeSel(gen)).click({ position: { x: 20, y: 10 } });
+      await leaveEditor(page);
+      await clickNode(page, gen);
       return { touched: [gen, other.id], watches: [promptWatch(gen)], expected: [{ id: 'prompt', value: PROMPT }] };
     }
   }
@@ -424,12 +515,12 @@ async function startPeer(peer: BrowserContext, path: string): Promise<() => Prom
   const id = await target.evaluate((e) => (e as HTMLElement).dataset.id!);
   await target.click({ position: { x: 8, y: 8 } });
   await page.keyboard.press('Shift+Digit2');
-  const prompt = page.locator(`${nodeSel(id)} textarea`).first();
+  const prompt = page.locator(`${contentSel(id)} textarea`).first();
   let on = true;
   const loop = (async () => {
     for (let i = 0; on; i++) {
       await prompt.fill(`peer edit ${i}`).catch(() => undefined);
-      await page.waitForTimeout(PEER_EVERY_MS);
+      await page.waitForTimeout(PEER_EVERY_MS).catch(() => undefined);
     }
   })();
   return async () => {
@@ -458,6 +549,56 @@ async function untouchedWatches(page: Page, probe: FluidProbe, touched: Set<stri
     .map((b) => ({ id: b.id.slice(0, 8), box: b, touched: false }));
 }
 
+type Persisted = { what: string; node: string; open: (page: Page, id: string, ids: Map<string, string>) => Promise<void>; selector: string; value: string };
+
+const PERSISTED: Persisted[] = [
+  { what: 'text', node: 'text', open: (page, id) => openNode(page, id), selector: TEXT_WATCHES[0].selector, value: TYPED },
+  { what: 'text size', node: 'text', open: (page, id) => openNode(page, id), selector: TEXT_WATCHES[1].selector, value: TEXT_SIZE },
+  { what: 'frame fill', node: 'frame', open: async (page, id, ids) => { await openNode(page, id, Open.Double); await pickFilledLayer(page, ids.get('frameLayer')); await openFill(page); }, selector: FILL_WATCH.selector, value: FRAME_FILL },
+  { what: 'prompt', node: 'gen', open: (page, id) => clickNode(page, id), selector: '', value: PROMPT }
+];
+
+async function afterReload(page: Page, ids: Map<string, string>): Promise<StepRun> {
+  const checks: string[] = [];
+  let error: string | null = null;
+  await page.reload({ waitUntil: 'load' });
+  await expect(page.locator(SURFACE).first()).toBeVisible({ timeout: 30_000 });
+  await page.waitForTimeout(6000);
+  const probe = new FluidProbe(page);
+  await probe.attach();
+  await probe.start([]);
+  for (const p of PERSISTED) {
+    const id = ids.get(p.node);
+    if (!id) {
+      error = `${p.what}: its node was never made`;
+      continue;
+    }
+    try {
+      await leaveEditor(page);
+      await p.open(page, id, ids);
+      const shown = await page.locator(p.selector || `${contentSel(id)} textarea`).first().inputValue();
+      if (!shown.toLowerCase().includes(p.value.toLowerCase())) {
+        checks.push(`after reload: ${p.what} shows "${shown}", last set "${p.value}"`);
+      }
+    } catch (err) {
+      error = `${p.what}: ${String(err).replace(/\x1b\[[0-9;]*m/g, '').split('\n')[0].slice(0, 160)}`;
+    }
+  }
+  const { facts } = await probe.stop(new Set(ids.values()), []);
+  return { name: 'after reload', facts, error, finalChecks: checks };
+}
+
+const AWAY_WHEELS = 8;
+const AWAY_STEP_PX = 300;
+
+async function awayFromContent(page: Page) {
+  const pane = (await page.locator(SURFACE).first().boundingBox())!;
+  await page.mouse.move(pane.x + pane.width / 2, pane.y + pane.height / 2);
+  for (let i = 0; i < AWAY_WHEELS; i++) {
+    await page.mouse.wheel(-AWAY_STEP_PX, 0);
+  }
+}
+
 async function runSession(page: Page, path: string): Promise<StepRun[]> {
   await page.goto(path, { waitUntil: 'load' });
   await expect(page.locator(SURFACE).first()).toBeVisible({ timeout: 30_000 });
@@ -467,6 +608,7 @@ async function runSession(page: Page, path: string): Promise<StepRun[]> {
   await page.keyboard.press('Shift+Digit0');
   await page.keyboard.press('Minus');
   await page.keyboard.press('Minus');
+  await awayFromContent(page);
   await page.waitForTimeout(1500);
   const probe = new FluidProbe(page);
   await probe.attach();
@@ -502,6 +644,8 @@ async function runSession(page: Page, path: string): Promise<StepRun[]> {
     runs.push({ name: step.name, facts, error, finalChecks });
     console.log(`[fluid] ${step.name} ${Date.now() - began}ms ${error ? `UNDRIVEN ${error}` : JSON.stringify(facts)}`);
   }
+  runs.push(await afterReload(page, ids));
+  console.log(`[fluid] after reload ${JSON.stringify(runs.at(-1))}`);
   return runs;
 }
 
@@ -512,7 +656,10 @@ function writeRun(run: SessionRun) {
   writeFileSync(join(OUT, 'SCORECARD.md'), scorecard(all));
 }
 
-async function recordedContext(browser: Browser, name: string): Promise<BrowserContext> {
+async function recordedContext(browser: Browser, browserName: string, name: string): Promise<BrowserContext> {
+  if (!recordsVideo(browserName)) {
+    return browser.newContext({ viewport: VIEWPORT });
+  }
   mkdirSync(join(OUT, 'raw', name), { recursive: true });
   return browser.newContext({ viewport: VIEWPORT, recordVideo: { dir: join(OUT, 'raw', name), size: VIEWPORT } });
 }
@@ -540,7 +687,7 @@ async function cleanup(db: SupabaseClient, canvasId: string, before: Set<string>
 
 test.describe('fluidity scorecard @real', () => {
   test.skip(!REAL_STACK, 'E2E_REAL_STACK=1');
-  test.setTimeout(600_000);
+  test.setTimeout(900_000);
 
   for (const variant of VARIANTS) {
     for (const renderer of RENDERERS) {
@@ -550,18 +697,19 @@ test.describe('fluidity scorecard @real', () => {
         const before = await liveNodeIds(db, canvasId);
         const name = `${browserName}-${renderer}-${variant}`;
         const path = `/p/${projectId}/c/${canvasId}${renderer === 'dom' ? '?renderer=dom' : ''}`;
-        const context = await recordedContext(browser, name);
+        const context = await recordedContext(browser, browserName, name);
         const page = await context.newPage();
         page.setDefaultTimeout(60_000);
         const mocked = await mockGenerate(page);
         const peer = variant === Variant.TwoTabs ? await browser.newContext({ viewport: VIEWPORT }) : null;
         let runs: StepRun[] = [];
+        let stopPeer = () => Promise.resolve();
         try {
           await signInE2e(page, ACCOUNT());
-          const stopPeer = peer ? await startPeer(peer, path) : () => Promise.resolve();
+          stopPeer = peer ? await startPeer(peer, path) : stopPeer;
           runs = await runSession(page, path);
-          await stopPeer();
         } finally {
+          await stopPeer();
           await peer?.close();
           await context.close();
           await saveVideo(page, name);

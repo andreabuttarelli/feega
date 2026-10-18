@@ -57,6 +57,9 @@ export function createPlaceSaves(options: PlaceOptions) {
   };
 
   const all = Object.values(queues);
+  let clock = 0;
+  const placedAt = new Map<string, number>();
+  const stamp = (id: string) => placedAt.set(id, ++clock);
 
   function unsentEntries(): PlaceEntry[] {
     return (Object.entries(queues) as [Placement, (typeof queues)[Placement]][]).flatMap(([action, queue]) =>
@@ -76,10 +79,19 @@ export function createPlaceSaves(options: PlaceOptions) {
   return {
     move: (id: string, x: number, y: number) => {
       options.announce?.intent({ id, x, y });
+      stamp(id);
       return queues[Placement.Move].schedule(id, { x, y }, SaveTiming.Now);
     },
-    resize: (id: string, width: number, height: number) => queues[Placement.Resize].schedule(id, { width, height }, SaveTiming.Now),
-    moveGroup: (id: string, x: number, y: number) => queues[Placement.MoveGroup].schedule(id, { x, y }, SaveTiming.Now),
+    resize: (id: string, width: number, height: number) => {
+      stamp(id);
+      return queues[Placement.Resize].schedule(id, { width, height }, SaveTiming.Now);
+    },
+    moveGroup: (id: string, x: number, y: number) => {
+      stamp(id);
+      return queues[Placement.MoveGroup].schedule(id, { x, y }, SaveTiming.Now);
+    },
+    mark: () => clock,
+    placedAfter: (id: string, mark: number) => (placedAt.get(id) ?? 0) > mark,
     dirty: (id: string) => all.some((queue) => queue.dirtyKeys(id).length > 0),
     unsent: () => all.some((queue) => queue.unsent()),
     unsentEntries,

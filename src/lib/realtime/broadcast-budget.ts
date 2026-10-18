@@ -27,7 +27,7 @@ export function fitsPlan(budget: Budget, plan: Plan): boolean {
   return budget.received + budget.sent <= PLAN_LIMITS[plan].messagesPerSecond;
 }
 
-export const MAX_HZ = 20;
+export const MAX_HZ = 30;
 const MIN_HZ = 0.2;
 const HZ_STEP = 10;
 
