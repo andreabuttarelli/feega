@@ -1477,18 +1477,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Auto layout (flexbox-style). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (fill, stroke, stroke_width and radius style it in the same call) drawn directly under them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
       inputSchema: z.object({
         clip_ids: z.array(z.string()).min(1).optional(),
+        children: z.array(layoutItemPatchSchema.extend({ clip_id: z.string() })).min(1).optional().describe('in place of clip_ids: each child with its sizing, as set_layout_item takes it'),
         clip_id: z.string().optional(),
         fill: z.string().optional().describe('container fill colour'),
         stroke: z.string().optional().describe('container stroke colour'),
         stroke_width: z.number().min(0).optional().describe('px'),
         radius: z.number().min(0).optional().describe('corner roundness, as roundness in set_props')
       }),
-      execute: async ({ clip_ids, clip_id, ...style }) => {
+      execute: async ({ clip_ids, children, clip_id, ...style }) => {
         if (clip_id) {
           return apply(styled(setAutoLayout(session.doc, clip_id, {}), clip_id, style), `auto layout on ${clip_id}`);
         }
+        const ids = children?.map((c) => c.clip_id) ?? clip_ids ?? [];
+        const sized = (children ?? []).reduce<OpResult>((r, { clip_id: child, ...item }) => (r.ok ? setLayoutItem(r.doc, child, item) : r), { ok: true, doc: session.doc });
         const id = deps.newId();
-        const out = apply(styled(wrapInAutoLayout(session.doc, clip_ids ?? [], id, deps.newId()), id, style), `wrapped ${clip_ids?.length ?? 0} clip(s) in an auto layout`);
+        const out = apply(styled(sized.ok ? wrapInAutoLayout(sized.doc, ids, id, deps.newId()) : sized, id, style), `wrapped ${ids.length} clip(s) in an auto layout`);
         return out.ok ? { ...out, container_id: id } : out;
       }
     }),
@@ -1500,7 +1503,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_layout_item: tool({
-      description: 'How a clip sizes inside its auto layout, per axis: fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; only inside a container). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this.',
+      description: 'How a clip sizes inside its auto layout, per axis: fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; on a clip not yet in a container it applies once it is parented). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this.',
       inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string() }),
       execute: async ({ clip_id, ...patch }) => apply(setLayoutItem(session.doc, clip_id, patch), `sized ${clip_id} in its auto layout`)
     }),

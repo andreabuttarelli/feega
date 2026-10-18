@@ -54,10 +54,6 @@ export function setLayoutItem(doc: MotionDoc, clipId: string, patch: Partial<Lay
   if (!parsed.success) {
     return fail(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
   }
-  const fills = parsed.data.width === Sizing.Fill || parsed.data.height === Sizing.Fill;
-  if (fills && !layoutParent(doc, found.clip)) {
-    return fail(`${clipId} is not inside an auto layout: fill needs a container to fill`);
-  }
   return { ok: true, doc: withClip(doc, clipId, (c) => ({ ...c, layoutItem: parsed.data })) };
 }
 
@@ -144,13 +140,13 @@ export function wrapInAutoLayout(source: MotionDoc, clipIds: readonly string[], 
   if (!result.ok) {
     return result;
   }
-  result = setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Center });
+  result = setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Start });
   for (const p of placed) {
     if (!result.ok) {
       return result;
     }
     result = setParent(result.doc, p.clip.id, id, { at: p.clip.from });
-    if (result.ok && isText(p.clip.component)) {
+    if (result.ok && isText(p.clip.component) && !p.clip.layoutItem) {
       result = setLayoutItem(result.doc, p.clip.id, HUG);
     }
   }

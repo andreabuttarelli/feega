@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } from '../doc';
 import { addClip, type OpResult } from '../timeline';
-import { Direction, Sizing } from './auto-layout';
+import { Align, Direction, Sizing } from './auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from './model';
 import { addAutoLayout, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout } from './ops';
 import { withAutoLayout } from './resolve';
@@ -98,8 +98,13 @@ describe('editing a container', () => {
     expect(clip(must(setLayoutItem(wrapped, 'a', { width: Sizing.Fill })), 'a').layoutItem).toMatchObject({ width: Sizing.Fill, height: Sizing.Fixed });
   });
 
-  it('refuses fill on a clip that is not inside a container', () => {
-    expect(setLayoutItem(row, 'a', { width: Sizing.Fill }).ok).toBe(false);
+  it('keeps fill on a clip not yet inside a container, for when it is parented', () => {
+    const intended = must(setLayoutItem(row, 'a', { width: Sizing.Fill }));
+    expect(clip(must(wrapInAutoLayout(intended, ['a', 'b'], 'box', 'lane')), 'a').layoutItem).toMatchObject({ width: Sizing.Fill });
+  });
+
+  it('a new root container aligns its children to the start', () => {
+    expect(clip(wrapped, 'box').autoLayout!.align).toBe(Align.Start);
   });
 
   it('moves a child to a new place in the order', () => {
