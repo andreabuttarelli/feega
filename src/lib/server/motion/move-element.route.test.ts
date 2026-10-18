@@ -227,6 +227,18 @@ describe('elements in and out of frames', () => {
     expect(await actions.moveFree(input as never)).toMatchObject({ outcome: 'done', frameId: TARGET });
     expect(written(input, TARGET).map((r) => clipIds(r.doc))).toEqual([['txt']]);
   });
+
+  it('copyFree pastes a free element into a frame and keeps the free element', async () => {
+    const element = { ...frameRow(SOURCE), width: 200, height: 45, data: { ...frameRow(SOURCE).data, kind: 'element' } };
+    const input = event({ source: SOURCE, drop: JSON.stringify({ on: 'frame', nodeId: TARGET, at: { x: 0.3, y: 0.6 } }) }, { nodes: [element, frameRow(TARGET)] });
+
+    const result = await actions.copyFree(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done', frameId: TARGET });
+    expect(written(input, TARGET)).toHaveLength(1);
+    expect(input.calls.some((c) => c.table === 'nodes' && c.op === 'update' && (c.payload as { deleted_at?: string }).deleted_at)).toBe(false);
+    expect((result as { undo: { kind: string }[] }).undo.map((u) => u.kind)).toEqual(['doc.revision']);
+  });
 });
 
 describe('drawElement action', () => {
