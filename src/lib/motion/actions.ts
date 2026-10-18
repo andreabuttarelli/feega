@@ -7,6 +7,8 @@ import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
 import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
 import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+import BringToFront from '@lucide/svelte/icons/bring-to-front';
+import SendToBack from '@lucide/svelte/icons/send-to-back';
 import SquaresUnite from '@lucide/svelte/icons/squares-unite';
 import SquaresSubtract from '@lucide/svelte/icons/squares-subtract';
 import SquaresIntersect from '@lucide/svelte/icons/squares-intersect';
@@ -216,6 +218,10 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.BringForward]: { name: 'Bring forward', icon: BringToFront, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.SendBackward]: { name: 'Send backward', icon: SendToBack, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.BringToFront]: { name: 'Bring to front', icon: BringToFront, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.SendToBack]: { name: 'Send to back', icon: SendToBack, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Union]: { name: 'Union', icon: SquaresUnite, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Subtract]: { name: 'Subtract', icon: SquaresSubtract, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Intersect]: { name: 'Intersect', icon: SquaresIntersect, group: GuideGroup.Edit, menu: MenuSection.Layer },
