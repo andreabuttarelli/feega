@@ -209,6 +209,9 @@ the frames need `CHROMIUM_PATH` (a local Chrome binary, e.g.
 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`) in its env; without it the call
 answers `closed` / "frames unavailable".
 
+`motion_tool` `measure_text {clip_id}` gives a text clip's rendered box in px (top-left, from the
+real font file; `approximate: true` when the font could not be read) to place things next to it.
+
 Every save is a revision. `list_motion_revisions` lists them (who saved, clip count);
 `restore_motion_revision` puts one back as a new revision, history kept. Free. CLI:
 `feega motion revisions <nodeId> [--restore <version>]`.

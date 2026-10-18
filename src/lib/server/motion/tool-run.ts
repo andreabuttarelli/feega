@@ -15,6 +15,7 @@ import { exportStill } from './still-export';
 import { createMotionTools, type MotionSession, type MotionToolDeps } from './motion-tools';
 import { frameMover } from './move-element';
 import { drawFrames, firstFrames } from './server-frames';
+import { fontAdvance } from './font-advance';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
 import type { Frame } from './frames';
 import type { MotionDoc } from '$lib/motion/doc';
@@ -43,6 +44,8 @@ export const TOOL_RUN_AGENT_KEY = 'mcp';
 const ID_LENGTH = 8;
 const HEADLESS = 'needs a chat turn in the editor: ask the motion agent instead';
 
+const readFontAdvance = fontAdvance();
+
 function once<T>(make: () => Promise<T>): () => Promise<T> {
   let made: Promise<T> | null = null;
   return () => (made ??= make());
@@ -57,7 +60,7 @@ const freshSession = (doc: MotionSession['doc'], version: number): MotionSession
 const noFrames: MotionToolDeps['frames'] = async () => null;
 
 function toolsFor(deps: Omit<MotionToolDeps, 'voiceover' | 'frames' | 'check' | 'newId'>, frames = noFrames): Record<string, Tool> {
-  return createMotionTools({ ...deps, newId, voiceover: offTurn, frames, check: async () => null });
+  return createMotionTools({ ...deps, newId, voiceover: offTurn, frames, check: async () => null, fontAdvance: readFontAdvance });
 }
 
 function carried(turn: ToolRunTurn | undefined, nodeId: string, doc: MotionDoc, version: number): MotionSession {
