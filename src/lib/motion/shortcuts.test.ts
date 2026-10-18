@@ -215,6 +215,16 @@ describe('flip keys', () => {
   });
 });
 
+describe('boolean keys', () => {
+  it('⌥⇧U unites, ⌥⇧S subtracts, ⌥⇧I intersects, ⌥⇧E excludes', () => {
+    expect(press('U', { alt: true, shift: true, code: 'KeyU' })).toBe(Command.Union);
+    expect(press('S', { alt: true, shift: true, code: 'KeyS' })).toBe(Command.Subtract);
+    expect(press('I', { alt: true, shift: true, code: 'KeyI' })).toBe(Command.Intersect);
+    expect(press('E', { alt: true, shift: true, code: 'KeyE' })).toBe(Command.Exclude);
+    expect(press('s', { alt: true, code: 'KeyS' })).toBe(Command.AlignBottom);
+  });
+});
+
 describe('sibling keys', () => {
   it('Tab selects the next layer and ⇧Tab the previous one', () => {
     expect(press('Tab')).toBe(Command.SelectNext);

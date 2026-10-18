@@ -1,6 +1,7 @@
 import { ungroupClip } from '$lib/motion/group';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
+import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
 import { setPartFills } from '$lib/motion/part-style';
 import { staticParts } from './static-parts';
 import { strokesSchema } from '$lib/motion/stroke/model';
@@ -1569,6 +1570,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
         return created(apply(withEffects(shape, [id], input.effects), `added ${input.kind} shape`), id);
       }
+    }),
+
+    combine_shapes: tool({
+      description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(2), op: z.enum([BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, BooleanOp.Exclude]), at: z.number().min(0).optional().describe('seconds; default 0') }),
+      execute: async (input) => apply(combineShapes(session.doc, input.clip_ids, input.op, frames(input.at ?? 0)), `combined ${input.clip_ids.join(', ')} (${input.op})`)
     }),
 
     set_path: tool({
