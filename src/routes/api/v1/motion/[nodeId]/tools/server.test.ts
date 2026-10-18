@@ -95,6 +95,36 @@ describe('POST /api/v1/motion/:node/tools runs one motion tool of the chat agent
     expect((await head()).tracks.flatMap((t) => t.clips)).toEqual([]);
   });
 
+  it('a tool that refuses is a 422 with the reason, not a 200', async () => {
+    const res = await post(NODE, { tool: 'set_props', input: { clip_id: 'nope', props: {} } });
+    const body = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(body).toMatchObject({ error: 'tool_refused' });
+    expect(typeof body.detail).toBe('string');
+  });
+
+  it('a batch applies every op in one revision', async () => {
+    const title = (text: string) => ({ tool: 'add_clip', input: { component: 'Title', start: 0, duration: 1, props: { text } } });
+    const res = await post(NODE, { tool: 'batch', input: { ops: [title('one'), title('two'), title('three')] } });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({ version: 2, saved: true });
+    expect(body.output.results).toHaveLength(3);
+    expect(JSON.stringify((await head()).tracks)).toContain('three');
+  });
+
+  it('a batch with one refused op saves nothing', async () => {
+    const ops = [{ tool: 'add_clip', input: { component: 'Title', start: 0, duration: 1 } }, { tool: 'set_props', input: { clip_id: 'nope', props: {} } }];
+    const res = await post(NODE, { tool: 'batch', input: { ops } });
+    const body = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(body).toMatchObject({ error: 'tool_refused', index: 1 });
+    expect((await head()).tracks.flatMap((t) => t.clips)).toEqual([]);
+  });
+
   it('a read-only key cannot run a tool', async () => {
     state.writeAllowed = false;
 
