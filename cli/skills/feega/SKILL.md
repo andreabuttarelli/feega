@@ -248,8 +248,7 @@ Graphic elements (Text, Box, Ellipse, Path, Image) live in frames or free on the
 text/image/video nodes generate. `canvas_tool` ops `draw_element` draws a free element,
 `group_elements` / `ungroup_element` group free elements; `move_frame_element` moves an element
 into another frame (or onto the canvas as a free element) keeping props and keyframes; op `place_in_frame` puts a generative node's output into a frame as an element; the
-motion `motion_tool` `move_to_frame` does the same from inside a video. Connecting a generative node to a frame
-(`insert_row` on `nodes_connections`) keeps one element following its next generations. CLI:
+motion `motion_tool` `move_to_frame` does the same from inside a video. A frame takes no inputs: a line into it is refused. CLI:
 `feega motion move <frameId> <elementId> --to <frameId>`, `feega motion place <nodeId> --to <frameId>`.
 
 A launch film's script is also laid out as a storyboard canvas linked to the video: one card per
