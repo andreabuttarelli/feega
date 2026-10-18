@@ -3,7 +3,7 @@
 Comments pinned to the canvas or to a node need a home; `canvas_events`
 is an audit log and node data would make every comment a node write.
 
-`canvas_comments` (migration `20261018120000_canvas_comments.sql`):
+`canvas_comments` (migration `20261018140000_canvas_comments.sql`):
 `canvas_id`, optional `node_id` (pinned to a node; `x`/`y` are then
 relative to it, else canvas coordinates), `parent_id` for replies,
 `author_id`, `body` (1–2,000 chars), `resolved_at`, soft `deleted_at`.
