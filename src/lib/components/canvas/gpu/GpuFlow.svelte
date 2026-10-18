@@ -70,16 +70,17 @@
   import { GpuScene, themeOf, type Card } from '$lib/canvas/gpu/scene';
   import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
-  import { Counter, count, exposeLoss, recordFrame } from '$lib/canvas/gpu/frame-stats';
+  import { Counter, count, exposeLoss, exposeReveal, exposeSettled, recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
-  import { cachedSnapshot, latestSnapshot, storeSnapshot } from '$lib/canvas/gpu/snapshot-cache';
+  import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
+  import { revealIn } from '$lib/canvas/gpu/reveal-gate';
   import { getFontEmbedCSS, toCanvas } from 'html-to-image';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string } = $props();
 
   const DOM_CAP = 6;
   const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
@@ -246,27 +247,126 @@
     shown = new Map(shown).set(id, key);
   };
   const preloaded = new Set<string>();
+  let looking = $state(new Set<string>());
+  const remote = new Map(Object.entries(props.cardPreviews ?? {}).map(([id, p]) => [id, p.hash]));
+  const lookedUp = (id: string) => {
+    const next = new Set(looking);
+    next.delete(id);
+    looking = next;
+  };
+  const publish = async (id: string, key: string, blob: Blob | null) => {
+    const hash = await digest(key);
+    if (!blob || !props.previewsAt || remote.get(id) === hash) {
+      return;
+    }
+    remote.set(id, hash);
+    await uploadSnapshot(props.previewsAt, id, key, blob);
+  };
+  const blobOf = async (bitmap: ImageBitmap) => {
+    const c = new OffscreenCanvas(bitmap.width, bitmap.height);
+    c.getContext('2d')!.drawImage(bitmap, 0, 0);
+    return c.convertToBlob({ type: 'image/webp', quality: 0.92 });
+  };
+
+  async function lookUp(t: Tile) {
+    const key = untrack(() => shotKeyOf(t.id));
+    const local = await latestSnapshot(t.id);
+    if (local) {
+      if (!shown.has(t.id)) {
+        showSnapshot(t.id, local.key, local.bitmap);
+      }
+      if (local.key === key) {
+        pictured = new Map(pictured).set(t.id, key);
+        count(Counter.CachedSnapshot);
+        void blobOf(local.bitmap).then((blob) => publish(t.id, key, blob));
+      }
+      return;
+    }
+    const far = props.cardPreviews?.[t.id];
+    const bitmap = far ? await remoteSnapshot(far.url) : null;
+    if (!far || !bitmap || shown.has(t.id)) {
+      return;
+    }
+    showSnapshot(t.id, key, bitmap);
+    if (far.hash === (await digest(key))) {
+      pictured = new Map(pictured).set(t.id, key);
+      count(Counter.CachedSnapshot);
+    }
+  }
 
   $effect(() => {
     if (!scene) {
       return;
     }
-    for (const t of placed) {
-      if (preloaded.has(t.id) || !snapshotKind(t)) {
-        continue;
-      }
-      preloaded.add(t.id);
-      void latestSnapshot(t.id).then((hit) => {
-        if (!hit || shown.has(t.id)) {
-          return;
-        }
-        showSnapshot(t.id, hit.key, hit.bitmap);
-        if (hit.key === shotKeyOf(t.id)) {
-          pictured = new Map(pictured).set(t.id, hit.key);
-          count(Counter.CachedSnapshot);
-        }
-      });
+    const fresh = placed.filter((t) => !preloaded.has(t.id) && snapshotKind(t));
+    if (!fresh.length) {
+      return;
     }
+    untrack(() => {
+      looking = new Set([...looking, ...fresh.map((t) => t.id)]);
+    });
+    for (const t of fresh) {
+      preloaded.add(t.id);
+      void lookUp(t).finally(() => lookedUp(t.id));
+    }
+  });
+
+  let openedAt = 0;
+  let revealed = $state(false);
+  let revealTick = $state(0);
+  const REVEAL_POLL_MS = 100;
+  const domDrawn = (id: string) => !!wrap?.querySelector(`.gpu-dom-node[data-id="${id}"] [data-drawn="true"], .gpu-dom-node[data-id="${id}"] img.poster`);
+  const previewed = (t: Tile) => {
+    if (domIds.has(t.id)) {
+      return t.kind !== 'motion' || domDrawn(t.id);
+    }
+    if (snapshotKind(t)) {
+      return shown.has(t.id) || !looking.has(t.id);
+    }
+    return !scene?.awaitsMedia(t.id);
+  };
+  const unpreviewed = () => [...visibleIds(placed, view, area)].filter((id) => byId.get(id) && !previewed(byId.get(id)!));
+
+  $effect(() => {
+    void revealTick;
+    if (revealed || !scene) {
+      return;
+    }
+    if (!area.width || (tiles.length && !fitted)) {
+      const t = setTimeout(() => revealTick++, REVEAL_POLL_MS);
+      return () => clearTimeout(t);
+    }
+    openedAt ||= performance.now();
+    void drawn;
+    void shown;
+    void looking;
+    const missing = unpreviewed();
+    const wait = revealIn(missing.length, performance.now() - openedAt);
+    if (!wait) {
+      revealed = true;
+      exposeReveal(Math.round(performance.now() - openedAt), missing);
+      return;
+    }
+    const t = setTimeout(() => revealTick++, Math.min(wait, REVEAL_POLL_MS));
+    return () => clearTimeout(t);
+  });
+
+  let settled = false;
+  $effect(() => {
+    void revealTick;
+    void drawn;
+    void shown;
+    if (!revealed || settled) {
+      return;
+    }
+    const missing = unpreviewed();
+    if (!missing.length) {
+      settled = true;
+      exposeSettled(Math.round(performance.now() - openedAt));
+      return;
+    }
+    const t = setTimeout(() => revealTick++, REVEAL_POLL_MS);
+    return () => clearTimeout(t);
   });
 
   $effect(() => {
@@ -374,7 +474,7 @@
             throw new Error('tainted snapshot');
           }
           showSnapshot(id, key, await createImageBitmap(canvas));
-          void storeSnapshot(id, key, canvas);
+          void storeSnapshot(id, key, canvas).then((blob) => publish(id, key, blob));
           count(Counter.Snapshot);
         }
       } catch (err) {
@@ -1427,7 +1527,7 @@
 }} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap svelte-flow" onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-revealed={revealed} data-view={`${view.x},${view.y},${view.zoom}`}>
   <div
     class="surface svelte-flow__pane"
     bind:this={surface}
@@ -1621,6 +1721,11 @@
   :global(html.canvas-gesture *) {
     user-select: none !important;
     -webkit-user-select: none !important;
+  }
+
+  .wrap:not([data-revealed='true']) .surface,
+  .wrap:not([data-revealed='true']) :global(canvas[data-testid='gpu-canvas']) {
+    visibility: hidden;
   }
 
   .wrap {
