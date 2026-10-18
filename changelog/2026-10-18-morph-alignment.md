@@ -5,7 +5,7 @@ Profiling the inline editor open on the heavy canvas (Chrome, prod build): the h
 built 240 rotated copies of a 120-point ring every frame for every morphing shape.
 
 Now the cost is computed on flat `Float64Array`s with an index offset; only the winning rotation
-is materialised. 0.40 → 0.09 ms per morph frame locally; `morph-cost.test.ts` checks it relative to the copying version in the same run (6× vs 1.2× before, gate 2×), since a wall-clock budget failed on CI; in the
+is materialised. 0.40 → 0.09 ms per morph frame locally. `morph-cost.test.ts` counts ring copies per morph frame (243 before, 3 after, gate 4): two wall-clock gates (absolute, then relative to the copying version) both failed on CI; in the
 profile 344 → 206 ms over the same window.
 
 Discarded: caching the alignment per outline pair — `shapeLayers` rebuilds outlines each frame,
