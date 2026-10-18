@@ -84,6 +84,27 @@ describe('POST /api/v1/org/canvas — the chat canvas ops, for CLI and MCP', () 
     expect(insert.payload).toMatchObject({ org_id: ORG, project_id: PROJECT, actor_kind: 'agent', actor_id: USER });
   });
 
+  it('a frame created through create_node gets the size of its format, not none', async () => {
+    const { db, calls } = fakeDb({ projects: [projectRow], nodes: [nodeRow] }, { filter: true });
+    caller(db);
+
+    await call({ project_id: PROJECT, op: 'create_node', input: { canvasId: CANVAS, type: 'motion', x: 1, y: 2, data: { format: '9:16', docHeadRevision: 0, posterAssetId: null, lastRenderAssetId: null } } });
+
+    const insert = calls.find((c) => c.op === 'insert' && c.table === 'nodes')!;
+    expect(insert.payload).toMatchObject({ width: 288, height: 512 });
+  });
+
+  it('draws a frame at the box asked, the same frame the canvas draws', async () => {
+    const { db, calls } = fakeDb({ projects: [projectRow], nodes: [nodeRow], canvases: [{ id: CANVAS, org_id: ORG, project_id: PROJECT }] }, { filter: true });
+    caller(db);
+
+    const { res } = await call({ project_id: PROJECT, op: 'draw_frame', input: { canvasId: CANVAS, x: 10, y: 20, w: 720, h: 450 } });
+
+    expect(res.status).toBe(200);
+    const insert = calls.find((c) => c.op === 'insert' && c.table === 'nodes')!;
+    expect(insert.payload).toMatchObject({ type: 'motion', x: 10, y: 20, width: 720, height: 450 });
+  });
+
   it('refuses an op it does not know, naming the ones it does', async () => {
     caller(fakeDb({ projects: [projectRow] }, { filter: true }).db);
 

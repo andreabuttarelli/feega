@@ -1,7 +1,8 @@
 import { loadSession } from '../lib/auth.ts';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { basename } from 'node:path';
 import { canvasApi } from '../lib/canvas.ts';
+import { exportAsk, type ExportFlags } from '../lib/export-ask.ts';
 
 async function token(): Promise<string> {
   const session = await loadSession();
@@ -24,6 +25,14 @@ export async function cmdCanvasUpload(project: string, file: string, opts: { can
   console.log(JSON.stringify(result, null, 2));
 }
 
+type FrameOpts = { canvas: string; x: number; y: number; w: number; h?: number; format?: string; org?: string };
+
+export async function cmdCanvasFrame(project: string, opts: FrameOpts) {
+  const input = { canvasId: opts.canvas, x: opts.x, y: opts.y, w: opts.w, h: opts.h, format: opts.format };
+  const result = await canvasApi.run(await token(), { project, op: 'draw_frame', input }, opts.org);
+  console.log(JSON.stringify(result, null, 2));
+}
+
 type ListedRoute = { provider: string; label: string; credits: number | null };
 
 type ListedModel = { id: string; provider: string; credits: number | null; uncensored: boolean; routedVia: string | null; routes?: ListedRoute[] };
@@ -41,4 +50,15 @@ export async function cmdCanvasModels(project: string, opts: { medium: string; o
     }));
   });
   console.table(rows);
+}
+
+export async function cmdCanvasExport(project: string, frames: string[], opts: ExportFlags & { out?: string; org?: string }) {
+  const result = (await canvasApi.run(await token(), { project, op: 'export_selection', input: exportAsk(frames, opts) }, opts.org)) as { url?: string; name?: string };
+  if (!result.url || !result.name) {
+    console.log(JSON.stringify(result, null, 2));
+    process.exit(1);
+  }
+  const out = opts.out ?? result.name;
+  await writeFile(out, new Uint8Array(await (await fetch(result.url)).arrayBuffer()));
+  console.log(out);
 }
