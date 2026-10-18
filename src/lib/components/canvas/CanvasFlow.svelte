@@ -39,7 +39,7 @@
   import CanvasPeers from './CanvasPeers.svelte';
   import CanvasMeasure from './CanvasMeasure.svelte';
   import { tileGaps } from '$lib/canvas/measure';
-  import { snapDrag, type SnapGuide } from '$lib/canvas/snap';
+  import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
   import type { CanvasPeer, LiveBox } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import CanvasAddBar from './CanvasAddBar.svelte';
@@ -418,6 +418,7 @@
 
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
+  let snapSpacing = $state<SpacingGap[]>([]);
 
   function snapped(dragged: Node[]): Node[] {
     const ids = new Set(dragged.map((n) => n.id));
@@ -432,6 +433,7 @@
     });
     const snap = snapDrag(rects, others, SNAP_SCREEN_PX / selection.zoom);
     snapGuides = snap.guides;
+    snapSpacing = snap.spacing;
     const at = new Map(snap.moves.map((m) => [m.id, { x: m.x, y: m.y }]));
     nodes = nodes.map((n) => (at.has(n.id) ? { ...n, position: at.get(n.id)! } : n));
     return dragged.map((n) => (at.has(n.id) ? { ...n, position: at.get(n.id)! } : n));
@@ -456,6 +458,7 @@
     if (!targetNode) return;
     const dragged = snapped(moving);
     snapGuides = [];
+    snapSpacing = [];
     if (onTileDrop?.(dragged.map((n) => n.id), pointOf(event)) === DropVerdict.Taken) {
       returnToOrigin();
       return;
@@ -1032,8 +1035,8 @@
     {#if peers.length}
       <CanvasPeers {peers} rectOf={tileRect} />
     {/if}
-    {#if measured.length || snapGuides.length}
-      <CanvasMeasure gaps={measured} guides={snapGuides} />
+    {#if measured.length || snapGuides.length || snapSpacing.length}
+      <CanvasMeasure gaps={[...measured, ...snapSpacing]} guides={snapGuides} />
     {/if}
   </SvelteFlow>
 

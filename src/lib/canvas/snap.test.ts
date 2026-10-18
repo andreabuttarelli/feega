@@ -22,7 +22,7 @@ describe('smart guides while dragging tiles', () => {
   });
 
   it('leaves the tile alone when nothing is within reach', () => {
-    expect(snapBox(box(150, 500), [box(0, 0)], 8)).toEqual({ dx: 0, dy: 0, guides: [] });
+    expect(snapBox(box(150, 500), [box(0, 0)], 8)).toEqual({ dx: 0, dy: 0, guides: [], spacing: [] });
   });
 });
 
@@ -31,5 +31,32 @@ describe('a dragged selection snaps as one box', () => {
     const dragged = [{ id: 'a', x: 203, y: 300, w: 50, h: 50 }, { id: 'b', x: 253, y: 300, w: 50, h: 50 }];
     const snap = snapDrag(dragged, [box(100, 0)], 8);
     expect(snap.moves).toEqual([{ id: 'a', x: 200, y: 300 }, { id: 'b', x: 250, y: 300 }]);
+  });
+});
+
+describe('equal spacing while dragging between two tiles', () => {
+  it('centres the tile in the gap and shows both equal distances', () => {
+    const snap = snapBox(box(253, 0), [box(0, 0), box(500, 0)], 8);
+    expect(snap.dx).toBe(-3);
+    expect(snap.spacing).toEqual([
+      { axis: 'x', from: 100, to: 250, at: 50 },
+      { axis: 'x', from: 350, to: 500, at: 50 }
+    ]);
+  });
+
+  it('works vertically too', () => {
+    const snap = snapBox(box(1000, 245), [box(1000, 0), box(1000, 500)], 8);
+    expect(snap.dy).toBe(5);
+    expect(snap.spacing.map((g) => g.axis)).toEqual(['y', 'y']);
+  });
+
+  it('ignores tiles that do not face the dragged one across the gap', () => {
+    expect(snapBox(box(253, 0), [box(0, 0), box(500, 900)], 8).spacing).toEqual([]);
+  });
+
+  it('prefers an edge that is closer than the equal spacing', () => {
+    const snap = snapBox(box(253, 0), [box(0, 0), box(500, 0), box(254, 900)], 8);
+    expect(snap.dx).toBe(1);
+    expect(snap.spacing).toEqual([]);
   });
 });
