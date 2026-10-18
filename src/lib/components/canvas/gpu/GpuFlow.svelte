@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { frameDrill } from '$lib/canvas/frame-drill';
+  import { Gesture } from '$lib/motion/drill';
   import { onMount, untrack, type ComponentProps } from 'svelte';
   import { page } from '$app/state';
   import type CanvasFlow from '../CanvasFlow.svelte';
@@ -435,6 +437,20 @@
       return;
     }
     clickNode(id, e.shiftKey || e.metaKey || e.ctrlKey);
+  }
+
+  function onDouble(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (target.closest('.gpu-dom-node [data-motion-node]')) {
+      return;
+    }
+    const hit = hitAt(toWorld(view, local(e as PointerEvent)));
+    const id = hit.kind === HitKind.Node ? hit.nodeId : null;
+    const stage = id ? wrap?.querySelector<HTMLElement>(`[data-motion-node="${id}"] [data-frame-stage]`)?.getBoundingClientRect() : null;
+    if (!id || !stage || stage.width <= 0 || stage.height <= 0) {
+      return;
+    }
+    frameDrill.request(id, { x: (e.clientX - stage.left) / stage.width, y: (e.clientY - stage.top) / stage.height }, Gesture.Double);
   }
 
   const pointerOf = (e: PointerEvent) => (e.pointerType === 'touch' ? Pointer.Touch : e.pointerType === 'pen' ? Pointer.Pen : Pointer.Mouse);
@@ -1140,6 +1156,7 @@
     onpointercancel={onUp}
     onwheel={onWheel}
     onclick={onClickInside}
+    ondblclick={onDouble}
     oncontextmenu={onContextMenu}
     onpointerleave={() => props.onPointer?.(null)}
     class:panning={space}

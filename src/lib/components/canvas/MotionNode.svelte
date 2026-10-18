@@ -10,6 +10,8 @@
 </script>
 
 <script lang="ts">
+  import { frameDrill } from '$lib/canvas/frame-drill';
+  import { Gesture } from '$lib/motion/drill';
   import { onMount, tick, untrack } from 'svelte';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import Play from '@lucide/svelte/icons/play';
@@ -306,6 +308,23 @@
     e.preventDefault();
     onopen();
   }
+  function enter(e: MouseEvent) {
+    const stage = root?.querySelector<HTMLElement>('[data-frame-stage]')?.getBoundingClientRect();
+    const inEditor = (e.target as HTMLElement | null)?.closest?.("[data-testid=selection-overlay]");
+    if (stage && !inEditor && stage.width > 0 && stage.height > 0) {
+      frameDrill.request(node.id, { x: (e.clientX - stage.left) / stage.width, y: (e.clientY - stage.top) / stage.height }, Gesture.Double);
+    }
+    onenter?.();
+  }
+
+  $effect(() => {
+    const el = root;
+    if (!el) {
+      return;
+    }
+    el.addEventListener('dblclick', enter);
+    return () => el.removeEventListener('dblclick', enter);
+  });
 </script>
 
 <div
@@ -313,7 +332,6 @@
   class:editing={!previewing}
   class:bare={!chrome.bar}
   data-kind={node.kind}
-  ondblclick={() => onenter?.()}
   data-testid="motion-node"
   data-motion-node={node.id}
   data-mode={mode}
