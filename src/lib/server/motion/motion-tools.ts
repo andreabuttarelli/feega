@@ -1,4 +1,6 @@
 import { ungroupClip } from '$lib/motion/group';
+import { StyleAction, StyleKind, applyStyle, defineStyle, detachStyle, removeStyle, stylesOf } from '$lib/motion/styles';
+import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
 import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
@@ -346,6 +348,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         layoutItem: c.layoutItem ?? null,
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
+        styleRef: c.styleRef ?? null,
         expressions: c.expressions,
         effects: c.effects,
         shaders: c.shaders,
@@ -366,6 +369,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     fields: doc.fields,
     referenceLook: doc.referenceLook ?? null,
     fonts: doc.fonts,
+    styles: stylesOf(doc),
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
     workArea: doc.workArea ? { start: secs(doc.workArea.from), end: secs(doc.workArea.to) } : null,
     interactive: interactiveOf(doc),
@@ -775,6 +779,16 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     const withAssets = Object.values(ids).reduce<OpResult>((r, assetId) => registered(r, assetId), { ok: true, doc: session.doc });
     const laid = apply(withAssets.ok ? placeSfx(withAssets.doc, cues, ids, deps.newId) : withAssets, `laid ${cues.length} sound effects`);
     return laid.ok ? `${cues.length} sound effects on the SFX track` : laid.error;
+  };
+
+  type StyleInput = { name?: string; style?: unknown; clip_ids?: string[] };
+  const named = (input: StyleInput) => input.name ?? '';
+  const STYLE_ACTIONS: Record<StyleAction, (input: StyleInput) => unknown> = {
+    [StyleAction.Define]: (input) => apply(defineStyle(session.doc, named(input), input.style), `style ${named(input)}`),
+    [StyleAction.Apply]: (input) => apply(applyStyle(session.doc, input.clip_ids ?? [], named(input)), `style ${named(input)} on ${(input.clip_ids ?? []).join(', ')}`),
+    [StyleAction.Detach]: (input) => apply(detachStyle(session.doc, input.clip_ids ?? []), `detached ${(input.clip_ids ?? []).join(', ')}`),
+    [StyleAction.Remove]: (input) => apply(removeStyle(session.doc, named(input)), `removed style ${named(input)}`),
+    [StyleAction.List]: () => ({ styles: stylesOf(session.doc) })
   };
 
   const tools: Record<string, Tool> = {
@@ -1885,6 +1899,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: `Set the font of a text clip (Title, Text, Kicker, Caption, ProductCard): any Google Fonts family (registered in the video automatically), an uploaded font, or a built-in (${Object.values(BuiltinFont).join(', ')}). weight ${FONT_WEIGHTS[0]}..${FONT_WEIGHTS[FONT_WEIGHTS.length - 1]}; the nearest weight the family has is used.`,
       inputSchema: z.object({ clip_id: z.string(), family: z.string().max(64), weight: z.number().int().min(100).max(900).optional(), italic: z.boolean().optional() }),
       execute: async (input) => apply(setFont(session.doc, input.clip_id, { family: input.family, weight: input.weight, italic: input.italic }, GOOGLE_FONTS), `font ${input.family} on ${input.clip_id}`)
+    }),
+
+    named_style: tool({
+      description: `Named styles of the video. action define (name, style) creates or edits one: kind ${StyleKind.Text} with font, size (share of frame height), weight, tracking (em), leading, color, or kind ${StyleKind.Colour} with color; editing restyles every clip using it. apply (name, clip_ids) links clips: a text style to text clips, a colour style to the text colour or shape fill. detach (clip_ids) unlinks them, keeping their look. remove (name) deletes a style. list returns the styles with their clips (also in get_motion_doc).`,
+      inputSchema: z.object({ action: z.enum(StyleAction), name: z.string().regex(STYLE_NAME).optional(), style: styleSchema.optional(), clip_ids: z.array(z.string()).optional() }),
+      execute: async (input) => STYLE_ACTIONS[input.action](input)
     }),
 
     register_font: tool({
