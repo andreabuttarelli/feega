@@ -17,6 +17,9 @@ export async function pickBarTool(page: Page, tool: string): Promise<void> {
 }
 
 export async function pickFrameTool(page: Page, tool: string): Promise<void> {
-  await pickRadio(page.getByTestId('edit-mode').locator('[data-mode="design"]'));
+  const design = page.getByTestId('edit-mode').locator('[data-mode="design"]');
+  if (await design.count()) {
+    await pickRadio(design);
+  }
   await page.getByTestId('draw-tools').locator(`[data-tool="${tool}"]`).click();
 }

@@ -7,7 +7,7 @@ import { test, expect, type Browser, type BrowserContext, type Page } from '@pla
 import { REAL_STACK, signInE2e } from './fixtures/session';
 import { pickBarTool } from './fixtures/canvas-bar';
 import { FluidProbe, Read, type Box, type PixelWatch, type Watch } from './fixtures/fluidity-probe';
-import { scorecard, verdictOf, type SessionRun, type StepResult } from './fixtures/fluidity-report';
+import { recordsVideo, scorecard, verdictOf, type SessionRun, type StepResult } from './fixtures/fluidity-report';
 
 const OUT = process.env.FLUID_OUT ?? join(homedir(), 'Documents', 'feega-videos', 'fluidity');
 const SLUG = process.env.FLUID_PROJECT_SLUG ?? 'gpu-fixture-0aef6d1a';
@@ -656,7 +656,10 @@ function writeRun(run: SessionRun) {
   writeFileSync(join(OUT, 'SCORECARD.md'), scorecard(all));
 }
 
-async function recordedContext(browser: Browser, name: string): Promise<BrowserContext> {
+async function recordedContext(browser: Browser, browserName: string, name: string): Promise<BrowserContext> {
+  if (!recordsVideo(browserName)) {
+    return browser.newContext({ viewport: VIEWPORT });
+  }
   mkdirSync(join(OUT, 'raw', name), { recursive: true });
   return browser.newContext({ viewport: VIEWPORT, recordVideo: { dir: join(OUT, 'raw', name), size: VIEWPORT } });
 }
@@ -694,7 +697,7 @@ test.describe('fluidity scorecard @real', () => {
         const before = await liveNodeIds(db, canvasId);
         const name = `${browserName}-${renderer}-${variant}`;
         const path = `/p/${projectId}/c/${canvasId}${renderer === 'dom' ? '?renderer=dom' : ''}`;
-        const context = await recordedContext(browser, name);
+        const context = await recordedContext(browser, browserName, name);
         const page = await context.newPage();
         page.setDefaultTimeout(60_000);
         const mocked = await mockGenerate(page);
