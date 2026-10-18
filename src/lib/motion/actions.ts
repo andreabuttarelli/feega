@@ -7,6 +7,7 @@ import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
 import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
 import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+import PenLine from '@lucide/svelte/icons/pen-line';
 import BringToFront from '@lucide/svelte/icons/bring-to-front';
 import SendToBack from '@lucide/svelte/icons/send-to-back';
 import SquaresUnite from '@lucide/svelte/icons/squares-unite';
@@ -227,6 +228,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Subtract]: { name: 'Subtract', icon: SquaresSubtract, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Intersect]: { name: 'Intersect', icon: SquaresIntersect, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Exclude]: { name: 'Exclude', icon: SquaresExclude, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.OutlineStroke]: { name: 'Outline stroke', icon: PenLine, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignLeft]: { name: 'Align left', icon: AlignStartVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignCenter]: { name: 'Align horizontal centres', icon: AlignCenterVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignRight]: { name: 'Align right', icon: AlignEndVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },

@@ -207,6 +207,12 @@ describe('mask keys', () => {
   });
 });
 
+describe('outline stroke key', () => {
+  it('⌥⌘O outlines the stroke of the selected shape', () => {
+    expect(press('ø', { mod: true, alt: true, code: 'KeyO' })).toBe(Command.OutlineStroke);
+  });
+});
+
 describe('select matching key', () => {
   it('⌥⌘A selects every layer like the selected ones', () => {
     expect(press('å', { mod: true, alt: true, code: 'KeyA' })).toBe(Command.SelectMatching);
