@@ -35,6 +35,11 @@ describe('memory budget — a heavy canvas fits an iPhone WebContent process', (
     expect(rendererResolution(3, Device.Desktop)).toBe(3);
   });
 
+  it('a phone mounts no off-screen tile to shoot posters or snapshots', () => {
+    expect(BUDGET[Device.Phone].posterShelf).toBe(0);
+    expect(BUDGET[Device.Phone].shootsSnapshots).toBe(false);
+  });
+
   it('a phone renders without MSAA, which quadruples the backing store', () => {
     expect(BUDGET[Device.Phone].antialias).toBe(false);
   });

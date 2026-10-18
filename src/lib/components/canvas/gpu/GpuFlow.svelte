@@ -72,6 +72,7 @@
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { Counter, count, exposeLoss, exposeReveal, exposeSettled, recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
+  import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
@@ -244,8 +245,7 @@
   let shown = $state(new Map<string, string>());
   const shotOf = (id: string) => shown.get(id) ?? null;
   const showSnapshot = (id: string, key: string, bitmap: ImageBitmap) => {
-    scene?.setSnapshot(id, key, bitmap);
-    shown = new Map(shown).set(id, key);
+    void scene?.setSnapshot(id, key, bitmap).then(() => (shown = new Map(shown).set(id, key)));
   };
   const preloaded = new Set<string>();
   let looking = $state(new Set<string>());
@@ -394,7 +394,7 @@
   let schedulerTick = $state(0);
   $effect(() => {
     void schedulerTick;
-    if (shotJob || !scene) {
+    if (shotJob || !scene || !BUDGET[currentDevice()].shootsSnapshots) {
       return;
     }
     if (performance.now() < busyUntil) {
@@ -494,7 +494,7 @@
 
   let parked = $state(new Map<string, number>());
   let shelfClock = $state(0);
-  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock)));
+  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock).slice(0, BUDGET[currentDevice()].posterShelf)));
   const shelfSince = new Map<string, number>();
   $effect(() => {
     const now = Date.now();
