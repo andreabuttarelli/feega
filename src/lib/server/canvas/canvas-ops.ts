@@ -24,7 +24,7 @@ import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPU
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
-import { MoveOutcome, drawElement, drawnSchema, dropFor, frameAnswer, frameStore, linkFrame, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
+import { drawElement, drawnSchema, dropFor, frameAnswer, frameStore, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
 import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
@@ -52,7 +52,7 @@ import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
 import { cancelRender } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { withdrawFromGallery } from '$lib/server/gallery/publish';
-import { registerCanvasUpload, UploadError } from '$lib/server/canvas/upload';
+import { importCanvasLink, registerCanvasUpload, UploadError } from '$lib/server/canvas/upload';
 import { canvasUploadPrefix, verdictForUpload } from '$lib/canvas/upload-kind';
 import { CANVAS_ASSET_BUCKET } from '$lib/server/repos/asset-storage';
 import { findProjectById } from '$lib/server/repos/projects';
@@ -299,6 +299,8 @@ const MAX_VOICE_NAME = 100;
 const MAX_CLONE_SAMPLE_BYTES = 3 * 1024 * 1024;
 
 const requestUploadInput = z.object({ fileName: z.string().min(1), mimeType: z.string().min(1), bytes: z.number().int().positive() }).strict();
+const importLinkInput = z.object({ url: z.string().url().describe('https link to a picture or video') }).strict();
+
 const registerUploadInput = z
   .object({
     canvasId: z.string(),
@@ -568,8 +570,7 @@ export const CANVAS_OPS = {
         targetHandle: input.targetHandle ?? null,
         actor: ctx.actor
       });
-      const linked = await linkFrame(framesOf(ctx), { sourceNodeId: input.sourceNodeId, frameNodeId: input.targetNodeId });
-      return { connection, ...(linked.outcome === MoveOutcome.Done ? { placed_in_frame: { clip_id: linked.clipId, revision: linked.versions[linked.frameId] } } : {}) };
+      return { connection };
     }
   }),
 
@@ -1006,6 +1007,12 @@ export const CANVAS_OPS = {
       }
       return uploadAnswer(() => registerCanvasUpload(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, ...input }));
     }
+  }),
+
+  import_link: op({
+    access: Access.Write,
+    input: importLinkInput,
+    run: async (ctx, input) => uploadAnswer(async () => ({ asset: (await importCanvasLink(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, url: input.url })).asset }))
   }),
 
   list_voices: op({

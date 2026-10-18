@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { frameDrill } from '$lib/canvas/frame-drill';
+  import { Gesture } from '$lib/motion/drill';
   import { onMount, untrack, type ComponentProps } from 'svelte';
   import { iconBitmap } from './icon-bitmap';
   import { idleChrome } from '$lib/canvas/gpu/idle-chrome';
@@ -28,7 +30,7 @@
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import { FocusMode, frameIn, type Insets } from '$lib/canvas/free-area';
+  import { FocusMode, inView, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
@@ -557,6 +559,13 @@
     if (f?.mode === FocusMode.Select) {
       untrack(() => select([...ids]));
     }
+    if (f?.mode !== FocusMode.Frame) {
+      const b = untrack(() => boundsOf(ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []))));
+      const s = untrack(() => screenSize());
+      if (b && untrack(() => inView(b, view, { width: s.width, height: s.height }, f?.free))) {
+        return;
+      }
+    }
     const frame = requestAnimationFrame(() => requestAnimationFrame(() => untrack(() => focusOn(ids, f?.free ?? null))));
     return () => cancelAnimationFrame(frame);
   });
@@ -639,6 +648,20 @@
       return;
     }
     clickNode(id, e.shiftKey || e.metaKey || e.ctrlKey);
+  }
+
+  function onDouble(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (target.closest('.gpu-dom-node [data-motion-node]')) {
+      return;
+    }
+    const hit = hitAt(toWorld(view, local(e as PointerEvent)));
+    const id = hit.kind === HitKind.Node ? hit.nodeId : null;
+    const stage = id ? wrap?.querySelector<HTMLElement>(`[data-motion-node="${id}"] [data-frame-stage]`)?.getBoundingClientRect() : null;
+    if (!id || !stage || stage.width <= 0 || stage.height <= 0) {
+      return;
+    }
+    frameDrill.request(id, { x: (e.clientX - stage.left) / stage.width, y: (e.clientY - stage.top) / stage.height }, Gesture.Double);
   }
 
   const pointerOf = (e: PointerEvent) => (e.pointerType === 'touch' ? Pointer.Touch : e.pointerType === 'pen' ? Pointer.Pen : Pointer.Mouse);
@@ -1284,9 +1307,9 @@
           props.onFlow?.(toFlow);
           observer.observe(surface!);
           if (!fitted && tiles.length) {
-            fitted = true;
             view = fitView(tiles);
           }
+          fitted = true;
         })
         .catch((err: unknown) => {
           failed = err instanceof Error ? err.message : String(err);
@@ -1345,6 +1368,7 @@
     onpointercancel={onUp}
     onwheel={onWheel}
     onclick={onClickInside}
+    ondblclick={onDouble}
     oncontextmenu={onContextMenu}
     onpointerleave={() => props.onPointer?.(null)}
     class:panning={space}

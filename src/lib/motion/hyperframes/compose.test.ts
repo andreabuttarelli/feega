@@ -109,6 +109,12 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(compose(auto)).toContain('white-space:pre;');
   });
 
+  it('a text marks its own box, so the editor selects the text box and not just its ink', () => {
+    const text = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'Body' } }, 'tx'));
+    expect(compose(text)).toContain('class="box" data-box');
+    expect(compose(doc)).not.toContain('class="box" data-box');
+  });
+
   it('text with a stroke outlines its glyphs; text without one composes as before', () => {
     const strokes = [{ paint: { type: 'solid', color: '#ff0000' }, width: 0.002, align: 'outside' }];
     const titled = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Hi', strokes } }, 'tt'));

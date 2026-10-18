@@ -58,6 +58,7 @@
   import LutPicker from './LutPicker.svelte';
   import TextPathSection from './TextPathSection.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
+  import StyleSection from './StyleSection.svelte';
   import { registerFont, setFont } from '$lib/motion/fonts/ops';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
@@ -81,7 +82,7 @@
   import { propsOwner, sliderOf, toShown, toStored, type Ranged } from '$lib/motion/units';
   import { BOUNDS, PHYSICS, PHYSICS_KEYS, PHYSICS_PRESET, PHYSICS_PRESETS, type Bounds, type PhysicsKey, type PhysicsPreset } from '$lib/motion/physics/model';
   import { applyPhysicsPreset, setPhysics } from '$lib/motion/physics/ops';
-  import { LinkUse, MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
+  import { MediaKind, acceptOf, itemOfPick, pickOfItem } from '$lib/motion/media/pick';
   import MediaPicker from './MediaPicker.svelte';
   import MediaListField from './MediaListField.svelte';
   import type { MediaUploader } from './media-upload';
@@ -108,8 +109,7 @@
     sharedWith = 0,
     partFill = null,
     lead,
-    mode = EditMode.Motion,
-    typeInto = null
+    mode = EditMode.Motion
   }: {
     doc: MotionDoc;
     analyses?: Record<string, AudioAnalysis>;
@@ -130,15 +130,7 @@
     partFill?: Snippet | null;
     lead?: Snippet;
     mode?: EditMode;
-    typeInto?: string | null;
   } = $props();
-
-  function typeHere(area: HTMLTextAreaElement, clipId: string | null) {
-    if (clipId !== null && clipId === clip.id) {
-      area.focus();
-      area.select();
-    }
-  }
 
   function leaveOnEscape(e: KeyboardEvent) {
     if (e.key === 'Escape') {
@@ -474,6 +466,7 @@
         {#each sharedFields as field (field.key)}{@render fieldRow(field)}{/each}
       </details>
     {/if}
+    {#if visual}<StyleSection {doc} {clip} {commit} />{/if}
     {#if visual}<AutoLayoutSection {doc} {clip} {commit} />{/if}
   {/if}
 
@@ -564,7 +557,7 @@
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
   {:else if field.control === Control.Textarea}
     <div class="stack">
-      <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} use:typeHere={typeInto} onkeydown={leaveOnEscape} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
+      <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} onkeydown={leaveOnEscape} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
     </div>
   {:else}
     <div class="line">
@@ -581,9 +574,9 @@
         {:else if field.control === Control.Color}
           <ColorField id={`f-${field.key}`} name={field.label} value={value(field)} {tokens} onchange={(v) => setProp(field, v)} />
         {:else if field.control === Control.Asset}
-          <MediaPicker label={field.label} value={typeof value(field) === 'string' && value(field) ? { kind: field.assetKind === AssetKind.Video ? MediaKind.Video : MediaKind.Image, assetId: String(value(field)) } : null} {assets} accept={acceptOf(field.assetKind)} links={LinkUse.Import} uploader={upload} onpick={(pick) => setProp(field, pick?.assetId ?? null)} />
+          <MediaPicker label={field.label} value={typeof value(field) === 'string' && value(field) ? { kind: field.assetKind === AssetKind.Video ? MediaKind.Video : MediaKind.Image, assetId: String(value(field)) } : null} {assets} accept={acceptOf(field.assetKind)} uploader={upload} onpick={(pick) => setProp(field, pick?.assetId ?? null)} />
         {:else if field.control === Control.MediaItem}
-          <MediaPicker label={field.label} value={pickOfItem(value(field))} {assets} accept={acceptOf(field.assetKind)} links={LinkUse.Keep} uploader={upload} onpick={(pick) => setProp(field, itemOfPick(pick))} />
+          <MediaPicker label={field.label} value={pickOfItem(value(field))} {assets} accept={acceptOf(field.assetKind)} uploader={upload} onpick={(pick) => setProp(field, itemOfPick(pick))} />
         {:else if field.control === Control.MediaList}
           <MediaListField label={field.label} value={value(field)} {assets} {upload} onchange={(list) => setProp(field, list)} />
         {:else if field.control === Control.Font}

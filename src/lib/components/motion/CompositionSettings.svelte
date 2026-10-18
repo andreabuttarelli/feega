@@ -2,13 +2,15 @@
   import { FRAME_RATES, type FrameRate } from '$lib/motion/design';
   import { setFrameRate } from '$lib/motion/frame-rate';
   import { setMotionBlur } from '$lib/motion/motion-blur-ops';
-  import { Background, FORMATS, MAX_SIDE, MIN_SIDE, MOTION_FORMATS, MAX_SECONDS, formatOf, formatSize, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
+  import { Background, FORMATS, MOTION_FORMATS, sideRange, MAX_SECONDS, formatOf, formatSize, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import { setCanvas, type OpResult } from '$lib/motion/timeline';
   import { parseDecimal, secondsLabel } from '$lib/motion/inspector';
   import { fitDuration } from '$lib/motion/fit-duration';
-  import { DocMode, docMode, setStill } from '$lib/motion/still';
+  import { DocMode, designStill, docMode, setStill } from '$lib/motion/still';
 
   let { doc, onchange }: { doc: MotionDoc; onchange: (result: OpResult, summary: string) => void } = $props();
+
+  const sides = $derived(sideRange(doc));
 
   function setDuration(text: string) {
     const seconds = parseDecimal(text);
@@ -45,14 +47,14 @@
   <label>
     <span>Size</span>
     <span class="size-field">
-      <input type="number" min={MIN_SIDE} max={MAX_SIDE} step="2" aria-label="Width" title="Width in pixels" value={doc.width} onchange={(e) => setSide('width', e.currentTarget.value)} data-testid="frame-width" />
+      <input type="number" min={sides.min} max={sides.max} step="1" aria-label="Width" title="Width in pixels" value={doc.width} onchange={(e) => setSide('width', e.currentTarget.value)} data-testid="frame-width" />
       <em>×</em>
-      <input type="number" min={MIN_SIDE} max={MAX_SIDE} step="2" aria-label="Height" title="Height in pixels" value={doc.height} onchange={(e) => setSide('height', e.currentTarget.value)} data-testid="frame-height" />
+      <input type="number" min={sides.min} max={sides.max} step="1" aria-label="Height" title="Height in pixels" value={doc.height} onchange={(e) => setSide('height', e.currentTarget.value)} data-testid="frame-height" />
     </span>
   </label>
   <label class="toggle" title="One frame: a post or a poster exported as an image, no timeline">
     <span>Still</span>
-    <input type="checkbox" checked={docMode(doc) === DocMode.Still} onchange={(e) => onchange(setStill(doc, e.currentTarget.checked ? 0 : null), e.currentTarget.checked ? 'Made a still' : 'Made a video')} data-testid="still" />
+    <input type="checkbox" checked={docMode(doc) === DocMode.Still} onchange={(e) => onchange(e.currentTarget.checked ? designStill(doc, 0) : setStill(doc, null), e.currentTarget.checked ? 'Made a still' : 'Made a video')} data-testid="still" />
   </label>
   {#if doc.still}
     <label>

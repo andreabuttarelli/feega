@@ -304,6 +304,7 @@ describe('motion agent tools', () => {
 
     expect(out).toMatchObject({ ok: true, seen: false });
     expect(String(out.note)).toContain('neither the editor nor the server');
+    expect(String(out.note)).toContain('CHROMIUM_PATH');
     expect(session.checkedAt).toBe(0);
   });
 

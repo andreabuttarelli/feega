@@ -521,10 +521,11 @@ export async function patchNodeData(
     base?: Record<string, unknown>;
     check: DataCheck;
     actor?: Actor;
+    known?: CanvasNodeRecord;
   }
 ): Promise<PatchWrite> {
   for (let attempt = 0; attempt < PATCH_MAX_ATTEMPTS; attempt++) {
-    const before = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId });
+    const before = attempt === 0 && input.known ? input.known : await findNode(db, { orgId: input.orgId, nodeId: input.nodeId });
     if (!before) {
       return { outcome: 'gone' };
     }

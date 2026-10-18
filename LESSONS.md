@@ -550,6 +550,15 @@ non fa niente) e `curl http://localhost:<porta>/src/<file>` non contiene il codi
 Vite non sempre vede i file cambiati in blocco da un cambio di branch. Mossa: dopo ogni cambio di
 branch riavvia il dev server e controlla col `curl` del modulo prima di credere a un rosso e2e.
 
+Anche senza checkout il watcher a volte smette di vedere i file salvati: il `curl` del modulo
+mostra il codice vecchio. Stessa mossa, riavvio prima di ogni giro e2e.
+
+### Un `ondblclick` di Svelte che non scatta mai
+Segnale: il listener in cattura su `document` vede il dblclick sul tuo elemento, il gestore Svelte
+no. Svelte 5 delega `dblclick`/`click` alla radice; un antenato (la tela, un nodo) ferma la
+propagazione prima. Mossa: `addEventListener('dblclick', …)` diretto sull'elemento in un
+`$effect`, e un test e2e che fa il gesto vero.
+
 ## Test: distinguere il tuo difetto dal rumore
 
 ### CI rossa con zero test falliti è una promessa non attesa, non un test tuo
@@ -3074,3 +3083,12 @@ Signal: the page keeps old markup (a new attribute is `null`, a fix "does nothin
 
 ### A drag e2e on a canvas node does not move it
 Signal: `mouse.down/move/up` on a seeded node leaves `boundingBox().x` unchanged; a text node's textbox gets the pointer. Cause: text/doc bodies take the pointer for editing, and a click first on a motion node opens the inline editor. Move: seed a `motion` element with `width/height` and a `motion_revisions` row, then press on it without a prior click; measure the peer's box BEFORE `mouse.down`, not after the moves.
+
+### A template prop edit saves but the frame keeps the old picture
+Signal: the DB holds the new value of a Custom clip prop, the inspector shows it, the frame still draws the old one (or an empty slot). Cause: the clip has a `varPrefix`; at runtime a declared variable (`<prefix>_<prop>`) wins over the prop, and its default was not moved. Move: `setProps` keeps driven variable defaults in step (`drivenVars`); check `interactive.vars` before suspecting assets or CSP.
+
+### Image export answers "needs the server renderer" or times out locally
+Signal: Export image fails with "not available here" or "Waiting failed: 20000ms exceeded". Cause: the server renderer is off without `CHROMIUM_PATH`, and it loads runtime scripts from `PUBLIC_APP_URL` (production by default), whose integrity hashes do not match your build. Move: start `vite dev` with `CHROMIUM_PATH=<Playwright Chrome for Testing binary>` and `PUBLIC_APP_URL=http://localhost:<port>`.
+
+### A canvas 500s only once it holds a group (DOM renderer)
+Signal: `?renderer=dom` answers 500 on a canvas that has a group; the same page without groups loads; `handleError` (logged locally) says `Cannot access X before initialization` inside `CanvasFlow.svelte`. Cause: a component-scope `const` declared below the function that the first render already calls, so only data that reaches that branch hits the TDZ. Move: declare the constant above its first use; `canvas-dom-group-ssr.spec.ts` guards it.

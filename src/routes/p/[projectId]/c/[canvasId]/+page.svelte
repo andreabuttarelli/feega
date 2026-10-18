@@ -44,6 +44,7 @@
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
   import { adoptCommitted, commitHub, rowsOf } from '$lib/canvas/commit-note';
+  import { peerTracks } from '$lib/realtime/peer-tracks';
   import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
   import CursorChat from '$lib/components/canvas/CursorChat.svelte';
@@ -1160,7 +1161,19 @@
   const PEER_SWEEP_MS = 1000;
   let cursorMarks = $state(new Map<string, HeldMark>());
   let presenceNow = $state(0);
+  const peerPaths = peerTracks();
+  let peerFrame = $state(0);
+  let peerFrameId = 0;
+  function wakePeerFrames() {
+    if (peerFrameId) { return; }
+    const step = () => {
+      peerFrame = Date.now();
+      peerFrameId = peerPaths.moving(peerFrame) ? requestAnimationFrame(step) : 0;
+    };
+    peerFrameId = requestAnimationFrame(step);
+  }
   const canvasPeers = $derived(canvasPeersOf(cursorMarks, cursorSession, presenceNow, (box) => tiles.some((t) => t.id === box.id && landedAt(t, box))));
+  const drawnPeers = $derived(peerFrame ? peerPaths.smooth(canvasPeers, peerFrame) : canvasPeers);
   let following = $state<string | null>(null);
   let presenting = $state(false);
   const followView = $derived(following ? followed(canvasPeers, following) : null);
@@ -1170,7 +1183,13 @@
     cursors.port.update({ presenting: on });
   }
   $effect(() => {
-    const unlisten = cursors.port.listen((mark) => { cursorMarks = keepCanvasMark(untrack(() => cursorMarks), mark); presenceNow = Date.now(); });
+    const unlisten = cursors.port.listen((mark, sentAt) => {
+      cursorMarks = keepCanvasMark(untrack(() => cursorMarks), mark);
+      presenceNow = Date.now();
+      peerPaths.heard(mark, sentAt, presenceNow);
+      if (document.visibilityState === 'hidden') { peerFrame = 0; return; }
+      wakePeerFrames();
+    });
     const sweep = setInterval(() => { presenceNow = Date.now(); }, PEER_SWEEP_MS);
     return () => { unlisten(); clearInterval(sweep); cursors.port.stop(); };
   });
@@ -1383,8 +1402,9 @@
   });
 
   function reframe(id: string | null, free: Insets) {
+    const row = id ? nodes.find((n) => n.id === id) : null;
     if (id && reframesOn(viewportOf(pageWidth)) === Reframe.Frame) {
-      focusOn([id], free);
+      focusOn([id], free, row && !tileChromeOf(row).bar ? FocusMode.Reveal : FocusMode.Frame);
     }
   }
 
@@ -3302,7 +3322,7 @@
   <Flow
     mode={canvasMode}
     actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
-    tiles={withPeerMotion(tiles, canvasPeers, new Set(selectedIds))}
+    tiles={withPeerMotion(tiles, drawnPeers, new Set(selectedIds))}
     {edges}
     onMove={move}
     onMoveEnd={moveEnd}
@@ -3353,7 +3373,7 @@
       domReason = why;
       Flow = CanvasFlow as unknown as typeof GpuFlow;
     }}
-    peers={canvasPeers}
+    peers={drawnPeers}
     onPointer={(cursor) => cursors.port.update({ cursor })}
     onLive={(live) => cursors.port.update({ live })}
     onView={(view) => cursors.port.update({ view })}

@@ -1,5 +1,6 @@
 import type { MotionClip, MotionDoc } from './doc';
 import { Matte } from './mask';
+import { layerOrder } from './siblings';
 import type { OpResult } from './timeline';
 
 type Membership = { matte: Matte; matteFrom: string | null };
@@ -11,7 +12,7 @@ const fail = (error: string): OpResult => ({ ok: false, error });
 
 const clipsOf = (doc: MotionDoc) => doc.tracks.flatMap((t) => t.clips as MotionClip[]);
 
-const levelOf = (doc: MotionDoc, id: string) => doc.tracks.findIndex((t) => t.clips.some((c) => c.id === id));
+const levelOf = (doc: MotionDoc, id: string) => layerOrder(doc).indexOf(id);
 
 const isMember = (clip: MotionClip) => !!clip.matteFrom && clip.matte !== Matte.None;
 

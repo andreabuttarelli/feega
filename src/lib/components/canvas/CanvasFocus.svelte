@@ -2,12 +2,12 @@
   import { untrack } from 'svelte';
   import { useSvelteFlow } from '@xyflow/svelte';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import { FocusMode, frameIn, type FocusRequest, type Insets } from '$lib/canvas/free-area';
+  import { FocusMode, frameIn, inView, type FocusRequest, type Insets } from '$lib/canvas/free-area';
 
   let { focus }: { focus: FocusRequest | null } = $props();
 
   const FIT_DURATION_MS = 250;
-  const { fitView, getNodes, updateNode, getNodesBounds, setViewport } = useSvelteFlow();
+  const { fitView, getNodes, updateNode, getNodesBounds, setViewport, getViewport } = useSvelteFlow();
   const EDIT_MAX_ZOOM = 2;
 
 
@@ -33,6 +33,12 @@
     }
     if (focus?.mode === FocusMode.Select) {
       untrack(() => select(ids));
+    }
+    if (focus?.mode !== FocusMode.Frame) {
+      const flow = document.querySelector('.svelte-flow')?.getBoundingClientRect();
+      if (flow && untrack(() => inView(getNodesBounds([...ids]), getViewport(), { width: flow.width, height: flow.height }, free))) {
+        return;
+      }
     }
 
     const frame = requestAnimationFrame(() =>

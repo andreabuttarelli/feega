@@ -2,8 +2,8 @@
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { LinkUse, MediaAccept, MediaKind, type MediaPick } from '$lib/motion/media/pick';
-import type { MediaUploader } from './media-upload';
+import { MediaAccept, MediaKind, type MediaPick } from '$lib/motion/media/pick';
+import type { MediaSource, MediaUploader } from './media-upload';
 import MediaPicker from './MediaPicker.svelte';
 
 const dir = dirname(fileURLToPath(import.meta.url));
@@ -17,7 +17,7 @@ const LIBRARY = [
 
 let app: Record<string, unknown> | null = null;
 
-function show(props: { value?: MediaPick | null; accept?: MediaAccept; links?: LinkUse; uploader?: MediaUploader }) {
+function show(props: { value?: MediaPick | null; accept?: MediaAccept; uploader?: MediaUploader }) {
   const onpick = vi.fn();
   app = mount(MediaPicker, { target: document.body, props: { value: null, assets: LIBRARY, label: 'Picture', onpick, ...props } });
   flushSync();
@@ -81,8 +81,9 @@ describe('the media picker', () => {
     expect(onpick).toHaveBeenLastCalledWith(null);
   });
 
-  it('validates a link, previews it, then keeps it as a link', () => {
-    const onpick = show({ links: LinkUse.Keep });
+  it('validates a link, previews it, then copies it into the project as an asset', async () => {
+    const uploader = vi.fn(async () => ({ ok: true as const, asset: { id: 'copied', kind: MediaKind.Image, label: 'a.jpg', previewUrl: '/a/copied' } }));
+    const onpick = show({ uploader });
     click(byId('media-add'));
     click(byId('media-tab-link'));
     type(byId('media-link'), 'not a link');
@@ -92,12 +93,16 @@ describe('the media picker', () => {
     click(byId('media-link-check'));
     expect(byId('media-link-preview').querySelector('img')?.getAttribute('src')).toBe('https://cdn.test/a.jpg');
     click(byId('media-link-use'));
-    expect(onpick).toHaveBeenLastCalledWith({ kind: MediaKind.Image, url: 'https://cdn.test/a.jpg' });
+    await tick();
+    await Promise.resolve();
+    flushSync();
+    expect(uploader).toHaveBeenCalledWith(new URL('https://cdn.test/a.jpg'), expect.any(Function));
+    expect(onpick).toHaveBeenLastCalledWith({ kind: MediaKind.Image, assetId: 'copied' });
   });
 
   it('uploads a file with progress, then sets the new asset', async () => {
     let finish: (v: Awaited<ReturnType<MediaUploader>>) => void = () => {};
-    const uploader = vi.fn((_file: File, progress: (f: number) => void) => {
+    const uploader = vi.fn((_source: MediaSource, progress: (f: number) => void) => {
       progress(0.5);
       return new Promise<Awaited<ReturnType<MediaUploader>>>((resolve) => (finish = resolve));
     });

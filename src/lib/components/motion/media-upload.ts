@@ -4,4 +4,6 @@ export type LibraryMedia = { id: string; kind: string; label: string; previewUrl
 
 export type UploadOutcome = { ok: true; asset: LibraryMedia & { kind: MediaKind } } | { ok: false; error: string };
 
-export type MediaUploader = (file: File, progress: (fraction: number) => void) => Promise<UploadOutcome>;
+export type MediaSource = File | URL;
+
+export type MediaUploader = (source: MediaSource, progress: (fraction: number) => void) => Promise<UploadOutcome>;

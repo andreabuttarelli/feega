@@ -36,7 +36,7 @@ describe('the auto layout section', () => {
   });
 
   it('marks the alignment spot and space between that the layout uses', () => {
-    expect(html(row, 'box')).toMatch(/aria-label="Align center start"[^>]*aria-pressed="true"/);
+    expect(html(row, 'box')).toMatch(/aria-label="Align start start"[^>]*aria-pressed="true"/);
     expect(html(must(setAutoLayout(row, 'box', { justify: Justify.SpaceBetween })), 'box')).toMatch(/aria-pressed="true"[^>]*data-testid="auto-layout-space-between"|data-testid="auto-layout-space-between"[^>]*aria-pressed="true"/);
   });
 

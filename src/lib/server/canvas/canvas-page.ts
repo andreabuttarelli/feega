@@ -2,7 +2,7 @@ import { rendererSwitch } from '$lib/server/canvas-renderer-switch';
 import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { MEDIA_UUID_RE } from '$lib/media-url';
-import { registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
+import { importCanvasLink, registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
 import { isOutputHandle } from '$lib/canvas/select-outputs';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoadEvent } from '@sveltejs/kit';
@@ -81,7 +81,7 @@ import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNod
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
-import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -198,13 +198,15 @@ async function spendOnVoice<T>(
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, connections, catalogue, shareToken, references] = await Promise.all([
+  const [nodes, listed, catalogue, shareToken, references] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
     projectCatalogue(db, { orgId, mode }),
     readCanvasShare(db, { orgId, canvasId }),
     referenceLibrary(db, { orgId, projectId: canvas.projectId })
   ]);
+
+  const connections = await canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed);
 
   const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines, killSwitch] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
@@ -507,6 +509,21 @@ export const actions: Actions<CanvasParams> = {
         path, fileName, mimeType, bytes,
         x: coord(fd.get('x')) ?? 0, y: coord(fd.get('y')) ?? 0
       });
+    } catch (cause) {
+      if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }
+      throw cause;
+    }
+  },
+  importLink: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const url = String((await request.formData()).get('url') ?? '');
+    if (!url) {
+      return fail(400, { error: 'invalid request' });
+    }
+
+    try {
+      const { asset } = await importCanvasLink(scope.db, { orgId: scope.orgId, projectId: scope.canvas.projectId, url });
+      return { asset };
     } catch (cause) {
       if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }
       throw cause;
@@ -1105,8 +1122,7 @@ export const actions: Actions<CanvasParams> = {
       actor: userActor(scope)
     });
 
-    const linked = targetNode?.type === 'motion' ? await linkFrame(canvasFrames(scope), { sourceNodeId, frameNodeId: targetNodeId }) : null;
-    return { connection, linked: linked?.outcome === MoveOutcome.Done ? linked : null };
+    return { connection };
   },
 
   createFormats: async ({ request, params, locals }) => {

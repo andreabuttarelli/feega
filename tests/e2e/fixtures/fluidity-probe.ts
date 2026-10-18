@@ -14,6 +14,7 @@ export type PixelWatch = { id: string; box: Box; touched: boolean };
 export type StepFacts = {
   remounts: string[];
   playerMounts: string[];
+  lazyMounts: string[];
   gpuCounts: Record<string, number>;
   fetches: string[];
   flashes: string[];
@@ -273,6 +274,7 @@ export class FluidProbe {
   private shots: Shot[] = [];
   private fetches: string[] = [];
   private recording = false;
+  private inViewAtStart = new Set<string>();
   private watchFetch = (r: { url: () => string }) => {
     const url = r.url();
     if (this.recording && WATCHED_FETCH.test(url) && !IGNORED_FETCH.test(url)) {
@@ -307,6 +309,8 @@ export class FluidProbe {
   }
 
   async start(watches: Watch[]) {
+    const vp = this.page.viewportSize()!;
+    this.inViewAtStart = new Set((await this.nodeBoxes()).filter((b) => b.x + b.width > 0 && b.y + b.height > 0 && b.x < vp.width && b.y < vp.height).map((b) => b.id));
     this.shots = [];
     this.fetches = [];
     this.recording = true;
@@ -339,7 +343,8 @@ export class FluidProbe {
     return {
       facts: {
         remounts,
-        playerMounts: [...new Set(r.playerMounts.filter((id) => !touched.has(id)))],
+        playerMounts: [...new Set(r.playerMounts.filter((id) => !touched.has(id) && this.inViewAtStart.has(id)))],
+        lazyMounts: [...new Set(r.playerMounts.filter((id) => !touched.has(id) && !this.inViewAtStart.has(id)))],
         gpuCounts: r.counts,
         fetches: this.fetches,
         flashes: this.cdp ? flashes : ['unmeasured (no screencast on this engine)'],

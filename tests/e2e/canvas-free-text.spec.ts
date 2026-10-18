@@ -94,6 +94,8 @@ async function visibleText(page: Page, nodeId: string) {
   await expect.poll(async () => (await inkPixels(page, nodeId)).count, { timeout: 20_000, message: 'the text paints real pixels on the canvas' }).toBeGreaterThan(MIN_INK_PIXELS);
 }
 
+const editableText = (page: Page) => page.frameLocator('[data-testid="motion-preview"] iframe').first().locator('[contenteditable]');
+
 test.describe('free text on the canvas @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
@@ -118,7 +120,7 @@ test.describe('free text on the canvas @real', () => {
       }
 
       await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
-      await expect(page.locator('aside.props textarea').first(), 'typing goes straight into the new text').toBeFocused({ timeout: 15_000 });
+      await expect(editableText(page), 'typing goes straight into the new text, where it is drawn').toHaveAttribute('contenteditable', /plaintext-only|true/, { timeout: 15_000 });
       await page.keyboard.type('Hello');
       await leave(page, pane);
       await expect.poll(async () => (await clipsOf(admin, element.id)).map((c) => c.props.text), { timeout: 10_000 }).toEqual(['Hello']);
@@ -145,7 +147,7 @@ test.describe('free text on the canvas @real', () => {
     await expect.poll(async () => (await elements(admin, session)).length, { timeout: 10_000 }).toBe(1);
     const [element] = await elements(admin, session);
     await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: 15_000 });
-    await expect(page.locator('aside.props textarea').first()).toBeFocused({ timeout: 15_000 });
+    await expect(editableText(page)).toHaveAttribute('contenteditable', /plaintext-only|true/, { timeout: 15_000 });
     await page.keyboard.type('Hello');
     await leave(page, pane);
     await expect.poll(async () => (await clipsOf(admin, element.id)).map((c) => c.props.text), { timeout: 10_000 }).toEqual(['Hello']);

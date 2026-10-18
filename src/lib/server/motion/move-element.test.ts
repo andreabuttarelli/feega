@@ -4,10 +4,9 @@ import { addClip } from '$lib/motion/timeline';
 import { setStill } from '$lib/motion/still';
 import { OutputKind, type Output } from '$lib/motion/move-element';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
-import { DropOn, MoveOutcome, copyElement, linkFrame, moveElement, placeOutput, refreshLinks, type FrameStore, type StoredFrame } from './move-element';
+import { DropOn, MoveOutcome, copyElement, moveElement, placeOutput, retireFrameInputs, type FrameStore, type StoredFrame } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
-const OTHER_ID = '22222222-2222-4333-8444-555555555555';
 const VIDEO_ID = '33333333-2222-4333-8444-555555555555';
 
 function must(result: { ok: true; doc: MotionDoc } | { ok: false; error: string }): MotionDoc {
@@ -17,12 +16,11 @@ function must(result: { ok: true; doc: MotionDoc } | { ok: false; error: string 
   return result.doc;
 }
 
-type Memory = { store: FrameStore; frames: Map<string, StoredFrame[]>; outputs: Map<string, Output>; edges: [string, string][]; removed: string[] };
+type Memory = { store: FrameStore; frames: Map<string, StoredFrame[]>; outputs: Map<string, Output>; removed: string[] };
 
 function memory(): Memory {
   const frames = new Map<string, StoredFrame[]>();
   const outputs = new Map<string, Output>();
-  const edges: [string, string][] = [];
   const removed: string[] = [];
   let made = 0;
   const head = (id: string) => frames.get(id)?.at(-1) ?? null;
@@ -48,10 +46,9 @@ function memory(): Memory {
     output: async (nodeId) => {
       const output = outputs.get(nodeId);
       return output ? { output, projectId: 'p1', canvasId: 'c1' } : null;
-    },
-    fedFrames: async (nodeId) => edges.filter(([from]) => from === nodeId).map(([, to]) => to)
+    }
   };
-  return { store, frames, outputs, edges, removed };
+  return { store, frames, outputs, removed };
 }
 
 function seed(m: Memory, nodeId: string, doc: MotionDoc) {
@@ -207,41 +204,55 @@ describe('a generated output dropped into a frame', () => {
   });
 });
 
-describe('a generative node connected to a frame', () => {
-  it('connecting places its output once; a new output updates the same element', async () => {
+describe('retiring the lines that still point into a frame', () => {
+  const line = (id: string, sourceNodeId: string, targetNodeId: string) => ({ id, sourceNodeId, targetNodeId });
+
+  it('a line whose output is not in the frame yet places it, then the line goes', async () => {
     const m = memory();
     seed(m, 'b', newMotionDoc(MotionFormat.Square));
     m.outputs.set('gen', { kind: OutputKind.Image, assetId: IMAGE_ID, name: 'gen' });
-    m.edges.push(['gen', 'b']);
+    const dropped: string[] = [];
 
-    await linkFrame(m.store, { sourceNodeId: 'gen', frameNodeId: 'b' });
-    m.outputs.set('gen', { kind: OutputKind.Image, assetId: OTHER_ID, name: 'gen' });
-    await refreshLinks(m.store, 'gen');
+    const kept = await retireFrameInputs(m.store, async (id) => void dropped.push(id), [line('e1', 'gen', 'b'), line('e2', 'gen', 'other')], new Set(['b']));
 
-    const clips = clipsOf(headOf(m, 'b').doc);
-    expect(clips).toHaveLength(1);
-    expect(clips[0].props.assetId).toBe(OTHER_ID);
-    expect(headOf(m, 'b').doc.links).toEqual({ gen: clips[0].id });
+    expect(kept.map((e) => e.id)).toEqual(['e2']);
+    expect(dropped).toEqual(['e1']);
+    expect(clipsOf(headOf(m, 'b').doc).map((c) => c.props.assetId)).toEqual([IMAGE_ID]);
   });
 
-  it('nothing generated yet: the frame is left alone', async () => {
+  it('a line already placed in the frame only loses the line, even when the user removed the element', async () => {
     const m = memory();
-    seed(m, 'b', newMotionDoc(MotionFormat.Square));
+    seed(m, 'b', { ...newMotionDoc(MotionFormat.Square), links: { gen: 'gone' } });
+    m.outputs.set('gen', { kind: OutputKind.Image, assetId: IMAGE_ID, name: 'gen' });
+    const dropped: string[] = [];
 
-    await linkFrame(m.store, { sourceNodeId: 'gen', frameNodeId: 'b' });
+    await retireFrameInputs(m.store, async (id) => void dropped.push(id), [line('e1', 'gen', 'b')], new Set(['b']));
 
+    expect(dropped).toEqual(['e1']);
     expect(headOf(m, 'b').version).toBe(1);
   });
 
-  it('the same output again writes nothing', async () => {
+  it('a source with nothing generated leaves the frame alone and drops the line', async () => {
+    const m = memory();
+    seed(m, 'b', newMotionDoc(MotionFormat.Square));
+    const dropped: string[] = [];
+
+    await retireFrameInputs(m.store, async (id) => void dropped.push(id), [line('e1', 'gen', 'b')], new Set(['b']));
+
+    expect(dropped).toEqual(['e1']);
+    expect(headOf(m, 'b').version).toBe(1);
+  });
+
+  it('run twice it places the output once', async () => {
     const m = memory();
     seed(m, 'b', newMotionDoc(MotionFormat.Square));
     m.outputs.set('gen', { kind: OutputKind.Text, text: 'hi', name: 'copy' });
+    const lines = [line('e1', 'gen', 'b')];
 
-    await linkFrame(m.store, { sourceNodeId: 'gen', frameNodeId: 'b' });
-    await linkFrame(m.store, { sourceNodeId: 'gen', frameNodeId: 'b' });
+    await retireFrameInputs(m.store, async () => {}, lines, new Set(['b']));
+    await retireFrameInputs(m.store, async () => {}, lines, new Set(['b']));
 
-    expect(headOf(m, 'b').version).toBe(2);
+    expect(clipsOf(headOf(m, 'b').doc)).toHaveLength(1);
   });
 });
 

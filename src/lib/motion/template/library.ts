@@ -6,9 +6,10 @@ import { setFrameRate } from '$lib/motion/frame-rate';
 import { MAX_FIELDS, type ExposedField } from './field-model';
 import { applyValues, Blank, fieldValues, locateClip, setField, type FieldValue } from './fields';
 import { keyFieldsSchema, type KeyFields } from './key-fields';
-import { VAR_PREFIX, paramVar } from '$lib/motion/custom/component';
+import { VAR_PREFIX } from '$lib/motion/custom/component';
 import { DEFAULT_INTERACTIVE, interactiveOf } from '$lib/motion/interactive/settings';
-import { MAX_VARS, coerceVars, type VarDecl } from '$lib/motion/interactive/var-model';
+import { MAX_VARS, type VarDecl } from '$lib/motion/interactive/var-model';
+import { drivenVars } from '$lib/motion/interactive/driven-vars';
 
 export const motionTemplateSchema = z.object({
   name: z.string().trim().min(1).max(60),
@@ -264,19 +265,7 @@ export function setTemplateValues(doc: MotionDoc, clipId: string, values: Record
   return applied.ok ? { ok: true, doc: syncedVars(applied.doc, clipId) } : applied;
 }
 
-function syncedVars(doc: MotionDoc, clipId: string): MotionDoc {
-  const clips = clipsIn(instanceComp(doc, clipId)?.comp.tracks ?? []);
-  const driven = new Map(clips.flatMap((c) => {
-    const own = varPrefixOf(c);
-    return own ? Object.entries(c.props).map(([key, value]) => [paramVar(own, key), value] as const) : [];
-  }));
-  const mine = interactiveOf(doc);
-  const vars = mine.vars.map((v) => {
-    const value = coerceVars([v], { [v.name]: driven.get(v.name) })[v.name];
-    return value === undefined ? v : ({ ...v, default: value } as VarDecl);
-  });
-  return { ...doc, interactive: { ...mine, vars } };
-}
+const syncedVars = (doc: MotionDoc, clipId: string): MotionDoc => drivenVars(doc, clipsIn(instanceComp(doc, clipId)?.comp.tracks ?? []));
 
 export function detachTemplate(doc: MotionDoc, clipId: string): Changed {
   const found = instanceComp(doc, clipId);

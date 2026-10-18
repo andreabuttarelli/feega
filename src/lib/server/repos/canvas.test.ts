@@ -4,6 +4,7 @@ import {
   createNode,
   deleteConnection,
   deleteNode,
+  findNode,
   listNodes,
   listNodesByIds,
   moveNode,
@@ -503,5 +504,18 @@ describe('patchNodeData refuses a group join that would nest a node inside itsel
     const { db } = fakeDb(rows());
 
     expect((await patchNodeData(db, { orgId: ORG, nodeId: 'b', patch: { groupId: 'b' }, check: DataCheck.None })).outcome).toBe('invalid');
+  });
+});
+
+describe('patchNodeData on a node the caller already read', () => {
+  it('writes without reading it again', async () => {
+    const { db, calls } = fakeDb({ nodes: [nodeRow] });
+    const known = await findNode(db, { orgId: ORG, nodeId: NODE });
+    calls.length = 0;
+
+    const out = await patchNodeData(db, { orgId: ORG, nodeId: NODE, patch: { prompt: 'nuovo' }, check: DataCheck.None, known: known ?? undefined });
+
+    expect(out.outcome).toBe('written');
+    expect(calls.filter((c) => c.table === 'nodes' && c.op === 'select')).toEqual([]);
   });
 });

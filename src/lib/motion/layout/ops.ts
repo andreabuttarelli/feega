@@ -2,7 +2,8 @@ import { TrackKind } from '../components';
 import { findClip, type MotionClip, type MotionDoc } from '../doc';
 import { pivotBox } from '../parent';
 import { setParent } from '../parent-ops';
-import { addClip, type OpResult } from '../timeline';
+import { layerOrder } from '../siblings';
+import { addClip, moveClip, type OpResult } from '../timeline';
 import { Align, Direction, Sizing } from './auto-layout';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, autoLayoutSchema, layoutItemSchema, type AutoLayout, type LayoutItem } from './model';
 import { childrenInOrder, withAutoLayout } from './resolve';
@@ -53,10 +54,6 @@ export function setLayoutItem(doc: MotionDoc, clipId: string, patch: Partial<Lay
   if (!parsed.success) {
     return fail(parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '));
   }
-  const fills = parsed.data.width === Sizing.Fill || parsed.data.height === Sizing.Fill;
-  if (fills && !layoutParent(doc, found.clip)) {
-    return fail(`${clipId} is not inside an auto layout: fill needs a container to fill`);
-  }
   return { ok: true, doc: withClip(doc, clipId, (c) => ({ ...c, layoutItem: parsed.data })) };
 }
 
@@ -104,7 +101,22 @@ function guessFlow(placed: Placed[]): Pick<AutoLayout, 'direction' | 'gap' | 'or
   return { direction, gap: roundPx(gap), order: sorted.map((p) => p.clip.id) };
 }
 
-export function wrapInAutoLayout(doc: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult {
+function ownTracks(doc: MotionDoc, clipIds: readonly string[], trackId: string): MotionDoc {
+  const topFirst = layerOrder(doc).filter((id) => clipIds.includes(id));
+  return topFirst.reduce((next, clipId) => {
+    const found = findClip(next, clipId);
+    if (!found || found.track.clips.length === 1) {
+      return next;
+    }
+    const own = { id: `${trackId}-${clipId}`, kind: found.track.kind, name: found.track.name, clips: [] };
+    const at = next.tracks.indexOf(found.track);
+    const moved = moveClip({ ...next, tracks: [...next.tracks.slice(0, at), own, ...next.tracks.slice(at)] }, clipId, { from: found.clip.from, trackId: own.id });
+    return moved.ok ? moved.doc : next;
+  }, doc);
+}
+
+export function wrapInAutoLayout(source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult {
+  const doc = ownTracks(source, clipIds, trackId);
   const size = { width: doc.width, height: doc.height };
   const placed: Placed[] = clipIds
     .map((c) => findClip(doc, c))
@@ -128,13 +140,13 @@ export function wrapInAutoLayout(doc: MotionDoc, clipIds: readonly string[], id:
   if (!result.ok) {
     return result;
   }
-  result = setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Center });
+  result = setAutoLayout(result.doc, id, { ...guessFlow(placed), align: Align.Start });
   for (const p of placed) {
     if (!result.ok) {
       return result;
     }
     result = setParent(result.doc, p.clip.id, id, { at: p.clip.from });
-    if (result.ok && isText(p.clip.component)) {
+    if (result.ok && isText(p.clip.component) && !p.clip.layoutItem) {
       result = setLayoutItem(result.doc, p.clip.id, HUG);
     }
   }

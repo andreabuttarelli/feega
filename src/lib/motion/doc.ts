@@ -4,6 +4,7 @@ import { screenCompOf } from './device-screen';
 import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, type PropsVerdict } from './components';
 import { withParams } from './custom/params';
 import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
+import { withMediaPickers } from './legacy-media';
 import { junctionSchema } from './junction-model';
 import { FASTEST_RATE, FPS, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS, TransitionKind, maxFrames } from './design';
 import { motionPathSchema } from './path';
@@ -14,6 +15,7 @@ import { DEPTH, SPACES, Space, cameraSchema, depthSchema } from './camera';
 import { PARENT_OPACITIES, ParentOpacity, parentProblem } from './parent';
 import { expressionsSchema, expressionsProblem } from './expression/schema';
 import { fontRefProblem, fontsSchema, usedFaces } from './fonts/model';
+import { stylesSchema } from './styles-model';
 import { effectsSchema, effectsProblem } from './effects/model';
 import { clipShadersSchema, clipShadersProblem, shadersSchema } from './shaders/model';
 import { BLEND_MODES, BlendMode } from './blend';
@@ -113,7 +115,8 @@ const clipSchema = z.object({
   markers: z.array(markerSchema).max(MAX_MARKERS).optional(),
   autoLayout: autoLayoutSchema.nullable().optional(),
   layoutItem: layoutItemSchema.optional(),
-  partStyles: partStylesSchema.optional()
+  partStyles: partStylesSchema.optional(),
+  styleRef: z.string().min(1).optional()
 });
 
 const trackSchema = z.object({
@@ -153,22 +156,29 @@ const assetRefSchema = z.object({
 });
 
 export const MIN_SIDE = 16;
-export const RESOLUTION_PROBLEM = 'resolution above 1080p (a 1440 square is the one exception)';
+export const DESIGN_MAX_SIDE = 16384;
+export const DESIGN_MIN_SIDE = 1;
+export const RESOLUTION_PROBLEM = `a video is at most 1080p (a 1440 square is the one exception); a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} px a side`;
 
-export function fitsResolution(d: { width: number; height: number }): boolean {
+export function sideRange(d: { still?: unknown }): { min: number; max: number } {
+  return d.still ? { min: DESIGN_MIN_SIDE, max: DESIGN_MAX_SIDE } : { min: MIN_SIDE, max: MAX_SIDE };
+}
+
+export function fitsResolution(d: { width: number; height: number; still?: unknown }): boolean {
+  const { min: shortest, max: longest } = sideRange(d);
   const sides = [d.width, d.height];
-  if (sides.some((side) => !Number.isInteger(side) || side < MIN_SIDE || side > MAX_SIDE)) {
+  if (sides.some((side) => !Number.isInteger(side) || side < shortest || side > longest)) {
     return false;
   }
-  return Math.min(d.width, d.height) <= MAX_SHORT_SIDE || (d.width === d.height && d.width <= LARGE_SQUARE);
+  return Boolean(d.still) || Math.min(d.width, d.height) <= MAX_SHORT_SIDE || (d.width === d.height && d.width <= LARGE_SQUARE);
 }
 
 export const motionDocSchema = z
   .object({
     version: z.literal(DOC_VERSION),
     fps: z.literal(FRAME_RATES).default(FPS),
-    width: z.number().int().min(16).max(MAX_SIDE),
-    height: z.number().int().min(16).max(MAX_SIDE),
+    width: z.number().int().min(DESIGN_MIN_SIDE).max(DESIGN_MAX_SIDE),
+    height: z.number().int().min(DESIGN_MIN_SIDE).max(DESIGN_MAX_SIDE),
     durationInFrames: z.number().int().min(1).max(FRAMES_CEILING),
     tracks: z.array(trackSchema).max(MAX_TRACKS),
     comps: z.record(z.string().min(1), compSchema).default({}),
@@ -192,7 +202,8 @@ export const motionDocSchema = z
     referenceLook: referenceLookSchema.optional(),
     still: stillSchema.optional(),
     freeSize: z.boolean().optional(),
-    links: z.record(z.string().min(1), z.string().min(1)).optional()
+    links: z.record(z.string().min(1), z.string().min(1)).optional(),
+    styles: stylesSchema
   })
   .refine(fitsResolution, RESOLUTION_PROBLEM)
   .refine((d) => d.durationInFrames <= maxFrames(d.fps), { message: `the video can be at most ${MAX_SECONDS} seconds`, path: ['durationInFrames'] })
@@ -234,7 +245,7 @@ export function upgradeDoc(input: unknown): unknown {
     doc = MIGRATIONS[version](doc);
     version += 1;
   }
-  return doc;
+  return withMediaPickers(doc);
 }
 
 export function byFrame<T extends { frame: number }>(track: readonly T[]): T[] {
@@ -363,6 +374,15 @@ export function parseMotionDoc(input: unknown): DocVerdict {
     return { ok: false, error: problem };
   }
   return { ok: true, doc };
+}
+
+export enum DocMode {
+  Video = 'video',
+  Still = 'still'
+}
+
+export function docMode(doc: Pick<MotionDoc, 'still'>): DocMode {
+  return doc.still ? DocMode.Still : DocMode.Video;
 }
 
 export function newMotionDoc(format: MotionFormat): MotionDoc {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Actor } from '$lib/server/repos/actor';
-import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
+import { Checkpoint, RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { parseOps } from '$lib/motion/doc-ops';
 import { OpsOutcome, commitOps } from '$lib/server/motion/frame-ops';
@@ -96,7 +96,8 @@ export const EDITOR_OPS = {
         expectedVersion: Number.isInteger(input.version) ? input.version : -1,
         doc: input.doc,
         actor: ctx.actor,
-        summary: input.summary || null
+        summary: input.summary || null,
+        checkpoint: Checkpoint.Coalesce
       });
       if (write.outcome === RevisionOutcome.Conflict) {
         const head = await headOrNew(ctx.db, nodeScope(ctx), ctx.motion.node);
@@ -117,7 +118,7 @@ export const EDITOR_OPS = {
       if (!ops) {
         return refused(HTTP_BAD_REQUEST, { error: 'invalid_ops' });
       }
-      const commit = await commitOps(ctx.db, { ...nodeScope(ctx), node: ctx.motion.node, baseVersion: input.version, ops, actor: ctx.actor, summary: input.summary || null });
+      const commit = await commitOps(ctx.db, { ...nodeScope(ctx), node: ctx.motion.node, baseVersion: input.version, ops, actor: ctx.actor, summary: input.summary || null, checkpoint: Checkpoint.Coalesce });
       if (commit.outcome === OpsOutcome.Invalid) {
         return refused(HTTP_BAD_REQUEST, { error: commit.error });
       }

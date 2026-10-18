@@ -3,6 +3,7 @@ import { arrangeLayers, Arrange } from './layer-order';
 import { MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { addClip, addTrack, type OpResult } from './timeline';
 import { TrackKind } from './components';
+import { layerOrder } from './siblings';
 
 const ok = (r: OpResult): MotionDoc => {
   if (!r.ok) {
@@ -49,6 +50,13 @@ describe('arranging layers inside a frame', () => {
     const three = ok(addClip(ok(addTrack(twoTracks(), TrackKind.Visual, 'highest')), { ...shape, trackId: 'highest' }, 'c'));
     expect(trackOf(ok(arrangeLayers(three, ['a'], Arrange.Forward, newId)), 'a')).toBe(trackOf(three, 'a') - 1);
     expect(trackOf(ok(arrangeLayers(three, ['c'], Arrange.Backward, newId)), 'c')).toBe(trackOf(three, 'c') + 1);
+  });
+
+  it('steps one clip past one clip when they share a track', () => {
+    const shared = ['a', 'b', 'c'].reduce((d, id) => ok(addClip(d, shape, id)), newMotionDoc(MotionFormat.Landscape));
+    expect(layerOrder(ok(arrangeLayers(shared, ['a'], Arrange.Forward, newId)))).toEqual(['c', 'a', 'b']);
+    expect(layerOrder(ok(arrangeLayers(shared, ['c'], Arrange.Backward, newId)))).toEqual(['b', 'c', 'a']);
+    expect(layerOrder(ok(arrangeLayers(shared, ['b'], Arrange.Back, newId)))).toEqual(['c', 'a', 'b']);
   });
 
   it('refuses a layer that is not in the frame', () => {
