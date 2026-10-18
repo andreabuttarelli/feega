@@ -3089,3 +3089,6 @@ Signal: the DB holds the new value of a Custom clip prop, the inspector shows it
 
 ### Image export answers "needs the server renderer" or times out locally
 Signal: Export image fails with "not available here" or "Waiting failed: 20000ms exceeded". Cause: the server renderer is off without `CHROMIUM_PATH`, and it loads runtime scripts from `PUBLIC_APP_URL` (production by default), whose integrity hashes do not match your build. Move: start `vite dev` with `CHROMIUM_PATH=<Playwright Chrome for Testing binary>` and `PUBLIC_APP_URL=http://localhost:<port>`.
+
+### A canvas 500s only once it holds a group (DOM renderer)
+Signal: `?renderer=dom` answers 500 on a canvas that has a group; the same page without groups loads; `handleError` (logged locally) says `Cannot access X before initialization` inside `CanvasFlow.svelte`. Cause: a component-scope `const` declared below the function that the first render already calls, so only data that reaches that branch hits the TDZ. Move: declare the constant above its first use; `canvas-dom-group-ssr.spec.ts` guards it.
