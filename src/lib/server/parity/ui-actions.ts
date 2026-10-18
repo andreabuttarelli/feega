@@ -183,6 +183,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.Subtract]: motion('combine_shapes'),
   [Command.Intersect]: motion('combine_shapes'),
   [Command.Exclude]: motion('combine_shapes'),
+  [Command.Flatten]: motion('combine_shapes'),
   [Command.RemoveMask]: motion('release_mask'),
   [Command.AlignLeft]: motion('arrange_space'),
   [Command.AlignCenter]: motion('arrange_space'),

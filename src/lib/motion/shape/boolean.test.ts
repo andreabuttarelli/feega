@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BooleanOp, combineShapes, polygonArea } from './boolean';
+import { BooleanOp, combineShapes, flattenShapes, polygonArea } from './boolean';
 import { MotionFormat, findClip, newMotionDoc, type MotionDoc } from '../doc';
 import { addClip, addTrack, type OpResult } from '../timeline';
 import { TrackKind } from '../components';
@@ -63,3 +63,39 @@ describe('boolean operations on shapes', () => {
     expect(combineShapes(apart, ['top', 'bottom'], BooleanOp.Intersect, 0).ok).toBe(false);
   });
 });
+
+describe('flatten', () => {
+  it('merges the shapes into one path on the bottom one, keeping every outline', () => {
+    const doc = ok(flattenShapes(overlapping(), ['top', 'bottom'], 0));
+    const outline = parsePath(String(findClip(doc, 'bottom')!.clip.props.path));
+
+    expect(findClip(doc, 'top')).toBeNull();
+    expect(typeof outline !== 'string' && outline.length).toBe(2);
+  });
+
+  it('turns a single shape into an editable path of the same outline', () => {
+    const doc = ok(flattenShapes(overlapping(), ['top'], 0));
+
+    expect(findClip(doc, 'top')!.clip.props.shape).toBe('path');
+    expect(areaOfClip(doc, 'top')).toBeCloseTo(1, 2);
+  });
+
+  it('keeps the curves of an ellipse instead of sampling them', () => {
+    const round = ok(addClip(newMotionDoc(MotionFormat.Landscape), { ...square(0.5), props: { ...square(0.5).props, shape: 'ellipse' } }, 'dot'));
+
+    expect(String(findClip(ok(flattenShapes(round, ['dot'], 0)), 'dot')!.clip.props.path)).toContain('C');
+  });
+
+  it('refuses a layer that is not a shape', () => {
+    const doc = ok(addClip(overlapping(), { component: 'Text', from: 0, durationInFrames: 60, props: { text: 'hi' } }, 'words'));
+    expect(flattenShapes(doc, ['words'], 0).ok).toBe(false);
+  });
+});
+
+function areaOfClip(doc: MotionDoc, id: string): number {
+  const outline = parsePath(String(findClip(doc, id)!.clip.props.path));
+  if (typeof outline === 'string') {
+    throw new Error(outline);
+  }
+  return outline.reduce((sum, c) => sum + polygonArea(flatten(c)), 0);
+}

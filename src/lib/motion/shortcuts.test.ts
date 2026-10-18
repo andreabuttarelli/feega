@@ -207,6 +207,13 @@ describe('mask keys', () => {
   });
 });
 
+describe('flatten key', () => {
+  it('⌘E flattens the selected shapes, E alone still switches the mode', () => {
+    expect(press('e', { mod: true, code: 'KeyE' })).toBe(Command.Flatten);
+    expect(press('e', { code: 'KeyE' })).toBe(Command.ToggleEditMode);
+  });
+});
+
 describe('select matching key', () => {
   it('⌥⌘A selects every layer like the selected ones', () => {
     expect(press('å', { mod: true, alt: true, code: 'KeyA' })).toBe(Command.SelectMatching);
