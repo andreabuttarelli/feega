@@ -95,6 +95,36 @@ describe('POST /api/v1/motion/:node/tools runs one motion tool of the chat agent
     expect((await head()).tracks.flatMap((t) => t.clips)).toEqual([]);
   });
 
+  it('a tool that refuses is a 422 with the reason, not a 200', async () => {
+    const res = await post(NODE, { tool: 'set_props', input: { clip_id: 'nope', props: {} } });
+    const body = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(body).toMatchObject({ error: 'tool_refused' });
+    expect(typeof body.detail).toBe('string');
+  });
+
+  it('a batch applies every op in one revision', async () => {
+    const title = (text: string) => ({ tool: 'add_clip', input: { component: 'Title', start: 0, duration: 1, props: { text } } });
+    const res = await post(NODE, { tool: 'batch', input: { ops: [title('one'), title('two'), title('three')] } });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body).toMatchObject({ version: 2, saved: true });
+    expect(body.output.results).toHaveLength(3);
+    expect(JSON.stringify((await head()).tracks)).toContain('three');
+  });
+
+  it('a batch with one refused op saves nothing', async () => {
+    const ops = [{ tool: 'add_clip', input: { component: 'Title', start: 0, duration: 1 } }, { tool: 'set_props', input: { clip_id: 'nope', props: {} } }];
+    const res = await post(NODE, { tool: 'batch', input: { ops } });
+    const body = await res.json();
+
+    expect(res.status).toBe(422);
+    expect(body).toMatchObject({ error: 'tool_refused', index: 1 });
+    expect((await head()).tracks.flatMap((t) => t.clips)).toEqual([]);
+  });
+
   it('a read-only key cannot run a tool', async () => {
     state.writeAllowed = false;
 
@@ -103,6 +133,25 @@ describe('POST /api/v1/motion/:node/tools runs one motion tool of the chat agent
 
   it('a node of another org is not found', async () => {
     expect((await post('elsewhere', { tool: 'get_motion_doc', input: {} })).status).toBe(404);
+  });
+});
+
+const shape = async (props: Record<string, unknown>) => (await (await post(NODE, { tool: 'add_clip', input: { component: 'Shape', start: 0, duration: 2, props: { shape: 'rect', ...props } } })).json()).output.clip_id as string;
+const tool = async (name: string, input: unknown) => (await (await post(NODE, { tool: name, input })).json()).output;
+const stack = async () => (await head()).tracks.flatMap((t) => [...t.clips].reverse().map((c) => c.id));
+const clipOf = async (id: string) => (await head()).tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
+
+describe('layout and layer tools through the endpoint', () => {
+  it('add_auto_layout paints its container fill right under the children, over the background', async () => {
+    const bg = await shape({ x: 540, y: 675, width: 1080, height: 1350 });
+    const a = await shape({ x: 300, y: 675, width: 100, height: 100 });
+    const b = await shape({ x: 600, y: 675, width: 100, height: 100 });
+
+    const out = await tool('add_auto_layout', { clip_ids: [a, b], fill: '#ff0000', stroke: '#00ff00', stroke_width: 4, radius: 0.2 });
+
+    expect(out.ok).toBe(true);
+    expect(await stack()).toEqual([b, a, out.container_id, bg]);
+    expect((await clipOf(out.container_id)).props).toMatchObject({ fill: '#ff0000', stroke: '#00ff00', strokeKind: 'solid', roundness: 0.2 });
   });
 });
 

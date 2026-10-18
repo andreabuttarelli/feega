@@ -224,7 +224,9 @@ CLI: `feega motion new --template builtin:prompt-input --format 9:16`.
 Every tool of the editor agent (add_clip, set_props, set_keyframes, set_canvas, export_image...)
 runs directly through `motion_tool`: no `tool` lists them, `tool` alone describes one with its
 JSON schema, `tool` with `node_id` and `input` runs it on the saved video as a new revision
-(`version` guards a stale write, 409). Free, no AI. A still graphic (post, story, poster) is a
+(`version` guards a stale write, 409). A tool that refuses answers 422 `{ error: "tool_refused", detail }`.
+Building many things: `tool` `"batch"` with `input` `{ ops: [{ tool, input }, ...] }` (up to 500) applies
+them all in one revision, or none if one refuses (422 with its `index`). Free, no AI. A still graphic (post, story, poster) is a
 video pinned to one frame: `set_canvas` `{ format: "A poster", still: 2 }`, then `export_image`
 `{ format: "png", scale: 2 }` returns the image `url`. CLI: `feega motion tool <nodeId> <tool>
 --input '{...}'`, `feega motion tools [name]`, `feega motion still <nodeId> --scale 2 --out poster.png`.

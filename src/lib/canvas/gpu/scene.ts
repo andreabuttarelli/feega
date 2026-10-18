@@ -11,7 +11,7 @@ import { Backend } from './backend';
 export { Backend };
 
 
-export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean; snapshot: string | null };
+export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean; snapshot: string | null; running: boolean };
 export type Peer = { id: string; name: string; color: string; at: { x: number; y: number } };
 export type Overlay = {
   selected: (Box & { id: string })[];
@@ -37,11 +37,15 @@ const TEXT_TIERS = [1, 2, 4] as const;
 const THUMB_COLUMNS = 3;
 const STAGE = '#000000';
 const OPEN_LABEL = 'Open editor';
+const SKELETON_ROWS = 6;
+const SKELETON_STEP = 22;
+const SKELETON_BAR = 10;
+const SKELETON_WIDTHS = [0.9, 0.75, 0.82, 0.6];
 const THUMB_GAP = 4;
 
 const tierFor = (zoom: number) => TEXT_TIERS.find((t) => t >= zoom * devicePixelRatio) ?? TEXT_TIERS[TEXT_TIERS.length - 1];
 
-type Built = { id: string; root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; media: Media | null };
+type Built = { id: string; root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; skeletons: Graphics[]; media: Media | null };
 
 function dotTexture(theme: Theme): Texture {
   const c = document.createElement('canvas');
@@ -114,6 +118,8 @@ export class GpuScene {
   private ready = new Set<string>();
   private retiring = new Map<string, Built>();
   private snapshots = new Map<string, { key: string; tex: Texture }>();
+  private staleSnapshots = new Map<string, Texture[]>();
+  private renderFailed = false;
   private dim: { body: number; edges: number } | null = null;
 
   private constructor(app: Application, theme: Theme) {
@@ -222,7 +228,7 @@ export class GpuScene {
     const old = this.snapshots.get(id);
     this.snapshots.set(id, { key, tex: Texture.from(bitmap) });
     if (old) {
-      queueMicrotask(() => old.tex.destroy(true));
+      this.staleSnapshots.set(id, [...(this.staleSnapshots.get(id) ?? []), old.tex]);
     }
   }
 
@@ -263,7 +269,14 @@ export class GpuScene {
     }
     this.dirty = false;
     const t0 = performance.now();
-    this.app.render();
+    try {
+      this.app.render();
+    } catch (err) {
+      if (!this.renderFailed) {
+        console.error('[canvas] render failed', err);
+      }
+      this.renderFailed = true;
+    }
     this.onFrame?.(performance.now() - t0);
   };
 
@@ -310,6 +323,10 @@ export class GpuScene {
       return;
     }
     this.destroyBuilt(this.retiring.get(b.id));
+    for (const tex of this.staleSnapshots.get(b.id) ?? []) {
+      tex.destroy(true);
+    }
+    this.staleSnapshots.delete(b.id);
     count(Counter.Upload);
     this.ready.add(b.id);
     this.report();
@@ -410,7 +427,7 @@ export class GpuScene {
     const holder = new Container();
     const root = new Container();
     holder.addChild(root);
-    const b: Built = { id: c.id, root: holder, skin: root, key, body: null, video: null, texts: [], media: null };
+    const b: Built = { id: c.id, root: holder, skin: root, key, body: null, video: null, texts: [], skeletons: [], media: null };
     const f = c.face;
     const BUILD: Record<Surface, () => void> = {
       [Surface.Media]: () => {
@@ -435,6 +452,7 @@ export class GpuScene {
       [Surface.Generate]: () => this.buildGenerate(root, b, c),
       [Surface.Text]: () => {
         this.panel(root, c);
+        this.skeleton(root, b, c, PAD);
         this.body(root, b, f.text, c, PAD);
       },
       [Surface.Source]: () => {
@@ -451,6 +469,7 @@ export class GpuScene {
           this.thumbGrid(root, f.thumbs, c, PAD + BODY_SIZE * 2);
           return;
         }
+        this.skeleton(root, b, c, PAD + BODY_SIZE * 2);
         const sub = this.text(f.subtitle, BODY_SIZE - 1, this.theme.inkSoft, c.w - PAD * 2);
         sub.position.set(PAD, PAD + BODY_SIZE * 2);
         root.addChild(sub);
@@ -508,6 +527,17 @@ export class GpuScene {
     });
   }
 
+  private skeleton(root: Container, b: Built, c: Card, top: number, bottom = PAD) {
+    const g = new Graphics();
+    const width = c.w - PAD * 2;
+    const rows = Math.max(1, Math.min(SKELETON_ROWS, Math.floor((c.h - top - bottom) / SKELETON_STEP)));
+    for (let i = 0; i < rows; i++) {
+      g.rect(PAD, top + i * SKELETON_STEP, width * SKELETON_WIDTHS[i % SKELETON_WIDTHS.length], SKELETON_BAR).fill({ color: this.theme.line, alpha: 0.9 });
+    }
+    root.addChild(g);
+    b.skeletons.push(g);
+  }
+
   private body(root: Container, b: Built, s: string, c: Card, top: number, bottom = PAD) {
     const width = c.w - PAD * 2;
     const t = this.text(this.clipLines(s, width, c.h - top - bottom, BODY_SIZE), BODY_SIZE, this.theme.ink, width);
@@ -523,6 +553,7 @@ export class GpuScene {
     if (f.media) {
       this.mediaSprite(root, b, f.media, { x: 1, y: 1, w: c.w - 2, h: c.h - footer - 1 });
     } else {
+      this.skeleton(root, b, c, PAD, footer + PAD);
       this.body(root, b, f.text || f.prompt || 'Describe what to generate…', c, PAD, footer + PAD);
     }
     const g = new Graphics();
@@ -554,6 +585,10 @@ export class GpuScene {
       b.root.visible = seen;
       for (const t of b.texts) {
         t.alpha = Math.max(0, Math.min(1, (Number(t.style.fontSize) * this.view.zoom - TEXT_FADE_FROM_PX) / TEXT_FADE_PX));
+      }
+      const textAlpha = Math.max(0, Math.min(1, (BODY_SIZE * this.view.zoom - TEXT_FADE_FROM_PX) / TEXT_FADE_PX));
+      for (const g of b.skeletons) {
+        g.alpha = 1 - textAlpha;
       }
       if (!b.video) {
         continue;
@@ -600,6 +635,11 @@ export class GpuScene {
     const line = 1.5 / z;
     if (o.hovered) {
       g.rect(o.hovered.x, o.hovered.y, o.hovered.w, o.hovered.h).stroke({ width: line, color: this.theme.accent, alpha: 0.5 });
+    }
+    for (const c of this.cards) {
+      if (c.running && !c.hidden) {
+        g.rect(c.x, c.y, c.w, c.h).stroke({ width: line * 1.5, color: this.theme.accent });
+      }
     }
     if (o.marquee) {
       const m = o.marquee;
