@@ -44,18 +44,27 @@ export function markerFrame(doc: MotionDoc, label: string): number | null {
   return allMarkers(doc).find((m) => m.label === label)?.frame ?? null;
 }
 
-export function setWorkArea(doc: MotionDoc, area: { from: number; to: number } | null): OpResult {
+export const MIN_WORK_AREA_S = 0.5;
+
+type Area = { from: number; to: number };
+
+const watchable = (doc: Pick<MotionDoc, 'fps'>, area: Area) => area.to - area.from >= Math.round(doc.fps * MIN_WORK_AREA_S);
+
+export function setWorkArea(doc: MotionDoc, area: Area | null): OpResult {
   if (!area) {
     return ok({ ...doc, workArea: null });
   }
   const from = Math.max(0, Math.round(area.from));
   const to = Math.min(doc.durationInFrames, Math.round(area.to));
-  return to > from ? ok({ ...doc, workArea: { from, to } }) : fail('the work area needs its out point after its in point');
+  if (to <= from) {
+    return fail('the work area needs its out point after its in point');
+  }
+  return watchable(doc, { from, to }) ? ok({ ...doc, workArea: { from, to } }) : fail(`the work area needs at least ${MIN_WORK_AREA_S}s between its in and out points`);
 }
 
 export function loopFrame(doc: MotionDoc, frame: number): number {
   const area = doc.workArea;
-  if (!area) {
+  if (!area || !watchable(doc, area)) {
     return frame;
   }
   return frame >= area.to || frame < area.from ? area.from : frame;
