@@ -80,7 +80,7 @@ test.describe('opening a frame on a phone @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
   test.setTimeout(90_000);
 
-  test('a tap selects and drags the frame; Open editor opens it with no black gap and the canvas around it', async ({ page, session, admin, seedNode }) => {
+  test('a tap selects and drags the frame; a double tap opens it with no black gap and the canvas around it', async ({ page, session, admin, seedNode }) => {
     await page.setViewportSize(PHONE);
     const { frame, neighbour } = await seedFrames(page, { session, admin, seedNode });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
@@ -105,7 +105,7 @@ test.describe('opening a frame on a phone @real', () => {
       .poll(async () => ((await admin.from('nodes').select('x').eq('id', frame.id).single()).data?.x as number) ?? 20, { timeout: 10_000, message: 'the move is saved' })
       .toBeGreaterThan(20);
 
-    await press(page, node.getByTestId('open-motion-editor'));
+    await body.dblclick();
     const shares = await samplesWhileOpening(page, body);
     if (SHOTS) {
       await page.screenshot({ path: `${SHOTS}/${test.info().project.name}-open.png` });

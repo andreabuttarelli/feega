@@ -29,7 +29,7 @@
   import { coverFrame } from '$lib/motion/still';
   import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, previewMode, releaseCapture, stop as stopIn } from '$lib/canvas/motion-preview';
 
-  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null, onenter = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null; onenter?: (() => void) | null } = $props();
+  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onenter = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onenter?: (() => void) | null } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
   const nodeId = $derived(node.id);
@@ -252,13 +252,6 @@
     }
   }
 
-  function open(e: MouseEvent) {
-    if (!onopen) {
-      return;
-    }
-    e.preventDefault();
-    onopen();
-  }
   function enter(e: MouseEvent) {
     const stage = root?.querySelector<HTMLElement>('[data-frame-stage]')?.getBoundingClientRect();
     const inEditor = (e.target as HTMLElement | null)?.closest?.("[data-testid=selection-overlay]");
@@ -310,7 +303,6 @@
     {/if}
     {#if !previewing}<div class="host" class:nodrag={layers.editor} class:nopan={layers.editor} data-testid="motion-node-editing" bind:this={host}></div>{/if}
     {#if previewing && node.docHeadRevision}<FrameHover nodeId={node.id} revision={node.docHeadRevision} {previewUrl} width={size.width} height={size.height} />{/if}
-    {#if previewing && chrome.bar}<a class="open nodrag" {href} data-testid="open-motion-editor" data-sveltekit-preload-data={onopen ? 'off' : 'hover'} onclick={open}>Open editor</a>{/if}
   </div>
 
 </div>
@@ -411,16 +403,4 @@
     color: var(--ui-accent);
   }
 
-  .open {
-    position: absolute;
-    z-index: 2;
-    right: 6px;
-    top: 6px;
-    padding: 4px 8px;
-    font-size: var(--ui-text-xs);
-    background: var(--ui-surface);
-    color: var(--ui-ink);
-    border: 1px solid var(--ui-line);
-    border-radius: 0;
-  }
 </style>

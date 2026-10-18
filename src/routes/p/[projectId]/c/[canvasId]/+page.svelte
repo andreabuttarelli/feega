@@ -115,7 +115,7 @@
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
   import { fitToNode } from '$lib/motion/custom-size';
   import { barContextOf } from '$lib/canvas/bottom-bar';
-  import { CanvasState, NodeMode, Opening, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
+  import { CanvasState, NodeMode, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { decoded, painted } from '$lib/canvas/paint-wait';
   import { viewportOf } from '$lib/motion/editor-layout';
@@ -3585,7 +3585,7 @@
           <div class="pending-frame" class:shown={look} data-testid="motion-node-pending" aria-busy="true">{#if look}<img src={look} alt="" draggable="false" />{/if}</div>
         {:else if motion}
           {@const motionAt = { projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }}
-          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} nodeMode={tileMode(id, inlineMotion, inlineStage.leaving)} onopen={opening === Opening.OnRequest ? () => requestMotion(id) : null} onenter={() => requestMotion(id)} />
+          <MotionNode node={motion} href={motionEditorPath(motionAt)} previewUrl={motionPreviewPath(motionAt)} posterUrl={(posterFresh(motion) ? assetUrl(motion.posterAssetId) : null) ?? (ghostShown(motion) ? catalogPosters.get(id) : null) ?? null} nodeMode={tileMode(id, inlineMotion, inlineStage.leaving)} onenter={() => requestMotion(id)} />
         {:else if studioBatch}
           <StudioBatchNode node={studioBatch} projectId={data.projectId} onpick={(batchId) => write(id, newStudioBatchData(batchId), SaveTiming.Now)} />
         {:else if isNodeType(row.type)}
