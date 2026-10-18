@@ -216,6 +216,7 @@ describe('motion agent timeline organisation', () => {
     expect((await t.run('arrange_space', { clip_ids: ['id1', 'id2', 'id3'], op: 'distribute_x' })).ok).toBe(true);
     expect((await t.run('arrange_space', { clip_ids: ['id3'], op: 'move', dx: 10 })).ok).toBe(true);
     expect((await t.run('arrange_space', { clip_ids: ['id1', 'id2'], op: 'distribute_y' })).ok).toBe(false);
+    expect((await t.run('arrange_space', { clip_ids: ['id1', 'id2', 'id3'], op: 'tidy' })).ok).toBe(true);
   });
 
   it('add_shape takes a radius per corner', async () => {

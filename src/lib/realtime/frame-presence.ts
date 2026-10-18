@@ -11,9 +11,18 @@ export type FrameSelf = { userId: string; name: string };
 
 export type FrameState = Pick<FrameMark, 'nodeId' | 'cursor' | 'selection'>;
 
-export type FramePresence = { self: FrameSelf; send: (state: FrameState) => void; listen: (on: (mark: FrameMark) => void) => () => void };
+export type FrameHead = { nodeId: string; version: number; doc: unknown };
+
+export type FramePresence = {
+  self: FrameSelf;
+  send: (state: FrameState) => void;
+  listen: (on: (mark: FrameMark) => void) => () => void;
+  landed: (head: FrameHead) => void;
+  onHead: (on: (head: FrameHead) => void) => () => void;
+};
 
 export const FRAME_EVENT = 'frame';
+export const FRAME_HEAD_EVENT = 'frame-head';
 export const MARK_STALE_MS = 10_000;
 export const PEER_COLOURS = ['#e5484d', '#0090ff', '#30a46c', '#f76b15', '#8e4ec6', '#d6409f', '#12a594', '#ffc53d'];
 
@@ -25,6 +34,8 @@ const markSchema = z.object({
   selection: z.array(z.string()).max(200),
   at: z.number().finite()
 });
+
+const headSchema = z.object({ nodeId: z.string().min(1), version: z.number().int().min(0), doc: z.record(z.string(), z.unknown()) });
 
 export function toMark(raw: unknown): FrameMark | null {
   const parsed = markSchema.safeParse(raw);
@@ -60,9 +71,13 @@ export function peersIn(marks: Map<string, FrameMark>, nodeId: string, selfId: s
 
 export type FrameLine = { receive: (payload: unknown) => void; attach: (send: ((mark: FrameMark) => void) | null) => void };
 
-export function frameHub(self: FrameSelf, now: () => number = Date.now): { port: FramePresence; line: FrameLine } {
+export type HeadLine = { receive: (payload: unknown) => void; attach: (send: ((head: FrameHead) => void) | null) => void };
+
+export function frameHub(self: FrameSelf, now: () => number = Date.now): { port: FramePresence; line: FrameLine; heads: HeadLine } {
   const listeners = new Set<(mark: FrameMark) => void>();
+  const headListeners = new Set<(head: FrameHead) => void>();
   let transmit: ((mark: FrameMark) => void) | null = null;
+  let announce: ((head: FrameHead) => void) | null = null;
 
   const port: FramePresence = {
     self,
@@ -70,6 +85,22 @@ export function frameHub(self: FrameSelf, now: () => number = Date.now): { port:
     listen: (on) => {
       listeners.add(on);
       return () => listeners.delete(on);
+    },
+    landed: (head) => announce?.(head),
+    onHead: (on) => {
+      headListeners.add(on);
+      return () => headListeners.delete(on);
+    }
+  };
+  const heads: HeadLine = {
+    attach: (send) => {
+      announce = send;
+    },
+    receive: (raw) => {
+      const parsed = headSchema.safeParse(raw);
+      if (parsed.success) {
+        headListeners.forEach((on) => on(parsed.data));
+      }
     }
   };
   const line: FrameLine = {
@@ -83,7 +114,7 @@ export function frameHub(self: FrameSelf, now: () => number = Date.now): { port:
       }
     }
   };
-  return { port, line };
+  return { port, line, heads };
 }
 
 const CONTEXT = Symbol('frame-presence');

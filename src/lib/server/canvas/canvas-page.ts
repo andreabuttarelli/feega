@@ -1,3 +1,4 @@
+import { rendererSwitch } from '$lib/server/canvas-renderer-switch';
 import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { MEDIA_UUID_RE } from '$lib/media-url';
@@ -79,7 +80,7 @@ import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes
 import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
-import { MOVE_STATUS, MoveOutcome, canvasBoxSchema, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -204,19 +205,21 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     referenceLibrary(db, { orgId, projectId: canvas.projectId })
   ]);
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines, killSwitch] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
     firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length }),
     templateLibrary(db, { orgId, actor: userActor({ userId }) }).list(),
     chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
-    canvasOutlines(db, { orgId, nodes })
+    canvasOutlines(db, { orgId, nodes }),
+    rendererSwitch()
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
 
   return {
+    rendererSwitch: killSwitch,
     handoff,
     canvas,
     nodes,
@@ -1124,6 +1127,16 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'spostamento non valido' });
     }
     return movedAnswer(await moveElement(canvasFrames(scope), ask.data));
+  },
+
+  copyElement: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = moveAskSchema.safeParse({ sourceNodeId: fd.get('source'), clipId: fd.get('clip'), drop: jsonField(fd, 'drop') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid paste' });
+    }
+    return movedAnswer(await copyElement(canvasFrames(scope), ask.data));
   },
 
   moveFree: async ({ request, params, locals }) => {

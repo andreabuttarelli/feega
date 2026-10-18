@@ -6,6 +6,7 @@
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { selectionView } from '$lib/motion/selection-context';
   import { reorderAt } from '$lib/motion/layout/guides';
+  import { measureGaps } from '$lib/motion/measure-gaps';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
   import { guessedBoxes } from '$lib/motion/move-element';
   import type { ComponentId } from '$lib/motion/components';
@@ -29,7 +30,8 @@
     onboxes = () => {},
     outlined = null,
     onhover = () => {},
-    ondragout = null
+    ondragout = null,
+    onmenu = null
   }: {
     doc: MotionDoc;
     frame: number;
@@ -39,13 +41,14 @@
     onpreview: (doc: MotionDoc | null) => void;
     onchange: (doc: MotionDoc, summary: string) => void;
     pickAt?: Pt | null;
-    ask?: () => { at: Pt; gesture: Gesture } | null;
+    ask?: () => { at: Pt | null; gesture: Gesture; from: Depth } | null;
     part?: string | null;
     onparts?: (parts: Record<string, string[]>) => void;
     onboxes?: (boxes: Boxes) => void;
     outlined?: string | null;
     onhover?: (id: string | null) => void;
     ondragout?: ((out: ElementOut, phase: DragPhase) => void) | null;
+    onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
   } = $props();
 
   const shared = selectionView()!;
@@ -82,6 +85,8 @@
   const hoverQuad = $derived(hover && hover !== selected && !hover.includes(PART_SEP) && boxes[hover] ? quadOf(shown, hover, frame, boxes[hover]) : null);
   const hoverPart = $derived(hover && hover.includes(PART_SEP) && hover !== `${selected}${PART_SEP}${part}` ? (boxes[hover] ?? null) : null);
   const anchor = $derived(quad && clip ? anchorOf(shown, clip.id, frame) : null);
+  let altHeld = $state(false);
+  const measured = $derived(altHeld && quad && hoverQuad && !grab ? measureGaps(aabb(quad), aabb(hoverQuad)) : []);
   const outlinedPart = $derived(outlined?.includes(PART_SEP) ? (boxes[outlined] ?? null) : null);
   const outlinedQuad = $derived(outlined && !outlinedPart && boxes[outlined] && findClip(shown, outlined) ? quadOf(shown, outlined, frame, boxes[outlined]) : null);
 
@@ -207,11 +212,24 @@
     const hit = partHit(at) ?? part;
     const actions = clip && hit ? PART_ACTIONS[partKind(doc, clip, hit)] : [];
     if (!hit || !actions.length) {
+      openLayerMenu(e, at);
       return;
     }
     e.preventDefault();
     part = hit;
     menu = { at, part: hit, actions };
+  }
+
+  function openLayerMenu(e: MouseEvent, at: Pt) {
+    const layers = liveStack(at);
+    if (!onmenu || !layers.length) {
+      return;
+    }
+    e.preventDefault();
+    if (!selection.includes(layers[0])) {
+      onselect([layers[0]]);
+    }
+    onmenu({ client: [e.clientX, e.clientY], layers });
   }
 
   function runMenu(action: PartAction) {
@@ -256,7 +274,7 @@
     const asked = asking ? ask() : null;
     asking = false;
     if (asked && !selection.length) {
-      step(asked.gesture, asked.at, levelOf({ open: false, clip: null, part: null }));
+      step(asked.gesture, asked.at, { depth: asked.from, clip: null, part: null });
       return;
     }
     if (!pendingPick) {
@@ -401,6 +419,8 @@
   }
 </script>
 
+<svelte:window onkeydown={(e) => (altHeld = e.altKey)} onkeyup={(e) => (altHeld = e.altKey)} onblur={() => (altHeld = false)} />
+
 <div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={double} oncontextmenu={openMenu} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} data-testid="hover-box" />{/if}
@@ -409,12 +429,18 @@
     {#each live?.gaps ?? [] as g (g.axis + g.from + g.to)}
       {#if g.axis === 'x'}<line class="gap" x1={g.from} y1={g.at} x2={g.to} y2={g.at} />{:else}<line class="gap" x1={g.at} y1={g.from} x2={g.at} y2={g.to} />{/if}
     {/each}
+    {#each measured as g (g.axis + g.from + g.to + g.at)}
+      {#if g.axis === 'x'}<line class="gap" x1={g.from} y1={g.at} x2={g.to} y2={g.at} />{:else}<line class="gap" x1={g.at} y1={g.from} x2={g.at} y2={g.to} />{/if}
+    {/each}
     {#each live?.guides ?? [] as g (g.axis + g.at)}
       {#if g.axis === 'x'}<line class="guide" x1={g.at} y1="0" x2={g.at} y2={doc.height} />{:else}<line class="guide" x1="0" y1={g.at} x2={doc.width} y2={g.at} />{/if}
     {/each}
   </svg>
   {#each live?.gaps ?? [] as g (g.axis + g.from + g.to)}
     <span class="gap-label" data-testid="gap-label" style={pct(g.axis === 'x' ? [(g.from + g.to) / 2, g.at] : [g.at, (g.from + g.to) / 2])}>{Math.round(g.to - g.from)}</span>
+  {/each}
+  {#each measured as g (g.axis + g.from + g.to + g.at)}
+    <span class="gap-label" data-testid="measure-label" style={pct(g.axis === 'x' ? [(g.from + g.to) / 2, g.at] : [g.at, (g.from + g.to) / 2])}>{Math.round(g.to - g.from)}</span>
   {/each}
   {#if hoverPart && !grab}
     <div class="outlined-part hover-part" data-testid="hover-part" style={boxStyle(hoverPart)}></div>
