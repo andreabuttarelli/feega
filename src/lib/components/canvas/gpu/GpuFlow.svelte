@@ -1403,8 +1403,7 @@
           {#if !domIds.has(t.id) && t.kind === 'motion'}
             {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
-              <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage>
-                <div class="frame-standin-drawn" data-drawn={drawn.has(t.id)}></div>
+              <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage data-drawn={drawn.has(t.id)}>
                 {#if t.poster}
                   <div class="frame-standin-poster" data-testid="motion-node-poster"></div>
                 {/if}
