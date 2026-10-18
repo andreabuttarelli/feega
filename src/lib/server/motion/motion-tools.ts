@@ -2009,7 +2009,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     arrange_layers: tool({
-      description: 'Move clips in the picture stack: front, forward (one step up), backward (one step down) or back; a clip sharing a track gets its own.',
+      description: 'Move clips in the picture stack: front, forward (above the one clip over it), backward (below the one clip under it) or back; a clip sharing a track is split onto its own, the others keep their order.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), to: z.enum([Arrange.Front, Arrange.Forward, Arrange.Backward, Arrange.Back]) }),
       execute: async (input) => apply(arrangeLayers(session.doc, input.clip_ids, input.to, deps.newId), `arranged ${input.clip_ids.join(', ')} ${input.to}`)
     }),
