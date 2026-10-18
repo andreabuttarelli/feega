@@ -58,6 +58,7 @@
   import LutPicker from './LutPicker.svelte';
   import TextPathSection from './TextPathSection.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
+  import StyleSection from './StyleSection.svelte';
   import { registerFont, setFont } from '$lib/motion/fonts/ops';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
@@ -108,8 +109,7 @@
     sharedWith = 0,
     partFill = null,
     lead,
-    mode = EditMode.Motion,
-    typeInto = null
+    mode = EditMode.Motion
   }: {
     doc: MotionDoc;
     analyses?: Record<string, AudioAnalysis>;
@@ -130,15 +130,7 @@
     partFill?: Snippet | null;
     lead?: Snippet;
     mode?: EditMode;
-    typeInto?: string | null;
   } = $props();
-
-  function typeHere(area: HTMLTextAreaElement, clipId: string | null) {
-    if (clipId !== null && clipId === clip.id) {
-      area.focus();
-      area.select();
-    }
-  }
 
   function leaveOnEscape(e: KeyboardEvent) {
     if (e.key === 'Escape') {
@@ -474,6 +466,7 @@
         {#each sharedFields as field (field.key)}{@render fieldRow(field)}{/each}
       </details>
     {/if}
+    {#if visual}<StyleSection {doc} {clip} {commit} />{/if}
     {#if visual}<AutoLayoutSection {doc} {clip} {commit} />{/if}
   {/if}
 
@@ -564,7 +557,7 @@
     <div class="stack"><MarkedLines {doc} {clip} {onchange} /></div>
   {:else if field.control === Control.Textarea}
     <div class="stack">
-      <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} use:typeHere={typeInto} onkeydown={leaveOnEscape} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
+      <textarea id={`f-${field.key}`} class="content" aria-label={field.label} rows="3" value={String(value(field) ?? '')} onkeydown={leaveOnEscape} onchange={(e) => setProp(field, e.currentTarget.value)} oninput={(e) => grow(e.currentTarget)}></textarea>
     </div>
   {:else}
     <div class="line">

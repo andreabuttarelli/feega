@@ -56,6 +56,13 @@ describe('measuring the clips in the preview', () => {
     expect((root.querySelector('.kf') as HTMLElement).style.transform).toBe('rotate(30deg)');
   });
 
+  it('a text with its own box measures the box, not the ink, so its selection is the text box', () => {
+    const root = stage();
+    root.insertAdjacentHTML('beforeend', '<div class="layer" data-clip="t"><div class="box" data-box data-rect="20,30,180,60"><div data-rect="70,50,40,10">Hi</div></div></div>');
+
+    expect(measureClips(root).t).toEqual({ left: 0.05, top: 0.1, width: 0.9, height: 0.6 });
+  });
+
   it('a line of text is as wide as its words, not as its block', () => {
     const root = stage();
     root.querySelector('span')!.setAttribute('data-rect', '10,40,200,10');

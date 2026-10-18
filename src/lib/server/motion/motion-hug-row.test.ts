@@ -27,7 +27,7 @@ describe('a hug row of text and icon', () => {
     await run('add_shape', { kind: 'rect', start: 0, duration: 2, props: { x: 900, y: 300, width: 24, height: 24 } });
     const wrapped = await run('add_auto_layout', { clip_ids: ['id1', 'id2'] });
     const row = String(wrapped.container_id);
-    await run('set_auto_layout', { clip_id: row, direction: Direction.Horizontal, gap: 12 });
+    await run('set_auto_layout', { clip_id: row, direction: Direction.Horizontal, gap: 12, align: 'center' });
     await run('set_layout_item', { clip_id: row, width: Sizing.Hug, height: Sizing.Hug });
     await run('set_layout_item', { clip_id: 'id1', width: Sizing.Hug, height: Sizing.Hug });
 
