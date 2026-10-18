@@ -348,6 +348,7 @@
   const dockOf = (part: Part) => ({ [DOCK_ATTR]: PART_DOCK[viewport][part] });
   const stageHost = $derived(rules.stage === Stage.Node ? inlineStage.of(data.node.id) : undefined);
   const stageShown = $derived(rules.stage === Stage.Node ? nodeLayers(NodeMode.Edit, inlineStage.paintOf(data.node.id)).editor : true);
+  const stageTakesPointer = $derived(stageShown && inlineStage.leaving !== data.node.id);
 
   const PANELS_LATE_MS = 4000;
   let panelsLate = $state(false);
@@ -1894,7 +1895,7 @@
   {/if}
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
-    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageShown ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
+    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
       <MotionPreview bind:this={preview} bind:redraws {html} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
