@@ -2,17 +2,21 @@ export type NodeData = Record<string, unknown>;
 
 export enum MergeRule {
   Replace = 'replace',
-  OneLevel = 'one-level'
+  Deep = 'deep'
 }
 
 const MERGE_RULES: Readonly<Record<string, MergeRule>> = {
-  params: MergeRule.OneLevel,
-  filters: MergeRule.OneLevel
+  params: MergeRule.Deep,
+  filters: MergeRule.Deep
 };
+
+const DEEP = () => MergeRule.Deep;
 
 function ruleOf(key: string): MergeRule {
   return MERGE_RULES[key] ?? MergeRule.Replace;
 }
+
+type RuleOf = (key: string) => MergeRule;
 
 function isRecord(value: unknown): value is NodeData {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -39,45 +43,28 @@ export function sameValue(a: unknown, b: unknown): boolean {
   return [...keys].every((key) => sameValue(left[key], right[key]));
 }
 
-function mergesOneLevel(key: string, a: unknown, b: unknown): boolean {
-  return ruleOf(key) === MergeRule.OneLevel && isRecord(a) && isRecord(b);
-}
-
-function diffLevel(before: NodeData, after: NodeData, keys: string[]): NodeData {
+function diffLevel(before: NodeData, after: NodeData, keys: string[], rule: RuleOf): NodeData {
   const out: NodeData = {};
   for (const key of keys) {
-    if (sameValue(before[key], after[key])) {
+    const was = before[key];
+    const now = after[key];
+    if (sameValue(was, now)) {
       continue;
     }
-    out[key] = present(after[key]);
+    if (rule(key) === MergeRule.Deep && isRecord(was) && isRecord(now)) {
+      out[key] = diffLevel(was, now, [...new Set([...Object.keys(was), ...Object.keys(now)])], DEEP);
+      continue;
+    }
+    out[key] = present(now);
   }
   return out;
 }
 
 export function diffNodeData(saved: NodeData, next: NodeData, keys: string[] = Object.keys(next)): NodeData {
-  const out: NodeData = {};
-
-  for (const key of keys) {
-    const before = saved[key];
-    const after = next[key];
-    if (sameValue(before, after)) {
-      continue;
-    }
-
-    if (mergesOneLevel(key, before, after)) {
-      const inner = before as NodeData;
-      const outer = after as NodeData;
-      out[key] = diffLevel(inner, outer, [...new Set([...Object.keys(inner), ...Object.keys(outer)])]);
-      continue;
-    }
-
-    out[key] = present(after);
-  }
-
-  return out;
+  return diffLevel(saved, next, keys, ruleOf);
 }
 
-function applyLevel(target: NodeData, patch: NodeData, nested: (key: string) => MergeRule): NodeData {
+function applyLevel(target: NodeData, patch: NodeData, rule: RuleOf): NodeData {
   const out: NodeData = { ...target };
 
   for (const [key, value] of Object.entries(patch)) {
@@ -85,8 +72,8 @@ function applyLevel(target: NodeData, patch: NodeData, nested: (key: string) => 
       delete out[key];
       continue;
     }
-    if (nested(key) === MergeRule.OneLevel && isRecord(value)) {
-      out[key] = applyLevel(isRecord(out[key]) ? out[key] : {}, value, () => MergeRule.Replace);
+    if (rule(key) === MergeRule.Deep && isRecord(value)) {
+      out[key] = applyLevel(isRecord(out[key]) ? out[key] : {}, value, DEEP);
       continue;
     }
     out[key] = value;
@@ -104,13 +91,12 @@ function nestedOf(data: NodeData, key: string): NodeData {
   return isRecord(value) ? value : {};
 }
 
-export function baseOf(saved: NodeData, patch: NodeData): NodeData {
+function baseLevel(saved: NodeData, patch: NodeData, rule: RuleOf): NodeData {
   const out: NodeData = {};
 
   for (const [key, value] of Object.entries(patch)) {
-    if (ruleOf(key) === MergeRule.OneLevel && isRecord(value)) {
-      const inner = nestedOf(saved, key);
-      out[key] = Object.fromEntries(Object.keys(value).map((sub) => [sub, present(inner[sub])]));
+    if (rule(key) === MergeRule.Deep && isRecord(value)) {
+      out[key] = baseLevel(nestedOf(saved, key), value, DEEP);
       continue;
     }
     out[key] = present(saved[key]);
@@ -119,28 +105,25 @@ export function baseOf(saved: NodeData, patch: NodeData): NodeData {
   return out;
 }
 
-function clashes(current: unknown, base: unknown, wanted: unknown): boolean {
-  return !sameValue(current, base) && !sameValue(current, wanted);
+export function baseOf(saved: NodeData, patch: NodeData): NodeData {
+  return baseLevel(saved, patch, ruleOf);
+}
+
+function losesItems(current: unknown, base: unknown, wanted: unknown): boolean {
+  const listed = Array.isArray(current) || Array.isArray(wanted);
+  return listed && !sameValue(current, base) && !sameValue(current, wanted);
+}
+
+function clashLevel(current: NodeData, base: NodeData, patch: NodeData, rule: RuleOf, prefix: string): string[] {
+  return Object.entries(patch).flatMap(([key, value]) => {
+    const path = `${prefix}${key}`;
+    if (rule(key) === MergeRule.Deep && isRecord(value) && isRecord(base[key])) {
+      return clashLevel(nestedOf(current, key), base[key] as NodeData, value, DEEP, `${path}.`);
+    }
+    return key in base && losesItems(current[key], base[key], value) ? [path] : [];
+  });
 }
 
 export function clashingKeys(current: NodeData, base: NodeData, patch: NodeData): string[] {
-  const out: string[] = [];
-
-  for (const [key, value] of Object.entries(patch)) {
-    if (ruleOf(key) === MergeRule.OneLevel && isRecord(value) && isRecord(base[key])) {
-      const now = nestedOf(current, key);
-      const was = base[key] as NodeData;
-      for (const sub of Object.keys(value)) {
-        if (clashes(now[sub], was[sub], value[sub])) {
-          out.push(`${key}.${sub}`);
-        }
-      }
-      continue;
-    }
-    if (key in base && clashes(current[key], base[key], value)) {
-      out.push(key);
-    }
-  }
-
-  return out;
+  return clashLevel(current, base, patch, ruleOf, '');
 }
