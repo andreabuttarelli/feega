@@ -6,6 +6,7 @@ import { setPartFills } from '$lib/motion/part-style';
 import { staticParts } from './static-parts';
 import { strokesSchema } from '$lib/motion/stroke/model';
 import { THREE_GUIDANCE } from './three-guidance';
+import { FRAMES_CLOSED_HINT } from './server-frames';
 import { GUIDES, guidesFor, type GuideTopic } from './guides';
 import { lintAdvice } from '$lib/motion/custom/lint';
 import { tool, type Tool, type ToolExecutionOptions } from 'ai';
@@ -20,7 +21,7 @@ import { CheckState as EffectCheck, Outcome, type Written } from '$lib/server/re
 const MAX_EFFECT_FAILURES = 3;
 import { addAdjustment, createComp, mergeView, precompose, viewOf } from '$lib/motion/precomp';
 import { z } from 'zod';
-import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
+import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, defaultProps, type ComponentId } from '$lib/motion/components';
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
@@ -167,7 +168,8 @@ import { guessedAdvance, measureText, type Advance, type TextLook } from '$lib/m
 import { isText } from '$lib/motion/layout/text-extent';
 import { outlineUrl } from '$lib/motion/fonts/outline';
 import { pivotBox } from '$lib/motion/parent';
-import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
+import { propsFromPx, pxRead, strokesFromPx, PX_FIELDS_GUIDE } from '$lib/motion/px-fields';
+import { UNITS_GUIDE, unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
 const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
 
@@ -331,6 +333,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         duration: secs(c.durationInFrames),
         trimStart: secs(c.trimStart),
         props: shownRecord(propsOwner(c.component), c.props, doc),
+        ...pxRead(c.props, doc),
         in: edgeSummary(c.transitionIn),
         out: edgeSummary(c.transitionOut),
         junction: c.junction ? { kind: c.junction.kind, duration: secs(c.junction.durationInFrames), from: junctionPairs(doc).find((p) => p.incoming === c.id)?.outgoing ?? null } : null,
@@ -403,6 +406,18 @@ const maskInput = z
     text: z.string().optional()
   })
   .strict();
+
+type ContainerStyle = { fill?: string; stroke?: string; stroke_width?: number; radius?: number };
+
+function containerProps(style: ContainerStyle): Record<string, unknown> {
+  const stroke = style.stroke === undefined ? {} : { stroke: style.stroke, strokeKind: StrokeKind.Solid };
+  return {
+    ...(style.fill === undefined ? {} : { fill: style.fill }),
+    ...stroke,
+    ...(style.stroke_width === undefined ? {} : { strokeWidth: style.stroke_width }),
+    ...(style.radius === undefined ? {} : { roundness: style.radius })
+  };
+}
 
 const SPRING_HELP = '(soft by default; stiffness and damping override it: keep damping near 2·√stiffness for the house soft settle, never a visible bounce).';
 
@@ -567,6 +582,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     return owner && owner !== CAMERA_LANE ? propsOwner(owner) : null;
   };
   const propsIn = (component: ComponentId, props: Record<string, unknown> = {}) => storedRecord(propsOwner(component), props, session.doc);
+  const newFromPx = (component: ComponentId, props: Record<string, unknown> = {}) => propsFromPx(props, shownRecord(propsOwner(component), defaultProps(component), session.doc), session.doc);
+  const editFromPx = (clipId: string, props: Record<string, unknown>) => propsFromPx(props, shownRecord(propsOf(clipId), findClip(session.doc, clipId)?.clip.props ?? {}, session.doc), session.doc);
   const keyIn =
     (owner: Owner, prop: string) =>
     (k: KeyInput): Keyframe =>
@@ -713,6 +730,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
   const created = (out: ReturnType<typeof apply>, clipId: string) => (out.ok ? { ...out, clip_id: clipId } : out);
 
+  const styled = (result: OpResult, clipId: string, style: ContainerStyle): OpResult => {
+    const props = containerProps(style);
+    return result.ok && Object.keys(props).length ? setProps(result.doc, clipId, propsIn('Shape', props)) : result;
+  };
+
   const screens = new Map<string, string>();
 
   async function recreateFromUrl(url: string, input: { name: string; start?: number; duration: number; track_id?: string }) {
@@ -779,7 +801,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
   const tools: Record<string, Tool> = {
     get_motion_doc: tool({
-      description: 'Read the video being edited: size, duration in seconds, tracks and clips (start/duration in seconds), and the clips the user has selected.',
+      description: `Read the video being edited: size, duration in seconds, tracks and clips (start/duration in seconds), and the clips the user has selected. ${UNITS_GUIDE} ${PX_FIELDS_GUIDE}`,
       inputSchema: z.object({}).strict(),
       execute: async () => docSummary(session.doc, session.selection)
     }),
@@ -817,7 +839,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_clip: tool({
-      description: `Add a clip of a library component at a time in seconds. Props not given take the component defaults. Colours may be brand.primary/secondary/accent/background/text or #rrggbb. ${PLACEMENT_HELP} Returns the clip id.`,
+      description: `Add a clip of a library component at a time in seconds. Props not given take the component defaults. ${UNITS_GUIDE} ${PX_FIELDS_GUIDE} Colours may be brand.primary/secondary/accent/background/text or #rrggbb. ${PLACEMENT_HELP} Returns the clip id.`,
       inputSchema: z.object({
         component: z.enum(COMPONENT_IDS),
         start: z.number().min(0),
@@ -825,7 +847,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         props: z.record(z.string(), z.unknown()).optional(),
         ...PLACED_PICTURE
       }),
-      execute: async (input) => {
+      execute: async (raw) => {
+        const input = { ...raw, props: newFromPx(raw.component, raw.props) };
         if (!assetKnown(input.props?.assetId)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
@@ -851,9 +874,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_props: tool({
-      description: 'Change some props of a clip; the rest are kept. Validated against the component. A Shape and text (Title, Text, Kicker, Caption) take fills (see add_shape; fills replaces a text colour, colours may carry alpha as #rrggbbaa); a poster photo slot in a media list ({assetId, kind}) takes fills too, the same layer stack. The same Shape and text clips take strokes (see add_shape); text draws its first visible stroke.',
+      description: `Change some props of a clip; the rest are kept (left/top keep the size, x/y the centre). ${PX_FIELDS_GUIDE} Validated against the component. A Shape and text (Title, Text, Kicker, Caption) take fills (see add_shape; fills replaces a text colour, colours may carry alpha as #rrggbbaa); a poster photo slot in a media list ({assetId, kind}) takes fills too, the same layer stack. The same Shape and text clips take strokes (see add_shape); text draws its first visible stroke.`,
       inputSchema: z.object({ clip_id: z.string(), props: z.record(z.string(), z.unknown()) }),
-      execute: async (input) => {
+      execute: async (raw) => {
+        const input = { ...raw, props: editFromPx(raw.clip_id, raw.props) };
         if (!assetKnown(input.props.assetId)) {
           return { ok: false, error: 'unknown asset id: call list_assets' };
         }
@@ -1499,14 +1523,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_auto_layout: tool({
-      description: 'Auto layout (flexbox-style). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (its fill is the frame background, set_props to colour it) on a track below them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1).optional(), clip_id: z.string().optional() }),
-      execute: async (input) => {
-        if (input.clip_id) {
-          return apply(setAutoLayout(session.doc, input.clip_id, {}), `auto layout on ${input.clip_id}`);
+      description: 'Auto layout (flexbox-style). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (fill, stroke, stroke_width and radius style it in the same call) drawn directly under them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
+      inputSchema: z.object({
+        clip_ids: z.array(z.string()).min(1).optional(),
+        clip_id: z.string().optional(),
+        fill: z.string().optional().describe('container fill colour'),
+        stroke: z.string().optional().describe('container stroke colour'),
+        stroke_width: z.number().min(0).optional().describe('px'),
+        radius: z.number().min(0).optional().describe('corner roundness, as roundness in set_props')
+      }),
+      execute: async ({ clip_ids, clip_id, ...style }) => {
+        if (clip_id) {
+          return apply(styled(setAutoLayout(session.doc, clip_id, {}), clip_id, style), `auto layout on ${clip_id}`);
         }
         const id = deps.newId();
-        const out = apply(wrapInAutoLayout(session.doc, input.clip_ids ?? [], id, deps.newId()), `wrapped ${input.clip_ids?.length ?? 0} clip(s) in an auto layout`);
+        const out = apply(styled(wrapInAutoLayout(session.doc, clip_ids ?? [], id, deps.newId()), id, style), `wrapped ${clip_ids?.length ?? 0} clip(s) in an auto layout`);
         return out.ok ? { ...out, container_id: id } : out;
       }
     }),
@@ -1604,9 +1635,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_shape: tool({
-      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. A rect rounds its corners with roundness (0..0.5 of the short side) or one radius per corner with corners [topLeft, topRight, bottomRight, bottomLeft] (unset ones follow roundness), and smoothing 0..1 softens them toward a squircle (0 = circular); set_props changes them later. Fill: fills is a stack of layers painted bottom to top (first = bottom), each {type: solid {color} | linear-gradient {stops [{color, pos 0..1}], angle} | radial-gradient {stops, center {x,y} 0..1, radius (1 = half the long side)} | image {assetId, fit cover/contain/fill/tile, focus {x,y} 0..1, scale}, opacity 0..1, visible, blend (css blend mode)}; e.g. a photo with a dark overlay is [{type: image, assetId}, {type: solid, color: #000000, opacity: 0.4}]. fills replaces the older fillKind/fill/fill2/gradientAngle (still read when fills is absent); set_props {fills} changes the whole stack. Stroke: strokes is a stack painted bottom to top over the fills, each {paint (a fills layer, never image), width, dash, gap (all fractions of the frame's short side, 0..0.2; dash 0 = solid), align inside/center/outside, sides [top, right, bottom, left] widths (rect only), cap butt/round/square, join miter/round/bevel, visible}; e.g. a 4px outside ring on a 1080 frame is [{paint: {type: solid, color: #ffffff}, width: 0.0037, align: outside}]. strokes replaces the older strokeKind/stroke/strokeWidth/dash/gap/cap/join (still read when strokes is absent; set_props {strokes} changes the whole stack). Other props as add_clip; a soft glow is effects [{kind: gaussian-blur}]. ${PLACEMENT_HELP} Returns the clip id.`,
-      inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), fills: fillsSchema.optional(), strokes: strokesSchema.optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
-      execute: async (input) => {
+      description: `Add a vector Shape clip. kind: ${SHAPE_KINDS.join(', ')}; path takes ${PATH_GUIDE}. A rect rounds its corners with radius (px) or roundness (0..0.5 of the short side) or one radius per corner with corners [topLeft, topRight, bottomRight, bottomLeft] (unset ones follow roundness), and smoothing 0..1 softens them toward a squircle (0 = circular); set_props changes them later. Fill: fills is a stack of layers painted bottom to top (first = bottom), each {type: solid {color} | linear-gradient {stops [{color, pos 0..1}], angle} | radial-gradient {stops, center {x,y} 0..1, radius (1 = half the long side)} | image {assetId, fit cover/contain/fill/tile, focus {x,y} 0..1, scale}, opacity 0..1, visible, blend (css blend mode)}; e.g. a photo with a dark overlay is [{type: image, assetId}, {type: solid, color: #000000, opacity: 0.4}]. fills replaces the older fillKind/fill/fill2/gradientAngle (still read when fills is absent); set_props {fills} changes the whole stack. Stroke: strokes is a stack painted bottom to top over the fills, each {paint (a fills layer, never image), width, dash, gap (all fractions of the frame's short side, 0..0.2; dash 0 = solid), align inside/center/outside, sides [top, right, bottom, left] widths (rect only), cap butt/round/square, join miter/round/bevel, visible}; e.g. a 4px outside ring is [{paint: {type: solid, color: #ffffff}, width_px: 4, align: outside}] (same as width: 0.0037 on a 1080 frame). strokes replaces the older strokeKind/stroke/strokeWidth/dash/gap/cap/join (still read when strokes is absent; set_props {strokes} changes the whole stack). Other props as add_clip; a soft glow is effects [{kind: gaussian-blur}]. ${PX_FIELDS_GUIDE} ${PLACEMENT_HELP} Returns the clip id.`,
+      inputSchema: z.object({ kind: z.enum(SHAPE_KINDS), start: z.number().min(0), duration: z.number().positive().optional(), path: z.string().optional(), fills: fillsSchema.optional(), strokes: z.preprocess((v) => strokesFromPx(v, session.doc), strokesSchema).optional(), props: z.record(z.string(), z.unknown()).optional(), ...PLACED_PICTURE }),
+      execute: async (raw) => {
+        const input = { ...raw, props: newFromPx('Shape', raw.props) };
         const id = deps.newId();
         const outlined = input.props?.stroke !== undefined && input.props?.strokeKind === undefined ? { strokeKind: StrokeKind.Solid } : {};
         const props = { ...propsIn('Shape', { ...outlined, ...input.props }), shape: input.kind, ...(input.path ? { path: input.path } : {}), ...(input.fills ? { fills: input.fills } : {}), ...(input.strokes ? { strokes: input.strokes } : {}) };
@@ -2407,7 +2439,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const times = input.times.map((t) => Math.min(t, end));
         const frames = (await deps.frames(toolCallId, times))?.filter((f) => f.bytes.length > 0) ?? [];
         if (!frames.length) {
-          return { ok: true, seen: false, note: 'frames unavailable: neither the editor nor the server could draw them. Continue without them; the user sees the video when they open the editor.' };
+          return { ok: true, seen: false, note: `frames unavailable: neither the editor nor the server could draw them (${FRAMES_CLOSED_HINT}). Continue without them; the user sees the video when they open the editor.` };
         }
         session.frames.set(toolCallId, frames);
         session.checkedAt = session.edits.length;

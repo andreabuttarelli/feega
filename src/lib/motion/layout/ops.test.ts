@@ -5,6 +5,7 @@ import { Direction, Sizing } from './auto-layout';
 import { autoLayoutPatchSchema, layoutItemPatchSchema } from './model';
 import { addAutoLayout, leaveAutoLayout, reorderChild, setAutoLayout, setLayoutItem, wrapInAutoLayout } from './ops';
 import { withAutoLayout } from './resolve';
+import { layerOrder } from '../siblings';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -33,6 +34,15 @@ describe('wrapInAutoLayout', () => {
     const lane = wrapped.tracks.findIndex((t) => t.id === 'lane');
     const lowest = Math.max(...['a', 'b', 'k'].map((id) => wrapped.tracks.findIndex((t) => t.clips.some((c) => c.id === id))));
     expect(lane).toBe(lowest + 1);
+  });
+
+  it('sits directly under its children, above a background sharing their track', () => {
+    let doc = newMotionDoc(MotionFormat.Square);
+    doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.5, y: 0.5, width: 1, height: 1 } }, 'bg'));
+    doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.3, y: 0.5, width: 0.1, height: 0.1 } }, 'a'));
+    doc = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect', x: 0.6, y: 0.5, width: 0.1, height: 0.1 } }, 'b'));
+    const order = layerOrder(must(wrapInAutoLayout(doc, ['a', 'b'], 'box', 'lane')));
+    expect(order).toEqual(['b', 'a', 'box', 'bg']);
   });
 
   it('parents the children, in reading order, and guesses the direction and gap', () => {

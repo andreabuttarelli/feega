@@ -204,7 +204,10 @@ same player inside a React (`@feega/motion-react`) or Flutter (`feega_motion`) a
 
 See a video with `view_motion_frames` (up to 6 times in seconds): the frames come back as
 images with the quality gate's `quality` and `blocking` notes. Free; look before and after
-`ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`.
+`ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`. Against a local server
+the frames need `CHROMIUM_PATH` (a local Chrome binary, e.g.
+`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`) in its env; without it the call
+answers `closed` / "frames unavailable".
 
 `motion_tool` `measure_text {clip_id}` gives a text clip's rendered box in px (top-left, from the
 real font file; `approximate: true` when the font could not be read) to place things next to it.
@@ -227,7 +230,9 @@ CLI: `feega motion new --template builtin:prompt-input --format 9:16`.
 Every tool of the editor agent (add_clip, set_props, set_keyframes, set_canvas, export_image...)
 runs directly through `motion_tool`: no `tool` lists them, `tool` alone describes one with its
 JSON schema, `tool` with `node_id` and `input` runs it on the saved video as a new revision
-(`version` guards a stale write, 409). Free, no AI. A still graphic (post, story, poster) is a
+(`version` guards a stale write, 409). A tool that refuses answers 422 `{ error: "tool_refused", detail }`.
+Building many things: `tool` `"batch"` with `input` `{ ops: [{ tool, input }, ...] }` (up to 500) applies
+them all in one revision, or none if one refuses (422 with its `index`). Free, no AI. A still graphic (post, story, poster) is a
 video pinned to one frame: `set_canvas` `{ format: "A poster", still: 2 }`, then `export_image`
 `{ format: "png", scale: 2 }` returns the image `url`. CLI: `feega motion tool <nodeId> <tool>
 --input '{...}'`, `feega motion tools [name]`, `feega motion still <nodeId> --scale 2 --out poster.png`.
