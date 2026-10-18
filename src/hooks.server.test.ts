@@ -189,12 +189,12 @@ describe('il tool che ha chiesto il lavoro', () => {
 });
 
 describe('la radice manda dove dice la regola di ingresso', () => {
-	const rootRequestTo = async () => {
+	const rootRequestTo = async (origin = 'http://localhost') => {
 		try {
 			await handle({
 				event: {
-					request: new Request('http://localhost/'),
-					url: new URL('http://localhost/'),
+					request: new Request(`${origin}/`),
+					url: new URL(`${origin}/`),
 					route: { id: '/' },
 					params: {},
 					cookies: { getAll: () => [], get: () => undefined, set: vi.fn() },
@@ -218,6 +218,12 @@ describe('la radice manda dove dice la regola di ingresso', () => {
 		mockSession = { session: { access_token: 'tok' }, user: { id: 'user-1', email: 'chi@esempio.it' } };
 		const redirected = await rootRequestTo();
 		expect(redirected?.location).toBe('/p/proj1/c/canvas1');
+	});
+
+	it('sul dominio del sito la radice è la homepage, non un redirect', async () => {
+		mockSession = { session: { access_token: 'tok' }, user: { id: 'user-1', email: 'chi@esempio.it' } };
+		const redirected = await rootRequestTo('https://www.feega.app');
+		expect(redirected).toBeNull();
 	});
 });
 

@@ -7,7 +7,7 @@
   let { children } = $props();
 
   const SITE = 'https://www.feega.app';
-  const OG_IMAGE = `${SITE}/site/og.png`;
+  const OG_IMAGE = `${SITE}/og.png`;
   const canonical = $derived(SITE + page.url.pathname);
 </script>
 
@@ -19,6 +19,8 @@
   <meta property="og:type" content="website" />
   <meta property="og:url" content={canonical} />
   <meta property="og:image" content={OG_IMAGE} />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content={OG_IMAGE} />
   <meta name="robots" content="max-image-preview:large" />

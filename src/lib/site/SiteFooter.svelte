@@ -6,22 +6,22 @@
   const year = new Date().getFullYear();
 </script>
 
-<footer class="foot">
+<footer class="site-foot">
   <hr class="rule" />
 
   <div class="grid">
-    <div class="ready">
+    <div class="site-ready">
       <h2>Ready?</h2>
       <a href={APP_URL}><span>Let's start now</span></a>
     </div>
 
     <div class="cols">
-      <div class="col">
+      <div class="site-col">
         <p>( Navigate )</p>
         <a href="/">Product</a>
         <a href={APP_URL}>Sign In</a>
       </div>
-      <div class="col">
+      <div class="site-col">
         <p>( Socials )</p>
         <a href={GITHUB_URL}>GitHub [Star Us]</a>
       </div>
@@ -30,7 +30,7 @@
     <p class="mark" aria-hidden="true">feega</p>
 
     <div class="base">
-      <a class="top" href="#top">Back to top ↑</a>
+      <a class="to-top" href="#top">Back to top ↑</a>
       <p class="copy">© {year} Feega. All rights reserved.<br />Made in Italy, by Andrea Buttarelli.</p>
     </div>
   </div>
@@ -44,7 +44,7 @@
     </nav>
   </div>
 
-  <p class="note">
+  <p class="notice">
     feega must never be used to create illegal content, such as CSAM, non-consensual intimate imagery (NCII) or sexual
     deepfakes. feega does not use Google APIs or Google user data to generate content: Google and GitHub Sign-In data is
     used only to authenticate your account.
@@ -52,7 +52,7 @@
 </footer>
 
 <style>
-  .foot {
+  .site-foot {
     max-width: 430px;
     margin: 0 auto;
     padding: 20px var(--site-gutter) var(--site-gutter);
@@ -71,7 +71,7 @@
     margin-top: 48px;
   }
 
-  .ready {
+  .site-ready {
     grid-column: 1 / -1;
     padding-top: 2px;
     background: var(--site-accent);
@@ -80,17 +80,17 @@
     letter-spacing: -0.04em;
   }
 
-  .ready h2 {
+  .site-ready h2 {
     font: inherit;
     color: var(--site-bg);
   }
 
-  .ready a {
+  .site-ready a {
     display: block;
     margin-top: 1px;
   }
 
-  .ready span {
+  .site-ready span {
     display: inline-block;
     border-bottom: 2px solid var(--site-ink);
   }
@@ -102,20 +102,20 @@
     margin-top: 53.4px;
   }
 
-  .col {
+  .site-col {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
   }
 
-  .col a,
-  .top,
+  .site-col a,
+  .to-top,
   .legal a {
     padding-bottom: 2px;
   }
 
-  .col p {
+  .site-col p {
     margin-bottom: 18px;
   }
 
@@ -137,7 +137,7 @@
     margin-top: 23px;
   }
 
-  .top {
+  .to-top {
     grid-column: 2;
     grid-row: 1;
     text-align: right;
@@ -160,7 +160,7 @@
     margin-top: 24px;
   }
 
-  .note {
+  .notice {
     margin-top: 40px;
     font-size: 12px;
     line-height: 1;
@@ -168,16 +168,16 @@
   }
 
   @media (min-width: 1200px) {
-    .foot {
+    .site-foot {
       max-width: 1500px;
     }
 
-    .ready {
+    .site-ready {
       grid-column: 1;
       font-size: 58px;
     }
 
-    .ready a {
+    .site-ready a {
       margin-top: 7px;
     }
 
@@ -207,7 +207,7 @@
       margin-top: 0;
     }
 
-    .top {
+    .to-top {
       grid-column: 1;
       text-align: left;
     }
@@ -228,7 +228,7 @@
       margin-top: 0;
     }
 
-    .note {
+    .notice {
       margin-top: 24px;
     }
   }

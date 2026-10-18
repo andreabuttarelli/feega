@@ -14,6 +14,7 @@ import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-cont
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { redirectFor } from '$lib/server/host-redirects';
+import { isSiteHost } from '$lib/site/host';
 import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
@@ -206,7 +207,7 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
 
   seedMetaClickCookies(event.cookies, event.url, event.route.id);
 
-  if (isRootPath(event.url.pathname)) {
+  if (isRootPath(event.url.pathname) && !isSiteHost(event.url)) {
     rememberCampaign(event.cookies, event.url);
     if (event.url.searchParams.has('code') || event.url.searchParams.has('error_description')) {
       throw redirect(303, `/auth/callback${event.url.search}`);
