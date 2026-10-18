@@ -2,6 +2,7 @@ import { ENGINE_GLOBAL, motionEngine } from '../engine/engine';
 import { COMPOSITION_ID } from '../hyperframes/capture';
 import { IDENTITY_3D, cssTransform, multiply, perspective, project, scaleOf, translation, type Mat4, type Size } from './matrix';
 import { PaintKind } from './paint-of';
+import type { ParticleBake } from '../particles/simulate';
 
 export type Point = [number, number];
 export type Quad = [Point, Point, Point, Point];
@@ -13,6 +14,7 @@ export type Paint =
   | { kind: PaintKind.Video; src: string; fit: string; start: number; duration: number; mediaStart: number; rate: number; element: Element }
   | { kind: PaintKind.Logo; src: string }
   | { kind: PaintKind.Text; box: HTMLElement; leaf: HTMLElement }
+  | { kind: PaintKind.Particles; bake: ParticleBake }
   | { kind: PaintKind.Html };
 
 export type Link = { el: HTMLElement; size: Size; offset: Point; perspectiveFor: boolean };
@@ -72,7 +74,21 @@ function textParts(layer: Element): { el: HTMLElement; paint: Paint }[] {
   return (lines.length ? lines : [whole]).map((leaf) => ({ el: leaf, paint: { kind: PaintKind.Text, box, leaf } }));
 }
 
-function paintOf(layer: Element): { el: HTMLElement; paint: Paint } | null {
+const PARTICLE_BAKES = /const B=(\[[\s\S]*?\]);\nconst items=/;
+const PARTICLE_CANVAS = 'pt-';
+
+function particleBakes(doc: Document): Map<string, ParticleBake> {
+  const script = [...doc.querySelectorAll('script')].map((s) => s.textContent ?? '').find((s) => PARTICLE_BAKES.test(s));
+  const bakes = script ? (JSON.parse(PARTICLE_BAKES.exec(script)![1]) as ParticleBake[]) : [];
+  return new Map(bakes.map((b) => [b.id, b]));
+}
+
+function paintOf(layer: Element, bakes: Map<string, ParticleBake> = new Map()): { el: HTMLElement; paint: Paint } | null {
+  const canvas = layer.querySelector(`.cc > canvas[id^="${PARTICLE_CANVAS}"]`) as HTMLElement | null;
+  const bake = canvas ? bakes.get(canvas.id.slice(PARTICLE_CANVAS.length)) : undefined;
+  if (canvas && bake && bake.shape !== 'sprite') {
+    return { el: canvas, paint: { kind: PaintKind.Particles, bake } };
+  }
   const fx = layer.querySelector(':scope > .fx');
   const fill = fx?.querySelector(':scope > div:not([class])') as HTMLElement | null;
   if (fill && fx!.children.length === 1 && /inset:\s*0/.test(fill.getAttribute('style') ?? '') && !fill.children.length) {
@@ -111,6 +127,10 @@ const insetFull = (el: HTMLElement) => INSET_CLASSES.some((c) => el.classList.co
 function contentSize(paint: Paint, parent: Size): Size {
   const SIZE: Record<PaintKind, () => Size> = {
     [PaintKind.Fill]: () => parent,
+    [PaintKind.Particles]: () => {
+      const { bake } = paint as Extract<Paint, { kind: PaintKind.Particles }>;
+      return { width: bake.width, height: bake.height };
+    },
     [PaintKind.Text]: () => parent,
     [PaintKind.Shape]: () => (paint as Extract<Paint, { kind: PaintKind.Shape }>).size,
     [PaintKind.Image]: () => parent,
@@ -125,7 +145,7 @@ function linksOf(chain: HTMLElement[], frame: Size, paint: Paint): Link[] {
   const links: Link[] = [];
   let parent: Size = frame;
   for (const el of chain) {
-    const placed = el.style.position === 'absolute' && el.style.width;
+    const placed = el.style.position === 'absolute' && el.style.width.endsWith('px');
     const size: Size = placed ? { width: px(el.style.width), height: px(el.style.height) } : parent;
     const offset: Point = placed && !insetFull(el) ? [px(el.style.left), px(el.style.top)] : [0, 0];
     links.push({ el, size, offset, perspectiveFor: false });
@@ -183,6 +203,7 @@ export function compileScene(html: string): Scene {
   const root = doc.getElementById('root') as HTMLElement;
   const frame = { width: px(root.dataset.width), height: px(root.dataset.height) };
   const background = [...doc.querySelectorAll('style')].map((s) => ROOT_BG.exec(s.textContent ?? '')?.[1]).find(Boolean) ?? null;
+  const bakes = particleBakes(doc);
   const backdrops = [...root.querySelectorAll('[data-clip]:not(.layer)')].filter((g) => g.querySelector('.layer[data-clip]'));
   const all = [...root.querySelectorAll('.layer[data-clip]'), ...backdrops].sort((a, b) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
   const leaves = all.filter((l) => !paintsNothing(l)).filter((l) => (backdrops.includes(l) || !l.querySelector('.layer[data-clip]')) && !backdrops.some((b) => b !== l && b.contains(l)));
@@ -191,7 +212,7 @@ export function compileScene(html: string): Scene {
     const outer = chainOf(layer as HTMLElement, root);
     const blend = outer.map((el) => el.style.mixBlendMode).filter((b) => b && b !== 'normal').pop() ?? 'normal';
     const backdrop = backdrops.includes(layer);
-    const single = backdrop ? null : paintOf(layer);
+    const single = backdrop ? null : paintOf(layer, bakes);
     const found = backdrop ? [] : single ? [single] : textParts(layer);
     const native = found.filter((f) => effectFree(chainOf(f.el, root)));
     const parts = native.length === found.length && found.length ? native : [{ el: layer as HTMLElement, paint: { kind: PaintKind.Html } as Paint }];
