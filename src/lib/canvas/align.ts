@@ -1,4 +1,5 @@
 import { Edge } from '$lib/motion/space';
+import { tidyMoves } from '$lib/motion/tidy';
 
 export type TileBox = { id: string; x: number; y: number; width: number; height: number };
 export type TileMove = { id: string; x: number; y: number };
@@ -25,4 +26,9 @@ export function alignTiles(tiles: readonly TileBox[], edge: Edge): TileMove[] {
     bottom: Math.max(...tiles.map((t) => t.y + t.height))
   };
   return tiles.map((t) => ({ id: t.id, ...PLACE[edge](t, bounds) })).filter((m, i) => m.x !== tiles[i].x || m.y !== tiles[i].y);
+}
+
+export function tidyTiles(tiles: readonly TileBox[]): TileMove[] {
+  const at = new Map(tiles.map((t) => [t.id, t]));
+  return tidyMoves(tiles.map((t) => ({ id: t.id, left: t.x, top: t.y, width: t.width, height: t.height }))).map((m) => ({ id: m.id, x: at.get(m.id)!.x + m.dx, y: at.get(m.id)!.y + m.dy }));
 }

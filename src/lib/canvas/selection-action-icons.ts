@@ -25,6 +25,7 @@ import AlignEndVertical from '@lucide/svelte/icons/align-end-vertical';
 import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
 import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
 import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
+import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 import FlipHorizontal2 from '@lucide/svelte/icons/flip-horizontal-2';
 import FlipVertical2 from '@lucide/svelte/icons/flip-vertical-2';
 import SquareDashed from '@lucide/svelte/icons/square-dashed';
@@ -54,6 +55,7 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'align-top': AlignStartHorizontal,
   'align-middle': AlignCenterHorizontal,
   'align-bottom': AlignEndHorizontal,
+  'tidy-up': LayoutGrid,
   'flip-horizontal': FlipHorizontal2,
   'flip-vertical': FlipVertical2,
   'use-as-mask': SquareDashed,
