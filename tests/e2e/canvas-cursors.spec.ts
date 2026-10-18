@@ -3,7 +3,7 @@ import doc from './fixtures/motion-doc.json' with { type: 'json' };
 
 const DESKTOP = { width: 1280, height: 860 };
 const CURSOR_LATENCY_MS = 1000;
-const COMMIT_LATENCY_MS = 600;
+const COMMIT_LATENCY_MS = 200;
 const ELEMENT = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null, kind: 'element' };
 
 test.use({ viewport: DESKTOP, actionTimeout: 15_000 });
