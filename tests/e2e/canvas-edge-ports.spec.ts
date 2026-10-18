@@ -65,8 +65,9 @@ test.describe('edges end on the port square @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
 
     const ports = page.locator(`.svelte-flow__node[data-id="${target.id}"] .svelte-flow__handle.port-in`);
-    await expect(ports).toHaveCount(1);
     await page.locator(`.svelte-flow__node[data-id="${target.id}"]`).click({ position: { x: 24, y: 12 } });
+    await page.keyboard.press('ControlOrMeta+a');
+    await expect(ports).toHaveCount(1);
     await expectEdgeOnPorts(page, source.id, target.id);
     await page.screenshot({ path: `${SHOTS}/before.png` });
 
@@ -86,6 +87,7 @@ test.describe('edges end on the port square @real', () => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await expect(page.locator('.svelte-flow__edge path.svelte-flow__edge-path')).toHaveCount(1);
     await page.locator('.svelte-flow__pane').click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press('ControlOrMeta+a');
 
     const widthOf = async () => (await page.locator(`.svelte-flow__node[data-id="${source.id}"]`).boundingBox())?.width ?? 0;
     const base = await widthOf();
