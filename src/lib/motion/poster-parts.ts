@@ -57,6 +57,13 @@ export function editablePart(doc: MotionDoc, clip: MotionClip, part: string): Pa
   return spec?.type === 'string' && TEXT_FORMATS.has(spec.format) && typeof clip.props[field] === 'string' ? PartEdit.Text : PartEdit.None;
 }
 
+export function drawnTexts(doc: MotionDoc, clip: MotionClip): Record<string, string> {
+  if (clip.component !== CUSTOM_CLIP) {
+    return {};
+  }
+  return Object.fromEntries(Object.entries(clip.props).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim() !== '' && editablePart(doc, clip, entry[0]) === PartEdit.Text));
+}
+
 const isMarkedLines = (clip: MotionClip, field: string) => clip.component === CUSTOM_CLIP && markedPoster(String(clip.props.name))?.lines === field;
 
 export function partText(clip: MotionClip, part: string): string {
