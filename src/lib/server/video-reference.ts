@@ -1,4 +1,6 @@
 import type { Db } from '$lib/server/db/client';
+import { ensureFfmpegPath } from '$lib/server/ffmpeg-bin';
+import { ffmpegGrab, type GrabFrame } from '$lib/server/motion/reference-frames';
 import type { ProjectMode } from '$lib/project-mode';
 import { findAsset, type Asset } from '$lib/server/repos/assets';
 import { BUCKET_BY_SOURCE, CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, signStoredFile } from '$lib/server/repos/asset-storage';
@@ -100,6 +102,15 @@ export function breakdownPorts(scope: { orgId: string; mode: ProjectMode }): Bre
       return screenModelReferences({ orgId: scope.orgId, mode: scope.mode, references: [{ medium: ReferenceMedium.Video, url }] });
     }
   };
+}
+
+export async function videoGrabber(db: Db, ref: BreakdownRef): Promise<GrabFrame | null> {
+  const asset = await findAsset(db, ref);
+  if (!reachable(asset, ref.projectId) || asset.type !== 'video') {
+    return null;
+  }
+  const [url, bin] = await Promise.all([signedUrlOf(db, asset), ensureFfmpegPath()]);
+  return url && bin ? ffmpegGrab(bin, url) : null;
 }
 
 export const breakdownReader = (db: Db, scope: { orgId: string; projectId: string; mode: ProjectMode }) => (assetId: string) =>

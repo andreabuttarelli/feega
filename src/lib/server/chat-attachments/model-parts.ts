@@ -60,6 +60,16 @@ export async function userContent(db: Db, input: { orgId: string; text: string; 
   return [{ type: 'text', text: input.text }, ...parts.flat()];
 }
 
+export type Picture = { label: string; bytes: Buffer };
+
+export function withPictures(content: string | Part[], pictures: readonly Picture[]): string | Part[] {
+  if (!pictures.length) {
+    return content;
+  }
+  const head: Part[] = typeof content === 'string' ? [{ type: 'text', text: content }] : content;
+  return [...head, ...pictures.flatMap((p): Part[] => [{ type: 'text', text: p.label }, { type: 'image', image: new Uint8Array(p.bytes), mediaType: 'image/jpeg' }])];
+}
+
 const NODE_TYPE_OF: Partial<Record<AttachmentKind, string>> = { [AttachmentKind.Video]: 'video' };
 
 export const canvasPlaceHint = (projectId: string): PlaceHint => (a) =>

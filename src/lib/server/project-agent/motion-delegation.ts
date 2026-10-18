@@ -9,6 +9,7 @@ import { Preset, settingsOf } from '$lib/motion/export-formats';
 import { findMotionNode } from '$lib/server/motion/editor';
 import { listMotionVideos } from '$lib/server/motion/agent-videos';
 import { askMotion, askStatus, type PickReply } from '$lib/server/motion/ask';
+import type { AttachmentSource } from '$lib/server/chat-attachments/register';
 import { MOTION_START_DEPS, startMotion } from '$lib/server/motion/start';
 import { RenderMode, renderState, requestRender } from '$lib/server/motion/agent-render';
 import { motionFrames } from '$lib/server/motion/agent-frames';
@@ -88,6 +89,8 @@ function framesForModel(output: Record<string, unknown>, drawn: DrawnFrame[] = [
 
 const VIEW_PREFIX = 'view-';
 
+export const referenceSources = (media: Asset[]): AttachmentSource[] => media.filter((a) => a.type === 'video').map((a) => ({ asset_id: a.id }));
+
 const mediaLine = (media: Asset[]) => `Media from the canvas to use (asset ids in list_assets): ${media.map((a) => `${a.id} (${a.type})`).join(', ')}.`;
 
 export function createMotionDelegation(deps: MotionDelegationDeps): Record<string, Tool> {
@@ -123,7 +126,8 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
     }
 
     const prompt = media.length ? `${request}\n\n${mediaLine(media as Asset[])}` : request;
-    const asked = await askMotion(db, { orgId, userId, nodeId, prompt, agentKey: SIDEBAR_AGENT_KEY, choice: { model: deps.model }, pick });
+    const attachments = referenceSources(media as Asset[]);
+    const asked = await askMotion(db, { orgId, userId, nodeId, prompt, attachments, agentKey: SIDEBAR_AGENT_KEY, choice: { model: deps.model }, pick });
     if (asked instanceof Response) {
       return asked.json();
     }
@@ -176,8 +180,8 @@ export function createMotionDelegation(deps: MotionDelegationDeps): Record<strin
 
     ask_motion_agent: tool({
       description: [
-        'Hand a request to the motion editor agent for one motion video of THIS project: it writes the video itself, in the editor thread, and costs credits like the editor — only when the user asked.',
-        'Runs in the background: poll get_motion_run with the returned run_id. media: node or asset ids of the canvas whose image, video or audio it should use.'
+        'Hand a request to the motion editor agent for one motion video of THIS project: it writes the video in the editor thread and costs credits like the editor — only when the user asked.',
+        'Background: poll get_motion_run with the returned run_id. media: node or asset ids of the canvas whose image, video or audio it should use.'
       ].join(' '),
       inputSchema: z.object({ nodeId: z.string(), request: z.string().min(1).max(8000), media: z.array(z.string()).optional(), reference_pick: pickReplySchema.optional() }).strict(),
       execute: async (input: { nodeId: string; request: string; media?: string[]; reference_pick?: PickReply }) => ask(input.nodeId, input.request, input.media, input.reference_pick)

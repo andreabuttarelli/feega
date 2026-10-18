@@ -75,8 +75,13 @@ import { exportStill } from './still-export';
 import { renderPagePath } from '$lib/motion/render-link';
 import { BROWSER_RENDER_CREDITS } from '$lib/motion/render-place';
 import type { ChatAttachment } from '$lib/chat-attachments';
-import { motionPlaceHint, userContent } from '$lib/server/chat-attachments/model-parts';
-import { breakdownReader } from '$lib/server/video-reference';
+import { motionPlaceHint, userContent, withPictures } from '$lib/server/chat-attachments/model-parts';
+import { compareFrames, referencePicture } from '$lib/server/motion/reference-frames';
+import { breakdownReader, videoGrabber } from '$lib/server/video-reference';
+import { DataCheck, patchNodeData } from '$lib/server/repos/canvas';
+import { REPLICA_BRIEF, REPLICA_COMPARE, VideoKind, kindTools, replicaCanvas, spanFrames } from '$lib/motion/replica';
+import type { SceneStep } from '$lib/server/motion/replica-loop';
+import { onceEach, replicaTurn } from '$lib/server/motion/replica-turn';
 
 export const MOTION_AGENT_KEY = 'motion';
 const CHECK_WAIT_MS = 90_000;
@@ -205,6 +210,7 @@ export type MotionTurnInput = {
   project: { id: string; brandId: string | null; mode: ProjectMode };
   motion: { record: CanvasNodeRecord; node: MotionNode };
   message: string;
+  step?: SceneStep;
   attachments?: ChatAttachment[];
   selection: string[];
   model: string;
@@ -227,7 +233,7 @@ async function importFollowed(answer: PickAnswer | null, importAsset: MotionTool
   return { ids: ok.map((o) => o.asset.id), note: lines.length ? `The references the user follows are now project assets: hang each under the storyboard beat it inspires (write_storyboard media) and take the look from them:\n${lines.join('\n')}` : '' };
 }
 
-export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number; pick: PickAsk | null; cut: CutReview | null; budget: BudgetCard | null; scripted: boolean };
+export type TurnOutcome = { reply: string; summary: string | null; version: number | null; revision: RevisionOutcome | null; costUsd: number; pick: PickAsk | null; cut: CutReview | null; budget: BudgetCard | null; scripted: boolean; edits: number };
 
 export type MotionTurn = { stream: ReadableStream<UIMessageChunk>; done: Promise<TurnOutcome> };
 
@@ -248,7 +254,7 @@ function writeText(writer: { write: (chunk: UIMessageChunk) => void }, id: strin
 }
 
 function cannedTurn(content: string, reply: Pick<Reply, 'finish'>, card: BudgetCard | null = null): MotionTurn {
-  const done = reply.finish({ content, tools: card ? [budgetTool(card)] : [] }, ReplyStatus.Done).then((): TurnOutcome => ({ reply: content, summary: null, version: null, revision: null, costUsd: 0, pick: null, cut: null, budget: card, scripted: false }));
+  const done = reply.finish({ content, tools: card ? [budgetTool(card)] : [] }, ReplyStatus.Done).then((): TurnOutcome => ({ reply: content, summary: null, version: null, revision: null, costUsd: 0, pick: null, cut: null, budget: card, scripted: false, edits: 0 }));
   const stream = createUIMessageStream({
     execute: ({ writer }) => {
       writer.write({ type: 'start' });
@@ -289,20 +295,27 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const note = motion.node.storyboard ? boardNote(await storyboard.read()) : null;
   const reply = await openReply(db, { orgId, threadId, actor });
   const raisedUsd = motion.node.budgetRaisedUsd ?? 0;
-  const budget = await readVideoBudget(db, nodeScope, raisedUsd).catch(() => videoBudget(0, raisedUsd));
-  const role = turnRole(message, head.doc);
+  const videoBreakdown = onceEach(breakdownReader(db, { orgId, projectId: project.id, mode: project.mode }));
+  const grabber = (assetId: string) => videoGrabber(db, { orgId, projectId: project.id, assetId });
+  const replica = await replicaTurn({ message, attachments, replicaOf: motion.node.replicaOf ?? input.step?.replicaOf }, { read: videoBreakdown, grabber });
+  if (replica.replicaOf && replica.replicaOf !== motion.node.replicaOf) {
+    await patchNodeData(db, { ...nodeScope, patch: { replicaOf: replica.replicaOf }, check: DataCheck.Schema, actor }).catch(() => null);
+  }
+  const budget = await readVideoBudget(db, nodeScope, raisedUsd, replica.kind).catch(() => videoBudget(0, raisedUsd, replica.kind));
+  const role = turnRole(message, head.doc, replica.kind);
   const reserve = DRAWS_FIX_RESERVE.has(role) ? Reserve.Drawn : Reserve.Kept;
   if (budgetSpent(budget, reserve)) {
     const card = budgetCard(budget);
     return cannedTurn(budgetNote(card), reply, card);
   }
-  const turnCapUsd = turnBudgetUsd(budget, reserve);
+  const turnCapUsd = Math.min(turnBudgetUsd(budget, reserve), input.step?.capUsd ?? Infinity);
   if (keepsCut(message)) {
     return cannedTurn(KEPT_CUT, reply);
   }
 
   const knownAssets = assets.length;
-  const session: MotionSession = { doc: head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick };
+  const replicaDoc = replica.canvas ? replicaCanvas(head.doc, replica.canvas) : null;
+  const session: MotionSession = { doc: replicaDoc ?? head.doc, baseVersion: head.version, edits: [], selection, frames: new Map(), views: 0, checkedAt: 0, codeWrites: 0, pick, lock: input.step ? spanFrames(input.step.span, head.doc.fps) : undefined, kind: replica.kind };
   const moderationScope = { orgId, userId, projectId: project.id, nodeId: motion.record.id, actor };
   const bucket = db.storage.from(CANVAS_ASSET_BUCKET) as unknown as FrameBucket;
   const frameScope = { orgId, projectId: project.id, nodeId: motion.record.id };
@@ -321,9 +334,12 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   session.pickAssets = picked.ids;
   const openingRound = role === StudioRole.Director ? Round.Research : Round.Edit;
   const memory = role === StudioRole.Director ? await projectMemory(db, { orgId, projectId: project.id, nodeId: motion.record.id }).catch(() => '') : '';
-  const openingText = [message, note, picked.note, memory].filter(Boolean).join('\n\n');
-  const videoBreakdown = breakdownReader(db, { orgId, projectId: project.id, mode: project.mode });
-  const openingContent = await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint, breakdown: videoBreakdown });
+  if (replicaDoc && replica.canvas) {
+    session.edits.push(`matched the reference canvas (${replica.canvas.format}, ${replica.canvas.durationS} s)`);
+  }
+  const replicaNote = replica.kind === VideoKind.Replica ? [REPLICA_BRIEF, input.step ? '' : REPLICA_COMPARE].filter(Boolean).join('\n') : '';
+  const openingText = [message, note, picked.note, memory, replicaNote].filter(Boolean).join('\n\n');
+  const openingContent = withPictures(await userContent(db, { orgId, text: openingText, attachments, hint: motionPlaceHint, breakdown: videoBreakdown }), input.step?.pictures ?? replica.frames.map(referencePicture));
   let seamDraws = 0;
   const drawTurnFrames = async (callId: string, times: number[]) => {
     const review = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: docTexts(session.doc), scope: moderationScope });
@@ -357,6 +373,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     music: (ask) => withOrgContext(orgId, () => layMusic(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, ask)),
     sfx: (sound) => withOrgContext(orgId, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
     frames: drawTurnFrames,
+    compareReference: replica.frames.length && !input.step ? async (callId) => compareFrames(replica.frames, await drawTurnFrames(callId, replica.frames.map((f) => f.time))) : undefined,
     inspect: frameStats,
     seam: async () => {
       const end = session.doc.durationInFrames / session.doc.fps;
@@ -442,7 +459,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
   const visionModel = gatewayModel(model)?.usable ? model : llmVisionModel();
   const vision = BROWSER_VISION[browser](visionModel);
   const asksPick = !choosesForUser(message);
-  const toolNames = roleTools(role, Object.keys(tools)).filter((name) => (vision === Vision.Available || (name !== VIEW_FRAMES && name !== DESCRIBE_FRAMES)) && (asksPick || name !== ASK_REFERENCE_PICK));
+  const toolNames = kindTools(replica.kind, roleTools(role, Object.keys(tools))).filter((name) => (vision === Vision.Available || (name !== VIEW_FRAMES && name !== DESCRIBE_FRAMES)) && (asksPick || name !== ASK_REFERENCE_PICK));
   const system = motionAgentPrompt({ brandName: project.brandId ? tokens.name : null, selectionNote: selectionNote(head.doc, selection), vision, frame: head.doc, style: styleOf(head.doc) });
   const t0 = Date.now();
   const stepModels: string[] = [];
@@ -758,7 +775,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
 
     const written = write?.outcome === RevisionOutcome.Written ? write.head : null;
     const asked = finished.tools.map(savedPick).findLast((p) => p !== null) ?? null;
-    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null, budget: card, scripted: role === StudioRole.Director && written !== null };
+    return { reply: turn.content, summary: written ? session.edits.join(', ') : null, version: written?.version ?? null, revision: write?.outcome ?? null, costUsd: charged(), pick: asked, cut: (gateTools[0]?.output as CutReview | undefined) ?? null, budget: card, scripted: role === StudioRole.Director && written !== null, edits: session.edits.length };
   }
 
   const reader = stream.getReader();

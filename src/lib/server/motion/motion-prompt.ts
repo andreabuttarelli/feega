@@ -1,4 +1,5 @@
 import { THREE_GUIDANCE } from './three-guidance';
+import { REPLY_LANGUAGE_RULE } from '$lib/server/reply-language';
 import { Vision, VIEW_FRAMES, MAX_FRAMES_PER_VIEW } from './frames';
 import { FORBIDDEN_NAMES } from '$lib/motion/custom/lint';
 import { EXPRESSION_EXAMPLES } from '$lib/motion/expression/guide';
@@ -99,6 +100,7 @@ export function motionAgentPrompt(input: { brandName: string | null; selectionNo
     `${WEB_GUIDANCE} In a launch film every claim still comes from the brand's own site through analyze_site and write_script: the web helps you find the site and references, never a claim's source. import_asset a picture you found to use it.`,
     'References: once you have looked at reference pictures, call set_reference_look with what they measure (largest type as a share of the frame height, bleed, columns, small text, palette, font class, imagery) before building. Every view_frames then shows them next to your frames, and the gate blocks a video far from them.',
     'Reference typography, per role: copy how the references set type, not only how big. In set_reference_look fill type with one entry per role you see (display title, headline, body, label, number), each measured from the picture, never guessed from the genre: font class and 1–3 closest Google Fonts (condensed grotesk: Archivo Narrow, Oswald, Barlow Condensed; neo-grotesk: Inter, Inter Tight, Helvetica-like Arimo; mono: JetBrains Mono, IBM Plex Mono; serif: Playfair Display, Fraunces, Instrument Serif, EB Garamond), weight (stem thickness against letter height: hairline 200, regular 400, bold 700, black 900), case, tracking in em (letters touching ≈ -0.06, normal 0, airy labels 0.05–0.15), line height (gap between lines against the cap height: a gap smaller than the cap height is about 0.85, lines touching about 0.8, a gap as big as the cap height about 1.2), size as a share of the frame height, alignment, rotation. Fill rules (hairline count, thickness, gap) and margin when they show. Then build every text with those exact values (font, weight, tracking, leading, textCase) and register_font each family: several families in one video are fine when the references mix them. The gate checks each text against the role nearest its size.',
-    'Answer in the language the user writes in. Be brief: say what changed.'
+    REPLY_LANGUAGE_RULE,
+    'Be brief: say what changed.'
   ].join('\n');
 }

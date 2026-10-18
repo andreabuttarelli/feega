@@ -4,6 +4,7 @@ import { Vision } from './frames';
 import { HOUSE_DEFAULTS, STYLES, TITLE_CARD_RULE, TITLE_TYPE_RULE, UI_FOCUS_RULE } from '$lib/motion/style';
 import { MotionStyle } from '$lib/motion/style-model';
 import { LOOP_RULE } from '$lib/motion/loop';
+import { REPLY_LANGUAGE_RULE } from '$lib/server/reply-language';
 
 const prompt = (style: MotionStyle) =>
   motionAgentPrompt({
@@ -130,5 +131,11 @@ describe('a product trailer films the screens where the work happens', () => {
     expect(PRODUCT_SCREENS_RULE).toMatch(/links/);
     expect(PRODUCT_SCREENS_RULE).toMatch(/editor/);
     expect(PRODUCT_SCREENS_RULE).toMatch(/at least two/);
+  });
+});
+
+describe('the motion agent reply language (live test: an English request answered in Spanish after a Spanish reference)', () => {
+  it('follows the user message, not the reference', () => {
+    expect(prompt(MotionStyle.LaunchFilm)).toContain(REPLY_LANGUAGE_RULE);
   });
 });

@@ -30,6 +30,7 @@ export type MotionNode = {
   lastRenderAssetId: string | null;
   storyboard?: StoryboardLink;
   budgetRaisedUsd?: number;
+  replicaOf?: string;
 };
 
 const FORMAT_NAMES: Record<string, MotionFormat> = {
@@ -53,6 +54,7 @@ export const motionNodeSchema = z.object({
   lastRenderAssetId: z.string().nullable(),
   storyboard: linkSchema.optional(),
   budgetRaisedUsd: z.number().min(0).optional(),
+  replicaOf: z.string().min(1).optional(),
   kind: z.enum(FrameKind).optional()
 });
 

@@ -310,6 +310,15 @@ describe('empty frames', () => {
     expect(tail(faded).map((p) => [p.kind, p.at])).toEqual([[Quality.TrailingEmpty, 6]]);
   });
 
+  it('a remake whose first 7.5 s show nothing is blocked (live test: the SaaS replica opened on 7.5 s of black)', () => {
+    const base = { ...newMotionDoc(MotionFormat.Landscape), durationInFrames: 16 * 30 };
+    const late = must(addClip(base, { component: 'Title', from: 225, durationInFrames: 16 * 30 - 225, props: { text: 'Steps' } }, 'late'));
+    const found = docProblems(late, { audioAssets: 0 }).filter((p) => p.kind === Quality.EmptyFrames);
+
+    expect(found.map((p) => p.at)).toEqual([0]);
+    expect(blocking(found)).toHaveLength(1);
+  });
+
   it('an empty frame blocks delivery', () => {
     expect(SEVERITY[Quality.EmptyFrames]).toBe(Severity.Blocking);
   });
