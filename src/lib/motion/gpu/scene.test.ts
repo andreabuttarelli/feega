@@ -55,6 +55,17 @@ describe('backdrop groups', () => {
   });
 });
 
+describe('3D clips', () => {
+  it('draws a Shape3D from its own WebGL canvas, sized to the frame', () => {
+    const cube = must(addClip(base, { component: 'Shape3D', from: 0, durationInFrames: 30 }, 'cube'));
+    const layer = scene(cube).layers.find((l) => l.clip === 'cube');
+
+    expect(layer?.paint.kind).toBe(PaintKind.Canvas);
+    expect((layer?.paint as { canvasId: string }).canvasId).toBe('three-cube');
+    expect(layer?.content).toEqual({ width: 1920, height: 1080 });
+  });
+});
+
 describe('particles', () => {
   it('draws a particle clip from its own bake, sized to the frame', () => {
     const sparks = must(addClip(base, { component: 'Particles', from: 0, durationInFrames: 30 }, 'sparks'));

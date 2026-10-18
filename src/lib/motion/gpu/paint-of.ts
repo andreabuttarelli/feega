@@ -8,6 +8,7 @@ export enum PaintKind {
   Logo = 'logo',
   Text = 'text',
   Particles = 'particles',
+  Canvas = 'canvas',
   Html = 'html'
 }
 
@@ -33,10 +34,10 @@ export const SUPPORT: Record<ComponentId, Support> = {
   ProductCard: Support.HtmlTexture,
   SocialMockup: Support.HtmlTexture,
   CanvasMock: Support.HtmlTexture,
-  Model3D: Support.HtmlTexture,
-  Shape3D: Support.HtmlTexture,
-  Text3D: Support.HtmlTexture,
-  Logo3D: Support.HtmlTexture,
+  Model3D: Support.Native,
+  Shape3D: Support.Native,
+  Text3D: Support.Native,
+  Logo3D: Support.Native,
   Device3D: Support.HtmlTexture,
   Composition: Support.HtmlTexture,
   Particles: Support.Native,

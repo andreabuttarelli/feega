@@ -13,6 +13,7 @@ import { withDeadline } from '../export/deadline';
 import { compileScene, frameAt, visibleAt, type Drawn, type Scene } from './scene';
 import { createPainter } from './textures';
 import { layoutText } from './text-layout';
+import { mountCanvasHost, type CanvasHost } from './canvas-host';
 
 export enum Freshness {
   Exact = 'exact',
@@ -48,6 +49,11 @@ export async function gpuEngine(compose: Compose, host: HTMLElement, preference:
   const renderer = await createRenderer(frame, preference);
   const painter = createPainter();
   painter.texts(await layoutText(scene, host));
+  const canvasClips = scene.layers.filter((l) => l.paint.kind === PaintKind.Canvas).flatMap((l) => l.covers);
+  const canvasHost: CanvasHost | null = canvasClips.length ? await mountCanvasHost(host, runHtml(compose(new Set(canvasClips)), { clips: canvasClips, after: 0, blend: 'normal', span: [0, scene.duration] }), frame) : null;
+  if (canvasHost) {
+    painter.canvases(canvasHost.canvas);
+  }
   const states: RunState[] = runs.map((run, i) => ({ run, html: pages[i], player: null, texture: null, at: Number.NaN, busy: null }));
   const runOf = new Map(runs.flatMap((run, i) => run.clips.map((clip) => [clip, i] as const)));
   const request = { format: FrameFormat.Bitmap, settle: Settle.Seek, layering: exportLayering(), ...frame };
@@ -116,6 +122,7 @@ export async function gpuEngine(compose: Compose, host: HTMLElement, preference:
     const t0 = performance.now();
     const items = frameAt(scene, t);
     const t1 = performance.now();
+    canvasHost?.at(t);
     await painter.prepare(items, t);
     const t2 = performance.now();
     const visible = new Set(items.map((d) => runOf.get(d.clip)).filter((r): r is number => r !== undefined));
@@ -160,6 +167,7 @@ export async function gpuEngine(compose: Compose, host: HTMLElement, preference:
         }
       });
       const items = frameAt(scene, t);
+      canvasHost?.at(t);
       await painter.prepare(items, t);
       renderer.draw(slotsOf(items));
       await onFrame(await createImageBitmap(renderer.canvas), index);
@@ -178,6 +186,7 @@ export async function gpuEngine(compose: Compose, host: HTMLElement, preference:
 
   const dispose = () => {
     renderer.destroy();
+    canvasHost?.dispose();
     states.forEach((s) => void s.player?.then((p) => p.dispose()));
   };
 

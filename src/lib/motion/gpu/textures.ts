@@ -15,7 +15,7 @@ const MAX_RASTER = 3;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const VIDEO_TIMEOUT_MS = 3000;
 
-export type Painter = { texts: (rasters: Map<SceneLayer, TextRaster>) => void; prepare: (items: Drawn[], t: number) => Promise<void>; place: (d: Drawn) => Placement | null; fill: (color: string, size: Size) => Texture };
+export type Painter = { canvases: (find: (id: string) => HTMLCanvasElement | null) => void; texts: (rasters: Map<SceneLayer, TextRaster>) => void; prepare: (items: Drawn[], t: number) => Promise<void>; place: (d: Drawn) => Placement | null; fill: (color: string, size: Size) => Texture };
 
 function picture(src: string): Promise<HTMLImageElement> {
   return new Promise((ok, ko) => {
@@ -71,6 +71,8 @@ export function createPainter(): Painter {
   const videos = new Map<string, { el: HTMLVideoElement; texture: Texture | null }>();
   const fills = new Map<string, Texture>();
   const texts = new Map<SceneLayer, Texture>();
+  const canvasTextures = new Map<string, Texture>();
+  let findCanvas: (id: string) => HTMLCanvasElement | null = () => null;
   const glows = glowTiles(() => document.createElement('canvas'));
   const swarms = new Map<string, { pen: CanvasRenderingContext2D; texture: Texture; memo: ParticleMemo }>();
   const swarmOf = (paint: Of<PaintKind.Particles>) => {
@@ -111,6 +113,16 @@ export function createPainter(): Painter {
   const PREPARE: Record<PaintKind, (d: Drawn, t: number) => Promise<unknown>> = {
     [PaintKind.Fill]: async () => {},
     [PaintKind.Text]: async () => {},
+    [PaintKind.Canvas]: async (d) => {
+      const { canvasId } = d.paint as Of<PaintKind.Canvas>;
+      const found = findCanvas(canvasId);
+      if (!found) {
+        return;
+      }
+      const texture = canvasTextures.get(canvasId) ?? Texture.from(found);
+      canvasTextures.set(canvasId, texture);
+      texture.source.update();
+    },
     [PaintKind.Particles]: async (d, t) => {
       const paint = d.paint as Of<PaintKind.Particles>;
       const swarm = swarmOf(paint);
@@ -145,6 +157,10 @@ export function createPainter(): Painter {
 
   const PLACE: Record<PaintKind, (d: Drawn) => Placement | null> = {
     [PaintKind.Html]: () => null,
+    [PaintKind.Canvas]: (d) => {
+      const texture = canvasTextures.get((d.paint as Of<PaintKind.Canvas>).canvasId);
+      return texture ? whole(texture, d.content) : null;
+    },
     [PaintKind.Particles]: (d) => {
       const swarm = swarms.get((d.paint as Of<PaintKind.Particles>).bake.id);
       return swarm ? whole(swarm.texture, d.content) : null;
@@ -179,6 +195,9 @@ export function createPainter(): Painter {
   };
 
   return {
+    canvases: (find) => {
+      findCanvas = find;
+    },
     texts: (rasters) => rasters.forEach((r, layer) => texts.set(layer, Texture.from(r.canvas))),
     prepare: async (items, t) => {
       await Promise.all(items.map((d) => PREPARE[d.paint.kind](d, t).catch(() => null)));

@@ -15,6 +15,7 @@ export type Paint =
   | { kind: PaintKind.Logo; src: string }
   | { kind: PaintKind.Text; box: HTMLElement; leaf: HTMLElement }
   | { kind: PaintKind.Particles; bake: ParticleBake }
+  | { kind: PaintKind.Canvas; canvasId: string; size: Size }
   | { kind: PaintKind.Html };
 
 export type Link = { el: HTMLElement; size: Size; offset: Point; perspectiveFor: boolean };
@@ -76,6 +77,7 @@ function textParts(layer: Element): { el: HTMLElement; paint: Paint }[] {
 
 const PARTICLE_BAKES = /const B=(\[[\s\S]*?\]);\nconst items=/;
 const PARTICLE_CANVAS = 'pt-';
+const THREE_CANVAS = 'three-';
 
 function particleBakes(doc: Document): Map<string, ParticleBake> {
   const script = [...doc.querySelectorAll('script')].map((s) => s.textContent ?? '').find((s) => PARTICLE_BAKES.test(s));
@@ -84,6 +86,10 @@ function particleBakes(doc: Document): Map<string, ParticleBake> {
 }
 
 function paintOf(layer: Element, bakes: Map<string, ParticleBake> = new Map()): { el: HTMLElement; paint: Paint } | null {
+  const three = layer.querySelector(`canvas[id^="${THREE_CANVAS}"]`) as HTMLElement | null;
+  if (three && layer.querySelectorAll('canvas,img,video,svg:not(.efd):not(.kd)').length === 1 && !layer.textContent?.trim()) {
+    return { el: three, paint: { kind: PaintKind.Canvas, canvasId: three.id, size: { width: px(three.style.width) || px(three.getAttribute('width')), height: px(three.style.height) || px(three.getAttribute('height')) } } };
+  }
   const canvas = layer.querySelector(`.cc > canvas[id^="${PARTICLE_CANVAS}"]`) as HTMLElement | null;
   const bake = canvas ? bakes.get(canvas.id.slice(PARTICLE_CANVAS.length)) : undefined;
   if (canvas && bake && bake.shape !== 'sprite') {
@@ -127,6 +133,7 @@ const insetFull = (el: HTMLElement) => INSET_CLASSES.some((c) => el.classList.co
 function contentSize(paint: Paint, parent: Size): Size {
   const SIZE: Record<PaintKind, () => Size> = {
     [PaintKind.Fill]: () => parent,
+    [PaintKind.Canvas]: () => (paint as Extract<Paint, { kind: PaintKind.Canvas }>).size,
     [PaintKind.Particles]: () => {
       const { bake } = paint as Extract<Paint, { kind: PaintKind.Particles }>;
       return { width: bake.width, height: bake.height };
