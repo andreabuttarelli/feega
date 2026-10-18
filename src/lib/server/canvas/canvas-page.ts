@@ -1,3 +1,4 @@
+import { cardPreviews } from '$lib/server/canvas/card-previews';
 import { rendererSwitch } from '$lib/server/canvas-renderer-switch';
 import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
@@ -208,7 +209,7 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
 
   const connections = await canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed);
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines, killSwitch] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines, killSwitch, previews] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
@@ -216,7 +217,8 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     templateLibrary(db, { orgId, actor: userActor({ userId }) }).list(),
     chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
     canvasOutlines(db, { orgId, nodes }),
-    rendererSwitch()
+    rendererSwitch(),
+    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
@@ -242,7 +244,8 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     projectBrandId,
     onboarding,
     componentTemplates,
-    outlines
+    outlines,
+    cardPreviews: previews
   };
 };
 

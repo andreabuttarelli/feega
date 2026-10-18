@@ -3369,6 +3369,8 @@
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
     thumbsOf={sourceThumbs}
+    cardPreviews={data.cardPreviews}
+    previewsAt={`/p/${data.projectId}/c/${data.canvas.id}/card-previews`}
     onfail={(why) => {
       console.warn(`[canvas] GPU renderer failed: ${why} → dom`);
       domReason = why;
