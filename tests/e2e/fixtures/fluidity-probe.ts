@@ -102,7 +102,8 @@ function install() {
       return '∅';
     }
     if (w.read === 'box') {
-      return el.getAttribute('data-box') ?? '∅';
+      const r = el.getBoundingClientRect();
+      return el.getAttribute('data-box') ?? `${Math.round(r.x)},${Math.round(r.y)},${Math.round(r.width)},${Math.round(r.height)}`;
     }
     if (w.read === 'value') {
       return (el as HTMLInputElement).value ?? '∅';
