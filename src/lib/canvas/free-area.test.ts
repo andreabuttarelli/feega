@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOCK_EDGE, Dock, Edge, frameIn, freeArea } from './free-area';
+import { DOCK_EDGE, Dock, Edge, frameIn, freeArea, inView } from './free-area';
 
 const SCREEN = { width: 1280, height: 720 };
 
@@ -78,5 +78,25 @@ describe('framing the edited node', () => {
     expect(view.zoom).toBe(2);
     expect(view.x + 10).toBeCloseTo(640, 5);
     expect(view.y + 10).toBeCloseTo(360, 5);
+  });
+});
+
+describe('a node already on screen', () => {
+  const screen = { width: 1000, height: 600 };
+  const view = { x: 0, y: 0, zoom: 1 };
+
+  it('is in view when its whole box is on screen, so selecting it does not move the camera', () => {
+    expect(inView({ x: 300, y: 250, width: 300, height: 80 }, view, screen)).toBe(true);
+  });
+
+  it('counts the panels docked over the canvas as off screen', () => {
+    const panels = { top: 46, right: 400, bottom: 0, left: 44 };
+    expect(inView({ x: 300, y: 250, width: 300, height: 80 }, view, screen, panels)).toBe(true);
+    expect(inView({ x: 10, y: 250, width: 300, height: 80 }, view, screen, panels)).toBe(false);
+  });
+
+  it('is not when part of it is off screen', () => {
+    expect(inView({ x: 900, y: 250, width: 300, height: 80 }, view, screen)).toBe(false);
+    expect(inView({ x: 300, y: 250, width: 300, height: 80 }, { x: -400, y: 0, zoom: 1 }, screen)).toBe(false);
   });
 });
