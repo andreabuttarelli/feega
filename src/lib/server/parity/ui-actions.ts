@@ -168,6 +168,8 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.AutoLayout]: motion('add_auto_layout'),
   [Command.UseAsMask]: motion('use_as_mask'),
   [Command.RemoveMask]: motion('release_mask'),
+  [Command.FlipHorizontal]: motion('set_transform'),
+  [Command.FlipVertical]: motion('set_transform'),
   [Command.ToolSelect]: VIEW,
   [Command.ToolText]: motion('add_clip'),
   [Command.ToolRectangle]: motion('add_shape'),
@@ -243,6 +245,8 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'align-top': canvas('move_node'),
   'align-middle': canvas('move_node'),
   'align-bottom': canvas('move_node'),
+  'flip-horizontal': motion('set_transform'),
+  'flip-vertical': motion('set_transform'),
   'use-as-mask': motion('use_as_mask'),
   'release-mask': motion('release_mask'),
   delete: canvas('delete_node')
