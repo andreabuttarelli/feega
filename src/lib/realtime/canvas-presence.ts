@@ -3,7 +3,7 @@ import { Plan, hzFor } from './broadcast-budget';
 import { MARK_STALE_MS, colourOf, type FrameCursor } from './frame-presence';
 
 export const CANVAS_PEER_EVENT = 'canvas-peer';
-export const TICK_MS = 50;
+export const TICK_MS = 33;
 export const HEARTBEAT_MS = 3000;
 export const SETTLE_MS = 3000;
 export const CHAT_MAX = 120;
@@ -30,7 +30,7 @@ export type CanvasLine = { receive: (payload: unknown) => void; attach: (send: (
 
 export type CanvasPresence = {
   update: (state: Partial<CanvasState>) => void;
-  listen: (on: (mark: CanvasMark) => void) => () => void;
+  listen: (on: (mark: CanvasMark, sentAt: number) => void) => () => void;
   crowd: (peers: number) => void;
   stop: () => void;
 };
@@ -110,7 +110,7 @@ export function presenterOf(peers: CanvasPeer[]): CanvasPeer | null {
 }
 
 export function canvasHub(self: CanvasSelf, now: () => number = Date.now): { port: CanvasPresence; line: CanvasLine } {
-  const listeners = new Set<(mark: CanvasMark) => void>();
+  const listeners = new Set<(mark: CanvasMark, sentAt: number) => void>();
   let transmit: ((mark: CanvasMark) => void) | null = null;
   let state: CanvasState = { cursor: null, selection: [], live: [], view: null, presenting: false, chat: null };
   let dirty = false;
@@ -167,7 +167,7 @@ export function canvasHub(self: CanvasSelf, now: () => number = Date.now): { por
     receive: (raw) => {
       const mark = toCanvasMark(raw);
       if (mark) {
-        listeners.forEach((on) => on({ ...mark, at: now() }));
+        listeners.forEach((on) => on({ ...mark, at: now() }, mark.at));
       }
     }
   };
