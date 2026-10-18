@@ -8,6 +8,14 @@ import { StyleKind, styleSchema, stylesSchema, type Style, type textStyleSchema,
 
 export { StyleKind };
 
+export enum StyleAction {
+  Define = 'define',
+  Apply = 'apply',
+  Detach = 'detach',
+  Remove = 'remove',
+  List = 'list'
+}
+
 export type NamedStyle = { name: string; style: Style; clips: string[] };
 
 const TEXT_KEY = 'font';

@@ -9,4 +9,5 @@ A colour style paints `color` where the component has it, else the fill stack.
 Only top-level clips are linked; clips inside compositions are not yet.
 
 Inspector "Style" section picks, detaches or saves the selected clip's look.
-Agent parity: `define_style`, `apply_style`, `list_styles`, `remove_style`.
+Agent parity: one `named_style` tool (define/apply/detach/remove/list), one name
+because the canvas chat prompt lists every editor tool name within a budget.

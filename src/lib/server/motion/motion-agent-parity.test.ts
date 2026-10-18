@@ -34,7 +34,7 @@ const DOC: Record<string, Access> = {
   referenceLook: { write: ['set_reference_look'], read: 'referenceLook' },
   still: { write: ['set_canvas'], read: 'still' },
   freeSize: { write: ['set_canvas'], read: 'format' },
-  styles: { write: ['define_style', 'remove_style'], read: 'styles' },
+  styles: { write: ['named_style'], read: 'styles' },
   links: { fixed: 'written by the canvas when a generative node is connected to the frame (connect_nodes)' }
 };
 
@@ -70,7 +70,7 @@ const CLIP: Record<string, Access> = {
   autoLayout: { write: ['add_auto_layout', 'set_auto_layout', 'reorder_auto_layout'], read: 'autoLayout' },
   layoutItem: { write: ['add_auto_layout', 'set_layout_item'], read: 'layoutItem' },
   partStyles: { write: ['set_part_fill'], read: 'partStyles' },
-  styleRef: { write: ['apply_style'], read: 'styleRef' },
+  styleRef: { write: ['named_style'], read: 'styleRef' },
   expressions: { write: ['set_expression', 'pulse_with_music'], read: 'expressions' },
   effects: { write: ['add_effect', 'set_effect', 'remove_effect', 'set_lut'], read: 'effects' },
   shaders: { write: ['add_custom_effect', 'set_custom_effect', 'remove_custom_effect'], read: 'shaders' },
