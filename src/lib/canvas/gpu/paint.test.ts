@@ -7,10 +7,10 @@ describe('paint — which node bodies the GPU draws and which stay DOM when read
     expect(Object.keys(PAINT).sort()).toEqual([...NODE_TYPES].sort());
   });
 
-  it('frames, free elements and uploaded images are GPU; everything with controls stays DOM', () => {
+  it('a frame with any poster is GPU at once (a stale one is re-shot off-screen), one without stays DOM', () => {
     expect(PAINT.motion({ posterAssetId: 'p', posterRevision: 2, docHeadRevision: 2 })).toBe(Paint.Gpu);
-    expect(PAINT.motion({ posterAssetId: 'p', docHeadRevision: 2 })).toBe(Paint.Dom);
-    expect(PAINT.motion({ posterAssetId: 'p', posterRevision: 1, docHeadRevision: 2 })).toBe(Paint.Dom);
+    expect(PAINT.motion({ posterAssetId: 'p', docHeadRevision: 2 })).toBe(Paint.Gpu);
+    expect(PAINT.motion({ posterAssetId: 'p', posterRevision: 1, docHeadRevision: 2 })).toBe(Paint.Gpu);
     expect(PAINT.motion({})).toBe(Paint.Dom);
     expect(PAINT.image({ assetId: 'a' })).toBe(Paint.Gpu);
     expect(PAINT.image({ prompt: 'x' })).toBe(Paint.Dom);

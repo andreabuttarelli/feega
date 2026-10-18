@@ -62,7 +62,9 @@
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { untrack } from 'svelte';
   import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
-  import { Renderer, rendererOf } from '$lib/canvas/gpu/renderer-flag';
+  import { Renderer, Switch, rendererOf } from '$lib/canvas/gpu/renderer-flag';
+  import RendererBadge from '$lib/components/canvas/gpu/RendererBadge.svelte';
+  import { dev } from '$app/environment';
   import { postThumb, productThumb } from '$lib/canvas/source-thumbs';
   import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
@@ -1103,6 +1105,7 @@
     return items.filter((url): url is string => !!url);
   }
 
+  let domReason = $state<string | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Dom ? (data.rendererSwitch === Switch.ForceDom ? 'kill switch' : '?renderer=dom') : null);
   let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Gpu ? null : (CanvasFlow as unknown as typeof GpuFlow));
   $effect(() => {
     if (Flow) {
@@ -3322,7 +3325,11 @@
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
     thumbsOf={sourceThumbs}
-    onfail={() => (Flow = CanvasFlow as unknown as typeof GpuFlow)}
+    onfail={(why) => {
+      console.warn(`[canvas] GPU renderer failed: ${why} → dom`);
+      domReason = why;
+      Flow = CanvasFlow as unknown as typeof GpuFlow;
+    }}
     peers={canvasPeers}
     onPointer={(cursor) => cursors.port.update({ cursor })}
     onLive={(live) => cursors.port.update({ live })}
@@ -3544,6 +3551,9 @@
       {/if}
     {/snippet}
   </Flow>
+  {/if}
+  {#if dev && domReason}
+    <RendererBadge renderer="dom" reason={domReason} />
   {/if}
   {#if !viewOnly && showsEmptyState(nodes.length, inlineMotion)}
     <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />

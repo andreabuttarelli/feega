@@ -1,6 +1,6 @@
 const KEEP = 600;
 
-type Stats = { render: number[]; pending?: number; loseDevice?: () => void };
+type Stats = { render: number[]; pending?: number; loseDevice?: () => void; counts?: Record<string, number> };
 
 declare global {
   interface Window {
@@ -24,4 +24,16 @@ export function reportPending(count: number) {
 export function exposeLoss(lose: () => void) {
   const stats = (window.__gpuCanvas ??= { render: [] });
   stats.loseDevice = lose;
+}
+
+export enum Counter {
+  Build = 'build',
+  Fetch = 'fetch',
+  Upload = 'upload'
+}
+
+export function count(name: Counter) {
+  const stats = (window.__gpuCanvas ??= { render: [] });
+  const counts = (stats.counts ??= {});
+  counts[name] = (counts[name] ?? 0) + 1;
 }

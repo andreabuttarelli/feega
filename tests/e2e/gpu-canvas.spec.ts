@@ -123,6 +123,12 @@ test.describe('GPU canvas: the same gestures as the DOM canvas @real', () => {
     await page.mouse.click(at.x, at.y);
     await expect(page.getByTestId('motion-editor')).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
     await expect(page.locator(`[data-testid="gpu-dom-node"][data-id="${frame.id}"] [data-testid="motion-node-editing"]`)).toBeVisible();
+    const players: number[] = [];
+    for (let i = 0; i < 20; i++) {
+      players.push(await page.locator('hyperframes-player').count());
+      await page.waitForTimeout(100);
+    }
+    expect(Math.max(...players), 'one player for the edited frame, never a second one in its tile').toBeLessThanOrEqual(1);
   });
 
   test('the rectangle tool draws a free element on the GPU canvas, which opens and undoes like on the DOM one', async ({ page, session, admin }) => {

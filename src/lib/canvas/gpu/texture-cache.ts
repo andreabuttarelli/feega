@@ -1,6 +1,6 @@
 import { ImageSource, Texture } from 'pixi8';
 import { createLru } from './lru';
-import { reportPending } from './frame-stats';
+import { Counter, count, reportPending } from './frame-stats';
 
 const BUDGET_BYTES = 256 * 1024 * 1024;
 const RGBA = 4;
@@ -35,6 +35,7 @@ export function createTextureCache(changed: () => void): TextureCache {
         return;
       }
       pending.set(url, [ready]);
+      count(Counter.Fetch);
       reportPending(pending.size);
       load(url)
         .then((bitmap) => {
