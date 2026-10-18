@@ -1176,6 +1176,7 @@
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
     'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
+    export: (ids) => props.onExport?.(ids),
     delete: (ids) => props.onDelete?.(ids)
   };
 

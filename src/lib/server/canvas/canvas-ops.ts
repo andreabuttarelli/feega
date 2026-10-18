@@ -30,6 +30,10 @@ import { renameProject } from '$lib/server/repos/projects';
 import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { exportRowsSchema } from '$lib/motion/export-rows';
+import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
+import { selectionPorts } from '$lib/server/motion/selection-export-ports';
+import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
@@ -80,6 +84,8 @@ export function canvasCtx(deps: CanvasDeps): CanvasCtx {
     deps.brandId ? withBrandContext(deps.brandId, fn) : withOrgContext(deps.orgId, fn);
   return { ...deps, actor: agentActor(deps.userId), billed };
 }
+
+const EXPORT_MAX_FRAMES = 50;
 
 export const NODE_NOT_FOUND = { error: 'node_not_found', message: 'No live node with that id in this project.' };
 
@@ -578,6 +584,24 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: z.object({ frameId: z.string(), targets: z.array(formatTargetSchema).min(1).max(8).describe('each {format: 1:1 | 4:5 | 9:16 | 16:9 …} or {size: {width, height}} px') }).strict(),
     run: async (ctx, input) => createFormats(framesOf(ctx), { nodeId: input.frameId, targets: input.targets })
+  }),
+
+  export_selection: op({
+    access: Access.Read,
+    input: z
+      .object({
+        frameIds: z.array(z.string()).min(1).max(EXPORT_MAX_FRAMES),
+        rows: exportRowsSchema.describe('value: 0.5–4 for scale, px for width/height'),
+        name: z.string().max(60).optional()
+      })
+      .strict(),
+    run: async (ctx, input) => {
+      if (!serverFramesOpen()) {
+        return { error: 'renderer_unavailable', message: 'image export needs the server renderer, which is not available here' };
+      }
+      const out = await exportSelection(selectionPorts({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.projectId, brandId: ctx.brandId ?? null, actor: ctx.actor }), { nodeIds: input.frameIds, rows: input.rows, name: input.name ?? 'Export' });
+      return out.outcome === ExportOutcome.Done ? out : { ...NODE_NOT_FOUND, nodeId: out.nodeId };
+    }
   }),
 
   move_frame_element: op({
