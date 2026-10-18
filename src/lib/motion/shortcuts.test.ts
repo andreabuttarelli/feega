@@ -238,7 +238,7 @@ describe('plain-letter tools in Design mode', () => {
   const design = (key: string) => commandFor({ key, code: `Key${key.toUpperCase()}`, mod: false, shift: false }, EditMode.Design);
   const motion = (key: string) => commandFor({ key, code: `Key${key.toUpperCase()}`, mod: false, shift: false }, EditMode.Motion);
 
-  it('T R O P pick text, rectangle, ellipse and pen, as in Figma', () => {
+  it('T R O P pick text, rectangle, ellipse and pen', () => {
     expect(design('t')).toBe(Command.ToolText);
     expect(design('r')).toBe(Command.ToolRectangle);
     expect(design('o')).toBe(Command.ToolEllipse);
