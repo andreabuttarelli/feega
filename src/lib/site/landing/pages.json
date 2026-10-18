@@ -1,0 +1,734 @@
+{
+ "ai-video-generator": {
+  "title": "AI Video Generator – Text to Video & Image to Video | feega",
+  "description": "Generate videos from text or images with Seedance 2.5, Kling 3.0 and Grok Imagine. Control the first and last frame, add voice and music, and publish.",
+  "heading": "AI video generator: text to video and image to video",
+  "intro": "feega turns a text prompt or an image into a video clip of up to 15 seconds with Seedance 2.5, Kling 3.0 or Grok Imagine. You can fix the first and the last frame, compare models side by side on the same prompt, and add voice-over and music before you publish.",
+  "cta": {
+   "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-video-generator",
+   "label": "Generate a video →"
+  },
+  "hero": {
+   "src": "/site/landing/ai-video-generator/05WZnm7I3OTTlL7iX3X5pwGYQ.webp",
+   "alt": "AI text to video generator: cinematic lighthouse shot"
+  },
+  "sections": [
+   {
+    "heading": "How it works on feega",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Text to video",
+    "html": "<p>Describe subject, action, style and camera: “a lighthouse in a storm, waves crashing, slow push-in, anamorphic”. Pick a model, a ratio and a duration, and run.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Image to video",
+    "html": "<p>Connect an image as the first frame to animate it. Connect a second image as the last frame to control where the shot ends.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Compare models on one prompt",
+    "html": "<p>Connect the same prompt to two video nodes with different models and run both. The takes sit next to each other on the canvas.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Examples made with feega",
+    "html": "",
+    "examples": [
+     {
+      "src": "/site/landing/ai-video-generator/WspDkfkhMD2sVyeDVl5grXKuIeA.webp",
+      "alt": "Text to video AI example: restaurant kitchen"
+     },
+     {
+      "src": "/site/landing/ai-video-generator/9HOzE0ueBQwOzwHnmh57H7yqp0.webp",
+      "alt": "Image to video AI example: astronaut in a desert"
+     },
+     {
+      "src": "/site/landing/ai-video-generator/bQzlClX4ipZQqbJjHbPousSSQ0.webp",
+      "alt": "AI video generator example: city time-lapse"
+     }
+    ],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-video-generator",
+     "label": "Generate a video →"
+    }
+   },
+   {
+    "heading": "Questions",
+    "html": "<p><strong>How long can a video be?</strong></p><p>Up to 15 seconds per clip. Longer videos are built clip by clip.</p><p><strong>Which aspect ratios?</strong></p><p>16:9, 9:16, 1:1 and more, depending on the model.</p><p><strong>Is it free?</strong></p><p>Every generation spends credits. The cost is shown on the node before you run it.</p>",
+    "examples": [],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-video-generator",
+     "label": "Start free on feega →"
+    }
+   },
+   {
+    "heading": "More on feega",
+    "html": "<p><a href=\"/\">feega home</a></p><p><a href=\"/ai-video-upscaler\">AI Video Upscaler</a></p><p><a href=\"/3d-animation-maker\">3D Animation Maker</a></p><p><a href=\"/ai-commercial-maker\">AI Commercial Maker</a></p><p><a href=\"/paper-cutout-animation\">Paper Cutout Animation</a></p><p><a href=\"/claymation-ai\">Claymation AI</a></p><p><a href=\"/80s-retro-video\">80s Retro VHS Video</a></p><p><a href=\"/anime-video-generator\">Anime Video Generator</a></p><p><a href=\"/ai-video-styles\">AI Video Styles</a></p><p><a href=\"/spotify-canvas-maker\">Spotify Canvas Maker</a></p><p><a href=\"/ai-node-editor\">AI Node Editor</a></p>",
+    "examples": [],
+    "cta": null
+   }
+  ],
+  "heroHeight": 520,
+  "exampleHeight": 180
+ },
+ "ai-video-styles": {
+  "title": "AI Video Styles – 3D, Anime, Claymation, Retro & More | feega",
+  "description": "One canvas for every AI video style: 3D animation, anime, claymation, paper cutout, 80s VHS, cinematic, fantasy and more. Text to video and image to video.",
+  "heading": "AI video styles",
+  "intro": "feega generates video in any visual style you can describe: 3D animation, anime, claymation, paper cutout, 80s VHS, watercolour, cinematic trailers, time-lapse, drone shots. It supports text-to-video and image-to-video with Seedance 2.5, Kling 3.0 and Grok Imagine, with first and last frame control.",
+  "cta": {
+   "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-video-styles",
+   "label": "Start a canvas →"
+  },
+  "hero": {
+   "src": "/site/landing/ai-video-styles/Bm8qnK4VdG4CJSzrKPKAjsR4C8.webp",
+   "alt": "AI video styles: many visual styles on one canvas"
+  },
+  "sections": [
+   {
+    "heading": "How it works on feega",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Styles with a dedicated guide",
+    "html": "<p>3D animation, anime, claymation, paper cutout and 80s retro each have their own page below, with prompts that work.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Every other style",
+    "html": "<p>Watercolour, horror, fantasy, movie trailer, fashion runway, realistic, time-lapse, drone footage, motion backgrounds, explainer videos and vertical loops for Spotify Canvas are all prompts on the same video node.</p><p>Describe the style, the subject and the camera. Add a reference image to lock the look.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Examples made with feega",
+    "html": "",
+    "examples": [
+     {
+      "src": "/site/landing/ai-video-styles/4oYRWrgP1To2tAiA7XLrm6ndw.webp",
+      "alt": "Watercolour AI video style"
+     },
+     {
+      "src": "/site/landing/ai-video-styles/eAwXk39rGlcV99hm9rbEYhpP3cE.webp",
+      "alt": "Fantasy movie trailer AI video style"
+     },
+     {
+      "src": "/site/landing/ai-video-styles/pdgCpYtv9yVp2RJcSxsCr5CwWdU.webp",
+      "alt": "Drone footage AI video style"
+     }
+    ],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-video-styles",
+     "label": "Start a canvas →"
+    }
+   },
+   {
+    "heading": "Questions",
+    "html": "<p><strong>Is feega a text-to-video tool?</strong></p><p>Yes, and image-to-video too. It also generates images, audio and documents on the same canvas.</p><p><strong>Which video models are available?</strong></p><p>Seedance 2.5, Seedance 2, Kling 3.0 and Grok Imagine for generation, FLUX Video Upscale for upscaling.</p><p><strong>Can I publish directly?</strong></p><p>Yes. Schedule posts to your connected social accounts from the calendar.</p>",
+    "examples": [],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-video-styles",
+     "label": "Start free on feega →"
+    }
+   },
+   {
+    "heading": "More on feega",
+    "html": "<p><a href=\"/\">feega home</a></p><p><a href=\"/ai-video-upscaler\">AI Video Upscaler</a></p><p><a href=\"/3d-animation-maker\">3D Animation Maker</a></p><p><a href=\"/ai-commercial-maker\">AI Commercial Maker</a></p><p><a href=\"/paper-cutout-animation\">Paper Cutout Animation</a></p><p><a href=\"/claymation-ai\">Claymation AI</a></p><p><a href=\"/80s-retro-video\">80s Retro VHS Video</a></p><p><a href=\"/anime-video-generator\">Anime Video Generator</a></p><p><a href=\"/spotify-canvas-maker\">Spotify Canvas Maker</a></p><p><a href=\"/ai-video-generator\">AI Video Generator</a></p><p><a href=\"/ai-node-editor\">AI Node Editor</a></p>",
+    "examples": [],
+    "cta": null
+   }
+  ],
+  "heroHeight": 520,
+  "exampleHeight": 180
+ },
+ "claymation-ai": {
+  "title": "Claymation AI Generator – Clay Animation from Text | feega",
+  "description": "Generate claymation-style videos from a prompt or a photo. Plasticine textures, fingerprints and stop-motion movement, made with AI on the feega canvas.",
+  "heading": "Claymation AI generator",
+  "intro": "feega generates claymation-style videos: describe plasticine characters, fingerprints and a stop-motion cadence, or start from a photo, and a video model renders a clay animation clip of up to 15 seconds.",
+  "cta": {
+   "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=claymation-ai",
+   "label": "Make a claymation video →"
+  },
+  "hero": {
+   "src": "/site/landing/claymation-ai/qQsWjiMKhSyWb6yjhaRs8BE.webp",
+   "alt": "Claymation AI: plasticine astronaut on the moon"
+  },
+  "sections": [
+   {
+    "heading": "How it works on feega",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "How to get the clay look",
+    "html": "<p>Name the material (plasticine, modelling clay), the imperfections (fingerprints, slight warping) and the motion (stop motion, 12 fps).</p><p>Turn a portrait or a product photo into a clay figure with an image node first, then animate it.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Examples made with feega",
+    "html": "",
+    "examples": [
+     {
+      "src": "/site/landing/claymation-ai/z0L169mk4rOL5xVos6LjTTjKr9k.webp",
+      "alt": "Claymation made with AI: clay dog in a garden"
+     },
+     {
+      "src": "/site/landing/claymation-ai/FLwYflwxLWPAKsZli0JIBRNzA.webp",
+      "alt": "Clay animation AI generator: plasticine chef"
+     },
+     {
+      "src": "/site/landing/claymation-ai/7SzRSrfNbdV6EGDia3YYmTrCrzE.webp",
+      "alt": "Claymation style product shot made with AI"
+     }
+    ],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=claymation-ai",
+     "label": "Make a claymation video →"
+    }
+   },
+   {
+    "heading": "Questions",
+    "html": "<p><strong>Can I turn a photo into claymation?</strong></p><p>Yes. Restyle the photo with an image node, then use it as the first frame of a video.</p><p><strong>How long can a claymation clip be?</strong></p><p>Up to 15 seconds per clip.</p>",
+    "examples": [],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=claymation-ai",
+     "label": "Start free on feega →"
+    }
+   },
+   {
+    "heading": "More on feega",
+    "html": "<p><a href=\"/\">feega home</a></p><p><a href=\"/ai-video-upscaler\">AI Video Upscaler</a></p><p><a href=\"/3d-animation-maker\">3D Animation Maker</a></p><p><a href=\"/ai-commercial-maker\">AI Commercial Maker</a></p><p><a href=\"/paper-cutout-animation\">Paper Cutout Animation</a></p><p><a href=\"/80s-retro-video\">80s Retro VHS Video</a></p><p><a href=\"/anime-video-generator\">Anime Video Generator</a></p><p><a href=\"/ai-video-styles\">AI Video Styles</a></p><p><a href=\"/spotify-canvas-maker\">Spotify Canvas Maker</a></p><p><a href=\"/ai-video-generator\">AI Video Generator</a></p><p><a href=\"/ai-node-editor\">AI Node Editor</a></p>",
+    "examples": [],
+    "cta": null
+   }
+  ],
+  "heroHeight": 520,
+  "exampleHeight": 180
+ },
+ "3d-animation-maker": {
+  "title": "AI 3D Animation Maker – Text or Image to 3D-Style Video | feega",
+  "description": "Make 3D animated videos from a prompt or a still image with Seedance, Kling and Grok Imagine on one canvas. No 3D software, no rigging.",
+  "heading": "AI 3D animation maker",
+  "intro": "feega makes 3D-style animated clips from a text prompt or a still image: describe the scene, pick a video model such as Seedance 2.5 or Kling 3.0, and get a clip of up to 15 seconds. It generates rendered-looking video, not an editable 3D model or scene file.",
+  "cta": {
+   "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=3d-animation-maker",
+   "label": "Make a 3D animation →"
+  },
+  "hero": {
+   "src": "/site/landing/3d-animation-maker/j6nX94cevNpu9ZCPa6zT9LyYBM.webp",
+   "alt": "AI 3D animation maker: 3D animated fox chef"
+  },
+  "sections": [
+   {
+    "heading": "How it works on feega",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "How to make a 3D animation online",
+    "html": "<p>1. Write the scene in a text node, for example “a Pixar-style fox chef flipping pancakes, soft studio lighting”.</p><p>2. Optional: generate or upload a character image and connect it as the first frame, so the look stays consistent.</p><p>3. Connect both to a video node, choose a model and a duration, and run it. Add a last frame too when you need the shot to end on a precise pose.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Why a canvas instead of a single prompt box",
+    "html": "<p>Every step stays visible: the prompt, the reference image, each take. Branch a take, change one word, run again, and keep the versions next to each other.</p><p>Add voice-over, music or sound effects from an audio node, then send the finished clip to the calendar and publish it.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Examples made with feega",
+    "html": "",
+    "examples": [
+     {
+      "src": "/site/landing/3d-animation-maker/SPptQvRPjzKcK24mYZ1FMYVq0.webp",
+      "alt": "3D animation made with AI: robot on a tiny planet"
+     },
+     {
+      "src": "/site/landing/3d-animation-maker/D4Kwhu1R7herLARW2C8neYzI1pg.webp",
+      "alt": "AI 3D product animation frame: floating sneakers"
+     },
+     {
+      "src": "/site/landing/3d-animation-maker/ri37uGYvPNbeS1n3BVsZnUCmE.webp",
+      "alt": "AI 3D animated character scene"
+     }
+    ],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=3d-animation-maker",
+     "label": "Make a 3D animation →"
+    }
+   },
+   {
+    "heading": "Questions",
+    "html": "<p><strong>Does feega export 3D models (GLB, FBX)?</strong></p><p>No. feega generates video that looks 3D-animated. It does not produce editable 3D meshes or rigs.</p><p><strong>How long can a 3D animation be?</strong></p><p>Up to 15 seconds per clip with Seedance and Kling. Chain clips for longer sequences.</p><p><strong>Can I animate my own character?</strong></p><p>Yes. Upload the character image and use it as the first frame of the clip.</p><p><strong>Which aspect ratios are supported?</strong></p><p>Vertical, square and horizontal, depending on the model you pick.</p>",
+    "examples": [],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=3d-animation-maker",
+     "label": "Start free on feega →"
+    }
+   },
+   {
+    "heading": "More on feega",
+    "html": "<p><a href=\"/\">feega home</a></p><p><a href=\"/ai-video-upscaler\">AI Video Upscaler</a></p><p><a href=\"/ai-commercial-maker\">AI Commercial Maker</a></p><p><a href=\"/paper-cutout-animation\">Paper Cutout Animation</a></p><p><a href=\"/claymation-ai\">Claymation AI</a></p><p><a href=\"/80s-retro-video\">80s Retro VHS Video</a></p><p><a href=\"/anime-video-generator\">Anime Video Generator</a></p><p><a href=\"/ai-video-styles\">AI Video Styles</a></p><p><a href=\"/spotify-canvas-maker\">Spotify Canvas Maker</a></p><p><a href=\"/ai-video-generator\">AI Video Generator</a></p><p><a href=\"/ai-node-editor\">AI Node Editor</a></p>",
+    "examples": [],
+    "cta": null
+   }
+  ],
+  "heroHeight": 520,
+  "exampleHeight": 180
+ },
+ "ai-commercial-maker": {
+  "title": "AI Commercial & Ad Maker – Product Video Ads | feega",
+  "description": "Create AI video commercials and ad creatives from your product catalog, add voice-over and music, then run them as Meta ads from the same canvas.",
+  "heading": "AI commercial and ad maker",
+  "intro": "feega creates video commercials and ad creatives from your products: import your store catalog, generate product shots and video clips, add a voice-over and music, and launch the result as a Meta ad campaign that you approve before it spends. Everything happens on one canvas.",
+  "cta": {
+   "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-commercial-maker",
+   "label": "Create an AI commercial →"
+  },
+  "hero": {
+   "src": "/site/landing/ai-commercial-maker/OJQOizDUDBeaJm5Xq3M8QtsmCM.webp",
+   "alt": "AI commercial maker: product ad frame for an iced coffee"
+  },
+  "sections": [
+   {
+    "heading": "How it works on feega",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "From product to ad in four steps",
+    "html": "<p>1. Import your catalog: the products node pulls titles, prices and images from your connected store.</p><p>2. Generate the visuals: product images with GPT Image, Nano Banana or Seedream, and video clips with Seedance, Kling or Grok Imagine.</p><p>3. Add sound: a text-to-speech voice-over, music and sound effects from the audio node.</p><p>4. Publish: schedule it as an organic post, or turn it into a Meta ad creative and approve the campaign.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "What makes it different from an ad template tool",
+    "html": "<p>You keep your brand voice, palette and logo in one place, and every generation can read them.</p><p>You see and approve every campaign before it runs. Ads are Meta only today (Facebook and Instagram).</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Examples made with feega",
+    "html": "",
+    "examples": [
+     {
+      "src": "/site/landing/ai-commercial-maker/sgrS3k6U7TjAumCQWDDxh4LOeI.webp",
+      "alt": "AI ad generator: skincare product ad"
+     },
+     {
+      "src": "/site/landing/ai-commercial-maker/cipSphiaDDYokd84oMlPizMsC4.webp",
+      "alt": "AI video ad frame: running shoe commercial"
+     },
+     {
+      "src": "/site/landing/ai-commercial-maker/Tq1Ah3oUIE7Hkh57kcSwd3Ya2bM.webp",
+      "alt": "AI advertisement for social media, vertical"
+     }
+    ],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-commercial-maker",
+     "label": "Create an AI commercial →"
+    }
+   },
+   {
+    "heading": "Questions",
+    "html": "<p><strong>Which ad platforms does feega support?</strong></p><p>Meta (Facebook and Instagram). Google, TikTok and other ad platforms are not supported.</p><p><strong>Can feega write the ad script?</strong></p><p>Yes. Ask the chat on the canvas for a script, then turn it into a voice-over with the audio node.</p><p><strong>Do ads go live automatically?</strong></p><p>No. A campaign runs only after you approve it.</p><p><strong>How long can a video ad be?</strong></p><p>Each generated clip lasts up to 15 seconds. Combine clips for longer spots.</p>",
+    "examples": [],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-commercial-maker",
+     "label": "Start free on feega →"
+    }
+   },
+   {
+    "heading": "More on feega",
+    "html": "<p><a href=\"/\">feega home</a></p><p><a href=\"/ai-video-upscaler\">AI Video Upscaler</a></p><p><a href=\"/3d-animation-maker\">3D Animation Maker</a></p><p><a href=\"/paper-cutout-animation\">Paper Cutout Animation</a></p><p><a href=\"/claymation-ai\">Claymation AI</a></p><p><a href=\"/80s-retro-video\">80s Retro VHS Video</a></p><p><a href=\"/anime-video-generator\">Anime Video Generator</a></p><p><a href=\"/ai-video-styles\">AI Video Styles</a></p><p><a href=\"/spotify-canvas-maker\">Spotify Canvas Maker</a></p><p><a href=\"/ai-video-generator\">AI Video Generator</a></p><p><a href=\"/ai-node-editor\">AI Node Editor</a></p>",
+    "examples": [],
+    "cta": null
+   }
+  ],
+  "heroHeight": 520,
+  "exampleHeight": 180
+ },
+ "paper-cutout-animation": {
+  "title": "Paper Cutout Animation Maker – AI Stop Motion Style | feega",
+  "description": "Create paper cutout and paper stop-motion animations with AI. Describe the scene, pick a video model, and get a handmade-looking clip in minutes.",
+  "heading": "Paper cutout animation maker",
+  "intro": "feega creates paper cutout animations from a text prompt or an image: describe layered paper shapes, visible texture and a stop-motion rhythm, and a video model such as Seedance or Kling renders a clip of up to 15 seconds that looks cut, glued and shot frame by frame.",
+  "cta": {
+   "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=paper-cutout-animation",
+   "label": "Make a paper animation →"
+  },
+  "hero": {
+   "src": "/site/landing/paper-cutout-animation/N6TClJBJezKaRomfSGnKodJPsQ.webp",
+   "alt": "Paper cutout animation made with AI: paper boat on paper waves"
+  },
+  "sections": [
+   {
+    "heading": "How it works on feega",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "A prompt that works",
+    "html": "<p>“Paper cutout stop motion, layered construction paper, a red paper boat on paper waves, visible fibres and soft shadows between layers, choppy 12 fps motion, top light.”</p><p>Keep the materials explicit (paper, card, fibres) and ask for choppy motion: that is what sells the stop-motion feel.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Keep the look consistent across shots",
+    "html": "<p>Generate one still in the paper style first, then use it as the first frame of every clip. Each shot starts from the same paper world.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Examples made with feega",
+    "html": "",
+    "examples": [
+     {
+      "src": "/site/landing/paper-cutout-animation/22dGk57ImPbfnJgg7E9tfwacSq0.webp",
+      "alt": "AI paper cut-out animation: fox in a paper forest"
+     },
+     {
+      "src": "/site/landing/paper-cutout-animation/mROg1qLD3aY6y1nCPXqeq8S5RZE.webp",
+      "alt": "Paper stop motion animation frame: cardboard city at night"
+     },
+     {
+      "src": "/site/landing/paper-cutout-animation/LoYzZN3YY2OEYHKHGKX8swaaU.webp",
+      "alt": "Paper cut animation made with AI: hot air balloon"
+     }
+    ],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=paper-cutout-animation",
+     "label": "Make a paper animation →"
+    }
+   },
+   {
+    "heading": "Questions",
+    "html": "<p><strong>Is it real stop motion?</strong></p><p>No. It is AI-generated video that imitates paper stop motion. No frames are photographed.</p><p><strong>Can I animate my own paper artwork?</strong></p><p>Yes. Upload a photo of it and use it as the first frame.</p><p><strong>How long can a clip be?</strong></p><p>Up to 15 seconds per clip.</p>",
+    "examples": [],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=paper-cutout-animation",
+     "label": "Start free on feega →"
+    }
+   },
+   {
+    "heading": "More on feega",
+    "html": "<p><a href=\"/\">feega home</a></p><p><a href=\"/ai-video-upscaler\">AI Video Upscaler</a></p><p><a href=\"/3d-animation-maker\">3D Animation Maker</a></p><p><a href=\"/ai-commercial-maker\">AI Commercial Maker</a></p><p><a href=\"/claymation-ai\">Claymation AI</a></p><p><a href=\"/80s-retro-video\">80s Retro VHS Video</a></p><p><a href=\"/anime-video-generator\">Anime Video Generator</a></p><p><a href=\"/ai-video-styles\">AI Video Styles</a></p><p><a href=\"/spotify-canvas-maker\">Spotify Canvas Maker</a></p><p><a href=\"/ai-video-generator\">AI Video Generator</a></p><p><a href=\"/ai-node-editor\">AI Node Editor</a></p>",
+    "examples": [],
+    "cta": null
+   }
+  ],
+  "heroHeight": 520,
+  "exampleHeight": 180
+ },
+ "80s-retro-video": {
+  "title": "80s Retro & VHS Video Generator – AI | feega",
+  "description": "Create 80s retro and VHS-look videos with AI: scanlines, tracking noise, neon and film grain. Generate a clip, add glitch effects to stills, and publish.",
+  "heading": "80s retro and VHS video generator",
+  "intro": "feega generates 80s retro and VHS-style clips from a prompt: ask for VHS tracking noise, scanlines, chromatic bleed and neon lighting, and a video model renders the clip. For stills, the effects node adds glitch, RGB shift, noise and pixelation directly on the canvas.",
+  "cta": {
+   "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=80s-retro-video",
+   "label": "Make an 80s video →"
+  },
+  "hero": {
+   "src": "/site/landing/80s-retro-video/c1iZtOm7pieuo5T0qsMHGmF0.webp",
+   "alt": "80s retro VHS video generator: neon arcade VHS frame"
+  },
+  "sections": [
+   {
+    "heading": "How it works on feega",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Prompt ingredients for a VHS look",
+    "html": "<p>“1986 home video, VHS tape, tracking lines, soft focus, colour bleed, timestamp in the corner, neon arcade at night.”</p><p>Ask for 4:3 framing when the model supports it: it reads as older footage straight away.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Retro effects on images",
+    "html": "<p>Stack glitch, RGB shift, noise, posterize, dither and halftone on any image in the effects node. The source image stays untouched.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Examples made with feega",
+    "html": "",
+    "examples": [
+     {
+      "src": "/site/landing/80s-retro-video/OAEo8xQVPjFakglb5eOXV9sc9U.webp",
+      "alt": "80s retro video made with AI: synthwave sunset"
+     },
+     {
+      "src": "/site/landing/80s-retro-video/QtepfNpoYQPlVDqkzk8RqFSJUi0.webp",
+      "alt": "VHS effect AI video frame: 1980s birthday party"
+     },
+     {
+      "src": "/site/landing/80s-retro-video/QEUxbnh4V0ycTQaY0CiG8m8nK0.webp",
+      "alt": "Retro 80s commercial made with AI"
+     }
+    ],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=80s-retro-video",
+     "label": "Make an 80s video →"
+    }
+   },
+   {
+    "heading": "Questions",
+    "html": "<p><strong>Can I add a VHS effect to my own video?</strong></p><p>Not as a filter today. You can generate new clips in the VHS style, and apply retro effects to images.</p><p><strong>Which effects are available for images?</strong></p><p>Glitch, RGB shift, noise, pixelate, posterize, dither, halftone, duotone, wave, swirl and more.</p>",
+    "examples": [],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=80s-retro-video",
+     "label": "Start free on feega →"
+    }
+   },
+   {
+    "heading": "More on feega",
+    "html": "<p><a href=\"/\">feega home</a></p><p><a href=\"/ai-video-upscaler\">AI Video Upscaler</a></p><p><a href=\"/3d-animation-maker\">3D Animation Maker</a></p><p><a href=\"/ai-commercial-maker\">AI Commercial Maker</a></p><p><a href=\"/paper-cutout-animation\">Paper Cutout Animation</a></p><p><a href=\"/claymation-ai\">Claymation AI</a></p><p><a href=\"/anime-video-generator\">Anime Video Generator</a></p><p><a href=\"/ai-video-styles\">AI Video Styles</a></p><p><a href=\"/spotify-canvas-maker\">Spotify Canvas Maker</a></p><p><a href=\"/ai-video-generator\">AI Video Generator</a></p><p><a href=\"/ai-node-editor\">AI Node Editor</a></p>",
+    "examples": [],
+    "cta": null
+   }
+  ],
+  "heroHeight": 520,
+  "exampleHeight": 180
+ },
+ "anime-video-generator": {
+  "title": "AI Anime Video Generator – Text or Image to Anime | feega",
+  "description": "Generate anime-style videos from a prompt or a character sheet. Keep the character consistent across shots and add voice and music on one canvas.",
+  "heading": "AI anime video generator",
+  "intro": "feega generates anime-style video clips of up to 15 seconds from a prompt or a character image. Generate the character once, reuse it as the first frame of every shot, and add dialogue, music and sound effects with the audio node.",
+  "cta": {
+   "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=anime-video-generator",
+   "label": "Make an anime video →"
+  },
+  "hero": {
+   "src": "/site/landing/anime-video-generator/VOKQNorrYQwVQCSJfNfCPoHzmQw.webp",
+   "alt": "AI anime video generator: anime rooftop scene"
+  },
+  "sections": [
+   {
+    "heading": "How it works on feega",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Keep a character consistent",
+    "html": "<p>Create a character sheet with an image node, then connect it to each video node as the first frame. Every shot starts from the same design.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Add voice and music",
+    "html": "<p>Write the lines in a text node, turn them into speech, and add music and sound effects. Dubbing into other languages is available on the audio node.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Examples made with feega",
+    "html": "",
+    "examples": [
+     {
+      "src": "/site/landing/anime-video-generator/3fLgztemXZR4uZJR9eVveKULLRc.webp",
+      "alt": "Anime character sheet for consistent AI video"
+     },
+     {
+      "src": "/site/landing/anime-video-generator/ORCZacmAQYp4jgvV1yJZP3ljtw.webp",
+      "alt": "Anime style AI video frame: rainy neon street"
+     },
+     {
+      "src": "/site/landing/anime-video-generator/ogVrWygCTQvolyB7EuVb2nepZU.webp",
+      "alt": "AI anime fight scene frame"
+     }
+    ],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=anime-video-generator",
+     "label": "Make an anime video →"
+    }
+   },
+   {
+    "heading": "Questions",
+    "html": "<p><strong>Can I animate my own drawing?</strong></p><p>Yes. Upload it and use it as the first frame of the clip.</p><p><strong>Can I make a full episode?</strong></p><p>Each clip lasts up to 15 seconds. Build longer sequences shot by shot on the canvas.</p>",
+    "examples": [],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=anime-video-generator",
+     "label": "Start free on feega →"
+    }
+   },
+   {
+    "heading": "More on feega",
+    "html": "<p><a href=\"/\">feega home</a></p><p><a href=\"/ai-video-upscaler\">AI Video Upscaler</a></p><p><a href=\"/3d-animation-maker\">3D Animation Maker</a></p><p><a href=\"/ai-commercial-maker\">AI Commercial Maker</a></p><p><a href=\"/paper-cutout-animation\">Paper Cutout Animation</a></p><p><a href=\"/claymation-ai\">Claymation AI</a></p><p><a href=\"/80s-retro-video\">80s Retro VHS Video</a></p><p><a href=\"/ai-video-styles\">AI Video Styles</a></p><p><a href=\"/spotify-canvas-maker\">Spotify Canvas Maker</a></p><p><a href=\"/ai-video-generator\">AI Video Generator</a></p><p><a href=\"/ai-node-editor\">AI Node Editor</a></p>",
+    "examples": [],
+    "cta": null
+   }
+  ],
+  "heroHeight": 520,
+  "exampleHeight": 180
+ },
+ "spotify-canvas-maker": {
+  "title": "Spotify Canvas Maker – AI Vertical Loops for Songs | feega",
+  "description": "Make a Spotify Canvas with AI: a vertical 9:16 looping video for your track, generated from a prompt or your cover art. Download it and upload it in Spotify for Artists.",
+  "heading": "Spotify Canvas maker",
+  "intro": "feega makes Spotify Canvas videos with AI: generate a vertical 9:16 clip of 4 to 8 seconds from a prompt or from your cover art, download it, and upload it in Spotify for Artists. Spotify loops it behind your track.",
+  "cta": {
+   "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=spotify-canvas-maker",
+   "label": "Make a Spotify Canvas →"
+  },
+  "hero": {
+   "src": "/site/landing/spotify-canvas-maker/pHP9dH68TJnaXswXz9BEpDxT3ZE.webp",
+   "alt": "Spotify Canvas maker: vertical looping visual for a song"
+  },
+  "sections": [
+   {
+    "heading": "How it works on feega",
+    "html": "<p><strong>1. </strong>Add a text node with your prompt, and an image node if you have a reference.</p><p><strong>2. </strong>Connect them to a video node and pick the model, ratio and duration.</p><p><strong>3. </strong>Generate. Every take stays on the canvas, ready to compare, edit or publish.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Make a Canvas that loops well",
+    "html": "<p>Ask for slow, continuous motion — drifting smoke, rain, a slow camera push — so the loop point is hard to see.</p><p>Use your cover art as the first frame and the same image as the last frame: the clip starts and ends on the same picture, and the loop closes.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "What Spotify expects",
+    "html": "<p>A vertical 9:16 video, 3 to 8 seconds long, uploaded by the artist in Spotify for Artists. feega generates and exports the clip; the upload itself happens in Spotify.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Examples made with feega",
+    "html": "",
+    "examples": [
+     {
+      "src": "/site/landing/spotify-canvas-maker/EjRWVv7z6KC1aJbJvAnjODGahaI.webp",
+      "alt": "AI Spotify Canvas loop: neon rain"
+     },
+     {
+      "src": "/site/landing/spotify-canvas-maker/ioJ1OIoq59LWf23yIIzKuDEcvTs.webp",
+      "alt": "AI Spotify Canvas: dancer in red smoke"
+     },
+     {
+      "src": "/site/landing/spotify-canvas-maker/ZoUGZoGmNd51IJ7Fwb8I8085gc.webp",
+      "alt": "Spotify Canvas video made with AI: sunflower field"
+     }
+    ],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=spotify-canvas-maker",
+     "label": "Make a Spotify Canvas →"
+    }
+   },
+   {
+    "heading": "Questions",
+    "html": "<p><strong>Does feega upload the Canvas to Spotify?</strong></p><p>No. You download the clip and upload it in Spotify for Artists.</p><p><strong>Can I use my album cover?</strong></p><p>Yes. Upload it and use it as the first and last frame.</p><p><strong>Which length should I pick?</strong></p><p>Between 4 and 8 seconds. Spotify accepts 3 to 8.</p>",
+    "examples": [],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=spotify-canvas-maker",
+     "label": "Start free on feega →"
+    }
+   },
+   {
+    "heading": "More on feega",
+    "html": "<p><a href=\"/\">feega home</a></p><p><a href=\"/ai-video-upscaler\">AI Video Upscaler</a></p><p><a href=\"/3d-animation-maker\">3D Animation Maker</a></p><p><a href=\"/ai-commercial-maker\">AI Commercial Maker</a></p><p><a href=\"/paper-cutout-animation\">Paper Cutout Animation</a></p><p><a href=\"/claymation-ai\">Claymation AI</a></p><p><a href=\"/80s-retro-video\">80s Retro VHS Video</a></p><p><a href=\"/anime-video-generator\">Anime Video Generator</a></p><p><a href=\"/ai-video-styles\">AI Video Styles</a></p><p><a href=\"/ai-video-generator\">AI Video Generator</a></p><p><a href=\"/ai-node-editor\">AI Node Editor</a></p>",
+    "examples": [],
+    "cta": null
+   }
+  ],
+  "heroHeight": 720,
+  "exampleHeight": 420
+ },
+ "ai-node-editor": {
+  "title": "AI Node Editor – Node-Based Canvas for Image, Video & Audio | feega",
+  "description": "feega is a node-based AI canvas: connect text, image, video and audio nodes, run them, and reuse the workflow. Works with a chat and with agents over MCP.",
+  "heading": "AI node editor for images, video and audio",
+  "intro": "feega is a node-based AI canvas: every prompt, image, video and sound is a node, and connections carry one node’s output into the next. You build a workflow once — prompt to image to video to voice-over — and run it again with new inputs, by hand, from the built-in chat, or from an external agent over MCP.",
+  "cta": {
+   "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-node-editor",
+   "label": "Open the node editor →"
+  },
+  "hero": {
+   "src": "/site/landing/ai-node-editor/UnN4BOH4OYh5STR8wjRga98yWg.webp",
+   "alt": "AI node editor: node-based canvas for image and video generation"
+  },
+  "sections": [
+   {
+    "heading": "How it works on feega",
+    "html": "<p><strong>1. </strong>Add nodes: a prompt, an image, a video, a voice.</p><p><strong>2. </strong>Connect them: each output feeds the next input.</p><p><strong>3. </strong>Generate one node or the whole chain, and reuse it.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Node types",
+    "html": "<p>Generation: text, image, video and audio (text to speech, voice changer, dubbing, music, sound effects, voice isolation).</p><p>Sources: documents, products from your store, social account feeds.</p><p>Flow: lists and select nodes to iterate over items, effects stacks on images, compositions, and a calendar to publish.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Typed connections",
+    "html": "<p>Ports say what they accept: a video node has separate inputs for the first and the last frame, an audio node shows the inputs its operation needs. A wrong connection is refused, not silently ignored.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "People, chat and agents on the same canvas",
+    "html": "<p>Several people can work on one canvas in real time. The chat in the sidebar can add and run nodes, and any MCP client can do the same through the feega MCP server.</p>",
+    "examples": [],
+    "cta": null
+   },
+   {
+    "heading": "Examples made with feega",
+    "html": "",
+    "examples": [
+     {
+      "src": "/site/landing/ai-node-editor/SZzLrC3yKuCck5pp8cJvtwHmrFo.webp",
+      "alt": "Node-based image generation workflow"
+     },
+     {
+      "src": "/site/landing/ai-node-editor/zG1QZrDPZduXQVQBRufb9Hq1bU.webp",
+      "alt": "Node-based video generation workflow with first and last frame"
+     }
+    ],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-node-editor",
+     "label": "Open the node editor →"
+    }
+   },
+   {
+    "heading": "Questions",
+    "html": "<p><strong>Is this like ComfyUI?</strong></p><p>It is node-based too, but runs in the browser on hosted models: nothing to install, no GPU needed.</p><p><strong>Which models can I use?</strong></p><p>GPT Image, Nano Banana, Seedream and Qwen for images; Seedance, Kling and Grok Imagine for video; FLUX Video Upscale for upscaling.</p><p><strong>Can an AI agent drive it?</strong></p><p>Yes, through the MCP server at mcp.feega.app.</p><p><strong>Can I collaborate?</strong></p><p>Yes. Canvases update in real time for everyone on them.</p>",
+    "examples": [],
+    "cta": {
+     "href": "https://oh.feega.app/?utm_source=feega.app&utm_medium=seo&utm_campaign=ai-node-editor",
+     "label": "Start free on feega →"
+    }
+   },
+   {
+    "heading": "More on feega",
+    "html": "<p><a href=\"/\">feega home</a></p><p><a href=\"/ai-video-upscaler\">AI Video Upscaler</a></p><p><a href=\"/3d-animation-maker\">3D Animation Maker</a></p><p><a href=\"/ai-commercial-maker\">AI Commercial Maker</a></p><p><a href=\"/paper-cutout-animation\">Paper Cutout Animation</a></p><p><a href=\"/claymation-ai\">Claymation AI</a></p><p><a href=\"/80s-retro-video\">80s Retro VHS Video</a></p><p><a href=\"/anime-video-generator\">Anime Video Generator</a></p><p><a href=\"/ai-video-styles\">AI Video Styles</a></p><p><a href=\"/spotify-canvas-maker\">Spotify Canvas Maker</a></p><p><a href=\"/ai-video-generator\">AI Video Generator</a></p>",
+    "examples": [],
+    "cta": null
+   }
+  ],
+  "heroHeight": 520,
+  "exampleHeight": 260
+ }
+}
