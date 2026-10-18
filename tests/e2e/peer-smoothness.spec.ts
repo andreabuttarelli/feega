@@ -25,7 +25,7 @@ async function watch(page: Page, ms: number): Promise<{ samples: Sample[]; frame
       const el = document.querySelector('[data-testid="peer-cursor"]');
       if (el) {
         const box = el.getBoundingClientRect();
-        samples.push({ t: now, x: box.left, y: box.top });
+        samples.push({ t: Date.now(), x: box.left, y: box.top });
       }
       if (now - began < duration) {
         requestAnimationFrame(step);
@@ -51,6 +51,27 @@ function stalls(samples: Sample[]): number {
   return moved / Math.max(1, samples.length - 1);
 }
 
+function latency(samples: Sample[], began: number): number {
+  const cx = samples.reduce((sum, s) => sum + s.x, 0) / samples.length;
+  const cy = samples.reduce((sum, s) => sum + s.y, 0) / samples.length;
+  let turns = 0;
+  let previous = NaN;
+  const lags = samples.map((s) => {
+    const angle = Math.atan2(s.y - cy, s.x - cx);
+    if (!Number.isNaN(previous) && angle - previous < -Math.PI) {
+      turns += 1;
+    }
+    previous = angle;
+    const unwrapped = angle + turns * 2 * Math.PI;
+    const drawnAt = began + (unwrapped / (2 * Math.PI)) * TURN_MS;
+    return s.t - drawnAt;
+  });
+  const sorted = [...lags].sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const wrap = Math.round(median / TURN_MS) * TURN_MS;
+  return median - wrap;
+}
+
 const percentile = (values: number[], p: number) => [...values].sort((a, b) => a - b)[Math.floor(values.length * p)] ?? NaN;
 
 test.describe('remote motion looks continuous @real', () => {
@@ -67,8 +88,8 @@ test.describe('remote motion looks continuous @real', () => {
     await page.mouse.move(CENTRE.x + RADIUS_PX, CENTRE.y);
     await expect(other.getByTestId('peer-cursor')).toBeVisible({ timeout: 10_000 });
 
+    const began = Date.now();
     const moving = (async () => {
-      const began = Date.now();
       while (Date.now() - began < SAMPLE_MS + 500) {
         const angle = ((Date.now() - began) / TURN_MS) * 2 * Math.PI;
         await page.mouse.move(CENTRE.x + RADIUS_PX * Math.cos(angle), CENTRE.y + RADIUS_PX * Math.sin(angle));
@@ -79,6 +100,7 @@ test.describe('remote motion looks continuous @real', () => {
     await moving;
 
     const report = {
+      latencyMs: Math.round(latency(seen.samples, began)),
       deviationPx: Number(deviation(seen.samples).toFixed(2)),
       stalledFrames: Number(stalls(seen.samples).toFixed(3)),
       frameMs: { p50: percentile(seen.frames, 0.5), p95: percentile(seen.frames, 0.95) }
