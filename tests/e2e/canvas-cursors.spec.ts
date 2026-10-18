@@ -110,4 +110,20 @@ test.describe('canvas cursors across two tabs @real', () => {
     await expect(other.getByTestId('presenter-prompt')).toHaveCount(0);
     await elsewhere.close();
   });
+
+  test('cursor chat: what I type next to my cursor shows next to it in the other tab, and goes away', async ({ page, session }) => {
+    const path = `/p/${session.projectId}/c/${session.canvasId}`;
+    const other = await page.context().newPage();
+    await gotoHydrated(page, path);
+    await gotoHydrated(other, path);
+    await page.waitForTimeout(1500);
+
+    await page.mouse.move(500, 400);
+    await page.keyboard.press('/');
+    await page.getByTestId('cursor-chat').fill('hello there');
+    await expect(other.getByTestId('peer-chat')).toHaveText('hello there', { timeout: 5000 });
+
+    await page.keyboard.press('Escape');
+    await expect(other.getByTestId('peer-chat')).toHaveCount(0, { timeout: 5000 });
+  });
 });
