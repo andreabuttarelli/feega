@@ -1,4 +1,6 @@
 import { cornerRadii, ellipseOutline, parsePath, pathData, polygonOutline, rectOutline, scaled, starOutline, type Outline, type Size } from './geometry';
+import { EMPTY_NETWORK, type VectorNetwork } from '../vector/model';
+import { networkFill, networkStroke } from '../vector/outline';
 import { morphOutline } from './morph';
 import { IDENTITY, applyModifiers, modifierFilter, modifierReach, type AppliedModifier, type Layer } from './modifiers';
 import { ShapeKind, modifierValues, type Modifier } from './schema';
@@ -10,6 +12,7 @@ import { strokeReach, svgStrokes } from '../stroke/render';
 export type ShapeLook = {
   shape: ShapeKind;
   path: string;
+  network?: VectorNetwork;
   roundness: number;
   smoothing?: number;
   corners?: number[];
@@ -53,7 +56,12 @@ const OUTLINE: Record<ShapeKind, (p: ShapeLook, size: Size) => Outline> = {
   [ShapeKind.Ellipse]: (_p, size) => ellipseOutline(size),
   [ShapeKind.Polygon]: (p, size) => polygonOutline(p.sides, p.roundness, size),
   [ShapeKind.Star]: (p, size) => starOutline(p.points, p.innerRadius, p.roundness, size),
-  [ShapeKind.Path]: (p, size) => pathOutline(p.path, size)
+  [ShapeKind.Path]: (p, size) => pathOutline(p.path, size),
+  [ShapeKind.Vector]: (p, size) => scaled(networkStroke(p.network ?? EMPTY_NETWORK), size)
+};
+
+const FILL_OUTLINE: Partial<Record<ShapeKind, (p: ShapeLook, size: Size) => Outline>> = {
+  [ShapeKind.Vector]: (p, size) => scaled(networkFill(p.network ?? EMPTY_NETWORK), size)
 };
 
 export function baseOutline(p: ShapeLook, size: Size): Outline {
@@ -118,9 +126,11 @@ export function shapeMarkup(p: ShapeLook, paint: Paint): string {
 export function shapeDrawing(p: ShapeLook, paint: Paint): { markup: string; extent: Extent | null } {
   const layers = shapeLayers(p, paint.size, paint.time).filter((l) => l.outline.length);
   const paths = layers.map((l) => `<path d="${pathData(l.outline)}"${matrixAttr(l.matrix)}${opacityAttr(l.opacity)}/>`).join('');
+  const ownFill = FILL_OUTLINE[p.shape]?.(p, paint.size);
+  const fillPaths = ownFill ? (ownFill.length ? `<path d="${pathData(ownFill)}"/>` : '') : paths;
   const extent = paintedExtent(p, paint, layers);
   const filter = filterOf(p, paint, extent);
-  const fills = svgFills(fillsOf(p), { id: paint.id, size: paint.size, color: paint.color, asset: paint.asset ?? NO_ASSET }, paths, p.fillRule);
+  const fills = fillPaths ? svgFills(fillsOf(p), { id: paint.id, size: paint.size, color: paint.color, asset: paint.asset ?? NO_ASSET }, fillPaths, p.fillRule) : { defs: '', body: '' };
   const strokes = svgStrokes(strokesOf(p), paint, paths, { sided: SIDED[p.shape] });
   const inner = fills.defs + strokes.defs + filter;
   const defs = inner ? `<defs>${inner}</defs>` : '';

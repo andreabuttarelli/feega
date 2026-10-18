@@ -11,11 +11,8 @@ Ported from upstream files:
 - `packages/core/src/vector/curve-math.ts` → `src/lib/motion/vector/curve-math.ts`
 - `packages/core/src/vector/bezier.ts` → `src/lib/motion/vector/edit.ts`
 - `packages/core/src/vector/regions.ts` → `src/lib/motion/vector/regions.ts`
-- `packages/core/src/vector/connectivity.ts` → `src/lib/motion/vector/connectivity.ts`
 - `packages/core/src/vector/path-helpers.ts` → `src/lib/motion/vector/path-sink.ts`
-- `packages/core/src/vector/handle-selection.ts` → `src/lib/motion/vector/handles.ts`
-- `packages/core/src/vector/freehand.ts` → `src/lib/motion/vector/freehand.ts`
-- `packages/core/tests/vector/stroke-runs.test.ts`, `packages/core/tests/vector/freehand.test.ts` → tests next to the ported files
+- `packages/core/tests/vector/stroke-runs.test.ts` → `src/lib/motion/vector/path-sink.test.ts`
 
 ```
 MIT License

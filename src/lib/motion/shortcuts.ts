@@ -58,6 +58,7 @@ export enum Command {
   AutoLayout = 'auto-layout',
   UseAsMask = 'use-as-mask',
   RemoveMask = 'remove-mask',
+  EditAsVector = 'edit-as-vector',
   SelectMatching = 'select-matching',
   BringForward = 'bring-forward',
   SendBackward = 'send-backward',

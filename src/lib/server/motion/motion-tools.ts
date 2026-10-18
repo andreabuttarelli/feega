@@ -4,6 +4,8 @@ import { StyleAction, StyleKind, applyStyle, defineStyle, detachStyle, removeSty
 import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
+import { setNetwork, toVector } from '$lib/motion/vector/ops';
+import { networkSchema } from '$lib/motion/vector/model';
 import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
 import { setPartFills } from '$lib/motion/part-style';
 import { staticParts } from './static-parts';
@@ -1679,6 +1681,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(2), op: z.enum([BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, BooleanOp.Exclude]), at: z.number().min(0).optional().describe('seconds; default 0') }),
       execute: async (input) => apply(combineShapes(session.doc, input.clip_ids, input.op, frames(input.at ?? 0)), `combined ${input.clip_ids.join(', ')} (${input.op})`)
+    }),
+
+    to_vector: tool({
+      description: 'Turn a Shape clip into an editable vector network (same drawing): vertices that any number of segments can join, filled regions.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(toVector(session.doc, input.clip_id), `made ${input.clip_id} a vector`)
+    }),
+
+    set_vector_network: tool({
+      description: 'Replace a Shape clip network: vertices [{x,y}] in 0..1 of its box, segments [{start,end,tangentStart,tangentEnd}] (tangents relative to their vertex, zero = straight), regions [{winding, loops: [[segment indices]]}] that fill.',
+      inputSchema: z.object({ clip_id: z.string(), network: networkSchema }),
+      execute: async (input) => apply(setNetwork(session.doc, input.clip_id, input.network), `set the network of ${input.clip_id}`)
     }),
 
     set_path: tool({

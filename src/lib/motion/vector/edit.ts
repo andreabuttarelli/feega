@@ -162,7 +162,7 @@ export function mirrorHandle(handle: Vector, mode: Mirroring, oppositeLength?: n
     return null;
   }
   if (mode === Mirroring.AngleAndLength) {
-    return { x: -handle.x, y: -handle.y };
+    return { x: 0 - handle.x, y: 0 - handle.y };
   }
   const length = Math.hypot(handle.x, handle.y);
   if (length < DETERMINANT_EPSILON) {
