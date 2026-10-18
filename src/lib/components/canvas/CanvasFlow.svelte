@@ -40,7 +40,7 @@
   import CanvasPeers from './CanvasPeers.svelte';
   import CanvasMeasure from './CanvasMeasure.svelte';
   import { tileGaps } from '$lib/canvas/measure';
-  import { snapDrag, type SnapGuide } from '$lib/canvas/snap';
+  import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
   import CanvasFollow from './CanvasFollow.svelte';
   import type { CanvasPeer, LiveBox, View } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
@@ -159,6 +159,7 @@
     onResize,
     onConnect,
     onDelete,
+    onCreateFormats,
     onEdgeDelete,
     onEdgeRetype,
     onEdgeModeChange,
@@ -230,6 +231,7 @@
      * `tiles` le contiene ancora — il difetto era esattamente il nodo che torna in scena.
      */
     onDelete?: (ids: string[]) => void;
+    onCreateFormats?: (frameId: string) => void;
     /** "Crea post" dalla barra della selezione: gli id scelti, così com'è per `onDelete`. */
     /** Una linea da togliere. Senza, il primo errore resta sulla tela per sempre. */
     onEdgeDelete?: (edgeId: string) => void;
@@ -427,6 +429,7 @@
 
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
+  let snapSpacing = $state<SpacingGap[]>([]);
 
   function snapped(dragged: Node[]): Node[] {
     const ids = new Set(dragged.map((n) => n.id));
@@ -441,6 +444,7 @@
     });
     const snap = snapDrag(rects, others, SNAP_SCREEN_PX / selection.zoom);
     snapGuides = snap.guides;
+    snapSpacing = snap.spacing;
     const at = new Map(snap.moves.map((m) => [m.id, { x: m.x, y: m.y }]));
     nodes = nodes.map((n) => (at.has(n.id) ? { ...n, position: at.get(n.id)! } : n));
     return dragged.map((n) => (at.has(n.id) ? { ...n, position: at.get(n.id)! } : n));
@@ -465,6 +469,7 @@
     if (!targetNode) return;
     const dragged = snapped(moving);
     snapGuides = [];
+    snapSpacing = [];
     const grabbed = dragged.find((n) => n.id === targetNode.id) ?? targetNode;
     const copyOffset = event.altKey ? dragOffset(dragOrigin, grabbed) : undefined;
     if (copyOffset && onDuplicate) {
@@ -671,6 +676,7 @@
     },
     'bring-front': (ids) => onRestack?.(ids, Stack.Front),
     'send-back': (ids) => onRestack?.(ids, Stack.Back),
+    'create-formats': (ids) => onCreateFormats?.(ids[0]),
     delete: (ids) => onDelete?.(ids)
   };
 
@@ -984,8 +990,8 @@
     {#if peers.length}
       <CanvasPeers {peers} rectOf={tileRect} />
     {/if}
-    {#if measured.length || snapGuides.length}
-      <CanvasMeasure gaps={measured} guides={snapGuides} />
+    {#if measured.length || snapGuides.length || snapSpacing.length}
+      <CanvasMeasure gaps={[...measured, ...snapSpacing]} guides={snapGuides} />
     {/if}
     <CanvasFollow view={follow} {onView} />
   </SvelteFlow>

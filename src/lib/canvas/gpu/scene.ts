@@ -3,15 +3,15 @@ import type { Viewport } from '../dot-grid';
 import { MOTION_NODE_BAR_H } from '../motion-node';
 import { AssetSize, sized } from '../asset-url';
 import { Surface, type CardFace, type Media } from './card-face';
-import { curvePoint, type Box, type Curve } from './geometry';
+import type { Box, Curve } from './geometry';
 import { createTextureCache, type TextureCache } from './texture-cache';
+import { Counter, count } from './frame-stats';
 import { Backend } from './backend';
 
 export { Backend };
 
 
 export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean };
-export type Wire = { id: string; curve: Curve; iterate: boolean; selected: boolean };
 export type Peer = { id: string; name: string; color: string; at: { x: number; y: number } };
 export type Overlay = {
   selected: (Box & { id: string })[];
@@ -28,12 +28,6 @@ export type Theme = { canvas: string; dot: string; paper: string; line: string; 
 const PAD = 14;
 const BODY_SIZE = 13;
 const DOT_TILE = 24;
-const DASH = 6;
-const GAP = 4;
-const DASH_SAMPLES = 400;
-const WIRE_WIDTH = 1;
-const BADGE_STROKE = 1.5;
-const ITERATE_BADGE_R = 11;
 const LIVE_VIDEO_CAP = 4;
 const NEAR_TIER_ZOOM = 0.75;
 const TEXT_FADE_FROM_PX = 3;
@@ -113,7 +107,6 @@ export class GpuScene {
   private theme: Theme;
   private grid: TilingSprite;
   private world = new Container();
-  private wires = new Graphics();
   private cardLayer = new Container();
   private overlay = new Graphics();
   private peerLayer = new Container();
@@ -125,7 +118,6 @@ export class GpuScene {
   private frame = 0;
   private playing = new Set<HTMLVideoElement>();
   private cards: Card[] = [];
-  private wiresIn: Wire[] = [];
   private overlayIn: Overlay | null = null;
   onFrame: ((ms: number) => void) | null = null;
   onLost: (() => void) | null = null;
@@ -141,7 +133,7 @@ export class GpuScene {
     this.backend = app.renderer.name === 'webgpu' ? Backend.WebGPU : Backend.WebGL;
     this.grid = new TilingSprite({ texture: dotTexture(theme), width: app.screen.width, height: app.screen.height });
     this.textures = createTextureCache(() => this.invalidate());
-    this.world.addChild(this.wires, this.cardLayer, this.overlay, this.peerLayer);
+    this.world.addChild(this.cardLayer, this.overlay, this.peerLayer);
     app.stage.addChild(this.grid, this.world);
     this.watchLoss();
     this.loop();
@@ -176,7 +168,7 @@ export class GpuScene {
       antialias: true,
       autoDensity: true,
       resolution: devicePixelRatio,
-      background: theme.canvas,
+      backgroundAlpha: 0,
       autoStart: false
     });
     host.appendChild(app.canvas);
@@ -202,7 +194,6 @@ export class GpuScene {
     this.grid.tilePosition.set(view.x % tile, view.y % tile);
     this.cull();
     this.retier();
-    this.drawWires();
     this.drawOverlay();
     this.drawPeers();
     this.invalidate();
@@ -234,21 +225,13 @@ export class GpuScene {
       }
     }
     this.cull();
-    this.drawWires();
     this.drawOverlay();
     this.invalidate();
   }
 
   setDim(dim: { body: number; edges: number } | null) {
     this.dim = dim;
-    this.wires.alpha = dim ? dim.edges : 1;
     this.setCards(this.cards);
-  }
-
-  setWires(wires: Wire[]) {
-    this.wiresIn = wires;
-    this.drawWires();
-    this.invalidate();
   }
 
   setOverlay(o: Overlay) {
@@ -330,6 +313,7 @@ export class GpuScene {
       return;
     }
     this.destroyBuilt(this.retiring.get(b.id));
+    count(Counter.Upload);
     this.ready.add(b.id);
     this.report();
   }
@@ -425,6 +409,7 @@ export class GpuScene {
   }
 
   private build(c: Card, key: string): Built {
+    count(Counter.Build);
     const holder = new Container();
     const root = new Container();
     holder.addChild(root);
@@ -632,55 +617,6 @@ export class GpuScene {
         t.resolution = tier;
       }
     }
-  }
-
-  private dashed(g: Graphics, c: Curve, color: string, width: number) {
-    let run = 0;
-    let on = true;
-    let prev = c.from;
-    g.moveTo(prev.x, prev.y);
-    for (let i = 1; i <= DASH_SAMPLES; i++) {
-      const p = curvePoint(c, i / DASH_SAMPLES);
-      run += Math.hypot(p.x - prev.x, p.y - prev.y);
-      if (on) {
-        g.lineTo(p.x, p.y);
-      } else {
-        g.moveTo(p.x, p.y);
-      }
-      if (run >= (on ? DASH : GAP)) {
-        if (on) {
-          g.stroke({ width, color });
-        }
-        on = !on;
-        run = 0;
-        g.moveTo(p.x, p.y);
-      }
-      prev = p;
-    }
-    if (on) {
-      g.stroke({ width, color });
-    }
-  }
-
-  private drawWires() {
-    const g = this.wires;
-    g.clear();
-    for (const w of this.wiresIn) {
-      const color = w.iterate ? this.theme.iterate : w.selected ? this.theme.inkSoft : this.theme.wire;
-      if (w.iterate) {
-        this.dashed(g, w.curve, color, WIRE_WIDTH);
-        g.circle(w.curve.mid.x, w.curve.mid.y, ITERATE_BADGE_R).fill(this.theme.paper).stroke({ width: BADGE_STROKE, color });
-        this.repeatGlyph(g, w.curve.mid, ITERATE_BADGE_R * 0.5, color, BADGE_STROKE);
-        continue;
-      }
-      const c = w.curve;
-      g.moveTo(c.from.x, c.from.y).bezierCurveTo(c.c1.x, c.c1.y, c.c2.x, c.c2.y, c.to.x, c.to.y).stroke({ width: WIRE_WIDTH, color });
-    }
-  }
-
-  private repeatGlyph(g: Graphics, at: { x: number; y: number }, r: number, color: string, width: number) {
-    g.arc(at.x, at.y, r, -Math.PI * 0.9, Math.PI * 0.4).stroke({ width, color });
-    g.arc(at.x, at.y, r, Math.PI * 0.1, Math.PI * 1.4).stroke({ width, color });
   }
 
   private drawOverlay() {

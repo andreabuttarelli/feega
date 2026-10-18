@@ -33,7 +33,7 @@ export type Curve = { from: Point; c1: Point; c2: Point; to: Point; mid: Point }
 
 const PORT_HIT_PX = 10;
 export const PORT_SIZE = 10;
-const PORT_OFFSET = PORT_SIZE / 2;
+export const PORT_OFFSET = PORT_SIZE / 2;
 const CORNER_HIT_PX = 8;
 const EDGE_HIT_PX = 6;
 const CURVATURE = 0.25;

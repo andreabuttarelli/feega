@@ -2,7 +2,7 @@ export const PROBE_REQUEST = 'gpu-parity:probe';
 export const PROBE_REPLY = 'gpu-parity:probe-reply';
 
 export type Spec = { doc: unknown; assets: Record<string, string>; origin: string };
-export type ShotsInput = { html: string; spec: Spec; times: number[]; width: number; height: number; preference: string };
+export type ShotsInput = { html: string; spec: Spec; displayWidth?: number; times: number[]; width: number; height: number; preference: string };
 export type ShotsResult = { pngs: string[]; ms: number; backend: string; runs: number; stats: Record<string, number>[] };
 export type ExportInput = { html: string; spec: Spec; times: number[]; width: number; height: number; fps: number; lanes: number; preference: string; keep: boolean };
 export type ExportResult = { wallMs: number; frames: number; mp4: string | null; fallback?: boolean };

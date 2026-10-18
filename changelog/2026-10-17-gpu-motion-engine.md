@@ -48,3 +48,14 @@ On real videos in Safari the GPU preview looked grainy and some animations diffe
 HTML engine; `?engine=html` looked right. The HTML engine is the default again; the GPU engine
 runs only with `?engine=gpu` (the kill switch still forces HTML). The public changelog entry is
 withdrawn until the GPU engine passes parity on real videos at preview size × DPR.
+
+## Sharp and faithful previews (2026-10-18)
+
+- Shapes were invisible in Safari: SVG markup parsed without the SVG namespace rasterises blank in
+  WebKit. The namespace is added before rasterising.
+- Preview resolution follows the displayed size x devicePixelRatio (renderer, text rasters, shape
+  rasters, HTML captures); textures carry mipmaps so downscaled rasters no longer sparkle.
+- Clips whose content the timeline animates (a keyframed weight/colour, inner spans) or that a
+  runtime script redraws (shape morph/dash bakes) are no longer drawn as still rasters: the GPU
+  engine leaves them to an HTML capture.
+- Harness: --display=<css px> --dpr=2 --engine=webkit|chromium [--ref=live], scripts/gpu-parity/sweep.mjs.

@@ -82,6 +82,7 @@
   import { Copied, elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { Direction as SiblingDirection, layerOrder, siblingOf } from '$lib/motion/siblings';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
+  import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
   import { FRAME_MENU_IDS, frameLayers, frameMenuRun, frameSummaries, type FrameLayer } from '$lib/motion/frame-menu';
   import type { SelectionActionId } from '$lib/canvas/selection-actions';
   import { Gesture } from '$lib/motion/drill';
@@ -1415,6 +1416,10 @@
       alignTo(run.edge);
       return;
     }
+    if ('arrange' in run) {
+      arrangeTo(run.arrange);
+      return;
+    }
     COMMANDS[run.command]();
   }
 
@@ -1426,6 +1431,7 @@
     }
   }
   const nudgeBy = (dx: number, dy: number) => selection.length && apply(moveBy(doc, selection, frame, [dx, dy], editMode), 'Moved with the arrows');
+  const arrangeTo = (to: Arrange) => apply(arrangeLayers(doc, selection, to, newId), `Arranged ${to}`);
   function combine(op: BooleanOp) {
     const result = combineShapes(doc, selection, op, frame);
     apply(result, `Combined shapes: ${op}`);
@@ -1547,6 +1553,10 @@
     [Command.Ungroup]: ungroupSelection,
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
+    [Command.BringForward]: () => arrangeTo(Arrange.Forward),
+    [Command.SendBackward]: () => arrangeTo(Arrange.Backward),
+    [Command.BringToFront]: () => arrangeTo(Arrange.Front),
+    [Command.SendToBack]: () => arrangeTo(Arrange.Back),
     [Command.Union]: () => combine(BooleanOp.Union),
     [Command.Subtract]: () => combine(BooleanOp.Subtract),
     [Command.Intersect]: () => combine(BooleanOp.Intersect),
@@ -1572,7 +1582,7 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.Union, Action.SelectMatching, Action.Subtract, Action.Intersect, Action.Exclude, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.Union, Action.SelectMatching, Action.BringForward, Action.SendBackward, Action.BringToFront, Action.SendToBack, Action.Subtract, Action.Intersect, Action.Exclude, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([

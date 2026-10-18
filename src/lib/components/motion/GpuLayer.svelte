@@ -35,7 +35,7 @@
     }
     let cancelled = false;
     const offstage = document.body.appendChild(Object.assign(document.createElement('div'), { style: OFFSTAGE }));
-    void gpu().then(({ gpuEngine }) => gpuEngine(source, offstage)).then((next) => {
+    void gpu().then(({ gpuEngine }) => gpuEngine(source, offstage, undefined, target.clientWidth || null)).then((next) => {
       if (cancelled) {
         next.dispose();
         return;

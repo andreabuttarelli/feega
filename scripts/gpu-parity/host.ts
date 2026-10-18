@@ -44,7 +44,7 @@ async function htmlShots(input: ShotsInput): Promise<ShotsResult> {
 }
 
 async function gpuShots(input: ShotsInput): Promise<ShotsResult> {
-  const engine = await gpuEngine(composer(input.spec), host(), input.preference as Backend);
+  const engine = await gpuEngine(composer(input.spec), host(), input.preference as Backend, input.displayWidth ?? null);
   const pngs: string[] = [];
   const stats = [];
   const start = performance.now();
@@ -148,4 +148,24 @@ async function gpuPreview(input: PreviewInput): Promise<PreviewResult> {
   return summary(deltas.slice(1), work);
 }
 
-Object.assign(window, { htmlShots, gpuShots, htmlExport, gpuExport, htmlPreview, gpuPreview });
+let live: (HTMLElement & { seek: (t: number) => void; pause: () => void }) | null = null;
+
+async function liveMount(input: { html: string; width: number; height: number }) {
+  await import('@hyperframes/player');
+  const el = document.createElement('hyperframes-player') as HTMLElement & { seek: (t: number) => void; pause: () => void };
+  el.setAttribute('sandbox-origin', 'opaque');
+  el.setAttribute('disable-click-to-play', '');
+  el.style.cssText = `position:absolute;left:0;top:0;width:${input.width}px;height:${input.height}px`;
+  const ready = new Promise((r) => el.addEventListener('ready', r, { once: true }));
+  host().replaceChildren(el);
+  el.setAttribute('srcdoc', input.html);
+  await ready;
+  live = el;
+}
+
+async function liveSeek(t: number) {
+  live?.seek(t);
+  await new Promise((r) => setTimeout(r, 400));
+}
+
+Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, htmlExport, gpuExport, htmlPreview, gpuPreview });

@@ -65,6 +65,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   moveElement: canvas('move_frame_element'),
   copyElement: canvas('copy_frame_element'),
   frameSize: motion('set_canvas'),
+  createFormats: canvas('create_formats'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),
   drawFrame: canvas('create_node'),
@@ -173,6 +174,10 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.Ungroup]: motion('ungroup'),
   [Command.AutoLayout]: motion('add_auto_layout'),
   [Command.UseAsMask]: motion('use_as_mask'),
+  [Command.BringForward]: motion('arrange_layers'),
+  [Command.SendBackward]: motion('arrange_layers'),
+  [Command.BringToFront]: motion('arrange_layers'),
+  [Command.SendToBack]: motion('arrange_layers'),
   [Command.Union]: motion('combine_shapes'),
   [Command.Subtract]: motion('combine_shapes'),
   [Command.Intersect]: motion('combine_shapes'),
@@ -267,6 +272,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'flip-vertical': motion('set_transform'),
   'use-as-mask': motion('use_as_mask'),
   'release-mask': motion('release_mask'),
+  'create-formats': canvas('create_formats'),
   delete: canvas('delete_node')
 };
 
@@ -308,6 +314,7 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'pen path points and handles': motion('set_path'),
   'align and distribute': motion('arrange_space'),
   'reorder layers': motion('set_track'),
+  'bring to front, send to back': motion('arrange_layers'),
   'poster line text, lines added or removed': motion('set_props'),
   'poster photo replace, fit, focus': motion('set_props'),
   'poster arrow shown, colour': motion('set_props'),

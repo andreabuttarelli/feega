@@ -178,9 +178,59 @@ function compareZ(a: SceneLayer, b: SceneLayer): number {
   return a.order - b.order;
 }
 
+const SAMPLES = 120;
+const SAFE_VARS = new Set(['--kc-zoom', '--kc-focusX', '--kc-focusY']);
+
+type Changes = Map<Element, Set<string>>;
+
+function styleMap(el: Element): Map<string, string> {
+  const style = (el as HTMLElement).style;
+  return new Map([...Array(style?.length ?? 0).keys()].map((i) => [style.item(i), style.getPropertyValue(style.item(i))]));
+}
+
+function animatedStyles(root: HTMLElement, timeline: Timeline, duration: number): Changes {
+  const elements = [root, ...root.querySelectorAll('*')];
+  const base = new Map(elements.map((el) => [el, styleMap(el)]));
+  const changes: Changes = new Map();
+  for (let i = 0; i <= SAMPLES; i++) {
+    timeline.seek((duration * i) / SAMPLES);
+    for (const el of elements) {
+      const now = styleMap(el);
+      const was = base.get(el)!;
+      for (const key of new Set([...now.keys(), ...was.keys()])) {
+        if (now.get(key) !== was.get(key)) {
+          changes.set(el, (changes.get(el) ?? new Set()).add(key));
+        }
+      }
+    }
+  }
+  timeline.seek(0);
+  return changes;
+}
+
+function contentAnimated(paintEl: HTMLElement, chain: HTMLElement[], changes: Changes): boolean {
+  for (const [el, keys] of changes) {
+    if (el !== paintEl && paintEl.contains(el)) {
+      return true;
+    }
+    if (chain.includes(el as HTMLElement) && [...keys].some((k) => k.startsWith('--') && !SAFE_VARS.has(k))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+const SCRIPT_DRIVEN: ReadonlySet<PaintKind> = new Set([PaintKind.Fill, PaintKind.Shape, PaintKind.Image, PaintKind.Logo, PaintKind.Video, PaintKind.Text]);
+
+function scriptDriven(doc: Document, clip: string): boolean {
+  return [...doc.querySelectorAll('script')].map((s) => s.textContent ?? '').some((text) => !text.includes(TIMELINE_MARK) && text.includes(`"${clip}"`));
+}
+
 export function compileScene(html: string): Scene {
   const doc = parse(html);
   const root = doc.getElementById('root') as HTMLElement;
+  const timeline = runTimeline(doc);
+  const changes = animatedStyles(root, timeline, px(root.dataset.duration));
   const frame = { width: px(root.dataset.width), height: px(root.dataset.height) };
   const background = [...doc.querySelectorAll('style')].map((s) => ROOT_BG.exec(s.textContent ?? '')?.[1]).find(Boolean) ?? null;
   const backdrops = [...root.querySelectorAll('[data-clip]:not(.layer)')].filter((g) => g.querySelector('.layer[data-clip]'));
@@ -193,7 +243,8 @@ export function compileScene(html: string): Scene {
     const backdrop = backdrops.includes(layer);
     const single = backdrop ? null : paintOf(layer);
     const found = backdrop ? [] : single ? [single] : textParts(layer);
-    const native = found.filter((f) => effectFree(chainOf(f.el, root)));
+    const clip = (layer as HTMLElement).dataset.clip ?? '';
+    const native = found.filter((f) => effectFree(chainOf(f.el, root)) && !contentAnimated(f.el, chainOf(f.el, root), changes) && !(SCRIPT_DRIVEN.has(f.paint.kind) && scriptDriven(doc, clip)));
     const parts = native.length === found.length && found.length ? native : [{ el: layer as HTMLElement, paint: { kind: PaintKind.Html } as Paint }];
     return parts.map((part) => {
       const chain = chainOf(part.el, root);
@@ -202,7 +253,7 @@ export function compileScene(html: string): Scene {
       return { clip: (layer as HTMLElement).dataset.clip ?? '', paint: part.paint, links, windows: windowsOf(outer, part.paint), z: zOf(outer), order: order++, content, blend, covers: [layer, ...layer.querySelectorAll('[data-clip]')].map((e) => (e as HTMLElement).dataset.clip ?? '') };
     });
   });
-  return { ...frame, background: background?.trim() ?? null, layers: layers.sort(compareZ), timeline: runTimeline(doc), duration: px(root.dataset.duration), doc };
+  return { ...frame, background: background?.trim() ?? null, layers: layers.sort(compareZ), timeline, duration: px(root.dataset.duration), doc };
 }
 
 function originOf(el: HTMLElement, size: Size, prop: 'transformOrigin' | 'perspectiveOrigin', vars: Vars): Point {

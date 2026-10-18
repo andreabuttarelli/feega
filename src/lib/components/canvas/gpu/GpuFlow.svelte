@@ -13,6 +13,9 @@
   import NodeBoundary from '../NodeBoundary.svelte';
   import EdgePanel from '../EdgePanel.svelte';
   import GpuTileChrome from './GpuTileChrome.svelte';
+  import RendererBadge from './RendererBadge.svelte';
+  import { dev } from '$app/environment';
+  import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
@@ -39,7 +42,8 @@
   import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
-  import { snapDrag, type SnapGuide } from '$lib/canvas/snap';
+  import { snapDrag, type SnapGuide, type SpacingGap } from '$lib/canvas/snap';
+
   import { dragOffset } from '$lib/canvas/duplicate-plan';
   import { enterFrame } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
@@ -53,10 +57,10 @@
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
-  import { PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
+  import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
-  import { GpuScene, themeOf, type Card, type Wire } from '$lib/canvas/gpu/scene';
+  import { GpuScene, themeOf, type Card } from '$lib/canvas/gpu/scene';
   import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { exposeLoss, recordFrame } from '$lib/canvas/gpu/frame-stats';
@@ -93,6 +97,7 @@
   let surface = $state<HTMLDivElement | null>(null);
   let scene = $state<GpuScene | null>(null);
   let failed = $state<string | null>(null);
+  let lossNote = $state<string | null>(null);
   let view = $state<Viewport>({ x: 0, y: 0, zoom: 1 });
   let area = $state({ width: 0, height: 0 });
   let selected = $state<string[]>([]);
@@ -140,9 +145,28 @@
       sticky = keep;
     }
   });
+  const kept = new Set<string>();
+  const domIds = $derived.by(() => {
+    const now = [...editIds, ...sticky.keys(), ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)];
+    for (const id of now) {
+      if (byId.get(id)?.kind !== 'motion') {
+        kept.add(id);
+      }
+    }
+    const alive = new Set(placed.map((t) => t.id));
+    for (const id of [...kept]) {
+      if (!alive.has(id)) {
+        kept.delete(id);
+      }
+    }
+    const next = new Set([...kept, ...now]);
+    return sameSet(lastDom, next) ? lastDom : (lastDom = next);
+  });
+  let lastDom = new Set<string>();
+  const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
   let parked = $state(new Map<string, number>());
   let shelfClock = $state(0);
-  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], editIds, parked, shelfClock)));
+  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock)));
   const shelfSince = new Map<string, number>();
   $effect(() => {
     const now = Date.now();
@@ -170,7 +194,6 @@
     }, SHELF_TICK_MS);
     return () => clearInterval(timer);
   });
-  const domIds = $derived(new Set([...editIds, ...sticky.keys(), ...shelf, ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)]));
 
   function portFor(nodeId: string, side: PortSide, handle: string | null | undefined): Port | null {
     const own = ports.filter((p) => p.nodeId === nodeId && p.side === side);
@@ -181,7 +204,7 @@
     edges.flatMap((e) => {
       const from = portFor(e.source, PortSide.Out, e.sourceHandle);
       const to = portFor(e.target, PortSide.In, e.targetHandle);
-      return from && to ? [{ edge: e, curve: wireCurve(from, to) }] : [];
+      return from && to ? [{ edge: e, curve: wireCurve({ x: from.x + PORT_OFFSET, y: from.y }, { x: to.x - PORT_OFFSET, y: to.y }) }] : [];
     })
   );
 
@@ -200,17 +223,6 @@
     )
   );
 
-  const wires = $derived(
-    curves.map(
-      (c): Wire => ({
-        id: c.edge.id,
-        curve: c.curve,
-        iterate: (c.edge.mode ?? 'fixed') === 'iterate',
-        selected: c.edge.id === selectedEdge || selected.includes(c.edge.source) || selected.includes(c.edge.target)
-      })
-    )
-  );
-
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && spec.flow.nodesDraggable);
 
@@ -224,10 +236,6 @@
     const css = wrap ? getComputedStyle(wrap) : null;
     const level = (name: string) => Number(css?.getPropertyValue(name) || 1);
     scene?.setDim(editing ? { body: level('--neighbour-body'), edges: level('--neighbour-edges') } : null);
-  });
-
-  $effect(() => {
-    scene?.setWires(wires);
   });
 
   $effect(() => {
@@ -722,6 +730,7 @@
 
   function endDrag(ids: string[], e: PointerEvent) {
     snapGuides = [];
+    snapSpacing = [];
     props.onLive?.([]);
     if (props.onTileDrop?.(ids, pointOf(e)) === DropVerdict.Taken) {
       settleOverrides();
@@ -764,6 +773,7 @@
 
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
+  let snapSpacing = $state<SpacingGap[]>([]);
   let altHeld = $state(false);
 
   function snapMoves(raw: TileMove[]): TileMove[] {
@@ -772,6 +782,7 @@
     const others = tiles.filter((t) => !ids.has(t.id)).map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }));
     const snap = snapDrag(rects, others, SNAP_SCREEN_PX / view.zoom);
     snapGuides = snap.guides;
+    snapSpacing = snap.spacing;
     const at = new Map(snap.moves.map((m) => [m.id, m]));
     return raw.map((m) => at.get(m.id) ?? m);
   }
@@ -965,6 +976,7 @@
     paste: () => menuAt && props.onPaste?.(toFlow(menuAt)),
     'bring-front': (ids) => props.onRestack?.(ids, Stack.Front),
     'send-back': (ids) => props.onRestack?.(ids, Stack.Back),
+    'create-formats': (ids) => props.onCreateFormats?.(ids[0]),
     delete: (ids) => props.onDelete?.(ids)
   };
 
@@ -1063,6 +1075,7 @@
           s.onLost = () => recover(s);
           exposeLoss(() => s.loseForTest());
           scene = s;
+          console.info(`[canvas] renderer ${s.backend}`);
           props.onFlow?.(toFlow);
           observer.observe(surface!);
           if (!fitted && tiles.length) {
@@ -1076,6 +1089,8 @@
         });
     const recover = (lost: GpuScene) => {
       const next = nextBackend(lost.backend);
+      console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'dom'}`);
+      lossNote = `${lost.backend} lost`;
       scene = null;
       built = null;
       try {
@@ -1132,10 +1147,13 @@
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" aria-hidden="true">
         {#each curves as c (c.edge.id)}
-          <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
+          <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} class:iterate={(c.edge.mode ?? 'fixed') === 'iterate'} class:linked={selected.includes(c.edge.source) || selected.includes(c.edge.target)} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
             <path class="svelte-flow__edge-path" d={`M${c.curve.from.x},${c.curve.from.y} C${c.curve.c1.x},${c.curve.c1.y} ${c.curve.c2.x},${c.curve.c2.y} ${c.curve.to.x},${c.curve.to.y}`} />
             {#if (c.edge.mode ?? 'fixed') === 'iterate'}
-              <g data-testid="wire-iterate-icon"></g>
+              <g class="wire-iterate-badge" data-testid="wire-iterate-icon" transform={`translate(${c.curve.mid.x} ${c.curve.mid.y})`}>
+                <circle r="11" />
+                <Repeat x={-7} y={-7} width={14} height={14} />
+              </g>
             {/if}
           </g>
         {/each}
@@ -1178,18 +1196,32 @@
         </div>
       {/each}
       <PeerLayer peers={props.peers ?? []} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
-      {#if measured.length || snapGuides.length}
-        <MeasureLayer gaps={measured} guides={snapGuides} zoom={view.zoom} />
+      {#if measured.length || snapGuides.length || snapSpacing.length}
+        <MeasureLayer gaps={[...measured, ...snapSpacing]} guides={snapGuides} zoom={view.zoom} />
       {/if}
     </div>
   </div>
 
+
+  <div class="poster-shelf" aria-hidden="true">
+    {#each placed.filter((t) => shelf.has(t.id)) as t (t.id)}
+      <div class="shelf-node" data-shelf={t.id} style={`width:${t.w}px;height:${t.h}px`}>
+        <NodeBoundary>
+          {@render props.tile({ id: t.id, selected: false })}
+        </NodeBoundary>
+      </div>
+    {/each}
+  </div>
 
   {#if failed}
     <p class="edge-refusal" role="alert">GPU renderer unavailable: {failed}</p>
   {/if}
 
   <PageZoomLock zoom={pageZoom} />
+
+  {#if dev}
+    <RendererBadge renderer={scene?.backend ?? 'starting'} reason={lossNote} />
+  {/if}
 
   {#if refusal}
     <p class="edge-refusal" role="status">{refusal}</p>
@@ -1329,7 +1361,43 @@
 
   .gpu-edges path {
     fill: none;
-    stroke: transparent;
+    stroke: color-mix(in srgb, var(--ink-soft, #6e6e73) 45%, var(--paper, #fff));
+    stroke-width: 1;
+  }
+
+  .gpu-edges .linked path,
+  .gpu-edges .selected path {
+    stroke: var(--ink-soft, #6e6e73);
+  }
+
+  .gpu-edges .iterate path {
+    stroke: var(--ui-wire-iterate);
+    stroke-dasharray: 6 4;
+  }
+
+  .wire-iterate-badge circle {
+    fill: var(--ui-panel-raised);
+    stroke: var(--ui-wire-iterate);
+    stroke-width: 1.5;
+  }
+
+  .wire-iterate-badge :global(svg) {
+    color: var(--ui-wire-iterate);
+  }
+
+  .poster-shelf {
+    position: fixed;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .shelf-node {
+    position: absolute;
+    left: 0;
+    top: 0;
   }
 
   .frame-standin {
@@ -1350,6 +1418,7 @@
   .gpu-dom-node {
     position: absolute;
     inset: 0;
+    content-visibility: auto;
     user-select: text;
   }
 
@@ -1371,6 +1440,7 @@
   .gpu-dom-node {
     position: absolute;
     inset: 0;
+    content-visibility: auto;
     user-select: text;
   }
 

@@ -14,7 +14,7 @@ const gpu = () => Paint.Gpu;
 const dom = () => Paint.Dom;
 
 export const PAINT: Record<NodeType, (data: Data) => Paint> = {
-  motion: (data) => (typeof data.posterAssetId === 'string' && data.posterAssetId && data.posterRevision === data.docHeadRevision ? Paint.Gpu : Paint.Dom),
+  motion: (data) => (typeof data.posterAssetId === 'string' && data.posterAssetId ? Paint.Gpu : Paint.Dom),
   image: (data) => (isUploadedNodeRow({ type: 'image', data }) ? Paint.Gpu : Paint.Dom),
   text: dom,
   video: dom,
