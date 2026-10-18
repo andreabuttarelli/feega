@@ -74,6 +74,7 @@
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
   import { Flip, flipClips } from '$lib/motion/layer-props';
+  import { Copied, elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { Direction as SiblingDirection, layerOrder, siblingOf } from '$lib/motion/siblings';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
   import { FRAME_MENU_IDS, frameLayers, frameMenuRun, frameSummaries, type FrameLayer } from '$lib/motion/frame-menu';
@@ -125,7 +126,7 @@
     type OpResult
   } from '$lib/motion/timeline';
   import { DragPhase, UndoRoute, type CanvasUndo, type ElementOut, type MoveOut } from '$lib/canvas/canvas-drop';
-  import { liftElement } from '$lib/motion/move-element';
+  import { copyElements, liftElement, pasteElements } from '$lib/motion/move-element';
   import { adoptHead, amend, canRedo, canUndo, followHead, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
   import { landed, outgoing, remote, type Synced } from '$lib/motion/frame-sync';
   import { Reveal, Snap, clampZoom } from '$lib/motion/timeline-view';
@@ -1283,10 +1284,22 @@
   function copyKeys() {
     if (keySelection.length) {
       keyBoard = copyKeyframes(doc, keySelection);
+      elementClipboard.copyKeyframes();
+      return;
+    }
+    if (selection.length) {
+      elementClipboard.copyElements(data.node.id, [...selection], copyElements(doc, selection));
     }
   }
 
   function pasteKeys() {
+    const copied = elementClipboard.elements;
+    if (elementClipboard.kind === Copied.Elements && copied) {
+      const pasted = pasteElements(doc, copied.elements, newId);
+      apply(pasted, 'Pasted elements');
+      selection = pasted.ok ? pasted.ids : selection;
+      return;
+    }
     const target = selected;
     if (!target || !keyBoard.length) {
       return;

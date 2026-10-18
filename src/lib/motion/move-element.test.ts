@@ -3,7 +3,7 @@ import { MotionFormat, findClip, newMotionDoc, parseMotionDoc, type MotionDoc } 
 import { addClip, setKeyframes, setTransform } from './timeline';
 import { Ease } from './design';
 import { DocMode, docMode, setStill } from './still';
-import { frameOf, guessedBoxes, liftElement, linkOutput, mediaElement, placeElement, OutputKind } from './move-element';
+import { copyElements, frameOf, guessedBoxes, liftElement, linkOutput, mediaElement, pasteElements, placeElement, OutputKind } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
 const VIDEO_ID = '99999999-2222-4333-8444-555555555555';
@@ -222,5 +222,33 @@ describe('the boxes the stage draws before the player measures', () => {
     expect(box.top).toBeCloseTo(0.3 * doc.height);
     expect(box.width).toBeCloseTo(0.8 * doc.width);
     expect(box.height).toBeCloseTo(0.4 * doc.height);
+  });
+});
+
+describe('copy and paste whole elements', () => {
+  it('copying leaves the source as it is and carries what the element needs', () => {
+    const doc = source();
+    const [copied] = copyElements(doc, ['txt', 'gone']);
+    expect(copyElements(doc, ['txt', 'gone'])).toHaveLength(1);
+    expect(copied.clip.props.text).toBe('hello');
+    expect(findClip(doc, 'txt')).not.toBeNull();
+  });
+
+  it('pasting into the same frame adds a copy with a new id at the same place', () => {
+    const doc = source();
+    const pasted = pasteElements(doc, copyElements(doc, ['txt']), ids());
+    if (!pasted.ok) throw new Error(pasted.error);
+    expect(pasted.ids).toHaveLength(1);
+    expect(pasted.ids[0]).not.toBe('txt');
+    const copy = findClip(pasted.doc, pasted.ids[0])!.clip;
+    expect(copy.props).toMatchObject({ text: 'hello', x: 0.25, y: 0.5 });
+    expect(findClip(pasted.doc, 'txt')).not.toBeNull();
+  });
+
+  it('pasting into another frame keeps the relative place', () => {
+    const target = newMotionDoc(MotionFormat.Vertical);
+    const pasted = pasteElements(target, copyElements(source(), ['txt']), ids());
+    if (!pasted.ok) throw new Error(pasted.error);
+    expect(findClip(pasted.doc, pasted.ids[0])!.clip.props).toMatchObject({ x: 0.25, y: 0.5 });
   });
 });
