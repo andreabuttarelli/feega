@@ -26,3 +26,12 @@ export function budgetOf(load: Load): Budget {
 export function fitsPlan(budget: Budget, plan: Plan): boolean {
   return budget.received + budget.sent <= PLAN_LIMITS[plan].messagesPerSecond;
 }
+
+export const MAX_HZ = 20;
+const MIN_HZ = 0.2;
+const HZ_STEP = 10;
+
+export function hzFor(peers: number, plan: Plan): number {
+  const crowd = Math.max(1, peers) ** 2;
+  return Math.max(MIN_HZ, Math.min(MAX_HZ, Math.floor((HZ_STEP * PLAN_LIMITS[plan].messagesPerSecond) / crowd) / HZ_STEP));
+}

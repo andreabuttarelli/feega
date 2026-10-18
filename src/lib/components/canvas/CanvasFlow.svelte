@@ -39,7 +39,8 @@
   import CanvasPeers from './CanvasPeers.svelte';
   import CanvasMeasure from './CanvasMeasure.svelte';
   import { tileGaps } from '$lib/canvas/measure';
-  import type { CanvasPeer } from '$lib/realtime/canvas-presence';
+  import type { CanvasPeer, LiveBox } from '$lib/realtime/canvas-presence';
+  import { setTileLive } from '$lib/canvas/tile-live-context';
   import CanvasAddBar from './CanvasAddBar.svelte';
   import { BarContext } from '$lib/canvas/bottom-bar';
   import CanvasDrawLayer from './CanvasDrawLayer.svelte';
@@ -191,6 +192,7 @@
     mode = CanvasMode.Edit,
     peers = [],
     onPointer,
+    onLive,
     tile
   }: {
     actionUrl?: (action: string) => string;
@@ -302,6 +304,7 @@
     /** Cosa disegnare dentro una tile. La tela non sa cosa mostra: lo decide chi la usa. */
     peers?: CanvasPeer[];
     onPointer?: (at: { x: number; y: number } | null) => void;
+    onLive?: (boxes: LiveBox[]) => void;
     tile: import('svelte').Snippet<[{ id: string; selected: boolean }]>;
     mode?: CanvasMode;
   } = $props();
@@ -324,6 +327,7 @@
   setTileRender(() => tile);
   setTileResize(() => onResize);
   setTileRotate(() => onRotate);
+  setTileLive(() => onLive);
 
   const toNode = (t: Tile): Node => ({
     id: t.id,
@@ -413,6 +417,7 @@
 
   function onNodeDrag({ nodes: dragged, event }: { nodes: Node[]; event: MouseEvent | TouchEvent }) {
     followMembers(dragged);
+    onLive?.(dragged.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y })));
     onTileDragOver?.(dragged.map((n) => n.id), pointOf(event));
   }
 
@@ -424,6 +429,7 @@
   }
 
   function onNodeDragStop({ targetNode, nodes: dragged, event }: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
+    onLive?.([]);
     if (!targetNode) return;
     if (onTileDrop?.(dragged.map((n) => n.id), pointOf(event)) === DropVerdict.Taken) {
       returnToOrigin();
