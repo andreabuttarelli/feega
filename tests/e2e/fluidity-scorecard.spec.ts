@@ -142,6 +142,12 @@ async function approach(page: Page, at: { x: number; y: number }) {
   await page.waitForTimeout(hoverBeforeOpen);
 }
 
+async function editingInPlace(page: Page) {
+  await expect
+    .poll(async () => (await Promise.all(page.frames().map((f) => f.locator('[contenteditable]').count().catch(() => 0)))).some(Boolean), { timeout: OPEN_MS })
+    .toBe(true);
+}
+
 async function clickNode(page: Page, id: string) {
   const b = await inView(page, id);
   await approach(page, { x: b.x + Math.min(20, b.width / 4), y: b.y + Math.min(12, b.height / 4) });
@@ -408,11 +414,11 @@ const STEPS: Step[] = [
       const before = await domIds(page);
       const spot = await emptySpot(page, { width: 200, height: 90 });
       await pickBarTool(page, 'text');
-      await page.mouse.click(spot.x + 40, spot.y + 40);
+      await drag(page, { x: spot.x + 20, y: spot.y + 20 }, { x: spot.x + spot.width - 20, y: spot.y + spot.height - 20 }, 4);
       const id = await newNode(page, before);
       ids.set('text', id);
       await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: OPEN_MS });
-      await expect(page.locator('aside.props textarea').first()).toBeFocused({ timeout: OPEN_MS });
+      await editingInPlace(page);
       await watch(TEXT_WATCHES);
       await page.keyboard.type(TYPED, { delay: 40 });
       const size = page.locator(TEXT_WATCHES[1].selector).first();
