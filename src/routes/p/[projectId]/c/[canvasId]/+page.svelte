@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
+  import type { ExportRow } from '$lib/motion/export-rows';
   import { localStore } from '$lib/browser-storage';
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
@@ -1444,6 +1446,7 @@
 
   async function refresh(): Promise<boolean> {
     const version = ++snapshotVersion;
+    const asked = places.mark();
     const snapshot = await post('snapshot', {});
     if (!snapshot) {
       return false;
@@ -1458,7 +1461,7 @@
     }
     const now = Date.now();
     const before = nodes;
-    nodes = keepSame(nodes, keepPending((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys, places.dirty), now);
+    nodes = keepSame(nodes, keepPending((snapshot.nodes as CanvasNodeRecord[]).map((n) => toTile(n)), nodes, saves.dirtyKeys, (id) => places.dirty(id) || places.placedAfter(id, asked)), now);
     edges = keepSame(edges, keepLines((snapshot.connections as Connection[]).map(toEdge), edges, lines.pending()), now);
     productsOverride = keepSame(products, (snapshot.products ?? {}) as Record<string, Product[]>, now);
     socialPostsOverride = keepSame(socialPosts, (snapshot.socialPosts ?? {}) as Record<string, SocialPost[]>, now);
@@ -3005,6 +3008,13 @@
   }
 
   let formatsFor = $state<string | null>(null);
+  let exportFor = $state<string[] | null>(null);
+
+  async function exportFrames(frameIds: string[], rows: ExportRow[]) {
+    await Promise.all(frameIds.map((id) => saves.flush(id)));
+    const out = await post('exportSelection', { frame_ids: JSON.stringify(frameIds), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
+    return out?.url ? (out as { url: string; name: string; files: string[] }) : 'Export failed';
+  }
 
   async function createFormats(nodeId: string, targets: FormatTarget[]) {
     landed(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
@@ -3296,6 +3306,9 @@
 
   <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />
 
+  {#if exportFor}
+    <ExportDialog count={exportFor.length} onexport={(rows) => exportFrames(exportFor!, rows)} onclose={() => (exportFor = null)} />
+  {/if}
   {#if formatsFor}
     <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
   {/if}
@@ -3330,6 +3343,7 @@
     onConnect={connect}
     onDelete={remove}
     onCreateFormats={(id) => (formatsFor = id)}
+    onExport={(ids) => (exportFor = ids)}
     onEdgeDelete={disconnect}
     onEdgeModeChange={setEdgeMode}
     onCreate={create}
@@ -3368,6 +3382,8 @@
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
     thumbsOf={sourceThumbs}
+    cardPreviews={data.cardPreviews}
+    previewsAt={`/p/${data.projectId}/c/${data.canvas.id}/card-previews`}
     onfail={(why) => {
       console.warn(`[canvas] GPU renderer failed: ${why} → dom`);
       domReason = why;

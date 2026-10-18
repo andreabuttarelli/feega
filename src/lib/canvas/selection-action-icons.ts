@@ -4,6 +4,7 @@
  * che non disegna niente.
  */
 import Copy from '@lucide/svelte/icons/copy';
+import Download from '@lucide/svelte/icons/download';
 import Workflow from '@lucide/svelte/icons/workflow';
 import Link2 from '@lucide/svelte/icons/link-2';
 import Megaphone from '@lucide/svelte/icons/megaphone';
@@ -62,5 +63,6 @@ export const SELECTION_ACTION_ICON: Record<SelectionActionId, Component> = {
   'use-as-mask': SquareDashed,
   'release-mask': Square,
   'create-formats': Proportions,
+  export: Download,
   delete: Trash2
 };

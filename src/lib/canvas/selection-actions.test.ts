@@ -23,6 +23,7 @@ describe('group and ungroup', () => {
       ['ungroup', 'Mod+Shift+G'],
       ['duplicate', 'Mod+D'],
       ['create-formats', null],
+      ['export', null],
       ['copy', 'Mod+C'],
       ['paste', 'Mod+V'],
       ['bring-front', 'Mod+]'],
@@ -40,6 +41,13 @@ describe('group and ungroup', () => {
       ['release-mask', null],
       ['delete', 'Backspace']
     ]);
+  });
+
+  it('offers Export for any picked frames, one or many, and nothing else', () => {
+    const frame = { data: { format: '4:5' } };
+    expect(shownFor('export', [frame])).toBe(true);
+    expect(shownFor('export', [frame, frame])).toBe(true);
+    expect(shownFor('export', [frame, { data: {} }])).toBe(false);
   });
 
   it('each surface shows the shared menu, in its order, limited to what it can run', () => {

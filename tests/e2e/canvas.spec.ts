@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { test, expect, ON_PRODUCTION, REAL_STACK, gotoHydrated, createE2eSession, teardownE2eSession, signInE2e } from './fixtures/session';
+import { hoverTile } from './fixtures/canvas-tile';
 
 /**
  * LA TELA, DAL VERO BROWSER — due percorsi critici, non una copertura esaustiva. @real: richiede
@@ -57,7 +58,7 @@ test.describe('canvas @real', () => {
     await expect(prompt).toHaveValue('Scrivi una sola parola: pronto. Grazie.');
   });
 
-  test('le modifiche di un agente arrivano sulla tela aperta senza ricaricare', async ({ page, session, seedNode }) => {
+  test('le modifiche di un agente arrivano sulla tela aperta senza ricaricare', async ({ page, session, seedNode, admin }) => {
     const typed = await seedNode({ type: 'text', x: 0, y: 0, data: { prompt: 'Mine' } });
     const edited = await seedNode({ type: 'doc', x: 600, y: 0, data: { content: 'Before agent', public: false } });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
@@ -91,10 +92,13 @@ test.describe('canvas @real', () => {
     });
     expect(created.ok()).toBe(true);
 
+    await expect(editedNode).toHaveAttribute('style', /translate\(900px/, { timeout: 2_000 });
+    await hoverTile(page, edited.id);
     await expect(editedNode).toContainText('After agent', { timeout: 2_000 });
+    const born = (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).eq('type', 'doc').neq('id', edited.id).single()).data!;
+    await hoverTile(page, born.id);
     await expect(page.getByText('Born from agent')).toBeVisible({ timeout: 2_000 });
     await expect(page.locator('.svelte-flow__edge')).toHaveCount(1, { timeout: 2_000 });
-    await expect(editedNode).toHaveAttribute('style', /translate\(900px/, { timeout: 2_000 });
 
     await typing;
     await expect(prompt).toHaveValue('Mine and still typing');
@@ -113,7 +117,7 @@ test.describe('canvas @real', () => {
 
     await context.setOffline(false);
     await expect(dot).toHaveAttribute('data-link', 'connected', { timeout: 15_000 });
-    await expect(page.locator(`.svelte-flow__node[data-id="${edited.id}"]`)).toContainText('Written while away', { timeout: 10_000 });
+    await expect(await hoverTile(page, edited.id)).toContainText('Written while away', { timeout: 10_000 });
     await expect(page.getByText(/tempo reale|connection lost/i)).toHaveCount(0);
   });
 
