@@ -1,3 +1,5 @@
+import type { Box } from './layout';
+
 export type Size = { width: number; height: number };
 export type Point = { x: number; y: number };
 export type View = { scale: number | null; x: number; y: number };
@@ -10,6 +12,7 @@ const MIN_SCALE = ZOOM_PRESETS[0];
 const MAX_SCALE = ZOOM_PRESETS[ZOOM_PRESETS.length - 1];
 const PERCENT = 100;
 const EPSILON = 1e-6;
+const BOX_MARGIN = 0.9;
 
 export enum Step {
   In = 1,
@@ -50,3 +53,20 @@ export function zoomStep(scale: number, step: Step): number {
 }
 
 export const zoomLabel = (view: View, scale: number): string => (view.scale === null ? 'Fit' : `${Math.round(scale * PERCENT)}%`);
+
+export function zoomToBox(target: Box, frame: Size, box: Size): View {
+  const scale = clampScale(Math.min(box.width / target.width, box.height / target.height) * BOX_MARGIN);
+  const centre = { x: target.left + target.width / 2, y: target.top + target.height / 2 };
+  return settle(scale, { x: (frame.width / 2 - centre.x) * scale, y: (frame.height / 2 - centre.y) * scale }, frame, box);
+}
+
+export function boxAround(boxes: readonly Box[]): Box | null {
+  if (!boxes.length) {
+    return null;
+  }
+  const left = Math.min(...boxes.map((b) => b.left));
+  const top = Math.min(...boxes.map((b) => b.top));
+  const right = Math.max(...boxes.map((b) => b.left + b.width));
+  const bottom = Math.max(...boxes.map((b) => b.top + b.height));
+  return { left, top, width: right - left, height: bottom - top };
+}

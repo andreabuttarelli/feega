@@ -13,6 +13,8 @@
   import NodeBoundary from '../NodeBoundary.svelte';
   import EdgePanel from '../EdgePanel.svelte';
   import GpuTileChrome from './GpuTileChrome.svelte';
+  import PeerLayer from '../PeerLayer.svelte';
+  import { setTileLive } from '$lib/canvas/tile-live-context';
   import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
   import { BarContext } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
@@ -75,6 +77,7 @@
   setTileRender(() => props.tile);
   setTileResize(() => props.onResize);
   setTileRotate(() => props.onRotate);
+  setTileLive(() => props.onLive);
 
   let wrap = $state<HTMLDivElement | null>(null);
   let surface = $state<HTMLDivElement | null>(null);
@@ -506,6 +509,7 @@
 
   function onMove(e: PointerEvent) {
     const p = local(e);
+    props.onPointer?.(toWorld(view, p));
     if (touches.has(e.pointerId)) {
       touches.set(e.pointerId, p);
       if (pinch && touches.size === 2) {
@@ -560,6 +564,7 @@
           }
         }
         overrides = next;
+        props.onLive?.(moved.map((m) => ({ id: m.id, x: m.x, y: m.y })));
         props.onTileDragOver?.([...a.origins.keys()], pointOf(e));
       },
       [GestureKind.Resize]: (a) => {
@@ -705,6 +710,7 @@
   }
 
   function endDrag(ids: string[], e: PointerEvent) {
+    props.onLive?.([]);
     if (props.onTileDrop?.(ids, pointOf(e)) === DropVerdict.Taken) {
       settleOverrides();
       return;
@@ -814,6 +820,11 @@
     deselect: () => clearSelection(),
     'select-all': () => select(placed.map((t) => t.id)),
     fit: () => fitTo(placed),
+    'zoom-actual': () => {
+      const s = screenSize();
+      view = zoomAt(view, { x: s.width / 2, y: s.height / 2 }, 1 / view.zoom);
+    },
+    'zoom-selection': () => selectedBoxes.length && fitTo(selectedBoxes),
     'zoom-in': () => zoomStep(STEP_ZOOM),
     'zoom-out': () => zoomStep(1 / STEP_ZOOM),
     duplicate: () => selected.length && props.onDuplicate?.(selected),
@@ -1008,6 +1019,7 @@
     onwheel={onWheel}
     onclick={onClickInside}
     oncontextmenu={onContextMenu}
+    onpointerleave={() => props.onPointer?.(null)}
     class:panning={space}
   >
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
@@ -1058,6 +1070,7 @@
           {/if}
         </div>
       {/each}
+      <PeerLayer peers={props.peers ?? []} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
     </div>
   </div>
 

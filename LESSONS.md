@@ -3063,3 +3063,6 @@ Signal: deselecting a frame flashes "Opening the editor…" or a stale picture; 
 
 ### Edits in an agent worktree never reach the running dev server
 Signal: the page keeps old markup (a new attribute is `null`, a fix "does nothing") although the file is saved. Cause: `vite.config.ts` ignores `.claude/worktrees` in `server.watch`, so a dev server started from a worktree never recompiles. Move: restart your own `vite dev --port <free>` after every edit before reading red or green.
+
+### A drag e2e on a canvas node does not move it
+Signal: `mouse.down/move/up` on a seeded node leaves `boundingBox().x` unchanged; a text node's textbox gets the pointer. Cause: text/doc bodies take the pointer for editing, and a click first on a motion node opens the inline editor. Move: seed a `motion` element with `width/height` and a `motion_revisions` row, then press on it without a prior click; measure the peer's box BEFORE `mouse.down`, not after the moves.

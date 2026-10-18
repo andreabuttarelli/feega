@@ -105,7 +105,8 @@ const DRAWN = { tool: 'rectangle', box: { left: 0, top: 0, width: 100, height: 8
 
 const CASES: { name: string; action: string; fields: Record<string, string>; status: number }[] = [
   { name: 'write lands a patch on its base', action: 'write', fields: { node_id: NODE, base: JSON.stringify({ prompt: 'a' }), patch: JSON.stringify({ prompt: 'b' }) }, status: 200 },
-  { name: 'write on a stale base answers 409 with the conflict keys', action: 'write', fields: { node_id: NODE, base: JSON.stringify({ prompt: 'stale' }), patch: JSON.stringify({ prompt: 'b' }) }, status: 409 },
+  { name: 'write on a stale base is last-writer-wins', action: 'write', fields: { node_id: NODE, base: JSON.stringify({ prompt: 'stale' }), patch: JSON.stringify({ prompt: 'b' }) }, status: 200 },
+  { name: 'write over a list moved underneath answers 409 with the conflict keys', action: 'write', fields: { node_id: NODE, base: JSON.stringify({ references: ['stale'] }), patch: JSON.stringify({ references: ['b'] }) }, status: 409 },
   { name: 'write on a missing node answers 404', action: 'write', fields: { node_id: 'missing', base: '{}', patch: '{}' }, status: 404 },
   { name: 'upload into the library registers only the asset', action: 'upload', fields: { into: 'library', path: `${ORG}/${PROJECT}/x.png`, file_name: 'x.png', mime_type: 'image/png', bytes: '10' }, status: 200 },
   { name: 'upload without a path answers 400', action: 'upload', fields: {}, status: 400 },

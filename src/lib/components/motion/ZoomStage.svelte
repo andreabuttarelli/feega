@@ -4,7 +4,8 @@
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
   import { isTyping } from '$lib/motion/shortcuts';
-  import { ACTUAL_SIZE, FIT, Step, panBy, scaleOf, zoomAt, zoomLabel, zoomStep, type Point, type Size, type View } from '$lib/motion/preview-view';
+  import { ACTUAL_SIZE, FIT, Step, panBy, scaleOf, zoomAt, zoomLabel, zoomStep, zoomToBox, type Point, type Size, type View } from '$lib/motion/preview-view';
+  import type { Box } from '$lib/motion/layout';
 
   let { frame, view = $bindable(FIT), onspace, children }: { frame: Size; view?: View; onspace?: () => void; children: Snippet } = $props();
 
@@ -43,6 +44,7 @@
   export const zoomOut = () => zoomTo(zoomStep(scale, Step.Out));
   export const fit = () => (view = FIT);
   export const actual = (anchor?: Point) => zoomTo(ACTUAL_SIZE, anchor);
+  export const toBox = (target: Box) => (view = zoomToBox(target, frame, box));
 
   function toggleFit(anchor: Point) {
     if (zoomed) {

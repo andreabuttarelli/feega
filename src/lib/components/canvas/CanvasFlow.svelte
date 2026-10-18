@@ -36,6 +36,9 @@
   import '@xyflow/svelte/dist/style.css';
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
+  import CanvasPeers from './CanvasPeers.svelte';
+  import type { CanvasPeer, LiveBox } from '$lib/realtime/canvas-presence';
+  import { setTileLive } from '$lib/canvas/tile-live-context';
   import CanvasAddBar from './CanvasAddBar.svelte';
   import { BarContext } from '$lib/canvas/bottom-bar';
   import CanvasDrawLayer from './CanvasDrawLayer.svelte';
@@ -182,6 +185,9 @@
     focus = null,
     onSelectionChange,
     mode = CanvasMode.Edit,
+    peers = [],
+    onPointer,
+    onLive,
     tile
   }: {
     actionUrl?: (action: string) => string;
@@ -291,6 +297,9 @@
      *  tela. Assente = nessuna tile è ridimensionabile a mano (il resizer non compare). */
     onResize?: (id: string, w: number, h: number) => void;
     /** Cosa disegnare dentro una tile. La tela non sa cosa mostra: lo decide chi la usa. */
+    peers?: CanvasPeer[];
+    onPointer?: (at: { x: number; y: number } | null) => void;
+    onLive?: (boxes: LiveBox[]) => void;
     tile: import('svelte').Snippet<[{ id: string; selected: boolean }]>;
     mode?: CanvasMode;
   } = $props();
@@ -313,6 +322,7 @@
   setTileRender(() => tile);
   setTileResize(() => onResize);
   setTileRotate(() => onRotate);
+  setTileLive(() => onLive);
 
   const toNode = (t: Tile): Node => ({
     id: t.id,
@@ -402,6 +412,7 @@
 
   function onNodeDrag({ nodes: dragged, event }: { nodes: Node[]; event: MouseEvent | TouchEvent }) {
     followMembers(dragged);
+    onLive?.(dragged.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y })));
     onTileDragOver?.(dragged.map((n) => n.id), pointOf(event));
   }
 
@@ -413,6 +424,7 @@
   }
 
   function onNodeDragStop({ targetNode, nodes: dragged, event }: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
+    onLive?.([]);
     if (!targetNode) return;
     if (onTileDrop?.(dragged.map((n) => n.id), pointOf(event)) === DropVerdict.Taken) {
       returnToOrigin();
@@ -629,6 +641,9 @@
   }
 
   function movePress(e: PointerEvent) {
+    if (toFlow) {
+      onPointer?.(toFlow({ x: e.clientX, y: e.clientY }));
+    }
     if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > PRESS_SLOP_PX) {
       endPress();
     }
@@ -765,6 +780,9 @@
 
   let wrap = $state<HTMLDivElement | null>(null);
 
+  const tileRects = $derived(new Map(tiles.map((t) => [t.id, t])));
+  const tileRect = (id: string) => tileRects.get(id) ?? null;
+
   const tierBoard = provideTierBoard();
   const posters = $derived(new Map(tiles.flatMap((t) => (t.poster ? [[t.id, t.poster] as const] : []))));
 </script>
@@ -779,6 +797,7 @@
   onpointermove={movePress}
   onpointerup={endPress}
   onpointercancel={endPress}
+  onpointerleave={() => onPointer?.(null)}
   ondragover={onDragOver}
   ondrop={onDrop}
 >
@@ -859,6 +878,9 @@
     <CanvasImageTiers board={tierBoard} />
     <CanvasDots />
     <CanvasPosterLayer {posters} />
+    {#if peers.length}
+      <CanvasPeers {peers} rectOf={tileRect} />
+    {/if}
   </SvelteFlow>
 
   {#if refusal}
