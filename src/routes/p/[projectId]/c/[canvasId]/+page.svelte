@@ -58,6 +58,9 @@
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { untrack } from 'svelte';
   import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
+  import { Renderer, rendererOf } from '$lib/canvas/gpu/renderer-flag';
+  import { postThumb, productThumb } from '$lib/canvas/source-thumbs';
+  import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
   import DocNode from '$lib/components/canvas/DocNode.svelte';
@@ -1047,6 +1050,19 @@
   /** `type`/`data` grezzi di ogni tile — la forma che `commonPropertiesOf` legge, per la barra
    *  della selezione: `tiles` porta già `node: CanvasNode`, un'astrazione diversa che non ha
    *  `model`/`params` come campi diretti. */
+  function sourceThumbs(id: string): string[] {
+    const items = [...(shownPosts[id] ?? []).map(postThumb), ...(shownProducts[id] ?? []).map(productThumb), ...(influencersByNode[id]?.views ?? []).map((v) => v.url)];
+    return items.filter((url): url is string => !!url);
+  }
+
+  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Gpu ? null : (CanvasFlow as unknown as typeof GpuFlow));
+  $effect(() => {
+    if (Flow) {
+      return;
+    }
+    void import('$lib/components/canvas/gpu/GpuFlow.svelte').then((m) => (Flow = m.default));
+  });
+
   const nodeSummaries = $derived(nodes.map((n) => ({ id: n.id, type: n.type, data: n.data })));
 
   const DYNAMIC_PARAM_TYPES: ReadonlySet<string> = new Set<GenMedium>(['image', 'video', 'model3d']);
@@ -3160,7 +3176,8 @@
     onConfirm={onAudioOperationSwitchConfirmed}
   />
 
-  <CanvasFlow
+  {#if Flow}
+  <Flow
     actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
     tiles={withPeerMotion(tiles, canvasPeers, new Set(selectedIds))}
     {edges}
@@ -3206,6 +3223,8 @@
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
+    thumbsOf={sourceThumbs}
+    onfail={() => (Flow = CanvasFlow as unknown as typeof GpuFlow)}
     peers={canvasPeers}
     onPointer={(cursor) => cursors.port.update({ cursor })}
     onLive={(live) => cursors.port.update({ live })}
@@ -3423,7 +3442,8 @@
         {/if}
       {/if}
     {/snippet}
-  </CanvasFlow>
+  </Flow>
+  {/if}
   {#if showsEmptyState(nodes.length, inlineMotion)}
     <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
   {/if}

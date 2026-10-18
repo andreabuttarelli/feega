@@ -26,8 +26,10 @@ describe('la tela chiede il permesso prima di far nascere un arco', () => {
   });
 
   it('il permesso viene dal modello, non da una regola riscritta nel componente', () => {
-    expect(flow).toMatch(/from '\$lib\/canvas\/connect-rules'/);
-    expect(flow).toMatch(/verdictBetween\(/);
+    const verdict = readFileSync(join(dir, 'connection-verdict.ts'), 'utf8');
+    expect(flow).toMatch(/from '\$lib\/canvas\/connection-verdict'/);
+    expect(verdict).toMatch(/from '\.\/connect-rules'/);
+    expect(verdict).toMatch(/verdictBetween\(/);
   });
 
   /**
