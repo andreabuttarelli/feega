@@ -7,6 +7,8 @@ import AlignStartHorizontal from '@lucide/svelte/icons/align-start-horizontal';
 import AlignCenterHorizontal from '@lucide/svelte/icons/align-center-horizontal';
 import AlignEndHorizontal from '@lucide/svelte/icons/align-end-horizontal';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+import BringToFront from '@lucide/svelte/icons/bring-to-front';
+import SendToBack from '@lucide/svelte/icons/send-to-back';
 import FlipHorizontal2 from '@lucide/svelte/icons/flip-horizontal-2';
 import FlipVertical2 from '@lucide/svelte/icons/flip-vertical-2';
 import CornerRightDown from '@lucide/svelte/icons/corner-right-down';
@@ -212,6 +214,10 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.BringForward]: { name: 'Bring forward', icon: BringToFront, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.SendBackward]: { name: 'Send backward', icon: SendToBack, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.BringToFront]: { name: 'Bring to front', icon: BringToFront, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.SendToBack]: { name: 'Send to back', icon: SendToBack, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignLeft]: { name: 'Align left', icon: AlignStartVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignCenter]: { name: 'Align horizontal centres', icon: AlignCenterVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.AlignRight]: { name: 'Align right', icon: AlignEndVertical, group: GuideGroup.Edit, menu: MenuSection.Layer },

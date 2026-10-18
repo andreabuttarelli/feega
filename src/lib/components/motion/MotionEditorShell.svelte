@@ -77,7 +77,7 @@
   import { Copied, elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { Direction as SiblingDirection, layerOrder, siblingOf } from '$lib/motion/siblings';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
-  import { arrangeLayers, type Arrange } from '$lib/motion/layer-order';
+  import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
   import { FRAME_MENU_IDS, frameLayers, frameMenuRun, frameSummaries, type FrameLayer } from '$lib/motion/frame-menu';
   import type { SelectionActionId } from '$lib/canvas/selection-actions';
   import { Gesture } from '$lib/motion/drill';
@@ -1518,6 +1518,10 @@
     [Command.Ungroup]: ungroupSelection,
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
+    [Command.BringForward]: () => arrangeTo(Arrange.Forward),
+    [Command.SendBackward]: () => arrangeTo(Arrange.Backward),
+    [Command.BringToFront]: () => arrangeTo(Arrange.Front),
+    [Command.SendToBack]: () => arrangeTo(Arrange.Back),
     [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask'),
     [Command.AlignLeft]: () => selection.length && alignTo(Edge.Left),
     [Command.AlignCenter]: () => selection.length && alignTo(Edge.Center),
@@ -1539,7 +1543,7 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.BringForward, Action.SendBackward, Action.BringToFront, Action.SendToBack, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([

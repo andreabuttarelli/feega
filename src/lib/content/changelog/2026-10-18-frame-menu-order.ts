@@ -3,5 +3,5 @@ import type { ChangelogEntry } from './index';
 export default {
   date: '2026-10-18',
   title: 'Layer order from the frame menu',
-  items: ['Right-click a layer inside a frame to bring it to the front or send it to the back.']
+  items: ['Right-click a layer inside a frame to bring it to the front or send it to the back.', 'Inside a frame, ⌘] and ⌘[ move a layer one step; add ⌥ to go all the way.']
 } satisfies ChangelogEntry;

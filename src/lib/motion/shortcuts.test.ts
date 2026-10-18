@@ -207,6 +207,16 @@ describe('mask keys', () => {
   });
 });
 
+describe('layer order keys', () => {
+  it('⌘] and ⌘[ step a layer, with ⌥ all the way', () => {
+    expect(press(']', { mod: true, code: 'BracketRight' })).toBe(Command.BringForward);
+    expect(press('[', { mod: true, code: 'BracketLeft' })).toBe(Command.SendBackward);
+    expect(press(']', { mod: true, alt: true, code: 'BracketRight' })).toBe(Command.BringToFront);
+    expect(press('[', { mod: true, alt: true, code: 'BracketLeft' })).toBe(Command.SendToBack);
+    expect(press('[', { code: 'BracketLeft' })).toBe(Command.StartHere);
+  });
+});
+
 describe('flip keys', () => {
   it('⇧H flips horizontally and ⇧V vertically', () => {
     expect(press('H', { shift: true, code: 'KeyH' })).toBe(Command.FlipHorizontal);

@@ -45,6 +45,12 @@ describe('arranging layers inside a frame', () => {
     expect(trackOf(doc, 'a')).toBeGreaterThan(0);
   });
 
+  it('brings a layer forward or backward one step', () => {
+    const three = ok(addClip(ok(addTrack(twoTracks(), TrackKind.Visual, 'highest')), { ...shape, trackId: 'highest' }, 'c'));
+    expect(trackOf(ok(arrangeLayers(three, ['a'], Arrange.Forward, newId)), 'a')).toBe(trackOf(three, 'a') - 1);
+    expect(trackOf(ok(arrangeLayers(three, ['c'], Arrange.Backward, newId)), 'c')).toBe(trackOf(three, 'c') + 1);
+  });
+
   it('refuses a layer that is not in the frame', () => {
     expect(arrangeLayers(twoTracks(), ['gone'], Arrange.Front, newId).ok).toBe(false);
   });
