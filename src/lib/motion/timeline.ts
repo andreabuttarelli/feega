@@ -3,7 +3,7 @@ import { Strictness } from './custom/component';
 import { withParams } from './custom/params';
 import { FPS, MAX_SECONDS, TransitionKind, maxFrames, type Edge } from './design';
 import { MAX_JUNCTION_FRAMES, junctionProblem, type Junction } from './junctions';
-import { FORMATS, MotionFormat, RESOLUTION_PROBLEM, byFrame, fitsResolution, cloneDoc, clipsOf, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
+import { DocMode, FORMATS, MotionFormat, RESOLUTION_PROBLEM, docMode, byFrame, fitsResolution, cloneDoc, clipsOf, clipProps, compRefProblem, findClip, fontsOfClip, newClip, type Background, type MotionClip, type MotionDoc, type MotionTrack } from './doc';
 import { Ease } from './design';
 import { Matte, isMaskKey, maskSchema, maskStackSchema, type MaskInput } from './mask';
 import { matteSource } from './matte';
@@ -85,6 +85,13 @@ export type NewClip = {
   transitionOut?: Edge;
 };
 
+type Span = { from: number; durationInFrames?: number };
+
+const CLIP_SPAN: Record<DocMode, (doc: MotionDoc, input: NewClip) => Span> = {
+  [DocMode.Video]: (_, input) => input,
+  [DocMode.Still]: (doc) => ({ from: 0, durationInFrames: doc.durationInFrames })
+};
+
 export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
   const spec = COMPONENTS[input.component];
   const track = trackFor(doc, spec.track, input.trackId);
@@ -101,10 +108,11 @@ export function addClip(doc: MotionDoc, input: NewClip, id: string): OpResult {
     return fail(missing);
   }
 
+  const span = CLIP_SPAN[docMode(doc)](doc, input);
   const clip = newClip({
     id,
-    from: Math.max(0, Math.round(input.from)),
-    durationInFrames: Math.max(MIN_FRAMES, Math.round(input.durationInFrames ?? (spec.durationInFrames * doc.fps) / FPS)),
+    from: Math.max(0, Math.round(span.from)),
+    durationInFrames: Math.max(MIN_FRAMES, Math.round(span.durationInFrames ?? (spec.durationInFrames * doc.fps) / FPS)),
     component: input.component,
     props: props.props,
     transitionIn: input.transitionIn ?? NO_EDGE,
