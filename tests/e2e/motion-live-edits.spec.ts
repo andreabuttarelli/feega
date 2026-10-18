@@ -22,7 +22,7 @@ test.describe('motion agent live edits @real', () => {
       return route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: edited });
     });
     page.on('request', (req) => {
-      if (req.url().includes('?/save')) {
+      if (req.url().includes('?/ops')) {
         saved.push(req.postData() ?? '');
       }
     });
@@ -37,6 +37,6 @@ test.describe('motion agent live edits @real', () => {
     await expect(page.getByTestId('empty-state')).toBeHidden();
     await page.waitForTimeout(PAST_HEAD_POLL_MS);
     await expect(page.getByTestId('empty-state')).toBeHidden();
-    await expect.poll(() => saved.some((body) => body.includes('"text":"Motion"'))).toBe(true);
+    await expect.poll(() => saved.some((body) => body.includes('Motion'))).toBe(true);
   });
 });

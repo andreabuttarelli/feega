@@ -1,3 +1,4 @@
+import { localStore } from '$lib/browser-storage';
 // Unified app warnings — one source so every surface reports problems the same way. Computed once
 // (server-side, in the brand layout load) and rendered by the global WarningCenter. Titles/messages
 // are i18n KEYS (translated client-side); `values` feed interpolation; `href` is a full path.
@@ -232,7 +233,7 @@ export function seenAfterOpening(warnings: readonly AppWarning[]): string[] {
 export const seenWarningIds = writable<readonly string[] | null>(null);
 
 export function loadSeenWarnings(brandSlug: string): void {
-  if (typeof localStorage === 'undefined' || !brandSlug) return;
+  if (!localStore() || !brandSlug) return;
   try {
     const raw = localStorage.getItem(seenWarningsKey(brandSlug));
     const parsed: unknown = raw ? JSON.parse(raw) : [];
@@ -246,7 +247,7 @@ export function loadSeenWarnings(brandSlug: string): void {
 export function markWarningsSeen(brandSlug: string, warnings: readonly AppWarning[]): void {
   const ids = seenAfterOpening(warnings);
   seenWarningIds.set(ids);
-  if (typeof localStorage === 'undefined' || !brandSlug) return;
+  if (!localStore() || !brandSlug) return;
   try {
     localStorage.setItem(seenWarningsKey(brandSlug), JSON.stringify(ids));
   } catch {

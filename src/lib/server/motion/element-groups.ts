@@ -134,8 +134,8 @@ export async function ungroupElement(store: FrameStore, members: Members, place:
 
 export async function rotateNodeGroup(store: FrameStore, members: Members, id: string, degrees: number): Promise<Moved> {
   const [group] = await members.read([id]);
-  if (!group || (await store.read(id))?.kind !== FrameKind.Group) {
-    return refused(MoveOutcome.NotFound, `no group ${id}`);
+  if (!group || !frameChrome((await store.read(id))?.kind ?? FrameKind.Frame).turns) {
+    return refused(MoveOutcome.NotFound, `nothing to turn at ${id}`);
   }
   const inside = await members.inGroup(id);
   const placed = (m: Member): Placed => ({ id: m.id, x: m.box.left, y: m.box.top, w: m.box.width, h: m.box.height, rotation: m.rotation });

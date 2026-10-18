@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localStore } from '$lib/browser-storage';
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
   import type { Stack } from '$lib/canvas/stacking';
@@ -123,7 +124,7 @@
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
-  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type HostShift, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type HostMove, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
@@ -362,9 +363,31 @@
 
   const placeHost = (box: HostBox) => (nodes = nodes.map((n) => (n.id !== box.id ? n : n.w === box.w && n.h === box.h ? { ...n, x: box.x, y: box.y } : { ...n, x: box.x, y: box.y, w: box.w, h: box.h, userHeight: box.h })));
 
-  function hostDrag(shift: HostShift, to: PointerPoint, phase: DragPhase) {
+  let turnFrom: { id: string; rotation: number } | null = null;
+
+  const turnTo = (id: string, rotation: number) => (nodes = nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, rotation } } : n)));
+
+  function hostTurn(id: string, rotation: number, turn: number, phase: DragPhase) {
+    turnFrom = turnFrom?.id === id ? turnFrom : { id, rotation };
+    const from = turnFrom.rotation;
+    if (phase !== DragPhase.Drop) {
+      turnTo(id, from + turn);
+      return;
+    }
+    turnFrom = null;
+    turnTo(id, from);
+    if (turn !== 0) {
+      rotateGroupBy(id, turn);
+    }
+  }
+
+  function hostDrag({ turn, ...shift }: HostMove, to: PointerPoint, phase: DragPhase) {
     const id = inlineMotion;
     const row = id ? nodes.find((n) => n.id === id) : null;
+    if (id && row && (turn !== 0 || turnFrom)) {
+      hostTurn(id, layoutOf(row.data).rotation, turn, phase);
+      return;
+    }
     const zero = toFlow?.({ x: 0, y: 0 });
     const unit = toFlow?.({ x: 1, y: 1 });
     if (!id || !row || !zero || !unit) {
@@ -591,7 +614,7 @@
    */
   let textViewModes = $state<Record<string, TextViewMode>>({});
 
-  const clientStorage = typeof localStorage === 'undefined' ? undefined : localStorage;
+  const clientStorage = localStore() ?? undefined;
 
   function textViewModeOf(nodeId: string): TextViewMode {
     return textViewModes[nodeId] ?? loadTextViewMode(clientStorage, nodeId);

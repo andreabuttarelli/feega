@@ -1,7 +1,19 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from 'vitest';
-import { LEAVE_CAP_MS, anchoredTo, inlineStage } from './inline-stage.svelte';
+import { LEAVE_CAP_MS, anchoredTo, inlineStage, stageOver } from './inline-stage.svelte';
 import { Paint } from './inline-motion';
+
+describe('the stage over a turned node', () => {
+  it('takes the node size and angle, centred on its on-screen box, not the box itself', () => {
+    const quarter = stageOver({ left: 0, top: 0, width: 50, height: 100 }, { width: 100, height: 50 }, 90);
+    expect(quarter).toEqual({ left: -25, top: 25, width: 100, height: 50, rotate: 90 });
+  });
+
+  it('scales with the zoom the box shows', () => {
+    const turned = stageOver({ left: 10, top: 10, width: 200, height: 100 }, { width: 100, height: 50 }, 0);
+    expect(turned).toEqual({ left: 10, top: 10, width: 200, height: 100, rotate: 0 });
+  });
+});
 
 describe('inline stage', () => {
   it('the editor shows only once its player has drawn, and the node keeps its picture a beat longer', async () => {

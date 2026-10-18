@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localStore } from '$lib/browser-storage';
   import { painted } from '$lib/canvas/paint-wait';
   import { frameDocs } from '$lib/canvas/frame-docs.svelte';
   import { FrameKind, frameChrome, freshText, openingSelection } from '$lib/canvas/motion-node';
@@ -284,15 +285,7 @@
   let pressAt: { x: number; y: number } | null = null;
   let pressedMenu: unknown = null;
 
-  function browserStore(): LayoutStore | null {
-    try {
-      return localStorage;
-    } catch {
-      return null;
-    }
-  }
-
-  let editMode = $state(timelineFits(history.present) ? readMode(browserStore()?.getItem(EDIT_MODE_KEY) ?? null) : EditMode.Design);
+  let editMode = $state(timelineFits(history.present) ? readMode(localStore()?.getItem(EDIT_MODE_KEY) ?? null) : EditMode.Design);
 
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
@@ -307,7 +300,7 @@
     }
     editMode = next;
     try {
-      browserStore()?.setItem(EDIT_MODE_KEY, next);
+      localStore()?.setItem(EDIT_MODE_KEY, next);
     } catch {
       return;
     }
@@ -381,7 +374,7 @@
     if (at !== null) {
       seekTo(at);
     }
-    layout = readLayout(browserStore(), firstLayout());
+    layout = readLayout(localStore(), firstLayout());
     if (selection.length) {
       relayout({ side: Side.Properties, inspector: Panel.Open });
     }
@@ -406,7 +399,7 @@
 
   function relayout(next: Partial<EditorLayout>) {
     layout = { ...layout, ...next };
-    writeLayout(browserStore(), layout);
+    writeLayout(localStore(), layout);
   }
 
   function startResize(e: PointerEvent) {

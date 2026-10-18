@@ -62,7 +62,9 @@ export enum UndoRoute {
 
 export type HostShift = { dx: number; dy: number; dw: number; dh: number };
 
-export type HostDrag = (shift: HostShift, to: PointerPoint, phase: DragPhase) => void;
+export type HostMove = HostShift & { turn: number };
+
+export type HostDrag = (move: HostMove, to: PointerPoint, phase: DragPhase) => void;
 
 const leads = (unit: number) => (unit === 0 ? 1 : 0);
 const grows = (unit: number) => (unit === 0 ? -1 : unit === 1 ? 1 : 0);
@@ -74,4 +76,12 @@ export function hostShift(unit: [number, number] | null, from: PointerPoint, to:
     return { dx: x, dy: y, dw: 0, dh: 0 };
   }
   return { dx: leads(unit[0]) * x, dy: leads(unit[1]) * y, dw: grows(unit[0]) * x, dh: grows(unit[1]) * y };
+}
+
+const DEGREES_PER_RADIAN = 180 / Math.PI;
+
+export function hostTurn(centre: PointerPoint, from: PointerPoint, to: PointerPoint): number {
+  const angle = (p: PointerPoint) => Math.atan2(p.y - centre.y, p.x - centre.x);
+  const swept = (angle(to) - angle(from)) * DEGREES_PER_RADIAN;
+  return ((swept + 540) % 360) - 180;
 }

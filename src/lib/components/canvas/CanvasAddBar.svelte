@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localStore } from '$lib/browser-storage';
   import type { Snippet } from 'svelte';
   import Upload from '@lucide/svelte/icons/upload';
   import LayoutGrid from '@lucide/svelte/icons/layout-grid';
@@ -119,7 +120,7 @@
     }
   }
 
-  let mode = $state(typeof localStorage === 'undefined' ? BarMode.Generate : storedMode());
+  let mode = $state(localStore() ? storedMode() : BarMode.Generate);
 
   function pickMode(next: BarMode) {
     mode = next;

@@ -185,11 +185,8 @@ test.describe('motion editor on a phone @real', () => {
 
     await page.getByRole('button', { name: 'Add', exact: true }).tap();
     await page.getByRole('menuitem', { name: 'Title', exact: true }).tap();
-    const clip = page.locator('[data-clip-id]').last();
-    await clip.scrollIntoViewIfNeeded();
-    await clip.tap();
-
-    await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' }).tap();
+    await expect(page.locator('[data-clip-id]').last(), 'the new clip is selected').toHaveClass(/selected/);
+    await expect(page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' }), 'selecting on a phone peeks Properties').toHaveAttribute('aria-pressed', 'true');
     await page.locator('[data-section="layout"] .section-head').tap();
     const opacity = page.getByRole('textbox', { name: 'Opacity', exact: true }).first();
     await opacity.fill('50');
@@ -206,7 +203,7 @@ test.describe('motion editor on a phone @real', () => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
 
-    await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Agent' }).tap();
+    await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chat' }).tap();
     await expect(page.getByLabel('Agent', { exact: true })).toBeVisible();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fractionIn, hostShift, isOutside } from './canvas-drop';
+import { fractionIn, hostShift, hostTurn, isOutside } from './canvas-drop';
 
 describe('where a drop lands inside a frame', () => {
   const stage = { left: 100, top: 50, width: 200, height: 100 };
@@ -37,6 +37,13 @@ describe('a gesture on a free element moves or sizes its node', () => {
 
   it('the top-left corner moves the corner and shrinks by as much', () => {
     expect(hostShift([0, 0], from, to)).toEqual({ dx: 30, dy: 20, dw: -30, dh: -20 });
+  });
+
+  it('a rotate grip turns the node by the angle swept around its centre', () => {
+    const centre = { x: 0, y: 0 };
+    expect(hostTurn(centre, { x: 10, y: 0 }, { x: 0, y: 10 })).toBeCloseTo(90);
+    expect(hostTurn(centre, { x: 10, y: 0 }, { x: 0, y: -10 })).toBeCloseTo(-90);
+    expect(hostTurn(centre, { x: -10, y: 1 }, { x: -10, y: -1 })).toBeCloseTo(11.42, 1);
   });
 
   it('a side handle sizes one axis only', () => {

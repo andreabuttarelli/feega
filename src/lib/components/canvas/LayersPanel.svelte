@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localStore } from '$lib/browser-storage';
   import Eye from '@lucide/svelte/icons/eye';
   import EyeOff from '@lucide/svelte/icons/eye-off';
   import Lock from '@lucide/svelte/icons/lock';
@@ -37,7 +38,7 @@
   let outlines = $state.raw<OutlineCache>({});
   const known = $derived({ ...canvas?.outlines, ...outlines });
   let opening = $state<{ nodeId: string; id: string } | null>(null);
-  let folds = $state.raw<Set<string>>(typeof localStorage === 'undefined' ? new Set() : readFolds(localStorage));
+  let folds = $state.raw<Set<string>>(localStore() ? readFolds(localStore()!) : new Set());
 
   const rows = $derived(layerRows(canvas?.nodes ?? [], video ? { nodeId: video.nodeId, doc: video.doc, parts: video.parts, mode: video.mode } : null, outlinesFor(heads, known), folds));
   const elements = $derived(new Set((canvas?.nodes ?? []).filter((n) => n.element).map((n) => n.id)));
