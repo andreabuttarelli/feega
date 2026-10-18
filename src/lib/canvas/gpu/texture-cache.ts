@@ -6,7 +6,7 @@ const BUDGET_BYTES = 256 * 1024 * 1024;
 const RGBA = 4;
 
 export type TextureCache = {
-  want: (url: string, ready: (tex: Texture) => void) => void;
+  want: (url: string, ready: (tex: Texture) => void) => () => void;
   clear: () => void;
 };
 
@@ -19,20 +19,32 @@ async function load(url: string): Promise<ImageBitmap> {
 }
 
 export function createTextureCache(changed: () => void): TextureCache {
-  const lru = createLru<Texture>(BUDGET_BYTES, (_url, tex) => tex.destroy(true));
+  const users = new Map<string, number>();
+  const lru = createLru<Texture>(BUDGET_BYTES, (_url, tex) => tex.destroy(true), (url) => (users.get(url) ?? 0) > 0);
+  const hold = (url: string) => {
+    users.set(url, (users.get(url) ?? 0) + 1);
+    let held = true;
+    return () => {
+      if (held) {
+        held = false;
+        users.set(url, (users.get(url) ?? 1) - 1);
+      }
+    };
+  };
   const pending = new Map<string, ((tex: Texture) => void)[]>();
 
   return {
     want(url, ready) {
+      const release = hold(url);
       const hit = lru.get(url);
       if (hit) {
         ready(hit);
-        return;
+        return release;
       }
       const waiting = pending.get(url);
       if (waiting) {
         waiting.push(ready);
-        return;
+        return release;
       }
       pending.set(url, [ready]);
       count(Counter.Fetch);
@@ -51,6 +63,7 @@ export function createTextureCache(changed: () => void): TextureCache {
           pending.delete(url);
           reportPending(pending.size);
         });
+      return release;
     },
     clear() {
       lru.clear();
