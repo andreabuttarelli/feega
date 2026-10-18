@@ -47,6 +47,7 @@ import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/c
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
@@ -1339,6 +1340,7 @@ export const actions: Actions<CanvasParams> = {
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
       nodeIds,
+      offset: offsetFrom(fd.get('dx'), fd.get('dy')),
       actor: userActor(scope)
     });
 

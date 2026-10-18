@@ -544,6 +544,12 @@ non fidarsi del proprio ramo stava per essere depositata sulla base di un loop m
 Questa lezione è più forte delle altre due che l'hanno accompagnata, perché quelle dipendono da
 qualcuno che si ricordi di controllare; questa toglie la possibilità che il taglio sia dannoso.
 
+### Il dev server serve il branch di prima dopo un checkout nello stesso worktree
+Segnale: una spec e2e fallisce come se la modifica non ci fosse (voce di menu assente, gesto che
+non fa niente) e `curl http://localhost:<porta>/src/<file>` non contiene il codice appena scritto.
+Vite non sempre vede i file cambiati in blocco da un cambio di branch. Mossa: dopo ogni cambio di
+branch riavvia il dev server e controlla col `curl` del modulo prima di credere a un rosso e2e.
+
 ## Test: distinguere il tuo difetto dal rumore
 
 ### CI rossa con zero test falliti è una promessa non attesa, non un test tuo

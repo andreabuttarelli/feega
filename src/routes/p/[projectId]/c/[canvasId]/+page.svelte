@@ -35,6 +35,7 @@
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
+  import { repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { canvasLink } from '$lib/realtime/canvas-link';
@@ -2912,10 +2913,15 @@
     };
   }
 
-  async function duplicate(ids: string[]) {
-    const result = await post('duplicate', { node_ids: ids.join(',') });
+  let lastDuplicate: LastDuplicate | null = null;
+
+  async function duplicate(ids: string[], dragged?: Offset) {
+    const offset = dragged ?? repeatOffset(lastDuplicate, ids);
+    const fields: Fields = offset ? { node_ids: ids.join(','), dx: offset.dx, dy: offset.dy } : { node_ids: ids.join(',') };
+    const result = await post('duplicate', fields);
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];
     const connected = (result?.connections ?? []) as Connection[];
+    lastDuplicate = offset && created.length ? { ids: created.map((n) => n.id), offset } : null;
     if (created.length) { nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))]; }
     if (connected.length) { edges = [...edges, ...connected.map(toEdge)]; }
     if (created.length) { pushGesture(createManyGesture(created, connected)); }
