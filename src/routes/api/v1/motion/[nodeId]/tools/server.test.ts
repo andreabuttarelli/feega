@@ -221,6 +221,59 @@ describe('auto layout sizing through the endpoint', () => {
   });
 });
 
+const clips = async () => (await head()).tracks.flatMap((t) => t.clips);
+const three = async () => [await shape({ x: 300, y: 675, width: 300, height: 300 }), await shape({ x: 400, y: 675, width: 300, height: 300 }), await shape({ x: 500, y: 675, width: 300, height: 300 })];
+
+describe('layer tools through the endpoint', () => {
+  it('arrange_layers moves one clip of a shared track in the stack', async () => {
+    const [a, b, c] = await three();
+
+    expect((await tool('arrange_layers', { clip_ids: [a], to: 'front' })).ok).toBe(true);
+    expect(await stack()).toEqual([a, c, b]);
+    expect((await tool('arrange_layers', { clip_ids: [a], to: 'back' })).ok).toBe(true);
+    expect((await stack()).at(-1)).toBe(a);
+    expect((await tool('arrange_layers', { clip_ids: [a], to: 'forward' })).ok).toBe(true);
+    expect(await stack()).toEqual([c, a, b]);
+  });
+
+  it('use_as_mask makes the lowest clip mask the others, then release_mask undoes it', async () => {
+    const [mask, a, b] = await three();
+
+    const out = await tool('use_as_mask', { clip_ids: [mask, a, b] });
+
+    expect(out.ok).toBe(true);
+    expect(JSON.stringify(await head())).toContain(mask);
+    expect((await tool('release_mask', { mask_id: mask })).ok).toBe(true);
+  });
+
+  it('combine_shapes leaves the bottom shape as the result', async () => {
+    const [a, b] = await three();
+
+    expect((await tool('combine_shapes', { clip_ids: [a, b], op: 'union' })).ok).toBe(true);
+    expect((await clips()).map((c) => c.id)).not.toContain(b);
+  });
+
+  it('precompose groups clips into one and ungroup puts them back', async () => {
+    const [a, b] = await three();
+
+    const out = await tool('precompose', { clip_ids: [a, b] });
+
+    expect(out.ok).toBe(true);
+    expect((await clips()).map((c) => c.id)).not.toContain(a);
+    expect((await tool('ungroup', { clip_id: out.clip_id })).ok).toBe(true);
+    expect((await clips()).map((c) => c.id)).toEqual(expect.arrayContaining([a, b]));
+  });
+
+  it('parent_clips groups clips under a new null', async () => {
+    const [a, b] = await three();
+
+    const out = await tool('parent_clips', { clip_ids: [a, b] });
+
+    expect(out.ok).toBe(true);
+    expect((await clips()).filter((c) => c.parent === out.null_id).map((c) => c.id).sort()).toEqual([a, b].sort());
+  });
+});
+
 describe('GET /api/v1/motion/tools lists them', () => {
   const get = (query = '') => {
     const url = new URL(`https://feega.test/api/v1/motion/tools${query}`);
