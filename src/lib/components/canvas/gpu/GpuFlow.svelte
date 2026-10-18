@@ -123,6 +123,7 @@
   let selectedEdge = $state<string | null>(null);
   let hovered = $state<string | null>(null);
   let overrides = $state<Map<string, Box>>(new Map());
+  let copies = $state<Map<string, Box>>(new Map());
   let marquee = $state<Box | null>(null);
   let ghost = $state<{ from: Port; at: Point; ok: boolean } | null>(null);
   let refusal = $state<string | null>(null);
@@ -786,7 +787,7 @@
             select([...a.origins.keys()]);
           }
         }
-        const next = new Map(overrides);
+        const next = new Map<string, Box>();
         const raw = movedBy(a.origins, { x: w.x - a.start.x, y: w.y - a.start.y });
         const moved = snapMoves(raw);
         const all = new Map(tiles.map((t) => [t.id, { x: t.x, y: t.y }]));
@@ -797,7 +798,13 @@
             next.set(m.id, { x: m.x, y: m.y, w: t.w, h: t.h });
           }
         }
-        overrides = next;
+        if (e.altKey) {
+          copies = next;
+          overrides = new Map();
+        } else {
+          overrides = next;
+          copies = new Map();
+        }
         props.onLive?.(moved.map((m) => ({ id: m.id, x: m.x, y: m.y })));
         props.onTileDragOver?.([...a.origins.keys()], pointOf(e));
       },
@@ -930,6 +937,7 @@
 
   function settleOverrides() {
     overrides = new Map();
+    copies = new Map();
   }
 
   function clearSelection() {
@@ -959,7 +967,7 @@
       settleOverrides();
       return;
     }
-    const grabbed = overrides.get(ids[0]);
+    const grabbed = copies.get(ids[0]) ?? overrides.get(ids[0]);
     const copyOffset = e.altKey && grabbed ? dragOffset(new Map(tiles.map((t) => [t.id, { x: t.x, y: t.y }])), { id: ids[0], position: grabbed }) : undefined;
     if (copyOffset && props.onDuplicate) {
       settleOverrides();
@@ -1383,6 +1391,9 @@
           </g>
         {/each}
       </svg>
+      {#each [...copies] as [id, c] (id)}
+        <div class="gpu-copy-ghost" data-testid="gpu-copy-ghost" style={`transform: translate(${c.x}px, ${c.y}px);width:${c.w}px;height:${c.h}px`}></div>
+      {/each}
       {#each placed as t (t.id)}
         {@const on = selected.includes(t.id)}
         <div
@@ -1586,6 +1597,15 @@
   .gpu-node {
     left: 0;
     top: 0;
+  }
+
+  .gpu-copy-ghost {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+    border: 1.5px dashed var(--ui-accent, #0a84ff);
+    background: color-mix(in srgb, var(--ui-accent, #0a84ff) 8%, transparent);
   }
 
   .gpu-node :global(.svelte-flow__handle.typed-port) {
