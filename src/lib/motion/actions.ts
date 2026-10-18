@@ -206,6 +206,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.Redo]: { name: 'Redo', icon: Redo, group: GuideGroup.Edit, place: Place.Bar },
   [Command.Copy]: { name: 'Copy', icon: ClipboardCopy, group: GuideGroup.Edit, menu: MenuSection.Keyframes },
   [Command.Paste]: { name: 'Paste', icon: ClipboardPaste, group: GuideGroup.Edit, menu: MenuSection.Keyframes },
+  [Command.SelectMatching]: { name: 'Select matching layers', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.SelectAll]: { name: 'Select all clips', icon: ListChecks, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.Deselect]: { name: 'Deselect', icon: X, group: GuideGroup.Edit, gesture: 'Tap an empty lane', menu: MenuSection.Layer },
   [Command.SelectChild]: { name: 'Select inside', icon: CornerRightDown, group: GuideGroup.Edit, gesture: 'Double-click', menu: MenuSection.Layer },

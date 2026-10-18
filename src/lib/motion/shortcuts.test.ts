@@ -207,6 +207,13 @@ describe('mask keys', () => {
   });
 });
 
+describe('select matching key', () => {
+  it('⌥⌘A selects every layer like the selected ones', () => {
+    expect(press('å', { mod: true, alt: true, code: 'KeyA' })).toBe(Command.SelectMatching);
+    expect(press('a', { mod: true, code: 'KeyA' })).toBe(Command.SelectAll);
+  });
+});
+
 describe('layer order keys', () => {
   it('⌘] and ⌘[ step a layer, with ⌥ all the way', () => {
     expect(press(']', { mod: true, code: 'BracketRight' })).toBe(Command.BringForward);
