@@ -321,7 +321,7 @@ function sizingOf(doc: MotionDoc, input: { format?: MotionFormat; size?: CanvasS
 
 export function setCanvas(doc: MotionDoc, input: { format?: MotionFormat; size?: CanvasSize; durationInFrames?: number; background?: Background }): OpResult {
   const { freeSize, ...size } = sizingOf(doc, input);
-  if (!fitsResolution(size)) {
+  if (!fitsResolution({ ...size, still: doc.still })) {
     return fail(`${size.width}×${size.height}: ${RESOLUTION_PROBLEM}`);
   }
   const durationInFrames = Math.round(input.durationInFrames ?? doc.durationInFrames);

@@ -148,3 +148,36 @@ describe('the cover frame a frame node shows, closed or just opened', () => {
     expect(made.ok && coverFrame(made.doc)).toBe(60);
   });
 });
+
+describe('a still design frame is not held to the video resolution', () => {
+  const page = () => {
+    const pinned = setStill(newMotionDoc(MotionFormat.Landscape), 0);
+    if (!pinned.ok) {
+      throw new Error(pinned.error);
+    }
+    return pinned.doc;
+  };
+
+  it('takes any size, a 1440×6000 page or a 1×1 dot', () => {
+    const sized = setCanvas(page(), { size: { width: 1440, height: 6000 } });
+
+    expect(sized.ok && [sized.doc.width, sized.doc.height]).toEqual([1440, 6000]);
+    expect(setCanvas(page(), { size: { width: 1, height: 1 } }).ok).toBe(true);
+    expect(sized.ok && parseMotionDoc(sized.doc).ok).toBe(true);
+  });
+
+  it('refuses a side past the GPU texture limit', () => {
+    expect(setCanvas(page(), { size: { width: 1440, height: 16385 } }).ok).toBe(false);
+  });
+
+  it('a video keeps the 1080p cap', () => {
+    expect(setCanvas(newMotionDoc(MotionFormat.Landscape), { size: { width: 1440, height: 4000 } }).ok).toBe(false);
+    expect(parseMotionDoc({ ...page(), width: 1440, height: 4000, still: undefined }).ok).toBe(false);
+  });
+
+  it('a tall design frame cannot turn into a video', () => {
+    const tall = setCanvas(page(), { size: { width: 1440, height: 4000 } });
+
+    expect(tall.ok && setStill(tall.doc, null).ok).toBe(false);
+  });
+});
