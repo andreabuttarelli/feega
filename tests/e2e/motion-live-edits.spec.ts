@@ -15,7 +15,7 @@ test.describe('motion agent live edits @real', () => {
     const node = await seedNode({ type: 'motion', data: MOTION_DATA });
     const saved: string[] = [];
 
-    await page.route(/\/motion\/[^/]+\/agent$/, (route) => {
+    await page.route(/\/api\/v1\/projects\/[^/]+\/(motion\/[^/]+\/)?agent$/, (route) => {
       if (route.request().method() !== 'POST') {
         return route.fallback();
       }
