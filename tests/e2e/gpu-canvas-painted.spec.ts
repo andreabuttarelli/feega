@@ -68,6 +68,27 @@ test.describe('every visible node on the GPU canvas stays painted @real', () => 
     }
   });
 
+  test('the canvas shows itself only once every node in view has its preview', async ({ browser }) => {
+    const reveals: string[] = [];
+    for (let run = 0; run < RUNS; run++) {
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+      const page = await ctx.newPage();
+      await signInE2e(page, ACCOUNT());
+      for (const visit of ['cold', 'warm']) {
+        await gotoHydrated(page, `/p/${process.env.GPU_FIXTURE_PROJECT}/c/${process.env.GPU_FIXTURE_CANVAS}`);
+        await page.waitForSelector('[data-revealed="true"]', { timeout: 30_000 });
+        const reveal = await page.evaluate(() => (window as unknown as { __gpuCanvas?: { reveal?: { ms: number; missing: string[] } } }).__gpuCanvas?.reveal);
+        const settled = await page.waitForFunction(() => (window as unknown as { __gpuCanvas?: { settled?: number } }).__gpuCanvas?.settled, undefined, { timeout: 30_000 }).then((h) => h.jsonValue()).catch(() => null);
+        reveals.push(`${visit} ${run}: shown ${reveal?.ms} ms with ${reveal?.missing.length} missing, all painted ${settled} ms`);
+        console.log(`[reveal] ${reveals.at(-1)}`);
+        expect.soft(reveal?.missing, `${visit} run ${run}: nodes without a preview when the canvas appeared`).toEqual([]);
+        await page.waitForTimeout(visit === 'cold' ? SETTLE_MS * 4 : 0);
+      }
+      await ctx.close();
+    }
+    console.log(`[reveal] ${reveals.join(' | ')}`);
+  });
+
   test('zooming out to the minimum and back, at every step', async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, colorScheme: (process.env.PAINTED_SCHEME as 'dark' | 'light') ?? 'light' });
     const page = await ctx.newPage();
