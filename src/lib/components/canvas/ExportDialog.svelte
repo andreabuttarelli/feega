@@ -1,16 +1,15 @@
 <script lang="ts">
-  import { IMAGE_FORMATS, ImageFormat, attachmentUrl } from '$lib/motion/still-model';
-  import { MAX_SCALE, MIN_SCALE, SizeBy, type ExportRow } from '$lib/motion/export-rows';
+  import { attachmentUrl } from '$lib/motion/still-model';
+  import { FILE, FILE_FORMATS, FileFormat, LOSSY, MAX_SCALE, MIN_SCALE, SizeBy, type ExportRow } from '$lib/motion/export-rows';
 
   type Made = { url: string; name: string; files: string[] };
 
   let { count, onexport, onclose }: { count: number; onexport: (rows: ExportRow[]) => Promise<Made | string>; onclose: () => void } = $props();
 
-  const LOSSY = new Set([ImageFormat.Jpg, ImageFormat.Webp]);
   const DEFAULT_QUALITY = 90;
   const SIZE_LABEL: Record<SizeBy, string> = { [SizeBy.Scale]: '×', [SizeBy.Width]: 'w', [SizeBy.Height]: 'h' };
 
-  const fresh = (): ExportRow => ({ format: ImageFormat.Png, by: SizeBy.Scale, value: 1, suffix: '', transparent: false });
+  const fresh = (): ExportRow => ({ format: FileFormat.Png, by: SizeBy.Scale, value: 1, suffix: '', transparent: false });
 
   let rows = $state<ExportRow[]>([fresh()]);
   let working = $state(false);
@@ -53,8 +52,8 @@
           {#each Object.values(SizeBy) as by (by)}<option value={by}>{SIZE_LABEL[by]}</option>{/each}
         </select>
         <input type="text" aria-label="Suffix" placeholder="Suffix" value={row.suffix} onchange={(e) => patch(i, { suffix: e.currentTarget.value })} />
-        <select aria-label="Format" value={row.format} onchange={(e) => patch(i, { format: e.currentTarget.value as ImageFormat })}>
-          {#each IMAGE_FORMATS as f (f)}<option value={f}>{f.toUpperCase()}</option>{/each}
+        <select aria-label="Format" value={row.format} onchange={(e) => patch(i, { format: e.currentTarget.value as FileFormat })}>
+          {#each FILE_FORMATS as f (f)}<option value={f}>{FILE[f].label}</option>{/each}
         </select>
         {#if row.quality !== undefined}
           <input type="number" aria-label="Quality" min="1" max="100" value={row.quality} onchange={(e) => patch(i, { quality: Number(e.currentTarget.value) })} />

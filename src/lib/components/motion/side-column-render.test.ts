@@ -6,35 +6,27 @@ import { ChatPlace, Side } from '$lib/motion/editor-layout';
 
 const pane = (id: string) => createRawSnippet(() => ({ render: () => `<p data-testid="${id}">${id}</p>` }));
 
-const html = (side: Side, busy = false, place = ChatPlace.Column) =>
-  render(SideColumn, { props: { place, side, onside: () => {}, widthPx: 400, onwidth: () => {}, busy, chat: pane('the-chat'), properties: pane('the-props') } }).body;
+const html = (side: Side, place = ChatPlace.Column) =>
+  render(SideColumn, { props: { place, side, onside: () => {}, widthPx: 400, onwidth: () => {}, chat: pane('the-chat'), properties: pane('the-props') } }).body;
 
 describe('side column', () => {
-  it('keeps the chat mounted, only hidden, while Properties shows', () => {
+  it('in the desktop column the chat stays shown: the right bar draws the tabs, not a second column', () => {
     const body = html(Side.Properties);
 
     expect(body).toContain('data-testid="the-chat"');
-    expect(body).toMatch(/data-pane="chat"[^>]*hidden/);
-    expect(body).not.toMatch(/data-pane="properties"[^>]*hidden/);
+    expect(body).not.toContain('role="tablist"');
+    expect(body).not.toMatch(/data-pane="chat"[^>]*hidden/);
   });
 
-  it('is a tablist of two segments, the shown one selected', () => {
-    const body = html(Side.Chat);
-
-    expect(body).toContain('role="tablist"');
-    expect(body).toMatch(/role="tab"[^>]*aria-selected="true"[^>]*>Chat/);
-    expect(body).toMatch(/data-pane="properties"[^>]*hidden/);
-  });
-
-  it('marks the hidden chat while the agent runs', () => {
-    expect(html(Side.Properties, true)).toContain('data-testid="chat-activity"');
-    expect(html(Side.Chat, true)).not.toContain('data-testid="chat-activity"');
+  it('in the desktop column Properties leaves for the right bar, beside Guide', () => {
+    expect(html(Side.Properties)).not.toContain('data-testid="the-props"');
   });
 
   it('hides nothing and draws no tabs outside the desktop column', () => {
-    const body = html(Side.Properties, false, ChatPlace.Drawer);
+    const body = html(Side.Properties, ChatPlace.Drawer);
 
     expect(body).not.toContain('role="tablist"');
+    expect(body).toContain('data-testid="the-props"');
     expect(body).not.toMatch(/data-pane="chat"[^>]*hidden/);
   });
 });

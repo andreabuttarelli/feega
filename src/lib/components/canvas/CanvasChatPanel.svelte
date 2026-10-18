@@ -4,42 +4,20 @@
 
 <script lang="ts">
   import { _ } from 'svelte-i18n';
-  import { CHROME_LOADERS } from '$lib/canvas/chrome-loaders';
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
-  import { readChatPanelPx, writeChatPanelPx, readChatTab, writeChatTab, CHAT_PANEL, type ChatTab } from '$lib/shell-prefs';
-  import { guideOpenRequest } from '$lib/canvas/guide-open';
+  import { readChatPanelPx, writeChatPanelPx, CHAT_PANEL } from '$lib/shell-prefs';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
-  import CanvasGuideTab from './CanvasGuideTab.svelte';
   import { replaceState } from '$app/navigation';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
   import { handoffOf, withoutHandoff, type ChatHandoff } from '$lib/canvas/chat-handoff';
+  import BarSlot from '$lib/components/brand-agent/BarSlot.svelte';
+  import { BarTab, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
 
-  let {
-    projectId,
-    brandSlug,
-    open,
-    viewOnly = false
-  }: {
-    projectId: string;
-    brandSlug: string;
-    open: boolean;
-    viewOnly?: boolean;
-  } = $props();
+  let { open }: { open: boolean } = $props();
 
   let widthPx = $state(readChatPanelPx());
-  let tab = $state<ChatTab>(readChatTab());
-
-  function selectTab(next: ChatTab) {
-    tab = next;
-    writeChatTab(next);
-  }
-
-  $effect(() => {
-    if ($guideOpenRequest) selectTab('guide');
-  });
-
   let prefill = $state<ChatPrefill | null>(null);
 
   $effect(() => {
@@ -48,7 +26,7 @@
       return;
     }
     taken.last = handoff;
-    selectTab('chat');
+    rightBar.select(BarTab.Chat);
     prefill = briefPrefill(handoff.text, handoff.attachments, Date.now());
     replaceState(withoutHandoff($page.url), $page.state);
   });
@@ -88,37 +66,12 @@
       onpointerdown={onResizeStart}
     ></div>
     <div class="chat-column">
-      <nav class="chat-tabs" aria-label={$_('app.shell.rail')}>
-        <button type="button" class="chat-tab" aria-pressed={tab === 'chat'} class:is-active={tab === 'chat'} onclick={() => selectTab('chat')}>
-          {$_('app.shell.chatTab')}
-        </button>
-        <button type="button" class="chat-tab" aria-pressed={tab === 'guide'} class:is-active={tab === 'guide'} onclick={() => selectTab('guide')}>
-          {$_('app.shell.guideTab')}
-        </button>
-      </nav>
-      <div class="chat-body" class:is-guide={tab === 'guide'}>
-        {#if tab === 'guide'}
-          <CanvasGuideTab initialSlug={$guideOpenRequest} onopened={() => guideOpenRequest.set(null)} />
-        {:else if viewOnly}
-          <p class="chat-view-only" data-testid="chat-view-only">View only: the chat edits the canvas and spends credits. Ask an admin for edit access.</p>
-        {:else if browser}
-          {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
-            <ChatPanel {projectId} {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
-          {/await}
-        {/if}
-      </div>
+      <BarSlot {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
     </div>
   </div>
 {/if}
 
 <style>
-  .chat-view-only {
-    margin: 0;
-    padding: var(--ui-space-4);
-    color: var(--ui-text-secondary);
-    font-size: var(--ui-type-caption);
-  }
-
   .chat-pane {
     position: relative;
     flex: 0 0 auto;
@@ -155,55 +108,6 @@
     flex-direction: column;
   }
 
-  .chat-tabs {
-    flex: 0 0 auto;
-    align-self: flex-start;
-    display: flex;
-    gap: 2px;
-    margin: 8px 12px 4px;
-    padding: 2px;
-    border-radius: var(--ui-radius-md);
-    background: var(--ui-input);
-  }
-
-  .chat-tab {
-    position: relative;
-    height: 28px;
-    padding: 0 12px;
-    border: 0;
-    border-radius: var(--ui-radius-sm);
-    background: transparent;
-    font: inherit;
-    font-size: var(--ui-type-body);
-    font-weight: var(--ui-weight-medium);
-    color: var(--ui-text-secondary);
-    cursor: pointer;
-  }
-  .chat-tab:hover {
-    color: var(--ui-text);
-  }
-  .chat-tab.is-active {
-    background: var(--ui-panel-raised);
-    color: var(--ui-text);
-    font-weight: var(--ui-weight-semibold);
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
-  }
-  .chat-tab:focus-visible {
-    outline: none;
-    box-shadow: var(--ui-ring);
-  }
-
-  .chat-body {
-    flex: 1;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-  }
-  .chat-body.is-guide {
-    padding: 10px 12px;
-    overflow: auto;
-  }
-
   @media (max-width: 767px) {
     .chat-pane {
       width: 100%;
@@ -212,10 +116,6 @@
     }
     .chat-resize-handle {
       display: none;
-    }
-    .chat-tab {
-      min-width: 44px;
-      font-size: 14px;
     }
   }
 </style>

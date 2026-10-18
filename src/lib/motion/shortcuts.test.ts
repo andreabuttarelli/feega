@@ -214,6 +214,24 @@ describe('scale tool key', () => {
   });
 });
 
+describe('pixel grid key', () => {
+  it("⇧' shows or hides the pixel grid", () => {
+    expect(press('"', { shift: true, code: 'Quote' })).toBe(Command.TogglePixelGrid);
+  });
+});
+
+describe('layout guides key', () => {
+  it('⇧G shows or hides the layout guides', () => {
+    expect(press('G', { shift: true, code: 'KeyG' })).toBe(Command.ToggleLayoutGuides);
+  });
+});
+
+describe('outline view key', () => {
+  it('⌘Y switches the frame to outlines and back', () => {
+    expect(press('y', { mod: true, code: 'KeyY' })).toBe(Command.ToggleOutlines);
+  });
+});
+
 describe('select matching key', () => {
   it('⌥⌘A selects every layer like the selected ones', () => {
     expect(press('å', { mod: true, alt: true, code: 'KeyA' })).toBe(Command.SelectMatching);

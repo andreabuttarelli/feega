@@ -1,5 +1,30 @@
 import { z } from 'zod';
-import { IMAGE_FORMATS, ImageFormat } from './still-model';
+
+export enum FileFormat {
+  Png = 'png',
+  Jpg = 'jpg',
+  Webp = 'webp',
+  Svg = 'svg',
+  Pdf = 'pdf'
+}
+
+export const FILE_FORMATS = Object.values(FileFormat) as [FileFormat, ...FileFormat[]];
+
+export enum Drawing {
+  Raster = 'raster',
+  Vector = 'vector',
+  Pages = 'pages'
+}
+
+const LOSSY_QUALITY = 92;
+
+export const FILE: Record<FileFormat, { mime: string; drawing: Drawing; label: string; quality?: number }> = {
+  [FileFormat.Png]: { mime: 'image/png', drawing: Drawing.Raster, label: 'PNG' },
+  [FileFormat.Jpg]: { mime: 'image/jpeg', drawing: Drawing.Raster, label: 'JPG', quality: LOSSY_QUALITY },
+  [FileFormat.Webp]: { mime: 'image/webp', drawing: Drawing.Raster, label: 'WebP', quality: LOSSY_QUALITY },
+  [FileFormat.Svg]: { mime: 'image/svg+xml', drawing: Drawing.Vector, label: 'SVG' },
+  [FileFormat.Pdf]: { mime: 'application/pdf', drawing: Drawing.Pages, label: 'PDF' }
+};
 
 export enum SizeBy {
   Scale = 'scale',
@@ -17,11 +42,11 @@ export const MAX_SCALE = 4;
 const MAX_SIDE = 8192;
 const MAX_ROWS = 8;
 const SUFFIX_MAX = 32;
-const LOSSY = new Set([ImageFormat.Jpg, ImageFormat.Webp]);
+export const LOSSY: ReadonlySet<FileFormat> = new Set([FileFormat.Jpg, FileFormat.Webp]);
 
 const rowSchema = z
   .object({
-    format: z.enum(IMAGE_FORMATS),
+    format: z.enum(FILE_FORMATS),
     by: z.enum(SizeBy).default(SizeBy.Scale),
     value: z.number().positive(),
     suffix: z.string().max(SUFFIX_MAX).default(''),
@@ -36,6 +61,8 @@ export const exportRowsSchema = z.array(rowSchema).min(1).max(MAX_ROWS);
 
 export type ExportRow = z.infer<typeof rowSchema>;
 
+export const exportElementsSchema = z.array(z.object({ frameId: z.string(), elementId: z.string() }).strict()).max(50);
+
 type Size = { width: number; height: number };
 
 export function rowSize(row: ExportRow, frame: Size): Size & { scale: number } {
@@ -43,18 +70,23 @@ export function rowSize(row: ExportRow, frame: Size): Size & { scale: number } {
   return { width: Math.round(frame.width * scale), height: Math.round(frame.height * scale), scale };
 }
 
-export type ExportFrame = { id: string; name: string };
+export type ExportFrame = { id: string; name: string; elementId?: string; elementName?: string };
 
-export type ExportFile = { frameId: string; row: ExportRow; name: string };
+export type ExportFile = { targets: ExportFrame[]; row: ExportRow; name: string };
 
-export function exportFiles(frames: readonly ExportFrame[], rows: readonly ExportRow[]): ExportFile[] {
+const nameOf = (frame: ExportFrame) => (frame.elementName ? `${frame.name} - ${frame.elementName}` : frame.name);
+
+export function exportFiles(frames: readonly ExportFrame[], rows: readonly ExportRow[], bundleName: string): ExportFile[] {
   const seen = new Map<string, number>();
-  return frames.flatMap((frame) => {
-    const count = (seen.get(frame.name) ?? 0) + 1;
-    seen.set(frame.name, count);
-    const base = count === 1 ? frame.name : `${frame.name} ${count}`;
-    return rows.map((row) => ({ frameId: frame.id, row, name: `${base}${row.suffix}.${row.format}` }));
+  const named = frames.map((frame) => {
+    const base = nameOf(frame);
+    const count = (seen.get(base) ?? 0) + 1;
+    seen.set(base, count);
+    return { frame, base: count === 1 ? base : `${base} ${count}` };
   });
+  const paged = rows.filter((row) => FILE[row.format].drawing === Drawing.Pages).map((row) => ({ targets: [...frames], row, name: `${frames.length === 1 ? named[0].base : bundleName}${row.suffix}.${row.format}` }));
+  const single = named.flatMap(({ frame, base }) => rows.filter((row) => FILE[row.format].drawing !== Drawing.Pages).map((row) => ({ targets: [frame], row, name: `${base}${row.suffix}.${row.format}` })));
+  return [...paged, ...single];
 }
 
 export const bundleOf = (files: number): Bundle => (files === 1 ? Bundle.File : Bundle.Zip);

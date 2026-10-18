@@ -1,51 +1,31 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { ChatPlace, SIDE_DEFAULT_PX, Side, sideWidth } from '$lib/motion/editor-layout';
+  import { ChatPlace, SIDE_DEFAULT_PX, sideWidth } from '$lib/motion/editor-layout';
+  import { rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
 
   let {
     place,
-    side,
-    onside,
     widthPx,
     onwidth,
     oncommit,
-    busy,
     chat,
     properties
   }: {
     place: ChatPlace;
-    side: Side;
-    onside: (side: Side) => void;
     widthPx: number;
     onwidth: (px: number) => void;
     oncommit?: () => void;
-    busy: boolean;
     chat: Snippet;
     properties: Snippet;
   } = $props();
 
-  const SEGMENTS: readonly { side: Side; label: string }[] = [
-    { side: Side.Chat, label: 'Chat' },
-    { side: Side.Properties, label: 'Properties' }
-  ];
   const KEY_STEP_PX = 16;
   const KEY_DELTA: Record<string, number> = { ArrowLeft: KEY_STEP_PX, ArrowRight: -KEY_STEP_PX };
 
   const docked = $derived(place === ChatPlace.Column);
-  const tabs: HTMLButtonElement[] = [];
 
-  function other(current: Side): Side {
-    return current === Side.Chat ? Side.Properties : Side.Chat;
-  }
-
-  function onTabKey(e: KeyboardEvent) {
-    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') {
-      return;
-    }
-    e.preventDefault();
-    const next = other(side);
-    onside(next);
-    tabs[SEGMENTS.findIndex((s) => s.side === next)]?.focus();
+  function into(node: HTMLElement, target: HTMLElement) {
+    target.appendChild(node);
   }
 
   function startResize(e: PointerEvent) {
@@ -91,25 +71,13 @@
       ondblclick={reset}
       onkeydown={onHandleKey}
     ></div>
-    <div class="segments" role="tablist" aria-label="Side panel" tabindex="-1" onkeydown={onTabKey}>
-      {#each SEGMENTS as segment, i (segment.side)}
-        <button
-          bind:this={tabs[i]}
-          type="button"
-          role="tab"
-          id="side-tab-{segment.side}"
-          aria-selected={side === segment.side}
-          aria-controls="side-pane-{segment.side}"
-          tabindex={side === segment.side ? 0 : -1}
-          data-testid="side-tab-{segment.side}"
-          onclick={() => onside(segment.side)}
-          >{segment.label}{#if segment.side === Side.Chat && busy && side !== Side.Chat}<span class="activity" data-testid="chat-activity" aria-label="Agent running"></span>{/if}</button
-        >
-      {/each}
-    </div>
   {/if}
-  <div class="pane" id="side-pane-properties" data-pane="properties" role={docked ? 'tabpanel' : undefined} hidden={docked && side !== Side.Properties}>{@render properties()}</div>
-  <div class="pane" id="side-pane-chat" data-pane="chat" role={docked ? 'tabpanel' : undefined} hidden={docked && side !== Side.Chat}>{@render chat()}</div>
+  {#if !docked}
+    <div class="pane" data-pane="properties">{@render properties()}</div>
+  {:else if rightBar.propertiesPane}
+    <div class="pane in-bar" data-pane="properties" use:into={rightBar.propertiesPane}>{@render properties()}</div>
+  {/if}
+  <div class="pane" data-pane="chat">{@render chat()}</div>
 </div>
 
 <style>

@@ -77,7 +77,7 @@ test.describe('on a phone the bottom controls never cover each other @real', () 
       await draw.locator('[data-tool="select"]').click();
       await expect(rectangle, 'picking a tool folds them again').toBeHidden();
 
-      await page.getByTestId('open-motion-editor').click();
+      await page.getByTestId('motion-node-stage').first().dblclick();
       await expect(page.getByTestId('add-bar')).toHaveAttribute('data-context', 'frame', { timeout: 15_000 });
       const timeline = page.locator('section[aria-label="Timeline"]');
       await expect(timeline, 'Motion shows the timeline').not.toHaveAttribute('inert', '');
