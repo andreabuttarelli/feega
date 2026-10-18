@@ -1,4 +1,4 @@
-import type { MotionDoc } from './doc';
+import { RESOLUTION_PROBLEM, fitsResolution, type MotionDoc } from './doc';
 import { setCanvas, type OpResult } from './timeline';
 import { timelineFits } from './editor-mount';
 
@@ -28,6 +28,9 @@ export function stillSeconds(doc: Pick<MotionDoc, 'still' | 'fps'>): number | nu
 export function setStill(doc: MotionDoc, seconds: number | null): OpResult {
   if (seconds === null) {
     const { still: _video, ...video } = doc;
+    if (!fitsResolution(video)) {
+      return { ok: false, error: `${doc.width}×${doc.height} cannot become a video: ${RESOLUTION_PROBLEM}` };
+    }
     return { ok: true, doc: video };
   }
   if (!Number.isFinite(seconds) || seconds < 0) {

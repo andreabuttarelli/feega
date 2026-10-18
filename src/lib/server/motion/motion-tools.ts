@@ -26,7 +26,7 @@ import { AssetKind, COMPONENTS, COMPONENT_IDS, TrackKind, type ComponentId } fro
 import { fieldsOf } from '$lib/motion/inspector';
 import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/design';
 import { setFrameRate } from '$lib/motion/frame-rate';
-import { Background, MAX_SIDE, MIN_SIDE, MOTION_FORMATS, clipsOf, findClip, formatOf, type MotionDoc } from '$lib/motion/doc';
+import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, formatOf, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
@@ -403,6 +403,18 @@ const maskInput = z
   })
   .strict();
 
+type ContainerStyle = { fill?: string; stroke?: string; stroke_width?: number; radius?: number };
+
+function containerProps(style: ContainerStyle): Record<string, unknown> {
+  const stroke = style.stroke === undefined ? {} : { stroke: style.stroke, strokeKind: StrokeKind.Solid };
+  return {
+    ...(style.fill === undefined ? {} : { fill: style.fill }),
+    ...stroke,
+    ...(style.stroke_width === undefined ? {} : { strokeWidth: style.stroke_width }),
+    ...(style.radius === undefined ? {} : { roundness: style.radius })
+  };
+}
+
 const SPRING_HELP = '(soft by default; stiffness and damping override it: keep damping near 2·√stiffness for the house soft settle, never a visible bounce).';
 
 const INTERP_HELP = `in/out set how the value enters and leaves a keyframe: bezier (default, uses ease), linear, hold (no change until the next keyframe), auto (smooth, never overshoots), continuous (smooth, keeps speed through). roving true (${SPATIAL_KEYS.join(', ')} only) retimes a middle keyframe so the speed is even.`;
@@ -694,6 +706,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     clipIds.flatMap((id) => effects.map((e) => ({ id, e }))).reduce<OpResult>((r, { id, e }) => (r.ok ? addEffect(r.doc, id, e.kind, deps.newId(), e.params) : r), result);
 
   const created = (out: ReturnType<typeof apply>, clipId: string) => (out.ok ? { ...out, clip_id: clipId } : out);
+
+  const styled = (result: OpResult, clipId: string, style: ContainerStyle): OpResult => {
+    const props = containerProps(style);
+    return result.ok && Object.keys(props).length ? setProps(result.doc, clipId, propsIn('Shape', props)) : result;
+  };
 
   const screens = new Map<string, string>();
 
@@ -1461,14 +1478,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_auto_layout: tool({
-      description: 'Auto layout (flexbox-style). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (its fill is the frame background, set_props to colour it) on a track below them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1).optional(), clip_id: z.string().optional() }),
-      execute: async (input) => {
-        if (input.clip_id) {
-          return apply(setAutoLayout(session.doc, input.clip_id, {}), `auto layout on ${input.clip_id}`);
+      description: 'Auto layout (flexbox-style). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (fill, stroke, stroke_width and radius style it in the same call) drawn directly under them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
+      inputSchema: z.object({
+        clip_ids: z.array(z.string()).min(1).optional(),
+        clip_id: z.string().optional(),
+        fill: z.string().optional().describe('container fill colour'),
+        stroke: z.string().optional().describe('container stroke colour'),
+        stroke_width: z.number().min(0).optional().describe('px'),
+        radius: z.number().min(0).optional().describe('corner roundness, as roundness in set_props')
+      }),
+      execute: async ({ clip_ids, clip_id, ...style }) => {
+        if (clip_id) {
+          return apply(styled(setAutoLayout(session.doc, clip_id, {}), clip_id, style), `auto layout on ${clip_id}`);
         }
         const id = deps.newId();
-        const out = apply(wrapInAutoLayout(session.doc, input.clip_ids ?? [], id, deps.newId()), `wrapped ${input.clip_ids?.length ?? 0} clip(s) in an auto layout`);
+        const out = apply(styled(wrapInAutoLayout(session.doc, clip_ids ?? [], id, deps.newId()), id, style), `wrapped ${clip_ids?.length ?? 0} clip(s) in an auto layout`);
         return out.ok ? { ...out, container_id: id } : out;
       }
     }),
@@ -1997,11 +2021,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_canvas: tool({
-      description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together; the long side up to ${MAX_SIDE}, the short side up to 1080), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor.`,
+      description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together: a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} a side, a video the long side up to ${MAX_SIDE} and the short side up to 1080; pass still with the size to make a tall page in one call), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor.`,
       inputSchema: z.object({
         format: z.enum(MOTION_FORMATS).optional(),
-        width: z.number().int().min(MIN_SIDE).max(MAX_SIDE).optional(),
-        height: z.number().int().min(MIN_SIDE).max(MAX_SIDE).optional(),
+        width: z.number().int().min(DESIGN_MIN_SIDE).max(DESIGN_MAX_SIDE).optional(),
+        height: z.number().int().min(DESIGN_MIN_SIDE).max(DESIGN_MAX_SIDE).optional(),
         duration: z.number().positive().max(MAX_SECONDS).optional(),
         fps: z.literal(FRAME_RATES).optional(),
         background: z.enum([Background.Brand, Background.Transparent]).optional(),
@@ -2012,7 +2036,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         if (stretched) {
           return { ok: false, error: stretched };
         }
-        const animated = input.still === false ? animateStill(session.doc, input.duration) : ({ ok: true, doc: session.doc } as OpResult);
+        const early = typeof input.still === 'number' ? setStill(session.doc, input.still) : ({ ok: true, doc: session.doc } as OpResult);
+        const animated = !early.ok || input.still !== false ? early : animateStill(early.doc, input.duration);
         const paced = !animated.ok || input.fps === undefined ? animated : setFrameRate(animated.doc, input.fps);
         const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, size: input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;

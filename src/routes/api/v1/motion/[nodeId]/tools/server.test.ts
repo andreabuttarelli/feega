@@ -106,6 +106,25 @@ describe('POST /api/v1/motion/:node/tools runs one motion tool of the chat agent
   });
 });
 
+const shape = async (props: Record<string, unknown>) => (await (await post(NODE, { tool: 'add_clip', input: { component: 'Shape', start: 0, duration: 2, props: { shape: 'rect', ...props } } })).json()).output.clip_id as string;
+const tool = async (name: string, input: unknown) => (await (await post(NODE, { tool: name, input })).json()).output;
+const stack = async () => (await head()).tracks.flatMap((t) => [...t.clips].reverse().map((c) => c.id));
+const clipOf = async (id: string) => (await head()).tracks.flatMap((t) => t.clips).find((c) => c.id === id)!;
+
+describe('layout and layer tools through the endpoint', () => {
+  it('add_auto_layout paints its container fill right under the children, over the background', async () => {
+    const bg = await shape({ x: 540, y: 675, width: 1080, height: 1350 });
+    const a = await shape({ x: 300, y: 675, width: 100, height: 100 });
+    const b = await shape({ x: 600, y: 675, width: 100, height: 100 });
+
+    const out = await tool('add_auto_layout', { clip_ids: [a, b], fill: '#ff0000', stroke: '#00ff00', stroke_width: 4, radius: 0.2 });
+
+    expect(out.ok).toBe(true);
+    expect(await stack()).toEqual([b, a, out.container_id, bg]);
+    expect((await clipOf(out.container_id)).props).toMatchObject({ fill: '#ff0000', stroke: '#00ff00', strokeKind: 'solid', roundness: 0.2 });
+  });
+});
+
 describe('GET /api/v1/motion/tools lists them', () => {
   const get = (query = '') => {
     const url = new URL(`https://feega.test/api/v1/motion/tools${query}`);
