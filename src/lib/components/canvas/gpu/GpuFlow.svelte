@@ -1037,7 +1037,7 @@
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} onrotate={props.onRotate} />
+          <GpuTileChrome tile={t} selected={on} resizable={resizable && on} onrotate={props.onRotate} />
           {#if !domIds.has(t.id) && t.kind === 'motion'}
             {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
             <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>

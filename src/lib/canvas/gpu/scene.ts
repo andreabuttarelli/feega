@@ -3,7 +3,7 @@ import type { Viewport } from '../dot-grid';
 import { MOTION_NODE_BAR_H } from '../motion-node';
 import { AssetSize, sized } from '../asset-url';
 import { Surface, type CardFace, type Media } from './card-face';
-import { cornersOf, curvePoint, type Box, type Curve } from './geometry';
+import { curvePoint, type Box, type Curve } from './geometry';
 import { createTextureCache, type TextureCache } from './texture-cache';
 import { Backend } from './backend';
 
@@ -27,7 +27,6 @@ export type Theme = { canvas: string; dot: string; paper: string; line: string; 
 
 const PAD = 14;
 const BODY_SIZE = 13;
-const CORNER_PX = 8;
 const DOT_TILE = 24;
 const DASH = 6;
 const GAP = 4;
@@ -671,15 +670,6 @@ export class GpuScene {
     const line = 1.5 / z;
     if (o.hovered) {
       g.rect(o.hovered.x, o.hovered.y, o.hovered.w, o.hovered.h).stroke({ width: line, color: this.theme.accent, alpha: 0.5 });
-    }
-    for (const s of o.selected) {
-      if (!o.resizable) {
-        continue;
-      }
-      const k = CORNER_PX / z;
-      for (const p of Object.values(cornersOf(s))) {
-        g.rect(p.x - k / 2, p.y - k / 2, k, k).fill(this.theme.paper).stroke({ width: line, color: this.theme.accent });
-      }
     }
     if (o.marquee) {
       const m = o.marquee;

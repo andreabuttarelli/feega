@@ -8,7 +8,9 @@
   import { tileHovered } from '$lib/canvas/layers';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
 
-  let { tile, selected, onrotate }: { tile: Tile; selected: boolean; onrotate?: (id: string, degrees: number) => void } = $props();
+  let { tile, selected, resizable = false, onrotate }: { tile: Tile; selected: boolean; resizable?: boolean; onrotate?: (id: string, degrees: number) => void } = $props();
+
+  const CORNERS = ['top left', 'top right', 'bottom left', 'bottom right'] as const;
 
   const SNAP_DEG = 15;
   const spaced = (i: number, n: number) => `${((i + 1) / (n + 1)) * 100}%`;
@@ -69,6 +71,12 @@
   <div class="svelte-flow__handle typed-port port-out source" data-handleid={out.handle} data-nodeid={tile.id} style={`top:${spaced(i, outputs.length)};--port:${CONNECTOR_STYLE[out.port].color}`} title={out.label} aria-label={out.label}></div>
   <span class={`port-name port-name-out ${out.incompatible ? 'port-name-flagged' : ''}`} style={`top:${spaced(i, outputs.length)};--port:${CONNECTOR_STYLE[out.port].color}`}>{out.label}</span>
 {/each}
+
+{#if resizable}
+  {#each CORNERS as corner (corner)}
+    <div class={`svelte-flow__resize-control handle ${corner}`} style={`border-color:${ringColor}`}></div>
+  {/each}
+{/if}
 
 {#if selected && tile.rotatable && onrotate}
   <button type="button" class="rotate-handle nodrag nopan" aria-label="Rotate" data-testid="rotate-handle" onpointerdown={startRotate}></button>
@@ -167,6 +175,28 @@
   }
   .node-label.is-chosen {
     color: var(--ink, #1d1d1f);
+  }
+
+  .handle {
+    position: absolute;
+    z-index: 5;
+    width: 8px;
+    height: 8px;
+    border: 1px solid;
+    background: var(--paper, #fff);
+    transform: translate(-50%, -50%);
+  }
+  .handle.left {
+    left: 0;
+  }
+  .handle.right {
+    left: 100%;
+  }
+  .handle.top {
+    top: 0;
+  }
+  .handle.bottom {
+    top: 100%;
   }
 
   .rotate-handle {
