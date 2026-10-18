@@ -28,9 +28,8 @@ vi.mock('$lib/server/credits', async (real) => {
   };
 });
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: async () => [{ org: { id: ORG }, role: 'owner' }] }));
-vi.mock('$lib/server/canvas/lookup', () => ({
-  findCanvasForUser: async () => ({ orgId: ORG, canvas: { id: CANVAS, projectId: PROJECT, name: 'C', viewport: null }, mode: 'standard', projectBrandId: null })
-}));
+const lookupFound = () => ({ orgId: ORG, canvas: { id: CANVAS, projectId: PROJECT, name: 'C', viewport: null }, mode: 'standard', projectBrandId: null });
+vi.mock('$lib/server/canvas/lookup', () => ({ findCanvasForUser: async () => lookupFound(), openCanvasForUser: async () => ({ memberships: [{ org: { id: ORG }, role: 'owner' }], found: lookupFound() }) }));
 vi.mock('$lib/server/canvas/sign-media', async (real) => ({ ...(await real<object>()), createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: () => reachable() }));
 
