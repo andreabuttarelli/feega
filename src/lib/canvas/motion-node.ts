@@ -93,14 +93,25 @@ export function frameNodeSize(width: number, picture: { width: number; height: n
   return { w, h: Math.round((w * picture.height) / picture.width) + BAR_H[kind][mode] };
 }
 
+type Picture = { width: number; height: number };
+
+type NodeBox = { kind: FrameKind; width: number | null; height: number | null };
+
+export function docNodeSize(node: NodeBox, doc: Picture & { freeSize?: boolean }): { w: number; h: number } | null {
+  if (node.kind !== FrameKind.Frame) {
+    return null;
+  }
+  const w = Math.round(node.width ?? MOTION_STAGE_WIDTH[docFormat(doc)]);
+  const h = Math.round((w * doc.height) / doc.width);
+  return w === node.width && h === node.height ? null : { w, h };
+}
+
 enum Sizing {
   Fixed = 'fixed',
   Free = 'free'
 }
 
 const sizingOf = (node: Pick<MotionNode, 'kind' | 'format'>): Sizing => (node.kind === FrameKind.Frame && node.format === MotionFormat.Custom ? Sizing.Free : Sizing.Fixed);
-
-type Picture = { width: number; height: number };
 
 export type FrameResize = { w: number; h: number; picture: Picture | null };
 

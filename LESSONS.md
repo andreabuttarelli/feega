@@ -3092,3 +3092,6 @@ Signal: Export image fails with "not available here" or "Waiting failed: 20000ms
 
 ### A canvas 500s only once it holds a group (DOM renderer)
 Signal: `?renderer=dom` answers 500 on a canvas that has a group; the same page without groups loads; `handleError` (logged locally) says `Cannot access X before initialization` inside `CanvasFlow.svelte`. Cause: a component-scope `const` declared below the function that the first render already calls, so only data that reaches that branch hits the TDZ. Move: declare the constant above its first use; `canvas-dom-group-ssr.spec.ts` guards it.
+
+### Play jumps to the start and never gets past frame 1
+Signal: Space or Play moves the playhead to a fixed frame, and the timecode flips between it and the next frame; the player is not paused. Cause: the doc has a `workArea` one frame long (an out point set at frame 0), and playback loops inside it. Move: read `workArea` in the doc before suspecting the player, the GPU engine or the interactive runtime.
