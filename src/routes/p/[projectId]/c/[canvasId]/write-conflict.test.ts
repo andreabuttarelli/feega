@@ -132,16 +132,23 @@ describe('actions.write merges a patch into the current row', () => {
 		});
 	});
 
-	it('the same key moved underneath is a 409, and the reapply lands on the fresh row', async () => {
-		const { send, reread, rows } = kit({ prompt: 'theirs', status: 'done', refId: 'asset-2' });
+	it('the same field moved underneath: the last writer wins, no 409, no banner', async () => {
+		const { send, rows } = kit({ prompt: 'theirs', status: 'done', refId: 'asset-2' });
 
-		expect((await send({ prompt: 'mine' }, { prompt: 'a white cat' })).status).toBe(409);
-		expect(stored(rows).data.prompt).toBe('theirs');
+		expect((await send({ prompt: 'mine' }, { prompt: 'a white cat' })).status).toBe(200);
+		expect(stored(rows).data).toEqual({ prompt: 'mine', status: 'done', refId: 'asset-2' });
+	});
 
-		const out = await writeWithRetry({ send, reread, patch: { prompt: 'mine' }, base: { prompt: 'a white cat' } });
+	it('a list moved underneath is a 409, and the reapply lands on the fresh row', async () => {
+		const { send, reread, rows } = kit({ prompt: 'a', references: ['x', 'theirs'] });
+
+		expect((await send({ references: ['x', 'mine'] }, { references: ['x'] })).status).toBe(409);
+		expect(stored(rows).data.references).toEqual(['x', 'theirs']);
+
+		const out = await writeWithRetry({ send, reread, patch: { references: ['x', 'theirs', 'mine'] }, base: { references: ['x'] } });
 
 		expect(out.ok).toBe(true);
-		expect(stored(rows).data).toEqual({ prompt: 'mine', status: 'done', refId: 'asset-2' });
+		expect(stored(rows).data.references).toEqual(['x', 'theirs', 'mine']);
 	});
 
 	it('a merged row the schema refuses is a 400 and nothing is written', async () => {
