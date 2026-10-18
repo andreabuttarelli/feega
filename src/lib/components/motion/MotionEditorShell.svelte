@@ -167,7 +167,7 @@
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 
-  const SAVE_DEBOUNCE_MS = 700;
+  const SAVE_DEBOUNCE_MS = 250;
   const CHECK_WIDTH = 480;
   const CHECK_DEBOUNCE_MS = 900;
   const COALESCE_MS = 800;
@@ -686,6 +686,7 @@
 
     if (result.type === 'success') {
       frameDocs.landed(data.node.id, version, Number(result.data?.version));
+      presence?.landed({ nodeId: data.node.id, version: Number(result.data?.version), doc: result.data?.doc });
       follow(landed({ version, doc: baseDoc }, sent, history.present, { version: Number(result.data?.version), doc: result.data?.doc as MotionDoc }));
       saveState = SaveState.Saved;
     } else {
@@ -760,6 +761,12 @@
   }
 
   let missedRemote = false;
+
+  $effect(() => presence?.onHead((head) => {
+    if (head.nodeId === data.node.id) {
+      takeRemote({ version: head.version, doc: head.doc as MotionDoc });
+    }
+  }));
 
   function takeRemote(head: SavedHead | null): boolean {
     if (saving) {
