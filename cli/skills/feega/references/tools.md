@@ -362,6 +362,14 @@ original keeps its count of remixes; withdrawing it later never touches the copi
 permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publishable`,
 `brand_logo_not_publishable`, `site_material_not_publishable` or `moderated`. Free.
 
+## Organisations and teams
+
+| Tool | CLI |
+|---|---|
+| `list_orgs` | `feega orgs` |
+| `team_op` `switch_org` | `feega orgs use <orgId>` |
+| `team_op` `create_org` | `feega orgs create <name>` |
+
 ## Ads
 
 | MCP | CLI |

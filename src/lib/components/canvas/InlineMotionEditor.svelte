@@ -128,7 +128,7 @@
       return;
     }
     const timer = setTimeout(() => {
-      const flow = document.querySelector('.svelte-flow')?.getBoundingClientRect();
+      const flow = document.querySelector('.svelte-flow, [data-canvas-surface]')?.getBoundingClientRect();
       if (!flow) {
         return;
       }

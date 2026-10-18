@@ -1,0 +1,53 @@
+import { describe, expect, it } from 'vitest';
+import { Surface, faceOf } from './card-face';
+import { PosterSource } from '../poster-lod';
+import { NODE_KIND_LABEL, NameTag } from '../node-label';
+
+const asset = (id: string) => `/a/${id}`;
+
+describe('faceOf — what a GPU card draws, one row per node type', () => {
+  it('a generated image shows its output, else its prompt waiting to run', () => {
+    const done = faceOf({ id: 'i', kind: 'image', tag: NameTag.Shown, poster: { url: '/a/out?w=256', source: PosterSource.Image } }, { prompt: 'a cat', model: 'flux', refId: 'out' }, asset);
+    expect(done).toMatchObject({ surface: Surface.Generate, label: NODE_KIND_LABEL.image, media: { url: '/a/out', video: false }, prompt: 'a cat', model: 'flux' });
+
+    const idle = faceOf({ id: 'i', kind: 'image', tag: NameTag.Shown }, { prompt: '' }, asset);
+    expect(idle).toMatchObject({ surface: Surface.Generate, media: null, prompt: '' });
+  });
+
+  it('a running generation says so', () => {
+    expect(faceOf({ id: 'v', kind: 'video', tag: NameTag.Shown }, { prompt: 'x', running: true }, asset).running).toBe(true);
+  });
+
+  it('a video output is a video, not an image', () => {
+    expect(faceOf({ id: 'v', kind: 'video', tag: NameTag.Shown }, { prompt: 'x', refId: 'r' }, asset).media).toEqual({ url: '/a/r', video: true });
+  });
+
+  it('a motion frame draws its poster and, when rendered, its mp4', () => {
+    const face = faceOf({ id: 'm', kind: 'motion', tag: NameTag.Shown, poster: { url: '/a/p', source: PosterSource.Image } }, { lastRenderAssetId: 'mp4' }, asset);
+    expect(face).toMatchObject({ surface: Surface.Frame, media: { url: '/a/p', video: false }, live: '/a/mp4' });
+  });
+
+  it('a free element has no label and no card chrome', () => {
+    const face = faceOf({ id: 'e', kind: 'motion', tag: NameTag.Hidden, poster: { url: '/a/p', source: PosterSource.Image } }, { kind: 'element' }, asset);
+    expect(face).toMatchObject({ surface: Surface.Graphic, label: null });
+  });
+
+  it('a document shows its text, a display name wins over the type label', () => {
+    expect(faceOf({ id: 'd', kind: 'doc', tag: NameTag.Shown, displayName: 'Brief' }, { content: '# Hi\nthere' }, asset)).toMatchObject({ surface: Surface.Text, label: 'Brief', text: '# Hi\nthere' });
+  });
+
+  it('sources show what they read from', () => {
+    expect(faceOf({ id: 'f', kind: 'social_account_feed', tag: NameTag.Shown }, { platform: 'instagram', handle: 'nike' }, asset)).toMatchObject({ surface: Surface.Source, title: '@nike', subtitle: 'instagram' });
+    expect(faceOf({ id: 'p', kind: 'products', tag: NameTag.Shown }, { type: 'shopify', url: 'https://x.co' }, asset)).toMatchObject({ surface: Surface.Source, title: 'https://x.co', subtitle: 'shopify' });
+    expect(faceOf({ id: 'w', kind: 'iframe', tag: NameTag.Shown }, { url: 'https://x.co' }, asset)).toMatchObject({ surface: Surface.Source, title: 'https://x.co' });
+  });
+
+  it('an unknown kind falls back to a plain card, never throws', () => {
+    expect(faceOf({ id: 'z', tag: NameTag.Shown }, {}, asset)).toMatchObject({ surface: Surface.Blank, label: null });
+  });
+
+  it('a source carries the thumbs of what it read', () => {
+    expect(faceOf({ id: 'f', kind: 'social_account_feed', tag: NameTag.Shown }, { platform: 'instagram', handle: 'nike' }, asset, ['t1', 't2']).thumbs).toEqual(['t1', 't2']);
+    expect(faceOf({ id: 'd', kind: 'doc', tag: NameTag.Shown }, { content: '' }, asset).thumbs).toEqual([]);
+  });
+});

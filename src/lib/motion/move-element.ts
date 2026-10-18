@@ -253,6 +253,29 @@ export function placeElement(doc: MotionDoc, element: Element, place: Placement,
   return { ok: true, clipId: clip.id, doc: { ...doc, ...merged(doc, element.carried, element), tracks, durationInFrames: grown(doc, clip) } };
 }
 
+export function copyElements(doc: MotionDoc, ids: readonly string[]): Element[] {
+  return ids.flatMap((id) => {
+    const lifted = liftElement(doc, id);
+    return lifted.ok ? [lifted.element] : [];
+  });
+}
+
+export type PastedElements = { ok: true; doc: MotionDoc; ids: string[] } | { ok: false; error: string };
+
+export function pasteElements(doc: MotionDoc, elements: readonly Element[], newId: NewId): PastedElements {
+  let next = doc;
+  const ids: string[] = [];
+  for (const element of elements) {
+    const placed = placeElement(next, { ...element, clip: { ...element.clip, id: newId() } }, { at: clipCentre(element.clip), frame: element.clip.from }, newId);
+    if (!placed.ok) {
+      return placed;
+    }
+    next = placed.doc;
+    ids.push(placed.clipId);
+  }
+  return ids.length ? { ok: true, doc: next, ids } : { ok: false, error: 'nothing to paste' };
+}
+
 function ownBox(clip: MotionClip): Box | null {
   const { props } = clip;
   if (!laidOut(clip.component) || typeof props.width !== 'number' || typeof props.height !== 'number') {

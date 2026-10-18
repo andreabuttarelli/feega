@@ -4,7 +4,7 @@ import { addClip } from '$lib/motion/timeline';
 import { setStill } from '$lib/motion/still';
 import { OutputKind, type Output } from '$lib/motion/move-element';
 import { RevisionOutcome, type RevisionWrite } from '$lib/server/repos/motion-revisions';
-import { DropOn, MoveOutcome, linkFrame, moveElement, placeOutput, refreshLinks, type FrameStore, type StoredFrame } from './move-element';
+import { DropOn, MoveOutcome, copyElement, linkFrame, moveElement, placeOutput, refreshLinks, type FrameStore, type StoredFrame } from './move-element';
 
 const IMAGE_ID = '11111111-2222-4333-8444-555555555555';
 const OTHER_ID = '22222222-2222-4333-8444-555555555555';
@@ -242,5 +242,31 @@ describe('a generative node connected to a frame', () => {
     await linkFrame(m.store, { sourceNodeId: 'gen', frameNodeId: 'b' });
 
     expect(headOf(m, 'b').version).toBe(2);
+  });
+});
+
+describe('copying an element out of a frame', () => {
+  it('pasted on the canvas it makes a new free element and leaves the source untouched', async () => {
+    const m = memory();
+    seed(m, 'a', withText());
+
+    const copied = await copyElement(m.store, { sourceNodeId: 'a', clipId: 'txt', drop: { on: DropOn.Canvas, x: 400, y: 120 } });
+
+    expect(copied).toMatchObject({ outcome: MoveOutcome.Done, frameId: 'frame-1', created: true });
+    expect(clipsOf(headOf(m, 'frame-1').doc).map((c) => c.props.text)).toEqual(['move me']);
+    expect(headOf(m, 'a').version).toBe(1);
+    expect(copied.outcome === MoveOutcome.Done && copied.undo.map((u) => u.kind)).toEqual(['node.create']);
+  });
+
+  it('pasted into another frame it lands there; the source keeps its element', async () => {
+    const m = memory();
+    seed(m, 'a', withText());
+    seed(m, 'b', newMotionDoc(MotionFormat.Vertical));
+
+    const copied = await copyElement(m.store, { sourceNodeId: 'a', clipId: 'txt', drop: { on: DropOn.Frame, nodeId: 'b', at: { x: 0.5, y: 0.5 } } });
+
+    expect(copied).toMatchObject({ outcome: MoveOutcome.Done, frameId: 'b' });
+    expect(findClip(headOf(m, 'a').doc, 'txt')).not.toBeNull();
+    expect(clipsOf(headOf(m, 'b').doc)).toHaveLength(1);
   });
 });
