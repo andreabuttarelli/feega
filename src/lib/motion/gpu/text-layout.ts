@@ -7,7 +7,7 @@ export type TextRaster = { canvas: HTMLCanvasElement; width: number; height: num
 
 type TextPaint = Extract<SceneLayer['paint'], { kind: PaintKind.Text }>;
 
-const RASTER_SCALE = 2;
+const MIN_TEXT_SCALE = 1;
 const FONT_SHEET = /@font-face|fonts\.googleapis/;
 const FONT_URL = /url\((['"]?)(https?:[^'")]+)\1\)/g;
 const STRIPPED = ['transform', 'opacity', 'filter', 'visibility'];
@@ -75,9 +75,9 @@ function fit(block: HTMLElement, box: HTMLElement) {
   block.style.fontSize = `${fitSize(Number(block.dataset.fit), measure, { width: box.clientWidth, height: box.clientHeight })}px`;
 }
 
-async function raster(leaf: HTMLElement, fontEmbedCSS: string): Promise<TextRaster> {
+async function raster(leaf: HTMLElement, fontEmbedCSS: string, scale: number): Promise<TextRaster> {
   const { width, height } = leaf.getBoundingClientRect();
-  const canvas = await toCanvas(leaf, { pixelRatio: RASTER_SCALE, width, height, fontEmbedCSS, style: { margin: '0', transform: 'none' } });
+  const canvas = await toCanvas(leaf, { pixelRatio: scale, width, height, fontEmbedCSS, style: { margin: '0', transform: 'none' } });
   return { canvas, width, height };
 }
 
@@ -91,7 +91,7 @@ function placeLinks(layer: SceneLayer, clone: HTMLElement, box: HTMLElement) {
   }
 }
 
-export async function layoutText(scene: Scene, host: HTMLElement): Promise<Map<SceneLayer, TextRaster>> {
+export async function layoutText(scene: Scene, host: HTMLElement, resolution = 1): Promise<Map<SceneLayer, TextRaster>> {
   const texts = scene.layers.filter((l) => l.paint.kind === PaintKind.Text);
   const out = new Map<SceneLayer, TextRaster>();
   if (!texts.length) {
@@ -126,7 +126,7 @@ export async function layoutText(scene: Scene, host: HTMLElement): Promise<Map<S
     const { box, leaf } = layer.paint as TextPaint;
     const clone = clones.get(box)!;
     placeLinks(layer, clone, box);
-    const drawn = await raster(follow(clone, pathOf(leaf, box)), fontCss);
+    const drawn = await raster(follow(clone, pathOf(leaf, box)), fontCss, Math.max(MIN_TEXT_SCALE, resolution));
     layer.content = { width: drawn.width, height: drawn.height };
     out.set(layer, drawn);
   }

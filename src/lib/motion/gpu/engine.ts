@@ -31,12 +31,14 @@ export class GpuIneligible extends Error {
 
 const CAPTURE_WAIT_MS = 600_000;
 const FRAME_DEADLINE_MS = 60_000;
+const MIN_RESOLUTION = 0.25;
+const MAX_RESOLUTION = 4;
 
 type RunState = { run: Run; html: string; player: Promise<CapturePlayer> | null; texture: Texture | null; at: number; busy: Promise<void> | null };
 
 export type Compose = (only?: ReadonlySet<string>) => string;
 
-export async function gpuEngine(compose: Compose, host: HTMLElement, preference: Backend = Backend.WebGPU): Promise<GpuEngine> {
+export async function gpuEngine(compose: Compose, host: HTMLElement, preference: Backend = Backend.WebGPU, displayWidth: number | null = null): Promise<GpuEngine> {
   const scene = compileScene(compose());
   const runs = runsOf(scene.layers);
   const pages = runs.map((run) => runHtml(compose(new Set(run.clips)), run));
@@ -45,12 +47,13 @@ export async function gpuEngine(compose: Compose, host: HTMLElement, preference:
     throw new GpuIneligible(runs.length, Math.max(0, ...contexts));
   }
   const frame = { width: scene.width, height: scene.height };
-  const renderer = await createRenderer(frame, preference);
-  const painter = createPainter();
-  painter.texts(await layoutText(scene, host));
+  const resolution = displayWidth ? Math.min(MAX_RESOLUTION, Math.max(MIN_RESOLUTION, (displayWidth * devicePixelRatio) / scene.width)) : 1;
+  const renderer = await createRenderer(frame, preference, resolution);
+  const painter = createPainter(resolution);
+  painter.texts(await layoutText(scene, host, resolution));
   const states: RunState[] = runs.map((run, i) => ({ run, html: pages[i], player: null, texture: null, at: Number.NaN, busy: null }));
   const runOf = new Map(runs.flatMap((run, i) => run.clips.map((clip) => [clip, i] as const)));
-  const request = { format: FrameFormat.Bitmap, settle: Settle.Seek, layering: exportLayering(), ...frame };
+  const request = { format: FrameFormat.Bitmap, settle: Settle.Seek, layering: exportLayering(), width: Math.round(frame.width * resolution), height: Math.round(frame.height * resolution) };
 
   const capture = (state: RunState, t: number) => {
     state.player ??= mountCapturePlayer(host, state.html);
