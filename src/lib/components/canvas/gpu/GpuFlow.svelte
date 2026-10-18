@@ -63,15 +63,19 @@
   import { GpuScene, themeOf, type Card } from '$lib/canvas/gpu/scene';
   import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
-  import { exposeLoss, recordFrame } from '$lib/canvas/gpu/frame-stats';
+  import { Counter, count, exposeLoss, recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
-  import { domPainted } from '$lib/canvas/gpu/paint';
+  import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
+  import { nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
+  import { cachedSnapshot, storeSnapshot } from '$lib/canvas/gpu/snapshot-cache';
+  import { getFontEmbedCSS, toCanvas } from 'html-to-image';
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
   let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void } = $props();
 
   const DOM_CAP = 6;
+  const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
   const SHELF_TICK_MS = 5000;
   const MOVE_SLOP_PX = 3;
   const LONG_PRESS_MS = 500;
@@ -145,25 +149,141 @@
       sticky = keep;
     }
   });
-  const kept = new Set<string>();
   const domIds = $derived.by(() => {
-    const now = [...editIds, ...sticky.keys(), ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)];
-    for (const id of now) {
-      if (byId.get(id)?.kind !== 'motion') {
-        kept.add(id);
-      }
-    }
-    const alive = new Set(placed.map((t) => t.id));
-    for (const id of [...kept]) {
-      if (!alive.has(id)) {
-        kept.delete(id);
-      }
-    }
-    const next = new Set([...kept, ...now]);
+    const liveFrames = domPainted(placed.filter((t) => t.kind === 'motion'), (id) => summaries.get(id)?.data ?? {}, view, area);
+    const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
   const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
+
+  const SNAPSHOT_SETTLE_MS = 120;
+  const SNAPSHOT_TIMEOUT_MS = 4000;
+  const withTimeout = <T,>(work: Promise<T>, ms: number) => Promise.race([work, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('snapshot timed out')), ms))]);
+  const HOVER_INTENT_MS = 150;
+  const SNAPSHOT_PIXEL_RATIO = 2;
+  let hoverLive = $state<string | null>(null);
+  let focusLive = $state<string | null>(null);
+  let hoverTimer: ReturnType<typeof setTimeout> | null = null;
+  let pictured = $state(new Map<string, string>());
+  let shotJob = $state<string | null>(null);
+  let shelfHost = $state<HTMLDivElement | null>(null);
+  let fontCss: string | null = null;
+
+  const snapshotKind = (t: Tile) => !!t.kind && t.kind !== 'motion' && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
+  const shotKeyOf = (id: string) => {
+    const t = byId.get(id);
+    return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.thumbsOf?.(id) ?? []) : '';
+  };
+  const shotOf = (id: string) => pictured.get(id) ?? null;
+
+  $effect(() => {
+    const id = hovered;
+    if (hoverTimer) {
+      clearTimeout(hoverTimer);
+      hoverTimer = null;
+    }
+    if (!id || !byId.get(id) || !snapshotKind(byId.get(id)!)) {
+      untrack(() => {
+        if (hoverLive && !wrap?.querySelector(`.gpu-dom-node[data-id="${hoverLive}"]:hover, .gpu-dom-node[data-id="${hoverLive}"]:focus-within`)) {
+          hoverLive = null;
+        }
+      });
+      return;
+    }
+    hoverTimer = setTimeout(() => (hoverLive = id), HOVER_INTENT_MS);
+  });
+
+  function trackFocus(e: FocusEvent) {
+    focusLive = (e.target as HTMLElement | null)?.closest<HTMLElement>('.gpu-dom-node')?.dataset.id ?? null;
+  }
+
+  $effect(() => {
+    if (shotJob || !scene) {
+      return;
+    }
+    const due = placed.filter(snapshotKind);
+    const seen = visibleIds(due, view, area);
+    const next = nextSnapshot(due, shotKeyOf, untrack(() => pictured), seen, domIds);
+    if (next) {
+      shotJob = next;
+    }
+  });
+
+  let shotMount = $state<string | null>(null);
+
+  $effect(() => {
+    const id = shotJob;
+    if (!id) {
+      return;
+    }
+    const key = untrack(() => shotKeyOf(id));
+    let cancelled = false;
+    const finish = () => {
+      if (!cancelled) {
+        pictured = new Map(pictured).set(id, key);
+        shotMount = null;
+        shotJob = null;
+      }
+    };
+    void cachedSnapshot(key).then((bitmap) => {
+      if (cancelled) {
+        return;
+      }
+      if (bitmap && scene) {
+        scene.setSnapshot(id, key, bitmap);
+        count(Counter.CachedSnapshot);
+        finish();
+        return;
+      }
+      shotMount = id;
+    });
+    return () => {
+      cancelled = true;
+    };
+  });
+
+  $effect(() => {
+    const id = shotMount;
+    const host = shelfHost;
+    if (!id || !host) {
+      return;
+    }
+    const key = untrack(() => shotKeyOf(id));
+    let cancelled = false;
+    void (async () => {
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      for (const img of host.querySelectorAll('img')) {
+        img.loading = 'eager';
+      }
+      await withTimeout(Promise.all([...host.querySelectorAll('img')].map((img) => img.decode().catch(() => undefined))), SNAPSHOT_TIMEOUT_MS).catch(() => undefined);
+      await new Promise((r) => setTimeout(r, SNAPSHOT_SETTLE_MS));
+      if (cancelled) {
+        return;
+      }
+      const el = host.querySelector<HTMLElement>('.snapshot-node');
+      try {
+        if (el && scene) {
+          fontCss ??= await withTimeout(getFontEmbedCSS(el), SNAPSHOT_TIMEOUT_MS);
+          const canvas = await withTimeout(toCanvas(el, { pixelRatio: SNAPSHOT_PIXEL_RATIO, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL }), SNAPSHOT_TIMEOUT_MS);
+          scene.setSnapshot(id, key, await createImageBitmap(canvas));
+          void storeSnapshot(key, canvas);
+          count(Counter.Snapshot);
+        }
+      } catch (err) {
+        console.warn(`[canvas] snapshot ${id}`, err);
+      }
+      if (!cancelled) {
+        pictured = new Map(pictured).set(id, key);
+        shotMount = null;
+        shotJob = null;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  });
+
   let parked = $state(new Map<string, number>());
   let shelfClock = $state(0);
   const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock)));
@@ -218,7 +338,8 @@
         h: t.h,
         rotation: t.rotation ?? 0,
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
-        hidden: domIds.has(t.id)
+        hidden: domIds.has(t.id),
+        snapshot: shotOf(t.id)
       })
     )
   );
@@ -1130,7 +1251,7 @@
 }} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap svelte-flow" bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" onfocusin={trackFocus} bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-view={`${view.x},${view.y},${view.zoom}`}>
   <div
     class="surface svelte-flow__pane"
     bind:this={surface}
@@ -1202,6 +1323,19 @@
     </div>
   </div>
 
+
+  <div class="snapshot-shelf" aria-hidden="true" bind:this={shelfHost}>
+    {#if shotMount && byId.get(shotMount)}
+      {@const t = byId.get(shotMount)!}
+      {#key shotMount}
+        <div class="snapshot-node" data-snapshot={t.id} style={`width:${t.w}px;height:${t.h}px`}>
+          <NodeBoundary>
+            {@render props.tile({ id: t.id, selected: false })}
+          </NodeBoundary>
+        </div>
+      {/key}
+    {/if}
+  </div>
 
   <div class="poster-shelf" aria-hidden="true">
     {#each placed.filter((t) => shelf.has(t.id)) as t (t.id)}
@@ -1383,6 +1517,20 @@
 
   .wire-iterate-badge :global(svg) {
     color: var(--ui-wire-iterate);
+  }
+
+  .snapshot-shelf {
+    position: fixed;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--ui-canvas);
+  }
+
+  .snapshot-node {
+    position: relative;
   }
 
   .poster-shelf {

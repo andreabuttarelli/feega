@@ -37,6 +37,8 @@ export const PAINT: Record<NodeType, (data: Data) => Paint> = {
 
 type Placed = { id: string; kind?: string; x: number; y: number; w: number; h: number };
 
+export const paintsDom = (kind: string, data: Data) => paintOf(kind, data) === Paint.Dom;
+
 const paintOf = (kind: string | undefined, data: Data) => (kind && kind in PAINT ? PAINT[kind as NodeType](data) : Paint.Dom);
 
 export function domPainted(tiles: Placed[], dataOf: (id: string) => Data, view: Viewport, screen: Screen): string[] {

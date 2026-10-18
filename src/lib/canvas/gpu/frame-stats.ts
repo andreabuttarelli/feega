@@ -29,7 +29,9 @@ export function exposeLoss(lose: () => void) {
 export enum Counter {
   Build = 'build',
   Fetch = 'fetch',
-  Upload = 'upload'
+  Upload = 'upload',
+  Snapshot = 'snapshot',
+  CachedSnapshot = 'cached-snapshot'
 }
 
 export function count(name: Counter) {
