@@ -5,7 +5,7 @@ import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { build } from 'vite';
 import sharp from 'sharp';
-import { chromium } from 'playwright';
+import { chromium, webkit } from 'playwright';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { composeHtml } from '$lib/motion/hyperframes/compose';
 import { parseMotionDoc, type MotionDoc } from '$lib/motion/doc';
@@ -38,6 +38,9 @@ const mode = (flags.get('mode') ?? Mode.Parity) as Mode;
 const frames = Number(flags.get('frames') ?? 12);
 const preference = flags.get('backend') ?? 'webgpu';
 const seconds = Number(flags.get('seconds') ?? 6);
+const displayWidth = flags.has('display') ? Number(flags.get('display')) : null;
+const scaleFactor = Number(flags.get('dpr') ?? 1);
+const engineName = flags.get('engine') ?? 'chromium';
 const name = flags.get('name') ?? docPath.split('/').pop()?.replace(/\.(doc\.)?json$/, '') ?? 'doc';
 
 async function hostBundle(): Promise<string> {
@@ -125,18 +128,31 @@ const spec = { doc, assets, origin: server.origin };
 const dir = join(OUT, name);
 mkdirSync(dir, { recursive: true });
 
-const browser = await chromium.launch({ ...LAUNCH, headless: mode !== Mode.Preview });
-const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
+const browser = engineName === 'webkit' ? await webkit.launch({ headless: mode !== Mode.Preview }) : await chromium.launch({ ...LAUNCH, headless: mode !== Mode.Preview });
+const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: scaleFactor });
 page.setDefaultTimeout(TIMEOUT_MS);
 page.on('pageerror', (e) => console.error('pageerror', e.message));
 page.on('console', (m) => (m.type() === 'error' ? console.error('console', m.text().slice(0, 300)) : undefined));
 await page.goto(server.url);
 const call = <I, O>(fn: string, input: I) => page.evaluate(([f, i]) => (window as unknown as Record<string, (x: unknown) => Promise<unknown>>)[f as string](i), [fn, input] as const) as Promise<O>;
 
+async function liveShots(times: number[], shots: ShotsInput): Promise<ShotsResult> {
+  const css = { width: shots.width / scaleFactor, height: shots.height / scaleFactor };
+  await call('liveMount', { html, ...css });
+  const pngs: string[] = [];
+  for (const t of times) {
+    await call('liveSeek', t);
+    pngs.push((await page.locator('#host hyperframes-player').screenshot()).toString('base64'));
+  }
+  await page.evaluate(() => document.getElementById('host')?.replaceChildren());
+  return { pngs, ms: 0, backend: 'live', runs: 0, stats: [] };
+}
+
 if (mode === Mode.Parity) {
   const times = spread(doc, frames);
-  const shots: ShotsInput = { html, spec, times, ...size, preference };
-  const before = await call<ShotsInput, ShotsResult>('htmlShots', shots);
+  const res = displayWidth ? Math.min(4, Math.max(0.25, (displayWidth * scaleFactor) / doc.width)) : 1;
+  const shots: ShotsInput = { html, spec, times, width: Math.round(doc.width * res), height: Math.round(doc.height * res), preference, ...(displayWidth ? { displayWidth } : {}) };
+  const before = flags.get('ref') === 'live' ? await liveShots(times, shots) : await call<ShotsInput, ShotsResult>('htmlShots', shots);
   console.log(`html engine ${(before.ms / times.length).toFixed(0)} ms/frame`);
   const after = await call<ShotsInput, ShotsResult>('gpuShots', shots);
   const framesDir = join(dir, 'frames');

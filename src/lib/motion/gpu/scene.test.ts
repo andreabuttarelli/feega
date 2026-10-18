@@ -95,6 +95,22 @@ describe('text', () => {
   });
 });
 
+describe('animated content', () => {
+  it('leaves a title whose type is keyframed to the HTML engine, a still raster would not move', () => {
+    const titled2 = must(addClip(base, { component: 'Title', from: 0, durationInFrames: 60, props: { text: 'hi' } }, 'title'));
+    const heavier = must(setKeyframes(titled2, 'title', 'weight', [{ frame: 0, value: 300, ease: Ease.Linear }, { frame: 30, value: 800, ease: Ease.Linear }]));
+
+    expect(scene(heavier).layers.filter((l) => l.clip === 'title').map((l) => l.paint.kind)).toEqual([PaintKind.Html]);
+  });
+
+  it('keeps a title whose box only moves on the GPU', () => {
+    const titled2 = must(addClip(base, { component: 'Title', from: 0, durationInFrames: 60, props: { text: 'hi' } }, 'title'));
+    const moved = must(setKeyframes(titled2, 'title', 'x', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 30, value: 0.2, ease: Ease.Linear }]));
+
+    expect(scene(moved).layers.filter((l) => l.clip === 'title').map((l) => l.paint.kind)).toEqual([PaintKind.Text]);
+  });
+});
+
 describe('frameAt', () => {
   it('places a shape where its box is', () => {
     const card = byClip(drawn(withCard, 0), 'card');
