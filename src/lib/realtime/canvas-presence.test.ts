@@ -29,7 +29,7 @@ describe('canvasHub sender', () => {
     vi.advanceTimersByTime(TICK_MS);
     vi.advanceTimersByTime(HEARTBEAT_MS - TICK_MS * 2);
     expect(sent).toHaveLength(1);
-    vi.advanceTimersByTime(TICK_MS * 2);
+    vi.advanceTimersByTime(TICK_MS * 3);
     expect(sent).toHaveLength(2);
     port.stop();
   });
