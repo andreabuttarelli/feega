@@ -10,7 +10,8 @@ import {
   nodeRowExists,
   restoreConnection,
   restoreNode,
-  writeNodeData
+  patchNodeData,
+  DataCheck
 } from '$lib/server/repos/canvas';
 import {
   checkGesture,
@@ -76,7 +77,7 @@ async function currentNodeState(db: Db, orgId: string, nodeId: string, ownEdgeId
     .filter((edge) => edge.targetNodeId === nodeId && !ownEdgeIds.has(edge.id))
     .map((edge) => edge.id);
 
-  return { exists: true, version: node.version, connectedBy };
+  return { exists: true, version: node.version, connectedBy, data: node.data };
 }
 
 async function currentEdgeState(db: Db, orgId: string, canvasId: string, edgeId: string): Promise<CurrentEdgeState> {
@@ -105,17 +106,9 @@ async function applyWrite(db: Db, orgId: string, canvasId: string, write: Invers
       });
       return;
     }
-    case 'write_node_data': {
-      const patch = write.data as { data?: Record<string, unknown> };
-      await writeNodeData(db, {
-        orgId,
-        nodeId: write.nodeId,
-        data: patch.data ?? {},
-        expectedVersion: write.expectedVersion,
-        actor
-      });
+    case 'patch_node_data':
+      await patchNodeData(db, { orgId, nodeId: write.nodeId, patch: write.patch, check: DataCheck.None, actor });
       return;
-    }
     case 'delete_edge':
       await deleteConnection(db, { orgId, connectionId: write.edgeId, actor });
       return;
@@ -135,11 +128,11 @@ async function applyWrite(db: Db, orgId: string, canvasId: string, write: Invers
 async function currentDocState(db: Db, orgId: string, nodeId: string): Promise<CurrentNodeState> {
   const node = await findNode(db, { orgId, nodeId });
   const head = node ? await readHead(db, { orgId, nodeId }) : null;
-  return node ? { exists: true, version: head?.version ?? 0, connectedBy: [] } : { exists: false };
+  return node ? { exists: true, version: head?.version ?? 0, connectedBy: [], data: {} } : { exists: false };
 }
 
 async function deletedNodeState(db: Db, orgId: string, nodeId: string): Promise<CurrentNodeState> {
-  return (await nodeRowExists(db, { orgId, nodeId })) ? { exists: true, version: 0, connectedBy: [] } : { exists: false };
+  return (await nodeRowExists(db, { orgId, nodeId })) ? { exists: true, version: 0, connectedBy: [], data: {} } : { exists: false };
 }
 
 export async function undoGesture(
