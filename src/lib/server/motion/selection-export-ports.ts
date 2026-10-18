@@ -5,10 +5,12 @@ import { findNode } from '$lib/server/repos/canvas';
 import { insertAsset } from '$lib/server/repos/assets';
 import { SIGNED_URL_TTL_S, signAssetFile, storeAssetFile } from '$lib/server/repos/asset-storage';
 import { frameStore } from './move-element';
-import { drawStill } from './still-export';
-import { chromiumFrames } from './chromium-frames';
+import { chromiumExport } from './chromium-frames';
+import { drawTargets } from './selection-draw';
+import { libsOrigin } from './libs-origin';
+import { composeHtml } from '$lib/motion/hyperframes/compose';
 import { assetUrls, motionAssets, motionTokens } from './editor';
-import type { SelectionPorts } from './selection-export';
+import type { DrawTarget, SelectionPorts } from './selection-export';
 
 export type SelectionScope = { db: Db; orgId: string; projectId: string; brandId: string | null; actor: Actor };
 
@@ -20,6 +22,11 @@ export function selectionPorts(scope: SelectionScope): SelectionPorts {
   const tokens = motionTokens(db, { orgId, brandId: scope.brandId });
   const canvasOf = new Map<string, string>();
 
+  const compose = async (target: DrawTarget) => {
+    const assets = await motionAssets({ db, orgId, projectId, canvasId: canvasOf.get(target.nodeId)! }, SIGNED_URL_TTL_S.render);
+    return composeHtml({ doc: target.doc, tokens: await tokens, assets: assetUrls(assets), origin: libsOrigin() });
+  };
+
   return {
     read: async (nodeId) => {
       const [frame, node] = await Promise.all([frames.read(nodeId), findNode(db, { orgId, nodeId })]);
@@ -29,10 +36,7 @@ export function selectionPorts(scope: SelectionScope): SelectionPorts {
       canvasOf.set(nodeId, frame.canvasId);
       return { name: node?.displayName || FRAME_NAME, doc: frame.doc };
     },
-    draw: async (nodeId, doc, spec) => {
-      const assets = await motionAssets({ db, orgId, projectId, canvasId: canvasOf.get(nodeId)! }, SIGNED_URL_TTL_S.render);
-      return drawStill(chromiumFrames, { doc, tokens: await tokens, assets: assetUrls(assets) }, spec);
-    },
+    draw: (targets, row) => drawTargets(chromiumExport, compose, targets, row),
     store: async (packed) => {
       const path = `${canvasUploadPrefix(orgId, projectId)}exports/${crypto.randomUUID()}/${packed.name}`;
       await storeAssetFile(db, path, new File([new Uint8Array(packed.bytes)], packed.name, { type: packed.mime }));
