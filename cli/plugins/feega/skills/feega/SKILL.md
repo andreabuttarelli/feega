@@ -204,7 +204,10 @@ same player inside a React (`@feega/motion-react`) or Flutter (`feega_motion`) a
 
 See a video with `view_motion_frames` (up to 6 times in seconds): the frames come back as
 images with the quality gate's `quality` and `blocking` notes. Free; look before and after
-`ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`.
+`ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`. Against a local server
+the frames need `CHROMIUM_PATH` (a local Chrome binary, e.g.
+`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`) in its env; without it the call
+answers `closed` / "frames unavailable".
 
 Every save is a revision. `list_motion_revisions` lists them (who saved, clip count);
 `restore_motion_revision` puts one back as a new revision, history kept. Free. CLI:
