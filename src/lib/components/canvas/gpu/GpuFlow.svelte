@@ -66,7 +66,7 @@
   import { Counter, count, exposeLoss, recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
   import { domPainted, paintsDom } from '$lib/canvas/gpu/paint';
-  import { nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
+  import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, latestSnapshot, storeSnapshot } from '$lib/canvas/gpu/snapshot-cache';
   import { getFontEmbedCSS, toCanvas } from 'html-to-image';
   import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
@@ -393,7 +393,8 @@
         rotation: t.rotation ?? 0,
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
         hidden: domIds.has(t.id),
-        snapshot: shotOf(t.id)
+        snapshot: shotOf(t.id),
+        running: isRunning(summaries.get(t.id)?.data ?? {})
       })
     )
   );

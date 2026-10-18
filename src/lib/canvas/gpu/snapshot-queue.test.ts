@@ -11,6 +11,12 @@ describe('snapshotKey — one picture per node revision', () => {
     expect(snapshotKey({ ...tile('a'), w: 120 }, { content: 'x' }, [])).not.toBe(base);
     expect(snapshotKey(tile('a'), { content: 'x' }, ['t'])).not.toBe(base);
   });
+
+  it('a run starting or finishing does not re-rasterise the card: its live state is drawn on top', () => {
+    const idle = snapshotKey(tile('a'), { prompt: 'p' }, []);
+    expect(snapshotKey(tile('a'), { prompt: 'p', running: true, status: 'running', run_id: 'r', started_at: 't' }, [])).toBe(idle);
+    expect(snapshotKey(tile('a'), { prompt: 'p', refId: 'out' }, [])).not.toBe(idle);
+  });
 });
 
 describe('nextSnapshot — which node to picture next', () => {

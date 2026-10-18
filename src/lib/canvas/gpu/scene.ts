@@ -11,7 +11,7 @@ import { Backend } from './backend';
 export { Backend };
 
 
-export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean; snapshot: string | null };
+export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean; snapshot: string | null; running: boolean };
 export type Peer = { id: string; name: string; color: string; at: { x: number; y: number } };
 export type Overlay = {
   selected: (Box & { id: string })[];
@@ -635,6 +635,11 @@ export class GpuScene {
     const line = 1.5 / z;
     if (o.hovered) {
       g.rect(o.hovered.x, o.hovered.y, o.hovered.w, o.hovered.h).stroke({ width: line, color: this.theme.accent, alpha: 0.5 });
+    }
+    for (const c of this.cards) {
+      if (c.running && !c.hidden) {
+        g.rect(c.x, c.y, c.w, c.h).stroke({ width: line * 1.5, color: this.theme.accent });
+      }
     }
     if (o.marquee) {
       const m = o.marquee;
