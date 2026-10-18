@@ -23,7 +23,7 @@ work.
 App: `canvasModeFor(role)` puts the canvas in the existing
 `CanvasMode.View` (no drag, connect, select, add bar, drop), node
 bodies ignore the pointer, a "View only" pill shows, the empty-state
-starters and the chat panel are hidden. Settings sections other than
+starters are hidden, and the chat panel stays mounted (mobile keeps it mounted on purpose) but shows a view-only note instead of the composer. Settings sections other than
 personal ones (`sectionEditable`) are `inert` with a notice. The motion
 editor redirects a viewer to the canvas (`assertEditor`). JWT
 generation calls (`orgScopeFor`) answer 403 `view_only` before the

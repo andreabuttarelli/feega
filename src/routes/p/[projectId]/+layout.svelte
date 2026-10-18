@@ -201,7 +201,7 @@
         {@render children()}
       </div>
       <div class="mobile-chat" class:is-hidden={mobileView.view !== 'chat'} data-testid="mobile-chat">
-        {#if canEdit}<CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={true} />{/if}
+        <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={true} viewOnly={!canEdit} />
         {#if $propertiesTarget}<span class="editing" data-testid="canvas-chat-editing">{editingLabel($propertiesTarget.name)}</span>{/if}
       </div>
       {#if viewSwitch && !typing}
@@ -257,7 +257,7 @@
         <CanvasSheet {projectId} />
       </div>
 
-      {#if canEdit}<CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={chatOpen && !inlineStage.editing} />{/if}
+      <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={chatOpen && !inlineStage.editing} viewOnly={!canEdit} />
     </div>
   {:else}
     <DesktopPageBar
