@@ -1,6 +1,6 @@
-# Frames: Figma-style "Use as mask"
+# Frames: "Use as mask"
 
-Frames had per-clip AE masks and track mattes, but not Figma's gesture:
+Frames had per-clip AE masks and track mattes, but not the design-tool gesture:
 draw a shape, select it with the layers above, use it as mask.
 
 Model (ADR 0010): a track matte with a named source. New optional clip

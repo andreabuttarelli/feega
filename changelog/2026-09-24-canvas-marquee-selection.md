@@ -17,7 +17,7 @@ all.
 
 - `selectionOnDrag` — a drag starting on empty canvas opens the marquee.
 - `selectionMode={SelectionMode.Partial}` — a node only partly inside the box is still
-  selected; a Figma-speed gesture rarely fully encloses the target on the first drag.
+  selected; a fast gesture rarely fully encloses the target on the first drag.
 - `panOnDrag={[1, 2]}` — panning moves to the middle (1) and right (2) mouse buttons,
   leaving the left button free for the marquee. `panOnScroll` (two-finger scroll) and
   the library's default `panActivationKey` (Space+drag) were already on and needed no

@@ -286,7 +286,12 @@ export async function copyElement(store: FrameStore, ask: MoveAsk): Promise<Move
   return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
 }
 
-export async function moveFree(store: FrameStore, ask: z.infer<typeof freeAskSchema>): Promise<Moved> {
+export enum FreeSource {
+  Remove = 'remove',
+  Keep = 'keep'
+}
+
+export async function moveFree(store: FrameStore, ask: z.infer<typeof freeAskSchema>, after: FreeSource = FreeSource.Remove): Promise<Moved> {
   const source = await store.read(ask.sourceNodeId);
   if (!source || ask.drop.on !== DropOn.Frame) {
     return refused(MoveOutcome.NotFound, `no element ${ask.sourceNodeId}`);
@@ -314,12 +319,17 @@ export async function moveFree(store: FrameStore, ask: z.infer<typeof freeAskSch
     clipId = placed.clipId;
   }
 
-  const write = await store.write(target.nodeId, target.version, doc, SUMMARY.movedIn);
+  const kept = after === FreeSource.Keep;
+  const write = await store.write(target.nodeId, target.version, doc, kept ? SUMMARY.copiedIn : SUMMARY.movedIn);
   if (write.outcome !== RevisionOutcome.Written) {
     return failedWrite(write);
   }
+  const done = { outcome: MoveOutcome.Done, frameId: target.nodeId, clipId, created: false, versions: { [target.nodeId]: write.head.version } } as const;
+  if (kept) {
+    return { ...done, undo: [revision(target.nodeId, target.version)] };
+  }
   await store.remove(source.nodeId);
-  return { outcome: MoveOutcome.Done, frameId: target.nodeId, clipId, created: false, versions: { [target.nodeId]: write.head.version }, undo: [revision(target.nodeId, target.version), deleted(source)] };
+  return { ...done, undo: [revision(target.nodeId, target.version), deleted(source)] };
 }
 
 const OUTPUT_LONG_SIDE = 320;

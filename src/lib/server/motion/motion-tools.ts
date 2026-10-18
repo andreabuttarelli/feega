@@ -1,6 +1,7 @@
 import { ungroupClip } from '$lib/motion/group';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
+import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
 import { setPartFills } from '$lib/motion/part-style';
 import { staticParts } from './static-parts';
 import { strokesSchema } from '$lib/motion/stroke/model';
@@ -224,9 +225,9 @@ export type StoryboardPort = {
   link: (nodeId: string, clipIds: string[]) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
 
-export type RevisionEntry = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
+export type RevisionEntry = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number; name?: string | null };
 
-export type RevisionLibrary = { list: () => Promise<RevisionEntry[]>; read: (version: number) => Promise<MotionDoc | null> };
+export type RevisionLibrary = { list: () => Promise<RevisionEntry[]>; read: (version: number) => Promise<MotionDoc | null>; name?: (version: number, name: string) => Promise<boolean> };
 
 export type UiRegion = { x: number; y: number; width: number; height: number };
 
@@ -875,7 +876,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_visibility: tool({
-      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it. clip_content true on a clip crops its children (set_parent) to its box at rest, like a Figma frame.',
+      description: 'Hide (left out of the render) or lock (not moved by edits) a track (track_id) or a clip (clip_id). bleed true on a clip declares that it runs off the frame edge on purpose (poster type, a full-bleed block): the safe-area check skips it. clip_content true on a clip crops its children (set_parent) to its box at rest, like a frame in a design tool.',
       inputSchema: z.object({ track_id: z.string().optional(), clip_id: z.string().optional(), hidden: z.boolean().optional(), locked: z.boolean().optional(), bleed: z.boolean().optional(), clip_content: z.boolean().optional() }),
       execute: async (input) => {
         const flags = { ...(input.hidden === undefined ? {} : { hidden: input.hidden }), ...(input.locked === undefined ? {} : { locked: input.locked }), ...(input.bleed === undefined || !input.clip_id ? {} : { bleed: input.bleed }), ...(input.clip_content === undefined || !input.clip_id ? {} : { clipContent: input.clip_content }) };
@@ -1135,7 +1136,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
 
     use_as_mask: tool({
       description:
-        'Figma "Use as mask": of clip_ids, the bottom-most clip (lowest track) becomes the mask of the others, which must sit on tracks above it. The mask is drawn nowhere; its alpha as rendered cuts every masked clip: a Shape rect, ellipse or path with its corner radius and smoothing, a gradient fill fading to transparent gives a soft mask, its keyframes move the mask. Hide the mask clip (set_visibility) to turn masking off; release_mask removes it.',
+        '"Use as mask": of clip_ids, the bottom-most clip (lowest track) becomes the mask of the others, which must sit on tracks above it. The mask is drawn nowhere; its alpha as rendered cuts every masked clip: a Shape rect, ellipse or path with its corner radius and smoothing, a gradient fill fading to transparent gives a soft mask, its keyframes move the mask. Hide the mask clip (set_visibility) to turn masking off; release_mask removes it.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(2) }),
       execute: async (input) => apply(useAsMask(session.doc, input.clip_ids), `masked ${input.clip_ids.length - 1} clip(s)`)
     }),
@@ -1455,7 +1456,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_auto_layout: tool({
-      description: 'Auto layout (Figma-style flexbox). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (its fill is the frame background, set_props to colour it) on a track below them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
+      description: 'Auto layout (flexbox-style). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (its fill is the frame background, set_props to colour it) on a track below them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1).optional(), clip_id: z.string().optional() }),
       execute: async (input) => {
         if (input.clip_id) {
@@ -1468,7 +1469,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_auto_layout: tool({
-      description: 'Change an auto layout container: direction horizontal|vertical, wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, padding {top,right,bottom,left} px, justify start|center|end|space-between on the main axis, align start|center|end on the cross axis, order (child ids, first to last). Only the fields given change. off true removes the auto layout (children keep their parent).',
+      description: 'Change an auto layout container: direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, padding {top,right,bottom,left} px, justify start|center|end|space-between on the main axis, align start|center|end on the cross axis, order (child ids, first to last). Only the fields given change. off true removes the auto layout (children keep their parent).',
       inputSchema: autoLayoutPatchSchema.extend({ clip_id: z.string(), off: z.boolean().optional() }),
       execute: async ({ clip_id, off, ...patch }) => apply(setAutoLayout(session.doc, clip_id, off ? null : patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
     }),
@@ -1569,6 +1570,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
         return created(apply(withEffects(shape, [id], input.effects), `added ${input.kind} shape`), id);
       }
+    }),
+
+    combine_shapes: tool({
+      description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(2), op: z.enum([BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, BooleanOp.Exclude]), at: z.number().min(0).optional().describe('seconds; default 0') }),
+      execute: async (input) => apply(combineShapes(session.doc, input.clip_ids, input.op, frames(input.at ?? 0)), `combined ${input.clip_ids.join(', ')} (${input.op})`)
     }),
 
     set_path: tool({
@@ -2558,7 +2565,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: 'version history is not available here' };
         }
         const entries = await deps.revisions.list();
-        return { ok: true, revisions: entries.map((e) => ({ version: e.version, actor: e.actorKind, summary: e.summary, at: e.createdAt, clips: e.clips })) };
+        return { ok: true, revisions: entries.map((e) => ({ version: e.version, name: e.name ?? null, actor: e.actorKind, summary: e.summary, at: e.createdAt, clips: e.clips })) };
+      }
+    }),
+
+    name_revision: tool({
+      description: 'Give a saved version of the video a name (number from list_revisions), e.g. "Client review"; an empty name removes it. Names show in the version history and in list_revisions.',
+      inputSchema: z.object({ version: z.number().int().min(1), name: z.string().max(60) }),
+      execute: async (input) => {
+        if (!deps.revisions?.name) {
+          return { ok: false, error: 'version names are not available here' };
+        }
+        return (await deps.revisions.name(input.version, input.name)) ? { ok: true } : { ok: false, error: `no version ${input.version}: call list_revisions` };
       }
     }),
 

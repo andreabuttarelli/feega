@@ -87,7 +87,7 @@ test.describe('opening a frame on a phone @real', () => {
 
     const node = nodeOf(page, frame.id);
     const body = node.getByTestId('motion-node-stage');
-    await expect(node.locator('img.poster, [data-testid="motion-node-poster"]').first()).toBeVisible();
+    await expect(node.locator('img.poster, [data-testid="motion-node-poster"], [data-drawn="true"]').first()).toBeVisible();
 
     await press(page, body);
     await expect(node, 'a tap selects the frame').toHaveClass(/selected/);

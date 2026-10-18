@@ -1,6 +1,7 @@
 import sharp from "sharp";
 import type { Page } from "@playwright/test";
 import { test, expect, REAL_STACK, gotoHydrated } from "./fixtures/session";
+import { pickFrameTool } from "./fixtures/canvas-bar";
 import poster from "./fixtures/poster-type-grid.json" with { type: "json" };
 
 const PORTRAIT = {
@@ -126,7 +127,7 @@ test.describe("text drawn inside a frame @real", () => {
       )?.posterAssetId ?? null;
     await page.waitForTimeout(4000);
     const blankPoster = await posterOf();
-    await page.getByTestId("draw-tools").locator('[data-tool="text"]').click();
+    await pickFrameTool(page, "text");
     const from = at(0.2, 0.4);
     const to = at(0.8, 0.6);
     await page.mouse.move(from.x, from.y);

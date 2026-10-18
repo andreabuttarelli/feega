@@ -41,6 +41,8 @@
     [FillType.Solid]: (f) => color((f as FillOf<FillType.Solid>).color),
     [FillType.Linear]: (f) => `linear-gradient(${(f as FillOf<FillType.Linear>).angle + 90}deg,${stopCss((f as FillOf<FillType.Linear>).stops)})`,
     [FillType.Radial]: (f) => `radial-gradient(circle,${stopCss((f as FillOf<FillType.Radial>).stops)})`,
+    [FillType.Angular]: (f) => `conic-gradient(from ${(f as FillOf<FillType.Angular>).angle}deg,${stopCss((f as FillOf<FillType.Angular>).stops)})`,
+    [FillType.Diamond]: (f) => `radial-gradient(closest-side,${stopCss((f as FillOf<FillType.Diamond>).stops)})`,
     [FillType.Image]: (f) => {
       const preview = assets.find((a) => a.id === (f as FillOf<FillType.Image>).assetId)?.previewUrl ?? (f as FillOf<FillType.Image>).src;
       return preview ? `center / cover no-repeat url("${preview}")` : 'var(--ui-input)';
@@ -204,7 +206,7 @@
         </label>
         {#if fill.type === FillType.Solid}
           {@render colour('Fill colour', fill.color, (next) => patch(index, { color: next }, 'Fill colour'))}
-        {:else if fill.type === FillType.Linear || fill.type === FillType.Radial}
+        {:else if fill.type !== FillType.Image}
           {@const at = Math.min(stopAt, fill.stops.length - 1)}
           <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
           <div class="relative mx-2 my-1 h-4 cursor-copy rounded-xs border border-ui-divider" data-testid="fill-bar" title="Click to add a stop" style={`background:linear-gradient(90deg,${stopCss(fill.stops)})`} onclick={(e) => addStopAt(index, e)}>
@@ -242,7 +244,11 @@
           </div>
           {#if fill.type === FillType.Linear}
             <label class={FIELD_ROW}><span class={LABEL}>Angle</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></label>
-          {:else}
+          {:else if fill.type === FillType.Angular}
+            <label class={FIELD_ROW}><span class={LABEL}>Angle</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="-360" max="360" step="1" data-testid="fill-angle" value={fill.angle} onchange={(e) => patch(index, { angle: Number(e.currentTarget.value) }, 'Gradient angle')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Centre X</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></label>
+            <label class={FIELD_ROW}><span class={LABEL}>Centre Y</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></label>
+          {:else if fill.type === FillType.Radial}
             <label class={FIELD_ROW}><span class={LABEL}>Centre X</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.x)} onchange={(e) => patch(index, { center: { ...fill.center, x: percentOf(e) } }, 'Gradient centre')} /></label>
             <label class={FIELD_ROW}><span class={LABEL}>Centre Y</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="0" max="100" value={pct(fill.center.y)} onchange={(e) => patch(index, { center: { ...fill.center, y: percentOf(e) } }, 'Gradient centre')} /></label>
             <label class={FIELD_ROW}><span class={LABEL}>Radius</span><input class={cn(FIELD_INPUT, 'w-16')} type="number" min="1" max="400" step="1" data-testid="fill-radius" value={pct(fill.radius)} onchange={(e) => patch(index, { radius: Math.max(1, Number(e.currentTarget.value)) / PERCENT }, 'Gradient radius')} /></label>

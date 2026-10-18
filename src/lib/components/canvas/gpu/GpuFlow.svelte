@@ -43,6 +43,7 @@
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, type SnapGuide } from '$lib/canvas/snap';
+  import { dragOffset } from '$lib/canvas/duplicate-plan';
   import { enterFrame } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
   import type { Edge } from '$lib/motion/space';
@@ -143,6 +144,25 @@
       sticky = keep;
     }
   });
+  const kept = new Set<string>();
+  const domIds = $derived.by(() => {
+    const now = [...editIds, ...sticky.keys(), ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)];
+    for (const id of now) {
+      if (byId.get(id)?.kind !== 'motion') {
+        kept.add(id);
+      }
+    }
+    const alive = new Set(placed.map((t) => t.id));
+    for (const id of [...kept]) {
+      if (!alive.has(id)) {
+        kept.delete(id);
+      }
+    }
+    const next = new Set([...kept, ...now]);
+    return sameSet(lastDom, next) ? lastDom : (lastDom = next);
+  });
+  let lastDom = new Set<string>();
+  const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
   let parked = $state(new Map<string, number>());
   let shelfClock = $state(0);
   const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock)));
@@ -173,25 +193,6 @@
     }, SHELF_TICK_MS);
     return () => clearInterval(timer);
   });
-  const kept = new Set<string>();
-  const domIds = $derived.by(() => {
-    const now = [...editIds, ...sticky.keys(), ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)];
-    for (const id of now) {
-      if (byId.get(id)?.kind !== 'motion') {
-        kept.add(id);
-      }
-    }
-    const alive = new Set(placed.map((t) => t.id));
-    for (const id of [...kept]) {
-      if (!alive.has(id)) {
-        kept.delete(id);
-      }
-    }
-    const next = new Set([...kept, ...now]);
-    return sameSet(lastDom, next) ? lastDom : (lastDom = next);
-  });
-  let lastDom = new Set<string>();
-  const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
 
   function portFor(nodeId: string, side: PortSide, handle: string | null | undefined): Port | null {
     const own = ports.filter((p) => p.nodeId === nodeId && p.side === side);
@@ -731,6 +732,13 @@
     props.onLive?.([]);
     if (props.onTileDrop?.(ids, pointOf(e)) === DropVerdict.Taken) {
       settleOverrides();
+      return;
+    }
+    const grabbed = overrides.get(ids[0]);
+    const copyOffset = e.altKey && grabbed ? dragOffset(new Map(tiles.map((t) => [t.id, { x: t.x, y: t.y }])), { id: ids[0], position: grabbed }) : undefined;
+    if (copyOffset && props.onDuplicate) {
+      settleOverrides();
+      props.onDuplicate(ids, copyOffset);
       return;
     }
     const moves = ids.flatMap((id) => (overrides.get(id) ? [{ id, x: overrides.get(id)!.x, y: overrides.get(id)!.y }] : []));

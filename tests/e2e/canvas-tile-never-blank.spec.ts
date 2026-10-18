@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { pickBarTool } from './fixtures/canvas-bar';
 import sharp from 'sharp';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
@@ -92,7 +93,7 @@ test.describe('a free element tile is never blank @real', () => {
       test.setTimeout(180_000);
       await page.setViewportSize({ width: 1440, height: 900 });
       await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-      await page.getByTestId('add-bar').getByTestId('draw-tools').locator(`[data-tool="${tool}"]`).click();
+      await pickBarTool(page, tool);
       const pane = (await page.locator('.svelte-flow').boundingBox())!;
       const from = { x: pane.x + pane.width * 0.35, y: pane.y + pane.height * 0.35 };
       await page.mouse.move(from.x, from.y);
@@ -128,7 +129,7 @@ test.describe('a free element tile is never blank @real', () => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.getByTestId('add-bar').getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
+    await pickBarTool(page, 'rectangle');
     const pane = (await page.locator('.svelte-flow').boundingBox())!;
     const from = { x: pane.x + pane.width * 0.35, y: pane.y + pane.height * 0.35 };
     await page.mouse.move(from.x, from.y);
@@ -166,7 +167,7 @@ test.describe('a free element tile is never blank @real', () => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.getByTestId('add-bar').getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
+    await pickBarTool(page, 'rectangle');
     const pane = (await page.locator('.svelte-flow').boundingBox())!;
     const from = { x: pane.x + pane.width * 0.35, y: pane.y + pane.height * 0.35 };
     await page.mouse.move(from.x, from.y);
@@ -203,7 +204,7 @@ test.describe('a free element tile is never blank @real', () => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.getByTestId('add-bar').getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
+    await pickBarTool(page, 'rectangle');
     const pane = (await page.locator('.svelte-flow').boundingBox())!;
     const from = { x: pane.x + pane.width * 0.35, y: pane.y + pane.height * 0.35 };
     await page.mouse.move(from.x, from.y);
