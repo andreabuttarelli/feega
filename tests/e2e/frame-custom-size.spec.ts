@@ -56,7 +56,8 @@ test.describe('a custom frame takes the size of its node @real', () => {
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
     await expect(async () => {
-      await page.locator('.node-label').first().click();
+      const tile = (await page.locator(`.svelte-flow__node[data-id="${node.id}"]`).boundingBox())!;
+      await page.mouse.click(tile.x + 24, tile.y - 10);
       await expect(page.getByRole('tab', { name: 'Properties' })).toBeVisible({ timeout: 3000 });
     }, 'the frame opens in place').toPass({ timeout: 30_000 });
     await page.getByRole('tab', { name: 'Properties' }).click();

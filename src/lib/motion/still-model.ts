@@ -29,7 +29,7 @@ const IMAGE: Record<ImageFormat, { mime: string; ext: string; quality?: number }
 
 type Size = { width: number; height: number };
 
-export type StillExport = { format: ImageFormat; scale: ImageScale; mime: string; ext: string; quality?: number; size: (doc: Size) => Size };
+export type StillExport = { format: ImageFormat; scale: number; mime: string; ext: string; quality?: number; size: (doc: Size) => Size };
 
 export const stillAskSchema = z.object({
   format: z.enum(IMAGE_FORMATS).default(ImageFormat.Png),
