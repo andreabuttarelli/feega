@@ -56,6 +56,17 @@ beforeEach(() => {
 });
 
 describe('orgScopeFor', () => {
+  it('un viewer non spende: la generazione si ferma prima del cancello dei crediti', async () => {
+    listMemberships.mockResolvedValue([{ org: { id: 'org-v', name: 'V', slug: 'v' }, role: 'viewer' }]);
+
+    const { scope, error } = await orgScopeFor(caller());
+
+    expect(scope).toBeUndefined();
+    expect(error?.status).toBe(403);
+    expect(await error?.json()).toMatchObject({ error: 'view_only' });
+    expect(gateOrgCredits).not.toHaveBeenCalled();
+  });
+
   it("un JWT lavora nell'org attiva dell'utente, non nella sua più vecchia", async () => {
     listMemberships.mockResolvedValue([{ org: { id: 'org-active', name: 'Active', slug: 'a' }, role: 'member' }]);
 

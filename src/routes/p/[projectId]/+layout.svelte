@@ -8,6 +8,7 @@
   import type { LeftPanelKind } from '$lib/components/canvas/CanvasLeftPanel.svelte';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import CanvasChatPanel from '$lib/components/canvas/CanvasChatPanel.svelte';
+  import { can, OrgAction } from '$lib/org-roles';
   import CanvasSheet from '$lib/components/canvas/CanvasSheet.svelte';
   import ChatLeaveGuard from '$lib/components/canvas/ChatLeaveGuard.svelte';
   import { openSheet, restoreSheet } from '$lib/canvas/sheet-nav';
@@ -167,6 +168,8 @@
   const viewSwitch = $derived(
     onCanvasRoute && !inlineStage.editing ? { view: mobileView.view, badge: chatBadge(mobileView, chatTurn), onselect: onMobileView, properties: { target: $propertiesTarget?.name ?? null, onopen: openProperties } } : null
   );
+
+  const canEdit = $derived(can(data.org.role, OrgAction.Edit));
 </script>
 
 <ChatLeaveGuard {projectId} />
@@ -198,7 +201,7 @@
         {@render children()}
       </div>
       <div class="mobile-chat" class:is-hidden={mobileView.view !== 'chat'} data-testid="mobile-chat">
-        <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={true} />
+        <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={true} viewOnly={!canEdit} />
         {#if $propertiesTarget}<span class="editing" data-testid="canvas-chat-editing">{editingLabel($propertiesTarget.name)}</span>{/if}
       </div>
       {#if viewSwitch && !typing}
@@ -254,7 +257,7 @@
         <CanvasSheet {projectId} />
       </div>
 
-      <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={chatOpen && !inlineStage.editing} />
+      <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={chatOpen && !inlineStage.editing} viewOnly={!canEdit} />
     </div>
   {:else}
     <DesktopPageBar
