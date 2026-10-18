@@ -3060,3 +3060,6 @@ Signal: a new Text/Title/Line in a still frame renders with opacity 0 (or clippe
 
 ### A `{#key}` editor remounts on close although a "leaving" state keeps it
 Signal: deselecting a frame flashes "Opening the editor…" or a stale picture; a `console.log` in the editor's `onMount` fires unmount→mount→unmount within one click. Cause: the state that keeps the block alive (`inlineStage.leave`) was set in an `$effect` reacting to the selection; the `{#if}/{#key}` block had already re-rendered without it, and `earlyFetch.take` had emptied the session cache, so the remount loaded again. `$effect.pre` did not fix it. Move: set the keep-alive state synchronously in the handler that changes the selection (`selectionChanged` → `leaveNow`), and keep the effect only as fallback.
+
+### A drag e2e on a canvas node does not move it
+Signal: `mouse.down/move/up` on a seeded node leaves `boundingBox().x` unchanged; a text node's textbox gets the pointer. Cause: text/doc bodies take the pointer for editing, and a click first on a motion node opens the inline editor. Move: seed a `motion` element with `width/height` and a `motion_revisions` row, then press on it without a prior click; measure the peer's box BEFORE `mouse.down`, not after the moves.
