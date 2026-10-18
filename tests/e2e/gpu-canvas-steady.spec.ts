@@ -167,6 +167,7 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
     await page.mouse.move(pane.x + pane.width - 40, pane.y + pane.height - 40, { steps: 20 });
     await page.mouse.up();
     expect(await page.evaluate(() => window.getSelection()?.toString() ?? '')).toBe('');
+  });
 
   test('an ⌥-drag leaves the original in place and drags its copy', async ({ page, session, admin, seedNode }) => {
     await page.setViewportSize({ width: 1600, height: 1000 });
