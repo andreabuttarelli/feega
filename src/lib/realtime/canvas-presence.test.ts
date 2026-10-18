@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CHAT_MAX, HEARTBEAT_MS, SETTLE_MS, TICK_MS, centreOf, followed, landedAt, presenterOf, withPeerMotion, canvasHub, canvasPeersOf, keepCanvasMark, toCanvasMark, type CanvasMark } from './canvas-presence';
+import { CHAT_MAX, HEARTBEAT_MS, viewportCentredOn, SETTLE_MS, TICK_MS, centreOf, followed, landedAt, presenterOf, withPeerMotion, canvasHub, canvasPeersOf, keepCanvasMark, toCanvasMark, type CanvasMark } from './canvas-presence';
 import { MARK_STALE_MS } from './frame-presence';
 
 const self = { sessionId: 's-me', userId: 'me', name: 'me' };
@@ -197,5 +197,13 @@ describe('cursor chat', () => {
     expect(toCanvasMark({ ...base, chat: 'hello' })?.chat).toBe('hello');
     expect(toCanvasMark({ ...base, chat: 'x'.repeat(CHAT_MAX + 1) })).toBeNull();
     expect(toCanvasMark(base)?.chat).toBeNull();
+  });
+});
+
+describe('viewportCentredOn', () => {
+  it('puts a followed centre in the middle of my screen, at its zoom', () => {
+    const size = { width: 800, height: 600 };
+    const view = viewportCentredOn({ cx: 250, cy: 175, zoom: 2 }, size);
+    expect(view).toEqual({ x: -100, y: -50, zoom: 2 });
   });
 });
