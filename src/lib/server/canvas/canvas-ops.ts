@@ -36,6 +36,7 @@ import { exportElementsSchema, exportRowsSchema, needsBrowser } from '$lib/motio
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
+import { listCanvasVersions, restoreCanvasVersion, saveCanvasVersion } from '$lib/server/canvas/canvas-versions';
 import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
@@ -947,6 +948,24 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: duplicateInput,
     run: async (ctx, input) => duplicateNodes(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, ...input, actor: ctx.actor })
+  }),
+
+  save_canvas_version: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), name: z.string().max(60).describe('e.g. "Client review"') }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? saveCanvasVersion(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, name: input.name, actor: ctx.actor }) : NOT_IN_PROJECT)
+  }),
+
+  list_canvas_versions: op({
+    access: Access.Read,
+    input: z.object({ canvasId: z.string() }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? { versions: await listCanvasVersions(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId }) } : NOT_IN_PROJECT)
+  }),
+
+  restore_canvas_version: op({
+    access: Access.Write,
+    input: z.object({ canvasId: z.string(), versionId: z.string().describe('from list_canvas_versions') }).strict(),
+    run: async (ctx, input) => ((await inProject(ctx, input.canvasId)) ? restoreCanvasVersion(ctx.db, { orgId: ctx.orgId, canvasId: input.canvasId, versionId: input.versionId, actor: ctx.actor }) : NOT_IN_PROJECT)
   }),
 
   share_canvas: op({

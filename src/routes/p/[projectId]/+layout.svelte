@@ -1,5 +1,6 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
+  import { versionsPanel } from '$lib/canvas/versions-panel.svelte';
   import { modeOf, ProjectMode } from '$lib/project-mode';
   import '$lib/styles/tailwind.css';
   import { page } from '$app/state';
@@ -241,6 +242,7 @@
   {:else if onCanvasRoute}
     <CanvasTopBar
       {projectId}
+      onVersions={() => versionsPanel.show()}
       projectName={data.project.name}
       projects={data.projects.map((p: { id: string; name: string; href: string; updatedAt: string; mode: string }) => ({
         id: p.id,

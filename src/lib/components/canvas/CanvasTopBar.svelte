@@ -1,4 +1,5 @@
 <script lang="ts">
+  import History from '@lucide/svelte/icons/history';
   import { _ } from 'svelte-i18n';
   import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
   import { cn } from '$lib/utils';
@@ -53,7 +54,8 @@
     profile,
     org,
     projectMode = ProjectMode.Standard,
-    brandName = null
+    brandName = null,
+    onVersions = null
   }: {
     projectId: string;
     projectName: string;
@@ -70,6 +72,7 @@
     org: { name: string } | null;
     projectMode?: string;
     brandName?: string | null;
+    onVersions?: (() => void) | null;
   } = $props();
 
   const ICON = 16;
@@ -281,6 +284,12 @@
           </div>
         {/each}
         <DropdownMenu.Separator />
+        {#if onVersions}
+          <DropdownMenu.Item class="sw-row" data-testid="canvas-versions" onSelect={onVersions}>
+            <span class="sw-lead"><History size={ICON} /></span>
+            Versions…
+          </DropdownMenu.Item>
+        {/if}
         <DropdownMenu.Item class="sw-row" data-testid="canvas-new" onSelect={() => submitCanvasAction(canvasHref, CanvasAction.New)}>
           <span class="sw-lead"><Plus size={ICON} /></span>
           {$_('app.shell.canvasActions.new')}
