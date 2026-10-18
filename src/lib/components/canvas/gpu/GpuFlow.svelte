@@ -145,7 +145,7 @@
   });
   let parked = $state(new Map<string, number>());
   let shelfClock = $state(0);
-  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], editIds, parked, shelfClock)));
+  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock)));
   const shelfSince = new Map<string, number>();
   $effect(() => {
     const now = Date.now();
@@ -175,7 +175,7 @@
   });
   const kept = new Set<string>();
   const domIds = $derived.by(() => {
-    const now = [...editIds, ...sticky.keys(), ...shelf, ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)];
+    const now = [...editIds, ...sticky.keys(), ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)];
     for (const id of now) {
       if (byId.get(id)?.kind !== 'motion') {
         kept.add(id);
@@ -1190,6 +1190,16 @@
   </div>
 
 
+  <div class="poster-shelf" aria-hidden="true">
+    {#each placed.filter((t) => shelf.has(t.id)) as t (t.id)}
+      <div class="shelf-node" data-shelf={t.id} style={`width:${t.w}px;height:${t.h}px`}>
+        <NodeBoundary>
+          {@render props.tile({ id: t.id, selected: false })}
+        </NodeBoundary>
+      </div>
+    {/each}
+  </div>
+
   {#if failed}
     <p class="edge-refusal" role="alert">GPU renderer unavailable: {failed}</p>
   {/if}
@@ -1360,6 +1370,21 @@
 
   .wire-iterate-badge :global(svg) {
     color: var(--ui-wire-iterate);
+  }
+
+  .poster-shelf {
+    position: fixed;
+    left: 0;
+    top: 0;
+    opacity: 0;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .shelf-node {
+    position: absolute;
+    left: 0;
+    top: 0;
   }
 
   .frame-standin {
