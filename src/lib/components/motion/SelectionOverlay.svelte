@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { textTarget } from '$lib/motion/hyperframes/text-edit';
   import { clipChrome } from '$lib/canvas/selection-chrome';
   import { onMount, untrack } from 'svelte';
   import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
@@ -32,7 +33,8 @@
     onhover = () => {},
     ondragout = null,
     onhostdrag = null,
-    onmenu = null
+    onmenu = null,
+    edittext = null
   }: {
     doc: MotionDoc;
     frame: number;
@@ -51,6 +53,7 @@
     ondragout?: ((out: ElementOut, phase: DragPhase) => void) | null;
     onhostdrag?: HostDrag | null;
     onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
+    edittext?: ((selector: string, at: { x: number; y: number } | null) => Promise<string | null>) | null;
   } = $props();
 
   const shared = selectionView()!;
@@ -101,6 +104,9 @@
   const ownParts = $derived(selected ? (split.parts[selected] ?? []) : []);
   const partBox = $derived(part ? (ownParts.find((p) => p.part === part)?.box ?? null) : null);
   let editing = $state<{ part: string; text: string } | null>(null);
+  let inPlace = $state(false);
+  let editTurn = 0;
+  let editAt: { x: number; y: number } | null = null;
   const editBox = $derived(part ? partBox : clip ? (boxes[clip.id] ?? null) : null);
   let partOf = '';
 
@@ -166,7 +172,7 @@
     const { level: next, edit } = drill(from, gesture, probe(p, picked));
     land(next);
     if (edit) {
-      editPart();
+      editPart(next);
     }
     return next;
   }
@@ -184,16 +190,49 @@
 
   let froms: Level[] = [];
 
+  $effect(() => {
+    const el = host;
+    if (!el) {
+      return;
+    }
+    el.addEventListener('dblclick', double);
+    return () => el.removeEventListener('dblclick', double);
+  });
+
   function double(e: MouseEvent) {
+    const [x, y] = local(e as PointerEvent);
+    editAt = { x: x / doc.width, y: y / doc.height };
     step(Gesture.Double, local(e as PointerEvent), froms[0] ?? level());
   }
 
-  function editPart() {
-    const target = part ?? CLIP_TEXT;
+  function editPart(at: Level) {
+    const target = at.part ?? CLIP_TEXT;
+    const clip = at.clip ? findClip(doc, at.clip)?.clip : null;
     if (!clip || editablePart(doc, clip, target) !== PartEdit.Text) {
       return;
     }
-    editing = { part: target, text: partText(clip, target) };
+    const text = partText(clip, target);
+    const point = editAt;
+    editAt = null;
+    if (!edittext) {
+      editing = { part: target, text };
+      return;
+    }
+    const clipId = clip.id;
+    const turn = ++editTurn;
+    inPlace = true;
+    void edittext(textTarget(clipId, target), point).then((typed) => {
+      if (turn === editTurn) {
+        inPlace = false;
+      }
+      if (typed === null || typed === text) {
+        return;
+      }
+      const result = writePartText(doc, clipId, target, typed);
+      if (result.ok) {
+        onchange(result.doc, 'Edited text on the canvas');
+      }
+    });
   }
 
   function commitPart(text: string) {
@@ -270,14 +309,27 @@
   let pendingPick = pickAt;
   let asking = true;
 
+  export function editClip(clipId: string) {
+    editAt = null;
+    if (!selection.includes(clipId)) {
+      onselect([clipId]);
+    }
+    editPart({ depth: Depth.Clip, clip: clipId, part: null });
+  }
+
+  export function drillAsked(asked: { at: Pt | null; gesture: Gesture; from: Depth }) {
+    editAt = asked.at ? { x: asked.at[0] / doc.width, y: asked.at[1] / doc.height } : null;
+    step(asked.gesture, asked.at, { depth: asked.from, clip: null, part: null });
+  }
+
   function pickPending() {
     if (!Object.keys(boxes).length) {
       return;
     }
     const asked = asking ? ask() : null;
     asking = false;
-    if (asked && !selection.length) {
-      step(asked.gesture, asked.at, { depth: asked.from, clip: null, part: null });
+    if (asked && (!selection.length || asked.gesture === Gesture.Double)) {
+      drillAsked(asked);
       return;
     }
     if (!pendingPick) {
@@ -452,7 +504,7 @@
 
 <svelte:window onkeydown={(e) => (altHeld = e.altKey)} onkeyup={(e) => (altHeld = e.altKey)} onblur={() => (altHeld = false)} />
 
-<div class="overlay" bind:this={host} data-testid="selection-overlay" role="presentation" ondblclick={double} oncontextmenu={openMenu} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
+<div class="overlay" class:typing={inPlace} bind:this={host} data-testid="selection-overlay" role="presentation" oncontextmenu={openMenu} onpointerdown={press} onpointermove={move} onpointerup={end} onpointercancel={() => end(null)} onpointerleave={() => (hover = null)}>
   <svg viewBox={`0 0 ${doc.width} ${doc.height}`} preserveAspectRatio="none" aria-hidden="true">
     {#if hoverQuad && !grab}<polygon class="hover" points={points(hoverQuad)} data-testid="hover-box" />{/if}
     {#if outlinedQuad}<polygon class="outlined" points={points(outlinedQuad)} data-testid="layer-hover-box" />{/if}
@@ -529,6 +581,10 @@
 </div>
 
 <style>
+  .overlay.typing {
+    pointer-events: none;
+  }
+
   .overlay {
     position: absolute;
     inset: 0;

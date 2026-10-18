@@ -82,6 +82,20 @@ describe('double-click goes one level deeper', () => {
   });
 });
 
+describe('a plain text, without parts', () => {
+  const plain = (top: string | null): Probe => ({ ...over(top), firstPart: () => null, editable: (clip, p) => clip === 'words' && p === null });
+  const WORDS: Level = { depth: Depth.Clip, clip: 'words', part: null };
+
+  it('double-click edits it straight away, from the frame or the canvas', () => {
+    expect(drill(FRAME, Gesture.Double, plain('words'))).toEqual({ level: WORDS, edit: true });
+    expect(drill(CANVAS, Gesture.Double, plain('words'))).toEqual({ level: WORDS, edit: true });
+  });
+
+  it('Enter on it, selected, edits it', () => {
+    expect(drill(WORDS, Gesture.Enter, plain(null))).toEqual({ level: WORDS, edit: true });
+  });
+});
+
 describe('keyboard', () => {
   it('Enter goes deeper without a pointer', () => {
     expect(drill(CANVAS, Gesture.Enter, nothing).level).toEqual(FRAME);

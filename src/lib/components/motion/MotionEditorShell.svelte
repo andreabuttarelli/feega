@@ -87,7 +87,7 @@
   import { FRAME_MENU_IDS, frameLayers, frameMenuRun, frameSummaries, type FrameLayer } from '$lib/motion/frame-menu';
   import type { SelectionActionId } from '$lib/canvas/selection-actions';
   import { Gesture } from '$lib/motion/drill';
-  import { frameDrill } from '$lib/canvas/frame-drill';
+  import { frameDrill, type DrillAsk } from '$lib/canvas/frame-drill';
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
   import { framePresence, keepMark, peersIn, type FrameCursor, type FrameMark } from '$lib/realtime/frame-presence';
@@ -983,6 +983,14 @@
 
   const DRAWN_SETTLE_FRAMES = 4;
 
+  $effect(() => {
+    const id = typeInto;
+    if (id && overlay) {
+      typeInto = null;
+      overlay.editClip(id);
+    }
+  });
+
   async function drawn(id: string) {
     selection = [id];
     typeInto = findClip(history.present, id)?.clip.component === DRAWN_TEXT ? id : null;
@@ -1664,9 +1672,13 @@
   let caughtAt = $state<[number, number] | null>(null);
   let overlay = $state<ReturnType<typeof SelectionOverlay> | null>(null);
 
+  const inFrame = (asked: DrillAsk) => ({ at: asked.at ? ([asked.at.x * doc.width, asked.at.y * doc.height] as [number, number]) : null, gesture: asked.gesture, from: asked.from });
+
+  $effect(() => frameDrill.listen(data.node.id, (asked) => overlay?.drillAsked(inFrame(asked))));
+
   function askedDrill() {
-    const asked = frameDrill.take(data.node.id);
-    return asked ? { at: asked.at ? ([asked.at.x * doc.width, asked.at.y * doc.height] as [number, number]) : null, gesture: asked.gesture, from: asked.from } : null;
+    const asked = frameDrill.take(data.node.id, (late) => overlay?.drillAsked(inFrame(late)));
+    return asked ? inFrame(asked) : null;
   }
 
   function selectSibling(direction: SiblingDirection) {
@@ -1943,7 +1955,7 @@
       <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
-        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at) => preview?.editText(selector, at, () => {}) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
         {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -1992,7 +2004,7 @@
         {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} upload={uploadMedia} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
         {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
-        <MotionInspector {typeInto} lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
