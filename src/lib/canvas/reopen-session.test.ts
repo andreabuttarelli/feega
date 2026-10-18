@@ -15,4 +15,12 @@ describe('reopening a frame', () => {
   it('a frame never opened has nothing to reuse', () => {
     expect(reopened(null, null, 1)).toBeNull();
   });
+
+  it('a session warmed at idle opens with its own head while no peer has saved since', () => {
+    expect(reopened(session, null, 2)).toEqual(session);
+  });
+
+  it('a session warmed at idle is stale once the frame moved past its head', () => {
+    expect(reopened(session, null, 3)).toBeNull();
+  });
 });

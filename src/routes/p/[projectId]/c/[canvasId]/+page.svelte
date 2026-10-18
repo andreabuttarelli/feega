@@ -125,6 +125,7 @@
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { frameHead } from '$lib/canvas/frame-outlines';
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
+  import { framesToWarm } from '$lib/canvas/warm-frames';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
   import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type HostMove, type PointerPoint } from '$lib/canvas/canvas-drop';
@@ -1202,8 +1203,7 @@
   const SAVE_MAX_WAIT_MS = 2000;
   const SAVE_BACKOFF_CAP_MS = 30000;
   const REMOTE_REFRESH_MS = 250;
-  const WARM_AFTER_MS = 500;
-  const WARM_ON_LOAD = 6;
+  const WARM_EVERY_MS = 1000;
   let saveStatus = $state(SaveStatus.Saved);
   let placeStatus = $state(SaveStatus.Saved);
   let unsentCount = $state(0);
@@ -1395,12 +1395,25 @@
     }
   }
 
-  const motionIds = $derived(nodes.filter((n) => n.type === 'motion').slice(0, WARM_ON_LOAD).map((n) => n.id).join());
+  const warmed = new Map<string, number>();
+
+  function warmInView() {
+    const corner = toFlow?.({ x: 0, y: 0 });
+    const far = toFlow?.({ x: innerWidth, y: innerHeight });
+    if (!corner || !far) {
+      return;
+    }
+    const view = { x: corner.x, y: corner.y, w: far.x - corner.x, h: far.y - corner.y };
+    const frames = nodes.filter((n) => n.type === 'motion' && n.version > 0).map((n) => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, version: n.version }));
+    for (const id of framesToWarm(frames, view, warmed)) {
+      warmed.set(id, frames.find((f) => f.id === id)!.version);
+      warmMotion(id);
+    }
+  }
 
   $effect(() => {
-    const ids = motionIds.split(',').filter(Boolean);
-    const timer = setTimeout(() => ids.forEach(warmMotion), WARM_AFTER_MS);
-    return () => clearTimeout(timer);
+    const timer = setInterval(() => (window.requestIdleCallback ? window.requestIdleCallback(warmInView) : warmInView()), WARM_EVERY_MS);
+    return () => clearInterval(timer);
   });
 
   function reframe(id: string | null, free: Insets) {
