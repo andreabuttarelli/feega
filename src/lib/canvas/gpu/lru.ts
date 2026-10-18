@@ -5,7 +5,7 @@ export type Lru<V> = {
   readonly bytes: number;
 };
 
-export function createLru<V>(budget: number, release: (key: string, value: V) => void): Lru<V> {
+export function createLru<V>(budget: number, release: (key: string, value: V) => void, inUse: (key: string) => boolean = () => false): Lru<V> {
   const entries = new Map<string, { value: V; bytes: number }>();
   let total = 0;
 
@@ -14,7 +14,7 @@ export function createLru<V>(budget: number, release: (key: string, value: V) =>
       if (total <= budget) {
         return;
       }
-      if (key === keep) {
+      if (key === keep || inUse(key)) {
         continue;
       }
       entries.delete(key);

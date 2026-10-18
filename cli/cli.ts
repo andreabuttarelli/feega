@@ -474,6 +474,21 @@ canvas
   });
 
 canvas
+  .command('frame <projectId>')
+  .description('Draw an empty frame on a canvas, like the frame tool: a box in canvas units, or a width and a preset format')
+  .requiredOption('--canvas <id>', 'The canvas')
+  .requiredOption('--w <n>', 'Width in canvas units', Number)
+  .option('--h <n>', 'Height in canvas units (omit with --format)', Number)
+  .option('--x <n>', 'Canvas position', Number, 0)
+  .option('--y <n>', 'Canvas position', Number, 0)
+  .option('--format <format>', 'A preset: 16:9, 9:16, 1:1, 4:5')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, opts) => {
+    const { cmdCanvasFrame } = await import('./commands/canvas.ts');
+    await cmdCanvasFrame(projectId, opts);
+  });
+
+canvas
   .command('upload <projectId> <file>')
   .description('Upload an image, video or document into a new node on a canvas; prints the node and asset')
   .option('--canvas <id>', 'The canvas (default: the first of the project)')

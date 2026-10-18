@@ -343,6 +343,8 @@
   setTileRotate(() => onRotate);
   setTileLive(() => onLive);
 
+  const GROUP_BEHIND_Z = -2000;
+
   const toNode = (t: Tile): Node => ({
     id: t.id,
     position: { x: t.x, y: t.y },
@@ -411,7 +413,6 @@
    */
   let dragOrigin = new Map<string, { x: number; y: number }>();
 
-  const GROUP_BEHIND_Z = -2000;
 
   function onNodeDragStart({ nodes: dragged }: { nodes: Node[] }) {
     dragOrigin = new Map(dragged.map((n) => [n.id, { ...n.position }]));
