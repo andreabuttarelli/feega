@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DOC_VERSION, FORMATS, MotionFormat, newMotionDoc, parseMotionDoc, upgradeDoc } from './doc';
 import { maxFrames } from './design';
+import { PropFormat } from './custom/component';
+import { FieldType } from './template/field-model';
 
 function clip(component: string) {
   return {
@@ -132,5 +134,35 @@ describe('stored docs from older versions', () => {
 
   it('refuses a doc from a newer version than this code knows', () => {
     expect(parseMotionDoc({ ...newMotionDoc(MotionFormat.Square), version: DOC_VERSION + 1 }).ok).toBe(false);
+  });
+});
+
+describe('custom components saved before media props had a picker', () => {
+  const legacy = (title: string) => ({
+    ...newMotionDoc(MotionFormat.Square),
+    components: { SplitHeadline: { source: { html: '', css: '', js: '' }, propsSchema: { type: 'object', properties: { media: { type: 'string', title, default: '', maxLength: 2000 } } }, version: 1 } }
+  });
+  const specOf = (title: string) => {
+    const parsed = parseMotionDoc(legacy(title));
+    return parsed.ok ? parsed.doc.components.SplitHeadline.propsSchema.properties.media : null;
+  };
+
+  it('a raw "id or link" text prop loads as a media item, its title without the hint', () => {
+    expect(specOf('Image or video (id or link; video:id)')).toMatchObject({ format: PropFormat.MediaItem, title: 'Image or video' });
+  });
+
+  it('an image-only hint loads as an image media item', () => {
+    expect(specOf('Chapter 1 image (asset id or link)')).toMatchObject({ format: PropFormat.MediaItem, assetKind: 'image', title: 'Chapter 1 image' });
+  });
+
+  it('the template field exposing it becomes a media field too', () => {
+    const field = { key: 'media', label: 'Image or video (id or link; video:id)', type: FieldType.Text, clipId: 'split', prop: 'media', default: '' };
+    const parsed = parseMotionDoc({ ...legacy('Image or video (id or link; video:id)'), fields: [field] });
+
+    expect(parsed.ok && parsed.doc.fields[0]).toMatchObject({ type: FieldType.Asset, label: 'Image or video' });
+  });
+
+  it('a plain text prop stays text', () => {
+    expect(specOf('Headline')).toEqual({ type: 'string', title: 'Headline', default: '', maxLength: 2000 });
   });
 });

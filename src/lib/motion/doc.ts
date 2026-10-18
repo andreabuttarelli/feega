@@ -4,6 +4,7 @@ import { screenCompOf } from './device-screen';
 import { COMPONENT_IDS, CUSTOM_NAME, TrackKind, parseProps, type ComponentId, type PropsVerdict } from './components';
 import { withParams } from './custom/params';
 import { MAX_COMPONENTS, Strictness, customComponentSchema, customValues, type CustomComponents } from './custom/component';
+import { withMediaPickers } from './legacy-media';
 import { junctionSchema } from './junction-model';
 import { FASTEST_RATE, FPS, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS, TransitionKind, maxFrames } from './design';
 import { motionPathSchema } from './path';
@@ -234,7 +235,7 @@ export function upgradeDoc(input: unknown): unknown {
     doc = MIGRATIONS[version](doc);
     version += 1;
   }
-  return doc;
+  return withMediaPickers(doc);
 }
 
 export function byFrame<T extends { frame: number }>(track: readonly T[]): T[] {

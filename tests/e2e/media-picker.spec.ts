@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { Locator, Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import legacySplit from './fixtures/legacy-split-headline.json' with { type: 'json' };
 
 const RED = 'tests/e2e/fixtures/red-square.png';
 const BLUE = readFileSync('tests/e2e/fixtures/blue-square.png');
@@ -109,5 +110,50 @@ test.describe('media picker @real', () => {
     await editing.getByTestId('media-link-use').click();
     await expect.poll(() => splitMedia(admin, session.canvasId), { timeout: 15_000, message: 'the link is stored as a link' }).toBe(BLUE_LINK);
     await shoot(page, '08-replaced');
+  });
+
+  test('a frame saved with the old "id or link" text prop edits it with the picker, by upload and by link, across reloads', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(180_000);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.route(BLUE_LINK, (route) => route.fulfill({ status: 200, contentType: 'image/png', body: BLUE, headers: { 'access-control-allow-origin': '*' } }));
+    const node = await seedNode({ type: 'motion', x: 80, y: 80, data: { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null } });
+    const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: legacySplit, actor_kind: 'user', actor_id: session.userId });
+    expect(error).toBeNull();
+
+    const openPicker = async () => {
+      await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+      await page.getByTestId('motion-node-stage').dblclick();
+      const picker = page.getByRole('group', { name: 'Image or video' }).first();
+      await expect(async () => {
+        if (!(await picker.isVisible())) {
+          await page.getByRole('tab', { name: 'Properties' }).click();
+        }
+        await expect(picker).toBeVisible({ timeout: 1000 });
+      }).toPass({ timeout: 30_000 });
+      await expect(page.locator('body')).not.toContainText('id or link');
+      return picker;
+    };
+
+    let picker = await openPicker();
+    await shoot(page, 'legacy-01-picker');
+    await picker.getByTestId('media-add').click();
+    await picker.getByTestId('media-file').setInputFiles(RED);
+    await expect(picker.getByTestId('media-preview').locator('img')).toBeVisible({ timeout: 60_000 });
+    await expect.poll(() => splitMedia(admin, session.canvasId), { timeout: 15_000, message: 'the upload is stored as an asset id' }).toMatch(/^[0-9a-f-]{36}$/);
+
+    picker = await openPicker();
+    await expect(picker.getByTestId('media-preview').locator('img'), 'the upload survives a reload').toBeVisible({ timeout: 30_000 });
+    await shoot(page, 'legacy-02-upload-reloaded');
+
+    await picker.getByTestId('media-replace').click();
+    await picker.getByTestId('media-tab-link').click();
+    await picker.getByTestId('media-link').fill(BLUE_LINK);
+    await picker.getByTestId('media-link-check').click();
+    await picker.getByTestId('media-link-use').click();
+    await expect.poll(() => splitMedia(admin, session.canvasId), { timeout: 15_000, message: 'the link is stored as a link' }).toBe(BLUE_LINK);
+
+    picker = await openPicker();
+    await expect(picker.getByTestId('media-preview').locator('img'), 'the link survives a reload').toBeVisible({ timeout: 30_000 });
+    await shoot(page, 'legacy-03-link-reloaded');
   });
 });
