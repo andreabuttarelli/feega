@@ -11,7 +11,7 @@ import { DrawTool } from '$lib/motion/draw-tool';
 import { frameShape } from './start';
 import { ADDABLE_LABEL } from '$lib/canvas/addable';
 import { savedMotion } from './agent-embed';
-import { saveMotionDoc } from './editor';
+import { commitOnto } from './frame-ops';
 import { DocMode, docMode } from '$lib/motion/still';
 import { DropOn, OutputKind, clipCentre, elementBox, frameOf, liftElement, linkOutput, mediaElement, placeElement, type Box, type Drop, type Element, type NewId, type Output, type Point } from '$lib/motion/move-element';
 import { RevisionOutcome, appendRevision, type RevisionWrite } from '$lib/server/repos/motion-revisions';
@@ -433,7 +433,7 @@ export function frameStore(db: Db, scope: { orgId: string; actor: Actor; project
       const saved = await savedMotion(db, { orgId, nodeId });
       return inScope(saved ? { nodeId, projectId: saved.project.id, canvasId: saved.record.canvasId, version: saved.version, doc: saved.doc, kind: saved.node.kind, stage: stageOf(saved.record, saved.doc), row: rowOf(saved.record), at: { x: saved.record.position.x, y: saved.record.position.y } } : null);
     },
-    write: (nodeId, expectedVersion, doc, summary) => saveMotionDoc(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
+    write: (nodeId, expectedVersion, doc, summary) => commitOnto(db, { orgId, nodeId, expectedVersion, doc, actor, summary }),
     create: async (at, doc, shape) => {
       const { data, ...size } = shape ?? frameShape(doc);
       const node = await createNode(db, { id: at.id, orgId, projectId: at.projectId, canvasId: at.canvasId, type: 'motion', x: at.x, y: at.y, displayName: ADDABLE_LABEL.motion, ...size, data: { ...atFirstRevision(data), format: formatOf(doc) }, actor });

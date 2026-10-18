@@ -3,12 +3,12 @@ import type { Actor } from '$lib/server/repos/actor';
 import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 import { listNodeRuns } from '$lib/server/repos/node-runs';
 import { parseOps } from '$lib/motion/doc-ops';
-import { OpsOutcome, commitOps } from '$lib/server/motion/frame-ops';
+import { OpsOutcome, commitOnto, commitOps } from '$lib/server/motion/frame-ops';
 import { batchView, renderView } from '$lib/server/motion/render-run';
 import type { MotionEditorScope } from '$lib/server/motion/editor-scope';
 import { saveExport } from '$lib/server/motion/export';
 import { saveFontUpload } from '$lib/server/motion/font-upload';
-import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
+import { assetUrls, headOrNew, motionAssets, motionTokens } from '$lib/server/motion/editor';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { templateLibrary } from '$lib/server/motion/templates';
 import { withTemplateSounds } from '$lib/server/motion/template-sounds';
@@ -91,10 +91,14 @@ export const EDITOR_OPS = {
     access: EditorAccess.Write,
     input: z.object({ version: z.number(), doc: z.unknown(), summary: summaryInput }),
     run: async (ctx, input) => {
-      const write = await saveMotionDoc(ctx.db, {
+      const parsed = parseMotionDoc(input.doc);
+      if (!parsed.ok) {
+        return refused(HTTP_BAD_REQUEST, { error: parsed.error });
+      }
+      const write = await commitOnto(ctx.db, {
         ...nodeScope(ctx),
         expectedVersion: Number.isInteger(input.version) ? input.version : -1,
-        doc: input.doc,
+        doc: parsed.doc,
         actor: ctx.actor,
         summary: input.summary || null
       });
