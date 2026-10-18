@@ -1,4 +1,5 @@
 import { ungroupClip } from '$lib/motion/group';
+import { ICON_NAMES, addIcon } from '$lib/motion/icons/icons';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
 import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
@@ -1570,6 +1571,22 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const props = { ...propsIn('Shape', { ...outlined, ...input.props }), shape: input.kind, ...(input.path ? { path: input.path } : {}), ...(input.fills ? { fills: input.fills } : {}), ...(input.strokes ? { strokes: input.strokes } : {}) };
         const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
         return created(apply(withEffects(shape, [id], input.effects), `added ${input.kind} shape`), id);
+      }
+    }),
+
+    list_icons: tool({
+      description: 'Names of the built-in line icons add_icon inserts.',
+      inputSchema: z.object({}).strict(),
+      execute: async () => ({ icons: ICON_NAMES })
+    }),
+
+    add_icon: tool({
+      description: 'Add a built-in line icon (list_icons names them) as a stroked Shape path clip. x, y: centre as a share of the frame (0..1); size: share of the frame short side; color: the stroke colour. Restyle it later with set_props strokes. Returns the clip id.',
+      inputSchema: z.object({ name: z.enum(ICON_NAMES as [string, ...string[]]), x: z.number().min(0).max(1).default(0.5), y: z.number().min(0).max(1).default(0.5), size: z.number().min(0.01).max(1).default(0.1), color: z.string().min(1).max(64).default('#ffffff'), start: z.number().min(0).default(0), duration: z.number().positive().optional(), track_id: z.string().optional() }),
+      execute: async (input) => {
+        const id = deps.newId();
+        const icon = addIcon(session.doc, { name: input.name, x: input.x, y: input.y, size: input.size, color: input.color, from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id }, id);
+        return created(apply(icon, `added the ${input.name} icon`), id);
       }
     }),
 
