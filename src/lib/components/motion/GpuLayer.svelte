@@ -3,6 +3,7 @@
   import type { Compose, GpuEngine } from '$lib/motion/gpu/engine';
 
   const gpu = () => import('$lib/motion/gpu/engine');
+  const OFFSTAGE = 'position:fixed;left:-20000px;top:0;width:1920px;height:1080px;pointer-events:none';
 
   let { html, compose, time, onfallback }: { html: string; compose: Compose; time: () => number; onfallback: (reason: unknown) => void } = $props();
 
@@ -33,7 +34,8 @@
       return;
     }
     let cancelled = false;
-    void gpu().then(({ gpuEngine }) => gpuEngine(source, target)).then((next) => {
+    const offstage = document.body.appendChild(Object.assign(document.createElement('div'), { style: OFFSTAGE }));
+    void gpu().then(({ gpuEngine }) => gpuEngine(source, offstage)).then((next) => {
       if (cancelled) {
         next.dispose();
         return;
@@ -49,6 +51,9 @@
     loop = requestAnimationFrame(tick);
     return () => {
       cancelled = true;
+      engine?.dispose();
+      engine = null;
+      offstage.remove();
     };
   });
 

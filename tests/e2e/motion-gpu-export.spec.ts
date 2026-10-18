@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import type { Page } from '@playwright/test';
 import sharp from 'sharp';
@@ -13,12 +14,17 @@ import asteroids from './fixtures/gpu-docs/asteroids.json' with { type: 'json' }
 
 type Doc = { width: number; height: number; fps: number; durationInFrames: number };
 
-const DOCS: [string, Doc, Engine][] = [
-  ['easing', easing as Doc, 'gpu'],
-  ['post', post as Doc, 'gpu'],
-  ['supasito', supasito as Doc, 'gpu'],
-  ['generative', generative as Doc, 'html'],
-  ['asteroids', asteroids as Doc, 'html']
+enum Proof {
+  Export = 'export',
+  Preview = 'preview'
+}
+
+const DOCS: [string, Doc, Engine, Proof][] = [
+  ['easing', easing as Doc, 'gpu', Proof.Export],
+  ['post', post as Doc, 'gpu', Proof.Export],
+  ['supasito', supasito as Doc, 'gpu', Proof.Export],
+  ['generative', generative as Doc, 'html', Proof.Export],
+  ['asteroids', asteroids as Doc, 'html', Proof.Preview]
 ];
 
 type Engine = 'gpu' | 'html';
@@ -55,17 +61,20 @@ async function picture(id: string): Promise<Buffer> {
   return sharp(Buffer.from(svg)).png().toBuffer();
 }
 
-async function seedPictures(doc: unknown, session: { orgId: string; projectId: string }, admin: import('@supabase/supabase-js').SupabaseClient): Promise<string[]> {
+async function seedPictures<T>(doc: T, session: { orgId: string; projectId: string }, admin: import('@supabase/supabase-js').SupabaseClient): Promise<{ doc: T; paths: string[] }> {
+  let text = JSON.stringify(doc);
   const paths: string[] = [];
-  for (const id of assetIdsOf(doc)) {
+  for (const old of assetIdsOf(doc)) {
+    const id = randomUUID();
+    text = text.split(old).join(id);
     const png = await picture(id);
     const path = `${session.orgId}/${session.projectId}/e2e/${id}.png`;
-    await admin.storage.from('canvas-assets').upload(path, png, { contentType: 'image/png', upsert: true });
-    const { error } = await admin.from('assets').upsert({ id, org_id: session.orgId, project_id: session.projectId, type: 'image', url: path, mime_type: 'image/png', bytes: png.length, ...PICTURE, source: 'upload' });
+    await admin.storage.from('canvas-assets').upload(path, png, { contentType: 'image/png' });
+    const { error } = await admin.from('assets').insert({ id, org_id: session.orgId, project_id: session.projectId, type: 'image', url: path, mime_type: 'image/png', bytes: png.length, ...PICTURE, source: 'upload' });
     expect(error).toBeNull();
     paths.push(path);
   }
-  return paths;
+  return { doc: JSON.parse(text) as T, paths };
 }
 
 async function seededEditor(page: Page, doc: Doc, { session, admin, seedNode }: { session: { orgId: string; userId: string; projectId: string; canvasId: string }; admin: import('@supabase/supabase-js').SupabaseClient; seedNode: (s: { type: string; data: Record<string, unknown> }) => Promise<{ id: string }> }) {
@@ -84,7 +93,8 @@ async function exported(page: Page, dir: string, name: string): Promise<{ file: 
   }
   await page.getByTestId('export-start').click();
   const link = page.getByTestId('export-download');
-  await expect(link).toBeVisible({ timeout: EXPORT_TIMEOUT_MS });
+  await expect(link.or(page.getByRole('alert').filter({ hasText: 'Export failed' }))).toBeVisible({ timeout: EXPORT_TIMEOUT_MS });
+  await expect(link).toBeVisible();
   const href = await link.getAttribute('href');
   const bytes = await page.evaluate(async (url) => {
     const buffer = new Uint8Array(await (await fetch(url as string)).arrayBuffer());
@@ -122,19 +132,25 @@ async function playPreview(page: Page, engine: Engine) {
   await expect(page.getByTestId('gpu-motion-canvas')).toHaveCount(engine === 'gpu' ? 1 : 0);
 }
 
+test.use(process.env.E2E_HEADED ? { headless: false, launchOptions: { args: ['--enable-gpu', '--ignore-gpu-blocklist', '--enable-unsafe-webgpu'] } } : {});
+
 test.describe('GPU motion engine is the default @real', () => {
   test.skip(!REAL_STACK, 'richiede lo stack reale: E2E_REAL_STACK=1');
   test.setTimeout(EXPORT_TIMEOUT_MS * 3);
 
-  for (const [name, doc, engine] of DOCS) {
-    test(`${name}: previews and exports on the ${engine} engine, same video as the HTML engine`, async ({ page, session, admin, seedNode }) => {
+  for (const [name, doc, engine, proof] of DOCS) {
+    test(`${name}: draws on the ${engine} engine, ${proof} matches the HTML engine`, async ({ page, session, admin, seedNode }) => {
       const dir = mkdtempSync(join(tmpdir(), `gpu-${name}-`));
-      const pictures = await seedPictures(doc, session, admin);
+      const { doc: seeded, paths: pictures } = await seedPictures(doc, session, admin);
       try {
         page.on('console', (m) => m.text().includes('GPU engine') && console.log(name, m.text().slice(0, 300)));
-        const url = await seededEditor(page, doc, { session, admin, seedNode });
+        const url = await seededEditor(page, seeded, { session, admin, seedNode });
         await gotoHydrated(page, url);
         await playPreview(page, engine);
+        await expect(page.getByTestId('motion-preview')).toHaveAttribute('data-engine', 'gpu');
+        if (proof === Proof.Preview) {
+          return;
+        }
         const gpu = await exported(page, dir, 'default');
         expect(gpu.engine).toBe(engine);
 

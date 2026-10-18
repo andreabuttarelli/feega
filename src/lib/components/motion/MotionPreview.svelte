@@ -115,7 +115,7 @@
       el.style.width = '100%';
       el.style.height = '100%';
       el.style.background = PLAYER_BACKDROP[background];
-      el.style.visibility = engine === RenderEngine.Gpu ? 'hidden' : '';
+      el.style.opacity = engine === RenderEngine.Gpu ? '0' : '';
       el.muted = muted;
       el.loop = loop;
       el.addEventListener('ready', () => {
@@ -268,7 +268,7 @@
   function showPlayer(reason: unknown) {
     console.warn('motion preview: GPU engine unavailable, HTML engine shown', reason);
     if (player) {
-      player.style.visibility = '';
+      player.style.opacity = '';
     }
   }
 
