@@ -111,12 +111,14 @@ type Summary = { data: Record<string, unknown> };
 
 const isGroup = (n: Summary) => n.data.kind === FrameKind.Group;
 
+const isDrawn = (n: Summary) => typeof n.data.format === 'string' && n.data.kind !== FrameKind.Group;
+
 const isFrame = (n: Summary) => typeof n.data.format === 'string' && (n.data.kind ?? FrameKind.Frame) === FrameKind.Frame;
 
 const SHOWN: Partial<Record<SelectionActionId, (summaries: readonly Summary[]) => boolean>> = {
   ungroup: (summaries) => summaries.some(isGroup),
   'create-formats': (summaries) => summaries.length === 1 && isFrame(summaries[0]),
-  export: (summaries) => summaries.length > 0 && summaries.every(isFrame)
+  export: (summaries) => summaries.length > 0 && summaries.every(isDrawn)
 };
 
 export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): boolean {
