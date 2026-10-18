@@ -185,7 +185,6 @@
 
   const SNAPSHOT_SETTLE_MS = 120;
   const SNAPSHOT_TIMEOUT_MS = 4000;
-  const IDLE_WAIT_MS = 200;
   const crossOrigin = (src: string) => {
     try {
       return new URL(src, location.href).origin !== location.origin;
@@ -201,7 +200,29 @@
       return true;
     }
   };
-  const idle = () => new Promise<void>((r) => ('requestIdleCallback' in window ? requestIdleCallback(() => r(), { timeout: IDLE_WAIT_MS }) : setTimeout(r, 0)));
+  const BUSY_MS = 400;
+  const IDLE_SLICE_MS = 12;
+  const QUIET_MAX_WAIT_MS = 5000;
+  let busyUntil = 0;
+  const markBusy = () => {
+    busyUntil = performance.now() + BUSY_MS;
+  };
+  const quiet = (since = performance.now()) =>
+    new Promise<void>((resolve) => {
+      const check = (deadline?: IdleDeadline) => {
+        const calm = performance.now() > busyUntil && (!deadline || deadline.timeRemaining() >= IDLE_SLICE_MS);
+        if (calm || performance.now() - since > QUIET_MAX_WAIT_MS) {
+          resolve();
+          return;
+        }
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(check, { timeout: BUSY_MS });
+          return;
+        }
+        setTimeout(check, BUSY_MS);
+      };
+      check();
+    });
   const withTimeout = <T,>(work: Promise<T>, ms: number) => Promise.race([work, new Promise<T>((_, reject) => setTimeout(() => reject(new Error('snapshot timed out')), ms))]);
   const HOVER_INTENT_MS = 150;
   const SNAPSHOT_PIXEL_RATIO = 2;
@@ -262,16 +283,22 @@
       });
       return;
     }
-    hoverTimer = setTimeout(() => (hoverLive = id), HOVER_INTENT_MS);
+    hoverTimer = setTimeout(() => void quiet().then(() => (hoverLive = hovered === id ? id : hoverLive)), HOVER_INTENT_MS);
   });
 
   function trackFocus(e: FocusEvent) {
     focusLive = (e.target as HTMLElement | null)?.closest<HTMLElement>('.gpu-dom-node')?.dataset.id ?? null;
   }
 
+  let schedulerTick = $state(0);
   $effect(() => {
+    void schedulerTick;
     if (shotJob || !scene) {
       return;
+    }
+    if (performance.now() < busyUntil) {
+      const t = setTimeout(() => schedulerTick++, BUSY_MS);
+      return () => clearTimeout(t);
     }
     const due = placed.filter(snapshotKind);
     const seen = visibleIds(due, view, area);
@@ -325,7 +352,7 @@
     let cancelled = false;
     void (async () => {
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await idle();
+      await quiet();
       for (const img of host.querySelectorAll('img')) {
         img.loading = 'eager';
       }
@@ -339,11 +366,11 @@
         if (el && scene) {
           fontCss ??= await withTimeout(getFontEmbedCSS(el), SNAPSHOT_TIMEOUT_MS);
           const options = { pixelRatio: SNAPSHOT_PIXEL_RATIO, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL };
-          let canvas = await withTimeout(toCanvas(el, options), SNAPSHOT_TIMEOUT_MS);
-          if (tainted(canvas)) {
-            canvas = await withTimeout(toCanvas(el, { ...options, filter: (n) => !(n instanceof HTMLImageElement && crossOrigin(n.currentSrc || n.src)) }), SNAPSHOT_TIMEOUT_MS);
-          }
-          if (tainted(canvas)) {
+          const foreign = [...el.querySelectorAll('img')].some((img) => crossOrigin(img.currentSrc || img.src));
+          const keep = (n: Node) => !(n instanceof HTMLImageElement && crossOrigin(n.currentSrc || n.src));
+          await quiet();
+          const canvas = await withTimeout(toCanvas(el, foreign ? { ...options, filter: keep } : options), SNAPSHOT_TIMEOUT_MS);
+          if (foreign && tainted(canvas)) {
             throw new Error('tainted snapshot');
           }
           showSnapshot(id, key, await createImageBitmap(canvas));
@@ -507,9 +534,18 @@
     props.onSelectionChange?.(ids);
   }
 
-  function screenSize() {
+  let surfaceRect: { width: number; height: number; left: number; top: number } | null = null;
+
+  function measureSurface() {
     const r = surface?.getBoundingClientRect();
-    return { width: r?.width ?? innerWidth, height: r?.height ?? innerHeight, left: r?.left ?? 0, top: r?.top ?? 0 };
+    surfaceRect = r ? { width: r.width, height: r.height, left: r.left, top: r.top } : null;
+  }
+
+  function screenSize() {
+    if (!surfaceRect?.width) {
+      measureSurface();
+    }
+    return surfaceRect ?? { width: innerWidth, height: innerHeight, left: 0, top: 0 };
   }
 
   function boundsOf(boxes: Box[]): { x: number; y: number; width: number; height: number } | null {
@@ -680,6 +716,8 @@
   const pointerOf = (e: PointerEvent) => (e.pointerType === 'touch' ? Pointer.Touch : e.pointerType === 'pen' ? Pointer.Pen : Pointer.Mouse);
 
   function onDown(e: PointerEvent) {
+    markBusy();
+    measureSurface();
     const p = local(e);
     if (e.pointerType === 'touch') {
       touches.set(e.pointerId, p);
@@ -767,6 +805,9 @@
   }
 
   function onMove(e: PointerEvent) {
+    if (active || e.buttons) {
+      markBusy();
+    }
     const p = local(e);
     props.onPointer?.(toWorld(view, p));
     if (touches.has(e.pointerId)) {
@@ -1004,6 +1045,7 @@
   }
 
   function onWheel(e: WheelEvent) {
+    markBusy();
     props.onUserPan?.();
     const target = e.target as HTMLElement;
     if (target.closest('.gpu-dom-node .nowheel')) {
@@ -1183,6 +1225,7 @@
   };
 
   function onKeydown(e: KeyboardEvent) {
+    markBusy();
     altHeld = e.altKey;
     if (e.key === ' ' && !(e.target as HTMLElement).closest?.(INTERACTIVE)) {
       space = true;
@@ -1312,6 +1355,7 @@
     let alive = true;
     let built: GpuScene | null = null;
     const observer = new ResizeObserver(() => {
+      measureSurface();
       built?.resize();
       area = { width: surface!.clientWidth, height: surface!.clientHeight };
     });
@@ -1392,6 +1436,7 @@
     onpointerup={onUp}
     onpointercancel={onUp}
     onwheel={onWheel}
+    onpointerenter={measureSurface}
     onclick={onClickInside}
     ondblclick={onDouble}
     oncontextmenu={onContextMenu}
