@@ -308,6 +308,7 @@ export const EMPTY_CANVAS: Record<EmptyAction, Parity> = {
 export const FRAME_CONTENT: Record<string, Parity> = {
   'add text': motion('add_clip'),
   'add shape': motion('add_shape'),
+  'add a built-in icon': motion('add_icon'),
   'move, resize, rotate an element': motion('set_transform'),
   'edit text': motion('set_props'),
   'fill, stroke, corner radius (also per corner)': motion('set_props'),

@@ -108,6 +108,8 @@
   import TemplateLibrary from '$lib/components/motion/TemplateLibrary.svelte';
   import TemplateInspector from '$lib/components/motion/TemplateInspector.svelte';
   import { carryEdits, insertTemplate, isLockedComp, type Inserted, type Instance, type TemplateEntry } from '$lib/motion/template/library';
+  import IconMenu from './IconMenu.svelte';
+  import { addIcon } from '$lib/motion/icons/icons';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
@@ -1008,6 +1010,16 @@
     adding = false;
     const id = newId();
     apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame }, id), `Added ${COMPONENTS[component].label}`);
+    selection = [id];
+  }
+
+  const ICON_SIZE = 0.12;
+  const ICON_COLOR = '#ffffff';
+
+  function addIconOf(name: string) {
+    adding = false;
+    const id = newId();
+    apply(addIcon(doc, { name, x: 0.5, y: 0.5, size: ICON_SIZE, color: ICON_COLOR, from: frame }, id), `Added the ${name} icon`);
     selection = [id];
   }
 
@@ -2071,6 +2083,7 @@
                 <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Visual)}>Video track</button>
                 <button type="button" role="menuitem" onclick={() => newTrack(TrackKind.Audio)}>Audio track</button>
               </div>
+              <IconMenu onpick={addIconOf} />
             </div>
           {/if}
         </div>
