@@ -4,6 +4,7 @@ import type { MotionNode } from '$lib/canvas/motion-node';
 import { applyOps, diffDoc, type DocOp } from '$lib/motion/doc-ops';
 import { RevisionOutcome, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
+import type { CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { headOrNew, saveMotionDoc } from './editor';
 
 export enum OpsOutcome {
@@ -47,10 +48,22 @@ export async function commitOps(db: Db, ask: OpsAsk): Promise<OpsCommit> {
   return { outcome: OpsOutcome.Busy };
 }
 
-export type DocAsk = FrameScope & { base: { version: number; doc: MotionDoc }; doc: MotionDoc; actor: Actor; summary: string | null };
+export type DocAsk = FrameScope & { base: { version: number; doc: MotionDoc }; doc: MotionDoc; actor: Actor; summary: string | null; record?: CanvasNodeRecord };
 
-export function commitDoc(db: Db, ask: DocAsk): Promise<OpsCommit> {
-  return commitOps(db, { ...ask, baseVersion: ask.base.version, ops: diffDoc(ask.base.doc, ask.doc) });
+export async function commitDoc(db: Db, ask: DocAsk): Promise<OpsCommit> {
+  const ops = diffDoc(ask.base.doc, ask.doc);
+  if (!ops.length) {
+    return { outcome: OpsOutcome.Written, head: { ...ask.base, summary: null, actorKind: ask.actor.kind }, rebased: false };
+  }
+
+  const write = await saveMotionDoc(db, { orgId: ask.orgId, nodeId: ask.nodeId, expectedVersion: ask.base.version, doc: ask.doc, actor: ask.actor, summary: ask.summary, known: ask.record });
+  if (write.outcome === RevisionOutcome.Written) {
+    return { outcome: OpsOutcome.Written, head: write.head, rebased: false };
+  }
+  if (write.outcome === RevisionOutcome.Invalid) {
+    return { outcome: OpsOutcome.Invalid, error: write.error };
+  }
+  return commitOps(db, { ...ask, baseVersion: ask.base.version, ops });
 }
 
 const REVISION_WRITE: { [K in OpsOutcome]: (commit: Extract<OpsCommit, { outcome: K }>) => RevisionWrite } = {

@@ -7,24 +7,24 @@ const ORG = 'org-1';
 const NODE = 'node-1';
 const BLOCKED_WORD = 'zqxforbidden';
 
-const state = vi.hoisted(() => ({ writeAllowed: true, db: null as unknown }));
+const state = vi.hoisted(() => ({ writeAllowed: true, db: null as unknown, screened: [] as string[][], assetsAsked: () => {}, nodeAfter: Promise.resolve() as Promise<unknown>, projectAfter: Promise.resolve() as Promise<unknown> }));
 
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async () => ({ caller: { db: state.db, orgId: ORG, userId: 'u-1', writeAllowed: state.writeAllowed } }) }));
 vi.mock('$lib/server/repos/motion-templates', () => ({ listOrgTemplates: async () => [], insertOrgTemplate: vi.fn(), deleteOrgTemplate: vi.fn() }));
-vi.mock('$lib/server/repos/assets', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/assets')>()), listProjectAssets: async () => [] }));
+vi.mock('$lib/server/repos/assets', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/repos/assets')>()), listProjectAssets: async () => (state.assetsAsked(), []) }));
 vi.mock('$lib/server/canvas/sign-media', async (importOriginal) => ({ ...(await importOriginal<typeof import('$lib/server/canvas/sign-media')>()), signAssetPaths: async () => new Map(), createAssetSigningDb: () => ({}) }));
 vi.mock('$lib/server/repos/projects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/projects')>()),
-  findProjectById: async () => ({ id: 'p-1', brandId: null, mode: 'standard' })
+  findProjectById: async () => (await state.projectAfter, { id: 'p-1', brandId: null, mode: 'standard' })
 }));
 vi.mock('$lib/server/moderation/model-input', () => ({
-  screenModelInput: async (_db: unknown, input: { texts: string[] }) => (input.texts.some((t) => t.includes(BLOCKED_WORD)) ? { ok: false, error: 'blocked' } : { ok: true })
+  screenModelInput: async (_db: unknown, input: { texts: string[] }) => (state.screened.push(input.texts), input.texts.some((t) => t.includes(BLOCKED_WORD)) ? { ok: false, error: 'blocked' } : { ok: true })
 }));
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()),
   patchNodeData: vi.fn(async () => ({ ok: true })),
   findNode: async (_db: unknown, input: { orgId: string; nodeId: string }) =>
-    input.orgId === ORG && input.nodeId === NODE ? { id: NODE, canvasId: 'c-1', projectId: 'p-1', type: 'motion', displayName: 'Poster', data: { format: '4:5' }, version: 1 } : null
+    (await state.nodeAfter, input.orgId === ORG && input.nodeId === NODE ? { id: NODE, canvasId: 'c-1', projectId: 'p-1', type: 'motion', displayName: 'Poster', data: { format: '4:5' }, version: 1 } : null)
 }));
 
 const { POST } = await import('./+server');
@@ -41,6 +41,10 @@ beforeEach(async () => {
   const fake = revisionsDb();
   state.db = fake.db;
   state.writeAllowed = true;
+  state.screened = [];
+  state.nodeAfter = Promise.resolve();
+  state.projectAfter = Promise.resolve();
+  state.assetsAsked = () => {};
   await appendRevision(fake.db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Portrait), actor: { kind: 'user', id: 'u-1' }, summary: 'start' });
 });
 
@@ -58,6 +62,27 @@ describe('POST /api/v1/motion/:node/tools runs one motion tool of the chat agent
     await post(NODE, { tool: 'set_canvas', input: { format: MotionFormat.Poster, still: 1 } });
 
     expect(await head()).toMatchObject({ width: 1080, height: 1527, still: { frame: 30 } });
+  });
+
+  it('reads the head while it looks up the node, not after', async () => {
+    const db = state.db as { from: (table: string) => unknown };
+    const from = db.from.bind(db);
+    state.nodeAfter = new Promise((asked) => (db.from = (table: string) => (table === 'motion_revisions' && asked(table), from(table))));
+
+    expect((await post(NODE, { tool: 'get_motion_doc', input: {} })).status).toBe(200);
+  });
+
+  it('lists the assets while it looks up the project, not after', async () => {
+    state.projectAfter = new Promise((asked) => (state.assetsAsked = () => asked(null)));
+
+    expect((await post(NODE, { tool: 'get_motion_doc', input: {} })).status).toBe(200);
+  });
+
+  it('the node patch reuses the node the run already read', async () => {
+    const { patchNodeData } = await import('$lib/server/repos/canvas');
+    await post(NODE, { tool: 'set_work_area', input: { start: 0, end: 1 } });
+
+    expect(patchNodeData).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ known: expect.objectContaining({ id: NODE, version: 1 }) }));
   });
 
   it('a read tool answers and saves nothing', async () => {
@@ -90,6 +115,27 @@ describe('POST /api/v1/motion/:node/tools runs one motion tool of the chat agent
 
   it('text the safety review blocks is refused like in the chat', async () => {
     const res = await post(NODE, { tool: 'add_clip', input: { component: 'Title', start: 0, duration: 1, props: { text: BLOCKED_WORD } } });
+
+    expect(res.status).toBe(422);
+    expect((await head()).tracks.flatMap((t) => t.clips)).toEqual([]);
+  });
+
+  it('only the text an op carries goes to the safety review, never its numbers or ids', async () => {
+    await post(NODE, { tool: 'set_work_area', input: { start: 0, end: 1 } });
+    await post(NODE, { tool: 'add_clip', input: { component: 'Title', start: 0, duration: 1, props: { text: 'Hello there' } } });
+
+    expect(state.screened.map((texts) => texts.join(' '))).toEqual(['', 'Title Hello there']);
+  });
+
+  it('a batch goes to the safety review once, with the text of every op', async () => {
+    const title = (text: string) => ({ tool: 'add_clip', input: { component: 'Title', start: 0, duration: 1, props: { text } } });
+    await post(NODE, { tool: 'batch', input: { ops: [title('one'), { tool: 'set_work_area', input: { start: 0, end: 1 } }, title('two')] } });
+
+    expect(state.screened).toEqual([['Title', 'one', 'Title', 'two']]);
+  });
+
+  it('a batch with blocked text saves nothing', async () => {
+    const res = await post(NODE, { tool: 'batch', input: { ops: [{ tool: 'add_clip', input: { component: 'Title', start: 0, duration: 1, props: { text: BLOCKED_WORD } } }] } });
 
     expect(res.status).toBe(422);
     expect((await head()).tracks.flatMap((t) => t.clips)).toEqual([]);
