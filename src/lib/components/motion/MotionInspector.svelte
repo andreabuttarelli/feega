@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { localStore } from '$lib/browser-storage';
   import { setMotionPath } from '$lib/motion/path-ops';
   import IconButton from './IconButton.svelte';
   import { Action } from '$lib/motion/actions';
@@ -157,19 +158,11 @@
   const family = $derived(familyOf(clip.component));
   let sections = $state<SectionState>({});
 
-  function sectionStore(): LayoutStore | null {
-    try {
-      return localStorage;
-    } catch {
-      return null;
-    }
-  }
-
   onMount(() => {
-    sections = readSections(sectionStore());
+    sections = readSections(localStore());
   });
 
-  const toggleSection = (section: Section) => (sections = flipSection(sections, family, section, sectionStore()));
+  const toggleSection = (section: Section) => (sections = flipSection(sections, family, section, localStore()));
   const segmented = (field: Field) => field.control === Control.Select && hasSegments(field.key);
   const inGrid = (field: Field) => field.control === Control.Range && fieldLook(field.key).short !== null;
   const afterDot = (prop: AnimProp) => prop.label.split(' · ')[1] ?? prop.label;
