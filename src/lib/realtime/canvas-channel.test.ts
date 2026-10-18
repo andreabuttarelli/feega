@@ -207,7 +207,7 @@ describe('canvas collaboration', () => {
 		connection.status('SUBSCRIBED');
 		hub.port.update({ cursor: { x: 3, y: 4 }, selection: ['a'] });
 		vi.advanceTimersByTime(60);
-		expect(connection.channel.send).toHaveBeenCalledWith({ type: 'broadcast', event: CANVAS_PEER_EVENT, payload: { sessionId: 's1', userId: 'me', name: 'Me', cursor: { x: 3, y: 4 }, selection: ['a'], live: [], at: 7 } });
+		expect(connection.channel.send).toHaveBeenCalledWith({ type: 'broadcast', event: CANVAS_PEER_EVENT, payload: { sessionId: 's1', userId: 'me', name: 'Me', cursor: { x: 3, y: 4 }, selection: ['a'], live: [], view: null, presenting: false, chat: null, at: 7 } });
 
 		const incoming = connection.listeners.find(({ kind, filter }) => kind === 'broadcast' && filter.event === CANVAS_PEER_EVENT);
 		incoming?.callback({ payload: { sessionId: 's2', userId: 'bo', name: 'Bo', cursor: null, selection: [], at: 9 } });

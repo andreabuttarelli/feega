@@ -7,6 +7,8 @@ import {
   listNodes,
   listNodesByIds,
   moveNode,
+  patchNodeData,
+  DataCheck,
   setConnectionMode,
   writeNodeData
 } from '$lib/server/repos/canvas';
@@ -473,5 +475,24 @@ describe('ogni gesto strutturale scrive canvas_events', () => {
 
     const event = calls.find((c) => c.table === 'canvas_events' && c.op === 'insert')!;
     expect(event.payload).toMatchObject({ actor_kind: 'agent', actor_id: 'user-1', agent_key: 'mcp:claude' });
+  });
+});
+
+describe('patchNodeData refuses a group join that would nest a node inside itself', () => {
+  const rows = () => ({ nodes: [{ ...nodeRow, id: 'b', data: {} }, { ...nodeRow, id: 'a', data: { groupId: 'b' } }] });
+
+  it('joining one of its own members is invalid and writes nothing', async () => {
+    const { db, calls } = fakeDb(rows());
+
+    const out = await patchNodeData(db, { orgId: ORG, nodeId: 'b', patch: { groupId: 'a' }, check: DataCheck.None });
+
+    expect(out.outcome).toBe('invalid');
+    expect(calls.some((c) => c.op === 'update')).toBe(false);
+  });
+
+  it('joining itself is invalid', async () => {
+    const { db } = fakeDb(rows());
+
+    expect((await patchNodeData(db, { orgId: ORG, nodeId: 'b', patch: { groupId: 'b' }, check: DataCheck.None })).outcome).toBe('invalid');
   });
 });

@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { env as publicEnv } from '$env/dynamic/public';
 import { env } from '$env/dynamic/private';
 import { json } from '@sveltejs/kit';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { markRlsScoped } from '$lib/server/rls-client';
 
 /**
@@ -328,21 +328,24 @@ export async function openOrgScope(
  * rendeva i rifiuti raggiungibili solo passando da una chiave API vera: qui si provano per quello
  * che sono, uno per uno.
  */
+async function activeOrgIdOf(supabase: SupabaseClient, user: User): Promise<string | null> {
+  const { listMemberships } = await import('$lib/server/repos/orgs');
+  const [active] = await listMemberships(supabase as never, user.id);
+  if (active) {
+    return active.org.id;
+  }
+
+  const { ensureOrgForUser } = await import('./org');
+  return ensureOrgForUser(supabase, user);
+}
+
 export async function orgScopeFor(
   caller: Caller
 ): Promise<{ scope: OrgScope; error?: undefined } | { scope?: undefined; error: Response }> {
   const { supabase, user, error, apiKey } = caller;
   if (error) return { error };
 
-  // A key's org is fixed by the row (api_keys.org_id) — there is nothing left to resolve. Only a
-  // JWT caller, who may belong to several orgs, needs ensureOrgForUser to pick one.
-  let orgId: string | null;
-  if (apiKey) {
-    orgId = apiKey.org_id;
-  } else {
-    const { ensureOrgForUser } = await import('./org');
-    orgId = await ensureOrgForUser(supabase, user as never);
-  }
+  const orgId = apiKey ? apiKey.org_id : await activeOrgIdOf(supabase, user as never);
   if (!orgId) return { error: json({ error: 'no_organization' }, { status: 500 }) };
 
   const gate = await gateOrgAiAction(orgId, apiKey);

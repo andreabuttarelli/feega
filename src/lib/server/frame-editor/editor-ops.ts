@@ -24,7 +24,7 @@ import { settingsFrom } from '$lib/motion/export-formats';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { editorSession } from '$lib/server/motion/editor-session';
 import { listRevisions } from '$lib/server/repos/motion-revisions';
-import { Restore, restoreRevision } from '$lib/server/motion/editor';
+import { Restore, restoreRevision } from '$lib/server/motion/restore';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { cancelRender } from '$lib/server/motion/render-run';
 import { startFarmRender } from '$lib/server/motion/render-start';

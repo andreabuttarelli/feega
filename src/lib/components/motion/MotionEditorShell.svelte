@@ -69,10 +69,13 @@
   import PenOverlay from '$lib/components/motion/PenOverlay.svelte';
   import CornerOverlay from '$lib/components/motion/CornerOverlay.svelte';
   import AlignBar from '$lib/components/motion/AlignBar.svelte';
-  import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from '$lib/motion/space';
+  import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes, tidySpace } from '$lib/motion/space';
   import type { Boxes } from '$lib/motion/scene-select';
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import { Flip, flipClips } from '$lib/motion/layer-props';
+  import { Copied, elementClipboard } from '$lib/canvas/element-clipboard.svelte';
+  import { Direction as SiblingDirection, layerOrder, siblingOf } from '$lib/motion/siblings';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
   import { arrangeLayers, type Arrange } from '$lib/motion/layer-order';
   import { FRAME_MENU_IDS, frameLayers, frameMenuRun, frameSummaries, type FrameLayer } from '$lib/motion/frame-menu';
@@ -124,7 +127,7 @@
     type OpResult
   } from '$lib/motion/timeline';
   import { DragPhase, UndoRoute, type CanvasUndo, type ElementOut, type MoveOut } from '$lib/canvas/canvas-drop';
-  import { liftElement } from '$lib/motion/move-element';
+  import { copyElements, liftElement, pasteElements } from '$lib/motion/move-element';
   import { adoptHead, amend, canRedo, canUndo, followHead, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
   import { landed, outgoing, remote, type Synced } from '$lib/motion/frame-sync';
   import { Reveal, Snap, clampZoom } from '$lib/motion/timeline-view';
@@ -171,7 +174,7 @@
   import Keyboard from '@lucide/svelte/icons/keyboard';
   import LayoutTemplate from '@lucide/svelte/icons/layout-template';
 
-  const SAVE_DEBOUNCE_MS = 700;
+  const SAVE_DEBOUNCE_MS = 250;
   const CHECK_WIDTH = 480;
   const CHECK_DEBOUNCE_MS = 900;
   const COALESCE_MS = 800;
@@ -690,6 +693,7 @@
 
     if (result.type === 'success') {
       frameDocs.landed(data.node.id, version, Number(result.data?.version));
+      presence?.landed({ nodeId: data.node.id, version: Number(result.data?.version), doc: result.data?.doc });
       follow(landed({ version, doc: baseDoc }, sent, history.present, { version: Number(result.data?.version), doc: result.data?.doc as MotionDoc }));
       saveState = SaveState.Saved;
     } else {
@@ -764,6 +768,12 @@
   }
 
   let missedRemote = false;
+
+  $effect(() => presence?.onHead((head) => {
+    if (head.nodeId === data.node.id) {
+      takeRemote({ version: head.version, doc: head.doc as MotionDoc });
+    }
+  }));
 
   function takeRemote(head: SavedHead | null): boolean {
     if (saving) {
@@ -1282,10 +1292,22 @@
   function copyKeys() {
     if (keySelection.length) {
       keyBoard = copyKeyframes(doc, keySelection);
+      elementClipboard.copyKeyframes();
+      return;
+    }
+    if (selection.length) {
+      elementClipboard.copyElements(data.node.id, [...selection], copyElements(doc, selection));
     }
   }
 
   function pasteKeys() {
+    const copied = elementClipboard.elements;
+    if (elementClipboard.kind === Copied.Elements && copied) {
+      const pasted = pasteElements(doc, copied.elements, newId);
+      apply(pasted, 'Pasted elements');
+      selection = pasted.ok ? pasted.ids : selection;
+      return;
+    }
     const target = selected;
     if (!target || !keyBoard.length) {
       return;
@@ -1457,6 +1479,8 @@
     [Command.SelectAll]: () => (selection = doc.tracks.flatMap((t) => t.clips.map((c) => c.id))),
     [Command.SelectChild]: () => overlay?.key(Gesture.Enter),
     [Command.SelectParent]: selectParent,
+    [Command.SelectNext]: () => selectSibling(SiblingDirection.Next),
+    [Command.SelectPrevious]: () => selectSibling(SiblingDirection.Previous),
     [Command.Deselect]: () => {
       if (overlay?.key(Gesture.Leave)) {
         return;
@@ -1494,7 +1518,16 @@
     [Command.Ungroup]: ungroupSelection,
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
-    [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask')
+    [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask'),
+    [Command.AlignLeft]: () => selection.length && alignTo(Edge.Left),
+    [Command.AlignCenter]: () => selection.length && alignTo(Edge.Center),
+    [Command.AlignRight]: () => selection.length && alignTo(Edge.Right),
+    [Command.AlignTop]: () => selection.length && alignTo(Edge.Top),
+    [Command.AlignMiddle]: () => selection.length && alignTo(Edge.Middle),
+    [Command.AlignBottom]: () => selection.length && alignTo(Edge.Bottom),
+    [Command.TidyUp]: () => selection.length > 1 && apply(tidySpace(doc, selection, frame, spaceBoxes(), editMode), 'Tidied up'),
+    [Command.FlipHorizontal]: () => selection.length && apply(flipClips(doc, selection, Flip.Horizontal), 'Flipped horizontally'),
+    [Command.FlipVertical]: () => selection.length && apply(flipClips(doc, selection, Flip.Vertical), 'Flipped vertically')
   };
 
   const TOOL_RUN: Partial<Record<ActionId, () => void>> = {
@@ -1597,7 +1630,14 @@
 
   function askedDrill() {
     const asked = frameDrill.take(data.node.id);
-    return asked ? { at: [asked.at.x * doc.width, asked.at.y * doc.height] as [number, number], gesture: asked.gesture } : null;
+    return asked ? { at: asked.at ? ([asked.at.x * doc.width, asked.at.y * doc.height] as [number, number]) : null, gesture: asked.gesture, from: asked.from } : null;
+  }
+
+  function selectSibling(direction: SiblingDirection) {
+    const next = siblingOf(layerOrder(doc), selection, direction);
+    if (next) {
+      selection = [next];
+    }
   }
 
   function selectParent() {

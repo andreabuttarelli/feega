@@ -43,6 +43,12 @@ describe('app sidebar', () => {
     expect(body.indexOf('Spring launch')).toBeLessThan(body.indexOf('New project'));
   });
 
+  it('shows the organisation switcher and New organisation even with a single organisation', () => {
+    const body = html();
+    expect(body).toContain('data-testid="org-switcher"');
+    expect(body).toContain('New organisation');
+  });
+
   it('offers New project even with no projects yet', () => {
     expect(html({ projects: [] })).toContain('action="/app?/project"');
   });

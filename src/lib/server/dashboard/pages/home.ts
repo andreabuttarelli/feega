@@ -5,7 +5,7 @@ import { chooseOrg, LAST_PROJECT_COOKIE, ORG_COOKIE } from '$lib/server/tenancy/
 import { takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { signedInDb } from '$lib/server/dashboard/app-shell';
 import { DASHBOARD_DEPS, dashboardFor } from '$lib/server/dashboard/dashboard';
-import { listMemberships } from '$lib/server/repos/orgs';
+import { listMemberships, setActiveOrg } from '$lib/server/repos/orgs';
 import { createProject } from '$lib/server/repos/projects';
 import { createCanvas } from '$lib/server/repos/canvas';
 import { SUPPORT_TOOLS } from '$lib/tools';
@@ -108,6 +108,7 @@ export const actions: Actions = {
       return fail(HTTP_NOT_FOUND, { error: 'Not your workspace' });
     }
 
+    await setActiveOrg(db, { userId: user.id, orgId });
     event.cookies.set(ORG_COOKIE, orgId, { path: '/', maxAge: ORG_COOKIE_MAX_AGE_S });
     throw redirect(HTTP_SEE_OTHER, DASHBOARD_PATH);
   }

@@ -4,7 +4,7 @@ import { addClip, setKeyframe, type OpResult } from './timeline';
 import { setClipFlags } from './organize';
 import { EditMode } from './edit-mode';
 import { aabb, quadOf } from './scene-select';
-import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes } from './space';
+import { Axis, Edge, alignSpace, distributeSpace, moveBy, propBoxes, tidySpace } from './space';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -95,5 +95,19 @@ describe('distribute', () => {
 
   it('needs three clips', () => {
     expect(distributeSpace(base, ['a', 'b'], 0, propBoxes(base), Axis.X, EditMode.Design).ok).toBe(false);
+  });
+});
+
+describe('tidy up inside a frame', () => {
+  it('lays a row out with even gaps and keeps the first clip where it is', () => {
+    const row = [
+      ['a', 0.1, 0.1],
+      ['b', 0.3, 0.1],
+      ['c', 0.7, 0.1]
+    ].reduce((doc, [id, x, width]) => shape(doc, id as string, x as number, width as number), newMotionDoc(MotionFormat.Landscape));
+    const tidied = must(tidySpace(row, ['a', 'b', 'c'], 0, propBoxes(row), EditMode.Design));
+    const lefts = ['a', 'b', 'c'].map((id) => Math.round(bounds(tidied, id).left));
+    expect(lefts[0]).toBe(Math.round(bounds(row, 'a').left));
+    expect(lefts[2] - lefts[1]).toBe(lefts[1] - lefts[0]);
   });
 });

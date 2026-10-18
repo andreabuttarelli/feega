@@ -40,6 +40,9 @@ export type SelectionActionId =
   | 'align-top'
   | 'align-middle'
   | 'align-bottom'
+  | 'tidy-up'
+  | 'flip-horizontal'
+  | 'flip-vertical'
   | 'use-as-mask'
   | 'release-mask'
   | 'delete';
@@ -67,12 +70,15 @@ export const SELECTION_ACTIONS: readonly SelectionAction[] = [
   { id: 'paste', label: 'Paste', group: 'menu', minNodes: 1, shortcut: 'Mod+V' },
   { id: 'bring-front', label: 'Bring to front', group: 'menu', minNodes: 1, shortcut: 'Mod+]' },
   { id: 'send-back', label: 'Send to back', group: 'menu', minNodes: 1, shortcut: 'Mod+[' },
-  { id: 'align-left', label: 'Align left', group: 'menu', minNodes: 1 },
-  { id: 'align-center', label: 'Align horizontal centres', group: 'menu', minNodes: 1 },
-  { id: 'align-right', label: 'Align right', group: 'menu', minNodes: 1 },
-  { id: 'align-top', label: 'Align top', group: 'menu', minNodes: 1 },
-  { id: 'align-middle', label: 'Align vertical centres', group: 'menu', minNodes: 1 },
-  { id: 'align-bottom', label: 'Align bottom', group: 'menu', minNodes: 1 },
+  { id: 'align-left', label: 'Align left', group: 'menu', minNodes: 1, shortcut: 'Alt+A' },
+  { id: 'align-center', label: 'Align horizontal centres', group: 'menu', minNodes: 1, shortcut: 'Alt+H' },
+  { id: 'align-right', label: 'Align right', group: 'menu', minNodes: 1, shortcut: 'Alt+D' },
+  { id: 'align-top', label: 'Align top', group: 'menu', minNodes: 1, shortcut: 'Alt+W' },
+  { id: 'align-middle', label: 'Align vertical centres', group: 'menu', minNodes: 1, shortcut: 'Alt+V' },
+  { id: 'align-bottom', label: 'Align bottom', group: 'menu', minNodes: 1, shortcut: 'Alt+S' },
+  { id: 'tidy-up', label: 'Tidy up', group: 'menu', minNodes: 2, shortcut: 'Mod+Alt+T' },
+  { id: 'flip-horizontal', label: 'Flip horizontal', group: 'menu', minNodes: 1, shortcut: 'Shift+H' },
+  { id: 'flip-vertical', label: 'Flip vertical', group: 'menu', minNodes: 1, shortcut: 'Shift+V' },
   { id: 'use-as-mask', label: 'Use as mask', group: 'menu', minNodes: 1, shortcut: 'Mod+Ctrl+M' },
   { id: 'release-mask', label: 'Remove mask', group: 'menu', minNodes: 1 },
   { id: 'copy-id', label: 'Copy id', group: 'overflow', minNodes: 1 },
@@ -93,7 +99,7 @@ export type AlignActionId = keyof typeof ALIGN_EDGE;
 
 export const ALIGN_ACTIONS = Object.keys(ALIGN_EDGE) as AlignActionId[];
 
-const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'use-as-mask', 'release-mask', 'delete'];
+const MENU_ORDER: readonly SelectionActionId[] = ['group', 'ungroup', 'duplicate', 'copy', 'paste', 'bring-front', 'send-back', ...ALIGN_ACTIONS, 'tidy-up', 'flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask', 'delete'];
 
 export const CANVAS_MENU: readonly SelectionAction[] = MENU_ORDER.map((id) => SELECTION_ACTIONS.find((a) => a.id === id)!);
 
@@ -109,11 +115,11 @@ export function shownFor(id: SelectionActionId, summaries: readonly Summary[]): 
   return SHOWN[id]?.(summaries) ?? true;
 }
 
-export type FrameOnlyActionId = 'use-as-mask' | 'release-mask';
+export type FrameOnlyActionId = 'flip-horizontal' | 'flip-vertical' | 'use-as-mask' | 'release-mask';
 
 export type CanvasActionId = Exclude<SelectionActionId, FrameOnlyActionId>;
 
-const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['use-as-mask', 'release-mask']);
+const FRAME_ONLY: ReadonlySet<SelectionActionId> = new Set<FrameOnlyActionId>(['flip-horizontal', 'flip-vertical', 'use-as-mask', 'release-mask']);
 
 export const isCanvasAction = (id: SelectionActionId): id is CanvasActionId => !FRAME_ONLY.has(id);
 

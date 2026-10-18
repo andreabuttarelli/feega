@@ -2847,6 +2847,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active_org_id: string | null
           avatar_url: string | null
           campaign_template_at: string | null
           created_at: string
@@ -2861,6 +2862,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_org_id?: string | null
           avatar_url?: string | null
           campaign_template_at?: string | null
           created_at?: string
@@ -2875,6 +2877,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_org_id?: string | null
           avatar_url?: string | null
           campaign_template_at?: string | null
           created_at?: string
