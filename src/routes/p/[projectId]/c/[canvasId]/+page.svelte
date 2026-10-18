@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
+  import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
   import type { Stack } from '$lib/canvas/stacking';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
@@ -2904,6 +2905,7 @@
   type Clipboard = {
     nodes: { type: string; data: Record<string, unknown>; dx: number; dy: number }[];
     edges: { sourceIndex: number; targetIndex: number; sourceHandle: string | null; targetHandle: string | null }[];
+    freeIds: string[];
   };
   let clipboard = $state<Clipboard | null>(null);
 
@@ -2917,6 +2919,7 @@
     const cy = chosen.reduce((sum, n) => sum + n.y, 0) / chosen.length;
 
     clipboard = {
+      freeIds: chosen.flatMap((n) => freeElement([n.id]) ?? []),
       nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy })),
       edges: edges
         .filter((e) => indexOf.has(e.source) && indexOf.has(e.target))
@@ -2940,6 +2943,14 @@
     }
   }
 
+  const FRAME_CENTRE = { x: 0.5, y: 0.5 };
+
+  async function pasteFreeInto(frameId: string, freeIds: string[]) {
+    for (const source of freeIds) {
+      landed(await post('copyFree', { source, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frameId, at: FRAME_CENTRE }) }));
+    }
+  }
+
   async function paste(at: { x: number; y: number }) {
     const copied = elementClipboard.elements;
     if (elementClipboard.kind === Copied.Elements && copied) {
@@ -2947,6 +2958,11 @@
       return;
     }
     if (!clipboard) { return; }
+    const frameId = pasteIntoFrame(nodes.filter((n) => selectedIds.includes(n.id)).map((n) => ({ id: n.id, takesDrops: tileChromeOf(n).takesDrops })), clipboard.freeIds);
+    if (frameId) {
+      await pasteFreeInto(frameId, clipboard.freeIds);
+      return;
+    }
 
     const result = await post('paste', {
       nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy }))),
