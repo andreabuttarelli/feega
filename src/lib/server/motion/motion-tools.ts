@@ -6,6 +6,7 @@ import { setPartFills } from '$lib/motion/part-style';
 import { staticParts } from './static-parts';
 import { strokesSchema } from '$lib/motion/stroke/model';
 import { THREE_GUIDANCE } from './three-guidance';
+import { FRAMES_CLOSED_HINT } from './server-frames';
 import { GUIDES, guidesFor, type GuideTopic } from './guides';
 import { lintAdvice } from '$lib/motion/custom/lint';
 import { tool, type Tool, type ToolExecutionOptions } from 'ai';
@@ -2364,7 +2365,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const times = input.times.map((t) => Math.min(t, end));
         const frames = (await deps.frames(toolCallId, times))?.filter((f) => f.bytes.length > 0) ?? [];
         if (!frames.length) {
-          return { ok: true, seen: false, note: 'frames unavailable: neither the editor nor the server could draw them. Continue without them; the user sees the video when they open the editor.' };
+          return { ok: true, seen: false, note: `frames unavailable: neither the editor nor the server could draw them (${FRAMES_CLOSED_HINT}). Continue without them; the user sees the video when they open the editor.` };
         }
         session.frames.set(toolCallId, frames);
         session.checkedAt = session.edits.length;
