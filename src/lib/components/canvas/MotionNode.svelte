@@ -16,6 +16,8 @@
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
   import FrameHover from './FrameHover.svelte';
+  import FrameLiveControls from './FrameLiveControls.svelte';
+  import { LiveHost } from '$lib/canvas/frame-live';
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { Background, FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
@@ -29,7 +31,7 @@
   import { coverFrame } from '$lib/motion/still';
   import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, previewMode, releaseCapture, stop as stopIn } from '$lib/canvas/motion-preview';
 
-  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onenter = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onenter?: (() => void) | null } = $props();
+  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onenter = null, liveHost = LiveHost.Node, liveUrl = '' }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onenter?: (() => void) | null; liveHost?: LiveHost; liveUrl?: string } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
   const nodeId = $derived(node.id);
@@ -304,7 +306,7 @@
     {#if !previewing}<div class="host" class:nodrag={layers.editor} class:nopan={layers.editor} data-testid="motion-node-editing" bind:this={host}></div>{/if}
     {#if previewing && node.docHeadRevision}<FrameHover nodeId={node.id} revision={node.docHeadRevision} {previewUrl} width={size.width} height={size.height} />{/if}
   </div>
-
+  {#if liveHost === LiveHost.Node}<FrameLiveControls nodeId={node.id} interactive={!!node.interactive && previewing} src={liveUrl} />{/if}
 </div>
 
 <style>
@@ -313,6 +315,7 @@
     outline-offset: 2px;
   }
   .motion {
+    position: relative;
     display: flex;
     flex-direction: column;
     width: 100%;

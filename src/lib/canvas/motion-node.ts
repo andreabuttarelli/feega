@@ -33,6 +33,7 @@ export type MotionNode = {
   storyboard?: StoryboardLink;
   budgetRaisedUsd?: number;
   versionNames?: VersionNames;
+  interactive?: boolean;
 };
 
 const FORMAT_NAMES: Record<string, MotionFormat> = {
@@ -57,7 +58,8 @@ export const motionNodeSchema = z.object({
   storyboard: linkSchema.optional(),
   budgetRaisedUsd: z.number().min(0).optional(),
   kind: z.enum(FrameKind).optional(),
-  versionNames: versionNamesSchema.optional()
+  versionNames: versionNamesSchema.optional(),
+  interactive: z.boolean().default(false)
 });
 
 export function storyboardOf(data: Record<string, unknown>): StoryboardLink | null {
@@ -169,6 +171,10 @@ export function motionSourcePath(input: { projectId: string; canvasId: string; n
 
 export function motionPreviewPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
   return `${motionEditorPath(input)}/preview`;
+}
+
+export function motionLivePath(input: { projectId: string; canvasId: string; nodeId: string }): string {
+  return `${motionEditorPath(input)}/live`;
 }
 
 export function storyboardPath(projectId: string, data: Record<string, unknown>): string | null {
