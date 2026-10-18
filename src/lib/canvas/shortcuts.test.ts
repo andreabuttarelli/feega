@@ -11,6 +11,7 @@ import {
 } from './shortcuts';
 import { CANVAS_ADD_BAR } from './addable';
 import { DrawTool } from '$lib/motion/draw-tool';
+import { Edge } from '$lib/motion/space';
 
 /** Un evento tastiera finto: bastano i campi che il registro guarda. */
 function ev(
@@ -235,6 +236,19 @@ describe('stacking order', () => {
   it('⌘] brings the selection to the front and ⌘[ sends it to the back', () => {
     expect(matchCanvasShortcut(ev(']', { metaKey: true }))).toEqual({ id: 'bring-front' });
     expect(matchCanvasShortcut(ev('[', { ctrlKey: true }))).toEqual({ id: 'send-back' });
+  });
+
+  it('Enter goes into the selected frame, Tab and ⇧Tab walk the tiles', () => {
+    expect(matchCanvasShortcut(ev('Enter'))).toEqual({ id: 'enter' });
+    expect(matchCanvasShortcut(ev('Tab'))).toEqual({ id: 'select-next' });
+    expect(matchCanvasShortcut(ev('Tab', { shiftKey: true }))).toEqual({ id: 'select-previous' });
+  });
+
+  it('⌥ letters align the selected tiles and ⌃⌥T tidies them up', () => {
+    expect(matchCanvasShortcut(ev('å', { altKey: true, code: 'KeyA' }))).toEqual({ id: 'align', edge: Edge.Left });
+    expect(matchCanvasShortcut(ev('ß', { altKey: true, code: 'KeyS' }))).toEqual({ id: 'align', edge: Edge.Bottom });
+    expect(matchCanvasShortcut(ev('†', { altKey: true, ctrlKey: true, code: 'KeyT' }))).toEqual({ id: 'tidy' });
+    expect(matchCanvasShortcut(ev('π', { altKey: true, code: 'KeyP' }))).toBeNull();
   });
 
   it('Figma zoom keys by physical digit: ⇧0 is 100%, ⇧1 fits everything, ⇧2 zooms to the selection', () => {

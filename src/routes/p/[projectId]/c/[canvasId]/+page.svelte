@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import type { Stack } from '$lib/canvas/stacking';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
@@ -2925,6 +2926,7 @@
   function copy(ids: string[]) {
     const chosen = nodes.filter((n) => ids.includes(n.id));
     if (!chosen.length) { return; }
+    elementClipboard.copyTiles();
 
     const indexOf = new Map(chosen.map((n, i) => [n.id, i]));
     const cx = chosen.reduce((sum, n) => sum + n.x, 0) / chosen.length;
@@ -2946,7 +2948,20 @@
   }
 
   /** ⌘V: quel che `copy` ha in mano, riposato attorno al punto dato — vuoto se non si è mai copiato. */
+  const PASTE_STAGGER = 24;
+
+  async function pasteElementsAt(at: { x: number; y: number }, copied: CopiedElements) {
+    for (const [i, clip] of copied.clipIds.entries()) {
+      landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify({ on: DropOn.Canvas, x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER }) }));
+    }
+  }
+
   async function paste(at: { x: number; y: number }) {
+    const copied = elementClipboard.elements;
+    if (elementClipboard.kind === Copied.Elements && copied) {
+      await pasteElementsAt(at, copied);
+      return;
+    }
     if (!clipboard) { return; }
 
     const result = await post('paste', {

@@ -206,3 +206,48 @@ describe('mask keys', () => {
     expect(press('m')).toBe(Command.AddMarker);
   });
 });
+
+describe('flip keys', () => {
+  it('⇧H flips horizontally and ⇧V vertically', () => {
+    expect(press('H', { shift: true, code: 'KeyH' })).toBe(Command.FlipHorizontal);
+    expect(press('V', { shift: true, code: 'KeyV' })).toBe(Command.FlipVertical);
+    expect(press('v', { code: 'KeyV' })).toBe(Command.ToolSelect);
+  });
+});
+
+describe('sibling keys', () => {
+  it('Tab selects the next layer and ⇧Tab the previous one', () => {
+    expect(press('Tab')).toBe(Command.SelectNext);
+    expect(press('Tab', { shift: true })).toBe(Command.SelectPrevious);
+  });
+});
+
+describe('align keys', () => {
+  it('⌥A ⌥H ⌥D ⌥W ⌥V ⌥S align, ⌃⌥T tidies up, by physical key', () => {
+    expect(press('å', { alt: true, code: 'KeyA' })).toBe(Command.AlignLeft);
+    expect(press('˙', { alt: true, code: 'KeyH' })).toBe(Command.AlignCenter);
+    expect(press('∂', { alt: true, code: 'KeyD' })).toBe(Command.AlignRight);
+    expect(press('∑', { alt: true, code: 'KeyW' })).toBe(Command.AlignTop);
+    expect(press('√', { alt: true, code: 'KeyV' })).toBe(Command.AlignMiddle);
+    expect(press('ß', { alt: true, code: 'KeyS' })).toBe(Command.AlignBottom);
+    expect(press('†', { mod: true, alt: true, code: 'KeyT' })).toBe(Command.TidyUp);
+  });
+});
+
+describe('plain-letter tools in Design mode', () => {
+  const design = (key: string) => commandFor({ key, code: `Key${key.toUpperCase()}`, mod: false, shift: false }, EditMode.Design);
+  const motion = (key: string) => commandFor({ key, code: `Key${key.toUpperCase()}`, mod: false, shift: false }, EditMode.Motion);
+
+  it('T R O P pick text, rectangle, ellipse and pen', () => {
+    expect(design('t')).toBe(Command.ToolText);
+    expect(design('r')).toBe(Command.ToolRectangle);
+    expect(design('o')).toBe(Command.ToolEllipse);
+    expect(design('p')).toBe(Command.ToolPen);
+  });
+
+  it('in Motion the letters keep their timeline meaning', () => {
+    expect(motion('o')).toBe(Command.WorkOut);
+    expect(motion('t')).toBe(Command.RevealOpacity);
+    expect(motion('p')).toBe(Command.RevealPosition);
+  });
+});
