@@ -23,6 +23,7 @@
   import { HEADS_PARAM, PARTS_PARAM, cacheOutlines, canvasHeads, headKey, headsParam, missingHeads, outlinesFor, partIds, partsParam, posterHeads, type FrameHead, type OutlineCache } from '$lib/canvas/frame-outlines';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import PartsProbe from './PartsProbe.svelte';
+  import { rowWindow } from '$lib/canvas/row-window';
   import { IconButton, IconSize, Kbd, MENU_CONTENT, MENU_ITEM } from '$lib/components/ui/shell';
   import { LAYER_MENU, LayerAction, LayerKind, NodeIcon, Pick, type Place, dropLayer, dropPlace, layerEdit, layerKey, layerRows, pickFor, pickLayers, rowPicked, rowsInside, searchRows, selectedLayers, type LayerRow } from '$lib/canvas/layers';
 
@@ -31,6 +32,9 @@
   const INDENT_PX = 14;
   const FOLD_GUTTER = 24;
   const PROBE_LANES = 6;
+  const ROW_STEP_PX = 33;
+  const OVERSCAN = 8;
+  const FALLBACK_VIEW_PX = 1000;
 
   const canvas = $derived(layersSource.canvas);
   const video = $derived(layersSource.video);
@@ -95,10 +99,44 @@
   const picked = $derived(selectedLayers(selection));
   let list = $state<HTMLDivElement | null>(null);
 
+  let view = $state({ scrollTop: 0, height: FALLBACK_VIEW_PX });
+  let listTop = 0;
+
+  $effect(() => {
+    const scroller = list?.parentElement;
+    if (!list || !scroller) {
+      return;
+    }
+    const read = () => (view = { scrollTop: scroller.scrollTop - listTop, height: scroller.clientHeight });
+    const place = () => {
+      listTop = list!.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+      read();
+    };
+    const sizes = new ResizeObserver(place);
+    sizes.observe(scroller);
+    scroller.addEventListener('scroll', read, { passive: true });
+    place();
+    return () => {
+      sizes.disconnect();
+      scroller.removeEventListener('scroll', read);
+    };
+  });
+
   $effect(() => {
     const first = picked[0];
-    const row = first && list ? list.querySelector<HTMLElement>(`[data-layer="${CSS.escape(first)}"][aria-selected="true"]`) : null;
-    row?.scrollIntoView({ block: 'nearest' });
+    const scroller = list?.parentElement;
+    if (!first || !list || !scroller) {
+      return;
+    }
+    const row = list.querySelector<HTMLElement>(`[data-layer="${CSS.escape(first)}"][aria-selected="true"]`);
+    if (row) {
+      row.scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    const index = untrack(() => shown.findIndex((r) => r.id === first));
+    if (index >= 0) {
+      scroller.scrollTop = listTop + index * ROW_STEP_PX - scroller.clientHeight / 2;
+    }
   });
 
   let renaming = $state<string | null>(null);
@@ -123,6 +161,8 @@
   const inside = $derived(rowsInside(rows, isPicked));
   let query = $state('');
   const shown = $derived(searchRows(rows, query));
+  const span = $derived(rowWindow({ ...view, count: shown.length, rowPx: ROW_STEP_PX, overscan: OVERSCAN }));
+  const visible = $derived(shown.slice(span.start, span.end));
   const ROW_HUE: Record<string, string> = { motion: 'var(--ui-type-frame)', image: 'var(--ui-type-media)', video: 'var(--ui-type-media)', text: 'var(--ui-type-text)' };
   const editable = (row: LayerRow) => row.kind !== LayerKind.Node && !row.nested;
 
@@ -229,8 +269,8 @@
 <input class="search" type="search" placeholder="Search layers…" aria-label="Search layers" data-testid="layers-search" bind:value={query} />
 
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-<div class="layers" bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" onkeydown={onKey}>
-  {#each shown as row (`${row.nodeId}/${row.key}`)}
+<div class="layers" bind:this={list} role="tree" aria-label="Layers" aria-multiselectable="true" tabindex="0" data-testid="layers" data-key-region="editor" style:padding-top={`${span.start * ROW_STEP_PX}px`} style:padding-bottom={`${(shown.length - span.end) * ROW_STEP_PX}px`} onkeydown={onKey}>
+  {#each visible as row (`${row.nodeId}/${row.key}`)}
     {@const RowIcon = KIND_ICON[row.kind] ?? ROW_ICON[row.type] ?? Square}
     <div
       class="row"
