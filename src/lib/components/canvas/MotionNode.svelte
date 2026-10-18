@@ -78,7 +78,7 @@
   const shownPoster = $derived(posterCurrent(local) && decodedPoster === poster ? decodedPoster : null);
   const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster));
   const playerUp = $derived(mounted && !!preview);
-  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
+  const mounted = $derived(nodeMode !== NodeMode.Edit && ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));
