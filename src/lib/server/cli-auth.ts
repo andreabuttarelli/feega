@@ -328,15 +328,20 @@ export async function openOrgScope(
  * rendeva i rifiuti raggiungibili solo passando da una chiave API vera: qui si provano per quello
  * che sono, uno per uno.
  */
-async function activeOrgIdOf(supabase: SupabaseClient, user: User): Promise<string | null> {
+const HTTP_FORBIDDEN = 403;
+
+type ActiveOrg = { orgId: string | null; mayEdit: boolean };
+
+async function activeOrgOf(supabase: SupabaseClient, user: User): Promise<ActiveOrg> {
   const { listMemberships } = await import('$lib/server/repos/orgs');
   const [active] = await listMemberships(supabase as never, user.id);
   if (active) {
-    return active.org.id;
+    const { can, OrgAction } = await import('$lib/org-roles');
+    return { orgId: active.org.id, mayEdit: can(active.role, OrgAction.Edit) };
   }
 
   const { ensureOrgForUser } = await import('./org');
-  return ensureOrgForUser(supabase, user);
+  return { orgId: await ensureOrgForUser(supabase, user), mayEdit: true };
 }
 
 export async function orgScopeFor(
@@ -345,7 +350,8 @@ export async function orgScopeFor(
   const { supabase, user, error, apiKey } = caller;
   if (error) return { error };
 
-  const orgId = apiKey ? apiKey.org_id : await activeOrgIdOf(supabase, user as never);
+  const { orgId, mayEdit } = apiKey ? { orgId: apiKey.org_id, mayEdit: true } : await activeOrgOf(supabase, user as never);
+  if (!mayEdit) return { error: json({ error: 'view_only', message: 'Viewers cannot generate or edit. Ask an admin for edit access.' }, { status: HTTP_FORBIDDEN }) };
   if (!orgId) return { error: json({ error: 'no_organization' }, { status: 500 }) };
 
   const gate = await gateOrgAiAction(orgId, apiKey);

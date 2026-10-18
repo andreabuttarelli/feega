@@ -40,6 +40,7 @@
   import { tilesAt } from '$lib/canvas/tiles-at';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, type SnapGuide } from '$lib/canvas/snap';
+  import { dragOffset } from '$lib/canvas/duplicate-plan';
   import { enterFrame } from '$lib/canvas/enter-frame';
   import { Direction, siblingOf } from '$lib/motion/siblings';
   import type { Edge } from '$lib/motion/space';
@@ -726,6 +727,13 @@
       settleOverrides();
       return;
     }
+    const grabbed = overrides.get(ids[0]);
+    const copyOffset = e.altKey && grabbed ? dragOffset(new Map(tiles.map((t) => [t.id, { x: t.x, y: t.y }])), { id: ids[0], position: grabbed }) : undefined;
+    if (copyOffset && props.onDuplicate) {
+      settleOverrides();
+      props.onDuplicate(ids, copyOffset);
+      return;
+    }
     const moves = ids.flatMap((id) => (overrides.get(id) ? [{ id, x: overrides.get(id)!.x, y: overrides.get(id)!.y }] : []));
     for (const m of moves) {
       props.onMove?.(m.id, m.x, m.y);
@@ -1107,7 +1115,7 @@
 }} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap svelte-flow" bind:this={wrap} ondragover={onDragOver} ondrop={onDrop} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" bind:this={wrap} ondragover={onDragOver} ondrop={spec.chrome ? onDrop : undefined} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-view={`${view.x},${view.y},${view.zoom}`}>
   <div
     class="surface svelte-flow__pane"
     bind:this={surface}

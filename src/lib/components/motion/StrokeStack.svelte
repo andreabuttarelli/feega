@@ -2,7 +2,7 @@
   import { cn } from '$lib/utils.js';
   import { FIELD_INPUT, FOCUS_RING, SECTION_LABEL } from '$lib/components/ui/shell/styles';
   import { resolveColor, type BrandTokens } from '$lib/motion/brand';
-  import { FILL_TYPES, FillType, colourAlpha, retypeFill, withAlpha, type Fill, type Stop } from '$lib/motion/fill/model';
+  import { FILL_TYPES, FillType, PAINTED_AS, PaintedAs, colourAlpha, retypeFill, withAlpha, type Fill, type Stop } from '$lib/motion/fill/model';
   import { CAPS, JOINS } from '$lib/motion/shape/schema';
   import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, removeStroke, setStroke, type Stroke, type StrokePatch } from '$lib/motion/stroke/model';
   import ColorField from './ColorField.svelte';
@@ -17,7 +17,7 @@
   const ICON = cn('inline-flex size-6 shrink-0 items-center justify-center rounded-sm text-ui-icon hover:bg-ui-wash hover:text-ui-text', FOCUS_RING);
   const LABEL = 'text-ui-label text-ui-text-2';
   const FIELD_ROW = 'flex items-center justify-between gap-2';
-  const PAINTS = FILL_TYPES.filter((t) => t !== FillType.Image);
+  const PAINTS = FILL_TYPES.filter((t) => PAINTED_AS[t] === PaintedAs.Svg);
 
   const PAINT_LABEL: Record<string, string> = {
     [FillType.Solid]: 'Solid',

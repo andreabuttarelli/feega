@@ -4,6 +4,7 @@ import type { Quality } from '../export-formats';
 import { frameTimes, samplesPerFrame, type Size } from '../export-plan';
 import { encodeMp4, mixAudio } from './encode';
 import { docCuts, joltMeter, type JoltAt } from '../smoothness';
+import { orFallback } from './fallback';
 import { keepAwake, visibleGate, type Page, type WakeLockHost } from './stay-awake';
 
 export type FrameSource = (times: number[], size: Size, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal) => Promise<void>;
@@ -20,6 +21,8 @@ export type BrowserJob = {
   quality: Quality;
   withAudio: boolean;
   frames: FrameSource;
+  fallback?: FrameSource | null;
+  onFallback?: (error: unknown) => void;
   signal: AbortSignal;
   onStage: (stage: BrowserStage) => void;
   onFrame: (done: number) => void;
@@ -39,7 +42,7 @@ export async function renderInBrowser(job: BrowserJob): Promise<Blob> {
     job.onStage(BrowserStage.Rendering);
     const times = frameTimes(job.doc);
     const meter = job.onJolts ? joltMeter() : undefined;
-    const blob = await encodeMp4({
+    const encode = (frames: FrameSource) => () => encodeMp4({
       size: job.size,
       fps: job.doc.fps,
       quality: job.quality,
@@ -48,10 +51,11 @@ export async function renderInBrowser(job: BrowserJob): Promise<Blob> {
       audio,
       signal: job.signal,
       gate: visibleGate(host.page, job.onPause),
-      render: (onFrame) => job.frames(times, job.size, onFrame, job.signal),
+      render: (onFrame) => frames(times, job.size, onFrame, job.signal),
       onFrame: job.onFrame,
       meter
     });
+    const blob = await orFallback(encode(job.frames), job.fallback ? encode(job.fallback) : null, job.signal, job.onFallback);
     job.onJolts?.(meter ? meter.jolts({ cuts: docCuts(job.doc) }) : []);
     return blob;
   } finally {

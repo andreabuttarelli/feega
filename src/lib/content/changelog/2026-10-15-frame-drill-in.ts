@@ -2,7 +2,7 @@ import type { ChangelogEntry } from './index';
 
 export default {
   date: '2026-10-15',
-  title: 'Select inside frames like in Figma',
+  title: 'Select inside frames',
   items: [
     'Hovering a frame on the canvas outlines the element under the pointer.',
     'Double-click goes one level deeper: frame, element, then its parts and text.',

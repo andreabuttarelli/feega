@@ -16,4 +16,4 @@ select, so every collapsed row read like a form.
 - Meant to be reused for strokes, effects and any "more settings" of a section.
 
 **Discarded.** Inline nested block with a connector: it keeps the panel long and still reads as
-"below the list"; the popover is what Figma and Framer users expect.
+"below the list"; the popover is what users of design tools expect.

@@ -22,7 +22,8 @@ type Axis = { main: 0 | 1; start: 'left' | 'top'; length: 'width' | 'height'; cr
 
 const AXIS: Record<Direction, Axis> = {
   [Direction.Horizontal]: { main: 0, start: 'left', length: 'width', crossStart: 'top', crossLength: 'height' },
-  [Direction.Vertical]: { main: 1, start: 'top', length: 'height', crossStart: 'left', crossLength: 'width' }
+  [Direction.Vertical]: { main: 1, start: 'top', length: 'height', crossStart: 'left', crossLength: 'width' },
+  [Direction.Grid]: { main: 0, start: 'left', length: 'width', crossStart: 'top', crossLength: 'height' }
 };
 
 const PADDING_GROWS: Record<Side, (delta: Pt) => number> = {

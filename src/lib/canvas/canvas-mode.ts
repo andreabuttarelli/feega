@@ -1,4 +1,5 @@
 import { SelectionMode } from '@xyflow/svelte';
+import { can, OrgAction, type OrgRole } from '$lib/org-roles';
 
 export enum CanvasMode {
   Edit = 'edit',
@@ -55,3 +56,7 @@ export const CANVAS_MODES: Record<CanvasMode, CanvasModeSpec> = {
     chrome: false
   }
 };
+
+export function canvasModeFor(role: OrgRole): CanvasMode {
+  return can(role, OrgAction.Edit) ? CanvasMode.Edit : CanvasMode.View;
+}

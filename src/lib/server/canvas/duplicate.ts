@@ -19,7 +19,7 @@ import { planDuplicate, DUPLICATE_OFFSET, type DuplicatePlan } from '$lib/canvas
  */
 export async function duplicateNodes(
   db: Db,
-  input: { orgId: string; projectId: string; canvasId: string; nodeIds: string[]; actor?: Actor }
+  input: { orgId: string; projectId: string; canvasId: string; nodeIds: string[]; offset?: { dx: number; dy: number }; actor?: Actor }
 ): Promise<{ nodes: CanvasNodeRecord[]; connections: Connection[] }> {
   if (!input.nodeIds.length) {
     return { nodes: [], connections: [] };
@@ -42,7 +42,7 @@ export async function duplicateNodes(
       sourceHandle: e.sourceHandle,
       targetHandle: e.targetHandle
     })),
-    offset: DUPLICATE_OFFSET
+    offset: input.offset ?? DUPLICATE_OFFSET
   });
 
   return writePlan(db, input, plan);

@@ -34,6 +34,20 @@ describe('duplicare una selezione', () => {
     expect(insert?.payload).toMatchObject({ x: 42, y: 52 });
   });
 
+  it('usa lo scarto chiesto quando arriva, come un trascinamento con Option', async () => {
+    const fake = fakeDb({
+      nodes: [
+        { id: 'a', canvas_id: 'canvas', project_id: 'project', type: 'text', display_name: null, x: 10, y: 20, z: 0, width: null, height: null, data: {}, version: 1 }
+      ],
+      nodes_connections: []
+    });
+
+    await duplicateNodes(fake.db, { ...scope, nodeIds: ['a'], offset: { dx: 300, dy: -5 }, actor: { kind: 'user', id: 'user' } });
+
+    const insert = fake.calls.find((c) => c.table === 'nodes' && c.op === 'insert');
+    expect(insert?.payload).toMatchObject({ x: 310, y: 15 });
+  });
+
   it('non prova a collegare un nodo scelto a uno fuori dalla selezione', async () => {
     const fake = fakeDb({
       nodes: [

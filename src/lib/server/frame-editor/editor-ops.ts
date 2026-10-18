@@ -23,7 +23,7 @@ import { SIGNED_URL_TTL_S } from '$lib/server/repos/asset-storage';
 import { settingsFrom } from '$lib/motion/export-formats';
 import { motionEditorPath } from '$lib/canvas/motion-node';
 import { editorSession } from '$lib/server/motion/editor-session';
-import { listRevisions } from '$lib/server/repos/motion-revisions';
+import { nameVersion, namedRevisions } from '$lib/server/motion/version-names';
 import { Restore, restoreRevision } from '$lib/server/motion/restore';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { cancelRender } from '$lib/server/motion/render-run';
@@ -245,7 +245,16 @@ export const EDITOR_OPS = {
   list_revisions: op({
     access: EditorAccess.Read,
     input: z.object({}),
-    run: async (ctx) => ok({ revisions: await listRevisions(ctx.db, nodeScope(ctx)) })
+    run: async (ctx) => ok({ revisions: await namedRevisions(ctx.db, nodeScope(ctx)) })
+  }),
+
+  name_revision: op({
+    access: EditorAccess.Write,
+    input: z.object({ version: z.number().int().min(1), name: z.string().max(200) }),
+    run: async (ctx, input) => {
+      const out = await nameVersion(ctx.db, { ...nodeScope(ctx), ...input, actor: ctx.actor });
+      return out.named ? ok({ named: true }) : refused(HTTP_NOT_FOUND, { error: out.error });
+    }
   }),
 
   restore_revision: op({

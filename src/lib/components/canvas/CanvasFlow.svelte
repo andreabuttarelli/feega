@@ -1,5 +1,6 @@
 <script lang="ts">
   const MIN_ZOOM = 0.05;
+  import { dragOffset, type Offset } from '$lib/canvas/duplicate-plan';
   import { focusEdges } from '$lib/canvas/edge-focus';
   import type { FocusRequest } from '$lib/canvas/free-area';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
@@ -252,7 +253,7 @@
     /** Un file scelto dalla barra: la tela non lo carica da sé, lo passa a chi la monta. */
     onUpload?: (file: File) => void;
     /** ⌘D: duplica la selezione, con gli id come SvelteFlow li conosce. */
-    onDuplicate?: (ids: string[]) => void;
+    onDuplicate?: (ids: string[], offset?: Offset) => void;
     /** ⌘C: copia la selezione negli appunti di chi monta la tela. */
     onCopy?: (ids: string[]) => void;
     /** ⌘V: incolla, al centro di quel che si sta guardando adesso. */
@@ -464,6 +465,13 @@
     if (!targetNode) return;
     const dragged = snapped(moving);
     snapGuides = [];
+    const grabbed = dragged.find((n) => n.id === targetNode.id) ?? targetNode;
+    const copyOffset = event.altKey ? dragOffset(dragOrigin, grabbed) : undefined;
+    if (copyOffset && onDuplicate) {
+      returnToOrigin();
+      onDuplicate(dragged.map((n) => n.id), copyOffset);
+      return;
+    }
     if (onTileDrop?.(dragged.map((n) => n.id), pointOf(event)) === DropVerdict.Taken) {
       returnToOrigin();
       return;
@@ -892,7 +900,7 @@
   onpointercancel={endPress}
   onpointerleave={() => onPointer?.(null)}
   ondragover={onDragOver}
-  ondrop={onDrop}
+  ondrop={spec.chrome ? onDrop : undefined}
 >
   <!--
     I gesti che ci si aspetta da una tela, e qui sono quattro flag: due dita spostano

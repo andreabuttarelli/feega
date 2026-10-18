@@ -5,10 +5,21 @@ import { findCanvasForUser, type OpenCanvas } from '$lib/server/canvas/lookup';
 import { canvasReachable } from '$lib/server/uncensored-workspace/workspace-server';
 import type { Db } from '$lib/server/db/client';
 import { findMotionNode } from './editor';
+import { can, OrgAction } from '$lib/org-roles';
+import { canvasPath } from '$lib/server/tenancy/entry';
+
+const HTTP_SEE_OTHER = 303;
 
 type Params = { projectId: string; canvasId: string; nodeId: string };
 export type CanvasScope = { db: Db; userId: string; found: OpenCanvas };
 type FoundMotion = Awaited<ReturnType<typeof findMotionNode>>;
+
+export function assertEditor(memberships: Membership[], orgId: string, viewPath: string): void {
+  const role = memberships.find((m) => m.org.id === orgId)?.role;
+  if (role && !can(role, OrgAction.Edit)) {
+    throw redirect(HTTP_SEE_OTHER, viewPath);
+  }
+}
 
 export async function canvasScope(locals: App.Locals, params: Params): Promise<CanvasScope> {
   const { session, user } = await locals.safeGetSession();
@@ -25,6 +36,7 @@ export async function canvasScope(locals: App.Locals, params: Params): Promise<C
   if (!found || found.canvas.projectId !== params.projectId) {
     throw error(404, 'This canvas does not exist, or is not yours');
   }
+  assertEditor(memberships, found.orgId, canvasPath(params.projectId, params.canvasId));
   return { db, userId: user.id, found };
 }
 

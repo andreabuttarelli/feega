@@ -1,7 +1,7 @@
 <script lang="ts">
   import { painted } from '$lib/canvas/paint-wait';
   import { frameDocs } from '$lib/canvas/frame-docs.svelte';
-  import { FrameKind, freshText, openingSelection } from '$lib/canvas/motion-node';
+  import { FrameKind, frameChrome, freshText, openingSelection } from '$lib/canvas/motion-node';
   import { DRAWN_TEXT } from '$lib/motion/draw-create';
   import { groupClips, ungroupClip } from '$lib/motion/group';
   import { onMount, tick, untrack } from 'svelte';
@@ -10,6 +10,9 @@
   import { deserialize } from '$app/forms';
   import { replaceState } from '$app/navigation';
   import { page } from '$app/state';
+  import { RenderEngine, engineFlag } from '$lib/motion/gpu/engine-flag';
+  import { engineKilled } from '$lib/motion/gpu/kill';
+  import { CaptureProfile } from '$lib/motion/export/capture-profile';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { headMoved, watchMotionNode } from '$lib/realtime/motion-channel';
   import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
@@ -74,6 +77,7 @@
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
   import { Flip, flipClips } from '$lib/motion/layer-props';
+  import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
   import { Copied, elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { Direction as SiblingDirection, layerOrder, siblingOf } from '$lib/motion/siblings';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
@@ -126,7 +130,7 @@
     type KeyRef,
     type OpResult
   } from '$lib/motion/timeline';
-  import { DragPhase, UndoRoute, type CanvasUndo, type ElementOut, type MoveOut } from '$lib/canvas/canvas-drop';
+  import { DragPhase, UndoRoute, type CanvasUndo, type ElementOut, type HostDrag, type MoveOut } from '$lib/canvas/canvas-drop';
   import { copyElements, liftElement, pasteElements } from '$lib/motion/move-element';
   import { adoptHead, amend, canRedo, canUndo, followHead, previousSource, record, redo, startHistory, undo, type History } from '$lib/motion/history';
   import { landed, outgoing, remote, type Synced } from '$lib/motion/frame-sync';
@@ -190,7 +194,7 @@
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
-  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
+  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, onhostdrag = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
   const rules = $derived(MOUNT[mount]);
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
@@ -349,6 +353,7 @@
   const dockOf = (part: Part) => ({ [DOCK_ATTR]: PART_DOCK[viewport][part] });
   const stageHost = $derived(rules.stage === Stage.Node ? inlineStage.of(data.node.id) : undefined);
   const stageShown = $derived(rules.stage === Stage.Node ? nodeLayers(NodeMode.Edit, inlineStage.paintOf(data.node.id)).editor : true);
+  const stageTakesPointer = $derived(stageShown && inlineStage.leaving !== data.node.id);
 
   const PANELS_LATE_MS = 4000;
   let panelsLate = $state(false);
@@ -1203,7 +1208,7 @@
     clipOp(ClipOp.Delete);
   }
 
-  type Revision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
+  type Revision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number; name: string | null };
   let revisionsOpen = $state(false);
   let revisions = $state<Revision[]>([]);
 
@@ -1217,8 +1222,21 @@
     if (!revisionsOpen) {
       return;
     }
+    await loadRevisions();
+  }
+
+  async function loadRevisions() {
     const result = await editorAction('revisions');
     revisions = result.type === 'success' ? ((result.data?.revisions as Revision[]) ?? []) : [];
+  }
+
+  async function nameCurrent(name: string) {
+    const form = new FormData();
+    form.set('version', String(version));
+    form.set('name', name);
+    const result = await editorAction('nameVersion', form);
+    notice = result.type === 'success' ? '' : 'The version could not be named: reload and try again.';
+    await loadRevisions();
   }
 
   async function restoreTo(target: number) {
@@ -1327,6 +1345,13 @@
     return preview.render(...args);
   }
 
+  function htmlExportFrames(...[times, size, onFrame, signal]: Parameters<MotionPreview['render']>) {
+    if (!preview) {
+      return Promise.reject(new Error('the preview is still loading'));
+    }
+    return preview.render(times, size, onFrame, signal, html, CaptureProfile.Fast, RenderEngine.Html);
+  }
+
   const NUDGE_MORE = 10;
 
   function toPlayhead(edge: ClipEdge) {
@@ -1406,6 +1431,14 @@
   }
   const nudgeBy = (dx: number, dy: number) => selection.length && apply(moveBy(doc, selection, frame, [dx, dy], editMode), 'Moved with the arrows');
   const arrangeTo = (to: Arrange) => apply(arrangeLayers(doc, selection, to, newId), `Arranged ${to}`);
+  function combine(op: BooleanOp) {
+    const result = combineShapes(doc, selection, op, frame);
+    apply(result, `Combined shapes: ${op}`);
+    if (result.ok) {
+      selection = selection.filter((id) => findClip(result.doc, id));
+    }
+  }
+
   const alignTo = (edge: Edge) => apply(alignSpace(doc, selection, frame, spaceBoxes(), edge, editMode), `Aligned ${edge}`);
   const distribute = (axis: Axis) => apply(distributeSpace(doc, selection, frame, spaceBoxes(), axis, editMode), `Distributed along ${axis}`);
 
@@ -1522,6 +1555,10 @@
     [Command.SendBackward]: () => arrangeTo(Arrange.Backward),
     [Command.BringToFront]: () => arrangeTo(Arrange.Front),
     [Command.SendToBack]: () => arrangeTo(Arrange.Back),
+    [Command.Union]: () => combine(BooleanOp.Union),
+    [Command.Subtract]: () => combine(BooleanOp.Subtract),
+    [Command.Intersect]: () => combine(BooleanOp.Intersect),
+    [Command.Exclude]: () => combine(BooleanOp.Exclude),
     [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask'),
     [Command.AlignLeft]: () => selection.length && alignTo(Edge.Left),
     [Command.AlignCenter]: () => selection.length && alignTo(Edge.Center),
@@ -1543,7 +1580,7 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.BringForward, Action.SendBackward, Action.BringToFront, Action.SendToBack, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.Union, Action.BringForward, Action.SendBackward, Action.BringToFront, Action.SendToBack, Action.Subtract, Action.Intersect, Action.Exclude, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
@@ -1760,8 +1797,9 @@
         <button type="button" class="clock" aria-haspopup="menu" aria-expanded={revisionsOpen} aria-label="Version history" title="Version history" disabled={agent === Agent.Working} data-testid="revisions-open" onclick={() => void toggleRevisions()}><HistoryIcon size={16} /></button>
         {#if revisionsOpen}
           <div class="menu more" role="menu" data-testid="revisions">
+            <input class="version-name" aria-label="Name the current version" placeholder="Name the current version" data-testid="version-name" onkeydown={(e) => e.key === 'Enter' && void nameCurrent(e.currentTarget.value)} />
             {#each revisions as r (r.version)}
-              <button type="button" role="menuitem" disabled={r.version === version} onclick={() => void restoreTo(r.version)}><span>v{r.version} · {r.actorKind === 'agent' ? 'Agent' : 'You'} · {r.clips} clips</span><kbd>{r.version === version ? 'Current' : 'Restore'}</kbd></button>
+              <button type="button" role="menuitem" disabled={r.version === version} onclick={() => void restoreTo(r.version)}><span>{r.name ? `${r.name} · v${r.version}` : `v${r.version}`} · {r.actorKind === 'agent' ? 'Agent' : 'You'} · {r.clips} clips</span><kbd>{r.version === version ? 'Current' : 'Restore'}</kbd></button>
             {:else}
               <span class="empty">No saved versions yet</span>
             {/each}
@@ -1857,6 +1895,7 @@
       {editorUrl}
       fileName={data.node.name ?? 'motion'}
       render={exportFrames}
+      fallbackRender={htmlExportFrames}
       tokens={data.tokens}
       {analyses}
       server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}` }}
@@ -1904,12 +1943,12 @@
   {/if}
 
   <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
-    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
+    <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
-      <MotionPreview bind:this={preview} bind:redraws {html} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
+      <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
-        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
         {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -2734,6 +2773,16 @@
     left: auto;
     right: 0;
     grid-template-columns: 220px;
+  }
+
+  .version-name {
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    border: 1px solid var(--ui-divider, #e3e3e6);
+    background: transparent;
+    color: inherit;
   }
 
   .menu.more button {

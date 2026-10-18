@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fillsSchema } from './model';
+import { strokePaintSchema } from '../stroke/model';
 import { fillLayersHtml, resolveFills, svgFills, textPaint, type FillPaint } from './render';
 
 const stack = (raw: unknown[]) => fillsSchema.parse(raw);
@@ -244,5 +245,43 @@ describe('fill stack in html', () => {
     const inlined = new Function(`return (${fillLayersHtml.toString()})`)();
     const fills = resolved([{ type: 'solid', color: '#111111' }]);
     expect(inlined(fills)).toBe(fillLayersHtml(fills));
+  });
+});
+
+describe('angular and diamond gradients', () => {
+  const stops = [
+    { color: '#000000', pos: 0 },
+    { color: '#ffffff', pos: 1 }
+  ];
+
+  it('an angular layer sweeps a conic gradient from its angle around its centre', () => {
+    const html = fillLayersHtml(stack([{ type: 'angular-gradient', stops, angle: 45, center: { x: 0.25, y: 0.5 } }]));
+    expect(html).toContain('background:conic-gradient(from 45deg at 25% 50%,#000000 0%,#ffffff 100%)');
+  });
+
+  it('a diamond layer is four mirrored corners reaching the edge midpoints at the last stop', () => {
+    const html = fillLayersHtml(stack([{ type: 'diamond-gradient', stops }]));
+    expect(html).toContain('linear-gradient(to bottom right,#000000 0%,#ffffff 50%) 100% 100%/50% 50% no-repeat');
+    expect(html).toContain('linear-gradient(to top left,#000000 0%,#ffffff 50%) 0% 0%/50% 50% no-repeat');
+  });
+
+  it('on a shape both paint through the outline, like a picture', () => {
+    const { defs, body } = svgFills(stack([{ type: 'angular-gradient', stops }, { type: 'diamond-gradient', stops }]), paint, PATHS, 'nonzero');
+    expect(defs.match(/<clipPath/g)).toHaveLength(2);
+    expect(body).toContain('conic-gradient');
+    expect(body).toContain('to bottom right');
+  });
+
+  it('on text an angular is one conic layer and a diamond four corner layers', () => {
+    expect(textPaint(stack([{ type: 'angular-gradient', stops }]), paint.color, paint.asset).backgroundImage).toContain('conic-gradient(from 0deg at 50% 50%');
+    const diamond = textPaint(stack([{ type: 'diamond-gradient', stops }]), paint.color, paint.asset);
+    expect(diamond.backgroundImage.split('linear-gradient')).toHaveLength(5);
+    expect(diamond.backgroundSize).toBe('50% 50%,50% 50%,50% 50%,50% 50%');
+    expect(diamond.backgroundBlendMode.split(',')).toHaveLength(4);
+  });
+
+  it('a stroke refuses them, since an outline cannot carry them', () => {
+    expect(strokePaintSchema.safeParse({ type: 'angular-gradient', stops }).success).toBe(false);
+    expect(strokePaintSchema.safeParse({ type: 'linear-gradient', stops }).success).toBe(true);
   });
 });
