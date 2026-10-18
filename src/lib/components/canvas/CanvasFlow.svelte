@@ -892,7 +892,7 @@
   onpointercancel={endPress}
   onpointerleave={() => onPointer?.(null)}
   ondragover={onDragOver}
-  ondrop={onDrop}
+  ondrop={spec.chrome ? onDrop : undefined}
 >
   <!--
     I gesti che ci si aspetta da una tela, e qui sono quattro flag: due dita spostano
