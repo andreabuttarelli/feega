@@ -22,7 +22,7 @@ async function positions(admin: SupabaseClient, canvasId: string) {
   return new Map((data ?? []).map((n) => [n.id, { x: Number(n.x), y: Number(n.y) }]));
 }
 
-test.describe('Figma arrange on the canvas @real', () => {
+test.describe('arrange on the canvas @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
   test('right-click aligns tiles, ⌃⌥T tidies them, a drag snaps with a guide', async ({ page, session, admin, seedNode }) => {

@@ -78,7 +78,7 @@ import { restackAskSchema, restackNodes } from '$lib/server/canvas/restack-nodes
 import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
-import { MOVE_STATUS, MoveOutcome, canvasBoxSchema, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -1123,6 +1123,16 @@ export const actions: Actions<CanvasParams> = {
       return fail(400, { error: 'spostamento non valido' });
     }
     return movedAnswer(await moveElement(canvasFrames(scope), ask.data));
+  },
+
+  copyElement: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = moveAskSchema.safeParse({ sourceNodeId: fd.get('source'), clipId: fd.get('clip'), drop: jsonField(fd, 'drop') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid paste' });
+    }
+    return movedAnswer(await copyElement(canvasFrames(scope), ask.data));
   },
 
   moveFree: async ({ request, params, locals }) => {
