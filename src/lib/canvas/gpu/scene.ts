@@ -128,6 +128,7 @@ export class GpuScene {
   private wiresIn: Wire[] = [];
   private overlayIn: Overlay | null = null;
   onFrame: ((ms: number) => void) | null = null;
+  onLost: (() => void) | null = null;
   onReady: ((drawn: Set<string>) => void) | null = null;
   private ready = new Set<string>();
   private retiring = new Map<string, Built>();
@@ -142,7 +143,29 @@ export class GpuScene {
     this.textures = createTextureCache(() => this.invalidate());
     this.world.addChild(this.wires, this.cardLayer, this.overlay, this.peerLayer);
     app.stage.addChild(this.grid, this.world);
+    this.watchLoss();
     this.loop();
+  }
+
+  private watchLoss() {
+    const lost = () => this.onLost?.();
+    if (this.backend === Backend.WebGPU) {
+      void (this.app.renderer as unknown as { gpu: { device: GPUDevice } }).gpu.device.lost.then(lost);
+      return;
+    }
+    this.app.canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      lost();
+    });
+  }
+
+  loseForTest() {
+    if (this.backend === Backend.WebGPU) {
+      (this.app.renderer as unknown as { gpu: { device: GPUDevice } }).gpu.device.destroy();
+      return;
+    }
+    const gl = (this.app.renderer as unknown as { gl: WebGL2RenderingContext }).gl;
+    gl.getExtension('WEBGL_lose_context')?.loseContext();
   }
 
   static async create(host: HTMLElement, preference: Backend, theme: Theme): Promise<GpuScene> {
@@ -245,6 +268,7 @@ export class GpuScene {
 
   destroy() {
     cancelAnimationFrame(this.frame);
+    this.onLost = null;
     for (const id of [...this.built.keys()]) {
       this.drop(id);
     }

@@ -1,6 +1,6 @@
 const KEEP = 600;
 
-type Stats = { render: number[]; pending?: number };
+type Stats = { render: number[]; pending?: number; loseDevice?: () => void };
 
 declare global {
   interface Window {
@@ -19,4 +19,9 @@ export function recordFrame(ms: number) {
 export function reportPending(count: number) {
   const stats = (window.__gpuCanvas ??= { render: [] });
   stats.pending = count;
+}
+
+export function exposeLoss(lose: () => void) {
+  const stats = (window.__gpuCanvas ??= { render: [] });
+  stats.loseDevice = lose;
 }

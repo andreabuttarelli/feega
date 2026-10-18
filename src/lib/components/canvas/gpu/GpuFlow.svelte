@@ -48,8 +48,9 @@
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { GpuScene, themeOf, type Card, type Wire } from '$lib/canvas/gpu/scene';
+  import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
-  import { recordFrame } from '$lib/canvas/gpu/frame-stats';
+  import { exposeLoss, recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
   import { domPainted } from '$lib/canvas/gpu/paint';
   import { NameTag } from '$lib/canvas/node-label';
@@ -967,27 +968,46 @@
       built?.resize();
       area = { width: surface!.clientWidth, height: surface!.clientHeight };
     });
-    GpuScene.create(surface!, backendOf(page.url), themeOf(wrap!))
-      .then((s) => {
-        if (!alive) {
-          s.destroy();
-          return;
-        }
-        built = s;
-        s.onFrame = recordFrame;
-        s.onReady = (shown) => (drawn = shown);
-        scene = s;
-        props.onFlow?.(toFlow);
-        observer.observe(surface!);
-        if (tiles.length) {
-          fitted = true;
-          view = fitView(tiles);
-        }
-      })
-      .catch((err: unknown) => {
-        failed = err instanceof Error ? err.message : String(err);
-        props.onfail?.(failed);
-      });
+    const start = (backend: Backend) =>
+      GpuScene.create(surface!, backend, themeOf(wrap!))
+        .then((s) => {
+          if (!alive) {
+            s.destroy();
+            return;
+          }
+          built = s;
+          s.onFrame = recordFrame;
+          s.onReady = (shown) => (drawn = shown);
+          s.onLost = () => recover(s);
+          exposeLoss(() => s.loseForTest());
+          scene = s;
+          props.onFlow?.(toFlow);
+          observer.observe(surface!);
+          if (!fitted && tiles.length) {
+            fitted = true;
+            view = fitView(tiles);
+          }
+        })
+        .catch((err: unknown) => {
+          failed = err instanceof Error ? err.message : String(err);
+          props.onfail?.(failed);
+        });
+    const recover = (lost: GpuScene) => {
+      const next = nextBackend(lost.backend);
+      scene = null;
+      built = null;
+      try {
+        lost.destroy();
+      } catch {
+        lost.canvas.remove();
+      }
+      if (!next) {
+        props.onfail?.('GPU context lost');
+        return;
+      }
+      void start(next);
+    };
+    void start(backendOf(page.url));
     return () => {
       alive = false;
       observer.disconnect();
