@@ -69,7 +69,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   createFormats: canvas('create_formats'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),
-  drawFrame: canvas('create_node'),
+  drawFrame: canvas('draw_frame'),
   moveFree: canvas('move_frame_element'),
   copyFree: canvas('copy_frame_element'),
   groupElements: canvas('group_elements'),

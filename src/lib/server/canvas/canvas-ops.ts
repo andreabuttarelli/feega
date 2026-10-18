@@ -24,7 +24,7 @@ import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPU
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
-import { MoveOutcome, drawElement, drawnSchema, dropFor, frameAnswer, frameStore, linkFrame, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
+import { MoveOutcome, drawElement, drawFrameAt, drawnSchema, dropFor, frameAnswer, frameStore, linkFrame, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
 import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
@@ -48,7 +48,8 @@ import { CANVAS_TEMPLATES } from '$lib/canvas/templates';
 import { WIRE_MODES } from '$lib/canvas-edges';
 import { cancelWorkflow, enqueueWorkflow, planWorkflowDryRun, workflowCredits } from '$lib/server/canvas/workflow';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
-import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
+import { motionNodeSize } from '$lib/canvas/motion-node';
 import { cancelRender } from '$lib/server/motion/render-run';
 import { motionRenderFarm } from '$lib/server/motion/renderer';
 import { withdrawFromGallery } from '$lib/server/gallery/publish';
@@ -170,6 +171,34 @@ const placeInFrameInput = z.object({ nodeId: z.string().describe('the Generate i
 const drawElementInput = z
   .object({ canvasId: z.string(), drawn: drawnSchema.describe('{tool:text|rectangle|ellipse, box:{left,top,width,height}}, or {tool:pen, path:SVG d}, in canvas units') })
   .strict();
+
+const drawFrameInput = z
+  .object({
+    canvasId: z.string(),
+    x: z.number().finite(),
+    y: z.number().finite(),
+    w: z.number().positive(),
+    h: z.number().positive().optional(),
+    format: z.enum(MOTION_FORMATS).optional()
+  })
+  .strict()
+  .refine((a) => a.h !== undefined || (a.format && a.format !== MotionFormat.Custom), 'h or a preset');
+
+function frameBox(input: z.infer<typeof drawFrameInput>) {
+  const preset = input.format && input.format !== MotionFormat.Custom ? FORMATS[input.format] : null;
+  const height = preset ? (input.w * preset.height) / preset.width : (input.h as number);
+  return { left: input.x, top: input.y, width: input.w, height };
+}
+
+const MOTION_TYPE = 'motion';
+
+const createdSize = (type: string, data: Record<string, unknown>) => {
+  if (type !== MOTION_TYPE) {
+    return {};
+  }
+  const size = motionNodeSize(MOTION_FORMATS.find((f) => f === data.format) ?? MotionFormat.Vertical);
+  return { width: size.w, height: size.h };
+};
 
 const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(2).max(50).describe('free elements on the canvas (frame nodes with data.kind element)') }).strict();
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
@@ -426,6 +455,7 @@ export const CANVAS_OPS = {
         y: input.y,
         displayName: input.displayName ?? null,
         data: verdict.data,
+        ...createdSize(input.type, verdict.data),
         actor: ctx.actor
       });
       return { outcome: 'written', node };
@@ -597,6 +627,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: drawElementInput,
     run: async (ctx, input) => frameAnswer(await drawElement(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, input.drawn))
+  }),
+
+  draw_frame: op({
+    access: Access.Write,
+    input: drawFrameInput,
+    run: async (ctx, input) => frameAnswer(await drawFrameAt(framesOf(ctx), { projectId: ctx.projectId, canvasId: input.canvasId }, frameBox(input), input.format))
   }),
 
   group_elements: op({

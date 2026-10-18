@@ -1,11 +1,11 @@
 import type { Db } from '$lib/server/db/client';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { findBrandLook } from '$lib/server/repos/brands';
-import { DataCheck, findNode, patchNodeData, type CanvasNodeRecord } from '$lib/server/repos/canvas';
+import { DataCheck, findNode, patchNodeData, resizeNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { appendRevision, readHead, RevisionOutcome, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
 import type { Actor } from '$lib/server/repos/actor';
 import { createAssetSigningDb, signAssetPaths } from '$lib/server/canvas/sign-media';
-import { motionOf, type MotionNode } from '$lib/canvas/motion-node';
+import { docNodeSize, motionOf, type MotionNode } from '$lib/canvas/motion-node';
 import { formatOf, newMotionDoc, type MotionDoc } from '$lib/motion/doc';
 import { AssetKind } from '$lib/motion/components';
 import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '$lib/motion/brand';
@@ -115,12 +115,23 @@ export async function saveMotionDoc(
     return write;
   }
 
-  await patchNodeData(db, {
+  const patched = await patchNodeData(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,
     patch: { docHeadRevision: write.head.version, format: formatOf(write.head.doc as MotionDoc) },
     check: DataCheck.Schema,
     actor: input.actor
   });
+  if (patched.outcome === 'written') {
+    await followDoc(db, input.orgId, patched.node, write.head.doc as MotionDoc);
+  }
   return write;
+}
+
+async function followDoc(db: Db, orgId: string, record: CanvasNodeRecord, doc: MotionDoc): Promise<void> {
+  const node = motionOf(record);
+  const size = node ? docNodeSize({ kind: node.kind, ...record.size }, doc) : null;
+  if (size) {
+    await resizeNode(db, { orgId, nodeId: record.id, width: size.w, height: size.h });
+  }
 }
