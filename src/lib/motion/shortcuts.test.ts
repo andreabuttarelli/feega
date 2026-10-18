@@ -222,7 +222,7 @@ describe('sibling keys', () => {
   });
 });
 
-describe('Figma align keys', () => {
+describe('align keys', () => {
   it('⌥A ⌥H ⌥D ⌥W ⌥V ⌥S align, ⌃⌥T tidies up, by physical key', () => {
     expect(press('å', { alt: true, code: 'KeyA' })).toBe(Command.AlignLeft);
     expect(press('˙', { alt: true, code: 'KeyH' })).toBe(Command.AlignCenter);
