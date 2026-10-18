@@ -6,6 +6,11 @@ export type StepResult = { name: string; facts: StepFacts | null; error: string 
 export type SessionRun = { browser: string; renderer: string; variant: string; steps: StepResult[]; mockedCalls: number; at: string };
 
 const GATED_FRAME_TIME = new Set(['chromium']);
+const VIDEO_KEEPS_FRAME_RATE = new Set(['chromium']);
+
+export function recordsVideo(browser: string): boolean {
+  return VIDEO_KEEPS_FRAME_RATE.has(browser);
+}
 
 export function failuresOf(step: StepResult, browser = 'chromium'): string[] {
   if (step.error) {
