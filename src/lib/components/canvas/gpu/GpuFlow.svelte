@@ -13,6 +13,9 @@
   import NodeBoundary from '../NodeBoundary.svelte';
   import EdgePanel from '../EdgePanel.svelte';
   import GpuTileChrome from './GpuTileChrome.svelte';
+  import RendererBadge from './RendererBadge.svelte';
+  import { dev } from '$app/environment';
+  import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
@@ -52,10 +55,10 @@
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
   import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
-  import { PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
+  import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
-  import { GpuScene, themeOf, type Card, type Wire } from '$lib/canvas/gpu/scene';
+  import { GpuScene, themeOf, type Card } from '$lib/canvas/gpu/scene';
   import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { exposeLoss, recordFrame } from '$lib/canvas/gpu/frame-stats';
@@ -92,6 +95,7 @@
   let surface = $state<HTMLDivElement | null>(null);
   let scene = $state<GpuScene | null>(null);
   let failed = $state<string | null>(null);
+  let lossNote = $state<string | null>(null);
   let view = $state<Viewport>({ x: 0, y: 0, zoom: 1 });
   let area = $state({ width: 0, height: 0 });
   let selected = $state<string[]>([]);
@@ -169,7 +173,22 @@
     }, SHELF_TICK_MS);
     return () => clearInterval(timer);
   });
-  const domIds = $derived(new Set([...editIds, ...sticky.keys(), ...shelf, ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)]));
+  const kept = new Set<string>();
+  const domIds = $derived.by(() => {
+    const now = [...editIds, ...sticky.keys(), ...shelf, ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)];
+    for (const id of now) {
+      kept.add(id);
+    }
+    const alive = new Set(placed.map((t) => t.id));
+    for (const id of [...kept]) {
+      if (!alive.has(id)) {
+        kept.delete(id);
+      }
+    }
+    return sameSet(lastDom, kept) ? lastDom : (lastDom = new Set(kept));
+  });
+  let lastDom = new Set<string>();
+  const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
 
   function portFor(nodeId: string, side: PortSide, handle: string | null | undefined): Port | null {
     const own = ports.filter((p) => p.nodeId === nodeId && p.side === side);
@@ -180,7 +199,7 @@
     edges.flatMap((e) => {
       const from = portFor(e.source, PortSide.Out, e.sourceHandle);
       const to = portFor(e.target, PortSide.In, e.targetHandle);
-      return from && to ? [{ edge: e, curve: wireCurve(from, to) }] : [];
+      return from && to ? [{ edge: e, curve: wireCurve({ x: from.x + PORT_OFFSET, y: from.y }, { x: to.x - PORT_OFFSET, y: to.y }) }] : [];
     })
   );
 
@@ -199,17 +218,6 @@
     )
   );
 
-  const wires = $derived(
-    curves.map(
-      (c): Wire => ({
-        id: c.edge.id,
-        curve: c.curve,
-        iterate: (c.edge.mode ?? 'fixed') === 'iterate',
-        selected: c.edge.id === selectedEdge || selected.includes(c.edge.source) || selected.includes(c.edge.target)
-      })
-    )
-  );
-
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && spec.flow.nodesDraggable);
 
@@ -223,10 +231,6 @@
     const css = wrap ? getComputedStyle(wrap) : null;
     const level = (name: string) => Number(css?.getPropertyValue(name) || 1);
     scene?.setDim(editing ? { body: level('--neighbour-body'), edges: level('--neighbour-edges') } : null);
-  });
-
-  $effect(() => {
-    scene?.setWires(wires);
   });
 
   $effect(() => {
@@ -1055,6 +1059,7 @@
           s.onLost = () => recover(s);
           exposeLoss(() => s.loseForTest());
           scene = s;
+          console.info(`[canvas] renderer ${s.backend}`);
           props.onFlow?.(toFlow);
           observer.observe(surface!);
           if (!fitted && tiles.length) {
@@ -1068,6 +1073,8 @@
         });
     const recover = (lost: GpuScene) => {
       const next = nextBackend(lost.backend);
+      console.warn(`[canvas] ${lost.backend} context lost → ${next ?? 'dom'}`);
+      lossNote = `${lost.backend} lost`;
       scene = null;
       built = null;
       try {
@@ -1124,10 +1131,13 @@
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" aria-hidden="true">
         {#each curves as c (c.edge.id)}
-          <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
+          <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} class:iterate={(c.edge.mode ?? 'fixed') === 'iterate'} class:linked={selected.includes(c.edge.source) || selected.includes(c.edge.target)} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
             <path class="svelte-flow__edge-path" d={`M${c.curve.from.x},${c.curve.from.y} C${c.curve.c1.x},${c.curve.c1.y} ${c.curve.c2.x},${c.curve.c2.y} ${c.curve.to.x},${c.curve.to.y}`} />
             {#if (c.edge.mode ?? 'fixed') === 'iterate'}
-              <g data-testid="wire-iterate-icon"></g>
+              <g class="wire-iterate-badge" data-testid="wire-iterate-icon" transform={`translate(${c.curve.mid.x} ${c.curve.mid.y})`}>
+                <circle r="11" />
+                <Repeat x={-7} y={-7} width={14} height={14} />
+              </g>
             {/if}
           </g>
         {/each}
@@ -1182,6 +1192,10 @@
   {/if}
 
   <PageZoomLock zoom={pageZoom} />
+
+  {#if dev}
+    <RendererBadge renderer={scene?.backend ?? 'starting'} reason={lossNote} />
+  {/if}
 
   {#if refusal}
     <p class="edge-refusal" role="status">{refusal}</p>
@@ -1321,7 +1335,28 @@
 
   .gpu-edges path {
     fill: none;
-    stroke: transparent;
+    stroke: color-mix(in srgb, var(--ink-soft, #6e6e73) 45%, var(--paper, #fff));
+    stroke-width: 1;
+  }
+
+  .gpu-edges .linked path,
+  .gpu-edges .selected path {
+    stroke: var(--ink-soft, #6e6e73);
+  }
+
+  .gpu-edges .iterate path {
+    stroke: var(--ui-wire-iterate);
+    stroke-dasharray: 6 4;
+  }
+
+  .wire-iterate-badge circle {
+    fill: var(--ui-panel-raised);
+    stroke: var(--ui-wire-iterate);
+    stroke-width: 1.5;
+  }
+
+  .wire-iterate-badge :global(svg) {
+    color: var(--ui-wire-iterate);
   }
 
   .frame-standin {
@@ -1342,6 +1377,7 @@
   .gpu-dom-node {
     position: absolute;
     inset: 0;
+    content-visibility: auto;
     user-select: text;
   }
 
@@ -1363,6 +1399,7 @@
   .gpu-dom-node {
     position: absolute;
     inset: 0;
+    content-visibility: auto;
     user-select: text;
   }
 
