@@ -35,7 +35,15 @@
   import { focusEdges } from '$lib/canvas/edge-focus';
   import { reportHref } from '$lib/reports/report-link';
   import { GraphScope } from '$lib/canvas/run-graph';
-  import type { SelectionActionId } from '$lib/canvas/selection-actions';
+  import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { tilesAt } from '$lib/canvas/tiles-at';
+  import { tileGaps } from '$lib/canvas/measure';
+  import { snapDrag, type SnapGuide } from '$lib/canvas/snap';
+  import { enterFrame } from '$lib/canvas/enter-frame';
+  import { Direction, siblingOf } from '$lib/motion/siblings';
+  import type { Edge } from '$lib/motion/space';
+  import MeasureLayer from '../MeasureLayer.svelte';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
   import type { GenMedium } from '$lib/canvas/gen-node';
   import type { CanvasEdgeKind, FlowEdge, WireMode } from '$lib/canvas-edges';
@@ -53,7 +61,7 @@
   import { exposeLoss, recordFrame } from '$lib/canvas/gpu/frame-stats';
   import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
   import { domPainted } from '$lib/canvas/gpu/paint';
-  import { NameTag } from '$lib/canvas/node-label';
+  import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
   let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void } = $props();
@@ -555,7 +563,8 @@
           }
         }
         const next = new Map(overrides);
-        const moved = movedBy(a.origins, { x: w.x - a.start.x, y: w.y - a.start.y });
+        const raw = movedBy(a.origins, { x: w.x - a.start.x, y: w.y - a.start.y });
+        const moved = snapMoves(raw);
         const all = new Map(tiles.map((t) => [t.id, { x: t.x, y: t.y }]));
         const follow = moved.flatMap((m) => followGroup(all, m.id, m, byId.get(m.id)?.members ?? []));
         for (const m of [...moved, ...follow]) {
@@ -711,6 +720,7 @@
   }
 
   function endDrag(ids: string[], e: PointerEvent) {
+    snapGuides = [];
     props.onLive?.([]);
     if (props.onTileDrop?.(ids, pointOf(e)) === DropVerdict.Taken) {
       settleOverrides();
@@ -743,10 +753,60 @@
     view = panBy(view, { x: -e.deltaX, y: -e.deltaY });
   }
 
+
+  const SNAP_SCREEN_PX = 6;
+  let snapGuides = $state<SnapGuide[]>([]);
+  let altHeld = $state(false);
+
+  function snapMoves(raw: TileMove[]): TileMove[] {
+    const ids = new Set(raw.map((m) => m.id));
+    const rects = raw.flatMap((m) => (byId.get(m.id) ? [{ id: m.id, x: m.x, y: m.y, w: byId.get(m.id)!.w, h: byId.get(m.id)!.h }] : []));
+    const others = tiles.filter((t) => !ids.has(t.id)).map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }));
+    const snap = snapDrag(rects, others, SNAP_SCREEN_PX / view.zoom);
+    snapGuides = snap.guides;
+    const at = new Map(snap.moves.map((m) => [m.id, m]));
+    return raw.map((m) => at.get(m.id) ?? m);
+  }
+
+  const measured = $derived.by(() => {
+    const over = hovered && altHeld ? byId.get(hovered) : null;
+    return over ? tileGaps(selectedBoxes, over) : [];
+  });
+
+  const placedBoxes = (ids: string[]) => ids.flatMap((id) => (byId.get(id) ? [{ id, x: byId.get(id)!.x, y: byId.get(id)!.y, width: byId.get(id)!.w, height: byId.get(id)!.h }] : []));
+
+  function placeTiles(moves: TileMove[]) {
+    if (!moves.length) {
+      return;
+    }
+    for (const m of moves) {
+      props.onMove?.(m.id, m.x, m.y);
+    }
+    props.onMoveEnd?.(moves);
+  }
+
+  const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));
+  const alignRun = (id: AlignActionId) => (ids: string[]) => alignSelection(ids, ALIGN_EDGE[id]);
+
+  function selectSibling(direction: Direction) {
+    const next = siblingOf(placed.map((t) => t.id), selected, direction);
+    if (next) {
+      select([next]);
+    }
+  }
+
+  let menuLayers = $state<{ id: string; label: string }[]>([]);
+  const tileLabel = (t: Tile) => t.displayName || NODE_KIND_LABEL[t.kind as keyof typeof NODE_KIND_LABEL] || t.kind || t.id;
+
+  function layersAt(at: Point): { id: string; label: string }[] {
+    return tilesAt(placed, toFlow(at)).flatMap((id) => (byId.get(id) ? [{ id, label: tileLabel(byId.get(id)!) }] : []));
+  }
+
   function openMenu(id: string, at: Point) {
     if (!selected.includes(id)) {
       select([id]);
     }
+    menuLayers = layersAt(at);
     menuAt = at;
   }
 
@@ -762,6 +822,7 @@
     }
     if (selected.length) {
       menuAt = { x: e.clientX, y: e.clientY };
+      menuLayers = layersAt(menuAt);
     }
   }
 
@@ -812,6 +873,16 @@
   const KEY_RUN: Record<CanvasCommand['id'], (c: CanvasCommand) => void> = {
     add: (c) => c.id === 'add' && addAtCentre(c.what),
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
+    align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
+    tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
+    enter: () => {
+      const only = selected.length === 1 ? selected[0] : null;
+      if (only) {
+        enterFrame(only, String(summaries.get(only)?.data.kind ?? '') || undefined);
+      }
+    },
+    'select-next': () => selectSibling(Direction.Next),
+    'select-previous': () => selectSibling(Direction.Previous),
     tool: (c) => {
       if (c.id === 'tool') {
         frameBar.tool = c.tool;
@@ -840,6 +911,7 @@
   };
 
   function onKeydown(e: KeyboardEvent) {
+    altHeld = e.altKey;
     if (e.key === ' ' && !(e.target as HTMLElement).closest?.(INTERACTIVE)) {
       space = true;
     }
@@ -862,7 +934,9 @@
     KEY_RUN[command.id](command);
   }
 
-  const SELECTION_RUN: Record<SelectionActionId, (ids: string[]) => void> = {
+  const SELECTION_RUN: Record<CanvasActionId, (ids: string[]) => void> = {
+    'tidy-up': (ids) => placeTiles(tidyTiles(placedBoxes(ids))),
+    ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => props.onDuplicate?.(ids),
     'connect-new': () => {
       if (selection.box) {
@@ -887,7 +961,7 @@
   };
 
   function runSelectionAction(id: SelectionActionId) {
-    if (selected.length) {
+    if (selected.length && isCanvasAction(id)) {
       SELECTION_RUN[id](selected);
     }
   }
@@ -1025,7 +1099,12 @@
   const domTiles = $derived(placed.filter((t) => domIds.has(t.id)));
 </script>
 
-<svelte:window onkeydown={onKeydown} onkeyup={(e) => e.key === ' ' && (space = false)} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
+<svelte:window onkeydown={onKeydown} onblur={() => (altHeld = false)} onkeyup={(e) => {
+  altHeld = e.altKey;
+  if (e.key === ' ') {
+    space = false;
+  }
+}} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="wrap svelte-flow" bind:this={wrap} ondragover={onDragOver} ondrop={onDrop} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-view={`${view.x},${view.y},${view.zoom}`}>
@@ -1091,6 +1170,9 @@
         </div>
       {/each}
       <PeerLayer peers={props.peers ?? []} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
+      {#if measured.length || snapGuides.length}
+        <MeasureLayer gaps={measured} guides={snapGuides} zoom={view.zoom} />
+      {/if}
     </div>
   </div>
 
@@ -1156,7 +1238,7 @@
   {/if}
 
   {#if menuAt && spec.chrome}
-    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} onpick={runSelectionAction} onclose={() => (menuAt = null)} />
+    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} available={canvasMenuIds(selected.length)} layers={menuLayers} onpick={runSelectionAction} onlayer={(id) => select([id])} onclose={() => (menuAt = null)} />
   {/if}
 
   {#if connectPickerAt}
