@@ -35,9 +35,10 @@ export function orgHint(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-export function chooseWorkspace(orgId: string): void {
+export async function chooseWorkspace(orgId: string): Promise<void> {
   document.cookie = `${ORG_COOKIE}=${encodeURIComponent(orgId)}; path=/; max-age=${ORG_COOKIE_MAX_AGE_S}; samesite=lax`;
   cache.clear();
+  await call('/api/v1/orgs/active', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ org_id: orgId }) });
 }
 
 function withOrg(path: string, query: URLSearchParams = new URLSearchParams()): string {
