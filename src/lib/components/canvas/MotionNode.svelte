@@ -19,7 +19,7 @@
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { Background, FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
-  import { NodeMode, Paint, Under, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
+  import { NodeMode, Paint, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
   import { DRAWN_EVENT } from '$lib/motion/hyperframes/measure';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
@@ -60,7 +60,7 @@
   const layers = $derived(nodeLayers(nodeMode, paint));
   const chrome = $derived(frameChrome(node.kind));
   const previewing = $derived(nodeMode === NodeMode.Preview);
-  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending && chrome.under === Under.Released));
+  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending));
   const liveTile = $derived(liveHere && (!!local || node.docHeadRevision > 0) && (!previewing || tiles.live(node.id)));
   const capturable = $derived(nodeMode !== NodeMode.Edit && !liveTile);
   let ownDrawn = $state(false);
@@ -69,7 +69,7 @@
   let loadedPoster = $state<string | null>(null);
   const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster && loadedPoster === poster));
   const playerUp = $derived(mounted && !!preview);
-  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile, chrome.under));
+  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));
