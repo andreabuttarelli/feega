@@ -3,6 +3,8 @@ import { editAt, valueAt } from './inspector';
 import { withParams } from './custom/params';
 import type { KeyValue } from './keyframes';
 import { setKeyframes, type OpResult } from './timeline';
+import { VideoControl, controlShown } from './still';
+import { timelineFits } from './editor-mount';
 
 export enum EditMode {
   Design = 'design',
@@ -43,3 +45,7 @@ const NEXT: Record<EditMode, EditMode> = { [EditMode.Design]: EditMode.Motion, [
 export const nextMode = (mode: EditMode): EditMode => NEXT[mode];
 
 export const readMode = (stored: string | null): EditMode => (Object.values(EditMode) as string[]).includes(stored ?? '') ? (stored as EditMode) : EditMode.Motion;
+
+export function startMode(doc: MotionDoc, stored: string | null): EditMode {
+  return controlShown(doc, VideoControl.EditMode) && timelineFits(doc) ? readMode(stored) : EditMode.Design;
+}
