@@ -7,7 +7,7 @@ const ORG = 'org-1';
 const NODE = 'node-1';
 const BLOCKED_WORD = 'zqxforbidden';
 
-const state = vi.hoisted(() => ({ writeAllowed: true, db: null as unknown, screened: [] as string[][], assetsAsked: () => {}, nodeAfter: Promise.resolve() as Promise<unknown>, projectAfter: Promise.resolve() as Promise<unknown> }));
+const state = vi.hoisted(() => ({ writeAllowed: true, db: null as unknown, screened: [] as string[][], rows: [] as Record<string, unknown>[], assetsAsked: () => {}, nodeAfter: Promise.resolve() as Promise<unknown>, projectAfter: Promise.resolve() as Promise<unknown> }));
 
 vi.mock('$lib/server/org-data/auth', () => ({ resolveOrgCaller: async () => ({ caller: { db: state.db, orgId: ORG, userId: 'u-1', writeAllowed: state.writeAllowed } }) }));
 vi.mock('$lib/server/repos/motion-templates', () => ({ listOrgTemplates: async () => [], insertOrgTemplate: vi.fn(), deleteOrgTemplate: vi.fn() }));
@@ -40,6 +40,7 @@ const head = async () => (await readHead(state.db as never, { orgId: ORG, nodeId
 beforeEach(async () => {
   const fake = revisionsDb();
   state.db = fake.db;
+  state.rows = fake.rows;
   state.writeAllowed = true;
   state.screened = [];
   state.nodeAfter = Promise.resolve();
@@ -83,6 +84,15 @@ describe('POST /api/v1/motion/:node/tools runs one motion tool of the chat agent
     await post(NODE, { tool: 'set_work_area', input: { start: 0, end: 1 } });
 
     expect(patchNodeData).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ known: expect.objectContaining({ id: NODE, version: 1 }) }));
+  });
+
+  it('a stream of ops by the agent folds into one checkpoint, the version still moves', async () => {
+    await post(NODE, { tool: 'set_work_area', input: { start: 0, end: 1 } });
+    await post(NODE, { tool: 'set_work_area', input: { start: 0, end: 2 } });
+    const third = await (await post(NODE, { tool: 'set_work_area', input: { start: 0, end: 1 } })).json();
+
+    expect(third.version).toBe(4);
+    expect(state.rows.map((r) => [r.version, r.actor_kind])).toEqual([[1, 'user'], [4, 'agent']]);
   });
 
   it('a read tool answers and saves nothing', async () => {

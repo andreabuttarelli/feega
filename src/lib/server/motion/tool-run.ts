@@ -3,7 +3,7 @@ import { nameVersion, namedRevisions } from './version-names';
 import type { Db } from '$lib/server/db/client';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { agentActor } from '$lib/server/repos/actor';
-import { readRevision } from '$lib/server/repos/motion-revisions';
+import { Checkpoint, readRevision } from '$lib/server/repos/motion-revisions';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { savedMotionWith } from './agent-embed';
@@ -175,7 +175,7 @@ async function commit(db: Db, ready: Prepared, summary: string): Promise<{ versi
   if (session.doc === saved.doc) {
     return { version: saved.version, saved: false };
   }
-  const written = await commitDoc(db, { ...ready.nodeScope, node: saved.node, record: saved.record, base: saved, doc: session.doc, actor: ready.actor, summary: session.edits.join('; ') || summary });
+  const written = await commitDoc(db, { ...ready.nodeScope, node: saved.node, record: saved.record, checkpoint: Checkpoint.Coalesce, base: saved, doc: session.doc, actor: ready.actor, summary: session.edits.join('; ') || summary });
   if (written.outcome === OpsOutcome.Invalid) {
     return { outcome: ToolRun.Invalid, detail: written.error };
   }
