@@ -207,6 +207,12 @@ describe('mask keys', () => {
   });
 });
 
+describe('pixel grid key', () => {
+  it("⇧' shows or hides the pixel grid", () => {
+    expect(press('"', { shift: true, code: 'Quote' })).toBe(Command.TogglePixelGrid);
+  });
+});
+
 describe('select matching key', () => {
   it('⌥⌘A selects every layer like the selected ones', () => {
     expect(press('å', { mod: true, alt: true, code: 'KeyA' })).toBe(Command.SelectMatching);

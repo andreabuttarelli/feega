@@ -77,6 +77,8 @@
   import type { Boxes } from '$lib/motion/scene-select';
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
+  import { GridToggle, flipGrid } from '$lib/motion/pixel-grid';
   import { Flip, flipClips } from '$lib/motion/layer-props';
   import { matchingLayers } from '$lib/motion/select-matching';
   import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
@@ -263,6 +265,7 @@
   let selectedPart = $state<string | null>(null);
   let partsByClip = $state.raw<Record<string, string[]>>({});
   let stageBoxes = $state.raw<Boxes>({});
+  let pixelGrid = $state(GridToggle.On);
   let viewportH = $state(0);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
@@ -1561,6 +1564,7 @@
     [Command.ToggleChat]: () => CHAT_TOGGLE[chatPlace](),
     [Command.ToggleInspector]: toggleInspector,
     [Command.ToggleTimeline]: () => relayout(toggleTimeline(layout)),
+    [Command.TogglePixelGrid]: () => (pixelGrid = flipGrid(pixelGrid)),
     [Command.Help]: () => (helpOpen = !helpOpen),
     [Command.Precompose]: precomposeSelection,
     [Command.Group]: groupSelection,
@@ -1972,6 +1976,7 @@
       <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
+        {#if !playing}<PixelGridOverlay width={doc.width} height={doc.height} toggle={pixelGrid} />{/if}
         {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
         {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
