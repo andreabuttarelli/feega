@@ -163,6 +163,10 @@ import { liftElement, type Element } from '$lib/motion/move-element';
 import { MoveOutcome, type FrameTarget, type Moved } from './move-element';
 import { IMAGE_FORMATS, IMAGE_SCALES, ImageFormat, ImageScale, stillExport, type StillExport } from '$lib/motion/still-model';
 import type { BreakdownAnswer } from '$lib/server/video-reference';
+import { guessedAdvance, measureText, type Advance, type TextLook } from '$lib/motion/text-measure';
+import { isText } from '$lib/motion/layout/text-extent';
+import { outlineUrl } from '$lib/motion/fonts/outline';
+import { pivotBox } from '$lib/motion/parent';
 import { unitOf, propsOwner, shownKeyframes, shownMask, shownOffset, shownRecord, storedMask, storedOffset, storedRecord, toShown, toStored, type Owner } from '$lib/motion/units';
 
 const COPY_SLOTS: ReadonlySet<string> = new Set(['text', 'lines', 'before_text']);
@@ -190,6 +194,7 @@ export type MotionToolDeps = {
   music?: (input: { mood: Mood; bpm?: number; seconds: number }) => Promise<Music>;
   sfx?: (sfx: Sfx) => Promise<SfxAsset>;
   frames: (callId: string, times: number[]) => Promise<Frame[] | null>;
+  fontAdvance?: (fontUrl: string) => Promise<Advance | null>;
   inspect?: (frames: Frame[]) => Promise<FrameStat[]>;
   seam?: () => Promise<number | null>;
   check: (callId: string, doc: MotionDoc, name: string) => Promise<CheckResult | null>;
@@ -418,6 +423,23 @@ type EffectSpec = z.infer<typeof effectSpec>;
 const PLACED = { track_id: z.string().optional() };
 
 const PLACED_PICTURE = { ...PLACED, effects: z.array(effectSpec).max(MAX_EFFECTS).optional() };
+
+const REGULAR_WEIGHT = 400;
+
+const WRAPS: Partial<Record<ComponentId, (p: Record<string, unknown>) => boolean>> = { Text: (p) => p.sizing !== 'auto' };
+const CAPITALS: Partial<Record<ComponentId, true>> = { Kicker: true };
+
+function textLook(component: ComponentId, p: Record<string, unknown>): TextLook {
+  return {
+    text: String(p.text ?? ''),
+    size: Number(p.size ?? 0),
+    tracking: Number(p.tracking ?? 0),
+    leading: Number(p.leading ?? 1),
+    align: (p.align as TextLook['align']) ?? 'left',
+    wraps: WRAPS[component]?.(p) ?? true,
+    capitals: Boolean(CAPITALS[component]) || p.textCase === 'upper'
+  };
+}
 
 const PLACEMENT_HELP = 'track_id puts it on that track (else the first that fits); effects is its effect stack, same kinds and params as add_effect.';
 
@@ -760,6 +782,26 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Read the video being edited: size, duration in seconds, tracks and clips (start/duration in seconds), and the clips the user has selected.',
       inputSchema: z.object({}).strict(),
       execute: async () => docSummary(session.doc, session.selection)
+    }),
+
+    measure_text: tool({
+      description: `The rendered box of a text clip (Title, Text, Kicker, Caption) at rest, in px of the frame: {left, top, width, height} of the ink lines (top-left corner, before transform, keyframes and animators) and the lines as they wrap. Measured with the font file the renderer loads; approximate true means the font could not be read and the box comes from an average glyph width (often 10-20% off). Use it to place things next to text.`,
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => {
+        const clip = findClip(session.doc, input.clip_id)?.clip;
+        if (!clip || !isText(clip.component)) {
+          return { ok: false, error: `${input.clip_id} is not a text clip` };
+        }
+        const shown = shownRecord(propsOwner(clip.component), clip.props, session.doc);
+        const look = textLook(clip.component, shown);
+        const family = String(shown.font ?? BuiltinFont.Sans);
+        const url = outlineUrl(family, Number(shown.weight ?? REGULAR_WEIGHT), session.doc.fonts, {});
+        const exact = url && deps.fontAdvance ? await deps.fontAdvance(url) : null;
+        const box = pivotBox(clip.props, session.doc);
+        const measured = measureText(look, box, exact ?? guessedAdvance(look.capitals));
+        const { lines, ...rect } = measured;
+        return { ok: true, approximate: !exact, box: rect, lines };
+      }
     }),
 
     list_components: tool({

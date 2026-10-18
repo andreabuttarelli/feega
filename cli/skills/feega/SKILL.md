@@ -206,6 +206,9 @@ See a video with `view_motion_frames` (up to 6 times in seconds): the frames com
 images with the quality gate's `quality` and `blocking` notes. Free; look before and after
 `ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`.
 
+`motion_tool` `measure_text {clip_id}` gives a text clip's rendered box in px (top-left, from the
+real font file; `approximate: true` when the font could not be read) to place things next to it.
+
 Every save is a revision. `list_motion_revisions` lists them (who saved, clip count);
 `restore_motion_revision` puts one back as a new revision, history kept. Free. CLI:
 `feega motion revisions <nodeId> [--restore <version>]`.
