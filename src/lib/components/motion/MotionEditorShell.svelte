@@ -96,7 +96,7 @@
   import { Align, addMarker, alignClips, allMarkers, clipName, clipsTo, distributeClips, trimClipsAt, loopFrame, nudgeClips, sequenceClips, setWorkArea, staggerClips } from '$lib/motion/organize';
   import ExportDialog from '$lib/components/motion/ExportDialog.svelte';
   import StillExport from '$lib/components/motion/StillExport.svelte';
-  import { animateStill, DocMode, docMode, stillFrame } from '$lib/motion/still';
+  import { animateStill, controlShown, DocMode, docMode, stillFrame, VideoControl } from '$lib/motion/still';
   import InteractivePanel from '$lib/components/motion/InteractivePanel.svelte';
   import { Liveness, interactiveOf } from '$lib/motion/interactive/settings';
   import { defaultsOf, type VarValues } from '$lib/motion/interactive/var-model';
@@ -946,7 +946,7 @@
 
   const newId = () => crypto.randomUUID().slice(0, 8);
 
-  const timelineHidden = $derived(layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design);
+  const timelineHidden = $derived(layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline));
   $effect(() => (rules.tools === ToolsPlace.CanvasBar ? frameBar.attach({ act: (action) => FRAME_ACTS[action]() }) : undefined));
   let timelineShownPx = $state(0);
   let timelineEl = $state<HTMLElement | null>(null);
@@ -1475,7 +1475,7 @@
   const toggleInspector = () => relayout(docked ? toggleSide(layout, Side.Properties) : { inspector: flip(layout.inspector) });
 
   const COMMANDS: Record<Command, () => void> = {
-    [Command.TogglePlay]: () => (playing = !playing),
+    [Command.TogglePlay]: () => (playing = controlShown(doc, VideoControl.Playback) && !playing),
     [Command.ToolSelect]: () => (frameBar.tool = DrawTool.Select),
     [Command.ToolText]: () => (frameBar.tool = DrawTool.Text),
     [Command.ToolRectangle]: () => (frameBar.tool = DrawTool.Rectangle),
@@ -1495,7 +1495,7 @@
     [Command.Duplicate]: duplicate,
     [Command.Undo]: undoEdit,
     [Command.Redo]: redoEdit,
-    [Command.Play]: () => (playing = true),
+    [Command.Play]: () => (playing = controlShown(doc, VideoControl.Playback)),
     [Command.Pause]: () => (playing = false),
     [Command.Rewind]: () => step(-doc.fps),
     [Command.GoStart]: () => seekTo(0),
@@ -1769,13 +1769,16 @@
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
       <span class="title" title={data.node.name ?? 'Frame'}>{pathNames(history.present, compPath).at(-1) ?? data.node.name ?? 'Frame'}</span>
       <span class="save-dot" data-tone={SAVE_TONE[saveState]} role="status" aria-label={`${saveState} · v${version}`}></span>
+      {#if controlShown(doc, VideoControl.EditMode)}
       <div class="mode-switch" role="radiogroup" aria-label="Edit mode" data-testid="edit-mode" title="Design edits the base, Motion keys at the playhead (E)">
         {#each [EditMode.Design, EditMode.Motion] as m (m)}
           <button type="button" role="radio" aria-checked={editMode === m} class:on={editMode === m} data-mode={m} onclick={() => setMode(m)}>{m === EditMode.Design ? 'Design' : 'Motion'}</button>
         {/each}
       </div>
+      {/if}
     </div>
 
+    {#if controlShown(doc, VideoControl.Transport)}
     <div class="group transport" bind:this={transportEl} {...dockOf(Part.Transport)} role="group" aria-label="Transport">
       <IconButton action={Action.GoStart} onclick={COMMANDS[Command.GoStart]} />
       <IconButton action={Action.StepBack} class="step" onclick={COMMANDS[Command.StepBack]} />
@@ -1796,6 +1799,7 @@
         {/if}
       </div>
     </div>
+    {/if}
 
     <div class="group trail" {...dockOf(Part.Bar)} data-testid="bar-trail">
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
@@ -1949,7 +1953,7 @@
     />
   {/if}
 
-  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
+  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${sideWidth(layout.sidePx, width)}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
     <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
       <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
@@ -2030,7 +2034,7 @@
     {/snippet}
     </SideColumn>
 
-    <section class="timeline-area" bind:this={timelineEl} bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design}>
+    <section class="timeline-area" class:gone={!controlShown(doc, VideoControl.Timeline)} bind:this={timelineEl} bind:clientHeight={timelineShownPx} {...dockOf(Part.Timeline)} aria-label="Timeline" inert={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
       <div class="resize" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline" aria-valuenow={layout.timelinePx} data-testid="timeline-resize" onpointerdown={startResize} ondblclick={() => relayout({ timelinePx: firstLayout().timelinePx })}></div>
 
       {#if unanimated}<p class="animate-hint" data-testid="animate-hint">Animate this frame — add keyframes at the playhead</p>{/if}
@@ -2634,8 +2638,7 @@
     flex-direction: column;
   }
 
-  [data-mode='still'] .transport,
-  [data-mode='still'] .timeline-area {
+  .timeline-area.gone {
     display: none;
   }
 
