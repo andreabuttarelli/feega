@@ -64,7 +64,7 @@ export function storyboardOf(data: Record<string, unknown>): StoryboardLink | nu
   return parsed.success ? parsed.data : null;
 }
 
-export const MOTION_NODE_BAR_H = 44;
+export const MOTION_NODE_BAR_H = 0;
 
 const BAR_H: Record<FrameKind, Record<NodeMode, number>> = {
   [FrameKind.Frame]: { [NodeMode.Preview]: MOTION_NODE_BAR_H, [NodeMode.Edit]: 0 },

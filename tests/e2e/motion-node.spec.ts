@@ -38,31 +38,15 @@ test.describe('motion node on the canvas @real', () => {
     expect(picture!.width / picture!.height).toBeCloseTo(16 / 9, 1);
   });
 
-  test('play in the node advances the frame without selecting or moving it', async ({ page, session }) => {
+  test('a frame tile has no playback controls; the editor stays one click away', async ({ page, session }) => {
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    const stage = page.getByTestId('motion-node-stage');
-    await expect(page.locator('hyperframes-player')).toHaveCount(0, { timeout: 15_000 });
-    const play = page.getByRole('button', { name: 'Play', exact: true });
-
+    const stage = page.getByTestId('motion-node-stage').first();
+    await expect(stage).toBeVisible({ timeout: 15_000 });
     const node = page.locator('.svelte-flow__node').filter({ has: stage });
-    const before = await node.boundingBox();
-    const still = await stage.screenshot();
-    await shoot(page, 'paused');
-
-    await play.click();
-    const timecode = page.getByTestId('motion-node-timecode');
-    await expect(timecode).toBeVisible({ timeout: 15_000 });
-    const start = await timecode.textContent();
-    await expect(timecode).not.toHaveText(start ?? '', { timeout: 5000 });
-    await page.waitForTimeout(600);
-    await shoot(page, 'playing');
-    expect((await stage.screenshot()).equals(still)).toBe(false);
-
-    await page.getByRole('button', { name: 'Pause', exact: true }).click();
-    await expect(node).not.toHaveClass(/selected/);
-    expect(await node.boundingBox()).toEqual(before);
-
-    await page.getByRole('button', { name: 'Go to start', exact: true }).click();
-    await expect(timecode).toHaveText(/^00:00:00 \//);
+    for (const name of ['Play', 'Pause', 'Stop', 'Go to start', 'Go to end', 'Loop', 'Mute', 'Unmute', 'Seek']) {
+      await expect(node.getByRole('button', { name, exact: true }), `no ${name} on the tile`).toHaveCount(0);
+    }
+    await expect(page.getByTestId('motion-node-timecode')).toHaveCount(0);
+    await expect(page.locator('hyperframes-player')).toHaveCount(0);
   });
 });
