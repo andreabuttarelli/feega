@@ -113,3 +113,36 @@ export async function listMembers(
     };
   });
 }
+
+export async function setMemberRole(db: Db, input: { orgId: string; userId: string; role: OrgRole }): Promise<void> {
+  const { error } = await db.from('orgs_members').update({ role: input.role }).eq('org_id', input.orgId).eq('user_id', input.userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function removeMember(db: Db, input: { orgId: string; userId: string }): Promise<void> {
+  const { error } = await db.from('orgs_members').delete().eq('org_id', input.orgId).eq('user_id', input.userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function transferOwnership(db: Db, input: { orgId: string; userId: string }): Promise<void> {
+  const { error } = await db.rpc('transfer_org_ownership' as never, { p_org: input.orgId, p_to: input.userId } as never);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function orgName(db: Db, orgId: string): Promise<string | null> {
+  const { data, error } = await db.from('orgs').select('name').eq('id', orgId).maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  return data?.name ?? null;
+}

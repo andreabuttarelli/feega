@@ -240,7 +240,8 @@ export async function listNodes(
     .eq('org_id', scope.orgId)
     .eq('canvas_id', scope.canvasId)
     .is('deleted_at', null)
-    .order('z', { ascending: true });
+    .order('z', { ascending: true })
+    .order('id', { ascending: true });
 
   if (error) {
     throw error;

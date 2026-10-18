@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import type { Db } from '$lib/server/db/client';
 import { createServiceRoleDb } from '$lib/server/db/client';
 import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
-import { hashInviteToken, inviteStatus } from '$lib/server/repos/invites';
+import { hashInviteToken, inviteStatus, LINK_INVITE_EMAIL } from '$lib/server/repos/invites';
 import type { OrgRole } from '$lib/server/repos/orgs';
 import { assertFreeOrgLimit, grantWelcomeCredits } from '$lib/server/tenancy/free-org-limit';
 
@@ -136,7 +136,8 @@ export async function acceptInviteWith(
   if (status === 'expired') {
     return { outcome: 'invalid' };
   }
-  if (invite.email.toLowerCase() !== input.email.toLowerCase()) {
+  const isLink = invite.email === LINK_INVITE_EMAIL;
+  if (!isLink && invite.email.toLowerCase() !== input.email.toLowerCase()) {
     return { outcome: 'wrong_email' };
   }
 
@@ -172,6 +173,10 @@ export async function acceptInviteWith(
 
   if (insertError) {
     throw insertError;
+  }
+
+  if (isLink) {
+    return { outcome: 'accepted', orgId: invite.org_id, role: invite.role as OrgRole };
   }
 
   const { error: markError } = await db

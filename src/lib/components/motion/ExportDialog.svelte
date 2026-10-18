@@ -87,6 +87,7 @@
     editorUrl,
     fileName,
     render,
+    fallbackRender = null,
     server,
     tokens,
     analyses = {},
@@ -100,6 +101,7 @@
     editorUrl: string;
     fileName: string;
     render: Renderer;
+    fallbackRender?: Renderer | null;
     server: ServerRender;
     tokens: BrandTokens;
     analyses?: Record<string, AudioAnalysis>;
@@ -256,6 +258,7 @@
         quality: settings.quality,
         withAudio: hasAudio && Boolean(caps?.aac),
         frames: render,
+        fallback: fallbackRender,
         signal,
         onStage: (stage) => {
           phase = STAGE_PHASE[stage];

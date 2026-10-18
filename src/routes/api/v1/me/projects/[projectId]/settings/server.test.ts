@@ -140,8 +140,6 @@ const ACTIONS: Array<[SettingsSection, string, Record<string, string>]> = [
   [SettingsSection.Content, 'enable', {}],
   [SettingsSection.Content, 'disable', {}],
   [SettingsSection.Content, 'persona', { influencerId: 'x', mark: 'on' }],
-  [SettingsSection.Team, 'invite', { email: 'not-an-email' }],
-  [SettingsSection.Team, 'revokeInvite', { invite_id: 'i1' }],
   [SettingsSection.ApiKeys, 'createApiKey', { name: 'deploy' }],
   [SettingsSection.ApiKeys, 'revokeApiKey', { key_id: 'k1' }],
   [SettingsSection.Danger, 'deleteBrand', { confirm: 'wrong' }]

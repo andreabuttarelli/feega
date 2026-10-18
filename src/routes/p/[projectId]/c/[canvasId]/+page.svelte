@@ -2,6 +2,7 @@
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import type { Stack } from '$lib/canvas/stacking';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
+  import { CanvasMode, canvasModeFor } from '$lib/canvas/canvas-mode';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
   import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
   /**
@@ -3130,13 +3131,16 @@
     [EmptyAction.Image]: () => void create('image', EMPTY_ORIGIN),
     [EmptyAction.Video]: () => void create('video', EMPTY_ORIGIN)
   };
+
+  const canvasMode = $derived(canvasModeFor(data.org.role));
+  const viewOnly = $derived(canvasMode === CanvasMode.View);
 </script>
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
 
 <svelte:window bind:innerWidth={pageWidth} />
 
-<div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
+<div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} class:view-only={viewOnly} style={inlineMotion ? neighbourStyle() : undefined}>
   {#if peers.length || canvasPeers.length}
     {#if topPeers}
       <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></Portal>
@@ -3195,8 +3199,10 @@
     onConfirm={onAudioOperationSwitchConfirmed}
   />
 
+  {#if viewOnly}<p class="view-only-badge" data-testid="view-only">View only</p>{/if}
   {#if Flow}
   <Flow
+    mode={canvasMode}
     actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
     tiles={withPeerMotion(tiles, canvasPeers, new Set(selectedIds))}
     {edges}
@@ -3473,7 +3479,7 @@
   {#if dev && domReason}
     <RendererBadge renderer="dom" reason={domReason} />
   {/if}
-  {#if showsEmptyState(nodes.length, inlineMotion)}
+  {#if !viewOnly && showsEmptyState(nodes.length, inlineMotion)}
     <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
   {/if}
   {#if editingMotion}
@@ -3539,6 +3545,24 @@
 </div>
 
 <style>
+  .view-only :global(.svelte-flow__node) {
+    pointer-events: none;
+  }
+
+  .view-only-badge {
+    position: absolute;
+    top: var(--ui-space-3);
+    left: 50%;
+    z-index: 5;
+    margin: 0;
+    padding: var(--ui-space-1) var(--ui-space-3);
+    border-radius: 9999px;
+    background: var(--ui-panel-raised);
+    color: var(--ui-text);
+    font-size: var(--ui-type-caption);
+    transform: translateX(-50%);
+  }
+
   .canvas.editing :global([role='toolbar'][aria-label='Selection actions']) {
     display: none;
   }
