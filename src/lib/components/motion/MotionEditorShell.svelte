@@ -171,7 +171,7 @@
   import { frameHover } from '$lib/canvas/layers';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
-  import { EDIT_MODE_KEY, EditMode, nextMode, readMode } from '$lib/motion/edit-mode';
+  import { EDIT_MODE_KEY, EditMode, nextMode, startMode } from '$lib/motion/edit-mode';
   import DrawOverlay from './DrawOverlay.svelte';
   import DrawTools from './DrawTools.svelte';
   import { PART_SEP, PartAction, runPart } from '$lib/motion/poster-parts';
@@ -290,7 +290,7 @@
   let pressAt: { x: number; y: number } | null = null;
   let pressedMenu: unknown = null;
 
-  let editMode = $state(timelineFits(history.present) ? readMode(localStore()?.getItem(EDIT_MODE_KEY) ?? null) : EditMode.Design);
+  let editMode = $state(startMode(history.present, localStore()?.getItem(EDIT_MODE_KEY) ?? null));
 
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
@@ -469,6 +469,7 @@
   let unsavedSummary = '';
 
   onMount(() => () => {
+    overlay?.flushTyping();
     if (saveTimer && saveState === SaveState.Pending) {
       clearTimeout(saveTimer);
       void save();
@@ -1974,7 +1975,7 @@
       <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
-        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at) => preview?.editText(selector, at, () => {}) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
         {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}

@@ -71,6 +71,15 @@ describe('editing a text where it is drawn', () => {
     expect(document.getElementById('tx-tx')!.getAttribute('contenteditable')).not.toBeNull();
   });
 
+  it('ends with the typed text when a click outside the frame takes the focus away', () => {
+    const { start, sent } = stage();
+    start(textTarget('tx', 'text'));
+    document.getElementById('tx-tx')!.textContent = 'Outside';
+    window.dispatchEvent(new Event('blur'));
+
+    expect(sent.at(-1)).toMatchObject({ type: TEXT_EDIT.end, text: 'Outside', end: EditEnd.Commit });
+  });
+
   it('finds a poster line by its part', () => {
     const { start } = stage();
     start(textTarget('p', 'lines:1'));

@@ -89,7 +89,8 @@ vi.mock('$lib/server/cli-auth', () => ({ gateOrgAiAction: async () => store.gate
 vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/canvas')>()),
   findNode: async (_db: unknown, input: { orgId: string; nodeId: string }) => (input.orgId === ORG && input.nodeId === NODE ? store.node : null),
-  patchNodeData: async () => ({ outcome: 'written' })
+  patchNodeData: async () => ({ outcome: 'written', node: store.node }),
+  resizeNode: async () => undefined
 }));
 vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async (_db: unknown, input: { orgId: string }) => (input.orgId === ORG ? { id: PROJECT, brandId: null } : null) }));
 vi.mock('$lib/server/repos/assets', () => ({

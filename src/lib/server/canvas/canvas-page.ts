@@ -1,3 +1,4 @@
+import { cardPreviews } from '$lib/server/canvas/card-previews';
 import { rendererSwitch } from '$lib/server/canvas-renderer-switch';
 import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
@@ -81,7 +82,11 @@ import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNod
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
-import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { exportRowsSchema } from '$lib/motion/export-rows';
+import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
+import { selectionPorts } from '$lib/server/motion/selection-export-ports';
+import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
+import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -198,7 +203,7 @@ async function spendOnVoice<T>(
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, connections, catalogue, shareToken, references] = await Promise.all([
+  const [nodes, listed, catalogue, shareToken, references] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
     projectCatalogue(db, { orgId, mode }),
@@ -206,7 +211,9 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     referenceLibrary(db, { orgId, projectId: canvas.projectId })
   ]);
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines, killSwitch] = await Promise.all([
+  const connections = await canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed);
+
+  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines, killSwitch, previews] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
@@ -214,7 +221,8 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     templateLibrary(db, { orgId, actor: userActor({ userId }) }).list(),
     chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
     canvasOutlines(db, { orgId, nodes }),
-    rendererSwitch()
+    rendererSwitch(),
+    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
@@ -240,7 +248,8 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     projectBrandId,
     onboarding,
     componentTemplates,
-    outlines
+    outlines,
+    cardPreviews: previews
   };
 };
 
@@ -1120,8 +1129,26 @@ export const actions: Actions<CanvasParams> = {
       actor: userActor(scope)
     });
 
-    const linked = targetNode?.type === 'motion' ? await linkFrame(canvasFrames(scope), { sourceNodeId, frameNodeId: targetNodeId }) : null;
-    return { connection, linked: linked?.outcome === MoveOutcome.Done ? linked : null };
+    return { connection };
+  },
+
+  exportSelection: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const rows = exportRowsSchema.safeParse(jsonField(fd, 'rows'));
+    const frameIds = jsonField(fd, 'frame_ids');
+    if (!rows.success || !Array.isArray(frameIds) || !frameIds.length) {
+      return fail(400, { error: 'invalid export' });
+    }
+    if (!serverFramesOpen()) {
+      return fail(503, { error: 'image export needs the server renderer, which is not available here' });
+    }
+    const ports = selectionPorts({ db: scope.db, orgId: scope.orgId, projectId: scope.canvas.projectId, brandId: scope.projectBrandId, actor: userActor(scope) });
+    const out = await exportSelection(ports, { nodeIds: frameIds.map(String), rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    if (out instanceof Error) {
+      return fail(502, { error: `the images could not be drawn: ${out.message}` });
+    }
+    return out.outcome === ExportOutcome.Done ? out : fail(404, { error: out.outcome });
   },
 
   createFormats: async ({ request, params, locals }) => {

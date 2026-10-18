@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NODE_TYPES } from './node-data';
-import { CANVAS_NODE_SPECS, canConnect, type NodeKind } from './graph';
+import { CANVAS_NODE_SPECS, FRAME_NO_INPUTS, canConnect, type NodeKind } from './graph';
 import { NODE_PORTS, portsOf, type PortContext } from './node-ports';
 import { anyPortAccepts } from './connectors';
 
@@ -29,7 +29,7 @@ const EXPECTED: Record<(typeof NODE_TYPES)[number], { inputs: boolean; output: b
   calendar: { inputs: true, output: false },
   audio: { inputs: true, output: true },
   model3d: { inputs: true, output: false },
-  motion: { inputs: true, output: true },
+  motion: { inputs: false, output: true },
   studio_batch: { inputs: false, output: true }
 };
 
@@ -54,14 +54,13 @@ describe('ogni tipo di nodo disegna le porte che la sua riga dichiara', () => {
     }
   });
 
-  it('a Frame takes pictures, videos and text from generative nodes, never audio', () => {
+  it('a Frame takes no inputs: nothing connects into it, it still feeds a composition', () => {
     const frame = { id: 'f', kind: 'motion' as const, model: null, uncensored: false };
-    expect(portsOf('motion', ctx).inputs).toEqual(['images', 'videos', 'text']);
-    for (const kind of ['image', 'video', 'text'] as const) {
-      expect(canConnect({ id: kind, kind, model: null, uncensored: false }, frame)).toEqual({ ok: true });
+    expect(portsOf('motion', ctx)).toEqual({ inputs: [], output: 'motions' });
+    for (const kind of ['image', 'video', 'text', 'audio', 'composition'] as const) {
+      expect(canConnect({ id: kind, kind, model: null, uncensored: false }, frame)).toEqual({ ok: false, why: FRAME_NO_INPUTS });
     }
-    expect(canConnect({ id: 'a', kind: 'audio', model: null, uncensored: false }, frame).ok).toBe(false);
-    expect(canConnect({ id: 'c', kind: 'composition', model: null, uncensored: false }, frame)).toEqual({ ok: false, why: 'A Frame takes generated images, videos and text' });
+    expect(canConnect(frame, { id: 'c', kind: 'composition', model: null, uncensored: false })).toEqual({ ok: true });
   });
 
   it('a 3D model takes an image or a text, whatever its model reads, and feeds nothing downstream', () => {

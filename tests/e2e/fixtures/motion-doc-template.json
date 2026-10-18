@@ -1,0 +1,706 @@
+{
+  "version": 5,
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "durationInFrames": 300,
+  "tracks": [
+    {
+      "id": "t3",
+      "kind": "visual",
+      "name": "Stack words",
+      "clips": [
+        {
+          "trimStart": 0,
+          "transitionIn": {
+            "kind": "none",
+            "durationInFrames": 0
+          },
+          "transitionOut": {
+            "kind": "none",
+            "durationInFrames": 0
+          },
+          "transform": {},
+          "keyframes": {},
+          "mask": null,
+          "maskStack": [],
+          "matte": "none",
+          "depth": 0,
+          "space": "world",
+          "parent": null,
+          "parentOpacity": "inherit",
+          "expressions": {},
+          "effects": [],
+          "shaders": [],
+          "blend": "normal",
+          "animators": [],
+          "textPath": null,
+          "motionBlur": true,
+          "path": null,
+          "id": "t4",
+          "from": 0,
+          "durationInFrames": 300,
+          "component": "Precomp",
+          "props": {
+            "comp": "t2",
+            "loop": false,
+            "hold": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "v1",
+      "kind": "visual",
+      "name": "Video 1",
+      "clips": []
+    },
+    {
+      "id": "a1",
+      "kind": "audio",
+      "name": "Audio 1",
+      "clips": []
+    }
+  ],
+  "comps": {
+    "t2": {
+      "template": {
+        "id": "builtin:stack-words",
+        "name": "Stack words",
+        "keys": {
+          "words": "words",
+          "media": "media",
+          "cards": "cards",
+          "font": "font",
+          "font_size": "font_size",
+          "font_weight": "font_weight",
+          "tracking": "tracking",
+          "background": "background",
+          "text_color": "text_color",
+          "placeholder_color": "placeholder_color",
+          "card_height": "card_height",
+          "card_aspect": "card_aspect",
+          "overlap": "overlap",
+          "beat": "beat",
+          "lead": "lead"
+        },
+        "keyFields": [
+          "words",
+          "media",
+          "background",
+          "text_color",
+          "beat"
+        ]
+      },
+      "name": "Stack words",
+      "durationInFrames": 300,
+      "tracks": [
+        {
+          "id": "t1-v1",
+          "kind": "visual",
+          "name": "Video 1",
+          "clips": [
+            {
+              "trimStart": 0,
+              "transitionIn": {
+                "kind": "none",
+                "durationInFrames": 0
+              },
+              "transitionOut": {
+                "kind": "none",
+                "durationInFrames": 0
+              },
+              "transform": {},
+              "keyframes": {},
+              "mask": null,
+              "maskStack": [],
+              "matte": "none",
+              "depth": 0,
+              "space": "world",
+              "parent": null,
+              "parentOpacity": "inherit",
+              "expressions": {},
+              "effects": [],
+              "shaders": [],
+              "blend": "normal",
+              "animators": [],
+              "textPath": null,
+              "motionBlur": true,
+              "path": null,
+              "id": "t1-stack",
+              "from": 0,
+              "durationInFrames": 300,
+              "component": "Custom",
+              "props": {
+                "name": "StackWords",
+                "words": "gets / better",
+                "media": "",
+                "cards": 5,
+                "font": "Inter",
+                "fontSize": 0.075,
+                "fontWeight": 400,
+                "tracking": -0.03,
+                "background": "#ececec",
+                "textColor": "#0d0d0d",
+                "placeholderColor": "#d6d6d6",
+                "cardHeight": 0.56,
+                "cardAspect": 0.8,
+                "overlap": 0.42,
+                "beat": 0.75,
+                "lead": 0.3,
+                "varPrefix": "stack"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "assets": [],
+  "camera": null,
+  "look": null,
+  "fonts": [
+    {
+      "family": "Inter",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "opsz",
+          14,
+          32
+        ],
+        [
+          "wght",
+          100,
+          900
+        ]
+      ]
+    },
+    {
+      "family": "Inter Tight",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wght",
+          100,
+          900
+        ]
+      ]
+    },
+    {
+      "family": "Geist",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wght",
+          100,
+          900
+        ]
+      ]
+    },
+    {
+      "family": "Instrument Sans",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        400,
+        500,
+        600,
+        700
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wdth",
+          75,
+          100
+        ],
+        [
+          "wght",
+          400,
+          700
+        ]
+      ]
+    },
+    {
+      "family": "Manrope",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800
+      ],
+      "italic": false,
+      "axes": [
+        [
+          "wght",
+          200,
+          800
+        ]
+      ]
+    },
+    {
+      "family": "DM Sans",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900,
+        1000
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "opsz",
+          9,
+          40
+        ],
+        [
+          "wght",
+          100,
+          1000
+        ]
+      ]
+    },
+    {
+      "family": "Space Grotesk",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        300,
+        400,
+        500,
+        600,
+        700
+      ],
+      "italic": false,
+      "axes": [
+        [
+          "wght",
+          300,
+          700
+        ]
+      ]
+    },
+    {
+      "family": "Instrument Serif",
+      "source": "google",
+      "category": "serif",
+      "weights": [
+        400
+      ],
+      "italic": true,
+      "axes": []
+    }
+  ],
+  "background": "brand",
+  "motionBlur": {
+    "enabled": false,
+    "shutterAngle": 180,
+    "shutterPhase": -90,
+    "samples": 8
+  },
+  "fields": [
+    {
+      "key": "words",
+      "label": "Words (\"/\" splits the word above from the word below)",
+      "clipId": "t1-stack",
+      "prop": "words",
+      "group": "Text",
+      "type": "text",
+      "default": "gets / better"
+    },
+    {
+      "key": "media",
+      "label": "Pictures and videos",
+      "clipId": "t1-stack",
+      "prop": "media",
+      "group": "Media",
+      "type": "media_list",
+      "default": ""
+    },
+    {
+      "key": "cards",
+      "label": "Cards",
+      "clipId": "t1-stack",
+      "prop": "cards",
+      "group": "Media",
+      "type": "number",
+      "min": 1,
+      "max": 12,
+      "default": 5
+    },
+    {
+      "key": "font",
+      "label": "Font",
+      "clipId": "t1-stack",
+      "prop": "font",
+      "group": "Style",
+      "type": "select",
+      "options": [
+        "Inter",
+        "Inter Tight",
+        "Geist",
+        "Instrument Sans",
+        "Manrope",
+        "DM Sans",
+        "Space Grotesk",
+        "Instrument Serif"
+      ],
+      "default": "Inter"
+    },
+    {
+      "key": "font_size",
+      "label": "Text size (share of the short side)",
+      "clipId": "t1-stack",
+      "prop": "fontSize",
+      "group": "Style",
+      "type": "number",
+      "min": 0.03,
+      "max": 0.16,
+      "default": 0.075
+    },
+    {
+      "key": "font_weight",
+      "label": "Text weight",
+      "clipId": "t1-stack",
+      "prop": "fontWeight",
+      "group": "Style",
+      "type": "number",
+      "min": 300,
+      "max": 800,
+      "default": 400
+    },
+    {
+      "key": "tracking",
+      "label": "Tracking (em)",
+      "clipId": "t1-stack",
+      "prop": "tracking",
+      "group": "Style",
+      "type": "number",
+      "min": -0.08,
+      "max": 0.05,
+      "default": -0.03
+    },
+    {
+      "key": "background",
+      "label": "Background",
+      "clipId": "t1-stack",
+      "prop": "background",
+      "group": "Style",
+      "type": "color",
+      "default": "#ececec"
+    },
+    {
+      "key": "text_color",
+      "label": "Text colour",
+      "clipId": "t1-stack",
+      "prop": "textColor",
+      "group": "Style",
+      "type": "color",
+      "default": "#0d0d0d"
+    },
+    {
+      "key": "placeholder_color",
+      "label": "Empty picture colour",
+      "clipId": "t1-stack",
+      "prop": "placeholderColor",
+      "group": "Style",
+      "type": "color",
+      "default": "#d6d6d6"
+    },
+    {
+      "key": "card_height",
+      "label": "Card height (share of the height)",
+      "clipId": "t1-stack",
+      "prop": "cardHeight",
+      "group": "Style",
+      "type": "number",
+      "min": 0.25,
+      "max": 0.8,
+      "default": 0.56
+    },
+    {
+      "key": "card_aspect",
+      "label": "Card aspect (width / height)",
+      "clipId": "t1-stack",
+      "prop": "cardAspect",
+      "group": "Style",
+      "type": "number",
+      "min": 0.5,
+      "max": 1.5,
+      "default": 0.8
+    },
+    {
+      "key": "overlap",
+      "label": "Overlap between cards",
+      "clipId": "t1-stack",
+      "prop": "overlap",
+      "group": "Style",
+      "type": "number",
+      "min": 0,
+      "max": 0.85,
+      "default": 0.42
+    },
+    {
+      "key": "beat",
+      "label": "Beat between cards (seconds)",
+      "clipId": "t1-stack",
+      "prop": "beat",
+      "group": "Motion",
+      "type": "number",
+      "min": 0.3,
+      "max": 1.5,
+      "default": 0.75
+    },
+    {
+      "key": "lead",
+      "label": "Lead-in (seconds)",
+      "clipId": "t1-stack",
+      "prop": "lead",
+      "group": "Motion",
+      "type": "number",
+      "min": 0,
+      "max": 1,
+      "default": 0.3
+    }
+  ],
+  "components": {
+    "StackWords": {
+      "source": {
+        "html": "",
+        "css": ".sw {\n  position: absolute;\n  inset: 0;\n  overflow: hidden;\n  background: var(--sw-bg);\n}\n\n.sw-word {\n  position: absolute;\n  white-space: nowrap;\n  pointer-events: none;\n  font-family: var(--sw-font);\n  font-weight: var(--sw-weight);\n  letter-spacing: var(--sw-tracking);\n  line-height: 1.1;\n  color: var(--sw-ink);\n  will-change: transform, opacity;\n  -webkit-font-smoothing: antialiased;\n}\n\n.sw-card {\n  position: absolute;\n  left: 0;\n  top: 0;\n  overflow: hidden;\n  background: var(--sw-empty);\n  transform-origin: 0 0;\n  will-change: transform;\n}\n\n.sw-card img,\n.sw-card video {\n  display: block;\n  width: 100%;\n  height: 100%;\n  object-fit: cover;\n  pointer-events: none;\n}",
+        "js": "const WORD_IN = 1.1;\nconst WORD_GAP = 0.08;\nconst WORD_RISE = 0.2;\n\nconst clamp01 = (x) => Math.min(1, Math.max(0, x));\nconst span = (t, at, length) => clamp01((t - at) / Math.max(length, 1e-6));\nconst expoInOut = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x < 0.5 ? Math.pow(2, 20 * x - 10) / 2 : (2 - Math.pow(2, -20 * x + 10)) / 2);\nconst smooth = (x) => x * x * x * (x * (x * 6 - 15) + 10);\nconst landSoftly = (x) => 1 - Math.pow(1 - x, 5);\n\nfunction wordIn(t, at) {\n  const progress = landSoftly(span(t, at, WORD_IN));\n  return { progress, rise: WORD_RISE * (1 - progress), opacity: smooth(span(t, at, WORD_IN * 0.35)) };\n}\n\nconst LINE = 1.1;\nconst MOVE = 1.2;\nconst SHRINK = 0.16;\nconst OFFSETS = [0.06, -0.08, 0.1, -0.03, 0.07, -0.05];\nconst ENTRY_GAP = 0.04;\nconst MAX_WIDTH = 0.5;\nconst WORD_LAG = 0.55;\nconst WORD_STAGGER = 0.12;\nconst WORD_SPACE = 0.18;\nconst EXIT = 1.2;\nconst EXIT_PAD = 0.05;\nconst WORD_EXIT = 0.6;\nconst WORD_LIFT = 0.12;\nconst ZOOM = 0.08;\nconst MAX_CARDS = 12;\n\nconst wordsOf = (raw) => String(raw || '').split('/').map((s) => s.trim()).filter(Boolean).slice(0, 2);\n\nfunction stackLayout(p, width, height) {\n  const heroH = Math.min(p.cardHeight * height, (MAX_WIDTH * width) / p.cardAspect);\n  const heroW = heroH * p.cardAspect;\n  const olderW = heroW * (1 - SHRINK);\n  return { heroH, heroW, heroX: (width - heroW) / 2, heroY: (height - heroH) / 2, pitch: olderW * (1 - p.overlap), size: Math.min(p.fontSize * Math.min(width, height), ((height - heroH) / 2) / (LINE + WORD_SPACE)) };\n}\n\nfunction stackFrame(p, t, length, width, height) {\n  const n = Math.max(1, Math.min(MAX_CARDS, Math.round(p.cards)));\n  const L = stackLayout(p, width, height);\n  const arrive = (i) => p.lead + i * p.beat;\n  const moved = (i) => expoInOut(span(t, arrive(i), MOVE));\n  const out = expoInOut(span(t, length - EXIT_PAD - EXIT, EXIT));\n  const away = out * (L.heroX + L.heroW + ENTRY_GAP * width);\n  const cards = Array.from({ length: n }, (_, i) => {\n    let age = 0;\n    for (let j = i + 1; j < n; j++) {\n      age += moved(j);\n    }\n    const settled = Math.min(1, age);\n    const scale = 1 - SHRINK * settled;\n    const w = L.heroW * scale;\n    const h = L.heroH * scale;\n    const start = -w - ENTRY_GAP * width;\n    const x = start + (L.heroX - start) * moved(i) - age * L.pitch - away;\n    const y = height / 2 - h / 2 + OFFSETS[i % OFFSETS.length] * L.heroH * settled;\n    const zoom = 1 + ZOOM * (1 - smooth(span(t, arrive(i), length - arrive(i))));\n    return { index: i, media: i, x, y, w, h, opacity: 1, zoom };\n  });\n  const landed = arrive(n - 1) + MOVE * WORD_LAG;\n  const fade = smooth(span(t, length - EXIT_PAD - EXIT - WORD_EXIT * 0.5, WORD_EXIT));\n  const centre = L.heroX + L.heroW / 2;\n  const words = wordsOf(p.words).map((text, k) => {\n    const word = wordIn(t, landed + k * WORD_STAGGER);\n    const y = k === 0 ? L.heroY - L.size * (LINE + WORD_SPACE) : L.heroY + L.heroH + L.size * WORD_SPACE;\n    return { text, x: centre, y, size: L.size, opacity: word.opacity * (1 - fade), rise: word.rise - WORD_LIFT * fade };\n  });\n  return { cards, words };\n}\n\nconst VIDEO_MARK = 'video:';\nconst LINK = /^(https?:|data:|blob:|\\/)/;\n\nconst picked = (item) => ({ src: item.src, video: item.kind === 'video' });\n\nconst mediaList = (raw) => Array.isArray(raw) ? raw.map(picked).filter((m) => m.src) : String(raw || '').split(',').map((s) => s.trim()).filter(Boolean).map((item) => {\n  const video = item.startsWith(VIDEO_MARK);\n  const id = video ? item.slice(VIDEO_MARK.length).trim() : item;\n  const src = LINK.test(id) ? id : assets[id];\n  return src ? { src, video } : null;\n}).filter(Boolean);\n\nconst seekVideo = (video, t) => {\n  if (!video || !(video.duration > 0)) {\n    return;\n  }\n  const at = t % video.duration;\n  if (Math.abs(video.currentTime - at) > 0.5 / fps) {\n    video.currentTime = at;\n  }\n};\n\nroot.insertAdjacentHTML('beforeend', '<div class=\"sw\"></div>');\n\nconst scene = root.querySelector('.sw');\n\nlet cache = { key: '', cards: [], words: [], lookKey: '' };\n\nconst sizeOf = () => ({ width: scene.clientWidth || 1920, height: scene.clientHeight || 1080 });\n\nconst mediaHtml = (item) => {\n  if (!item) {\n    return '';\n  }\n  return item.video ? '<video muted playsinline preload=\"auto\" src=\"' + item.src + '\"></video>' : '<img decoding=\"sync\" draggable=\"false\" src=\"' + item.src + '\">';\n};\n\nconst build = (p, f) => {\n  const key = JSON.stringify([p.media, f.cards.length, f.words.map((w) => w.text)]);\n  if (key === cache.key) {\n    return cache;\n  }\n  const items = mediaList(p.media);\n  scene.innerHTML = '';\n  const cards = f.cards.map((c) => {\n    const node = document.createElement('div');\n    node.className = 'sw-card';\n    node.innerHTML = mediaHtml(items.length ? items[c.media % items.length] : null);\n    scene.appendChild(node);\n    const video = node.querySelector('video');\n    if (video) {\n      video.addEventListener('loadedmetadata', () => seekVideo(video, tl.time()));\n    }\n    return { node, inner: node.firstElementChild, video };\n  });\n  const words = f.words.map((w) => {\n    const node = document.createElement('div');\n    node.className = 'sw-word';\n    node.textContent = w.text;\n    scene.appendChild(node);\n    return node;\n  });\n  cache = { ...cache, key, cards, words };\n  return cache;\n};\n\nconst paintLook = (p) => {\n  const key = JSON.stringify([p.background, p.textColor, p.placeholderColor, p.font, p.fontWeight, p.tracking]);\n  if (key === cache.lookKey) {\n    return;\n  }\n  cache = { ...cache, lookKey: key };\n  const s = scene.style;\n  s.setProperty('--sw-bg', p.background);\n  s.setProperty('--sw-ink', p.textColor);\n  s.setProperty('--sw-empty', p.placeholderColor);\n  s.setProperty('--sw-font', String(p.font).includes(',') ? p.font : '\"' + p.font + '\", \"Helvetica Neue\", Helvetica, Arial, sans-serif');\n  s.setProperty('--sw-weight', String(p.fontWeight));\n  s.setProperty('--sw-tracking', p.tracking + 'em');\n};\n\nconst paintCard = (card, c, t, width) => {\n  const s = card.node.style;\n  const visible = c.x + c.w > 0 && c.x < width;\n  s.width = c.w + 'px';\n  s.height = c.h + 'px';\n  s.transform = 'translate3d(' + c.x + 'px, ' + c.y + 'px, 0)';\n  s.visibility = visible ? 'visible' : 'hidden';\n  if (card.inner) {\n    card.inner.style.transform = 'scale(' + c.zoom + ')';\n  }\n  seekVideo(card.video, t);\n};\n\nconst paintWord = (s, w) => {\n  s.fontSize = w.size + 'px';\n  s.left = w.x + 'px';\n  s.top = w.y + 'px';\n  s.opacity = String(w.opacity);\n  s.transform = 'translate3d(-50%, ' + w.rise + 'em, 0)';\n  s.visibility = w.opacity > 0.002 ? 'visible' : 'hidden';\n};\n\nconst draw = () => {\n  const p = { ...props };\n  const t = tl.time();\n  const { width, height } = sizeOf();\n  const f = stackFrame(p, t, duration, width, height);\n  const nodes = build(p, f);\n  paintLook(p);\n  f.cards.forEach((c, i) => paintCard(nodes.cards[i], c, t, width));\n  f.words.forEach((w, i) => paintWord(nodes.words[i].style, w));\n};\n\ndraw();\ntl.to({}, { duration, ease: 'none', onUpdate: draw }, 0);"
+      },
+      "propsSchema": {
+        "type": "object",
+        "properties": {
+          "words": {
+            "type": "string",
+            "title": "Words (\"/\" splits the word above from the word below)",
+            "default": "gets / better",
+            "group": "Content",
+            "maxLength": 80
+          },
+          "media": {
+            "type": "string",
+            "title": "Pictures and videos",
+            "default": "",
+            "format": "media",
+            "group": "Content",
+            "maxLength": 2000
+          },
+          "cards": {
+            "type": "number",
+            "title": "Cards",
+            "default": 5,
+            "minimum": 1,
+            "maximum": 12,
+            "step": 1,
+            "group": "Content"
+          },
+          "font": {
+            "type": "string",
+            "title": "Font",
+            "default": "Inter",
+            "format": "font",
+            "group": "Style"
+          },
+          "fontSize": {
+            "type": "number",
+            "title": "Text size (share of the short side)",
+            "default": 0.075,
+            "minimum": 0.03,
+            "maximum": 0.16,
+            "step": 0.005,
+            "group": "Style"
+          },
+          "fontWeight": {
+            "type": "number",
+            "title": "Text weight",
+            "default": 400,
+            "minimum": 300,
+            "maximum": 800,
+            "step": 100,
+            "group": "Style"
+          },
+          "tracking": {
+            "type": "number",
+            "title": "Tracking (em)",
+            "default": -0.03,
+            "minimum": -0.08,
+            "maximum": 0.05,
+            "step": 0.005,
+            "group": "Style"
+          },
+          "background": {
+            "type": "string",
+            "title": "Background",
+            "default": "#ececec",
+            "format": "color",
+            "group": "Style"
+          },
+          "textColor": {
+            "type": "string",
+            "title": "Text colour",
+            "default": "#0d0d0d",
+            "format": "color",
+            "group": "Style"
+          },
+          "placeholderColor": {
+            "type": "string",
+            "title": "Empty picture colour",
+            "default": "#d6d6d6",
+            "format": "color",
+            "group": "Style"
+          },
+          "cardHeight": {
+            "type": "number",
+            "title": "Card height (share of the height)",
+            "default": 0.56,
+            "minimum": 0.25,
+            "maximum": 0.8,
+            "step": 0.01,
+            "group": "Layout"
+          },
+          "cardAspect": {
+            "type": "number",
+            "title": "Card aspect (width / height)",
+            "default": 0.8,
+            "minimum": 0.5,
+            "maximum": 1.5,
+            "step": 0.05,
+            "group": "Layout"
+          },
+          "overlap": {
+            "type": "number",
+            "title": "Overlap between cards",
+            "default": 0.42,
+            "minimum": 0,
+            "maximum": 0.85,
+            "step": 0.01,
+            "group": "Layout"
+          },
+          "beat": {
+            "type": "number",
+            "title": "Beat between cards (seconds)",
+            "default": 0.75,
+            "minimum": 0.3,
+            "maximum": 1.5,
+            "step": 0.05,
+            "group": "Motion"
+          },
+          "lead": {
+            "type": "number",
+            "title": "Lead-in (seconds)",
+            "default": 0.3,
+            "minimum": 0,
+            "maximum": 1,
+            "step": 0.05,
+            "group": "Motion"
+          },
+          "varPrefix": {
+            "type": "string",
+            "title": "Runtime variable prefix",
+            "default": "stack",
+            "group": "Layout",
+            "maxLength": 20
+          }
+        }
+      },
+      "mode": "deterministic",
+      "version": 1,
+      "check": null
+    }
+  },
+  "shaders": {},
+  "interactive": {
+    "playback": "autoplay",
+    "loop": true,
+    "outside": "fallback",
+    "scrollLength": 3,
+    "vars": [
+      {
+        "name": "stack_words",
+        "kind": "string",
+        "default": "gets / better"
+      },
+      {
+        "name": "stack_background",
+        "kind": "color",
+        "default": "#ececec"
+      },
+      {
+        "name": "stack_text_color",
+        "kind": "color",
+        "default": "#0d0d0d"
+      },
+      {
+        "name": "stack_beat",
+        "kind": "number",
+        "default": 0.75,
+        "min": 0.3,
+        "max": 1.5
+      },
+      {
+        "name": "stack_cards",
+        "kind": "number",
+        "default": 5,
+        "min": 1,
+        "max": 12
+      }
+    ],
+    "bindings": []
+  }
+}

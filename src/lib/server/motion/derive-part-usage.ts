@@ -1,6 +1,7 @@
 import { PropFormat, VAR_PREFIX, type CustomComponent, type PropSpec } from '$lib/motion/custom/component';
 import { parsePart } from '$lib/motion/poster-parts';
 import { PAGE, type PartUsage } from '$lib/motion/part-usage';
+import { ShapePaint, markupPaint } from '$lib/motion/part-shapes';
 import { PART_ATTR, defaultsOf, renderRoot, type Schema, type Size } from './static-parts';
 
 type Rule = { selector: string; pseudo: boolean; decls: { prop: string; value: string }[] };
@@ -197,6 +198,13 @@ export function derivePartUsage(component: CustomComponent, size: Size): PartUsa
     parts[field] = (parts[field] ?? 0) + 1;
   }
 
+  const paints = new Map<string, Set<ShapePaint | null>>();
+  for (const el of first.querySelectorAll(PART)) {
+    const { field } = parsePart(el.getAttribute(PART_ATTR)!);
+    paints.set(field, (paints.get(field) ?? new Set()).add(markupPaint(el)));
+  }
+  const shapes = Object.fromEntries([...paints].filter(([, set]) => set.size === 1 && !set.has(null)).map(([field, set]) => [field, [...set][0]!]));
+
   const fields: Record<string, string[]> = {};
   for (const [key, spec] of Object.entries(specs)) {
     const perturb = perturbOf(spec);
@@ -209,5 +217,5 @@ export function derivePartUsage(component: CustomComponent, size: Size): PartUsa
       fields[key] = users;
     }
   }
-  return { parts, fields };
+  return Object.keys(shapes).length ? { parts, fields, shapes } : { parts, fields };
 }

@@ -51,7 +51,7 @@ const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
   move_frame_element:
     'Move one element (a clip: text, image, video, shape, component) out of a Frame into another Frame of THIS project, or onto the empty canvas as a free element (a Text, Box, Ellipse, Path or Image on its own, no frame around it, the size it had in its frame). Props, style and keyframes are kept and re-timed to the target frame rate; x/y (0..1 of the target frame) is where its centre lands. Never turns an element into a generative node. Both frames are saved as revisions.',
   place_in_frame:
-    "Put the generated output of a Generate image, Generate video or Generate text node of THIS project into a Frame as an element (image, video at the frame's start, or text), centred at x/y (0..1). Omit toFrameId to put it on the canvas as a free element (Image, Video or Text, no frame around it). The generative node is not changed. To keep the element following the node's next generations, connect_nodes the node to the Frame instead.",
+    "Put the generated output of a Generate image, Generate video or Generate text node of THIS project into a Frame as an element (image, video at the frame's start, or text), centred at x/y (0..1). Omit toFrameId to put it on the canvas as a free element (Image, Video or Text, no frame around it). The generative node is not changed. A Frame takes no inputs: connect_nodes into a Frame is refused.",
   draw_element:
     'Draw a free graphic element on a canvas of THIS project, outside any frame: drawn { tool: "text" | "rectangle" | "ellipse", box: { left, top, width, height } } in canvas units, or { tool: "pen", path: "<SVG d in canvas units>" }. It is a Text, Box, Ellipse or Path with the same fills, strokes, effects and text style as inside a frame; it is NOT a Generate text node. Answers frame_id (the element node) and element_id (its clip): edit it with the frame tools.',
   group_elements:
@@ -89,9 +89,9 @@ function fieldsOf(schema: z.ZodType): string {
 }
 
 const GENERIC_DESCRIPTION = [
-  'Every other canvas op of THIS project, the same ones the API and MCP run: op and its input in camelCase.',
-  `Spend credits, only when the user asked: ${GENERIC_OPS.filter((name) => CANVAS_OPS[name].access === Access.Spend).join(', ')}.`,
-  `Ops: ${GENERIC_OPS.map((name) => `${name} {${fieldsOf(CANVAS_OPS[name].input)}}`).join('; ')}.`
+  'Other canvas ops of THIS project, as API/MCP: op, camelCase input.',
+  `Spend credits, only if the user asked: ${GENERIC_OPS.filter((name) => CANVAS_OPS[name].access === Access.Spend).join(', ')}.`,
+  `Ops: ${GENERIC_OPS.map((name) => `${name} {${fieldsOf(CANVAS_OPS[name].input)}}`).join(';')}.`
 ].join(' ');
 
 function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {
