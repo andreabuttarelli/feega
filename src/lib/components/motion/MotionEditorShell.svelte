@@ -1207,7 +1207,7 @@
     clipOp(ClipOp.Delete);
   }
 
-  type Revision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
+  type Revision = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number; name: string | null };
   let revisionsOpen = $state(false);
   let revisions = $state<Revision[]>([]);
 
@@ -1221,8 +1221,21 @@
     if (!revisionsOpen) {
       return;
     }
+    await loadRevisions();
+  }
+
+  async function loadRevisions() {
     const result = await editorAction('revisions');
     revisions = result.type === 'success' ? ((result.data?.revisions as Revision[]) ?? []) : [];
+  }
+
+  async function nameCurrent(name: string) {
+    const form = new FormData();
+    form.set('version', String(version));
+    form.set('name', name);
+    const result = await editorAction('nameVersion', form);
+    notice = result.type === 'success' ? '' : 'The version could not be named: reload and try again.';
+    await loadRevisions();
   }
 
   async function restoreTo(target: number) {
@@ -1774,8 +1787,9 @@
         <button type="button" class="clock" aria-haspopup="menu" aria-expanded={revisionsOpen} aria-label="Version history" title="Version history" disabled={agent === Agent.Working} data-testid="revisions-open" onclick={() => void toggleRevisions()}><HistoryIcon size={16} /></button>
         {#if revisionsOpen}
           <div class="menu more" role="menu" data-testid="revisions">
+            <input class="version-name" aria-label="Name the current version" placeholder="Name the current version" data-testid="version-name" onkeydown={(e) => e.key === 'Enter' && void nameCurrent(e.currentTarget.value)} />
             {#each revisions as r (r.version)}
-              <button type="button" role="menuitem" disabled={r.version === version} onclick={() => void restoreTo(r.version)}><span>v{r.version} · {r.actorKind === 'agent' ? 'Agent' : 'You'} · {r.clips} clips</span><kbd>{r.version === version ? 'Current' : 'Restore'}</kbd></button>
+              <button type="button" role="menuitem" disabled={r.version === version} onclick={() => void restoreTo(r.version)}><span>{r.name ? `${r.name} · v${r.version}` : `v${r.version}`} · {r.actorKind === 'agent' ? 'Agent' : 'You'} · {r.clips} clips</span><kbd>{r.version === version ? 'Current' : 'Restore'}</kbd></button>
             {:else}
               <span class="empty">No saved versions yet</span>
             {/each}
@@ -2749,6 +2763,16 @@
     left: auto;
     right: 0;
     grid-template-columns: 220px;
+  }
+
+  .version-name {
+    font: inherit;
+    font-size: 12px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    border: 1px solid var(--ui-divider, #e3e3e6);
+    background: transparent;
+    color: inherit;
   }
 
   .menu.more button {

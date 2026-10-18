@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { versionNamesSchema, type VersionNames } from '$lib/motion/version-names';
 import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$lib/motion/doc';
 import { NodeMode, Opening, Under } from './inline-motion';
 import { FrameFormat } from '$lib/motion/hyperframes/capture';
@@ -30,6 +31,7 @@ export type MotionNode = {
   lastRenderAssetId: string | null;
   storyboard?: StoryboardLink;
   budgetRaisedUsd?: number;
+  versionNames?: VersionNames;
 };
 
 const FORMAT_NAMES: Record<string, MotionFormat> = {
@@ -53,7 +55,8 @@ export const motionNodeSchema = z.object({
   lastRenderAssetId: z.string().nullable(),
   storyboard: linkSchema.optional(),
   budgetRaisedUsd: z.number().min(0).optional(),
-  kind: z.enum(FrameKind).optional()
+  kind: z.enum(FrameKind).optional(),
+  versionNames: versionNamesSchema.optional()
 });
 
 export function storyboardOf(data: Record<string, unknown>): StoryboardLink | null {

@@ -225,9 +225,9 @@ export type StoryboardPort = {
   link: (nodeId: string, clipIds: string[]) => Promise<{ ok: true } | { ok: false; error: string }>;
 };
 
-export type RevisionEntry = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number };
+export type RevisionEntry = { version: number; summary: string | null; actorKind: string; createdAt: string; clips: number; name?: string | null };
 
-export type RevisionLibrary = { list: () => Promise<RevisionEntry[]>; read: (version: number) => Promise<MotionDoc | null> };
+export type RevisionLibrary = { list: () => Promise<RevisionEntry[]>; read: (version: number) => Promise<MotionDoc | null>; name?: (version: number, name: string) => Promise<boolean> };
 
 export type UiRegion = { x: number; y: number; width: number; height: number };
 
@@ -2565,7 +2565,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
           return { ok: false, error: 'version history is not available here' };
         }
         const entries = await deps.revisions.list();
-        return { ok: true, revisions: entries.map((e) => ({ version: e.version, actor: e.actorKind, summary: e.summary, at: e.createdAt, clips: e.clips })) };
+        return { ok: true, revisions: entries.map((e) => ({ version: e.version, name: e.name ?? null, actor: e.actorKind, summary: e.summary, at: e.createdAt, clips: e.clips })) };
+      }
+    }),
+
+    name_revision: tool({
+      description: 'Give a saved version of the video a name (number from list_revisions), e.g. "Client review"; an empty name removes it. Names show in the version history and in list_revisions.',
+      inputSchema: z.object({ version: z.number().int().min(1), name: z.string().max(60) }),
+      execute: async (input) => {
+        if (!deps.revisions?.name) {
+          return { ok: false, error: 'version names are not available here' };
+        }
+        return (await deps.revisions.name(input.version, input.name)) ? { ok: true } : { ok: false, error: `no version ${input.version}: call list_revisions` };
       }
     }),
 

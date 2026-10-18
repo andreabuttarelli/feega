@@ -95,6 +95,7 @@ export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
   head: editor('read_head'),
   revisions: tool('list_motion_revisions'),
   restore: tool('restore_motion_revision'),
+  nameVersion: tool('motion_editor_op'),
   exported: editor('record_export'),
   poster: uiOnly('thumbnail the browser captures after a save (POST /api/v1/motion/{node}/poster, multipart); export_image makes stills for agents'),
   still: motion('export_image'),
