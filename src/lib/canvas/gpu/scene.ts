@@ -5,7 +5,9 @@ import { AssetSize, sized } from '../asset-url';
 import { Surface, type CardFace, type Media } from './card-face';
 import type { Box, Curve } from './geometry';
 import { createTextureCache, type TextureCache } from './texture-cache';
-import { Counter, count } from './frame-stats';
+import { Counter, count, exposeTextures } from './frame-stats';
+import { BUDGET, currentDevice, rendererResolution } from './memory-budget';
+import { textureReport, type SourceSize } from './texture-bytes';
 import { Backend } from './backend';
 import { ChromeLayer } from './chrome-layer';
 import type { IdleChrome } from './idle-chrome';
@@ -46,7 +48,7 @@ const SKELETON_BAR = 10;
 const SKELETON_WIDTHS = [0.9, 0.75, 0.82, 0.6];
 const THUMB_GAP = 4;
 
-const tierFor = (zoom: number) => TEXT_TIERS.find((t) => t >= zoom * devicePixelRatio) ?? TEXT_TIERS[TEXT_TIERS.length - 1];
+const tierFor = (zoom: number) => TEXT_TIERS.find((t) => t >= zoom * rendererResolution(devicePixelRatio, currentDevice())) ?? TEXT_TIERS[TEXT_TIERS.length - 1];
 
 type Built = { id: string; root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; skeletons: Graphics[]; media: Media | null; releases: (() => void)[] };
 
@@ -131,10 +133,11 @@ export class GpuScene {
     this.theme = theme;
     this.backend = app.renderer.name === 'webgpu' ? Backend.WebGPU : Backend.WebGL;
     this.grid = new TilingSprite({ texture: dotTexture(theme), width: app.screen.width, height: app.screen.height });
-    this.textures = createTextureCache(() => this.invalidate());
+    this.textures = createTextureCache(() => this.invalidate(), currentDevice());
     this.chrome = new ChromeLayer({ font: theme.font, ink: theme.inkSoft, size: LABEL_SIZE });
     this.world.addChild(this.cardLayer, this.chrome.root, this.overlay, this.peerLayer);
     app.stage.addChild(this.grid, this.world);
+    exposeTextures(() => textureReport((app.renderer.texture as unknown as { managedTextures: readonly (SourceSize | null)[] }).managedTextures));
     this.watchLoss();
     this.loop();
   }
@@ -165,9 +168,9 @@ export class GpuScene {
     await app.init({
       preference,
       resizeTo: host,
-      antialias: true,
+      antialias: BUDGET[currentDevice()].antialias,
       autoDensity: true,
-      resolution: devicePixelRatio,
+      resolution: rendererResolution(devicePixelRatio, currentDevice()),
       backgroundAlpha: 0,
       autoStart: false
     });
