@@ -40,8 +40,9 @@
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
   import { adoptCommitted, commitHub, rowsOf } from '$lib/canvas/commit-note';
-  import { canvasHub, canvasPeersOf, keepCanvasMark, landedAt, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
+  import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
+  import CursorChat from '$lib/components/canvas/CursorChat.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
@@ -58,6 +59,9 @@
   import { formatCredits } from '$lib/components/credit-amount-format';
   import { untrack } from 'svelte';
   import CanvasFlow from '$lib/components/canvas/CanvasFlow.svelte';
+  import { Renderer, rendererOf } from '$lib/canvas/gpu/renderer-flag';
+  import { postThumb, productThumb } from '$lib/canvas/source-thumbs';
+  import type GpuFlow from '$lib/components/canvas/gpu/GpuFlow.svelte';
   import GenNode from '$lib/components/canvas/GenNode.svelte';
   import IframeNode from '$lib/components/canvas/IframeNode.svelte';
   import DocNode from '$lib/components/canvas/DocNode.svelte';
@@ -1047,6 +1051,19 @@
   /** `type`/`data` grezzi di ogni tile — la forma che `commonPropertiesOf` legge, per la barra
    *  della selezione: `tiles` porta già `node: CanvasNode`, un'astrazione diversa che non ha
    *  `model`/`params` come campi diretti. */
+  function sourceThumbs(id: string): string[] {
+    const items = [...(shownPosts[id] ?? []).map(postThumb), ...(shownProducts[id] ?? []).map(productThumb), ...(influencersByNode[id]?.views ?? []).map((v) => v.url)];
+    return items.filter((url): url is string => !!url);
+  }
+
+  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Gpu ? null : (CanvasFlow as unknown as typeof GpuFlow));
+  $effect(() => {
+    if (Flow) {
+      return;
+    }
+    void import('$lib/components/canvas/gpu/GpuFlow.svelte').then((m) => (Flow = m.default));
+  });
+
   const nodeSummaries = $derived(nodes.map((n) => ({ id: n.id, type: n.type, data: n.data })));
 
   const DYNAMIC_PARAM_TYPES: ReadonlySet<string> = new Set<GenMedium>(['image', 'video', 'model3d']);
@@ -1071,6 +1088,14 @@
   let cursorMarks = $state(new Map<string, HeldMark>());
   let presenceNow = $state(0);
   const canvasPeers = $derived(canvasPeersOf(cursorMarks, cursorSession, presenceNow, (box) => tiles.some((t) => t.id === box.id && landedAt(t, box))));
+  let following = $state<string | null>(null);
+  let presenting = $state(false);
+  const followView = $derived(following ? followed(canvasPeers, following) : null);
+  const presenter = $derived(presenterOf(canvasPeers));
+  function spotlight(on: boolean) {
+    presenting = on;
+    cursors.port.update({ presenting: on });
+  }
   $effect(() => {
     const unlisten = cursors.port.listen((mark) => { cursorMarks = keepCanvasMark(untrack(() => cursorMarks), mark); presenceNow = Date.now(); });
     const sweep = setInterval(() => { presenceNow = Date.now(); }, PEER_SWEEP_MS);
@@ -1104,7 +1129,8 @@
   const places = createPlaceSaves({
     send,
     backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
-    onStatus: (status) => { placeStatus = status; keepOutbox(); }
+    onStatus: (status) => { placeStatus = status; keepOutbox(); },
+    announce: { intent: (row) => commits.publish([row]), refused: () => commits.publish([]) }
   });
 
   const lines = createOpQueue({
@@ -1411,6 +1437,7 @@
       onPeers: (value) => { peers = value; cursors.port.crowd(value.length + 1); },
       onLink: (state) => { canvasLink.set(state); },
       frames: frames.line,
+      frameHeads: frames.heads,
       cursors: cursors.line,
       commits: commits.line
     });
@@ -3107,12 +3134,19 @@
 <svelte:window bind:innerWidth={pageWidth} />
 
 <div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
-  {#if peers.length}
+  {#if peers.length || canvasPeers.length}
     {#if topPeers}
-      <Portal to={topPeers}><PeerAvatars {peers} /></Portal>
+      <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></Portal>
     {:else}
-      <div class="peers"><PeerAvatars {peers} /></div>
+      <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></div>
     {/if}
+  {/if}
+  <CursorChat onchat={(chat) => cursors.port.update({ chat })} />
+  {#if presenter && following !== presenter.userId}
+    <div class="presenting" role="status" data-testid="presenter-prompt">
+      {displayName(presenter.name)} is presenting
+      <button type="button" onclick={() => (following = presenter.userId)}>Follow</button>
+    </div>
   {/if}
   <p class="save-status" role="status" data-status={syncShown.state} aria-label={syncShown.label} title={syncShown.label}></p>
   {#if failed}
@@ -3158,7 +3192,8 @@
     onConfirm={onAudioOperationSwitchConfirmed}
   />
 
-  <CanvasFlow
+  {#if Flow}
+  <Flow
     actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
     tiles={withPeerMotion(tiles, canvasPeers, new Set(selectedIds))}
     {edges}
@@ -3204,9 +3239,14 @@
     catalogueSyncedFor={(type) => mediumCatalogue[type].synced}
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
+    thumbsOf={sourceThumbs}
+    onfail={() => (Flow = CanvasFlow as unknown as typeof GpuFlow)}
     peers={canvasPeers}
     onPointer={(cursor) => cursors.port.update({ cursor })}
     onLive={(live) => cursors.port.update({ live })}
+    onView={(view) => cursors.port.update({ view })}
+    onUserPan={() => (following = null)}
+    follow={followView}
   >
     {#snippet tile({ id, selected })}
       {@const row = nodes.find((n) => n.id === id)}
@@ -3421,7 +3461,8 @@
         {/if}
       {/if}
     {/snippet}
-  </CanvasFlow>
+  </Flow>
+  {/if}
   {#if showsEmptyState(nodes.length, inlineMotion)}
     <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
   {/if}
@@ -3604,6 +3645,8 @@
     margin-bottom: 0;
   }
 
+  .presenting { position: absolute; z-index: 10; left: 50%; top: 16px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 6px 12px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 9999px; font-size: 13px; }
+  .presenting button { border: 0; background: var(--ui-accent, #0090ff); color: white; border-radius: 9999px; padding: 2px 10px; cursor: pointer; }
   .peers { position: absolute; z-index: 10; right: 16px; top: 16px; }
 
   .save-status {

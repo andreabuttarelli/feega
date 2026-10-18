@@ -42,7 +42,7 @@
     {#if peer.cursor}
       <div class="cursor" data-testid="peer-cursor" data-user={peer.userId} style:transform="translate({peer.cursor.x}px, {peer.cursor.y}px) scale(var(--inverse))">
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M1 1 L1 13 L5 9.5 L8 15 L10 14 L7 8.5 L12 8.5 Z" fill={peer.colour} stroke="#fff" stroke-width="1" /></svg>
-        <span class="name" style:background={peer.colour}>{displayName(peer.name)}</span>
+        <span class="name" class:chat={!!peer.chat} style:background={peer.colour} data-testid={peer.chat ? 'peer-chat' : undefined}>{peer.chat ?? displayName(peer.name)}</span>
       </div>
     {/if}
   {/each}
@@ -53,5 +53,6 @@
   .outline { position: absolute; border-style: solid; box-sizing: border-box; }
   .outline.live { transition: left 50ms linear, top 50ms linear, width 50ms linear, height 50ms linear; }
   .cursor { position: absolute; left: 0; top: 0; transform-origin: 0 0; transition: transform 50ms linear; will-change: transform; }
+  .name.chat { padding: 6px 12px; font-size: 13px; line-height: 16px; white-space: normal; max-width: 240px; }
   .name { position: absolute; left: 14px; top: 14px; padding: 2px 6px; color: #fff; font-size: 11px; line-height: 14px; white-space: nowrap; border-radius: 9999px; }
 </style>

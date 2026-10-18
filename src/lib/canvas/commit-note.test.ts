@@ -47,8 +47,8 @@ describe('rowsOf', () => {
     expect(rowsOf('write', {}, { node: { id: 'n', version: 4, data: { a: 1 } } })).toEqual([{ id: 'n', version: 4, data: { a: 1 } }]);
   });
 
-  it('a move carries the position it asked for', () => {
-    expect(rowsOf('move', { node_id: 'n', x: 3, y: 4 }, {})).toEqual([{ id: 'n', x: 3, y: 4 }]);
+  it('a move was announced when it was asked for, so its confirmation is silent', () => {
+    expect(rowsOf('move', { node_id: 'n', x: 3, y: 4 }, {})).toBeNull();
   });
 
   it('any other action is a bare nudge', () => {

@@ -1,7 +1,7 @@
 import type { RealtimeChannel, RealtimePostgresChangesPayload, SupabaseClient } from '@supabase/supabase-js';
 import { dedupePresence, type PresencePeer } from './presence-peers';
 import { ChannelStatus, createLink, type LinkPort, type LinkState } from './connection-link';
-import { FRAME_EVENT, type FrameLine } from './frame-presence';
+import { FRAME_EVENT, FRAME_HEAD_EVENT, type FrameLine, type HeadLine } from './frame-presence';
 import { CANVAS_PEER_EVENT, type CanvasLine } from './canvas-presence';
 import { COMMIT_EVENT, type CommitLine } from '$lib/canvas/commit-note';
 
@@ -24,6 +24,7 @@ type CanvasConnection = {
 	onCanvasList: () => void;
 	onLink: (state: LinkState) => void;
 	frames?: FrameLine;
+	frameHeads?: HeadLine;
 	cursors?: CanvasLine;
 	commits?: CommitLine;
 	environment?: LinkEnvironment;
@@ -58,7 +59,7 @@ export function connectCanvas(options: CanvasConnection): () => void {
 	const environment = options.environment ?? browserEnvironment;
 	let closed = false;
 	let channel: RealtimeChannel | null = null;
-	const lines = ([[FRAME_EVENT, options.frames], [CANVAS_PEER_EVENT, options.cursors], [COMMIT_EVENT, options.commits]] as const)
+	const lines = ([[FRAME_EVENT, options.frames], [CANVAS_PEER_EVENT, options.cursors], [COMMIT_EVENT, options.commits], [FRAME_HEAD_EVENT, options.frameHeads]] as const)
 		.flatMap(([event, line]) => (line ? [{ event, line: line as BroadcastLine }] : []));
 
 	const link = createLink({

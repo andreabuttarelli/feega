@@ -4,6 +4,8 @@ import type { NarrowedDatabase } from '$lib/server/db/typed-database';
 import { actorCols, edgeActorCols, type Actor } from './actor';
 import { recordEvent } from './canvas-events';
 import { clashingKeys, mergeNodeData } from '$lib/canvas/node-patch';
+import { nestsInItself } from '$lib/canvas/group-cycle';
+import { layoutOf } from '$lib/canvas/node-layout';
 import { validateNodeData } from '$lib/canvas/node-data';
 
 /**
@@ -498,6 +500,16 @@ export type PatchWrite =
   | { outcome: 'gone' };
 
 const PATCH_MAX_ATTEMPTS = 5;
+const NESTED_IN_ITSELF = 'a node cannot join a group it contains';
+
+async function joinsOwnDescendant(db: Db, orgId: string, node: CanvasNodeRecord, patch: Record<string, unknown>): Promise<boolean> {
+  if (typeof patch.groupId !== 'string') {
+    return false;
+  }
+  const nodes = await listNodes(db, { orgId, canvasId: node.canvasId });
+  const parents = new Map(nodes.map((n) => [n.id, layoutOf(n.data).groupId]));
+  return nestsInItself(parents, node.id, patch.groupId);
+}
 
 export async function patchNodeData(
   db: Db,
@@ -514,6 +526,10 @@ export async function patchNodeData(
     const before = await findNode(db, { orgId: input.orgId, nodeId: input.nodeId });
     if (!before) {
       return { outcome: 'gone' };
+    }
+
+    if (await joinsOwnDescendant(db, input.orgId, before, input.patch)) {
+      return { outcome: 'invalid', error: NESTED_IN_ITSELF };
     }
 
     const keys = input.base ? clashingKeys(before.data, input.base, input.patch) : [];
