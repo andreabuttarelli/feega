@@ -123,7 +123,7 @@ between the two is the point.
 
 ### properties panel
 
-The right panel reads like Figma's: a head with the selection's icon, name and kind, then
+The right panel reads like a design tool's: a head with the selection's icon, name and kind, then
 sections in one fixed order — Layout, Layer, Fill, Stroke, Effects, Text, Animation (Motion mode
 only). Which sections a selection gets is one table (`src/lib/motion/properties-view.ts`); which
 section a field lands in is another (`src/lib/motion/inspector-sections.ts`).
@@ -162,7 +162,7 @@ Panels that open or fold (the timeline in Design mode) move on `--ease-expo-out`
 
 ### selecting inside a frame
 
-Figma's drill-in. A depth is what is selected: the canvas (frame closed), the frame (open,
+The drill-in of design tools. A depth is what is selected: the canvas (frame closed), the frame (open,
 nothing inside), a clip, a part (a poster line, a photo, a text). One table decides every gesture
 (`DRILL` in `src/lib/motion/drill.ts`); a new case is a row there, never an `if` elsewhere.
 
