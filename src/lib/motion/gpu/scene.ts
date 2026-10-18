@@ -84,7 +84,7 @@ function particleBakes(doc: Document): Map<string, ParticleBake> {
 }
 
 function paintOf(layer: Element, bakes: Map<string, ParticleBake> = new Map()): { el: HTMLElement; paint: Paint } | null {
-  const canvas = layer.querySelector(`:scope > .fx > .cc > canvas[id^="${PARTICLE_CANVAS}"]`) as HTMLElement | null;
+  const canvas = layer.querySelector(`.cc > canvas[id^="${PARTICLE_CANVAS}"]`) as HTMLElement | null;
   const bake = canvas ? bakes.get(canvas.id.slice(PARTICLE_CANVAS.length)) : undefined;
   if (canvas && bake && bake.shape !== 'sprite') {
     return { el: canvas, paint: { kind: PaintKind.Particles, bake } };
