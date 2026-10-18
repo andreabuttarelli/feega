@@ -384,16 +384,22 @@
       });
       return;
     }
-    hoverTimer = setTimeout(() => (hoverLive = id), HOVER_INTENT_MS);
+    hoverTimer = setTimeout(() => void quiet().then(() => (hoverLive = hovered === id ? id : hoverLive)), HOVER_INTENT_MS);
   });
 
   function trackFocus(e: FocusEvent) {
     focusLive = (e.target as HTMLElement | null)?.closest<HTMLElement>('.gpu-dom-node')?.dataset.id ?? null;
   }
 
+  let schedulerTick = $state(0);
   $effect(() => {
+    void schedulerTick;
     if (shotJob || !scene) {
       return;
+    }
+    if (performance.now() < busyUntil) {
+      const t = setTimeout(() => schedulerTick++, BUSY_MS);
+      return () => clearTimeout(t);
     }
     const due = placed.filter(snapshotKind);
     const seen = visibleIds(due, view, area);
@@ -461,12 +467,11 @@
         if (el && scene) {
           fontCss ??= await withTimeout(getFontEmbedCSS(el), SNAPSHOT_TIMEOUT_MS);
           const options = { pixelRatio: SNAPSHOT_PIXEL_RATIO, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL };
+          const foreign = [...el.querySelectorAll('img')].some((img) => crossOrigin(img.currentSrc || img.src));
+          const keep = (n: Node) => !(n instanceof HTMLImageElement && crossOrigin(n.currentSrc || n.src));
           await quiet();
-          let canvas = await withTimeout(toCanvas(el, options), SNAPSHOT_TIMEOUT_MS);
-          if (tainted(canvas)) {
-            canvas = await withTimeout(toCanvas(el, { ...options, filter: (n) => !(n instanceof HTMLImageElement && crossOrigin(n.currentSrc || n.src)) }), SNAPSHOT_TIMEOUT_MS);
-          }
-          if (tainted(canvas)) {
+          const canvas = await withTimeout(toCanvas(el, foreign ? { ...options, filter: keep } : options), SNAPSHOT_TIMEOUT_MS);
+          if (foreign && tainted(canvas)) {
             throw new Error('tainted snapshot');
           }
           showSnapshot(id, key, await createImageBitmap(canvas));
@@ -630,9 +635,18 @@
     props.onSelectionChange?.(ids);
   }
 
-  function screenSize() {
+  let surfaceRect: { width: number; height: number; left: number; top: number } | null = null;
+
+  function measureSurface() {
     const r = surface?.getBoundingClientRect();
-    return { width: r?.width ?? innerWidth, height: r?.height ?? innerHeight, left: r?.left ?? 0, top: r?.top ?? 0 };
+    surfaceRect = r ? { width: r.width, height: r.height, left: r.left, top: r.top } : null;
+  }
+
+  function screenSize() {
+    if (!surfaceRect?.width) {
+      measureSurface();
+    }
+    return surfaceRect ?? { width: innerWidth, height: innerHeight, left: 0, top: 0 };
   }
 
   function boundsOf(boxes: Box[]): { x: number; y: number; width: number; height: number } | null {
@@ -804,6 +818,7 @@
 
   function onDown(e: PointerEvent) {
     markBusy();
+    measureSurface();
     const p = local(e);
     if (e.pointerType === 'touch') {
       touches.set(e.pointerId, p);
@@ -1448,6 +1463,7 @@
     let alive = true;
     let built: GpuScene | null = null;
     const observer = new ResizeObserver(() => {
+      measureSurface();
       built?.resize();
       area = { width: surface!.clientWidth, height: surface!.clientHeight };
     });
@@ -1528,6 +1544,7 @@
     onpointerup={onUp}
     onpointercancel={onUp}
     onwheel={onWheel}
+    onpointerenter={measureSurface}
     onclick={onClickInside}
     ondblclick={onDouble}
     oncontextmenu={onContextMenu}
