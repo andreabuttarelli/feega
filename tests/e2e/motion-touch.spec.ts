@@ -97,6 +97,20 @@ async function openEditor(page: Page, url: string): Promise<void> {
   }
 }
 
+async function openProperties(page: Page) {
+  const properties = page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' });
+  if ((await properties.getAttribute('aria-pressed')) !== 'true') {
+    await properties.click();
+  }
+}
+
+async function closeProperties(page: Page) {
+  const properties = page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' });
+  if ((await properties.getAttribute('aria-pressed')) === 'true') {
+    await properties.click();
+  }
+}
+
 test.describe('motion editor a dito @real', () => {
   test.skip(!REAL_STACK, 'richiede uno stack disposable: E2E_REAL_STACK=1');
 
@@ -162,7 +176,7 @@ test.describe('motion editor a dito @real', () => {
     test('una pressione lunga sul clip apre il suo menu, e da lì si sceglie il parent', async ({ page, session, seedNode }) => {
       const node = await seedNode({ type: 'motion', data: MOTION_DATA });
       await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
-      await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' }).click();
+      await closeProperties(page);
 
       await expect(page.getByTestId('clip-bar')).toBeVisible();
       await longPress(page, '[data-layer="bar-1"] .bar');
@@ -180,7 +194,7 @@ test.describe('motion editor a dito @real', () => {
     test('Select several aggiunge clip con un tocco, senza tasti', async ({ page, session, seedNode }) => {
       const node = await seedNode({ type: 'motion', data: MOTION_DATA });
       await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
-      await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' }).click();
+      await closeProperties(page);
 
       await page.getByTestId('clip-bar').getByRole('button', { name: 'Select several' }).click();
       await page.locator('[data-layer="bar-1"] .bar').first().tap();
@@ -256,7 +270,7 @@ test.describe('motion editor a dito @real', () => {
       await page.getByTestId('motion-preview').tap();
 
       await expect(page.getByRole('button', { name: 'Play', exact: true })).toBeVisible();
-      await expect(page.getByTestId('clip-bar')).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Properties' }), 'the tapped clip is selected: Properties peeks').toHaveAttribute('aria-pressed', 'true');
       if (SHOTS) {
         await page.screenshot({ path: `${SHOTS}/iphone-tap-while-playing.png` });
       }
@@ -270,6 +284,7 @@ test.describe('motion editor a dito @real', () => {
       const node = await seedNode({ type: 'motion', data: MOTION_DATA });
       await openEditor(page, `/p/${session.projectId}/c/${session.canvasId}/motion/${node.id}`);
 
+      await openProperties(page);
       const sheet = page.getByRole('complementary', { name: 'Properties' });
       await expect(sheet).toBeVisible();
       const stage = (await page.getByRole('region', { name: 'Preview' }).boundingBox())!;
@@ -290,7 +305,7 @@ test.describe('motion editor a dito @real', () => {
       const transport = page.getByRole('group', { name: 'Transport' });
       await expect(transport).toBeVisible();
 
-      await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Agent' }).click();
+      await page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chat' }).click();
       const sheet = page.getByRole('complementary', { name: 'Agent' });
       const grabber = sheet.getByTestId('sheet-grabber');
       await expect(grabber).toHaveAttribute('data-detent', 'half');
