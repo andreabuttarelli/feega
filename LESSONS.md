@@ -3095,3 +3095,6 @@ Signal: `?renderer=dom` answers 500 on a canvas that has a group; the same page 
 
 ### Play jumps to the start and never gets past frame 1
 Signal: Space or Play moves the playhead to a fixed frame, and the timecode flips between it and the next frame; the player is not paused. Cause: the doc has a `workArea` one frame long (an out point set at frame 0), and playback loops inside it. Move: read `workArea` in the doc before suspecting the player, the GPU engine or the interactive runtime.
+
+### Every e2e spec fails at collection with "needs an import attribute of type: json"
+Signal: `npx playwright test` lists 0 tests; the error names a `.json` under `src/lib`. Cause: a spec imports an app module (`frame-custom-size.spec.ts` → `timeline`/`editor-mount` → `still.ts`), and a new import in that chain reaches a module that imports JSON without `with { type: 'json' }`, which Playwright's Node loader rejects. Move: keep modules that e2e specs import free of JSON-importing dependencies; check with `npx playwright test --list` before pushing.
