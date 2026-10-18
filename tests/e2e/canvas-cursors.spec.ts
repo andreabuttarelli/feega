@@ -1,4 +1,4 @@
-import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { test, expect, REAL_STACK, gotoHydrated, signInE2e } from './fixtures/session';
 import doc from './fixtures/motion-doc.json' with { type: 'json' };
 
 const DESKTOP = { width: 1280, height: 860 };
@@ -87,5 +87,27 @@ test.describe('canvas cursors across two tabs @real', () => {
     const latency = Date.now() - started;
     console.log(JSON.stringify({ committedMoveLatencyMs: latency }));
     expect(latency).toBeLessThan(COMMIT_LATENCY_MS);
+  });
+
+  test('spotlight: the other person is offered to follow, and their view then tracks mine', async ({ page, browser, session }) => {
+    const path = `/p/${session.projectId}/c/${session.canvasId}`;
+    const elsewhere = await browser.newContext({ viewport: DESKTOP });
+    const other = await elsewhere.newPage();
+    await signInE2e(other, { email: session.email, password: session.password });
+    await gotoHydrated(page, path);
+    await gotoHydrated(other, path);
+
+    await page.getByTestId('spotlight').click();
+    await other.getByTestId('presenter-prompt').getByRole('button', { name: 'Follow' }).click();
+    const viewOf = (p: typeof page) => p.locator('.svelte-flow__viewport').first().getAttribute('style');
+    const before = await viewOf(other);
+    const mineBefore = await viewOf(page);
+
+    await page.mouse.move(600, 400);
+    await page.mouse.wheel(300, 200);
+    await expect.poll(() => viewOf(page), { timeout: 5000 }).not.toBe(mineBefore);
+    await expect.poll(() => viewOf(other), { timeout: 5000 }).not.toBe(before);
+    await expect(other.getByTestId('presenter-prompt')).toHaveCount(0);
+    await elsewhere.close();
   });
 });

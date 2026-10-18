@@ -40,7 +40,8 @@
   import CanvasMeasure from './CanvasMeasure.svelte';
   import { tileGaps } from '$lib/canvas/measure';
   import { snapDrag, type SnapGuide } from '$lib/canvas/snap';
-  import type { CanvasPeer, LiveBox } from '$lib/realtime/canvas-presence';
+  import CanvasFollow from './CanvasFollow.svelte';
+  import type { CanvasPeer, LiveBox, View } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import CanvasAddBar from './CanvasAddBar.svelte';
   import { BarContext } from '$lib/canvas/bottom-bar';
@@ -195,6 +196,9 @@
     peers = [],
     onPointer,
     onLive,
+    onView,
+    onUserPan,
+    follow = null,
     tile
   }: {
     actionUrl?: (action: string) => string;
@@ -307,6 +311,9 @@
     peers?: CanvasPeer[];
     onPointer?: (at: { x: number; y: number } | null) => void;
     onLive?: (boxes: LiveBox[]) => void;
+    onView?: (view: View) => void;
+    onUserPan?: () => void;
+    follow?: View | null;
     tile: import('svelte').Snippet<[{ id: string; selected: boolean }]>;
     mode?: CanvasMode;
   } = $props();
@@ -925,7 +932,7 @@
     {isValidConnection}
     onconnectend={() => (refusal = null)}
     {...spec.flow}
-    onmovestart={() => (moving = true)}
+    onmovestart={(event) => { moving = true; if (event) { onUserPan?.(); } }}
     onmoveend={() => (moving = false)}
     fitView
     fitViewOptions={{ padding: FIT_PADDING, maxZoom: READABLE_ZOOM }}
@@ -972,6 +979,7 @@
     {#if measured.length || snapGuides.length}
       <CanvasMeasure gaps={measured} guides={snapGuides} />
     {/if}
+    <CanvasFollow view={follow} {onView} />
   </SvelteFlow>
 
   {#if refusal}
