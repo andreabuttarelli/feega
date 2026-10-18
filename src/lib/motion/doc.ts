@@ -376,6 +376,15 @@ export function parseMotionDoc(input: unknown): DocVerdict {
   return { ok: true, doc };
 }
 
+export enum DocMode {
+  Video = 'video',
+  Still = 'still'
+}
+
+export function docMode(doc: Pick<MotionDoc, 'still'>): DocMode {
+  return doc.still ? DocMode.Still : DocMode.Video;
+}
+
 export function newMotionDoc(format: MotionFormat): MotionDoc {
   const { width, height } = FORMATS[format];
   return {

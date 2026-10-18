@@ -23,6 +23,25 @@ describe('the motion agent makes still graphics', () => {
     expect(await run('get_motion_doc', {})).toMatchObject({ still: { time: 2 } });
   });
 
+  it('set_canvas with still turns a video into a design frame on a transparent background, unless one is asked', async () => {
+    const plain = setup();
+    await plain.run('set_canvas', { still: 0 });
+    expect(plain.session.doc.background).toBe('transparent');
+
+    const branded = setup();
+    await branded.run('set_canvas', { still: 0, background: 'brand' });
+    expect(branded.session.doc.background).toBe('brand');
+  });
+
+  it('add_clip on a still spans the whole frame', async () => {
+    const { run, session } = setup();
+    await run('set_canvas', { still: 0 });
+
+    await run('add_clip', { component: 'Title', props: {}, from: 1 });
+
+    expect(session.doc.tracks[0].clips[0]).toMatchObject({ from: 0, durationInFrames: session.doc.durationInFrames });
+  });
+
   it('set_canvas with still false makes it a video again', async () => {
     const { run, session } = setup();
     await run('set_canvas', { still: 1 });
