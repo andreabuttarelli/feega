@@ -11,7 +11,7 @@ import { Backend } from './backend';
 export { Backend };
 
 
-export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean };
+export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean; snapshot: string | null };
 export type Peer = { id: string; name: string; color: string; at: { x: number; y: number } };
 export type Overlay = {
   selected: (Box & { id: string })[];
@@ -86,7 +86,7 @@ function place(sprite: Sprite, tex: Texture, box: Box, fit: Fit) {
 }
 
 function faceKey(c: Card): string {
-  return JSON.stringify([c.w, c.h, c.face]);
+  return c.snapshot ? `snap:${c.w}:${c.h}:${c.snapshot}` : JSON.stringify([c.w, c.h, c.face]);
 }
 
 function cover(tex: Texture, w: number, h: number): Texture {
@@ -124,6 +124,7 @@ export class GpuScene {
   onReady: ((drawn: Set<string>) => void) | null = null;
   private ready = new Set<string>();
   private retiring = new Map<string, Built>();
+  private snapshots = new Map<string, { key: string; tex: Texture }>();
   private bar: Texture | null = null;
   private dim: { body: number; edges: number } | null = null;
 
@@ -227,6 +228,14 @@ export class GpuScene {
     this.cull();
     this.drawOverlay();
     this.invalidate();
+  }
+
+  setSnapshot(id: string, key: string, bitmap: ImageBitmap) {
+    const old = this.snapshots.get(id);
+    this.snapshots.set(id, { key, tex: Texture.from(bitmap) });
+    if (old) {
+      queueMicrotask(() => old.tex.destroy(true));
+    }
   }
 
   setDim(dim: { body: number; edges: number } | null) {
@@ -462,7 +471,18 @@ export class GpuScene {
       },
       [Surface.Blank]: () => this.panel(root, c)
     };
-    BUILD[f.surface]();
+    const snap = c.snapshot ? this.snapshots.get(c.id) : undefined;
+    if (snap && snap.key === c.snapshot) {
+      const sprite = new Sprite(snap.tex);
+      sprite.width = c.w;
+      sprite.height = c.h;
+      root.addChild(sprite);
+      b.body = sprite;
+      b.media = { url: snap.key, video: false };
+      queueMicrotask(() => this.markReady(b));
+    } else {
+      BUILD[f.surface]();
+    }
     this.cardLayer.addChild(holder);
     return b;
   }

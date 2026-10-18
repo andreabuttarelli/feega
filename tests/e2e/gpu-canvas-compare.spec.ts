@@ -166,4 +166,20 @@ test.describe('GPU canvas against the DOM canvas on a real canvas @perf @real', 
       }
     });
   }
+
+  test('the real heavy canvas copy, DOM vs GPU', async ({ page }) => {
+    test.skip(!process.env.GPU_FIXTURE_CANVAS, 'GPU_FIXTURE_PROJECT + GPU_FIXTURE_CANVAS');
+    await page.setViewportSize(DESKTOP);
+    await page.addInitScript(instrument);
+    const out: Record<string, unknown> = {};
+    for (const renderer of ['dom', 'webgpu']) {
+      await page.goto(`/p/${process.env.GPU_FIXTURE_PROJECT}/c/${process.env.GPU_FIXTURE_CANVAS}?renderer=${renderer}`);
+      await expect(page.locator('.svelte-flow__node').first()).toBeVisible({ timeout: 60_000 });
+      await page.waitForTimeout(renderer === 'dom' ? SETTLE_MS : 25_000);
+      const pan = await measure(page, SWEEP_MS, (until) => wheelPan(page, until));
+      const zoom = await measure(page, SWEEP_MS, (until) => wheelZoom(page, until));
+      out[renderer] = { pan, zoom, domNodes: await page.evaluate(() => document.getElementsByTagName('*').length) };
+    }
+    console.log(`[gpu-real] ${JSON.stringify(out)}`);
+  });
 });
