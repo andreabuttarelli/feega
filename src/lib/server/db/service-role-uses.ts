@@ -54,7 +54,7 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     tables: ['posts', 'node_runs', 'ai_calls']
   },
   {
-    path: 'src/lib/server/tenancy/bootstrap.ts — createFirstOrg',
+    path: 'src/lib/server/tenancy/bootstrap.ts — createFirstOrg (also every org made with "New organisation", team/orgs.ts createOrg)',
     why: "Alla creazione non esiste ancora una riga in orgs_members, quindi auth_org_ids() è vuoto e la policy rifiuterebbe l'insert della org e del suo primo membro. È l'unico punto in cui la RLS non può funzionare per costruzione: l'appartenenza sta nascendo. Non accetta un org_id da chi chiama — lo crea, e il membro è sempre l'utente della sessione. Legge/scrive anche credit_ledger (assertFreeOrgLimit, grantWelcomeCredits): il limite di org gratuite e il benvenuto sono decisi qui, non altrove.",
     tables: ['orgs', 'orgs_members', 'credit_ledger']
   },

@@ -342,6 +342,14 @@ const orgs = program
   });
 
 orgs
+  .command('create <name>')
+  .description('Create an organisation you own and make it active')
+  .action(async (name: string) => {
+    const { cmdOrgsCreate } = await import('./commands/orgs.ts');
+    await cmdOrgsCreate(name);
+  });
+
+orgs
   .command('use <orgId>')
   .description('Make an organisation active for the web app, the CLI and agents')
   .action(async (orgId: string) => {

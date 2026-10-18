@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fakeDb } from '$lib/server/db/fake-db';
-import { orgsOf, switchOrg, SwitchOutcome } from '$lib/server/team/orgs';
+import { FreeOrgLimitReachedError } from '$lib/server/tenancy/free-org-limit';
+import { createOrg, CreateOutcome, orgsOf, switchOrg, SwitchOutcome } from '$lib/server/team/orgs';
 
 const USER = 'user-1';
 
@@ -39,5 +40,34 @@ describe("cambiare org attiva", () => {
       ['b', true],
       ['a', false]
     ]);
+  });
+});
+
+describe('nuova organizzazione', () => {
+  it("la crea con chi la chiede come owner e la rende attiva", async () => {
+    const { db, calls } = fakeDb({ profiles: [] });
+    const createFirstOrg = vi.fn(async () => ({ orgId: 'new', slug: 'acme-1', role: 'owner' as const }));
+
+    const created = await createOrg(db, { createFirstOrg }, { userId: USER, name: '  Acme  ' });
+
+    expect(created).toEqual({ outcome: CreateOutcome.Created, orgId: 'new' });
+    expect(createFirstOrg).toHaveBeenCalledWith({ userId: USER, name: 'Acme' });
+    expect(calls.find((c) => c.table === 'profiles' && c.op === 'update')?.payload).toEqual({ active_org_id: 'new' });
+  });
+
+  it('oltre il limite di org gratuite non la crea, e lo dice', async () => {
+    const { db } = fakeDb({});
+    const createFirstOrg = vi.fn(async () => {
+      throw new FreeOrgLimitReachedError();
+    });
+
+    expect(await createOrg(db, { createFirstOrg }, { userId: USER, name: 'Acme' })).toEqual({ outcome: CreateOutcome.FreeLimit });
+  });
+
+  it('un nome vuoto non crea niente', async () => {
+    const createFirstOrg = vi.fn();
+
+    expect(await createOrg(fakeDb({}).db, { createFirstOrg }, { userId: USER, name: '   ' })).toEqual({ outcome: CreateOutcome.InvalidName });
+    expect(createFirstOrg).not.toHaveBeenCalled();
   });
 });
