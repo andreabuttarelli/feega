@@ -37,6 +37,8 @@
   import CanvasTile from './CanvasTile.svelte';
   import CanvasPointer from './CanvasPointer.svelte';
   import CanvasPeers from './CanvasPeers.svelte';
+  import CanvasMeasure from './CanvasMeasure.svelte';
+  import { tileGaps } from '$lib/canvas/measure';
   import type { CanvasPeer, LiveBox } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import CanvasAddBar from './CanvasAddBar.svelte';
@@ -898,6 +900,13 @@
   const tileRects = $derived(new Map(tiles.map((t) => [t.id, t])));
   const tileRect = (id: string) => tileRects.get(id) ?? null;
 
+  let altHeld = $state(false);
+  let hoveredTile = $state<string | null>(null);
+  const measured = $derived.by(() => {
+    const hovered = hoveredTile && altHeld ? tileRect(hoveredTile) : null;
+    return hovered ? tileGaps(selection.ids.flatMap((id) => tileRect(id) ?? []), hovered) : [];
+  });
+
   const tierBoard = provideTierBoard();
   const posters = $derived(new Map(tiles.flatMap((t) => (t.poster ? [[t.id, t.poster] as const] : []))));
 </script>
@@ -935,7 +944,9 @@
     ed era invece una cancellazione a metà, locale e muta. ⌫ resta uno: lo riconosce
     `shortcuts.ts` e lo esegue `CanvasKeys`, che passa da chi la riga ce l'ha davvero.
   -->
-  <SvelteFlow
+<SvelteFlow
+    onnodepointerenter={({ node }) => (hoveredTile = node.id)}
+    onnodepointerleave={() => (hoveredTile = null)}
     minZoom={MIN_ZOOM}
     bind:nodes
     bind:edges
@@ -995,6 +1006,9 @@
     <CanvasPosterLayer {posters} />
     {#if peers.length}
       <CanvasPeers {peers} rectOf={tileRect} />
+    {/if}
+    {#if measured.length}
+      <CanvasMeasure gaps={measured} />
     {/if}
   </SvelteFlow>
 
@@ -1105,7 +1119,10 @@
 </div>
 
 <svelte:window
+  onkeyup={(e) => (altHeld = e.altKey)}
+  onblur={() => (altHeld = false)}
   onkeydown={(e) => {
+    altHeld = e.altKey;
     if (e.key !== 'Escape') return;
     picked = null;
     refusal = null;
