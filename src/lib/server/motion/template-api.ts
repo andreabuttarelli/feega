@@ -8,7 +8,8 @@ import { motionOf } from '$lib/canvas/motion-node';
 import { cardDetail } from '$lib/motion/template/card';
 import { templateCard } from '$lib/motion/template/cards';
 import { insertTemplate, setTemplateValues, templateFields } from '$lib/motion/template/library';
-import { headOrNew, saveMotionDoc } from './editor';
+import { headOrNew } from './editor';
+import { commitOnto } from './frame-ops';
 import { templateLibrary } from './templates';
 import { withTemplateSounds, type SfxMaker } from './template-sounds';
 import { laySfx } from './sfx';
@@ -81,7 +82,7 @@ export async function addTemplate(db: Db, scope: NodeScope, raw: unknown, sfx?: 
   const sounded = body.data.sound ? await withTemplateSounds(filled.doc, placed.clipId, make, newId) : filled;
   const doc = sounded.ok ? sounded.doc : filled.doc;
 
-  const write = await saveMotionDoc(db, { orgId: scope.orgId, nodeId: scope.nodeId, expectedVersion: head.version, doc, actor, summary: `Inserted ${entry.template.name}` });
+  const write = await commitOnto(db, { orgId: scope.orgId, nodeId: scope.nodeId, expectedVersion: head.version, doc, actor, summary: `Inserted ${entry.template.name}` });
   if (write.outcome !== RevisionOutcome.Written) {
     return refuse(write.outcome === RevisionOutcome.Invalid ? write.error : 'conflict', HTTP_CONFLICT);
   }

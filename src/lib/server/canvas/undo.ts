@@ -1,6 +1,6 @@
 import type { Db } from '$lib/server/db/client';
 import { readHead, readRevision } from '$lib/server/repos/motion-revisions';
-import { saveMotionDoc } from '$lib/server/motion/editor';
+import { commitOnto } from '$lib/server/motion/frame-ops';
 import type { Actor } from '$lib/server/repos/actor';
 import {
   deleteConnection,
@@ -125,7 +125,7 @@ async function applyWrite(db: Db, orgId: string, canvasId: string, write: Invers
     case 'restore_doc': {
       const old = await readRevision(db, { orgId, nodeId: write.nodeId, version: write.version });
       if (old) {
-        await saveMotionDoc(db, { orgId, nodeId: write.nodeId, expectedVersion: write.expectedVersion, doc: old.doc, actor, summary: `Undid back to version ${write.version}` });
+        await commitOnto(db, { orgId, nodeId: write.nodeId, expectedVersion: write.expectedVersion, doc: old.doc, actor, summary: `Undid back to version ${write.version}` });
       }
       return;
     }

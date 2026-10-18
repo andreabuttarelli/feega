@@ -5,7 +5,8 @@ import { diffDoc } from '$lib/motion/doc-ops';
 import { appendRevision, readHead } from '$lib/server/repos/motion-revisions';
 import { revisionsDb } from '$lib/server/repos/motion-revisions.test';
 import type { Db } from '$lib/server/db/client';
-import { OpsOutcome, commitDoc, commitOps } from './frame-ops';
+import { OpsOutcome, commitDoc, commitOnto, commitOps } from './frame-ops';
+import { RevisionOutcome } from '$lib/server/repos/motion-revisions';
 
 vi.mock('$lib/server/repos/canvas', async (real) => ({ ...(await real<object>()), patchNodeData: vi.fn(async () => ({ ok: true })) }));
 
@@ -124,5 +125,26 @@ describe('committing a whole doc edited from an older head', () => {
     expect(out.outcome).toBe(OpsOutcome.Written);
     const head = await readHead(db, scope);
     expect([textOf(head?.doc, 'a'), textOf(head?.doc, 'b')]).toEqual(['agent', 'typed by hand']);
+  });
+});
+
+describe('commitOnto: a whole-doc write lands as ops on whatever head is current', () => {
+  it('a write based on an older version keeps the edit that landed meanwhile', async () => {
+    const { db } = await seeded();
+    await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 1, doc: retext(start(), 'b', 'B'), actor: bo });
+
+    const out = await commitOnto(db, { orgId: ORG, nodeId: NODE, expectedVersion: 1, doc: retext(start(), 'a', 'A'), actor: ana, summary: 'Ana' });
+
+    expect(out.outcome).toBe(RevisionOutcome.Written);
+    const head = await readHead(db, scope);
+    expect([textOf(head?.doc, 'a'), textOf(head?.doc, 'b')]).toEqual(['A', 'B']);
+  });
+
+  it('the first revision of a new frame is written as is', async () => {
+    const { db } = revisionsDb();
+
+    const out = await commitOnto(db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: start(), actor: ana, summary: null });
+
+    expect(out).toMatchObject({ outcome: RevisionOutcome.Written, head: { version: 1 } });
   });
 });

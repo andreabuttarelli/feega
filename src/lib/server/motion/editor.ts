@@ -42,9 +42,9 @@ export async function findMotionNode(db: Db, scope: { orgId: string; nodeId: str
   return record && node ? { record, node } : null;
 }
 
-export const newHead = (node: MotionNode): MotionHead => ({ version: 0, doc: newMotionDoc(node.format), summary: null, actorKind: 'system' });
+export const newHead = (node: Pick<MotionNode, 'format'>): MotionHead => ({ version: 0, doc: newMotionDoc(node.format), summary: null, actorKind: 'system' });
 
-export async function headOrNew(db: Db, scope: { orgId: string; nodeId: string }, node: MotionNode): Promise<MotionHead> {
+export async function headOrNew(db: Db, scope: { orgId: string; nodeId: string }, node: Pick<MotionNode, 'format'>): Promise<MotionHead> {
   return (await readHead(db, scope)) ?? newHead(node);
 }
 
