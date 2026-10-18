@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Gesture } from '$lib/motion/drill';
+import { Depth, Gesture } from '$lib/motion/drill';
 import { drillRequests } from './frame-drill';
 
 describe('a drill asked on a closed frame', () => {
@@ -7,7 +7,7 @@ describe('a drill asked on a closed frame', () => {
     const asks = drillRequests(() => 0);
     asks.request('a', { x: 0.4, y: 0.1 }, Gesture.Double);
     expect(asks.take('b')).toBeNull();
-    expect(asks.take('a')).toEqual({ at: { x: 0.4, y: 0.1 }, gesture: Gesture.Double });
+    expect(asks.take('a')).toEqual({ at: { x: 0.4, y: 0.1 }, gesture: Gesture.Double, from: Depth.Canvas });
     expect(asks.take('a')).toBeNull();
   });
 
@@ -25,5 +25,17 @@ describe('a drill asked on a closed frame', () => {
     asks.request('a', { x: 0.5, y: 0.5 }, Gesture.Deep);
     now = 10_000;
     expect(asks.take('a')).toBeNull();
+  });
+
+  it('Enter on a selected frame asks from inside the frame, with no point', () => {
+    const asks = drillRequests(() => 0);
+    asks.request('a', null, Gesture.Enter, Depth.Frame);
+    expect(asks.take('a')).toEqual({ at: null, gesture: Gesture.Enter, from: Depth.Frame });
+  });
+
+  it('a pointer gesture starts from the canvas', () => {
+    const asks = drillRequests(() => 0);
+    asks.request('a', { x: 0.5, y: 0.5 }, Gesture.Click);
+    expect(asks.take('a')?.from).toBe(Depth.Canvas);
   });
 });

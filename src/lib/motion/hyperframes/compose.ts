@@ -474,7 +474,8 @@ const RESOLVE: Record<PropFormat, ValueResolver> = {
   [PropFormat.Asset]: (v, ctx) => ctx.asset(typeof v === 'string' ? v : null),
   [PropFormat.Textarea]: (v) => v,
   [PropFormat.Font]: (v, ctx) => ctx.font(String(v)),
-  [PropFormat.Media]: (v, ctx) => resolveMedia(v, ctx.asset, ctx.color)
+  [PropFormat.Media]: (v, ctx) => resolveMedia(v, ctx.asset, ctx.color),
+  [PropFormat.MediaItem]: (v) => v
 };
 
 const ENV_LOAD: Record<Target, EnvLoad> = { [Target.Video]: EnvLoad.Wait, [Target.Screen]: EnvLoad.Swap };

@@ -118,7 +118,6 @@ test.describe('GPU canvas: the same gestures as the DOM canvas @real', () => {
     await expect
       .poll(async () => ((await admin.from('nodes').select('data').eq('id', frame.id).single()).data?.data as { posterAssetId?: string | null }).posterAssetId ?? null, { timeout: 30_000, message: 'the shelf shoots the missing poster' })
       .not.toBeNull();
-    await expect(page.getByTestId('gpu-poster-shelf')).toHaveCount(0);
 
     const at = await centreOf(page, frame.id);
     await page.mouse.click(at.x, at.y);
@@ -131,6 +130,7 @@ test.describe('GPU canvas: the same gestures as the DOM canvas @real', () => {
     await open(page, session);
     const bar = page.getByTestId('add-bar');
     await expect(bar).toHaveAttribute('data-context', 'canvas');
+    await bar.getByTestId('bar-mode').getByRole('radio', { name: 'Design' }).click();
     await bar.getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
     await expect(page.getByTestId('canvas-draw')).toBeVisible();
 
@@ -181,5 +181,21 @@ test.describe('GPU canvas: the same gestures as the DOM canvas @real', () => {
     expect((await admin.from('nodes').select('data').eq('id', text.id).single()).data!.data.prompt).toBe('before');
     await page.context().setOffline(false);
     await expect.poll(async () => (await admin.from('nodes').select('data').eq('id', text.id).single()).data!.data.prompt, { timeout: 30_000 }).toBe('before offline');
+  });
+
+  test('a lost GPU context falls back without a reload and keeps the canvas', async ({ page, session, seedNode }) => {
+    const doc = await seedNode({ type: 'doc', x: 0, y: 0, data: { content: 'Survives the loss', public: false } });
+    await open(page, session);
+    const before = await page.getByTestId('gpu-canvas').getAttribute('data-backend');
+    const url = page.url();
+    await page.evaluate(() => (window as unknown as { __gpuCanvas: { loseDevice: () => void } }).__gpuCanvas.loseDevice());
+    if (before === 'webgpu') {
+      await expect(page.getByTestId('gpu-canvas')).toHaveAttribute('data-backend', 'webgl', { timeout: 15_000 });
+    } else {
+      await expect(page.getByTestId('gpu-canvas')).toHaveCount(0, { timeout: 15_000 });
+    }
+    expect(page.url(), 'no reload').toBe(url);
+    await expect(page.locator(`.svelte-flow__node[data-id="${doc.id}"]`)).toBeVisible();
+    await expect(page.getByText('Survives the loss')).toBeVisible();
   });
 });

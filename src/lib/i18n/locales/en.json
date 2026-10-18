@@ -555,6 +555,13 @@
     },
     "ads": {
       "syncing": "Syncing…"
+    },
+    "orgs": {
+      "label": "Organisation",
+      "new": "New organisation",
+      "namePlaceholder": "Organisation name",
+      "create": "Create",
+      "cancel": "Cancel"
     }
   },
   "cookie": {

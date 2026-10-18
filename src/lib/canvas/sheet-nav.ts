@@ -70,3 +70,12 @@ export async function restoreSheet({ canvasHref, sheetHref, path, data }: SheetR
   await goto(canvasHref, { replaceState: true });
   pushState(sheetHref, { sheet: { path, data } });
 }
+
+export async function refreshSheet(path: string): Promise<void> {
+  const href = `${location.pathname}${location.search}`;
+  const outcome = sheetOutcomeOf(href, await preloadData(href));
+  if (outcome.kind !== 'open') {
+    return;
+  }
+  replaceState(href, { sheet: { path, data: outcome.data } });
+}

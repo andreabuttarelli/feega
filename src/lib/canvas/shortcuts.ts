@@ -41,6 +41,9 @@
  */
 import { isTypingTarget } from '$lib/shortcuts';
 import { CANVAS_ADD_BAR, ADDABLE_LABEL, type Addable } from './addable';
+import { DrawTool } from '$lib/motion/draw-tool';
+import { Command, commandFor } from '$lib/motion/shortcuts';
+import { Edge } from '$lib/motion/space';
 
 /** Di quante unità di tela sposta una freccia, e quanto con Shift. */
 export const NUDGE_STEP = 8;
@@ -52,9 +55,16 @@ export type CanvasCommandId =
   | 'select-all'
   | 'add'
   | 'fit'
+  | 'zoom-actual'
+  | 'zoom-selection'
   | 'zoom-in'
   | 'zoom-out'
   | 'nudge'
+  | 'align'
+  | 'tidy'
+  | 'enter'
+  | 'select-next'
+  | 'select-previous'
   | 'duplicate'
   | 'copy'
   | 'paste'
@@ -62,6 +72,7 @@ export type CanvasCommandId =
   | 'redo'
   | 'group'
   | 'ungroup'
+  | 'tool'
   | 'bring-front'
   | 'send-back';
 
@@ -72,7 +83,22 @@ export type CanvasCommandId =
 export type CanvasCommand =
   | { id: 'add'; what: Addable }
   | { id: 'nudge'; dx: number; dy: number }
-  | { id: Exclude<CanvasCommandId, 'add' | 'nudge'> };
+  | { id: 'tool'; tool: DrawTool }
+  | { id: 'align'; edge: Edge }
+  | { id: Exclude<CanvasCommandId, 'add' | 'nudge' | 'tool' | 'align'> };
+
+const TOOL_OF_COMMAND: Partial<Record<Command, DrawTool>> = {
+  [Command.ToolSelect]: DrawTool.Select,
+  [Command.ToolText]: DrawTool.Text,
+  [Command.ToolRectangle]: DrawTool.Rectangle,
+  [Command.ToolEllipse]: DrawTool.Ellipse,
+  [Command.ToolPen]: DrawTool.Pen
+};
+
+function toolFor(e: KeyboardEvent): DrawTool | null {
+  const command = commandFor({ key: e.key, mod: false, shift: e.shiftKey });
+  return command ? (TOOL_OF_COMMAND[command] ?? null) : null;
+}
 
 const PASTE_MOD_KEYS: Record<string, 'duplicate' | 'copy' | 'paste' | 'bring-front' | 'send-back'> = { d: 'duplicate', c: 'copy', v: 'paste', ']': 'bring-front', '[': 'send-back' };
 
@@ -95,13 +121,24 @@ const ARROWS: Record<string, { dx: number; dy: number }> = {
 
 const ZOOM_IN_KEYS = ['+', '='];
 
+const SHIFT_DIGIT_ZOOM: Record<string, 'zoom-actual' | 'fit' | 'zoom-selection'> = { Digit0: 'zoom-actual', Digit1: 'fit', Digit2: 'zoom-selection' };
+
 /**
  * Da un evento al comando, o null. `null` non è «non so»: è «questo evento non è mio», e chi
  * ascolta deve lasciarlo passare intatto — dentro un campo di testo è l'unica risposta giusta.
  */
+const ALT_ALIGN: Record<string, Edge> = { KeyA: Edge.Left, KeyH: Edge.Center, KeyD: Edge.Right, KeyW: Edge.Top, KeyV: Edge.Middle, KeyS: Edge.Bottom };
+
+function altCommand(e: KeyboardEvent): CanvasCommand | null {
+  if (isTypingTarget(e.target) || e.shiftKey) return null;
+  const mod = e.metaKey || e.ctrlKey;
+  if (mod) return e.code === 'KeyT' ? { id: 'tidy' } : null;
+  const edge = ALT_ALIGN[e.code];
+  return edge ? { id: 'align', edge } : null;
+}
+
 export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
-  // Alt fuori sempre: su macOS ⌥+lettera scrive un carattere vero, e intercettarlo lo mangia.
-  if (e.altKey) return null;
+  if (e.altKey) return altCommand(e);
 
   // Mentre si scrive nessun tasto è nostro, nemmeno quelli con modificatore: ⌘A dentro una
   // textarea seleziona il testo, ed è quello che l'utente sta chiedendo.
@@ -124,8 +161,13 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
     return null;
   }
 
+  const tool = toolFor(e);
+  if (tool) return { id: 'tool', tool };
+
   if (key === 'Backspace' || key === 'Delete') return { id: 'delete' };
   if (key === 'Escape') return { id: 'deselect' };
+  if (key === 'Enter' && !e.shiftKey) return { id: 'enter' };
+  if (key === 'Tab') return { id: e.shiftKey ? 'select-previous' : 'select-next' };
 
   const arrow = ARROWS[key];
   if (arrow) {
@@ -133,6 +175,8 @@ export function matchCanvasShortcut(e: KeyboardEvent): CanvasCommand | null {
     return { id: 'nudge', dx: arrow.dx * step, dy: arrow.dy * step };
   }
 
+  const shiftZoom = e.shiftKey ? SHIFT_DIGIT_ZOOM[e.code] : undefined;
+  if (shiftZoom) return { id: shiftZoom };
   if (key === '0') return { id: 'fit' };
   if (ZOOM_IN_KEYS.includes(key)) return { id: 'zoom-in' };
   if (key === '-') return { id: 'zoom-out' };
@@ -170,17 +214,25 @@ export const CANVAS_SHORTCUTS: readonly CanvasShortcutRow[] = [
   { id: 'delete', keys: ['⌫'], label: 'Delete selection' },
   { id: 'select-all', keys: ['mod', 'A'], label: 'Seleziona tutto' },
   { id: 'deselect', keys: ['Esc'], label: 'Deseleziona' },
+  { id: 'enter', keys: ['↵'], label: 'Select inside the frame' },
+  { id: 'select-next', keys: ['Tab'], label: 'Select the next tile' },
+  { id: 'select-previous', keys: ['⇧Tab'], label: 'Select the previous tile' },
   { id: 'undo', keys: ['mod', 'Z'], label: 'Undo' },
   { id: 'redo', keys: ['⇧', 'mod', 'Z'], label: 'Ripeti' },
   { id: 'duplicate', keys: ['mod', 'D'], label: 'Duplicate selection' },
+  { id: 'tool', keys: ['V', '⇧T', '⇧R', '⇧O', '⇧P'], label: 'Select, text, box, ellipse, pen' },
   { id: 'group', keys: ['mod', 'G'], label: 'Group elements' },
   { id: 'ungroup', keys: ['⇧', 'mod', 'G'], label: 'Ungroup' },
   { id: 'bring-front', keys: ['mod', ']'], label: 'Bring to front' },
   { id: 'send-back', keys: ['mod', '['], label: 'Send to back' },
   { id: 'copy', keys: ['mod', 'C'], label: 'Copy selection' },
   { id: 'paste', keys: ['mod', 'V'], label: 'Incolla' },
+  { id: 'align', keys: ['⌥A', '⌥H', '⌥D', '⌥W', '⌥V', '⌥S'], label: 'Align left, centre, right, top, middle, bottom' },
+  { id: 'tidy', keys: ['⌃⌥T'], label: 'Tidy up' },
   { id: 'nudge', keys: ['←', '↑', '↓', '→'], label: 'Move selection (⇧ for more)' },
-  { id: 'fit', keys: ['0'], label: 'Inquadra tutto' },
+  { id: 'fit', keys: ['0', '⇧1'], label: 'Inquadra tutto' },
+  { id: 'zoom-actual', keys: ['⇧0'], label: 'Zoom to 100%' },
+  { id: 'zoom-selection', keys: ['⇧2'], label: 'Zoom to selection' },
   { id: 'zoom-in', keys: ['+'], label: 'Ingrandisci' },
   { id: 'zoom-out', keys: ['-'], label: 'Rimpicciolisci' }
 ];

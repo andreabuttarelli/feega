@@ -12,12 +12,16 @@
   import PageZoomLock from '../PageZoomLock.svelte';
   import NodeBoundary from '../NodeBoundary.svelte';
   import EdgePanel from '../EdgePanel.svelte';
+  import GpuTileChrome from './GpuTileChrome.svelte';
+  import PeerLayer from '../PeerLayer.svelte';
+  import { setTileLive } from '$lib/canvas/tile-live-context';
+  import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
   import { BarContext } from '$lib/canvas/bottom-bar';
   import { frameBar } from '$lib/canvas/frame-bar.svelte';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { CANVAS_MODES, CanvasMode } from '$lib/canvas/canvas-mode';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import { FocusMode, frameIn } from '$lib/canvas/free-area';
+  import { FocusMode, frameIn, type Insets } from '$lib/canvas/free-area';
   import { ZoomStep, type CanvasZoom } from '$lib/canvas/page-zoom';
   import { Region, keyRegion } from '$lib/canvas/key-region.svelte';
   import { matchCanvasShortcut, preventable, type CanvasCommand } from '$lib/canvas/shortcuts';
@@ -31,7 +35,15 @@
   import { focusEdges } from '$lib/canvas/edge-focus';
   import { reportHref } from '$lib/reports/report-link';
   import { GraphScope } from '$lib/canvas/run-graph';
-  import type { SelectionActionId } from '$lib/canvas/selection-actions';
+  import { ALIGN_ACTIONS, ALIGN_EDGE, canvasMenuIds, isCanvasAction, type AlignActionId, type CanvasActionId, type SelectionActionId } from '$lib/canvas/selection-actions';
+  import { alignTiles, tidyTiles, type TileMove } from '$lib/canvas/align';
+  import { tilesAt } from '$lib/canvas/tiles-at';
+  import { tileGaps } from '$lib/canvas/measure';
+  import { snapDrag, type SnapGuide } from '$lib/canvas/snap';
+  import { enterFrame } from '$lib/canvas/enter-frame';
+  import { Direction, siblingOf } from '$lib/motion/siblings';
+  import type { Edge } from '$lib/motion/space';
+  import MeasureLayer from '../MeasureLayer.svelte';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
   import type { GenMedium } from '$lib/canvas/gen-node';
   import type { CanvasEdgeKind, FlowEdge, WireMode } from '$lib/canvas-edges';
@@ -39,20 +51,23 @@
   import { setTileResize } from '$lib/canvas/tile-resize-context';
   import { setTileRotate } from '$lib/canvas/tile-rotate-context';
   import type { Viewport } from '$lib/canvas/dot-grid';
-  import { panBy, toWorld, zoomAt, type Point } from '$lib/canvas/gpu/camera';
+  import { panBy, toWorld, visibleIds, zoomAt, type Point } from '$lib/canvas/gpu/camera';
   import { PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { GpuScene, themeOf, type Card, type Wire } from '$lib/canvas/gpu/scene';
+  import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
-  import { recordFrame } from '$lib/canvas/gpu/frame-stats';
-  import { shelfIds } from '$lib/canvas/gpu/poster-shelf';
-  import { NameTag } from '$lib/canvas/node-label';
-  import { canvasLod } from '$lib/canvas/canvas-lod.svelte';
+  import { exposeLoss, recordFrame } from '$lib/canvas/gpu/frame-stats';
+  import { parkStuck, shelfIds } from '$lib/canvas/gpu/poster-shelf';
+  import { domPainted } from '$lib/canvas/gpu/paint';
+  import { NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
+  import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[] } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void } = $props();
 
   const DOM_CAP = 6;
+  const SHELF_TICK_MS = 5000;
   const MOVE_SLOP_PX = 3;
   const LONG_PRESS_MS = 500;
   const LABEL_CLEARANCE = 24;
@@ -71,12 +86,14 @@
   setTileRender(() => props.tile);
   setTileResize(() => props.onResize);
   setTileRotate(() => props.onRotate);
+  setTileLive(() => props.onLive);
 
   let wrap = $state<HTMLDivElement | null>(null);
   let surface = $state<HTMLDivElement | null>(null);
   let scene = $state<GpuScene | null>(null);
   let failed = $state<string | null>(null);
   let view = $state<Viewport>({ x: 0, y: 0, zoom: 1 });
+  let area = $state({ width: 0, height: 0 });
   let selected = $state<string[]>([]);
   let selectedEdge = $state<string | null>(null);
   let hovered = $state<string | null>(null);
@@ -96,14 +113,63 @@
   const assetBase = $derived(`/p/${page.params.projectId}/c/${page.params.canvasId}/assets/`);
   const assetUrl = (id: string) => `${assetBase}${id}`;
 
-  const placed = $derived(tiles.map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}) })));
+  const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}) })));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));
   const summaries = $derived(new Map((props.nodeSummaries ?? []).map((n) => [n.id, n])));
   const ports = $derived(placed.flatMap((t) => portsOf(t)));
   const nodeOf = $derived(new Map(tiles.filter((t) => t.node).map((t) => [t.id, t.node!])));
   const lookup = (id: string) => nodeOf.get(id) ?? null;
   const edges = $derived(focusEdges(props.edges ?? [], selected) ?? props.edges ?? []);
-  const domIds = $derived(new Set(selected.slice(0, DOM_CAP)));
+  const editIds = $derived(new Set(selected.slice(0, DOM_CAP)));
+  let drawn = $state(new Set<string>());
+  let sticky = $state(new Map<string, number>());
+  let wasEditing = new Set<string>();
+  $effect(() => {
+    const now = editIds;
+    const left = [...wasEditing].filter((id) => !now.has(id));
+    wasEditing = new Set(now);
+    if (left.length) {
+      untrack(() => (sticky = new Map([...sticky, ...left.map((id) => [id, Date.now()] as const)])));
+    }
+  });
+  $effect(() => {
+    const seen = visibleIds(placed.filter((t) => sticky.has(t.id)), view, area);
+    const keep = new Map([...sticky].filter(([id]) => seen.has(id)));
+    if (keep.size !== untrack(() => sticky.size)) {
+      sticky = keep;
+    }
+  });
+  let parked = $state(new Map<string, number>());
+  let shelfClock = $state(0);
+  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], editIds, parked, shelfClock)));
+  const shelfSince = new Map<string, number>();
+  $effect(() => {
+    const now = Date.now();
+    for (const id of shelf) {
+      if (!shelfSince.has(id)) {
+        shelfSince.set(id, now);
+      }
+    }
+    for (const id of [...shelfSince.keys()]) {
+      if (!shelf.has(id)) {
+        shelfSince.delete(id);
+      }
+    }
+  });
+  onMount(() => {
+    const timer = setInterval(() => {
+      shelfClock = Date.now();
+      const next = parkStuck(shelfSince, parked, shelfClock);
+      if (next.size !== parked.size || [...next].some(([id, at]) => parked.get(id) !== at)) {
+        for (const id of next.keys()) {
+          shelfSince.delete(id);
+        }
+        parked = next;
+      }
+    }, SHELF_TICK_MS);
+    return () => clearInterval(timer);
+  });
+  const domIds = $derived(new Set([...editIds, ...sticky.keys(), ...shelf, ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)]));
 
   function portFor(nodeId: string, side: PortSide, handle: string | null | undefined): Port | null {
     const own = ports.filter((p) => p.nodeId === nodeId && p.side === side);
@@ -128,7 +194,6 @@
         h: t.h,
         rotation: t.rotation ?? 0,
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
-        ports: portsOf(t),
         hidden: domIds.has(t.id)
       })
     )
@@ -148,8 +213,16 @@
   const selectedBoxes = $derived(selected.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : [])));
   const resizable = $derived(selectedBoxes.length === 1 && selectedBoxes[0].minW != null && selectedBoxes[0].minH != null && spec.flow.nodesDraggable);
 
+  const editing = $derived(props.barContext === BarContext.Frame);
+
   $effect(() => {
     scene?.setCards(cards);
+  });
+
+  $effect(() => {
+    const css = wrap ? getComputedStyle(wrap) : null;
+    const level = (name: string) => Number(css?.getPropertyValue(name) || 1);
+    scene?.setDim(editing ? { body: level('--neighbour-body'), edges: level('--neighbour-edges') } : null);
   });
 
   $effect(() => {
@@ -171,7 +244,6 @@
 
   $effect(() => {
     scene?.setCamera(view);
-    canvasLod.view(view.zoom);
   });
 
   $effect(() => {
@@ -269,23 +341,26 @@
     if (!ids?.length) {
       return;
     }
-    untrack(() => {
-      if (f?.mode === FocusMode.Select) {
-        select([...ids]);
-      }
-      const boxes = ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []));
-      const b = boundsOf(boxes);
-      if (!b) {
-        return;
-      }
-      if (f?.free) {
-        const s = screenSize();
-        animateTo(frameIn(b, { width: s.width, height: s.height }, f.free, EDIT_MAX_ZOOM));
-        return;
-      }
-      fitTo(boxes);
-    });
+    if (f?.mode === FocusMode.Select) {
+      untrack(() => select([...ids]));
+    }
+    const frame = requestAnimationFrame(() => requestAnimationFrame(() => untrack(() => focusOn(ids, f?.free ?? null))));
+    return () => cancelAnimationFrame(frame);
   });
+
+  function focusOn(ids: readonly string[], free: Insets | null) {
+    const boxes = ids.flatMap((id) => (byId.get(id) ? [byId.get(id)!] : []));
+    const b = boundsOf(boxes);
+    if (!b) {
+      return;
+    }
+    if (free) {
+      const s = screenSize();
+      animateTo(frameIn(b, { width: s.width, height: s.height }, free, EDIT_MAX_ZOOM));
+      return;
+    }
+    fitTo(boxes);
+  }
 
   type Active =
     | { kind: GestureKind.Pan; last: Point; moved: boolean }
@@ -338,6 +413,21 @@
     return edge ? { kind: HitKind.Edge, edgeId: edge } : { kind: HitKind.Empty };
   }
 
+  function boxHit(hit: Hit, target: HTMLElement): Hit {
+    const box = target.closest<HTMLElement>('.gpu-node')?.dataset.id;
+    const overridable = hit.kind === HitKind.Node || hit.kind === HitKind.Empty || hit.kind === HitKind.Edge;
+    return overridable && box ? { kind: HitKind.Node, nodeId: box } : hit;
+  }
+
+  function onClickInside(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    const id = target.closest<HTMLElement>('.gpu-dom-node')?.dataset.id;
+    if (!id || !target.closest(INTERACTIVE) || !spec.flow.elementsSelectable || selected.includes(id)) {
+      return;
+    }
+    clickNode(id, e.shiftKey || e.metaKey || e.ctrlKey);
+  }
+
   const pointerOf = (e: PointerEvent) => (e.pointerType === 'touch' ? Pointer.Touch : e.pointerType === 'pen' ? Pointer.Pen : Pointer.Mouse);
 
   function onDown(e: PointerEvent) {
@@ -351,8 +441,8 @@
       }
     }
     const w = toWorld(view, p);
-    const hit = hitAt(w);
     const target = e.target as HTMLElement;
+    const hit = boxHit(hitAt(w), target);
     const inDom = target.closest('.gpu-dom-node');
     if (inDom && hit.kind !== HitKind.Port && hit.kind !== HitKind.Corner && target.closest(INTERACTIVE)) {
       return;
@@ -428,6 +518,7 @@
 
   function onMove(e: PointerEvent) {
     const p = local(e);
+    props.onPointer?.(toWorld(view, p));
     if (touches.has(e.pointerId)) {
       touches.set(e.pointerId, p);
       if (pinch && touches.size === 2) {
@@ -472,13 +563,18 @@
           }
         }
         const next = new Map(overrides);
-        for (const m of movedBy(a.origins, { x: w.x - a.start.x, y: w.y - a.start.y })) {
+        const raw = movedBy(a.origins, { x: w.x - a.start.x, y: w.y - a.start.y });
+        const moved = snapMoves(raw);
+        const all = new Map(tiles.map((t) => [t.id, { x: t.x, y: t.y }]));
+        const follow = moved.flatMap((m) => followGroup(all, m.id, m, byId.get(m.id)?.members ?? []));
+        for (const m of [...moved, ...follow]) {
           const t = byId.get(m.id);
           if (t) {
             next.set(m.id, { x: m.x, y: m.y, w: t.w, h: t.h });
           }
         }
         overrides = next;
+        props.onLive?.(moved.map((m) => ({ id: m.id, x: m.x, y: m.y })));
         props.onTileDragOver?.([...a.origins.keys()], pointOf(e));
       },
       [GestureKind.Resize]: (a) => {
@@ -624,6 +720,8 @@
   }
 
   function endDrag(ids: string[], e: PointerEvent) {
+    snapGuides = [];
+    props.onLive?.([]);
     if (props.onTileDrop?.(ids, pointOf(e)) === DropVerdict.Taken) {
       settleOverrides();
       return;
@@ -644,6 +742,7 @@
     e.preventDefault();
     const p = local(e);
     if (e.ctrlKey || e.metaKey) {
+      e.stopPropagation();
       view = zoomAt(view, p, Math.exp(-e.deltaY * WHEEL_ZOOM));
       return;
     }
@@ -654,10 +753,60 @@
     view = panBy(view, { x: -e.deltaX, y: -e.deltaY });
   }
 
+
+  const SNAP_SCREEN_PX = 6;
+  let snapGuides = $state<SnapGuide[]>([]);
+  let altHeld = $state(false);
+
+  function snapMoves(raw: TileMove[]): TileMove[] {
+    const ids = new Set(raw.map((m) => m.id));
+    const rects = raw.flatMap((m) => (byId.get(m.id) ? [{ id: m.id, x: m.x, y: m.y, w: byId.get(m.id)!.w, h: byId.get(m.id)!.h }] : []));
+    const others = tiles.filter((t) => !ids.has(t.id)).map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }));
+    const snap = snapDrag(rects, others, SNAP_SCREEN_PX / view.zoom);
+    snapGuides = snap.guides;
+    const at = new Map(snap.moves.map((m) => [m.id, m]));
+    return raw.map((m) => at.get(m.id) ?? m);
+  }
+
+  const measured = $derived.by(() => {
+    const over = hovered && altHeld ? byId.get(hovered) : null;
+    return over ? tileGaps(selectedBoxes, over) : [];
+  });
+
+  const placedBoxes = (ids: string[]) => ids.flatMap((id) => (byId.get(id) ? [{ id, x: byId.get(id)!.x, y: byId.get(id)!.y, width: byId.get(id)!.w, height: byId.get(id)!.h }] : []));
+
+  function placeTiles(moves: TileMove[]) {
+    if (!moves.length) {
+      return;
+    }
+    for (const m of moves) {
+      props.onMove?.(m.id, m.x, m.y);
+    }
+    props.onMoveEnd?.(moves);
+  }
+
+  const alignSelection = (ids: string[], edge: Edge) => placeTiles(alignTiles(placedBoxes(ids), edge));
+  const alignRun = (id: AlignActionId) => (ids: string[]) => alignSelection(ids, ALIGN_EDGE[id]);
+
+  function selectSibling(direction: Direction) {
+    const next = siblingOf(placed.map((t) => t.id), selected, direction);
+    if (next) {
+      select([next]);
+    }
+  }
+
+  let menuLayers = $state<{ id: string; label: string }[]>([]);
+  const tileLabel = (t: Tile) => t.displayName || NODE_KIND_LABEL[t.kind as keyof typeof NODE_KIND_LABEL] || t.kind || t.id;
+
+  function layersAt(at: Point): { id: string; label: string }[] {
+    return tilesAt(placed, toFlow(at)).flatMap((id) => (byId.get(id) ? [{ id, label: tileLabel(byId.get(id)!) }] : []));
+  }
+
   function openMenu(id: string, at: Point) {
     if (!selected.includes(id)) {
       select([id]);
     }
+    menuLayers = layersAt(at);
     menuAt = at;
   }
 
@@ -673,6 +822,7 @@
     }
     if (selected.length) {
       menuAt = { x: e.clientX, y: e.clientY };
+      menuLayers = layersAt(menuAt);
     }
   }
 
@@ -723,10 +873,30 @@
   const KEY_RUN: Record<CanvasCommand['id'], (c: CanvasCommand) => void> = {
     add: (c) => c.id === 'add' && addAtCentre(c.what),
     nudge: (c) => c.id === 'nudge' && nudge(c.dx, c.dy),
+    align: (c) => c.id === 'align' && placeTiles(alignTiles(placedBoxes(selected), c.edge)),
+    tidy: () => placeTiles(tidyTiles(placedBoxes(selected))),
+    enter: () => {
+      const only = selected.length === 1 ? selected[0] : null;
+      if (only) {
+        enterFrame(only, String(summaries.get(only)?.data.kind ?? '') || undefined);
+      }
+    },
+    'select-next': () => selectSibling(Direction.Next),
+    'select-previous': () => selectSibling(Direction.Previous),
+    tool: (c) => {
+      if (c.id === 'tool') {
+        frameBar.tool = c.tool;
+      }
+    },
     delete: () => (selected.length || selectedEdge) && dropSelection(selected, selectedEdge ? [selectedEdge] : []),
     deselect: () => clearSelection(),
     'select-all': () => select(placed.map((t) => t.id)),
     fit: () => fitTo(placed),
+    'zoom-actual': () => {
+      const s = screenSize();
+      view = zoomAt(view, { x: s.width / 2, y: s.height / 2 }, 1 / view.zoom);
+    },
+    'zoom-selection': () => selectedBoxes.length && fitTo(selectedBoxes),
     'zoom-in': () => zoomStep(STEP_ZOOM),
     'zoom-out': () => zoomStep(1 / STEP_ZOOM),
     duplicate: () => selected.length && props.onDuplicate?.(selected),
@@ -741,6 +911,7 @@
   };
 
   function onKeydown(e: KeyboardEvent) {
+    altHeld = e.altKey;
     if (e.key === ' ' && !(e.target as HTMLElement).closest?.(INTERACTIVE)) {
       space = true;
     }
@@ -763,7 +934,9 @@
     KEY_RUN[command.id](command);
   }
 
-  const SELECTION_RUN: Record<SelectionActionId, (ids: string[]) => void> = {
+  const SELECTION_RUN: Record<CanvasActionId, (ids: string[]) => void> = {
+    'tidy-up': (ids) => placeTiles(tidyTiles(placedBoxes(ids))),
+    ...(Object.fromEntries(ALIGN_ACTIONS.map((id) => [id, alignRun(id)])) as Record<AlignActionId, (ids: string[]) => void>),
     duplicate: (ids) => props.onDuplicate?.(ids),
     'connect-new': () => {
       if (selection.box) {
@@ -788,7 +961,7 @@
   };
 
   function runSelectionAction(id: SelectionActionId) {
-    if (selected.length) {
+    if (selected.length && isCanvasAction(id)) {
       SELECTION_RUN[id](selected);
     }
   }
@@ -865,26 +1038,50 @@
   onMount(() => {
     let alive = true;
     let built: GpuScene | null = null;
-    const observer = new ResizeObserver(() => built?.resize());
-    GpuScene.create(surface!, backendOf(page.url), themeOf(wrap!))
-      .then((s) => {
-        if (!alive) {
-          s.destroy();
-          return;
-        }
-        built = s;
-        s.onFrame = recordFrame;
-        scene = s;
-        props.onFlow?.(toFlow);
-        observer.observe(surface!);
-        if (tiles.length) {
-          fitted = true;
-          view = fitView(tiles);
-        }
-      })
-      .catch((err: unknown) => {
-        failed = err instanceof Error ? err.message : String(err);
-      });
+    const observer = new ResizeObserver(() => {
+      built?.resize();
+      area = { width: surface!.clientWidth, height: surface!.clientHeight };
+    });
+    const start = (backend: Backend) =>
+      GpuScene.create(surface!, backend, themeOf(wrap!))
+        .then((s) => {
+          if (!alive) {
+            s.destroy();
+            return;
+          }
+          built = s;
+          s.onFrame = recordFrame;
+          s.onReady = (shown) => (drawn = shown);
+          s.onLost = () => recover(s);
+          exposeLoss(() => s.loseForTest());
+          scene = s;
+          props.onFlow?.(toFlow);
+          observer.observe(surface!);
+          if (!fitted && tiles.length) {
+            fitted = true;
+            view = fitView(tiles);
+          }
+        })
+        .catch((err: unknown) => {
+          failed = err instanceof Error ? err.message : String(err);
+          props.onfail?.(failed);
+        });
+    const recover = (lost: GpuScene) => {
+      const next = nextBackend(lost.backend);
+      scene = null;
+      built = null;
+      try {
+        lost.destroy();
+      } catch {
+        lost.canvas.remove();
+      }
+      if (!next) {
+        props.onfail?.('GPU context lost');
+        return;
+      }
+      void start(next);
+    };
+    void start(backendOf(page.url));
     return () => {
       alive = false;
       observer.disconnect();
@@ -900,66 +1097,85 @@
   }
 
   const domTiles = $derived(placed.filter((t) => domIds.has(t.id)));
-  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds)));
-  const shelfTiles = $derived(placed.filter((t) => shelf.has(t.id)));
 </script>
 
-<svelte:window onkeydown={onKeydown} onkeyup={(e) => e.key === ' ' && (space = false)} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
+<svelte:window onkeydown={onKeydown} onblur={() => (altHeld = false)} onkeyup={(e) => {
+  altHeld = e.altKey;
+  if (e.key === ' ') {
+    space = false;
+  }
+}} onpointerup={(e) => active && !surface?.contains(e.target as Node) && onUp(e)} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="wrap" bind:this={wrap} ondragover={onDragOver} ondrop={onDrop} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-view={`${view.x},${view.y},${view.zoom}`}>
+<div class="wrap svelte-flow" bind:this={wrap} ondragover={onDragOver} ondrop={onDrop} data-canvas-surface data-renderer={scene?.backend ?? 'pending'} data-view={`${view.x},${view.y},${view.zoom}`}>
   <div
-    class="surface"
+    class="surface svelte-flow__pane"
     bind:this={surface}
     onpointerdown={onDown}
     onpointermove={onMove}
     onpointerup={onUp}
     onpointercancel={onUp}
     onwheel={onWheel}
+    onclick={onClickInside}
     oncontextmenu={onContextMenu}
+    onpointerleave={() => props.onPointer?.(null)}
     class:panning={space}
   >
-    <div class="dom-layer" style={`transform:translate(${view.x}px,${view.y}px) scale(${view.zoom})`}>
-      {#each domTiles as t (t.id)}
+    <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
+      <svg class="gpu-edges" aria-hidden="true">
+        {#each curves as c (c.edge.id)}
+          <g class="svelte-flow__edge" class:selected={c.edge.id === selectedEdge} data-id={c.edge.id} data-source={c.edge.source} data-target={c.edge.target}>
+            <path class="svelte-flow__edge-path" d={`M${c.curve.from.x},${c.curve.from.y} C${c.curve.c1.x},${c.curve.c1.y} ${c.curve.c2.x},${c.curve.c2.y} ${c.curve.to.x},${c.curve.to.y}`} />
+            {#if (c.edge.mode ?? 'fixed') === 'iterate'}
+              <g data-testid="wire-iterate-icon"></g>
+            {/if}
+          </g>
+        {/each}
+      </svg>
+      {#each placed as t (t.id)}
+        {@const on = selected.includes(t.id)}
         <div
-          class="gpu-dom-node"
+          class="svelte-flow__node gpu-node"
+          class:selected={on}
+          class:has-dom={domIds.has(t.id)}
+          role="button"
+          tabindex="-1"
+          aria-label={t.displayName || t.kind || 'node'}
+          aria-pressed={on}
+          data-testid="gpu-node"
           data-id={t.id}
-          data-testid="gpu-dom-node"
-          style={`left:${t.x}px;top:${t.y}px;width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg` : ''}`}
+          data-kind={t.kind}
+          data-box={`${t.x},${t.y},${t.w},${t.h}`}
+          style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <NodeBoundary>
-            {@render props.tile({ id: t.id, selected: true })}
-          </NodeBoundary>
+          <GpuTileChrome tile={t} selected={on} resizable={resizable && on} onrotate={props.onRotate} />
+          {#if !domIds.has(t.id) && t.kind === 'motion'}
+            {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
+            <div class="frame-standin" data-testid="motion-node" data-motion-node={t.id} data-kind={kind} data-mode="gpu" style={`--bar-h:${kind === 'frame' ? MOTION_NODE_BAR_H : 0}px`}>
+              <div class="frame-standin-stage" data-testid="motion-node-stage" data-frame-stage>
+                <div class="frame-standin-drawn" data-drawn={drawn.has(t.id)}></div>
+                {#if t.poster}
+                  <div class="frame-standin-poster" data-testid="motion-node-poster"></div>
+                {/if}
+              </div>
+            </div>
+          {/if}
+          {#if domIds.has(t.id)}
+            <div class="gpu-dom-node" data-testid="gpu-dom-node" data-id={t.id}>
+              <NodeBoundary>
+                {@render props.tile({ id: t.id, selected: on })}
+              </NodeBoundary>
+            </div>
+          {/if}
         </div>
       {/each}
+      <PeerLayer peers={props.peers ?? []} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
+      {#if measured.length || snapGuides.length}
+        <MeasureLayer gaps={measured} guides={snapGuides} zoom={view.zoom} />
+      {/if}
     </div>
   </div>
 
-  <div class="poster-shelf" aria-hidden="true">
-    {#each shelfTiles as t (t.id)}
-      <div class="shelf-node" data-testid="gpu-poster-shelf" data-id={t.id} style={`width:${t.w}px;height:${t.h}px`}>
-        <NodeBoundary>
-          {@render props.tile({ id: t.id, selected: false })}
-        </NodeBoundary>
-      </div>
-    {/each}
-  </div>
-
-  <div class="a11y-mirror" role="application" aria-label="Canvas">
-    {#each placed as t (t.id)}
-      <button
-        type="button"
-        class="mirror-node"
-        data-testid="gpu-node"
-        data-id={t.id}
-        data-kind={t.kind}
-        data-box={`${t.x},${t.y},${t.w},${t.h}`}
-        aria-label={t.displayName || t.kind || 'node'}
-        aria-pressed={selected.includes(t.id)}
-        onclick={() => select([t.id])}
-      ></button>
-    {/each}
-  </div>
 
   {#if failed}
     <p class="edge-refusal" role="alert">GPU renderer unavailable: {failed}</p>
@@ -1022,7 +1238,7 @@
   {/if}
 
   {#if menuAt && spec.chrome}
-    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} onpick={runSelectionAction} onclose={() => (menuAt = null)} />
+    <CanvasContextMenu at={menuAt} summaries={selectedSummaries} available={canvasMenuIds(selected.length)} layers={menuLayers} onpick={runSelectionAction} onlayer={(id) => select([id])} onclose={() => (menuAt = null)} />
   {/if}
 
   {#if connectPickerAt}
@@ -1073,46 +1289,83 @@
     position: absolute;
     inset: 0;
     display: block;
+    pointer-events: none;
   }
 
-  .dom-layer {
+  .gpu-nodes {
     position: absolute;
     z-index: 1;
     left: 0;
     top: 0;
-    transform-origin: 0 0;
+  }
+
+  .gpu-node {
+    left: 0;
+    top: 0;
+  }
+
+  .gpu-node :global(.svelte-flow__handle.typed-port) {
+    pointer-events: all;
+    cursor: crosshair;
+  }
+
+  .gpu-edges {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    overflow: visible;
     pointer-events: none;
+  }
+
+  .gpu-edges path {
+    fill: none;
+    stroke: transparent;
+  }
+
+  .frame-standin {
+    position: absolute;
+    inset: 0;
+  }
+
+  .frame-standin-stage {
+    position: absolute;
+    inset: 0 0 var(--bar-h) 0;
+  }
+
+  .frame-standin-poster {
+    position: absolute;
+    inset: 0;
   }
 
   .gpu-dom-node {
     position: absolute;
-    pointer-events: auto;
+    inset: 0;
     user-select: text;
   }
 
-  .poster-shelf {
-    position: fixed;
-    left: 0;
-    top: 0;
-    opacity: 0;
-    pointer-events: none;
-    z-index: -1;
+  .frame-standin {
+    position: absolute;
+    inset: 0;
   }
 
-  .shelf-node {
+  .frame-standin-stage {
     position: absolute;
-    left: 0;
-    top: 0;
+    inset: 0 0 var(--bar-h) 0;
   }
 
-  .a11y-mirror {
+  .frame-standin-poster {
     position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+    inset: 0;
   }
+
+  .gpu-dom-node {
+    position: absolute;
+    inset: 0;
+    user-select: text;
+  }
+
 
   .edge-refusal {
     position: absolute;

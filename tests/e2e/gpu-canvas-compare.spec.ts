@@ -89,7 +89,7 @@ async function seed(admin: SupabaseClient, s: E2eSession, count: number) {
 }
 
 async function open(page: Page, s: E2eSession, renderer: string) {
-  const query = renderer === 'dom' ? '' : `?renderer=${renderer}`;
+  const query = `?renderer=${renderer}`;
   await page.goto(`/p/${s.projectId}/c/${s.canvasId}${query}`);
   const ready = renderer === 'dom' ? page.locator('.svelte-flow__node').first() : page.locator('[data-testid="gpu-canvas"]');
   await expect(ready).toBeVisible({ timeout: 60_000 });

@@ -73,7 +73,7 @@ export type FrameStore = {
 };
 
 export type Moved =
-  | { outcome: MoveOutcome.Done; frameId: string; clipId: string; created: boolean; versions: Record<string, number>; undo: UndoItem[] }
+  | { outcome: MoveOutcome.Done; frameId: string; clipId: string; created: boolean; versions: Record<string, number>; undo: UndoItem[]; turn?: { id: string; degrees: number } }
   | { outcome: Exclude<MoveOutcome, MoveOutcome.Done>; detail?: string };
 
 export type MoveAsk = { sourceNodeId: string; clipId: string; drop: Drop; box?: Box | null; versions?: Record<string, number> };
@@ -83,6 +83,7 @@ export type OutputAsk = { sourceNodeId: string; drop: Drop; id?: string };
 const SUMMARY = {
   movedOut: 'Moved an element to another frame',
   movedIn: 'Moved an element in from another frame',
+  copiedIn: 'Pasted an element from another frame',
   placed: 'Placed a generated output',
   linked: 'Updated from a connected node',
   putBack: 'Put back after a failed move'
@@ -260,6 +261,29 @@ export async function moveElement(store: FrameStore, ask: MoveAsk): Promise<Move
     versions: { [landing.frameId]: landing.version, [source.nodeId]: left.head.version },
     undo: [...landing.undo, revision(source.nodeId, source.version)]
   };
+}
+
+export async function copyElement(store: FrameStore, ask: MoveAsk): Promise<Moved> {
+  const source = await store.read(ask.sourceNodeId);
+  if (!source) {
+    return refused(MoveOutcome.NotFound, `no frame ${ask.sourceNodeId}`);
+  }
+  const lifted = liftElement(source.doc, ask.clipId);
+  if (!lifted.ok) {
+    return refused(MoveOutcome.NoElement, lifted.error);
+  }
+
+  const target = await targetOf(store, ask.drop, ask.versions);
+  if (target && !('doc' in target)) {
+    return target;
+  }
+  const landing = target
+    ? await landInFrame(store, target, seenAt(lifted.element, source, target), ask.drop as Extract<Drop, { on: DropOn.Frame }>, SUMMARY.copiedIn)
+    : await landOut(store, source, lifted.element, ask.drop as Extract<Drop, { on: DropOn.Canvas }>, ask.box ?? null);
+  if (!isLanding(landing)) {
+    return landing;
+  }
+  return { outcome: MoveOutcome.Done, frameId: landing.frameId, clipId: landing.clipId, created: landing.created, versions: { [landing.frameId]: landing.version }, undo: landing.undo };
 }
 
 export async function moveFree(store: FrameStore, ask: z.infer<typeof freeAskSchema>): Promise<Moved> {

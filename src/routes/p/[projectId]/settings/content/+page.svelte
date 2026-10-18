@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
+  import { enhance } from '$lib/settings/enhance';
   import type { SubmitFunction } from '@sveltejs/kit';
   import { page } from '$app/state';
   import { openSheet } from '$lib/canvas/sheet-nav';

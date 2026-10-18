@@ -1,3 +1,6 @@
+import { findClip, type MotionDoc } from './doc';
+import { setKeyframes, setTransform, type OpResult } from './timeline';
+
 export enum Flip {
   Horizontal = 'horizontal',
   Vertical = 'vertical'
@@ -13,4 +16,21 @@ const AXIS: Record<Flip, keyof Scales> = {
 export function flipPatch(scales: Scales, flip: Flip): Scales {
   const key = AXIS[flip];
   return { [key]: -(scales[key] ?? 1) };
+}
+
+function flipOne(doc: MotionDoc, clipId: string, flip: Flip): OpResult {
+  const clip = findClip(doc, clipId)?.clip;
+  if (!clip) {
+    return { ok: false, error: `no clip ${clipId}` };
+  }
+  const key = AXIS[flip];
+  const track = clip.keyframes[key];
+  if (track?.length) {
+    return setKeyframes(doc, clipId, key, track.map((k) => ({ ...k, value: -Number(k.value) })));
+  }
+  return setTransform(doc, clipId, flipPatch(clip.transform, flip));
+}
+
+export function flipClips(doc: MotionDoc, ids: readonly string[], flip: Flip): OpResult {
+  return ids.reduce<OpResult>((r, id) => (r.ok ? flipOne(r.doc, id, flip) : r), { ok: true, doc });
 }

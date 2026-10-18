@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/sveltekit';
 import { busyAnswer } from '$lib/db-busy';
 import { seedMetaClickCookies } from '$lib/server/meta-click-cookies';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { outlivesTurn } from '$lib/server/session-life';
 import { markRlsScoped } from '$lib/server/rls-client';
 import { createUserDb, type Db } from '$lib/server/db/client';
 import { env as publicEnv } from '$env/dynamic/public';
@@ -178,9 +179,10 @@ export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle()
   let cachedSession: ReturnType<typeof getSession> | null = null;
   const getSession = async () => {
     const {
-      data: { session }
+      data: { session: stored }
     } = await event.locals.supabase.auth.getSession();
-    if (!session) return { session: null, user: null };
+    if (!stored) return { session: null, user: null };
+    const session = outlivesTurn(stored) ? stored : ((await event.locals.supabase.auth.refreshSession()).data.session ?? stored);
 
     const { verifiedUser } = await import('$lib/server/nav-cache');
     const user = await verifiedUser(event.locals.supabase, session);

@@ -58,8 +58,6 @@ const CHAT_TOOL_OPS: Partial<Record<CanvasOpName, string>> = {
     'Group two or more things on the canvas of THIS project into one Group; they keep their places and sizes and move as one. Free elements (type motion, data.kind element) are drawn inside the Group; frames and other nodes join it (data.groupId) and keep working. Inside a frame, group clips with the frame tool precompose instead.',
   rotate_group:
     'Turn a Group on the canvas of THIS project by degrees (clockwise); everything in it, frames included, turns around the group centre.',
-  move_group:
-    'Move a Group on the canvas of THIS project to x/y; everything in it moves by the same amount.',
   ungroup_element:
     'Split a Group of free elements on the canvas of THIS project back into one element per shape, each where it was.',
   delete_node:

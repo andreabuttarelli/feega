@@ -10,6 +10,9 @@ const UNAUTHORIZED = 401;
 
 export const ORG_PARAM = 'org';
 export const ACTION_PARAM = 'action';
+export const PATH_PARAM = 'path';
+
+const API_PARAMS = new Set([ORG_PARAM, ACTION_PARAM, PATH_PARAM]);
 
 export type Bearer = { token: string; db: Db; user: User };
 
@@ -27,11 +30,11 @@ export async function bearerOf(request: Request): Promise<Bearer | Response> {
   return { token, db, user };
 }
 
-export function pageEvent(bearer: Bearer, request: Request, apiUrl: URL, pagePath: string) {
+export function bearerEvent(bearer: Bearer, request: Request, apiUrl: URL, pagePath: string, params: Record<string, string> = {}) {
   const org = apiUrl.searchParams.get(ORG_PARAM) ?? undefined;
   const url = new URL(pagePath, apiUrl);
   for (const [key, value] of apiUrl.searchParams) {
-    if (key !== ORG_PARAM && key !== ACTION_PARAM) {
+    if (!API_PARAMS.has(key)) {
       url.searchParams.append(key, value);
     }
   }
@@ -42,7 +45,11 @@ export function pageEvent(bearer: Bearer, request: Request, apiUrl: URL, pagePat
     supabase: withVerifiedUser(bearer.db, bearer.user)
   };
   const cookies = { get: (name: string) => (name === ORG_COOKIE ? org : undefined), getAll: () => [], set: () => {}, delete: () => {} };
-  const event = { request, url, params: {}, locals, cookies, route: { id: null }, depends: () => {}, untrack: <T>(fn: () => T) => fn(), setHeaders: () => {} };
+  return { request, url, params, locals, cookies, route: { id: null }, depends: () => {}, untrack: <T>(fn: () => T) => fn(), setHeaders: () => {} };
+}
+
+export function pageEvent(bearer: Bearer, request: Request, apiUrl: URL, pagePath: string, params: Record<string, string> = {}) {
+  const event = bearerEvent(bearer, request, apiUrl, pagePath, params);
   return { ...event, parent: () => appShell(event as never) };
 }
 
@@ -67,4 +74,13 @@ export async function answerOf(run: () => Promise<unknown>): Promise<Response> {
     }
     throw e;
   }
+}
+
+export async function bareAnswerOf(run: () => Promise<unknown>): Promise<Response> {
+  const enveloped = await answerOf(run);
+  if (enveloped.status !== OK) {
+    return enveloped;
+  }
+  const body = (await enveloped.json()) as { data?: unknown; redirect?: string };
+  return json(body.redirect ? { redirect: body.redirect } : (body.data ?? null), { status: OK });
 }

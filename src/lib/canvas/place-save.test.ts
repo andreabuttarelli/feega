@@ -5,14 +5,14 @@ import type { ActionAnswer } from './node-save';
 const ok: ActionAnswer = { type: 'success', data: {} };
 const offline: ActionAnswer = { type: 'network' };
 
-function harness(answers: ActionAnswer[]) {
+function harness(answers: ActionAnswer[], announce = { intent: vi.fn(), refused: vi.fn() }) {
   const sent: { action: string; fields: Record<string, string | number> }[] = [];
   const send = vi.fn(async (action: string, fields: Record<string, string | number>) => {
     sent.push({ action, fields });
     return answers.shift() ?? ok;
   });
-  const places = createPlaceSaves({ send, backoffMs: () => 0 });
-  return { sent, places };
+  const places = createPlaceSaves({ send, backoffMs: () => 0, announce });
+  return { sent, places, announce };
 }
 
 describe('placement saves: a move or resize is never rolled back, it is retried until it lands', () => {
@@ -66,6 +66,34 @@ describe('placement saves: a move or resize is never rolled back, it is retried 
     await places.flush();
 
     expect(sent).toHaveLength(1);
+  });
+});
+
+describe('placement saves tell peers before the server answers', () => {
+  it('announces a move the moment it is scheduled', () => {
+    const { places, announce } = harness([new Promise<never>(() => {}) as unknown as ActionAnswer]);
+
+    places.move('a', 1, 2);
+
+    expect(announce.intent).toHaveBeenCalledWith({ id: 'a', x: 1, y: 2 });
+  });
+
+  it('a refused move tells peers to take the confirmed state again', async () => {
+    const { places, announce } = harness([{ type: 'failure', status: 404 }]);
+
+    places.move('a', 1, 2);
+    await places.flush();
+
+    expect(announce.refused).toHaveBeenCalledWith('a');
+  });
+
+  it('a move that lands is not a refusal', async () => {
+    const { places, announce } = harness([ok]);
+
+    places.move('a', 1, 2);
+    await places.flush();
+
+    expect(announce.refused).not.toHaveBeenCalled();
   });
 });
 

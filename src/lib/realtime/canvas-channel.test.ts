@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { connectCanvas, type LinkEnvironment } from './canvas-channel';
 import { LinkState } from './connection-link';
 import { FRAME_EVENT, frameHub, type FrameMark } from './frame-presence';
+import { CANVAS_PEER_EVENT, canvasHub, type CanvasLine, type CanvasMark } from './canvas-presence';
 
 function socket() {
 	const listeners: Array<{ kind: string; filter: Record<string, string>; callback: (value?: any) => void }> = [];
@@ -44,13 +45,13 @@ function environment() {
 	};
 }
 
-function open(connection: ReturnType<typeof socket>, env = environment(), frames = frameHub({ userId: 'me', name: 'Me' }, () => 7).line) {
+function open(connection: ReturnType<typeof socket>, env = environment(), frames = frameHub({ userId: 'me', name: 'Me' }, () => 7).line, cursors?: CanvasLine) {
 	const onChange = vi.fn();
 	const onLink = vi.fn();
 	const onPeers = vi.fn();
 	const onReconnect = vi.fn();
 	const onCanvasList = vi.fn();
-	const close = connectCanvas({ client: connection.client as unknown as SupabaseClient, canvasId: 'canvas', projectId: 'proj', peer, onChange, onPeers, onReconnect, onCanvasList, onLink, frames, environment: env.env });
+	const close = connectCanvas({ client: connection.client as unknown as SupabaseClient, canvasId: 'canvas', projectId: 'proj', peer, onChange, onPeers, onReconnect, onCanvasList, onLink, frames, cursors, environment: env.env });
 	return { close, onChange, onPeers, onReconnect, onCanvasList, onLink, env };
 }
 
@@ -192,5 +193,31 @@ describe('canvas collaboration', () => {
 		callbacks.close();
 		hub.port.send({ nodeId: null, cursor: null, selection: [] });
 		expect(connection.channel.send).toHaveBeenCalledTimes(1);
+	});
+
+	it('carries canvas cursors on their own event, only while joined', async () => {
+		vi.useFakeTimers();
+		const connection = socket();
+		const hub = canvasHub({ sessionId: 's1', userId: 'me', name: 'Me' }, () => 7);
+		const heard: CanvasMark[] = [];
+		hub.port.listen((m) => heard.push(m));
+		const callbacks = open(connection, environment(), undefined, hub.line);
+		await vi.waitFor(() => expect(connection.channel.subscribe).toHaveBeenCalled());
+
+		connection.status('SUBSCRIBED');
+		hub.port.update({ cursor: { x: 3, y: 4 }, selection: ['a'] });
+		vi.advanceTimersByTime(60);
+		expect(connection.channel.send).toHaveBeenCalledWith({ type: 'broadcast', event: CANVAS_PEER_EVENT, payload: { sessionId: 's1', userId: 'me', name: 'Me', cursor: { x: 3, y: 4 }, selection: ['a'], live: [], view: null, presenting: false, chat: null, at: 7 } });
+
+		const incoming = connection.listeners.find(({ kind, filter }) => kind === 'broadcast' && filter.event === CANVAS_PEER_EVENT);
+		incoming?.callback({ payload: { sessionId: 's2', userId: 'bo', name: 'Bo', cursor: null, selection: [], at: 9 } });
+		expect(heard.map((m) => m.userId)).toEqual(['bo']);
+
+		callbacks.close();
+		hub.port.update({ cursor: null });
+		vi.advanceTimersByTime(60);
+		expect(connection.channel.send).toHaveBeenCalledTimes(1);
+		hub.port.stop();
+		vi.useRealTimers();
 	});
 });

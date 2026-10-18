@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import type { Stack } from '$lib/canvas/stacking';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
@@ -38,7 +39,10 @@
   import { canvasLink } from '$lib/realtime/canvas-link';
   import type { PresencePeer } from '$lib/realtime/presence-peers';
   import { displayName, frameHub, provideFramePresence } from '$lib/realtime/frame-presence';
+  import { adoptCommitted, commitHub, rowsOf } from '$lib/canvas/commit-note';
+  import { canvasHub, canvasPeersOf, followed, keepCanvasMark, landedAt, presenterOf, withPeerMotion, type HeldMark } from '$lib/realtime/canvas-presence';
   import PeerAvatars from '$lib/components/canvas/PeerAvatars.svelte';
+  import CursorChat from '$lib/components/canvas/CursorChat.svelte';
   import { Portal } from 'bits-ui';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { deserialize } from '$app/forms';
@@ -83,6 +87,10 @@
   import EffectsEditor from '$lib/components/canvas/EffectsEditor.svelte';
   import CompositionNode from '$lib/components/canvas/CompositionNode.svelte';
   import ComponentLibrary from '$lib/components/motion/ComponentLibrary.svelte';
+  import { canvasMediaUploader, projectMedia } from '$lib/canvas/media-uploader';
+  import type { LibraryMedia, MediaUploader } from '$lib/components/motion/media-upload';
+  import { changedRaw } from '$lib/motion/template/raw-values';
+  import { templateFields } from '$lib/motion/template/library';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
   import { defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
@@ -94,10 +102,11 @@
   import { AssetKind } from '$lib/motion/components';
   import MotionNode from '$lib/components/canvas/MotionNode.svelte';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, frameNodeSize, motionEditorPath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, frameNodeSize, frameResize, motionEditorPath, type FrameResize, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
-  import { layoutOf, rotateGroup, type Placed } from '$lib/canvas/node-layout';
+  import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
+  import { fitToNode } from '$lib/motion/custom-size';
   import { barContextOf } from '$lib/canvas/bottom-bar';
   import { CanvasState, NodeMode, Opening, Paint, Reframe, dismissedAfterClick, editorOn, inlineMotionTarget, neighbourStyle, openingOf, reframesOn, tileMode } from '$lib/canvas/inline-motion';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
@@ -350,9 +359,15 @@
   }
 
   function rotateGroupBy(id: string, degrees: number) {
+    if (turnGroup({ id, degrees })) {
+      undoStack.push({ source: 'turn', turn: { id, degrees } });
+    }
+  }
+
+  function turnGroup({ id, degrees }: Turn): boolean {
     const group = nodes.find((n) => n.id === id);
     if (!group) {
-      return;
+      return false;
     }
     const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
     const turned = new Map(rotateGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), degrees).map((t) => [t.id, t]));
@@ -361,6 +376,7 @@
       return t ? { ...n, x: t.x, y: t.y, data: { ...n.data, rotation: t.rotation } } : n;
     });
     void post('rotateGroup', { id, degrees: String(degrees) });
+    return true;
   }
 
   function groupElements(ids: string[]) {
@@ -1012,6 +1028,8 @@
       tag: chrome.label ? NameTag.Shown : NameTag.Hidden,
       rotation: layoutOf(n.data).rotation,
       rotatable: motionOf(n)?.kind === FrameKind.Group,
+      behind: chrome.behind,
+      members: chrome.behind ? nodes.filter((m) => layoutOf(m.data).groupId === n.id).map((m) => m.id) : undefined,
       inPost: data.nodeIdsInPost.includes(n.id),
       select: n.select,
       settings: hasInspector(n.type),
@@ -1038,7 +1056,7 @@
     return items.filter((url): url is string => !!url);
   }
 
-  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url) === Renderer.Gpu ? null : (CanvasFlow as unknown as typeof GpuFlow));
+  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Gpu ? null : (CanvasFlow as unknown as typeof GpuFlow));
   $effect(() => {
     if (Flow) {
       return;
@@ -1063,6 +1081,26 @@
   });
   const frames = frameHub({ userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
   provideFramePresence(frames.port);
+  const cursorSession = crypto.randomUUID();
+  const cursors = canvasHub({ sessionId: cursorSession, userId: data.session?.user?.id ?? '', name: displayName(data.session?.user?.email ?? 'User') });
+  const commits = commitHub(cursorSession);
+  const PEER_SWEEP_MS = 1000;
+  let cursorMarks = $state(new Map<string, HeldMark>());
+  let presenceNow = $state(0);
+  const canvasPeers = $derived(canvasPeersOf(cursorMarks, cursorSession, presenceNow, (box) => tiles.some((t) => t.id === box.id && landedAt(t, box))));
+  let following = $state<string | null>(null);
+  let presenting = $state(false);
+  const followView = $derived(following ? followed(canvasPeers, following) : null);
+  const presenter = $derived(presenterOf(canvasPeers));
+  function spotlight(on: boolean) {
+    presenting = on;
+    cursors.port.update({ presenting: on });
+  }
+  $effect(() => {
+    const unlisten = cursors.port.listen((mark) => { cursorMarks = keepCanvasMark(untrack(() => cursorMarks), mark); presenceNow = Date.now(); });
+    const sweep = setInterval(() => { presenceNow = Date.now(); }, PEER_SWEEP_MS);
+    return () => { unlisten(); clearInterval(sweep); cursors.port.stop(); };
+  });
   let pending = 0;
   let snapshotMissed = false;
   let snapshotVersion = 0;
@@ -1091,7 +1129,8 @@
   const places = createPlaceSaves({
     send,
     backoffMs: (failures) => Math.min(SAVE_BACKOFF_CAP_MS, 1000 * 2 ** (failures - 1)),
-    onStatus: (status) => { placeStatus = status; keepOutbox(); }
+    onStatus: (status) => { placeStatus = status; keepOutbox(); },
+    announce: { intent: (row) => commits.publish([row]), refused: () => commits.publish([]) }
   });
 
   const lines = createOpQueue({
@@ -1158,7 +1197,7 @@
    * cronologia, non due stack separati: creare un nodo dopo averne spostato un altro e poi
    * annullare due volte deve disfare la creazione e poi lo spostamento, nell'ordine vero.
    */
-  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture };
+  type StackEntry = { source: 'server'; gesture: Gesture } | { source: 'move'; gesture: MoveGesture } | { source: 'turn'; turn: Turn };
   const undoStack = createUndoStack<StackEntry>();
 
   /** Ogni scrittura che passa da `undo` (server) spinge qui, mai `undoStack.push` diretto — la
@@ -1190,6 +1229,7 @@
     if (ids.join() !== untrack(() => selectedIds.join())) { void saves.flush(); }
     const before = untrack(() => inlineMotion);
     selectedIds = ids;
+    cursors.port.update({ selection: ids });
     leaveNow(before);
   }
 
@@ -1394,11 +1434,20 @@
       },
       onReconnect: () => { void checkStale(Trigger.Reconnect); },
       onCanvasList: () => { void invalidate(CANVAS_LIST_DEPENDENCY); },
-      onPeers: (value) => { peers = value; },
+      onPeers: (value) => { peers = value; cursors.port.crowd(value.length + 1); },
       onLink: (state) => { canvasLink.set(state); },
-      frames: frames.line
+      frames: frames.line,
+      frameHeads: frames.heads,
+      cursors: cursors.line,
+      commits: commits.line
+    });
+    const unheard = commits.listen((note) => {
+      const adopted = adoptCommitted(nodes, note.rows, saves.dirtyKeys, places.dirty);
+      nodes = adopted.tiles;
+      if (adopted.refetch) { void refresh(); }
     });
     return () => {
+      unheard();
       disconnect();
       canvasLink.set(null);
     };
@@ -1459,6 +1508,12 @@
     return body;
   }
 
+  function announceCommit(action: string, fields: Record<string, unknown>, answer: ActionAnswer) {
+    if (answer.type !== 'success') { return; }
+    const rows = rowsOf(action, fields, (answer.data ?? {}) as Record<string, unknown>);
+    if (rows) { commits.publish(rows); }
+  }
+
   async function send(
     action: string,
     fields: Record<string, string | number | File | string[]>
@@ -1477,7 +1532,9 @@
 
     const text = await res.text();
     try {
-      return deserialize(text) as ActionAnswer;
+      const answer = deserialize(text) as ActionAnswer;
+      announceCommit(action, fields, answer);
+      return answer;
     } catch {
       console.warn(`canvas action ${action}: unreadable ${res.status}`, text.slice(0, 500));
       return { type: 'error', status: res.status };
@@ -1622,6 +1679,27 @@
 
   let frameLibraryAt = $state<{ x: number; y: number } | null>(null);
   const catalogPosters = new SvelteMap<string, string>();
+  let frameMedia = $state<LibraryMedia[]>([]);
+  const frameMediaUrls = $derived(Object.fromEntries(frameMedia.map((m) => [m.id, m.url ?? m.previewUrl])));
+  const uploadToFrameLibrary = canvasMediaUploader(supabase, { orgId: data.orgId, projectId: data.projectId, canvasId: data.canvas.id });
+  const uploadFrameMedia: MediaUploader = async (file, progress) => {
+    const outcome = await uploadToFrameLibrary(file, progress);
+    if (outcome.ok) {
+      frameMedia = [outcome.asset, ...frameMedia.filter((m) => m.id !== outcome.asset.id)];
+    }
+    return outcome;
+  };
+
+  $effect(() => {
+    if (frameLibraryAt) {
+      void projectMedia({ projectId: data.projectId, canvasId: data.canvas.id }).then((media) => (frameMedia = media));
+    }
+  });
+
+  function frameValues(templateId: string, draft: Instance | null): Record<string, string> {
+    const fresh = draft ? frameDraft(templateId, formatOf(draft.doc)) : null;
+    return draft && fresh ? changedRaw(templateFields(fresh.doc, fresh.clipId), templateFields(draft.doc, draft.clipId)) : {};
+  }
 
   function frameDraft(templateId: string, format: MotionFormat): Instance | null {
     const entry = data.componentTemplates.find((t) => t.id === templateId);
@@ -1646,12 +1724,13 @@
     const spot = placeNear(at, frameSize, occupiedRects());
     const id = crypto.randomUUID();
     const name = data.componentTemplates.find((t) => t.id === templateId)?.template.name ?? null;
-    const poster = item?.preview?.poster;
+    const values = frameValues(templateId, draft);
+    const poster = Object.keys(values).length ? null : item?.preview?.poster;
     if (poster) {
       catalogPosters.set(id, poster);
     }
     nodes = [...nodes, toTile(placedFrame({ id, canvasId: data.canvas.id, projectId: data.projectId, name, at: spot, doc }))];
-    const result = await post('frame_template', { template: templateId, format: formatOf(doc), x: spot.x, y: spot.y, node_id: id });
+    const result = await post('frame_template', { template: templateId, format: formatOf(doc), values: JSON.stringify(values), x: spot.x, y: spot.y, node_id: id });
     const node = result?.node as CanvasNodeRecord | undefined;
     nodes = settle(nodes, id, node ? toTile(node) : null);
     if (!node) {
@@ -2118,14 +2197,54 @@
     }
     const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motionOf(row)?.kind);
     if (Math.abs(fit.h - row.h) > FIT_SLACK_PX) {
-      void resize(row.id, fit.w, fit.h);
+      void storeSize(row.id, fit.w, fit.h);
     }
   });
 
+  function framePlan(id: string, w: number, h: number): FrameResize | null {
+    const row = nodes.find((node) => node.id === id);
+    const motion = motionOf(row ?? { id, type: '', data: {} });
+    if (!motion || !row) {
+      return null;
+    }
+    const open = layersSource.video?.nodeId === id ? layersSource.video : null;
+    const shown = open ? { ...motion, format: formatOf(open.doc) } : motion;
+    const mode = id === inlineMotion ? NodeMode.Edit : NodeMode.Preview;
+    return frameResize(shown, { w, h }, open?.doc ?? PICTURE_OF_KIND[motion.kind](motion, row), mode);
+  }
+
+  async function sizeFrameDoc(id: string, picture: { width: number; height: number }) {
+    const open = layersSource.video;
+    if (open?.nodeId === id) {
+      open.edit(fitToNode(open.doc, picture), 'Resized the frame');
+      return;
+    }
+    const result = await post('frameSize', { node_id: id, width: picture.width, height: picture.height });
+    if (result?.undo) {
+      pushGesture({ items: result.undo as UndoItem[] });
+    }
+  }
+
   async function resize(id: string, width: number, height: number) {
-    const fit = frameFit(id, width);
-    const w = fit?.w ?? width;
-    const h = fit?.h ?? height;
+    const group = nodes.find((n) => n.id === id);
+    if (group && motionOf(group)?.kind === FrameKind.Group) {
+      const placed = (n: Tile): Placed => ({ id: n.id, x: n.x, y: n.y, w: n.w, h: n.h, rotation: layoutOf(n.data).rotation });
+      const scaled = new Map(scaleGroup(placed(group), nodes.filter((n) => layoutOf(n.data).groupId === id).map(placed), { w: width, h: height }).map((t) => [t.id, t]));
+      nodes = nodes.map((n) => {
+        const t = scaled.get(n.id);
+        return t ? { ...n, x: t.x, y: t.y, w: t.w, h: t.h, userHeight: t.h } : n;
+      });
+      await post('scaleGroup', { id, width: String(width), height: String(height) });
+      return;
+    }
+    const plan = framePlan(id, width, height);
+    await storeSize(id, plan?.w ?? width, plan?.h ?? height);
+    if (plan?.picture) {
+      await sizeFrameDoc(id, plan.picture);
+    }
+  }
+
+  async function storeSize(id: string, w: number, h: number) {
     nodes = nodes.map((n) => (n.id === id ? { ...n, w, h, userHeight: h } : n));
     const placed = places.resize(id, w, h);
     keepOutbox();
@@ -2818,6 +2937,7 @@
   function copy(ids: string[]) {
     const chosen = nodes.filter((n) => ids.includes(n.id));
     if (!chosen.length) { return; }
+    elementClipboard.copyTiles();
 
     const indexOf = new Map(chosen.map((n, i) => [n.id, i]));
     const cx = chosen.reduce((sum, n) => sum + n.x, 0) / chosen.length;
@@ -2839,7 +2959,20 @@
   }
 
   /** ⌘V: quel che `copy` ha in mano, riposato attorno al punto dato — vuoto se non si è mai copiato. */
+  const PASTE_STAGGER = 24;
+
+  async function pasteElementsAt(at: { x: number; y: number }, copied: CopiedElements) {
+    for (const [i, clip] of copied.clipIds.entries()) {
+      landed(await post('copyElement', { source: copied.frameId, clip, drop: JSON.stringify({ on: DropOn.Canvas, x: at.x + i * PASTE_STAGGER, y: at.y + i * PASTE_STAGGER }) }));
+    }
+  }
+
   async function paste(at: { x: number; y: number }) {
+    const copied = elementClipboard.elements;
+    if (elementClipboard.kind === Copied.Elements && copied) {
+      await pasteElementsAt(at, copied);
+      return;
+    }
     if (!clipboard) { return; }
 
     const result = await post('paste', {
@@ -2924,6 +3057,11 @@
   async function undo() {
     const entry = undoStack.popUndo();
     if (!entry) { return; }
+    if (entry.source === 'turn') {
+      const back = undoTurn(entry.turn);
+      if (turnGroup(back)) { undoStack.pushRedo({ source: 'turn', turn: back }); }
+      return;
+    }
     if (entry.source === 'move') {
       await applyMoveUndo(entry.gesture, (redo) => undoStack.pushRedo({ source: 'move', gesture: redo }));
       return;
@@ -2934,6 +3072,11 @@
   async function redo() {
     const entry = undoStack.popRedo();
     if (!entry) { return; }
+    if (entry.source === 'turn') {
+      const back = undoTurn(entry.turn);
+      if (turnGroup(back)) { undoStack.pushUndo({ source: 'turn', turn: back }); }
+      return;
+    }
     if (entry.source === 'move') {
       await applyMoveUndo(entry.gesture, (redo) => undoStack.pushUndo({ source: 'move', gesture: redo }));
       return;
@@ -2991,12 +3134,19 @@
 <svelte:window bind:innerWidth={pageWidth} />
 
 <div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
-  {#if peers.length}
+  {#if peers.length || canvasPeers.length}
     {#if topPeers}
-      <Portal to={topPeers}><PeerAvatars {peers} /></Portal>
+      <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></Portal>
     {:else}
-      <div class="peers"><PeerAvatars {peers} /></div>
+      <div class="peers"><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></div>
     {/if}
+  {/if}
+  <CursorChat onchat={(chat) => cursors.port.update({ chat })} />
+  {#if presenter && following !== presenter.userId}
+    <div class="presenting" role="status" data-testid="presenter-prompt">
+      {displayName(presenter.name)} is presenting
+      <button type="button" onclick={() => (following = presenter.userId)}>Follow</button>
+    </div>
   {/if}
   <p class="save-status" role="status" data-status={syncShown.state} aria-label={syncShown.label} title={syncShown.label}></p>
   {#if failed}
@@ -3045,7 +3195,7 @@
   {#if Flow}
   <Flow
     actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
-    {tiles}
+    tiles={withPeerMotion(tiles, canvasPeers, new Set(selectedIds))}
     {edges}
     onMove={move}
     onMoveEnd={moveEnd}
@@ -3090,6 +3240,13 @@
     onPropertyChange={commonChange}
     onSelectionChange={selectionChanged}
     thumbsOf={sourceThumbs}
+    onfail={() => (Flow = CanvasFlow as unknown as typeof GpuFlow)}
+    peers={canvasPeers}
+    onPointer={(cursor) => cursors.port.update({ cursor })}
+    onLive={(live) => cursors.port.update({ live })}
+    onView={(view) => cursors.port.update({ view })}
+    onUserPan={() => (following = null)}
+    follow={followView}
   >
     {#snippet tile({ id, selected })}
       {@const row = nodes.find((n) => n.id === id)}
@@ -3336,7 +3493,9 @@
       items={componentItems}
       format={MotionFormat.Landscape}
       draftOf={frameDraft}
-      compose={(doc) => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: {}, target: Target.Screen })}
+      compose={(doc) => composeHtml({ doc, tokens: FEEGA_TOKENS, assets: frameMediaUrls, target: Target.Screen })}
+      assets={frameMedia}
+      upload={uploadFrameMedia}
       target={AddTarget.Canvas}
       onpick={(templateId, _sounds, draft) => void addFrame(templateId, draft)}
       onclose={() => (frameLibraryAt = null)}
@@ -3486,6 +3645,8 @@
     margin-bottom: 0;
   }
 
+  .presenting { position: absolute; z-index: 10; left: 50%; top: 16px; transform: translateX(-50%); display: flex; gap: 8px; align-items: center; padding: 6px 12px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 9999px; font-size: 13px; }
+  .presenting button { border: 0; background: var(--ui-accent, #0090ff); color: white; border-radius: 9999px; padding: 2px 10px; cursor: pointer; }
   .peers { position: absolute; z-index: 10; right: 16px; top: 16px; }
 
   .save-status {

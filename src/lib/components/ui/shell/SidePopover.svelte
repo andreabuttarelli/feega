@@ -66,7 +66,7 @@
 
 <div
   bind:this={box}
-  bind:clientHeight={height}
+  bind:offsetHeight={height}
   role="dialog"
   aria-label={label}
   data-testid="side-popover"

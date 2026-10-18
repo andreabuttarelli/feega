@@ -1,4 +1,4 @@
-import { groupElements, moveNodeGroup, rotateNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
+import { groupElements, moveNodeGroup, rotateNodeGroup, scaleNodeGroup, ungroupElement } from '$lib/server/motion/element-groups';
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { z } from 'zod';
 import type { Db } from '$lib/server/db/client';
@@ -24,7 +24,7 @@ import { connectRefusal, nodeModelError, targetTakesNoInputs, UNCENSORED_NO_INPU
 import { unknownFieldsError, validateNewNodeData } from '$lib/canvas/node-data';
 import { cancelLoop, enqueueLoop, planLoop, retryLoopCombo } from '$lib/server/canvas/loop';
 import { GraphScope, enqueueGraph, planGraph } from '$lib/server/canvas/run-graph';
-import { MoveOutcome, drawElement, drawnSchema, dropFor, frameAnswer, frameStore, linkFrame, moveElement, placeOutput } from '$lib/server/motion/move-element';
+import { MoveOutcome, drawElement, drawnSchema, dropFor, frameAnswer, frameStore, linkFrame, moveElement, copyElement, placeOutput } from '$lib/server/motion/move-element';
 import { CanvasRemoval, openNewCanvas, removeCanvas, renameCanvasTo } from '$lib/server/canvas/lifecycle';
 import { renameProject } from '$lib/server/repos/projects';
 import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
@@ -174,6 +174,7 @@ const groupElementsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.s
 const ungroupElementInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a free element holding several shapes') }).strict();
 
 const rotateGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), degrees: z.number().finite().describe('clockwise, added to its current angle') }).strict();
+const scaleGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), width: z.number().positive(), height: z.number().positive() }).strict();
 const moveGroupInput = z.object({ canvasId: z.string(), nodeId: z.string().describe('a Group on the canvas'), x: z.number().finite(), y: z.number().finite() }).strict();
 const membersOf = (ctx: CanvasCtx, canvasId: string) => nodeMembers(ctx.db, { orgId: ctx.orgId, canvasId, actor: ctx.actor });
 
@@ -242,6 +243,7 @@ const addFrameInput = z
     canvasId: z.string(),
     templateId: z.string().describe('a motion template id (list_motion_templates)'),
     format: z.enum(MOTION_FORMATS).default(MotionFormat.Landscape),
+    values: z.record(z.string(), z.string().max(4000)).optional().describe('field key → value, as set_template_values takes them'),
     x: z.number(),
     y: z.number()
   })
@@ -573,6 +575,12 @@ export const CANVAS_OPS = {
     run: async (ctx, input) => frameAnswer(await moveElement(framesOf(ctx), { sourceNodeId: input.frameId, clipId: input.elementId, drop: dropFor(input) }))
   }),
 
+  copy_frame_element: op({
+    access: Access.Write,
+    input: moveFrameElementInput,
+    run: async (ctx, input) => frameAnswer(await copyElement(framesOf(ctx), { sourceNodeId: input.frameId, clipId: input.elementId, drop: dropFor(input) }))
+  }),
+
   draw_element: op({
     access: Access.Write,
     input: drawElementInput,
@@ -595,6 +603,12 @@ export const CANVAS_OPS = {
     access: Access.Write,
     input: rotateGroupInput,
     run: async (ctx, input) => frameAnswer(await rotateNodeGroup(framesOf(ctx), membersOf(ctx, input.canvasId), input.nodeId, input.degrees))
+  }),
+
+  scale_group: op({
+    access: Access.Write,
+    input: scaleGroupInput,
+    run: async (ctx, input) => frameAnswer(await scaleNodeGroup(membersOf(ctx, input.canvasId), input.nodeId, { w: input.width, h: input.height }))
   }),
 
   move_group: op({
@@ -874,6 +888,7 @@ export const CANVAS_OPS = {
         userId: ctx.userId,
         templateId: input.templateId,
         format: input.format,
+        values: input.values,
         at: { x: input.x, y: input.y },
         actor: ctx.actor
       });

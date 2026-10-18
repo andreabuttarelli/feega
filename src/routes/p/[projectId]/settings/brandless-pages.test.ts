@@ -8,7 +8,7 @@ vi.mock('$lib/server/supabase-admin', () => {
 
 const PAGES = {
   'connected-accounts': () => import('./connected-accounts/+page.server'),
-  danger: () => import('./danger/+page.server')
+  danger: () => import('$lib/server/settings/pages/danger')
 };
 
 const event = {

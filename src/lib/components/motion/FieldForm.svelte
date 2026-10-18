@@ -5,9 +5,13 @@
   import { locateClip, setDeepProps, setField } from '$lib/motion/template/fields';
   import type { TemplateFieldValue } from '$lib/motion/template/library';
   import { FieldLayout } from '$lib/motion/template/key-fields';
+  import { PropFormat } from '$lib/motion/custom/component';
+  import { LinkUse, MediaAccept, MediaKind, acceptOf, itemOfPick, pickOfItem, type MediaPick } from '$lib/motion/media/pick';
+  import MediaPicker from './MediaPicker.svelte';
+  import MediaListField from './MediaListField.svelte';
+  import type { MediaUploader } from './media-upload';
 
-  type Asset = { id: string; kind: AssetKind; label: string; previewUrl: string };
-  type Media = { assetId: string; kind: 'image' | 'video' };
+  type Asset = { id: string; kind: string; label: string; previewUrl: string; seconds?: number | null };
   type Change = { ok: true; doc: MotionDoc } | { ok: false; error: string };
 
   let {
@@ -16,6 +20,7 @@
     assets,
     setValue,
     onchange,
+    upload = null,
     layout = FieldLayout.Grouped
   }: {
     doc: MotionDoc;
@@ -23,12 +28,26 @@
     assets: Asset[];
     setValue: (f: TemplateFieldValue, raw: string) => Change;
     onchange: (doc: MotionDoc, summary: string) => void;
+    upload?: MediaUploader | null;
     layout?: FieldLayout;
   } = $props();
 
   const MEDIA_KIND: Record<string, AssetKind> = { Image: AssetKind.Image, Video: AssetKind.Video, Logo: AssetKind.Image };
   const CROPPABLE = new Set(['Image', 'Video']);
-  const LIST_KINDS = new Set(['image', 'video']);
+  const MEDIA_FIELDS = new Set([FieldType.Asset, FieldType.MediaList]);
+
+  type Slot = { accept: MediaAccept; links: LinkUse; read: (v: unknown) => MediaPick | null; write: (p: MediaPick | null) => string };
+  const ASSET_SLOT = (accept: MediaAccept): Slot => ({ accept, links: LinkUse.Import, read: (v) => (typeof v === 'string' && v ? { kind: accept === MediaAccept.Video ? MediaKind.Video : MediaKind.Image, assetId: v } : null), write: (p) => p?.assetId ?? '' });
+  const ITEM_SLOT = (accept: MediaAccept): Slot => ({ accept, links: LinkUse.Keep, read: pickOfItem, write: itemOfPick });
+
+  function slotOf(f: TemplateFieldValue): Slot {
+    const clip = target(f);
+    const spec = clip?.component === 'Custom' ? doc.components[String(clip.props.name)]?.propsSchema.properties[f.prop] : undefined;
+    if (spec?.format === PropFormat.MediaItem) {
+      return ITEM_SLOT(acceptOf(spec.assetKind));
+    }
+    return ASSET_SLOT(acceptOf(MEDIA_KIND[clip?.component ?? ''] ?? AssetKind.Image));
+  }
 
   let error = $state('');
 
@@ -51,19 +70,12 @@
   const set = (f: TemplateFieldValue, raw: string) => done(setValue(f, raw), `Set ${f.label}`);
   const crop = (f: TemplateFieldValue, axis: 'focusX' | 'focusY', value: number) => done(setDeepProps(doc, f.clipId, { [axis]: value }), `Cropped ${f.label}`);
 
-  const mediaOf = (f: TemplateFieldValue): Media[] => (Array.isArray(f.value) ? f.value : []);
-
-  function toggleMedia(f: TemplateFieldValue, asset: Asset) {
-    const list = mediaOf(f);
-    const next = list.some((m) => m.assetId === asset.id) ? list.filter((m) => m.assetId !== asset.id) : [...list, { assetId: asset.id, kind: asset.kind as Media['kind'] }];
-    done(setField(doc, f, next), `Set ${f.label}`);
-  }
 </script>
 
 {#each groups as group (group.name)}
 {#if group.name && layout === FieldLayout.Grouped}<h4 class="group" data-testid="field-group">{group.name}</h4>{/if}
 {#each group.fields as f (f.docKey)}
-  <label class="field">
+  <svelte:element this={MEDIA_FIELDS.has(f.type) ? 'div' : 'label'} class="field">
     <span>{f.label}{f.unit ? ` (${f.unit})` : ''}</span>
     {#if f.type === FieldType.Text}
       <textarea rows="2" value={String(f.value ?? '')} onchange={(e) => set(f, e.currentTarget.value)}></textarea>
@@ -86,16 +98,8 @@
     {:else if f.type === FieldType.Boolean}
       <input type="checkbox" checked={Boolean(f.value)} onchange={(e) => set(f, e.currentTarget.checked ? 'yes' : 'no')} />
     {:else if f.type === FieldType.Asset}
-      {@const kind = MEDIA_KIND[target(f)?.component ?? ''] ?? AssetKind.Image}
-      <div class="assets">
-        {#each assets.filter((a) => a.kind === kind) as asset (asset.id)}
-          <button type="button" class="asset" class:on={f.value === asset.id} title={asset.label} onclick={() => set(f, asset.id)}>
-            {#if asset.kind === 'image'}<img src={asset.previewUrl} alt="" />{:else}<span>{asset.label}</span>{/if}
-          </button>
-        {:else}
-          <span class="empty">No {kind} assets on this canvas yet.</span>
-        {/each}
-      </div>
+      {@const slot = slotOf(f)}
+      <MediaPicker label={f.label} value={slot.read(f.value)} {assets} accept={slot.accept} links={slot.links} uploader={upload} onpick={(pick) => set(f, slot.write(pick))} />
       {#if CROPPABLE.has(target(f)?.component ?? '') && f.value}
         {@const t = target(f)}
         <div class="crop" style={`aspect-ratio: ${f.aspect ?? 1};`}>
@@ -105,17 +109,9 @@
         <span class="row">Crop Y <input type="range" min="0" max="1" step="0.01" value={Number(t?.props.focusY ?? 0.5)} oninput={(e) => crop(f, 'focusY', Number(e.currentTarget.value))} /></span>
       {/if}
     {:else if f.type === FieldType.MediaList}
-      <div class="assets">
-        {#each assets.filter((a) => LIST_KINDS.has(a.kind)) as asset (asset.id)}
-          <button type="button" class="asset" class:on={mediaOf(f).some((m) => m.assetId === asset.id)} title={asset.label} onclick={() => toggleMedia(f, asset)}>
-            {#if asset.kind === 'image'}<img src={asset.previewUrl} alt="" />{:else}<span>{asset.label}</span>{/if}
-          </button>
-        {:else}
-          <span class="empty">No pictures or videos on this canvas yet.</span>
-        {/each}
-      </div>
+      <MediaListField label={f.label} value={f.value} {assets} {upload} onchange={(list) => done(setField(doc, f, list), `Set ${f.label}`)} />
     {/if}
-  </label>
+  </svelte:element>
 {/each}
 {/each}
 
@@ -157,31 +153,10 @@
     font-size: 12px;
   }
 
-  .assets {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 4px;
-  }
-
-  .asset {
-    aspect-ratio: 1;
-    border: 1px solid var(--ui-line);
-    background: var(--ui-surface);
-    overflow: hidden;
-    font-size: 9px;
-    padding: 2px;
-  }
-
-  .asset img,
   .crop img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-  }
-
-  .asset.on {
-    outline: 2px solid var(--ui-accent);
-    outline-offset: 1px;
   }
 
   .crop {
@@ -196,7 +171,6 @@
     align-items: center;
   }
 
-  .empty,
   .error {
     grid-column: 1 / -1;
     color: var(--ui-ink-2);

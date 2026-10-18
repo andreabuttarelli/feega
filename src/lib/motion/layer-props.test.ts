@@ -7,7 +7,7 @@ import { setClipFlags } from './organize';
 import { pathData, rectOutline } from './shape/geometry';
 import { COMPONENTS } from './components';
 import { shapeMarkup, type ShapeLook } from './shape/render';
-import { Flip, flipPatch } from './layer-props';
+import { Flip, flipClips, flipPatch } from './layer-props';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -65,5 +65,27 @@ describe('clip content', () => {
     const clipped = html(must(setClipFlags(base(), 'box', { clipContent: true })));
     expect(clipped).toMatch(/data-clip="kid"[^>]*style="[^"]*clip-path:inset\(270px 270px 270px 270px\)/);
     expect(html(base())).not.toContain('clip-path:inset(');
+  });
+});
+
+describe('⇧H / ⇧V flip every selected layer', () => {
+  const doc = must(addClip(must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 0, durationInFrames: 60, props: { shape: 'rect' } }, 'a')), { component: 'Text', from: 0, durationInFrames: 60, props: { text: 'hi' } }, 'b'));
+
+  it('negates the scale on the flipped axis of each layer', () => {
+    const flipped = must(flipClips(doc, ['a', 'b'], Flip.Horizontal));
+    expect(findClip(flipped, 'a')!.clip.transform.scaleX).toBe(-1);
+    expect(findClip(flipped, 'b')!.clip.transform.scaleX).toBe(-1);
+    expect(findClip(flipped, 'a')!.clip.transform.scaleY).toBeUndefined();
+  });
+
+  it('flips an animated scale on every keyframe, so the animation stays mirrored', () => {
+    const keyed = { ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'a' ? { ...c, keyframes: { scaleY: [{ frame: 0, value: 1 }, { frame: 30, value: 2 }] } } : c)) })) } as MotionDoc;
+    const flipped = must(flipClips(keyed, ['a'], Flip.Vertical));
+    expect(findClip(flipped, 'a')!.clip.keyframes.scaleY!.map((k) => k.value)).toEqual([-1, -2]);
+  });
+
+  it('flipping twice is the original', () => {
+    const twice = must(flipClips(must(flipClips(doc, ['a'], Flip.Horizontal)), ['a'], Flip.Horizontal));
+    expect(findClip(twice, 'a')!.clip.transform.scaleX).toBe(1);
   });
 });
