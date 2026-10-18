@@ -52,4 +52,25 @@ test.describe('copy and paste elements @real', () => {
     await expect.poll(async () => (await elements()).length, { timeout: 15_000 }).toBeGreaterThan(0);
     expect(await clipCount(admin, frame.id)).toBe(2);
   });
+
+  test('⌘V with a frame selected pastes a copied free element into it and keeps the original', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const frame = await seedNode({ type: 'motion', x: 80, y: 80, data: LANDSCAPE });
+    const free = await seedNode({ type: 'motion', x: 900, y: 80, data: { ...LANDSCAPE, kind: 'element' } });
+    for (const id of [frame.id, free.id]) {
+      const doc = id === frame.id ? { ...frameDoc, tracks: [{ ...frameDoc.tracks[0], clips: [] }] } : { ...frameDoc, background: 'transparent' };
+      const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: id, version: 1, doc, actor_kind: 'user', actor_id: session.userId });
+      expect(error).toBeNull();
+    }
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.locator(`.svelte-flow__node[data-id="${free.id}"]`).click({ position: { x: 4, y: 4 } });
+    await page.keyboard.press('ControlOrMeta+c');
+    await page.locator(`.svelte-flow__node[data-id="${frame.id}"]`).click({ position: { x: 4, y: 4 } });
+    await page.keyboard.press('ControlOrMeta+v');
+
+    await expect.poll(() => clipCount(admin, frame.id), { timeout: 15_000 }).toBe(1);
+    const kept = await admin.from('nodes').select('deleted_at').eq('id', free.id).single();
+    expect(kept.data?.deleted_at).toBeNull();
+  });
 });

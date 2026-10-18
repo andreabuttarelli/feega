@@ -152,7 +152,7 @@ describe('preview zoom keys', () => {
     expect(press('-')).toBe(Command.ZoomOut);
   });
 
-  it('Figma keys: ⇧0 is 100%, ⇧1 fits, ⇧2 zooms to the selection, whatever the layout prints', () => {
+  it('zoom keys: ⇧0 is 100%, ⇧1 fits, ⇧2 zooms to the selection, whatever the layout prints', () => {
     expect(press(')', { shift: true, code: 'Digit0' })).toBe(Command.PreviewActual);
     expect(press('!', { shift: true, code: 'Digit1' })).toBe(Command.PreviewFit);
     expect(press('@', { shift: true, code: 'Digit2' })).toBe(Command.PreviewSelection);
@@ -200,7 +200,7 @@ describe('arrows by edit mode', () => {
 });
 
 describe('mask keys', () => {
-  it('control-command-M uses the selection as mask, as in Figma; command-M alone does not', () => {
+  it('control-command-M uses the selection as mask, command-M alone does not', () => {
     expect(commandFor({ key: 'm', code: 'KeyM', mod: true, shift: false, ctrlCmd: true })).toBe(Command.UseAsMask);
     expect(commandFor({ key: 'm', code: 'KeyM', mod: true, shift: false })).toBeNull();
     expect(press('m')).toBe(Command.AddMarker);
@@ -212,6 +212,16 @@ describe('flip keys', () => {
     expect(press('H', { shift: true, code: 'KeyH' })).toBe(Command.FlipHorizontal);
     expect(press('V', { shift: true, code: 'KeyV' })).toBe(Command.FlipVertical);
     expect(press('v', { code: 'KeyV' })).toBe(Command.ToolSelect);
+  });
+});
+
+describe('boolean keys', () => {
+  it('⌥⇧U unites, ⌥⇧S subtracts, ⌥⇧I intersects, ⌥⇧E excludes', () => {
+    expect(press('U', { alt: true, shift: true, code: 'KeyU' })).toBe(Command.Union);
+    expect(press('S', { alt: true, shift: true, code: 'KeyS' })).toBe(Command.Subtract);
+    expect(press('I', { alt: true, shift: true, code: 'KeyI' })).toBe(Command.Intersect);
+    expect(press('E', { alt: true, shift: true, code: 'KeyE' })).toBe(Command.Exclude);
+    expect(press('s', { alt: true, code: 'KeyS' })).toBe(Command.AlignBottom);
   });
 });
 

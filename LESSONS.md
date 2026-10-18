@@ -544,6 +544,12 @@ non fidarsi del proprio ramo stava per essere depositata sulla base di un loop m
 Questa lezione è più forte delle altre due che l'hanno accompagnata, perché quelle dipendono da
 qualcuno che si ricordi di controllare; questa toglie la possibilità che il taglio sia dannoso.
 
+### Il dev server serve il branch di prima dopo un checkout nello stesso worktree
+Segnale: una spec e2e fallisce come se la modifica non ci fosse (voce di menu assente, gesto che
+non fa niente) e `curl http://localhost:<porta>/src/<file>` non contiene il codice appena scritto.
+Vite non sempre vede i file cambiati in blocco da un cambio di branch. Mossa: dopo ogni cambio di
+branch riavvia il dev server e controlla col `curl` del modulo prima di credere a un rosso e2e.
+
 ## Test: distinguere il tuo difetto dal rumore
 
 ### CI rossa con zero test falliti è una promessa non attesa, non un test tuo
@@ -3018,7 +3024,7 @@ Signal: WebKit zoom p5 ~10 fps while Chromium holds 60/60 and per-frame JS stays
 Signal: a button or hint has the right size but the default text colour (white on white, grey on grey); `buttonVariants(...)` output lacks `text-ui-on-accent`. Cause: `tailwind-variants` merges with its own tailwind-merge, which reads `text-ui-label` as a colour and keeps only the last `text-*`. `cn()` knows the type roles; `tv()` does not unless told. Move: every `tv()` takes `{ twMergeConfig: TW_MERGE_CONFIG }` from `$lib/utils`.
 
 ### A matted clip renders nothing in preview, still and video
-Signal: a clip with a track matte (or a Figma mask) is invisible everywhere; its `.kt` wrapper has a `mask:url(data:image/svg+xml…)` that, opened alone, shows the right shape. Cause: `.kt` was `position:absolute` with no box, 0×0, so `mask-size:100% 100%` covered nothing. Markup tests and the fast-vs-exact PSNR spec stayed green: black equals black. Move: look at pixels, not markup — `npm run bench:export -- --doc=<{doc,assets}.json> --engines=chromium --lanes=1 --keep` writes the real export mp4, `--parity --live` the preview frames; check `getBoundingClientRect()` of the wrapper.
+Signal: a clip with a track matte (or a shape mask) is invisible everywhere; its `.kt` wrapper has a `mask:url(data:image/svg+xml…)` that, opened alone, shows the right shape. Cause: `.kt` was `position:absolute` with no box, 0×0, so `mask-size:100% 100%` covered nothing. Markup tests and the fast-vs-exact PSNR spec stayed green: black equals black. Move: look at pixels, not markup — `npm run bench:export -- --doc=<{doc,assets}.json> --engines=chromium --lanes=1 --keep` writes the real export mp4, `--parity --live` the preview frames; check `getBoundingClientRect()` of the wrapper.
 
 ### ⌘Z of a delete answers "node_deleted_by_peer"
 Signal: undoing a canvas delete is refused with `node_deleted_by_peer` on the real stack; `undo.test.ts` stays green. Cause: the precondition looked the node up with `findNode`, which filters `deleted_at is null`, so a soft-deleted row is never found; `fakeDb` without `{ filter: true }` ignores that filter. Move: a test about soft deletes seeds `deleted_at` and uses `fakeDb(rows, { filter: true })`; a precondition on a deleted row reads it with `nodeRowExists`.
@@ -3061,6 +3067,8 @@ Signal: a new Text/Title/Line in a still frame renders with opacity 0 (or clippe
 ### A `{#key}` editor remounts on close although a "leaving" state keeps it
 Signal: deselecting a frame flashes "Opening the editor…" or a stale picture; a `console.log` in the editor's `onMount` fires unmount→mount→unmount within one click. Cause: the state that keeps the block alive (`inlineStage.leave`) was set in an `$effect` reacting to the selection; the `{#if}/{#key}` block had already re-rendered without it, and `earlyFetch.take` had emptied the session cache, so the remount loaded again. `$effect.pre` did not fix it. Move: set the keep-alive state synchronously in the handler that changes the selection (`selectionChanged` → `leaveNow`), and keep the effect only as fallback.
 
+### A route answers 500 "Internal Error" and nothing is logged
+Signal: a page that loads fine on dev 500s on your branch; `__data.json` for the same URL has no error; no stack in the `vite dev` output. Cause: a component threw during server render (here `onDestroy` calling `cancelAnimationFrame`, which runs on the server too), and the error reached `handleError` but never the terminal. Move: write the error to a file from `handleError` in a throwaway local patch (or render with `ssrLoadModule` + props), and keep browser-only cleanup in `onMount`'s return, browser-only libraries (Pixi) behind a dynamic `import()`.
 ### Edits in an agent worktree never reach the running dev server
 Signal: the page keeps old markup (a new attribute is `null`, a fix "does nothing") although the file is saved. Cause: `vite.config.ts` ignores `.claude/worktrees` in `server.watch`, so a dev server started from a worktree never recompiles. Move: restart your own `vite dev --port <free>` after every edit before reading red or green.
 

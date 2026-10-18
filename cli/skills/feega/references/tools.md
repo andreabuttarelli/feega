@@ -369,6 +369,11 @@ permissions. Refused with `uncensored_not_publishable`, `real_brand_not_publisha
 | `list_orgs` | `feega orgs` |
 | `team_op` `switch_org` | `feega orgs use <orgId>` |
 | `team_op` `create_org` | `feega orgs create <name>` |
+| `list_team` | `feega team` |
+| `team_op` `invite` / `resend_invite` / `revoke_invite` | `feega team invite <email> [--role]` / `resend <id>` / `revoke <id>` |
+| `team_op` `invite_link` / `disable_invite_link` | `feega team link` / `link-off` |
+| `team_op` `set_role` / `remove_member` | `feega team role <userId> <role>` / `remove <userId>` |
+| `team_op` `leave` / `transfer_ownership` | `feega team leave` / `transfer <userId>` |
 
 ## Ads
 

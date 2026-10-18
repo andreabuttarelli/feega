@@ -1,7 +1,9 @@
 <script lang="ts">
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
+  import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
   import type { Stack } from '$lib/canvas/stacking';
   import EmptyCanvas from '$lib/components/canvas/EmptyCanvas.svelte';
+  import { CanvasMode, canvasModeFor } from '$lib/canvas/canvas-mode';
   import { EmptyAction, requestChat, showsEmptyState } from '$lib/canvas/empty-canvas';
   import { MediaOrigin, audioNodeFiles } from '$lib/canvas/download';
   /**
@@ -34,6 +36,7 @@
   import { ActionKind, SaveFailure, actAtVersion, actionKind, adoptFrameHead, adoptIdleRows, saveBanner, failureOf, isOwnEcho, keepDirty, keepLocal, orphanedEdits, saveMessage, sendResultOf, serverWritten, writeWithRetry, type ActionAnswer, type WriteOutcome } from '$lib/canvas/node-save';
   import { createUndoStack } from '$lib/canvas/undo-stack';
   import { writesFrameAt, type Gesture, type UndoItem } from '$lib/canvas/undo-plan';
+  import { repeatOffset, type LastDuplicate, type Offset } from '$lib/canvas/duplicate-plan';
   import { buildMoveGesture, checkMoveGesture, inverseMoveGesture, type MoveGesture } from '$lib/canvas/move-gesture';
   import { connectCanvas } from '$lib/realtime/canvas-channel';
   import { canvasLink } from '$lib/realtime/canvas-link';
@@ -118,7 +121,7 @@
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
-  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type HostShift, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
@@ -347,6 +350,48 @@
       }
     });
     return DropVerdict.Taken;
+  }
+
+  type HostBox = { id: string; x: number; y: number; w: number; h: number };
+  const HOST_MIN_PX = 4;
+  let hostOrigin: HostBox | null = null;
+
+  const placeHost = (box: HostBox) => (nodes = nodes.map((n) => (n.id !== box.id ? n : n.w === box.w && n.h === box.h ? { ...n, x: box.x, y: box.y } : { ...n, x: box.x, y: box.y, w: box.w, h: box.h, userHeight: box.h })));
+
+  function hostDrag(shift: HostShift, to: PointerPoint, phase: DragPhase) {
+    const id = inlineMotion;
+    const row = id ? nodes.find((n) => n.id === id) : null;
+    const zero = toFlow?.({ x: 0, y: 0 });
+    const unit = toFlow?.({ x: 1, y: 1 });
+    if (!id || !row || !zero || !unit) {
+      return;
+    }
+    const scale = unit.x - zero.x;
+    const origin = hostOrigin?.id === id ? hostOrigin : { id, x: row.x, y: row.y, w: row.w, h: row.h };
+    hostOrigin = origin;
+    const next = { id, x: origin.x + shift.dx * scale, y: origin.y + shift.dy * scale, w: Math.max(HOST_MIN_PX, origin.w + shift.dw * scale), h: Math.max(HOST_MIN_PX, origin.h + shift.dh * scale) };
+    const sized = next.w !== origin.w || next.h !== origin.h;
+    if (phase !== DragPhase.Drop) {
+      placeHost(next);
+      cursors.port.update({ live: [{ id, x: next.x, y: next.y }] });
+      if (!sized) {
+        tileDragOver([id], to);
+      }
+      return;
+    }
+    hostOrigin = null;
+    cursors.port.update({ live: [] });
+    placeHost(origin);
+    if (!sized && tileDrop([id], to) === DropVerdict.Taken) {
+      return;
+    }
+    if (next.x !== origin.x || next.y !== origin.y) {
+      void moveEnd([{ id, x: next.x, y: next.y }]);
+      void move(id, next.x, next.y);
+    }
+    if (sized) {
+      void resize(id, next.w, next.h);
+    }
   }
 
   async function regroup(action: string, fields: Record<string, string>) {
@@ -2911,10 +2956,15 @@
     };
   }
 
-  async function duplicate(ids: string[]) {
-    const result = await post('duplicate', { node_ids: ids.join(',') });
+  let lastDuplicate: LastDuplicate | null = null;
+
+  async function duplicate(ids: string[], dragged?: Offset) {
+    const offset = dragged ?? repeatOffset(lastDuplicate, ids);
+    const fields: Fields = offset ? { node_ids: ids.join(','), dx: offset.dx, dy: offset.dy } : { node_ids: ids.join(',') };
+    const result = await post('duplicate', fields);
     const created = (result?.nodes ?? []) as CanvasNodeRecord[];
     const connected = (result?.connections ?? []) as Connection[];
+    lastDuplicate = offset && created.length ? { ids: created.map((n) => n.id), offset } : null;
     if (created.length) { nodes = [...nodes, ...created.map((n) => toTile(n, { select: true }))]; }
     if (connected.length) { edges = [...edges, ...connected.map(toEdge)]; }
     if (created.length) { pushGesture(createManyGesture(created, connected)); }
@@ -2931,6 +2981,7 @@
   type Clipboard = {
     nodes: { type: string; data: Record<string, unknown>; dx: number; dy: number }[];
     edges: { sourceIndex: number; targetIndex: number; sourceHandle: string | null; targetHandle: string | null }[];
+    freeIds: string[];
   };
   let clipboard = $state<Clipboard | null>(null);
 
@@ -2944,6 +2995,7 @@
     const cy = chosen.reduce((sum, n) => sum + n.y, 0) / chosen.length;
 
     clipboard = {
+      freeIds: chosen.flatMap((n) => freeElement([n.id]) ?? []),
       nodes: chosen.map((n) => ({ type: n.type, data: n.data, dx: n.x - cx, dy: n.y - cy })),
       edges: edges
         .filter((e) => indexOf.has(e.source) && indexOf.has(e.target))
@@ -2967,6 +3019,14 @@
     }
   }
 
+  const FRAME_CENTRE = { x: 0.5, y: 0.5 };
+
+  async function pasteFreeInto(frameId: string, freeIds: string[]) {
+    for (const source of freeIds) {
+      landed(await post('copyFree', { source, drop: JSON.stringify({ on: DropOn.Frame, nodeId: frameId, at: FRAME_CENTRE }) }));
+    }
+  }
+
   async function paste(at: { x: number; y: number }) {
     const copied = elementClipboard.elements;
     if (elementClipboard.kind === Copied.Elements && copied) {
@@ -2974,6 +3034,11 @@
       return;
     }
     if (!clipboard) { return; }
+    const frameId = pasteIntoFrame(nodes.filter((n) => selectedIds.includes(n.id)).map((n) => ({ id: n.id, takesDrops: tileChromeOf(n).takesDrops })), clipboard.freeIds);
+    if (frameId) {
+      await pasteFreeInto(frameId, clipboard.freeIds);
+      return;
+    }
 
     const result = await post('paste', {
       nodes: JSON.stringify(clipboard.nodes.map((n) => ({ type: n.type, data: n.data, x: at.x + n.dx, y: at.y + n.dy }))),
@@ -3127,13 +3192,16 @@
     [EmptyAction.Image]: () => void create('image', EMPTY_ORIGIN),
     [EmptyAction.Video]: () => void create('video', EMPTY_ORIGIN)
   };
+
+  const canvasMode = $derived(canvasModeFor(data.org.role));
+  const viewOnly = $derived(canvasMode === CanvasMode.View);
 </script>
 
 <svelte:head><title>feega — {data.canvas.name}</title></svelte:head>
 
 <svelte:window bind:innerWidth={pageWidth} />
 
-<div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} style={inlineMotion ? neighbourStyle() : undefined}>
+<div class="canvas" onpointerover={warmHovered} class:editing={inlineMotion !== null} class:view-only={viewOnly} style={inlineMotion ? neighbourStyle() : undefined}>
   {#if peers.length || canvasPeers.length}
     {#if topPeers}
       <Portal to={topPeers}><PeerAvatars {peers} {following} {presenting} onfollow={(id) => (following = id)} onspotlight={spotlight} /></Portal>
@@ -3192,8 +3260,10 @@
     onConfirm={onAudioOperationSwitchConfirmed}
   />
 
+  {#if viewOnly}<p class="view-only-badge" data-testid="view-only">View only</p>{/if}
   {#if Flow}
   <Flow
+    mode={canvasMode}
     actionUrl={(action: string) => canvasActionUrl({ projectId: data.projectId, canvasId: data.canvas.id }, action)}
     tiles={withPeerMotion(tiles, canvasPeers, new Set(selectedIds))}
     {edges}
@@ -3463,12 +3533,12 @@
     {/snippet}
   </Flow>
   {/if}
-  {#if showsEmptyState(nodes.length, inlineMotion)}
+  {#if !viewOnly && showsEmptyState(nodes.length, inlineMotion)}
     <EmptyCanvas onaction={(action) => EMPTY_STARTS[action]()} />
   {/if}
   {#if editingMotion}
     {#key editingMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} {canvasundo} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} onhostdrag={hostDrag} {canvasundo} />
     {/key}
   {/if}
 
@@ -3529,6 +3599,24 @@
 </div>
 
 <style>
+  .view-only :global(.svelte-flow__node) {
+    pointer-events: none;
+  }
+
+  .view-only-badge {
+    position: absolute;
+    top: var(--ui-space-3);
+    left: 50%;
+    z-index: 5;
+    margin: 0;
+    padding: var(--ui-space-1) var(--ui-space-3);
+    border-radius: 9999px;
+    background: var(--ui-panel-raised);
+    color: var(--ui-text);
+    font-size: var(--ui-type-caption);
+    transform: translateX(-50%);
+  }
+
   .canvas.editing :global([role='toolbar'][aria-label='Selection actions']) {
     display: none;
   }

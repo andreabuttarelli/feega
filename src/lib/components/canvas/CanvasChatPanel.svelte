@@ -19,11 +19,13 @@
   let {
     projectId,
     brandSlug,
-    open
+    open,
+    viewOnly = false
   }: {
     projectId: string;
     brandSlug: string;
     open: boolean;
+    viewOnly?: boolean;
   } = $props();
 
   let widthPx = $state(readChatPanelPx());
@@ -97,6 +99,8 @@
       <div class="chat-body" class:is-guide={tab === 'guide'}>
         {#if tab === 'guide'}
           <CanvasGuideTab initialSlug={$guideOpenRequest} onopened={() => guideOpenRequest.set(null)} />
+        {:else if viewOnly}
+          <p class="chat-view-only" data-testid="chat-view-only">View only: the chat edits the canvas and spends credits. Ask an admin for edit access.</p>
         {:else if browser}
           {#await CHROME_LOADERS.chat() then { default: ChatPanel }}
             <ChatPanel {projectId} {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
@@ -108,6 +112,13 @@
 {/if}
 
 <style>
+  .chat-view-only {
+    margin: 0;
+    padding: var(--ui-space-4);
+    color: var(--ui-text-secondary);
+    font-size: var(--ui-type-caption);
+  }
+
   .chat-pane {
     position: relative;
     flex: 0 0 auto;

@@ -19,6 +19,8 @@ type InviteRow = Database['public']['Tables']['orgs_invites']['Row'];
 
 const TOKEN_BYTES = 32;
 const EXPIRES_IN_DAYS = 7;
+export const LINK_EXPIRES_IN_DAYS = 365;
+export const LINK_INVITE_EMAIL = '*';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type InviteStatus = 'pending' | 'accepted' | 'expired';
@@ -72,7 +74,7 @@ function toInvite(row: InviteColumns, now: Date): Invite {
 
 export async function createInvite(
   db: Db,
-  input: { orgId: string; email: string; role: OrgRole; invitedBy: string; now?: Date }
+  input: { orgId: string; email: string; role: OrgRole; invitedBy: string; now?: Date; expiresInDays?: number }
 ): Promise<{ invite: Invite; token: string }> {
   const now = input.now ?? new Date();
   const { token, tokenHash } = mintInviteToken();
@@ -84,7 +86,7 @@ export async function createInvite(
       email: input.email.toLowerCase(),
       role: input.role,
       token: tokenHash,
-      expires_at: new Date(now.getTime() + EXPIRES_IN_DAYS * DAY_MS).toISOString(),
+      expires_at: new Date(now.getTime() + (input.expiresInDays ?? EXPIRES_IN_DAYS) * DAY_MS).toISOString(),
       invited_by: input.invitedBy
     })
     .select(INVITE_COLUMNS)
@@ -118,6 +120,46 @@ export async function revokeInvite(
     .delete()
     .eq('id', input.inviteId)
     .eq('org_id', input.orgId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function renewInvite(
+  db: Db,
+  input: { orgId: string; inviteId: string; now?: Date }
+): Promise<{ email: string; role: OrgRole; token: string } | null> {
+  const now = input.now ?? new Date();
+  const { data: row, error } = await db
+    .from('orgs_invites')
+    .select('id, email, role, accepted_at')
+    .eq('id', input.inviteId)
+    .eq('org_id', input.orgId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  if (!row || row.accepted_at || row.email === LINK_INVITE_EMAIL) {
+    return null;
+  }
+
+  const { token, tokenHash } = mintInviteToken();
+  const { error: updateError } = await db
+    .from('orgs_invites')
+    .update({ token: tokenHash, expires_at: new Date(now.getTime() + EXPIRES_IN_DAYS * DAY_MS).toISOString() })
+    .eq('id', input.inviteId)
+    .eq('org_id', input.orgId);
+
+  if (updateError) {
+    throw updateError;
+  }
+  return { email: row.email, role: row.role as OrgRole, token };
+}
+
+export async function deleteLinkInvite(db: Db, orgId: string): Promise<void> {
+  const { error } = await db.from('orgs_invites').delete().eq('org_id', orgId).eq('email', LINK_INVITE_EMAIL);
 
   if (error) {
     throw error;

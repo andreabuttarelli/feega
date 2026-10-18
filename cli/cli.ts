@@ -357,6 +357,37 @@ orgs
     await cmdOrgsUse(orgId);
   });
 
+const team = program
+  .command('team')
+  .description('Members and pending invites of the active organisation')
+  .option('--org <id>', 'Another organisation than the active one')
+  .action(async (opts) => {
+    const { cmdTeam } = await import('./commands/orgs.ts');
+    await cmdTeam(opts);
+  });
+
+const teamCommand = (name: string, description: string, body: (...args: string[]) => Record<string, unknown>) =>
+  team
+    .command(name)
+    .description(description)
+    .option('--org <id>', 'Another organisation than the active one')
+    .action(async (...args: unknown[]) => {
+      const opts = args.at(-2) as { org?: string; role?: string; off?: boolean };
+      const values = args.slice(0, -2) as string[];
+      const { cmdTeamOp } = await import('./commands/orgs.ts');
+      await cmdTeamOp({ ...body(...values), ...(opts.role ? { role: opts.role } : {}) } as never, opts);
+    });
+
+teamCommand('invite <email>', 'Invite by email (--role admin|member|viewer, default member)', (email) => ({ op: 'invite', email, role: 'member' })).option('--role <role>', 'admin, member or viewer');
+teamCommand('resend <inviteId>', 'Send an invite again with a fresh link', (invite_id) => ({ op: 'resend_invite', invite_id }));
+teamCommand('revoke <inviteId>', 'Revoke a pending invite', (invite_id) => ({ op: 'revoke_invite', invite_id }));
+teamCommand('link', 'Create or reset the invite link (joins as viewer)', () => ({ op: 'invite_link' }));
+teamCommand('link-off', 'Turn the invite link off', () => ({ op: 'disable_invite_link' }));
+teamCommand('role <userId> <role>', 'Change a member role', (user_id, role) => ({ op: 'set_role', user_id, role }));
+teamCommand('remove <userId>', 'Remove a member', (user_id) => ({ op: 'remove_member', user_id }));
+teamCommand('leave', 'Leave the organisation', () => ({ op: 'leave' }));
+teamCommand('transfer <userId>', 'Make a member the owner; you become admin', (user_id) => ({ op: 'transfer_ownership', user_id }));
+
 const gallery = program
   .command('gallery [query]')
   .description('Search the public gallery of free motion videos and compositions to remix')

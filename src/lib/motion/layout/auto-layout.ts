@@ -2,7 +2,8 @@ import type { Box } from '../layout';
 
 export enum Direction {
   Horizontal = 'horizontal',
-  Vertical = 'vertical'
+  Vertical = 'vertical',
+  Grid = 'grid'
 }
 
 export enum Justify {
@@ -35,7 +36,10 @@ export type Flow = {
   padding: Padding;
   justify: Justify;
   align: Align;
+  columns?: number;
 };
+
+export const DEFAULT_COLUMNS = 2;
 
 export type Item = {
   id: string;
@@ -54,12 +58,20 @@ type Axes = { main: Dim; cross: Dim; mainStart: 'left' | 'top'; crossStart: 'lef
 
 const AXES: Record<Direction, Axes> = {
   [Direction.Horizontal]: { main: 'width', cross: 'height', mainStart: 'left', crossStart: 'top' },
-  [Direction.Vertical]: { main: 'height', cross: 'width', mainStart: 'top', crossStart: 'left' }
+  [Direction.Vertical]: { main: 'height', cross: 'width', mainStart: 'top', crossStart: 'left' },
+  [Direction.Grid]: { main: 'width', cross: 'height', mainStart: 'left', crossStart: 'top' }
 };
 
 const PAD: Record<Dim, (p: Padding) => number> = {
   width: (p) => p.left + p.right,
   height: (p) => p.top + p.bottom
+};
+
+const JUSTIFIED_IN_CELL: Record<Justify, (free: number) => number> = {
+  [Justify.Start]: () => 0,
+  [Justify.Center]: (free) => free / 2,
+  [Justify.End]: (free) => free,
+  [Justify.SpaceBetween]: () => 0
 };
 
 const ALIGNED: Record<Align, (free: number) => number> = {
@@ -122,10 +134,59 @@ function hugMain(item: Item, flow: Flow): number {
   return sum(kids.map((k) => measure(k)[m])) + gaps(kids.length, flow.gap) + PAD[m](flow.padding);
 }
 
+const columnsOf = (flow: Flow) => Math.max(1, Math.round(flow.columns ?? DEFAULT_COLUMNS));
+
+function gridRows(kids: Item[], flow: Flow): Item[][] {
+  const columns = columnsOf(flow);
+  return Array.from({ length: Math.ceil(kids.length / columns) }, (_, r) => kids.slice(r * columns, (r + 1) * columns));
+}
+
+const rowHeights = (rows: Item[][], height: (k: Item) => number) => rows.map((row) => Math.max(...row.map(height)));
+
+function hugGrid(item: Item, flow: Flow): Size {
+  const kids = flowing(item);
+  const columns = columnsOf(flow);
+  const widest = kids.length ? Math.max(...kids.map((k) => measure(k).width)) : 0;
+  const used = Math.min(columns, kids.length);
+  const heights = rowHeights(gridRows(kids, flow), (k) => measure(k).height);
+  return {
+    width: used * widest + gaps(used, flow.gap) + PAD.width(flow.padding),
+    height: sum(heights) + gaps(heights.length, flow.crossGap) + PAD.height(flow.padding)
+  };
+}
+
+function measureGrid(item: Item, flow: Flow, given: Partial<Size>): Size {
+  const hugged = hugGrid(item, flow);
+  const side = (dim: Dim) => clamp(item, dim, given[dim] ?? (item.sizing[dim] === Sizing.Hug ? hugged[dim] : item[dim]));
+  return { width: side('width'), height: side('height') };
+}
+
+function placeGrid(item: Item, flow: Flow, inner: Box, out: Map<string, Box>): void {
+  const columns = columnsOf(flow);
+  const cell = (inner.width - gaps(columns, flow.gap)) / columns;
+  const rows = gridRows(flowing(item), flow);
+  const sizeIn = (k: Item) => measure(k, k.sizing.width === Sizing.Fill ? { width: cell } : {});
+  const heights = rowHeights(rows, (k) => (k.sizing.height === Sizing.Fill ? 0 : sizeIn(k).height));
+  let top = inner.top;
+
+  rows.forEach((row, r) => {
+    row.forEach((k, col) => {
+      const own = sizeIn(k);
+      const height = k.sizing.height === Sizing.Fill ? clamp(k, 'height', heights[r]) : own.height;
+      const left = inner.left + col * (cell + flow.gap) + JUSTIFIED_IN_CELL[flow.justify](cell - own.width);
+      place(k, { left, top: top + ALIGNED[flow.align](heights[r] - height), width: own.width, height }, out);
+    });
+    top += heights[r] + flow.crossGap;
+  });
+}
+
 export function measure(item: Item, given: Partial<Size> = {}): Size {
   const { flow } = item;
   if (!flow) {
     return { width: clamp(item, 'width', given.width ?? item.width), height: clamp(item, 'height', given.height ?? item.height) };
+  }
+  if (flow.direction === Direction.Grid) {
+    return measureGrid(item, flow, given);
   }
   const { main: m, cross: c } = AXES[flow.direction];
   const main = clamp(item, m, given[m] ?? (item.sizing[m] === Sizing.Hug ? hugMain(item, flow) : item[m]));
@@ -163,6 +224,10 @@ function place(item: Item, at: Box, out: Map<string, Box>): void {
   const ax = AXES[flow.direction];
   const { main: m, cross: c } = ax;
   const inner = { left: at.left + flow.padding.left, top: at.top + flow.padding.top, width: at.width - PAD.width(flow.padding), height: at.height - PAD.height(flow.padding) };
+  if (flow.direction === Direction.Grid) {
+    placeGrid(item, flow, inner, out);
+    return;
+  }
   const kids = flowing(item);
   const stretched = (k: Item) => k.sizing[c] === Sizing.Fill && !flow.wrap;
   const natural = new Map(kids.map((k) => [k, measure(k, stretched(k) ? { [c]: inner[c] } : {})[m]]));

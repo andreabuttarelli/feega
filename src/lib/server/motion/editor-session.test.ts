@@ -6,7 +6,7 @@ const slow = <T>(value: T) => new Promise<T>((resolve) => setTimeout(() => resol
 const NODE = { format: 'landscape', lastRenderAssetId: null, posterAssetId: null };
 const RECORD = { id: 'n1', displayName: 'Frame', data: {} };
 
-vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: () => slow([{ orgId: 'o1' }]) }));
+vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: () => slow([{ org: { id: 'o1', name: 'o', slug: 'o' }, role: 'member' }]) }));
 vi.mock('$lib/server/canvas/lookup', () => ({
   findCanvasForUser: () => slow({ orgId: 'o1', canvas: { id: 'c1', projectId: 'p1', name: 'Canvas' }, mode: 'standard', projectBrandId: null })
 }));

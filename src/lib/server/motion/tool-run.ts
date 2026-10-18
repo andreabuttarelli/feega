@@ -1,8 +1,9 @@
 import { asSchema, type Tool } from 'ai';
+import { nameVersion, namedRevisions } from './version-names';
 import type { Db } from '$lib/server/db/client';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
 import { agentActor } from '$lib/server/repos/actor';
-import { listRevisions, readRevision } from '$lib/server/repos/motion-revisions';
+import { readRevision } from '$lib/server/repos/motion-revisions';
 import { screenModelInput } from '$lib/server/moderation/model-input';
 import { ModerationProfile } from '$lib/server/moderation/profiles';
 import { savedMotion } from './agent-embed';
@@ -108,7 +109,7 @@ export async function runMotionTool(db: Db, scope: ToolRunScope, ask: ToolRunAsk
     session,
     assets,
     templates: templateLibrary(db, { orgId: scope.orgId, actor }),
-    revisions: { list: () => listRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null },
+    revisions: { list: () => namedRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null, name: async (version, name) => (await nameVersion(db, { ...nodeScope, version, name, actor })).named },
     exportStill: (doc, spec) => exportStill(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId }, doc, spec, { tokens, assets }),
     moveOut: frameMover(db, { orgId: scope.orgId, actor, projectId: saved.project.id }, scope.nodeId)
   }, frames);

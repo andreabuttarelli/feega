@@ -1,3 +1,4 @@
+import { can, OrgAction, type OrgRole } from '$lib/org-roles';
 import { SOCIAL_PUBLISHING_SURFACE, visibleUnder, type SocialPublishing } from '$lib/social-publishing';
 import { siInstagram, siTiktok, siFacebook, siX, siThreads, siYoutube, siBluesky, siReddit } from 'simple-icons';
 
@@ -128,6 +129,14 @@ export const SETTINGS_GROUPS: readonly {
 })).filter((group) => group.items.length > 0);
 
 /** True quando `pathname` (es. `/p/x/settings/video`) è una sezione che richiede un brand. */
+const PERSONAL_SCOPE: SettingsScope = 'account';
+
+export function sectionEditable(pathname: string, role: OrgRole): boolean {
+  const trimmed = pathname.replace(/\/$/, '');
+  const section = SETTINGS_SECTIONS.find((s) => trimmed.endsWith(`/settings/${s.path}`));
+  return section?.scope === PERSONAL_SCOPE || can(role, OrgAction.Edit);
+}
+
 export function sectionRequiresBrand(pathname: string): boolean {
   const trimmed = pathname.replace(/\/$/, '');
   return SETTINGS_SECTIONS.some((s) => s.requiresBrand && trimmed.endsWith(`/settings/${s.path}`));

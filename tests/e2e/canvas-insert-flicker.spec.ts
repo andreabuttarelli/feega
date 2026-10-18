@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { pickBarTool, pickFrameTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 import poster from './fixtures/poster-type-grid.json' with { type: 'json' };
 
@@ -72,7 +73,7 @@ test.describe('an inserted shape never blinks @real', () => {
       test.setTimeout(120_000);
       await page.setViewportSize({ width: 1440, height: 900 });
       await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-      await page.getByTestId('add-bar').getByTestId('draw-tools').locator(`[data-tool="${tool}"]`).click();
+      await pickBarTool(page, tool);
       await watchFreeElement(page);
       const pane = (await page.locator('.svelte-flow').boundingBox())!;
       const from = { x: pane.x + pane.width * 0.35, y: pane.y + pane.height * 0.35 };
@@ -124,7 +125,7 @@ test.describe('an inserted shape never blinks @real', () => {
       requestAnimationFrame(tick);
     });
 
-    await page.getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
+    await pickFrameTool(page, 'rectangle');
     const at = (fx: number, fy: number) => ({ x: box.x + box.width * fx, y: box.y + box.height * fy });
     const before = Date.now();
     await drag(page, at(0.3, 0.5), at(0.6, 0.7));
