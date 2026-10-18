@@ -144,3 +144,20 @@ describe('placement entries survive a reload', () => {
     expect(reopened.sent.map((s) => s.action).sort()).toEqual(['move', 'resize']);
   });
 });
+
+describe('a snapshot asked for before a move never undoes it', () => {
+  it('a move saved while a snapshot was in flight still counts as placed for that snapshot', async () => {
+    const { places } = harness([]);
+    places.move('a', 1, 1);
+    await places.flush();
+
+    const asked = places.mark();
+    places.move('a', 50, 60);
+    await places.flush();
+
+    expect(places.dirty('a')).toBe(false);
+    expect(places.placedAfter('a', asked)).toBe(true);
+    expect(places.placedAfter('a', places.mark())).toBe(false);
+    expect(places.placedAfter('b', asked)).toBe(false);
+  });
+});

@@ -1,9 +1,10 @@
 import { z } from 'zod';
 import { versionNamesSchema, type VersionNames } from '$lib/motion/version-names';
 import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$lib/motion/doc';
-import { NodeMode, Opening, Under } from './inline-motion';
+import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '$lib/motion/hyperframes/capture';
 import { DRAWN_TEXT } from '$lib/motion/draw-create';
+import { FramePress } from '$lib/motion/drill';
 
 export enum FrameKind {
   Frame = 'frame',
@@ -11,12 +12,12 @@ export enum FrameKind {
   Group = 'group'
 }
 
-type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean; under: Under; ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean };
+type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress };
 
 const CHROME: Record<FrameKind, Chrome> = {
-  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, under: Under.Released, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false },
-  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, under: Under.Kept, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false },
-  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, under: Under.Released, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true }
+  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move },
+  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick },
+  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick }
 };
 
 export const frameChrome = (kind: FrameKind): Chrome => CHROME[kind];

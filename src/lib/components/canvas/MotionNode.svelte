@@ -19,7 +19,7 @@
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { Background, FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
-  import { NodeMode, Paint, Under, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
+  import { NodeMode, Paint, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
   import { DRAWN_EVENT } from '$lib/motion/hyperframes/measure';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
@@ -29,7 +29,7 @@
   import { coverFrame } from '$lib/motion/still';
   import { Intent, PreviewMode, Sight, Still, captureFree, claimCapture, intentOf, previewMode, releaseCapture, stop as stopIn } from '$lib/canvas/motion-preview';
 
-  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onopen = null, onenter = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onopen?: (() => void) | null; onenter?: (() => void) | null } = $props();
+  let { node, href, previewUrl, posterUrl = null, nodeMode = NodeMode.Preview, onenter = null }: { node: MotionNode; href: string; previewUrl: string; posterUrl?: string | null; nodeMode?: NodeMode; onenter?: (() => void) | null } = $props();
 
   let host = $state<HTMLDivElement | null>(null);
   const nodeId = $derived(node.id);
@@ -60,15 +60,16 @@
   const layers = $derived(nodeLayers(nodeMode, paint));
   const chrome = $derived(frameChrome(node.kind));
   const previewing = $derived(nodeMode === NodeMode.Preview);
-  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending && chrome.under === Under.Released));
+  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending));
   const liveTile = $derived(liveHere && (!!local || node.docHeadRevision > 0) && (!previewing || tiles.live(node.id)));
   const capturable = $derived(nodeMode !== NodeMode.Edit && !liveTile);
   let ownDrawn = $state(false);
   let decodedPoster = $state<string | null>(untrack(() => poster));
   const shownPoster = $derived(posterCurrent(local) && decodedPoster === poster ? decodedPoster : null);
-  const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster));
+  let loadedPoster = $state<string | null>(null);
+  const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster && loadedPoster === poster));
   const playerUp = $derived(mounted && !!preview);
-  const mounted = $derived(nodeMode !== NodeMode.Edit && ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile, chrome.under));
+  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));
@@ -252,13 +253,6 @@
     }
   }
 
-  function open(e: MouseEvent) {
-    if (!onopen) {
-      return;
-    }
-    e.preventDefault();
-    onopen();
-  }
   function enter(e: MouseEvent) {
     const stage = root?.querySelector<HTMLElement>('[data-frame-stage]')?.getBoundingClientRect();
     const inEditor = (e.target as HTMLElement | null)?.closest?.("[data-testid=selection-overlay]");
@@ -292,7 +286,7 @@
   <div class="stage" data-testid="motion-node-stage" data-frame-stage>
     {#if layers.own || mounted}
       {#if shownPoster && !(playerUp && ownDrawn)}
-        <img class="poster" class:under={playerUp} class:kept={!layers.own} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" />
+        <img class="poster" class:under={playerUp} class:kept={!layers.own} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" onload={() => (loadedPoster = shownPoster)} />
       {/if}
       {#if mounted && preview}
         <div class="own" class:kept={!layers.own} data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing muted={true} loop={false} /></div>
@@ -310,7 +304,6 @@
     {/if}
     {#if !previewing}<div class="host" class:nodrag={layers.editor} class:nopan={layers.editor} data-testid="motion-node-editing" bind:this={host}></div>{/if}
     {#if previewing && node.docHeadRevision}<FrameHover nodeId={node.id} revision={node.docHeadRevision} {previewUrl} width={size.width} height={size.height} />{/if}
-    {#if previewing && chrome.bar}<a class="open nodrag" {href} data-testid="open-motion-editor" data-sveltekit-preload-data={onopen ? 'off' : 'hover'} onclick={open}>Open editor</a>{/if}
   </div>
 
 </div>
@@ -411,16 +404,4 @@
     color: var(--ui-accent);
   }
 
-  .open {
-    position: absolute;
-    z-index: 2;
-    right: 6px;
-    top: 6px;
-    padding: 4px 8px;
-    font-size: var(--ui-text-xs);
-    background: var(--ui-surface);
-    color: var(--ui-ink);
-    border: 1px solid var(--ui-line);
-    border-radius: 0;
-  }
 </style>
