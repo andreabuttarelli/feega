@@ -13,7 +13,7 @@ describe('the right-click menu inside a frame', () => {
     expect(ids).toEqual(['group', 'ungroup', 'duplicate', 'align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'use-as-mask', 'release-mask', 'delete']);
   });
 
-  it('aligns a single element to the frame, as Figma does', () => {
+  it('aligns a single element to the frame', () => {
     const one = [{ id: 'c', type: 'clip', data: {} }];
     expect(menuFor(FRAME_MENU_IDS, one).map((a) => a.id)).toContain('align-left');
   });

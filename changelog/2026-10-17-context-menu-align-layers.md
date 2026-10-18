@@ -1,6 +1,6 @@
 # Context menu: align, mask, select layer, and inside frames
 
-Figma's right-click carries align, mask and "Select layer" (help.figma.com 360040449873).
+A design tool's right-click carries align, mask and "Select layer".
 `CANVAS_MENU` in `canvas/selection-actions.ts` stays the one table; each surface says
 which ids it can run (`canvasMenuIds`, `FRAME_MENU_IDS`) and `menuFor` keeps the shared order.
 
