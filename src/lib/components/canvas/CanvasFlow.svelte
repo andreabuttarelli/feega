@@ -39,6 +39,7 @@
   import CanvasPeers from './CanvasPeers.svelte';
   import CanvasMeasure from './CanvasMeasure.svelte';
   import { tileGaps } from '$lib/canvas/measure';
+  import { snapDrag, type SnapGuide } from '$lib/canvas/snap';
   import type { CanvasPeer, LiveBox } from '$lib/realtime/canvas-presence';
   import { setTileLive } from '$lib/canvas/tile-live-context';
   import CanvasAddBar from './CanvasAddBar.svelte';
@@ -415,7 +416,29 @@
     nodes = nodes.map((n) => (at.has(n.id) ? { ...n, position: at.get(n.id)! } : n));
   }
 
-  function onNodeDrag({ nodes: dragged, event }: { nodes: Node[]; event: MouseEvent | TouchEvent }) {
+  const SNAP_SCREEN_PX = 6;
+  let snapGuides = $state<SnapGuide[]>([]);
+
+  function snapped(dragged: Node[]): Node[] {
+    const ids = new Set(dragged.map((n) => n.id));
+    const size = (id: string) => tiles.find((t) => t.id === id);
+    const rects = dragged.flatMap((n) => {
+      const t = size(n.id);
+      return t ? [{ id: n.id, x: n.position.x, y: n.position.y, w: t.w, h: t.h }] : [];
+    });
+    const others = nodes.flatMap((n) => {
+      const t = ids.has(n.id) ? null : size(n.id);
+      return t ? [{ x: n.position.x, y: n.position.y, w: t.w, h: t.h }] : [];
+    });
+    const snap = snapDrag(rects, others, SNAP_SCREEN_PX / selection.zoom);
+    snapGuides = snap.guides;
+    const at = new Map(snap.moves.map((m) => [m.id, { x: m.x, y: m.y }]));
+    nodes = nodes.map((n) => (at.has(n.id) ? { ...n, position: at.get(n.id)! } : n));
+    return dragged.map((n) => (at.has(n.id) ? { ...n, position: at.get(n.id)! } : n));
+  }
+
+  function onNodeDrag({ nodes: moving, event }: { nodes: Node[]; event: MouseEvent | TouchEvent }) {
+    const dragged = snapped(moving);
     followMembers(dragged);
     onLive?.(dragged.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y })));
     onTileDragOver?.(dragged.map((n) => n.id), pointOf(event));
@@ -428,9 +451,11 @@
     });
   }
 
-  function onNodeDragStop({ targetNode, nodes: dragged, event }: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
+  function onNodeDragStop({ targetNode, nodes: moving, event }: { targetNode: Node | null; nodes: Node[]; event: MouseEvent | TouchEvent }) {
     onLive?.([]);
     if (!targetNode) return;
+    const dragged = snapped(moving);
+    snapGuides = [];
     if (onTileDrop?.(dragged.map((n) => n.id), pointOf(event)) === DropVerdict.Taken) {
       returnToOrigin();
       return;
@@ -1007,8 +1032,8 @@
     {#if peers.length}
       <CanvasPeers {peers} rectOf={tileRect} />
     {/if}
-    {#if measured.length}
-      <CanvasMeasure gaps={measured} />
+    {#if measured.length || snapGuides.length}
+      <CanvasMeasure gaps={measured} guides={snapGuides} />
     {/if}
   </SvelteFlow>
 
