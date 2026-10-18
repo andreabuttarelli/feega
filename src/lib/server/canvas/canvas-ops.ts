@@ -30,6 +30,7 @@ import { renameProject } from '$lib/server/repos/projects';
 import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { createFormats, formatTargetSchema } from '$lib/server/motion/create-formats';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { writeNodesBatch } from '$lib/server/canvas/batch-write';
 import { pasteNodes } from '$lib/server/canvas/paste';
@@ -567,6 +568,12 @@ export const CANVAS_OPS = {
       const linked = await linkFrame(framesOf(ctx), { sourceNodeId: input.sourceNodeId, frameNodeId: input.targetNodeId });
       return { connection, ...(linked.outcome === MoveOutcome.Done ? { placed_in_frame: { clip_id: linked.clipId, revision: linked.versions[linked.frameId] } } : {}) };
     }
+  }),
+
+  create_formats: op({
+    access: Access.Write,
+    input: z.object({ frameId: z.string(), targets: z.array(formatTargetSchema).min(1).max(8).describe('each {format: 1:1 | 4:5 | 9:16 | 16:9 …} or {size: {width, height}} px') }).strict(),
+    run: async (ctx, input) => createFormats(framesOf(ctx), { nodeId: input.frameId, targets: input.targets })
   }),
 
   move_frame_element: op({

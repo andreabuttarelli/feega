@@ -158,6 +158,7 @@
     onResize,
     onConnect,
     onDelete,
+    onCreateFormats,
     onEdgeDelete,
     onEdgeRetype,
     onEdgeModeChange,
@@ -229,6 +230,7 @@
      * `tiles` le contiene ancora — il difetto era esattamente il nodo che torna in scena.
      */
     onDelete?: (ids: string[]) => void;
+    onCreateFormats?: (frameId: string) => void;
     /** "Crea post" dalla barra della selezione: gli id scelti, così com'è per `onDelete`. */
     /** Una linea da togliere. Senza, il primo errore resta sulla tela per sempre. */
     onEdgeDelete?: (edgeId: string) => void;
@@ -663,6 +665,7 @@
     },
     'bring-front': (ids) => onRestack?.(ids, Stack.Front),
     'send-back': (ids) => onRestack?.(ids, Stack.Back),
+    'create-formats': (ids) => onCreateFormats?.(ids[0]),
     delete: (ids) => onDelete?.(ids)
   };
 
