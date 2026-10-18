@@ -1,4 +1,5 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { pickBarTool } from './fixtures/canvas-bar';
 import type { Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -25,7 +26,7 @@ async function clipOf(admin: SupabaseClient, nodeId: string): Promise<Clip | und
 
 async function drawBox(page: Page) {
   const bar = page.getByTestId('add-bar');
-  await bar.getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
+  await pickBarTool(page, 'rectangle');
   const pane = (await page.locator('.svelte-flow').boundingBox())!;
   const from = { x: pane.x + pane.width * 0.3, y: pane.y + pane.height * 0.35 };
   await page.mouse.move(from.x, from.y);

@@ -23,7 +23,7 @@ const sse = (parts: unknown[]) => [...parts.map((p) => `data: ${JSON.stringify(p
 const askFrames = (callId: string) => sse([{ type: 'start' }, { type: 'data-motion-frames', data: { callId, times: [0.5, 1.5], doc } }, { type: 'finish' }]);
 
 const OPEN_AGENT: Record<string, (page: Page) => Promise<void>> = {
-  phone: (page) => page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Agent' }).click(),
+  phone: (page) => page.getByRole('navigation', { name: 'Panels' }).getByRole('button', { name: 'Chat' }).click(),
   tablet: (page) => page.getByTestId('toggle-chat').click(),
   desktop: async () => {}
 };
@@ -175,7 +175,7 @@ test.describe('motion editor inside the canvas @real', () => {
     await expectOnNode(page, nodeOf(first));
     await expect(page.getByTestId('editor-stage').getByTestId('motion-preview')).toHaveCount(1);
     await expect(nodeOf(first).getByTestId('motion-preview')).toHaveCount(0);
-    await expect(page).toHaveURL(new RegExp(`/c/${session.canvasId}$`));
+    await expect(page).toHaveURL(new RegExp(`/c/${session.canvasId}(\\?renderer=\\w+)?$`));
     await expect(page.getByRole('region', { name: 'Timeline', exact: true })).toBeVisible();
     await expect(page.getByLabel('Agent', { exact: true })).toBeVisible();
     await expectFramed(page, nodeOf(first));
@@ -246,7 +246,7 @@ test.describe('motion editor inside the canvas @real', () => {
   test('the agent sees frames captured by the player inside the node', async ({ page, session }, info) => {
     const [first] = info.annotations.filter((a) => a.type === 'node').map((a) => a.description!);
     const stored: string[] = [];
-    await page.route(/\/motion\/[^/]+\/agent$/, (route) =>
+    await page.route(/\/api\/v1\/projects\/[^/]+\/(motion\/[^/]+\/)?agent$/, (route) =>
       route.request().method() === 'POST' ? route.fulfill({ status: 200, headers: { 'content-type': 'text/event-stream' }, body: askFrames('call_inline') }) : route.fallback()
     );
     page.on('response', (res) => {

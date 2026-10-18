@@ -59,3 +59,19 @@ export enum UndoRoute {
   Here = 'here',
   Canvas = 'canvas'
 }
+
+export type HostShift = { dx: number; dy: number; dw: number; dh: number };
+
+export type HostDrag = (shift: HostShift, to: PointerPoint, phase: DragPhase) => void;
+
+const leads = (unit: number) => (unit === 0 ? 1 : 0);
+const grows = (unit: number) => (unit === 0 ? -1 : unit === 1 ? 1 : 0);
+
+export function hostShift(unit: [number, number] | null, from: PointerPoint, to: PointerPoint): HostShift {
+  const x = to.x - from.x;
+  const y = to.y - from.y;
+  if (!unit) {
+    return { dx: x, dy: y, dw: 0, dh: 0 };
+  }
+  return { dx: leads(unit[0]) * x, dy: leads(unit[1]) * y, dw: grows(unit[0]) * x, dh: grows(unit[1]) * y };
+}

@@ -121,7 +121,7 @@
   import InlineMotionEditor, { prefetchSession } from '$lib/components/canvas/InlineMotionEditor.svelte';
   import { newStudioBatchData, studioBatchOf } from '$lib/canvas/studio-batch-node';
   import StudioBatchNode from '$lib/components/canvas/StudioBatchNode.svelte';
-  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type PointerPoint } from '$lib/canvas/canvas-drop';
+  import { DragPhase, DropVerdict, frameUnderPointer, type CanvasUndo, type ElementOut, type HostShift, type PointerPoint } from '$lib/canvas/canvas-drop';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
   import { propertiesRequest, propertiesTarget, targetOf } from '$lib/canvas/phone-properties';
   import { DropOn, type Drop } from '$lib/motion/move-element';
@@ -350,6 +350,48 @@
       }
     });
     return DropVerdict.Taken;
+  }
+
+  type HostBox = { id: string; x: number; y: number; w: number; h: number };
+  const HOST_MIN_PX = 4;
+  let hostOrigin: HostBox | null = null;
+
+  const placeHost = (box: HostBox) => (nodes = nodes.map((n) => (n.id !== box.id ? n : n.w === box.w && n.h === box.h ? { ...n, x: box.x, y: box.y } : { ...n, x: box.x, y: box.y, w: box.w, h: box.h, userHeight: box.h })));
+
+  function hostDrag(shift: HostShift, to: PointerPoint, phase: DragPhase) {
+    const id = inlineMotion;
+    const row = id ? nodes.find((n) => n.id === id) : null;
+    const zero = toFlow?.({ x: 0, y: 0 });
+    const unit = toFlow?.({ x: 1, y: 1 });
+    if (!id || !row || !zero || !unit) {
+      return;
+    }
+    const scale = unit.x - zero.x;
+    const origin = hostOrigin?.id === id ? hostOrigin : { id, x: row.x, y: row.y, w: row.w, h: row.h };
+    hostOrigin = origin;
+    const next = { id, x: origin.x + shift.dx * scale, y: origin.y + shift.dy * scale, w: Math.max(HOST_MIN_PX, origin.w + shift.dw * scale), h: Math.max(HOST_MIN_PX, origin.h + shift.dh * scale) };
+    const sized = next.w !== origin.w || next.h !== origin.h;
+    if (phase !== DragPhase.Drop) {
+      placeHost(next);
+      cursors.port.update({ live: [{ id, x: next.x, y: next.y }] });
+      if (!sized) {
+        tileDragOver([id], to);
+      }
+      return;
+    }
+    hostOrigin = null;
+    cursors.port.update({ live: [] });
+    placeHost(origin);
+    if (!sized && tileDrop([id], to) === DropVerdict.Taken) {
+      return;
+    }
+    if (next.x !== origin.x || next.y !== origin.y) {
+      void moveEnd([{ id, x: next.x, y: next.y }]);
+      void move(id, next.x, next.y);
+    }
+    if (sized) {
+      void resize(id, next.w, next.h);
+    }
   }
 
   async function regroup(action: string, fields: Record<string, string>) {
@@ -3496,7 +3538,7 @@
   {/if}
   {#if editingMotion}
     {#key editingMotion}
-      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} {canvasundo} />
+      <InlineMotionEditor projectId={data.projectId} canvasId={data.canvas.id} nodeId={editingMotion} revision={headRevisionOf(editingMotion)} leaving={editingMotion !== inlineMotion} onclose={() => (dismissedMotion = editingMotion)} onframe={(free) => reframe(editingMotion, free)} onmoveout={moveOut} onhostdrag={hostDrag} {canvasundo} />
     {/key}
   {/if}
 
