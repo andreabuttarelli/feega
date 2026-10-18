@@ -1468,7 +1468,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_auto_layout: tool({
-      description: 'Change an auto layout container: direction horizontal|vertical, wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, padding {top,right,bottom,left} px, justify start|center|end|space-between on the main axis, align start|center|end on the cross axis, order (child ids, first to last). Only the fields given change. off true removes the auto layout (children keep their parent).',
+      description: 'Change an auto layout container: direction horizontal|vertical|grid (grid: columns equal-width columns, rows as tall as their tallest child, gap between columns, crossGap between rows, justify/align place a child inside its cell), wrap (lines break when the row is full; needs a fixed main size), gap and crossGap (between lines) in px of the frame, padding {top,right,bottom,left} px, justify start|center|end|space-between on the main axis, align start|center|end on the cross axis, order (child ids, first to last). Only the fields given change. off true removes the auto layout (children keep their parent).',
       inputSchema: autoLayoutPatchSchema.extend({ clip_id: z.string(), off: z.boolean().optional() }),
       execute: async ({ clip_id, off, ...patch }) => apply(setAutoLayout(session.doc, clip_id, off ? null : patch), off ? `auto layout off on ${clip_id}` : `changed auto layout ${clip_id}`)
     }),
