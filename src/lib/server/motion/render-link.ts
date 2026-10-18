@@ -5,7 +5,7 @@ import { SERVICE_ROLE_USES } from '$lib/server/db/service-role-uses';
 import { BROWSER_RENDER_PREFIX, completeRun, createRun, failRun, runsByIds, setRunParams, type NodeRun } from '$lib/server/repos/node-runs';
 import { findNode } from '$lib/server/repos/canvas';
 import { findProjectById } from '$lib/server/repos/projects';
-import { readRevision } from '$lib/server/repos/motion-revisions';
+import { readCheckpoint } from '$lib/server/repos/motion-revisions';
 import { CANVAS_ASSET_BUCKET, SIGNED_URL_TTL_S, signAssetFiles } from '$lib/server/repos/asset-storage';
 import { signKnowledgePaths } from '$lib/server/media-archive';
 import type { Actor } from '$lib/server/repos/actor';
@@ -148,7 +148,7 @@ const linkSigner =
 export async function linkPayload(db: Db, run: NodeRun): Promise<LinkPayload | null> {
   const place = await placeOf(db, run);
   const revision = Number(linkOf(run).revision);
-  const head = place ? await readRevision(db, { orgId: run.orgId, nodeId: run.nodeId, version: revision }) : null;
+  const head = place ? await readCheckpoint(db, { orgId: run.orgId, nodeId: run.nodeId, version: revision }) : null;
   const project = place ? await findProjectById(db, { orgId: run.orgId, projectId: place.record.projectId }) : null;
   if (!place || !head || !project) {
     return null;

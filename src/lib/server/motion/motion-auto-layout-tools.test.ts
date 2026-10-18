@@ -40,11 +40,11 @@ describe('motion agent auto layout tools', () => {
     expect(findClip(session.doc, 'id1')!.clip.parent).toBeNull();
   });
 
-  it('refuses fill outside a container and auto layout on a clip without a box', async () => {
+  it('keeps fill outside a container and refuses auto layout on a clip without a box', async () => {
     const { run } = setup();
     await run('add_clip', { component: 'Shape', start: 0, duration: 4 });
     await run('add_null', { start: 0 });
-    expect((await run('set_layout_item', { clip_id: 'id1', width: Sizing.Fill })).ok).toBe(false);
+    expect((await run('set_layout_item', { clip_id: 'id1', width: Sizing.Fill })).ok).toBe(true);
     expect((await run('add_auto_layout', { clip_id: 'id2' })).ok).toBe(false);
   });
 });

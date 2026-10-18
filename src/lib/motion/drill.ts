@@ -50,6 +50,10 @@ const innermost: Rule = (_level, p) => {
   return part ? at(Depth.Part, p.top, part) : clipOr(p.top);
 };
 
+const editedText = (clip: string | null, p: Probe): Step | null => (clip && !p.firstPart(clip) && p.editable(clip, null) ? { level: { depth: Depth.Clip, clip, part: null }, edit: true } : null);
+
+const innermostOrText: Rule = (level, p) => editedText(p.top, p) ?? innermost(level, p);
+
 const editHere: Rule = (level, p) => ({ level, edit: !!level.clip && p.editable(level.clip, level.part) });
 
 const intoPart: Rule = (level, p) => {
@@ -66,7 +70,7 @@ const firstChild: Rule = (level, p) => (p.firstClip ? at(Depth.Clip, p.firstClip
 
 const firstPart: Rule = (level, p) => {
   const part = level.clip ? p.firstPart(level.clip) : null;
-  return part ? at(Depth.Part, level.clip, part) : stay(level, p);
+  return part ? at(Depth.Part, level.clip, part) : (editedText(level.clip, p) ?? stay(level, p));
 };
 
 const toClip: Rule = (level) => at(Depth.Clip, level.clip);
@@ -75,7 +79,7 @@ const CLICK: Record<Depth, Rule> = { [Depth.Canvas]: pickedAt, [Depth.Frame]: pi
 
 export const DRILL: Record<Gesture, Record<Depth, Rule>> = {
   [Gesture.Click]: CLICK,
-  [Gesture.Double]: { [Depth.Canvas]: pointed(innermost), [Depth.Frame]: pointed(innermost), [Depth.Clip]: pointed(intoPart), [Depth.Part]: editHere },
+  [Gesture.Double]: { [Depth.Canvas]: pointed(innermostOrText), [Depth.Frame]: pointed(innermostOrText), [Depth.Clip]: pointed(intoPart), [Depth.Part]: editHere },
   [Gesture.Deep]: { [Depth.Canvas]: innermost, [Depth.Frame]: innermost, [Depth.Clip]: innermost, [Depth.Part]: innermost },
   [Gesture.Enter]: { [Depth.Canvas]: frame, [Depth.Frame]: firstChild, [Depth.Clip]: firstPart, [Depth.Part]: editHere },
   [Gesture.Leave]: { [Depth.Canvas]: canvas, [Depth.Frame]: canvas, [Depth.Clip]: frame, [Depth.Part]: toClip },

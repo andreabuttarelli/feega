@@ -204,7 +204,13 @@ same player inside a React (`@feega/motion-react`) or Flutter (`feega_motion`) a
 
 See a video with `view_motion_frames` (up to 6 times in seconds): the frames come back as
 images with the quality gate's `quality` and `blocking` notes. Free; look before and after
-`ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`.
+`ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`. Against a local server
+the frames need `CHROMIUM_PATH` (a local Chrome binary, e.g.
+`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`) in its env; without it the call
+answers `closed` / "frames unavailable".
+
+`motion_tool` `measure_text {clip_id}` gives a text clip's rendered box in px (top-left, from the
+real font file; `approximate: true` when the font could not be read) to place things next to it.
 
 Every save is a revision. `list_motion_revisions` lists them (who saved, clip count);
 `restore_motion_revision` puts one back as a new revision, history kept. Free. CLI:
@@ -224,21 +230,32 @@ CLI: `feega motion new --template builtin:prompt-input --format 9:16`.
 Every tool of the editor agent (add_clip, set_props, set_keyframes, set_canvas, export_image...)
 runs directly through `motion_tool`: no `tool` lists them, `tool` alone describes one with its
 JSON schema, `tool` with `node_id` and `input` runs it on the saved video as a new revision
-(`version` guards a stale write, 409). Free, no AI. A still graphic (post, story, poster) is a
+(`version` guards a stale write, 409). A tool that refuses answers 422 `{ error: "tool_refused", detail }`.
+Building many things: `tool` `"batch"` with `input` `{ ops: [{ tool, input }, ...] }` (up to 500) applies
+them all in one revision, or none if one refuses (422 with its `index`). Free, no AI. A still graphic (post, story, poster) is a
 video pinned to one frame: `set_canvas` `{ format: "A poster", still: 2 }`, then `export_image`
 `{ format: "png", scale: 2 }` returns the image `url`. CLI: `feega motion tool <nodeId> <tool>
 --input '{...}'`, `feega motion tools [name]`, `feega motion still <nodeId> --scale 2 --out poster.png`.
+
+Built-in line icons (arrow, check, close, menu, search, user, star, heart, play, cart…):
+`add_icon` `{ name, x, y, size, color }` inserts one as a stroked Shape
+path clip (x, y centre 0..1, size a share of the short side). Through `motion_tool`.
+
+Named styles keep a video consistent: `named_style` `{ action: "define", name, style: { kind:
+"text", font, size, weight, tracking, leading, color } }` (or `{ kind: "colour", color }`)
+creates or edits one; `action: "apply"` with `name` and `clip_ids` links clips (a colour style
+paints text colour or shape fill); `"detach"` unlinks, `"remove"` deletes, `"list"` lists them
+with their clips. Editing a style restyles every linked clip. Through `motion_tool`.
 
 The frame editor page's own actions (read the head, save the whole doc, apply doc ops, render and
 batch status) run through `motion_editor_op` `{ node_id, op, input }` with the same answers as
 the page. CLI: `feega motion op <nodeId> <op> --input '{...}'`.
 
 Graphic elements (Text, Box, Ellipse, Path, Image) live in frames or free on the canvas; Generate
-text/image/video nodes generate. `canvas_tool` ops `draw_element` draws a free element,
+text/image/video nodes generate. `canvas_tool` ops `draw_frame` draws an empty frame (`feega canvas frame`), `draw_element` draws a free element,
 `group_elements` / `ungroup_element` group free elements; `move_frame_element` moves an element
 into another frame (or onto the canvas as a free element) keeping props and keyframes; op `place_in_frame` puts a generative node's output into a frame as an element; the
-motion `motion_tool` `move_to_frame` does the same from inside a video. Connecting a generative node to a frame
-(`insert_row` on `nodes_connections`) keeps one element following its next generations. CLI:
+motion `motion_tool` `move_to_frame` does the same from inside a video. A frame takes no inputs: a line into it is refused. CLI:
 `feega motion move <frameId> <elementId> --to <frameId>`, `feega motion place <nodeId> --to <frameId>`.
 
 A launch film's script is also laid out as a storyboard canvas linked to the video: one card per

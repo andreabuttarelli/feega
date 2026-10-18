@@ -1,7 +1,7 @@
 import type { Db } from '$lib/server/db/client';
 import type { Actor } from '$lib/server/repos/actor';
 import { DataCheck, findNode, patchNodeData } from '$lib/server/repos/canvas';
-import { listRevisions, readRevision, type RevisionListing } from '$lib/server/repos/motion-revisions';
+import { listRevisions, readRevision, sealRevision, type RevisionListing } from '$lib/server/repos/motion-revisions';
 import { namesOf, withName } from '$lib/motion/version-names';
 
 type Scope = { orgId: string; nodeId: string };
@@ -23,6 +23,9 @@ export async function nameVersion(db: Db, input: Scope & { version: number; name
   }
 
   const versionNames = withName(namesOf(node.data), input.version, input.name);
-  const write = await patchNodeData(db, { orgId: input.orgId, nodeId: input.nodeId, patch: { versionNames }, check: DataCheck.Schema, actor: input.actor });
+  const [write] = await Promise.all([
+    patchNodeData(db, { orgId: input.orgId, nodeId: input.nodeId, patch: { versionNames }, check: DataCheck.Schema, actor: input.actor }),
+    sealRevision(db, input)
+  ]);
   return write.outcome === 'written' ? { named: true } : { named: false, error: write.outcome };
 }

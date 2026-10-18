@@ -10,6 +10,8 @@
 </script>
 
 <script lang="ts">
+  import { frameDrill } from '$lib/canvas/frame-drill';
+  import { Gesture } from '$lib/motion/drill';
   import { onMount, tick, untrack } from 'svelte';
   import Clapperboard from '@lucide/svelte/icons/clapperboard';
   import MotionPreview from '$lib/components/motion/MotionPreview.svelte';
@@ -17,7 +19,7 @@
   import { warmPlayer, whenIdle } from '$lib/motion/hyperframes/warm-player';
   import { Background, FORMATS } from '$lib/motion/doc';
   import { MOTION_NODE_BAR_H, frameChrome, type MotionNode } from '$lib/canvas/motion-node';
-  import { NodeMode, Paint, Under, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
+  import { NodeMode, Paint, nodeLayers, ownPlayer } from '$lib/canvas/inline-motion';
   import { DRAWN_EVENT } from '$lib/motion/hyperframes/measure';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import { frameDocs, posterCurrent } from '$lib/canvas/frame-docs.svelte';
@@ -58,15 +60,16 @@
   const layers = $derived(nodeLayers(nodeMode, paint));
   const chrome = $derived(frameChrome(node.kind));
   const previewing = $derived(nodeMode === NodeMode.Preview);
-  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending && chrome.under === Under.Released));
+  const liveHere = $derived(settledSight === Sight.InView && !canvasLod.far && !(nodeMode === NodeMode.Edit && paint !== Paint.Pending));
   const liveTile = $derived(liveHere && (!!local || node.docHeadRevision > 0) && (!previewing || tiles.live(node.id)));
   const capturable = $derived(nodeMode !== NodeMode.Edit && !liveTile);
   let ownDrawn = $state(false);
   let decodedPoster = $state<string | null>(untrack(() => poster));
   const shownPoster = $derived(posterCurrent(local) && decodedPoster === poster ? decodedPoster : null);
-  const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster));
+  let loadedPoster = $state<string | null>(null);
+  const painted = $derived(ownDrawn || (!liveTile && !!poster && shownPoster === poster && loadedPoster === poster));
   const playerUp = $derived(mounted && !!preview);
-  const mounted = $derived(nodeMode !== NodeMode.Edit && ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile, chrome.under));
+  const mounted = $derived(ownPlayer(nodeMode, paint, mode === PreviewMode.Live || capturing || liveTile));
 
   onMount(() => {
     whenIdle(() => void warmPlayer(location.origin));
@@ -257,6 +260,23 @@
     e.preventDefault();
     onopen();
   }
+  function enter(e: MouseEvent) {
+    const stage = root?.querySelector<HTMLElement>('[data-frame-stage]')?.getBoundingClientRect();
+    const inEditor = (e.target as HTMLElement | null)?.closest?.("[data-testid=selection-overlay]");
+    if (stage && !inEditor && stage.width > 0 && stage.height > 0) {
+      frameDrill.request(node.id, { x: (e.clientX - stage.left) / stage.width, y: (e.clientY - stage.top) / stage.height }, Gesture.Double);
+    }
+    onenter?.();
+  }
+
+  $effect(() => {
+    const el = root;
+    if (!el) {
+      return;
+    }
+    el.addEventListener('dblclick', enter);
+    return () => el.removeEventListener('dblclick', enter);
+  });
 </script>
 
 <div
@@ -264,7 +284,6 @@
   class:editing={!previewing}
   class:bare={!chrome.bar}
   data-kind={node.kind}
-  ondblclick={() => onenter?.()}
   data-testid="motion-node"
   data-motion-node={node.id}
   data-mode={mode}
@@ -274,7 +293,7 @@
   <div class="stage" data-testid="motion-node-stage" data-frame-stage>
     {#if layers.own || mounted}
       {#if shownPoster && !(playerUp && ownDrawn)}
-        <img class="poster" class:under={playerUp} class:kept={!layers.own} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" />
+        <img class="poster" class:under={playerUp} class:kept={!layers.own} src={shownPoster} alt="" draggable="false" data-testid="motion-node-poster" onload={() => (loadedPoster = shownPoster)} />
       {/if}
       {#if mounted && preview}
         <div class="own" class:kept={!layers.own} data-drawn={ownDrawn}><MotionPreview bind:this={player} html={preview.html} background={chrome.bar ? Background.Brand : Background.Transparent} width={preview.width} height={preview.height} fps={preview.fps} bind:frame bind:playing muted={true} loop={false} /></div>

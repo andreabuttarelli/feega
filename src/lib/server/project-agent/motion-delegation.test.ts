@@ -96,7 +96,8 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
     store.nodes.push(row);
     return row;
   },
-  patchNodeData: async () => ({ outcome: 'written' })
+  patchNodeData: async (_db: unknown, input: { nodeId: string }) => ({ outcome: 'written', node: store.nodes.find((n) => n.id === input.nodeId) }),
+  resizeNode: async () => undefined
 }));
 vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async (_db: unknown, input: { orgId: string }) => (input.orgId === ORG ? { id: PROJECT, brandId: null, mode: 'standard' } : null) }));
 vi.mock('$lib/server/repos/assets', () => ({

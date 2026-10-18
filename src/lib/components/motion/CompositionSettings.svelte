@@ -6,7 +6,7 @@
   import { setCanvas, type OpResult } from '$lib/motion/timeline';
   import { parseDecimal, secondsLabel } from '$lib/motion/inspector';
   import { fitDuration } from '$lib/motion/fit-duration';
-  import { DocMode, docMode, setStill } from '$lib/motion/still';
+  import { DocMode, designStill, docMode, setStill } from '$lib/motion/still';
 
   let { doc, onchange }: { doc: MotionDoc; onchange: (result: OpResult, summary: string) => void } = $props();
 
@@ -54,7 +54,7 @@
   </label>
   <label class="toggle" title="One frame: a post or a poster exported as an image, no timeline">
     <span>Still</span>
-    <input type="checkbox" checked={docMode(doc) === DocMode.Still} onchange={(e) => onchange(setStill(doc, e.currentTarget.checked ? 0 : null), e.currentTarget.checked ? 'Made a still' : 'Made a video')} data-testid="still" />
+    <input type="checkbox" checked={docMode(doc) === DocMode.Still} onchange={(e) => onchange(e.currentTarget.checked ? designStill(doc, 0) : setStill(doc, null), e.currentTarget.checked ? 'Made a still' : 'Made a video')} data-testid="still" />
   </label>
   {#if doc.still}
     <label>

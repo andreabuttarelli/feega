@@ -40,18 +40,13 @@ describe('restoring a motion revision', () => {
     await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 1, doc: newMotionDoc(MotionFormat.Landscape), actor: user });
     let raced = false;
     const racing = {
-      from: (table: string) => {
-        const real = db.from(table as never) as unknown as { insert: (row: unknown) => Promise<unknown> };
-        return {
-          ...real,
-          insert: async (row: unknown) => {
-            if (!raced) {
-              raced = true;
-              await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 2, doc: { ...newMotionDoc(MotionFormat.Landscape), fps: 24 }, actor: user });
-            }
-            return real.insert(row);
-          }
-        };
+      from: db.from,
+      rpc: async (name: string, args: unknown) => {
+        if (!raced) {
+          raced = true;
+          await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 2, doc: { ...newMotionDoc(MotionFormat.Landscape), fps: 24 }, actor: user });
+        }
+        return (db as unknown as { rpc: (n: string, a: unknown) => Promise<unknown> }).rpc(name, args);
       }
     } as unknown as Db;
 

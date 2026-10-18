@@ -177,7 +177,8 @@ const PART_FIELD: Record<PartKind, PartField> = {
   [PartKind.Other]: PartField.Shown,
   [PartKind.Line]: PartField.Own,
   [PartKind.Photo]: PartField.Alone,
-  [PartKind.Arrow]: PartField.Own
+  [PartKind.Arrow]: PartField.Own,
+  [PartKind.Shape]: PartField.Own
 };
 
 export function partFocus(doc: MotionDoc, clip: MotionClip, part: string): string[] {

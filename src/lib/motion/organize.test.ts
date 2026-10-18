@@ -80,6 +80,17 @@ describe('work area', () => {
     expect(loopFrame(d, 10)).toBe(30);
     expect(loopFrame(three, 449)).toBe(449);
   });
+
+  it('a work area too short to watch does not trap playback at its in point', () => {
+    const saved = { ...three, workArea: { from: 0, to: 1 } };
+    expect(loopFrame(saved, 1)).toBe(1);
+    expect(loopFrame(saved, 40)).toBe(40);
+  });
+
+  it('a work area too short to watch is refused', () => {
+    expect(setWorkArea(three, { from: 0, to: 1 }).ok).toBe(false);
+    expect(setWorkArea(three, { from: 0, to: three.fps / 2 }).ok).toBe(true);
+  });
 });
 
 describe('hide, lock, solo, shy', () => {

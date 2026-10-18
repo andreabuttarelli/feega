@@ -96,10 +96,11 @@ test.describe('poster parts on the canvas @real', () => {
 
     await layerRow.click();
     await overlay.dblclick({ position: title });
-    const field = page.getByTestId('part-edit');
-    await expect(field).toBeVisible();
-    await field.fill(TYPED);
-    await field.press('Enter');
+    const field = page.frameLocator('[data-testid="motion-preview"] iframe').first().locator(`[data-part="${TITLE_LINE}"]`);
+    await expect(field, 'the line itself becomes editable where it is drawn').toHaveAttribute('contenteditable', /plaintext-only|true/);
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type(TYPED);
+    await page.keyboard.press('Enter');
     await shoot(page, '9-poster-edited');
 
     await expect

@@ -1,16 +1,27 @@
-import { RESOLUTION_PROBLEM, fitsResolution, type MotionDoc } from './doc';
+import { Background, DocMode, RESOLUTION_PROBLEM, docMode, fitsResolution, type MotionDoc } from './doc';
 import { setCanvas, type OpResult } from './timeline';
 import { timelineFits } from './editor-mount';
 
 export const ANIMATE_SECONDS = 5;
 
-export enum DocMode {
-  Video = 'video',
-  Still = 'still'
+export { DocMode, docMode };
+
+export enum VideoControl {
+  Transport = 'transport',
+  Playback = 'playback',
+  Timeline = 'timeline',
+  EditMode = 'edit-mode'
 }
 
-export function docMode(doc: Pick<MotionDoc, 'still'>): DocMode {
-  return doc.still ? DocMode.Still : DocMode.Video;
+const EVERY_CONTROL: ReadonlySet<VideoControl> = new Set(Object.values(VideoControl));
+
+const CONTROLS: Record<DocMode, ReadonlySet<VideoControl>> = {
+  [DocMode.Video]: EVERY_CONTROL,
+  [DocMode.Still]: new Set()
+};
+
+export function controlShown(doc: Pick<MotionDoc, 'still'>, control: VideoControl): boolean {
+  return CONTROLS[docMode(doc)].has(control);
 }
 
 export function stillFrame(doc: Pick<MotionDoc, 'still'>): number | null {
@@ -38,6 +49,16 @@ export function setStill(doc: MotionDoc, seconds: number | null): OpResult {
   }
   const frame = Math.min(Math.round(seconds * doc.fps), doc.durationInFrames - 1);
   return { ok: true, doc: { ...doc, still: { frame } } };
+}
+
+const DESIGN_LOOK: Record<DocMode, (doc: MotionDoc) => MotionDoc> = {
+  [DocMode.Video]: (doc) => (doc.background === Background.Brand ? { ...doc, background: Background.Transparent } : doc),
+  [DocMode.Still]: (doc) => doc
+};
+
+export function designStill(doc: MotionDoc, seconds: number): OpResult {
+  const pinned = setStill(doc, seconds);
+  return pinned.ok ? { ok: true, doc: DESIGN_LOOK[docMode(doc)](pinned.doc) } : pinned;
 }
 
 export function animateStill(doc: MotionDoc, seconds = ANIMATE_SECONDS): OpResult {

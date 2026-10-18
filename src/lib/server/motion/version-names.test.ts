@@ -26,6 +26,14 @@ describe('naming a frame version', () => {
     expect((update?.payload as { data: { versionNames: unknown } }).data.versionNames).toEqual({ '1': 'Client review' });
   });
 
+  it('a named version is sealed: later edits never fold into it', async () => {
+    const fake = frame();
+    await nameVersion(fake.db, { ...scope, version: 2, name: 'Client review', actor: user });
+
+    const seal = fake.calls.find((c) => c.table === 'motion_revisions' && c.op === 'update');
+    expect(seal?.payload).toEqual({ sealed: true });
+  });
+
   it('lists every version with its name, if it has one', async () => {
     const listed = await namedRevisions(frame({ '1': 'First cut' }).db, scope);
     expect(listed.map((r) => [r.version, r.name]).sort()).toEqual([

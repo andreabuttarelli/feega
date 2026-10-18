@@ -37,7 +37,7 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
 vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'project-1', brandId: null }) }));
 vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/motion-revisions')>()),
-  readRevision: async (_db: unknown, input: { version: number }) => {
+  readCheckpoint: async (_db: unknown, input: { version: number }) => {
     store.revisions.push(input.version);
     const { newMotionDoc, MotionFormat } = await import('$lib/motion/doc');
     return { version: input.version, doc: newMotionDoc(MotionFormat.Landscape), summary: null, actorKind: 'user' };

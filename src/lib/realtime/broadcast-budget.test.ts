@@ -29,13 +29,13 @@ describe('fitsPlan', () => {
 });
 
 describe('hzFor', () => {
-  it('runs at full rate up to five peers on Pro', () => {
+  it('runs at full rate up to four peers on Pro', () => {
     expect(hzFor(1, Plan.Pro)).toBe(MAX_HZ);
-    expect(hzFor(5, Plan.Pro)).toBe(MAX_HZ);
+    expect(hzFor(4, Plan.Pro)).toBe(MAX_HZ);
   });
 
   it('slows down past that so the canvas stays inside the quota', () => {
-    for (const peers of [6, 10, 20]) {
+    for (const peers of [5, 10, 20]) {
       const hz = hzFor(peers, Plan.Pro);
       expect(hz).toBeLessThan(MAX_HZ);
       expect(fitsPlan(budgetOf({ peers, hz, draggers: 0, dragHz: 0 }), Plan.Pro)).toBe(true);

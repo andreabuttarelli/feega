@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import type { CDPSession, Page } from '@playwright/test';
+import { EVENT_LATENCY_CATEGORIES, presentedLatencies, type TraceEvent } from './event-latency';
 
 export type Box = { x: number; y: number; width: number; height: number };
 export type Watch = { id: string; selector: string; read: Read };
@@ -14,6 +15,7 @@ export type PixelWatch = { id: string; box: Box; touched: boolean };
 export type StepFacts = {
   remounts: string[];
   playerMounts: string[];
+  lazyMounts: string[];
   gpuCounts: Record<string, number>;
   fetches: string[];
   flashes: string[];
@@ -271,8 +273,10 @@ export function flashesIn(shots: Raw[], watches: PixelWatch[]): { flashes: strin
 export class FluidProbe {
   private cdp: CDPSession | null = null;
   private shots: Shot[] = [];
+  private trace: TraceEvent[] = [];
   private fetches: string[] = [];
   private recording = false;
+  private inViewAtStart = new Set<string>();
   private watchFetch = (r: { url: () => string }) => {
     const url = r.url();
     if (this.recording && WATCHED_FETCH.test(url) && !IGNORED_FETCH.test(url)) {
@@ -296,6 +300,7 @@ export class FluidProbe {
       }
       void this.cdp!.send('Page.screencastFrameAck', { sessionId: f.sessionId }).catch(() => undefined);
     });
+    this.cdp.on('Tracing.dataCollected', (d) => this.trace.push(...(d.value as unknown as TraceEvent[])));
   }
 
   get pixels() {
@@ -307,12 +312,16 @@ export class FluidProbe {
   }
 
   async start(watches: Watch[]) {
+    const vp = this.page.viewportSize()!;
+    this.inViewAtStart = new Set((await this.nodeBoxes()).filter((b) => b.x + b.width > 0 && b.y + b.height > 0 && b.x < vp.width && b.y < vp.height).map((b) => b.id));
     this.shots = [];
     this.fetches = [];
     this.recording = true;
     await this.page.evaluate((w) => (window as unknown as { __fluid: { start: (w: unknown) => void } }).__fluid.start(w), watches);
     if (this.cdp) {
       const vp = this.page.viewportSize()!;
+      this.trace = [];
+      await this.cdp.send('Tracing.start', { traceConfig: { includedCategories: EVENT_LATENCY_CATEGORIES }, transferMode: 'ReportEvents' });
       await this.cdp.send('Page.startScreencast', { format: 'jpeg', quality: 70, maxWidth: vp.width, maxHeight: vp.height, everyNthFrame: 1 });
     }
   }
@@ -324,6 +333,9 @@ export class FluidProbe {
   async stop(touched: Set<string>, pixelWatches: PixelWatch[]): Promise<{ facts: StepFacts; colours: Record<string, number[][]> }> {
     if (this.cdp) {
       await this.cdp.send('Page.stopScreencast');
+      const complete = new Promise((done) => this.cdp!.once('Tracing.tracingComplete', done));
+      await this.cdp.send('Tracing.end');
+      await complete;
     }
     this.recording = false;
     const r = (await this.page.evaluate(() => (window as unknown as { __fluid: { stop: () => unknown } }).__fluid.stop())) as PageResult;
@@ -335,11 +347,12 @@ export class FluidProbe {
       const back = reverted(seq);
       return back ? [`${id}: ${back}`] : [];
     });
-    const latencies = r.latencies.filter((x) => x >= 0 && x < 5000);
+    const latencies = (this.cdp ? presentedLatencies(this.trace) : r.latencies).filter((x) => x >= 0 && x < 5000);
     return {
       facts: {
         remounts,
-        playerMounts: [...new Set(r.playerMounts.filter((id) => !touched.has(id)))],
+        playerMounts: [...new Set(r.playerMounts.filter((id) => !touched.has(id) && this.inViewAtStart.has(id)))],
+        lazyMounts: [...new Set(r.playerMounts.filter((id) => !touched.has(id) && !this.inViewAtStart.has(id)))],
         gpuCounts: r.counts,
         fetches: this.fetches,
         flashes: this.cdp ? flashes : ['unmeasured (no screencast on this engine)'],
