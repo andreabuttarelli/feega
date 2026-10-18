@@ -24,7 +24,8 @@ export enum ToolRun {
   Unknown = 'unknown_tool',
   Invalid = 'invalid_input',
   Blocked = 'blocked',
-  Conflict = 'conflict'
+  Conflict = 'conflict',
+  Refused = 'tool_refused'
 }
 
 export type ToolRunAsk = { tool: string; input: unknown; version?: number; callId?: string };
@@ -35,7 +36,7 @@ export type EditorFrames = (callId: string, times: number[], doc: MotionDoc) => 
 
 export type ToolRunTurn = { sessions: Map<string, MotionSession>; selection: string[]; editor: EditorFrames | null };
 
-export type ToolRunResult = { outcome: ToolRun.Done; output: unknown; version: number; saved: boolean; frames: Frame[] } | { outcome: Exclude<ToolRun, ToolRun.Done>; detail?: string };
+export type ToolRunResult = { outcome: ToolRun.Done; output: unknown; version: number; saved: boolean; frames: Frame[] } | { outcome: Exclude<ToolRun, ToolRun.Done | ToolRun.Refused>; detail?: string };
 
 export const TOOL_RUN_AGENT_KEY = 'mcp';
 const ID_LENGTH = 8;
@@ -88,13 +89,21 @@ async function validInput(found: Tool, input: unknown): Promise<{ ok: true; valu
   return checked.success ? { ok: true, value: checked.value } : { ok: false, error: checked.error.message };
 }
 
-export async function runMotionTool(db: Db, scope: ToolRunScope, ask: ToolRunAsk, turn?: ToolRunTurn): Promise<ToolRunResult> {
+export type BatchOp = { tool: string; input?: unknown };
+
+export type BatchResult = { outcome: ToolRun.Done; output: { results: unknown[] }; version: number; saved: boolean } | { outcome: Exclude<ToolRun, ToolRun.Done>; detail?: string; index?: number } | { outcome: ToolRun.Refused; detail: string; index: number; output: unknown };
+
+type Prepared = { saved: NonNullable<Awaited<ReturnType<typeof savedMotion>>>; session: MotionSession; tools: Record<string, Tool>; actor: ReturnType<typeof agentActor>; nodeScope: { orgId: string; nodeId: string } };
+
+type Failure = { outcome: Exclude<ToolRun, ToolRun.Done | ToolRun.Refused>; detail?: string };
+
+async function prepare(db: Db, scope: ToolRunScope, version: number | undefined, turn?: ToolRunTurn): Promise<Prepared | Failure> {
   const saved = await savedMotion(db, scope);
   if (!saved || (scope.projectId && saved.project.id !== scope.projectId)) {
     return { outcome: ToolRun.NotFound };
   }
-  if (ask.version !== undefined && ask.version !== saved.version) {
-    return { outcome: ToolRun.Conflict, detail: `the video is at revision ${saved.version}, not ${ask.version}` };
+  if (version !== undefined && version !== saved.version) {
+    return { outcome: ToolRun.Conflict, detail: `the video is at revision ${saved.version}, not ${version}` };
   }
 
   const actor = agentActor(scope.userId, scope.agentKey ?? TOOL_RUN_AGENT_KEY);
@@ -109,12 +118,17 @@ export async function runMotionTool(db: Db, scope: ToolRunScope, ask: ToolRunAsk
     session,
     assets,
     templates: templateLibrary(db, { orgId: scope.orgId, actor }),
-    revisions: { list: () => namedRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null, name: async (version, name) => (await nameVersion(db, { ...nodeScope, version, name, actor })).named },
+    revisions: { list: () => namedRevisions(db, nodeScope), read: async (v) => (await readRevision(db, { ...nodeScope, version: v }))?.doc ?? null, name: async (v, name) => (await nameVersion(db, { ...nodeScope, version: v, name, actor })).named },
     exportStill: (doc, spec) => exportStill(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId }, doc, spec, { tokens, assets }),
     moveOut: frameMover(db, { orgId: scope.orgId, actor, projectId: saved.project.id }, scope.nodeId)
   }, frames);
+  return { saved, session, tools, actor, nodeScope };
+}
 
-  const found = tools[ask.tool];
+const isFailure = (p: Prepared | Failure): p is Failure => 'outcome' in p;
+
+async function execute(db: Db, scope: ToolRunScope, ready: Prepared, ask: BatchOp, callId: string): Promise<{ output: unknown } | Failure> {
+  const found = ready.tools[ask.tool];
   if (!found?.execute) {
     return { outcome: ToolRun.Unknown, detail: `no motion tool ${ask.tool}: GET /api/v1/motion/tools lists them` };
   }
@@ -122,24 +136,70 @@ export async function runMotionTool(db: Db, scope: ToolRunScope, ask: ToolRunAsk
   if (!input.ok) {
     return { outcome: ToolRun.Invalid, detail: input.error };
   }
-  const screened = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: [JSON.stringify(input.value)], scope: { ...scope, projectId: saved.project.id, actor } });
+  const screened = await screenModelInput(db, { profile: ModerationProfile.Standard, texts: [JSON.stringify(input.value)], scope: { ...scope, projectId: ready.saved.project.id, actor: ready.actor } });
   if (!screened.ok) {
     return { outcome: ToolRun.Blocked, detail: screened.error };
   }
+  return { output: await found.execute(input.value, { toolCallId: callId, messages: [], context: {} }) };
+}
 
-  const callId = ask.callId ?? `${TOOL_RUN_AGENT_KEY}-${newId()}`;
-  const output = await found.execute(input.value, { toolCallId: callId, messages: [], context: {} });
-  const seen = session.frames.get(callId) ?? [];
+async function commit(db: Db, ready: Prepared, summary: string): Promise<{ version: number; saved: boolean } | Failure> {
+  const { saved, session } = ready;
   if (session.doc === saved.doc) {
-    return { outcome: ToolRun.Done, output, version: saved.version, saved: false, frames: seen };
+    return { version: saved.version, saved: false };
   }
-
-  const commit = await commitDoc(db, { ...nodeScope, node: saved.node, base: saved, doc: session.doc, actor, summary: session.edits.join('; ') || ask.tool });
-  if (commit.outcome === OpsOutcome.Invalid) {
-    return { outcome: ToolRun.Invalid, detail: commit.error };
+  const written = await commitDoc(db, { ...ready.nodeScope, node: saved.node, base: saved, doc: session.doc, actor: ready.actor, summary: session.edits.join('; ') || summary });
+  if (written.outcome === OpsOutcome.Invalid) {
+    return { outcome: ToolRun.Invalid, detail: written.error };
   }
-  if (commit.outcome !== OpsOutcome.Written) {
+  if (written.outcome !== OpsOutcome.Written) {
     return { outcome: ToolRun.Conflict };
   }
-  return { outcome: ToolRun.Done, output, version: commit.head.version, saved: true, frames: seen };
+  return { version: written.head.version, saved: true };
+}
+
+export function refusalOf(output: unknown): string | null {
+  if (!output || typeof output !== 'object' || (output as { ok?: unknown }).ok !== false) {
+    return null;
+  }
+  const error = (output as { error?: unknown }).error;
+  return typeof error === 'string' ? error : 'the tool refused';
+}
+
+export const MAX_BATCH_OPS = 500;
+
+export async function runMotionBatch(db: Db, scope: ToolRunScope, ops: BatchOp[], version?: number): Promise<BatchResult> {
+  const ready = await prepare(db, scope, version);
+  if (isFailure(ready)) {
+    return ready;
+  }
+  const results: unknown[] = [];
+  for (const [index, op] of ops.entries()) {
+    const ran = await execute(db, scope, ready, op, `${TOOL_RUN_AGENT_KEY}-${newId()}`);
+    if ('outcome' in ran) {
+      return { ...ran, index };
+    }
+    const refused = refusalOf(ran.output);
+    if (refused) {
+      return { outcome: ToolRun.Refused, detail: refused, index, output: ran.output };
+    }
+    results.push(ran.output);
+  }
+  const written = await commit(db, ready, `batch of ${ops.length}`);
+  return 'outcome' in written ? written : { outcome: ToolRun.Done, output: { results }, ...written };
+}
+
+export async function runMotionTool(db: Db, scope: ToolRunScope, ask: ToolRunAsk, turn?: ToolRunTurn): Promise<ToolRunResult> {
+  const ready = await prepare(db, scope, ask.version, turn);
+  if (isFailure(ready)) {
+    return ready;
+  }
+  const callId = ask.callId ?? `${TOOL_RUN_AGENT_KEY}-${newId()}`;
+  const ran = await execute(db, scope, ready, ask, callId);
+  if ('outcome' in ran) {
+    return ran;
+  }
+  const seen = ready.session.frames.get(callId) ?? [];
+  const written = await commit(db, ready, ask.tool);
+  return 'outcome' in written ? written : { outcome: ToolRun.Done, output: ran.output, frames: seen, ...written };
 }

@@ -241,7 +241,8 @@ export function registerMotionTools(server: McpServer) {
       title: 'Run a frame editor tool',
       description:
         'Every tool of the motion editor agent (add_clip, set_props, set_keyframes, add_template, set_canvas, export_image... over 140), run directly on a video with no AI and no credits. ' +
-        'No `tool`: lists them by name. `tool` alone: its description and JSON input schema. `tool` with `node_id`: runs it on the saved video with `input`; an edit is saved as a new revision (`version` answers the new one; pass the `version` you read to refuse a stale write with 409). ' +
+        'No `tool`: lists them by name. `tool` alone: its description and JSON input schema. `tool` with `node_id`: runs it on the saved video with `input`; an edit is saved as a new revision (`version` answers the new one; pass the `version` you read to refuse a stale write with 409; a tool that refuses is an error with its reason). ' +
+        'Prefer `tool` "batch" with `input` { ops: [{ tool, input }, ...] } (up to 500): every op in one revision, all or none. ' +
         'Still graphics: `set_canvas` with `still` (seconds of the frame) and `format` "4:5" post, "9:16" story or "A poster"; `export_image` (`format` png, jpg, webp; `scale` 1 or 2) saves the image to the project and returns its `url`. ' +
         'Tools that need a chat turn (research, voice, sub-agents) answer with an error: use `ask_motion_agent` for those.',
       inputSchema: z.object({ org, tool: z.string().optional(), node_id: z.string().optional(), input: z.record(z.string(), z.unknown()).optional(), version: z.number().int().min(0).optional() }),
