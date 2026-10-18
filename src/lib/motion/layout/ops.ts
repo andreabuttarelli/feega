@@ -2,7 +2,8 @@ import { TrackKind } from '../components';
 import { findClip, type MotionClip, type MotionDoc } from '../doc';
 import { pivotBox } from '../parent';
 import { setParent } from '../parent-ops';
-import { addClip, type OpResult } from '../timeline';
+import { layerOrder } from '../siblings';
+import { addClip, moveClip, type OpResult } from '../timeline';
 import { Align, Direction, Sizing } from './auto-layout';
 import { DEFAULT_AUTO_LAYOUT, DEFAULT_LAYOUT_ITEM, autoLayoutSchema, layoutItemSchema, type AutoLayout, type LayoutItem } from './model';
 import { childrenInOrder, withAutoLayout } from './resolve';
@@ -104,7 +105,22 @@ function guessFlow(placed: Placed[]): Pick<AutoLayout, 'direction' | 'gap' | 'or
   return { direction, gap: roundPx(gap), order: sorted.map((p) => p.clip.id) };
 }
 
-export function wrapInAutoLayout(doc: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult {
+function ownTracks(doc: MotionDoc, clipIds: readonly string[], trackId: string): MotionDoc {
+  const topFirst = layerOrder(doc).filter((id) => clipIds.includes(id));
+  return topFirst.reduce((next, clipId) => {
+    const found = findClip(next, clipId);
+    if (!found || found.track.clips.length === 1) {
+      return next;
+    }
+    const own = { id: `${trackId}-${clipId}`, kind: found.track.kind, name: found.track.name, clips: [] };
+    const at = next.tracks.indexOf(found.track);
+    const moved = moveClip({ ...next, tracks: [...next.tracks.slice(0, at), own, ...next.tracks.slice(at)] }, clipId, { from: found.clip.from, trackId: own.id });
+    return moved.ok ? moved.doc : next;
+  }, doc);
+}
+
+export function wrapInAutoLayout(source: MotionDoc, clipIds: readonly string[], id: string, trackId: string): OpResult {
+  const doc = ownTracks(source, clipIds, trackId);
   const size = { width: doc.width, height: doc.height };
   const placed: Placed[] = clipIds
     .map((c) => findClip(doc, c))

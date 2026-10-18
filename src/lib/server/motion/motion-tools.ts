@@ -399,6 +399,18 @@ const maskInput = z
   })
   .strict();
 
+type ContainerStyle = { fill?: string; stroke?: string; stroke_width?: number; radius?: number };
+
+function containerProps(style: ContainerStyle): Record<string, unknown> {
+  const stroke = style.stroke === undefined ? {} : { stroke: style.stroke, strokeKind: StrokeKind.Solid };
+  return {
+    ...(style.fill === undefined ? {} : { fill: style.fill }),
+    ...stroke,
+    ...(style.stroke_width === undefined ? {} : { strokeWidth: style.stroke_width }),
+    ...(style.radius === undefined ? {} : { roundness: style.radius })
+  };
+}
+
 const SPRING_HELP = '(soft by default; stiffness and damping override it: keep damping near 2·√stiffness for the house soft settle, never a visible bounce).';
 
 const INTERP_HELP = `in/out set how the value enters and leaves a keyframe: bezier (default, uses ease), linear, hold (no change until the next keyframe), auto (smooth, never overshoots), continuous (smooth, keeps speed through). roving true (${SPATIAL_KEYS.join(', ')} only) retimes a middle keyframe so the speed is even.`;
@@ -690,6 +702,11 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     clipIds.flatMap((id) => effects.map((e) => ({ id, e }))).reduce<OpResult>((r, { id, e }) => (r.ok ? addEffect(r.doc, id, e.kind, deps.newId(), e.params) : r), result);
 
   const created = (out: ReturnType<typeof apply>, clipId: string) => (out.ok ? { ...out, clip_id: clipId } : out);
+
+  const styled = (result: OpResult, clipId: string, style: ContainerStyle): OpResult => {
+    const props = containerProps(style);
+    return result.ok && Object.keys(props).length ? setProps(result.doc, clipId, propsIn('Shape', props)) : result;
+  };
 
   const screens = new Map<string, string>();
 
@@ -1457,14 +1474,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     add_auto_layout: tool({
-      description: 'Auto layout (flexbox-style). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (its fill is the frame background, set_props to colour it) on a track below them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1).optional(), clip_id: z.string().optional() }),
-      execute: async (input) => {
-        if (input.clip_id) {
-          return apply(setAutoLayout(session.doc, input.clip_id, {}), `auto layout on ${input.clip_id}`);
+      description: 'Auto layout (flexbox-style). With clip_ids: wraps those visual clips in a new transparent rectangle Shape (fill, stroke, stroke_width and radius style it in the same call) drawn directly under them, parents them to it in reading order, guesses direction and gap from where they are, and makes text hug its words and the container hug its children; returns container_id. With clip_id: turns an existing clip with a box (a rectangle Shape) into a container of the clips parented to it. Children are the clips whose parent is the container; their x/y/width/height then come from the layout, their transform and keyframes still apply on top (a staggered rise-in still works). Animate the container transform to move the whole group.',
+      inputSchema: z.object({
+        clip_ids: z.array(z.string()).min(1).optional(),
+        clip_id: z.string().optional(),
+        fill: z.string().optional().describe('container fill colour'),
+        stroke: z.string().optional().describe('container stroke colour'),
+        stroke_width: z.number().min(0).optional().describe('px'),
+        radius: z.number().min(0).optional().describe('corner roundness, as roundness in set_props')
+      }),
+      execute: async ({ clip_ids, clip_id, ...style }) => {
+        if (clip_id) {
+          return apply(styled(setAutoLayout(session.doc, clip_id, {}), clip_id, style), `auto layout on ${clip_id}`);
         }
         const id = deps.newId();
-        const out = apply(wrapInAutoLayout(session.doc, input.clip_ids ?? [], id, deps.newId()), `wrapped ${input.clip_ids?.length ?? 0} clip(s) in an auto layout`);
+        const out = apply(styled(wrapInAutoLayout(session.doc, clip_ids ?? [], id, deps.newId()), id, style), `wrapped ${clip_ids?.length ?? 0} clip(s) in an auto layout`);
         return out.ok ? { ...out, container_id: id } : out;
       }
     }),
