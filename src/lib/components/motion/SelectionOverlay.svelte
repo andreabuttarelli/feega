@@ -2,7 +2,7 @@
   import { clipChrome } from '$lib/canvas/selection-chrome';
   import { onMount, untrack } from 'svelte';
   import { findClip, type MotionClip, type MotionDoc } from '$lib/motion/doc';
-  import { DragPhase, isOutside, type ElementOut } from '$lib/canvas/canvas-drop';
+  import { DragPhase, isOutside, type ElementOut, type HostDrag, type HostShift, hostShift } from '$lib/canvas/canvas-drop';
   import type { MeasuredBox } from '$lib/motion/hyperframes/measure';
   import { selectionView } from '$lib/motion/selection-context';
   import { reorderAt } from '$lib/motion/layout/guides';
@@ -31,6 +31,7 @@
     outlined = null,
     onhover = () => {},
     ondragout = null,
+    onhostdrag = null,
     onmenu = null
   }: {
     doc: MotionDoc;
@@ -48,6 +49,7 @@
     outlined?: string | null;
     onhover?: (id: string | null) => void;
     ondragout?: ((out: ElementOut, phase: DragPhase) => void) | null;
+    onhostdrag?: HostDrag | null;
     onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
   } = $props();
 
@@ -68,7 +70,8 @@
   };
 
   const chrome = $derived(clipChrome(part));
-  type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; pointer: number };
+  type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; start: ClientPt; pointer: number };
+  type ClientPt = { x: number; y: number };
 
   let host = $state<HTMLDivElement | null>(null);
   let boxes = $state<Boxes>(untrack(() => guessedBoxes(withAutoLayout(doc))));
@@ -296,6 +299,8 @@
     return () => clearTimeout(later);
   });
 
+  const client = (e: PointerEvent): ClientPt => ({ x: e.clientX, y: e.clientY });
+
   function local(e: PointerEvent): Pt {
     const rect = host!.getBoundingClientRect();
     return [((e.clientX - rect.left) / rect.width) * doc.width, ((e.clientY - rect.top) / rect.height) * doc.height];
@@ -313,7 +318,7 @@
       return;
     }
     host!.setPointerCapture(e.pointerId);
-    grab = { grip, handle, clipId, from: local(e), pointer: e.pointerId };
+    grab = { grip, handle, clipId, from: local(e), start: client(e), pointer: e.pointerId };
   }
 
   let lastPress: Pt | null = null;
@@ -362,6 +367,11 @@
       hover = e.pointerType === 'mouse' ? hoverAt(local(e)) : null;
       return;
     }
+    const hosted = hostGesture(grab, e);
+    if (hosted) {
+      onhostdrag!(hosted.shift, hosted.to, DragPhase.Over);
+      return;
+    }
     const outside = leaving(e);
     if (outside || out) {
       ondragout?.(outside ?? { clipId: grab.clipId, client: { x: e.clientX, y: e.clientY }, box: null }, outside ? DragPhase.Over : DragPhase.Back);
@@ -386,15 +396,31 @@
     onpreview(result.doc);
   }
 
+  const HOST_GRIPS = new Set<Grip>([Grip.Move, Grip.Scale]);
+
+  function hostGesture(g: Grab | null, e: PointerEvent | null): { shift: HostShift; to: ClientPt } | null {
+    if (!onhostdrag || !g || !HOST_GRIPS.has(g.grip)) {
+      return null;
+    }
+    const to = e ? client(e) : g.start;
+    const unit = g.grip === Grip.Scale && quad ? handlesOf(quad)[g.handle].unit : null;
+    return { shift: hostShift(unit, g.start, to), to };
+  }
+
   function end(e: PointerEvent | null) {
     const done = live;
     const grip = grab?.grip;
+    const hosting = hostGesture(grab, e);
     const reordered = done && grip === Grip.Move && grab && e ? reorderAt(doc, grab.clipId, local(e)) : null;
     const outside = grab && e ? leaving(e) : null;
     out = false;
     grab = null;
     live = null;
     onpreview(null);
+    if (hosting) {
+      onhostdrag!(hosting.shift, hosting.to, DragPhase.Drop);
+      return;
+    }
     if (outside) {
       ondragout?.(outside, DragPhase.Drop);
       return;
@@ -456,7 +482,7 @@
     {#each handles as h, i (i)}
       <button type="button" class="target scale" aria-label="Scale" data-handle={i} style={pct(h.at)} onpointerdown={(e) => begin(e, Grip.Scale, i, clip.id)}><span></span></button>
     {/each}
-    {#if anchor && chrome.handles}
+    {#if anchor && chrome.handles && !onhostdrag}
       <button type="button" class="target anchor" aria-label="Anchor point" data-testid="selection-anchor" style={pct(anchor)} onpointerdown={(e) => begin(e, Grip.Anchor, 0, clip.id)}><span></span></button>
     {/if}
     {#if partBox && part}

@@ -1,4 +1,5 @@
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
+import { pickBarTool } from './fixtures/canvas-bar';
 import type { Page } from '@playwright/test';
 
 const SHOTS = process.env.CANVAS_MOTION_SHOTS;
@@ -32,7 +33,7 @@ test.describe('free elements on the canvas @real', () => {
     const bar = page.getByTestId('add-bar');
     await expect(bar).toHaveAttribute('data-context', 'canvas');
     await bar.getByTestId('bar-mode').getByRole('radio', { name: 'Design' }).click();
-    await bar.getByTestId('draw-tools').locator('[data-tool="rectangle"]').click();
+    await pickBarTool(page, 'rectangle');
     await expect(page.getByTestId('canvas-draw')).toBeVisible();
     await shoot(page, '1-draw-tools-on-canvas');
 

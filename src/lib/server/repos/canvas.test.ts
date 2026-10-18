@@ -22,7 +22,7 @@ import type { Db } from '$lib/server/db/client';
  * `deleteConnection`, …) registra un evento subito dopo, e senza una riga da restituire quella
  * `insert().select().single()` tornerebbe `null` e romperebbe la chiamata vera che sta testando.
  */
-type Call = { table: string; op: string; payload?: unknown; filters: [string, unknown][] };
+type Call = { table: string; op: string; payload?: unknown; filters: [string, unknown][]; orders: string[] };
 
 /**
  * `updateRows` separa cosa un `UPDATE ... RETURNING` porta da cosa una `SELECT` precedente vede:
@@ -36,7 +36,7 @@ function fakeDb(rows: Record<string, unknown[]>, updateRows?: Record<string, unk
   const written: Record<string, unknown[]> = updateRows ? { canvas_events: [eventRow], ...updateRows } : seeded;
 
   const builder = (table: string, op: string, payload?: unknown) => {
-    const call: Call = { table, op, payload, filters: [] };
+    const call: Call = { table, op, payload, filters: [], orders: [] };
     calls.push(call);
     const rowsFor = op === 'update' ? written : seeded;
 
@@ -53,7 +53,8 @@ function fakeDb(rows: Record<string, unknown[]>, updateRows?: Record<string, unk
         call.filters.push([column, values]);
         return chain;
       },
-      order() {
+      order(column: string) {
+        call.orders.push(column);
         return chain;
       },
       select() {
@@ -129,6 +130,14 @@ describe('la lettura non esce dall org', () => {
     await listNodes(db, { orgId: ORG, canvasId: CANVAS });
 
     expect(filtersOf(calls, 'select')).toMatchObject({ org_id: ORG, canvas_id: CANVAS });
+  });
+
+  it('two nodes brought to front at once get one stable order: z, then id', async () => {
+    const { db, calls } = fakeDb({ nodes: [] });
+
+    await listNodes(db, { orgId: ORG, canvasId: CANVAS });
+
+    expect(calls.find((c) => c.op === 'select')?.orders).toEqual(['z', 'id']);
   });
 
   it('esclude i nodi cancellati', async () => {

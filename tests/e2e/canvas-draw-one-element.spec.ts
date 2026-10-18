@@ -1,4 +1,5 @@
 import type { Page } from '@playwright/test';
+import { barTool, pickBarTool } from './fixtures/canvas-bar';
 import { test, expect, REAL_STACK, gotoHydrated } from './fixtures/session';
 
 const TOOLS = [
@@ -28,7 +29,7 @@ test.describe('a shape drawn on the canvas is one element @real', () => {
       await page.getByRole('button', { name: 'Layers', exact: true }).click();
       const layers = page.getByTestId('layers');
 
-      await page.getByTestId('add-bar').getByTestId('draw-tools').locator(`[data-tool="${tool}"]`).click();
+      await pickBarTool(page, tool);
       await dragOnPane(page, 240, 120);
       const element = page.locator('[data-kind="element"][data-motion-node]');
       await expect(element).toHaveCount(1, { timeout: 10_000 });
@@ -50,7 +51,7 @@ test.describe('a shape drawn on the canvas is one element @real', () => {
     test.setTimeout(120_000);
     await page.setViewportSize({ width: 1440, height: 900 });
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    const frameTool = page.getByTestId('add-bar').getByTestId('draw-tools').locator('[data-tool="frame"]');
+    const frameTool = await barTool(page, 'frame');
     await expect(frameTool).toBeVisible();
 
     await frameTool.click();

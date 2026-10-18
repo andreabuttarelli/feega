@@ -10,6 +10,7 @@ import SunMoon from '@lucide/svelte/icons/sun-moon';
 import LogOut from '@lucide/svelte/icons/log-out';
 import Shapes from '@lucide/svelte/icons/shapes';
 import Wrench from '@lucide/svelte/icons/wrench';
+import Users from '@lucide/svelte/icons/users';
 import CircleHelp from '@lucide/svelte/icons/circle-help';
 import { REPORT_PATH } from '$lib/reports/report-link';
 import { BILLING_PATH } from '$lib/billing-path';
@@ -60,6 +61,7 @@ export type NavItem = {
 const DASHBOARD_PATH = '/app';
 const CANVASES_PATH = `${DASHBOARD_PATH}/canvases`;
 const TEMPLATES_PATH = `${DASHBOARD_PATH}/templates`;
+export const TEAM_PATH = `${DASHBOARD_PATH}/team`;
 export const TOOLS_PATH = `${DASHBOARD_PATH}/tools`;
 
 const none = () => null;
@@ -81,6 +83,7 @@ export const APP_NAV: readonly NavItem[] = [
   row({ id: 'templates', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Frame templates' }, icon: LayoutTemplate, href: () => TEMPLATES_PATH }),
   row({ id: 'tools', section: NavSection.Main, kind: NavKind.Link, label: { text: 'Tools' }, icon: Wrench, href: () => TOOLS_PATH }),
   row({ id: 'settings', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.settings' }, icon: Settings, needs: NavNeeds.Project, href: inProject('/settings/project') }),
+  row({ id: 'team', section: NavSection.Account, kind: NavKind.Link, label: { text: 'Team' }, icon: Users, href: () => TEAM_PATH }),
   row({ id: 'billing', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.billing' }, icon: CreditCard, meta: NavMeta.Credits, href: () => BILLING_PATH }),
   row({ id: 'changelog', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.changelog' }, icon: Sparkles, load: NavLoad.Document, href: () => '/changelog' }),
   row({ id: 'report', section: NavSection.Account, kind: NavKind.Link, label: { key: 'app.shell.menu.report' }, icon: Flag, href: () => REPORT_PATH }),

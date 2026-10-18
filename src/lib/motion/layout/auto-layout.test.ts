@@ -234,3 +234,30 @@ describe('the root', () => {
     expect(layoutTree(leaf('a', 5, 6)).get('a')).toEqual({ left: 0, top: 0, width: 5, height: 6 });
   });
 });
+
+describe('a grid', () => {
+  const grid = (over: Partial<Flow> = {}) => ({ direction: Direction.Grid, columns: 2, gap: 10, crossGap: 20, ...over });
+
+  it('splits the width into equal columns and starts a row every few children', () => {
+    const out = layoutTree(box('c', 210, 300, [leaf('a', 50, 40), leaf('b', 50, 60), leaf('d', 50, 30)], grid()));
+    expect(out.get('a')).toEqual({ left: 0, top: 0, width: 50, height: 40 });
+    expect(out.get('b')).toEqual({ left: 110, top: 0, width: 50, height: 60 });
+    expect(out.get('d')).toEqual({ left: 0, top: 80, width: 50, height: 30 });
+  });
+
+  it('a filling child takes its whole cell', () => {
+    const fill = { width: Sizing.Fill, height: Sizing.Fill };
+    const out = layoutTree(box('c', 210, 300, [leaf('a', 10, 40), leaf('b', 10, 10, { sizing: fill })], grid()));
+    expect(out.get('b')).toEqual({ left: 110, top: 0, width: 100, height: 40 });
+  });
+
+  it('aligns a child inside its cell', () => {
+    const out = layoutTree(box('c', 210, 300, [leaf('a', 50, 40), leaf('b', 50, 20)], grid({ align: Align.End, justify: Justify.Center })));
+    expect(out.get('b')).toEqual({ left: 135, top: 20, width: 50, height: 20 });
+  });
+
+  it('hugs its widest child per column and its rows', () => {
+    const size = measure(box('c', 0, 0, [leaf('a', 50, 40), leaf('b', 70, 60), leaf('d', 50, 30)], grid({ padding: { top: 1, right: 2, bottom: 3, left: 4 } }), { sizing: hug }));
+    expect(size).toEqual({ width: 4 + 70 + 10 + 70 + 2, height: 1 + 60 + 20 + 30 + 3 });
+  });
+});

@@ -3,7 +3,8 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { SETTINGS_SECTIONS, settingsGroupsFor } from '$lib/components/settings/platforms';
+  import { SETTINGS_SECTIONS, sectionEditable, settingsGroupsFor } from '$lib/components/settings/platforms';
+  import { Notice } from '$lib/components/ui/notice';
   import PageHead from '$lib/components/PageHead.svelte';
   import BrandGate from '$lib/components/settings/BrandGate.svelte';
   import { _ } from 'svelte-i18n';
@@ -13,6 +14,7 @@
   let { data, children } = $props();
   const settingsBase = $derived(`/p/${data.project.id}/settings`);
   const path = $derived($page.url.pathname);
+  const editable = $derived(sectionEditable(path, data.org.role));
   /** OAuth intermediate pages keep their own full-page UI. */
   const isOauthFlow = $derived(
     path.includes('/settings/facebook') ||
@@ -111,7 +113,8 @@
         <span>{$_('app.nav.settings')}</span>
       </a>
     {/if}
-    <div class="settings">
+    {#if !editable}<Notice>View only: ask an admin of this organisation for edit access.</Notice>{/if}
+    <div class="settings" inert={!editable}>
       {#if data.brandGate}
         <BrandGate projectId={data.project.id} returnTo={path} orgBrands={data.orgBrands} />
       {:else}

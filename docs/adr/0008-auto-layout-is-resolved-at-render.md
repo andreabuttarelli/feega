@@ -2,7 +2,7 @@
 
 Context: a frame (`MotionDoc`) places every visual clip by hand: `props.x/y` (centre) and
 `props.width/height`, fractions of the frame. Lining up a row of buttons, a card with a title and
-a caption, or a list that grows when a word changes means moving every clip again. Figma solves
+a caption, or a list that grows when a word changes means moving every clip again. Design tools solve
 it with auto layout: a frame that lays its children out like flexbox. Parenting already exists
 (`clip.parent`, transforms compose down the chain), and so do precomps.
 

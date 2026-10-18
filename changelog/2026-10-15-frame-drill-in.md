@@ -1,4 +1,4 @@
-# Drill into frames like Figma
+# Drill into frames
 
 A click on a closed frame selected the frame and nothing else could be reached from the canvas;
 inside the open editor, a second click on the selected clip jumped to a part, so click meant two

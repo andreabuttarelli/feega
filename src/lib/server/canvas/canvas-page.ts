@@ -47,6 +47,7 @@ import { planLoop, enqueueLoop, cancelLoop, retryLoopCombo } from '$lib/server/c
 import { planWorkflowDryRun, enqueueWorkflow, cancelWorkflow, workflowCredits } from '$lib/server/canvas/workflow';
 import { GraphScope, enqueueGraph, planGraph, type GraphInput } from '$lib/server/canvas/run-graph';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
+import { offsetFrom } from '$lib/canvas/duplicate-plan';
 import { ShowRun, removeNodes, resizeOnCanvas, shareDoc, showRun, type RunShown } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
@@ -80,7 +81,7 @@ import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNod
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
-import { MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
+import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, linkFrame, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
 // minuto, e il default della piattaforma è sotto quella soglia. Senza, la richiesta muore a metà
@@ -1160,6 +1161,16 @@ export const actions: Actions<CanvasParams> = {
     return movedAnswer(await moveFree(canvasFrames(scope), ask.data));
   },
 
+  copyFree: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const ask = freeAskSchema.safeParse({ sourceNodeId: fd.get('source'), drop: jsonField(fd, 'drop') });
+    if (!ask.success) {
+      return fail(400, { error: 'invalid paste' });
+    }
+    return movedAnswer(await moveFree(canvasFrames(scope), ask.data, FreeSource.Keep));
+  },
+
   groupElements: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
     const ask = groupAskSchema.safeParse({ ids: jsonField(await request.formData(), 'ids') });
@@ -1351,6 +1362,7 @@ export const actions: Actions<CanvasParams> = {
       projectId: scope.canvas.projectId,
       canvasId: scope.canvasId,
       nodeIds,
+      offset: offsetFrom(fd.get('dx'), fd.get('dy')),
       actor: userActor(scope)
     });
 

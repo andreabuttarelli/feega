@@ -1,6 +1,7 @@
 import { z } from 'zod';
+import { versionNamesSchema, type VersionNames } from '$lib/motion/version-names';
 import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$lib/motion/doc';
-import { NodeMode, Opening } from './inline-motion';
+import { NodeMode, Opening, Under } from './inline-motion';
 import { FrameFormat } from '$lib/motion/hyperframes/capture';
 import { DRAWN_TEXT } from '$lib/motion/draw-create';
 
@@ -10,12 +11,12 @@ export enum FrameKind {
   Group = 'group'
 }
 
-type Chrome = { bar: boolean; ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean };
+type Chrome = { bar: boolean; dragsHost: boolean; under: Under; ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean };
 
 const CHROME: Record<FrameKind, Chrome> = {
-  [FrameKind.Frame]: { bar: true, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false },
-  [FrameKind.Element]: { bar: false, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false },
-  [FrameKind.Group]: { bar: false, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true }
+  [FrameKind.Frame]: { bar: true, dragsHost: false, under: Under.Released, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false },
+  [FrameKind.Element]: { bar: false, dragsHost: true, under: Under.Kept, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false },
+  [FrameKind.Group]: { bar: false, dragsHost: false, under: Under.Released, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true }
 };
 
 export const frameChrome = (kind: FrameKind): Chrome => CHROME[kind];
@@ -30,6 +31,7 @@ export type MotionNode = {
   lastRenderAssetId: string | null;
   storyboard?: StoryboardLink;
   budgetRaisedUsd?: number;
+  versionNames?: VersionNames;
 };
 
 const FORMAT_NAMES: Record<string, MotionFormat> = {
@@ -53,7 +55,8 @@ export const motionNodeSchema = z.object({
   lastRenderAssetId: z.string().nullable(),
   storyboard: linkSchema.optional(),
   budgetRaisedUsd: z.number().min(0).optional(),
-  kind: z.enum(FrameKind).optional()
+  kind: z.enum(FrameKind).optional(),
+  versionNames: versionNamesSchema.optional()
 });
 
 export function storyboardOf(data: Record<string, unknown>): StoryboardLink | null {

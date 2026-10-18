@@ -1,4 +1,5 @@
 import { styleOf } from '$lib/motion/style';
+import { nameVersion, namedRevisions } from './version-names';
 import { briefAwaits, promptTexts } from '$lib/motion/script-brief';
 import { ASK_REFERENCE_PICK, avoidedImages, choosesForUser, latestAnswer, pickAwaits, readAnswer, rejectedRounds, shownRefs, savedPick, type PickAnswer, type PickAsk } from '$lib/reference-pick';
 import { createUIMessageStream, streamText, type ModelMessage, type Tool, type UIMessageChunk } from 'ai';
@@ -55,7 +56,7 @@ import { motionAgentPrompt } from '$lib/server/motion/motion-prompt';
 import { speakVoiceover } from '$lib/server/motion/voiceover';
 import { layMusic } from '$lib/server/motion/music';
 import { laySfx } from '$lib/server/motion/sfx';
-import { RevisionOutcome, listRevisions, readRevision } from '$lib/server/repos/motion-revisions';
+import { RevisionOutcome, readRevision } from '$lib/server/repos/motion-revisions';
 import { brandSources } from '$lib/server/motion/brand-sources';
 import { storyboardStore } from '$lib/server/motion/storyboard';
 import { boardNote } from '$lib/motion/storyboard';
@@ -349,7 +350,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     assets,
     newId: () => crypto.randomUUID().slice(0, 8),
     templates: templateLibrary(db, { orgId, actor: { kind: 'agent', id: userId, agentKey: MOTION_AGENT_KEY } }),
-    revisions: { list: () => listRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null },
+    revisions: { list: () => namedRevisions(db, nodeScope), read: async (version) => (await readRevision(db, { ...nodeScope, version }))?.doc ?? null, name: async (version, name) => (await nameVersion(db, { ...nodeScope, version, name, actor })).named },
     ...sources,
     videoBreakdown,
     analysis: async (assetId) => (await analyzeSounds(storageAnalysis(db), { orgId, projectId: project.id }, assets, [assetId]))[assetId] ?? null,

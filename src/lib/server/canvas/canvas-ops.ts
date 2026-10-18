@@ -236,6 +236,9 @@ const connectionIdInput = z.object({ connectionId: z.string().describe('from lis
 const edgeModeInput = z.object({ connectionId: z.string(), mode: z.enum(WIRE_MODES).describe('iterate makes the line a loop axis') }).strict();
 const resizeNodeInput = z.object({ nodeId: z.string(), width: z.number().positive(), height: z.number().positive() }).strict();
 const nodeIdsInput = z.object({ canvasId: z.string(), nodeIds: z.array(z.string()).min(1) }).strict();
+const duplicateInput = nodeIdsInput
+  .extend({ offset: z.object({ dx: z.number(), dy: z.number() }).optional().describe('where the copies land relative to the originals; omitted = a small step') })
+  .strict();
 const shareCanvasInput = z.object({ canvasId: z.string(), on: z.boolean().describe('true mints a view-only link; false revokes it') }).strict();
 const shareDocInput = z.object({ nodeId: z.string().describe('a doc node'), on: z.boolean() }).strict();
 const insertTemplateInput = z.object({ canvasId: z.string(), templateId: z.string().describe('from list_templates'), x: z.number(), y: z.number() }).strict();
@@ -843,7 +846,7 @@ export const CANVAS_OPS = {
 
   duplicate_nodes: op({
     access: Access.Write,
-    input: nodeIdsInput,
+    input: duplicateInput,
     run: async (ctx, input) => duplicateNodes(ctx.db, { orgId: ctx.orgId, projectId: ctx.projectId, ...input, actor: ctx.actor })
   }),
 

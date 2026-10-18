@@ -17,7 +17,7 @@ test.describe('motion agent frames @real', () => {
     const stored: string[] = [];
     let asked = 0;
 
-    await page.route(/\/motion\/[^/]+\/agent$/, (route) => {
+    await page.route(/\/api\/v1\/projects\/[^/]+\/(motion\/[^/]+\/)?agent$/, (route) => {
       if (route.request().method() !== 'POST') {
         return route.fallback();
       }
