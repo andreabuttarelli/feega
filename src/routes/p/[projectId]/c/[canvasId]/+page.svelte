@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
+  import type { ExportRow } from '$lib/motion/export-rows';
   import { localStore } from '$lib/browser-storage';
   import { Copied, elementClipboard, type CopiedElements } from '$lib/canvas/element-clipboard.svelte';
   import { pasteIntoFrame } from '$lib/canvas/paste-into-frame';
@@ -3006,6 +3008,13 @@
   }
 
   let formatsFor = $state<string | null>(null);
+  let exportFor = $state<string[] | null>(null);
+
+  async function exportFrames(frameIds: string[], rows: ExportRow[]) {
+    await Promise.all(frameIds.map((id) => saves.flush(id)));
+    const out = await post('exportSelection', { frame_ids: JSON.stringify(frameIds), rows: JSON.stringify(rows), name: data.canvas.name ?? 'Export' });
+    return out?.url ? (out as { url: string; name: string; files: string[] }) : 'Export failed';
+  }
 
   async function createFormats(nodeId: string, targets: FormatTarget[]) {
     landed(await post('createFormats', { node_id: nodeId, targets: JSON.stringify(targets) }));
@@ -3297,6 +3306,9 @@
 
   <RunsPanel runs={runListing} staleCount={staleNodeIds.length} onrunstale={() => runGraph(GraphScope.Stale, staleNodeIds)} />
 
+  {#if exportFor}
+    <ExportDialog count={exportFor.length} onexport={(rows) => exportFrames(exportFor!, rows)} onclose={() => (exportFor = null)} />
+  {/if}
   {#if formatsFor}
     <FormatsDialog oncreate={(targets) => createFormats(formatsFor!, targets)} onclose={() => (formatsFor = null)} />
   {/if}
@@ -3331,6 +3343,7 @@
     onConnect={connect}
     onDelete={remove}
     onCreateFormats={(id) => (formatsFor = id)}
+    onExport={(ids) => (exportFor = ids)}
     onEdgeDelete={disconnect}
     onEdgeModeChange={setEdgeMode}
     onCreate={create}

@@ -82,6 +82,10 @@ import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNod
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
+import { exportRowsSchema } from '$lib/motion/export-rows';
+import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
+import { selectionPorts } from '$lib/server/motion/selection-export-ports';
+import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -1126,6 +1130,25 @@ export const actions: Actions<CanvasParams> = {
     });
 
     return { connection };
+  },
+
+  exportSelection: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const rows = exportRowsSchema.safeParse(jsonField(fd, 'rows'));
+    const frameIds = jsonField(fd, 'frame_ids');
+    if (!rows.success || !Array.isArray(frameIds) || !frameIds.length) {
+      return fail(400, { error: 'invalid export' });
+    }
+    if (!serverFramesOpen()) {
+      return fail(503, { error: 'image export needs the server renderer, which is not available here' });
+    }
+    const ports = selectionPorts({ db: scope.db, orgId: scope.orgId, projectId: scope.canvas.projectId, brandId: scope.projectBrandId, actor: userActor(scope) });
+    const out = await exportSelection(ports, { nodeIds: frameIds.map(String), rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    if (out instanceof Error) {
+      return fail(502, { error: `the images could not be drawn: ${out.message}` });
+    }
+    return out.outcome === ExportOutcome.Done ? out : fail(404, { error: out.outcome });
   },
 
   createFormats: async ({ request, params, locals }) => {
