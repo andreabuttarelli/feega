@@ -230,7 +230,7 @@ video pinned to one frame: `set_canvas` `{ format: "A poster", still: 2 }`, then
 --input '{...}'`, `feega motion tools [name]`, `feega motion still <nodeId> --scale 2 --out poster.png`.
 
 Built-in line icons (arrow, check, close, menu, search, user, star, heart, play, cart…):
-`list_icons` names them, `add_icon` `{ name, x, y, size, color }` inserts one as a stroked Shape
+`add_icon` `{ name, x, y, size, color }` inserts one as a stroked Shape
 path clip (x, y centre 0..1, size a share of the short side). Through `motion_tool`.
 
 The frame editor page's own actions (read the head, save the whole doc, apply doc ops, render and

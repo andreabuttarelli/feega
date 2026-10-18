@@ -1574,14 +1574,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       }
     }),
 
-    list_icons: tool({
-      description: 'Names of the built-in line icons add_icon inserts.',
-      inputSchema: z.object({}).strict(),
-      execute: async () => ({ icons: ICON_NAMES })
-    }),
-
     add_icon: tool({
-      description: 'Add a built-in line icon (list_icons names them) as a stroked Shape path clip. x, y: centre as a share of the frame (0..1); size: share of the frame short side; color: the stroke colour. Restyle it later with set_props strokes. Returns the clip id.',
+      description: 'Add a built-in line icon (name: one of the schema enum) as a stroked Shape path clip. x, y: centre as a share of the frame (0..1); size: share of the frame short side; color: the stroke colour. Restyle it later with set_props strokes. Returns the clip id.',
       inputSchema: z.object({ name: z.enum(ICON_NAMES as [string, ...string[]]), x: z.number().min(0).max(1).default(0.5), y: z.number().min(0).max(1).default(0.5), size: z.number().min(0.01).max(1).default(0.1), color: z.string().min(1).max(64).default('#ffffff'), start: z.number().min(0).default(0), duration: z.number().positive().optional(), track_id: z.string().optional() }),
       execute: async (input) => {
         const id = deps.newId();

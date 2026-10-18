@@ -6,4 +6,5 @@ only M L C Z (arcs become cubics, circles/rects/lines become paths), since the
 Shape parser reads no arcs. An icon is a Shape path clip with no fill and one
 round-capped stroke, 2/24 of its size, so it restyles like any shape.
 
-Editor: an Icons column in the Add menu with search. Agent: `list_icons`, `add_icon`.
+Editor: an Icons column in the Add menu with search. Agent: `add_icon`, its names in the input enum (no separate list tool: the canvas
+chat prompt carries every editor tool name within a budget).

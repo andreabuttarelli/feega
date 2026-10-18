@@ -12,10 +12,8 @@ function setup() {
 }
 
 describe('icon tools', () => {
-  it('the agent lists the icons and adds one as a shape', async () => {
+  it('the agent adds an icon as a shape', async () => {
     const { session, run } = setup();
-
-    expect((await run('list_icons', {})).icons).toContain('cart');
     const out = await run('add_icon', { name: 'cart', x: 0.2, y: 0.3, size: 0.1, color: '#ff0000', start: 0 });
 
     expect(out.ok).toBe(true);
