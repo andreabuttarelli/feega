@@ -114,7 +114,7 @@
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
-  import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
+  import BarSlot from '$lib/components/brand-agent/BarSlot.svelte';
   import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
@@ -1482,6 +1482,12 @@
     [ChatPlace.Sheet]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)
   };
   const docked = $derived(chatPlace === ChatPlace.Column);
+  const barProperties = {
+    get shown() {
+      return layout.side === Side.Properties;
+    },
+    onshow: (shown: boolean) => relayout({ side: shown ? Side.Properties : Side.Chat })
+  };
   const sideOpen = $derived(layout.chat === Panel.Open || layout.inspector === Panel.Open);
   const chatShown = $derived(docked ? sideOpen && layout.side === Side.Chat : sheet === Sheet.Agent);
   const propsShown = $derived(docked ? sideOpen && layout.side === Side.Properties : layout.inspector === Panel.Open);
@@ -2006,7 +2012,7 @@
       {/if}
     </section>
 
-    <SideColumn place={chatPlace} side={layout.side} onside={(side) => relayout({ side })} widthPx={sideWidth(layout.sidePx, width)} onwidth={(sidePx) => (layout = { ...layout, sidePx })} oncommit={() => relayout({})} busy={agentBusy}>
+    <SideColumn place={chatPlace} widthPx={sideWidth(layout.sidePx, width)} onwidth={(sidePx) => (layout = { ...layout, sidePx })} oncommit={() => relayout({})}>
     {#snippet properties()}
     <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
@@ -2042,7 +2048,7 @@
     {#snippet chat()}
     <aside class="chat" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Chat</span><span class="editing" data-testid="chat-editing">{editingLabel(editingName)}</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
-      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} /><ChatPanel projectId={data.projectId} reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />{/if}
+      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} /><BarSlot reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} properties={docked ? barProperties : undefined} />{/if}
     </aside>
     {/snippet}
     </SideColumn>
