@@ -40,7 +40,7 @@ const ALIGN: Record<StrokeAlign, Aligned> = {
   }
 };
 
-type Painted = Exclude<Fill, FillOf<FillType.Image>>;
+type Painted = FillOf<FillType.Solid | FillType.Linear | FillType.Radial>;
 
 const look = (s: Stroke) => `${opacityAttr(s.paint)}`;
 const blended = (s: Stroke) => blendStyle(s.paint);

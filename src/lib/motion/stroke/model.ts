@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { FillType, fillSchema } from '../fill/model';
+import { FillType, PAINTED_AS, PaintedAs, fillSchema } from '../fill/model';
 import { CAPS, JOINS, ShapeKind } from '../shape/schema';
 
 export enum StrokeAlign {
@@ -20,7 +20,7 @@ const DEFAULT_ANGLE = 90;
 const width = z.number().min(0).max(MAX_STROKE_WIDTH);
 const dashLength = z.number().min(0).max(MAX_DASH).default(0);
 
-export const strokePaintSchema = fillSchema.refine((f) => f.type !== FillType.Image, { message: 'a stroke paints with a colour or a gradient, not an image' });
+export const strokePaintSchema = fillSchema.refine((f) => PAINTED_AS[f.type] === PaintedAs.Svg, { message: 'a stroke paints with a colour, a linear or a radial gradient' });
 
 export const strokeSchema = z.object({
   paint: strokePaintSchema,
