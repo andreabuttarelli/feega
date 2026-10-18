@@ -8,17 +8,18 @@ enum Bar {
   InCanvasBar = 'in-canvas-bar',
   OwnRow = 'own-row'
 }
+const STAGE = 'motion-node-stage';
 enum Open {
-  Stage = 'motion-node-stage',
-  Link = 'open-motion-editor'
+  Click = 'click',
+  Double = 'dblclick'
 }
 const VIEWPORTS = [
-  { name: 'desktop-1440', width: 1440, height: 900, open: Open.Stage, bar: Bar.InCanvasBar },
-  { name: 'desktop-1280', width: 1280, height: 800, open: Open.Stage, bar: Bar.InCanvasBar },
-  { name: 'desktop-1024', width: 1024, height: 768, open: Open.Stage, bar: Bar.InCanvasBar },
-  { name: 'ipad', width: 820, height: 1180, open: Open.Stage, bar: Bar.InCanvasBar },
-  { name: 'ipad-landscape', width: 1180, height: 820, open: Open.Stage, bar: Bar.InCanvasBar },
-  { name: 'iphone', width: 390, height: 844, open: Open.Link, bar: Bar.OwnRow }
+  { name: 'desktop-1440', width: 1440, height: 900, open: Open.Click, bar: Bar.InCanvasBar },
+  { name: 'desktop-1280', width: 1280, height: 800, open: Open.Click, bar: Bar.InCanvasBar },
+  { name: 'desktop-1024', width: 1024, height: 768, open: Open.Click, bar: Bar.InCanvasBar },
+  { name: 'ipad', width: 820, height: 1180, open: Open.Click, bar: Bar.InCanvasBar },
+  { name: 'ipad-landscape', width: 1180, height: 820, open: Open.Click, bar: Bar.InCanvasBar },
+  { name: 'iphone', width: 390, height: 844, open: Open.Double, bar: Bar.OwnRow }
 ];
 const STILL_FRAME = 30;
 const SETTLE_MS = 700;
@@ -71,7 +72,7 @@ test.describe('the Design | Motion switch on a frame opened on the canvas @real'
         await admin.from('canvases').update({ name: LONG_CANVAS }).eq('id', session.canvasId);
 
         await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-        await page.locator(`.svelte-flow__node[data-id="${node.id}"]`).getByTestId(viewport.open).click({ position: { x: 10, y: 10 } });
+        await page.locator(`.svelte-flow__node[data-id="${node.id}"]`).getByTestId(STAGE)[viewport.open]({ position: { x: 10, y: 10 } });
         const editor = page.getByTestId('motion-editor');
         await expect(editor).toHaveAttribute('data-mount', 'canvas', { timeout: 15_000 });
         await expect(editor).toHaveAttribute('data-mode', frame.mode);
@@ -108,7 +109,7 @@ test.describe('the Design | Motion switch on a frame opened on the canvas @real'
     expect(error).toBeNull();
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
-    await page.locator(`.svelte-flow__node[data-id="${node.id}"]`).getByTestId(Open.Stage).click({ position: { x: 10, y: 10 } });
+    await page.locator(`.svelte-flow__node[data-id="${node.id}"]`).getByTestId(STAGE).click({ position: { x: 10, y: 10 } });
     await expect(page.getByTestId('editor-stage')).toHaveAttribute('data-shown', 'true', { timeout: 15_000 });
     const modeSwitch = page.getByTestId('edit-mode');
     await modeSwitch.locator('[data-mode="design"]').click();

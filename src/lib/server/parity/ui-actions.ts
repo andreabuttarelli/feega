@@ -66,6 +66,7 @@ export const CANVAS_PAGE_ACTIONS: Record<string, Parity> = {
   moveElement: canvas('move_frame_element'),
   copyElement: canvas('copy_frame_element'),
   frameSize: motion('set_canvas'),
+  exportSelection: canvas('export_selection'),
   createFormats: canvas('create_formats'),
   placeOutput: canvas('place_in_frame'),
   drawElement: canvas('draw_element'),
@@ -170,6 +171,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleInspector]: VIEW,
   [Command.ToggleTimeline]: VIEW,
   [Command.ToggleLayoutGuides]: VIEW,
+  [Command.ToggleOutlines]: VIEW,
   [Command.Help]: VIEW,
   [Command.Precompose]: motion('precompose'),
   [Command.Group]: motion('precompose'),
@@ -275,6 +277,7 @@ export const SELECTION_TOOLBAR: Record<SelectionActionId, Parity> = {
   'use-as-mask': motion('use_as_mask'),
   'release-mask': motion('release_mask'),
   'create-formats': canvas('create_formats'),
+  export: canvas('export_selection'),
   delete: canvas('delete_node')
 };
 

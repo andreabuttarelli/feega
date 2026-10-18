@@ -13,7 +13,7 @@
   import type { ComponentId } from '$lib/motion/components';
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
-  import { Depth, Gesture, drill, levelOf, type Level, type Probe } from '$lib/motion/drill';
+  import { Depth, FramePress, Gesture, Press, drill, levelOf, pressOf, type Level, type Probe } from '$lib/motion/drill';
   import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Bounds, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
@@ -33,6 +33,7 @@
     onhover = () => {},
     ondragout = null,
     onhostdrag = null,
+    onframemove = null,
     onmenu = null,
     edittext = null,
     layoutBounds = []
@@ -53,6 +54,7 @@
     onhover?: (id: string | null) => void;
     ondragout?: ((out: ElementOut, phase: DragPhase) => void) | null;
     onhostdrag?: HostDrag | null;
+    onframemove?: HostDrag | null;
     onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
     edittext?: ((selector: string, at: { x: number; y: number } | null, oninput: (text: string) => void) => Promise<string | null>) | null;
     layoutBounds?: Bounds[];
@@ -75,7 +77,9 @@
   };
 
   const chrome = $derived(clipChrome(part));
-  type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; start: ClientPt; pointer: number };
+  type Grab = { grip: Grip; handle: number; clipId: string; from: Pt; start: ClientPt; pointer: number; whole: boolean; travelled: boolean };
+  const FRAME_SLOP_PX = 4;
+  const framePress = $derived(onframemove ? FramePress.Move : FramePress.Pick);
   type ClientPt = { x: number; y: number };
 
   let host = $state<HTMLDivElement | null>(null);
@@ -347,11 +351,14 @@
     }
     const asked = asking ? ask() : null;
     asking = false;
-    if (asked && (!selection.length || asked.gesture === Gesture.Double)) {
+    const framePicked = pressOf(Depth.Frame, framePress) === Press.MoveFrame;
+    const selectsFrame = framePicked && asked?.gesture === Gesture.Click;
+    if (asked && !selectsFrame && (!selection.length || asked.gesture === Gesture.Double)) {
       drillAsked(asked);
       return;
     }
-    if (!pendingPick) {
+    if (!pendingPick || framePicked) {
+      pendingPick = null;
       return;
     }
     const at = pendingPick;
@@ -389,7 +396,7 @@
       return;
     }
     host!.setPointerCapture(e.pointerId);
-    grab = { grip, handle, clipId, from: local(e), start: client(e), pointer: e.pointerId };
+    grab = { grip, handle, clipId, from: local(e), start: client(e), pointer: e.pointerId, whole: false, travelled: false };
   }
 
   let lastPress: Pt | null = null;
@@ -399,6 +406,11 @@
     const p = local(e);
     const from = level();
     froms = [froms.at(-1) ?? from, from];
+    if (pressOf(from.depth, framePress) === Press.MoveFrame) {
+      host!.setPointerCapture(e.pointerId);
+      grab = { grip: Grip.Move, handle: 0, clipId: '', from: p, start: client(e), pointer: e.pointerId, whole: true, travelled: false };
+      return;
+    }
     const mode = pickModeAt(lastPress, p, e.altKey ? Modifier.Alt : Modifier.None);
     lastPress = p;
     const gesture = e.metaKey || e.ctrlKey ? Gesture.Deep : Gesture.Click;
@@ -440,7 +452,7 @@
     }
     const hosted = hostGesture(grab, e);
     if (hosted) {
-      onhostdrag!(hosted.move, hosted.to, DragPhase.Over);
+      hosted.send(hosted.move, hosted.to, DragPhase.Over);
       return;
     }
     const outside = leaving(e);
@@ -470,17 +482,22 @@
   const HOST_GRIPS = new Set<Grip>([Grip.Move, Grip.Scale, Grip.Rotate]);
   const STILL = { dx: 0, dy: 0, dw: 0, dh: 0 };
 
-  function hostGesture(g: Grab | null, e: PointerEvent | null): { move: HostMove; to: ClientPt } | null {
-    if (!onhostdrag || !g || !HOST_GRIPS.has(g.grip)) {
+  function hostGesture(g: Grab | null, e: PointerEvent | null): { move: HostMove; to: ClientPt; send: HostDrag } | null {
+    const send = g?.whole ? onframemove : onhostdrag;
+    if (!send || !g || !HOST_GRIPS.has(g.grip)) {
       return null;
     }
     const to = e ? client(e) : g.start;
+    g.travelled ||= Math.hypot(to.x - g.start.x, to.y - g.start.y) >= FRAME_SLOP_PX;
+    if (g.whole && !g.travelled) {
+      return null;
+    }
     if (g.grip === Grip.Rotate) {
       const rect = host!.getBoundingClientRect();
-      return { move: { ...STILL, turn: hostTurn({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, g.start, to) }, to };
+      return { move: { ...STILL, turn: hostTurn({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, g.start, to) }, to, send };
     }
     const unit = g.grip === Grip.Scale && quad ? handlesOf(quad)[g.handle].unit : null;
-    return { move: { ...hostShift(unit, g.start, to), turn: 0 }, to };
+    return { move: { ...hostShift(unit, g.start, to), turn: 0 }, to, send };
   }
 
   function end(e: PointerEvent | null) {
@@ -494,7 +511,7 @@
     live = null;
     onpreview(null);
     if (hosting) {
-      onhostdrag!(hosting.move, hosting.to, DragPhase.Drop);
+      hosting.send(hosting.move, hosting.to, DragPhase.Drop);
       return;
     }
     if (outside) {
