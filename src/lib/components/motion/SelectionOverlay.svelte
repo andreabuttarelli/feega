@@ -14,7 +14,7 @@
   import type { Transform } from '$lib/motion/keyframes';
   import { CLIP_TEXT, PART_ACTIONS, PART_ACTION_LOOK, PART_SEP, PartAction, PartEdit, editablePart, partAt, partBoxes, partKind, partText, runPart, writePartText } from '$lib/motion/poster-parts';
   import { Depth, Gesture, drill, levelOf, type Level, type Probe } from '$lib/motion/drill';
-  import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
+  import { Grip, Modifier, aabb, pickModeAt, anchorOf, dragPatch, handlesOf, pick, quadOf, readout, remeasured, spacing, stackAt, writePatch, type Bounds, type Boxes, type Gap, type Guide, type Pt, type Quad } from '$lib/motion/scene-select';
 
   let {
     doc,
@@ -34,7 +34,8 @@
     ondragout = null,
     onhostdrag = null,
     onmenu = null,
-    edittext = null
+    edittext = null,
+    layoutBounds = []
   }: {
     doc: MotionDoc;
     frame: number;
@@ -54,6 +55,7 @@
     onhostdrag?: HostDrag | null;
     onmenu?: ((menu: { client: Pt; layers: string[] }) => void) | null;
     edittext?: ((selector: string, at: { x: number; y: number } | null, oninput: (text: string) => void) => Promise<string | null>) | null;
+    layoutBounds?: Bounds[];
   } = $props();
 
   const shared = selectionView()!;
@@ -455,7 +457,7 @@
     if (!box) {
       return;
     }
-    const { patch, guides } = dragPatch({ doc: laid, clipId: grab.clipId, frame, box, grip: grab.grip, handle: grab.handle, from: grab.from, to: local(e), shift: e.shiftKey, snapTargets: others(grab.clipId), snapPx: snapReach() });
+    const { patch, guides } = dragPatch({ doc: laid, clipId: grab.clipId, frame, box, grip: grab.grip, handle: grab.handle, from: grab.from, to: local(e), shift: e.shiftKey, snapTargets: [...others(grab.clipId), ...layoutBounds], snapPx: snapReach() });
     const result = writePatch(doc, grab.clipId, frame, patch);
     if (!result.ok) {
       return;
