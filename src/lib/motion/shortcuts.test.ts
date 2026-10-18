@@ -207,6 +207,13 @@ describe('mask keys', () => {
   });
 });
 
+describe('scale tool key', () => {
+  it('K is the scale tool in Design and still pauses in Motion', () => {
+    expect(commandFor({ key: 'k', code: 'KeyK', mod: false, shift: false }, EditMode.Design)).toBe(Command.ToolScale);
+    expect(commandFor({ key: 'k', code: 'KeyK', mod: false, shift: false }, EditMode.Motion)).toBe(Command.Pause);
+  });
+});
+
 describe('select matching key', () => {
   it('⌥⌘A selects every layer like the selected ones', () => {
     expect(press('å', { mod: true, alt: true, code: 'KeyA' })).toBe(Command.SelectMatching);
