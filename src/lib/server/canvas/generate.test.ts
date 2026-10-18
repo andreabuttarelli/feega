@@ -1027,9 +1027,7 @@ function statefulNodesDb(initial: { id: string; orgId: string; data: Record<stri
               eq: () => ({
                 is: () => ({
                   maybeSingle: async () => ({ data: nodeRow(), error: null }),
-                  // `upstreamInputsFor` chiama `listNodes`, che finisce con `.order(...)` e si
-                  // aspetta un array — questo nodo, senza archi in ingresso in questo scenario.
-                  order: () => Promise.resolve({ data: [nodeRow()], error: null })
+                  order: () => ({ order: () => Promise.resolve({ data: [nodeRow()], error: null }) })
                 })
               })
             })
