@@ -289,7 +289,7 @@
   export async function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast, prefer: RenderEngine = engine): Promise<void> {
     const { settle, lanes } = CAPTURE_PROFILES[profile];
     exportedOn = RenderEngine.Gpu;
-    if (prefer === RenderEngine.Gpu && gpuCompose && source === html && size.width === width && size.height === height && (await renderOnGpu(gpuCompose, times, onFrame, signal, lanes()))) {
+    if (prefer === RenderEngine.Gpu && gpuCompose && source === html && size.width === width && size.height === height && width % 2 === 0 && height % 2 === 0 && (await renderOnGpu(gpuCompose, times, onFrame, signal, lanes()))) {
       return;
     }
     exportedOn = RenderEngine.Html;

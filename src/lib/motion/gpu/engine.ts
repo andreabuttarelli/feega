@@ -9,6 +9,7 @@ import { createRenderer, SlotKind, type Slot } from './renderer';
 import { gpuEligible, runHtml, runsOf, type Run } from './runs';
 import { lanesWithin, webglPerLane } from '../export/webgl-budget';
 import { shootInLanes } from '../export/lanes';
+import { withDeadline } from '../export/deadline';
 import { compileScene, frameAt, visibleAt, type Drawn, type Scene } from './scene';
 import { createPainter } from './textures';
 import { layoutText } from './text-layout';
@@ -29,6 +30,7 @@ export class GpuIneligible extends Error {
 }
 
 const CAPTURE_WAIT_MS = 600_000;
+const FRAME_DEADLINE_MS = 60_000;
 
 type RunState = { run: Run; html: string; player: Promise<CapturePlayer> | null; texture: Texture | null; at: number; busy: Promise<void> | null };
 
@@ -147,25 +149,26 @@ export async function gpuEngine(compose: Compose, host: HTMLElement, preference:
       );
       return new Map(shots);
     };
+    const drawFrame = async (shots: Map<number, ImageBitmap>, index: number) => {
+      const t = times[index];
+      states.forEach((state, r) => {
+        const bitmap = shots.get(r);
+        if (bitmap) {
+          state.texture?.destroy(true);
+          state.texture = Texture.from(bitmap);
+          state.at = t;
+        }
+      });
+      const items = frameAt(scene, t);
+      await painter.prepare(items, t);
+      renderer.draw(slotsOf(items));
+      await onFrame(await createImageBitmap(renderer.canvas), index);
+    };
     try {
       await shootInLanes(
         times,
         players.map((_, lane) => shooter(lane)),
-        async (shots, index) => {
-          const t = times[index];
-          states.forEach((state, r) => {
-            const bitmap = shots.get(r);
-            if (bitmap) {
-              state.texture?.destroy(true);
-              state.texture = Texture.from(bitmap);
-              state.at = t;
-            }
-          });
-          const items = frameAt(scene, t);
-          await painter.prepare(items, t);
-          renderer.draw(slotsOf(items));
-          await onFrame(await createImageBitmap(renderer.canvas), index);
-        },
+        (shots, index) => withDeadline(drawFrame(shots, index), FRAME_DEADLINE_MS, `GPU frame ${index}`),
         signal
       );
     } finally {
