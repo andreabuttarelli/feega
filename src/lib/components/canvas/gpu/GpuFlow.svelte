@@ -177,7 +177,9 @@
   const domIds = $derived.by(() => {
     const now = [...editIds, ...sticky.keys(), ...shelf, ...domPainted(placed, (id) => summaries.get(id)?.data ?? {}, view, area)];
     for (const id of now) {
-      kept.add(id);
+      if (byId.get(id)?.kind !== 'motion') {
+        kept.add(id);
+      }
     }
     const alive = new Set(placed.map((t) => t.id));
     for (const id of [...kept]) {
@@ -185,7 +187,8 @@
         kept.delete(id);
       }
     }
-    return sameSet(lastDom, kept) ? lastDom : (lastDom = new Set(kept));
+    const next = new Set([...kept, ...now]);
+    return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
   const sameSet = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));

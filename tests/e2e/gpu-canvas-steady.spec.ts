@@ -63,12 +63,12 @@ async function probe(page: Page, run: () => Promise<void>): Promise<Probe> {
   const after = await page.evaluate(() => ({ ...((window as unknown as { __gpuCanvas?: { counts?: Record<string, number> } }).__gpuCanvas?.counts ?? {}) }));
   const remounts = await page.evaluate(() => (window as unknown as { __steady: { remounts: number } }).__steady.remounts);
   const counts = Object.fromEntries(Object.keys(after).map((k) => [k, (after[k] ?? 0) - (before[k] ?? 0)]).filter(([, v]) => v));
-  return { remounts, requests: requests.filter((u) => !/posthog|supabase\.co\/realtime|__data|_app\/immutable|@vite|node_modules/.test(u)), counts, blankFrames: 0 };
+  return { remounts, requests: requests.filter((u) => !/posthog|fonts\.g|supabase\.co\/realtime|__data|_app\/immutable|@vite|node_modules/.test(u)), counts, blankFrames: 0 };
 }
 
 async function pan(page: Page, ms: number) {
   const pane = (await page.locator('[data-canvas-surface]').boundingBox())!;
-  await page.mouse.move(pane.x + 20, pane.y + pane.height - 20);
+  await page.mouse.move(pane.x + pane.width / 2, pane.y + pane.height * 0.75);
   const until = Date.now() + ms;
   for (let i = 0; Date.now() < until; i++) {
     await page.mouse.wheel(Math.sin(i / 6) * 30, Math.cos(i / 9) * 20);
@@ -89,11 +89,29 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
     await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(8000);
 
+    const viewBefore = await page.locator('[data-canvas-surface]').getAttribute('data-view');
     const result = await probe(page, () => pan(page, PAN_MS));
+    expect(await page.locator('[data-canvas-surface]').getAttribute('data-view'), 'the pan moved the camera').not.toBe(viewBefore);
     console.log(`[steady] ${JSON.stringify(result)}`);
     expect(result.counts, 'no GPU card rebuilt, no texture fetched or uploaded').toEqual({});
     expect(result.remounts, 'no DOM tile, player or iframe mounted or unmounted').toBe(0);
     expect(result.requests, 'no network request at all while panning').toEqual([]);
+
+    const away = await probe(page, async () => {
+      const pane = (await page.locator('[data-canvas-surface]').boundingBox())!;
+      await page.mouse.move(pane.x + pane.width / 2, pane.y + pane.height * 0.75);
+      for (let i = 0; i < 40; i++) {
+        await page.mouse.wheel(-120, 0);
+      }
+      await page.waitForTimeout(500);
+      for (let i = 0; i < 40; i++) {
+        await page.mouse.wheel(120, 0);
+      }
+      await page.waitForTimeout(1500);
+    });
+    console.log(`[steady-away] ${JSON.stringify(away)}`);
+    expect(away.remounts, 'frames leaving and re-entering the view are not remounted').toBe(0);
+    expect(away.requests, 'nor fetched again').toEqual([]);
   });
 
   test('a free box and a free text drag, resize and keep their place after a reload', async ({ page, session, admin, seedNode }) => {
@@ -134,5 +152,39 @@ test.describe('the GPU canvas holds still while the camera moves @real', () => {
     await expect.poll(async () => (await rowOf()).x).toBe(settled.x);
     const shown = (await page.locator(`.svelte-flow__node[data-id="${box.id}"]`).getAttribute('data-box'))!.split(',').map(Number);
     expect(shown[0], 'no revert after reload').toBe(settled.x);
+  });
+
+  test('a wire ends on its ports at every zoom', async ({ page, session, admin, seedNode }) => {
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    const text = await seedNode({ type: 'text', x: 0, y: 0, data: { prompt: 'a' } });
+    const image = await seedNode({ type: 'image', x: 700, y: 120, data: { prompt: 'b' } });
+    expect((await admin.from('nodes_connections').insert({ org_id: session.orgId, canvas_id: session.canvasId, source_node_id: text.id, target_node_id: image.id, target_handle: 'text', actor_kind: 'user', actor_id: session.userId })).error).toBeNull();
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await expect(page.getByTestId('gpu-canvas')).toBeVisible({ timeout: 30_000 });
+    const pane = (await page.locator('[data-canvas-surface]').boundingBox())!;
+    const zoomOf = async () => Number(((await page.locator('[data-canvas-surface]').getAttribute('data-view')) ?? '0,0,1').split(',')[2]);
+    for (const target of [0.2, 1, 2]) {
+      await page.mouse.move(pane.x + pane.width / 2, pane.y + pane.height / 2);
+      await page.keyboard.down('Control');
+      for (let i = 0; i < 200 && Math.abs((await zoomOf()) - target) / target > 0.05; i++) {
+        await page.mouse.wheel(0, (await zoomOf()) < target ? -10 : 10);
+      }
+      await page.keyboard.up('Control');
+      const gap = await page.evaluate(([from, to]) => {
+        const path = document.querySelector<SVGPathElement>('.gpu-edges path')!;
+        const m = path.getScreenCTM()!;
+        const end = (t: number) => {
+          const p = path.getPointAtLength(t * path.getTotalLength());
+          return new DOMPoint(p.x, p.y).matrixTransform(m);
+        };
+        const port = (sel: string) => document.querySelector(sel)!.getBoundingClientRect();
+        const out = port(`.svelte-flow__node[data-id="${from}"] .typed-port.port-out`);
+        const inn = port(`.svelte-flow__node[data-id="${to}"] .typed-port.port-in`);
+        const a = end(0);
+        const b = end(1);
+        return [Math.hypot(a.x - out.right, a.y - (out.top + out.height / 2)), Math.hypot(b.x - inn.left, b.y - (inn.top + inn.height / 2))];
+      }, [text.id, image.id] as const);
+      expect(Math.max(...gap), `wire ends within 2 px of its ports at zoom ${target}`).toBeLessThanOrEqual(2);
+    }
   });
 });

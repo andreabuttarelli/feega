@@ -107,6 +107,9 @@ async function nodeCentre(page: Page, renderer: string): Promise<{ x: number; y:
 }
 
 async function heap(page: Page) {
+  if (page.context().browser()?.browserType().name() !== 'chromium') {
+    return { heapMb: 0, domNodes: await page.evaluate(() => document.getElementsByTagName('*').length) };
+  }
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable');
   const { metrics } = await cdp.send('Performance.getMetrics');
