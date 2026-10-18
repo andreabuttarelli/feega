@@ -10,5 +10,5 @@ same `onMove`/`onMoveEnd` as any drag (save queue, one undo). Guides draw in `Me
 (canvas units), so the GPU renderer mounts the same layer with the same `snapDrag` result.
 
 Not here: equal-spacing guides between three tiles (frame overlay has them; canvas next).
-`tests/e2e/canvas-figma-arrange.spec.ts` (@real, test account) walks right-click align, ⌃⌥T
+`tests/e2e/canvas-arrange.spec.ts` (@real, test account) walks right-click align, ⌃⌥T
 tidy and a drag that snaps and shows a guide.
