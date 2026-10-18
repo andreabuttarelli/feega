@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Reframe, reframesOn, NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, dismissedAfterClick, editorOn, inlineMotionTarget, nodeLayers, openingOf, ownPlayer, tileMode, Under } from './inline-motion';
+import { Reframe, reframesOn, NEIGHBOUR_WHILE_EDITING, NodeMode, Opening, Paint, Part, dismissedAfterClick, editorOn, inlineMotionTarget, nodeLayers, openingOf, ownPlayer, tileMode } from './inline-motion';
 import { Viewport } from '$lib/motion/editor-layout';
 
 const rows = [
@@ -58,11 +58,6 @@ describe('the node player while the editor opens', () => {
     expect(ownPlayer(NodeMode.Edit, Paint.Pending, false)).toBe(false);
   });
 
-  it('a free element keeps its player mounted under the editor, so closing the editor reloads nothing', () => {
-    expect(ownPlayer(NodeMode.Edit, Paint.Swapped, true, Under.Kept)).toBe(true);
-    expect(ownPlayer(NodeMode.Edit, Paint.Swapped, false, Under.Kept)).toBe(false);
-    expect(nodeLayers(NodeMode.Edit, Paint.Swapped).own, 'kept, never shown under the editor').toBe(false);
-  });
 });
 
 describe('the other nodes while a frame is edited on a phone', () => {

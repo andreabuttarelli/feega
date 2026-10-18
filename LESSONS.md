@@ -3092,3 +3092,9 @@ Signal: Export image fails with "not available here" or "Waiting failed: 20000ms
 
 ### A canvas 500s only once it holds a group (DOM renderer)
 Signal: `?renderer=dom` answers 500 on a canvas that has a group; the same page without groups loads; `handleError` (logged locally) says `Cannot access X before initialization` inside `CanvasFlow.svelte`. Cause: a component-scope `const` declared below the function that the first render already calls, so only data that reaches that branch hits the TDZ. Move: declare the constant above its first use; `canvas-dom-group-ssr.spec.ts` guards it.
+
+### Play jumps to the start and never gets past frame 1
+Signal: Space or Play moves the playhead to a fixed frame, and the timecode flips between it and the next frame; the player is not paused. Cause: the doc has a `workArea` one frame long (an out point set at frame 0), and playback loops inside it. Move: read `workArea` in the doc before suspecting the player, the GPU engine or the interactive runtime.
+
+### Every e2e spec fails at collection with "needs an import attribute of type: json"
+Signal: `npx playwright test` lists 0 tests; the error names a `.json` under `src/lib`. Cause: a spec imports an app module (`frame-custom-size.spec.ts` → `timeline`/`editor-mount` → `still.ts`), and a new import in that chain reaches a module that imports JSON without `with { type: 'json' }`, which Playwright's Node loader rejects. Move: keep modules that e2e specs import free of JSON-importing dependencies; check with `npx playwright test --list` before pushing.

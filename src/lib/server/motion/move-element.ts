@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Background, formatOf, type MotionDoc } from '$lib/motion/doc';
+import { Background, formatOf, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
 import type { Db } from '$lib/server/db/client';
 import { createNode, deleteConnection, deleteNode, findNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { findAsset } from '$lib/server/repos/assets';
@@ -533,10 +533,10 @@ export async function drawElement(store: FrameStore, place: Place & { id?: strin
   return { outcome: MoveOutcome.Done, frameId, clipId, created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
 }
 
-export async function drawFrameAt(store: FrameStore, place: Place & { id?: string }, box: CanvasBox): Promise<Extract<Moved, { outcome: MoveOutcome.Done }>> {
+export async function drawFrameAt(store: FrameStore, place: Place & { id?: string }, box: CanvasBox, format?: MotionFormat): Promise<Extract<Moved, { outcome: MoveOutcome.Done }>> {
   const shaped = drawnFrameNodeOf(box);
   const at = { x: box.left, y: box.top };
-  const frameId = await store.create({ ...place, ...at }, drawnFrame(box), { data: shaped.data, width: shaped.w, height: shaped.h });
+  const frameId = await store.create({ ...place, ...at }, drawnFrame(box, format), { data: shaped.data, width: shaped.w, height: shaped.h });
   return { outcome: MoveOutcome.Done, frameId, clipId: '', created: true, versions: { [frameId]: 1 }, undo: [created(frameId, at)] };
 }
 

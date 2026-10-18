@@ -1,0 +1,1233 @@
+{
+  "version": 5,
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "durationInFrames": 360,
+  "tracks": [
+    {
+      "id": "t3",
+      "kind": "visual",
+      "name": "Scroll story",
+      "clips": [
+        {
+          "trimStart": 0,
+          "transitionIn": {
+            "kind": "none",
+            "durationInFrames": 0
+          },
+          "transitionOut": {
+            "kind": "none",
+            "durationInFrames": 0
+          },
+          "transform": {},
+          "keyframes": {},
+          "mask": null,
+          "maskStack": [],
+          "matte": "none",
+          "depth": 0,
+          "space": "world",
+          "parent": null,
+          "parentOpacity": "inherit",
+          "expressions": {},
+          "effects": [],
+          "shaders": [],
+          "blend": "normal",
+          "animators": [],
+          "textPath": null,
+          "motionBlur": true,
+          "path": null,
+          "id": "t4",
+          "from": 0,
+          "durationInFrames": 360,
+          "component": "Precomp",
+          "props": {
+            "comp": "t2",
+            "loop": false,
+            "hold": false
+          }
+        }
+      ]
+    },
+    {
+      "id": "v1",
+      "kind": "visual",
+      "name": "Video 1",
+      "clips": []
+    },
+    {
+      "id": "a1",
+      "kind": "audio",
+      "name": "Audio 1",
+      "clips": []
+    }
+  ],
+  "comps": {
+    "t2": {
+      "template": {
+        "id": "builtin:scroll-story",
+        "name": "Scroll story",
+        "keys": {
+          "headline1": "headline1",
+          "kicker1": "kicker1",
+          "image1": "image1",
+          "headline2": "headline2",
+          "kicker2": "kicker2",
+          "image2": "image2",
+          "headline3": "headline3",
+          "kicker3": "kicker3",
+          "image3": "image3",
+          "font": "font",
+          "font_size": "font_size",
+          "font_weight": "font_weight",
+          "tracking": "tracking",
+          "background": "background",
+          "text_color": "text_color",
+          "label_color": "label_color",
+          "line_color": "line_color",
+          "line_opacity": "line_opacity",
+          "show_labels": "show_labels",
+          "columns": "columns",
+          "rows": "rows",
+          "image_size": "image_size",
+          "image_ratio": "image_ratio",
+          "lane1": "lane1",
+          "lane2": "lane2",
+          "lane3": "lane3",
+          "speed1": "speed1",
+          "speed2": "speed2",
+          "speed3": "speed3",
+          "parallax": "parallax",
+          "swap_style": "swap_style",
+          "swap_duration": "swap_duration",
+          "swap_stagger": "swap_stagger",
+          "hold_seconds": "hold_seconds",
+          "move_seconds": "move_seconds",
+          "easing": "easing",
+          "idle_drift": "idle_drift"
+        },
+        "keyFields": [
+          "headline1",
+          "image1",
+          "headline2",
+          "image2",
+          "headline3"
+        ]
+      },
+      "name": "Scroll story",
+      "durationInFrames": 360,
+      "tracks": [
+        {
+          "id": "t1-v1",
+          "kind": "visual",
+          "name": "Video 1",
+          "clips": [
+            {
+              "trimStart": 0,
+              "transitionIn": {
+                "kind": "none",
+                "durationInFrames": 0
+              },
+              "transitionOut": {
+                "kind": "none",
+                "durationInFrames": 0
+              },
+              "transform": {},
+              "keyframes": {},
+              "mask": null,
+              "maskStack": [],
+              "matte": "none",
+              "depth": 0,
+              "space": "world",
+              "parent": null,
+              "parentOpacity": "inherit",
+              "expressions": {},
+              "effects": [],
+              "shaders": [],
+              "blend": "normal",
+              "animators": [],
+              "textPath": null,
+              "motionBlur": true,
+              "path": null,
+              "id": "t1-story",
+              "from": 0,
+              "durationInFrames": 360,
+              "component": "Custom",
+              "props": {
+                "name": "ScrollStory",
+                "headline1": "start with\nthe land",
+                "kicker1": "origin",
+                "image1": "https://picsum.photos/id/1015/1200/1500",
+                "headline2": "follow the\nlight in",
+                "kicker2": "process",
+                "image2": "https://picsum.photos/id/1039/1200/1500",
+                "headline3": "and keep\ngoing",
+                "kicker3": "arrival",
+                "image3": "https://picsum.photos/id/1043/1200/1500",
+                "font": "Inter Tight",
+                "fontSize": 9,
+                "fontWeight": 600,
+                "tracking": -0.05,
+                "background": "#000000",
+                "textColor": "#ffffff",
+                "labelColor": "#8a8a8a",
+                "lineColor": "#ffffff",
+                "lineOpacity": 0.14,
+                "showLabels": true,
+                "columns": 12,
+                "rows": 8,
+                "imageSize": 0.42,
+                "imageRatio": 1.25,
+                "lane1": 0,
+                "lane2": 9,
+                "lane3": 1,
+                "speed1": 1,
+                "speed2": 1.4,
+                "speed3": 1.2,
+                "parallax": 0.06,
+                "swapStyle": "mask-up",
+                "swapDuration": 0.9,
+                "swapStagger": 0.12,
+                "holdSeconds": 1.2,
+                "moveSeconds": 4.2,
+                "easing": "expo",
+                "idleDrift": 0,
+                "varPrefix": "story"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "assets": [],
+  "camera": null,
+  "look": null,
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wght",
+          100,
+          900
+        ]
+      ]
+    },
+    {
+      "family": "Inter",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "opsz",
+          14,
+          32
+        ],
+        [
+          "wght",
+          100,
+          900
+        ]
+      ]
+    },
+    {
+      "family": "Geist",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wght",
+          100,
+          900
+        ]
+      ]
+    },
+    {
+      "family": "Instrument Sans",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        400,
+        500,
+        600,
+        700
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wdth",
+          75,
+          100
+        ],
+        [
+          "wght",
+          400,
+          700
+        ]
+      ]
+    },
+    {
+      "family": "Manrope",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800
+      ],
+      "italic": false,
+      "axes": [
+        [
+          "wght",
+          200,
+          800
+        ]
+      ]
+    },
+    {
+      "family": "Space Grotesk",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        300,
+        400,
+        500,
+        600,
+        700
+      ],
+      "italic": false,
+      "axes": [
+        [
+          "wght",
+          300,
+          700
+        ]
+      ]
+    },
+    {
+      "family": "DM Sans",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900,
+        1000
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "opsz",
+          9,
+          40
+        ],
+        [
+          "wght",
+          100,
+          1000
+        ]
+      ]
+    },
+    {
+      "family": "Instrument Serif",
+      "source": "google",
+      "category": "serif",
+      "weights": [
+        400
+      ],
+      "italic": true,
+      "axes": []
+    }
+  ],
+  "background": "brand",
+  "motionBlur": {
+    "enabled": false,
+    "shutterAngle": 180,
+    "shutterPhase": -90,
+    "samples": 8
+  },
+  "fields": [
+    {
+      "key": "headline1",
+      "label": "Chapter 1 headline (one line per row)",
+      "clipId": "t1-story",
+      "prop": "headline1",
+      "group": "Text",
+      "type": "text",
+      "default": "start with\nthe land"
+    },
+    {
+      "key": "kicker1",
+      "label": "Chapter 1 label",
+      "clipId": "t1-story",
+      "prop": "kicker1",
+      "group": "Text",
+      "type": "text",
+      "default": "origin"
+    },
+    {
+      "key": "image1",
+      "label": "Chapter 1 image",
+      "clipId": "t1-story",
+      "prop": "image1",
+      "group": "Media",
+      "type": "asset",
+      "default": "https://picsum.photos/id/1015/1200/1500"
+    },
+    {
+      "key": "headline2",
+      "label": "Chapter 2 headline (one line per row)",
+      "clipId": "t1-story",
+      "prop": "headline2",
+      "group": "Text",
+      "type": "text",
+      "default": "follow the\nlight in"
+    },
+    {
+      "key": "kicker2",
+      "label": "Chapter 2 label",
+      "clipId": "t1-story",
+      "prop": "kicker2",
+      "group": "Text",
+      "type": "text",
+      "default": "process"
+    },
+    {
+      "key": "image2",
+      "label": "Chapter 2 image",
+      "clipId": "t1-story",
+      "prop": "image2",
+      "group": "Media",
+      "type": "asset",
+      "default": "https://picsum.photos/id/1039/1200/1500"
+    },
+    {
+      "key": "headline3",
+      "label": "Chapter 3 headline (one line per row)",
+      "clipId": "t1-story",
+      "prop": "headline3",
+      "group": "Text",
+      "type": "text",
+      "default": "and keep\ngoing"
+    },
+    {
+      "key": "kicker3",
+      "label": "Chapter 3 label",
+      "clipId": "t1-story",
+      "prop": "kicker3",
+      "group": "Text",
+      "type": "text",
+      "default": "arrival"
+    },
+    {
+      "key": "image3",
+      "label": "Chapter 3 image",
+      "clipId": "t1-story",
+      "prop": "image3",
+      "group": "Media",
+      "type": "asset",
+      "default": "https://picsum.photos/id/1043/1200/1500"
+    },
+    {
+      "key": "font",
+      "label": "Font",
+      "clipId": "t1-story",
+      "prop": "font",
+      "group": "Style",
+      "type": "select",
+      "options": [
+        "Inter Tight",
+        "Inter",
+        "Geist",
+        "Instrument Sans",
+        "Manrope",
+        "Space Grotesk",
+        "DM Sans",
+        "Instrument Serif"
+      ],
+      "default": "Inter Tight"
+    },
+    {
+      "key": "font_size",
+      "label": "Headline size (% of the short side)",
+      "clipId": "t1-story",
+      "prop": "fontSize",
+      "group": "Style",
+      "type": "number",
+      "min": 3,
+      "max": 20,
+      "default": 9
+    },
+    {
+      "key": "font_weight",
+      "label": "Headline weight",
+      "clipId": "t1-story",
+      "prop": "fontWeight",
+      "group": "Style",
+      "type": "number",
+      "min": 300,
+      "max": 800,
+      "default": 600
+    },
+    {
+      "key": "tracking",
+      "label": "Headline tracking (em)",
+      "clipId": "t1-story",
+      "prop": "tracking",
+      "group": "Style",
+      "type": "number",
+      "min": -0.08,
+      "max": 0.05,
+      "default": -0.05
+    },
+    {
+      "key": "background",
+      "label": "Background",
+      "clipId": "t1-story",
+      "prop": "background",
+      "group": "Style",
+      "type": "color",
+      "default": "#000000"
+    },
+    {
+      "key": "text_color",
+      "label": "Headline colour",
+      "clipId": "t1-story",
+      "prop": "textColor",
+      "group": "Style",
+      "type": "color",
+      "default": "#ffffff"
+    },
+    {
+      "key": "label_color",
+      "label": "Label colour",
+      "clipId": "t1-story",
+      "prop": "labelColor",
+      "group": "Style",
+      "type": "color",
+      "default": "#8a8a8a"
+    },
+    {
+      "key": "line_color",
+      "label": "Grid line colour",
+      "clipId": "t1-story",
+      "prop": "lineColor",
+      "group": "Grid",
+      "type": "color",
+      "default": "#ffffff"
+    },
+    {
+      "key": "line_opacity",
+      "label": "Grid line opacity",
+      "clipId": "t1-story",
+      "prop": "lineOpacity",
+      "group": "Grid",
+      "type": "number",
+      "min": 0,
+      "max": 1,
+      "default": 0.14
+    },
+    {
+      "key": "show_labels",
+      "label": "Show labels and progress",
+      "clipId": "t1-story",
+      "prop": "showLabels",
+      "group": "Grid",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "key": "columns",
+      "label": "Grid columns",
+      "clipId": "t1-story",
+      "prop": "columns",
+      "group": "Grid",
+      "type": "number",
+      "min": 2,
+      "max": 24,
+      "default": 12
+    },
+    {
+      "key": "rows",
+      "label": "Grid rows",
+      "clipId": "t1-story",
+      "prop": "rows",
+      "group": "Grid",
+      "type": "number",
+      "min": 2,
+      "max": 24,
+      "default": 8
+    },
+    {
+      "key": "image_size",
+      "label": "Image width (share of the short side)",
+      "clipId": "t1-story",
+      "prop": "imageSize",
+      "group": "Media",
+      "type": "number",
+      "min": 0.15,
+      "max": 0.8,
+      "default": 0.42
+    },
+    {
+      "key": "image_ratio",
+      "label": "Image height / width",
+      "clipId": "t1-story",
+      "prop": "imageRatio",
+      "group": "Media",
+      "type": "number",
+      "min": 0.5,
+      "max": 2,
+      "default": 1.25
+    },
+    {
+      "key": "lane1",
+      "label": "Chapter 1 image column",
+      "clipId": "t1-story",
+      "prop": "lane1",
+      "group": "Media",
+      "type": "number",
+      "min": 0,
+      "max": 24,
+      "default": 0
+    },
+    {
+      "key": "lane2",
+      "label": "Chapter 2 image column",
+      "clipId": "t1-story",
+      "prop": "lane2",
+      "group": "Media",
+      "type": "number",
+      "min": 0,
+      "max": 24,
+      "default": 9
+    },
+    {
+      "key": "lane3",
+      "label": "Chapter 3 image column",
+      "clipId": "t1-story",
+      "prop": "lane3",
+      "group": "Media",
+      "type": "number",
+      "min": 0,
+      "max": 24,
+      "default": 1
+    },
+    {
+      "key": "speed1",
+      "label": "Chapter 1 image speed",
+      "clipId": "t1-story",
+      "prop": "speed1",
+      "group": "Media",
+      "type": "number",
+      "min": 1,
+      "max": 3,
+      "default": 1
+    },
+    {
+      "key": "speed2",
+      "label": "Chapter 2 image speed",
+      "clipId": "t1-story",
+      "prop": "speed2",
+      "group": "Media",
+      "type": "number",
+      "min": 1,
+      "max": 3,
+      "default": 1.4
+    },
+    {
+      "key": "speed3",
+      "label": "Chapter 3 image speed",
+      "clipId": "t1-story",
+      "prop": "speed3",
+      "group": "Media",
+      "type": "number",
+      "min": 1,
+      "max": 3,
+      "default": 1.2
+    },
+    {
+      "key": "parallax",
+      "label": "Inner image parallax",
+      "clipId": "t1-story",
+      "prop": "parallax",
+      "group": "Media",
+      "type": "number",
+      "min": 0,
+      "max": 0.2,
+      "default": 0.06
+    },
+    {
+      "key": "swap_style",
+      "label": "Headline swap",
+      "clipId": "t1-story",
+      "prop": "swapStyle",
+      "group": "Motion",
+      "type": "select",
+      "options": [
+        "mask-up",
+        "mask-down",
+        "fade"
+      ],
+      "default": "mask-up"
+    },
+    {
+      "key": "swap_duration",
+      "label": "Line swap (seconds)",
+      "clipId": "t1-story",
+      "prop": "swapDuration",
+      "group": "Motion",
+      "type": "number",
+      "min": 0.2,
+      "max": 2,
+      "default": 0.9
+    },
+    {
+      "key": "swap_stagger",
+      "label": "Line stagger (seconds)",
+      "clipId": "t1-story",
+      "prop": "swapStagger",
+      "group": "Motion",
+      "type": "number",
+      "min": 0,
+      "max": 0.5,
+      "default": 0.12
+    },
+    {
+      "key": "hold_seconds",
+      "label": "Hold on each chapter (seconds)",
+      "clipId": "t1-story",
+      "prop": "holdSeconds",
+      "group": "Motion",
+      "type": "number",
+      "min": 0.2,
+      "max": 10,
+      "default": 1.2
+    },
+    {
+      "key": "move_seconds",
+      "label": "Move between chapters (seconds)",
+      "clipId": "t1-story",
+      "prop": "moveSeconds",
+      "group": "Motion",
+      "type": "number",
+      "min": 0.4,
+      "max": 10,
+      "default": 4.2
+    },
+    {
+      "key": "easing",
+      "label": "Move easing",
+      "clipId": "t1-story",
+      "prop": "easing",
+      "group": "Motion",
+      "type": "select",
+      "options": [
+        "expo",
+        "quint",
+        "cubic"
+      ],
+      "default": "expo"
+    },
+    {
+      "key": "idle_drift",
+      "label": "Idle drift while holding",
+      "clipId": "t1-story",
+      "prop": "idleDrift",
+      "group": "Motion",
+      "type": "number",
+      "min": 0,
+      "max": 1,
+      "default": 0
+    }
+  ],
+  "components": {
+    "ScrollStory": {
+      "source": {
+        "html": "",
+        "css": ".ss {\n  position: absolute;\n  inset: 0;\n  container-type: size;\n  overflow: hidden;\n  background: var(--ss-bg);\n  color: var(--ss-ink);\n  font-family: var(--ss-font);\n  -webkit-font-smoothing: antialiased;\n}\n\n.ss-grid,\n.ss-images,\n.ss-text {\n  position: absolute;\n  inset: 0;\n  pointer-events: none;\n}\n\n.ss-v,\n.ss-h {\n  position: absolute;\n  display: block;\n  background: var(--ss-line);\n  opacity: var(--ss-line-opacity);\n}\n\n.ss-v {\n  width: var(--ss-hair);\n  margin-left: calc(var(--ss-hair) / -2);\n  transform-origin: 50% 0;\n}\n\n.ss-h {\n  height: var(--ss-hair);\n  margin-top: calc(var(--ss-hair) / -2);\n  transform-origin: 0 50%;\n}\n\n.ss-fig {\n  position: absolute;\n  left: 0;\n  top: 0;\n  margin: 0;\n  will-change: transform;\n}\n\n.ss-pic {\n  position: absolute;\n  inset: 0;\n  overflow: hidden;\n  background: color-mix(in srgb, var(--ss-ink) 8%, var(--ss-bg));\n}\n\n.ss-pic img {\n  position: absolute;\n  left: 0;\n  top: -20%;\n  display: block;\n  width: 100%;\n  height: 140%;\n  object-fit: cover;\n}\n\n.ss-cap {\n  position: absolute;\n  left: 0;\n  bottom: 100%;\n  padding-bottom: 0.8cqmin;\n  font-size: 1.5cqmin;\n  font-weight: 500;\n  font-variant-numeric: tabular-nums;\n  letter-spacing: 0.02em;\n  color: var(--ss-label);\n}\n\n.ss-head {\n  position: absolute;\n  inset: 0;\n  display: flex;\n  flex-direction: column;\n  align-items: center;\n  justify-content: center;\n  text-align: center;\n  font-size: calc(var(--ss-size) * 1cqmin);\n  font-weight: var(--ss-weight);\n  letter-spacing: var(--ss-tracking);\n  line-height: 0.98;\n}\n\n.ss-line {\n  display: block;\n  overflow: hidden;\n  padding: 0.04em 0.06em 0.08em;\n  margin: -0.04em 0 -0.08em;\n  white-space: pre;\n}\n\n.ss-in {\n  display: block;\n  will-change: transform;\n}\n\n.ss-kicker,\n.ss-index,\n.ss-progress {\n  position: absolute;\n  font-size: 1.6cqmin;\n  font-weight: 500;\n  letter-spacing: 0.02em;\n  font-variant-numeric: tabular-nums;\n  color: var(--ss-label);\n}\n\n.ss-kicker .ss-line,\n.ss-index-now .ss-line {\n  position: absolute;\n  left: 0;\n  top: 0;\n}\n\n.ss-kicker .ss-line {\n  color: var(--ss-ink);\n}\n\n.ss-index {\n  display: flex;\n}\n\n.ss-index-now {\n  position: relative;\n  display: inline-block;\n  width: 1.3em;\n  height: 1.2em;\n  color: var(--ss-ink);\n}\n\n.ss-progress {\n  height: 0;\n}\n\n.ss-bar {\n  position: absolute;\n  left: 0;\n  top: calc(var(--ss-hair) * -1);\n  display: block;\n  width: 100%;\n  height: calc(var(--ss-hair) * 2);\n  background: var(--ss-ink);\n  transform-origin: 0 50%;\n}\n\n.ss-mark {\n  position: absolute;\n  bottom: 0;\n  padding: 0 0 1cqmin 0.8cqmin;\n  color: var(--ss-ink);\n}\n\n.ss-bare .ss-kicker,\n.ss-bare .ss-index,\n.ss-bare .ss-progress,\n.ss-bare .ss-cap {\n  display: none;\n}",
+        "js": "const CHAPTERS = 3;\nconst MASK_TRAVEL = 1.1;\nconst LABEL_SLOTS = 1;\nconst LINE_HEIGHT = 0.98;\nconst CHAR_WIDTH = 0.5;\nconst WIDE = 1.4;\nconst IDLE = 0.01;\nconst MARK_DIM = 0.35;\nconst MARGIN = 0.04;\nconst EXIT = 1.02;\nconst SWAP_LEAD = 0.35;\n\nconst SWAP_STYLE = {\n  'mask-up': { travel: MASK_TRAVEL, dir: -1, fade: false },\n  'mask-down': { travel: MASK_TRAVEL, dir: 1, fade: false },\n  fade: { travel: 0.12, dir: -1, fade: true }\n};\n\nconst clamp01 = (x) => Math.min(1, Math.max(0, x));\nconst span = (t, at, length) => clamp01((t - at) / Math.max(length, 1e-6));\nconst expoInOut = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x < 0.5 ? Math.pow(2, 20 * x - 10) / 2 : (2 - Math.pow(2, -20 * x + 10)) / 2);\nconst powInOut = (n) => (x) => (x < 0.5 ? Math.pow(2 * x, n) / 2 : 1 - Math.pow(2 - 2 * x, n) / 2);\nconst EASE = { expo: expoInOut, quint: powInOut(5), cubic: powInOut(3) };\nconst smooth = (x) => x * x * x * (x * (x * 6 - 15) + 10);\n\nconst linesOf = (text) => String(text || '').split('\\n').map((s) => s.trim()).filter(Boolean);\n\nfunction storyChapters(p) {\n  return Array.from({ length: CHAPTERS }, (_, i) => ({\n    lines: linesOf(p['headline' + (i + 1)]),\n    kicker: String(p['kicker' + (i + 1)] || ''),\n    image: String(p['image' + (i + 1)] || ''),\n    lane: Number(p['lane' + (i + 1)]) || 0,\n    speed: Number(p['speed' + (i + 1)]) || 1\n  }));\n}\n\nfunction storyPhases(p, length) {\n  const unit = length / (CHAPTERS * p.holdSeconds + (CHAPTERS - 1) * p.moveSeconds);\n  const hold = p.holdSeconds * unit;\n  const move = p.moveSeconds * unit;\n  const holds = Array.from({ length: CHAPTERS }, (_, k) => [k * (hold + move), k * (hold + move) + hold]);\n  return { holds, moves: holds.slice(0, -1).map(([, end]) => [end, end + move]) };\n}\n\nfunction storyPosition(p, t, length) {\n  const ease = EASE[p.easing] || expoInOut;\n  const { moves } = storyPhases(p, length);\n  const k = moves.findIndex(([a, b]) => t > a && t < b);\n  if (k < 0) {\n    return moves.filter(([, b]) => t >= b).length;\n  }\n  return k + ease(span(t, moves[k][0], moves[k][1] - moves[k][0]));\n}\n\nfunction swapPlan(p, length) {\n  const chapters = storyChapters(p);\n  const { moves } = storyPhases(p, length);\n  return moves.map(([a, b], k) => {\n    const slots = LABEL_SLOTS + Math.max(chapters[k].lines.length, chapters[k + 1].lines.length);\n    const lead = p.swapDuration * SWAP_LEAD;\n    const total = (slots - 1) * p.swapStagger + lead + p.swapDuration;\n    const start = Math.max(a, (a + b) / 2 - total / 2);\n    const outAt = Array.from({ length: slots }, (_, j) => start + j * p.swapStagger);\n    return { outAt, inAt: outAt.map((at) => at + lead) };\n  });\n}\n\nfunction slotFrame(p, t, inAt, outAt) {\n  const style = SWAP_STYLE[p.swapStyle] || SWAP_STYLE['mask-up'];\n  const inRaw = inAt === null ? 1 : span(t, inAt, p.swapDuration);\n  const outRaw = outAt === null ? 0 : span(t, outAt, p.swapDuration);\n  const enter = inAt === null ? 1 : expoInOut(inRaw);\n  const leave = expoInOut(outRaw);\n  const y = -style.dir * style.travel * (1 - enter) + style.dir * style.travel * leave;\n  const opacity = style.fade ? smooth(inRaw) * (1 - smooth(outRaw)) : 1;\n  const on = inRaw > 0 && outRaw < 1 && (!style.fade || opacity > 0);\n  return { y, opacity, on };\n}\n\nfunction headFrames(p, t, length) {\n  const chapters = storyChapters(p);\n  const plan = swapPlan(p, length);\n  return chapters.map((chapter, i) => {\n    const inAt = (j) => (i === 0 ? null : plan[i - 1].inAt[j]);\n    const outAt = (j) => (i === chapters.length - 1 ? null : plan[i].outAt[j]);\n    const slot = (j) => slotFrame(p, t, inAt(j), outAt(j));\n    const label = slotFrame(p, t, i === 0 ? null : plan[i - 1].outAt[0], outAt(0));\n    return { kicker: label, index: label, lines: chapter.lines.map((_, j) => slot(j + LABEL_SLOTS)) };\n  });\n}\n\nfunction storyGrid(p, width, height) {\n  const margin = MARGIN * Math.min(width, height);\n  const columns = Math.max(1, Math.round(p.columns));\n  const rows = Math.max(3, Math.round(p.rows));\n  const col = (width - 2 * margin) / columns;\n  const row = (height - 2 * margin) / rows;\n  return {\n    margin,\n    col,\n    row,\n    xs: Array.from({ length: columns + 1 }, (_, k) => margin + k * col),\n    ys: Array.from({ length: rows + 1 }, (_, k) => margin + k * row)\n  };\n}\n\nfunction headBox(p, width, height) {\n  const size = (p.fontSize / 100) * Math.min(width, height);\n  const chapters = storyChapters(p);\n  const lines = Math.max(1, ...chapters.map((c) => c.lines.length));\n  const chars = Math.max(1, ...chapters.flatMap((c) => c.lines.map((l) => l.length)));\n  const w = Math.min(width, chars * CHAR_WIDTH * size);\n  const h = lines * LINE_HEIGHT * size;\n  return { x: (width - w) / 2, y: (height - h) / 2, w, h };\n}\n\nfunction wideRest(p, chapter, grid, head, gap, i, short) {\n  const top = grid.ys[1];\n  const bottom = grid.ys[grid.ys.length - 2];\n  const left = grid.xs[0];\n  const right = grid.xs[grid.xs.length - 1];\n  const w = Math.min(p.imageSize * short, (bottom - top) / p.imageRatio, (right - left) / 2);\n  const h = w * p.imageRatio;\n  const lane = grid.xs[Math.min(grid.xs.length - 1, Math.max(0, Math.round(chapter.lane)))];\n  const x = Math.min(lane, right - w);\n  const clear = x + w <= head.x - gap || x >= head.x + head.w + gap;\n  const leftSide = x + w / 2 < head.x + head.w / 2;\n  const safeX = clear ? x : leftSide ? Math.max(left, head.x - gap - w) : Math.min(right - w, head.x + head.w + gap);\n  return { x: safeX, y: (top + bottom) / 2 - h / 2, w, h };\n}\n\nfunction stackedRest(p, chapter, grid, head, gap, i, short) {\n  const top = grid.ys[1];\n  const bottom = grid.ys[grid.ys.length - 2];\n  const left = grid.xs[0];\n  const right = grid.xs[grid.xs.length - 1];\n  const room = Math.max(0, Math.min(head.y - gap - top, bottom - (head.y + head.h + gap)));\n  const w = Math.min(p.imageSize * short, room / p.imageRatio, right - left);\n  const h = w * p.imageRatio;\n  const lane = grid.xs[Math.min(grid.xs.length - 1, Math.max(0, Math.round(chapter.lane)))];\n  const x = Math.max(left, Math.min(lane, right - w));\n  const above = i % 2 === 0;\n  const y = above ? top + (head.y - gap - top - h) / 2 : head.y + head.h + gap + (bottom - head.y - head.h - gap - h) / 2;\n  return { x, y, w, h };\n}\n\nconst REST = { wide: wideRest, stacked: stackedRest };\n\nfunction imageFrames(p, t, length, position, width, height) {\n  const grid = storyGrid(p, width, height);\n  const head = headBox(p, width, height);\n  const gap = grid.col * 0.5;\n  const rest = REST[width / height >= WIDE ? 'wide' : 'stacked'];\n  return storyChapters(p).map((chapter, i) => {\n    const r = rest(p, chapter, grid, head, gap, i, Math.min(width, height));\n    const away = (i - position) * Math.max(1, chapter.speed);\n    const idle = p.idleDrift * IDLE * height * Math.sin((2 * Math.PI * t) / Math.max(length, 1e-6) + i);\n    const travel = EXIT * (away < 0 ? r.y + r.h - grid.ys[1] : grid.ys[grid.ys.length - 2] - r.y);\n    return { x: r.x, y: r.y + away * travel + idle, w: r.w, h: r.h, shift: away * p.parallax };\n  });\n}\n\nfunction markFrames(position) {\n  return Array.from({ length: CHAPTERS }, (_, k) => MARK_DIM + (1 - MARK_DIM) * smooth(clamp01(1 - Math.abs(position - k))));\n}\n\nfunction storyFrame(p, t, length, width, height) {\n  const position = storyPosition(p, t, length);\n  return {\n    chapter: Math.min(CHAPTERS - 1, Math.max(0, Math.round(position))),\n    position,\n    heads: headFrames(p, t, length),\n    images: imageFrames(p, t, length, position, width, height),\n    marks: markFrames(position)\n  };\n}\n\nconst LINK = /^(https?:|data:|blob:|\\/)/;\nconst HAIRLINE_BASE = 1080;\nconst pad2 = (n) => String(n).padStart(2, '0');\n\nconst sourceOf = (raw) => {\n  const id = String(raw || '').trim();\n  return LINK.test(id) ? id : assets[id] || '';\n};\n\nroot.insertAdjacentHTML('beforeend', '<div class=\"ss\"><div class=\"ss-grid\"></div><div class=\"ss-images\"></div><div class=\"ss-text\"></div><div class=\"ss-kicker\"></div><div class=\"ss-index\"><span class=\"ss-index-now\"></span><span class=\"ss-index-of\"></span></div><div class=\"ss-progress\"><i class=\"ss-bar\"></i></div></div>');\n\nconst scene = root.querySelector('.ss');\nconst gridLayer = root.querySelector('.ss-grid');\nconst imageLayer = root.querySelector('.ss-images');\nconst textLayer = root.querySelector('.ss-text');\nconst kickerLayer = root.querySelector('.ss-kicker');\nconst indexNow = root.querySelector('.ss-index-now');\nconst indexOf = root.querySelector('.ss-index-of');\nconst progressLayer = root.querySelector('.ss-progress');\nconst bar = root.querySelector('.ss-bar');\n\nlet cache = { gridKey: '', grid: null, contentKey: '', content: null, lookKey: '' };\n\nconst sizeOf = () => ({ width: scene.clientWidth || 1920, height: scene.clientHeight || 1080 });\n\nconst maskedLine = (text) => {\n  const line = document.createElement('span');\n  line.className = 'ss-line';\n  const inner = document.createElement('span');\n  inner.className = 'ss-in';\n  inner.textContent = text;\n  line.appendChild(inner);\n  return { line, inner };\n};\n\nconst buildGrid = (p, width, height) => {\n  const key = JSON.stringify([width, height, p.columns, p.rows]);\n  if (key === cache.gridKey) {\n    return cache.grid;\n  }\n  const grid = storyGrid(p, width, height);\n  const top = grid.ys[0];\n  const left = grid.xs[0];\n  const tall = grid.ys[grid.ys.length - 1] - top;\n  const wide = grid.xs[grid.xs.length - 1] - left;\n  gridLayer.innerHTML = '';\n  const line = (cls, s) => {\n    const node = document.createElement('i');\n    node.className = cls;\n    Object.assign(node.style, s);\n    gridLayer.appendChild(node);\n    return node;\n  };\n  const v = grid.xs.map((x) => line('ss-v', { left: x + 'px', top: top + 'px', height: tall + 'px' }));\n  const h = grid.ys.map((y) => line('ss-h', { top: y + 'px', left: left + 'px', width: wide + 'px' }));\n  cache = { ...cache, gridKey: key, grid: { ...grid, v, h, top, left, tall, wide } };\n  return cache.grid;\n};\n\nconst buildContent = (p) => {\n  const chapters = storyChapters(p);\n  const key = JSON.stringify(chapters);\n  if (key === cache.contentKey) {\n    return cache.content;\n  }\n  imageLayer.innerHTML = '';\n  textLayer.innerHTML = '';\n  kickerLayer.innerHTML = '';\n  indexNow.innerHTML = '';\n  progressLayer.querySelectorAll('.ss-mark').forEach((m) => m.remove());\n  const content = chapters.map((chapter, i) => {\n    const figure = document.createElement('figure');\n    figure.className = 'ss-fig';\n    const src = sourceOf(chapter.image);\n    figure.innerHTML = '<div class=\"ss-pic\">' + (src ? '<img decoding=\"sync\" src=\"' + src + '\">' : '') + '</div><figcaption class=\"ss-cap\">' + pad2(i + 1) + '</figcaption>';\n    imageLayer.appendChild(figure);\n    const head = document.createElement('div');\n    head.className = 'ss-head';\n    const lines = chapter.lines.map((text) => {\n      const l = maskedLine(text);\n      head.appendChild(l.line);\n      return l;\n    });\n    textLayer.appendChild(head);\n    const kicker = maskedLine(chapter.kicker);\n    kickerLayer.appendChild(kicker.line);\n    const index = maskedLine(pad2(i + 1));\n    indexNow.appendChild(index.line);\n    const mark = document.createElement('span');\n    mark.className = 'ss-mark';\n    mark.textContent = pad2(i + 1);\n    progressLayer.appendChild(mark);\n    return { figure, img: figure.querySelector('img'), lines, kicker, index, mark };\n  });\n  indexOf.textContent = ' / ' + pad2(chapters.length);\n  cache = { ...cache, contentKey: key, content };\n  return content;\n};\n\nconst paintLook = (p, unit) => {\n  const key = JSON.stringify([p.background, p.textColor, p.labelColor, p.lineColor, p.lineOpacity, p.font, p.fontSize, p.fontWeight, p.tracking, p.showLabels, unit]);\n  if (key === cache.lookKey) {\n    return;\n  }\n  cache = { ...cache, lookKey: key };\n  const s = scene.style;\n  s.setProperty('--ss-bg', p.background);\n  s.setProperty('--ss-ink', p.textColor);\n  s.setProperty('--ss-label', p.labelColor);\n  s.setProperty('--ss-line', p.lineColor);\n  s.setProperty('--ss-line-opacity', String(p.lineOpacity));\n  s.setProperty('--ss-hair', Math.max(1, unit / HAIRLINE_BASE) + 'px');\n  s.setProperty('--ss-font', String(p.font).includes(',') ? p.font : '\"' + p.font + '\", system-ui, sans-serif');\n  s.setProperty('--ss-size', String(p.fontSize));\n  s.setProperty('--ss-weight', String(p.fontWeight));\n  s.setProperty('--ss-tracking', p.tracking + 'em');\n  scene.classList.toggle('ss-bare', !p.showLabels);\n};\n\nconst paintSlot = (target, slot) => {\n  target.line.style.visibility = slot.on ? 'visible' : 'hidden';\n  target.inner.style.transform = 'translateY(' + slot.y * 100 + '%)';\n  target.inner.style.opacity = String(slot.opacity);\n};\n\nconst place = (grid) => {\n  const inset = grid.col * 0.12;\n  Object.assign(kickerLayer.style, { left: grid.left + inset + 'px', top: grid.top + inset + 'px' });\n  imageLayer.style.clipPath = 'inset(' + grid.ys[1] + 'px 0 ' + (sizeOf().height - grid.ys[grid.ys.length - 2]) + 'px 0)';\n  Object.assign(progressLayer.style, { left: grid.left + 'px', top: grid.top + grid.tall + 'px', width: grid.wide + 'px' });\n  const index = indexNow.parentElement;\n  Object.assign(index.style, { right: grid.left + inset + 'px', top: grid.top + inset + 'px' });\n};\n\nconst draw = () => {\n  const p = { ...props };\n  const t = tl.time();\n  const { width, height } = sizeOf();\n  const grid = buildGrid(p, width, height);\n  const content = buildContent(p);\n  paintLook(p, Math.min(width, height));\n  place(grid);\n  const f = storyFrame(p, t, duration, width, height);\n\n\n  content.forEach((c, i) => {\n    const img = f.images[i];\n    const s = c.figure.style;\n    s.width = img.w + 'px';\n    s.height = img.h + 'px';\n    s.transform = 'translate3d(' + img.x + 'px, ' + img.y + 'px, 0)';\n    s.visibility = img.y < height && img.y + img.h > 0 ? 'visible' : 'hidden';\n    if (c.img) {\n      c.img.style.transform = 'translateY(' + img.shift * 100 + '%)';\n    }\n    const head = f.heads[i];\n    c.lines.forEach((l, j) => paintSlot(l, head.lines[j]));\n    paintSlot(c.kicker, head.kicker);\n    paintSlot(c.index, head.index);\n    c.mark.style.left = (i / content.length) * 100 + '%';\n    c.mark.style.opacity = String(f.marks[i]);\n  });\n  bar.style.transform = 'scaleX(' + f.position / (content.length - 1) + ')';\n};\n\ndraw();\ntl.to({}, { duration, ease: 'none', onUpdate: draw }, 0);"
+      },
+      "propsSchema": {
+        "type": "object",
+        "properties": {
+          "headline1": {
+            "type": "string",
+            "title": "Chapter 1 headline (one line per row)",
+            "default": "start with\nthe land",
+            "format": "textarea",
+            "group": "Content",
+            "maxLength": 200
+          },
+          "kicker1": {
+            "type": "string",
+            "title": "Chapter 1 label",
+            "default": "origin",
+            "group": "Content",
+            "maxLength": 40
+          },
+          "image1": {
+            "type": "string",
+            "title": "Chapter 1 image",
+            "default": "https://picsum.photos/id/1015/1200/1500",
+            "format": "media-item",
+            "assetKind": "image",
+            "group": "Content",
+            "maxLength": 500
+          },
+          "headline2": {
+            "type": "string",
+            "title": "Chapter 2 headline (one line per row)",
+            "default": "follow the\nlight in",
+            "format": "textarea",
+            "group": "Content",
+            "maxLength": 200
+          },
+          "kicker2": {
+            "type": "string",
+            "title": "Chapter 2 label",
+            "default": "process",
+            "group": "Content",
+            "maxLength": 40
+          },
+          "image2": {
+            "type": "string",
+            "title": "Chapter 2 image",
+            "default": "https://picsum.photos/id/1039/1200/1500",
+            "format": "media-item",
+            "assetKind": "image",
+            "group": "Content",
+            "maxLength": 500
+          },
+          "headline3": {
+            "type": "string",
+            "title": "Chapter 3 headline (one line per row)",
+            "default": "and keep\ngoing",
+            "format": "textarea",
+            "group": "Content",
+            "maxLength": 200
+          },
+          "kicker3": {
+            "type": "string",
+            "title": "Chapter 3 label",
+            "default": "arrival",
+            "group": "Content",
+            "maxLength": 40
+          },
+          "image3": {
+            "type": "string",
+            "title": "Chapter 3 image",
+            "default": "https://picsum.photos/id/1043/1200/1500",
+            "format": "media-item",
+            "assetKind": "image",
+            "group": "Content",
+            "maxLength": 500
+          },
+          "font": {
+            "type": "string",
+            "title": "Font",
+            "default": "Inter Tight",
+            "format": "font",
+            "group": "Style"
+          },
+          "fontSize": {
+            "type": "number",
+            "title": "Headline size (% of the short side)",
+            "default": 9,
+            "minimum": 3,
+            "maximum": 20,
+            "step": 0.5,
+            "group": "Style"
+          },
+          "fontWeight": {
+            "type": "number",
+            "title": "Headline weight",
+            "default": 600,
+            "minimum": 300,
+            "maximum": 800,
+            "step": 100,
+            "group": "Style"
+          },
+          "tracking": {
+            "type": "number",
+            "title": "Headline tracking (em)",
+            "default": -0.05,
+            "minimum": -0.08,
+            "maximum": 0.05,
+            "step": 0.005,
+            "group": "Style"
+          },
+          "background": {
+            "type": "string",
+            "title": "Background",
+            "default": "#000000",
+            "format": "color",
+            "group": "Style"
+          },
+          "textColor": {
+            "type": "string",
+            "title": "Headline colour",
+            "default": "#ffffff",
+            "format": "color",
+            "group": "Style"
+          },
+          "labelColor": {
+            "type": "string",
+            "title": "Label colour",
+            "default": "#8a8a8a",
+            "format": "color",
+            "group": "Style"
+          },
+          "lineColor": {
+            "type": "string",
+            "title": "Grid line colour",
+            "default": "#ffffff",
+            "format": "color",
+            "group": "Style"
+          },
+          "lineOpacity": {
+            "type": "number",
+            "title": "Grid line opacity",
+            "default": 0.14,
+            "minimum": 0,
+            "maximum": 1,
+            "step": 0.01,
+            "group": "Style"
+          },
+          "showLabels": {
+            "type": "boolean",
+            "title": "Show labels and progress",
+            "default": true,
+            "group": "Style"
+          },
+          "columns": {
+            "type": "number",
+            "title": "Grid columns",
+            "default": 12,
+            "minimum": 2,
+            "maximum": 24,
+            "step": 1,
+            "group": "Layout"
+          },
+          "rows": {
+            "type": "number",
+            "title": "Grid rows",
+            "default": 8,
+            "minimum": 2,
+            "maximum": 24,
+            "step": 1,
+            "group": "Layout"
+          },
+          "imageSize": {
+            "type": "number",
+            "title": "Image width (share of the short side)",
+            "default": 0.42,
+            "minimum": 0.15,
+            "maximum": 0.8,
+            "step": 0.01,
+            "group": "Layout"
+          },
+          "imageRatio": {
+            "type": "number",
+            "title": "Image height / width",
+            "default": 1.25,
+            "minimum": 0.5,
+            "maximum": 2,
+            "step": 0.05,
+            "group": "Layout"
+          },
+          "lane1": {
+            "type": "number",
+            "title": "Chapter 1 image column",
+            "default": 0,
+            "minimum": 0,
+            "maximum": 24,
+            "step": 1,
+            "group": "Layout"
+          },
+          "lane2": {
+            "type": "number",
+            "title": "Chapter 2 image column",
+            "default": 9,
+            "minimum": 0,
+            "maximum": 24,
+            "step": 1,
+            "group": "Layout"
+          },
+          "lane3": {
+            "type": "number",
+            "title": "Chapter 3 image column",
+            "default": 1,
+            "minimum": 0,
+            "maximum": 24,
+            "step": 1,
+            "group": "Layout"
+          },
+          "speed1": {
+            "type": "number",
+            "title": "Chapter 1 image speed",
+            "default": 1,
+            "minimum": 1,
+            "maximum": 3,
+            "step": 0.05,
+            "group": "Motion"
+          },
+          "speed2": {
+            "type": "number",
+            "title": "Chapter 2 image speed",
+            "default": 1.4,
+            "minimum": 1,
+            "maximum": 3,
+            "step": 0.05,
+            "group": "Motion"
+          },
+          "speed3": {
+            "type": "number",
+            "title": "Chapter 3 image speed",
+            "default": 1.2,
+            "minimum": 1,
+            "maximum": 3,
+            "step": 0.05,
+            "group": "Motion"
+          },
+          "parallax": {
+            "type": "number",
+            "title": "Inner image parallax",
+            "default": 0.06,
+            "minimum": 0,
+            "maximum": 0.2,
+            "step": 0.01,
+            "group": "Motion"
+          },
+          "swapStyle": {
+            "type": "string",
+            "title": "Headline swap",
+            "default": "mask-up",
+            "enum": [
+              "mask-up",
+              "mask-down",
+              "fade"
+            ],
+            "group": "Motion"
+          },
+          "swapDuration": {
+            "type": "number",
+            "title": "Line swap (seconds)",
+            "default": 0.9,
+            "minimum": 0.2,
+            "maximum": 2,
+            "step": 0.05,
+            "group": "Motion"
+          },
+          "swapStagger": {
+            "type": "number",
+            "title": "Line stagger (seconds)",
+            "default": 0.12,
+            "minimum": 0,
+            "maximum": 0.5,
+            "step": 0.01,
+            "group": "Motion"
+          },
+          "holdSeconds": {
+            "type": "number",
+            "title": "Hold on each chapter (seconds)",
+            "default": 1.2,
+            "minimum": 0.2,
+            "maximum": 10,
+            "step": 0.1,
+            "group": "Motion"
+          },
+          "moveSeconds": {
+            "type": "number",
+            "title": "Move between chapters (seconds)",
+            "default": 4.2,
+            "minimum": 0.4,
+            "maximum": 10,
+            "step": 0.1,
+            "group": "Motion"
+          },
+          "easing": {
+            "type": "string",
+            "title": "Move easing",
+            "default": "expo",
+            "enum": [
+              "expo",
+              "quint",
+              "cubic"
+            ],
+            "group": "Motion"
+          },
+          "idleDrift": {
+            "type": "number",
+            "title": "Idle drift while holding",
+            "default": 0,
+            "minimum": 0,
+            "maximum": 1,
+            "step": 0.05,
+            "group": "Motion"
+          },
+          "varPrefix": {
+            "type": "string",
+            "title": "Runtime variable prefix",
+            "default": "story",
+            "group": "Layout",
+            "maxLength": 20
+          }
+        }
+      },
+      "mode": "deterministic",
+      "version": 1,
+      "check": null
+    }
+  },
+  "shaders": {},
+  "interactive": {
+    "playback": "scrub",
+    "loop": true,
+    "outside": "fallback",
+    "scrollLength": 4,
+    "vars": [
+      {
+        "name": "story_headline1",
+        "kind": "string",
+        "default": "start with\nthe land"
+      },
+      {
+        "name": "story_kicker1",
+        "kind": "string",
+        "default": "origin"
+      },
+      {
+        "name": "story_image1",
+        "kind": "string",
+        "default": "https://picsum.photos/id/1015/1200/1500"
+      },
+      {
+        "name": "story_headline2",
+        "kind": "string",
+        "default": "follow the\nlight in"
+      },
+      {
+        "name": "story_kicker2",
+        "kind": "string",
+        "default": "process"
+      },
+      {
+        "name": "story_image2",
+        "kind": "string",
+        "default": "https://picsum.photos/id/1039/1200/1500"
+      },
+      {
+        "name": "story_headline3",
+        "kind": "string",
+        "default": "and keep\ngoing"
+      },
+      {
+        "name": "story_kicker3",
+        "kind": "string",
+        "default": "arrival"
+      },
+      {
+        "name": "story_image3",
+        "kind": "string",
+        "default": "https://picsum.photos/id/1043/1200/1500"
+      },
+      {
+        "name": "story_text_color",
+        "kind": "color",
+        "default": "#ffffff"
+      },
+      {
+        "name": "story_background",
+        "kind": "color",
+        "default": "#000000"
+      },
+      {
+        "name": "story_line_color",
+        "kind": "color",
+        "default": "#ffffff"
+      },
+      {
+        "name": "story_line_opacity",
+        "kind": "number",
+        "default": 0.14,
+        "min": 0,
+        "max": 1
+      },
+      {
+        "name": "story_columns",
+        "kind": "number",
+        "default": 12,
+        "min": 2,
+        "max": 24
+      },
+      {
+        "name": "story_rows",
+        "kind": "number",
+        "default": 8,
+        "min": 2,
+        "max": 24
+      },
+      {
+        "name": "story_swap_style",
+        "kind": "enum",
+        "default": "mask-up",
+        "options": [
+          "mask-up",
+          "mask-down",
+          "fade"
+        ]
+      }
+    ],
+    "bindings": []
+  }
+}
