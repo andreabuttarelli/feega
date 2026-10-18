@@ -55,3 +55,5 @@ export async function firstFrames(sources: readonly FrameSource[]): Promise<Fram
   }
   return null;
 }
+
+export const FRAMES_CLOSED_HINT = 'server frames are off: set CHROMIUM_PATH to a local Chrome or Chromium binary (macOS: /Applications/Google Chrome.app/Contents/MacOS/Google Chrome) in the server env and restart it';

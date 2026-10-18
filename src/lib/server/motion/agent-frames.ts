@@ -4,7 +4,7 @@ import { blocking, docProblems, frameProblems } from '$lib/motion/direction';
 import { savedMotion } from './agent-embed';
 import { assetUrls, motionAssets, motionTokens } from './editor';
 import { chromiumFrames, serverFramesOpen } from './chromium-frames';
-import { drawFrames, MAX_FRAME_SIZE } from './server-frames';
+import { drawFrames, FRAMES_CLOSED_HINT, MAX_FRAME_SIZE } from './server-frames';
 import { MAX_FRAMES_PER_VIEW } from './frames';
 import { frameStats } from './frame-stats';
 
@@ -48,7 +48,7 @@ function timesProblem(times: readonly number[], seconds: number): string | null 
 
 export async function motionFrames(db: Db, scope: { orgId: string; nodeId: string }, ask: FramesAsk): Promise<FramesAnswer> {
   if (!serverFramesOpen()) {
-    return { ok: false, failure: FramesFailure.Closed };
+    return { ok: false, failure: FramesFailure.Closed, detail: FRAMES_CLOSED_HINT };
   }
   const saved = await savedMotion(db, scope);
   if (!saved) {

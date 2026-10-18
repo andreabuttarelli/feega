@@ -204,7 +204,10 @@ same player inside a React (`@feega/motion-react`) or Flutter (`feega_motion`) a
 
 See a video with `view_motion_frames` (up to 6 times in seconds): the frames come back as
 images with the quality gate's `quality` and `blocking` notes. Free; look before and after
-`ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`.
+`ask_motion_agent`. CLI: `feega motion frames <nodeId> --at 1,2.5,4`. Against a local server
+the frames need `CHROMIUM_PATH` (a local Chrome binary, e.g.
+`/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`) in its env; without it the call
+answers `closed` / "frames unavailable".
 
 Every save is a revision. `list_motion_revisions` lists them (who saved, clip count);
 `restore_motion_revision` puts one back as a new revision, history kept. Free. CLI:
@@ -234,6 +237,12 @@ video pinned to one frame: `set_canvas` `{ format: "A poster", still: 2 }`, then
 Built-in line icons (arrow, check, close, menu, search, user, star, heart, play, cart…):
 `add_icon` `{ name, x, y, size, color }` inserts one as a stroked Shape
 path clip (x, y centre 0..1, size a share of the short side). Through `motion_tool`.
+
+Named styles keep a video consistent: `named_style` `{ action: "define", name, style: { kind:
+"text", font, size, weight, tracking, leading, color } }` (or `{ kind: "colour", color }`)
+creates or edits one; `action: "apply"` with `name` and `clip_ids` links clips (a colour style
+paints text colour or shape fill); `"detach"` unlinks, `"remove"` deletes, `"list"` lists them
+with their clips. Editing a style restyles every linked clip. Through `motion_tool`.
 
 The frame editor page's own actions (read the head, save the whole doc, apply doc ops, render and
 batch status) run through `motion_editor_op` `{ node_id, op, input }` with the same answers as
