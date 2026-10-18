@@ -25,6 +25,7 @@ import { Ease, FRAME_RATES, MAX_SECONDS, TRANSITION_KINDS } from '$lib/motion/de
 import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, MAX_SIDE, MIN_SIDE, MOTION_FORMATS, clipsOf, findClip, formatOf, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
+import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
 import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
@@ -1931,6 +1932,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Add a visual or audio track, optionally named. A new visual track goes on top.',
       inputSchema: z.object({ kind: z.enum([TrackKind.Visual, TrackKind.Audio]), name: z.string().max(60).optional() }),
       execute: async (input) => apply(addTrack(session.doc, input.kind, deps.newId(), input.name), `added ${input.kind} track`)
+    }),
+
+    arrange_layers: tool({
+      description: 'Bring clips to the front or send them to the back of the picture stack; a clip sharing a track gets its own.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), to: z.enum([Arrange.Front, Arrange.Back]) }),
+      execute: async (input) => apply(arrangeLayers(session.doc, input.clip_ids, input.to, deps.newId), `arranged ${input.clip_ids.join(', ')} ${input.to}`)
     }),
 
     set_track: tool({

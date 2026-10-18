@@ -74,6 +74,7 @@
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
+  import { arrangeLayers, type Arrange } from '$lib/motion/layer-order';
   import { FRAME_MENU_IDS, frameLayers, frameMenuRun, frameSummaries, type FrameLayer } from '$lib/motion/frame-menu';
   import type { SelectionActionId } from '$lib/canvas/selection-actions';
   import { Gesture } from '$lib/motion/drill';
@@ -1367,6 +1368,10 @@
       alignTo(run.edge);
       return;
     }
+    if ('arrange' in run) {
+      arrangeTo(run.arrange);
+      return;
+    }
     COMMANDS[run.command]();
   }
 
@@ -1378,6 +1383,7 @@
     }
   }
   const nudgeBy = (dx: number, dy: number) => selection.length && apply(moveBy(doc, selection, frame, [dx, dy], editMode), 'Moved with the arrows');
+  const arrangeTo = (to: Arrange) => apply(arrangeLayers(doc, selection, to, newId), `Arranged ${to}`);
   const alignTo = (edge: Edge) => apply(alignSpace(doc, selection, frame, spaceBoxes(), edge, editMode), `Aligned ${edge}`);
   const distribute = (axis: Axis) => apply(distributeSpace(doc, selection, frame, spaceBoxes(), axis, editMode), `Distributed along ${axis}`);
 

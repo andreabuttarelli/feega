@@ -286,6 +286,7 @@ export const FRAME_CONTENT: Record<string, Parity> = {
   'pen path points and handles': motion('set_path'),
   'align and distribute': motion('arrange_space'),
   'reorder layers': motion('set_track'),
+  'bring to front, send to back': motion('arrange_layers'),
   'poster line text, lines added or removed': motion('set_props'),
   'poster photo replace, fit, focus': motion('set_props'),
   'poster arrow shown, colour': motion('set_props'),
