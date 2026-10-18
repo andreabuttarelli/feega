@@ -29,6 +29,8 @@
   import { SAVE_TONE, SaveState, TimeDisplay, clockLabel, DISPLAY_NAME, isTap } from '$lib/motion/editor-bar';
   import Upload from '@lucide/svelte/icons/upload';
   import HistoryIcon from '@lucide/svelte/icons/history';
+  import BranchIcon from '@lucide/svelte/icons/git-branch';
+  import BranchesMenu from './BranchesMenu.svelte';
   import { BarItem, ON_PHONE, PhonePlace } from '$lib/motion/phone-bar';
   import ShortcutHelp from '$lib/components/motion/ShortcutHelp.svelte';
   import { decodePeaks } from '$lib/motion/peaks-decode';
@@ -1231,6 +1233,57 @@
     return deserialize(await res.text());
   }
 
+  type Fork = { id: string; frameId: string; name: string; baseVersion: number };
+  type Conflict = { path: string; branch: unknown; main: unknown };
+  const fork = (data.node as { fork?: Fork | null }).fork ?? null;
+  let branchesOpen = $state(false);
+  let branches = $state<Fork[]>([]);
+  let conflicts = $state<Conflict[] | null>(null);
+  const editorPathOf = (nodeId: string) => `/p/${data.projectId}/c/${data.canvas.id}/motion/${nodeId}`;
+
+  async function toggleBranches() {
+    branchesOpen = !branchesOpen;
+    if (!branchesOpen || fork) {
+      return;
+    }
+    const result = await editorAction('branches');
+    branches = result.type === 'success' ? ((result.data as { branches: Fork[] }).branches ?? []) : [];
+  }
+
+  async function createBranch(name: string) {
+    await save();
+    const form = new FormData();
+    form.set('name', name);
+    const result = await editorAction('createBranch', form);
+    if (result.type === 'success') {
+      location.assign(editorPathOf((result.data as { branchId: string }).branchId));
+    }
+  }
+
+  async function reviewBranch() {
+    await save();
+    const result = await editorAction('reviewBranch');
+    conflicts = result.type === 'success' ? (result.data as { conflicts: Conflict[] }).conflicts : [];
+  }
+
+  async function mergeBranch(choices: Record<string, string>) {
+    const form = new FormData();
+    form.set('choices', JSON.stringify(choices));
+    const result = await editorAction('mergeBranch', form);
+    if (result.type === 'success' && fork) {
+      location.assign(editorPathOf(fork.frameId));
+      return;
+    }
+    notice = 'The branch could not be merged.';
+  }
+
+  async function dropCurrentBranch() {
+    const result = await editorAction('dropBranch');
+    if (result.type === 'success' && fork) {
+      location.assign(editorPathOf(fork.frameId));
+    }
+  }
+
   async function toggleRevisions() {
     revisionsOpen = !revisionsOpen;
     if (!revisionsOpen) {
@@ -1817,6 +1870,10 @@
       <IconButton action={Action.Undo} disabled={!canUndo(history, agent)} onclick={undoEdit} />
       <IconButton action={Action.Redo} disabled={!canRedo(history, agent)} onclick={redoEdit} />
       <div class="popover-anchor" data-phone={ON_PHONE[BarItem.History]}>
+        <button type="button" class="clock" aria-haspopup="menu" aria-expanded={branchesOpen} aria-label="Branches" title="Branches" disabled={agent === Agent.Working} data-testid="branches-open" onclick={() => void toggleBranches()}><BranchIcon size={16} /></button>
+        {#if branchesOpen}
+          <BranchesMenu {fork} {branches} {conflicts} oncreate={(name) => void createBranch(name)} onopen={(id) => location.assign(editorPathOf(id))} onreview={() => void reviewBranch()} onmerge={(c) => void mergeBranch(c)} ondrop={() => void dropCurrentBranch()} />
+        {/if}
         <button type="button" class="clock" aria-haspopup="menu" aria-expanded={revisionsOpen} aria-label="Version history" title="Version history" disabled={agent === Agent.Working} data-testid="revisions-open" onclick={() => void toggleRevisions()}><HistoryIcon size={16} /></button>
         {#if revisionsOpen}
           <div class="menu more" role="menu" data-testid="revisions">
