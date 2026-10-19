@@ -63,6 +63,29 @@ pub struct PathItem {
     pub look: Look,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct Size {
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageItem {
+    pub clip: String,
+    pub src: String,
+    pub video: bool,
+    pub media_time: f64,
+    pub size: Size,
+    pub fit: String,
+    pub focus: [f64; 2],
+    pub zoom: f64,
+    pub clipped: bool,
+    pub inner: Affine,
+    #[serde(flatten)]
+    pub look: Look,
+}
+
 fn normal() -> String {
     "normal".into()
 }
@@ -70,6 +93,7 @@ fn normal() -> String {
 #[derive(Debug, Clone)]
 pub enum Item {
     Path(PathItem),
+    Image(ImageItem),
     Other { clip: String, kind: String },
 }
 
@@ -77,10 +101,11 @@ impl<'de> Deserialize<'de> for Item {
     fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
         let value = serde_json::Value::deserialize(d)?;
         let text = |key: &str| value.get(key).and_then(|v| v.as_str()).unwrap_or_default().to_string();
-        if text("kind") == "path" {
-            return serde_json::from_value(value).map(Item::Path).map_err(serde::de::Error::custom);
+        match text("kind").as_str() {
+            "path" => serde_json::from_value(value).map(Item::Path).map_err(serde::de::Error::custom),
+            "image" => serde_json::from_value(value).map(Item::Image).map_err(serde::de::Error::custom),
+            _ => Ok(Item::Other { clip: text("clip"), kind: text("kind") }),
         }
-        Ok(Item::Other { clip: text("clip"), kind: text("kind") })
     }
 }
 
