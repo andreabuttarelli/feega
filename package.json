@@ -13,7 +13,7 @@
     "dev:vercel": "vercel dev --listen 5173",
     "build": "node scripts/typecheck-runtime.mjs && vite build",
     "build:node": "NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=8192} DEPLOY_TARGET=node npm run build",
-    "start": "node --env-file-if-exists=.env build",
+    "start": "node --env-file-if-exists=.env scripts/node-server.mjs",
     "preview": "vite preview",
     "sync": "svelte-kit sync",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
