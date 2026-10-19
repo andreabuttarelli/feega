@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { apply2d } from '../../affine';
 import { FillRule, PaintKind } from '../paint';
 import { DomGap, DrawnKind, readTree, type DrawnPath } from './read';
-import { NO_INDEX, type RawNode, type RawTree } from './tree';
+import { NO_INDEX, TEXT_PAD, type RawNode, type RawTree } from './tree';
+import { boxBook } from '../text/test-face';
+import { Smoothing } from '../text/painter';
 
 const FRAME = { width: 400, height: 300 };
 
 function el(part: Partial<RawNode> & { parent: number }): RawNode {
-  return { tag: 'div', svg: false, at: [0, 0], size: [0, 0], style: {}, attrs: {}, text: '', layer: NO_INDEX, ...part };
+  return { tag: 'div', svg: false, at: [0, 0], size: [0, 0], style: {}, attrs: {}, text: '', lines: [], raster: null, layer: NO_INDEX, ...part };
 }
 
 const root = (style: RawNode['style'] = {}) => el({ parent: NO_INDEX, size: [FRAME.width, FRAME.height], style });
@@ -163,5 +165,43 @@ describe('readTree', () => {
 
   it('names media it cannot draw', () => {
     expect(readTree(tree(root(), el({ parent: 0, tag: 'img', size: [10, 10] }))).gaps.map((g) => g.reason)).toEqual([DomGap.Media]);
+  });
+  describe('text', () => {
+    const typeset = (missing: string[] = []) => ({ fonts: boxBook(new Set(missing)), smoothing: Smoothing.Plain });
+    const line = (chars: string[], xs: number[], top = 30) => ({ chars, xs, top, height: 10 });
+    const label = (part: Partial<RawNode> = {}) => el({ parent: 0, at: [10, 10], size: [100, 40], text: 'ab', lines: [line(['a', 'b'], [20, 26])], style: { color: 'rgb(255, 0, 0)', 'font-family': '"Inter Tight", system-ui', 'font-size': '10px', 'font-weight': '600' }, ...part });
+
+    it('draws every glyph where the browser placed it, on the line baseline', () => {
+      const read = readTree(tree(root(), label()), typeset());
+      const glyphs = read.drawn as DrawnPath[];
+
+      expect(read.gaps).toEqual([]);
+      expect(glyphs.map((g) => near(bounds(g)))).toEqual([
+        { left: 30, top: 41, right: 35, bottom: 48 },
+        { left: 36, top: 41, right: 41, bottom: 48 }
+      ]);
+      expect(glyphs[0].paint).toEqual({ kind: PaintKind.Solid, color: [1, 0, 0, 1] });
+    });
+
+    it('draws the case the browser shows, not the case typed', () => {
+      const read = readTree(tree(root(), label({ style: { ...label().style, 'text-transform': 'uppercase' } })), typeset(['a', 'b']));
+
+      expect(read.drawn).toHaveLength(2);
+      expect(read.gaps).toEqual([]);
+    });
+
+    it('names a glyph no loaded font covers', () => {
+      const read = readTree(tree(root(), label()), typeset(['b']));
+
+      expect(read.drawn).toHaveLength(1);
+      expect(read.gaps.map((g) => g.reason)).toEqual([DomGap.Font]);
+    });
+
+    it('draws text set in a font the page never loaded from the raster the browser made of it', () => {
+      const read = readTree(tree(root(), label({ raster: { layer: 3, width: 120, height: 60 } })), typeset(['a', 'b']));
+
+      expect(read.gaps).toEqual([]);
+      expect(read.drawn).toEqual([{ kind: DrawnKind.Layer, layer: 3, width: 120, height: 60, opacity: 1, matrix: [1, 0, 0, 1, 10 - TEXT_PAD, 10 - TEXT_PAD] }]);
+    });
   });
 });

@@ -2,6 +2,7 @@ import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
 import type { PathItem } from '$lib/motion/gpu-full/display-list';
 import { dashes } from '$lib/motion/gpu-full/stroke';
+import { FillRule } from '$lib/motion/gpu-full/paint';
 import { line, rect, solid } from './shapes';
 
 export enum ChromePart {
@@ -12,10 +13,22 @@ export enum ChromePart {
   Handle = 'handle',
   Label = 'label',
   PortName = 'port-name',
+  PortRing = 'port-ring',
   Icon = 'icon'
 }
 
-export type Glyphs = (text: string, size: number, wrap?: { width: number; height: number }) => { contours: number[][]; width: number };
+export type TextSet = { width?: number; height?: number; leading?: number; tracking?: number };
+
+export enum PortState {
+  Quiet = 'quiet',
+  Lit = 'lit',
+  Off = 'off',
+  Flagged = 'flagged'
+}
+
+export type PortMark = { type: ConnectorType; state: PortState; label?: string };
+
+export type Glyphs = (text: string, size: number, set?: TextSet) => { contours: number[][]; width: number; height: number };
 
 export type ChromeTile = {
   id: string;
@@ -27,8 +40,8 @@ export type ChromeTile = {
   handles: boolean;
   hovered: boolean;
   ringColor: string;
-  inputs: readonly ConnectorType[];
-  output: ConnectorType | null;
+  inputs: readonly PortMark[];
+  outputs: readonly PortMark[];
   label: string | null;
   icon: number[][] | null;
   names: boolean;
@@ -44,6 +57,9 @@ const HANDLE_SIZE = 8;
 const HANDLE_BORDER = 1;
 const LABEL_SIZE = 12;
 const LABEL_GAP = 4;
+const LABEL_PAD = 2;
+const LABEL_LEADING = 1.3;
+const NAME_LEADING = 1;
 const HOVER_COLOR = '#b14cff';
 const HANDLE_FILL = '#ffffff';
 const LABEL_COLOR = '#6e6e73';
@@ -51,6 +67,14 @@ const ICON_SIZE = 12;
 const ICON_GAP = 5;
 const NAME_SIZE = 11;
 const NAME_GAP = 16;
+const PORT_RING = 1;
+
+const PORT_LOOK: Record<PortState, { opacity: number; ring: boolean; named: boolean }> = {
+  [PortState.Quiet]: { opacity: 1, ring: false, named: false },
+  [PortState.Lit]: { opacity: 1, ring: true, named: true },
+  [PortState.Off]: { opacity: 0.12, ring: false, named: false },
+  [PortState.Flagged]: { opacity: 0.5, ring: false, named: false }
+};
 
 const item = (t: ChromeTile, part: ChromePart, contours: number[][], color: string, opacity = 1): PathItem => solid(`${t.id}:${part}`, contours, color, opacity);
 
@@ -77,15 +101,19 @@ const RINGS: Record<NodeChrome, (t: ChromeTile) => PathItem[]> = {
 
 const spaced = (t: ChromeTile, i: number, n: number) => t.y + ((i + 1) / (n + 1)) * t.height;
 
-const port = (t: ChromeTile, part: ChromePart, left: number, centre: number, type: ConnectorType) =>
-  item(t, part, [rect(left, centre - PORT_SIZE / 2, PORT_SIZE, PORT_SIZE)], CONNECTOR_STYLE[type].color);
+function port(t: ChromeTile, part: ChromePart, left: number, centre: number, m: PortMark): PathItem[] {
+  const top = centre - PORT_SIZE / 2;
+  const colour = CONNECTOR_STYLE[m.type].color;
+  const look = PORT_LOOK[m.state];
+  const inset = PORT_RING + PORT_RING / 2;
+  const ring = look.ring ? [item(t, ChromePart.PortRing, line(rect(left - inset, top - inset, PORT_SIZE + 2 * inset, PORT_SIZE + 2 * inset), PORT_RING, true), colour)] : [];
+  return [item(t, part, [rect(left, top, PORT_SIZE, PORT_SIZE)], colour, look.opacity), ...ring];
+}
 
 function ports(t: ChromeTile): PathItem[] {
-  const inputs = t.inputs.map((type, i) => port(t, ChromePart.PortIn, t.x - PORT_SIZE, spaced(t, i, t.inputs.length), type));
-  if (!t.output) {
-    return inputs;
-  }
-  return [...inputs, port(t, ChromePart.PortOut, t.x + t.width, t.y + t.height / 2, t.output)];
+  const inputs = t.inputs.flatMap((m, i) => port(t, ChromePart.PortIn, t.x - PORT_SIZE, spaced(t, i, t.inputs.length), m));
+  const outputs = t.outputs.flatMap((m, i) => port(t, ChromePart.PortOut, t.x + t.width, spaced(t, i, t.outputs.length), m));
+  return [...inputs, ...outputs];
 }
 
 function handles(t: ChromeTile): PathItem[] {
@@ -111,24 +139,25 @@ function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   if (!t.label) {
     return [];
   }
-  const baseline = t.y - LABEL_GAP;
-  const icon = t.icon ? [item(t, ChromePart.Icon, shift(t.icon, t.x, baseline - ICON_SIZE), LABEL_COLOR)] : [];
+  const line = LABEL_SIZE * LABEL_LEADING;
+  const top = t.y - LABEL_GAP - LABEL_PAD - line;
+  const icon = t.icon ? [{ ...item(t, ChromePart.Icon, shift(t.icon, t.x, top + (line - ICON_SIZE) / 2), LABEL_COLOR), rule: FillRule.Union }] : [];
   const left = t.icon ? t.x + ICON_SIZE + ICON_GAP : t.x;
-  return [...icon, item(t, ChromePart.Label, shift(glyphs(t.label, LABEL_SIZE).contours, left, baseline), LABEL_COLOR)];
+  return [...icon, item(t, ChromePart.Label, shift(glyphs(t.label, LABEL_SIZE, { leading: LABEL_LEADING, tracking: 0 }).contours, left, top), LABEL_COLOR)];
 }
 
-function name(t: ChromeTile, glyphs: Glyphs, type: ConnectorType, centre: number, side: ChromePart): PathItem {
-  const { contours, width } = glyphs(CONNECTOR_STYLE[type].label, NAME_SIZE);
+function name(t: ChromeTile, glyphs: Glyphs, m: PortMark, centre: number, side: ChromePart): PathItem {
+  const type = m.type;
+  const { contours, width } = glyphs(m.label ?? CONNECTOR_STYLE[type].label, NAME_SIZE, { leading: NAME_LEADING });
   const left = side === ChromePart.PortIn ? t.x - NAME_GAP - width : t.x + t.width + NAME_GAP;
-  return item(t, ChromePart.PortName, shift(contours, left, centre + NAME_SIZE / 2), CONNECTOR_STYLE[type].color);
+  return item(t, ChromePart.PortName, shift(contours, left, centre - NAME_SIZE / 2), CONNECTOR_STYLE[type].color);
 }
 
 function names(t: ChromeTile, glyphs: Glyphs): PathItem[] {
-  if (!t.names) {
-    return [];
-  }
-  const inputs = t.inputs.map((type, i) => name(t, glyphs, type, spaced(t, i, t.inputs.length), ChromePart.PortIn));
-  return t.output ? [...inputs, name(t, glyphs, t.output, t.y + t.height / 2, ChromePart.PortOut)] : inputs;
+  const shown = (m: PortMark) => t.names || PORT_LOOK[m.state].named;
+  const inputs = t.inputs.flatMap((m, i) => (shown(m) ? [name(t, glyphs, m, spaced(t, i, t.inputs.length), ChromePart.PortIn)] : []));
+  const outputs = t.outputs.flatMap((m, i) => (shown(m) ? [name(t, glyphs, m, spaced(t, i, t.outputs.length), ChromePart.PortOut)] : []));
+  return [...inputs, ...outputs];
 }
 
 export const tileChrome = (t: ChromeTile, glyphs: Glyphs): PathItem[] => [...hover(t), ...RINGS[t.ring](t), ...ports(t), ...names(t, glyphs), ...handles(t), ...label(t, glyphs)];
