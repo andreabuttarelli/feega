@@ -4,6 +4,7 @@ import { getFacebookPages, selectFacebookPage, syncBrandAccounts, type FacebookP
 import { canAffordSeat } from '$lib/server/social-connections';
 import { BILLING_PATH } from '$lib/billing-path';
 import { brandSlugOf } from '$lib/server/tenancy/brand-slug';
+import { load as projectShell } from '$lib/server/projects/project-shell';
 
 // Facebook headless connect — the page Zernio redirects back to after OAuth. Meta only allows
 // posting to a Page (never a personal profile), so we list the Pages the user admins and let them
@@ -45,8 +46,9 @@ const resolveBrand = async (
   return data ?? null;
 };
 
-export const load: PageServerLoad = async ({ params, url, parent, locals: { supabase } }) => {
-  await parent(); // ensures the brand layout (auth + brand resolution) has run
+export const load: PageServerLoad = async (event) => {
+  const { params, url, locals: { supabase } } = event;
+  await projectShell(event);
   const dest = url.searchParams.get('return') === 'activate' ? 'activate' : 'settings';
   const tempToken = url.searchParams.get('tempToken') ?? url.searchParams.get('temp_token');
   // Zernio names this connect_token; accept documented name + fallbacks.

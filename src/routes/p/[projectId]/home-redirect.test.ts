@@ -20,11 +20,14 @@ const redirect = vi.fn((status: number, location: string) => {
 
 vi.mock('@sveltejs/kit', async (orig) => ({ ...(await orig<object>()), redirect, error: vi.fn() }));
 
+const projectShell = vi.fn();
+vi.mock('$lib/server/projects/project-shell', () => ({ load: projectShell }));
+
 async function loadHome(canvases: Array<{ id: string }>, projectId = 'proj1') {
 	const mod = await import('./+page.server');
+	projectShell.mockResolvedValue({ project: { id: projectId }, org: { id: 'org1' }, canvases });
 	try {
 		await (mod.load as (e: unknown) => Promise<unknown>)({
-			parent: async () => ({ project: { id: projectId }, org: { id: 'org1' }, canvases }),
 			locals: { db: async () => fakeDb({ canvases: [] }).db }
 		});
 		return { redirected: null as null | { status: number; location: string } };
