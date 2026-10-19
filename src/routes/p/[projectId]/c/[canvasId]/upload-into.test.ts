@@ -43,6 +43,8 @@ vi.mock('$lib/server/repos/influencers', () => ({
 	signInfluencerViewFiles: vi.fn()
 }));
 
+import { readFileSync } from 'node:fs';
+import { fakeDb } from '$lib/server/db/fake-db';
 import { actions } from './+page.server';
 
 const SCOPE = { orgId: 'org-1', canvasId: 'canvas-1' };
@@ -109,5 +111,25 @@ describe('actions.importLink', () => {
 
 		expect(importCanvasLink).not.toHaveBeenCalled();
 		expect(result).toMatchObject({ status: 400 });
+	});
+});
+
+describe('actions.uploadFont', () => {
+	it('a font dropped on the canvas joins the org font library under its real family', async () => {
+		const path = 'org-1/fonts/x-fraunces.woff2';
+		const { db, calls } = fakeDb({ assets: [] }, { files: { [path]: new Uint8Array(readFileSync('static/fonts/fraunces-latin.woff2')) } });
+		const event = fakeEvent({ path }) as unknown as { locals: { db: () => Promise<unknown> } };
+		event.locals.db = async () => db;
+
+		const result = await actions.uploadFont(event as never);
+
+		expect(result).toMatchObject({ font: { family: 'Fraunces' } });
+		expect(calls.find((c) => c.op === 'insert')?.payload).toMatchObject({ org_id: 'org-1', project_id: null, url: path });
+	});
+
+	it('refuses a font path outside the org folder', async () => {
+		const result = await actions.uploadFont(fakeEvent({ path: 'org-2/fonts/x.woff2' }));
+
+		expect(result).toMatchObject({ status: 400, data: { error: 'invalid_path' } });
 	});
 });

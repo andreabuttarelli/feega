@@ -1446,9 +1446,11 @@
     props.onConnectNew?.(selected, s.createsNodeType, s.promptTemplate);
   }
 
+  const OS_FILES = 'Files';
+
   function onDragOver(e: DragEvent) {
     const types = e.dataTransfer?.types ?? [];
-    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT].some((type) => types.includes(type))) {
+    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, OS_FILES].some((type) => types.includes(type))) {
       return;
     }
     e.preventDefault();
@@ -1457,6 +1459,12 @@
 
   function onDrop(e: DragEvent) {
     const at = { x: e.clientX, y: e.clientY };
+    const files = [...(e.dataTransfer?.files ?? [])];
+    if (files.length && props.onUpload) {
+      e.preventDefault();
+      files.forEach((file) => props.onUpload?.(file));
+      return;
+    }
     const output = e.dataTransfer?.getData(CANVAS_DRAG_OUTPUT);
     if (output) {
       e.preventDefault();

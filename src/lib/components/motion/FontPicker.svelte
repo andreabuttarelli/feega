@@ -1,18 +1,19 @@
 <script lang="ts">
   import { BuiltinFont, fontStack, nearestWeight, searchFonts, type CatalogueFont, type FontFace } from '$lib/motion/fonts/model';
+  import { MAX_FONT_MB, type FontLibrary } from '$lib/motion/fonts/library';
 
   let {
     value,
     fonts,
     brand = [],
     onpick,
-    onupload
+    library = null
   }: {
     value: string;
     fonts: FontFace[];
     brand?: string[];
     onpick: (family: string, catalogue: CatalogueFont[]) => void;
-    onupload?: (file: File) => Promise<string | null>;
+    library?: FontLibrary | null;
   } = $props();
 
   const RESULTS = 40;
@@ -25,6 +26,10 @@
   let catalogue = $state<CatalogueFont[]>([]);
   let uploading = $state(false);
   let uploadError = $state('');
+  let renaming = $state<string | null>(null);
+
+  const uploaded = $derived((library?.families ?? []).filter((f) => f.family.toLowerCase().includes(query.trim().toLowerCase())));
+  const missing = $derived(library?.missing.includes(value) ?? false);
 
   const results = $derived(searchFonts(catalogue, query, brand, RESULTS));
   const brandSet = $derived(new Set(brand));
@@ -64,20 +69,40 @@
   async function upload(input: HTMLInputElement) {
     const file = input.files?.[0];
     input.value = '';
-    if (!file || !onupload) {
+    if (!file || !library) {
       return;
     }
     uploading = true;
-    uploadError = (await onupload(file)) ?? '';
+    const uploadedFont = await library.upload(file);
     uploading = false;
-    if (!uploadError) {
-      open = false;
+    uploadError = uploadedFont.ok ? '' : uploadedFont.error;
+    if (uploadedFont.ok) {
+      pick(uploadedFont.family);
     }
+  }
+
+  async function rename(family: string, to: string) {
+    if (renaming !== family) {
+      return;
+    }
+    renaming = null;
+    if (!library || !to.trim() || to.trim() === family) {
+      return;
+    }
+    uploadError = (await library.rename(family, to.trim())) ?? '';
+  }
+
+  async function remove(family: string) {
+    if (!library || !confirm(`Delete the uploaded font ${family} for everyone in the workspace? Videos using it fall back to a system font.`)) {
+      return;
+    }
+    uploadError = (await library.remove(family)) ?? '';
   }
 </script>
 
 <div class="font-picker" data-testid="font-picker">
   <button type="button" class="current" style={`font-family: ${fontStack(value, fonts)}`} aria-expanded={open} aria-label={`Font ${value}`} onclick={toggle}>{value}</button>
+  {#if missing}<p class="warn" role="status" data-testid="font-missing">The file of {value} is gone: a fallback font is showing.</p>{/if}
   {#if open}
     <div class="panel" role="dialog" aria-label="Choose a font">
       <input type="search" placeholder="Search Google Fonts…" aria-label="Search fonts" bind:value={query} />
@@ -87,6 +112,24 @@
           <li><button type="button" class:on={family === value} style={`font-family: ${fontStack(family, fonts)}`} onclick={() => pick(family)}>{family}</button></li>
         {/each}
       </ul>
+      {#if library}
+        <p class="group">Uploaded</p>
+        <ul data-testid="font-uploaded">
+          {#each uploaded as font (font.family)}
+            <li class="row">
+              {#if renaming === font.family}
+                <input class="rename" value={font.family} aria-label={`Rename ${font.family}`} {@attach (el) => el.focus()} onkeydown={(e) => (e.key === 'Enter' ? rename(font.family, e.currentTarget.value) : e.key === 'Escape' ? (renaming = null) : null)} onblur={(e) => rename(font.family, e.currentTarget.value)} />
+              {:else}
+                <button type="button" class:on={font.family === value} style={`font-family: '${font.family}', system-ui`} onclick={() => pick(font.family)}>{font.family}<span class="tag">{font.variants.length > 1 ? `${font.variants.length} styles` : 'uploaded'}</span></button>
+                <button type="button" class="act" aria-label={`Rename ${font.family}`} onclick={() => (renaming = font.family)}>Rename</button>
+                <button type="button" class="act" aria-label={`Delete ${font.family}`} onclick={() => remove(font.family)}>Delete</button>
+              {/if}
+            </li>
+          {:else}
+            <li class="muted">{library.families.length ? 'No uploaded font matches.' : 'No uploaded fonts yet.'}</li>
+          {/each}
+        </ul>
+      {/if}
       <p class="group">Google Fonts{brand.length ? ' · brand first' : ''}</p>
       <ul class="results" data-testid="font-results">
         {#each results as font (font.f)}
@@ -99,12 +142,12 @@
           <li class="muted">{catalogue.length ? 'No font matches.' : 'Loading the catalogue…'}</li>
         {/each}
       </ul>
-      {#if onupload}
+      {#if library}
         <label class="upload">
           <input type="file" accept={ACCEPT} aria-label="Upload a font file" disabled={uploading} onchange={(e) => upload(e.currentTarget)} />
-          {uploading ? 'Uploading…' : 'Upload a font (TTF, OTF, WOFF2)'}
+          {uploading ? 'Uploading…' : 'Upload font…'}
         </label>
-        <p class="muted">Upload only fonts your licence lets you use in videos.</p>
+        <p class="muted">TTF, OTF, WOFF or WOFF2, up to {MAX_FONT_MB}MB. Everyone in the workspace can use it; upload only fonts your licence allows.</p>
         {#if uploadError}<p class="error" role="alert">{uploadError}</p>{/if}
       {/if}
     </div>
@@ -183,6 +226,34 @@
     font-size: 12px;
     display: grid;
     gap: 4px;
+  }
+
+  .row {
+    display: flex;
+    gap: 2px;
+  }
+
+  .row > button:first-child {
+    flex: 1;
+  }
+
+  .act {
+    font-size: 10px;
+    padding: 0 4px;
+    color: var(--muted-foreground, #888);
+    border-radius: var(--ui-radius-sm);
+  }
+
+  .rename {
+    width: 100%;
+    font-size: 14px;
+    border-radius: var(--ui-radius-sm);
+  }
+
+  .warn {
+    color: #b45309;
+    font-size: 11px;
+    margin: 2px 0 0;
   }
 
   .error {

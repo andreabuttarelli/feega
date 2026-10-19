@@ -59,7 +59,8 @@
   import TextPathSection from './TextPathSection.svelte';
   import AutoLayoutSection from './AutoLayoutSection.svelte';
   import StyleSection from './StyleSection.svelte';
-  import { registerFont, setFont } from '$lib/motion/fonts/ops';
+  import { registerFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+  import type { FontLibrary } from '$lib/motion/fonts/library';
   import type { CatalogueFont } from '$lib/motion/fonts/model';
   import { withParams } from '$lib/motion/custom/params';
   import type { CustomSource } from '$lib/motion/custom/component';
@@ -101,7 +102,7 @@
     composeHref = null,
     tab = $bindable<InspectorTab>(InspectorTab.Properties),
     onchange,
-    onuploadfont,
+    fonts = null,
     upload = null,
     onopen,
     focus = null,
@@ -121,7 +122,7 @@
     composeHref?: string | null;
     tab?: InspectorTab;
     onchange: (doc: MotionDoc, summary: string) => void;
-    onuploadfont?: (file: File) => Promise<string | null>;
+    fonts?: FontLibrary | null;
     upload?: MediaUploader | null;
     onopen?: (comp: string) => void;
     focus?: readonly string[] | null;
@@ -225,12 +226,13 @@
     commit(setProps(doc, clip.id, { [field.key]: value }), `Edited ${field.label.toLowerCase()}`);
   }
 
-  function pickFont(field: Field, family: string, catalogue: CatalogueFont[]) {
+  function pickFont(field: Field, asked: string, catalogue: CatalogueFont[]) {
+    const { doc: base, family } = withUploaded(doc, asked, fonts?.families ?? []);
     if (clip.component !== 'Custom') {
-      commit(setFont(doc, clip.id, { family }, catalogue), `Set the font to ${family}`);
+      commit(setFont(base, clip.id, { family }, catalogue), `Set the font to ${family}`);
       return;
     }
-    const registered = registerFont(doc, family, catalogue);
+    const registered = registerFont(base, family, catalogue);
     commit(registered.ok ? setProps(registered.doc, clip.id, { [field.key]: family }) : registered, `Set ${field.label.toLowerCase()} to ${family}`);
   }
 
@@ -580,7 +582,7 @@
         {:else if field.control === Control.MediaList}
           <MediaListField label={field.label} value={value(field)} {assets} {upload} onchange={(list) => setProp(field, list)} />
         {:else if field.control === Control.Font}
-          <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} onupload={onuploadfont} />
+          <FontPicker value={String(value(field))} fonts={doc.fonts} brand={tokens.fonts ?? []} onpick={(family, catalogue) => pickFont(field, family, catalogue)} library={fonts} />
         {:else if field.control === Control.Comp}
           <div class="comp">
             <select id={`f-${field.key}`} value={String(value(field))} onchange={(e) => setProp(field, e.currentTarget.value)}>

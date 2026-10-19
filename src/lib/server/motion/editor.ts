@@ -1,6 +1,6 @@
 import { isInteractive } from '$lib/motion/interactive/settings';
 import type { Db } from '$lib/server/db/client';
-import { listProjectAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
+import { listFontAssets, listProjectAssets, type Asset, type AssetType } from '$lib/server/repos/assets';
 import { findBrandLook } from '$lib/server/repos/brands';
 import { DataCheck, findNode, patchNodeData, resizeNode, type CanvasNodeRecord } from '$lib/server/repos/canvas';
 import { appendRevision, readHead, RevisionOutcome, type Checkpoint, type MotionHead, type RevisionWrite } from '$lib/server/repos/motion-revisions';
@@ -12,6 +12,7 @@ import { AssetKind } from '$lib/motion/components';
 import { FEEGA_TOKENS, brandTokens, paletteFrom, type BrandTokens } from '$lib/motion/brand';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { fontsFrom } from '$lib/motion/fonts/model';
+import { fontFileOf } from '$lib/motion/fonts/library';
 
 export type MotionAsset = { id: string; kind: AssetKind; label: string; previewUrl: string; url: string | null; seconds?: number | null; width?: number | null; height?: number | null };
 
@@ -58,6 +59,10 @@ export async function motionTokens(db: Db, input: { orgId: string; brandId: stri
 }
 
 function assetLabel(asset: Asset, kind: AssetKind): string {
+  if (kind === AssetKind.Font) {
+    const font = fontFileOf(asset);
+    return `${font.family} ${font.weight}${font.italic ? ' italic' : ''}`;
+  }
   return `${kind} · ${asset.createdAt.slice(0, 10)} · ${asset.id.slice(0, 6)}`;
 }
 
@@ -74,10 +79,7 @@ const newestFirst = (a: Asset, b: Asset) => b.createdAt.localeCompare(a.createdA
 
 export async function motionAssets(scope: AssetScope, ttlSeconds?: number): Promise<MotionAsset[]> {
   const place = { orgId: scope.orgId, projectId: scope.projectId, limit: ASSET_LIMIT };
-  const [media, fonts] = await Promise.all([
-    listProjectAssets(scope.db, { ...place, types: MEDIA_TYPES }),
-    listProjectAssets(scope.db, { ...place, types: ['document'], mimePrefix: FONT_MIME })
-  ]);
+  const [media, fonts] = await Promise.all([listProjectAssets(scope.db, { ...place, types: MEDIA_TYPES }), listFontAssets(scope.db, place)]);
   const unique = [...new Map([...media, ...fonts].map((a) => [a.id, a])).values()];
   const usable = unique.filter((a) => kindOf(a) && a.url).sort(newestFirst).slice(0, ASSET_LIMIT);
   return signAssets(scope, usable, ttlSeconds);
@@ -85,7 +87,8 @@ export async function motionAssets(scope: AssetScope, ttlSeconds?: number): Prom
 
 export async function assetsById(scope: AssetScope, ids: string[]): Promise<Record<string, string>> {
   const wanted = new Set(ids);
-  const all = await listProjectAssets(scope.db, { orgId: scope.orgId, projectId: scope.projectId });
+  const [project, fonts] = await Promise.all([listProjectAssets(scope.db, { orgId: scope.orgId, projectId: scope.projectId }), listFontAssets(scope.db, { orgId: scope.orgId, limit: ASSET_LIMIT })]);
+  const all = [...new Map([...project, ...fonts].map((a) => [a.id, a])).values()];
   return assetUrls(await signAssets(scope, all.filter((a) => wanted.has(a.id) && kindOf(a) && a.url)));
 }
 

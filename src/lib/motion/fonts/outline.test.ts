@@ -18,4 +18,9 @@ describe('outlineUrl', () => {
     expect(outlineUrl('Acme Sans', 700, [upload], { 'font-1': 'https://x/acme.ttf' })).toBe('https://x/acme.ttf');
     expect(outlineUrl('Acme Sans', 700, [upload], {})).toBeNull();
   });
+
+  it('an uploaded family with several files takes the file nearest the weight', () => {
+    const family = { ...upload, weights: [400, 700], variants: [{ assetId: 'r', weight: 400, italic: false }, { assetId: 'b', weight: 700, italic: false }] } as FontFace;
+    expect(outlineUrl('Acme Sans', 800, [family], { r: 'https://x/r.ttf', b: 'https://x/b.ttf' })).toBe('https://x/b.ttf');
+  });
 });

@@ -94,6 +94,7 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
 }));
 vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async (_db: unknown, input: { orgId: string }) => (input.orgId === ORG ? { id: PROJECT, brandId: null } : null) }));
 vi.mock('$lib/server/repos/assets', () => ({
+  listFontAssets: async () => [],
   listProjectAssets: async () => [],
   findAssets: async () => new Map([['a-doc', { id: 'a-doc', projectId: PROJECT, type: 'document', url: 'x', content: 'Green bottles.', mimeType: 'text/markdown' }]])
 }));

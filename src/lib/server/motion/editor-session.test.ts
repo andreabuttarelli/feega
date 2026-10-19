@@ -23,6 +23,7 @@ vi.mock('$lib/server/repos/node-runs', () => ({ listNodeRuns: () => slow([]) }))
 vi.mock('./templates', () => ({ templateLibrary: () => ({ own: () => slow([]) }) }));
 vi.mock('$lib/server/gallery/editor', () => ({ editorGallery: () => slow(null) }));
 vi.mock('./renderer', () => ({ motionRenderFarm: () => null, knownRenderLimit: () => null }));
+vi.mock('./font-upload', () => ({ orgFontFamilies: () => slow([]) }));
 
 const { loadEditorSession } = await import('./editor-session');
 const { serverTiming } = await import('$lib/server/server-timing');
@@ -52,5 +53,6 @@ describe('loadEditorSession', () => {
     expect(phases.header()).toMatch(/scope;dur=\d+/);
     expect(phases.header()).toMatch(/head;dur=\d+/);
     expect(phases.header()).toMatch(/assets;dur=\d+/);
+    expect(phases.header()).toMatch(/fonts;dur=\d+/);
   });
 });
