@@ -30,6 +30,8 @@
   import { tileHovered } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
   import { overlayOf } from '$lib/canvas/core/world-overlay';
+  import { peerOutlines } from '$lib/canvas/peer-outlines';
+  import { displayName } from '$lib/realtime/frame-presence';
   import { dev } from '$app/environment';
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
@@ -1303,7 +1305,25 @@
 
   const SNAP_SCREEN_PX = 6;
   let snapGuides = $state<SnapGuide[]>([]);
-  const coreOverlay = $derived(coreOn && coreLook ? overlayOf({ curves, selected, selectedEdge, marquee, guides: snapGuides, zoom: view.zoom, theme: { ...coreLook, panel: coreLook.paper } }) : []);
+  const corePeers = $derived(coreOn && coreType ? (props.peers ?? []).filter((p) => !p.chat) : []);
+  const coreRotate = $derived(coreOn && props.onRotate ? selectedBoxes.filter((t) => t.rotatable && !t.rotation).map((t) => ({ id: t.id, box: { x: t.x, y: t.y, w: t.w, h: t.h } })) : []);
+  const coreOverlay = $derived(
+    coreOn && coreLook && coreType
+      ? overlayOf({
+          curves,
+          selected,
+          selectedEdge,
+          marquee,
+          guides: snapGuides,
+          zoom: view.zoom,
+          theme: { ...coreLook, panel: coreLook.paper },
+          glyphs: coreType.glyphs,
+          peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
+          outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
+          rotate: coreRotate
+        })
+      : []
+  );
   let snapSpacing = $state<SpacingGap[]>([]);
   let altHeld = $state(false);
 
@@ -1725,7 +1745,7 @@
           data-box={`${t.x},${t.y},${t.w},${t.h}`}
           style={`transform: translate(${t.x}px, ${t.y}px);width:${t.w}px;height:${t.h}px${t.rotation ? `;rotate:${t.rotation}deg;transform-origin:${t.w / 2}px ${t.h / 2}px` : ''}`}
         >
-          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} />
+          <GpuTileChrome tile={t} selected={on} painted={coreDrawn.has(t.id)} full={chromeIds.has(t.id)} resizable={resizable && on} onrotate={props.onRotate} knobDrawn={coreRotate.some((r) => r.id === t.id)} />
           {@render props.tileOver?.({ id: t.id })}
           {#if !domIds.has(t.id) && t.kind === 'motion'}
             {@const kind = String(summaries.get(t.id)?.data.kind ?? 'frame')}
@@ -1746,7 +1766,7 @@
           {/if}
         </div>
       {/each}
-      <PeerLayer peers={props.peers ?? []} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
+      <PeerLayer peers={corePeers.length ? (props.peers ?? []).filter((p) => p.chat) : (props.peers ?? [])} outlined={!corePeers.length} rectOf={(id) => byId.get(id) ?? null} zoom={view.zoom} />
       {#if measured.length || snapGuides.length || snapSpacing.length}
         <MeasureLayer gaps={[...measured, ...snapSpacing]} guides={coreOn ? [] : snapGuides} zoom={view.zoom} />
       {/if}
