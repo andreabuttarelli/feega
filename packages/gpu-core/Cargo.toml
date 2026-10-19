@@ -28,7 +28,9 @@ png = "0.17"
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "=0.2.129"
 wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3", features = ["HtmlCanvasElement", "HtmlImageElement", "HtmlVideoElement", "ImageBitmap"] }
+web-sys = { version = "0.3", features = ["HtmlCanvasElement", "HtmlImageElement", "HtmlVideoElement", "ImageBitmap", "WebGl2RenderingContext", "WebGlTexture"] }
+vello_hybrid = { version = "0.2.0", default-features = false, features = ["webgl"] }
+vello_common = "0.2.0"
 
 [profile.release]
 opt-level = "s"
