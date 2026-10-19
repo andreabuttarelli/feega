@@ -4,9 +4,8 @@ use vello::wgpu;
 use vello::{AaConfig, AaSupport, RenderParams, RendererOptions, Scene};
 
 use crate::display_list::{Cover, DisplayList, Item, Look, MaskMode};
-use crate::filter_passes::FilterPasses;
-use crate::filters::Fx;
-use crate::passes::{layer_texture, Fold, Passes};
+use crate::filter_passes::{layer_texture, FilterPasses, WgpuRunner};
+use crate::filters::{Fold, Fx};
 use crate::pictures::Pictures;
 use crate::scene::{alone, bounds, build, cover, layer_worthy, plain, silhouette, Layers, Placed};
 use crate::Skipped;
@@ -30,7 +29,6 @@ fn snapped(r: Rect, frame: Rect) -> Rect {
 
 pub struct Engine {
     pub vello: vello::Renderer,
-    passes: Passes,
     filters: FilterPasses,
 }
 
@@ -47,7 +45,7 @@ struct Gpu<'a> {
 impl Engine {
     pub fn new(device: &wgpu::Device) -> Result<Self, EngineError> {
         let vello = vello::Renderer::new(device, RendererOptions { antialiasing_support: AaSupport::area_only(), ..Default::default() })?;
-        Ok(Self { vello, passes: Passes::new(device), filters: FilterPasses::new(device) })
+        Ok(Self { vello, filters: FilterPasses::new(device) })
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
@@ -70,6 +68,10 @@ impl Engine {
             self.vello.unregister_texture(image);
         }
         drawn.map(|_| skipped)
+    }
+
+    fn runner<'a>(&'a self, gpu: &Gpu<'a>) -> WgpuRunner<'a> {
+        WgpuRunner { device: gpu.device, queue: gpu.queue, passes: &self.filters }
     }
 
     fn render(&mut self, gpu: &Gpu, scene: &Scene, base: Color, target: &wgpu::TextureView, (width, height): (u32, u32)) -> Result<(), EngineError> {
@@ -106,9 +108,9 @@ impl Engine {
         let under = DisplayList { items: list.items[..at].to_vec(), ..list.clone_empty() };
         let (scene, _) = build(&under, pictures, layers);
         let below = self.paint(gpu, &scene, region, base)?;
-        let soft = self.passes.blur(gpu.device, gpu.queue, below, sigma);
+        let soft = Fx { runner: &self.runner(gpu) }.blurred(below, sigma);
         let shape = self.paint(gpu, &silhouette(item, pictures, frame), region, Color::TRANSPARENT)?;
-        let texture = self.passes.apply(gpu.device, gpu.queue, &soft, &shape);
+        let texture = Fx { runner: &self.runner(gpu) }.masked(&soft, &shape);
         Ok(self.place(texture, region))
     }
 
@@ -128,12 +130,12 @@ impl Engine {
         let region = Self::region(gpu, item, look, pictures);
         let body = self.paint(gpu, &alone(item, pictures, frame), region, Color::TRANSPARENT)?;
         let body = match &look.filters {
-            Some(filters) => Fx { device: gpu.device, queue: gpu.queue, passes: &self.filters }.apply(body, filters, look.space.unwrap_or(UNIT_SPACE)),
+            Some(filters) => Fx { runner: &self.runner(gpu) }.apply(body, filters, look.space.unwrap_or(UNIT_SPACE)),
             None => body,
         };
-        let body = self.passes.blur(gpu.device, gpu.queue, body, look.blur);
+        let body = Fx { runner: &self.runner(gpu) }.blurred(body, look.blur);
         let texture = match self.mask(gpu, look, pictures, region)? {
-            Some(mask) => self.passes.apply(gpu.device, gpu.queue, &body, &mask),
+            Some(mask) => Fx { runner: &self.runner(gpu) }.masked(&body, &mask),
             None => body,
         };
         Ok(self.place(texture, region))
@@ -144,13 +146,13 @@ impl Engine {
         let mut acc: Option<wgpu::Texture> = None;
         for layer in look.masks.iter().flatten() {
             let covered = self.paint(gpu, &cover(&layer.cover, pictures), region, Color::TRANSPARENT)?;
-            let covered = self.passes.blur(gpu.device, gpu.queue, covered, layer.feather);
+            let covered = Fx { runner: &self.runner(gpu) }.blurred(covered, layer.feather);
             let luma = matches!(layer.cover, Cover::Picture { luma: true, .. });
-            acc = Some(self.passes.fold(gpu.device, gpu.queue, acc.as_ref(), &covered, Fold { mode: layer.mode, level: layer.level, invert: layer.invert, luma }));
+            acc = Some(Fx { runner: &self.runner(gpu) }.folded(acc.as_ref(), &covered, Fold { mode: layer.mode, level: layer.level, invert: layer.invert, luma }));
         }
         if let Some(matte) = &look.matte {
             let covered = self.paint(gpu, &plain(&matte.items, pictures, frame), region, Color::TRANSPARENT)?;
-            acc = Some(self.passes.fold(gpu.device, gpu.queue, acc.as_ref(), &covered, Fold { mode: MaskMode::Intersect, level: 1.0, invert: matte.invert, luma: matte.luma }));
+            acc = Some(Fx { runner: &self.runner(gpu) }.folded(acc.as_ref(), &covered, Fold { mode: MaskMode::Intersect, level: 1.0, invert: matte.invert, luma: matte.luma }));
         }
         Ok(acc)
     }
