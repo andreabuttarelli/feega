@@ -42,7 +42,8 @@ export enum ItemKind {
   Image = 'image',
   Layer = 'layer',
   Text = 'text',
-  Lens = 'lens'
+  Lens = 'lens',
+  Glyphs = 'glyphs'
 }
 
 export enum Unsupported {
@@ -82,7 +83,9 @@ export type TextItem = { kind: ItemKind.Text; clip: string; plan: TextPlan; turn
 
 export type LensItem = { kind: ItemKind.Lens; clip: string; lens: Lens; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
-export type Item = PathItem | ImageItem | LayerItem | TextItem | LensItem;
+export type GlyphsItem = { kind: ItemKind.Glyphs; clip: string; font: string; coords: [string, number][]; size: number; glyphs: [number, number, number][]; paint: Paint; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+
+export type Item = GlyphsItem | PathItem | ImageItem | LayerItem | TextItem | LensItem;
 
 export enum FilterKind {
   Css = 'css',
@@ -105,7 +108,8 @@ export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<str
 
 type PathContent = Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number };
 type ImageContent = Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { stencil?: PathContent[] };
-type Content = PathContent | ImageContent | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<TextItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LensItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
+type GlyphsContent = Omit<GlyphsItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number };
+type Content = PathContent | ImageContent | GlyphsContent | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<TextItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LensItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
 type Size = { width: number; height: number };
 type Partly = { content: Content[]; gaps: string[] };
 type Painted = Content[] | Partly | Unsupported;
@@ -243,6 +247,9 @@ function outlinedText(env: Env): Painted {
   const turn = scaleAbout(frame.left + frame.width / 2, frame.top + frame.height / 2, Number(props.rotation ?? 0), scale);
   return inks.map((ink): Content => {
     const path: PathContent = { kind: ItemKind.Path, contours: ink.contours, rule: ink.rule, paint: ink.paint, opacity: ink.opacity, matrix: mul2d(turn, ink.matrix), blur: ink.blur * scale };
+    if (ink.run) {
+      return { kind: ItemKind.Glyphs, ...ink.run, paint: ink.paint, opacity: ink.opacity, matrix: path.matrix, blur: path.blur };
+    }
     if (!ink.picture) {
       return path;
     }

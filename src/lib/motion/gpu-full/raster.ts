@@ -360,7 +360,8 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     [ItemKind.Image]: drawImage,
     [ItemKind.Layer]: drawLayer,
     [ItemKind.Text]: () => {},
-    [ItemKind.Lens]: () => {}
+    [ItemKind.Lens]: () => {},
+    [ItemKind.Glyphs]: () => {}
   };
 
   function drawItem(item: Item, opacity: number, pictures: Pictures) {

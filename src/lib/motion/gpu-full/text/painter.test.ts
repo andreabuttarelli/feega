@@ -3,8 +3,9 @@ import { COMPONENTS } from '../../components';
 import { boxOf } from '../../layout';
 import { FillType } from '../../fill/model';
 import { apply2d } from '../../affine';
-import { paintText, Smoothing, TextGap, type Ink, type TextComponent, type TextEnv } from './painter';
-import { boxBook } from './test-face';
+import { paintText, Smoothing, TextGap, TextOutput, type Ink, type TextComponent, type TextEnv } from './painter';
+import { boxBook, boxFace } from './test-face';
+import type { Face } from './face';
 import { FillRule, PaintKind, type Paint } from '../paint';
 import { animatorSchema, AnimatorUnit, SelectorShape } from '../../text-animators/model';
 
@@ -295,5 +296,27 @@ describe('paintText', () => {
     const tracked = { text: 'abc', align: 'left', tracking: 0.1 };
 
     expect(width(drawn(paintText(env('Text', tracked, { animators: [zero] }))))).toBeCloseTo(width(drawn(paintText(env('Text', { ...tracked, tracking: 0 })))), 0);
+  });
+  describe('as glyph runs', () => {
+    const keyed: Face = { ...boxFace, key: { font: 'box.woff2', coords: [['wght', 400]] } };
+    const runs = (component: TextComponent, props: Record<string, unknown>, change: Partial<TextEnv> = {}) => drawn(paintText(env(component, { text: 'ab', align: 'left', tracking: 0, ...props }, { fonts: () => ({ face: keyed, skew: 0 }), output: TextOutput.Glyphs, ...change })));
+
+    it('hands the core glyph ids and pen positions instead of outlines', () => {
+      const [ink] = runs('Text', {});
+
+      expect(ink.contours).toEqual([]);
+      expect(ink.run).toMatchObject({ font: 'box.woff2', coords: [['wght', 400]] });
+      expect(ink.run?.glyphs.map(([id]) => id)).toEqual([0x61, 0x62]);
+      expect(ink.run!.glyphs[1][1] - ink.run!.glyphs[0][1]).toBeCloseTo(ink.run!.size / 2);
+    });
+
+    it('keeps outlines for a stroke and for a face without a file', () => {
+      expect(runs('Text', { strokes: [{ paint: { type: FillType.Solid, color: '#ff0000' }, width: 0.01 }] }).map((i) => Boolean(i.run))).toEqual([true, false]);
+      expect(runs('Text', {}, { fonts: boxBook() })[0].run).toBeUndefined();
+    });
+
+    it('keeps outlines while a title line is still rising behind its mask', () => {
+      expect(runs('Title', {}, { time: 0.1 })[0]?.run).toBeUndefined();
+    });
   });
 });

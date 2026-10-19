@@ -7,8 +7,8 @@ import { FillType } from '../fill/model';
 import { BlendMode } from '../blend';
 import { displayListAt, drawFrame, FillRule, ItemKind, PaintKind, prepare, Unsupported, type ImageItem, type PathItem } from './display-list';
 import { apply2d } from '../affine';
-import { boxBook } from './text/test-face';
-import { Smoothing } from './text/painter';
+import { boxBook, boxFace } from './text/test-face';
+import { Smoothing, TextOutput } from './text/painter';
 import { addAnimator } from '../text-animators/ops';
 import { setTextPath } from '../text-path/ops';
 import { PathPreset, PathSourceKind } from '../text-path/model';
@@ -177,6 +177,15 @@ describe('displayListAt', () => {
     expect(kinds(fill([{ type: 'linear-gradient', angle: 0, stops }]))).toEqual([ItemKind.Text]);
     expect(new Set(kinds(fill([{ type: 'diamond-gradient', stops }])))).toEqual(new Set([ItemKind.Path]));
     expect(new Set(kinds(fill([{ type: 'angular-gradient', stops }])))).toEqual(new Set([ItemKind.Path]));
+  });
+
+  it('carries text as glyph runs when asked to, for the native core to outline', () => {
+    const keyed = { ...boxFace, key: { font: 'box.woff2', coords: [] as [string, number][] } };
+    const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab' } }, 'text'));
+    const runs = drawFrame(prepare(texted, FEEGA_TOKENS, {}, { fonts: () => ({ face: keyed, skew: 0 }), smoothing: Smoothing.Plain, output: TextOutput.Glyphs }), 60).items.filter((i) => i.clip === 'text');
+
+    expect(runs.map((i) => i.kind)).toEqual([ItemKind.Glyphs]);
+    expect(runs[0]).toMatchObject({ font: 'box.woff2', coords: [], glyphs: [[0x61, expect.any(Number), expect.any(Number)], [0x62, expect.any(Number), expect.any(Number)]] });
   });
 
   describe('text animators', () => {

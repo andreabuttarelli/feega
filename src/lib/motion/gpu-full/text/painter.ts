@@ -36,9 +36,11 @@ export enum TextGap {
 
 export type Painted = { inks: Ink[]; frame: Box };
 
+export type GlyphRun = { font: string; coords: [string, number][]; size: number; glyphs: [number, number, number][] };
+
 export type Picture = { src: string; fit: string; focus: [number, number]; area: Rect };
 
-export type Ink = { contours: number[][]; paint: Paint; rule: FillRule; opacity: number; matrix: Affine; blur: number; picture?: Picture };
+export type Ink = { contours: number[][]; paint: Paint; rule: FillRule; opacity: number; matrix: Affine; blur: number; picture?: Picture; run?: GlyphRun };
 
 type Size = { width: number; height: number };
 
@@ -62,7 +64,12 @@ export const smoothingOf = (userAgent: string): Smoothing => (DILATING_PLATFORM.
 
 export type NativeFaces = { rules: readonly FaceRule[]; registry: readonly FontFace[] };
 
-export type Typeset = { fonts: FaceBook; smoothing: Smoothing; native?: NativeFaces };
+export enum TextOutput {
+  Outlines = 'outlines',
+  Glyphs = 'glyphs'
+}
+
+export type Typeset = { fonts: FaceBook; smoothing: Smoothing; native?: NativeFaces; output?: TextOutput };
 
 export const NO_TYPESET: Typeset = { fonts: () => null, smoothing: Smoothing.Plain };
 
@@ -79,6 +86,7 @@ export type TextEnv = {
   still: number | null;
   fonts: FaceBook;
   animators: readonly TextAnimator[];
+  output?: TextOutput;
   asset: (id: string) => string | null;
 };
 
@@ -490,9 +498,20 @@ function slotsOf(text: string, paragraphs: string[], finest: AnimatorUnit): (par
   };
 }
 
-type Unit = { look: Tinted; contours: number[][]; outlines: number[][]; box: Rect; area: Rect };
+type Positioned = { face: Face; skew: number; glyph: number; x: number; y: number };
 
-export function inksOf(plan: TextPlan, fonts: FaceBook): Painted | TextGap {
+type Unit = { look: Tinted; contours: number[][]; outlines: number[][]; glyphs: Positioned[]; box: Rect; area: Rect };
+
+function runsOf(glyphs: Positioned[], size: number): GlyphRun[] | null {
+  if (!glyphs.every((g) => g.face.key && g.skew === 0)) {
+    return null;
+  }
+  const byFace = new Map<Face, Positioned[]>();
+  glyphs.forEach((g) => byFace.set(g.face, [...(byFace.get(g.face) ?? []), g]));
+  return [...byFace].map(([face, own]) => ({ font: face.key!.font, coords: face.key!.coords, size, glyphs: own.map((g): [number, number, number] => [g.glyph, g.x, g.y]) }));
+}
+
+export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = TextOutput.Outlines): Painted | TextGap {
   const { laid, type, room } = place(plan, fonts);
   const run = plan.animation;
   const slots = run ? slotsOf(plan.text, plan.paragraphs, run.finest) : null;
@@ -531,9 +550,10 @@ export function inksOf(plan: TextPlan, fonts: FaceBook): Painted | TextGap {
       for (const g of line.glyphs) {
         const slot = slots && g.word >= 0 ? slots(i, g) : null;
         const key = `${slot ? slot.key : -1}:${plan.area === Area.Line ? l : 0}`;
-        const unit = units.get(key) ?? { look: slot && run ? (run.looks[slot.look] ?? UNTINTED) : UNTINTED, contours: [], outlines: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[plan.area] };
+        const unit = units.get(key) ?? { look: slot && run ? (run.looks[slot.look] ?? UNTINTED) : UNTINTED, contours: [], outlines: [], glyphs: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[plan.area] };
         units.set(key, unit);
         unit.contours.push(...moved(glyphContours(g.face, g.glyph, type.size, g.skew, smoothing.darken(type.size)), x + g.x, baseline - g.dy));
+        unit.glyphs.push({ face: g.face, skew: g.skew, glyph: g.glyph, x: x + g.x, y: baseline - g.dy });
         unit.outlines.push(...(plan.outline ? moved(glyphContours(g.face, g.glyph, type.size, g.skew, 0), x + g.x, baseline - g.dy + smoothing.rise) : []));
         unit.box = [Math.min(unit.box[0], x + g.pen), Math.min(unit.box[1], top), Math.max(unit.box[2], x + g.pen + g.advance), Math.max(unit.box[3], top + laid.lineHeight)];
       }
@@ -550,10 +570,12 @@ export function inksOf(plan: TextPlan, fonts: FaceBook): Painted | TextGap {
       };
       const ink = (contours: number[][], paint: Paint, rule: FillRule, squash = 1, picture?: Picture): Ink => ({ contours: squashed(contours, squash), paint, rule, opacity: plan.fade * look.opacity, matrix: unsquashed(matrix, squash), blur: look.blur * scaleOf(look.turn), ...(picture ? { picture } : {}) });
       const shown = placed(unit.contours);
-      const filled = plan.fills.flatMap((f) => shadesOf(f, unit.area)).map((shade) => ink(shade.clip ? within(shown, shade.clip) : shown, tinted(shade.paint, look), FillRule.NonZero, shade.squash, shade.picture));
+      const runs = output === TextOutput.Glyphs && rise === 0 ? runsOf(unit.glyphs, type.size) : null;
+      const asRuns = (paint: Paint) => runs!.map((run): Ink => ({ contours: [], paint, rule: FillRule.NonZero, opacity: plan.fade * look.opacity, matrix: look === UNTINTED ? matrix : mul2d(matrix, turn), blur: look.blur * scaleOf(look.turn), run }));
+      const filled = plan.fills.flatMap((f) => shadesOf(f, unit.area)).flatMap((shade) => (runs && !shade.clip && shade.squash === 1 && !shade.picture ? asRuns(tinted(shade.paint, look)) : [ink(shade.clip ? within(shown, shade.clip) : shown, tinted(shade.paint, look), FillRule.NonZero, shade.squash, shade.picture)]));
       const outline = plan.outline;
       const stroked = outline ? [ink(placed(unit.outlines.flatMap((c) => strokePolygons(c, true, outline.width, Cap.Butt, Join.Miter))), tinted({ kind: PaintKind.Solid, color: outline.colour }, look), FillRule.Union)] : [];
-      inks.push(...(outline?.under ? [...stroked, ...filled] : [...filled, ...stroked]).filter((i) => i.contours.length && visible(i.paint)));
+      inks.push(...(outline?.under ? [...stroked, ...filled] : [...filled, ...stroked]).filter((i) => (i.contours.length || i.run) && visible(i.paint)));
     }
   });
   const rendered = { left, top: plan.frame.top, width: plan.frame.hugs ? laid.width : plan.frame.width, height: plan.frame.anchor === Anchor.Top ? laid.height : plan.frame.height };
@@ -562,5 +584,5 @@ export function inksOf(plan: TextPlan, fonts: FaceBook): Painted | TextGap {
 
 export function paintText(env: TextEnv): Painted | TextGap {
   const plan = planOf(env);
-  return typeof plan === 'string' ? plan : inksOf(plan, env.fonts);
+  return typeof plan === 'string' ? plan : inksOf(plan, env.fonts, env.output);
 }
