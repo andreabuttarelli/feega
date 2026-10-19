@@ -124,4 +124,19 @@ describe('tileChrome', () => {
 
     expect(asked).toEqual([0]);
   });
+
+  it('dims ports a drag cannot reach and half-dims flagged ones', () => {
+    const t = tile({ inputs: [{ type: 'text', state: PortState.Off }, { type: 'images', state: PortState.Flagged }] });
+    const [off, flagged] = ofPart(t, ChromePart.PortIn);
+
+    expect(off.opacity).toBe(0.12);
+    expect(flagged.opacity).toBe(0.5);
+  });
+
+  it('rings a lit port 1px out, offset 1px, and names it', () => {
+    const t = tile({ outputs: [{ type: 'videos', state: PortState.Lit }] });
+
+    expect(box(ofPart(t, ChromePart.PortRing)[0].contours)).toEqual([398, 268, 412, 282]);
+    expect(ofPart(t, ChromePart.PortName)).toHaveLength(1);
+  });
 });
