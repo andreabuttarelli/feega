@@ -136,7 +136,7 @@
   import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
   import BarSlot from '$lib/components/brand-agent/BarSlot.svelte';
-  import { rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
+  import { BarSeat, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
   import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
@@ -305,6 +305,7 @@
   let hostWidth = $state(0);
   const viewport = $derived(viewportOf(rules.measure === Measure.Host && hostWidth ? hostWidth : width));
   const chatPlace = $derived(CHAT_PLACE[viewport]);
+  const barSeat = $derived(mount === Mount.Canvas && viewportOf(width) === Viewport.Desktop ? BarSeat.InPlace : BarSeat.Own);
   let moreOpen = $state(false);
   let menuOpen = $state(false);
   let clockOpen = $state(false);
@@ -1122,7 +1123,7 @@
   });
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
-      frameBar.sidePx = docked && sideOpen ? rightBar.width : 0;
+      frameBar.sidePx = docked && sideOpen && barSeat === BarSeat.Own ? rightBar.width : 0;
     }
   });
 
@@ -1684,7 +1685,8 @@
     [ChatPlace.Drawer]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent),
     [ChatPlace.Sheet]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)
   };
-  const docked = $derived(chatPlace === ChatPlace.Column);
+  const sidePlace = $derived(barSeat === BarSeat.InPlace ? ChatPlace.Column : chatPlace);
+  const docked = $derived(sidePlace === ChatPlace.Column);
   const barProperties = {
     get shown() {
       return layout.side === Side.Properties;
@@ -2186,7 +2188,7 @@
     />
   {/if}
 
-  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${rightBar.width}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && !sideOpen} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
+  <div class="body" bind:this={body} style={`--tl-h: ${layout.timelinePx}px; --side-w: ${rightBar.width}px;`} class:coding={inspectorTab === InspectorTab.Code && selected?.component === 'Custom'} class:no-props={!docked && layout.inspector === Panel.Closed} class:no-chat={!docked && layout.chat === Panel.Closed} class:no-side={docked && (!sideOpen || barSeat === BarSeat.InPlace)} class:no-timeline={layout.timeline === Panel.Closed || !timelineFits(doc) || editMode === EditMode.Design || !controlShown(doc, VideoControl.Timeline)}>
     <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
       <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
@@ -2230,7 +2232,7 @@
       {/if}
     </section>
 
-    <SideColumn place={chatPlace} widthPx={rightBar.width} onwidth={(px) => rightBar.resize(px)} oncommit={() => rightBar.keepWidth()}>
+    <SideColumn place={sidePlace} widthPx={rightBar.width} onwidth={(px) => rightBar.resize(px)} oncommit={() => rightBar.keepWidth()}>
     {#snippet properties()}
     <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
@@ -2268,7 +2270,7 @@
     {#snippet chat()}
     <aside class="chat" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Chat</span><span class="editing" data-testid="chat-editing">{editingLabel(editingName)}</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
-      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} />{/if}<BarSlot reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} properties={docked ? barProperties : undefined} />
+      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} />{/if}<BarSlot reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} properties={docked ? barProperties : undefined} seat={barSeat} />
     </aside>
     {/snippet}
     </SideColumn>

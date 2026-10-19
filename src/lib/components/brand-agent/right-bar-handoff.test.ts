@@ -7,9 +7,10 @@ const editor = read('../motion/MotionEditorShell.svelte');
 const canvasPane = read('../canvas/CanvasChatPanel.svelte');
 
 describe('the right bar never goes back to the park between canvas and editor', () => {
-  it('the canvas pane does not close when a frame opens: it stows only once the editor holds the bar', () => {
-    expect(layout).not.toMatch(/<CanvasChatPanel open=\{[^}]*inlineStage\.editing/);
-    expect(canvasPane).toMatch(/bind:held/);
+  it('the canvas pane stays open while a frame is edited, and the editor on the canvas seats the bar in place', () => {
+    expect(layout).toMatch(/<CanvasChatPanel open=\{chatOpen \|\| inlineStage\.editing\}/);
+    expect(editor).toMatch(/seat=\{barSeat\}/);
+    expect(editor).toMatch(/mount === Mount\.Canvas && viewportOf\(width\) === Viewport\.Desktop \? BarSeat\.InPlace/);
   });
 
   it('the editor claims the bar as soon as it mounts, not when its panels are due', () => {

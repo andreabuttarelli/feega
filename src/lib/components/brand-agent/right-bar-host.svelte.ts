@@ -18,7 +18,12 @@ export type BarBinding = {
   readonly properties?: BarProperties;
 };
 
-export type BarClaim = { readonly element: HTMLElement; readonly binding: BarBinding };
+export type BarClaim = { readonly element: HTMLElement | null; readonly binding: BarBinding };
+
+export enum BarSeat {
+  Own = 'own',
+  InPlace = 'in-place'
+}
 
 const SHARED_TABS = [BarTab.Chat, BarTab.Guide] as const;
 
@@ -35,6 +40,10 @@ export class RightBarHost {
     return this.#claims.at(-1) ?? null;
   }
 
+  get holder(): BarClaim | null {
+    return this.#claims.findLast((c) => c.element !== null) ?? null;
+  }
+
   get tabs(): BarTab[] {
     return this.active?.binding.properties ? [...SHARED_TABS, BarTab.Properties] : [...SHARED_TABS];
   }
@@ -43,7 +52,7 @@ export class RightBarHost {
     return this.active?.binding.properties?.shown ? BarTab.Properties : this.#picked;
   }
 
-  claim(element: HTMLElement, binding: BarBinding): BarClaim {
+  claim(element: HTMLElement | null, binding: BarBinding): BarClaim {
     const claim = { element, binding };
     this.#claims = [...this.#claims, claim];
     return claim;
