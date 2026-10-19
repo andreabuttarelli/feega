@@ -8,7 +8,8 @@ import { composeHtml } from '../hyperframes/compose';
 import { LIVE_GLOBAL } from './runtime';
 import { Liveness, PlayMode } from './settings';
 import { InteractivePreset, applyInteractivePreset } from './presets';
-import { SELF_SCROLL, STANDALONE_MS, embedSettings, interactiveBundle, upgradePlayer } from './bundle';
+import { SELF_SCROLL, STANDALONE_MS, embedSettings, interactiveBundle, livePage, upgradePlayer } from './bundle';
+import { LIVE_MESSAGE } from './live-bridge';
 import { HOST_MESSAGE } from './host';
 import { HOSTED, MOTION_LIBS_ROUTE, Script, scriptUrl } from '../libs/catalog';
 import { writeComponent } from '../custom/ops';
@@ -190,3 +191,14 @@ describe('a page published from the minified editor', () => {
   });
 });
 
+
+describe('a frame running live on the canvas', () => {
+  it('is the hosted player page plus a bridge that hands wheel and Esc back to the canvas', () => {
+    const doc = card();
+    const page = livePage({ doc, tokens: FEEGA_TOKENS, assets: {}, title: 'Clip' }, ORIGIN);
+
+    expect(page).toContain('<hyperframes-player id="player"');
+    expect(page).toContain('(function playerMain(');
+    expect(page).toContain(LIVE_MESSAGE);
+  });
+});

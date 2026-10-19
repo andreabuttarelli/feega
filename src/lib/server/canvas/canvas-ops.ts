@@ -30,7 +30,7 @@ import { renameProject } from '$lib/server/repos/projects';
 import { removeNodes, resizeOnCanvas, shareDoc, showRun } from '$lib/server/canvas/node-writes';
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { duplicateNodes } from '$lib/server/canvas/duplicate';
-import { exportRowsSchema } from '$lib/motion/export-rows';
+import { exportElementsSchema, exportRowsSchema } from '$lib/motion/export-rows';
 import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
 import { selectionPorts } from '$lib/server/motion/selection-export-ports';
 import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
@@ -620,17 +620,20 @@ export const CANVAS_OPS = {
     access: Access.Read,
     input: z
       .object({
-        frameIds: z.array(z.string()).min(1).max(EXPORT_MAX_FRAMES),
+        frameIds: z.array(z.string()).max(EXPORT_MAX_FRAMES).default([]),
+        elements: exportElementsSchema.default([]),
         rows: exportRowsSchema.describe('value: 0.5–4 for scale, px for width/height'),
         name: z.string().max(60).optional()
       })
-      .strict(),
+      .strict()
+      .refine((i) => i.frameIds.length + i.elements.length > 0),
     run: async (ctx, input) => {
       if (!serverFramesOpen()) {
         return { error: 'renderer_unavailable', message: 'image export needs the server renderer, which is not available here' };
       }
-      const out = await exportSelection(selectionPorts({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.projectId, brandId: ctx.brandId ?? null, actor: ctx.actor }), { nodeIds: input.frameIds, rows: input.rows, name: input.name ?? 'Export' });
-      return out.outcome === ExportOutcome.Done ? out : { ...NODE_NOT_FOUND, nodeId: out.nodeId };
+      const targets = [...input.frameIds.map((nodeId) => ({ nodeId })), ...input.elements.map((e) => ({ nodeId: e.frameId, elementId: e.elementId }))];
+      const out = await exportSelection(selectionPorts({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.projectId, brandId: ctx.brandId ?? null, actor: ctx.actor }), { targets, rows: input.rows, name: input.name ?? 'Export' });
+      return out.outcome === ExportOutcome.Done ? out : { error: out.outcome, nodeId: out.nodeId, elementId: out.elementId };
     }
   }),
 

@@ -8,6 +8,7 @@
   import type { LeftPanelKind } from '$lib/components/canvas/CanvasLeftPanel.svelte';
   import { inlineStage } from '$lib/canvas/inline-stage.svelte';
   import CanvasChatPanel from '$lib/components/canvas/CanvasChatPanel.svelte';
+  import RightBar from '$lib/components/brand-agent/RightBar.svelte';
   import { can, OrgAction } from '$lib/org-roles';
   import CanvasSheet from '$lib/components/canvas/CanvasSheet.svelte';
   import ChatLeaveGuard from '$lib/components/canvas/ChatLeaveGuard.svelte';
@@ -173,6 +174,7 @@
 </script>
 
 <ChatLeaveGuard {projectId} />
+{#if browser}<RightBar {projectId} viewOnly={!canEdit} />{/if}
 
 <div class="project-shell ui-app" class:is-editing={inlineStage.editing} class:is-sheet-pending={sheetPending} class:is-uncensored={data.project.mode === ProjectMode.Uncensored} data-viewport={viewport} data-mode={data.project.mode}>
   {#if isMobile}
@@ -201,7 +203,7 @@
         {@render children()}
       </div>
       <div class="mobile-chat" class:is-hidden={mobileView.view !== 'chat'} data-testid="mobile-chat">
-        <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={true} viewOnly={!canEdit} />
+        <CanvasChatPanel open={true} />
         {#if $propertiesTarget}<span class="editing" data-testid="canvas-chat-editing">{editingLabel($propertiesTarget.name)}</span>{/if}
       </div>
       {#if viewSwitch && !typing}
@@ -257,7 +259,7 @@
         <CanvasSheet {projectId} />
       </div>
 
-      <CanvasChatPanel {projectId} brandSlug={data.brand?.slug ?? ''} open={chatOpen && !inlineStage.editing} viewOnly={!canEdit} />
+      <CanvasChatPanel open={chatOpen && !inlineStage.editing} />
     </div>
   {:else}
     <DesktopPageBar

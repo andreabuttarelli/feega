@@ -48,6 +48,7 @@ describe('group and ungroup', () => {
     expect(shownFor('export', [frame])).toBe(true);
     expect(shownFor('export', [frame, frame])).toBe(true);
     expect(shownFor('export', [frame, { data: {} }])).toBe(false);
+    expect(shownFor('export', [{ data: { format: '1:1', kind: 'element' } }]), 'a free element exports on its own').toBe(true);
   });
 
   it('each surface shows the shared menu, in its order, limited to what it can run', () => {

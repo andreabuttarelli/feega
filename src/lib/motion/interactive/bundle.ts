@@ -18,6 +18,7 @@ import { Liveness, PlayMode, SCROLL_LENGTH, interactiveOf, type Interactive } fr
 import { FIT_SCALE, fitBox } from './fit';
 import { LINK_MESSAGE, NATIVE_BRIDGE, PLAYER_MESSAGE, PROTOCOL_VERSION, PlayerEvent } from './protocol';
 import type { EmbedSettings } from './loader';
+import { bridgeScript } from './live-bridge';
 import { VAR_RULES, coerceVars, type VarDecl } from './var-model';
 
 export const BUNDLE_FILE = 'feega-interactive.html';
@@ -259,10 +260,17 @@ export function hostedPage(page: string, origin: string): string | null {
     return null;
   }
 
-  const { doc, tokens, assets, analyses, settings, title } = source;
+  return servedPage(source, origin);
+}
+
+function servedPage({ doc, tokens, assets, analyses, settings, title }: EmbedSource, origin: string): string {
   const composed = composeHtml({ doc, tokens, assets, analyses, liveness: Liveness.Live, target: Target.Screen, origin, runtime: RuntimeDelivery.Hosted });
   return `<!doctype html>${playerPage(composed, doc, settings, title, hostedScriptTag(origin, Script.Player))}`;
 }
+
+export type LiveSource = Omit<EmbedSource, 'settings'>;
+
+export const livePage = (source: LiveSource, origin: string): string => servedPage({ ...source, settings: interactiveOf(source.doc) }, origin).replace('</body>', `${bridgeScript()}</body>`);
 
 export const isSourceEmbed = (page: string) => STORED_SOURCE.test(page);
 

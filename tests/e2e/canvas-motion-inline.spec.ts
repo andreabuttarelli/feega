@@ -141,7 +141,7 @@ async function expectTimelineFits(page: Page) {
 async function openOnPhone(page: Page) {
   const stage = page.getByTestId('motion-node-stage').first();
   await stage.click({ position: { x: 60, y: 10 } });
-  await stage.getByTestId('open-motion-editor').click();
+  await stage.dblclick({ position: { x: 60, y: 10 } });
 }
 
 const NEIGHBOUR_MIN_OPACITY = 0.75;
