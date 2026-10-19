@@ -11,7 +11,7 @@ use crate::pictures::Pictures;
 
 const CACHE_SIDE: u32 = 4096;
 const RASTERS_PER_DRAW: usize = 1;
-const ITEMS_PER_RASTER: usize = 96;
+const ITEMS_PER_RASTER: usize = 48;
 
 #[wasm_bindgen]
 pub struct WebCore {

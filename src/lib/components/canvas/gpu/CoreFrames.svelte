@@ -203,14 +203,15 @@
 
   let cacheBytes = $state(0);
   const IDLE_MS = 50;
+  const PICTURES_PER_FRAME = 1;
 
-  function putPart(into: CoreRaster, group: string, using?: Pictures) {
+  function putPart(into: CoreRaster, group: string) {
     const job = putting.get(group) ?? { parts: parts(listOf(group), PART_ITEMS), next: 0 };
     const part = job.parts[job.next];
     if (job.next === 0) {
-      into.putGroup(group, part, using);
+      into.putGroup(group, part);
     } else {
-      into.appendGroup(group, part, using);
+      into.appendGroup(group, part);
     }
     job.next++;
     if (job.next < job.parts.length) {
@@ -235,20 +236,20 @@
     }
     const unput = held.find((f) => !put.has(f.group));
     if (unput) {
-      putPart(into, unput.group, pictures);
+      putPart(into, unput.group);
     }
-    const shown = held.filter((f) => put.has(f.group));
-    for (const f of shown.filter((f) => !pictured.has(f.group))) {
-      into.upload(listOf(f.group), pictures);
-      pictured.add(f.group);
+    const unpictured = held.find((f) => put.has(f.group) && !pictured.has(f.group));
+    if (unpictured && into.upload(listOf(unpictured.group), pictures, PICTURES_PER_FRAME)) {
+      pictured.add(unpictured.group);
     }
+    const shown = held.filter((f) => pictured.has(f.group));
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
     const screen = screenUses(cached(shown, wide.view, wide.area, textureBytes), at, device, null);
     const pending = into.drawScreen({ ...screen, items: [...screen.items, ...throughCamera(overlay, at)] }, pictures);
     cacheBytes = into.cacheBytes();
-    return pending || held.some((f) => !put.has(f.group));
+    return pending || held.some((f) => !pictured.has(f.group));
   }
 
   let ahead = false;

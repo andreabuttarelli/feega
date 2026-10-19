@@ -11,7 +11,7 @@ type Attached = { draw: (list: string) => string; picture: (clip: string, source
 
 export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine; cache?: boolean };
 export type Screen = { width: number; height: number; background: Rgba | null; items: (Item | Use)[] };
-export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; dropGroup: (key: string) => void; drawScreen: (screen: Screen, pictures?: Pictures) => boolean; upload: (list: DisplayList, pictures: Pictures) => void; cacheBytes: () => number };
+export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; dropGroup: (key: string) => void; drawScreen: (screen: Screen, pictures?: Pictures) => boolean; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
 type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
 
@@ -43,8 +43,14 @@ async function coreModule(): Promise<CoreModule> {
   return core;
 }
 
-function rasterOf(attached: Attached): CoreRaster {
+type Fit = (size: Size) => Size;
+
+const asIs: Fit = (size) => size;
+
+export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
+  const decoded = new WeakMap<object, ImageBitmap | null | undefined>();
   const uploaded = new Map<string, Picture['source']>();
+  const queues = new WeakMap<DisplayList, ImageItem[]>();
   const stills = new Map<string, HTMLCanvasElement>();
 
   function still(clip: string, picture: Picture): HTMLCanvasElement {
@@ -55,16 +61,34 @@ function rasterOf(attached: Attached): CoreRaster {
     return canvas;
   }
 
-  function upload(item: ImageItem, pictures: Pictures) {
+  function upload(item: ImageItem, pictures: Pictures): boolean {
     const picture = pictures(item);
     if (!picture) {
-      return;
+      return false;
     }
     if (uploaded.get(item.clip) === picture.source && !moving(picture)) {
-      return;
+      return false;
     }
     attached.picture(item.clip, moving(picture) ? still(item.clip, picture) : picture.source, picture.size.width, picture.size.height);
     uploaded.set(item.clip, picture.source);
+    return true;
+  }
+
+  function decodedOf(picture: Picture): ImageBitmap | null | undefined {
+    if (typeof createImageBitmap !== 'function') {
+      return undefined;
+    }
+    const source = picture.source as object;
+    if (decoded.has(source)) {
+      return decoded.get(source);
+    }
+    decoded.set(source, null);
+    const size = fit(picture.size);
+    void createImageBitmap(picture.source as ImageBitmapSource, { resizeWidth: size.width, resizeHeight: size.height, resizeQuality: 'high' }).then(
+      (bitmap) => decoded.set(source, bitmap),
+      () => decoded.set(source, undefined)
+    );
+    return null;
   }
 
   const flat = <T extends { items: (Item | Use)[] }>(list: T): T => ({ ...list, items: ungrouped(list.items as Item[]) });
@@ -88,7 +112,29 @@ function rasterOf(attached: Attached): CoreRaster {
       attached.append_group(key, JSON.stringify(flat(list)));
     },
     dropGroup: (key: string) => attached.drop_group(key),
-    upload: (list: DisplayList, pictures: Pictures) => wanted(list.items).forEach((item) => upload(item, pictures)),
+    upload: (list: DisplayList, pictures: Pictures, most: number) => {
+      const queue = queues.get(list) ?? queues.set(list, wanted(drawable(list).items)).get(list)!;
+      let sent = 0;
+      for (const item of [...queue]) {
+        if (sent >= most) {
+          break;
+        }
+        const picture = pictures(item);
+        const bitmap = picture && !moving(picture) ? decodedOf(picture) : undefined;
+        if (bitmap === null) {
+          continue;
+        }
+        queue.splice(queue.indexOf(item), 1);
+        if (bitmap && uploaded.get(item.clip) !== picture!.source) {
+          attached.picture(item.clip, bitmap, bitmap.width, bitmap.height);
+          uploaded.set(item.clip, picture!.source);
+          sent++;
+          continue;
+        }
+        sent += upload(item, pictures) ? 1 : 0;
+      }
+      return queue.length === 0;
+    },
     drawScreen: (screen: Screen, pictures = NO_PICTURES) => {
       wanted(drawn(screen.items as Item[])).forEach((item) => upload(item, pictures));
       attached.draw(JSON.stringify(flat(screen)));
@@ -139,5 +185,5 @@ export async function createCoreGl(canvas: HTMLCanvasElement, width: number, hei
     const fit = fitted(source, { width: w, height: h });
     picture(clip, fit.source, fit.size.width, fit.size.height);
   };
-  return rasterOf(attached);
+  return rasterOf(attached, glPictureSize);
 }
