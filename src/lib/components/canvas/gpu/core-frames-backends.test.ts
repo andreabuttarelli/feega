@@ -25,10 +25,25 @@ const { flushSync, mount, unmount } = (await import(join(dir, '../../../../../no
 let app: Record<string, unknown> | null = null;
 
 afterEach(() => {
+  tried.webgpu.length = 0;
+  tried.webgl.length = 0;
   if (app) {
     unmount(app);
   }
   app = null;
+});
+
+describe('CoreFrames dot grid', () => {
+  it('paints the dots on a layer of their own, since the core canvas sits above the tiles the scene still draws', () => {
+    app = mount(CoreFrames, { target: document.body, props: { frames: [], view: { x: 30, y: -10, zoom: 2 }, area: { width: 100, height: 80 }, sourceUrl: (id: string) => id, onready: () => undefined, onfallback: () => undefined } });
+    flushSync();
+
+    const core = document.querySelector<HTMLElement>('[data-testid="core-canvas"]')!;
+    const grid = document.querySelector<HTMLElement>('[data-testid="core-grid"]')!;
+
+    expect(core.style.backgroundImage).toBe('');
+    expect(grid.style.backgroundSize).toBe('48px 48px');
+  });
 });
 
 describe('CoreFrames backends', () => {
