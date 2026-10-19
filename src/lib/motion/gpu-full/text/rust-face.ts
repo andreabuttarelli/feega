@@ -2,10 +2,10 @@ import { Ligatures, Op, type Command, type Face, type Shaped } from './face';
 import type { Axes, Source } from './fonts';
 
 export type TextCore = {
-  add_font: (family: string, bytes: Uint8Array) => number;
+  addFont: (family: string, bytes: Uint8Array) => number;
   covers: (font: number, codePoint: number) => boolean;
-  axis_tags: (font: number) => string;
-  axis_ranges: (font: number) => Float32Array;
+  axisTags: (font: number) => string;
+  axisRanges: (font: number) => Float32Array;
   metrics: (font: number, tags: string, values: Float32Array) => Float32Array;
   shape: (font: number, tags: string, values: Float32Array, text: string, ligatures: number) => Float32Array;
   outline: (font: number, tags: string, values: Float32Array, glyph: number) => Float32Array;
@@ -18,8 +18,8 @@ const AXIS_STRIDE = 3;
 const COORD_DIGITS = 100;
 
 function axesOf(core: TextCore, font: number): Axes {
-  const tags = core.axis_tags(font).split(',').filter(Boolean);
-  const ranges = core.axis_ranges(font);
+  const tags = core.axisTags(font).split(',').filter(Boolean);
+  const ranges = core.axisRanges(font);
   return Object.fromEntries(tags.map((tag, i) => [tag, [ranges[i * AXIS_STRIDE], ranges[i * AXIS_STRIDE + 1], ranges[i * AXIS_STRIDE + 2]]]));
 }
 
@@ -54,7 +54,7 @@ function faceOf(core: TextCore, font: number, coords: Record<string, number>): F
 }
 
 export function rustSource(core: TextCore, bytes: Uint8Array): Source {
-  const font = core.add_font('', bytes);
+  const font = core.addFont('', bytes);
   const faces = new Map<string, Face>();
   return {
     axes: axesOf(core, font),

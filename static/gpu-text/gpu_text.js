@@ -14,12 +14,12 @@ export class TextCore {
      * @param {Uint8Array} bytes
      * @returns {number}
      */
-    add_font(family, bytes) {
+    addFont(family, bytes) {
         const ptr0 = passStringToWasm0(family, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passArray8ToWasm0(bytes, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
-        const ret = wasm.textcore_add_font(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        const ret = wasm.textcore_addFont(this.__wbg_ptr, ptr0, len0, ptr1, len1);
         if (ret[2]) {
             throw takeFromExternrefTable0(ret[1]);
         }
@@ -29,8 +29,8 @@ export class TextCore {
      * @param {number} font
      * @returns {Float32Array}
      */
-    axis_ranges(font) {
-        const ret = wasm.textcore_axis_ranges(this.__wbg_ptr, font);
+    axisRanges(font) {
+        const ret = wasm.textcore_axisRanges(this.__wbg_ptr, font);
         var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
         return v1;
@@ -39,11 +39,11 @@ export class TextCore {
      * @param {number} font
      * @returns {string}
      */
-    axis_tags(font) {
+    axisTags(font) {
         let deferred1_0;
         let deferred1_1;
         try {
-            const ret = wasm.textcore_axis_tags(this.__wbg_ptr, font);
+            const ret = wasm.textcore_axisTags(this.__wbg_ptr, font);
             deferred1_0 = ret[0];
             deferred1_1 = ret[1];
             return getStringFromWasm0(ret[0], ret[1]);
@@ -72,12 +72,12 @@ export class TextCore {
      * @param {number} room
      * @returns {Float32Array}
      */
-    lay_out(text, family, weight, size, tracking, leading, spaces, wrap, room) {
+    layOut(text, family, weight, size, tracking, leading, spaces, wrap, room) {
         const ptr0 = passStringToWasm0(text, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passStringToWasm0(family, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
         const len1 = WASM_VECTOR_LEN;
-        const ret = wasm.textcore_lay_out(this.__wbg_ptr, ptr0, len0, ptr1, len1, weight, size, tracking, leading, spaces, wrap, room);
+        const ret = wasm.textcore_layOut(this.__wbg_ptr, ptr0, len0, ptr1, len1, weight, size, tracking, leading, spaces, wrap, room);
         var v3 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
         wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
         return v3;
