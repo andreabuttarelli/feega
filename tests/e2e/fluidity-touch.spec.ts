@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -25,8 +25,9 @@ const RUNS = Number(process.env.FLUID_RUNS ?? 3);
 const ONLY = process.env.FLUID_STEPS ? new RegExp(process.env.FLUID_STEPS) : null;
 const DEVICES = (process.env.FLUID_DEVICES ?? `${Device.IPhone},${Device.Desktop}`).split(',') as Device[];
 const OUT = process.env.FLUID_OUT ?? join(homedir(), 'Documents', 'feega-videos', 'fluidity-touch');
-const SETTLE_MS = 8_000;
-const STEP_MS = 30_000;
+const SETTLE_MS = 6_000;
+const STEP_MS = 20_000;
+const TEST_MS = 600_000;
 const AFTER_STEP_MS = 800;
 const MOVES = 24;
 const DRAG_PX = 40;
@@ -37,6 +38,8 @@ const MIN_TARGET_PX = 60;
 const ZOOM_TRIES = 12;
 const PLAY_MS = 3_000;
 const SCRUB_MOVES = 30;
+const DOUBLE_TAP_WAIT_MS = 1_500;
+const EDITOR_STEPS = /timeline scrub|playback|properties sheet|typing in place|colour drag|editor close/;
 const TYPED = 'Fluid';
 const COLOURS = ['#e11d48', '#16a34a', '#2563eb', '#f59e0b', '#9333ea', '#0ea5e9'];
 const KB_PER_MB = 1024;
@@ -182,6 +185,21 @@ async function tapSequence(page: Page, ...ids: string[]) {
   }
 }
 
+async function doubleTapOpen(page: Page) {
+  await bringMotionNodeIntoReach(page);
+  const at = await centre(page, MOTION_NODE);
+  await page.touchscreen.tap(at.x, at.y);
+  await page.touchscreen.tap(at.x, at.y);
+  const editor = page.getByTestId('motion-editor');
+  const byTaps = await editor.waitFor({ timeout: DOUBLE_TAP_WAIT_MS }).then(() => true, () => false);
+  if (!byTaps) {
+    await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, clientX: x, clientY: y, detail: 2 })), at);
+  }
+  console.log(`[touch] editor opened by ${byTaps ? 'two taps' : 'dblclick dispatched after two taps'}`);
+  await expect(editor).toBeVisible();
+  await page.waitForTimeout(SETTLE_MS / 2);
+}
+
 const STEPS: Step[] = [
   { name: 'tap select', drive: async (page) => { const at = await centre(page, MOTION_NODE); await page.touchscreen.tap(at.x, at.y); await expect(page.locator(MOTION_NODE).first()).toHaveClass(/selected/); } },
   { name: 'drag move', drive: async (page) => { const at = await centre(page, MOTION_NODE); await fingers(page, [line(at, DRAG_PX, 0)]); await fingers(page, [line({ x: at.x + DRAG_PX, y: at.y }, -DRAG_PX, 0)]); } },
@@ -189,7 +207,7 @@ const STEPS: Step[] = [
   { name: 'two-finger pan', drive: async (page) => { const at = await emptyPoint(page); await fingers(page, [line(at, PAN_PX, PAN_PX / 2), line({ x: at.x + PINCH_FROM_PX, y: at.y }, PAN_PX, PAN_PX / 2)]); } },
   { name: 'insert sheet', drive: async (page) => { await tapSequence(page, 'mobile-view-insert'); await expect(page.getByTestId('insert-sheet')).toBeVisible(); await page.getByTestId('mobile-view-insert').tap(); await expect(page.getByTestId('insert-sheet')).toBeHidden(); } },
   { name: 'layers sheet', drive: async (page) => { await tapSequence(page, 'mobile-view-layers'); await expect(page.getByTestId('mobile-layers')).toBeVisible(); await page.getByTestId('mobile-view-layers').tap(); await expect(page.getByTestId('mobile-layers')).toBeHidden(); } },
-  { name: 'double-tap open', drive: async (page) => { await bringMotionNodeIntoReach(page); const at = await centre(page, MOTION_NODE); await page.touchscreen.tap(at.x, at.y); await page.touchscreen.tap(at.x, at.y); if (!(await page.getByTestId('motion-editor').count())) { await page.locator(MOTION_NODE).first().dblclick({ position: { x: 20, y: 40 } }); } await expect(page.getByTestId('motion-editor')).toBeVisible(); await page.waitForTimeout(SETTLE_MS / 2); } },
+  { name: 'double-tap open', drive: doubleTapOpen },
   { name: 'timeline scrub', drive: async (page) => { const ruler = (await page.getByRole('slider', { name: 'Playhead' }).boundingBox())!; const from = { x: ruler.x + 10, y: ruler.y + ruler.height / 2 }; await fingers(page, [Array.from({ length: SCRUB_MOVES + 1 }, (_, i) => ({ x: from.x + ((ruler.width - 20) * i) / SCRUB_MOVES, y: from.y }))]); } },
   { name: 'playback', drive: async (page) => { await page.keyboard.press('Space'); await page.waitForTimeout(PLAY_MS); await page.keyboard.press('Space'); } },
   { name: 'properties sheet', drive: async (page) => { await page.getByTestId('phone-tab-layers').tap(); await page.locator('aside.layers-sheet [data-kind="clip"]').first().tap(); await expect(page.locator('aside.props')).toBeVisible(); } },
@@ -245,6 +263,10 @@ async function session(base: string, device: Device, canvas: { projectId: string
       let peak = rssMb(mine);
       const sampler = setInterval(() => (peak = Math.max(peak, rssMb(mine))), 250);
       let error: string | null = null;
+      if (EDITOR_STEPS.test(step.name) && !(await page.getByTestId('motion-editor').count())) {
+        rows.push({ device, canvas: label, run, step: step.name, facts: null, error: 'editor not open' });
+        continue;
+      }
       try {
         await Promise.race([step.drive(page), new Promise<never>((_, no) => setTimeout(() => no(new Error(`over ${STEP_MS} ms`)), STEP_MS))]);
         await page.waitForTimeout(AFTER_STEP_MS);
@@ -280,27 +302,46 @@ function table(rows: Row[]): string {
   return lines.join('\n');
 }
 
+const signedDb = async (): Promise<SupabaseClient> => {
+  const db = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
+  const signed = await db.auth.signInWithPassword({ email: process.env.E2E_TEST_EMAIL!, password: process.env.E2E_TEST_PASSWORD! });
+  if (signed.error) {
+    throw new Error(signed.error.message);
+  }
+  return db;
+};
+
+function record(rows: Row[], name: string) {
+  mkdirSync(OUT, { recursive: true });
+  writeFileSync(join(OUT, `rows-${name}.json`), JSON.stringify(rows, null, 2));
+  const all = readdirSync(OUT).filter((f) => f.startsWith('rows-')).flatMap((f) => JSON.parse(readFileSync(join(OUT, f), 'utf8')) as Row[]);
+  writeFileSync(join(OUT, 'SCORECARD.md'), table(all));
+}
+
+enum Canvas {
+  Heavy = 'heavy',
+  Light = 'light'
+}
+
+const CANVAS_OF: Record<Canvas, () => Promise<{ projectId: string; canvasId: string }>> = {
+  [Canvas.Heavy]: async () => HEAVY,
+  [Canvas.Light]: async () => lightCanvas(await signedDb())
+};
+
 test.describe('touch fluidity scorecard @real', () => {
   test.skip(!process.env.FLUID_TOUCH || !process.env.E2E_TEST_EMAIL, 'needs FLUID_TOUCH=1 and the test account owning the heavy canvas copy');
-  test.setTimeout(3_600_000);
+  test.setTimeout(TEST_MS);
 
-  test('every step driven by touch, heavy and light canvas, iPhone and desktop Safari', async ({ baseURL }) => {
-    const db = createClient(process.env.PUBLIC_SUPABASE_URL!, process.env.PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
-    const signed = await db.auth.signInWithPassword({ email: process.env.E2E_TEST_EMAIL!, password: process.env.E2E_TEST_PASSWORD! });
-    expect(signed.error).toBeNull();
-    const canvases = { heavy: HEAVY, light: await lightCanvas(db) };
-    const rows: Row[] = [];
-    for (const device of DEVICES) {
-      for (const [label, canvas] of Object.entries(canvases)) {
-        for (let run = 1; run <= RUNS; run++) {
-          rows.push(...(await session(baseURL!, device, canvas, label, run)));
-        }
+  for (const device of DEVICES) {
+    for (const canvas of Object.values(Canvas)) {
+      for (let run = 1; run <= RUNS; run++) {
+        test(`${device} ${canvas} canvas, run ${run}`, async ({ baseURL }) => {
+          const rows = await session(baseURL!, device, await CANVAS_OF[canvas](), canvas, run);
+          record(rows, `${device}-${canvas}-${run}`);
+          console.log(table(rows));
+          expect(rows.filter((r) => r.error).map((r) => `${r.step}: ${r.error}`), 'every step is driven').toEqual([]);
+        });
       }
     }
-    mkdirSync(OUT, { recursive: true });
-    writeFileSync(join(OUT, `rows-${Date.now()}.json`), JSON.stringify(rows, null, 2));
-    writeFileSync(join(OUT, 'SCORECARD.md'), table(rows));
-    console.log(table(rows));
-    expect(rows.filter((r) => r.error).map((r) => `${r.device} ${r.canvas} ${r.step}: ${r.error}`), 'every step is driven').toEqual([]);
-  });
+  }
 });
