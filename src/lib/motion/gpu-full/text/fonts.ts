@@ -69,14 +69,15 @@ function coordsFor(source: Source, weight: number, request: Request): Record<str
   return { ...auto, ...Object.fromEntries(Object.entries(request.axes).filter(([tag]) => source.axes[tag])) };
 }
 
+export const resolvedRequest = <R extends Omit<Request, 'size'>>(request: R, registry: readonly FontFace[]): R => ({ ...request, family: familyName(request.family, registry), weight: loadedWeight(request.family, request.weight, registry) });
+
 export function faceBook(rules: readonly FaceRule[], sources: ReadonlyMap<string, Source>, registry: readonly FontFace[]): FaceBook {
   return (request, codePoint): Resolved | null => {
-    const family = familyName(request.family, registry);
+    const { family, weight: desired } = resolvedRequest(request, registry);
     const own = rules.filter((r) => r.family === family && sources.has(r.url));
     const styled = own.filter((r) => r.italic === request.italic);
     const pool = styled.length ? styled : own;
     const skew = request.italic && !styled.length ? SYNTHETIC_OBLIQUE : 0;
-    const desired = loadedWeight(request.family, request.weight, registry);
     const group = nearest([...new Map(pool.map((r) => [r.weight.join('-'), r.weight])).values()], desired);
     if (!group) {
       return null;

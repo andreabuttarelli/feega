@@ -14,10 +14,13 @@
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { screenUses } from '$lib/canvas/core/screen-uses';
   import { drawsWhole, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
+  import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
+
+  type CoreCard = { key: string; frame: FrameOnCanvas };
 
   type Source = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens };
 
-  let { frames, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, cards = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
   const BACKENDS = [createCore];
@@ -54,13 +57,31 @@
     }
   });
 
-  const whole = $derived(
+  let cardLists = $state(new Map<string, DisplayList>());
+  const readying = new Set<string>();
+
+  $effect(() => {
+    for (const c of cards) {
+      if (!cardLists.has(c.key) && !readying.has(c.key)) {
+        readying.add(c.key);
+        void media.ready(c.frame.list).then(() => (cardLists = new Map(cardLists).set(c.key, c.frame.list)));
+      }
+    }
+  });
+
+  const imagesIn = (list: DisplayList) => list.items.filter((i) => i.kind === ItemKind.Image).length;
+
+  const cardPuts = $derived(cards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, images: imagesIn(c.frame.list) }] : [])));
+
+  const framePuts = $derived(
     frames.flatMap((f): HeldFrame[] => {
       const list = lists.get(keyOf(f));
-      return list && drawsWhole(list) ? [{ id: f.id, group: keyOf(f), box: f.box, size: { width: list.width, height: list.height }, images: list.items.filter((i) => i.kind === ItemKind.Image).length }] : [];
+      return list && drawsWhole(list) ? [{ id: f.id, group: keyOf(f), box: f.box, size: { width: list.width, height: list.height }, images: imagesIn(list) }] : [];
     })
   );
 
+  const whole = $derived([...cardPuts, ...framePuts]);
+  const listOf = (group: string) => cardLists.get(group) ?? lists.get(group)!;
   const textureBytes = BUDGET[currentDevice()].textureBytes;
   const held = $derived(resident(whole, view, area, textureBytes));
 
@@ -110,7 +131,7 @@
       put.delete(group);
     }
     for (const f of shown.filter((f) => !put.has(f.group))) {
-      into.putGroup(f.group, lists.get(f.group)!, media.pictures);
+      into.putGroup(f.group, listOf(f.group), media.pictures);
       put.add(f.group);
     }
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
@@ -128,7 +149,7 @@
   $effect(() => () => media.dispose());
 </script>
 
-<canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-frames={whole.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+<canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
 
 <style>
   .core-frames {

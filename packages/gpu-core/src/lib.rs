@@ -17,6 +17,10 @@ pub mod pictures;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
 pub mod scene;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod stroke;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod text;
 pub mod turbulence;
 #[cfg(target_arch = "wasm32")]
 pub mod web;

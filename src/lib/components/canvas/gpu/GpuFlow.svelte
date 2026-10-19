@@ -7,7 +7,7 @@
   import { iconBitmap } from './icon-bitmap';
   import { idleChrome } from '$lib/canvas/gpu/idle-chrome';
   import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
-  import { isNodeType } from '$lib/canvas/node-data';
+  import { NODE_TYPES, isNodeType, type NodeType } from '$lib/canvas/node-data';
   import { page } from '$app/state';
   import type CanvasFlow from '../CanvasFlow.svelte';
   import type { Tile } from '../CanvasFlow.svelte';
@@ -23,6 +23,9 @@
   import GpuTileChrome from './GpuTileChrome.svelte';
   import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
+  import { cardKey, cardOnCanvas, portMarks, type CardTile } from '$lib/canvas/core/card-source';
+  import { coreText, type CoreText } from './core-text';
+  import { NodeChrome } from '$lib/canvas/selection-chrome';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
   import { dev } from '$app/environment';
   import Repeat from '@lucide/svelte/icons/repeat';
@@ -189,6 +192,37 @@
   let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
+  let coreType = $state<CoreText | null>(null);
+  $effect(() => {
+    if (coreOn && !coreType) {
+      void coreText(NODE_TYPES).then((t) => (coreType = t)).catch((e: unknown) => console.warn('[canvas] core text not loaded', e));
+    }
+  });
+  const coreLook = $derived(wrap ? themeOf(wrap) : null);
+  const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && t.kind !== 'motion' && !handedOver(t) && !t.rotation;
+  const coreCards = $derived.by(() => {
+    const text = coreType;
+    const look = coreLook;
+    if (!coreOn || !text || !look) {
+      return [];
+    }
+    const theme = { ...look, panel: look.paper };
+    return placed.filter(drawsCard).map((t) => {
+      const idle = !chromeIds.has(t.id);
+      const card: CardTile = {
+        id: t.id,
+        box: { x: t.x, y: t.y, w: t.w, h: t.h },
+        face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
+        ring: NodeChrome.None,
+        handles: false,
+        hovered: false,
+        ...(idle ? portMarks(t) : { inputs: [], outputs: [] }),
+        label: idle ? labelOf(t) : null,
+        icon: idle ? (text.icons.get(t.kind as NodeType) ?? null) : null
+      };
+      return { key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold) };
+    });
+  });
   const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${id}/source`;
   let domShows = $state(new Set<string>());
   const handedOver = (t: Tile) => domIds.has(t.id) && (t.kind !== 'motion' || domShows.has(t.id));
@@ -596,7 +630,7 @@
         hidden: handedOver(t) || coreDrawn.has(t.id),
         snapshot: shotOf(t.id),
         running: isRunning(summaries.get(t.id)?.data ?? {}),
-        chrome: chromeOf(t)
+        chrome: coreDrawn.has(t.id) ? null : chromeOf(t)
       })
     )
   );
@@ -1642,7 +1676,7 @@
     data-owns-pinch
   >
     {#if coreOn && scene}
-      <CoreFrames frames={coreFrames} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={(why) => { console.warn(`[canvas] core off: ${why}`); coreOn = false; coreDrawn = new Set(); }} />
+      <CoreFrames frames={coreFrames} cards={coreCards} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={(why) => { console.warn(`[canvas] core off: ${why}`); coreOn = false; coreDrawn = new Set(); }} />
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" aria-hidden="true">

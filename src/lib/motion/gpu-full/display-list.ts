@@ -28,7 +28,8 @@ import { stillSeconds } from '../still';
 import { animatorOfKey, COLOR_VALUE, SELECTOR_KEYS, type TextAnimator } from '../text-animators/model';
 import { textPathAt, type OnPath } from '../hyperframes/text-path';
 import { paintOnPath } from './text/on-path';
-import { NO_TYPESET, paintText, TEXT_COMPONENTS, TextGap, type TextComponent, type Typeset } from './text/painter';
+import { NO_TYPESET, paintText, planOf, TEXT_COMPONENTS, TextGap, type NativeFaces, type TextComponent, type TextPlan, type Typeset } from './text/painter';
+import { resolvedRequest, type FaceRule } from './text/fonts';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
 export { FillRule, PaintKind, type Paint, type Stop };
@@ -36,7 +37,8 @@ export { FillRule, PaintKind, type Paint, type Stop };
 export enum ItemKind {
   Path = 'path',
   Image = 'image',
-  Layer = 'layer'
+  Layer = 'layer',
+  Text = 'text'
 }
 
 export enum Unsupported {
@@ -70,7 +72,11 @@ export type ImageItem = { kind: ItemKind.Image; clip: string; src: string; video
 
 export type LayerItem = { kind: ItemKind.Layer; clip: string; source: string; size: Size; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
-export type Item = PathItem | ImageItem | LayerItem;
+export type Turn = { scale: number; rotation: number };
+
+export type TextItem = { kind: ItemKind.Text; clip: string; plan: TextPlan; turn: Turn; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+
+export type Item = PathItem | ImageItem | LayerItem | TextItem;
 
 export enum FilterKind {
   Css = 'css',
@@ -87,11 +93,11 @@ export type Gap = { clip: string; component: ComponentId; reason: Unsupported; d
 
 export type DomReads = ReadonlyMap<string, DomRead>;
 
-export type DisplayList = { width: number; height: number; background: Rgba | null; items: Item[]; unsupported: Gap[] };
+export type DisplayList = { width: number; height: number; background: Rgba | null; items: Item[]; unsupported: Gap[]; faces?: readonly FaceRule[] };
 
 export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; typeset: Typeset };
 
-type Content = (Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number }) | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
+type Content = (Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number }) | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<TextItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
 type Size = { width: number; height: number };
 type Partly = { content: Content[]; gaps: string[] };
 type Painted = Content[] | Partly | Unsupported;
@@ -195,8 +201,21 @@ const logoPainter = ({ props, size, asset, logo }: Env): Painted => {
 
 const TEXT_GAP: Record<TextGap, Unsupported> = { [TextGap.Font]: Unsupported.Font, [TextGap.Glyph]: Unsupported.Glyph, [TextGap.Fill]: Unsupported.Fill };
 
+function nativeText(env: Env, native: NativeFaces): Painted {
+  const { clip, animators, props, box, stage, css, time, fps, still, typeset } = env;
+  const plan = planOf({ component: clip.component as TextComponent, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators });
+  if (typeof plan === 'string') {
+    return TEXT_GAP[plan];
+  }
+  const turn = { scale: Number(props.scale ?? 1), rotation: Number(props.rotation ?? 0) };
+  return [{ kind: ItemKind.Text, plan: { ...plan, request: resolvedRequest(plan.request, native.registry) }, turn, opacity: 1, matrix: IDENTITY }];
+}
+
 function textPainter(env: Env): Painted {
   const { clip, animators, onPath, props, box, stage, css, time, fps, still, typeset } = env;
+  if (typeset.native && !onPath) {
+    return nativeText(env, typeset.native);
+  }
   const component = clip.component as TextComponent;
   const painted = onPath ? paintOnPath({ component, ...typeset, props, stage, box, colour: css, animators, onPath }) : paintText({ component, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators });
   if (typeof painted === 'string') {
@@ -399,7 +418,7 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     unsupported.push({ clip: clip.id, component: clip.component, reason: drawn });
   }
   const background = doc.background === Background.Transparent ? null : colour('brand.background');
-  return { ...size, background, items, unsupported };
+  return { ...size, background, items, unsupported, ...(typeset.native ? { faces: typeset.native.rules } : {}) };
 }
 
 export const displayListAt = (doc: MotionDoc, frame: number, tokens: BrandTokens, typeset: Typeset = NO_TYPESET): DisplayList => drawFrame(prepare(doc, tokens, {}, typeset), frame);

@@ -94,4 +94,10 @@ describe('cardItems', () => {
 
     expect(new Set(clips).size).toBe(3);
   });
+
+  it('clips body text to the card', () => {
+    const [body] = paths(cardItems(card('doc', { content: 'x'.repeat(500) }, { x: 10, y: 20 }), theme, glyphs), CardPart.Body);
+
+    expect(body.scissor).toEqual([10, 20, 210, 120]);
+  });
 });

@@ -116,6 +116,8 @@
         : [];
       return [...cardItems(c as CoreCard, coreTheme, glyphs, bold), ...chrome];
     });
+    core.width = width * dpr;
+    core.height = height * dpr;
     const raster = await BACKENDS[backend](core, width * dpr, height * dpr);
     const pics = await pictures(items);
     await settle();
@@ -125,6 +127,8 @@
     const before = cards.map((c) => crop(scene.canvas, region(c)));
     raster.draw({ width: width * dpr, height: height * dpr, background: null, items: atDensity(items, dpr), unsupported: [] }, pics);
     scores = cards.map((c, i) => ({ name: c.name, score: ssim(before[i], crop(core, region(c))) }));
+    const origin = (el: Element) => ({ x: el.getBoundingClientRect().left + scrollX, y: el.getBoundingClientRect().top + scrollY });
+    document.body.dataset.regions = JSON.stringify({ reference: origin(reference), core: origin(core), cards: cards.map((c) => ({ name: c.name, ...region(c) })) });
     document.body.dataset.parity = JSON.stringify(scores);
   });
 </script>
