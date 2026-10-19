@@ -15,6 +15,8 @@ import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-cont
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { redirectFor } from '$lib/server/host-redirects';
+import { corsPreflight, extraOrigins, withCors } from '$lib/server/api-cors';
+import { bearerSession, bearerTokenOf } from '$lib/server/bearer-session';
 import { SiteVisibility, rootShowsSite, siteVisibility } from '$lib/site/visibility';
 import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
@@ -91,6 +93,15 @@ async function brandIdFromSlug(slug: string): Promise<string | null> {
 // Replaces kit's built-in CSRF check (disabled in svelte.config.js) so /oauth/token can opt out —
 // see $lib/server/csrf for why.
 const PERMANENT_REDIRECT = 308;
+
+const cors: Handle = async ({ event, resolve }) => {
+  const extra = extraOrigins(privateEnv.API_EXTRA_ORIGINS);
+  const preflight = corsPreflight(event.request, extra);
+  if (preflight) {
+    return preflight;
+  }
+  return withCors(event.request, await resolve(event), extra);
+};
 
 const hostRedirect: Handle = async ({ event, resolve }) => {
   const target = redirectFor(event.url);
@@ -170,11 +181,13 @@ async function refuseSocialPublishing(event: RequestEvent): Promise<void> {
   }
 }
 
-export const handle: Handle = sequence(hostRedirect, siteGate, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
+export const handle: Handle = sequence(cors, hostRedirect, siteGate, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.
+  const requestBearer = bearerTokenOf(event.request);
   event.locals.supabase = markRlsScoped(createServerClient(publicEnv.PUBLIC_SUPABASE_URL, publicEnv.PUBLIC_SUPABASE_ANON_KEY, {
+    ...(requestBearer ? { global: { headers: { Authorization: `Bearer ${requestBearer}` } } } : {}),
     cookies: {
       getAll: () => validSessionCookies(event.cookies.getAll()),
       setAll: (cookiesToSet: CookieToSet[]) => {
@@ -196,12 +209,13 @@ export const handle: Handle = sequence(hostRedirect, siteGate, csrf, Sentry.sent
 
   // getSession() is local (cookie → JWT). getUser() hits GoTrue — cache it across SPA
   // navigations on this isolate so every in-brand click is not a 300–800ms auth RTT.
+  const verifyBearer = async (token: string) => (await import('$lib/server/nav-cache')).verifiedToken(createUserDb(token), token);
   let cachedSession: ReturnType<typeof getSession> | null = null;
   const getSession = async () => {
     const {
       data: { session: stored }
     } = await event.locals.supabase.auth.getSession();
-    if (!stored) return { session: null, user: null };
+    if (!stored) return requestBearer ? bearerSession(requestBearer, verifyBearer) : { session: null, user: null };
     const session = outlivesTurn(stored) ? stored : ((await event.locals.supabase.auth.refreshSession()).data.session ?? stored);
 
     const { verifiedUser } = await import('$lib/server/nav-cache');
