@@ -204,11 +204,14 @@ const TEXT_GAP: Record<TextGap, Unsupported> = { [TextGap.Font]: Unsupported.Fon
 
 function textPainter(env: Env): Painted {
   const { clip, animators, props, box, stage, css, time, fps, still, typeset } = env;
-  const inks = paintText({ component: clip.component as TextComponent, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators });
-  if (!Array.isArray(inks)) {
-    return TEXT_GAP[inks];
+  const painted = paintText({ component: clip.component as TextComponent, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators });
+  if (typeof painted === 'string') {
+    return TEXT_GAP[painted];
   }
-  return inks.map((ink) => ({ kind: ItemKind.Path as const, contours: ink.contours, rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: ink.color }, opacity: ink.opacity, matrix: ink.matrix, blur: ink.blur }));
+  const { frame, inks } = painted;
+  const scale = Number(props.scale ?? 1);
+  const turn = scaleAbout(frame.left + frame.width / 2, frame.top + frame.height / 2, Number(props.rotation ?? 0), scale);
+  return inks.map((ink) => ({ kind: ItemKind.Path as const, contours: ink.contours, rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: ink.color }, opacity: ink.opacity, matrix: mul2d(turn, ink.matrix), blur: ink.blur * scale }));
 }
 
 type Box = { left: number; top: number; width: number; height: number };
@@ -223,13 +226,15 @@ const boxed: Placement = (props, frame) => {
   return { box, turn, opacity: Number(props.opacity ?? 1) };
 };
 
+const unturned: Placement = (props, frame) => ({ ...boxed(props, frame), turn: IDENTITY });
+
 const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }>> = {
   BrandBackground: { place: fullFrame, paint: backgroundPainter },
   Shape: { place: boxed, paint: shapePainter },
   Image: { place: boxed, paint: imagePainter },
   Video: { place: boxed, paint: videoPainter },
   Logo: { place: boxed, paint: logoPainter },
-  ...Object.fromEntries(TEXT_COMPONENTS.map((c) => [c, { place: boxed, paint: textPainter }]))
+  ...Object.fromEntries(TEXT_COMPONENTS.map((c) => [c, { place: unturned, paint: textPainter }]))
 };
 
 const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (clip.transform[k as TransformKey] ?? TRANSFORM[k as TransformKey].fallback) !== TRANSFORM[k as TransformKey].fallback || (clip.keyframes[k]?.length ?? 0) > 0);

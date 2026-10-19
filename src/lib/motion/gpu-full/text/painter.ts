@@ -27,6 +27,8 @@ export enum TextGap {
   Stroke = 'stroke'
 }
 
+export type Painted = { inks: Ink[]; frame: Box };
+
 export type Ink = { contours: number[][]; color: Rgba; opacity: number; matrix: Affine; blur: number };
 
 type Size = { width: number; height: number };
@@ -235,7 +237,7 @@ function mixed(base: Rgba, tint: Rgba | null, amount: number): Rgba {
   return [channel(0), channel(1), channel(2), alpha];
 }
 
-export function paintText(env: TextEnv): Ink[] | TextGap {
+export function paintText(env: TextEnv): Painted | TextGap {
   const kind = KINDS[env.component];
   const p = env.props as Props;
   if (elementStrokes(env.component, p).some((s) => s.visible !== false)) {
@@ -298,5 +300,6 @@ export function paintText(env: TextEnv): Ink[] | TextGap {
       }
     }
   });
-  return inks.filter((i) => i.opacity > 0);
+  const rendered = { left, top: frame.box.top - env.box.top, width: frame.hugs ? laid.width : frame.box.width, height: frame.anchor === Anchor.Top ? laid.height : frame.box.height };
+  return { inks: inks.filter((i) => i.opacity > 0), frame: rendered };
 }

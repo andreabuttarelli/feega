@@ -146,6 +146,16 @@ describe('displayListAt', () => {
 
     expect(displayListAt(bent, 0, FEEGA_TOKENS, boxType).unsupported).toContainEqual({ clip: 'text', component: 'Text', reason: Unsupported.TextPath });
   });
+  it('turns a title about the centre of its safe box, as the page does', () => {
+    const centre = (rotation: number) => {
+      const titled = must(addClip(withBg, { component: 'Title', from: 0, durationInFrames: 90, props: { text: 'ab', align: 'left', x: 0.1, width: 0.3, rotation } }, 'title'));
+      const ink = corners(displayListAt(titled, 60, FEEGA_TOKENS, boxType).items.find((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'title'));
+      return (ink.left + ink.right) / 2;
+    };
+
+    expect((centre(0) + centre(180)) / 2).toBeCloseTo(288, 0);
+  });
+
   describe('text animators', () => {
     const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab' } }, 'text'));
     const animated = (values: Record<string, number>) => must(addAnimator(texted, 'text', 'a', { shape: SelectorShape.Square, start: 0, end: 0, values }));
