@@ -1,7 +1,7 @@
 use vello::kurbo::Rect;
 
 use crate::canvas::Canvas;
-use crate::display_list::{Cover, DisplayList, Item, Look, MaskMode, Rgba};
+use crate::display_list::{Cover, DisplayList, Item, Lens, Look, MaskMode, Rgba};
 use crate::filters::{Fold, Fx, Runner};
 use crate::scene::{alone, bounds, build_into, cover, layer_worthy, plain, silhouette, Layers, Placed, Shelf};
 
@@ -39,6 +39,11 @@ fn snapped(r: Rect, frame: Rect) -> Rect {
 pub fn prepare<S: Surface>(surface: &mut S, list: &DisplayList, pictures: &Shelf<Pic<S>>) -> Result<Layers<Pic<S>>, S::Error> {
     let mut layers = Layers::new();
     for (i, item) in list.items.iter().enumerate() {
+        if let Item::Lens(lens) = item {
+            let layer = refracted(surface, list, i, &layers, pictures, &lens.lens)?;
+            layers.behind.insert(i, layer);
+            continue;
+        }
         if let Some(sigma) = item.look().and_then(|l| l.backdrop) {
             let layer = behind(surface, list, i, &layers, pictures, sigma)?;
             layers.behind.insert(i, layer);
@@ -64,6 +69,16 @@ fn behind<S: Surface>(surface: &mut S, list: &DisplayList, at: usize, layers: &L
     let fx = Fx { runner: surface.runner() };
     let texture = fx.masked(&fx.blurred(below, sigma), &shape);
     Ok(surface.place(texture, region))
+}
+
+fn refracted<S: Surface>(surface: &mut S, list: &DisplayList, at: usize, layers: &Layers<Pic<S>>, pictures: &Shelf<Pic<S>>, lens: &Lens) -> Result<Placed<Pic<S>>, S::Error> {
+    let frame = surface.frame();
+    let under = DisplayList { items: list.items[..at].to_vec(), ..list.clone_empty() };
+    let content = surface.paint(frame, None, &|c| {
+        build_into(c, &under, pictures, layers);
+    })?;
+    let fx = Fx { runner: surface.runner() };
+    Ok(surface.place(fx.refracted(&content, &lens.params()), frame))
 }
 
 fn region<S: Surface>(surface: &S, item: &Item, look: &Look, pictures: &Shelf<Pic<S>>) -> Rect {
