@@ -8,6 +8,11 @@ export enum Readiness {
   Partial = 'partial'
 }
 
+export enum VideoPreload {
+  Auto = 'auto',
+  Metadata = 'metadata'
+}
+
 export type Media = { ready: (list: DisplayList) => Promise<Readiness>; pictures: Pictures; dispose: () => void };
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -17,9 +22,9 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   return img.decode().then(() => img);
 }
 
-function loadVideo(src: string): Promise<HTMLVideoElement> {
+function loadVideo(src: string, preload: VideoPreload): Promise<HTMLVideoElement> {
   const video = document.createElement('video');
-  Object.assign(video, { crossOrigin: 'anonymous', muted: true, playsInline: true, preload: 'auto', src });
+  Object.assign(video, { crossOrigin: 'anonymous', muted: true, playsInline: true, preload, src });
   return new Promise((resolve, reject) => {
     video.addEventListener('loadeddata', () => resolve(video), { once: true });
     video.addEventListener('error', () => reject(new Error(`video ${src}`)), { once: true });
@@ -47,13 +52,13 @@ function needed(items: Item[]): ImageItem[] {
   ]);
 }
 
-export function createMedia(): Media {
+export function createMedia({ videoPreload = VideoPreload.Auto }: { videoPreload?: VideoPreload } = {}): Media {
   const images = new Map<string, Promise<HTMLImageElement>>();
   const videos = new Map<string, Promise<HTMLVideoElement>>();
   const loaded = new Map<string, Picture>();
 
   const imageOf = (src: string) => images.get(src) ?? images.set(src, loadImage(src)).get(src)!;
-  const videoOf = (clip: string, src: string) => videos.get(clip) ?? videos.set(clip, loadVideo(src)).get(clip)!;
+  const videoOf = (clip: string, src: string) => videos.get(clip) ?? videos.set(clip, loadVideo(src, videoPreload)).get(clip)!;
 
   async function readyOne(item: ImageItem) {
     if (!item.video) {

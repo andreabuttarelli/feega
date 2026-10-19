@@ -4,7 +4,7 @@ import { MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
 import { addClip, type OpResult } from '../timeline';
 import { drawFrame, ItemKind, prepare, Unsupported, type ImageItem } from './display-list';
 import { imageRect } from './image-rect';
-import { createMedia, Readiness } from './media';
+import { createMedia, Readiness, VideoPreload } from './media';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -65,6 +65,32 @@ describe('createMedia', () => {
 
     expect(await media.ready(list('/ok.png'))).toBe(Readiness.Whole);
     expect(await media.ready(list('/ok.png', '/gone.png'))).toBe(Readiness.Partial);
+  });
+
+  const fakeVideos = () => {
+    const made: { preload?: string }[] = [];
+    vi.stubGlobal('document', {
+      createElement: () => {
+        const el = { preload: '', duration: 10, currentTime: 0, videoWidth: 4, videoHeight: 4, addEventListener: (event: string, done: () => void) => event === 'loadeddata' && queueMicrotask(done), removeAttribute: () => {} };
+        made.push(el);
+        return el;
+      }
+    });
+    return made;
+  };
+  const video = { kind: ItemKind.Image, clip: 'v', src: '/v.mp4', video: true, mediaTime: 0 } as ImageItem;
+  const withVideo = { width: 10, height: 10, background: null, items: [video], unsupported: [] };
+
+  it('the editor buffers whole videos, to play them', async () => {
+    const made = fakeVideos();
+    await createMedia().ready(withVideo);
+    expect(made[0].preload).toBe('auto');
+  });
+
+  it('the canvas only asks for what one frame needs', async () => {
+    const made = fakeVideos();
+    await createMedia({ videoPreload: VideoPreload.Metadata }).ready(withVideo);
+    expect(made[0].preload).toBe('metadata');
   });
 });
 

@@ -5,7 +5,8 @@
   import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
   import { loadFonts } from '$lib/motion/gpu-full/text/load';
   import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
-  import { createMedia, Readiness } from '$lib/motion/gpu-full/media';
+  import { createMedia, Readiness, VideoPreload } from '$lib/motion/gpu-full/media';
+  import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
   import { ItemKind } from '$lib/motion/gpu-full/display-list';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
@@ -18,7 +19,7 @@
   import { drawsWhole, onStage, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
-  import { oneAtATime } from '$lib/canvas/core/one-at-a-time';
+  import { readPool } from '$lib/canvas/core/read-pool';
   import { readClips, type CustomFrame } from '$lib/motion/gpu-full/dom/custom';
   import type { Pictures } from '$lib/motion/gpu-full/raster';
   import { Stand, fillOrder, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
@@ -42,29 +43,29 @@
   const put = new Set<string>();
   const pictured = new Set<string>();
   const putting = new Map<string, { parts: DisplayList[]; next: number }>();
-  const media = createMedia();
+  const media = createMedia({ videoPreload: VideoPreload.Metadata });
   const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
   const keyOf = (f: FrameAt) => `${f.id}:${f.revision}`;
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, MAX_RESOLUTION);
 
   let readsHost = $state<HTMLDivElement | null>(null);
-  const domRead = oneAtATime();
+  const READ_LANES = 2;
+  const READ_TIMEOUT_MS = 8000;
+  const domRead = readPool({ lanes: READ_LANES, timeoutMs: READ_TIMEOUT_MS });
+  const fromView = (f: FrameAt) => () => Math.hypot(view.x + (f.box.x + f.box.w / 2) * view.zoom - area.width / 2, view.y + (f.box.y + f.box.h / 2) * view.zoom - area.height / 2);
   const customPictures = new Map<string, CustomFrame['picture']>();
   const pictures: Pictures = (item) => [...customPictures.values()].reduce<ReturnType<Pictures>>((found, of) => found ?? of(item), null) ?? media.pictures(item);
 
-  async function readDom(source: Source, prepared: Prepared, frame: number): Promise<CustomFrame | null> {
+  async function readDom(f: FrameAt, source: Source, prepared: Prepared, frame: number): Promise<CustomFrame | null> {
     const host = readsHost;
     if (!host || !readClips(source.doc).read.length) {
       return null;
     }
     const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('$lib/motion/gpu-full/dom/custom'), import('$lib/motion/hyperframes/compose'), import('$lib/motion/interactive/settings')]);
-    return domRead(async () => {
-      const reads = await mountCustomReads(host, (only) => composeHtml({ doc: source.doc, tokens: source.tokens, assets: source.assets, liveness: Liveness.Baked, target: Target.Screen, only }), prepared);
-      try {
-        return await reads.readAt(frame);
-      } finally {
-        reads.dispose();
-      }
+    return domRead(fromView(f), async (signal) => {
+      const mounting = mountCustomReads(host, (only) => composeHtml({ doc: source.doc, tokens: source.tokens, assets: source.assets, liveness: Liveness.Baked, target: Target.Screen, only }), prepared);
+      signal.addEventListener('abort', () => void mounting.then((r) => r.dispose(), () => undefined));
+      return (await mounting).readAt(frame);
     });
   }
 
@@ -77,7 +78,7 @@
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing: smoothingOf(navigator.userAgent) });
     const still = stillFrame(source.doc);
-    const custom = await readDom(source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
+    const custom = await readDom(f, source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
     const list = drawFrame(prepared, still, custom?.reads);
     if ((await media.ready(list)) === Readiness.Partial) {
       return;
@@ -121,9 +122,12 @@
   const posterIds = $derived(new Set(posters.map((p) => p.frame.id)));
   const shownCards = $derived([...cards, ...postersFor(posters, new Set(framePuts.map((f) => f.id)))]);
 
+  const cardIndex = $derived(new SpatialIndex(shownCards.map((c) => ({ id: c.key, ...c.frame.box }))));
+
   $effect(() => {
+    const onScreen = cardIndex.visible(view, area);
     for (const c of shownCards) {
-      if (!cardLists.has(c.key) && !readying.has(c.key)) {
+      if (onScreen.has(c.key) && !cardLists.has(c.key) && !readying.has(c.key)) {
         readying.add(c.key);
         void media.ready(c.frame.list).then(() => (cardLists = new Map(cardLists).set(c.key, withoutPictures(c.frame.list, look, (i) => !pictures(i)))));
       }
