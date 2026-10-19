@@ -1,9 +1,9 @@
 use std::fs::{self, File};
 use std::io::BufWriter;
 
-use gpu_core::display_list::{parse, DisplayList, Item};
+use gpu_core::display_list::{parse, Cover, DisplayList, Item};
 use gpu_core::pictures::{picture, Pictures};
-use gpu_core::{render::Renderer, scene::build};
+use gpu_core::render::Renderer;
 
 fn decode(path: &str) -> Option<vello::peniko::ImageData> {
     let mut decoder = png::Decoder::new(File::open(path).ok()?);
@@ -20,14 +20,27 @@ fn decode(path: &str) -> Option<vello::peniko::ImageData> {
     Some(picture(info.width, info.height, rgba))
 }
 
-fn pictures(list: &DisplayList) -> Pictures {
-    list.items
+fn wanted(items: &[Item]) -> Vec<(String, String)> {
+    items
         .iter()
-        .filter_map(|item| match item {
-            Item::Image(image) => decode(&image.src).map(|data| (image.clip.clone(), data)),
-            _ => None,
+        .flat_map(|item| {
+            let own = match item {
+                Item::Image(image) => vec![(image.clip.clone(), image.src.clone())],
+                _ => vec![],
+            };
+            let look = item.look();
+            let matte = look.and_then(|l| l.matte.as_ref()).map(|m| wanted(&m.items)).unwrap_or_default();
+            let covers = look.and_then(|l| l.masks.as_ref()).into_iter().flatten().filter_map(|m| match &m.cover {
+                Cover::Picture { src, .. } => Some((src.clone(), src.clone())),
+                _ => None,
+            });
+            own.into_iter().chain(matte).chain(covers).collect::<Vec<_>>()
         })
         .collect()
+}
+
+fn pictures(list: &DisplayList) -> Pictures {
+    wanted(&list.items).into_iter().filter_map(|(key, src)| decode(&src).map(|data| (key, data))).collect()
 }
 
 fn main() {
@@ -36,15 +49,13 @@ fn main() {
     let mut renderer = Renderer::new().expect("a GPU adapter");
     for pair in pairs {
         let list = parse(&fs::read_to_string(&pair[0]).expect("display list")).expect("valid display list");
-        let pictures = pictures(&list);
-        let (_, skipped) = build(&list, &pictures);
-        for s in &skipped {
+        let rendered = renderer.render(&list, &pictures(&list)).expect("render");
+        for s in &rendered.skipped {
             eprintln!("not drawn: {} {}", s.clip, s.what);
         }
-        let pixels = renderer.render(&list, &pictures).expect("render");
         let mut encoder = png::Encoder::new(BufWriter::new(File::create(&pair[1]).expect("png")), list.width, list.height);
         encoder.set_color(png::ColorType::Rgba);
         encoder.set_depth(png::BitDepth::Eight);
-        encoder.write_header().and_then(|mut w| w.write_image_data(&pixels)).expect("png write");
+        encoder.write_header().and_then(|mut w| w.write_image_data(&rendered.pixels)).expect("png write");
     }
 }

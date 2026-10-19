@@ -3141,3 +3141,11 @@ compositor hides the cost of repainting the whole frame every tick.
 **Move:** don't expect an fps number from emulation to go red; assert the mechanism (hinted
 layers in the preview iframe while it plays, `ipad-playback-fps.spec.ts`) and log fps beside it.
 Layer hints drop only past a budget (`layerPixels`), never for a whole device class.
+
+## gpu-core: a GPU picture draws on the first frames, then vanishes
+
+**Signal:** on WebGPU, a picture registered with vello (`register_texture`) shows in the first
+one or two frames and is missing after, while the same display list renders right natively (CPU
+blobs). Happens once full-frame layers churn the image atlas.
+**Move:** call `mark_override_image_dirty` on every registered picture before each frame; the
+atlas may be rebuilt and an override texture is only recopied when marked dirty.

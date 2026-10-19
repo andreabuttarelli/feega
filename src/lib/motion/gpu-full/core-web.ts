@@ -1,4 +1,4 @@
-import { ItemKind, type DisplayList, type ImageItem } from './display-list';
+import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item } from './display-list';
 import type { Picture, Pictures, Raster } from './raster';
 
 const CORE_URL = '/gpu-core/gpu_core.js';
@@ -7,6 +7,16 @@ type Attached = { draw: (list: string) => string; picture: (clip: string, source
 type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: (canvas: HTMLCanvasElement, width: number, height: number) => Promise<Attached> } };
 
 const NO_PICTURES: Pictures = () => null;
+
+const coverPicture = (src: string) => ({ kind: ItemKind.Image, clip: src, src, video: false }) as ImageItem;
+
+function wanted(items: Item[]): ImageItem[] {
+  return items.flatMap((i) => [
+    ...(i.kind === ItemKind.Image ? [i] : []),
+    ...wanted(i.matte?.items ?? []),
+    ...(i.masks ?? []).flatMap((m) => (m.cover.kind === CoverKind.Picture ? [coverPicture(m.cover.src)] : []))
+  ]);
+}
 
 const moving = (picture: Picture) => typeof HTMLVideoElement !== 'undefined' && picture.source instanceof HTMLVideoElement;
 
@@ -33,11 +43,7 @@ export async function createCore(canvas: HTMLCanvasElement, width: number, heigh
 
   return {
     draw: (list: DisplayList, pictures = NO_PICTURES) => {
-      for (const item of list.items) {
-        if (item.kind === ItemKind.Image) {
-          upload(item, pictures);
-        }
-      }
+      wanted(list.items).forEach((item) => upload(item, pictures));
       attached.draw(JSON.stringify(list));
     },
     dispose: () => attached.free()

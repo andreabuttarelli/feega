@@ -1,4 +1,7 @@
 pub mod display_list;
+pub mod engine;
+pub mod kernel;
+pub mod passes;
 pub mod pictures;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
