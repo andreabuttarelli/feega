@@ -13,6 +13,7 @@ describe('engineFlag', () => {
   it('draws on the GPU only when the URL asks for it', () => {
     expect(engineFlag(url('?engine=gpu'), false)).toBe(RenderEngine.Gpu);
     expect(engineFlag(url('?engine=gpu-full'), false)).toBe(RenderEngine.GpuFull);
+    expect(engineFlag(url('?engine=gpu-core'), false)).toBe(RenderEngine.GpuCore);
   });
 
   it('forces HTML for everyone when the kill switch is on', () => {
