@@ -15,6 +15,17 @@ describe('createLru — a byte budget that evicts the least recently used', () =
     expect(lru.bytes).toBe(80);
   });
 
+  it('drops an entry nobody needs now, but keeps one still in use', () => {
+    const released: string[] = [];
+    const lru = createLru<string>(100, (_k, v) => released.push(v), (k) => k === 'used');
+    lru.set('free', 'F', 40);
+    lru.set('used', 'U', 40);
+    lru.drop('free');
+    lru.drop('used');
+    expect(released).toEqual(['F']);
+    expect(lru.bytes).toBe(40);
+  });
+
   it('never evicts what was just inserted, even if it alone is over budget', () => {
     const lru = createLru<string>(10, () => {});
     lru.set('big', 'X', 50);

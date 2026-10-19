@@ -375,6 +375,9 @@ export class GpuScene {
     }
     if (!next.media) {
       this.destroyBuilt(old);
+      if (old.media) {
+        this.textures.drop(this.imageUrl(old.media.url));
+      }
       return;
     }
     if (!this.ready.delete(old.id)) {
