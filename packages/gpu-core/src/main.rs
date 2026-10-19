@@ -4,6 +4,7 @@ use std::io::BufWriter;
 use gpu_core::display_list::{parse, Cover, DisplayList, Item};
 use gpu_core::pictures::{picture, Pictures};
 use gpu_core::render::Renderer;
+use gpu_core::text::wanted_fonts;
 
 fn decode(path: &str) -> Option<vello::peniko::ImageData> {
     let mut decoder = png::Decoder::new(File::open(path).ok()?);
@@ -49,6 +50,13 @@ fn main() {
     let mut renderer = Renderer::new().expect("a GPU adapter");
     for pair in pairs {
         let list = parse(&fs::read_to_string(&pair[0]).expect("display list")).expect("valid display list");
+        for url in wanted_fonts(&list) {
+            if !renderer.has_font(url) {
+                if let Ok(bytes) = fs::read(url) {
+                    renderer.put_font(url, gpu_text::Source::from_bytes(&bytes).expect("a readable font"));
+                }
+            }
+        }
         let rendered = renderer.render(&list, &pictures(&list)).expect("render");
         for s in &rendered.skipped {
             eprintln!("not drawn: {} {}", s.clip, s.what);

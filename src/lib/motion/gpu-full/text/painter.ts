@@ -16,6 +16,8 @@ import { elementStrokes } from '../../stroke/elements';
 import { TextSizing } from '../../text-sizing';
 import { rgbaOf, type Rgba } from '../rgba';
 import type { Face, FaceBook, Request } from './face';
+import type { FaceRule } from './fonts';
+import type { FontFace } from '../../fonts/model';
 import { layOut, Shaping, Spaces, type Flow, type Glyph, type Laid, type Line, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
 import { animation, type Animation, type Look } from './animators';
@@ -55,7 +57,9 @@ const DILATING_PLATFORM = /Macintosh|Mac OS X/;
 
 export const smoothingOf = (userAgent: string): Smoothing => (DILATING_PLATFORM.test(userAgent) ? Smoothing.Dilated : Smoothing.Plain);
 
-export type Typeset = { fonts: FaceBook; smoothing: Smoothing };
+export type NativeFaces = { rules: readonly FaceRule[]; registry: readonly FontFace[] };
+
+export type Typeset = { fonts: FaceBook; smoothing: Smoothing; native?: NativeFaces };
 
 export const NO_TYPESET: Typeset = { fonts: () => null, smoothing: Smoothing.Plain };
 

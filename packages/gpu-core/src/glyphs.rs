@@ -20,6 +20,10 @@ impl Fonts {
     pub fn put(&mut self, key: &str, source: Source) {
         self.sources.insert(key.into(), source);
     }
+
+    pub fn sources(&self) -> &HashMap<String, Source> {
+        &self.sources
+    }
 }
 
 fn path_of(commands: &[Command], to: Affine) -> BezPath {

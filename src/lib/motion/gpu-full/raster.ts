@@ -355,7 +355,8 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
   const DRAW: Record<ItemKind, (item: never, opacity: number, pictures: Pictures) => void> = {
     [ItemKind.Path]: (item: PathItem, opacity) => fillPath(item, opacity),
     [ItemKind.Image]: drawImage,
-    [ItemKind.Layer]: drawLayer
+    [ItemKind.Layer]: drawLayer,
+    [ItemKind.Text]: () => {}
   };
 
   function drawItem(item: Item, opacity: number, pictures: Pictures) {

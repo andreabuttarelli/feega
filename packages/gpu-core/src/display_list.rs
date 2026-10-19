@@ -185,12 +185,155 @@ pub struct GlyphsItem {
     pub look: Look,
 }
 
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Shaping {
+    Runs,
+    Chars,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Spacing {
+    Collapse,
+    Keep,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct Flow {
+    pub spaces: Spacing,
+    pub wraps: bool,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Anchor {
+    Centre,
+    Top,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct PlanFrame {
+    pub left: f64,
+    pub top: f64,
+    pub width: f64,
+    pub height: f64,
+    pub anchor: Anchor,
+    pub hugs: bool,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Area {
+    Line,
+    Block,
+    Whole,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Unit {
+    Char,
+    Word,
+    Line,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Smoothing {
+    Dilated,
+    Plain,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PlanRequest {
+    pub family: String,
+    pub weight: f32,
+    pub italic: bool,
+    pub axes: std::collections::BTreeMap<String, f32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum FillPlan {
+    Solid { color: Rgba },
+    Linear { angle: f64, stops: Vec<Stop> },
+    Radial { center: [f64; 2], radius: f64, stops: Vec<Stop> },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TextOutline {
+    pub width: f64,
+    pub colour: Rgba,
+    pub under: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Tint {
+    pub color: Rgba,
+    pub amount: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Tinted {
+    pub opacity: f32,
+    pub blur: f64,
+    pub turn: Affine,
+    pub tint: Option<Tint>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TextAnimation {
+    pub finest: Unit,
+    pub looks: Vec<Tinted>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TextPlan {
+    pub text: String,
+    pub paragraphs: Vec<String>,
+    pub request: PlanRequest,
+    pub size: f64,
+    pub fits: bool,
+    pub tracking: f64,
+    pub leading: f64,
+    pub inset: f64,
+    pub shaping: Shaping,
+    pub flow: Flow,
+    pub frame: PlanFrame,
+    pub align: f64,
+    pub fade: f32,
+    pub rises: Option<Vec<f64>>,
+    pub area: Area,
+    pub backdrop: Option<Rgba>,
+    pub fills: Vec<FillPlan>,
+    pub outline: Option<TextOutline>,
+    pub animation: Option<TextAnimation>,
+    pub smoothing: Smoothing,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct Turn {
+    pub scale: f64,
+    pub rotation: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TextItem {
+    pub clip: String,
+    pub plan: TextPlan,
+    pub turn: Turn,
+    #[serde(flatten)]
+    pub look: Look,
+}
+
 #[derive(Debug, Clone)]
 pub enum Item {
     Path(PathItem),
     Image(ImageItem),
     Use(UseItem),
     Glyphs(GlyphsItem),
+    Text(Box<TextItem>),
     Other { clip: String, kind: String },
 }
 
@@ -199,7 +342,7 @@ impl Item {
         match self {
             Item::Path(p) => Some(&p.look),
             Item::Image(i) => Some(&i.look),
-            Item::Use(_) | Item::Glyphs(_) | Item::Other { .. } => None,
+            Item::Use(_) | Item::Glyphs(_) | Item::Text(_) | Item::Other { .. } => None,
         }
     }
 
@@ -209,6 +352,7 @@ impl Item {
             Item::Image(i) => &i.clip,
             Item::Use(u) => &u.clip,
             Item::Glyphs(g) => &g.clip,
+            Item::Text(t) => &t.clip,
             Item::Other { clip, .. } => clip,
         }
     }
@@ -219,6 +363,7 @@ impl Item {
             Item::Image(_) => "image",
             Item::Use(_) => "use",
             Item::Glyphs(_) => "glyphs",
+            Item::Text(_) => "text",
             Item::Other { kind, .. } => kind,
         }
     }
@@ -233,9 +378,19 @@ impl<'de> Deserialize<'de> for Item {
             "image" => serde_json::from_value(value).map(Item::Image).map_err(serde::de::Error::custom),
             "use" => serde_json::from_value(value).map(Item::Use).map_err(serde::de::Error::custom),
             "glyphs" => serde_json::from_value(value).map(Item::Glyphs).map_err(serde::de::Error::custom),
+            "text" => serde_json::from_value(value).map(|t| Item::Text(Box::new(t))).map_err(serde::de::Error::custom),
             _ => Ok(Item::Other { clip: text("clip"), kind: text("kind") }),
         }
     }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FaceSpec {
+    pub family: String,
+    pub italic: bool,
+    pub weight: [f32; 2],
+    pub url: String,
+    pub ranges: Vec<[u32; 2]>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -244,11 +399,13 @@ pub struct DisplayList {
     pub height: u32,
     pub background: Option<Rgba>,
     pub items: Vec<Item>,
+    #[serde(default)]
+    pub faces: Vec<FaceSpec>,
 }
 
 impl DisplayList {
     pub fn clone_empty(&self) -> Self {
-        Self { width: self.width, height: self.height, background: self.background, items: Vec::new() }
+        Self { width: self.width, height: self.height, background: self.background, items: Vec::new(), faces: self.faces.clone() }
     }
 }
 
