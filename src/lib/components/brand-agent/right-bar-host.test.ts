@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BarTab, RightBarHost, moveKeepingScroll } from './right-bar-host.svelte';
+import { BarTab, RightBarHost, moveKeepingScroll, portalInto } from './right-bar-host.svelte';
 
 const el = (name: string) => ({ name }) as unknown as HTMLElement;
 
@@ -74,5 +74,19 @@ describe('moving the bar keeps where the reader was', () => {
     moveKeepingScroll(node as unknown as HTMLElement, { appendChild: () => {} } as unknown as HTMLElement, new Map([[gone as unknown as Element, 99]]));
 
     expect(gone.scrollTop).toBe(0);
+  });
+});
+
+describe('a pane portalled into the bar', () => {
+  it('leaves the bar when its editor closes, so the next editor is the only inspector', () => {
+    const pane = { removed: false, remove() { this.removed = true; } };
+    const appended: unknown[] = [];
+    const target = { appendChild: (n: unknown) => appended.push(n) };
+
+    const portal = portalInto(pane as unknown as HTMLElement, target as unknown as HTMLElement);
+    expect(appended).toEqual([pane]);
+
+    portal.destroy();
+    expect(pane.removed).toBe(true);
   });
 });

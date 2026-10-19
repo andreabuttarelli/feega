@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { ChatPlace, SIDE_DEFAULT_PX, sideWidth } from '$lib/motion/editor-layout';
-  import { rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
+  import { portalInto, rightBar } from '$lib/components/brand-agent/right-bar-host.svelte';
 
   let {
     place,
@@ -23,10 +23,6 @@
   const KEY_DELTA: Record<string, number> = { ArrowLeft: KEY_STEP_PX, ArrowRight: -KEY_STEP_PX };
 
   const docked = $derived(place === ChatPlace.Column);
-
-  function into(node: HTMLElement, target: HTMLElement) {
-    target.appendChild(node);
-  }
 
   function startResize(e: PointerEvent) {
     const handle = e.currentTarget as HTMLElement;
@@ -75,7 +71,7 @@
   {#if !docked}
     <div class="pane" data-pane="properties">{@render properties()}</div>
   {:else if rightBar.propertiesPane}
-    <div class="pane in-bar" data-pane="properties" use:into={rightBar.propertiesPane}>{@render properties()}</div>
+    <div class="pane in-bar" data-pane="properties" use:portalInto={rightBar.propertiesPane}>{@render properties()}</div>
   {/if}
   <div class="pane" data-pane="chat">{@render chat()}</div>
 </div>
