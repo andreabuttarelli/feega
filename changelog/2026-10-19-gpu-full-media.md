@@ -1,6 +1,6 @@
 # gpu-full draws images, video and logos
 
-Step 1 of the gpu-full roadmap (ADR 0018). `Image`, `Video` and `Logo` become `ImageItem`s in
+Step 1 of the gpu-full roadmap (ADR 0019). `Image`, `Video` and `Logo` become `ImageItem`s in
 the display list: box, fit, focus, zoom, and for video the source time from `sourceSeconds`
 (speed, reverse, trim, time remap). `imageRect` reproduces CSS `object-fit`/`object-position`
 and the zoom around the focus; a logo spans its box width at the picture's aspect, centred, as
