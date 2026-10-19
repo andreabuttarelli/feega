@@ -115,17 +115,12 @@ fn skip(skipped: &mut Vec<Skipped>, clip: &str, what: &str) {
     skipped.push(Skipped { clip: clip.into(), what: what.into() });
 }
 
-fn unsupported(look: &Look) -> Option<&'static str> {
-    let rules: [(bool, &'static str); 1] = [(look.backdrop.is_some(), "backdrop")];
-    rules.iter().find(|(hit, _)| *hit).map(|(_, what)| *what)
-}
-
 pub fn needs_layer(look: &Look) -> bool {
     look.blur > 0.0 || look.masks.is_some() || look.matte.is_some() || look.filters.is_some()
 }
 
 pub fn layer_worthy(item: &Item) -> bool {
-    item.look().is_some_and(|look| needs_layer(look) && unsupported(look).is_none())
+    item.look().is_some_and(needs_layer)
 }
 
 fn layered(scene: &mut Scene, blend: &str, opacity: f32, frame: Rect, paint: impl FnOnce(&mut Scene)) {
@@ -204,7 +199,33 @@ pub fn plain(items: &[Item], pictures: &Pictures, frame: Rect) -> Scene {
     scene
 }
 
-pub type Layers = HashMap<usize, ImageData>;
+#[derive(Default)]
+pub struct Layers {
+    pub bodies: HashMap<usize, ImageData>,
+    pub behind: HashMap<usize, ImageData>,
+}
+
+impl Layers {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn into_images(self) -> impl Iterator<Item = ImageData> {
+        self.bodies.into_values().chain(self.behind.into_values())
+    }
+}
+
+fn full_frame(scene: &mut Scene, image: &ImageData) {
+    scene.draw_image(&ImageBrush::new(image.clone()), Affine::IDENTITY);
+}
+
+pub fn silhouette(item: &Item, pictures: &Pictures, frame: Rect) -> Scene {
+    let white = match item {
+        Item::Path(path) => Item::Path(PathItem { paint: Paint::Solid { color: WHITE }, ..path.clone() }),
+        other => other.clone(),
+    };
+    alone(&white, pictures, frame)
+}
 
 pub fn build(list: &DisplayList, pictures: &Pictures, layers: &Layers) -> (Scene, Vec<Skipped>) {
     let mut scene = Scene::new();
@@ -215,13 +236,15 @@ pub fn build(list: &DisplayList, pictures: &Pictures, layers: &Layers) -> (Scene
             skip(&mut skipped, item.clip(), item.kind());
             continue;
         };
-        if let Some(what) = unsupported(look) {
-            skip(&mut skipped, item.clip(), what);
-            continue;
+        if look.backdrop.is_some() {
+            match layers.behind.get(&i) {
+                Some(image) => scissored(&mut scene, look, |s| full_frame(s, image)),
+                None => skip(&mut skipped, item.clip(), "backdrop"),
+            }
         }
         if needs_layer(look) {
-            match layers.get(&i) {
-                Some(image) => scissored(&mut scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| s.draw_image(&ImageBrush::new(image.clone()), Affine::IDENTITY))),
+            match layers.bodies.get(&i) {
+                Some(image) => scissored(&mut scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| full_frame(s, image))),
                 None => skip(&mut skipped, item.clip(), "layer"),
             }
             continue;

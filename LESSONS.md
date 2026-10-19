@@ -3146,5 +3146,7 @@ Layer hints drop only past a budget (`layerPixels`), never for a whole device cl
 
 **Signal:** a picture (mask cover, image) shows in the first frame and is black after, on WebGPU
 and natively alike. Happens once full-frame layers grow vello's image atlas between scenes.
-**Move:** `Engine::draw` marks every picture dirty before each frame, so a rebuilt atlas recopies
-it. Guarded by `a_picture_mask_survives_frames_that_grow_the_image_atlas`.
+**Move:** `Engine::render` marks every picture dirty before every vello render (frame, layer,
+backdrop), so a rebuilt atlas recopies it; once per frame is not enough. Guarded by
+`a_picture_mask_survives_frames_that_grow_the_image_atlas` and
+`a_picture_under_a_backdrop_stays_drawn_frame_after_frame`.
