@@ -4,6 +4,7 @@ import { FORMATS, MOTION_FORMATS, MotionFormat, formatOf as docFormat } from '$l
 import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '$lib/motion/hyperframes/capture';
 import { DRAWN_TEXT } from '$lib/motion/draw-create';
+import { FramePress } from '$lib/motion/drill';
 
 export enum FrameKind {
   Frame = 'frame',
@@ -11,12 +12,12 @@ export enum FrameKind {
   Group = 'group'
 }
 
-type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean };
+type Chrome = { bar: boolean; dragsHost: boolean; turns: boolean;ports: boolean; label: boolean; takesDrops: boolean; poster: FrameFormat; opening: Opening | null; behind: boolean; press: FramePress };
 
 const CHROME: Record<FrameKind, Chrome> = {
-  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false },
-  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false },
-  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true }
+  [FrameKind.Frame]: { bar: true, dragsHost: false, turns: false, ports: true, label: true, takesDrops: true, poster: FrameFormat.Jpeg, opening: null, behind: false, press: FramePress.Move },
+  [FrameKind.Element]: { bar: false, dragsHost: true, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: null, behind: false, press: FramePress.Pick },
+  [FrameKind.Group]: { bar: false, dragsHost: false, turns: true, ports: false, label: false, takesDrops: false, poster: FrameFormat.Png, opening: Opening.OnRequest, behind: true, press: FramePress.Pick }
 };
 
 export const frameChrome = (kind: FrameKind): Chrome => CHROME[kind];
@@ -32,6 +33,7 @@ export type MotionNode = {
   storyboard?: StoryboardLink;
   budgetRaisedUsd?: number;
   versionNames?: VersionNames;
+  interactive?: boolean;
 };
 
 const FORMAT_NAMES: Record<string, MotionFormat> = {
@@ -56,7 +58,8 @@ export const motionNodeSchema = z.object({
   storyboard: linkSchema.optional(),
   budgetRaisedUsd: z.number().min(0).optional(),
   kind: z.enum(FrameKind).optional(),
-  versionNames: versionNamesSchema.optional()
+  versionNames: versionNamesSchema.optional(),
+  interactive: z.boolean().default(false)
 });
 
 export function storyboardOf(data: Record<string, unknown>): StoryboardLink | null {
@@ -111,7 +114,9 @@ enum Sizing {
   Free = 'free'
 }
 
-const sizingOf = (node: Pick<MotionNode, 'kind' | 'format'>): Sizing => (node.kind === FrameKind.Frame && node.format === MotionFormat.Custom ? Sizing.Free : Sizing.Fixed);
+const FREE_KIND: ReadonlySet<FrameKind> = new Set([FrameKind.Element]);
+
+const sizingOf = (node: Pick<MotionNode, 'kind' | 'format'>): Sizing => ((node.kind === FrameKind.Frame && node.format === MotionFormat.Custom) || FREE_KIND.has(node.kind) ? Sizing.Free : Sizing.Fixed);
 
 export type FrameResize = { w: number; h: number; picture: Picture | null };
 
@@ -168,6 +173,10 @@ export function motionSourcePath(input: { projectId: string; canvasId: string; n
 
 export function motionPreviewPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
   return `${motionEditorPath(input)}/preview`;
+}
+
+export function motionLivePath(input: { projectId: string; canvasId: string; nodeId: string }): string {
+  return `${motionEditorPath(input)}/live`;
 }
 
 export function storyboardPath(projectId: string, data: Record<string, unknown>): string | null {

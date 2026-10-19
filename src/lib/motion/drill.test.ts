@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Depth, Gesture, depthOf, drill, type Level, type Probe } from './drill';
+import { Depth, FramePress, Gesture, Press, depthOf, drill, pressOf, type Level, type Probe } from './drill';
 
 const CANVAS: Level = { depth: Depth.Canvas, clip: null, part: null };
 const FRAME: Level = { depth: Depth.Frame, clip: null, part: null };
@@ -25,6 +25,18 @@ describe('depth of a selection', () => {
     expect(depthOf({ open: true, clip: null, part: null })).toBe(Depth.Frame);
     expect(depthOf({ open: true, clip: 'a', part: null })).toBe(Depth.Clip);
     expect(depthOf({ open: true, clip: 'a', part: 'p' })).toBe(Depth.Part);
+  });
+});
+
+describe('a press on a frame selected on the canvas', () => {
+  it('moves the whole frame: inner elements wait for a double-click or Enter', () => {
+    expect(pressOf(Depth.Frame, FramePress.Move)).toBe(Press.MoveFrame);
+  });
+
+  it('picks the element under the pointer once inside, or where the frame does not move on press', () => {
+    expect(pressOf(Depth.Clip, FramePress.Move)).toBe(Press.Pick);
+    expect(pressOf(Depth.Part, FramePress.Move)).toBe(Press.Pick);
+    expect(pressOf(Depth.Frame, FramePress.Pick)).toBe(Press.Pick);
   });
 });
 

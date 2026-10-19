@@ -46,7 +46,8 @@ export const SIDED: Record<ShapeKind, boolean> = {
   [ShapeKind.Ellipse]: false,
   [ShapeKind.Polygon]: false,
   [ShapeKind.Star]: false,
-  [ShapeKind.Path]: false
+  [ShapeKind.Path]: false,
+  [ShapeKind.Vector]: false
 };
 
 export const sidesShown = (kind: ShapeKind): boolean => SIDED[kind] ?? false;

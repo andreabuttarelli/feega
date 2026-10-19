@@ -82,6 +82,31 @@ export function measureClips(root: HTMLElement, kinds: Kinds = KINDS): Record<st
     };
   }
 
+  const spoken = (el: Element) => (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+
+  const drawnAs = (layer: HTMLElement, value: string): HTMLElement | null => {
+    const wanted = value.replace(/\s+/g, ' ').trim();
+    let found = [...layer.querySelectorAll<HTMLElement>('*')].find((el) => spoken(el) === wanted) ?? null;
+    while (found) {
+      const inner = [...found.children].find((el) => spoken(el) === wanted) as HTMLElement | undefined;
+      if (!inner) {
+        return found;
+      }
+      found = inner;
+    }
+    return null;
+  };
+
+  for (const layer of root.querySelectorAll<HTMLElement>('[data-texts]')) {
+    const texts = JSON.parse(layer.dataset.texts!) as Record<string, string>;
+    for (const [field, value] of Object.entries(texts)) {
+      if (layer.querySelector('[' + kinds.part + '="' + field + '"],[' + kinds.part + '^="' + field + ':"]')) {
+        continue;
+      }
+      drawnAs(layer, value)?.setAttribute(kinds.part, field);
+    }
+  }
+
   for (const layer of root.querySelectorAll<HTMLElement>('[data-clip]')) {
     for (const el of layer.querySelectorAll<HTMLElement>('[' + kinds.part + ']')) {
       const r = el.getBoundingClientRect();

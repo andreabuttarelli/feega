@@ -12,7 +12,7 @@ describe('peerTracks: peers drawn on smooth paths', () => {
     tracks.heard(peer({ cursor: { x: 0, y: 0 } }), 0, 1000);
     tracks.heard(peer({ cursor: { x: 100, y: 0 } }), 50, 1050);
 
-    const [drawn] = tracks.smooth([peer({ cursor: { x: 100, y: 0 } })], 1175);
+    const [drawn] = tracks.smooth([peer({ cursor: { x: 100, y: 0 } })], 1120);
     expect(drawn.cursor!.x).toBeGreaterThan(0);
     expect(drawn.cursor!.x).toBeLessThan(100);
   });
@@ -22,7 +22,7 @@ describe('peerTracks: peers drawn on smooth paths', () => {
     tracks.heard(peer({ live: [{ id: 'n', x: 0, y: 0, w: 10 }] }), 0, 1000);
     tracks.heard(peer({ live: [{ id: 'n', x: 100, y: 0, w: 10 }] }), 50, 1050);
 
-    const [drawn] = tracks.smooth([peer({ live: [{ id: 'n', x: 100, y: 0, w: 10 }] })], 1175);
+    const [drawn] = tracks.smooth([peer({ live: [{ id: 'n', x: 100, y: 0, w: 10 }] })], 1120);
     expect(drawn.live[0].x).toBeGreaterThan(0);
     expect(drawn.live[0].x).toBeLessThan(100);
     expect(drawn.live[0].w).toBe(10);

@@ -9,7 +9,8 @@ export enum ShapeKind {
   Ellipse = 'ellipse',
   Polygon = 'polygon',
   Star = 'star',
-  Path = 'path'
+  Path = 'path',
+  Vector = 'vector'
 }
 
 export enum FillKind {
@@ -41,7 +42,8 @@ export const GEOMETRY_OF: Record<ShapeKind, readonly (typeof GEOMETRY)[number][]
   [ShapeKind.Ellipse]: [],
   [ShapeKind.Polygon]: ['sides', 'roundness'],
   [ShapeKind.Star]: ['points', 'innerRadius', 'roundness'],
-  [ShapeKind.Path]: []
+  [ShapeKind.Path]: [],
+  [ShapeKind.Vector]: []
 };
 
 export function shapeFieldShown(kind: ShapeKind, key: string): boolean {

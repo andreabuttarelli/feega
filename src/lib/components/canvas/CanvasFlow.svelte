@@ -160,6 +160,7 @@
     onConnect,
     onDelete,
     onCreateFormats,
+    onExport,
     onEdgeDelete,
     onEdgeRetype,
     onEdgeModeChange,
@@ -232,6 +233,7 @@
      */
     onDelete?: (ids: string[]) => void;
     onCreateFormats?: (frameId: string) => void;
+    onExport?: (frameIds: string[]) => void;
     /** "Crea post" dalla barra della selezione: gli id scelti, così com'è per `onDelete`. */
     /** Una linea da togliere. Senza, il primo errore resta sulla tela per sempre. */
     onEdgeDelete?: (edgeId: string) => void;
@@ -679,6 +681,7 @@
     'bring-front': (ids) => onRestack?.(ids, Stack.Front),
     'send-back': (ids) => onRestack?.(ids, Stack.Back),
     'create-formats': (ids) => onCreateFormats?.(ids[0]),
+    export: (ids) => onExport?.(ids),
     delete: (ids) => onDelete?.(ids)
   };
 

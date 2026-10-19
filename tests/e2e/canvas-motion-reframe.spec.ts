@@ -100,7 +100,7 @@ async function open(page: Page, stage: Locator, touch: boolean) {
     if (!drawnByPosterLayer) {
       await stage.tap({ position });
     }
-    await stage.getByTestId('open-motion-editor').dispatchEvent('click');
+    await stage.dblclick({ position });
     return;
   }
   await stage.click({ position });

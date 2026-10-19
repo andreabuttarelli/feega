@@ -1,4 +1,4 @@
-const CACHE = 'gpu-canvas-snapshots-v1';
+const CACHE = 'gpu-canvas-snapshots-v2';
 const PREFIX = '/__gpu-snapshot/';
 const LATEST = '/__gpu-snapshot-latest/';
 const KEY_HEADER = 'x-snapshot-key';

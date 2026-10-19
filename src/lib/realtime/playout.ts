@@ -1,8 +1,12 @@
 export type Values = Record<string, number>;
 
-export const MIN_DELAY_MS = 80;
+const MIN_DELAY_MS = 30;
 const MAX_DELAY_MS = 250;
-const DELAY_GAPS = 3;
+const START_DELAY_MS = 100;
+const JITTER_MARGIN = 2.5;
+const JITTER_WEIGHT = 0.1;
+const EASE = 0.08;
+const MAX_STEP_MS = 10;
 export const EXTRAPOLATE_MS = 60;
 export const SNAP_PX = 400;
 const KEPT = 12;
@@ -14,15 +18,24 @@ const lerp = (a: Values, b: Values, k: number): Values =>
 
 const distance = (a: Values, b: Values) => Math.hypot((b.x ?? 0) - (a.x ?? 0), (b.y ?? 0) - (a.y ?? 0));
 
-function delayOf(points: Point[]): number {
+function medianGap(points: Point[]): number {
   const gaps = points.slice(1).map((p, i) => p.at - points[i].at).sort((a, b) => a - b);
-  const median = gaps[Math.floor(gaps.length / 2)] ?? 0;
-  return Math.min(MAX_DELAY_MS, Math.max(MIN_DELAY_MS, median * DELAY_GAPS));
+  return gaps[Math.floor(gaps.length / 2)] ?? 0;
 }
+
+const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
 
 export function playout() {
   const points: Point[] = [];
   let offset = Infinity;
+  let jitter = 0;
+  let delay = START_DELAY_MS;
+
+  function retune(lateness: number) {
+    jitter += (lateness - jitter) * JITTER_WEIGHT;
+    const target = clamp(medianGap(points) + JITTER_MARGIN * jitter, MIN_DELAY_MS, MAX_DELAY_MS);
+    delay += clamp((target - delay) * EASE, -MAX_STEP_MS, MAX_STEP_MS);
+  }
 
   function between(time: number): Values | null {
     const after = points.findIndex((p) => p.at >= time);
@@ -61,13 +74,15 @@ export function playout() {
       if (points.length > KEPT) {
         points.shift();
       }
+      retune(receivedAt - sentAt - offset);
     },
     sample(now: number): Values | null {
       if (!points.length) {
         return null;
       }
-      return between(now - offset - delayOf(points));
+      return between(now - offset - delay);
     },
+    delay: () => delay,
     idleSince: () => (points.length ? points[points.length - 1].at + offset : -Infinity)
   };
 }

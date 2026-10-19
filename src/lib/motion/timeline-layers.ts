@@ -52,6 +52,36 @@ export function layerRows(tracks: readonly MotionTrack[], view: RowView): Row[] 
 
 export const rowsHeight = (rows: readonly Row[]): number => rows.reduce((sum, r) => sum + ROW_PX[r.kind], 0);
 
+export type RowWindow = { from: number; to: number; before: number; after: number };
+
+function firstBelow(rows: readonly Row[], y: number): number {
+  let lo = 0;
+  let hi = rows.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (rows[mid].top + ROW_PX[rows[mid].kind] <= y) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  return lo;
+}
+
+const UNMEASURED_VIEW_PX = 720;
+
+export function rowWindow(rows: readonly Row[], scrolled: number, measured: number, overscan: number): RowWindow {
+  if (!rows.length) {
+    return { from: 0, to: 0, before: 0, after: 0 };
+  }
+  const view = measured > 0 ? measured : UNMEASURED_VIEW_PX;
+  const from = Math.max(0, firstBelow(rows, scrolled) - overscan);
+  const to = Math.min(rows.length, firstBelow(rows, scrolled + view) + overscan);
+  const last = rows[rows.length - 1];
+  const end = to < rows.length ? rows[to].top : last.top + ROW_PX[last.kind];
+  return { from, to, before: rows[from]?.top ?? 0, after: last.top + ROW_PX[last.kind] - end };
+}
+
 export function layerName(clip: Pick<MotionClip, 'id' | 'component' | 'props'>, comps: Record<string, { name: string }>): string {
   const comp = compOf(clip as MotionClip);
   const custom = clip.component === 'Custom' ? (clip.props as { name?: string }).name : undefined;

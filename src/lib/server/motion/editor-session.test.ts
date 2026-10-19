@@ -8,7 +8,7 @@ const RECORD = { id: 'n1', displayName: 'Frame', data: {} };
 
 vi.mock('$lib/server/repos/orgs', () => ({ listMemberships: () => slow([{ org: { id: 'o1', name: 'o', slug: 'o' }, role: 'member' }]) }));
 vi.mock('$lib/server/canvas/lookup', () => ({
-  findCanvasForUser: () => slow({ orgId: 'o1', canvas: { id: 'c1', projectId: 'p1', name: 'Canvas' }, mode: 'standard', projectBrandId: null })
+  openCanvasForUser: () => slow({ memberships: [{ org: { id: 'o1', name: 'o', slug: 'o' }, role: 'member' }], found: { orgId: 'o1', canvas: { id: 'c1', projectId: 'p1', name: 'Canvas' }, mode: 'standard', projectBrandId: null } })
 }));
 vi.mock('$lib/server/uncensored-workspace/workspace-server', () => ({ canvasReachable: () => slow(true) }));
 vi.mock('./editor', () => ({
@@ -18,7 +18,7 @@ vi.mock('./editor', () => ({
   motionTokens: () => slow({}),
   motionAssets: () => slow([])
 }));
-vi.mock('$lib/server/repos/motion-revisions', () => ({ readHead: () => slow({ version: 3, doc: { scenes: [] } }) }));
+vi.mock('$lib/server/repos/motion-revisions', () => ({ headCache: () => new Map(), readHead: () => slow({ version: 3, doc: { scenes: [] } }) }));
 vi.mock('$lib/server/repos/node-runs', () => ({ listNodeRuns: () => slow([]) }));
 vi.mock('./templates', () => ({ templateLibrary: () => ({ own: () => slow([]) }) }));
 vi.mock('$lib/server/gallery/editor', () => ({ editorGallery: () => slow(null) }));
@@ -36,13 +36,13 @@ const params = { projectId: 'p1', canvasId: 'c1', nodeId: 'n1' };
 const url = new URL('http://x/p/p1/c/c1/motion/n1/session');
 
 describe('loadEditorSession', () => {
-  it('apre la sessione in quattro giri, non sei: nodo e dati partono insieme', async () => {
+  it('apre la sessione in tre giri: tela e appartenenze insieme, poi nodo e dati insieme', async () => {
     const started = performance.now();
     const data = await loadEditorSession(locals, params, url);
     const elapsed = performance.now() - started;
 
     expect(data.head.version).toBe(3);
-    expect(elapsed).toBeLessThan(HOP_MS * 5);
+    expect(elapsed).toBeLessThan(HOP_MS * 4);
   });
 
   it('dice per fase dove è andato il tempo', async () => {

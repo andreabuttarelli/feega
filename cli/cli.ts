@@ -455,6 +455,25 @@ canvas
   });
 
 canvas
+  .command('export <projectId> <targets...>')
+  .description('Export frames, or one element as frameId:elementId: one file, or a zip for several (free, no AI)')
+  .option('--format <f>', 'png, jpg, webp, svg or pdf (one file, a page per frame)', 'png')
+  .option('--scale <n>', 'Scale 0.5–4')
+  .option('--width <px>', 'Fixed width, keeps the ratio')
+  .option('--height <px>', 'Fixed height, keeps the ratio')
+  .option('--suffix <s>', 'Added to each file name, e.g. @2x')
+  .option('--quality <n>', 'JPG/WebP quality 1–100')
+  .option('--transparent', 'No background')
+  .option('--rows <json>', 'Several settings at once, e.g. \'[{"format":"png","by":"scale","value":2}]\'')
+  .option('--name <name>', 'Zip name')
+  .option('--out <file>', 'Where to save it (default: the file name)')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (projectId: string, targets: string[], opts) => {
+    const { cmdCanvasExport } = await import('./commands/canvas.ts');
+    await cmdCanvasExport(projectId, targets, opts);
+  });
+
+canvas
   .command('frame <projectId>')
   .description('Draw an empty frame on a canvas, like the frame tool: a box in canvas units, or a width and a preset format')
   .requiredOption('--canvas <id>', 'The canvas')

@@ -54,7 +54,7 @@ test.describe('motion editor @real', () => {
 
     await page.keyboard.press('ControlOrMeta+Alt+b');
     await expect(page.getByLabel('Properties', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Agent', { exact: true })).toBeHidden();
+    await expect(page.getByRole('tab', { name: 'Properties' }), 'Properties opens as a tab of the one right bar').toHaveAttribute('aria-selected', 'true');
   });
 
   test('⌘J nasconde la timeline, la preview prende lo spazio, il transport resta e la timeline torna alla stessa altezza', async ({ page, session, seedNode }) => {

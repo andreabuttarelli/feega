@@ -1,7 +1,10 @@
 export enum SegmentIcon {
   AlignLeft = 'align-left',
   AlignCenter = 'align-center',
-  AlignRight = 'align-right'
+  AlignRight = 'align-right',
+  AutoWidth = 'auto-width',
+  AutoHeight = 'auto-height',
+  FixedSize = 'fixed-size'
 }
 
 export type Segment = { value: string; label: string; icon: SegmentIcon | null };
@@ -15,6 +18,11 @@ const SEGMENTS: Record<string, Record<string, Omit<Segment, 'value'>>> = {
   fit: {
     cover: { label: 'Cover', icon: null },
     contain: { label: 'Contain', icon: null }
+  },
+  sizing: {
+    auto: { label: 'Auto width', icon: SegmentIcon.AutoWidth },
+    'auto-height': { label: 'Auto height', icon: SegmentIcon.AutoHeight },
+    fixed: { label: 'Fixed size', icon: SegmentIcon.FixedSize }
   },
   textCase: {
     'as-typed': { label: 'As typed', icon: null },
