@@ -23,4 +23,13 @@ describe('screen uses', () => {
   it('carries the screen size and background', () => {
     expect(screenUses([], { x: 0, y: 0, zoom: 1 }, SCREEN, null)).toEqual({ width: 800, height: 600, background: null, items: [] });
   });
+
+  it('turns a rotated frame about its world pivot', () => {
+    const turned = { ...frame('a', 0), size: { width: 200, height: 100 }, turn: { degrees: 90, about: { x: 100, y: 50 } } };
+    const [use] = screenUses([turned], { x: 0, y: 0, zoom: 1 }, SCREEN, null).items as { matrix: number[] }[];
+    const at = (x: number, y: number) => [use.matrix[0] * x + use.matrix[2] * y + use.matrix[4], use.matrix[1] * x + use.matrix[3] * y + use.matrix[5]].map((v) => Math.round(v) + 0);
+
+    expect(at(100, 50)).toEqual([100, 50]);
+    expect(at(200, 50)).toEqual([100, 150]);
+  });
 });

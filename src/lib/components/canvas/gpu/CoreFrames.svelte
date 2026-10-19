@@ -12,11 +12,11 @@
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { resident, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
-  import { screenUses } from '$lib/canvas/core/screen-uses';
+  import { screenUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { drawsWhole, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
 
-  type CoreCard = { key: string; frame: FrameOnCanvas };
+  type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
   type Source = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens };
 
@@ -71,7 +71,7 @@
 
   const imagesIn = (list: DisplayList) => list.items.filter((i) => i.kind === ItemKind.Image).length;
 
-  const cardPuts = $derived(cards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, images: imagesIn(c.frame.list) }] : [])));
+  const cardPuts = $derived(cards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, images: imagesIn(c.frame.list), turn: c.turn }] : [])));
 
   const framePuts = $derived(
     frames.flatMap((f): HeldFrame[] => {
