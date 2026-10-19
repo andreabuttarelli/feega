@@ -75,6 +75,16 @@ describe('grouping free elements on the canvas', () => {
     expect((result as { undo: { kind: string }[] }).undo.map((u) => u.kind)).toEqual(['node.create', 'node.delete', 'node.delete']);
   });
 
+  it('gives the group the id the client already drew it with', async () => {
+    const id = '77777777-7777-4777-8777-777777777777';
+    const input = event({ ids: JSON.stringify([A, B]), node_id: id }, two());
+
+    const result = await actions.groupElements(input as never);
+
+    expect(result).toMatchObject({ outcome: 'done' });
+    expect(input.calls.find((c) => c.table === 'nodes' && c.op === 'insert')?.payload).toMatchObject({ id });
+  });
+
   it('refuses a lone pick: one thing is not a group', async () => {
     const input = event({ ids: JSON.stringify([A, 'gone-node']) }, { nodes: [elementRow(A, AT_A)], motion_revisions: [revisionRow(A, box('a', AT_A))] });
 

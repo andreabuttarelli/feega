@@ -1216,11 +1216,12 @@ export const actions: Actions<CanvasParams> = {
 
   groupElements: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);
-    const ask = groupAskSchema.safeParse({ ids: jsonField(await request.formData(), 'ids') });
+    const form = await request.formData();
+    const ask = groupAskSchema.safeParse({ ids: jsonField(form, 'ids'), id: String(form.get('node_id') ?? '') || undefined });
     if (!ask.success) {
       return fail(400, { error: 'invalid group' });
     }
-    return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids));
+    return movedAnswer(await groupElements(canvasFrames(scope), canvasMembers(scope), { projectId: scope.canvas.projectId, canvasId: scope.canvasId }, ask.data.ids, ask.data.id));
   },
 
   restack: async ({ request, params, locals }) => {

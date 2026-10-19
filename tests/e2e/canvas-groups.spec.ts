@@ -3,6 +3,8 @@ import type { Page } from '@playwright/test';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 const SHOTS = process.env.CANVAS_MOTION_SHOTS;
+const SLOW_SERVER_MS = 3_000;
+const INSTANT_MS = 100;
 const LANDSCAPE = { format: '16:9', docHeadRevision: 1, posterAssetId: null, lastRenderAssetId: null };
 
 type Clip = { id: string; component: string; props: Record<string, unknown> };
@@ -77,6 +79,47 @@ test.describe('groups @real', () => {
     await page.keyboard.press('ControlOrMeta+Shift+g');
     await expect.poll(async () => (await alive()).map((n) => n.display_name).sort(), { timeout: 10_000 }).toEqual(['Box', 'Ellipse']);
     await shoot(page, '3-ungrouped');
+  });
+
+  test('⌘G and ⇧⌘G change the canvas at once, while the server is still answering', async ({ page, session, admin, seedNode }) => {
+    test.setTimeout(120_000);
+    const seeded: string[] = [];
+    for (const [i, shape] of ['rect', 'ellipse'].entries()) {
+      const node = await seedNode({ type: 'motion', x: 120 + i * 220, y: 160, data: { ...LANDSCAPE, kind: 'element' } });
+      await admin.from('nodes').update({ width: 120, height: 120 }).eq('id', node.id);
+      const { error } = await admin.from('motion_revisions').insert({ org_id: session.orgId, node_id: node.id, version: 1, doc: sheet(`o${i}`, shape), actor_kind: 'user', actor_id: session.userId });
+      expect(error).toBeNull();
+      seeded.push(node.id);
+    }
+    await page.route(/\?\/(groupElements|ungroupElement)/, async (route) => {
+      await new Promise((done) => setTimeout(done, SLOW_SERVER_MS));
+      await route.continue();
+    });
+
+    await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await page.locator('.svelte-flow__pane').click({ position: { x: 10, y: 10 } });
+    await page.keyboard.press('ControlOrMeta+a');
+
+    await page.evaluate((known) => {
+      const probe = window as unknown as { groupProbe: { pressed: number; shown: number } };
+      probe.groupProbe = { pressed: 0, shown: 0 };
+      window.addEventListener('keydown', (e) => { if (e.key.toLowerCase() === 'g' && !probe.groupProbe.pressed) { probe.groupProbe.pressed = performance.now(); } }, { capture: true });
+      new MutationObserver((_, observer) => {
+        const fresh = [...document.querySelectorAll('[data-motion-node]')].some((el) => !known.includes(el.getAttribute('data-motion-node') ?? ''));
+        if (fresh) { probe.groupProbe.shown = performance.now(); observer.disconnect(); }
+      }).observe(document.body, { childList: true, subtree: true });
+    }, seeded);
+    await page.keyboard.press('ControlOrMeta+g');
+
+    await expect.poll(() => page.evaluate(() => (window as unknown as { groupProbe: { shown: number } }).groupProbe.shown)).toBeGreaterThan(0);
+    const { pressed, shown } = await page.evaluate(() => (window as unknown as { groupProbe: { pressed: number; shown: number } }).groupProbe);
+    expect(shown - pressed, 'the group is drawn before the server answers').toBeLessThan(INSTANT_MS);
+
+    const alive = async () => (await admin.from('nodes').select('display_name').eq('canvas_id', session.canvasId).is('deleted_at', null)).data ?? [];
+    await expect.poll(async () => (await alive()).map((n) => n.display_name), { timeout: 15_000 }).toEqual(['Group']);
+    await page.keyboard.press('ControlOrMeta+Shift+g');
+    await expect.poll(async () => (await alive()).map((n) => n.display_name).sort(), { timeout: 15_000 }).toEqual(['Box', 'Ellipse']);
+    await expect(page.getByText('The canvas refused this change.')).toHaveCount(0);
   });
 
   test('the toolbar groups two elements and the right-click menu ungroups them', async ({ page, session, admin, seedNode }) => {
