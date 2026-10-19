@@ -207,6 +207,12 @@ pub struct DisplayList {
     pub items: Vec<Item>,
 }
 
+impl DisplayList {
+    pub fn clone_empty(&self) -> Self {
+        Self { width: self.width, height: self.height, background: self.background, items: Vec::new() }
+    }
+}
+
 pub fn parse(json: &str) -> Result<DisplayList, serde_json::Error> {
     serde_json::from_str(json)
 }

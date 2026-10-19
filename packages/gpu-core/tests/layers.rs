@@ -135,6 +135,41 @@ fn a_picture_mask_survives_frames_that_grow_the_image_atlas() {
 
 #[cfg(feature = "gpu")]
 #[test]
+fn a_backdrop_blurs_only_what_lies_under_the_item() {
+    let json = r#"{ "width": 64, "height": 64, "background": [0, 0, 0, 1], "items": [
+    { "kind": "path", "clip": "half", "contours": [[0, 0, 32, 0, 32, 64, 0, 64]], "rule": "nonzero",
+      "paint": { "kind": "solid", "color": [1, 1, 1, 1] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal" },
+    { "kind": "path", "clip": "glass", "contours": [[16, 16, 48, 16, 48, 48, 16, 48]], "rule": "nonzero",
+      "paint": { "kind": "solid", "color": [1, 1, 1, 0] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal", "backdrop": 4 } ] }"#;
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
+    let rendered = renderer.render(&parse(json).unwrap(), &Pictures::new()).unwrap();
+    let pixels = rendered.pixels;
+
+    assert!(rendered.skipped.is_empty());
+    assert!((60..200).contains(&grey(&pixels, 32, 32)));
+    assert_eq!(grey(&pixels, 30, 4), 255);
+    assert_eq!(grey(&pixels, 34, 4), 0);
+}
+
+#[cfg(feature = "gpu")]
+#[test]
+fn a_picture_under_a_backdrop_stays_drawn_frame_after_frame() {
+    let json = r#"{ "width": 64, "height": 64, "background": [0, 0, 0, 1], "items": [
+    { "kind": "image", "clip": "under", "src": "u", "video": false, "mediaTime": 0, "size": { "width": 64, "height": 64 },
+      "fit": "fill", "focus": [0.5, 0.5], "zoom": 1, "clipped": true, "inner": [1, 0, 0, 1, 0, 0], "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal" },
+    { "kind": "path", "clip": "glass", "contours": [[16, 16, 48, 16, 48, 48, 16, 48]], "rule": "nonzero",
+      "paint": { "kind": "solid", "color": [1, 1, 1, 0] }, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal", "backdrop": 4 } ] }"#;
+    let pictures = Pictures::from([("under".to_string(), picture(2, 2, vec![255; 16]))]);
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
+
+    for frame in 0..3 {
+        let pixels = renderer.render(&parse(json).unwrap(), &pictures).unwrap().pixels;
+        assert_eq!(grey(&pixels, 4, 4), 255, "frame {frame}");
+    }
+}
+
+#[cfg(feature = "gpu")]
+#[test]
 fn a_wipe_cuts_the_item_at_its_scissor() {
     let pixels = render(&square(r#", "scissor": [0, 0, 32, 64]"#));
 
