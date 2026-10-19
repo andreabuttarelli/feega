@@ -114,7 +114,12 @@ export const FRAME_PAGE_ACTIONS: Record<string, Parity> = {
   deleteTemplate: motion('delete_template'),
   batchStatus: editor('batch_status'),
   cancelRender: canvas('cancel_render'),
-  renderStatus: editor('render_status')
+  renderStatus: editor('render_status'),
+  branches: editor('list_branches'),
+  createBranch: editor('create_branch'),
+  reviewBranch: editor('review_branch'),
+  mergeBranch: editor('merge_branch'),
+  dropBranch: editor('drop_branch')
 };
 
 export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
