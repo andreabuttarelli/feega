@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { HOSTED, Script } from '$lib/motion/libs/catalog';
+import { captureScript } from './capture';
 
 type HtmlToImage = { toSvg: (node: HTMLElement, options: Record<string, unknown>) => Promise<string> };
 
@@ -29,5 +30,11 @@ describe('the hosted screenshot library', () => {
     const svg = decodeURIComponent(await screenshotTool().toSvg(node, { width: 200, height: 100, fontEmbedCSS: '', skipFonts: true, includeStyleProperties: ['font-size'] }));
 
     expect(svg).toContain('font-size: 79.92px');
+  });
+});
+
+describe('the capture runtime', () => {
+  it('draws text at precise geometry, so a slow push-in does not snap glyphs frame to frame on Linux', () => {
+    expect(captureScript({ width: 100, height: 100 }, 's', '/lib.js')).toContain('text-rendering:geometricPrecision');
   });
 });

@@ -16,3 +16,10 @@ Guard: `src/lib/motion/hyperframes/screenshot-font.test.ts` runs the
 hosted bundle and fails if a fractional size is rounded again.
 `bench:gpu-parity` accepts `--under=html` to compare the export capture
 with `--ref=live`.
+
+With exact sizes, Linux CI flagged a flicker in the kinetic-title push-in:
+hinted glyphs snapped to whole pixels on some frames and not others
+(frame dumps from CI showed the whole title shifting every 2 of 3
+frames). The capture document now sets `text-rendering:
+geometricPrecision`, which turns hinting off; the e2e passes on Linux
+and the iso-blocks poster still matches the live DOM pixel for pixel.
