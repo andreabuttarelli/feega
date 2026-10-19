@@ -36,4 +36,13 @@ describe('the server answers the native bundles across origins', () => {
     expect(answer.headers.get('access-control-allow-origin')).toBe('tauri://localhost');
     expect(answer.headers.get('vary')).toContain('Origin');
   });
+
+  it('never lets a bundle origin send cookies: no credentials, no wildcard', () => {
+    const preflight = corsPreflight(from('tauri://localhost', 'OPTIONS'), []);
+    const answer = withCors(from('tauri://localhost'), new Response('{}'), []);
+    for (const headers of [preflight!.headers, answer.headers]) {
+      expect(headers.get('access-control-allow-credentials')).toBeNull();
+      expect(headers.get('access-control-allow-origin')).not.toBe('*');
+    }
+  });
 });

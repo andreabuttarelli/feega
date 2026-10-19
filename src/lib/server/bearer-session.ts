@@ -17,3 +17,17 @@ export async function bearerSession(token: string, verify: (token: string) => Pr
   }
   return { session: { access_token: token, token_type: 'bearer', user } as Session, user };
 }
+
+export enum SessionSource {
+  Bearer = 'bearer',
+  Cookie = 'cookie',
+  None = 'none'
+}
+
+export function sessionSourceOf(request: Request, url: URL): SessionSource {
+  if (bearerTokenOf(request)) {
+    return SessionSource.Bearer;
+  }
+  const origin = request.headers.get('origin');
+  return !origin || origin === url.origin ? SessionSource.Cookie : SessionSource.None;
+}
