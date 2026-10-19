@@ -3,7 +3,7 @@ import { TYPE, type TextCase } from '../../components';
 import { Ease } from '../../design';
 import { safeBox } from '../../fit';
 import { elementFills } from '../../fill/elements';
-import { FillType, type Fill, type FillOf } from '../../fill/model';
+import { FillType, ImageFit, type Fill, type FillOf } from '../../fill/model';
 import { BlendMode } from '../../blend';
 import { StrokeAlign } from '../../stroke/model';
 import { firstColour } from '../../stroke/render';
@@ -18,10 +18,11 @@ import { rgbaOf, type Rgba } from '../rgba';
 import type { Face, FaceBook, Request } from './face';
 import type { FaceRule } from './fonts';
 import type { FontFace } from '../../fonts/model';
-import { layOut, Shaping, Spaces, type Flow, type Glyph, type Laid, type Line, type Type } from './layout';
+import { layOut, NO_EXTRA, Shaping, Spaces, type Extra, type Flow, type Glyph, type Laid, type Line, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
 import { animation, type Animation, type Look } from './animators';
-import { clipped, contoursOf, dilated, type Rect } from './outline';
+import { clipped, contoursOf, dilated, within, type Rect } from './outline';
+import { blended } from '../blend-colour';
 
 export type TextComponent = 'Title' | 'Text' | 'Kicker' | 'Caption';
 
@@ -35,7 +36,11 @@ export enum TextGap {
 
 export type Painted = { inks: Ink[]; frame: Box };
 
-export type Ink = { contours: number[][]; paint: Paint; rule: FillRule; opacity: number; matrix: Affine; blur: number };
+export type GlyphRun = { font: string; coords: [string, number][]; size: number; glyphs: [number, number, number][] };
+
+export type Picture = { src: string; fit: string; focus: [number, number]; area: Rect };
+
+export type Ink = { contours: number[][]; paint: Paint; rule: FillRule; opacity: number; matrix: Affine; blur: number; picture?: Picture; run?: GlyphRun };
 
 type Size = { width: number; height: number };
 
@@ -59,7 +64,12 @@ export const smoothingOf = (userAgent: string): Smoothing => (DILATING_PLATFORM.
 
 export type NativeFaces = { rules: readonly FaceRule[]; registry: readonly FontFace[] };
 
-export type Typeset = { fonts: FaceBook; smoothing: Smoothing; native?: NativeFaces };
+export enum TextOutput {
+  Outlines = 'outlines',
+  Glyphs = 'glyphs'
+}
+
+export type Typeset = { fonts: FaceBook; smoothing: Smoothing; native?: NativeFaces; output?: TextOutput };
 
 export const NO_TYPESET: Typeset = { fonts: () => null, smoothing: Smoothing.Plain };
 
@@ -76,6 +86,8 @@ export type TextEnv = {
   still: number | null;
   fonts: FaceBook;
   animators: readonly TextAnimator[];
+  output?: TextOutput;
+  asset: (id: string) => string | null;
 };
 
 enum Motion {
@@ -196,7 +208,7 @@ export const moved = (contours: number[][], dx: number, dy: number) => contours.
 
 const rect = ([l, t, r, b]: Rect) => [l, t, r, t, r, b, l, b];
 
-export const STILL: Look = { opacity: 1, blur: 0, turn: [1, 0, 0, 1, 0, 0], tint: null };
+export const STILL: Look = { opacity: 1, blur: 0, turn: [1, 0, 0, 1, 0, 0], tint: null, spacing: 0 };
 
 const WORD = /\S+/g;
 
@@ -221,7 +233,7 @@ function mixed(base: Rgba, tint: Rgba, amount: number): Rgba {
   return [channel(0), channel(1), channel(2), alpha];
 }
 
-type Shade = { paint: Paint; squash: number };
+type Shade = { paint: Paint; squash: number; clip: number[] | null; picture?: Picture };
 
 export type Colour = (v: string) => Rgba;
 
@@ -232,41 +244,117 @@ const stopsOf = (f: { stops: { color: string; pos: number }[]; opacity: number }
 const DEG = Math.PI / 180;
 const CSS_TURN = 90;
 const HALF = 0.5;
+const WEDGES = 120;
+const FULL_TURN = 360;
+const WHITE: Rgba = [1, 1, 1, 1];
 
-export type FillPlan = { kind: PaintKind.Solid; color: Rgba } | { kind: PaintKind.Linear; angle: number; stops: Stop[] } | { kind: PaintKind.Radial; center: [number, number]; radius: number; stops: Stop[] };
+export enum ClippedFill {
+  Diamond = 'diamond',
+  Angular = 'angular',
+  Image = 'image'
+}
 
-const PLANS: Partial<{ [T in FillType]: (f: FillOf<T>, colour: Colour) => FillPlan }> = {
+export type FillPlan =
+  | { kind: PaintKind.Solid; color: Rgba }
+  | { kind: PaintKind.Linear; angle: number; stops: Stop[] }
+  | { kind: PaintKind.Radial; center: [number, number]; radius: number; stops: Stop[] }
+  | { kind: ClippedFill.Diamond; stops: Stop[] }
+  | { kind: ClippedFill.Angular; angle: number; center: [number, number]; stops: Stop[] }
+  | { kind: ClippedFill.Image; src: string; fit: string; focus: [number, number]; opacity: number };
+
+type FillKind = FillPlan['kind'];
+
+const PLANS: Partial<{ [T in FillType]: (f: FillOf<T>, colour: Colour, asset: (id: string) => string | null) => FillPlan | null }> = {
   [FillType.Solid]: (f, colour) => ({ kind: PaintKind.Solid, color: faded(colour(f.color), f.opacity) }),
   [FillType.Linear]: (f, colour) => ({ kind: PaintKind.Linear, angle: f.angle, stops: stopsOf(f, colour) }),
-  [FillType.Radial]: (f, colour) => ({ kind: PaintKind.Radial, center: [f.center.x, f.center.y], radius: f.radius, stops: stopsOf(f, colour) })
+  [FillType.Radial]: (f, colour) => ({ kind: PaintKind.Radial, center: [f.center.x, f.center.y], radius: f.radius, stops: stopsOf(f, colour) }),
+  [FillType.Diamond]: (f, colour) => ({ kind: ClippedFill.Diamond, stops: stopsOf(f, colour) }),
+  [FillType.Angular]: (f, colour) => ({ kind: ClippedFill.Angular, angle: f.angle, center: [f.center.x, f.center.y], stops: stopsOf(f, colour) }),
+  [FillType.Image]: (f, _colour, asset) => {
+    const src = f.src ?? asset(f.assetId);
+    return src && f.fit !== ImageFit.Tile ? { kind: ClippedFill.Image, src, fit: f.fit, focus: [f.focus.x, f.focus.y], opacity: f.opacity } : null;
+  }
 };
 
-const SHADES: { [K in PaintKind]: (f: Extract<FillPlan, { kind: K }>, area: Rect) => Shade } = {
-  [PaintKind.Solid]: (f) => ({ paint: { kind: PaintKind.Solid, color: f.color }, squash: 1 }),
+function colourAt(stops: Stop[], t: number): Rgba {
+  const after = stops.findIndex((s) => s.at >= t);
+  if (after <= 0) {
+    return (after === 0 ? stops[0] : stops[stops.length - 1]).color;
+  }
+  const [a, b] = [stops[after - 1], stops[after]];
+  const k = b.at === a.at ? 0 : (t - a.at) / (b.at - a.at);
+  return a.color.map((v, i) => v + (b.color[i] - v) * k) as Rgba;
+}
+
+const rectPolygon = ([l, t, r, b]: Rect) => [l, t, r, t, r, b, l, b];
+
+function towardCorner([l, t, r, b]: Rect, sx: number, sy: number, stops: Stop[]): Paint {
+  const [w, h] = [r - l, b - t];
+  const length = Math.hypot(w, h) || 1;
+  const [dx, dy] = [(sx * h) / length, (sy * w) / length];
+  const reach = (Math.abs(w * dx) + Math.abs(h * dy)) * HALF;
+  const [cx, cy] = [(l + r) * HALF, (t + b) * HALF];
+  return { kind: PaintKind.Linear, from: [cx - dx * reach, cy - dy * reach], to: [cx + dx * reach, cy + dy * reach], stops };
+}
+
+const QUADRANTS: [number, number][] = [
+  [1, 1],
+  [-1, 1],
+  [1, -1],
+  [-1, -1]
+];
+
+const unclipped = (paint: Paint, squash = 1): Shade[] => [{ paint, squash, clip: null }];
+
+const SHADES: { [K in FillKind]: (f: Extract<FillPlan, { kind: K }>, area: Rect) => Shade[] } = {
+  [PaintKind.Solid]: (f) => unclipped({ kind: PaintKind.Solid, color: f.color }),
   [PaintKind.Linear]: (f, [l, t, r, b]) => {
     const turn = (f.angle + CSS_TURN) * DEG;
     const [dx, dy] = [Math.sin(turn), -Math.cos(turn)];
     const reach = (Math.abs((r - l) * dx) + Math.abs((b - t) * dy)) * HALF;
     const [cx, cy] = [(l + r) * HALF, (t + b) * HALF];
-    return { paint: { kind: PaintKind.Linear, from: [cx - dx * reach, cy - dy * reach], to: [cx + dx * reach, cy + dy * reach], stops: f.stops }, squash: 1 };
+    return unclipped({ kind: PaintKind.Linear, from: [cx - dx * reach, cy - dy * reach], to: [cx + dx * reach, cy + dy * reach], stops: f.stops });
   },
   [PaintKind.Radial]: (f, [l, t, r, b]) => {
     const [rx, ry] = [f.radius * HALF * (r - l), f.radius * HALF * (b - t)];
     const squash = ry > 0 ? rx / ry : 1;
-    return { paint: { kind: PaintKind.Radial, center: [l + f.center[0] * (r - l), (t + f.center[1] * (b - t)) * squash], radius: rx, stops: f.stops }, squash };
-  }
+    return unclipped({ kind: PaintKind.Radial, center: [l + f.center[0] * (r - l), (t + f.center[1] * (b - t)) * squash], radius: rx, stops: f.stops }, squash);
+  },
+  [ClippedFill.Diamond]: (f, [l, t, r, b]) => {
+    const [cx, cy] = [(l + r) * HALF, (t + b) * HALF];
+    const stops = f.stops.map((s) => ({ ...s, at: s.at * HALF }));
+    return QUADRANTS.map(([sx, sy]) => {
+      const quadrant: Rect = [sx > 0 ? cx : l, sy > 0 ? cy : t, sx > 0 ? r : cx, sy > 0 ? b : cy];
+      return { paint: towardCorner(quadrant, sx, sy, stops), squash: 1, clip: rectPolygon(quadrant) };
+    });
+  },
+  [ClippedFill.Angular]: (f, [l, t, r, b]) => {
+    const [cx, cy] = [l + f.center[0] * (r - l), t + f.center[1] * (b - t)];
+    const far = 2 * Math.hypot(r - l, b - t);
+    const ray = (k: number): [number, number] => {
+      const angle = (f.angle + (k * FULL_TURN) / WEDGES) * DEG;
+      return [cx + Math.sin(angle) * far, cy - Math.cos(angle) * far];
+    };
+    const mid = (p: [number, number]): [number, number] => [(cx + p[0]) * HALF, (cy + p[1]) * HALF];
+    return Array.from({ length: WEDGES }, (_, k) => {
+      const [a, z] = [ray(k), ray(k + 1)];
+      return { paint: { kind: PaintKind.Linear, from: mid(a), to: mid(z), stops: [{ at: 0, color: colourAt(f.stops, k / WEDGES) }, { at: 1, color: colourAt(f.stops, (k + 1) / WEDGES) }] }, squash: 1, clip: [cx, cy, ...a, ...z] };
+    });
+  },
+  [ClippedFill.Image]: (f, area) => [{ paint: { kind: PaintKind.Solid, color: faded(WHITE, f.opacity) }, squash: 1, clip: null, picture: { src: f.src, fit: f.fit, focus: f.focus, area } }]
 };
 
-const shadeOf = (f: FillPlan, area: Rect): Shade => (SHADES[f.kind] as (f: FillPlan, area: Rect) => Shade)(f, area);
+const shadesOf = (f: FillPlan, area: Rect): Shade[] => (SHADES[f.kind] as (f: FillPlan, area: Rect) => Shade[])(f, area);
 
-const plain = (fills: Fill[]) => fills.length === 1 && fills[0].type === FillType.Solid && fills[0].opacity === 1;
+const throughText = (fills: Fill[]) => !(fills.length === 1 && fills[0].type === FillType.Solid && fills[0].opacity === 1 && fills[0].blend === BlendMode.Normal);
 
-function fillPlans(fills: Fill[], colour: Colour, animated: boolean): FillPlan[] | null {
-  const drawable = fills.every((f) => PLANS[f.type] && f.blend === BlendMode.Normal);
-  if (!drawable || (animated && fills.length > 0 && !plain(fills))) {
-    return null;
+function fillPlans(fills: Fill[], colour: Colour, asset: (id: string) => string | null): FillPlan[] | null {
+  if (!fills.every((f) => f.blend === BlendMode.Normal)) {
+    const solids = fills.every((f) => f.type === FillType.Solid) ? (fills as FillOf<FillType.Solid>[]) : null;
+    return solids && [{ kind: PaintKind.Solid, color: solids.reduce<Rgba>((under, f) => blended(under, faded(colour(f.color), f.opacity), f.blend), [0, 0, 0, 0]) }];
   }
-  return fills.map((f) => (PLANS[f.type] as (f: Fill, c: Colour) => FillPlan)(f, colour));
+  const plans = fills.map((f) => (PLANS[f.type] as ((f: Fill, c: Colour, a: typeof asset) => FillPlan | null) | undefined)?.(f, colour, asset) ?? null);
+  return plans.every((plan) => plan !== null) ? (plans as FillPlan[]) : null;
 }
 
 const STROKE_STRETCH: Record<StrokeAlign, { stretch: number; under: boolean }> = {
@@ -294,9 +382,9 @@ const visible = (paint: Paint) => paint.kind !== PaintKind.Solid || paint.color[
 
 export const tintedPaint = (paint: Paint, look: Look, colour: Colour): Paint => (look.tint && paint.kind === PaintKind.Solid ? { kind: PaintKind.Solid, color: mixed(paint.color, colour(look.tint.color), look.tint.amount) } : paint);
 
-export type Tinted = { opacity: number; blur: number; turn: Affine; tint: { color: Rgba; amount: number } | null };
+export type Tinted = { opacity: number; blur: number; turn: Affine; tint: { color: Rgba; amount: number } | null; spacing?: number };
 
-const UNTINTED: Tinted = { ...STILL, tint: null };
+const UNTINTED: Tinted = { opacity: 1, blur: 0, turn: STILL.turn, tint: null };
 
 const tinted = (paint: Paint, look: Tinted): Paint => (look.tint && paint.kind === PaintKind.Solid ? { kind: PaintKind.Solid, color: mixed(paint.color, look.tint.color, look.tint.amount) } : paint);
 
@@ -331,13 +419,15 @@ const wordsOf = (text: string): Word[] => text.split('\n').flatMap((line, l) => 
 
 const charsBeforeOf = (words: Word[]) => words.map((_, w) => words.slice(0, w).reduce((n, word) => n + word.chars, 0));
 
-function looksOf(text: string, run: Animation, colour: Colour): Tinted[] {
+function looksOf(text: string, run: Animation, colour: Colour, hiddenWhenIsolated: boolean, tracking: number): Tinted[] {
   const words = wordsOf(text);
   const before = charsBeforeOf(words);
   return words.flatMap((word, w) =>
     Array.from({ length: word.chars }, (_, letter) => {
       const look = run.at({ [AnimatorUnit.Char]: before[w] + letter, [AnimatorUnit.Word]: w, [AnimatorUnit.Line]: word.line });
-      return { ...look, tint: look.tint ? { color: colour(look.tint.color), amount: look.tint.amount } : null };
+      const skipped = hiddenWhenIsolated && (run.isolates || look.opacity < 1);
+      const { spacing, ...own } = look;
+      return { ...own, ...(run.tracks ? { spacing: spacing - tracking } : {}), opacity: skipped ? 0 : look.opacity, tint: look.tint ? { color: colour(look.tint.color), amount: look.tint.amount } : null };
     })
   );
 }
@@ -346,7 +436,8 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
   const kind = KINDS[env.component];
   const p = env.props as Props;
   const colour: Colour = (v) => rgbaOf(env.colour(v)) ?? [0, 0, 0, 1];
-  const fills = fillPlans(elementFills(env.component, p).filter((f) => f.visible), colour, env.animators.length > 0);
+  const visibleFills = elementFills(env.component, p).filter((f) => f.visible);
+  const fills = fillPlans(visibleFills, colour, env.asset);
   if (!fills) {
     return TextGap.Fill;
   }
@@ -373,7 +464,7 @@ export function planOf(env: TextEnv): TextPlan | TextGap {
     backdrop: kind.inset > 0 ? colour(String(p.background)) : null,
     fills,
     outline: outlineOf(env, colour),
-    animation: run ? { finest: run.finest, looks: looksOf(cased, run, colour) } : null,
+    animation: run ? { finest: run.finest, looks: looksOf(cased, run, colour, throughText(visibleFills), Number(p.tracking)) } : null,
     smoothing: env.smoothing
   };
 }
@@ -382,7 +473,12 @@ type Placed = { laid: Laid; type: Type; room: number };
 
 function place(plan: TextPlan, fonts: FaceBook): Placed {
   const typeAt = (size: number): Type => ({ request: plan.request, size, tracking: plan.tracking, leading: plan.leading, inset: plan.inset * size, shaping: plan.shaping });
-  const lay = (size: number) => layOut(plan.paragraphs, typeAt(size), plan.flow, plan.frame.width, fonts);
+  const looks = plan.animation?.looks;
+  const words = wordsOf(plan.text);
+  const before = charsBeforeOf(words);
+  const wordsBefore = plan.paragraphs.map((_, i) => plan.paragraphs.slice(0, i).reduce((n, para) => n + (para.match(WORD)?.length ?? 0), 0));
+  const extra: Extra = looks ? (paragraph, word, letter) => looks[(before[wordsBefore[paragraph] + word] ?? 0) + letter]?.spacing ?? 0 : NO_EXTRA;
+  const lay = (size: number) => layOut(plan.paragraphs, typeAt(size), plan.flow, plan.frame.width, fonts, extra);
   const size = plan.fits ? fitSize(plan.size, (s) => lay(s), plan.frame) : plan.size;
   const laid = lay(size);
   return { laid, type: typeAt(size), room: plan.frame.hugs ? laid.width : plan.frame.width };
@@ -402,9 +498,20 @@ function slotsOf(text: string, paragraphs: string[], finest: AnimatorUnit): (par
   };
 }
 
-type Unit = { look: Tinted; contours: number[][]; outlines: number[][]; box: Rect; area: Rect };
+type Positioned = { face: Face; skew: number; glyph: number; x: number; y: number };
 
-export function inksOf(plan: TextPlan, fonts: FaceBook): Painted | TextGap {
+type Unit = { look: Tinted; contours: number[][]; outlines: number[][]; glyphs: Positioned[]; box: Rect; area: Rect };
+
+function runsOf(glyphs: Positioned[], size: number): GlyphRun[] | null {
+  if (!glyphs.every((g) => g.face.key && g.skew === 0)) {
+    return null;
+  }
+  const byFace = new Map<Face, Positioned[]>();
+  glyphs.forEach((g) => byFace.set(g.face, [...(byFace.get(g.face) ?? []), g]));
+  return [...byFace].map(([face, own]) => ({ font: face.key!.font, coords: face.key!.coords, size, glyphs: own.map((g): [number, number, number] => [g.glyph, g.x, g.y]) }));
+}
+
+export function inksOf(plan: TextPlan, fonts: FaceBook, output: TextOutput = TextOutput.Outlines): Painted | TextGap {
   const { laid, type, room } = place(plan, fonts);
   const run = plan.animation;
   const slots = run ? slotsOf(plan.text, plan.paragraphs, run.finest) : null;
@@ -443,9 +550,10 @@ export function inksOf(plan: TextPlan, fonts: FaceBook): Painted | TextGap {
       for (const g of line.glyphs) {
         const slot = slots && g.word >= 0 ? slots(i, g) : null;
         const key = `${slot ? slot.key : -1}:${plan.area === Area.Line ? l : 0}`;
-        const unit = units.get(key) ?? { look: slot && run ? (run.looks[slot.look] ?? UNTINTED) : UNTINTED, contours: [], outlines: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[plan.area] };
+        const unit = units.get(key) ?? { look: slot && run ? (run.looks[slot.look] ?? UNTINTED) : UNTINTED, contours: [], outlines: [], glyphs: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[plan.area] };
         units.set(key, unit);
         unit.contours.push(...moved(glyphContours(g.face, g.glyph, type.size, g.skew, smoothing.darken(type.size)), x + g.x, baseline - g.dy));
+        unit.glyphs.push({ face: g.face, skew: g.skew, glyph: g.glyph, x: x + g.x, y: baseline - g.dy });
         unit.outlines.push(...(plan.outline ? moved(glyphContours(g.face, g.glyph, type.size, g.skew, 0), x + g.x, baseline - g.dy + smoothing.rise) : []));
         unit.box = [Math.min(unit.box[0], x + g.pen), Math.min(unit.box[1], top), Math.max(unit.box[2], x + g.pen + g.advance), Math.max(unit.box[3], top + laid.lineHeight)];
       }
@@ -460,12 +568,14 @@ export function inksOf(plan: TextPlan, fonts: FaceBook): Painted | TextGap {
         const turned = look === UNTINTED ? contours : transformed(contours, turn);
         return mask ? clipped(turned, mask) : turned;
       };
-      const ink = (contours: number[][], paint: Paint, rule: FillRule, squash = 1): Ink => ({ contours: squashed(contours, squash), paint, rule, opacity: plan.fade * look.opacity, matrix: unsquashed(matrix, squash), blur: look.blur * scaleOf(look.turn) });
+      const ink = (contours: number[][], paint: Paint, rule: FillRule, squash = 1, picture?: Picture): Ink => ({ contours: squashed(contours, squash), paint, rule, opacity: plan.fade * look.opacity, matrix: unsquashed(matrix, squash), blur: look.blur * scaleOf(look.turn), ...(picture ? { picture } : {}) });
       const shown = placed(unit.contours);
-      const filled = plan.fills.map((f) => shadeOf(f, unit.area)).map((shade) => ink(shown, tinted(shade.paint, look), FillRule.NonZero, shade.squash));
+      const runs = output === TextOutput.Glyphs && rise === 0 ? runsOf(unit.glyphs, type.size) : null;
+      const asRuns = (paint: Paint) => runs!.map((run): Ink => ({ contours: [], paint, rule: FillRule.NonZero, opacity: plan.fade * look.opacity, matrix: look === UNTINTED ? matrix : mul2d(matrix, turn), blur: look.blur * scaleOf(look.turn), run }));
+      const filled = plan.fills.flatMap((f) => shadesOf(f, unit.area)).flatMap((shade) => (runs && !shade.clip && shade.squash === 1 && !shade.picture ? asRuns(tinted(shade.paint, look)) : [ink(shade.clip ? within(shown, shade.clip) : shown, tinted(shade.paint, look), FillRule.NonZero, shade.squash, shade.picture)]));
       const outline = plan.outline;
       const stroked = outline ? [ink(placed(unit.outlines.flatMap((c) => strokePolygons(c, true, outline.width, Cap.Butt, Join.Miter))), tinted({ kind: PaintKind.Solid, color: outline.colour }, look), FillRule.Union)] : [];
-      inks.push(...(outline?.under ? [...stroked, ...filled] : [...filled, ...stroked]).filter((i) => i.contours.length && visible(i.paint)));
+      inks.push(...(outline?.under ? [...stroked, ...filled] : [...filled, ...stroked]).filter((i) => (i.contours.length || i.run) && visible(i.paint)));
     }
   });
   const rendered = { left, top: plan.frame.top, width: plan.frame.hugs ? laid.width : plan.frame.width, height: plan.frame.anchor === Anchor.Top ? laid.height : plan.frame.height };
@@ -474,5 +584,5 @@ export function inksOf(plan: TextPlan, fonts: FaceBook): Painted | TextGap {
 
 export function paintText(env: TextEnv): Painted | TextGap {
   const plan = planOf(env);
-  return typeof plan === 'string' ? plan : inksOf(plan, env.fonts);
+  return typeof plan === 'string' ? plan : inksOf(plan, env.fonts, env.output);
 }

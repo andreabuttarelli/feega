@@ -2,9 +2,9 @@ import { apply2d, mul2d, type Affine } from '../../affine';
 import { invert2d } from '../../parent';
 import { ellipseOutline, flatten, parsePath, rectOutline, type Outline } from '../../shape/geometry';
 import { FillRule, MAX_STOPS, PaintKind, type Paint } from '../paint';
-import { rgbaOf } from '../rgba';
-import { cornerOf, isNone, lengthOf, linearGradient, splitTop, tileOf, transformOf, type Size } from './css';
-import { NO_INDEX, TEXT_PAD, type RawNode, type RawTree, type TextLine } from './tree';
+import { rgbaOf, type Rgba } from '../rgba';
+import { cornerOf, isNone, lengthOf, linearGradient, splitTop, tileOf, transformOf, type Gradient, type Size } from './css';
+import { NO_INDEX, type RawNode, type RawTree, type TextLine } from './tree';
 import { Ligatures } from '../text/face';
 import { glyphContours, moved, NO_TYPESET, SMOOTHING, Smoothing, type Typeset } from '../text/painter';
 import type { SvgNode } from '../../effects/registry';
@@ -37,13 +37,15 @@ export enum DomGap {
 
 export enum DrawnKind {
   Path = 'path',
-  Layer = 'layer'
+  Layer = 'layer',
+  Group = 'group'
 }
 
 export type Look = { masks?: MaskLayer[]; filters?: Filter[]; space?: Linear; blend?: BlendMode };
 export type DrawnPath = { kind: DrawnKind.Path; contours: number[][]; rule: FillRule; paint: Paint; opacity: number; matrix: Affine } & Look;
 export type DrawnLayer = { kind: DrawnKind.Layer; layer: number; width: number; height: number; opacity: number; matrix: Affine } & Look;
-export type Drawn = DrawnPath | DrawnLayer;
+export type DrawnGroup = { kind: DrawnKind.Group; items: Drawn[]; opacity: number; matrix: Affine } & Look;
+export type Drawn = DrawnPath | DrawnLayer | DrawnGroup;
 export type DomGapCount = { element: string; reason: DomGap; count: number };
 export type DomRead = { drawn: Drawn[]; gaps: DomGapCount[] };
 
@@ -75,7 +77,6 @@ const ORIGIN_POSITIONS = new Set(['', '0% 0%', '0px 0px', 'left top']);
 const REFUSALS: [DomGap, (s: Style) => boolean][] = [
   [DomGap.Filter, (s) => !isNone(s['backdrop-filter'])],
   [DomGap.Mask, (s) => !isNone(s['mask-image'])],
-  [DomGap.Order, (s) => !NO_Z.has(s['z-index'] ?? '')],
   [DomGap.Transform, (s) => transformOf(s.transform, s['transform-origin']) === null]
 ];
 
@@ -112,6 +113,41 @@ function outlineOf(shape: BoxShape, size: Size): Outline {
 
 const squared = (shape: BoxShape) => shape.round && shape.radii.every((r) => r === 0);
 
+type Band = { color: Rgba; contours: number[][] };
+
+const sameColour = (a: Rgba, b: Rgba) => a.every((v, i) => Math.abs(v - b[i]) < UNIT_EPSILON);
+
+function bandsOf(gradient: Gradient, tile: Size, tiles: [number, number][], size: Size): Band[] | null {
+  const { from, to, stops } = gradient;
+  const vertical = Math.abs(from[0] - to[0]) < UNIT_EPSILON;
+  const horizontal = Math.abs(from[1] - to[1]) < UNIT_EPSILON;
+  const constant = stops.every((stop, i) => i === 0 || stop.at - stops[i - 1].at < UNIT_EPSILON || sameColour(stop.color, stops[i - 1].color));
+  if ((!vertical && !horizontal) || !constant) {
+    return null;
+  }
+  const along = vertical ? 1 : 0;
+  const ends = [-Infinity, ...stops.map((st) => st.at), Infinity];
+  const spans = stops.map((stop, i) => ({ color: stop.color, t0: i === 0 ? ends[0] : stops[i - 1].at, t1: stop.at })).concat({ color: stops[stops.length - 1].color, t0: stops[stops.length - 1].at, t1: ends[ends.length - 1] });
+  const coord = (t: number) => from[along] + Math.max(-1e6, Math.min(1e6, t)) * (to[along] - from[along]);
+  const bands = new Map<string, Band>();
+  for (const span of spans) {
+    if (span.color[3] <= 0 || span.t1 - span.t0 < UNIT_EPSILON) {
+      continue;
+    }
+    const [a, b] = [coord(span.t0), coord(span.t1)].sort((p, q) => p - q);
+    const band = bands.get(span.color.join()) ?? bands.set(span.color.join(), { color: span.color, contours: [] }).get(span.color.join())!;
+    for (const [x, y] of tiles) {
+      const box = { x0: x, y0: y, x1: Math.min(x + tile.w, size.w), y1: Math.min(y + tile.h, size.h) };
+      const [x0, x1] = vertical ? [box.x0, box.x1] : [Math.max(box.x0, x + a), Math.min(box.x1, x + b)];
+      const [y0, y1] = vertical ? [Math.max(box.y0, y + a), Math.min(box.y1, y + b)] : [box.y0, box.y1];
+      if (x1 > x0 && y1 > y0) {
+        band.contours.push([x0, y0, x1, y0, x1, y1, x0, y1]);
+      }
+    }
+  }
+  return [...bands.values()].filter((b) => b.contours.length);
+}
+
 function backgroundOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Own {
   const drawn: Drawn[] = [];
   const color = rgbaOf(s['background-color'] ?? '');
@@ -141,6 +177,11 @@ function backgroundOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Ow
       return { drawn, gaps: [DomGap.Radius] };
     }
     const tiles = single ? [[0, 0]] : grid(size, tile);
+    const bands = squared(shape) ? bandsOf(gradient, tile, tiles as [number, number][], size) : null;
+    if (bands) {
+      drawn.push(...bands.map((b) => path(b.contours, solid(b.color), matrix)));
+      continue;
+    }
     for (const [x, y] of tiles) {
       const contours = single ? flat(outlineOf(shape, { w: Math.min(tile.w, size.w), h: Math.min(tile.h, size.h) })) : [[x, y, Math.min(x + tile.w, size.w), y, Math.min(x + tile.w, size.w), Math.min(y + tile.h, size.h), x, Math.min(y + tile.h, size.h)]];
       const paint: Paint = { kind: PaintKind.Linear, from: [gradient.from[0] + x, gradient.from[1] + y], to: [gradient.to[0] + x, gradient.to[1] + y], stops: gradient.stops };
@@ -187,16 +228,52 @@ function borderOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Own {
   return { drawn: [path(contours, solid(color), matrix, FillRule.EvenOdd)], gaps: [] };
 }
 
+function pixelSnapped(m: Affine, size: Size): Affine {
+  if (!upright(m) || size.w <= 0 || size.h <= 0) {
+    return m;
+  }
+  const [x0, y0] = [Math.round(m[4]), Math.round(m[5])];
+  const [x1, y1] = [Math.round(m[0] * size.w + m[4]), Math.round(m[3] * size.h + m[5])];
+  return [(x1 - x0) / size.w, 0, 0, (y1 - y0) / size.h, x0, y0];
+}
+
+const SHADOW = /^((?:rgba?|hsla?)\([^)]*\)|#[0-9a-f]+|[a-z]+)\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px(?:\s+(-?[\d.]+)px)?$/i;
+const SHADOW_SIGMA = 0.5;
+
+function shadowsOf(s: Style, size: Size, shape: BoxShape, matrix: Affine): Own {
+  if (isNone(s['box-shadow'])) {
+    return nothing();
+  }
+  const drawn: Drawn[] = [];
+  for (const one of splitTop(s['box-shadow'] ?? '').reverse()) {
+    const m = SHADOW.exec(one.trim());
+    const color = m ? rgbaOf(m[1]) : null;
+    if (!m || !color) {
+      return nothing(DomGap.Shadow);
+    }
+    const [dx, dy, blur, spread] = [Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5] ?? 0)];
+    const grown: Size = { w: Math.max(0, size.w + 2 * spread), h: Math.max(0, size.h + 2 * spread) };
+    const grownShape: BoxShape = shape.round ? { round: true, radii: shape.radii.map((r) => Math.max(0, r + spread)) } : shape;
+    if (color[3] <= 0 || !grown.w || !grown.h) {
+      continue;
+    }
+    const filters: Filter[] = blur > 0 ? [{ kind: FilterKind.Css, fns: [{ name: 'blur', args: [`${blur * SHADOW_SIGMA}px`] }] }] : [];
+    drawn.push({ ...path(flat(outlineOf(grownShape, grown), dx - spread, dy - spread), solid(color), matrix), ...(filters.length ? { filters, space: linearOf(matrix) } : {}) });
+  }
+  return { drawn, gaps: [] };
+}
+
 const boxPainter: Painter = (node, scope) => {
   const size = { w: node.size[0], h: node.size[1] };
   const shape = boxShapeOf(node.style, size);
   if (!shape) {
     return nothing(DomGap.Radius);
   }
-  const background = backgroundOf(node.style, size, shape, scope.matrix);
-  const border = borderOf(node.style, size, shape, scope.matrix);
-  const shadow = isNone(node.style['box-shadow']) ? [] : [DomGap.Shadow];
-  return { drawn: [...background.drawn, ...border.drawn], gaps: [...background.gaps, ...border.gaps, ...shadow] };
+  const matrix = pixelSnapped(scope.matrix, size);
+  const background = backgroundOf(node.style, size, shape, matrix);
+  const border = borderOf(node.style, size, shape, matrix);
+  const shadow = shadowsOf(node.style, size, shape, matrix);
+  return { drawn: [...shadow.drawn, ...background.drawn, ...border.drawn], gaps: [...shadow.gaps, ...background.gaps, ...border.gaps] };
 };
 
 const layerPainter: Painter = (node, scope) => {
@@ -282,13 +359,21 @@ const shapePainter =
 
 const familyOf = (s: Style) => (splitTop(s['font-family'] ?? '')[0] ?? '').replace(/^["']|["']$/g, '');
 
+const upright = (m: Affine) => Math.abs(m[1]) < UNIT_EPSILON && Math.abs(m[2]) < UNIT_EPSILON && Math.abs(m[3]) > UNIT_EPSILON;
+
+const snapped = (y: number, m: Affine) => (upright(m) ? (Math.round(m[3] * y + m[5]) - m[5]) / m[3] : Math.round(y));
+
+const SUBPIXEL_STEPS = 4;
+
+const quartered = (x: number, m: Affine) => (upright(m) ? (Math.round((m[0] * x + m[4]) * SUBPIXEL_STEPS) / SUBPIXEL_STEPS - m[4]) / m[0] : x);
+
 function textOf(node: RawNode, scope: Scope): Own {
   const s = node.style;
   const cased = CASES[s['text-transform'] ?? ''];
   const color = rgbaOf(s.color ?? '');
   if (node.raster) {
     const { layer, width, height } = node.raster;
-    return { drawn: [{ kind: DrawnKind.Layer, layer, width, height, opacity: 1, matrix: mul2d(scope.matrix, [1, 0, 0, 1, -TEXT_PAD, -TEXT_PAD]) }], gaps: [] };
+    return { drawn: [{ kind: DrawnKind.Layer, layer, width, height, opacity: 1, matrix: mul2d(scope.matrix, [1, 0, 0, 1, ...node.raster.at]) }], gaps: [] };
   }
   if (!node.lines.length || !cased || !color) {
     return nothing(DomGap.Text);
@@ -305,11 +390,11 @@ function textOf(node: RawNode, scope: Scope): Own {
       return;
     }
     const { face, skew } = resolved;
-    const baseline = line.top + (line.height * face.ascent) / (face.ascent + face.descent) - smoothing.rise;
+    const baseline = snapped(line.top + Math.round((face.ascent * size) / face.unitsPerEm), scope.matrix) - smoothing.rise;
     const [shaped] = face.shape(char, Ligatures.Off);
     drawn.push(path(moved(glyphContours(face, shaped.glyph, size, skew, smoothing.darken(size)), x, baseline), solid(color), scope.matrix));
   };
-  node.lines.forEach((line) => line.chars.forEach((c, i) => glyph(line, cased(c), line.xs[i])));
+  node.lines.forEach((line) => line.chars.forEach((c, i) => glyph(line, cased(c), quartered(line.xs[i], scope.matrix))));
   return { drawn, gaps };
 }
 
@@ -349,6 +434,10 @@ const clipEffect: GroupEffect = ({ node, items, matrix, viewport, defs }) => {
   if (isNone(value)) {
     return items;
   }
+  const inset = insetOf(value ?? '', { w: node.size[0], h: node.size[1] });
+  if (inset) {
+    return masked(items, { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: [inset], matrix } });
+  }
   const clip = referenced(value, defs);
   if (!clip || clip.tag.toLowerCase() !== 'clippath' || (clip.attrs.clipPathUnits ?? USER_SPACE) !== USER_SPACE) {
     return DomGap.Mask;
@@ -357,9 +446,27 @@ const clipEffect: GroupEffect = ({ node, items, matrix, viewport, defs }) => {
   if (outlines.some((o) => o === null)) {
     return DomGap.Mask;
   }
-  const mask: MaskLayer = { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: (outlines as Outline[]).flatMap((o) => flat(o)), matrix } };
-  return items.map((d) => ({ ...d, masks: [...(d.masks ?? []), mask] }));
+  return masked(items, { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: (outlines as Outline[]).flatMap((o) => flat(o)), matrix } });
 };
+
+const masked = (items: Drawn[], mask: MaskLayer) => items.map((d) => ({ ...d, masks: [...(d.masks ?? []), mask] }));
+
+const INSET = /^inset\(([^)]*)\)$/;
+
+function insetOf(value: string, size: Size): number[] | null {
+  const m = INSET.exec(value.trim());
+  if (!m || m[1].includes('round')) {
+    return null;
+  }
+  const parts = m[1].trim().split(/\s+/);
+  const [t, r, b, l] = [parts[0], parts[1] ?? parts[0], parts[2] ?? parts[0], parts[3] ?? parts[1] ?? parts[0]];
+  const v = numbers(lengthOf(t, size.h), lengthOf(r, size.w), lengthOf(b, size.h), lengthOf(l, size.w));
+  if (!v) {
+    return null;
+  }
+  const [x0, y0, x1, y1] = [v[3], v[0], size.w - v[1], size.h - v[2]];
+  return x1 > x0 && y1 > y0 ? [x0, y0, x1, y0, x1, y1, x0, y1] : [];
+}
 
 const filterEffect: GroupEffect = ({ node, items, matrix, defs }) => {
   const value = node.style.filter;
@@ -377,8 +484,18 @@ const filterEffect: GroupEffect = ({ node, items, matrix, defs }) => {
 const REGION_DEFAULTS = { x: '-10%', y: '-10%', width: '120%', height: '120%' };
 const GENERATORS = new Set(['feTurbulence', 'feFlood']);
 
+const LOCAL_POINTS: Record<DrawnKind, (d: never) => [number, number][]> = {
+  [DrawnKind.Path]: (d: DrawnPath) => d.contours.flatMap((c) => Array.from({ length: c.length / 2 }, (_, i): [number, number] => [c[2 * i], c[2 * i + 1]])),
+  [DrawnKind.Layer]: (d: DrawnLayer) => [[0, 0], [d.width, 0], [d.width, d.height], [0, d.height]],
+  [DrawnKind.Group]: (d: DrawnGroup) => d.items.flatMap(worldPoints)
+};
+
+function worldPoints(d: Drawn): [number, number][] {
+  return (LOCAL_POINTS[d.kind] as (d: Drawn) => [number, number][])(d).map((p) => apply2d(d.matrix, p));
+}
+
 function frameBox(items: Drawn[]): { x: number; y: number; w: number; h: number } | null {
-  const points = items.flatMap((d) => (d.kind === DrawnKind.Layer ? [[0, 0], [d.width, d.height]] : d.contours.flatMap((c) => Array.from({ length: c.length / 2 }, (_, i) => [c[2 * i], c[2 * i + 1]]))).map((p) => apply2d(d.matrix, p as [number, number])));
+  const points = items.flatMap(worldPoints);
   if (!points.length) {
     return null;
   }
@@ -470,14 +587,7 @@ function viewportOf(node: RawNode, outer: Size): { viewport: Size; fit: Affine }
 function spills(items: Drawn[], matrix: Affine, size: Size): boolean {
   const local = invert2d(matrix);
   const inside = ([x, y]: [number, number]) => x >= -SPILL_TOLERANCE && y >= -SPILL_TOLERANCE && x <= size.w + SPILL_TOLERANCE && y <= size.h + SPILL_TOLERANCE;
-  return items.some((item) => {
-    const toLocal = mul2d(local, item.matrix);
-    const points: [number, number][] =
-      item.kind === DrawnKind.Layer
-        ? [[0, 0], [item.width, 0], [item.width, item.height], [0, item.height]]
-        : item.contours.flatMap((c) => Array.from({ length: c.length / 2 }, (_, i): [number, number] => [c[2 * i], c[2 * i + 1]]));
-    return points.some((p) => !inside(apply2d(toLocal, p)));
-  });
+  return items.some((item) => worldPoints(item).some((p) => !inside(apply2d(local, p))));
 }
 
 function boxClip(node: RawNode, kids: Drawn[], matrix: Affine): Drawn[] | null {
@@ -488,6 +598,21 @@ function boxClip(node: RawNode, kids: Drawn[], matrix: Affine): Drawn[] | null {
   }
   const mask: MaskLayer = { mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: [[0, 0, size.w, 0, size.w, size.h, 0, size.h]], matrix } };
   return kids.map((d) => ({ ...d, masks: [...(d.masks ?? []), mask] }));
+}
+
+const zOf = (node: RawNode) => (NO_Z.has(node.style['z-index'] ?? '') ? 0 : Number(node.style['z-index']) || 0);
+
+function stacked(kids: RawNode[], ids: number[]): number[] {
+  const rank = (node: RawNode) => (!layered(node) ? [0, 0] : zOf(node) < 0 ? [-1, zOf(node)] : [1, zOf(node)]);
+  return ids
+    .map((id, i) => ({ id, i, r: rank(kids[i]) }))
+    .sort((a, b) => a.r[0] - b.r[0] || a.r[1] - b.r[1] || a.i - b.i)
+    .map((k) => k.id);
+}
+
+function overlapping(items: Drawn[]): boolean {
+  const boxes = items.map((d) => frameBox([d]));
+  return boxes.some((a, i) => !a || boxes.some((b, j) => j > i && (!b || (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h))));
 }
 
 export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead {
@@ -510,13 +635,13 @@ export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead 
       gap(node, refusal ? refusal[0] : DomGap.Geometry);
       return [];
     }
-    const [x, y] = node.at ?? [0, 0];
+    const [x, y] = (node.at ?? [0, 0]).map((v) => (isNone(node.style.transform) ? v : Math.round(v)));
     const matrix = mul2d(mul2d(outer.matrix, [1, 0, 0, 1, x, y]), transformOf(node.style.transform, node.style['transform-origin']) as Affine);
     const visible = !HIDDEN.has(node.style.visibility ?? '');
     const own = visible ? painterOf(node)(node, { ...outer, matrix }) : nothing();
     const text = visible && node.text ? textOf(node, { ...outer, matrix }) : nothing();
     [...own.gaps, ...text.gaps].forEach((reason) => gap(node, reason));
-    const order = node.svg ? children[i] : [...children[i].filter((c) => !layered(nodes[c])), ...children[i].filter((c) => layered(nodes[c]))];
+    const order = node.svg ? children[i] : stacked(children[i].map((c) => nodes[c]), children[i]);
     const inner = { ...outer, matrix: mul2d(matrix, view.fit), viewport: view.viewport };
     const kids = order.flatMap((c) => visit(c, inner));
     const size = { w: node.size[0], h: node.size[1] };
@@ -532,9 +657,8 @@ export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead 
     }
     const items = effected;
     const opacity = opacityOf(node.style);
-    if (opacity < 1 && items.length > 1) {
-      gap(node, DomGap.Opacity);
-      return [];
+    if (opacity < 1 && items.length > 1 && overlapping(items)) {
+      return [{ kind: DrawnKind.Group, items, opacity, matrix: [1, 0, 0, 1, 0, 0] }];
     }
     return items.map((d) => ({ ...d, opacity: d.opacity * opacity }));
   };

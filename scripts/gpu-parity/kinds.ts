@@ -179,6 +179,19 @@ const KINDS: Record<string, () => MotionDoc> = {
     const wave = must(setTextPath(ring, 'wave', { source: { kind: PathSourceKind.Preset, preset: PathPreset.Wave } }));
     return keys(must(addAnimator(wave, 'wave', 'a', { softness: 0.3, start: 0, end: 200, values: { y: -0.6, opacity: 0.2, rotation: 30 } })), 'wave', 'ta.a.offset', -130, 100);
   },
+  'more-fills': () => {
+    const diamond = clip(backdrop, 'Title', 'diamond', { text: 'Diamond title', y: 0.15, height: 0.22, fills: [{ type: FillType.Diamond, stops }] });
+    const angular = clip(diamond, 'Text', 'angular', { text: 'Angular body copy', size: 0.08, x: 0.3, y: 0.42, width: 0.5, fills: [{ type: FillType.Angular, angle: 30, center: { x: 0.5, y: 0.5 }, stops }] });
+    const pictured = clip(angular, 'Kicker', 'picture', { text: 'image fill', size: 0.1, x: 0.75, y: 0.42, fills: [{ type: FillType.Image, assetId: 'pic-a', fit: 'cover' }] });
+    const blended = clip(pictured, 'Caption', 'blend', { text: 'Screened solids', size: 0.05, x: 0.3, y: 0.68, fills: [{ type: FillType.Solid, color: '#0a84ff' }, { type: FillType.Solid, color: '#ff375f', blend: 'screen' }] });
+    const moving = clip(blended, 'Text', 'moving', { text: 'Gradient letters rise', size: 0.06, x: 0.7, y: 0.8, width: 0.5, fills: [{ type: FillType.Linear, angle: 0, stops }] });
+    return must(applyPreset(moving, 'moving', TextPreset.BlurUp, { start: 0, duration: SECONDS }, 'a'));
+  },
+  tracking: () => {
+    const placed = clip(clip(backdrop, 'Title', 'wide', { text: 'Letters open up', y: 0.25, height: 0.25 }), 'Text', 'words', { text: 'words drift apart one by one', size: 0.05, x: 0.4, y: 0.65, width: 0.7 });
+    const opened = keys(must(addAnimator(placed, 'wide', 'a', { softness: 0.3, start: 0, end: 200, values: { tracking: 0.3 } })), 'wide', 'ta.a.offset', -130, 100);
+    return keys(must(addAnimator(opened, 'words', 'a', { unit: 'word' as never, softness: 0.5, start: 0, end: 200, values: { tracking: 0.2, opacity: 0.4 } })), 'words', 'ta.a.offset', -150, 100);
+  },
   blur: () => keys(must(addClip(shape(backdrop, 'sharp', { shape: 'rect', x: 0.3, y: 0.5, width: 0.2, height: 0.3, fill: '#ffd60a' }), { component: 'Shape', from: 0, durationInFrames: SECONDS, props: { shape: 'star', x: 0.7, y: 0.5, width: 0.25, height: 0.4, fill: '#bf5af2' }, effects: [{ id: 'g', kind: 'gaussian-blur', enabled: true, params: { radius: 6 } }] } as never, 'soft')), 'sharp', 'blur', 0, 24)
 };
 

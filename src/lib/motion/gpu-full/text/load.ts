@@ -21,9 +21,13 @@ const web: Reader = {
 };
 
 const SPACE = 0x20;
+const CUSTOM = 'Custom';
 
 function codePointsOf(doc: MotionDoc): number[] {
-  const texts = doc.tracks.flatMap((t) => t.clips.filter((c) => (TEXT_COMPONENTS as readonly string[]).includes(c.component)).map((c) => String(c.props.text ?? '')));
+  const clips = doc.tracks.flatMap((t) => t.clips);
+  const titles = clips.filter((c) => (TEXT_COMPONENTS as readonly string[]).includes(c.component)).map((c) => String(c.props.text ?? ''));
+  const custom = clips.filter((c) => c.component === CUSTOM).flatMap((c) => [JSON.stringify(c.props), JSON.stringify(doc.components[String(c.props.name)]?.source ?? '')]);
+  const texts = [...titles, ...custom];
   const all = texts.flatMap((t) => [t, t.toUpperCase(), t.toLowerCase()]).join('');
   return [...new Set([SPACE, ...[...all].map((c) => c.codePointAt(0)!)])];
 }

@@ -70,7 +70,7 @@ export type ReadAttr = (typeof READ_ATTRS)[number];
 
 export type TextLine = { chars: string[]; xs: number[]; top: number; height: number };
 
-export type TextRaster = { layer: number; width: number; height: number };
+export type TextRaster = { layer: number; width: number; height: number; at: [number, number] };
 
 export type RawNode = {
   tag: string;

@@ -86,4 +86,9 @@ describe('faceBook', () => {
   it('finds nothing for a family it has no file for', () => {
     expect(ask('Missing', 400, 65).resolved).toBeNull();
   });
+
+  it('stamps a face with the file and coordinates it came from', () => {
+    expect(ask('Inter', 700, 65, { size: 120 }).resolved?.face.key).toEqual({ font: 'https://fonts.gstatic.com/inter.woff2', coords: [['wght', 700], ['opsz', 120]] });
+    expect(ask('Inter', 700, 65, { size: 120 }).resolved?.face).toBe(ask('Inter', 700, 65, { size: 120 }).resolved?.face);
+  });
 });

@@ -3,8 +3,9 @@ import { COMPONENTS } from '../../components';
 import { boxOf } from '../../layout';
 import { FillType } from '../../fill/model';
 import { apply2d } from '../../affine';
-import { paintText, Smoothing, TextGap, type Ink, type TextComponent, type TextEnv } from './painter';
-import { boxBook } from './test-face';
+import { paintText, Smoothing, TextGap, TextOutput, type Ink, type TextComponent, type TextEnv } from './painter';
+import { boxBook, boxFace } from './test-face';
+import type { Face } from './face';
 import { FillRule, PaintKind, type Paint } from '../paint';
 import { animatorSchema, AnimatorUnit, SelectorShape } from '../../text-animators/model';
 
@@ -13,7 +14,7 @@ const FPS = 30;
 
 function env(component: TextComponent, props: Record<string, unknown>, change: Partial<TextEnv> = {}): TextEnv {
   const parsed = COMPONENTS[component].schema.parse(props) as Record<string, unknown>;
-  return { component, smoothing: Smoothing.Plain, props: parsed, box: boxOf(parsed as never, stage), stage, colour: (v) => (v.startsWith('#') ? v : '#ffffff'), time: 10, trim: 0, fps: FPS, still: null, fonts: boxBook(), animators: [], ...change };
+  return { component, smoothing: Smoothing.Plain, props: parsed, box: boxOf(parsed as never, stage), stage, colour: (v) => (v.startsWith('#') ? v : '#ffffff'), time: 10, trim: 0, fps: FPS, still: null, fonts: boxBook(), animators: [], asset: () => null, ...change };
 }
 
 const drawn = (painted: ReturnType<typeof paintText>): Ink[] => {
@@ -91,13 +92,9 @@ describe('paintText', () => {
   });
 
   it('names what it cannot paint yet', () => {
-    const gradient = [{ type: FillType.Linear, angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
+    const tiled = [{ type: FillType.Image, src: 'https://x.test/p.png', fit: 'tile' }];
 
-    const angular = [{ type: FillType.Angular, angle: 0, center: { x: 0.5, y: 0.5 }, stops: gradient[0].stops }];
-    const blended = [{ type: FillType.Solid, color: '#ff0000', blend: 'multiply' }];
-
-    expect(paintText(env('Text', { fills: angular }))).toBe(TextGap.Fill);
-    expect(paintText(env('Text', { fills: blended }))).toBe(TextGap.Fill);
+    expect(paintText(env('Text', { fills: tiled }))).toBe(TextGap.Fill);
     expect(paintText(env('Text', {}, { fonts: () => null }))).toBe(TextGap.Font);
   });
 
@@ -236,6 +233,90 @@ describe('paintText', () => {
         { kind: PaintKind.Solid, color: [1, 0, 0, 1] },
         { kind: PaintKind.Solid, color: [0, 0, 1, 0.5] }
       ]);
+    });
+  });
+  describe('the rest of the fills', () => {
+    const stops = [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }];
+    const inksOf = (props: Record<string, unknown>, change: Partial<TextEnv> = {}) => drawn(paintText(env('Text', { text: 'aa', align: 'left', ...props }, change)));
+    const solid = (color: string, blend = 'normal') => ({ type: FillType.Solid, color, blend });
+
+    it('draws a diamond as four linear quadrants meeting at the centre', () => {
+      const inks = inksOf({ fills: [{ type: FillType.Diamond, stops }] });
+
+      expect(inks).toHaveLength(4);
+      expect(inks.every((i) => i.paint.kind === PaintKind.Linear)).toBe(true);
+    });
+
+    it('draws an angular gradient as thin wedges, black just after where it starts', () => {
+      const inks = inksOf({ fills: [{ type: FillType.Angular, angle: 0, center: { x: 0.5, y: 0.5 }, stops }] });
+      const first = inks[0].paint as Extract<Paint, { kind: PaintKind.Linear }>;
+
+      expect(inks.length).toBeGreaterThan(8);
+      expect(first.stops[0].color[0]).toBeLessThan(0.05);
+    });
+
+    it('blends solid layers into one colour like background-blend-mode', () => {
+      const [multiplied] = inksOf({ fills: [solid('#ffffff'), solid('#ff0000', 'multiply')] });
+      const [screened] = inksOf({ fills: [solid('#808080'), solid('#808080', 'screen')] });
+
+      expect(multiplied.paint).toEqual({ kind: PaintKind.Solid, color: [1, 0, 0, 1] });
+      expect((screened.paint as Extract<Paint, { kind: PaintKind.Solid }>).color[0]).toBeCloseTo(0.749, 2);
+    });
+
+    it('still names a blended gradient', () => {
+      expect(paintText(env('Text', { fills: [solid('#ffffff'), { type: FillType.Linear, angle: 0, stops, blend: 'multiply' }] }))).toBe(TextGap.Fill);
+    });
+
+    it('shows an image through the glyphs', () => {
+      const [ink] = inksOf({ fills: [{ type: FillType.Image, assetId: 'pic', fit: 'contain' }] }, { asset: (id) => (id === 'pic' ? 'https://x.test/p.png' : null) });
+
+      expect(ink.picture).toMatchObject({ src: 'https://x.test/p.png', fit: 'contain' });
+      expect(ink.contours.length).toBeGreaterThan(0);
+    });
+
+    it('paints a gradient through units a colour animator touches', () => {
+      const a = animatorSchema.parse({ id: 'a', unit: AnimatorUnit.Char, values: { color: '#ff0000' } });
+
+      expect(inksOf({ fills: [{ type: FillType.Linear, angle: 0, stops }] }, { animators: [a] }).map((i) => i.paint.kind)).toEqual([PaintKind.Linear, PaintKind.Linear]);
+    });
+
+    it('hides gradient text in units the page isolates, as background-clip text skips them', () => {
+      const moved = animatorSchema.parse({ id: 'a', unit: AnimatorUnit.Char, values: { y: 0.2 } });
+      const faded = animatorSchema.parse({ id: 'b', unit: AnimatorUnit.Char, shape: SelectorShape.Square, end: 50, values: { opacity: 0.5 } });
+      const gradient = { fills: [{ type: FillType.Linear, angle: 0, stops }] };
+
+      expect(inksOf(gradient, { animators: [moved] })).toEqual([]);
+      expect(inksOf(gradient, { animators: [faded] })).toHaveLength(1);
+    });
+  });
+
+  it('lets a tracking animator replace the text tracking inside its units, as the page does', () => {
+    const zero = animatorSchema.parse({ id: 'a', unit: AnimatorUnit.Char, values: { tracking: 0 } });
+    const width = (inks: Ink[]) => extent(inks).right - extent(inks).left;
+    const tracked = { text: 'abc', align: 'left', tracking: 0.1 };
+
+    expect(width(drawn(paintText(env('Text', tracked, { animators: [zero] }))))).toBeCloseTo(width(drawn(paintText(env('Text', { ...tracked, tracking: 0 })))), 0);
+  });
+  describe('as glyph runs', () => {
+    const keyed: Face = { ...boxFace, key: { font: 'box.woff2', coords: [['wght', 400]] } };
+    const runs = (component: TextComponent, props: Record<string, unknown>, change: Partial<TextEnv> = {}) => drawn(paintText(env(component, { text: 'ab', align: 'left', tracking: 0, ...props }, { fonts: () => ({ face: keyed, skew: 0 }), output: TextOutput.Glyphs, ...change })));
+
+    it('hands the core glyph ids and pen positions instead of outlines', () => {
+      const [ink] = runs('Text', {});
+
+      expect(ink.contours).toEqual([]);
+      expect(ink.run).toMatchObject({ font: 'box.woff2', coords: [['wght', 400]] });
+      expect(ink.run?.glyphs.map(([id]) => id)).toEqual([0x61, 0x62]);
+      expect(ink.run!.glyphs[1][1] - ink.run!.glyphs[0][1]).toBeCloseTo(ink.run!.size / 2);
+    });
+
+    it('keeps outlines for a stroke and for a face without a file', () => {
+      expect(runs('Text', { strokes: [{ paint: { type: FillType.Solid, color: '#ff0000' }, width: 0.01 }] }).map((i) => Boolean(i.run))).toEqual([true, false]);
+      expect(runs('Text', {}, { fonts: boxBook() })[0].run).toBeUndefined();
+    });
+
+    it('keeps outlines while a title line is still rising behind its mask', () => {
+      expect(runs('Title', {}, { time: 0.1 })[0]?.run).toBeUndefined();
     });
   });
 });
