@@ -13,3 +13,8 @@ export function referencedAssets(doc: MotionDoc, library: readonly AssetRef[]): 
   const known = new Map([...library, ...doc.assets].map((a) => [a.id, a]));
   return [...known.values()].filter((a) => used.includes(a.id));
 }
+
+export function usedAssetUrls(doc: MotionDoc, urls: Record<string, string>): Record<string, string> {
+  const used = usedText(doc);
+  return Object.fromEntries(Object.entries(urls).filter(([id]) => used.includes(id)));
+}
