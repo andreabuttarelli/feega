@@ -58,22 +58,22 @@ fn mix(name: &str) -> Mix {
 
 fn unsupported(item: &PathItem) -> Option<&'static str> {
     let rules: [(bool, &'static str); 5] = [
-        (item.blur > 0.0, "blur"),
-        (item.scissor.is_some(), "wipe"),
-        (item.masks.is_some() || item.matte.is_some(), "mask"),
-        (item.filters.is_some(), "effect"),
-        (item.backdrop.is_some(), "backdrop"),
+        (item.look.blur > 0.0, "blur"),
+        (item.look.scissor.is_some(), "wipe"),
+        (item.look.masks.is_some() || item.look.matte.is_some(), "mask"),
+        (item.look.filters.is_some(), "effect"),
+        (item.look.backdrop.is_some(), "backdrop"),
     ];
     rules.iter().find(|(hit, _)| *hit).map(|(_, what)| *what)
 }
 
 fn draw(scene: &mut Scene, item: &PathItem, frame: Rect) {
-    let m = item.matrix;
+    let m = item.look.matrix;
     let transform = Affine::new(m);
     let brush = brush(&item.paint);
-    let layered = item.opacity < 1.0 || item.blend != "normal";
+    let layered = item.look.opacity < 1.0 || item.look.blend != "normal";
     if layered {
-        scene.push_layer(Fill::NonZero, BlendMode::new(mix(&item.blend), Compose::SrcOver), item.opacity, Affine::IDENTITY, &frame);
+        scene.push_layer(Fill::NonZero, BlendMode::new(mix(&item.look.blend), Compose::SrcOver), item.look.opacity, Affine::IDENTITY, &frame);
     }
     if let Some(within) = &item.within {
         let mut region = joined(&within.contours);

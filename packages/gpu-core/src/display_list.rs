@@ -32,19 +32,13 @@ pub struct Within {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct PathItem {
-    pub clip: String,
-    pub contours: Vec<Vec<f64>>,
-    pub rule: FillRule,
-    pub paint: Paint,
+pub struct Look {
     pub opacity: f32,
     pub matrix: Affine,
     #[serde(default)]
     pub blur: f64,
     #[serde(default = "normal")]
     pub blend: String,
-    #[serde(default)]
-    pub within: Option<Within>,
     #[serde(default)]
     pub scissor: Option<[f64; 4]>,
     #[serde(default)]
@@ -55,6 +49,18 @@ pub struct PathItem {
     pub filters: Option<serde_json::Value>,
     #[serde(default)]
     pub backdrop: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PathItem {
+    pub clip: String,
+    pub contours: Vec<Vec<f64>>,
+    pub rule: FillRule,
+    pub paint: Paint,
+    #[serde(default)]
+    pub within: Option<Within>,
+    #[serde(flatten)]
+    pub look: Look,
 }
 
 fn normal() -> String {
