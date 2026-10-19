@@ -13,6 +13,8 @@
   import { resident, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { screenUses, type Turn } from '$lib/canvas/core/screen-uses';
+  import { throughCamera } from '$lib/canvas/core/world-overlay';
+  import type { PathItem } from '$lib/motion/gpu-full/display-list';
   import { drawsWhole, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
 
@@ -20,7 +22,7 @@
 
   type Source = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens };
 
-  let { frames, cards = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, cards = [], overlay = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; overlay?: PathItem[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
   const BACKENDS = [createCore, createCoreGl];
@@ -135,14 +137,15 @@
       put.add(f.group);
     }
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
-    into.drawScreen(screenUses(shown, at, { width: area.width * resolution, height: area.height * resolution }, null), media.pictures);
+    const screen = screenUses(shown, at, { width: area.width * resolution, height: area.height * resolution }, null);
+    into.drawScreen({ ...screen, items: [...screen.items, ...throughCamera(overlay, at)] }, media.pictures);
     return false;
   }
 
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame));
 
   $effect(() => {
-    void [raster, held, view.x, view.y, view.zoom, area.width, area.height];
+    void [raster, held, overlay, view.x, view.y, view.zoom, area.width, area.height];
     pacer.invalidate();
   });
 
