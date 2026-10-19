@@ -1735,7 +1735,7 @@
     data-owns-pinch
   >
     {#if coreOn}
-      <CoreFrames frames={coreFrames} cards={nodeCards} posters={posterCards} overlay={coreOverlay} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={coreOff} />
+      <CoreFrames frames={coreFrames} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={coreOff} />
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">

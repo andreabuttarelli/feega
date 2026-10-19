@@ -40,7 +40,7 @@ describe('loadFonts', () => {
     const book = await fontLoader({ text: async () => CSS, bytes: async () => new Uint8Array([1]) }, engine)(titled, {}, FEEGA_TOKENS);
 
     expect(read).toHaveLength(1);
-    expect(book({ family: 'DM Sans', weight: 400, italic: false, size: 10, axes: {} }, 0x48)?.face).toBe(boxFace);
+    expect(book({ family: 'DM Sans', weight: 400, italic: false, size: 10, axes: {} }, 0x48)?.face.shape).toBe(boxFace.shape);
   });
 
   it('starts the face engine only once a file is read', () => {
@@ -48,6 +48,14 @@ describe('loadFonts', () => {
     fontLoader({ text: async () => CSS, bytes: async () => new Uint8Array() }, async () => (started++, () => ({ axes: {}, covers: () => true, at: () => boxFace })));
 
     expect(started).toBe(0);
+  });
+
+  it('downloads the subsets a custom component writes, from its props and its source', async () => {
+    const ticked = must(addClip({ ...titled, components: { Card: { source: { html: '', css: '', js: "make('div', 'tick', box, 'Ā')" }, propsSchema: { type: 'object', properties: {} }, version: 1, check: null } } } as MotionDoc, { component: 'Custom', from: 0, durationInFrames: 30, props: { name: 'Card' } }, 'card'));
+    const fetched: string[] = [];
+    await fontLoader({ text: async () => CSS, bytes: async (url) => (fetched.push(url), new Uint8Array()) })(ticked, {}, FEEGA_TOKENS);
+
+    expect(fetched).toContain('https://g.test/ext.woff2');
   });
 
   it('asks for the fonts of clips inside a precomp', async () => {

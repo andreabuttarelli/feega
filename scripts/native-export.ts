@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { parseMotionDoc } from '$lib/motion/doc';
-import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
+import { drawFrame, ItemKind, prepare } from '$lib/motion/gpu-full/display-list';
 import { fontLoader, type Reader } from '$lib/motion/gpu-full/text/load';
-import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
+import { smoothingOf, TextOutput } from '$lib/motion/gpu-full/text/painter';
 import { VIDEO_ASSET, placeholder, placeholderVideo } from './gpu-parity/assets';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -16,9 +16,13 @@ const BROWSER = { headers: { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS
 
 const flags = new Map(process.argv.slice(2).map((a) => a.replace(/^--/, '').split(/=(.*)/s).slice(0, 2) as [string, string]));
 
+const fetched = new Map<string, Uint8Array>();
+
+const remember = (url: string, bytes: Uint8Array) => (fetched.set(url, bytes), bytes);
+
 const files: Reader = {
   text: (url) => (REMOTE.test(url) ? fetch(url, BROWSER).then((r) => (r.ok ? r.text() : '')) : Promise.resolve(readFileSync(url, 'utf8'))),
-  bytes: (url) => (REMOTE.test(url) ? fetch(url, BROWSER).then((r) => r.arrayBuffer()).then((b) => new Uint8Array(b)) : Promise.resolve(new Uint8Array(readFileSync(url))))
+  bytes: (url) => (REMOTE.test(url) ? fetch(url, BROWSER).then((r) => r.arrayBuffer()).then((b) => remember(url, new Uint8Array(b))) : Promise.resolve(remember(url, new Uint8Array(readFileSync(url)))))
 };
 
 function assetIds(value: unknown, into = new Set<string>()): Set<string> {
@@ -57,10 +61,18 @@ if (!verdict.ok) {
 }
 const doc = verdict.doc;
 const assets = { ...(flags.has('placeholders') ? await placeholders(assetIds(doc), flags.get('placeholders')!) : {}), ...given(flags.get('assets')) };
-const prepared = prepare(doc, FEEGA_TOKENS, assets, { fonts: await fontLoader(files)(doc, assets, FEEGA_TOKENS), smoothing: smoothingOf(flags.get('user-agent') ?? '') });
+const prepared = prepare(doc, FEEGA_TOKENS, assets, { fonts: await fontLoader(files)(doc, assets, FEEGA_TOKENS), smoothing: smoothingOf(flags.get('user-agent') ?? ''), output: flags.get('text') === TextOutput.Glyphs ? TextOutput.Glyphs : TextOutput.Outlines });
 const spread = Number(flags.get('spread') ?? 0);
 const frames = spread ? Array.from({ length: spread }, (_, i) => Math.round((Math.floor(((i + 0.5) * doc.durationInFrames) / spread) / doc.fps) * doc.fps)) : Array.from({ length: doc.durationInFrames }, (_, i) => i);
-const lists = join(mkdtempSync(join(tmpdir(), 'native-export-')), 'frames.jsonl');
-writeFileSync(lists, frames.map((f) => JSON.stringify(drawFrame(prepared, f))).join('\n'));
+const work = mkdtempSync(join(tmpdir(), 'native-export-'));
+const lists = join(work, 'frames.jsonl');
+const drawn = frames.map((f) => drawFrame(prepared, f));
+writeFileSync(lists, drawn.map((list) => JSON.stringify(list)).join('\n'));
+const used = [...new Set(drawn.flatMap((list) => list.items.flatMap((i) => (i.kind === ItemKind.Glyphs ? [i.font] : []))))];
+const fontFlags = used.flatMap((url, i) => {
+  const file = join(work, `font-${i}`);
+  writeFileSync(file, fetched.get(url)!);
+  return ['--font', `${url}=${file}`];
+});
 const sink = flags.has('frames') ? ['--frames', resolve(flags.get('frames')!)] : ['--out', resolve(flags.get('out') ?? 'export.mp4')];
-execFileSync('cargo', ['run', '--release', '-q', '--bin', 'gpu-core-export', '--', '--lists', lists, '--fps', String(doc.fps), ...sink], { cwd: CORE, stdio: ['ignore', 'inherit', 'inherit'] });
+execFileSync('cargo', ['run', '--release', '-q', '--bin', 'gpu-core-export', '--', '--lists', lists, '--fps', String(doc.fps), ...fontFlags, ...sink], { cwd: CORE, stdio: ['ignore', 'inherit', 'inherit'] });

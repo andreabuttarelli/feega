@@ -40,7 +40,7 @@ pub fn prepare<S: Surface>(surface: &mut S, list: &DisplayList, pictures: &Shelf
     let mut layers = Layers::new();
     for (i, item) in list.items.iter().enumerate() {
         if let Item::Lens(lens) = item {
-            let layer = refracted(surface, list, i, &layers, pictures, &lens.lens)?;
+            let layer = refracted(surface, list, lens.under..i, &layers, pictures, &lens.lens)?;
             layers.behind.insert(i, layer);
             continue;
         }
@@ -71,9 +71,9 @@ fn behind<S: Surface>(surface: &mut S, list: &DisplayList, at: usize, layers: &L
     Ok(surface.place(texture, region))
 }
 
-fn refracted<S: Surface>(surface: &mut S, list: &DisplayList, at: usize, layers: &Layers<Pic<S>>, pictures: &Shelf<Pic<S>>, lens: &Lens) -> Result<Placed<Pic<S>>, S::Error> {
+fn refracted<S: Surface>(surface: &mut S, list: &DisplayList, span: std::ops::Range<usize>, layers: &Layers<Pic<S>>, pictures: &Shelf<Pic<S>>, lens: &Lens) -> Result<Placed<Pic<S>>, S::Error> {
     let frame = surface.frame();
-    let under = DisplayList { items: list.items[..at].to_vec(), ..list.clone_empty() };
+    let under = DisplayList { items: list.items[span].to_vec(), ..list.clone_empty() };
     let content = surface.paint(frame, None, &|c| {
         build_into(c, &under, pictures, layers);
     })?;

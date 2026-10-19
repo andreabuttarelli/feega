@@ -360,6 +360,8 @@ impl Lens {
 pub struct LensItem {
     pub clip: String,
     pub lens: Lens,
+    #[serde(default)]
+    pub under: usize,
 }
 
 #[derive(Debug, Clone)]

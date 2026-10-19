@@ -7,6 +7,7 @@ type ProbeConfig = { request: string; reply: string; timeline: string; prefix: s
 
 type Seekable = { pause: () => void; seek: (t: number) => void };
 
+
 export function domProbe(cfg: ProbeConfig) {
   const UNRENDERED = new Set(['style', 'script', 'defs', 'clippath', 'pattern', 'lineargradient', 'radialgradient', 'filter', 'mask', 'symbol', 'marker', 'title', 'desc', 'metadata']);
   const UNTRANSFORMED = 'feega-dom-read-untransformed';
@@ -63,15 +64,32 @@ export function domProbe(cfg: ProbeConfig) {
   const CASES: Record<string, (c: string) => string> = { uppercase: (c) => c.toUpperCase(), lowercase: (c) => c.toLowerCase() };
   const unquoted = (family: string) => family.trim().replace(/^["']|["']$/g, '');
 
-  const webFamilies = () => new Set([...document.fonts].filter((f) => f.status === 'loaded').map((f) => unquoted(f.family)));
+  const RANGE = /U\+([0-9a-f?]+)(?:-([0-9a-f]+))?/gi;
+  const inRange = (range: string, cp: number) =>
+    [...range.matchAll(RANGE)].some((m) => {
+      const lo = parseInt(m[1].replace(/\?/g, '0'), 16);
+      const hi = m[2] ? parseInt(m[2], 16) : parseInt(m[1].replace(/\?/g, 'F'), 16);
+      return lo <= cp && cp <= hi;
+    });
+
+  const webFaces = () => [...document.fonts].filter((f) => f.status === 'loaded');
+
+  const coveredBy = (faces: FontFace[], family: string, lines: TextLine[]) => {
+    const own = faces.filter((f) => unquoted(f.family) === family);
+    return own.length > 0 && lines.every((l) => l.chars.every((c) => own.some((f) => inRange(f.unicodeRange, c.codePointAt(0)!))));
+  };
+
+  const SUBPIXEL_STEPS = 4;
 
   const rasterOf = (computed: CSSStyleDeclaration, lines: TextLine[], box: DOMRect, layers: Promise<ImageBitmap>[]): TextRaster => {
     const size = parseFloat(computed.fontSize) || 0;
-    const right = Math.max(box.width, ...lines.map((l) => (l.xs[l.xs.length - 1] ?? 0) + 2 * size));
-    const bottom = Math.max(box.height, ...lines.map((l) => l.top + l.height));
+    const left = Math.floor(box.left) - cfg.pad;
+    const top = Math.floor(box.top) - cfg.pad;
+    const right = Math.max(box.right, ...lines.map((l) => box.left + (l.xs[l.xs.length - 1] ?? 0) + 2 * size));
+    const bottom = Math.max(box.bottom, ...lines.map((l) => box.top + l.top + l.height));
     const canvas = document.createElement('canvas');
-    canvas.width = Math.ceil(right) + 2 * cfg.pad;
-    canvas.height = Math.ceil(bottom) + 2 * cfg.pad;
+    canvas.width = Math.ceil(right) + cfg.pad - left;
+    canvas.height = Math.ceil(bottom) + cfg.pad - top;
     const pen = canvas.getContext('2d') as CanvasRenderingContext2D;
     pen.font = `${computed.fontStyle} ${computed.fontWeight} ${computed.fontSize} ${computed.fontFamily}`;
     pen.fillStyle = computed.color;
@@ -79,10 +97,12 @@ export function domProbe(cfg: ProbeConfig) {
     for (const line of lines) {
       line.chars.forEach((raw, i) => {
         const char = cased(raw);
-        pen.fillText(char, cfg.pad + line.xs[i], cfg.pad + line.top + pen.measureText(char).fontBoundingBoxAscent);
+        const x = Math.round((box.left + line.xs[i]) * SUBPIXEL_STEPS) / SUBPIXEL_STEPS;
+        const baseline = Math.round(box.top + line.top + Math.round(pen.measureText(char).fontBoundingBoxAscent));
+        pen.fillText(char, x - left, baseline - top);
       });
     }
-    return { layer: layers.push(createImageBitmap(canvas)) - 1, width: canvas.width, height: canvas.height };
+    return { layer: layers.push(createImageBitmap(canvas)) - 1, width: canvas.width, height: canvas.height, at: [left - box.left, top - box.top] };
   };
 
   const REFERENCE = /url\(\s*["']?#([^"')]+)["']?\s*\)/;
@@ -128,14 +148,14 @@ export function domProbe(cfg: ProbeConfig) {
     visit(root, cfg.none);
     const rects = untransformed(() => {
       const boxes = elements.map((el) => el.getBoundingClientRect());
-      const web = webFamilies();
+      const web = webFaces();
       elements.forEach((el, i) => {
         if (!(el instanceof HTMLElement) || !nodes[i].text) {
           return;
         }
         const computed = getComputedStyle(el);
         nodes[i].lines = linesOf(el, boxes[i]);
-        nodes[i].raster = web.has(unquoted(computed.fontFamily.split(',')[0])) ? null : rasterOf(computed, nodes[i].lines, boxes[i], layers);
+        nodes[i].raster = coveredBy(web, unquoted(computed.fontFamily.split(',')[0]), nodes[i].lines) ? null : rasterOf(computed, nodes[i].lines, boxes[i], layers);
       });
       return boxes;
     });

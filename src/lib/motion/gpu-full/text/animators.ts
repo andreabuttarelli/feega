@@ -1,5 +1,5 @@
 import { IDENTITY, mul2d, type Affine } from '../../affine';
-import { ANIMATOR_UNITS, AnimatorUnit, type TextAnimator } from '../../text-animators/model';
+import { ANIMATOR_UNITS, AnimatorUnit, type TextAnimator, type ValueKey } from '../../text-animators/model';
 import { finestUnit } from '../../text-animators/render';
 import { positionsOf, selection } from '../../text-animators/split';
 
@@ -7,9 +7,11 @@ export type Slot = Record<AnimatorUnit, number>;
 
 export type Tint = { color: string; amount: number };
 
-export type Look = { opacity: number; blur: number; turn: Affine; tint: Tint | null };
+export type Look = { opacity: number; blur: number; turn: Affine; tint: Tint | null; spacing: number };
 
-export type Animation = { finest: AnimatorUnit; at: (slot: Slot) => Look };
+export type Animation = { finest: AnimatorUnit; isolates: boolean; tracks: boolean; at: (slot: Slot) => Look };
+
+const ISOLATING: readonly ValueKey[] = ['x', 'y', 'rotation', 'scale', 'blur'];
 
 const DEG = Math.PI / 180;
 
@@ -30,15 +32,16 @@ export function animation(text: string, animators: readonly TextAnimator[]): Ani
   const seed = animators.find((a) => a.unit === finest)!.seed;
   const positions = Object.fromEntries(ANIMATOR_UNITS.map((unit) => [unit, positionsOf(text, unit, unit === finest ? seed : null)])) as Record<AnimatorUnit, number[]>;
   const at = (slot: Slot): Look => {
-    const look: Look = { opacity: 1, blur: 0, turn: IDENTITY, tint: null };
+    const look: Look = { opacity: 1, blur: 0, turn: IDENTITY, tint: null, spacing: 0 };
     for (const a of animators) {
       const amount = selection(a, positions[a.unit][slot[a.unit]] ?? 0);
       look.opacity *= 1 - amount * (1 - (a.values.opacity ?? 1));
       look.blur += amount * (a.values.blur ?? 0);
+      look.spacing += amount * (a.values.tracking ?? 0);
       look.turn = mul2d(look.turn, turnOf(a, amount));
       look.tint = a.values.color === undefined ? look.tint : { color: a.values.color, amount };
     }
     return look;
   };
-  return { finest, at };
+  return { finest, isolates: animators.some((a) => ISOLATING.some((k) => a.values[k] !== undefined)), tracks: animators.some((a) => a.values.tracking !== undefined), at };
 }
