@@ -3175,3 +3175,6 @@ full-frame one. Hundreds of them (a custom component flattened, its group grain 
 every child) exhaust the GPU silently. Bisect by slicing the group's children in
 `scripts/gpu-parity/host.ts`; a single child that flips the frame is a blend/layer bug instead
 (WebGL2 `multiply` inside a group: vello_hybrid wiped the backdrop; the GL core now composites blended layers itself, `Blending::Composited`).
+
+## `coveredMs` of the core canvas bench jumps from ~1 s to ~7 s
+Signal: `scripts/bench/canvas-core.ts` with `BENCH_RENDERERS=core` reports covered in 6–8 s; the default `gpu,core` order reports ~1 s on the same code. The first run on a fresh dev server pays vite compiles and cold `/source` responses. Move: compare runs in the same order (default `gpu,core`, or a warm-up first), one server restart per A/B variant.

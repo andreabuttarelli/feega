@@ -70,11 +70,11 @@ fn a_small_zoom_keeps_the_texture() {
 }
 
 #[test]
-fn a_new_use_beyond_the_raster_budget_waits_for_the_next_draw_instead_of_expanding() {
+fn a_new_use_beyond_the_raster_budget_shows_its_background_until_its_texture_exists() {
     let mut lib = library(&["a", "b"]);
 
     let first = lib.plan(&screen(&[("a", 1.0, 0.0), ("b", 1.0, 200.0)]), LIMITS);
-    assert_eq!(kinds(&first.screen), vec!["image"]);
+    assert_eq!(kinds(&first.screen), vec!["image", "path"]);
     assert!(first.pending);
 
     let second = lib.plan(&screen(&[("a", 1.0, 0.0), ("b", 1.0, 200.0)]), LIMITS);
@@ -158,7 +158,9 @@ fn a_big_group_is_rastered_a_chunk_per_draw_over_its_partial_texture() {
 
     let first = lib.plan(&at, ONE_ITEM);
     assert_eq!(kinds(&first.rasters[0].list), vec!["path"]);
-    assert!(first.screen.items.is_empty());
+    let Item::Image(partial) = &first.screen.items[0] else { panic!() };
+    assert_eq!(partial.src, first.rasters[0].clip);
+    assert_eq!(first.screen.items.len(), 1);
     assert!(first.pending);
 
     let second = lib.plan(&at, ONE_ITEM);
