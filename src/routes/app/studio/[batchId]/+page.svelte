@@ -1,6 +1,7 @@
 <script lang="ts">
   import PageTitle from '$lib/components/PageTitle.svelte';
-  import { enhance } from '$app/forms';
+  import { apiEnhance } from '$lib/dashboard/api-enhance';
+  import { postPageAction } from '$lib/api/page-action';
   import { publishes } from '$lib/social-publishing';
   import { invalidate } from '$app/navigation';
   import { ArrowLeft, Check, Columns2, Download, CalendarPlus, RotateCcw, X, ChevronLeft, ChevronRight } from '@lucide/svelte';
@@ -43,7 +44,7 @@
     }
     draining = true;
     try {
-      await fetch('?/drain', { method: 'POST', body: new FormData(), headers: { 'x-sveltekit-action': 'true' } });
+      await postPageAction(location.pathname, 'drain', new FormData());
     } finally {
       draining = false;
       await invalidate(dependency);
@@ -100,7 +101,7 @@
     <section class="progress" aria-live="polite" data-testid="studio-progress">
       <p><strong>Making your photos… {ready.length} of {total} ready.</strong> You can leave this page: they keep coming.</p>
       <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax={total} aria-valuenow={ready.length}><span style={`width: ${total ? (ready.length / total) * 100 : 0}%`}></span></div>
-      <form method="POST" action="?/cancel" use:enhance><button type="submit" class="link">Stop the rest</button></form>
+      <form method="POST" action="?/cancel" use:apiEnhance><button type="submit" class="link">Stop the rest</button></form>
     </section>
   {:else if ready.length}
     <p class="hint" data-testid="studio-ready">{ready.length} photo{ready.length === 1 ? '' : 's'} ready. Tap the ones you like, then download or schedule them.</p>
@@ -109,7 +110,7 @@
   {#if previewOnly && !pending}
     <section class="notice">
       <p>These are quick previews. Make the full set in high quality{data.perImage ? `, ${data.perImage} credits per photo` : ''}.</p>
-      <form method="POST" action="?/run" use:enhance><button class="primary" type="submit">Make the full set</button></form>
+      <form method="POST" action="?/run" use:apiEnhance><button class="primary" type="submit">Make the full set</button></form>
     </section>
   {/if}
 
@@ -117,7 +118,7 @@
     <section class="unmade" role="alert" data-testid="studio-unmade">
       <p><strong>{unmade.length} photo{unmade.length === 1 ? '' : 's'} could not be made.</strong> {unmadeText?.problem ?? ''} {unmadeText?.fix ?? ''}</p>
       {#if retryable.length}
-        <form method="POST" action="?/retry" use:enhance>
+        <form method="POST" action="?/retry" use:apiEnhance>
           {#each retryable as item (item.id)}<input type="hidden" name="itemId" value={item.id} />{/each}
           <button type="submit"><RotateCcw size={14} /> Try again</button>
         </form>
@@ -132,7 +133,7 @@
       {@const isPicked = item.approval === Approval.Approved}
       <figure class="cell" class:picked={isPicked} data-status={item.status}>
         {#if item.status === ItemStatus.Done && item.url}
-          <form method="POST" action={isPicked ? '?/reject' : '?/approve'} use:enhance>
+          <form method="POST" action={isPicked ? '?/reject' : '?/approve'} use:apiEnhance>
             <input type="hidden" name="itemId" value={item.id} />
             <button type="submit" class="photo" aria-pressed={isPicked} aria-label={`${isPicked ? 'Unpick' : 'Pick'} ${item.environment} photo`}>
               <img src={item.url} alt={`${item.productTitle}, ${item.environment}`} loading="lazy" />
@@ -149,7 +150,7 @@
           {#if item.status === ItemStatus.Done}
             <span class="tools">
               <button type="button" class="icon" aria-label="Compare with the original" onclick={() => (comparing = ready.findIndex((r) => r.id === item.id))}><Columns2 size={16} /></button>
-              <form method="POST" action="?/regenerate" use:enhance><input type="hidden" name="itemId" value={item.id} /><button type="submit" class="icon" aria-label="Make this one again"><RotateCcw size={16} /></button></form>
+              <form method="POST" action="?/regenerate" use:apiEnhance><input type="hidden" name="itemId" value={item.id} /><button type="submit" class="icon" aria-label="Make this one again"><RotateCcw size={16} /></button></form>
             </span>
           {/if}
         </figcaption>
@@ -158,7 +159,7 @@
   </div>
 
   {#if !pending && ready.length}
-    <form method="POST" action="?/more" use:enhance class="more">
+    <form method="POST" action="?/more" use:apiEnhance class="more">
       <span>Want more choice?</span>
       <select name="variations" bind:value={more} aria-label="How many more versions">
         {#each [1, 2, 3, 4] as n (n)}<option value={n}>{n} more of each</option>{/each}
@@ -187,7 +188,7 @@
       {#if posted}
         <p>Added as a draft post. <a href={posted.href}>Open the calendar</a></p>
       {:else if data.brands.length}
-        <form method="POST" action="?/calendar" use:enhance>
+        <form method="POST" action="?/calendar" use:apiEnhance>
           <label>Brand <select name="brand_id">{#each data.brands as b (b.id)}<option value={b.id}>{b.name}</option>{/each}</select></label>
           <label>Day <input type="date" name="date" value={tomorrow} min={new Date().toISOString().slice(0, 10)} /></label>
           <button type="submit" class="primary">Add {picked.length} photo{picked.length === 1 ? '' : 's'}</button>
@@ -211,7 +212,7 @@
     </div>
     <div class="compare-bar">
       <button type="button" class="icon" aria-label="Previous" onclick={() => step(-1)}><ChevronLeft size={18} /></button>
-      <form method="POST" action={compared.approval === Approval.Approved ? '?/reject' : '?/approve'} use:enhance>
+      <form method="POST" action={compared.approval === Approval.Approved ? '?/reject' : '?/approve'} use:apiEnhance>
         <input type="hidden" name="itemId" value={compared.id} />
         <button type="submit" class="primary">{compared.approval === Approval.Approved ? 'Unpick' : 'Pick this one'}</button>
       </form>

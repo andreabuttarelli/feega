@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { refuseModelSpend } from './fixtures/session';
 
-const SPENDING = ['/api/v1/projects/p1/agent', '/api/v1/projects/p1/motion/n1/agent', '/api/v1/org/nodes/n1/generate', '/p/p1/c/c1?/run', '/api/v1/projects/p1/canvases/c1?action=run'];
+const SPENDING = ['/api/v1/projects/p1/agent', '/api/v1/projects/p1/motion/n1/agent', '/api/v1/org/nodes/n1/generate', '/p/p1/c/c1?/run', '/api/v1/projects/p1/canvases/c1?action=run', '/api/v1/studio/b1?action=run'];
 
 test.describe('a spec never reaches a real model', () => {
   test.skip(process.env.E2E_ALLOW_SPEND === '1', 'spesa permessa esplicitamente');

@@ -1,1 +1,1 @@
-export { load, actions } from '$lib/server/dashboard/pages/studio';
+export { actions } from '$lib/server/dashboard/pages/studio';
