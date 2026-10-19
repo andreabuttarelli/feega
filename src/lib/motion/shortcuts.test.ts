@@ -207,6 +207,13 @@ describe('mask keys', () => {
   });
 });
 
+describe('flatten key', () => {
+  it('⌘E flattens the selected shapes, E alone still switches the mode', () => {
+    expect(press('e', { mod: true, code: 'KeyE' })).toBe(Command.Flatten);
+    expect(press('e', { code: 'KeyE' })).toBe(Command.ToggleEditMode);
+  });
+});
+
 describe('scale tool key', () => {
   it('K is the scale tool in Design and still pauses in Motion', () => {
     expect(commandFor({ key: 'k', code: 'KeyK', mod: false, shift: false }, EditMode.Design)).toBe(Command.ToolScale);

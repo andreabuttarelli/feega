@@ -4,7 +4,7 @@ import { StyleAction, StyleKind, applyStyle, defineStyle, detachStyle, removeSty
 import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
-import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
+import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
 import { scaleClips } from '$lib/motion/scale-tool';
 import { setLayoutGuides } from '$lib/motion/layout-guides/guides';
 import { MAX_LAYOUT_GUIDES, layoutGuideSchema } from '$lib/motion/layout-guides/model';
@@ -44,6 +44,14 @@ import type { Pt } from '$lib/motion/scene-select';
 import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '$lib/motion/organize';
 
 const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) => `distribute_${a}` as const), 'tidy', 'move', 'scale'] as const;
+
+const FLATTEN = 'flatten';
+const SHAPE_OPS = [BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, BooleanOp.Exclude, FLATTEN] as const;
+
+const SHAPE_OP: Record<(typeof SHAPE_OPS)[number], (doc: MotionDoc, ids: string[], frame: number) => OpResult> = {
+  ...(Object.fromEntries(Object.values(BooleanOp).map((op) => [op, (doc: MotionDoc, ids: string[], frame: number) => combineShapes(doc, ids, op, frame)])) as Record<BooleanOp, (doc: MotionDoc, ids: string[], frame: number) => OpResult>),
+  [FLATTEN]: flattenShapes
+};
 
 type SpaceInput = { doc: MotionDoc; ids: string[]; frame: number; by: Pt; mode: EditMode; factor: number | undefined };
 
@@ -1694,9 +1702,9 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     combine_shapes: tool({
-      description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(2), op: z.enum([BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, BooleanOp.Exclude]), at: z.number().min(0).optional().describe('seconds; default 0') }),
-      execute: async (input) => apply(combineShapes(session.doc, input.clip_ids, input.op, frames(input.at ?? 0)), `combined ${input.clip_ids.join(', ')} (${input.op})`)
+      description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed. flatten (one or more shapes) merges their outlines into one editable path as they are, curves kept, with no boolean.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum([...SHAPE_OPS]), at: z.number().min(0).optional().describe('seconds; default 0') }),
+      execute: async (input) => apply(SHAPE_OP[input.op](session.doc, input.clip_ids, frames(input.at ?? 0)), `${input.op} ${input.clip_ids.join(', ')}`)
     }),
 
     set_path: tool({
