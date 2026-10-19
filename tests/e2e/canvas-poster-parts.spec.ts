@@ -52,7 +52,7 @@ test.describe('poster parts on the canvas @real', () => {
     const title = { x: box.width * 0.4, y: box.height * 0.1 };
 
     await expect(async () => {
-      await overlay.click({ position: title });
+      await overlay.dblclick({ position: title });
       await expect(page.getByTestId('selection-box')).toBeVisible({ timeout: 1000 });
     }, 'the poster selects once the preview has measured it').toPass({ timeout: 15_000 });
     await overlay.dblclick({ position: title });

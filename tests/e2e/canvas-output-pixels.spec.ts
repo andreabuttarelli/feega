@@ -1,3 +1,4 @@
+import { hoverTile } from './fixtures/canvas-tile';
 import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, mkdtempSync } from 'node:fs';
@@ -39,6 +40,7 @@ test.describe('a generated output placed on the canvas shows what was generated 
     const gen = await seedNode({ type: 'image', x: 80, y: 420, data: { prompt: 'red', refId: asset!.id } });
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await hoverTile(page, gen.id);
     await page.locator(`[data-id="${gen.id}"] .gen-body`).hover();
     const viewport = page.viewportSize()!;
     await page.getByTestId('drag-to-frame').dragTo(page.locator('.svelte-flow__pane'), { targetPosition: { x: viewport.width / 2, y: 160 } });
@@ -84,6 +86,7 @@ test.describe('a generated output placed on the canvas shows what was generated 
     const gen = await seedNode({ type: 'video', x: 80, y: 420, data: { prompt: 'red', refId: asset!.id } });
 
     await gotoHydrated(page, `/p/${session.projectId}/c/${session.canvasId}`);
+    await hoverTile(page, gen.id);
     await page.locator(`[data-id="${gen.id}"] .gen-body`).hover();
     await page.getByTestId('drag-to-frame').dragTo(page.locator('.svelte-flow__pane'), { targetPosition: { x: page.viewportSize()!.width / 2, y: 160 } });
     const made = async () => (await admin.from('nodes').select('id').eq('canvas_id', session.canvasId).eq('type', 'motion').is('deleted_at', null)).data ?? [];
