@@ -13,6 +13,7 @@ import { createMedia } from '$lib/motion/gpu-full/media';
 import { loadFonts } from '$lib/motion/gpu-full/text/load';
 import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
 import { BACKENDS, FullBackend } from '$lib/motion/gpu-full/backends';
+import { renderOnCore } from '$lib/motion/gpu-full/core-export';
 import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
 
 const composer = (spec: Spec) => (only?: ReadonlySet<string>) => composeHtml({ doc: spec.doc as MotionDoc, tokens: FEEGA_TOKENS, assets: spec.assets, origin: spec.origin, only });
@@ -87,6 +88,18 @@ async function fullShots(input: ShotsInput, backend: FullBackend): Promise<Shots
 const gpuFullShots = (input: ShotsInput) => fullShots(input, FullBackend.WebGl2);
 const gpuCoreShots = (input: ShotsInput) => fullShots(input, FullBackend.Core);
 const gpuCoreGlShots = (input: ShotsInput) => fullShots(input, FullBackend.CoreGl);
+
+async function coreExportShots(input: ShotsInput, backend: FullBackend): Promise<ShotsResult> {
+  const doc = input.spec.doc as MotionDoc;
+  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets, { fonts: await loadFonts(doc, input.spec.assets), smoothing: smoothingOf(navigator.userAgent) });
+  const pngs: string[] = [];
+  const start = performance.now();
+  const done = await renderOnCore(prepared, backend, input.times, async (bitmap) => void pngs.push(await png(bitmap, input.width, input.height)), new AbortController().signal);
+  if (!done) {
+    throw new Error('core export fell back to HTML');
+  }
+  return { pngs, ms: performance.now() - start, backend: `core export ${backend}`, runs: 0, stats: [] };
+}
 
 async function encode(input: ExportInput, render: (onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>) => Promise<void>): Promise<ExportResult> {
   const start = performance.now();
@@ -199,4 +212,4 @@ async function liveSeek(t: number) {
   await new Promise((r) => setTimeout(r, 400));
 }
 
-Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, gpuFullShots, gpuCoreShots, gpuCoreGlShots, htmlExport, gpuExport, htmlPreview, gpuPreview });
+Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, gpuFullShots, gpuCoreShots, gpuCoreGlShots, coreExportShots: (i: ShotsInput) => coreExportShots(i, FullBackend.Core), coreExportGlShots: (i: ShotsInput) => coreExportShots(i, FullBackend.CoreGl), htmlExport, gpuExport, htmlPreview, gpuPreview });

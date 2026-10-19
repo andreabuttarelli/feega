@@ -9,7 +9,7 @@ type Attached = { draw: (list: string) => string; picture: (clip: string, source
 
 export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine };
 export type Screen = { width: number; height: number; background: Rgba | null; items: (Item | Use)[] };
-export type CoreRaster = Raster & { putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; dropGroup: (key: string) => void; drawScreen: (screen: Screen, pictures?: Pictures) => void };
+export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; dropGroup: (key: string) => void; drawScreen: (screen: Screen, pictures?: Pictures) => void };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
 type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
 
@@ -62,7 +62,7 @@ function rasterOf(attached: Attached): CoreRaster {
   return {
     draw: (list: DisplayList, pictures = NO_PICTURES) => {
       wanted(list.items).forEach((item) => upload(item, pictures));
-      attached.draw(JSON.stringify(list));
+      return attached.draw(JSON.stringify(list)).split('\n').filter(Boolean);
     },
     putGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
       wanted(list.items).forEach((item) => upload(item, pictures));
