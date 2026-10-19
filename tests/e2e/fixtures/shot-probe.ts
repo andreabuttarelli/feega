@@ -73,6 +73,11 @@ async function jolts(c: ShotCase): Promise<{ jolts: JoltAt[]; diffs: number[] }>
   const look = probeOf(size, { add: (frame) => frames.push(Uint8Array.from(frame)), jolts: () => [] })!;
   for (let f = 0; f < lastFrame(doc); f++) {
     const bitmap = frameOf(await player.shoot(f / doc.fps, request));
+    if (f >= 38 && f <= 50) {
+      const cv = Object.assign(document.createElement('canvas'), { width: bitmap.width, height: bitmap.height });
+      cv.getContext('2d')!.drawImage(bitmap, 0, 0);
+      (window as any).dbgFrames = [...((window as any).dbgFrames ?? []), cv.toDataURL('image/png')];
+    }
     look(bitmap);
     bitmap.close();
   }
