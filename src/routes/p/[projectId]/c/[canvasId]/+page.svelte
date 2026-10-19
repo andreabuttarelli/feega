@@ -102,6 +102,7 @@
   import { templateFields } from '$lib/motion/template/library';
   import { AddTarget, catalogue as componentCatalogue, libraryFormat } from '$lib/motion/template/catalogue';
   import { PENDING_FRAME_TYPE, pendingFrame } from '$lib/canvas/pending-frame';
+  import { groupedLocally, inOrder, ungroupedLocally } from '$lib/canvas/optimistic-group';
   import { defaultFrameBox, drawnFrameTile, drawnTile, pendingOutput, placedFrame, settle } from '$lib/canvas/optimistic-insert';
   import { SvelteMap } from 'svelte/reactivity';
   import type { Instance } from '$lib/motion/template/library';
@@ -443,13 +444,23 @@
     }
   }
 
-  async function regroup(action: string, fields: Record<string, string>) {
-    const res = await post(action, fields);
-    if (res?.outcome !== 'done') {
-      return;
-    }
-    pushGesture({ items: (res.undo ?? []) as UndoItem[] });
-    await refresh();
+  const regroups = inOrder();
+  let regrouping = 0;
+
+  function regroup(action: string, fields: Record<string, string>) {
+    regrouping += 1;
+    void regroups(async () => {
+      await places.flush();
+      const res = await post(action, fields);
+      if (res?.outcome === 'done') {
+        pushGesture({ items: (res.undo ?? []) as UndoItem[] });
+      }
+    }).finally(() => {
+      regrouping -= 1;
+      if (!regrouping) {
+        void refresh();
+      }
+    });
   }
 
   function rotateGroupBy(id: string, degrees: number) {
@@ -474,14 +485,18 @@
   }
 
   function groupElements(ids: string[]) {
-    if (ids.length > 1) {
-      void regroup('groupElements', { ids: JSON.stringify(ids) });
+    if (ids.length < 2) {
+      return;
     }
+    const id = crypto.randomUUID();
+    nodes = groupedLocally(nodes, ids, id, (record) => toTile(record));
+    regroup('groupElements', { ids: JSON.stringify(ids), node_id: id });
   }
 
   function ungroupElements(ids: string[]) {
     for (const id of ids) {
-      void regroup('ungroupElement', { id });
+      nodes = ungroupedLocally(nodes, id);
+      regroup('ungroupElement', { id });
     }
   }
 
@@ -1393,7 +1408,7 @@
   $effect(() => {
     const [id] = selectedIds;
     if (selectedIds.length === 1 && untrack(() => nodes.find((n) => n.id === id))?.type === 'motion') {
-      prefetchSession(motionEditorPath({ projectId: data.projectId, canvasId: data.canvas.id, nodeId: id }));
+      untrack(() => warmMotion(id));
     }
   });
 

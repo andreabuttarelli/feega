@@ -36,6 +36,7 @@ test.describe('groups behave like design-tool groups @real', () => {
     await page.keyboard.press('ControlOrMeta+g');
     await expect.poll(async () => (await rowOf(frame.id)).data.groupId, { timeout: 10_000 }).toBeTruthy();
     const groupId = String((await rowOf(frame.id)).data.groupId);
+    await expect(page.locator(`.svelte-flow__node[data-id="${box.id}"]`), 'the box now lives inside the group the server wrote').toHaveCount(0);
     const groupTile = page.locator(`.svelte-flow__node[data-id="${groupId}"]`);
     const frameTile = page.locator(`.svelte-flow__node[data-id="${frame.id}"]`);
 
