@@ -20,7 +20,7 @@
   import { oneAtATime } from '$lib/canvas/core/one-at-a-time';
   import { readClips, type CustomFrame } from '$lib/motion/gpu-full/dom/custom';
   import type { Pictures } from '$lib/motion/gpu-full/raster';
-  import { Stand, fillOrder, placeholder, standIn, type Look } from '$lib/canvas/core/placeholders';
+  import { Stand, fillOrder, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
   import { Device } from '$lib/canvas/gpu/memory-budget';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
@@ -121,7 +121,7 @@
     for (const c of shownCards) {
       if (!cardLists.has(c.key) && !readying.has(c.key)) {
         readying.add(c.key);
-        void media.ready(c.frame.list).then(() => (cardLists = new Map(cardLists).set(c.key, c.frame.list)));
+        void media.ready(c.frame.list).then(() => (cardLists = new Map(cardLists).set(c.key, withoutPictures(c.frame.list, look, (i) => !pictures(i)))));
       }
     }
   });
@@ -134,14 +134,18 @@
 
   const standIns = $derived<{ id: string; box: FrameAt['box']; stand: Stand; turn?: Turn }[]>([...frames.map((f) => ({ id: f.id, box: f.box, stand: Stand.Frame })), ...cards.map((c) => ({ id: c.frame.id, box: c.frame.box, stand: Stand.Card, turn: c.turn }))]);
   const placeholders = $derived(new Map(standIns.map((n) => [n.id, { ...n, ...placeholder(n.stand, { width: n.box.w, height: n.box.h }, look) }])));
+  const blocksGroup = (key: string) => `${key}:blocks`;
+  const cardBlocks = $derived(new Map(shownCards.filter((c) => !cardLists.has(c.key)).map((c) => [blocksGroup(c.key), { card: c, list: withoutPictures(c.frame.list, look) }])));
+  const blocksById = $derived(new Map([...cardBlocks.entries()].map(([group, { card }]) => [card.frame.id, { id: card.frame.id, group, box: card.frame.box, size: { width: card.frame.list.width, height: card.frame.list.height }, bytes: 0, ...(card.turn ? { turn: card.turn } : {}) }])));
+
   const held = $derived.by(() => {
     const ready = new Map(real.map((f) => [f.id, f]));
     return [...placeholders.values()].flatMap((p) => {
-      const shown = standIn<HeldFrame>([ready.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...(p.turn ? { turn: p.turn } : {}) }]);
+      const shown = standIn<HeldFrame>([ready.get(p.id), blocksById.get(p.id), { id: p.id, group: p.group, box: p.box, size: { width: p.box.w, height: p.box.h }, bytes: 0, ...(p.turn ? { turn: p.turn } : {}) }]);
       return shown ? [shown] : [];
     });
   });
-  const listOf = (group: string) => cardLists.get(group) ?? lists.get(group) ?? [...placeholders.values()].find((p) => p.group === group)!.list;
+  const listOf = (group: string) => cardLists.get(group) ?? lists.get(group) ?? cardBlocks.get(group)?.list ?? [...placeholders.values()].find((p) => p.group === group)!.list;
 
   const waiting = $derived.by(() => {
     const ready = new Set(real.map((f) => f.id));

@@ -1,6 +1,6 @@
 import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Screen } from '$lib/canvas/gpu/camera';
-import type { DisplayList } from '$lib/motion/gpu-full/display-list';
+import { ItemKind, type DisplayList, type ImageItem, type Item } from '$lib/motion/gpu-full/display-list';
 import { rgbaOf, type Rgba } from '$lib/motion/gpu-full/rgba';
 import type { Box } from './canvas-scene';
 import { line, rect, solid } from './shapes';
@@ -35,3 +35,22 @@ export function fillOrder<T extends { box: Box }>(items: readonly T[], view: Vie
   const seen = (b: Box) => b.x + b.w >= centre.x - half.w && b.x <= centre.x + half.w && b.y + b.h >= centre.y - half.h && b.y <= centre.y + half.h;
   return items.filter((i) => seen(i.box)).sort((a, b) => distance(a.box) - distance(b.box));
 }
+
+type Missing = (i: ImageItem) => boolean;
+
+const ALL: Missing = () => true;
+
+const block = (i: ImageItem, look: Look): Item => ({ ...solid(i.clip, [rect(0, 0, i.size.width, i.size.height)], look.line, i.opacity), matrix: i.matrix, ...(i.scissor ? { scissor: i.scissor } : {}) });
+
+const blocked = (items: readonly Item[], look: Look, missing: Missing): Item[] =>
+  items.map((i) => {
+    if (i.kind === ItemKind.Image && missing(i)) {
+      return block(i, look);
+    }
+    if (i.kind === ItemKind.Group) {
+      return { ...i, items: blocked(i.items, look, missing) };
+    }
+    return i;
+  });
+
+export const withoutPictures = (list: DisplayList, look: Look, missing: Missing = ALL): DisplayList => ({ ...list, items: blocked(list.items, look, missing) });
