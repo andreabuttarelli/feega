@@ -201,7 +201,7 @@
     }
   });
   const coreLook = $derived(wrap ? themeOf(wrap) : null);
-  const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && t.kind !== 'motion' && !handedOver(t) && !t.rotation;
+  const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && t.kind !== 'motion' && !handedOver(t);
   const coreCards = $derived.by(() => {
     const text = coreType;
     const look = coreLook;
@@ -226,7 +226,8 @@
         icon: dom ? null : (text.icons.get(t.kind as NodeType) ?? null),
         names: on
       };
-      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold) }];
+      const turn = t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined;
+      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold), turn }];
     });
   });
   const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${id}/source`;
