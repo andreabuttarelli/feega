@@ -13,7 +13,7 @@ import { MOTION_LIBS_ROUTE } from '$lib/motion/libs/catalog';
 import { lanesWithin, webglPerLane } from '$lib/motion/export/webgl-budget';
 import base from '../vite-node.config';
 import { libraryPath } from '../motion-libs';
-import { luma, psnr, ssim } from './metrics';
+import { differing, luma, psnr, ssim } from './metrics';
 import type { ExportInput, ExportResult, PreviewInput, PreviewResult, ShotsInput, ShotsResult } from './probe';
 
 enum Mode {
@@ -41,6 +41,9 @@ const seconds = Number(flags.get('seconds') ?? 6);
 const displayWidth = flags.has('display') ? Number(flags.get('display')) : null;
 const scaleFactor = Number(flags.get('dpr') ?? 1);
 const engineName = flags.get('engine') ?? 'chromium';
+const SHOTS: Record<string, string> = { gpu: 'gpuShots', 'gpu-full': 'gpuFullShots' };
+const PIXEL_TOLERANCE = 8;
+const under = SHOTS[flags.get('under') ?? 'gpu'];
 const name = flags.get('name') ?? docPath.split('/').pop()?.replace(/\.(doc\.)?json$/, '') ?? 'doc';
 
 async function hostBundle(): Promise<string> {
@@ -154,24 +157,24 @@ if (mode === Mode.Parity) {
   const shots: ShotsInput = { html, spec, times, width: Math.round(doc.width * res), height: Math.round(doc.height * res), preference, ...(displayWidth ? { displayWidth } : {}) };
   const before = flags.get('ref') === 'live' ? await liveShots(times, shots) : await call<ShotsInput, ShotsResult>('htmlShots', shots);
   console.log(`html engine ${(before.ms / times.length).toFixed(0)} ms/frame`);
-  const after = await call<ShotsInput, ShotsResult>('gpuShots', shots);
+  const after = await call<ShotsInput, ShotsResult>(under, shots);
   const framesDir = join(dir, 'frames');
   rmSync(framesDir, { recursive: true, force: true });
   mkdirSync(framesDir, { recursive: true });
-  const rows: { t: number; ssim: number; psnr: number }[] = [];
+  const rows: { t: number; ssim: number; psnr: number; off: number }[] = [];
   for (let i = 0; i < times.length; i++) {
     const a = await rgba(before.pngs[i]);
     const b = await rgba(after.pngs[i]);
     const la = luma(a.pixels);
     const lb = luma(b.pixels);
-    rows.push({ t: times[i], ssim: ssim(la, lb, a.width, a.height), psnr: psnr(la, lb) });
+    rows.push({ t: times[i], ssim: ssim(la, lb, a.width, a.height), psnr: psnr(la, lb), off: differing(a.pixels, b.pixels, PIXEL_TOLERANCE) });
     writeFileSync(join(framesDir, `html-${String(i).padStart(3, '0')}.png`), Buffer.from(before.pngs[i], 'base64'));
     writeFileSync(join(framesDir, `gpu-${String(i).padStart(3, '0')}.png`), Buffer.from(after.pngs[i], 'base64'));
   }
   const fmt = (n: number) => (Number.isFinite(n) ? n.toFixed(2) : 'inf');
   const worst = rows.reduce((w, r) => (r.ssim < w.ssim ? r : w), rows[0]);
   const mean = rows.reduce((s, r) => s + r.ssim, 0) / rows.length;
-  const report = [`# ${name} — backend ${after.backend}, ${after.runs} html runs`, '', '| t (s) | SSIM | PSNR dB |', '|---|---|---|', ...rows.map((r) => `| ${r.t.toFixed(2)} | ${r.ssim.toFixed(4)} | ${fmt(r.psnr)} |`), '', `mean SSIM ${mean.toFixed(4)}, worst ${worst.ssim.toFixed(4)} at ${worst.t.toFixed(2)} s`, `stats ${JSON.stringify(after.stats.slice(0, 3))}`].join('\n');
+  const report = [`# ${name} — backend ${after.backend}, ${after.runs} html runs`, '', '| t (s) | SSIM | PSNR dB | pixels off |', '|---|---|---|---|', ...rows.map((r) => `| ${r.t.toFixed(2)} | ${r.ssim.toFixed(4)} | ${fmt(r.psnr)} | ${(r.off * 100).toFixed(2)}% |`), '', `mean SSIM ${mean.toFixed(4)}, worst ${worst.ssim.toFixed(4)} at ${worst.t.toFixed(2)} s`, `stats ${JSON.stringify(after.stats.slice(0, 3))}`, `not drawn: ${after.unsupported?.join(', ') || 'none'}`].join('\n');
   writeFileSync(join(dir, 'parity.md'), report);
   console.log(report);
   const ff = (args: string[]) => execFileSync('ffmpeg', ['-y', '-loglevel', 'error', ...args]);

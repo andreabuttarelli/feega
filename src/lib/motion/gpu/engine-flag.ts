@@ -1,12 +1,18 @@
 export enum RenderEngine {
   Html = 'html',
-  Gpu = 'gpu'
+  Gpu = 'gpu',
+  GpuFull = 'gpu-full'
 }
 
 const PARAM = 'engine';
 
 export const KILL_FLAG = 'motion-engine-html';
 
+const ASKED: ReadonlySet<string> = new Set([RenderEngine.Gpu, RenderEngine.GpuFull]);
+
 export const killSwitch = (env: string | undefined, flagged: boolean): boolean => env === RenderEngine.Html || flagged;
 
-export const engineFlag = (url: URL, killed: boolean): RenderEngine => (!killed && url.searchParams.get(PARAM) === RenderEngine.Gpu ? RenderEngine.Gpu : RenderEngine.Html);
+export function engineFlag(url: URL, killed: boolean): RenderEngine {
+  const asked = url.searchParams.get(PARAM) ?? '';
+  return !killed && ASKED.has(asked) ? (asked as RenderEngine) : RenderEngine.Html;
+}
