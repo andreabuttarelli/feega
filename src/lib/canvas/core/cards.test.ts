@@ -80,4 +80,11 @@ describe('cardItems', () => {
   it.each(Object.keys(NODE_PORTS))('draws something for a %s card', (kind) => {
     expect(cardItems(card(kind, {}), theme, glyphs).length).toBeGreaterThan(0);
   });
+
+  it('sets a source title in the bold face', () => {
+    const bold: Glyphs = () => ({ contours: [[0, 0, 1, 0, 1, 1]], width: 1 });
+    const [title] = paths(cardItems(card('iframe', { url: 'x' }), theme, glyphs, bold), CardPart.Title);
+
+    expect(box(title.contours)).toEqual([14, 27, 15, 28]);
+  });
 });

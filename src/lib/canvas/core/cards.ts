@@ -46,7 +46,7 @@ const RUNNING = 'Running…';
 const AUTO_MODEL = 'Auto';
 const CENTRE: [number, number] = [0.5, 0.5];
 
-type Ctx = { c: CoreCard; theme: CoreTheme; glyphs: Glyphs; clip: (p: CardPart) => string };
+type Ctx = { c: CoreCard; theme: CoreTheme; glyphs: Glyphs; bold: Glyphs; clip: (p: CardPart) => string };
 
 const at = (c: CoreCard, contours: number[][]) => contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + c.x : v + c.y)));
 
@@ -71,7 +71,7 @@ function text(x: Ctx, part: CardPart, s: string, size: number, colour: string, l
     return [];
   }
   const wrap = width === null ? undefined : { width, height };
-  return [solid(x.clip(part), at(x.c, x.glyphs(s, size, wrap).contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + left : v + top + size)))), colour)];
+  return [solid(x.clip(part), at(x.c, (part === CardPart.Title ? x.bold : x.glyphs)(s, size, wrap).contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + left : v + top + size)))), colour)];
 }
 
 const body = (x: Ctx, s: string, top: number, bottom = PAD) => text(x, CardPart.Body, s, BODY_SIZE, x.theme.ink, PAD, top, x.c.w - PAD * 2, x.c.h - top - bottom);
@@ -134,4 +134,4 @@ const SURFACES: Record<Surface, (x: Ctx) => Item[]> = {
   [Surface.Blank]: (x) => panel(x)
 };
 
-export const cardItems = (c: CoreCard, theme: CoreTheme, glyphs: Glyphs): Item[] => SURFACES[c.face.surface]({ c, theme, glyphs, clip: (p) => `${c.id}:${p}` });
+export const cardItems = (c: CoreCard, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): Item[] => SURFACES[c.face.surface]({ c, theme, glyphs, bold, clip: (p) => `${c.id}:${p}` });
