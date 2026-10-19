@@ -2,7 +2,7 @@ import { fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 import { loadEditorSession } from '$lib/server/motion/editor-session';
 import { motionScope as scopeFor, type MotionEditorScope } from '$lib/server/motion/editor-scope';
-import { runEditorOp, type EditorAnswer, type EditorCtx } from '$lib/server/frame-editor/editor-ops';
+import { EDITOR_OPS, runEditorOp, type EditorAnswer, type EditorCtx } from '$lib/server/frame-editor/editor-ops';
 import { gateOrgAiActionForForm } from '$lib/server/cli-auth';
 import { savePoster } from '$lib/server/motion/poster';
 
@@ -52,6 +52,24 @@ export const actions: Actions = {
   head: async ({ locals, params }) => answered(await runEditorOp('read_head', editorCtx(await scopeFor(locals, params)), {})),
 
   revisions: async ({ locals, params }) => answered(await runEditorOp('list_revisions', editorCtx(await scopeFor(locals, params)), {})),
+
+  branches: async ({ locals, params }) => answered(await runEditorOp('list_branches', editorCtx(await scopeFor(locals, params)), {})),
+
+  createBranch: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const input = EDITOR_OPS.create_branch.input.safeParse({ name: (await request.formData()).get('name') });
+    return input.success ? answered(await runEditorOp('create_branch', editorCtx(scope), input.data)) : fail(HTTP_BAD_REQUEST, { error: 'invalid_branch_name' });
+  },
+
+  reviewBranch: async ({ locals, params }) => answered(await runEditorOp('review_branch', editorCtx(await scopeFor(locals, params)), {})),
+
+  mergeBranch: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const input = EDITOR_OPS.merge_branch.input.safeParse({ choices: parsedJson(String((await request.formData()).get('choices') ?? '{}')) });
+    return input.success ? answered(await runEditorOp('merge_branch', editorCtx(scope), input.data)) : fail(HTTP_BAD_REQUEST, { error: 'invalid_choices' });
+  },
+
+  dropBranch: async ({ locals, params }) => answered(await runEditorOp('drop_branch', editorCtx(await scopeFor(locals, params)), {})),
 
   restore: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);

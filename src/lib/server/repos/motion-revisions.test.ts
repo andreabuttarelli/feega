@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Db } from '$lib/server/db/client';
 import { MotionFormat, newMotionDoc } from '$lib/motion/doc';
-import { CHECKPOINT_IDLE_MS, Checkpoint, RevisionOutcome, appendRevision, listRevisions, readCheckpoint, readHead, readRevision, sealRevision } from './motion-revisions';
+import { CHECKPOINT_IDLE_MS, Checkpoint, RevisionOutcome, appendRevision, headCache, listRevisions, readCheckpoint, readHead, readRevision, sealRevision } from './motion-revisions';
 
 type Row = Record<string, unknown>;
 
@@ -223,5 +223,52 @@ describe('revisions are checkpoints, not one row per edit', () => {
 
     expect(await readRevision(db, { orgId: ORG, nodeId: NODE, version: 1 })).toBeNull();
     expect(await readCheckpoint(db, { orgId: ORG, nodeId: NODE, version: 1 })).toMatchObject({ version: 2, doc: { height: 900 } });
+  });
+});
+
+describe('a cached head is read without the doc while the version holds', () => {
+  const docReads = (db: Db) => {
+    const columns: string[] = [];
+    const from = db.from.bind(db);
+    (db as unknown as { from: unknown }).from = (table: string) => {
+      const t = from(table as never) as unknown as { select: (c: string) => unknown };
+      return { ...t, select: (c: string) => (columns.push(c), t.select(c)) };
+    };
+    return () => columns.filter((c) => c.includes('doc')).length;
+  };
+
+  it('reopening the same version does not download the doc again', async () => {
+    const { db } = revisionsDb();
+    await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Square), actor: user });
+    const cache = headCache();
+    const reads = docReads(db);
+
+    const first = await readHead(db, { orgId: ORG, nodeId: NODE }, cache);
+    const again = await readHead(db, { orgId: ORG, nodeId: NODE }, cache);
+
+    expect(again).toEqual(first);
+    expect(reads()).toBe(1);
+  });
+
+  it('a new version is read in full, never served from the cache', async () => {
+    const { db } = revisionsDb();
+    await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Square), actor: user });
+    const cache = headCache();
+    await readHead(db, { orgId: ORG, nodeId: NODE }, cache);
+    await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 1, doc: { ...newMotionDoc(MotionFormat.Square), height: 900 }, actor: user });
+
+    const head = await readHead(db, { orgId: ORG, nodeId: NODE }, cache);
+
+    expect(head).toMatchObject({ version: 2, doc: { height: 900 } });
+  });
+
+  it('a caller editing the doc it got does not change what the next reader sees', async () => {
+    const { db } = revisionsDb();
+    await appendRevision(db, { orgId: ORG, nodeId: NODE, expectedVersion: 0, doc: newMotionDoc(MotionFormat.Square), actor: user });
+    const cache = headCache();
+
+    (await readHead(db, { orgId: ORG, nodeId: NODE }, cache))!.doc.height = 1;
+
+    expect((await readHead(db, { orgId: ORG, nodeId: NODE }, cache))?.doc.height).toBe(1080);
   });
 });

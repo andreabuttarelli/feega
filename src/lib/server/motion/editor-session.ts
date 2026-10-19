@@ -1,6 +1,7 @@
+import { forkOf } from './branch-store';
 import { canvasScope, motionOrThrow, nodeLookup, type CanvasScope } from './editor-scope';
 import { motionAssets, motionTokens, newHead } from './editor';
-import { readHead } from '$lib/server/repos/motion-revisions';
+import { headCache, readHead } from '$lib/server/repos/motion-revisions';
 import { serverTiming, type Phases } from '$lib/server/server-timing';
 import { knownRenderLimit, motionRenderFarm } from './renderer';
 import { batchView, renderView } from './render-run';
@@ -19,6 +20,8 @@ type SessionAsk = { projectId: string; nodeId: string; briefIds: string[] };
 
 export type MotionEditorData = Awaited<ReturnType<typeof editorSession>>;
 
+const HEADS = headCache();
+
 export const libraryOf = (scope: { db: Db; orgId: string; userId: string }) => templateLibrary(scope.db, { orgId: scope.orgId, actor: { kind: 'user', id: scope.userId } });
 
 export async function loadEditorSession(locals: App.Locals, params: EditorParams, url: URL, phases: Phases = serverTiming()) {
@@ -34,7 +37,7 @@ export async function editorSession(canvas: CanvasScope, params: SessionAsk, pha
   const uploadLimit = farm ? knownRenderLimit() : null;
   const [lookup, savedHead, tokens, assets, runs, templates, gallery, briefAttachments] = await Promise.all([
     phases.time('node', nodeLookup(canvas, params.nodeId)),
-    phases.time('head', readHead(db, nodeScope)),
+    phases.time('head', readHead(db, nodeScope, HEADS)),
     phases.time('tokens', motionTokens(db, { orgId: found.orgId, brandId: found.projectBrandId })),
     phases.time('assets', motionAssets({ db, orgId: found.orgId, projectId: params.projectId, canvasId: found.canvas.id })),
     phases.time('runs', listNodeRuns(db, nodeScope)),
@@ -49,7 +52,7 @@ export async function editorSession(canvas: CanvasScope, params: SessionAsk, pha
     projectId: params.projectId,
     canvas: { id: scope.canvas.id, name: scope.canvas.name },
     orgId: scope.orgId,
-    node: { id: scope.motion.record.id, name: scope.motion.record.displayName, lastRenderAssetId: scope.motion.node.lastRenderAssetId, posterAssetId: scope.motion.node.posterAssetId, kind: scope.motion.node.kind },
+    node: { id: scope.motion.record.id, name: scope.motion.record.displayName, lastRenderAssetId: scope.motion.node.lastRenderAssetId, posterAssetId: scope.motion.node.posterAssetId, kind: scope.motion.node.kind, fork: forkOf(scope.motion.record) },
     head: { version: head.version, doc: head.doc },
     tokens,
     assets,

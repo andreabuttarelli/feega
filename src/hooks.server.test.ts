@@ -5,7 +5,7 @@ vi.mock('$env/static/public', () => ({
 	PUBLIC_SUPABASE_ANON_KEY: 'anon-key'
 }));
 
-vi.mock('$env/dynamic/private', () => ({ env: {} }));
+vi.mock('$env/dynamic/private', () => ({ env: { VERCEL_ENV: 'production' } }));
 
 vi.mock('@sentry/sveltekit', () => ({
 	sentryHandle: () => ({ event, resolve }: { event: unknown; resolve: (event: unknown) => unknown }) =>
@@ -220,9 +220,12 @@ describe('la radice manda dove dice la regola di ingresso', () => {
 		expect(redirected?.location).toBe('/p/proj1/c/canvas1');
 	});
 
-	it('sul dominio del sito la radice è la homepage, non un redirect', async () => {
+	it('su un deploy di anteprima la radice è il sito, non un redirect', async () => {
+		const { env } = await import('$env/dynamic/private');
+		Object.assign(env, { VERCEL_ENV: 'preview' });
 		mockSession = { session: { access_token: 'tok' }, user: { id: 'user-1', email: 'chi@esempio.it' } };
 		const redirected = await rootRequestTo('https://www.feega.app');
+		Object.assign(env, { VERCEL_ENV: 'production' });
 		expect(redirected).toBeNull();
 	});
 });

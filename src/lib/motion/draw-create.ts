@@ -1,4 +1,5 @@
 import { COMPONENTS, TYPE_SIZE, type ComponentId } from './components';
+import { TextSizing } from './text-sizing';
 import { Background, MAX_SHORT_SIDE, MAX_SIDE, MotionFormat, newMotionDoc, type MotionDoc } from './doc';
 import { DrawTool, type DrawBox } from './draw-tool';
 import { mapOutline, parsePath, pathData, type Outline, type Pt } from './shape/geometry';
@@ -41,18 +42,18 @@ function fittedSize(doc: MotionDoc, box: DrawBox): number {
   return Math.round(Math.min(Math.max(fit, TYPE_SIZE.min), TYPE_SIZE.max) * SIZE_PRECISION) / SIZE_PRECISION;
 }
 
-const BOX_SIZED: Record<BoxTool, (doc: MotionDoc, box: DrawBox) => Record<string, unknown>> = {
-  [DrawTool.Text]: (doc, box) => ({ size: fittedSize(doc, box) }),
+const BOX_SIZED: Record<BoxTool, (doc: MotionDoc, box: DrawBox, sizing: TextSizing) => Record<string, unknown>> = {
+  [DrawTool.Text]: (doc, box, sizing) => ({ size: fittedSize(doc, box), sizing }),
   [DrawTool.Rectangle]: () => ({}),
   [DrawTool.Ellipse]: () => ({})
 };
 
-export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string): OpResult {
+export function drawClip(doc: MotionDoc, tool: DrawTool, box: DrawBox, frame: number, id: string, sizing: TextSizing = TextSizing.AutoHeight): OpResult {
   const made = BOX_CLIP[tool as BoxTool];
   if (!made) {
     return fail(`${tool} does not draw a box`);
   }
-  return place(doc, made.component, { ...made.props, ...BOX_SIZED[tool as BoxTool](doc, box), ...box }, frame, id);
+  return place(doc, made.component, { ...made.props, ...BOX_SIZED[tool as BoxTool](doc, box, sizing), ...box }, frame, id);
 }
 
 function boundsOf(outline: Outline): DrawBox {
@@ -88,9 +89,9 @@ export enum CanvasTheme {
   Dark = 'dark'
 }
 
-export type Drawn = { tool: BoxTool; box: CanvasBox; theme?: CanvasTheme } | { tool: DrawTool.Pen; outline: Outline };
+export type Drawn = { tool: BoxTool; box: CanvasBox; theme?: CanvasTheme; sizing?: TextSizing } | { tool: DrawTool.Pen; outline: Outline };
 
-export type DrawnWire = { tool: BoxTool; box: CanvasBox; theme?: CanvasTheme } | { tool: DrawTool.Pen; path: string };
+export type DrawnWire = { tool: BoxTool; box: CanvasBox; theme?: CanvasTheme; sizing?: TextSizing } | { tool: DrawTool.Pen; path: string };
 
 export function drawnOf(wire: DrawnWire): Drawn | string {
   if (wire.tool !== DrawTool.Pen) {
@@ -119,7 +120,10 @@ export function blankElement(box: CanvasBox): OpResult {
   return setStill({ ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box), background: Background.Transparent }, 0);
 }
 
-export function drawnFrame(box: CanvasBox): MotionDoc {
+export function drawnFrame(box: CanvasBox, format: MotionFormat = MotionFormat.Custom): MotionDoc {
+  if (format !== MotionFormat.Custom) {
+    return newMotionDoc(format);
+  }
   return { ...newMotionDoc(MotionFormat.Landscape), ...elementPixels(box) };
 }
 
@@ -137,7 +141,7 @@ export function drawnElement(drawn: Drawn, id: string): DrawnElement {
   const made =
     drawn.tool === DrawTool.Pen
       ? penClip(blank.doc, mapOutline(drawn.outline, ([x, y]) => [(x - box.left) / box.width, (y - box.top) / box.height]), 0, id)
-      : drawClip(blank.doc, drawn.tool, FULL_BOX, 0, id);
+      : drawClip(blank.doc, drawn.tool, FULL_BOX, 0, id, drawn.sizing);
   const theme = drawn.tool === DrawTool.Pen ? CanvasTheme.Light : (drawn.theme ?? CanvasTheme.Light);
   return made.ok ? { ok: true, doc: canvasReady(made.doc, theme), box } : made;
 }

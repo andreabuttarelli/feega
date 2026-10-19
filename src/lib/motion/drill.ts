@@ -14,6 +14,25 @@ export enum Gesture {
   Hover = 'hover'
 }
 
+export enum FramePress {
+  Pick = 'pick',
+  Move = 'move'
+}
+
+export enum Press {
+  Pick = 'pick',
+  MoveFrame = 'move-frame'
+}
+
+const PRESS: Record<Depth, Record<FramePress, Press>> = {
+  [Depth.Canvas]: { [FramePress.Pick]: Press.Pick, [FramePress.Move]: Press.Pick },
+  [Depth.Frame]: { [FramePress.Pick]: Press.Pick, [FramePress.Move]: Press.MoveFrame },
+  [Depth.Clip]: { [FramePress.Pick]: Press.Pick, [FramePress.Move]: Press.Pick },
+  [Depth.Part]: { [FramePress.Pick]: Press.Pick, [FramePress.Move]: Press.Pick }
+};
+
+export const pressOf = (depth: Depth, frame: FramePress): Press => PRESS[depth][frame];
+
 export type Level = { depth: Depth; clip: string | null; part: string | null };
 
 export type Probe = {

@@ -34,6 +34,7 @@ const DOC: Record<string, Access> = {
   referenceLook: { write: ['set_reference_look'], read: 'referenceLook' },
   still: { write: ['set_canvas'], read: 'still' },
   freeSize: { write: ['set_canvas'], read: 'format' },
+  layoutGuides: { write: ['set_canvas'], read: 'layoutGuides' },
   styles: { write: ['named_style'], read: 'styles' },
   links: { fixed: 'written by the canvas when a generative node is connected to the frame (connect_nodes)' }
 };
@@ -69,6 +70,7 @@ const CLIP: Record<string, Access> = {
   parentOpacity: { write: ['set_parent'], read: 'parentOpacity' },
   autoLayout: { write: ['add_auto_layout', 'set_auto_layout', 'reorder_auto_layout'], read: 'autoLayout' },
   layoutItem: { write: ['add_auto_layout', 'set_layout_item'], read: 'layoutItem' },
+  constraints: { write: ['set_layout_item'], read: 'constraints' },
   partStyles: { write: ['set_part_fill'], read: 'partStyles' },
   styleRef: { write: ['named_style'], read: 'styleRef' },
   expressions: { write: ['set_expression', 'pulse_with_music'], read: 'expressions' },

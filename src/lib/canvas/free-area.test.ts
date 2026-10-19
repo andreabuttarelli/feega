@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOCK_EDGE, Dock, Edge, frameIn, freeArea, inView } from './free-area';
+import { DOCK_EDGE, Dock, Edge, frameIn, freeArea, inView, revealIn } from './free-area';
 
 const SCREEN = { width: 1280, height: 720 };
 
@@ -98,5 +98,20 @@ describe('a node already on screen', () => {
   it('is not when part of it is off screen', () => {
     expect(inView({ x: 900, y: 250, width: 300, height: 80 }, view, screen)).toBe(false);
     expect(inView({ x: 300, y: 250, width: 300, height: 80 }, { x: -400, y: 0, zoom: 1 }, screen)).toBe(false);
+  });
+});
+
+describe('revealing a node behind a panel', () => {
+  const screen = { width: 1000, height: 600 };
+  const panels = { top: 0, right: 400, bottom: 0, left: 0 };
+
+  it('slides the view only as far as needed, without zooming', () => {
+    const view = revealIn({ x: 500, y: 100, width: 200, height: 50 }, { x: 0, y: 0, zoom: 1 }, screen, panels);
+    expect(view).toEqual({ x: -132, y: 0, zoom: 1 });
+  });
+
+  it('leaves a visible node where it is', () => {
+    const view = { x: 0, y: 0, zoom: 1 };
+    expect(revealIn({ x: 100, y: 100, width: 200, height: 50 }, view, screen, panels)).toBe(view);
   });
 });

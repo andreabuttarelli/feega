@@ -17,3 +17,7 @@ Second step of moving www.feega.app off Framer.
   `.card`, `.wrap`, `.title`, `.hero` globally.
 - Parity vs live at 375/768/1280/1440/1920: 0.93–0.984 pixel match, 0.96–0.993 within ±3px;
   videos and the two live embeds are animated, so some difference is structural.
+
+- Hidden in production like the rest of the site: `/` stays the app entry unless
+  `PUBLIC_SITE_ENABLED=true` and the host is the site host (`rootShowsSite`). Local and preview
+  deploys show the homepage at `/` on any host.

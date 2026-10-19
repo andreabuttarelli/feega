@@ -1,0 +1,81 @@
+{
+  "projectId": "e472ff3c-4b1f-4b95-8f31-695e7940b40a",
+  "canvasId": "b5a892f3-3112-41b3-ab8c-5f7d0d69887d",
+  "landings": [
+    {
+      "key": "saas",
+      "name": "Northwind",
+      "desktop": {
+        "nodeId": "546a6ab6-023a-443f-8add-aa7b667e8d08",
+        "width": 1440,
+        "height": 4735,
+        "clips": 274
+      },
+      "mobile": {
+        "nodeId": "eff7b921-2338-44db-9a2f-8d5deb7dff9a",
+        "width": 390,
+        "height": 6680,
+        "clips": 265
+      }
+    },
+    {
+      "key": "fashion",
+      "name": "MAISON VÉLIN",
+      "desktop": {
+        "nodeId": "c64f817b-b1d3-4686-918a-5a8ff54513f9",
+        "width": 1440,
+        "height": 4386,
+        "clips": 248
+      },
+      "mobile": {
+        "nodeId": "18d68df5-319e-4b92-8796-e3f6a7fbeed6",
+        "width": 390,
+        "height": 5613,
+        "clips": 239
+      }
+    },
+    {
+      "key": "fintech",
+      "name": "Ledgerly",
+      "desktop": {
+        "nodeId": "e2a121a4-df75-4ce4-90ff-b05b7a9f79aa",
+        "width": 1440,
+        "height": 4795,
+        "clips": 275
+      },
+      "mobile": {
+        "nodeId": "3e4ac176-aa2f-453f-95ee-53e71bec914c",
+        "width": 390,
+        "height": 6589,
+        "clips": 266
+      }
+    },
+    {
+      "key": "app",
+      "name": "Pulse",
+      "desktop": {
+        "nodeId": "110046f8-9016-470b-9508-ca0e22b46971",
+        "width": 1440,
+        "height": 4723,
+        "clips": 274
+      },
+      "mobile": {
+        "nodeId": "9520f748-ecdd-410a-929c-ab2acd470bd7",
+        "width": 390,
+        "height": 6606,
+        "clips": 266
+      }
+    }
+  ],
+  "free": {
+    "loose": [
+      "731b5929-5a44-4766-94fe-167d795c367a",
+      "a495f814-9d0d-40ca-9641-e0a3457fd7ee",
+      "9081dfa9-6e06-4906-903a-49100c1947b4"
+    ],
+    "groups": [
+      "7177caac-4a1e-4d21-a6d1-1bd379a33498",
+      "83558f1d-cf88-458c-8552-7b1c096497e7"
+    ]
+  }
+}

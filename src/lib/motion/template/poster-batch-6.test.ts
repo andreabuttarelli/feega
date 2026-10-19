@@ -4,7 +4,7 @@ import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { PropFormat, customValues, Strictness } from '$lib/motion/custom/component';
 import { composeHtml } from '$lib/motion/hyperframes/compose';
 import { partUsage } from '$lib/motion/part-usage';
-import { PartEdit, editablePart, parsePart } from '$lib/motion/poster-parts';
+import { PartEdit, PartKind, editablePart, parsePart, partKind } from '$lib/motion/poster-parts';
 import type { MotionClip } from '$lib/motion/doc';
 import { POSTER_BATCH_6 } from './poster-batch-6';
 
@@ -43,7 +43,7 @@ describe.each(POSTER_BATCH_6)('the %s poster', (_id, entry, name) => {
   });
 
   it('lets every text part be edited in place', () => {
-    const text = parts.filter((p) => content.includes(parsePart(p).field) && schema[parsePart(p).field].type === 'string' && TEXT.includes(schema[parsePart(p).field].format));
+    const text = parts.filter((p) => partKind(doc, clip, p) !== PartKind.Shape && content.includes(parsePart(p).field) && schema[parsePart(p).field].type === 'string' && TEXT.includes(schema[parsePart(p).field].format));
     expect(text.filter((p) => editablePart(doc, clip, p) !== PartEdit.Text)).toEqual([]);
   });
 

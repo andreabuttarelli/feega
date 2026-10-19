@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CLIP_TEXT, PART_ACTIONS, PartAction, PartEdit, PartKind, runPart, componentLabel, editablePart, partAt, partBoxes, partKind, partLabel, partText, writePartText } from './poster-parts';
+import { CLIP_TEXT, PART_ACTIONS, PartAction, PartEdit, PartKind, runPart, componentLabel, drawnTexts, editablePart, partAt, partBoxes, partKind, partLabel, partText, writePartText } from './poster-parts';
 import { TYPE_GRID_CLIP, TYPE_GRID_POSTER_TEMPLATE } from './template/type-grid-poster/template';
 import { MotionFormat, findClip, newMotionDoc } from './doc';
 import { addClip } from './timeline';
@@ -31,6 +31,14 @@ describe('poster parts', () => {
     expect(editablePart(doc, clip, 'footer2')).toBe(PartEdit.Text);
     expect(editablePart(doc, clip, 'media:0')).toBe(PartEdit.None);
     expect(editablePart(doc, clip, 'nope')).toBe(PartEdit.None);
+  });
+
+  it('names every text field a template draws, so the preview can find it; never a colour or a media field', () => {
+    const texts = drawnTexts(doc, clip);
+
+    expect(texts.footer2).toBe(clip.props.footer2);
+    expect(texts.lines).toBe(clip.props.lines);
+    expect(Object.keys(texts).some((f) => f.startsWith('media'))).toBe(false);
   });
 
   it('reads and writes one line of a multi-line field, or the whole field', () => {

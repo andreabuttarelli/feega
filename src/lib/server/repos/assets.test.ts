@@ -53,6 +53,18 @@ describe('la libreria di un progetto si legge per org e progetto', () => {
   });
 });
 
+describe('i media di un progetto si filtrano e si limitano nella query, non dopo', () => {
+  it('chiede solo i tipi voluti e al più limit righe', async () => {
+    const { db, calls } = fakeDb({ assets: [row] });
+
+    await listProjectAssets(db, { orgId: ORG, projectId: PROJECT, types: ['image', 'video'], limit: 200 });
+
+    const call = calls.find((c) => c.table === 'assets' && c.op === 'select')!;
+    expect(filtersOf(calls, 'select')).toMatchObject({ org_id: ORG, project_id: PROJECT, type: ['image', 'video'] });
+    expect(call.limit).toBe(200);
+  });
+});
+
 describe('un file che esiste già fuori dalla tela diventa un asset solo la prima volta', () => {
   it('trova la riga esistente e non ne inserisce una seconda', async () => {
     const { db, calls } = fakeDb({
