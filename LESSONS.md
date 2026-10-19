@@ -3150,3 +3150,10 @@ and natively alike. Happens once full-frame layers grow vello's image atlas betw
 backdrop), so a rebuilt atlas recopies it; once per frame is not enough. Guarded by
 `a_picture_mask_survives_frames_that_grow_the_image_atlas` and
 `a_picture_under_a_backdrop_stays_drawn_frame_after_frame`.
+
+## A GPU parity gap that both backends share is usually the reference
+
+**Signal:** two independent renderers score the same SSIM against the HTML capture (video 0.96,
+grain 0.93). **Move:** compare against `--ref=live` and encode the variable you suspect into the
+asset (frame number as luma) before touching a renderer; both gaps were in the capture path or
+in a half-pixel convention, not in timing.
