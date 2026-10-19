@@ -16,6 +16,12 @@
   import { page } from '$app/state';
   import { _ } from 'svelte-i18n';
   import { errorCopyFor } from '$lib/error-copy';
+  import { isSiteHost } from '$lib/site/host';
+  import { env as publicEnv } from '$env/dynamic/public';
+  import { siteFlagOn } from '$lib/site/visibility';
+  import SiteNotFound from '$lib/site/SiteNotFound.svelte';
+
+  const NOT_FOUND = 404;
 
   const status = $derived(page.status);
   const loggedIn = $derived(Boolean(page.data?.session));
@@ -24,12 +30,23 @@
   // 404 → non c'è; 401/403 → non è tua; tutto il resto → si è rotto da noi.
   // `$page.error.message` non si mostra MAI: è testo interno.
   const copy = $derived(errorCopyFor(status));
+  const siteNotFound = $derived(
+    status === NOT_FOUND &&
+      isSiteHost(page.url) &&
+      siteFlagOn(publicEnv.PUBLIC_SITE_ENABLED)
+  );
 </script>
 
 <svelte:head>
-  <title>{$_(copy.title)} · feega</title>
-  <meta name="robots" content="noindex" />
+  {#if !siteNotFound}
+    <title>{$_(copy.title)} · feega</title>
+    <meta name="robots" content="noindex" />
+  {/if}
 </svelte:head>
+
+{#if siteNotFound}
+<SiteNotFound />
+{:else}
 
 <main class="err-page">
   <!-- Classi prefissate `err-`: app.css ha già `.card`, `.body` & co. come classi globali,
@@ -46,6 +63,7 @@
     </div>
   </div>
 </main>
+{/if}
 
 <style>
   .err-page {
