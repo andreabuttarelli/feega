@@ -32,7 +32,7 @@ describe('opening the editor by viewport', () => {
     expect(openingOf(Viewport.Desktop)).toBe(Opening.OnSelect);
   });
 
-  it('on a phone the editor opens only for the selected frame whose Open editor was pressed', () => {
+  it('on a phone the editor opens only for the selected frame that was double-tapped', () => {
     expect(inlineMotionTarget(['m1'], rows, null, Opening.OnRequest)).toBeNull();
     expect(inlineMotionTarget(['m1'], rows, null, Opening.OnRequest, 'm1')).toBe('m1');
     expect(inlineMotionTarget(['m1'], rows, null, Opening.OnRequest, 'm2')).toBeNull();
@@ -70,10 +70,10 @@ describe('the other nodes while a frame is edited on a phone', () => {
 });
 
 describe('the canvas around an opening editor', () => {
-  it('stays put on desktop; a phone or tablet frames the node in the room the panels leave', () => {
+  it('stays put on desktop and on a phone; a tablet frames the node in the room the panels leave', () => {
     expect(reframesOn(Viewport.Desktop)).toBe(Reframe.Stay);
     expect(reframesOn(Viewport.Tablet)).toBe(Reframe.Frame);
-    expect(reframesOn(Viewport.Phone)).toBe(Reframe.Frame);
+    expect(reframesOn(Viewport.Phone)).toBe(Reframe.Stay);
   });
 });
 

@@ -34,6 +34,7 @@ const DOC: Record<string, Access> = {
   referenceLook: { write: ['set_reference_look'], read: 'referenceLook' },
   still: { write: ['set_canvas'], read: 'still' },
   freeSize: { write: ['set_canvas'], read: 'format' },
+  layoutGuides: { write: ['set_canvas'], read: 'layoutGuides' },
   styles: { write: ['named_style'], read: 'styles' },
   links: { fixed: 'written by the canvas when a generative node is connected to the frame (connect_nodes)' }
 };

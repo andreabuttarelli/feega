@@ -50,7 +50,7 @@ test.describe('the phone top bar fits the screen @real', () => {
       }
       await expectInside(page, page.locator('header.mobile-topbar'), 'browsing');
 
-      await page.getByTestId('open-motion-editor').click();
+      await page.getByTestId('motion-node-stage').first().dblclick();
       await expect(page.getByTestId('editor-stage')).toBeVisible({ timeout: 20_000 });
       if (SHOTS) {
         await page.screenshot({ path: `${SHOTS}/${process.env.TOP_BAR_TAG ?? 'after'}-${phone.name}-frame.png` });
