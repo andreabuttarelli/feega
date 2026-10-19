@@ -10,7 +10,7 @@ import { composeHtml } from '$lib/motion/hyperframes/compose';
 import type { MotionDoc } from '$lib/motion/doc';
 import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
 import { createMedia } from '$lib/motion/gpu-full/media';
-import { loadFonts } from '$lib/motion/gpu-full/text/load';
+import { faceEngineOf, loadFontsWith } from '$lib/motion/gpu-full/text/engines';
 import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
 import { BACKENDS, FullBackend } from '$lib/motion/gpu-full/backends';
 import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
@@ -64,7 +64,7 @@ async function gpuShots(input: ShotsInput): Promise<ShotsResult> {
 
 async function fullShots(input: ShotsInput, backend: FullBackend): Promise<ShotsResult> {
   const doc = input.spec.doc as MotionDoc;
-  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets, { fonts: await loadFonts(doc, input.spec.assets), smoothing: smoothingOf(navigator.userAgent) });
+  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets, { fonts: await loadFontsWith(faceEngineOf(input.spec.faces))(doc, input.spec.assets), smoothing: smoothingOf(navigator.userAgent) });
   const media = createMedia();
   const canvas = document.createElement('canvas');
   const raster = await BACKENDS[backend](canvas, input.width, input.height);

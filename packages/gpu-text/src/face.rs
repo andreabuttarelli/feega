@@ -40,6 +40,8 @@ pub type Axes = BTreeMap<String, (f32, f32, f32)>;
 
 pub type Coords = [(String, f32)];
 
+const SUBUNITS: i32 = 64;
+
 const OPTIONAL_LIGATURES: [&[u8; 4]; 5] = [b"liga", b"clig", b"dlig", b"hlig", b"calt"];
 
 #[derive(Debug)]
@@ -132,7 +134,7 @@ impl Face {
         let mut buffer = UnicodeBuffer::new();
         buffer.push_str(text);
         buffer.guess_segment_properties();
-        let shaped = shaper.shape(buffer, ShapeOptions::new().features(&features));
+        let shaped = shaper.shape(buffer, ShapeOptions::new().features(&features).scale(Some(self.units_per_em as i32 * SUBUNITS)));
         let clusters: Vec<u32> = shaped.glyph_infos().iter().map(|i| i.cluster).collect();
         let starts: Vec<usize> = text.char_indices().map(|(at, _)| at).collect();
         let chars_from = |cluster: u32| starts.iter().position(|&s| s as u32 >= cluster).unwrap_or(starts.len());
@@ -144,7 +146,7 @@ impl Face {
             .map(|(i, (info, pos))| {
                 let end = clusters.iter().skip(i + 1).find(|&&c| c != info.cluster).map_or(starts.len(), |&c| chars_from(c));
                 let first = clusters.iter().position(|&c| c == info.cluster) == Some(i);
-                Shaped { glyph: info.glyph_id, advance: pos.x_advance as f32, dx: pos.x_offset as f32, dy: pos.y_offset as f32, chars: if first { (end - chars_from(info.cluster)).max(1) as u32 } else { 0 } }
+                Shaped { glyph: info.glyph_id, advance: pos.x_advance as f32 / SUBUNITS as f32, dx: pos.x_offset as f32 / SUBUNITS as f32, dy: pos.y_offset as f32 / SUBUNITS as f32, chars: if first { (end - chars_from(info.cluster)).max(1) as u32 } else { 0 } }
             })
             .collect()
     }

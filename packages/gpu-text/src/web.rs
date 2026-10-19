@@ -48,6 +48,14 @@ impl TextCore {
         self.fonts.source(font).covers(code_point)
     }
 
+    pub fn axis_tags(&self, font: usize) -> String {
+        self.fonts.source(font).axes().keys().cloned().collect::<Vec<_>>().join(",")
+    }
+
+    pub fn axis_ranges(&self, font: usize) -> Vec<f32> {
+        self.fonts.source(font).axes().values().flat_map(|(min, max, fallback)| [*min, *max, *fallback]).collect()
+    }
+
     pub fn metrics(&self, font: usize, tags: &str, values: &[f32]) -> Vec<f32> {
         let face = self.fonts.source(font).at(&coords(tags, values));
         vec![face.units_per_em() as f32, face.ascent(), face.descent()]
