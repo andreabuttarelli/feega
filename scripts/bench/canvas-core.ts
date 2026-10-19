@@ -21,7 +21,7 @@ enum Target {
 
 const BROWSER_PROCESSES: Record<Target, RegExp> = {
   [Target.Chrome]: /headless_shell|chrome-headless|Chromium|for Testing/,
-  [Target.IPhone]: /WebKit|Playwright/
+  [Target.IPhone]: /WebKit|Playwright|com\.apple\.WebKit/
 };
 
 const LAUNCH: Record<Target, () => Promise<Browser>> = {
@@ -32,6 +32,20 @@ const LAUNCH: Record<Target, () => Promise<Browser>> = {
 const CONTEXT: Record<Target, BrowserContextOptions> = {
   [Target.Chrome]: { viewport: { width: 1440, height: 900 } },
   [Target.IPhone]: { ...devices['iPhone 15 Pro'] }
+};
+
+const FULL_PAINT_TIMEOUT_MS = 60_000;
+const PREVIEW_UPLOAD = /\/card-previews/;
+
+const descendantsOf = (root: string) => {
+  const children = new Map<string, string[]>();
+  for (const [pid, ppid] of execSync('ps -axo pid=,ppid=').toString().trim().split('\n').map((l) => l.trim().split(/\s+/))) {
+    children.set(ppid, [...(children.get(ppid) ?? []), pid]);
+  }
+  const out = new Set<string>();
+  const walk = (pid: string) => (children.get(pid) ?? []).forEach((c) => (out.add(c), walk(c)));
+  walk(root);
+  return out;
 };
 
 const pidsOf = (re: RegExp) =>
@@ -114,7 +128,7 @@ async function zoomShots(page: Page, target: Target, renderer: string) {
     await zoomTo(page, zoom);
     await page.waitForTimeout(ZOOM_SETTLE_MS);
     shots[`z${zoom}`] = await zoomOf(page);
-    await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}-z${zoom}.png` });
+    await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer}-z${zoom}.png` });
   }
   return shots;
 }
@@ -124,32 +138,39 @@ async function run(target: Target, renderer: string) {
   const browser = await LAUNCH[target]();
   const page = await (await browser.newContext({ ...CONTEXT[target], serviceWorkers: 'block' })).newPage();
   await login(page);
-  const mine = () => new Set([...pidsOf(BROWSER_PROCESSES[target])].filter((p) => !before.has(p)));
+  const mine = () => new Set([...descendantsOf(String(process.pid)), ...[...pidsOf(BROWSER_PROCESSES[target])].filter((p) => !before.has(p))]);
+  let images = 0;
+  let uploads = 0;
+  page.on('request', (r) => {
+    images += r.resourceType() === 'image' || r.resourceType() === 'media' ? 1 : 0;
+    uploads += r.method() !== 'GET' && PREVIEW_UPLOAD.test(r.url()) ? 1 : 0;
+  });
   const t0 = Date.now();
-  await page.goto(`${BASE}/p/${heavy.projectId}/c/${heavy.canvasId}${renderer ? `?renderer=${renderer}` : ''}`);
+  await page.goto(`${BASE}/p/${heavy.projectId}/c/${heavy.canvasId}?renderer=${renderer}`);
   await page.getByRole('button', { name: 'Reject all' }).click({ timeout: 8000 }).catch(() => undefined);
   await page.locator('[data-renderer]:not([data-renderer="pending"])').first().waitFor({ timeout: 30_000 });
   const firstMs = Date.now() - t0;
   const core = page.locator('[data-testid=core-canvas]');
-  const coverage = renderer ? await core.waitFor({ state: 'attached', timeout: 10_000 }).then(() => covered(page), () => null) : null;
+  const coverage = renderer === 'core' ? await core.waitFor({ state: 'attached', timeout: 10_000 }).then(() => covered(page), () => null) : null;
+  const fullPaintMs = (await page.waitForFunction('window.__gpuCanvas?.settled', null, { timeout: FULL_PAINT_TIMEOUT_MS }).then((h) => h.jsonValue(), () => null)) as number | null;
   await page.waitForTimeout(SETTLE_MS);
   const idleMb = rssMb(mine());
   const pixiTextureMb = Math.round(((await page.evaluate('window.__gpuCanvas?.textures?.().bytes ?? 0')) as number) / 1024 / 1024);
-  await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}-settled.png` });
+  await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer}-settled.png` });
   const motion = await pan(page);
   const panMb = rssMb(mine());
   const coreFrames = (await core.count()) ? `${await core.getAttribute('data-frames')} whole, ${await core.getAttribute('data-partial')} partial` : null;
   const cacheKb = (await core.count()) ? Math.round(Number(await core.getAttribute('data-cache-bytes')) / BYTES_PER_KB) : null;
   const backend = await page.locator('[data-renderer]').first().getAttribute('data-renderer');
-  await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}.png` });
+  await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer}.png` });
   const zooms = await zoomShots(page, target, renderer);
   await browser.close();
-  return { target, renderer: renderer || 'gpu', backend, coreFrames, firstMs, ...coverage, pixiTextureMb, cacheKb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion, zooms };
+  return { target, renderer, backend, coreFrames, firstMs, fullPaintMs, imageRequests: images, previewUploads: uploads, ...coverage, pixiTextureMb, cacheKb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion, zooms };
 }
 
 const targets = (process.env.BENCH_TARGETS ?? `${Target.Chrome},${Target.IPhone}`).split(',') as Target[];
 for (const target of targets) {
-  for (const renderer of (process.env.BENCH_RENDERERS ?? ',core').split(',')) {
+  for (const renderer of (process.env.BENCH_RENDERERS ?? 'gpu,core').split(',')) {
     console.log(JSON.stringify(await run(target, renderer)));
   }
 }

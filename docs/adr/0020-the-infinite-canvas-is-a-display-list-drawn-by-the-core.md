@@ -55,6 +55,20 @@ input: pointer/wheel/keys in TS ─► hit-test in TS on the same boxes ─► c
 | 2 | node cards, ports, edges, handles, guides, marquee, peers' cursors | card snapshots, stored previews, Pixi chrome |
 | 3 | WebGL2 backend, default flip | PixiJS, html-to-image, snapshot cache/queue |
 
+Since #970 the core path never creates or imports the Pixi scene. What is left, in order:
+
+| Step | In the core | Deleted |
+|---|---|---|
+| A | partial frames → 0 (Custom/Device3D read through the DOM reader) | frame posters on the core path |
+| B | over-budget nodes redrawn at a lower scale, placeholders while loading | — |
+| C | the resting picture of DOM tiles drawn by the core | snapshot queue/cache, `card-previews` route, html-to-image in `GpuFlow` |
+| D | editing dim | `chrome-layer.ts`, `GpuTileChrome.svelte` |
+| E | core is the default (heavy-canvas bench ≤ 1 % pixels off, no metric worse than Pixi) | — |
+| F | one release clean on the default | the Pixi canvas modules in `src/lib/canvas/gpu/`; `pixi8` stays for the motion engine, html-to-image for `text-layout` |
+
+Benchmarks for any step run only with load average < 6: one run under load 26 showed core full
+paint 24.8 s vs Pixi 13.7 s and is not evidence of anything.
+
 ## Inventory: what each node is made of
 
 | Node | Visual parts | Primitives needed |
