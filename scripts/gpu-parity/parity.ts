@@ -30,7 +30,8 @@ const HTTP_PARTIAL = 206;
 const TIMEOUT_MS = 3_600_000;
 const APP_LANES = 4;
 const ASSET_SIZE = { width: 1600, height: 1000 };
-const TYPES: Record<string, string> = { js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json', png: 'image/png', mp4: 'video/mp4' };
+const TYPES: Record<string, string> = { js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json', png: 'image/png', mp4: 'video/mp4', wasm: 'application/wasm' };
+const STATIC_ROUTES = ['/gpu-core/'];
 const LAUNCH = { channel: 'chromium', args: ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=metal', '--enable-gpu-rasterization', '--enable-unsafe-webgpu'] };
 
 const flags = new Map(process.argv.slice(2).map((a) => a.replace(/^--/, '').split('=') as [string, string]));
@@ -42,7 +43,7 @@ const seconds = Number(flags.get('seconds') ?? 6);
 const displayWidth = flags.has('display') ? Number(flags.get('display')) : null;
 const scaleFactor = Number(flags.get('dpr') ?? 1);
 const engineName = flags.get('engine') ?? 'chromium';
-const SHOTS: Record<string, string> = { gpu: 'gpuShots', 'gpu-full': 'gpuFullShots' };
+const SHOTS: Record<string, string> = { gpu: 'gpuShots', 'gpu-full': 'gpuFullShots', 'gpu-core': 'gpuCoreShots' };
 const PIXEL_TOLERANCE = 8;
 const under = SHOTS[flags.get('under') ?? 'gpu'];
 const name = flags.get('name') ?? docPath.split('/').pop()?.replace(/\.(doc\.)?json$/, '') ?? 'doc';
@@ -93,6 +94,11 @@ function serve(script: string, assets: Map<string, Buffer>): Promise<{ url: stri
         return;
       }
       res.writeHead(HTTP_OK, { 'content-type': TYPES[file.split('.').pop() ?? ''] ?? 'text/plain', 'access-control-allow-origin': '*' }).end(readFileSync(file));
+      return;
+    }
+    if (STATIC_ROUTES.some((r) => pathname.startsWith(r))) {
+      const file = join(ROOT, 'static', pathname);
+      res.writeHead(existsSync(file) ? HTTP_OK : HTTP_NOT_FOUND, { 'content-type': TYPES[file.split('.').pop() ?? ''] ?? 'text/plain' }).end(existsSync(file) ? readFileSync(file) : undefined);
       return;
     }
     const asset = assets.get(pathname);

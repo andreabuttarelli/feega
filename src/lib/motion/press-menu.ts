@@ -1,4 +1,5 @@
 import { LONG_PRESS_MS } from './tooltip';
+import { haptic } from '$lib/native-actions';
 import { isTap } from './editor-bar';
 
 export type Point = { x: number; y: number };
@@ -46,7 +47,7 @@ export function pressMenu(node: HTMLElement, initial: Open) {
     touching = true;
     timer = setTimeout(() => {
       from = null;
-      navigator.vibrate?.(HAPTIC_MS);
+      haptic(HAPTIC_MS);
       swallowNextClick();
       open(at);
     }, LONG_PRESS_MS);

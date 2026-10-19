@@ -4,7 +4,8 @@
   import { Notice } from '$lib/components/ui/notice';
   import { DISPLAY_UNITS_PER_CREDIT } from '$lib/components/credit-amount-format';
   import { packProductId } from '$lib/store-products';
-  import { storeBridge, type StorePurchase } from '$lib/store-purchases';
+  import { nativeBridge, type StorePurchase } from '$lib/native-bridge';
+  import { nativeKeys } from '$lib/native-keys';
   import type { CreditRung } from '$lib/credit-ladder';
 
   let {
@@ -19,7 +20,7 @@
     onPurchased: () => void;
   } = $props();
 
-  const bridge = storeBridge();
+  const bridge = nativeBridge(globalThis, nativeKeys())?.store ?? null;
   let busy = $state(false);
   let failed = $state(false);
 

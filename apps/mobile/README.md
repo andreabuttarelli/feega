@@ -24,7 +24,9 @@ npm run ios:sim                    # unsigned simulator build in build/ios
 rm -rf build                       # builds are ~1 GB
 ```
 
-The shell loads `FeegaWebURL` from `Info.plist` (`https://oh.feega.app`). A debug build takes
+The shell loads `FeegaWebURL` from `Info.plist` (`https://oh.feega.app`). `npm run bundle`
+(`FEEGA_API=<api host>`) switches it to the static build in `www` (`FeegaWebSource = bundle`); do
+not commit the bundle — `git checkout -- www ios/App/App/Info.plist` returns to hosted. A debug build takes
 `FEEGA_WEB=<url>` from the launch environment (`SIMCTL_CHILD_FEEGA_WEB=…` with `simctl launch`).
 
 ## Install the debug build on your own iPhone (free Apple ID, no paid account)

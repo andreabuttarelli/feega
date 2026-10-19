@@ -318,6 +318,9 @@ dependencies = [
  "serde",
  "serde_json",
  "vello",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
 ]
 
 [[package]]
