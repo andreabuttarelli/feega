@@ -65,13 +65,17 @@ export function domProbe(cfg: ProbeConfig) {
 
   const webFamilies = () => new Set([...document.fonts].filter((f) => f.status === 'loaded').map((f) => unquoted(f.family)));
 
+  const SUBPIXEL_STEPS = 4;
+
   const rasterOf = (computed: CSSStyleDeclaration, lines: TextLine[], box: DOMRect, layers: Promise<ImageBitmap>[]): TextRaster => {
     const size = parseFloat(computed.fontSize) || 0;
-    const right = Math.max(box.width, ...lines.map((l) => (l.xs[l.xs.length - 1] ?? 0) + 2 * size));
-    const bottom = Math.max(box.height, ...lines.map((l) => l.top + l.height));
+    const left = Math.floor(box.left) - cfg.pad;
+    const top = Math.floor(box.top) - cfg.pad;
+    const right = Math.max(box.right, ...lines.map((l) => box.left + (l.xs[l.xs.length - 1] ?? 0) + 2 * size));
+    const bottom = Math.max(box.bottom, ...lines.map((l) => box.top + l.top + l.height));
     const canvas = document.createElement('canvas');
-    canvas.width = Math.ceil(right) + 2 * cfg.pad;
-    canvas.height = Math.ceil(bottom) + 2 * cfg.pad;
+    canvas.width = Math.ceil(right) + cfg.pad - left;
+    canvas.height = Math.ceil(bottom) + cfg.pad - top;
     const pen = canvas.getContext('2d') as CanvasRenderingContext2D;
     pen.font = `${computed.fontStyle} ${computed.fontWeight} ${computed.fontSize} ${computed.fontFamily}`;
     pen.fillStyle = computed.color;
@@ -79,10 +83,12 @@ export function domProbe(cfg: ProbeConfig) {
     for (const line of lines) {
       line.chars.forEach((raw, i) => {
         const char = cased(raw);
-        pen.fillText(char, cfg.pad + line.xs[i], cfg.pad + line.top + pen.measureText(char).fontBoundingBoxAscent);
+        const x = Math.round((box.left + line.xs[i]) * SUBPIXEL_STEPS) / SUBPIXEL_STEPS;
+        const baseline = Math.round(box.top + line.top + Math.round(pen.measureText(char).fontBoundingBoxAscent));
+        pen.fillText(char, x - left, baseline - top);
       });
     }
-    return { layer: layers.push(createImageBitmap(canvas)) - 1, width: canvas.width, height: canvas.height };
+    return { layer: layers.push(createImageBitmap(canvas)) - 1, width: canvas.width, height: canvas.height, at: [left - box.left, top - box.top] };
   };
 
   const REFERENCE = /url\(\s*["']?#([^"')]+)["']?\s*\)/;
