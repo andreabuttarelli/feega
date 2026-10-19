@@ -1,5 +1,5 @@
 import { error, redirect } from '@sveltejs/kit';
-import type { ServerLoadEvent } from '@sveltejs/kit';
+import type { Cookies, ServerLoadEvent } from '@sveltejs/kit';
 import { listMemberships } from '$lib/server/repos/orgs';
 import { listProjects } from '$lib/server/repos/projects';
 import { listCanvases } from '$lib/server/repos/canvas';
@@ -14,6 +14,8 @@ import { UNCENSORED_LOCK_TEXT, UncensoredLock, uncensoredSectionVisible } from '
 import { uncensoredLockFor } from '$lib/server/uncensored-workspace/workspace-server';
 import type { Db } from '$lib/server/db/client';
 import { CANVAS_LIST_DEPENDENCY } from '$lib/canvas/canvas-list';
+
+const LAST_PROJECT_MAX_AGE_S = 60 * 60 * 24 * 365;
 
 const FLAGS = {
   navTeam: env.FEATURE_NAV_TEAM === 'true'
@@ -60,9 +62,7 @@ export const load = async ({ params, locals, depends, cookies }: Pick<ServerLoad
   ]);
   const listed = allProjects.filter((p) => p.mode === ProjectMode.Standard || uncensoredLock === UncensoredLock.Open);
 
-  // Dove atterra chi rientra: l'ultimo progetto aperto, letto da `homePathFor` — non il più
-  // nuovo per nascita (vedi `src/lib/server/tenancy/entry.ts`).
-  cookies.set(LAST_PROJECT_COOKIE, project.id, { path: '/', maxAge: 60 * 60 * 24 * 365 });
+  rememberProject(cookies, project.id);
 
   return {
     profile: { name: profile.name, email: profile.email, avatarUrl: profile.avatarUrl },
@@ -108,3 +108,7 @@ async function loadBrandShell(db: Db, orgId: string, brandId: string | null): Pr
 }
 
 export type ProjectShell = Awaited<ReturnType<typeof load>>;
+
+export function rememberProject(cookies: Pick<Cookies, 'set'>, projectId: string): void {
+  cookies.set(LAST_PROJECT_COOKIE, projectId, { path: '/', maxAge: LAST_PROJECT_MAX_AGE_S });
+}

@@ -71,3 +71,8 @@ export async function loadPageData<T>(url: URL): Promise<T> {
   const { status, body } = await apiCall<Answer>(withOrg(twin.api, twin.query));
   return twin.reader.load(status, body) as T;
 }
+
+export async function loadApiData<T>(api: string): Promise<T> {
+  const { status, body } = await apiCall<Answer>(withOrg(api));
+  return pageLoadOf(status, body) as T;
+}
