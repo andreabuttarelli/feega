@@ -7,7 +7,7 @@ vi.mock('$lib/server/internal-users', () => ({ isInternalEmail: () => false }));
 vi.mock('$lib/analytics', () => ({ trackingAllowed: () => true }));
 vi.mock('$lib/server/social-publishing', () => ({ socialPublishing: async () => 'off' }));
 
-const { load } = await import('./+layout.server');
+const { load } = await import('$lib/server/root-shell');
 
 const NEW_USER = '2026-10-12T09:00:00Z';
 const OLD_USER = '2026-01-01T09:00:00Z';

@@ -6,7 +6,7 @@ vi.mock('$lib/server/internal-users', () => ({ isInternalEmail: () => false }));
 vi.mock('$lib/analytics', () => ({ trackingAllowed: () => true }));
 vi.mock('$lib/server/social-publishing', () => ({ socialPublishing: async () => 'off' }));
 
-import { load } from './+layout.server';
+import { load } from '$lib/server/root-shell';
 import { CURRENT_TERMS_VERSION } from '$lib/legal-links';
 
 function event(user: { id: string } | null, termsVersion: string | null) {
