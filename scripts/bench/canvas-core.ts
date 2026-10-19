@@ -4,6 +4,7 @@ import heavy from '../../tests/e2e/fixtures/heavy-canvas-landings.json' with { t
 
 const BASE = process.env.BENCH_BASE_URL ?? 'http://localhost:5199';
 const SETTLE_MS = 12_000;
+const FULL_PAINT_TIMEOUT_MS = 60_000;
 const PAN_MS = 4000;
 const PAN_STEP = 40;
 const KB_PER_MB = 1024;
@@ -75,12 +76,22 @@ async function run(target: Target, renderer: string) {
   const page = await (await browser.newContext({ ...CONTEXT[target], serviceWorkers: 'block' })).newPage();
   await login(page);
   const mine = () => new Set([...pidsOf(BROWSER_PROCESSES[target])].filter((p) => !before.has(p)));
+  const traffic = { images: 0, previewUploads: 0 };
+  page.on('request', (r) => {
+    traffic.images += r.resourceType() === 'image' ? 1 : 0;
+    traffic.previewUploads += r.method() === 'POST' && r.url().endsWith('/card-previews') ? 1 : 0;
+  });
   const t0 = Date.now();
   await page.goto(`${BASE}/p/${heavy.projectId}/c/${heavy.canvasId}${renderer ? `?renderer=${renderer}` : ''}`);
   await page.getByRole('button', { name: 'Reject all' }).click({ timeout: 8000 }).catch(() => undefined);
   await page.locator('[data-renderer]:not([data-renderer="pending"])').first().waitFor({ timeout: 30_000 });
   const firstMs = Date.now() - t0;
+  const fullPaintMs = await page
+    .waitForFunction('window.__gpuCanvas?.settled', null, { timeout: FULL_PAINT_TIMEOUT_MS })
+    .then(() => Date.now() - t0)
+    .catch(() => null);
   await page.waitForTimeout(SETTLE_MS);
+  const pixi = (await page.evaluate('window.__gpuCanvas?.counts ?? {}')) as Record<string, number>;
   const idleMb = rssMb(mine());
   const pixiTextureMb = Math.round(((await page.evaluate('window.__gpuCanvas?.textures?.().bytes ?? 0')) as number) / 1024 / 1024);
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}-settled.png` });
@@ -91,12 +102,12 @@ async function run(target: Target, renderer: string) {
   const backend = await page.locator('[data-renderer]').first().getAttribute('data-renderer');
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}.png` });
   await browser.close();
-  return { target, renderer: renderer || 'gpu', backend, coreFrames, firstMs, pixiTextureMb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion };
+  return { target, renderer: renderer || 'gpu', backend, coreFrames, firstMs, fullPaintMs, pixiTextureMb, pixi, ...traffic, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion };
 }
 
 const targets = (process.env.BENCH_TARGETS ?? `${Target.Chrome},${Target.IPhone}`).split(',') as Target[];
 for (const target of targets) {
-  for (const renderer of ['', 'core']) {
+  for (const renderer of (process.env.BENCH_RENDERERS ?? ',core').split(',')) {
     console.log(JSON.stringify(await run(target, renderer)));
   }
 }

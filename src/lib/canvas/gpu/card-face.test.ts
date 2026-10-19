@@ -55,6 +55,11 @@ describe('faceOf — what a GPU card draws, one row per node type', () => {
 describe('a face the core draws', () => {
   it('drops its poster and live media, so Pixi holds no texture for it', () => {
     const face = faceOf({ id: 'f', kind: 'motion', poster: { url: 'p.jpg' } as never }, {}, (id) => id, []);
-    expect(handedToCore(face)).toMatchObject({ media: null, live: null, surface: face.surface });
+    expect(handedToCore(face)).toMatchObject({ media: null, live: null });
+  });
+
+  it('is a blank panel, so Pixi lays out no text and fetches no thumbnails for it', () => {
+    const face = faceOf({ id: 's', kind: 'social_account_feed' }, { title: 'feed' }, (id) => id, ['t1.jpg', 't2.jpg']);
+    expect(handedToCore(face)).toMatchObject({ surface: Surface.Blank, text: '', title: '', subtitle: '', thumbs: [] });
   });
 });

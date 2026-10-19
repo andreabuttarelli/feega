@@ -74,6 +74,7 @@
   import { PORT_OFFSET, PortSide, edgeAt, portAt, portsOf, resizeCornerAt, wireCurve, type Box, type Corner, type Port } from '$lib/canvas/gpu/geometry';
   import { GestureKind, HitKind, Pointer, clicked, gestureFor, marqueeBox, marqueePick, movedBy, resized, type Hit } from '$lib/canvas/gpu/gesture';
   import { faceOf, handedToCore } from '$lib/canvas/gpu/card-face';
+  import { claimedByCore } from '$lib/canvas/gpu/core-claim';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { GpuScene, themeOf, type Card } from '$lib/canvas/gpu/scene';
   import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
@@ -189,7 +190,23 @@
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
+  let coreRefused = $state(new Set<string>());
   const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
+  const coreState = $derived.by(() => {
+    const framed = new Set(coreFrames.map((f) => f.id));
+    const unframed = placed.filter((t) => t.kind === 'motion' && !framed.has(t.id)).map((t) => t.id);
+    return { on: coreOn, refused: new Set([...coreRefused, ...unframed]), dom: domIds };
+  });
+  const claimed = (t: Tile) => claimedByCore(t, coreState);
+  const coreReady = (drawn: Set<string>, refused: Set<string>) =>
+    untrack(() => {
+      if (!sameSet(coreDrawn, drawn)) {
+        coreDrawn = drawn;
+      }
+      if (!sameSet(coreRefused, refused)) {
+        coreRefused = refused;
+      }
+    });
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
     if (coreOn && !coreType) {
@@ -197,7 +214,7 @@
     }
   });
   const coreLook = $derived(wrap ? themeOf(wrap) : null);
-  const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && t.kind !== 'motion' && !handedOver(t) && !t.rotation;
+  const drawsCard = (t: Tile) => t.kind !== 'motion' && claimed(t);
   const coreCards = $derived.by(() => {
     const text = coreType;
     const look = coreLook;
@@ -305,6 +322,7 @@
   let fontCss: string | null = null;
 
   const snapshotKind = (t: Tile) => !!t.kind && t.kind !== 'motion' && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
+  const shootable = (t: Tile) => snapshotKind(t) && !claimed(t);
   const shotKeyOf = (id: string) => {
     const t = byId.get(id);
     return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.thumbsOf?.(id) ?? []) : '';
@@ -366,7 +384,7 @@
     if (!scene) {
       return;
     }
-    const fresh = placed.filter((t) => !preloaded.has(t.id) && snapshotKind(t));
+    const fresh = placed.filter((t) => !preloaded.has(t.id) && shootable(t));
     if (!fresh.length) {
       return;
     }
@@ -395,6 +413,9 @@
   const previewed = (t: Tile) => {
     if (domIds.has(t.id)) {
       return t.kind !== 'motion' || domDrawn(t.id);
+    }
+    if (claimed(t)) {
+      return coreDrawn.has(t.id);
     }
     if (snapshotKind(t)) {
       return shown.has(t.id) || !looking.has(t.id);
@@ -480,7 +501,7 @@
       const t = setTimeout(() => schedulerTick++, BUSY_MS);
       return () => clearTimeout(t);
     }
-    const due = placed.filter(snapshotKind);
+    const due = placed.filter(shootable);
     const seen = visibleIds(due, view, area);
     const s = screenSize();
     const next = nextSnapshot(due, shotKeyOf, untrack(() => pictured), seen, domIds, toWorld(view, { x: s.width / 2, y: s.height / 2 }));
@@ -573,7 +594,7 @@
 
   let parked = $state(new Map<string, number>());
   let shelfClock = $state(0);
-  const shelf = $derived(new Set(shelfIds(props.nodeSummaries ?? [], domIds, parked, shelfClock).slice(0, BUDGET[currentDevice()].posterShelf)));
+  const shelf = $derived(new Set(shelfIds((props.nodeSummaries ?? []).filter((r) => !byId.get(r.id) || !claimed(byId.get(r.id)!)), domIds, parked, shelfClock).slice(0, BUDGET[currentDevice()].posterShelf)));
   const shelfSince = new Map<string, number>();
   $effect(() => {
     const now = Date.now();
@@ -617,7 +638,7 @@
 
   function faceFor(t: Tile) {
     const face = faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []);
-    return coreDrawn.has(t.id) ? handedToCore(face) : face;
+    return claimed(t) ? handedToCore(face) : face;
   }
 
   const cards = $derived(
@@ -630,10 +651,10 @@
         h: t.h,
         rotation: t.rotation ?? 0,
         face: faceFor(t),
-        hidden: handedOver(t) || coreDrawn.has(t.id),
-        snapshot: shotOf(t.id),
+        hidden: handedOver(t) || claimed(t),
+        snapshot: claimed(t) ? null : shotOf(t.id),
         running: isRunning(summaries.get(t.id)?.data ?? {}),
-        chrome: coreDrawn.has(t.id) ? null : chromeOf(t)
+        chrome: claimed(t) ? null : chromeOf(t)
       })
     )
   );
@@ -1646,7 +1667,7 @@
     data-owns-pinch
   >
     {#if coreOn && scene}
-      <CoreFrames frames={coreFrames} cards={coreCards} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={(why) => { console.warn(`[canvas] core off: ${why}`); coreOn = false; coreDrawn = new Set(); }} />
+      <CoreFrames frames={coreFrames} cards={coreCards} {view} {area} sourceUrl={coreSource} onready={coreReady} onfallback={(why) => { console.warn(`[canvas] core off: ${why}`); coreOn = false; coreDrawn = new Set(); coreRefused = new Set(); }} />
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" aria-hidden="true">

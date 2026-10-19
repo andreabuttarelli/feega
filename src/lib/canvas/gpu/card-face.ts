@@ -129,4 +129,4 @@ export function faceOf(t: FaceTile, data: Data, asset: AssetUrl, thumbs: string[
   return { ...BLANK, label, thumbs, ...FACES[kind](data, asset, t) };
 }
 
-export const handedToCore = (face: CardFace): CardFace => ({ ...face, media: null, live: null });
+export const handedToCore = (face: CardFace): CardFace => ({ ...face, surface: Surface.Blank, media: null, live: null, text: '', title: '', subtitle: '', thumbs: [] });

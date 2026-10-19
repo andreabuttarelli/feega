@@ -16,7 +16,7 @@
 
   type Source = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens };
 
-  let { frames, cards = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, cards = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (drawn: Set<string>, refused: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
   const BACKENDS = [createCore, createCoreGl];
@@ -30,9 +30,13 @@
   const keyOf = (f: FrameAt) => `${f.id}:${f.revision}`;
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, MAX_RESOLUTION);
 
+  let failed = $state(new Set<string>());
+  const fail = (id: string) => (failed = new Set(failed).add(id));
+
   async function load(f: FrameAt) {
     const res = await fetch(`${sourceUrl(f.id)}?revision=${f.revision}`);
     if (!res.ok) {
+      fail(f.id);
       return;
     }
     const source = (await res.json()) as Source;
@@ -48,7 +52,10 @@
     for (const f of frames) {
       if (seen.has(f.id) && !asked.has(keyOf(f))) {
         asked.add(keyOf(f));
-        void load(f).catch((e: unknown) => console.warn('[canvas] core frame not loaded', f.id, e));
+        void load(f).catch((e: unknown) => {
+          console.warn('[canvas] core frame not loaded', f.id, e);
+          fail(f.id);
+        });
       }
     }
   });
@@ -78,7 +85,8 @@
   const listOf = (group: string) => cardLists.get(group) ?? lists.get(group)!;
 
   $effect(() => {
-    onready(new Set(whole.map((f) => f.id)));
+    const partial = frames.filter((f) => lists.has(keyOf(f)) && !drawsWhole(lists.get(keyOf(f))!)).map((f) => f.id);
+    onready(new Set(whole.map((f) => f.id)), new Set([...failed, ...partial]));
   });
 
   $effect(() => {
