@@ -5,8 +5,8 @@
   import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
   import { loadFonts } from '$lib/motion/gpu-full/text/load';
   import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
-  import { createMedia } from '$lib/motion/gpu-full/media';
-  import type { Viewport } from '$lib/canvas/dot-grid';
+  import { createMedia, Readiness } from '$lib/motion/gpu-full/media';
+  import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
   import { ItemKind } from '$lib/motion/gpu-full/display-list';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
@@ -45,7 +45,9 @@
     const fonts = await loadFonts(source.doc, source.assets);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing: smoothingOf(navigator.userAgent) });
     const list = drawFrame(prepared, stillFrame(source.doc));
-    await media.ready(list);
+    if ((await media.ready(list)) === Readiness.Partial) {
+      return;
+    }
     lists = new Map(lists).set(keyOf(f), onStage(list, f.kind));
   }
 
@@ -66,7 +68,11 @@
     for (const c of cards) {
       if (!cardLists.has(c.key) && !readying.has(c.key)) {
         readying.add(c.key);
-        void media.ready(c.frame.list).then(() => (cardLists = new Map(cardLists).set(c.key, c.frame.list)));
+        void media.ready(c.frame.list).then((readiness) => {
+          if (readiness === Readiness.Whole) {
+            cardLists = new Map(cardLists).set(c.key, c.frame.list);
+          }
+        });
       }
     }
   });
@@ -152,7 +158,7 @@
   $effect(() => () => media.dispose());
 </script>
 
-<canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+<canvas class="core-frames" bind:this={canvas} style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
 
 <style>
   .core-frames {

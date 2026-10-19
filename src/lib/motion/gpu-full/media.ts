@@ -3,7 +3,12 @@ import type { Picture, Pictures } from './raster';
 
 const SEEK_SLACK_S = 0.001;
 
-export type Media = { ready: (list: DisplayList) => Promise<void>; pictures: Pictures; dispose: () => void };
+export enum Readiness {
+  Whole = 'whole',
+  Partial = 'partial'
+}
+
+export type Media = { ready: (list: DisplayList) => Promise<Readiness>; pictures: Pictures; dispose: () => void };
 
 function loadImage(src: string): Promise<HTMLImageElement> {
   const img = new Image();
@@ -61,9 +66,10 @@ export function createMedia(): Media {
     loaded.set(item.clip, { source: video, size: { width: video.videoWidth, height: video.videoHeight } });
   }
 
-  async function ready(list: DisplayList) {
+  async function ready(list: DisplayList): Promise<Readiness> {
     const pictures = needed(list.items);
     await Promise.all(pictures.map((p) => readyOne(p).catch(() => loaded.delete(p.clip))));
+    return pictures.every((p) => loaded.has(p.clip)) ? Readiness.Whole : Readiness.Partial;
   }
 
   function dispose() {
