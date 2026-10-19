@@ -82,7 +82,8 @@
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
   import { Fling, type Glide } from '$lib/canvas/core/inertia';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
-  import { GpuScene, GridPlace, themeOf, type Card } from '$lib/canvas/gpu/scene';
+  import { GpuScene, GridPlace, type Card } from '$lib/canvas/gpu/scene';
+  import { themeOf } from '$lib/canvas/gpu/theme';
   import { Backend, nextBackend } from '$lib/canvas/gpu/backend';
   import { backendOf } from '$lib/canvas/gpu/renderer-flag';
   import { Counter, count, exposeLoss, exposeReveal, exposeSettled, recordFrame } from '$lib/canvas/gpu/frame-stats';

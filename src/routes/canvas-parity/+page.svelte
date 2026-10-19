@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/state';
-  import { GpuScene, themeOf, type Card } from '$lib/canvas/gpu/scene';
+  import { GpuScene, type Card } from '$lib/canvas/gpu/scene';
+  import { themeOf } from '$lib/canvas/gpu/theme';
   import { Backend } from '$lib/canvas/gpu/backend';
   import { faceOf } from '$lib/canvas/gpu/card-face';
   import { idleChrome } from '$lib/canvas/gpu/idle-chrome';
