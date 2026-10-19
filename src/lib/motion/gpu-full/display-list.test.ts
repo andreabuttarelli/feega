@@ -168,6 +168,17 @@ describe('displayListAt', () => {
     expect(picture?.matte?.items.flatMap((i) => (i.kind === ItemKind.Path ? i.contours : []))).toHaveLength(2);
   });
 
+  it('keeps fills the native core cannot read on the JS painter, never in a text plan', () => {
+    const native = { ...boxType, native: { rules: [], registry: [] } };
+    const fill = (fills: unknown[]) => must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab', fills } }, 'text'));
+    const kinds = (doc: MotionDoc) => drawFrame(prepare(doc, FEEGA_TOKENS, {}, native), 60).items.filter((i) => i.clip === 'text').map((i) => i.kind);
+    const stops = [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }];
+
+    expect(kinds(fill([{ type: 'linear-gradient', angle: 0, stops }]))).toEqual([ItemKind.Text]);
+    expect(new Set(kinds(fill([{ type: 'diamond-gradient', stops }])))).toEqual(new Set([ItemKind.Path]));
+    expect(new Set(kinds(fill([{ type: 'angular-gradient', stops }])))).toEqual(new Set([ItemKind.Path]));
+  });
+
   describe('text animators', () => {
     const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab' } }, 'text'));
     const animated = (values: Record<string, number>) => must(addAnimator(texted, 'text', 'a', { shape: SelectorShape.Square, start: 0, end: 0, values }));
