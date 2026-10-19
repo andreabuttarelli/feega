@@ -5,6 +5,8 @@ import { AssetSize, sized } from '../asset-url';
 import { Surface, type CardFace, type Media } from './card-face';
 import type { Box, Curve } from './geometry';
 import { createTextureCache, fitBitmap, type TextureCache } from './texture-cache';
+import { createUploadQueue, type UploadQueue } from './upload-queue';
+import { textureDecoder } from './texture-decoder';
 import { Counter, count, exposeTextures } from './frame-stats';
 import { BUDGET, currentDevice, rendererResolution } from './memory-budget';
 import { textureReport, type SourceSize } from './texture-bytes';
@@ -121,6 +123,7 @@ export class GpuScene {
   private frame = 0;
   private playing = new Set<HTMLVideoElement>();
   private cards: Card[] = [];
+  private readonly uploads: UploadQueue;
   private overlayIn: Overlay | null = null;
   onFrame: ((ms: number) => void) | null = null;
   onLost: (() => void) | null = null;
@@ -140,7 +143,11 @@ export class GpuScene {
     this.theme = theme;
     this.backend = app.renderer.name === 'webgpu' ? Backend.WebGPU : Backend.WebGL;
     this.grid = new TilingSprite({ texture: dotTexture(theme), width: app.screen.width, height: app.screen.height });
+    this.uploads = createUploadQueue({ now: () => performance.now(), rank: (url) => this.distanceOf(url) });
     this.textures = createTextureCache({
+      decode: textureDecoder,
+      queue: this.uploads,
+      upload: (tex) => app.renderer.texture.initSource(tex.source),
       changed: () => this.invalidate(),
       device: currentDevice(),
       pinned: (url) => this.pins.pinned(url, (b) => b.root.visible),
@@ -257,6 +264,19 @@ export class GpuScene {
     this.setCards(this.cards);
   }
 
+  private distanceOf(url: string): number {
+    const v = this.visibleBox();
+    const centre = { x: v.x + v.w / 2, y: v.y + v.h / 2 };
+    const ids = new Set(this.pins.owners(url).map((b) => b.id));
+    let nearest = Infinity;
+    for (const c of this.cards) {
+      if (ids.has(c.id)) {
+        nearest = Math.min(nearest, Math.hypot(c.x + c.w / 2 - centre.x, c.y + c.h / 2 - centre.y));
+      }
+    }
+    return nearest;
+  }
+
   private seen(c: Box) {
     const v = this.visibleBox();
     const margin = 40 / this.view.zoom;
@@ -311,6 +331,9 @@ export class GpuScene {
 
   private loop = () => {
     this.frame = requestAnimationFrame(this.loop);
+    if (this.uploads.size()) {
+      this.uploads.drain();
+    }
     if (!this.dirty && !this.playing.size) {
       return;
     }
