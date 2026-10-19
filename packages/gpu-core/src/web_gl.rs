@@ -3,7 +3,7 @@ use vello::peniko::{BlendMode, Brush, Compose, Fill, ImageQuality, ImageSampler,
 use vello_common::paint::{Image, ImageId, ImageSource};
 use vello_hybrid::{RenderSize, Resources, Scene, WebGlRenderer, WebGlTextureBindings, WebGlTextureWithDimensions};
 use wasm_bindgen::prelude::*;
-use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, WebGl2RenderingContext as Gl};
+use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap, WebGl2RenderingContext as Gl};
 
 use crate::canvas::{brush, Canvas};
 use crate::display_list::{parse, DisplayList, Paint, Rgba, Size};
@@ -123,7 +123,7 @@ impl Surface for GlSurface<'_> {
 
 const CACHE_SIDE: u32 = 4096;
 const RASTERS_PER_DRAW: usize = 1;
-const ITEMS_PER_RASTER: usize = 48;
+const ITEMS_PER_RASTER: usize = 16;
 
 #[wasm_bindgen]
 pub struct WebGlCore {
@@ -157,6 +157,8 @@ impl WebGlCore {
         let (rgba, bytes) = (Gl::RGBA as i32, Gl::UNSIGNED_BYTE);
         let uploaded = if let Some(video) = source.dyn_ref::<HtmlVideoElement>() {
             gl.tex_image_2d_with_u32_and_u32_and_html_video_element(Gl::TEXTURE_2D, 0, rgba, Gl::RGBA, bytes, video)
+        } else if let Some(bitmap) = source.dyn_ref::<ImageBitmap>() {
+            gl.tex_image_2d_with_u32_and_u32_and_image_bitmap(Gl::TEXTURE_2D, 0, rgba, Gl::RGBA, bytes, bitmap)
         } else if let Some(still) = source.dyn_ref::<HtmlCanvasElement>() {
             gl.tex_image_2d_with_u32_and_u32_and_html_canvas_element(Gl::TEXTURE_2D, 0, rgba, Gl::RGBA, bytes, still)
         } else {

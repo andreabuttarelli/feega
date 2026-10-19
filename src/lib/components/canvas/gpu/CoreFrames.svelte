@@ -10,7 +10,7 @@
   import { ItemKind } from '$lib/motion/gpu-full/display-list';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
-  import { CACHE_SHARE, cached, pictureBytes, resident, type HeldFrame } from '$lib/canvas/core/residency';
+  import { cached, pictureBytes, resident, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, screenUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { throughCamera } from '$lib/canvas/core/world-overlay';
@@ -134,8 +134,7 @@
 
   const whole = $derived([...cardPuts, ...framePuts]);
   const textureBytes = BUDGET[currentDevice()].textureBytes;
-  const reach = $derived(widened(view, area));
-  const real = $derived(resident(whole, reach.view, reach.area, textureBytes * (1 - CACHE_SHARE)));
+  const real = $derived(resident(whole, view, area, textureBytes));
 
   const standIns = $derived<{ id: string; box: FrameAt['box']; stand: Stand; turn?: Turn }[]>([...frames.map((f) => ({ id: f.id, box: f.box, stand: Stand.Frame })), ...cards.map((c) => ({ id: c.frame.id, box: c.frame.box, stand: Stand.Card, turn: c.turn }))]);
   const placeholders = $derived(new Map(standIns.map((n) => [n.id, { ...n, ...placeholder(n.stand, { width: n.box.w, height: n.box.h }, look) }])));
@@ -203,22 +202,25 @@
 
   let cacheBytes = $state(0);
   const IDLE_MS = 50;
+  const PICTURES_PER_FRAME = 4;
+  const ITEMS_PER_FRAME = 2 * PART_ITEMS;
 
-  function putPart(into: CoreRaster, group: string, using?: Pictures) {
+  function putPart(into: CoreRaster, group: string): number {
     const job = putting.get(group) ?? { parts: parts(listOf(group), PART_ITEMS), next: 0 };
     const part = job.parts[job.next];
     if (job.next === 0) {
-      into.putGroup(group, part, using);
+      into.putGroup(group, part);
     } else {
-      into.appendGroup(group, part, using);
+      into.appendGroup(group, part);
     }
     job.next++;
     if (job.next < job.parts.length) {
       putting.set(group, job);
-      return;
+      return part.items.length + 1;
     }
     putting.delete(group);
     put.add(group);
+    return part.items.length + 1;
   }
 
   function paint(): boolean {
@@ -233,22 +235,25 @@
       putting.delete(group);
       pictured.delete(group);
     }
-    const unput = held.find((f) => !put.has(f.group));
-    if (unput) {
-      putPart(into, unput.group, pictures);
+    let room = ITEMS_PER_FRAME;
+    for (const f of held) {
+      while (room > 0 && !put.has(f.group)) {
+        room -= putPart(into, f.group);
+      }
     }
-    const shown = held.filter((f) => put.has(f.group));
-    for (const f of shown.filter((f) => !pictured.has(f.group))) {
-      into.upload(listOf(f.group), pictures);
-      pictured.add(f.group);
+    for (const f of held.filter((f) => put.has(f.group) && !pictured.has(f.group)).slice(0, PICTURES_PER_FRAME)) {
+      if (into.upload(listOf(f.group), pictures, 1)) {
+        pictured.add(f.group);
+      }
     }
+    const shown = held.filter((f) => pictured.has(f.group));
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
     const screen = screenUses(cached(shown, wide.view, wide.area, textureBytes), at, device, null);
     const pending = into.drawScreen({ ...screen, items: [...screen.items, ...throughCamera(overlay, at)] }, pictures);
     cacheBytes = into.cacheBytes();
-    return pending || held.some((f) => !put.has(f.group));
+    return pending || held.some((f) => !pictured.has(f.group));
   }
 
   let ahead = false;

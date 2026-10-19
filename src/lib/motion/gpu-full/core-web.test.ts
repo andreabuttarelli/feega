@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BlendMode } from '../blend';
-import { ItemKind, type GroupItem, type ImageItem, type LayerItem } from './display-list';
-import { GL_PICTURE_SIDE, glPictureSize, pictureKey, wantedPictures, warmCore } from './core-web';
+import { ItemKind, type DisplayList, type GroupItem, type ImageItem, type Item, type LayerItem } from './display-list';
+import type { Pictures } from './raster';
+import { GL_PICTURE_SIDE, glPictureSize, pictureKey, wantedPictures, warmCore, rasterOf } from './core-web';
 
 describe('glPictureSize', () => {
   it('keeps a picture that fits the WebGL atlas as it is', () => {
@@ -34,5 +35,21 @@ describe('warming the core', () => {
     const first = warmCore();
     first.catch(() => undefined);
     expect(warmCore()).toBe(first);
+  });
+});
+
+describe('uploading a group\'s pictures', () => {
+  it('sends at most the given number per call and says when all are in', () => {
+    const sent: string[] = [];
+    const attached = { picture: (clip: string) => sent.push(clip) } as unknown as Parameters<typeof rasterOf>[0];
+    const image = (clip: string) => ({ kind: ItemKind.Image, clip, src: clip, video: false }) as unknown as Item;
+    const list = { width: 1, height: 1, background: null, items: [image('a'), image('b')] } as DisplayList;
+    const source = {};
+    const pictures = () => ({ source, size: { width: 1, height: 1 } }) as unknown as ReturnType<Pictures>;
+    const raster = rasterOf(attached);
+
+    expect(raster.upload(list, pictures, 1)).toBe(false);
+    expect(raster.upload(list, pictures, 1)).toBe(true);
+    expect(sent).toEqual(['a', 'b']);
   });
 });
