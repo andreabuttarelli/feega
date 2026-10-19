@@ -8,6 +8,8 @@ import type { Backend } from '$lib/canvas/gpu/backend';
 import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { composeHtml } from '$lib/motion/hyperframes/compose';
 import type { MotionDoc } from '$lib/motion/doc';
+import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
+import { createRaster } from '$lib/motion/gpu-full/raster';
 import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
 
 const composer = (spec: Spec) => (only?: ReadonlySet<string>) => composeHtml({ doc: spec.doc as MotionDoc, tokens: FEEGA_TOKENS, assets: spec.assets, origin: spec.origin, only });
@@ -54,6 +56,25 @@ async function gpuShots(input: ShotsInput): Promise<ShotsResult> {
   }
   const out = { pngs, ms: performance.now() - start, backend: engine.backend, runs: engine.runs.length, stats };
   engine.dispose();
+  return out;
+}
+
+async function gpuFullShots(input: ShotsInput): Promise<ShotsResult> {
+  const doc = input.spec.doc as MotionDoc;
+  const prepared = prepare(doc, FEEGA_TOKENS);
+  const canvas = document.createElement('canvas');
+  const raster = createRaster(canvas, input.width, input.height);
+  const pngs: string[] = [];
+  const gaps = new Map<string, string>();
+  const start = performance.now();
+  for (const t of input.times) {
+    const list = drawFrame(prepared, Math.round(t * doc.fps));
+    list.unsupported.forEach((g) => gaps.set(g.clip, `${g.component}:${g.reason}`));
+    raster.draw(list);
+    pngs.push(await png(canvas, input.width, input.height));
+  }
+  const out = { pngs, ms: performance.now() - start, backend: 'gpu-full webgl2', runs: 0, stats: [], unsupported: [...gaps].map(([clip, why]) => `${clip} ${why}`) };
+  raster.dispose();
   return out;
 }
 
@@ -168,4 +189,4 @@ async function liveSeek(t: number) {
   await new Promise((r) => setTimeout(r, 400));
 }
 
-Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, htmlExport, gpuExport, htmlPreview, gpuPreview });
+Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, gpuFullShots, htmlExport, gpuExport, htmlPreview, gpuPreview });

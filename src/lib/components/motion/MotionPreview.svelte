@@ -19,6 +19,9 @@
   import { RenderEngine } from '$lib/motion/gpu/engine-flag';
   import { EditEnd, TEXT_EDIT, type TextEditMessage } from '$lib/motion/hyperframes/text-edit';
   import GpuLayer from './GpuLayer.svelte';
+  import GpuFullLayer from './GpuFullLayer.svelte';
+  import type { BrandTokens } from '$lib/motion/brand';
+  import type { MotionDoc } from '$lib/motion/doc';
   import { currentDevice, previewHtml } from '$lib/canvas/gpu/memory-budget';
   import type { Compose } from '$lib/motion/gpu/engine';
 
@@ -47,8 +50,11 @@
     background = Background.Brand,
     engine = RenderEngine.Html,
     gpuCompose = null,
+    fullDoc = null,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; fullDoc?: { doc: MotionDoc; tokens: BrandTokens } | null; children?: Snippet } = $props();
+
+  const DRAWN_OVER: ReadonlySet<RenderEngine> = new Set([RenderEngine.Gpu, RenderEngine.GpuFull]);
 
   let pointer = $state<InputValues>({});
   let exportedOn = $state<RenderEngine | null>(null);
@@ -132,7 +138,7 @@
       el.style.width = '100%';
       el.style.height = '100%';
       el.style.background = PLAYER_BACKDROP[background];
-      el.style.opacity = engine === RenderEngine.Gpu ? '0' : '';
+      el.style.opacity = DRAWN_OVER.has(engine) ? '0' : '';
       el.muted = muted;
       el.loop = loop;
       el.addEventListener('ready', () => {
@@ -321,7 +327,7 @@
           textEditing = false;
           player?.iframeElement?.blur();
           window.focus();
-          if (player && engine === RenderEngine.Gpu) {
+          if (player && DRAWN_OVER.has(engine)) {
             player.style.opacity = '0';
           }
         }
@@ -433,6 +439,13 @@
   {#if engine === RenderEngine.Gpu && gpuCompose}
     <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
       <GpuLayer {html} compose={gpuCompose} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+    </div>
+  {/if}
+  {#if engine === RenderEngine.GpuFull && fullDoc}
+    <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
+      {#key `${fullDoc.doc.width}x${fullDoc.doc.height}`}
+        <GpuFullLayer doc={fullDoc.doc} tokens={fullDoc.tokens} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+      {/key}
     </div>
   {/if}
   {@render children?.()}

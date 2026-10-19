@@ -1,0 +1,98 @@
+import { describe, expect, it } from 'vitest';
+import { FEEGA_TOKENS } from '../brand';
+import { MotionFormat, newMotionDoc, type MotionClip, type MotionDoc } from '../doc';
+import { Ease } from '../design';
+import { addClip, setKeyframes, type OpResult } from '../timeline';
+import { FillType } from '../fill/model';
+import { displayListAt, ItemKind, PaintKind, Unsupported, type PathItem } from './display-list';
+import { apply2d } from '../affine';
+
+function must(r: OpResult): MotionDoc {
+  if (!r.ok) {
+    throw new Error(r.error);
+  }
+  return r.doc;
+}
+
+const blank = newMotionDoc(MotionFormat.Landscape);
+const withBg = must(addClip(blank, { component: 'BrandBackground', from: 0, durationInFrames: 90 }, 'bg'));
+const square = { shape: 'rect', x: 0.5, y: 0.5, width: 0.1, height: 0.1, fill: '#ff0000' };
+const withCard = must(addClip(withBg, { component: 'Shape', from: 0, durationInFrames: 90, props: square }, 'card'));
+
+const cardProps = withCard.tracks.flatMap((t) => t.clips).find((c) => c.id === 'card')!.props;
+const patch = (doc: MotionDoc, id: string, change: Partial<MotionClip>): MotionDoc => ({ ...doc, tracks: doc.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === id ? { ...c, ...change } : c)) })) });
+const list = (doc: MotionDoc, frame = 0) => displayListAt(doc, frame, FEEGA_TOKENS);
+const pathOf = (doc: MotionDoc, clip: string, frame = 0) => list(doc, frame).items.find((i): i is PathItem => i.kind === ItemKind.Path && i.clip === clip);
+const corners = (item: PathItem | undefined) => {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const contour of item?.contours ?? []) {
+    for (let i = 0; i < contour.length; i += 2) {
+      const [x, y] = apply2d(item!.matrix, [contour[i], contour[i + 1]]);
+      xs.push(x);
+      ys.push(y);
+    }
+  }
+  return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+};
+
+describe('displayListAt', () => {
+  it('paints the brand background as a full-frame rectangle in the token colour', () => {
+    const bg = pathOf(withBg, 'bg');
+
+    expect(corners(bg)).toEqual({ left: 0, top: 0, right: 1920, bottom: 1080 });
+    expect(bg?.paint).toEqual({ kind: PaintKind.Solid, color: [0x0a / 255, 0x0a / 255, 0x0a / 255, 1].map((v) => expect.closeTo(v, 2)) });
+  });
+
+  it('places a rectangle shape in its box, in frame pixels', () => {
+    expect(corners(pathOf(withCard, 'card'))).toEqual({ left: 864, top: 486, right: 1056, bottom: 594 });
+  });
+
+  it('moves a shape with its keyframed offset', () => {
+    const moving = must(setKeyframes(withCard, 'card', 'x', [{ frame: 0, value: 0, ease: Ease.Linear }, { frame: 60, value: 0.25, ease: Ease.Linear }]));
+
+    expect(corners(pathOf(moving, 'card', 60)).left).toBeCloseTo(864 + 480);
+  });
+
+  it('multiplies the clip opacity into the item', () => {
+    const faded = patch(withCard, 'card', { transform: { opacity: 0.5 }, props: { ...cardProps, opacity: 0.5 } });
+
+    expect(pathOf(faded, 'card')?.opacity).toBeCloseTo(0.25);
+  });
+
+  it('leaves out a clip outside its time window', () => {
+    const late = patch(withCard, 'card', { from: 30 });
+
+    expect(pathOf(late, 'card', 10)).toBeUndefined();
+    expect(pathOf(late, 'card', 30)).toBeDefined();
+  });
+
+  it('paints the top track last', () => {
+    const order = list(withCard).items.map((i) => i.clip);
+
+    expect(order.indexOf('bg')).toBeLessThan(order.indexOf('card'));
+  });
+
+  it('maps a linear gradient to the same end points as the HTML engine', () => {
+    const fills = [{ type: FillType.Linear, angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
+    const graded = patch(withCard, 'card', { props: { ...cardProps, fills } });
+
+    expect(pathOf(graded, 'card')?.paint).toMatchObject({ kind: PaintKind.Linear, from: [0, 54], to: [192, 54] });
+  });
+
+  it('reads a gaussian blur effect as a blur radius', () => {
+    const blurred = patch(withCard, 'card', { effects: [{ id: 'e1', kind: 'gaussian-blur', enabled: true, params: { radius: 12 } }] } as never);
+
+    expect(pathOf(blurred, 'card')?.blur).toBeGreaterThan(0);
+  });
+
+  it('names what it cannot draw yet instead of drawing it wrong', () => {
+    const titled = must(addClip(withCard, { component: 'Title', from: 0, durationInFrames: 90 }, 'title'));
+    const shadowed = patch(titled, 'card', { effects: [{ id: 'e1', kind: 'drop-shadow', enabled: true, params: {} }] } as never);
+    const drawn = list(shadowed);
+
+    expect(drawn.unsupported).toContainEqual({ clip: 'title', component: 'Title', reason: Unsupported.Component });
+    expect(drawn.unsupported).toContainEqual({ clip: 'card', component: 'Shape', reason: Unsupported.Effect });
+    expect(drawn.items.map((i) => i.clip)).toEqual(['bg']);
+  });
+});
