@@ -157,13 +157,18 @@ export function domProbe(cfg: ProbeConfig) {
       return;
     }
     const source = e.source as Window | null;
-    const w = window as unknown as { __timelines?: Record<string, Seekable>; __fontsReady?: Promise<unknown>; __hfWaitForSeekCompletion?: () => Promise<void> };
+    const w = window as unknown as { __timelines?: Record<string, Seekable>; __fontsReady?: Promise<unknown>; __hfWaitForSeekCompletion?: () => Promise<void>; __hf?: { buildReady?: Record<string, Promise<unknown>> }; __player?: { renderSeek?: (t: number, o: { exact: boolean }) => void } };
     const done = (body: Record<string, unknown>, transfer: Transferable[]) => source?.postMessage({ type: cfg.reply, id: m.id, time: m.time, ...body }, { targetOrigin: '*', transfer });
     Promise.resolve(w.__fontsReady)
       .then(() => document.fonts.ready)
+      .then(() => Promise.all(Object.values(w.__hf?.buildReady ?? {})))
       .then(() => {
         const tl = w.__timelines?.[cfg.timeline];
         tl?.pause();
+        if (w.__player?.renderSeek) {
+          w.__player.renderSeek(m.time, { exact: true });
+          return;
+        }
         tl?.seek(m.time);
       })
       .then(() => w.__hfWaitForSeekCompletion?.())
@@ -172,7 +177,7 @@ export function domProbe(cfg: ProbeConfig) {
         const pending: Promise<ImageBitmap>[] = [];
         const trees = Object.fromEntries(
           m.clips.flatMap((clip) => {
-            const root = document.getElementById(cfg.prefix + clip);
+            const root = document.getElementById(cfg.prefix + clip) ?? document.querySelector<HTMLElement>(`[data-clip="${CSS.escape(clip)}"]`);
             return root ? [[clip, read(root, pending)]] : [];
           })
         );

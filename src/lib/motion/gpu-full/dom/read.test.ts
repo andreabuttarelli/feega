@@ -31,6 +31,13 @@ function bounds(item: DrawnPath) {
 const near = (b: ReturnType<typeof bounds>) => Object.fromEntries(Object.entries(b).map(([k, v]) => [k, Math.round(v * 100) / 100]));
 
 describe('readTree', () => {
+  it('leaves the root z-index to the order of clips, and still refuses it inside', () => {
+    const box = el({ parent: 0, size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
+
+    expect(readTree(tree(root({ 'z-index': '3' }), box))).toMatchObject({ gaps: [], drawn: [{ kind: DrawnKind.Path }] });
+    expect(readTree(tree(root(), { ...box, style: { ...box.style, 'z-index': '3' } })).gaps).toMatchObject([{ reason: DomGap.Order }]);
+  });
+
   it('fills a box background at its position inside its parents', () => {
     const t = tree(root(), el({ parent: 0, at: [10, 20], size: [100, 100] }), el({ parent: 1, at: [5, 5], size: [30, 40], style: { 'background-color': 'rgb(255, 0, 0)' } }));
 
