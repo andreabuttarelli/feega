@@ -7,11 +7,8 @@ export type CoreState = { on: boolean; refused: ReadonlySet<string>; dom: Readon
 const FRAME = 'motion';
 
 export function claimedByCore(t: ClaimTile, s: CoreState): boolean {
-  if (!s.on || !t.kind) {
+  if (!s.on || !t.kind || s.refused.has(t.id)) {
     return false;
   }
-  if (t.kind === FRAME) {
-    return !s.refused.has(t.id);
-  }
-  return isNodeType(t.kind) && !s.dom.has(t.id);
+  return t.kind === FRAME || (isNodeType(t.kind) && !s.dom.has(t.id));
 }

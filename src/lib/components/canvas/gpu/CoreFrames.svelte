@@ -76,9 +76,11 @@
       if (!cardLists.has(c.key) && !readying.has(c.key)) {
         readying.add(c.key);
         void media.ready(c.frame.list).then((readiness) => {
-          if (readiness === Readiness.Whole) {
-            cardLists = new Map(cardLists).set(c.key, c.frame.list);
+          if (readiness !== Readiness.Whole) {
+            fail(c.frame.id);
+            return;
           }
+          cardLists = new Map(cardLists).set(c.key, c.frame.list);
         });
       }
     }

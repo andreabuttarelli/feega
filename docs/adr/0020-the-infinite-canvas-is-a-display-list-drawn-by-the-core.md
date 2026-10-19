@@ -62,14 +62,16 @@ non-DOM node card and every frame the core has not refused is the core's from th
 first frame. Pixi gets a blank hidden face for it (no poster, thumbs, text, snapshot or chrome),
 the snapshot preload, html-to-image queue, stored-preview upload and poster shelf skip it, and
 the reveal waits on the core having drawn it. A frame is refused (back to Pixi's poster) when
-its source fails, it has no head revision, or its list has parts the core cannot draw.
+its source fails, it has no head revision, or its list has parts the core cannot draw; a card
+or frame is refused when an image of it does not load or it falls outside the core's texture
+budget (`resident`).
 
 ### Flipping the default, then deleting
 
 | Step | Gate | Removes |
 |---|---|---|
-| A | partial frames on the heavy copy → 0 (today 32/57 Chrome, 24/36 iPhone): every doc part drawn by `drawFrame` | Pixi frame posters, poster shelf, `poster-lod` on canvas |
-| B | cards over the core texture budget (`resident`) drawn or paged by the core, not left blank | Pixi card faces |
+| A | partial frames on the heavy copy → 0 (today 15/57 Chrome, 13/36 iPhone): every doc part drawn by `drawFrame` | Pixi frame posters, poster shelf, `poster-lod` on canvas |
+| B | nothing over the core texture budget handed back: `resident` pages at a lower scale instead (13 refused on Chrome at fit); a missing image draws the core's placeholder | Pixi card faces |
 | C | DOM-handed tiles stay DOM, but their resting picture is the core's | snapshot queue/cache, `card-previews` route, bucket folder, `canvas-page` preview load, html-to-image in `GpuFlow` |
 | D | chrome, wires, marquee, guides, selection, peers in the core (#952, #954) | `chrome-layer.ts`, Pixi overlay |
 | E | `Renderer.Core` default in `renderer-flag.ts`; parity bench (`canvas-core-parity.ts`) ≤ 1% pixels off; this bench no worse on Chrome and iPhone | `?renderer=gpu` path |

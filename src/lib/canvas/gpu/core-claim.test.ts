@@ -18,6 +18,10 @@ describe('claimedByCore — what Pixi must not load, decode or capture', () => {
     expect(claimedByCore({ id: 'a', kind: 'image', rotation: 12 } as never, on)).toBe(true);
   });
 
+  it('hands back a card the core refused, e.g. over its texture budget', () => {
+    expect(claimedByCore({ id: 'a', kind: 'image' }, { ...on, refused: new Set(['a']) })).toBe(false);
+  });
+
   it('leaves DOM-handed tiles and non-node tiles to Pixi', () => {
     expect(claimedByCore({ id: 'a', kind: 'image' }, { ...on, dom: new Set(['a']) })).toBe(false);
     expect(claimedByCore({ id: 'g', kind: 'rect' }, on)).toBe(false);
