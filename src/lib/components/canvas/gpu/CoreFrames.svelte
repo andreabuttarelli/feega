@@ -19,6 +19,7 @@
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
   import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
+  import { gestureWatch } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '$lib/motion/gpu-full/dom/custom';
   import type { Pictures } from '$lib/motion/gpu-full/raster';
   import { Stand, fillOrder, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
@@ -246,7 +247,7 @@
       putting.delete(group);
       pictured.delete(group);
     }
-    let room = ITEMS_PER_FRAME;
+    let room = gesture.active() ? 0 : ITEMS_PER_FRAME;
     for (const f of held) {
       while (room > 0 && !put.has(f.group)) {
         room -= putPart(into, f.group);
@@ -268,6 +269,16 @@
   }
 
   let ahead = false;
+  const gesture = gestureWatch();
+  let lastView = '';
+
+  $effect(() => {
+    const now = `${view.x},${view.y},${view.zoom}`;
+    if (lastView && now !== lastView) {
+      gesture.moved();
+    }
+    lastView = now;
+  });
 
   const idle = (run: () => void) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : setTimeout(run, IDLE_MS));
 
@@ -278,7 +289,9 @@
       ahead = false;
       return;
     }
-    putPart(into, next.group);
+    if (!gesture.active()) {
+      putPart(into, next.group);
+    }
     idle(putAhead);
   }
 

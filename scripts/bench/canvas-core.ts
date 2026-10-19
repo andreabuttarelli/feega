@@ -106,6 +106,20 @@ async function pan(page: Page): Promise<{ fps: number; worstMs: number }> {
   return { fps: Math.round((stamps.length / PAN_MS) * 1000), worstMs: Math.round(Math.max(...gaps)) };
 }
 
+async function zoomMotion(page: Page): Promise<{ zoomFps: number; zoomWorstMs: number }> {
+  await page.evaluate('window.__bench = []');
+  const size = page.viewportSize()!;
+  const start = Date.now();
+  while (Date.now() - start < PAN_MS) {
+    const dir = Date.now() - start > PAN_MS / 2 ? 1 : -1;
+    await page.evaluate(`document.elementFromPoint(${size.width / 2}, ${size.height / 2})?.dispatchEvent(new WheelEvent('wheel', { clientX: ${size.width / 2}, clientY: ${size.height / 2}, deltaY: ${ZOOM_STEP * dir}, ctrlKey: true, bubbles: true, cancelable: true }))`);
+    await page.waitForTimeout(16);
+  }
+  const stamps = (await page.evaluate('window.__bench')) as number[];
+  const gaps = stamps.slice(1).map((t, i) => t - stamps[i]);
+  return { zoomFps: Math.round((stamps.length / PAN_MS) * 1000), zoomWorstMs: Math.round(Math.max(...gaps)) };
+}
+
 const zoomOf = async (page: Page) => Number(((await page.locator('[data-view]').first().getAttribute('data-view')) ?? '0,0,1').split(',')[2]);
 
 async function zoomTo(page: Page, zoom: number) {
@@ -157,7 +171,7 @@ async function run(target: Target, renderer: string) {
   const idleMb = rssMb(mine());
   const pixiTextureMb = Math.round(((await page.evaluate('window.__gpuCanvas?.textures?.().bytes ?? 0')) as number) / 1024 / 1024);
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer}-settled.png` });
-  const motion = await pan(page);
+  const motion = { ...(await pan(page)), ...(await zoomMotion(page)) };
   const panMb = rssMb(mine());
   const coreFrames = (await core.count()) ? `${await core.getAttribute('data-frames')} whole, ${await core.getAttribute('data-partial')} partial` : null;
   const cacheKb = (await core.count()) ? Math.round(Number(await core.getAttribute('data-cache-bytes')) / BYTES_PER_KB) : null;
