@@ -37,10 +37,20 @@ function wanted(items: Item[]): ImageItem[] {
 
 const moving = (picture: Picture) => (typeof HTMLVideoElement !== 'undefined' && picture.source instanceof HTMLVideoElement) || (typeof HTMLCanvasElement !== 'undefined' && picture.source instanceof HTMLCanvasElement);
 
-async function coreModule(): Promise<CoreModule> {
+let loading: Promise<CoreModule> | null = null;
+
+async function loadCore(): Promise<CoreModule> {
   const core = (await import(/* @vite-ignore */ CORE_URL)) as CoreModule;
   await core.default();
   return core;
+}
+
+export function warmCore(): Promise<CoreModule> {
+  loading ??= loadCore().catch((e: unknown) => {
+    loading = null;
+    throw e;
+  });
+  return loading;
 }
 
 function rasterOf(attached: Attached): CoreRaster {
@@ -95,7 +105,7 @@ export async function createCore(canvas: HTMLCanvasElement, width: number, heigh
   if (!('gpu' in navigator)) {
     throw new Error('webgpu unavailable');
   }
-  const core = await coreModule();
+  const core = await warmCore();
   return rasterOf(await core.WebCore.attach(canvas, width, height));
 }
 
@@ -124,7 +134,7 @@ export async function createCoreGl(canvas: HTMLCanvasElement, width: number, hei
   if (!canvas.getContext('webgl2', GL_CONTEXT)) {
     throw new Error('webgl2 unavailable');
   }
-  const core = await coreModule();
+  const core = await warmCore();
   const attached = core.WebGlCore.attach(canvas, width, height);
   const picture = attached.picture.bind(attached);
   attached.picture = (clip, source, w, h) => {
