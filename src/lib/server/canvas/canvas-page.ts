@@ -1593,3 +1593,5 @@ export const actions: Actions<CanvasParams> = {
   }
 
 };
+
+export type CanvasPageData = Awaited<ReturnType<typeof load>>;

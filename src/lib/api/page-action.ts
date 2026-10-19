@@ -1,9 +1,10 @@
 import { deserialize } from '$app/forms';
-import type { ActionResult } from '@sveltejs/kit';
+import { error, type ActionResult } from '@sveltejs/kit';
 import { apiCall, withOrg } from './client';
-import { pageActionOf } from './page-answers';
+import { pageActionOf, pageLoadOf } from './page-answers';
 
 const ACTION_PARAM = 'action';
+const NOT_FOUND = 404;
 
 const BEARER_PAGES: { page: RegExp; api: (m: RegExpExecArray) => string }[] = [
   { page: /^\/p\/([^/?#]+)\/c\/([^/?#]+)$/, api: (m) => `/api/v1/projects/${m[1]}/canvases/${m[2]}` },
@@ -37,4 +38,14 @@ export async function postPageAction(pageUrl: string, action: string, form: Form
 
   const { status, body } = await apiCall(withOrg(api, new URLSearchParams({ [ACTION_PARAM]: action })), { method: 'POST', body: form });
   return pageActionOf(status, body);
+}
+
+export async function loadPageData<T>(url: URL): Promise<T> {
+  const api = apiPathOf(url.pathname);
+  if (!api) {
+    error(NOT_FOUND, 'not_found');
+  }
+
+  const { status, body } = await apiCall(withOrg(api, url.searchParams));
+  return pageLoadOf(status, body) as T;
 }
