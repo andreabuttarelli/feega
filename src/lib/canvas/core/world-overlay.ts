@@ -3,7 +3,7 @@ import type { PathItem } from '$lib/motion/gpu-full/display-list';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import { EdgeLook, edgeItems, ghostItems, guideItems, hoverItems, marqueeItems, runningItems, peerItems, rotateItems, type CorePeer, type CoreTheme } from './overlay';
-import { stateChrome, type Glyphs, type StateTile } from './chrome';
+import { stateChrome, tileChrome, type Glyphs, type StateTile } from './chrome';
 import { turned, type Turn } from './screen-uses';
 import { line, rect, solid } from './shapes';
 
@@ -17,7 +17,14 @@ export type Wire = { id: string; source: string; target: string; mode?: string }
 
 export type WorldOverlay = { curves: readonly { edge: Wire; curve: Curve }[]; selected: readonly string[]; selectedEdge: string | null; marquee: Box | null; guides: readonly SnapGuide[]; zoom: number; theme: CoreTheme; glyphs: Glyphs; peers: readonly CorePeer[]; outlines: readonly PeerOutline[]; rotate: readonly { id: string; box: Box }[]; ghost: { curve: Curve; ok: boolean } | null; hovered: Box | null; running: readonly (Box & { id: string })[]; chrome: readonly ChromeOnCanvas[] };
 
-export type ChromeOnCanvas = StateTile & { turn?: Turn };
+export enum ChromeLayers {
+  State = 'state',
+  Whole = 'whole'
+}
+
+export type ChromeOnCanvas = StateTile & { turn?: Turn; layers?: ChromeLayers };
+
+const chromeOf = (t: ChromeOnCanvas, glyphs: Glyphs): PathItem[] => (t.layers === ChromeLayers.Whole ? [...tileChrome(t, glyphs), ...stateChrome(t, glyphs)] : stateChrome(t, glyphs));
 
 export function edgeLook(edge: Wire, selected: readonly string[], selectedEdge: string | null): EdgeLook {
   if (edge.mode === ITERATE) {
@@ -32,7 +39,7 @@ const turnedBy = (items: PathItem[], turn: Turn | undefined): PathItem[] => (tur
 export function overlayOf(o: WorldOverlay): PathItem[] {
   return [
     ...o.curves.flatMap((c) => edgeItems(c.edge.id, c.curve, edgeLook(c.edge, o.selected, o.selectedEdge), o.theme)),
-    ...o.chrome.flatMap((t) => turnedBy(stateChrome(t, o.glyphs), t.turn)),
+    ...o.chrome.flatMap((t) => turnedBy(chromeOf(t, o.glyphs), t.turn)),
     ...o.running.flatMap((b) => runningItems(b, o.zoom, o.theme)),
     ...(o.hovered ? hoverItems(o.hovered, o.zoom, o.theme) : []),
     ...(o.marquee ? marqueeItems(o.marquee, o.zoom, o.theme) : []),

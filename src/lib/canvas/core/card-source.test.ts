@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { faceOf } from '$lib/canvas/gpu/card-face';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
-import { CHROME_REACH, cardKey, cardOnCanvas, cardsOnCanvas, portMarks, ringColour, type CardTile } from './card-source';
+import { CHROME_REACH, CardLayer, cardKey, cardOnCanvas, cardsOnCanvas, portMarks, ringColour, type CardTile } from './card-source';
 import { PortState, type Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
 
@@ -22,6 +22,13 @@ const xs = (c: number[][]) => c.flatMap((k) => k.filter((_, i) => i % 2 === 0));
 const ys = (c: number[][]) => c.flatMap((k) => k.filter((_, i) => i % 2 === 1));
 
 describe('cardOnCanvas', () => {
+  it('draws only the face of a poster, leaving label and ports to the overlay', () => {
+    const whole = cardOnCanvas(tile, theme, glyphs);
+    const face = cardOnCanvas(tile, theme, glyphs, glyphs, null, CardLayer.Face);
+
+    expect(face.list.items.length).toBeLessThan(whole.list.items.length);
+  });
+
   it('grows the box by the chrome reach so labels and ports are not scissored away', () => {
     const f = cardOnCanvas(tile, theme, glyphs);
 
