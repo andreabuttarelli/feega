@@ -3132,3 +3132,12 @@ chunks with `var first_child_getter`, one imported both with and without `?v=` (
 the Svelte runtime from a later, runtime-discovered optimize pass). A dev server with a fresh deps
 cache does not reproduce it. Move: restart dev with `vite dev --force`. Excluding `@lucide/svelte`
 from `optimizeDeps` is not the fix: the barrel import then loads ~4.000 modules.
+
+## Playback "unwatchable on iPad" but 60 fps in WebKit iPad emulation
+
+**Signal:** a real iPad reports a stuttering preview; Playwright WebKit with the iPad descriptor
+on a Mac shows 59 fps p50 inside the preview iframe with or without `will-change`. The Mac's
+compositor hides the cost of repainting the whole frame every tick.
+**Move:** don't expect an fps number from emulation to go red; assert the mechanism (hinted
+layers in the preview iframe while it plays, `ipad-playback-fps.spec.ts`) and log fps beside it.
+Layer hints drop only past a budget (`layerPixels`), never for a whole device class.
