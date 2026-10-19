@@ -103,6 +103,10 @@ describe('a frame node follows the shape of its graphic', () => {
 });
 
 describe('a free element is a frame without chrome', () => {
+  it('a frame leaving the editor keeps its size, never a NaN height', () => {
+    expect(frameNodeSize(420, { width: 1920, height: 1080 }, NodeMode.Leaving)).toEqual({ w: 420, h: 236 });
+  });
+
   it('is the drawn box exactly: no bar, in preview or edit', () => {
     const made = elementNodeOf({ width: 240, height: 80 });
 

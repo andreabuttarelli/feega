@@ -75,7 +75,7 @@
 
 {/if}
 
-{#if resizable}
+{#if resizable && chrome.handles}
   {#each CORNERS as corner (corner)}
     <div class={`svelte-flow__resize-control handle ${corner}`} style={`border-color:${ringColor}`}></div>
   {/each}

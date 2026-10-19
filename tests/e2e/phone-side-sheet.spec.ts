@@ -99,7 +99,7 @@ test.describe('on a phone Properties and Chat are one tap away @real', () => {
       await expect(page.getByTestId('chat-editing'), '(c) the chat knows the frame').toHaveText('Editing: Hero');
       await shoot(page, `${phone.name}-c-frame-chat`);
 
-      await stage.click();
+      await stage.dblclick();
       await expect(props, '(d) selecting an element snaps back to Properties, even over Chat').toBeVisible();
       await below(props, stage);
       await shoot(page, `${phone.name}-d-element-properties`);
@@ -123,9 +123,8 @@ test.describe('on a phone Properties and Chat are one tap away @real', () => {
       await shoot(page, `${phone.name}-f-group`);
       await tabProps.click();
       await expect(props).toBeHidden();
-      const bar = (await page.getByTestId('add-bar').boundingBox())!;
-      const tabs = (await tabProps.boundingBox())!;
-      expect(bar.y + bar.height, '(f) the draw tools sit above the tabs, not on them').toBeLessThanOrEqual(tabs.y + 1);
+      await expect(page.getByTestId('add-bar'), '(f) the draw tools live behind the + tab, not on the tabs').toBeHidden();
+      await expect(page.getByTestId('phone-tab-insert'), '(f) the + tab sits with the others').toBeVisible();
     });
   }
 });
