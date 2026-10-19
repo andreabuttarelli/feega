@@ -2,6 +2,7 @@
   import { _ } from 'svelte-i18n';
   import Share2 from '@lucide/svelte/icons/share-2';
   import { ShareState } from '$lib/canvas/shared-view';
+  import { systemShare } from '$lib/native-actions';
 
   let {
     shareToken,
@@ -27,6 +28,8 @@
       busy = false;
     }
   }
+
+  const share = systemShare();
 
   async function copy() {
     await navigator.clipboard.writeText(link);
@@ -64,6 +67,7 @@
         <div class="share-link">
           <input type="text" readonly value={link || `/s/${shareToken}`} onfocus={(e) => e.currentTarget.select()} />
           <button type="button" onclick={copy}>{$_(copied ? 'app.shell.shareCopied' : 'app.shell.shareCopy')}</button>
+          {#if share && link}<button type="button" onclick={() => share({ url: link })} data-testid="share-native"><Share2 size={14} /></button>{/if}
         </div>
         <button type="button" class="share-reset" disabled={busy} onclick={() => set(ShareState.On)}>
           {$_('app.shell.shareNewLink')}

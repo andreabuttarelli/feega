@@ -35,6 +35,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>FeegaAppleSignIn</key>
 	<string>off</string>
+	<key>FeegaWebSource</key>
+	<string>hosted</string>
 	<key>FeegaWebURL</key>
 	<string>https://oh.feega.app</string>
 	<key>LSRequiresIPhoneOS</key>

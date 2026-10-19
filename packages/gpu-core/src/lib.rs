@@ -1,6 +1,9 @@
 pub mod display_list;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod render;
 pub mod scene;
+#[cfg(target_arch = "wasm32")]
+pub mod web;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Skipped {

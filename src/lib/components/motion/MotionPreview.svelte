@@ -20,6 +20,7 @@
   import { EditEnd, TEXT_EDIT, type TextEditMessage } from '$lib/motion/hyperframes/text-edit';
   import GpuLayer from './GpuLayer.svelte';
   import GpuFullLayer from './GpuFullLayer.svelte';
+  import { FullBackend } from '$lib/motion/gpu-full/backends';
   import type { BrandTokens } from '$lib/motion/brand';
   import type { MotionDoc } from '$lib/motion/doc';
   import { previewHtml } from '$lib/canvas/gpu/memory-budget';
@@ -54,7 +55,9 @@
     children
   }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; fullDoc?: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> } | null; children?: Snippet } = $props();
 
-  const DRAWN_OVER: ReadonlySet<RenderEngine> = new Set([RenderEngine.Gpu, RenderEngine.GpuFull]);
+  const DRAWN_OVER: ReadonlySet<RenderEngine> = new Set([RenderEngine.Gpu, RenderEngine.GpuFull, RenderEngine.GpuCore]);
+
+  const FULL_ENGINES: ReadonlySet<RenderEngine> = new Set([RenderEngine.GpuFull, RenderEngine.GpuCore]);
 
   let pointer = $state<InputValues>({});
   let exportedOn = $state<RenderEngine | null>(null);
@@ -441,10 +444,10 @@
       <GpuLayer {html} compose={gpuCompose} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
     </div>
   {/if}
-  {#if engine === RenderEngine.GpuFull && fullDoc}
+  {#if FULL_ENGINES.has(engine) && fullDoc}
     <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
       {#key `${fullDoc.doc.width}x${fullDoc.doc.height}`}
-        <GpuFullLayer doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} compose={gpuCompose ?? (() => html)} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+        <GpuFullLayer backend={engine === RenderEngine.GpuCore ? FullBackend.Core : FullBackend.WebGl2} doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} compose={gpuCompose ?? (() => html)} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
       {/key}
     </div>
   {/if}

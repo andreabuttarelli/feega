@@ -23,7 +23,12 @@ public enum ShellFlag: String {
 }
 
 public final class FeegaBridgeViewController: CAPBridgeViewController, WKScriptMessageHandler {
-    public static let webURL: URL = {
+    public static let source: WebSource = {
+        let setting = Bundle.main.object(forInfoDictionaryKey: "FeegaWebSource") as? String
+        return WebSource(setting: setting, hosted: hostedURL)
+    }()
+
+    private static let hostedURL: URL = {
         #if DEBUG
         if let override = ProcessInfo.processInfo.environment["FEEGA_WEB"].flatMap(URL.init(string:)) {
             return override
@@ -39,7 +44,9 @@ public final class FeegaBridgeViewController: CAPBridgeViewController, WKScriptM
 
     override public func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
-        descriptor.serverURL = Self.webURL.absoluteString
+        if let server = Self.source.serverURL {
+            descriptor.serverURL = server.absoluteString
+        }
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         descriptor.appendedUserAgentString = "FeegaNative/mobile-\(version)"
         return descriptor
@@ -61,7 +68,7 @@ public final class FeegaBridgeViewController: CAPBridgeViewController, WKScriptM
     }
 
     public func open(deepLink: URL) {
-        guard let target = DeepLink.webURL(for: deepLink, web: Self.webURL) else {
+        guard let target = DeepLink.webURL(for: deepLink, web: Self.source.origin) else {
             return
         }
         webView?.load(URLRequest(url: target))

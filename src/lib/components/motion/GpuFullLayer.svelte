@@ -3,12 +3,13 @@
   import type { BrandTokens } from '$lib/motion/brand';
   import type { MotionDoc } from '$lib/motion/doc';
   import { drawFrame, prepare, type Prepared } from '$lib/motion/gpu-full/display-list';
-  import { createRaster, type Raster } from '$lib/motion/gpu-full/raster';
+  import type { Raster } from '$lib/motion/gpu-full/raster';
+  import { BACKENDS, type FullBackend } from '$lib/motion/gpu-full/backends';
   import { createMedia } from '$lib/motion/gpu-full/media';
   import { mountCustomReads, type CustomReads } from '$lib/motion/gpu-full/dom/custom';
   import type { Compose } from '$lib/motion/gpu-full/dom/reader';
 
-  let { doc, tokens, assets, compose, time, onfallback }: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; compose: Compose; time: () => number; onfallback: (reason: unknown) => void } = $props();
+  let { backend, doc, tokens, assets, compose, time, onfallback }: { backend: FullBackend; doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; compose: Compose; time: () => number; onfallback: (reason: unknown) => void } = $props();
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let host = $state<HTMLDivElement | null>(null);
@@ -32,13 +33,12 @@
     if (!target) {
       return;
     }
-    let raster: Raster;
-    try {
-      raster = untrack(() => createRaster(target, doc.width, doc.height));
-    } catch (e) {
-      onfallback(e);
-      return;
-    }
+    let raster: Raster | null = null;
+    let gone = false;
+    untrack(() => BACKENDS[backend](target, doc.width, doc.height)).then(
+      (made) => (gone ? made.dispose() : (raster = made)),
+      onfallback
+    );
     const media = createMedia();
     let drawn: [Prepared | null, number] = [null, -1];
     let busy = false;
@@ -46,23 +46,24 @@
     const tick = () => {
       loop = requestAnimationFrame(tick);
       const current = reads;
-      const now = current?.of;
-      if (!current || !now) {
+      const into = raster;
+      if (!current || !into || busy) {
         return;
       }
+      const now = current.of;
       const frame = Math.round(time() * now.doc.fps);
-      if (busy || (drawn[0] === now && drawn[1] === frame)) {
+      if (drawn[0] === now && drawn[1] === frame) {
         return;
       }
       drawn = [now, frame];
       busy = true;
       void current.custom
-        .then((reads) => reads.readAt(frame))
+        .then((r) => r.readAt(frame))
         .then(async (read) => {
           const list = drawFrame(now, frame, read.reads);
           gaps = list.unsupported.length;
           await media.ready(list);
-          raster.draw(list, (item) => read.picture(item) ?? media.pictures(item));
+          into.draw(list, (item) => read.picture(item) ?? media.pictures(item));
         })
         .catch(onfallback)
         .finally(() => {
@@ -72,7 +73,8 @@
     loop = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(loop);
-      raster.dispose();
+      gone = true;
+      raster?.dispose();
       media.dispose();
     };
   });
