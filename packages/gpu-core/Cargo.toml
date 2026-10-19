@@ -13,6 +13,9 @@ crate-type = ["cdylib", "rlib"]
 name = "gpu-core-render"
 path = "src/main.rs"
 
+[features]
+gpu = []
+
 [dependencies]
 vello = "0.11.0"
 serde = { version = "1", features = ["derive"] }

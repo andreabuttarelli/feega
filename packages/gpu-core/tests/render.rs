@@ -1,4 +1,4 @@
-use gpu_core::{display_list::parse, render::Renderer, scene::build, Skipped};
+use gpu_core::{display_list::parse, scene::build, Skipped};
 
 const SQUARE: &str = r#"{
   "width": 64, "height": 64, "background": [0, 0, 1, 1],
@@ -23,10 +23,11 @@ fn names_the_items_it_does_not_draw_yet() {
     assert_eq!(skipped, vec![Skipped { clip: "pic".into(), what: "image".into() }]);
 }
 
+#[cfg(feature = "gpu")]
 #[test]
 fn paints_a_square_over_the_background() {
     let list = parse(SQUARE).unwrap();
-    let mut renderer = Renderer::new().expect("a GPU adapter");
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
     let pixels = renderer.render(&list).unwrap();
     let at = |x: usize, y: usize| &pixels[(y * 64 + x) * 4..(y * 64 + x) * 4 + 4];
 
