@@ -1,6 +1,6 @@
 # gpu-full draws strokes, transitions, moves, blend modes, masks and mattes
 
-Step 2 of the gpu-full roadmap (ADR 0018).
+Step 2 of the gpu-full roadmap (ADR 0019).
 
 - **Strokes** (`stroke.ts`): polylines become band, join (miter with SVG's limit 4, round,
   bevel) and cap polygons, filled with a new `Union` rule; dashes cut by arc length. Inside and
