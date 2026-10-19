@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { faceOf } from '$lib/canvas/gpu/card-face';
-import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
-import { rgbaOf } from '$lib/motion/gpu-full/rgba';
-import { CHROME_REACH, cardKey, cardOnCanvas, portMarks, type CardTile } from './card-source';
+import { CHROME_REACH, cardKey, cardOnCanvas, portMarks, ringColour, type CardTile } from './card-source';
 import { PortState, type Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
 
@@ -15,14 +13,10 @@ const tile: CardTile = {
   box: { x: 100, y: 200, w: 240, h: 160 },
   face: faceOf({ id: 'n', kind: 'doc' }, { content: 'hi' }, (id) => id),
   shot: null,
-  ring: NodeChrome.None,
-  handles: false,
-  hovered: false,
   inputs: [],
   outputs: [{ type: 'text', state: PortState.Quiet }],
   label: 'Document',
-  icon: null,
-  names: false
+  icon: null
 };
 
 const xs = (c: number[][]) => c.flatMap((k) => k.filter((_, i) => i % 2 === 0));
@@ -48,22 +42,19 @@ describe('cardOnCanvas', () => {
   });
 });
 
-describe('selection ring colour', () => {
-  it('rings a selected card in its output colour, the accent when it has none', () => {
-    const ring = (t: CardTile) => cardOnCanvas({ ...t, ring: NodeChrome.Selected, handles: true }, theme, glyphs).list.items.find((i) => i.clip === 'n:ring')!;
-    const colour = (i: unknown) => (i as { paint: { color: number[] } }).paint.color;
+describe('card group', () => {
+  it('holds no hover, ring or handles: they are overlay, drawn every frame', () => {
+    const f = cardOnCanvas(tile, theme, glyphs);
+    const drawn = new Set(f.list.items.map((i) => i.clip.split(':')[1]));
 
-    expect(colour(ring(tile))).toEqual(rgbaOf(CONNECTOR_STYLE.text.color));
-    expect(colour(ring({ ...tile, outputs: [] }))).toEqual(rgbaOf(theme.accent));
+    expect(drawn.has('ring') || drawn.has('hover') || drawn.has('handle') || drawn.has('port-name')).toBe(false);
   });
 });
 
-describe('selected card', () => {
-  it('draws handles and port names when selected', () => {
-    const f = cardOnCanvas({ ...tile, ring: NodeChrome.Selected, handles: true, names: true }, theme, glyphs);
-
-    expect(f.list.items.filter((i) => i.clip === 'n:handle')).toHaveLength(8);
-    expect(f.list.items.some((i) => i.clip === 'n:port-name')).toBe(true);
+describe('selection ring colour', () => {
+  it('rings in the output colour, the accent when there is none', () => {
+    expect(ringColour(tile, theme)).toBe(CONNECTOR_STYLE.text.color);
+    expect(ringColour({ ...tile, outputs: [] }, theme)).toBe(theme.accent);
   });
 });
 
@@ -90,7 +81,6 @@ describe('cardKey', () => {
 
   it('changes with anything that changes the drawing', () => {
     expect(cardKey({ ...tile, box: { ...tile.box, w: 300 } })).not.toBe(cardKey(tile));
-    expect(cardKey({ ...tile, ring: NodeChrome.Selected })).not.toBe(cardKey(tile));
     expect(cardKey({ ...tile, label: 'Other' })).not.toBe(cardKey(tile));
   });
 });

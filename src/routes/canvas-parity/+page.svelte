@@ -9,7 +9,6 @@
   import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
   import { NODE_PORTS } from '$lib/canvas/node-ports';
   import { NODE_KIND_ICON, NODE_KIND_LABEL } from '$lib/canvas/node-label';
-  import { NodeChrome } from '$lib/canvas/selection-chrome';
   import { iconBitmap } from '$lib/components/canvas/gpu/icon-bitmap';
   import { iconNodes } from '$lib/components/canvas/gpu/icon-nodes';
   import { BACKENDS, FullBackend } from '$lib/motion/gpu-full/backends';
@@ -113,7 +112,7 @@
     const items = cards.flatMap((c) => {
       const ports = portsFor(c.kind);
       const chrome = withChrome
-        ? tileChrome({ id: c.id, x: c.x, y: c.y, width: c.w, height: c.h, ring: NodeChrome.None, handles: false, hovered: false, ringColor: theme.accent, inputs: ports.inputs.map(quiet), outputs: [quiet(ports.output)], label: NODE_KIND_LABEL[c.kind], icon: icons.get(c.kind) ?? null, names: false }, glyphs)
+        ? tileChrome({ id: c.id, x: c.x, y: c.y, width: c.w, height: c.h, inputs: ports.inputs.map(quiet), outputs: [quiet(ports.output)], label: NODE_KIND_LABEL[c.kind], icon: icons.get(c.kind) ?? null }, glyphs)
         : [];
       return [...cardItems(c as CoreCard, coreTheme, glyphs, bold), ...chrome];
     });
