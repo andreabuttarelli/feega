@@ -644,7 +644,7 @@
         face: faceFor(t),
         hidden: handedOver(t) || coreDrawn.has(t.id),
         snapshot: shotOf(t.id),
-        running: isRunning(summaries.get(t.id)?.data ?? {}),
+        running: !coreOn && isRunning(summaries.get(t.id)?.data ?? {}),
         chrome: coreDrawn.has(t.id) ? null : chromeOf(t)
       })
     )
@@ -681,15 +681,17 @@
     scene?.setDim(editing ? { body: level('--neighbour-body'), edges: level('--neighbour-edges') } : null);
   });
 
+  const ghostCurve = $derived(ghost ? (ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from)) : null);
+  const hoveredBox = $derived(hovered && !selected.includes(hovered) ? (byId.get(hovered) ?? null) : null);
+
   $effect(() => {
-    const ghostCurve = ghost ? (ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from)) : null;
     scene?.setOverlay({
       selected: selectedBoxes,
       resizable,
       marquee: coreOn ? null : marquee,
-      ghost: ghostCurve,
+      ghost: coreOn ? null : ghostCurve,
       ghostOk: ghost?.ok ?? false,
-      hovered: hovered && !selected.includes(hovered) ? (byId.get(hovered) ?? null) : null,
+      hovered: coreOn ? null : hoveredBox,
       peers: []
     });
   });
@@ -1324,7 +1326,10 @@
           glyphs: coreType.glyphs,
           peers: corePeers.flatMap((p) => (p.cursor ? [{ id: p.sessionId, name: displayName(p.name), color: p.colour, at: p.cursor }] : [])),
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
-          rotate: coreRotate
+          rotate: coreRotate,
+          ghost: ghostCurve ? { curve: ghostCurve, ok: ghost?.ok ?? false } : null,
+          hovered: hoveredBox,
+          running: placed.filter((t) => isRunning(summaries.get(t.id)?.data ?? {})).map((t) => ({ x: t.x, y: t.y, w: t.w, h: t.h }))
         })
       : []
   );

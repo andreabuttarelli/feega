@@ -6,7 +6,7 @@ import { edgeLook, overlayOf, throughCamera } from './world-overlay';
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', line: '#e5e5e5', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
 const edge = (over: Partial<{ id: string; source: string; target: string; mode: string }> = {}) => ({ id: 'e', source: 'a', target: 'b', ...over });
 const glyphs = ((text: string, size: number) => ({ contours: [[0, 0, size, 0, size, size]], width: text.length * size, height: size })) as never;
-const none = { peers: [], outlines: [], rotate: [], glyphs };
+const none = { peers: [], outlines: [], rotate: [], glyphs, ghost: null, hovered: null, running: [] };
 const curve = wireCurve({ x: 0, y: 0 }, { x: 100, y: 50 });
 
 describe('edge look', () => {
@@ -25,8 +25,15 @@ describe('world overlay', () => {
   });
 
   it('adds peers outlines and cursors, then rotate knobs, on top', () => {
-    const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, glyphs, peers: [{ id: 'p', name: 'Ann', color: '#ff0000', at: { x: 5, y: 5 } }], outlines: [{ key: 'p:n', box: { x: 0, y: 0, w: 10, h: 10 }, color: '#ff0000' }], rotate: [{ id: 'n', box: { x: 0, y: 0, w: 10, h: 10 } }] });
+    const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, glyphs, ghost: null, hovered: null, running: [], peers: [{ id: 'p', name: 'Ann', color: '#ff0000', at: { x: 5, y: 5 } }], outlines: [{ key: 'p:n', box: { x: 0, y: 0, w: 10, h: 10 }, color: '#ff0000' }], rotate: [{ id: 'n', box: { x: 0, y: 0, w: 10, h: 10 } }] });
     expect(items.map((i) => i.clip.split(':').at(-1))).toEqual(['peer-outline', 'peer-cursor', 'peer-tag', 'peer-tag', 'rotate', 'rotate']);
+  });
+
+  it('draws the pending wire, the hovered ring and running rings that Pixi drew', () => {
+    const box = { x: 0, y: 0, w: 10, h: 10 };
+    const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, ghost: { curve, ok: false }, hovered: box, running: [box] });
+    expect(items.map((i) => i.clip.split(':').at(-1))).toEqual(['ghost', 'hover', 'running']);
+    expect(items[0].paint).toEqual({ kind: 'solid', color: [192 / 255, 57 / 255, 43 / 255, 1] });
   });
 
   it('is placed on screen through the camera', () => {

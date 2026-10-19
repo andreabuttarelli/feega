@@ -5,17 +5,27 @@ import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import { EdgeLook, edgeItems, guideItems, marqueeItems, peerItems, rotateItems, type CorePeer, type CoreTheme } from './overlay';
 import type { Glyphs } from './chrome';
-import { line, rect, solid } from './shapes';
+import { cubic, line, rect, solid } from './shapes';
 
 const ITERATE = 'iterate';
 const PEER_OUTLINE_PX = 2;
 const PEER_OUTLINE = 'peer-outline';
+const RING_PX = 1.5;
+const RUNNING_PX = RING_PX * 1.5;
+const HOVER_OPACITY = 0.5;
+const REFUSED = '#c0392b';
+
+export enum Ring {
+  Ghost = 'ghost',
+  Hover = 'hover',
+  Running = 'running'
+}
 
 export type PeerOutline = { key: string; box: Box; color: string };
 
 export type Wire = { id: string; source: string; target: string; mode?: string };
 
-export type WorldOverlay = { curves: readonly { edge: Wire; curve: Curve }[]; selected: readonly string[]; selectedEdge: string | null; marquee: Box | null; guides: readonly SnapGuide[]; zoom: number; theme: CoreTheme; glyphs: Glyphs; peers: readonly CorePeer[]; outlines: readonly PeerOutline[]; rotate: readonly { id: string; box: Box }[] };
+export type WorldOverlay = { curves: readonly { edge: Wire; curve: Curve }[]; selected: readonly string[]; selectedEdge: string | null; marquee: Box | null; guides: readonly SnapGuide[]; zoom: number; theme: CoreTheme; glyphs: Glyphs; peers: readonly CorePeer[]; outlines: readonly PeerOutline[]; rotate: readonly { id: string; box: Box }[]; ghost: { curve: Curve; ok: boolean } | null; hovered: Box | null; running: readonly Box[] };
 
 export function edgeLook(edge: Wire, selected: readonly string[], selectedEdge: string | null): EdgeLook {
   if (edge.mode === ITERATE) {
@@ -25,6 +35,8 @@ export function edgeLook(edge: Wire, selected: readonly string[], selectedEdge: 
   return linked ? EdgeLook.Linked : EdgeLook.Plain;
 }
 
+const ring = (b: Box, kind: Ring, width: number, colour: string, opacity = 1) => solid(`${b.x},${b.y}:${kind}`, line(rect(b.x, b.y, b.w, b.h), width, true), colour, opacity);
+
 export function overlayOf(o: WorldOverlay): PathItem[] {
   return [
     ...o.curves.flatMap((c) => edgeItems(c.edge.id, c.curve, edgeLook(c.edge, o.selected, o.selectedEdge), o.theme)),
@@ -32,7 +44,10 @@ export function overlayOf(o: WorldOverlay): PathItem[] {
     ...guideItems(o.guides, o.zoom, o.theme),
     ...o.outlines.map((p) => solid(`${p.key}:${PEER_OUTLINE}`, line(rect(p.box.x, p.box.y, p.box.w, p.box.h), PEER_OUTLINE_PX / o.zoom, true), p.color)),
     ...o.peers.flatMap((p) => peerItems(p, o.zoom, o.glyphs)),
-    ...o.rotate.flatMap((r) => rotateItems(r.id, r.box, o.theme))
+    ...o.rotate.flatMap((r) => rotateItems(r.id, r.box, o.theme)),
+    ...(o.ghost ? [solid(`wire:${Ring.Ghost}`, line(cubic(o.ghost.curve), RING_PX / o.zoom), o.ghost.ok ? o.theme.accent : REFUSED)] : []),
+    ...(o.hovered ? [ring(o.hovered, Ring.Hover, RING_PX / o.zoom, o.theme.accent, HOVER_OPACITY)] : []),
+    ...o.running.map((b) => ring(b, Ring.Running, RUNNING_PX / o.zoom, o.theme.accent))
   ];
 }
 
