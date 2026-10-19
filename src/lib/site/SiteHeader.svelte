@@ -6,9 +6,9 @@
 
 <header class="bar">
   <div class="row">
-    <a class="logo" href="/">Feega</a>
+    <a class="site-brand" href="/"><span>Feega</span><span aria-hidden="true">Andrea Buttarelli</span></a>
 
-    <nav class="nav" aria-label="Main">
+    <nav class="links" aria-label="Main">
       {#each HEADER_LINKS as link (link.href)}
         <a href={link.href}>{link.label}</a>
       {/each}
@@ -22,7 +22,7 @@
   </div>
 
   {#if open}
-    <nav class="menu" aria-label="Menu">
+    <nav class="drawer" aria-label="Menu">
       {#each MENU_LINKS as link (link.href)}
         <a href={link.href} onclick={() => (open = false)}>{link.label}</a>
       {/each}
@@ -35,9 +35,33 @@
     position: fixed;
     inset: 0 0 auto;
     z-index: 10;
+    mix-blend-mode: difference;
     max-width: 430px;
     margin: 0 auto;
     padding: var(--site-gutter);
+  }
+
+  .site-brand {
+    display: grid;
+    overflow: hidden;
+    height: 1.2em;
+  }
+
+  .site-brand span {
+    grid-area: 1 / 1;
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .site-brand span + span {
+    transform: translateY(110%);
+  }
+
+  .site-brand:hover span:first-child {
+    transform: translateY(-110%);
+  }
+
+  .site-brand:hover span + span {
+    transform: none;
   }
 
   .row {
@@ -49,7 +73,7 @@
     height: 18px;
   }
 
-  .nav,
+  .links,
   .cta {
     display: none;
   }
@@ -64,7 +88,7 @@
     cursor: pointer;
   }
 
-  .menu {
+  .drawer {
     position: fixed;
     inset: 0;
     max-width: 430px;
@@ -92,13 +116,13 @@
       height: 21px;
     }
 
-    .logo {
+    .site-brand {
       grid-column: 1;
       grid-row: 1;
       justify-self: start;
     }
 
-    .nav {
+    .links {
       grid-column: 2;
       grid-row: 1;
       display: flex;
@@ -115,7 +139,7 @@
     }
 
     .toggle,
-    .menu {
+    .drawer {
       display: none;
     }
   }

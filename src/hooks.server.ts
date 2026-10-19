@@ -15,7 +15,7 @@ import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-cont
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { redirectFor } from '$lib/server/host-redirects';
-import { SiteVisibility, siteVisibility } from '$lib/site/visibility';
+import { SiteVisibility, rootShowsSite, siteVisibility } from '$lib/site/visibility';
 import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
@@ -103,8 +103,12 @@ const hostRedirect: Handle = async ({ event, resolve }) => {
 const SITE_ROUTES = '/(site)';
 const NOT_FOUND = 404;
 
+function siteEnv() {
+  return { vercelEnv: privateEnv.VERCEL_ENV, flag: publicEnv.PUBLIC_SITE_ENABLED };
+}
+
 export function siteShown(): boolean {
-  return siteVisibility({ vercelEnv: privateEnv.VERCEL_ENV, flag: publicEnv.PUBLIC_SITE_ENABLED }) === SiteVisibility.Shown;
+  return siteVisibility(siteEnv()) === SiteVisibility.Shown;
 }
 
 export const siteGate: Handle = async ({ event, resolve }) => {
@@ -222,7 +226,7 @@ export const handle: Handle = sequence(hostRedirect, siteGate, csrf, Sentry.sent
 
   seedMetaClickCookies(event.cookies, event.url, event.route.id);
 
-  if (isRootPath(event.url.pathname)) {
+  if (isRootPath(event.url.pathname) && !rootShowsSite(event.url, siteEnv())) {
     rememberCampaign(event.cookies, event.url);
     if (event.url.searchParams.has('code') || event.url.searchParams.has('error_description')) {
       throw redirect(303, `/auth/callback${event.url.search}`);

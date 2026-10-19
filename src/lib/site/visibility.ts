@@ -1,3 +1,5 @@
+import { isSiteHost } from './host';
+
 export enum SiteVisibility {
   Hidden = 'hidden',
   Shown = 'shown'
@@ -14,4 +16,12 @@ export function siteVisibility(env: SiteEnv): SiteVisibility {
   }
 
   return SiteVisibility.Hidden;
+}
+
+export function rootShowsSite(url: URL, env: SiteEnv): boolean {
+  if (siteVisibility(env) === SiteVisibility.Hidden) {
+    return false;
+  }
+
+  return isSiteHost(url) || env.vercelEnv !== PRODUCTION;
 }
