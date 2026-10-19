@@ -6,7 +6,7 @@ const STEPS = ['#00ff00', '#0000ff', '#ffff00', '#00ffff', '#ff00ff', '#808080',
 const STEP_GAP_MS = 120;
 const FRAME_MS = 1000 / 60;
 const LIVE_BUDGET_MS = 3 * FRAME_MS;
-const OPS = '?/ops';
+const OPS = 'ops';
 const OUT = process.env.COLOUR_DRAG_OUT;
 
 const box = {
@@ -92,7 +92,7 @@ for (const renderer of ['gpu', 'dom']) {
       await expect.poll(() => frame.evaluate((rgb) => (window as unknown as { painted: Record<string, number> }).painted[rgb] ?? null, rgbOf('#ff0000'))).not.toBeNull();
       const saves: number[] = [];
       page.on('request', (r) => {
-        if (r.method() === 'POST' && r.url().includes(OPS)) {
+        if (r.method() === 'POST' && new URL(r.url()).searchParams.get('action') === OPS) {
           saves.push(Date.now());
         }
       });
