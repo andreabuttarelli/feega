@@ -54,6 +54,23 @@ async function login(page: Page) {
   await page.waitForURL((u) => !u.pathname.startsWith('/login'));
 }
 
+const COVER_POLL_MS = 100;
+const COVER_LIMIT_MS = 30_000;
+
+async function covered(page: Page): Promise<{ placeholdersMs: number | null; coveredMs: number | null }> {
+  const start = Date.now();
+  let placeholdersMs: number | null = null;
+  while (Date.now() - start < COVER_LIMIT_MS) {
+    const [held, waiting] = await page.locator('[data-testid=core-canvas]').evaluate((c) => [Number(c.getAttribute('data-held')), Number(c.getAttribute('data-waiting'))]);
+    placeholdersMs ??= held > 0 ? Date.now() - start : null;
+    if (held > 0 && waiting === 0) {
+      return { placeholdersMs, coveredMs: Date.now() - start };
+    }
+    await page.waitForTimeout(COVER_POLL_MS);
+  }
+  return { placeholdersMs, coveredMs: null };
+}
+
 async function pan(page: Page): Promise<{ fps: number; worstMs: number }> {
   await page.evaluate('window.__bench = []; (function tick(t) { if (t) window.__bench.push(t); requestAnimationFrame(tick); })()');
   const box = page.viewportSize()!;
@@ -80,18 +97,19 @@ async function run(target: Target, renderer: string) {
   await page.getByRole('button', { name: 'Reject all' }).click({ timeout: 8000 }).catch(() => undefined);
   await page.locator('[data-renderer]:not([data-renderer="pending"])').first().waitFor({ timeout: 30_000 });
   const firstMs = Date.now() - t0;
+  const core = page.locator('[data-testid=core-canvas]');
+  const coverage = renderer ? await core.waitFor({ state: 'attached', timeout: 10_000 }).then(() => covered(page), () => null) : null;
   await page.waitForTimeout(SETTLE_MS);
   const idleMb = rssMb(mine());
   const pixiTextureMb = Math.round(((await page.evaluate('window.__gpuCanvas?.textures?.().bytes ?? 0')) as number) / 1024 / 1024);
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}-settled.png` });
   const motion = await pan(page);
   const panMb = rssMb(mine());
-  const core = page.locator('[data-testid=core-canvas]');
   const coreFrames = (await core.count()) ? `${await core.getAttribute('data-frames')} whole, ${await core.getAttribute('data-partial')} partial` : null;
   const backend = await page.locator('[data-renderer]').first().getAttribute('data-renderer');
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}.png` });
   await browser.close();
-  return { target, renderer: renderer || 'gpu', backend, coreFrames, firstMs, pixiTextureMb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion };
+  return { target, renderer: renderer || 'gpu', backend, coreFrames, firstMs, ...coverage, pixiTextureMb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion };
 }
 
 const targets = (process.env.BENCH_TARGETS ?? `${Target.Chrome},${Target.IPhone}`).split(',') as Target[];
