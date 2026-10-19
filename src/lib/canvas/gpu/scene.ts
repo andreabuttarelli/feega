@@ -292,6 +292,10 @@ export class GpuScene {
     this.grid.width = this.app.screen.width;
     this.grid.height = this.app.screen.height;
     this.cull();
+    if (grown) {
+      this.draw();
+      return;
+    }
     this.invalidate();
   }
 
@@ -310,6 +314,10 @@ export class GpuScene {
     if (!this.dirty && !this.playing.size) {
       return;
     }
+    this.draw();
+  };
+
+  private draw() {
     this.dirty = false;
     const t0 = performance.now();
     try {
@@ -322,7 +330,7 @@ export class GpuScene {
       this.renderFailed = true;
     }
     this.onFrame?.(performance.now() - t0);
-  };
+  }
 
   private closeUploaded() {
     for (const source of (this.app.renderer.texture as unknown as { managedTextures: readonly ({ resource: unknown } | null)[] }).managedTextures) {

@@ -4,6 +4,7 @@ export const MEASURE_REQUEST = 'feega:measure';
 export const MEASURE_REPLY = 'feega:measured';
 export const REDRAWN = 'feega:redrawn';
 export const DRAWN_EVENT = 'motion-drawn';
+export const TILE_PAINTED = 'motion-tile-painted';
 export const DRAWN_FALLBACK_MS = 600;
 export const REDRAW_QUIET_MS = 150;
 

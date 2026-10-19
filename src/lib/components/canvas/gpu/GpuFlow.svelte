@@ -2,6 +2,7 @@
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Gesture } from '$lib/motion/drill';
   import { onMount, untrack, type ComponentProps } from 'svelte';
+  import { TILE_PAINTED } from '$lib/motion/hyperframes/measure';
   import { iconBitmap } from './icon-bitmap';
   import { idleChrome } from '$lib/canvas/gpu/idle-chrome';
   import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
@@ -177,6 +178,28 @@
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
+  let domShows = $state(new Set<string>());
+  const handedOver = (t: Tile) => domIds.has(t.id) && (t.kind !== 'motion' || domShows.has(t.id));
+  $effect(() => {
+    const kept = [...untrack(() => domShows)].filter((id) => domIds.has(id));
+    if (kept.length !== untrack(() => domShows.size)) {
+      domShows = new Set(kept);
+    }
+  });
+  $effect(() => {
+    const el = wrap;
+    if (!el) {
+      return;
+    }
+    const painted = (e: Event) => {
+      const id = (e.target as HTMLElement).closest<HTMLElement>('.gpu-dom-node')?.dataset.id;
+      if (id && !domShows.has(id)) {
+        domShows = new Set([...domShows, id]);
+      }
+    };
+    el.addEventListener(TILE_PAINTED, painted);
+    return () => el.removeEventListener(TILE_PAINTED, painted);
+  });
   let hoverChrome = $state<string | null>(null);
   const chromeIds = $derived(new Set([...selected, ...domIds, ...(hoverChrome ? [hoverChrome] : []), ...(ghost ? [ghost.from.nodeId] : [])]));
   const labelOf = (t: Tile) => {
@@ -546,7 +569,7 @@
         h: t.h,
         rotation: t.rotation ?? 0,
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
-        hidden: domIds.has(t.id),
+        hidden: handedOver(t),
         snapshot: shotOf(t.id),
         running: isRunning(summaries.get(t.id)?.data ?? {}),
         chrome: chromeOf(t)
@@ -1602,7 +1625,7 @@
             </div>
           {/if}
           {#if domIds.has(t.id)}
-            <div class="gpu-dom-node" data-testid="gpu-dom-node" data-id={t.id}>
+            <div class="gpu-dom-node" class:unshown={!handedOver(t)} data-testid="gpu-dom-node" data-id={t.id}>
               <NodeBoundary>
                 {@render props.tile({ id: t.id, selected: on })}
               </NodeBoundary>
@@ -1865,6 +1888,10 @@
   .frame-standin {
     position: absolute;
     inset: 0;
+  }
+
+  .gpu-dom-node.unshown :global([data-motion-node]) {
+    opacity: 0;
   }
 
   .frame-standin-stage {
