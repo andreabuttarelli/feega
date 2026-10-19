@@ -1,6 +1,6 @@
 # gpu-full draws custom components
 
-Step 5 of the gpu-full roadmap (ADR 0018). The user's real videos are `Custom` clips: JS that
+Step 5 of the gpu-full roadmap (ADR 0019). The user's real videos are `Custom` clips: JS that
 builds DOM. gpu-full now runs that JS in a sandboxed iframe (`allow-scripts`, opaque origin,
 transparent, never shown), the same page `composeHtml` builds with `only` = the custom clips. A
 probe inside the page seeks the timeline, walks each `#cc-<clip>` root and posts back a plain
@@ -27,12 +27,12 @@ change what is drawn (filter, mask, clip) drops the whole subtree.
 
 Parity on the real fixtures (Chromium, Metal):
 
-| Fixture | as-is | noise effect off |
-|---|---|---|
-| saturn-a0252066 (Three.js scene, 6 frames) | SSIM 1.0000, 0.00% off | — |
-| saturn-aec7935d (iso blocks poster) | 0.0645 — clip skipped: `noise` effect | 0.8643, 7.09% off: text only |
-| saturn-39cd5543 (photo grid in a precomp, frame in range) | 0.0942 — clip skipped: `noise` | 0.8148, 18.9% off: text + 2 clipped photo groups |
-| saturn-299aece1 | empty doc, 1.0000 | — |
+| Fixture | mean SSIM | worst | pixels off | not drawn |
+|---|---|---|---|---|
+| saturn-a0252066 (Three.js scene) | 1.0000 | 1.0000 | 0.00% | — |
+| saturn-aec7935d (iso blocks poster, noise) | 0.8467 | 0.8467 | ~7% | 7 text elements |
+| saturn-39cd5543 (photo grid in a precomp; frame inside the clip) | 0.8037 | 0.8037 | 18.9% | 9 text elements, 2 clip-path photo groups |
+| saturn-299aece1 | 1.0000 | — | 0.00% | empty doc |
 
 Discarded: reading `offsetLeft`/`offsetWidth` (integers, half-pixel errors); a same-origin
 iframe (user code would reach the editor); approximating text with the browser's raster.

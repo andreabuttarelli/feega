@@ -95,6 +95,6 @@ web; natively they need a JS+WebGL runtime and stay out of scope.
 Built (2026-10-19): the component runs in a sandboxed opaque-origin iframe; a probe posts the
 untransformed tree back per frame, `readTree` converts it (subset and gaps listed in
 `changelog/2026-10-19-gpu-full-custom.md`). The Three.js fixture reaches SSIM 1.0000; the two
-posters miss only their text, clipped photo groups and the `noise` clip effect.
+posters (0.85 / 0.80) miss only their text and two clip-path photo groups.
 
 Ports of third-party code, when they happen, are recorded in `THIRD_PARTY_NOTICES.md`. None yet.
