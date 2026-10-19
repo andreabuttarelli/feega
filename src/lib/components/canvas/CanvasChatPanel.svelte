@@ -7,7 +7,6 @@
   import { browser } from '$app/environment';
   import { page } from '$app/stores';
   import { get } from 'svelte/store';
-  import { readChatPanelPx, writeChatPanelPx, CHAT_PANEL } from '$lib/shell-prefs';
   import { canvasSelection } from '$lib/canvas/promote-sheet';
   import { replaceState } from '$app/navigation';
   import { briefPrefill, type ChatPrefill } from '$lib/components/brand-agent/chat-prefill';
@@ -17,8 +16,8 @@
 
   let { open }: { open: boolean } = $props();
 
-  let widthPx = $state(readChatPanelPx());
   let prefill = $state<ChatPrefill | null>(null);
+  let held = $state(true);
 
   $effect(() => {
     const handoff = $page.data.handoff as ChatHandoff | null | undefined;
@@ -34,20 +33,20 @@
   function onResizeStart(e: PointerEvent) {
     e.preventDefault();
     const startX = e.clientX;
-    const startW = widthPx;
+    const startW = rightBar.width;
     const target = e.currentTarget as HTMLElement;
     target.setPointerCapture(e.pointerId);
 
     const onMove = (ev: PointerEvent) => {
       const next = startW - (ev.clientX - startX);
-      widthPx = Math.min(CHAT_PANEL.MAX, Math.max(CHAT_PANEL.MIN, Math.round(next)));
+      rightBar.resize(next);
     };
     const onUp = () => {
       target.releasePointerCapture(e.pointerId);
       target.removeEventListener('pointermove', onMove);
       target.removeEventListener('pointerup', onUp);
       target.removeEventListener('pointercancel', onUp);
-      writeChatPanelPx(widthPx);
+      rightBar.keepWidth();
     };
     target.addEventListener('pointermove', onMove);
     target.addEventListener('pointerup', onUp);
@@ -56,7 +55,7 @@
 </script>
 
 {#if open}
-  <div class="chat-pane" style={`--chat-w: ${widthPx}px;`}>
+  <div class="chat-pane" class:stowed={!held} style={`--chat-w: ${rightBar.width}px;`}>
     <div
       class="chat-resize-handle"
       role="separator"
@@ -66,7 +65,7 @@
       onpointerdown={onResizeStart}
     ></div>
     <div class="chat-column">
-      <BarSlot {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
+      <BarSlot bind:held {prefill} context={() => ({ canvasId: get(page).params.canvasId ?? null, selection: get(canvasSelection) })} />
     </div>
   </div>
 {/if}
@@ -81,6 +80,10 @@
     display: flex;
     background: var(--ui-wash);
     border-left: 1px solid var(--ui-divider);
+  }
+
+  .stowed {
+    display: none;
   }
 
   .chat-resize-handle {

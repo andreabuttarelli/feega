@@ -11,7 +11,8 @@
     onbusy,
     prefill = null,
     reload = 0,
-    properties
+    properties,
+    held = $bindable(false)
   }: {
     context?: () => Record<string, unknown>;
     onturnend?: () => void;
@@ -20,6 +21,7 @@
     prefill?: ChatPrefill | null;
     reload?: number;
     properties?: BarProperties;
+    held?: boolean;
   } = $props();
 
   let slot = $state<HTMLDivElement | null>(null);
@@ -48,6 +50,10 @@
     }
     const claim = untrack(() => rightBar.claim(slot!, binding));
     return () => rightBar.release(claim);
+  });
+
+  $effect(() => {
+    held = slot !== null && rightBar.active?.element === slot;
   });
 
   $effect(() => {

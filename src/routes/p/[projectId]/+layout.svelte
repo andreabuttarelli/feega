@@ -288,7 +288,7 @@
         <CanvasSheet {projectId} />
       </div>
 
-      <CanvasChatPanel open={chatOpen && !inlineStage.editing} />
+      <CanvasChatPanel open={chatOpen} />
     </div>
   {:else}
     <DesktopPageBar
