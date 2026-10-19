@@ -72,6 +72,28 @@ pub struct Matte {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct CssFunction {
+    pub name: String,
+    pub args: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SvgNode {
+    pub tag: String,
+    #[serde(default)]
+    pub attrs: serde_json::Map<String, serde_json::Value>,
+    #[serde(default)]
+    pub children: Vec<SvgNode>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum Filter {
+    Css { fns: Vec<CssFunction> },
+    Svg { nodes: Vec<SvgNode> },
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Look {
     pub opacity: f32,
     pub matrix: Affine,
@@ -86,7 +108,9 @@ pub struct Look {
     #[serde(default)]
     pub matte: Option<Matte>,
     #[serde(default)]
-    pub filters: Option<serde_json::Value>,
+    pub filters: Option<Vec<Filter>>,
+    #[serde(default)]
+    pub space: Option<[f64; 4]>,
     #[serde(default)]
     pub backdrop: Option<f64>,
 }

@@ -1,11 +1,15 @@
+pub mod colour;
 pub mod display_list;
 pub mod engine;
+pub mod filter_passes;
+pub mod filters;
 pub mod kernel;
 pub mod passes;
 pub mod pictures;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
 pub mod scene;
+pub mod turbulence;
 #[cfg(target_arch = "wasm32")]
 pub mod web;
 
