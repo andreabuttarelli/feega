@@ -196,7 +196,7 @@
   let lastDom = new Set<string>();
   let coreOn = $state(props.core ?? false);
   let coreDrawn = $state(new Set<string>());
-  const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
+  const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}).map((f) => ({ ...f, poster: byId.get(f.id)?.poster?.url ?? null })) : []);
   let coreType = $state<CoreText | null>(null);
   $effect(() => {
     if (coreOn && !coreType) {

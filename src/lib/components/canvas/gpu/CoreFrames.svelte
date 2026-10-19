@@ -15,7 +15,7 @@
   import { screenUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { throughCamera } from '$lib/canvas/core/world-overlay';
   import type { PathItem } from '$lib/motion/gpu-full/display-list';
-  import { drawsWhole, onStage, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
+  import { drawsWhole, onStage, posterList, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
@@ -31,6 +31,7 @@
   let raster = $state<CoreRaster | null>(null);
   let lists = $state(new Map<string, DisplayList>());
   const asked = new Set<string>();
+  const postered = new Set<string>();
   const put = new Set<string>();
   const media = createMedia();
   const keyOf = (f: FrameAt) => `${f.id}:${f.revision}`;
@@ -44,11 +45,15 @@
     const source = (await res.json()) as Source;
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing: smoothingOf(navigator.userAgent) });
-    const list = drawFrame(prepared, stillFrame(source.doc));
-    if ((await media.ready(list)) === Readiness.Partial) {
+    const drawn = drawFrame(prepared, stillFrame(source.doc));
+    const list = drawsWhole(drawn) ? onStage(drawn, f.kind) : f.poster ? posterList({ width: drawn.width, height: drawn.height }, f.poster) : null;
+    if (!list || (await media.ready(list)) === Readiness.Partial) {
       return;
     }
-    lists = new Map(lists).set(keyOf(f), onStage(list, f.kind));
+    if (!drawsWhole(drawn)) {
+      postered.add(keyOf(f));
+    }
+    lists = new Map(lists).set(keyOf(f), list);
   }
 
   $effect(() => {
@@ -158,7 +163,7 @@
   $effect(() => () => media.dispose());
 </script>
 
-<canvas class="core-frames" bind:this={canvas} style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+<canvas class="core-frames" bind:this={canvas} style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.keys()].filter((k) => postered.has(k)).length}></canvas>
 
 <style>
   .core-frames {

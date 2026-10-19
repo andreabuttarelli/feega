@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsWhole, framesOnCanvas, onStage, stillFrame } from './frame-source';
+import { drawsWhole, framesOnCanvas, onStage, posterList, stillFrame } from './frame-source';
+import { ItemKind } from '$lib/motion/gpu-full/display-list';
 
 const tile = (id: string, kind = 'motion') => ({ id, kind, x: 10, y: 20, w: 300, h: 200 });
 
@@ -50,5 +51,13 @@ describe('a transparent doc on the canvas', () => {
   it('elements and groups stay see-through, and an opaque doc keeps its own colour', () => {
     expect(onStage(list(null), FrameKind.Element).background).toBeNull();
     expect(onStage(list([1, 0, 0, 1]), FrameKind.Frame).background).toEqual([1, 0, 0, 1]);
+  });
+});
+
+describe('a frame the core cannot draw yet', () => {
+  it('shows its poster contained on the black stage, the way its card does today', () => {
+    const list = posterList({ width: 300, height: 200 }, 'https://p/poster.jpg');
+    expect(list).toMatchObject({ width: 300, height: 200, background: [0, 0, 0, 1], unsupported: [] });
+    expect(list.items).toEqual([expect.objectContaining({ kind: ItemKind.Image, src: 'https://p/poster.jpg', fit: 'contain', size: { width: 300, height: 200 } })]);
   });
 });

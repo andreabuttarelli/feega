@@ -1,7 +1,9 @@
 import { FrameKind, MOTION_NODE_BAR_H, frameChrome } from '$lib/canvas/motion-node';
 import { posterSecond } from '$lib/motion/poster-capture';
 import { stillFrame as docStill } from '$lib/motion/still';
-import type { DisplayList } from '$lib/motion/gpu-full/display-list';
+import { ItemKind, type DisplayList } from '$lib/motion/gpu-full/display-list';
+import { IDENTITY } from '$lib/motion/affine';
+import { BlendMode } from '$lib/motion/blend';
 import type { Rgba } from '$lib/motion/gpu-full/rgba';
 import type { Box } from './canvas-scene';
 
@@ -9,7 +11,7 @@ const MOTION = 'motion';
 
 export type FrameTile = { id: string; kind?: string | null; x: number; y: number; w: number; h: number };
 export type FrameData = { kind?: unknown; docHeadRevision?: unknown };
-export type FrameAt = { id: string; kind: FrameKind; revision: number; box: Box };
+export type FrameAt = { id: string; kind: FrameKind; revision: number; box: Box; poster?: string | null };
 
 const kindOf = (raw: unknown): FrameKind => (Object.values(FrameKind).includes(raw as FrameKind) ? (raw as FrameKind) : FrameKind.Frame);
 
@@ -33,10 +35,21 @@ export const stillFrame = (doc: { fps: number; durationInFrames: number; still?:
 
 export const drawsWhole = (list: DisplayList): boolean => list.unsupported.length === 0;
 
+const CONTAIN = 'contain';
+const CENTRE = 0.5;
+const BLACK: Rgba = [0, 0, 0, 1];
+
 const STAGE: Record<FrameKind, Rgba | null> = {
-  [FrameKind.Frame]: [0, 0, 0, 1],
+  [FrameKind.Frame]: BLACK,
   [FrameKind.Element]: null,
   [FrameKind.Group]: null
 };
 
 export const onStage = (list: DisplayList, kind: FrameKind): DisplayList => ({ ...list, background: list.background ?? STAGE[kind] });
+
+export const posterList = (size: { width: number; height: number }, src: string): DisplayList => ({
+  ...size,
+  background: BLACK,
+  items: [{ kind: ItemKind.Image, clip: src, src, video: false, mediaTime: 0, size, fit: CONTAIN, focus: [CENTRE, CENTRE], zoom: 1, clipped: true, inner: IDENTITY, opacity: 1, matrix: IDENTITY, blur: 0, blend: BlendMode.Normal }],
+  unsupported: []
+});
