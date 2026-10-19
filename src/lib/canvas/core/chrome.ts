@@ -15,7 +15,7 @@ export enum ChromePart {
   Icon = 'icon'
 }
 
-export type Glyphs = (text: string, size: number) => { contours: number[][]; width: number };
+export type Glyphs = (text: string, size: number, wrap?: { width: number; height: number }) => { contours: number[][]; width: number };
 
 export type ChromeTile = {
   id: string;
