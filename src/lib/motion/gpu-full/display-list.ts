@@ -20,6 +20,7 @@ import { modifierFilter } from '../shape/modifiers';
 import { ShapeKind, modifierValues } from '../shape/schema';
 import { flatten, rectOutline, type Outline } from '../shape/geometry';
 import { rgbaOf, type Rgba } from './rgba';
+import { FillRule, PaintKind, type Paint, type Stop } from './paint';
 import { sourceSeconds } from '../time-remap';
 import { edgeAt, moveAt, type Pose } from './edges';
 import { stillSeconds } from '../still';
@@ -27,22 +28,11 @@ import { animatorOfKey, COLOR_VALUE, SELECTOR_KEYS, type TextAnimator } from '..
 import { NO_TYPESET, paintText, TEXT_COMPONENTS, TextGap, type TextComponent, type Typeset } from './text/painter';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
+export { FillRule, PaintKind, type Paint, type Stop } from './paint';
 
 export enum ItemKind {
   Path = 'path',
   Image = 'image'
-}
-
-export enum PaintKind {
-  Solid = 'solid',
-  Linear = 'linear',
-  Radial = 'radial'
-}
-
-export enum FillRule {
-  NonZero = 'nonzero',
-  EvenOdd = 'evenodd',
-  Union = 'union'
 }
 
 export enum Unsupported {
@@ -64,13 +54,6 @@ export enum Unsupported {
   Glyph = 'glyph',
   TextPath = 'text-path'
 }
-
-export type Stop = { at: number; color: Rgba };
-
-export type Paint =
-  | { kind: PaintKind.Solid; color: Rgba }
-  | { kind: PaintKind.Linear; from: [number, number]; to: [number, number]; stops: Stop[] }
-  | { kind: PaintKind.Radial; center: [number, number]; radius: number; stops: Stop[] };
 
 export type Scissor = [number, number, number, number];
 
