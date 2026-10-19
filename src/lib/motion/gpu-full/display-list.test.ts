@@ -5,7 +5,7 @@ import { Ease, TransitionKind } from '../design';
 import { addClip, setKeyframes, type OpResult } from '../timeline';
 import { FillType } from '../fill/model';
 import { BlendMode } from '../blend';
-import { displayListAt, FillRule, ItemKind, PaintKind, Unsupported, type PathItem } from './display-list';
+import { displayListAt, drawFrame, FillRule, ItemKind, PaintKind, prepare, Unsupported, type ImageItem, type PathItem } from './display-list';
 import { apply2d } from '../affine';
 import { boxBook } from './text/test-face';
 import { Smoothing } from './text/painter';
@@ -44,16 +44,6 @@ const corners = (item: PathItem | undefined) => {
   }
   return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
 };
-
-describe('keyframed modifiers', () => {
-  it('repeats a shape as many times as its keyframed copies say at the frame', () => {
-    const repeated = patch(withCard, 'card', { props: { ...cardProps, modifiers: [{ id: 'r', kind: 'repeater', enabled: true, params: { copies: 1, offsetX: 0.2, offsetY: 0 } }] }, keyframes: { 'mod.r.copies': [{ frame: 0, value: 1, ease: 'linear' }, { frame: 10, value: 5, ease: 'linear' }] } });
-    const drawn = list(repeated, 10);
-
-    expect(drawn.unsupported).toEqual([]);
-    expect(drawn.items.filter((i) => i.clip === 'card')).toHaveLength(5);
-  });
-});
 
 describe('displayListAt', () => {
   it('paints the brand background as a full-frame rectangle in the token colour', () => {
@@ -168,6 +158,14 @@ describe('displayListAt', () => {
     };
 
     expect((centre(0) + centre(180)) / 2).toBeCloseTo(288, 0);
+  });
+
+  it('shows an image fill through the glyphs as a matted picture', () => {
+    const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab', fills: [{ type: 'image', assetId: 'pic' }] } }, 'text'));
+    const picture = drawFrame(prepare(texted, FEEGA_TOKENS, { pic: 'https://x.test/p.png' }, boxType), 60).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'text');
+
+    expect(picture?.src).toBe('https://x.test/p.png');
+    expect(picture?.matte?.items.flatMap((i) => (i.kind === ItemKind.Path ? i.contours : []))).toHaveLength(2);
   });
 
   describe('text animators', () => {

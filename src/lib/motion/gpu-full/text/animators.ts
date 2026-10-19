@@ -1,5 +1,5 @@
 import { IDENTITY, mul2d, type Affine } from '../../affine';
-import { ANIMATOR_UNITS, AnimatorUnit, type TextAnimator } from '../../text-animators/model';
+import { ANIMATOR_UNITS, AnimatorUnit, type TextAnimator, type ValueKey } from '../../text-animators/model';
 import { finestUnit } from '../../text-animators/render';
 import { positionsOf, selection } from '../../text-animators/split';
 
@@ -9,7 +9,9 @@ export type Tint = { color: string; amount: number };
 
 export type Look = { opacity: number; blur: number; turn: Affine; tint: Tint | null };
 
-export type Animation = { finest: AnimatorUnit; at: (slot: Slot) => Look };
+export type Animation = { finest: AnimatorUnit; isolates: boolean; at: (slot: Slot) => Look };
+
+const ISOLATING: readonly ValueKey[] = ['x', 'y', 'rotation', 'scale', 'blur'];
 
 const DEG = Math.PI / 180;
 
@@ -40,5 +42,5 @@ export function animation(text: string, animators: readonly TextAnimator[]): Ani
     }
     return look;
   };
-  return { finest, at };
+  return { finest, isolates: animators.some((a) => ISOLATING.some((k) => a.values[k] !== undefined)), at };
 }

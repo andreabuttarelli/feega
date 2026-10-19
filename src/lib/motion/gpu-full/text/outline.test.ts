@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Op } from './face';
-import { clipped, contoursOf, dilated } from './outline';
+import { clipped, contoursOf, dilated, within } from './outline';
 
 const extent = (contours: number[][]) => {
   const xs = contours.flatMap((c) => c.filter((_, i) => i % 2 === 0));
@@ -56,5 +56,16 @@ describe('dilated', () => {
     const reversed = [0, 100, 100, 100, 100, 0, 0, 0];
 
     expect(extent(dilated([reversed], 1))).toEqual([-1, -1, 101, 101]);
+  });
+});
+
+describe('within', () => {
+  it('keeps what lies inside a convex polygon, whichever way it winds', () => {
+    const square = [[0, 0, 100, 0, 100, 100, 0, 100]];
+    const triangle = [0, 0, 100, 0, 0, 100];
+
+    expect(extent(within(square, triangle))).toEqual([0, 0, 100, 100]);
+    expect(within(square, triangle)[0].every((v, i, c) => i % 2 === 1 || v + c[i + 1] <= 100 + 1e-9)).toBe(true);
+    expect(within(square, [...triangle].reverse().flatMap((_, i, a) => (i % 2 === 0 ? [a[i + 1], a[i]] : []))).length).toBe(1);
   });
 });
