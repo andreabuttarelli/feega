@@ -14,3 +14,10 @@ harfrust = "0.12.0"
 parley = { version = "0.12.0", default-features = false, features = ["std"] }
 skrifa = "0.44.0"
 wuff = "0.2.9"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "=0.2.129"
+
+[profile.release]
+opt-level = "s"
+lto = true

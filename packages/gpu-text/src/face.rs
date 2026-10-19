@@ -64,6 +64,10 @@ impl Source {
         FontRef::new(&self.data).expect("checked when the source was read")
     }
 
+    pub(crate) fn bytes(&self) -> Arc<Vec<u8>> {
+        self.data.clone()
+    }
+
     pub fn axes(&self) -> Axes {
         self.font().axes().iter().map(|a| (a.tag().to_string(), (a.min_value(), a.max_value(), a.default_value()))).collect()
     }

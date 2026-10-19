@@ -61,6 +61,28 @@ jobs:
       - name: Web build compiles
         run: cargo build --locked --lib --target wasm32-unknown-unknown
 
+  gpu-text:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/gpu-text
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/gpu-text
+
+      - name: Faces, face book and layout
+        run: cargo test --locked
+
+      - name: Web build compiles
+        run: cargo build --locked --lib --target wasm32-unknown-unknown
+
   schema-drift:
     runs-on: ubuntu-latest
     continue-on-error: true
