@@ -83,12 +83,21 @@ fn draw(scene: &mut Scene, item: &PathItem, frame: Rect) {
     }
 }
 
-fn draw_image(scene: &mut Scene, item: &ImageItem, image: &ImageData) {
-    let natural = Size { width: image.width as f64, height: image.height as f64 };
+fn image_region(item: &ImageItem, natural: Size) -> (Rect, Rect) {
     let fitted = image_rect(item.size, natural, &item.fit, item.focus, item.zoom);
     let [k, _, _, _, tx, ty] = item.inner;
     let placed = Rect::new(fitted.x * k + tx, fitted.y * k + ty, (fitted.x + fitted.width) * k + tx, (fitted.y + fitted.height) * k + ty);
     let region = if item.clipped { placed.intersect(Rect::new(0.0, 0.0, item.size.width, item.size.height)) } else { placed };
+    (placed, region)
+}
+
+fn natural(image: &ImageData) -> Size {
+    Size { width: image.width as f64, height: image.height as f64 }
+}
+
+fn draw_image(scene: &mut Scene, item: &ImageItem, image: &ImageData) {
+    let natural = natural(image);
+    let (placed, region) = image_region(item, natural);
     if region.is_zero_area() {
         return;
     }
@@ -199,10 +208,15 @@ pub fn plain(items: &[Item], pictures: &Pictures, frame: Rect) -> Scene {
     scene
 }
 
+pub struct Placed {
+    pub image: ImageData,
+    pub origin: Point,
+}
+
 #[derive(Default)]
 pub struct Layers {
-    pub bodies: HashMap<usize, ImageData>,
-    pub behind: HashMap<usize, ImageData>,
+    pub bodies: HashMap<usize, Placed>,
+    pub behind: HashMap<usize, Placed>,
 }
 
 impl Layers {
@@ -211,12 +225,31 @@ impl Layers {
     }
 
     pub fn into_images(self) -> impl Iterator<Item = ImageData> {
-        self.bodies.into_values().chain(self.behind.into_values())
+        self.bodies.into_values().chain(self.behind.into_values()).map(|p| p.image)
     }
 }
 
-fn full_frame(scene: &mut Scene, image: &ImageData) {
-    scene.draw_image(&ImageBrush::new(image.clone()), Affine::IDENTITY);
+fn placed(scene: &mut Scene, layer: &Placed) {
+    scene.draw_image(&ImageBrush::new(layer.image.clone()), Affine::translate(layer.origin.to_vec2()));
+}
+
+fn hull(points: impl Iterator<Item = Point>) -> Option<Rect> {
+    points.fold(None, |acc: Option<Rect>, p| Some(acc.map_or(Rect::from_points(p, p), |r| r.union_pt(p))))
+}
+
+pub fn bounds(item: &Item, pictures: &Pictures) -> Option<Rect> {
+    match item {
+        Item::Path(path) => {
+            let m = Affine::new(path.look.matrix);
+            hull(path.contours.iter().flat_map(|c| c.chunks_exact(2).map(move |xy| m * Point::new(xy[0], xy[1]))))
+        }
+        Item::Image(image) => {
+            let (_, region) = image_region(image, natural(pictures.get(&image.clip)?));
+            let m = Affine::new(image.look.matrix);
+            hull([(region.x0, region.y0), (region.x1, region.y0), (region.x1, region.y1), (region.x0, region.y1)].into_iter().map(|(x, y)| m * Point::new(x, y)))
+        }
+        Item::Other { .. } => None,
+    }
 }
 
 pub fn silhouette(item: &Item, pictures: &Pictures, frame: Rect) -> Scene {
@@ -238,13 +271,13 @@ pub fn build(list: &DisplayList, pictures: &Pictures, layers: &Layers) -> (Scene
         };
         if look.backdrop.is_some() {
             match layers.behind.get(&i) {
-                Some(image) => scissored(&mut scene, look, |s| full_frame(s, image)),
+                Some(layer) => scissored(&mut scene, look, |s| placed(s, layer)),
                 None => skip(&mut skipped, item.clip(), "backdrop"),
             }
         }
         if needs_layer(look) {
             match layers.bodies.get(&i) {
-                Some(image) => scissored(&mut scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| full_frame(s, image))),
+                Some(layer) => scissored(&mut scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| placed(s, layer))),
                 None => skip(&mut skipped, item.clip(), "layer"),
             }
             continue;

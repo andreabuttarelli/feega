@@ -55,6 +55,25 @@ fn wide_kernels_stride_to_stay_within_the_tap_budget() {
 }
 
 #[test]
+fn a_path_is_bounded_by_its_transformed_points() {
+    let list = parse(&square(r#", "matrix": [2, 0, 0, 1, 4, 0]"#).replace(r#""matrix": [1, 0, 0, 1, 0, 0], "blend": "normal", "matrix""#, r#""blend": "normal", "matrix""#)).unwrap();
+
+    let b = gpu_core::scene::bounds(&list.items[0], &gpu_core::pictures::Pictures::new()).unwrap();
+    assert_eq!((b.x0, b.y0, b.x1, b.y1), (36.0, 16.0, 100.0, 48.0));
+}
+
+#[test]
+fn an_image_is_bounded_by_its_box_when_clipped() {
+    let json = r#"{ "width": 64, "height": 64, "background": null, "items": [
+    { "kind": "image", "clip": "pic", "src": "x", "video": false, "mediaTime": 0, "size": { "width": 20, "height": 10 },
+      "fit": "cover", "focus": [0.5, 0.5], "zoom": 1, "clipped": true, "inner": [1, 0, 0, 1, 0, 0], "opacity": 1, "matrix": [1, 0, 0, 1, 5, 6], "blend": "normal" } ] }"#;
+    let pictures = gpu_core::pictures::Pictures::from([("pic".to_string(), gpu_core::pictures::picture(1, 1, vec![0; 4]))]);
+
+    let b = gpu_core::scene::bounds(&parse(json).unwrap().items[0], &pictures).unwrap();
+    assert_eq!((b.x0, b.y0, b.x1, b.y1), (5.0, 6.0, 25.0, 16.0));
+}
+
+#[test]
 fn parses_masks_and_mattes() {
     let masked = parse(&square(RECT_MASK)).unwrap();
     let matted = parse(&square(MATTE)).unwrap();
