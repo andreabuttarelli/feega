@@ -40,7 +40,7 @@ describe('loadFonts', () => {
     const book = await fontLoader({ text: async () => CSS, bytes: async () => new Uint8Array([1]) }, engine)(titled, {}, FEEGA_TOKENS);
 
     expect(read).toHaveLength(1);
-    expect(book({ family: 'DM Sans', weight: 400, italic: false, size: 10, axes: {} }, 0x48)?.face).toBe(boxFace);
+    expect(book({ family: 'DM Sans', weight: 400, italic: false, size: 10, axes: {} }, 0x48)?.face.shape).toBe(boxFace.shape);
   });
 
   it('starts the face engine only once a file is read', () => {

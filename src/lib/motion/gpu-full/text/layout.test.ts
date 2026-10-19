@@ -98,4 +98,12 @@ describe('layOut', () => {
   it('gives the line height it stacked lines with', () => {
     expect(layOut(['a'], type, wrapping, 10_000, boxBook()).lineHeight).toBeCloseTo(1.2 * SIZE);
   });
+
+  it('adds extra spacing after the characters it is asked to, in em', () => {
+    const spaced = layOut(['ab cd'], type, wrapping, 10_000, boxBook(), (_p, word, letter) => (word === 0 && letter === 0 ? 0.5 : 0));
+    const glyphs = lines(spaced)[0].glyphs;
+
+    expect(glyphs[1].x - glyphs[0].x).toBeCloseTo(em(WIDE) + 0.5 * SIZE);
+    expect(spaced.width).toBeCloseTo(layOut(['ab cd'], type, wrapping, 10_000, boxBook()).width + 0.5 * SIZE);
+  });
 });

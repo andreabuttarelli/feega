@@ -48,4 +48,10 @@ describe('animation', () => {
     expect(look.blur).toBeCloseTo(2 + 3 * 0.5);
     expect(look.tint).toEqual({ color: '#0000ff', amount: 0.5 });
   });
+
+  it('sums tracking in em, weighted by selection', () => {
+    const run = animation('a', [animator({ values: { tracking: 0.2 } }), animator({ id: 'b', shape: SelectorShape.Ramp, softness: 1, start: 0, end: 200, values: { tracking: 0.1 } })])!;
+
+    expect(run.at(slot(0)).spacing).toBeCloseTo(0.2 + 0.05);
+  });
 });

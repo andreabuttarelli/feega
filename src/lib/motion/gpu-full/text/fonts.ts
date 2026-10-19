@@ -72,6 +72,13 @@ function coordsFor(source: Source, weight: number, request: Request): Record<str
 export const resolvedRequest = <R extends Omit<Request, 'size'>>(request: R, registry: readonly FontFace[]): R => ({ ...request, family: familyName(request.family, registry), weight: loadedWeight(request.family, request.weight, registry) });
 
 export function faceBook(rules: readonly FaceRule[], sources: ReadonlyMap<string, Source>, registry: readonly FontFace[]): FaceBook {
+  const keyed = new Map<string, Face>();
+  const stamped = (font: string, coords: Record<string, number>): Face => {
+    const name = `${font}|${JSON.stringify(coords)}`;
+    const face = keyed.get(name) ?? { ...sources.get(font)!.at(coords), key: { font, coords: Object.entries(coords) } };
+    keyed.set(name, face);
+    return face;
+  };
   return (request, codePoint): Resolved | null => {
     const { family, weight: desired } = resolvedRequest(request, registry);
     const own = rules.filter((r) => r.family === family && sources.has(r.url));
@@ -87,6 +94,6 @@ export function faceBook(rules: readonly FaceRule[], sources: ReadonlyMap<string
       return null;
     }
     const source = sources.get(rule.url)!;
-    return { face: source.at(coordsFor(source, clamp(desired, group), request)), skew };
+    return { face: stamped(rule.url, coordsFor(source, clamp(desired, group), request)), skew };
   };
 }

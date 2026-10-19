@@ -58,17 +58,18 @@ export function paintOnPath(env: PathEnv): Painted | TextGap {
   const run = animation(String(p.text), env.animators);
   const colour: Colour = (v) => rgbaOf(env.colour(v)) ?? [0, 0, 0, 1];
   const color = colour(String(p.color));
-  const places = placeGlyphs(env.onPath.curve, drawn.map((c) => c.advance), env.onPath.placement);
-  const inks: Ink[] = [];
   let letter = 0;
+  const looks = drawn.map((char) => (run && !char.space ? run.at({ [AnimatorUnit.Char]: letter++, [AnimatorUnit.Word]: 0, [AnimatorUnit.Line]: 0 }) : STILL));
+  const advances = drawn.map((char, i) => char.advance + (run?.tracks && !char.space ? looks[i].spacing - Number(p.tracking) : 0) * size);
+  const places = placeGlyphs(env.onPath.curve, advances, env.onPath.placement);
+  const inks: Ink[] = [];
   drawn.forEach((char, i) => {
     if (char.space) {
       return;
     }
-    const look = run ? run.at({ [AnimatorUnit.Char]: letter, [AnimatorUnit.Word]: 0, [AnimatorUnit.Line]: 0 }) : STILL;
-    letter += 1;
+    const look = looks[i];
     const [x, y, angle] = places[i];
-    const box = mul2d(mul2d(turned(x, y, angle), [1, 0, 0, 1, -char.advance / 2, -BASELINE_EM * size]), about([0, 0, char.advance, lineHeight], look.turn, size));
+    const box = mul2d(mul2d(turned(x, y, angle), [1, 0, 0, 1, -advances[i] / 2, -BASELINE_EM * size]), about([0, 0, advances[i], lineHeight], look.turn, size));
     const own = size / char.face.unitsPerEm;
     let pen = 0;
     const contours = char.glyphs.flatMap((g) => {

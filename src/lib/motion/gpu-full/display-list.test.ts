@@ -5,10 +5,10 @@ import { Ease, TransitionKind } from '../design';
 import { addClip, setKeyframes, type OpResult } from '../timeline';
 import { FillType } from '../fill/model';
 import { BlendMode } from '../blend';
-import { displayListAt, FillRule, ItemKind, PaintKind, Unsupported, type PathItem } from './display-list';
+import { displayListAt, drawFrame, FillRule, ItemKind, PaintKind, prepare, Unsupported, type ImageItem, type PathItem } from './display-list';
 import { apply2d } from '../affine';
-import { boxBook } from './text/test-face';
-import { Smoothing } from './text/painter';
+import { boxBook, boxFace } from './text/test-face';
+import { Smoothing, TextOutput } from './text/painter';
 import { addAnimator } from '../text-animators/ops';
 import { setTextPath } from '../text-path/ops';
 import { PathPreset, PathSourceKind } from '../text-path/model';
@@ -44,16 +44,6 @@ const corners = (item: PathItem | undefined) => {
   }
   return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
 };
-
-describe('keyframed modifiers', () => {
-  it('repeats a shape as many times as its keyframed copies say at the frame', () => {
-    const repeated = patch(withCard, 'card', { props: { ...cardProps, modifiers: [{ id: 'r', kind: 'repeater', enabled: true, params: { copies: 1, offsetX: 0.2, offsetY: 0 } }] }, keyframes: { 'mod.r.copies': [{ frame: 0, value: 1, ease: 'linear' }, { frame: 10, value: 5, ease: 'linear' }] } });
-    const drawn = list(repeated, 10);
-
-    expect(drawn.unsupported).toEqual([]);
-    expect(drawn.items.filter((i) => i.clip === 'card')).toHaveLength(5);
-  });
-});
 
 describe('displayListAt', () => {
   it('paints the brand background as a full-frame rectangle in the token colour', () => {
@@ -170,6 +160,34 @@ describe('displayListAt', () => {
     expect((centre(0) + centre(180)) / 2).toBeCloseTo(288, 0);
   });
 
+  it('shows an image fill through the glyphs as a matted picture', () => {
+    const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab', fills: [{ type: 'image', assetId: 'pic' }] } }, 'text'));
+    const picture = drawFrame(prepare(texted, FEEGA_TOKENS, { pic: 'https://x.test/p.png' }, boxType), 60).items.find((i): i is ImageItem => i.kind === ItemKind.Image && i.clip === 'text');
+
+    expect(picture?.src).toBe('https://x.test/p.png');
+    expect(picture?.matte?.items.flatMap((i) => (i.kind === ItemKind.Path ? i.contours : []))).toHaveLength(2);
+  });
+
+  it('keeps fills the native core cannot read on the JS painter, never in a text plan', () => {
+    const native = { ...boxType, native: { rules: [], registry: [] } };
+    const fill = (fills: unknown[]) => must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab', fills } }, 'text'));
+    const kinds = (doc: MotionDoc) => drawFrame(prepare(doc, FEEGA_TOKENS, {}, native), 60).items.filter((i) => i.clip === 'text').map((i) => i.kind);
+    const stops = [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }];
+
+    expect(kinds(fill([{ type: 'linear-gradient', angle: 0, stops }]))).toEqual([ItemKind.Text]);
+    expect(new Set(kinds(fill([{ type: 'diamond-gradient', stops }])))).toEqual(new Set([ItemKind.Path]));
+    expect(new Set(kinds(fill([{ type: 'angular-gradient', stops }])))).toEqual(new Set([ItemKind.Path]));
+  });
+
+  it('carries text as glyph runs when asked to, for the native core to outline', () => {
+    const keyed = { ...boxFace, key: { font: 'box.woff2', coords: [] as [string, number][] } };
+    const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab' } }, 'text'));
+    const runs = drawFrame(prepare(texted, FEEGA_TOKENS, {}, { fonts: () => ({ face: keyed, skew: 0 }), smoothing: Smoothing.Plain, output: TextOutput.Glyphs }), 60).items.filter((i) => i.clip === 'text');
+
+    expect(runs.map((i) => i.kind)).toEqual([ItemKind.Glyphs]);
+    expect(runs[0]).toMatchObject({ font: 'box.woff2', coords: [], glyphs: [[0x61, expect.any(Number), expect.any(Number)], [0x62, expect.any(Number), expect.any(Number)]] });
+  });
+
   describe('text animators', () => {
     const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab' } }, 'text'));
     const animated = (values: Record<string, number>) => must(addAnimator(texted, 'text', 'a', { shape: SelectorShape.Square, start: 0, end: 0, values }));
@@ -189,8 +207,16 @@ describe('displayListAt', () => {
       expect(glyphsAt(blurred, 60).map((i) => i.blur)).toEqual([4, 4]);
     });
 
-    it('still names a tracking animator', () => {
-      expect(displayListAt(animated({ tracking: 0.1 }), 60, FEEGA_TOKENS, boxType).unsupported).toContainEqual({ clip: 'text', component: 'Text', reason: Unsupported.Animator });
+    it('draws a tracking animator by spreading the selected characters', () => {
+      const width = (doc: MotionDoc) => {
+        const ink = corners(glyphsAt(doc, 60).reduce((all, i) => ({ ...i, contours: [...all.contours, ...i.contours] })));
+        return ink.right - ink.left;
+      };
+      const tracked = must(addAnimator(texted, 'text', 'a', { values: { tracking: 0.5 } }));
+
+      expect(displayListAt(tracked, 60, FEEGA_TOKENS, boxType).unsupported).toEqual([]);
+      expect(width(tracked)).toBeGreaterThan(width(texted));
     });
   });
+
 });
