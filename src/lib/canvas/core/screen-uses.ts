@@ -24,7 +24,7 @@ const near = (view: Viewport, b: Box, screen: ScreenSize, reach: number) => {
 
 export const AHEAD_REACH = 1;
 
-export function turned(t: Turn | undefined): Affine {
+function turned(t: Turn | undefined): Affine {
   if (!t) {
     return [1, 0, 0, 1, 0, 0];
   }

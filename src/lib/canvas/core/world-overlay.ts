@@ -1,11 +1,11 @@
-import { mul2d, type Affine } from '$lib/motion/affine';
+import { composeLocal, mul2d, type Affine } from '$lib/motion/affine';
 import type { PathItem } from '$lib/motion/gpu-full/display-list';
 import type { Viewport } from '$lib/canvas/dot-grid';
 import type { Box, Curve } from '$lib/canvas/gpu/geometry';
 import type { SnapGuide } from '$lib/canvas/snap';
 import { EdgeLook, edgeItems, ghostItems, guideItems, hoverItems, marqueeItems, runningItems, peerItems, rotateItems, type CorePeer, type CoreTheme } from './overlay';
 import { stateChrome, type Glyphs, type StateTile } from './chrome';
-import { turned, type Turn } from './screen-uses';
+import type { Turn } from './screen-uses';
 import { line, rect, solid } from './shapes';
 
 const ITERATE = 'iterate';
@@ -28,7 +28,7 @@ export function edgeLook(edge: Wire, selected: readonly string[], selectedEdge: 
   return linked ? EdgeLook.Linked : EdgeLook.Plain;
 }
 
-const turnedBy = (items: PathItem[], turn: Turn | undefined): PathItem[] => (turn ? items.map((i) => ({ ...i, matrix: mul2d(turned(turn), i.matrix) })) : items);
+const turnedBy = (items: PathItem[], turn: Turn | undefined): PathItem[] => (turn ? items.map((i) => ({ ...i, matrix: mul2d(composeLocal({ x: 0, y: 0, rotateZ: turn.degrees, scaleX: 1, scaleY: 1 }, [turn.about.x, turn.about.y]), i.matrix) })) : items);
 
 export function overlayOf(o: WorldOverlay): PathItem[] {
   return [
