@@ -6,8 +6,8 @@ import { createFilters } from './filters-gpu';
 import { BlendMode } from '../blend';
 import { MaskMode } from '../mask';
 import { CoverKind, RampKind, type MaskLayer } from './mask-layers';
+import { MAX_STOPS } from './paint';
 
-const MAX_STOPS = 8;
 const MSAA = 8;
 const STENCIL_ALL = 0xff;
 const CLIP_BIT = 0x80;
