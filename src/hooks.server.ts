@@ -8,12 +8,14 @@ import { outlivesTurn } from '$lib/server/session-life';
 import { markRlsScoped } from '$lib/server/rls-client';
 import { createUserDb, type Db } from '$lib/server/db/client';
 import { env as publicEnv } from '$env/dynamic/public';
+import { env as privateEnv } from '$env/dynamic/private';
 import type { Handle } from '@sveltejs/kit';
 import { withBrandContext, withToolContext } from '$lib/server/ai-log';
 import { TOOL_HEADER, TOOL_HEADER_LEGACY, toolFromHeader } from '@feega/api-contracts';
 import { createAdminClient } from '$lib/server/supabase-admin';
 import { isCsrfForbidden } from '$lib/server/csrf';
 import { redirectFor } from '$lib/server/host-redirects';
+import { SiteVisibility, siteVisibility } from '$lib/site/visibility';
 import { rememberCampaign, takeCampaign } from '$lib/server/onboarding/campaign-cookie';
 import { ENTRY_DEPS, homePathFor } from '$lib/server/tenancy/entry';
 import { ORG_COOKIE, LAST_PROJECT_COOKIE } from '$lib/server/tenancy/context';
@@ -98,6 +100,20 @@ const hostRedirect: Handle = async ({ event, resolve }) => {
   return resolve(event);
 };
 
+const SITE_ROUTES = '/(site)';
+const NOT_FOUND = 404;
+
+export function siteShown(): boolean {
+  return siteVisibility({ vercelEnv: privateEnv.VERCEL_ENV, flag: publicEnv.PUBLIC_SITE_ENABLED }) === SiteVisibility.Shown;
+}
+
+export const siteGate: Handle = async ({ event, resolve }) => {
+  if (event.route.id?.startsWith(SITE_ROUTES) && !siteShown()) {
+    throw error(NOT_FOUND);
+  }
+  return resolve(event);
+};
+
 const csrf: Handle = async ({ event, resolve }) => {
   if (isCsrfForbidden(event.request, event.url)) {
     const message = `Cross-site ${event.request.method} form submissions are forbidden`;
@@ -150,7 +166,7 @@ async function refuseSocialPublishing(event: RequestEvent): Promise<void> {
   }
 }
 
-export const handle: Handle = sequence(hostRedirect, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
+export const handle: Handle = sequence(hostRedirect, siteGate, csrf, Sentry.sentryHandle(), async ({ event, resolve }) => {
   // Per-request Supabase client bound to the request cookies (SSR auth).
   // Marchiato come RLS-scoped: chiave anon, quindi Postgres valuta le policy dell'utente. È la
   // dichiarazione su cui `query` decide di leggere — vedi $lib/server/rls-client.

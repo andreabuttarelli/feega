@@ -1,0 +1,227 @@
+@font-face {
+  font-family: 'BDO Grotesk';
+  src: url('/site/fonts/bdo-grotesk-variable.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'DM Sans';
+  src: url('/site/fonts/dm-sans-latin.woff2') format('woff2');
+  font-weight: 400 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+.site {
+  --site-bg: #000;
+  --site-ink: #f0eee9;
+  --site-accent: #ff4000;
+  --site-line: #4f4f4f;
+  --site-gutter: 12px;
+  --site-text: 14px;
+  --site-text-line: 16.8px;
+
+  min-height: 100vh;
+  background: var(--site-bg);
+  color: var(--site-ink);
+  font-family: 'BDO Grotesk', sans-serif;
+  font-size: var(--site-text);
+  line-height: var(--site-text-line);
+  letter-spacing: -0.02em;
+  font-variation-settings: 'wght' 500;
+  -webkit-font-smoothing: antialiased;
+}
+
+.site :is(h1, h2, h3, h4) {
+  font-family: inherit;
+}
+
+@media (min-width: 1200px) {
+  .site {
+    --site-gutter: 20px;
+    --site-text: 16px;
+    --site-text-line: 19.2px;
+  }
+}
+
+.site a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.site-legal {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 140px 20px 120px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.site-legal h1 {
+  font-size: 37px;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-weight: 400;
+}
+
+.site-legal h2 {
+  margin-top: 40px;
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.04em;
+  font-weight: 400;
+}
+
+.site-legal h3 {
+  margin-top: 32px;
+  font-size: 18px;
+  line-height: 1.2;
+  font-weight: 400;
+}
+
+.site-legal h1 + p {
+  margin-top: 24px;
+  opacity: 0.7;
+}
+
+.site-legal h1 + p + * {
+  margin-top: 24px;
+}
+
+.site-legal :is(p, ul, ol, table) {
+  margin-top: 20px;
+}
+
+.site-legal :is(h2, h3) + * {
+  margin-top: 20px;
+}
+
+.site-legal ul {
+  list-style: none;
+  padding: 0;
+}
+
+.site-legal ul > li {
+  position: relative;
+  padding-left: 18.3px;
+}
+
+.site-legal ul > li::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: 0.6em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.site-legal ol {
+  list-style: none;
+  padding: 0;
+  counter-reset: item;
+}
+
+.site-legal ol > li {
+  position: relative;
+  padding-left: 18.3px;
+  counter-increment: item;
+}
+
+.site-legal ol > li::before {
+  content: counter(item) '.';
+  position: absolute;
+  left: 0;
+}
+
+.site-legal li p,
+.site-legal li + li {
+  margin-top: 0;
+}
+
+.site-legal strong {
+  font-weight: 400;
+}
+
+.site-legal hr {
+  margin-top: 40px;
+  border: 0;
+  border-top: 1px solid var(--site-line);
+}
+
+.site-legal hr + :is(p, .rows) {
+  margin-top: 23px;
+}
+
+.site-legal table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.site-legal :is(th, td) {
+  padding: 8px 8px 8px 0;
+  text-align: left;
+  vertical-align: top;
+  font-weight: 400;
+}
+
+@media (min-width: 1200px) {
+  .site-legal {
+    padding-top: 180px;
+    padding-bottom: 160px;
+    font-size: 16px;
+  }
+
+  .site-legal h1 {
+    font-size: 58px;
+  }
+
+  .site-legal h2 {
+    margin-top: 48px;
+    font-size: 38px;
+  }
+
+  .site-legal :is(ul, ol) > li {
+    padding-left: 20.9px;
+  }
+
+  .site-legal ul > li::before {
+    left: 3px;
+    width: 5px;
+    height: 5px;
+  }
+
+  .site-legal hr {
+    margin-top: 48px;
+  }
+
+  .site-legal :is(p, ul, ol) {
+    margin-top: 20.1px;
+  }
+
+}
+
+.site-legal .rows {
+  margin-top: 20px;
+}
+
+.site-legal .row {
+  padding: 12px 0;
+  box-shadow: inset 0 1px var(--site-line);
+}
+
+.site-legal .row p + p {
+  margin-top: 20px;
+}
+
+.site-legal .row:first-child,
+.site-legal .row p:first-child {
+  margin-top: 0;
+}
+
+.site-legal .row span {
+  opacity: 0.6;
+}
