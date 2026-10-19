@@ -6,10 +6,11 @@
   import { CAPS, JOINS } from '$lib/motion/shape/schema';
   import { STROKE_ALIGNS, StrokeAlign, addStroke, moveStroke, removeStroke, setStroke, type Stroke, type StrokePatch } from '$lib/motion/stroke/model';
   import ColorField from './ColorField.svelte';
+  import type { LiveGesture } from '$lib/motion/live-edit';
   import { Adder } from './stack-adder';
   import SidePopover from '$lib/components/ui/shell/SidePopover.svelte';
 
-  let { strokes, tokens, sided = false, short, title = '', adder = Adder.Own, onchange }: { strokes: Stroke[]; tokens: BrandTokens; sided?: boolean; short: number; title?: string; adder?: Adder; onchange: (strokes: Stroke[], summary: string) => void } = $props();
+  let { strokes, tokens, sided = false, short, title = '', adder = Adder.Own, gesture = null, onchange }: { gesture?: LiveGesture | null; strokes: Stroke[]; tokens: BrandTokens; sided?: boolean; short: number; title?: string; adder?: Adder; onchange: (strokes: Stroke[], summary: string) => void } = $props();
 
   const PERCENT = 100;
   const PX_DIGITS = 10;
@@ -82,7 +83,7 @@
 
 {#snippet colour(name: string, value: string, write: (next: string) => void)}
   {@const { base, alpha } = colourAlpha(value)}
-  <ColorField {name} value={base} {tokens} {alpha} onchange={(next) => write(recolour(next, alpha))} onalpha={(next) => write(recolour(base, next))} />
+  <ColorField {name} {gesture} value={base} {tokens} {alpha} onchange={(next) => write(recolour(next, alpha))} onalpha={(next) => write(recolour(base, next))} />
 {/snippet}
 
 <div class="flex flex-col gap-0.5" data-testid="stroke-stack" bind:this={root}>

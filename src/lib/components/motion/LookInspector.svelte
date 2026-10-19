@@ -3,9 +3,11 @@
   import { ENVIRONMENT, ENV_PRESETS, LIGHT, LIGHT_KINDS, LightKind, MAX_LIGHTS, type Light } from '$lib/motion/look';
   import { removeLight, removeLook, setLight, setLook } from '$lib/motion/look-ops';
   import NumberField from './NumberField.svelte';
+  import type { LiveGesture } from '$lib/motion/live-edit';
+  import { liveColour } from './live-colour';
   import { FieldFill, FieldKind } from '$lib/motion/number-field';
 
-  let { doc, onchange }: { doc: MotionDoc; onchange: (doc: MotionDoc, summary: string) => void } = $props();
+  let { doc, gesture = null, onchange }: { doc: MotionDoc; gesture?: LiveGesture | null; onchange: (doc: MotionDoc, summary: string) => void } = $props();
 
   const POSITION = ['x', 'y', 'z'] as const;
   let error = $state('');
@@ -72,7 +74,7 @@
             <select value={light.kind} aria-label={`Kind of ${light.id}`} onchange={(e) => editLight(light, { kind: e.currentTarget.value as LightKind })}>
               {#each LIGHT_KINDS as kind (kind)}<option value={kind}>{kind}</option>{/each}
             </select>
-            <input type="color" value={light.color} aria-label={`Colour of ${light.id}`} onchange={(e) => editLight(light, { color: e.currentTarget.value })} />
+            <input type="color" value={light.color} aria-label={`Colour of ${light.id}`} use:liveColour={{ gesture, apply: (color) => editLight(light, { color }) }} />
             <button type="button" class="link" onclick={() => commit(removeLight(doc, light.id), `Removed light ${light.id}`)}>Remove</button>
           </div>
           <div class="row">
