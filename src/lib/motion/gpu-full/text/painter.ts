@@ -8,17 +8,17 @@ import { BlendMode } from '../../blend';
 import { StrokeAlign } from '../../stroke/model';
 import { firstColour } from '../../stroke/render';
 import { Cap, Join, strokePolygons } from '../stroke';
-import { FillRule, PaintKind, type Paint } from '../paint';
+import { FillRule, PaintKind, type Paint, type Stop } from '../paint';
 import { fitSize } from '../../hyperframes/fit-runtime';
 import type { Box } from '../../layout';
 import { easeCurve } from '../../sample-track';
 import { elementStrokes } from '../../stroke/elements';
 import { TextSizing } from '../../text-sizing';
 import { rgbaOf, type Rgba } from '../rgba';
-import type { Face, FaceBook } from './face';
+import type { Face, FaceBook, Request } from './face';
 import { layOut, Shaping, Spaces, type Flow, type Glyph, type Laid, type Line, type Type } from './layout';
 import { AnimatorUnit, type TextAnimator } from '../../text-animators/model';
-import { animation, type Animation, type Look, type Slot } from './animators';
+import { animation, type Animation, type Look } from './animators';
 import { clipped, contoursOf, dilated, type Rect } from './outline';
 
 export type TextComponent = 'Title' | 'Text' | 'Kicker' | 'Caption';
@@ -80,13 +80,13 @@ enum Motion {
   FadeUp = 'fade-up'
 }
 
-enum Area {
+export enum Area {
   Line = 'line',
   Block = 'block',
   Whole = 'whole'
 }
 
-enum Anchor {
+export enum Anchor {
   Centre = 'centre',
   Top = 'top'
 }
@@ -192,41 +192,9 @@ export const moved = (contours: number[][], dx: number, dy: number) => contours.
 
 const rect = ([l, t, r, b]: Rect) => [l, t, r, t, r, b, l, b];
 
-type Placed = { laid: Laid; type: Type; frame: Frame; room: number };
-
-function place(env: TextEnv, kind: Kind, p: Props, paragraphs: string[], shaping: Shaping): Placed {
-  const frame = kind.frame(p, env.box, env.stage);
-  const requested = kind.size(p, Math.min(env.stage.width, env.stage.height));
-  const typeAt = (size: number): Type => ({
-    request: { family: String(p.font), weight: Number(p.weight), italic: p.italic === true, axes: axesOf(p) },
-    size,
-    tracking: Number(p.tracking),
-    leading: Number(p.leading),
-    inset: kind.inset * size,
-    shaping
-  });
-  const flow = kind.flow(p);
-  const lay = (size: number) => layOut(paragraphs, typeAt(size), flow, frame.box.width, env.fonts);
-  const size = kind.fits(p) ? fitSize(requested, (s) => lay(s), frame.box) : requested;
-  const laid = lay(size);
-  return { laid, type: typeAt(size), frame, room: frame.hugs ? laid.width : frame.box.width };
-}
-
-type Unit = { slot: Slot | null; contours: number[][]; outlines: number[][]; box: Rect; area: Rect };
-
 export const STILL: Look = { opacity: 1, blur: 0, turn: [1, 0, 0, 1, 0, 0], tint: null };
 
 const WORD = /\S+/g;
-
-function slotsOf(text: string, paragraphs: string[]): (paragraph: number, g: Glyph) => Slot {
-  const words = text.split('\n').flatMap((line, l) => [...line.matchAll(WORD)].map((m) => ({ line: l, chars: [...m[0]].length })));
-  const charsBefore = words.map((_, w) => words.slice(0, w).reduce((n, word) => n + word.chars, 0));
-  const wordsBefore = paragraphs.map((_, i) => paragraphs.slice(0, i).reduce((n, para) => n + (para.match(WORD)?.length ?? 0), 0));
-  return (paragraph, g) => {
-    const word = wordsBefore[paragraph] + g.word;
-    return { [AnimatorUnit.Char]: (charsBefore[word] ?? 0) + g.letter, [AnimatorUnit.Word]: word, [AnimatorUnit.Line]: words[word]?.line ?? 0 };
-  };
-}
 
 export function about([left, top, right, bottom]: Rect, turn: Affine, em: number): Affine {
   const cx = (left + right) / 2;
@@ -251,42 +219,50 @@ function mixed(base: Rgba, tint: Rgba, amount: number): Rgba {
 
 type Shade = { paint: Paint; squash: number };
 
-type Layer = (area: Rect) => Shade;
-
 export type Colour = (v: string) => Rgba;
 
 const faded = (c: Rgba, opacity: number): Rgba => [c[0], c[1], c[2], c[3] * opacity];
 
-const stopsOf = (f: { stops: { color: string; pos: number }[]; opacity: number }, colour: Colour) => [...f.stops].sort((a, b) => a.pos - b.pos).map((s) => ({ at: s.pos, color: faded(colour(s.color), f.opacity) }));
+const stopsOf = (f: { stops: { color: string; pos: number }[]; opacity: number }, colour: Colour): Stop[] => [...f.stops].sort((a, b) => a.pos - b.pos).map((s) => ({ at: s.pos, color: faded(colour(s.color), f.opacity) }));
 
 const DEG = Math.PI / 180;
 const CSS_TURN = 90;
 const HALF = 0.5;
 
-const LAYERS: Partial<{ [T in FillType]: (f: FillOf<T>, colour: Colour) => Layer }> = {
-  [FillType.Solid]: (f, colour) => () => ({ paint: { kind: PaintKind.Solid, color: faded(colour(f.color), f.opacity) }, squash: 1 }),
-  [FillType.Linear]: (f, colour) => ([l, t, r, b]) => {
+export type FillPlan = { kind: PaintKind.Solid; color: Rgba } | { kind: PaintKind.Linear; angle: number; stops: Stop[] } | { kind: PaintKind.Radial; center: [number, number]; radius: number; stops: Stop[] };
+
+const PLANS: Partial<{ [T in FillType]: (f: FillOf<T>, colour: Colour) => FillPlan }> = {
+  [FillType.Solid]: (f, colour) => ({ kind: PaintKind.Solid, color: faded(colour(f.color), f.opacity) }),
+  [FillType.Linear]: (f, colour) => ({ kind: PaintKind.Linear, angle: f.angle, stops: stopsOf(f, colour) }),
+  [FillType.Radial]: (f, colour) => ({ kind: PaintKind.Radial, center: [f.center.x, f.center.y], radius: f.radius, stops: stopsOf(f, colour) })
+};
+
+const SHADES: { [K in PaintKind]: (f: Extract<FillPlan, { kind: K }>, area: Rect) => Shade } = {
+  [PaintKind.Solid]: (f) => ({ paint: { kind: PaintKind.Solid, color: f.color }, squash: 1 }),
+  [PaintKind.Linear]: (f, [l, t, r, b]) => {
     const turn = (f.angle + CSS_TURN) * DEG;
     const [dx, dy] = [Math.sin(turn), -Math.cos(turn)];
     const reach = (Math.abs((r - l) * dx) + Math.abs((b - t) * dy)) * HALF;
     const [cx, cy] = [(l + r) * HALF, (t + b) * HALF];
-    return { paint: { kind: PaintKind.Linear, from: [cx - dx * reach, cy - dy * reach], to: [cx + dx * reach, cy + dy * reach], stops: stopsOf(f, colour) }, squash: 1 };
+    return { paint: { kind: PaintKind.Linear, from: [cx - dx * reach, cy - dy * reach], to: [cx + dx * reach, cy + dy * reach], stops: f.stops }, squash: 1 };
   },
-  [FillType.Radial]: (f, colour) => ([l, t, r, b]) => {
+  [PaintKind.Radial]: (f, [l, t, r, b]) => {
     const [rx, ry] = [f.radius * HALF * (r - l), f.radius * HALF * (b - t)];
     const squash = ry > 0 ? rx / ry : 1;
-    return { paint: { kind: PaintKind.Radial, center: [l + f.center.x * (r - l), (t + f.center.y * (b - t)) * squash], radius: rx, stops: stopsOf(f, colour) }, squash };
+    return { paint: { kind: PaintKind.Radial, center: [l + f.center[0] * (r - l), (t + f.center[1] * (b - t)) * squash], radius: rx, stops: f.stops }, squash };
   }
 };
 
+const shadeOf = (f: FillPlan, area: Rect): Shade => (SHADES[f.kind] as (f: FillPlan, area: Rect) => Shade)(f, area);
+
 const plain = (fills: Fill[]) => fills.length === 1 && fills[0].type === FillType.Solid && fills[0].opacity === 1;
 
-function layersOf(fills: Fill[], colour: Colour, animated: boolean): Layer[] | null {
-  const drawable = fills.every((f) => LAYERS[f.type] && f.blend === BlendMode.Normal);
+function fillPlans(fills: Fill[], colour: Colour, animated: boolean): FillPlan[] | null {
+  const drawable = fills.every((f) => PLANS[f.type] && f.blend === BlendMode.Normal);
   if (!drawable || (animated && fills.length > 0 && !plain(fills))) {
     return null;
   }
-  return fills.map((f) => (LAYERS[f.type] as (f: Fill, c: Colour) => Layer)(f, colour));
+  return fills.map((f) => (PLANS[f.type] as (f: Fill, c: Colour) => FillPlan)(f, colour));
 }
 
 const STROKE_STRETCH: Record<StrokeAlign, { stretch: number; under: boolean }> = {
@@ -314,45 +290,142 @@ const visible = (paint: Paint) => paint.kind !== PaintKind.Solid || paint.color[
 
 export const tintedPaint = (paint: Paint, look: Look, colour: Colour): Paint => (look.tint && paint.kind === PaintKind.Solid ? { kind: PaintKind.Solid, color: mixed(paint.color, colour(look.tint.color), look.tint.amount) } : paint);
 
-export function paintText(env: TextEnv): Painted | TextGap {
+export type Tinted = { opacity: number; blur: number; turn: Affine; tint: { color: Rgba; amount: number } | null };
+
+const UNTINTED: Tinted = { ...STILL, tint: null };
+
+const tinted = (paint: Paint, look: Tinted): Paint => (look.tint && paint.kind === PaintKind.Solid ? { kind: PaintKind.Solid, color: mixed(paint.color, look.tint.color, look.tint.amount) } : paint);
+
+export type PlanFrame = { left: number; top: number; width: number; height: number; anchor: Anchor; hugs: boolean };
+
+export type TextPlan = {
+  text: string;
+  paragraphs: string[];
+  request: Omit<Request, 'size'>;
+  size: number;
+  fits: boolean;
+  tracking: number;
+  leading: number;
+  inset: number;
+  shaping: Shaping;
+  flow: Flow;
+  frame: PlanFrame;
+  align: number;
+  fade: number;
+  rises: number[] | null;
+  area: Area;
+  backdrop: Rgba | null;
+  fills: FillPlan[];
+  outline: Outline | null;
+  animation: { finest: AnimatorUnit; looks: Tinted[] } | null;
+  smoothing: Smoothing;
+};
+
+type Word = { line: number; chars: number };
+
+const wordsOf = (text: string): Word[] => text.split('\n').flatMap((line, l) => [...line.matchAll(WORD)].map((m) => ({ line: l, chars: [...m[0]].length })));
+
+const charsBeforeOf = (words: Word[]) => words.map((_, w) => words.slice(0, w).reduce((n, word) => n + word.chars, 0));
+
+function looksOf(text: string, run: Animation, colour: Colour): Tinted[] {
+  const words = wordsOf(text);
+  const before = charsBeforeOf(words);
+  return words.flatMap((word, w) =>
+    Array.from({ length: word.chars }, (_, letter) => {
+      const look = run.at({ [AnimatorUnit.Char]: before[w] + letter, [AnimatorUnit.Word]: w, [AnimatorUnit.Line]: word.line });
+      return { ...look, tint: look.tint ? { color: colour(look.tint.color), amount: look.tint.amount } : null };
+    })
+  );
+}
+
+export function planOf(env: TextEnv): TextPlan | TextGap {
   const kind = KINDS[env.component];
   const p = env.props as Props;
   const colour: Colour = (v) => rgbaOf(env.colour(v)) ?? [0, 0, 0, 1];
-  const fills = elementFills(env.component, p).filter((f) => f.visible);
-  const layers = layersOf(fills, colour, env.animators.length > 0);
-  if (!layers) {
+  const fills = fillPlans(elementFills(env.component, p).filter((f) => f.visible), colour, env.animators.length > 0);
+  if (!fills) {
     return TextGap.Fill;
   }
-  const outline = outlineOf(env, colour);
   const cased = casedOf(env.component, p);
   const run = animation(cased, env.animators);
   const paragraphs = kind.paragraphs(cased);
-  const { laid, type, frame, room } = place(env, kind, p, paragraphs, run?.finest === AnimatorUnit.Char ? Shaping.Chars : Shaping.Runs);
-  const slots = slotsOf(cased, paragraphs);
+  const frame = kind.frame(p, env.box, env.stage);
+  return {
+    text: cased,
+    paragraphs,
+    request: { family: String(p.font), weight: Number(p.weight), italic: p.italic === true, axes: axesOf(p) },
+    size: kind.size(p, Math.min(env.stage.width, env.stage.height)),
+    fits: kind.fits(p),
+    tracking: Number(p.tracking),
+    leading: Number(p.leading),
+    inset: kind.inset,
+    shaping: run?.finest === AnimatorUnit.Char ? Shaping.Chars : Shaping.Runs,
+    flow: kind.flow(p),
+    frame: { left: frame.box.left - env.box.left, top: frame.box.top - env.box.top, width: frame.box.width, height: frame.box.height, anchor: frame.anchor, hugs: frame.hugs },
+    align: ALIGN_SHARE[p.align] ?? 0,
+    fade: kind.motion === Motion.FadeUp ? progress(env, { at: 0, duration: FADE_FRAMES / env.fps }, p.easing) : 1,
+    rises: kind.motion === Motion.LinesRise ? paragraphs.map((_, i) => progress(env, { at: (i * LINE_STAGGER) / env.fps, duration: REVEAL_FRAMES / env.fps }, p.easing)) : null,
+    area: kind.area,
+    backdrop: kind.inset > 0 ? colour(String(p.background)) : null,
+    fills,
+    outline: outlineOf(env, colour),
+    animation: run ? { finest: run.finest, looks: looksOf(cased, run, colour) } : null,
+    smoothing: env.smoothing
+  };
+}
+
+type Placed = { laid: Laid; type: Type; room: number };
+
+function place(plan: TextPlan, fonts: FaceBook): Placed {
+  const typeAt = (size: number): Type => ({ request: plan.request, size, tracking: plan.tracking, leading: plan.leading, inset: plan.inset * size, shaping: plan.shaping });
+  const lay = (size: number) => layOut(plan.paragraphs, typeAt(size), plan.flow, plan.frame.width, fonts);
+  const size = plan.fits ? fitSize(plan.size, (s) => lay(s), plan.frame) : plan.size;
+  const laid = lay(size);
+  return { laid, type: typeAt(size), room: plan.frame.hugs ? laid.width : plan.frame.width };
+}
+
+type Slotted = { key: number; look: number };
+
+function slotsOf(text: string, paragraphs: string[], finest: AnimatorUnit): (paragraph: number, g: Glyph) => Slotted {
+  const words = wordsOf(text);
+  const charsBefore = charsBeforeOf(words);
+  const wordsBefore = paragraphs.map((_, i) => paragraphs.slice(0, i).reduce((n, para) => n + (para.match(WORD)?.length ?? 0), 0));
+  return (paragraph, g) => {
+    const word = wordsBefore[paragraph] + g.word;
+    const char = (charsBefore[word] ?? 0) + g.letter;
+    const slot = { [AnimatorUnit.Char]: char, [AnimatorUnit.Word]: word, [AnimatorUnit.Line]: words[word]?.line ?? 0 };
+    return { key: slot[finest], look: char };
+  };
+}
+
+type Unit = { look: Tinted; contours: number[][]; outlines: number[][]; box: Rect; area: Rect };
+
+export function inksOf(plan: TextPlan, fonts: FaceBook): Painted | TextGap {
+  const { laid, type, room } = place(plan, fonts);
+  const run = plan.animation;
+  const slots = run ? slotsOf(plan.text, plan.paragraphs, run.finest) : null;
   if (!laid.blocks.some((b) => b.lines.length) || laid.ascent + laid.descent === 0) {
     return TextGap.Font;
   }
   if (laid.missing) {
     return TextGap.Glyph;
   }
-  const left = frame.box.left - env.box.left;
-  const top = frame.box.top - env.box.top + (frame.anchor === Anchor.Centre ? (frame.box.height - laid.height) / 2 : 0);
-  const share = ALIGN_SHARE[p.align] ?? 0;
-  const fade = kind.motion === Motion.FadeUp ? progress(env, { at: 0, duration: FADE_FRAMES / env.fps }, p.easing) : 1;
-  const lift = kind.motion === Motion.FadeUp ? FADE_RISE_PX * (1 - fade) : 0;
-  const matrix: Affine = [1, 0, 0, 1, left, top + lift];
+  const smoothing = SMOOTHING[plan.smoothing];
+  const { left } = plan.frame;
+  const top = plan.frame.top + (plan.frame.anchor === Anchor.Centre ? (plan.frame.height - laid.height) / 2 : 0);
+  const matrix: Affine = [1, 0, 0, 1, left, top + FADE_RISE_PX * (1 - plan.fade)];
   const inks: Ink[] = [];
   const stripWidth = laid.blocks.reduce((n, b) => n + b.lines.reduce((m, line) => m + inkedWidth(line), 0), 0);
   let strip = 0;
   laid.blocks.forEach((block, i) => {
-    const rise = kind.motion === Motion.LinesRise ? (RISE_PERCENT / PERCENT) * block.height * (1 - progress(env, { at: (i * LINE_STAGGER) / env.fps, duration: REVEAL_FRAMES / env.fps }, p.easing)) : 0;
-    const mask: Rect | null = kind.motion === Motion.LinesRise ? [0, block.top, room, block.top + block.height + DESCENDER_EM * type.size] : null;
+    const rise = plan.rises ? (RISE_PERCENT / PERCENT) * block.height * (1 - plan.rises[i]) : 0;
+    const mask: Rect | null = plan.rises ? [0, block.top, room, block.top + block.height + DESCENDER_EM * type.size] : null;
     const backdrop: number[][] = [];
     const units = new Map<string, Unit>();
     block.lines.forEach((line, l) => {
-      const x = (room - line.width) * share;
+      const x = (room - line.width) * plan.align;
       const top = block.top + l * laid.lineHeight + rise;
-      const baseline = block.top + line.baseline + rise - SMOOTHING[env.smoothing].rise;
+      const baseline = block.top + line.baseline + rise - smoothing.rise;
       const start = x + (line.glyphs[0]?.pen ?? 0);
       const areas: Record<Area, Rect> = {
         [Area.Line]: [start - strip, block.top + line.baseline + rise - laid.ascent, start - strip + stripWidth, block.top + line.baseline + rise + laid.descent],
@@ -360,36 +433,42 @@ export function paintText(env: TextEnv): Painted | TextGap {
         [Area.Whole]: [0, 0, room, laid.height]
       };
       strip += inkedWidth(line);
-      if (kind.inset > 0) {
+      if (plan.backdrop) {
         backdrop.push(rect([x, baseline - laid.ascent - CAPTION_PAD_EM * type.size, x + line.width, baseline + laid.descent + CAPTION_PAD_EM * type.size]));
       }
       for (const g of line.glyphs) {
-        const slot = run && g.word >= 0 ? slots(i, g) : null;
-        const key = `${slot && run ? slot[run.finest] : -1}:${kind.area === Area.Line ? l : 0}`;
-        const unit = units.get(key) ?? { slot, contours: [], outlines: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[kind.area] };
+        const slot = slots && g.word >= 0 ? slots(i, g) : null;
+        const key = `${slot ? slot.key : -1}:${plan.area === Area.Line ? l : 0}`;
+        const unit = units.get(key) ?? { look: slot && run ? (run.looks[slot.look] ?? UNTINTED) : UNTINTED, contours: [], outlines: [], box: [Infinity, Infinity, -Infinity, -Infinity], area: areas[plan.area] };
         units.set(key, unit);
-        unit.contours.push(...moved(glyphContours(g.face, g.glyph, type.size, g.skew, SMOOTHING[env.smoothing].darken(type.size)), x + g.x, baseline - g.dy));
-        unit.outlines.push(...(outline ? moved(glyphContours(g.face, g.glyph, type.size, g.skew, 0), x + g.x, baseline - g.dy + SMOOTHING[env.smoothing].rise) : []));
+        unit.contours.push(...moved(glyphContours(g.face, g.glyph, type.size, g.skew, smoothing.darken(type.size)), x + g.x, baseline - g.dy));
+        unit.outlines.push(...(plan.outline ? moved(glyphContours(g.face, g.glyph, type.size, g.skew, 0), x + g.x, baseline - g.dy + smoothing.rise) : []));
         unit.box = [Math.min(unit.box[0], x + g.pen), Math.min(unit.box[1], top), Math.max(unit.box[2], x + g.pen + g.advance), Math.max(unit.box[3], top + laid.lineHeight)];
       }
     });
-    if (backdrop.length) {
-      inks.push({ contours: backdrop, paint: { kind: PaintKind.Solid, color: colour(String(p.background)) }, rule: FillRule.NonZero, opacity: fade, matrix, blur: 0 });
+    if (plan.backdrop) {
+      inks.push({ contours: backdrop, paint: { kind: PaintKind.Solid, color: plan.backdrop }, rule: FillRule.NonZero, opacity: plan.fade, matrix, blur: 0 });
     }
     for (const unit of units.values()) {
-      const look = unit.slot && run ? run.at(unit.slot) : STILL;
+      const { look } = unit;
       const turn = about(unit.box, look.turn, type.size);
       const placed = (contours: number[][]) => {
-        const turned = look === STILL ? contours : transformed(contours, turn);
+        const turned = look === UNTINTED ? contours : transformed(contours, turn);
         return mask ? clipped(turned, mask) : turned;
       };
-      const ink = (contours: number[][], paint: Paint, rule: FillRule, squash = 1): Ink => ({ contours: squashed(contours, squash), paint, rule, opacity: fade * look.opacity, matrix: unsquashed(matrix, squash), blur: look.blur * scaleOf(look.turn) });
+      const ink = (contours: number[][], paint: Paint, rule: FillRule, squash = 1): Ink => ({ contours: squashed(contours, squash), paint, rule, opacity: plan.fade * look.opacity, matrix: unsquashed(matrix, squash), blur: look.blur * scaleOf(look.turn) });
       const shown = placed(unit.contours);
-      const filled = layers.map((layer) => layer(unit.area)).map((shade) => ink(shown, tintedPaint(shade.paint, look, colour), FillRule.NonZero, shade.squash));
-      const stroked = outline ? [ink(placed(unit.outlines.flatMap((c) => strokePolygons(c, true, outline.width, Cap.Butt, Join.Miter))), tintedPaint({ kind: PaintKind.Solid, color: outline.colour }, look, colour), FillRule.Union)] : [];
+      const filled = plan.fills.map((f) => shadeOf(f, unit.area)).map((shade) => ink(shown, tinted(shade.paint, look), FillRule.NonZero, shade.squash));
+      const outline = plan.outline;
+      const stroked = outline ? [ink(placed(unit.outlines.flatMap((c) => strokePolygons(c, true, outline.width, Cap.Butt, Join.Miter))), tinted({ kind: PaintKind.Solid, color: outline.colour }, look), FillRule.Union)] : [];
       inks.push(...(outline?.under ? [...stroked, ...filled] : [...filled, ...stroked]).filter((i) => i.contours.length && visible(i.paint)));
     }
   });
-  const rendered = { left, top: frame.box.top - env.box.top, width: frame.hugs ? laid.width : frame.box.width, height: frame.anchor === Anchor.Top ? laid.height : frame.box.height };
+  const rendered = { left, top: plan.frame.top, width: plan.frame.hugs ? laid.width : plan.frame.width, height: plan.frame.anchor === Anchor.Top ? laid.height : plan.frame.height };
   return { inks: inks.filter((i) => i.opacity > 0), frame: rendered };
+}
+
+export function paintText(env: TextEnv): Painted | TextGap {
+  const plan = planOf(env);
+  return typeof plan === 'string' ? plan : inksOf(plan, env.fonts);
 }
