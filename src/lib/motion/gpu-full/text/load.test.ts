@@ -3,7 +3,8 @@ import { FEEGA_TOKENS } from '../../brand';
 import { MotionFormat, newMotionDoc, type MotionDoc } from '../../doc';
 import { composeHtml } from '../../hyperframes/compose';
 import { addClip, type OpResult } from '../../timeline';
-import { BUILTIN_FONTS_URL, fontLoader } from './load';
+import { readFileSync } from 'node:fs';
+import { BUILTIN_FONTS_URL, facesLoader, fontLoader } from './load';
 
 function must(r: OpResult): MotionDoc {
   if (!r.ok) {
@@ -29,5 +30,12 @@ describe('loadFonts', () => {
     await fontLoader({ text: async () => CSS, bytes: async (url) => (fetched.push(url), new Uint8Array()) })(titled, {});
 
     expect(fetched).toEqual(['https://g.test/latin.woff2']);
+  });
+
+  it('hands the native core only the faces whose files loaded', async () => {
+    const latin = new Uint8Array(readFileSync('static/fonts/dm-sans-latin.woff2'));
+    const { native } = await facesLoader({ text: async () => CSS, bytes: async () => latin })(titled, {});
+
+    expect(native.rules.map((r) => r.url)).toEqual(['https://g.test/latin.woff2']);
   });
 });

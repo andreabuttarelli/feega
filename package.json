@@ -54,7 +54,8 @@
     "docs:mcp-tools": "node scripts/mcp-inventory.mjs --write",
     "bench:export": "vite-node --config scripts/vite-node.config.ts scripts/bench/export-bench.ts --",
     "build:gpu-core": "cd packages/gpu-core && cargo build --lib --release --target wasm32-unknown-unknown && wasm-bindgen --target web --no-typescript --out-dir ../../static/gpu-core target/wasm32-unknown-unknown/release/gpu_core.wasm",
-    "bench:gpu-parity": "vite-node --config scripts/vite-node.config.ts scripts/gpu-parity/parity.ts --"
+    "bench:gpu-parity": "vite-node --config scripts/vite-node.config.ts scripts/gpu-parity/parity.ts --",
+    "bench:gpu-native": "vite-node --config scripts/vite-node.config.ts scripts/gpu-parity/core.ts --"
   },
   "devDependencies": {
     "@internationalized/date": "^3.12.0",
