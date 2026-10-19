@@ -8,14 +8,24 @@ export enum Renderer {
 
 export enum Switch {
   Open = 'open',
-  ForceDom = 'force-dom'
+  ForceDom = 'force-dom',
+  CoreOff = 'core-off'
 }
 
 const PARAM = 'renderer';
 
 const CHOSEN: Record<string, Renderer> = {
   dom: Renderer.Dom,
-  core: Renderer.Core
+  core: Renderer.Core,
+  gpu: Renderer.Gpu,
+  webgpu: Renderer.Gpu,
+  webgl: Renderer.Gpu
+};
+
+const UNDER: Record<Switch, (chosen: Renderer) => Renderer> = {
+  [Switch.Open]: (chosen) => chosen,
+  [Switch.ForceDom]: () => Renderer.Dom,
+  [Switch.CoreOff]: (chosen) => (chosen === Renderer.Core ? Renderer.Gpu : chosen)
 };
 
 const BACKEND_OF: Record<string, Backend> = {
@@ -23,6 +33,6 @@ const BACKEND_OF: Record<string, Backend> = {
   webgl: Backend.WebGL
 };
 
-export const rendererOf = (url: URL, kill: Switch): Renderer => (kill === Switch.ForceDom ? Renderer.Dom : (CHOSEN[url.searchParams.get(PARAM) ?? ''] ?? Renderer.Gpu));
+export const rendererOf = (url: URL, kill: Switch): Renderer => UNDER[kill](CHOSEN[url.searchParams.get(PARAM) ?? ''] ?? Renderer.Core);
 
 export const backendOf = (url: URL): Backend => BACKEND_OF[url.searchParams.get(PARAM) ?? ''] ?? Backend.WebGPU;
