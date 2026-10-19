@@ -5,14 +5,15 @@
   import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
   import { createMedia, Readiness, VideoPreload } from '$lib/motion/gpu-full/media';
   import { SpatialIndex } from '$lib/canvas/core/spatial-index';
+  import { Outcome } from '$lib/motion/gpu-full/core-outcome';
   import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
   import { ItemKind } from '$lib/motion/gpu-full/display-list';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
   import { cached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
-  import { AHEAD_REACH, screenUses, type Turn } from '$lib/canvas/core/screen-uses';
-  import { throughCamera } from '$lib/canvas/core/world-overlay';
+  import { AHEAD_REACH, worldUses, type Turn } from '$lib/canvas/core/screen-uses';
+  import { SentOverlay, SentUses } from '$lib/canvas/core/use-diff';
   import type { PathItem } from '$lib/motion/gpu-full/display-list';
   import { drawsWhole, onStage, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
@@ -193,6 +194,8 @@
         put.clear();
         pictured.clear();
         putting.clear();
+        sent = new SentUses();
+        sentOverlay = new SentOverlay();
         raster = r;
       },
       (e: unknown) => {
@@ -217,6 +220,10 @@
   const IDLE_MS = 50;
   const PICTURES_PER_FRAME = 4;
   const ITEMS_PER_FRAME = 2 * PART_ITEMS;
+  let sent = new SentUses();
+  let sentOverlay = new SentOverlay();
+  const painted: Record<Outcome, number> = { [Outcome.Idle]: 0, [Outcome.Reused]: 0, [Outcome.Partial]: 0, [Outcome.Full]: 0 };
+  let paintedLabel = $state('');
 
   function putPart(into: CoreRaster, group: string): number {
     const job = putting.get(group) ?? { parts: parts(listOf(group), PART_ITEMS), next: 0 };
@@ -263,8 +270,17 @@
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const screen = screenUses(heldWhileEdited(cached(shown, wide.view, wide.area, textureBytes), edited), at, device, null);
-    const pending = into.drawScreen({ ...screen, items: [...screen.items, ...throughCamera(overlay, at)] }, pictures);
+    const patch = sent.patch(worldUses(heldWhileEdited(cached(shown, wide.view, wide.area, textureBytes), edited)));
+    if (patch) {
+      into.patchUses(patch);
+    }
+    if (sentOverlay.changed(overlay)) {
+      into.setOverlay(overlay);
+    }
+    into.setCamera(at.x, at.y, at.zoom);
+    const { outcome, pending } = into.frame(performance.now());
+    painted[outcome]++;
+    paintedLabel = `${painted[Outcome.Reused]},${painted[Outcome.Partial]},${painted[Outcome.Full]}`;
     cacheBytes = into.cacheBytes();
     return pending || held.some((f) => !pictured.has(f.group));
   }
@@ -317,7 +333,7 @@
 <div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>
 <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
 {#key backend}
-  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-painted={paintedLabel} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
 {/key}
 
 <style>

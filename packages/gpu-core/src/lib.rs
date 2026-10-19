@@ -9,12 +9,15 @@ pub mod files;
 pub mod filters;
 #[cfg(target_arch = "wasm32")]
 pub mod gl_passes;
+#[cfg(target_arch = "wasm32")]
+pub mod gl_reproject;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod glyphs;
 pub mod groups;
 pub mod kernel;
 pub mod layers;
 pub mod pictures;
+pub mod reproject;
 pub mod retained;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod render;
