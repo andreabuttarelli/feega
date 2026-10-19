@@ -13,7 +13,8 @@ const MODULES: Record<DashboardPage, () => Promise<PageModule>> = {
   [DashboardPage.Canvases]: () => import('$lib/server/dashboard/pages/canvases'),
   [DashboardPage.Templates]: () => import('$lib/server/dashboard/pages/templates'),
   [DashboardPage.Motion]: () => import('$lib/server/dashboard/pages/motion'),
-  [DashboardPage.Credits]: () => import('$lib/server/dashboard/pages/credits')
+  [DashboardPage.Credits]: () => import('$lib/server/dashboard/pages/credits'),
+  [DashboardPage.Compose]: () => import('$lib/server/dashboard/pages/compose')
 };
 
 const UNKNOWN = () => json({ error: 'not_found' }, { status: NOT_FOUND });

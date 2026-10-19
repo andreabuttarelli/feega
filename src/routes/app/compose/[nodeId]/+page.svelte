@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, untrack } from 'svelte';
   import { POSTER_WIDTH, posterJob, posterSecond, sendPoster } from '$lib/motion/poster-capture';
-  import { deserialize } from '$app/forms';
+  import { postPageAction } from '$lib/api/page-action';
   import { invalidateAll } from '$app/navigation';
   import Play from '@lucide/svelte/icons/play';
   import Pause from '@lucide/svelte/icons/pause';
@@ -39,6 +39,8 @@
   const FALLBACK_LAYOUT: LayoutId = 'tilted-grid';
 
   let { data } = $props();
+
+  const composeUrl = $derived(`/app/compose/${data.node.id}?project=${data.projectId}`);
 
   const supabase = createSupabaseBrowserClient();
   let doc = $state.raw<MotionDoc>(data.head.doc);
@@ -86,7 +88,7 @@
     designError = null;
     const form = new FormData();
     form.set('prompt', layoutPrompt);
-    const result = await post('?/designLayout', form).finally(() => (designing = false));
+    const result = await postPageAction(composeUrl, 'designLayout', form).finally(() => (designing = false));
     if (result.type === 'success' && result.data?.layout) {
       change(withCustomLayout(current, result.data.layout as CustomLayout));
       layoutPrompt = '';
@@ -118,18 +120,13 @@
     saveTimer = setTimeout(() => void save(), SAVE_DEBOUNCE_MS);
   }
 
-  async function post(url: string, form: FormData) {
-    const res = await fetch(url, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    return deserialize(await res.text());
-  }
-
   async function save() {
     saveState = SaveState.Saving;
     const form = new FormData();
     form.set('doc', JSON.stringify(doc));
     form.set('version', String(version));
     form.set('summary', 'Edited in Compositions');
-    const result = await post(`${data.editorUrl}?/save`, form);
+    const result = await postPageAction(data.editorUrl, 'save', form);
 
     if (result.type === 'success') {
       version = Number(result.data?.version ?? version);
@@ -175,7 +172,7 @@
     form.set('file_name', file.name);
     form.set('mime_type', file.type);
     form.set('bytes', String(file.size));
-    const result = await post(`/app/compose/${data.node.id}?project=${data.projectId}&/upload`, form);
+    const result = await postPageAction(composeUrl, 'upload', form);
     if (result.type !== 'success') {
       notice = result.type === 'failure' ? String(result.data?.error ?? 'Upload refused') : 'Upload failed';
       return null;
@@ -239,7 +236,7 @@
 
 {#if publishing}
   <PublishDialog
-    actionUrl={`/app/compose/${data.node.id}?project=${data.projectId}`}
+    actionUrl={composeUrl}
     {doc}
     assets={assetUrls}
     tokens={data.tokens}

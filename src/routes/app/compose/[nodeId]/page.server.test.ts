@@ -37,7 +37,7 @@ const llmStructured = vi.fn();
 vi.mock('$lib/server/llm', () => ({ llmStructured }));
 vi.mock('$lib/server/moderation/model-input', () => ({ screenModelInput: async () => ({ ok: true }) }));
 
-const { load, actions } = await import('./+page.server');
+const { load, actions } = await import('$lib/server/compose/editor-page');
 const { fakeDb } = await import('$lib/server/db/fake-db');
 
 const event = (fields?: Record<string, string>) => {
