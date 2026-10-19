@@ -20,6 +20,7 @@ import { LINK_MESSAGE, NATIVE_BRIDGE, PLAYER_MESSAGE, PROTOCOL_VERSION, PlayerEv
 import type { EmbedSettings } from './loader';
 import { bridgeScript } from './live-bridge';
 import { VAR_RULES, coerceVars, type VarDecl } from './var-model';
+import { usedAssetUrls } from '../doc-assets';
 
 export const BUNDLE_FILE = 'feega-interactive.html';
 export const SELF_SCROLL = 'self-scroll';
@@ -303,7 +304,7 @@ export function revisionFingerprint(input: Pick<InteractiveInput, 'doc' | 'token
 
 async function inlinedInput(input: InteractiveInput): Promise<EmbedSource> {
   const logo = input.tokens.logoUrl ? await inlineAssets({ logo: input.tokens.logoUrl }, input.fetchBlob) : {};
-  const assets = await inlineAssets(input.assetUrls, input.fetchBlob);
+  const assets = await inlineAssets(usedAssetUrls(input.doc, input.assetUrls), input.fetchBlob);
   const tokens = { ...input.tokens, logoUrl: logo.logo ?? input.tokens.logoUrl };
   return { doc: input.doc, tokens, assets, analyses: input.analyses, settings: input.settings ?? interactiveOf(input.doc), title: input.title };
 }
