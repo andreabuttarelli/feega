@@ -9,8 +9,8 @@ import { FEEGA_TOKENS } from '$lib/motion/brand';
 import { composeHtml } from '$lib/motion/hyperframes/compose';
 import type { MotionDoc } from '$lib/motion/doc';
 import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
-import { createRaster } from '$lib/motion/gpu-full/raster';
 import { createMedia } from '$lib/motion/gpu-full/media';
+import { BACKENDS, FullBackend } from '$lib/motion/gpu-full/backends';
 import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
 
 const composer = (spec: Spec) => (only?: ReadonlySet<string>) => composeHtml({ doc: spec.doc as MotionDoc, tokens: FEEGA_TOKENS, assets: spec.assets, origin: spec.origin, only });
@@ -60,12 +60,12 @@ async function gpuShots(input: ShotsInput): Promise<ShotsResult> {
   return out;
 }
 
-async function gpuFullShots(input: ShotsInput): Promise<ShotsResult> {
+async function fullShots(input: ShotsInput, backend: FullBackend): Promise<ShotsResult> {
   const doc = input.spec.doc as MotionDoc;
   const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets);
   const media = createMedia();
   const canvas = document.createElement('canvas');
-  const raster = createRaster(canvas, input.width, input.height);
+  const raster = await BACKENDS[backend](canvas, input.width, input.height);
   const pngs: string[] = [];
   const gaps = new Map<string, string>();
   const start = performance.now();
@@ -76,11 +76,14 @@ async function gpuFullShots(input: ShotsInput): Promise<ShotsResult> {
     raster.draw(list, media.pictures);
     pngs.push(await png(canvas, input.width, input.height));
   }
-  const out = { pngs, ms: performance.now() - start, backend: 'gpu-full webgl2', runs: 0, stats: [], unsupported: [...gaps].map(([clip, why]) => `${clip} ${why}`) };
+  const out = { pngs, ms: performance.now() - start, backend: `gpu-full ${backend}`, runs: 0, stats: [], unsupported: [...gaps].map(([clip, why]) => `${clip} ${why}`) };
   raster.dispose();
   media.dispose();
   return out;
 }
+
+const gpuFullShots = (input: ShotsInput) => fullShots(input, FullBackend.WebGl2);
+const gpuCoreShots = (input: ShotsInput) => fullShots(input, FullBackend.Core);
 
 async function encode(input: ExportInput, render: (onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>) => Promise<void>): Promise<ExportResult> {
   const start = performance.now();
@@ -193,4 +196,4 @@ async function liveSeek(t: number) {
   await new Promise((r) => setTimeout(r, 400));
 }
 
-Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, gpuFullShots, htmlExport, gpuExport, htmlPreview, gpuPreview });
+Object.assign(window, { liveMount, liveSeek, htmlShots, gpuShots, gpuFullShots, gpuCoreShots, htmlExport, gpuExport, htmlPreview, gpuPreview });
