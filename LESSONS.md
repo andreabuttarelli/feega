@@ -3141,3 +3141,12 @@ compositor hides the cost of repainting the whole frame every tick.
 **Move:** don't expect an fps number from emulation to go red; assert the mechanism (hinted
 layers in the preview iframe while it plays, `ipad-playback-fps.spec.ts`) and log fps beside it.
 Layer hints drop only past a budget (`layerPixels`), never for a whole device class.
+
+## gpu-core: a GPU picture draws on the first frames, then vanishes
+
+**Signal:** a picture (mask cover, image) shows in the first frame and is black after, on WebGPU
+and natively alike. Happens once full-frame layers grow vello's image atlas between scenes.
+**Move:** `Engine::render` marks every picture dirty before every vello render (frame, layer,
+backdrop), so a rebuilt atlas recopies it; once per frame is not enough. Guarded by
+`a_picture_mask_survives_frames_that_grow_the_image_atlas` and
+`a_picture_under_a_backdrop_stays_drawn_frame_after_frame`.

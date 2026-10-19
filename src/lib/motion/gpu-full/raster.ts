@@ -201,6 +201,7 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
   const pong = plain(gl, width, height);
   const accA = plain(gl, width, height);
   const accB = plain(gl, width, height);
+  const shade = plain(gl, width, height);
   const foldProgram = program(gl, QUAD_VS, FOLD_FS);
   const geometry = gl.createBuffer()!;
   const quad = gl.createBuffer()!;
@@ -477,21 +478,28 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     return into.texture;
   }
 
-  function behind(sigma: number) {
-    resolveInto(main);
-    const soft = blurTexture(main.texture, sigma);
+  const silhouette = (item: Item): Item => (item.kind === ItemKind.Path ? { ...item, paint: { kind: PaintKind.Solid, color: WHITE } } : item);
+
+  function behind(item: Item, sigma: number, pictures: Pictures) {
+    intoLayer(() => drawItem(silhouette(item), 1, pictures));
     gl.disable(gl.BLEND);
-    pass(copyProgram, soft, main.fbo, () => {
+    pass(copyProgram, layer.texture, shade.fbo, () => {
       gl.uniform1f(u(copyProgram, 'u_opacity'), 1);
       bindMask(copyProgram, null);
     });
+    resolveInto(main);
+    const soft = blurTexture(main.texture, sigma);
     gl.enable(gl.BLEND);
+    pass(copyProgram, soft, main.fbo, () => {
+      gl.uniform1f(u(copyProgram, 'u_opacity'), 1);
+      bindMask(copyProgram, shade.texture);
+    });
   }
 
   function layered(item: Item, pictures: Pictures) {
     const mask = item.masks || item.matte ? maskOf(item, pictures) : null;
     if (item.backdrop) {
-      scissored(item, () => behind(item.backdrop!));
+      scissored(item, () => behind(item, item.backdrop!, pictures));
     }
     intoLayer(() => drawItem(item, 1, pictures));
     const filtered = item.filters ? filters.apply(layer.texture, item.filters, item.space ?? [1, 0, 0, 1]) : layer.texture;

@@ -17,7 +17,7 @@ const v = (a: TextAnimator, field: string) => `var(${cssName(a.id, field)})`;
 
 const FINEST_FIRST = [AnimatorUnit.Char, AnimatorUnit.Word, AnimatorUnit.Line];
 
-function finestUnit(animators: readonly TextAnimator[]): AnimatorUnit {
+export function finestUnit(animators: readonly TextAnimator[]): AnimatorUnit {
   return FINEST_FIRST.find((unit) => animators.some((a) => a.unit === unit))!;
 }
 

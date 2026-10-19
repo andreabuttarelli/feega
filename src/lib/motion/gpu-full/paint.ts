@@ -14,7 +14,7 @@ export enum FillRule {
 
 export const MAX_STOPS = 8;
 
-export type Stop ={ at: number; color: Rgba };
+export type Stop = { at: number; color: Rgba };
 
 export type Paint =
   | { kind: PaintKind.Solid; color: Rgba }

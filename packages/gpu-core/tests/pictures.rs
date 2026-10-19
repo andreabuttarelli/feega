@@ -2,7 +2,7 @@ use gpu_core::display_list::{parse, Item};
 use gpu_core::pictures::Pictures;
 #[cfg(feature = "gpu")]
 use gpu_core::pictures::picture;
-use gpu_core::scene::build;
+use gpu_core::scene::{build, Layers};
 
 #[cfg(feature = "gpu")]
 const RED: [u8; 4] = [255, 0, 0, 255];
@@ -44,7 +44,7 @@ fn parses_an_image_item() {
 
 #[test]
 fn an_image_without_its_picture_is_skipped_by_name() {
-    let (_, skipped) = build(&parse(&list("cover", true)).unwrap(), &Pictures::new());
+    let (_, skipped) = build(&parse(&list("cover", true)).unwrap(), &Pictures::new(), &Layers::new());
 
     assert_eq!(skipped.len(), 1);
     assert_eq!(skipped[0].what, "image");
@@ -54,7 +54,7 @@ fn an_image_without_its_picture_is_skipped_by_name() {
 #[test]
 fn cover_fills_the_box_and_crops_to_it() {
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    let pixels = renderer.render(&parse(&list("cover", true)).unwrap(), &halves()).unwrap();
+    let pixels = renderer.render(&parse(&list("cover", true)).unwrap(), &halves()).unwrap().pixels;
 
     assert_eq!(at(&pixels, 18, 32), RED);
     assert_eq!(at(&pixels, 45, 32), GREEN);
@@ -67,7 +67,7 @@ fn cover_fills_the_box_and_crops_to_it() {
 #[test]
 fn contain_leaves_the_box_edges_empty() {
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    let pixels = renderer.render(&parse(&list("contain", true)).unwrap(), &halves()).unwrap();
+    let pixels = renderer.render(&parse(&list("contain", true)).unwrap(), &halves()).unwrap().pixels;
 
     assert_eq!(at(&pixels, 20, 32), RED);
     assert_eq!(at(&pixels, 32, 18), BLUE);
@@ -78,7 +78,7 @@ fn contain_leaves_the_box_edges_empty() {
 #[test]
 fn an_unclipped_picture_spills_past_its_box() {
     let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
-    let pixels = renderer.render(&parse(&list("cover", false)).unwrap(), &halves()).unwrap();
+    let pixels = renderer.render(&parse(&list("cover", false)).unwrap(), &halves()).unwrap().pixels;
 
     assert_eq!(at(&pixels, 4, 32), RED);
     assert_eq!(at(&pixels, 60, 32), GREEN);

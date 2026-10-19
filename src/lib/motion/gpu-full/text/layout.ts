@@ -5,17 +5,22 @@ export enum Spaces {
   Keep = 'keep'
 }
 
+export enum Shaping {
+  Runs = 'runs',
+  Chars = 'chars'
+}
+
 export type Flow = { spaces: Spaces; wraps: boolean };
 
-export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: number; inset: number };
+export type Type = { request: Omit<Request, 'size'>; size: number; tracking: number; leading: number; inset: number; shaping: Shaping };
 
-export type Glyph = { face: Face; glyph: number; skew: number; x: number; dy: number; char: number };
+export type Glyph = { face: Face; glyph: number; skew: number; x: number; dy: number; char: number; pen: number; advance: number; word: number; letter: number };
 
 export type Line = { glyphs: Glyph[]; width: number; baseline: number };
 
 export type Block = { lines: Line[]; top: number; height: number };
 
-export type Laid = { blocks: Block[]; width: number; height: number; ascent: number; descent: number; missing: boolean };
+export type Laid = { blocks: Block[]; width: number; height: number; ascent: number; descent: number; lineHeight: number; missing: boolean };
 
 type Token = { glyphs: Glyph[]; width: number; space: boolean };
 
@@ -51,7 +56,7 @@ function runsOf(text: string, type: Type, book: FaceBook): { runs: { text: strin
   return { runs, missing };
 }
 
-function tokenOf(text: string, first: number, type: Type, book: FaceBook): Token & { missing: boolean } {
+function shapedOf(text: string, first: number, type: Type, book: FaceBook): Token & { missing: boolean } {
   const ligatures = type.tracking === 0 ? Ligatures.On : Ligatures.Off;
   const tracking = type.tracking * type.size;
   const { runs, missing } = runsOf(text, type, book);
@@ -61,16 +66,29 @@ function tokenOf(text: string, first: number, type: Type, book: FaceBook): Token
     const scale = type.size / run.face.unitsPerEm;
     let char = first + run.at;
     for (const g of run.face.shape(run.text, ligatures)) {
-      glyphs.push({ face: run.face, glyph: g.glyph, skew: run.skew, x: x + g.dx * scale, dy: g.dy * scale, char });
-      x += g.advance * scale + tracking * g.chars;
+      const advance = g.advance * scale + tracking * g.chars;
+      glyphs.push({ face: run.face, glyph: g.glyph, skew: run.skew, x: x + g.dx * scale, dy: g.dy * scale, char, pen: x, advance, word: -1, letter: char - first });
+      x += advance;
       char += g.chars;
     }
   }
   return { glyphs, width: x, space: text.startsWith(SPACE), missing };
 }
 
+function tokenOf(text: string, first: number, word: number, type: Type, book: FaceBook): Token & { missing: boolean } {
+  const pieces = type.shaping === Shaping.Chars ? [...text] : [text];
+  const token: Token & { missing: boolean } = { glyphs: [], width: 0, space: text.startsWith(SPACE), missing: false };
+  for (const [i, piece] of pieces.entries()) {
+    const shaped = shapedOf(piece, first + i, type, book);
+    token.glyphs.push(...shift(shaped.glyphs, token.width).map((g) => ({ ...g, word: token.space ? -1 : word, letter: g.char - first })));
+    token.width += shaped.width;
+    token.missing ||= shaped.missing;
+  }
+  return token;
+}
+
 function shift(glyphs: Glyph[], by: number): Glyph[] {
-  return glyphs.map((g) => ({ ...g, x: g.x + by }));
+  return glyphs.map((g) => ({ ...g, x: g.x + by, pen: g.pen + by }));
 }
 
 function wrapped(tokens: Token[], flow: Flow, room: number, inset: number): { glyphs: Glyph[]; width: number }[] {
@@ -131,8 +149,10 @@ export function layOut(paragraphs: string[], type: Type, flow: Flow, room: numbe
   const blocks = paragraphs.map((paragraph): Block => {
     const text = collapsed(paragraph, flow.spaces);
     let first = 0;
+    let words = 0;
     const tokens = [...text.matchAll(TOKEN)].map((m) => {
-      const token = tokenOf(m[0], first, type, book);
+      const token = tokenOf(m[0], first, words, type, book);
+      words += token.space ? 0 : 1;
       first += [...m[0]].length;
       missing ||= token.missing;
       return token;
@@ -143,5 +163,5 @@ export function layOut(paragraphs: string[], type: Type, flow: Flow, room: numbe
     return block;
   });
   const width = Math.max(0, ...blocks.flatMap((b) => b.lines.map((l) => l.width)));
-  return { blocks, width, height: top, ascent, descent, missing };
+  return { blocks, width, height: top, ascent, descent, lineHeight, missing };
 }

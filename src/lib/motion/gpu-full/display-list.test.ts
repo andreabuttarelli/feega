@@ -9,6 +9,8 @@ import { displayListAt, FillRule, ItemKind, PaintKind, Unsupported, type PathIte
 import { apply2d } from '../affine';
 import { boxBook } from './text/test-face';
 import { Smoothing } from './text/painter';
+import { addAnimator } from '../text-animators/ops';
+import { SelectorShape } from '../text-animators/model';
 
 const boxType = { fonts: boxBook(), smoothing: Smoothing.Plain };
 
@@ -143,5 +145,38 @@ describe('displayListAt', () => {
     const bent = patch(texted, 'text', { textPath: { path: 'M0 0 L1 0' } } as never);
 
     expect(displayListAt(bent, 0, FEEGA_TOKENS, boxType).unsupported).toContainEqual({ clip: 'text', component: 'Text', reason: Unsupported.TextPath });
+  });
+  it('turns a title about the centre of its safe box, as the page does', () => {
+    const centre = (rotation: number) => {
+      const titled = must(addClip(withBg, { component: 'Title', from: 0, durationInFrames: 90, props: { text: 'ab', align: 'left', x: 0.1, width: 0.3, rotation } }, 'title'));
+      const ink = corners(displayListAt(titled, 60, FEEGA_TOKENS, boxType).items.find((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'title'));
+      return (ink.left + ink.right) / 2;
+    };
+
+    expect((centre(0) + centre(180)) / 2).toBeCloseTo(288, 0);
+  });
+
+  describe('text animators', () => {
+    const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'ab' } }, 'text'));
+    const animated = (values: Record<string, number>) => must(addAnimator(texted, 'text', 'a', { shape: SelectorShape.Square, start: 0, end: 0, values }));
+    const glyphsAt = (doc: MotionDoc, frame: number) => displayListAt(doc, frame, FEEGA_TOKENS, boxType).items.filter((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'text');
+
+    it('samples keyframed selector fields per frame', () => {
+      const swept = must(setKeyframes(animated({ opacity: 0 }), 'text', 'ta.a.end', [{ frame: 20, value: 0, ease: Ease.Linear }, { frame: 80, value: 100, ease: Ease.Linear }]));
+
+      expect(glyphsAt(swept, 20).flatMap((i) => i.contours)).toHaveLength(2);
+      expect(glyphsAt(swept, 50).flatMap((i) => i.contours)).toHaveLength(1);
+      expect(glyphsAt(swept, 80)).toHaveLength(0);
+    });
+
+    it('blurs a unit by its animator blur', () => {
+      const blurred = must(addAnimator(texted, 'text', 'a', { values: { blur: 4 } }));
+
+      expect(glyphsAt(blurred, 60).map((i) => i.blur)).toEqual([4, 4]);
+    });
+
+    it('still names a tracking animator', () => {
+      expect(displayListAt(animated({ tracking: 0.1 }), 60, FEEGA_TOKENS, boxType).unsupported).toContainEqual({ clip: 'text', component: 'Text', reason: Unsupported.Animator });
+    });
   });
 });

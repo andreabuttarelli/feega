@@ -98,11 +98,13 @@ export function unitPositions(text: string, unit: AnimatorUnit): number[] {
   return [...positions(text.split('\n'), unit, null).values()];
 }
 
-export function charPositions(text: string, seed: number | null): number[] {
-  const units = unitsOf(text.split('\n'), AnimatorUnit.Char);
+export function positionsOf(text: string, unit: AnimatorUnit, seed: number | null): number[] {
+  const units = unitsOf(text.split('\n'), unit);
   const rank = ranks(units.length, seed);
   return units.map((_, i) => round((rank[i] + 0.5) / units.length));
 }
+
+export const charPositions = (text: string, seed: number | null): number[] => positionsOf(text, AnimatorUnit.Char, seed);
 
 export function splitText(text: string, options: SplitOptions): string {
   return splitLines(text, options).join('\n');
