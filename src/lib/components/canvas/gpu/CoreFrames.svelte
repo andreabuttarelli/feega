@@ -17,12 +17,13 @@
   import type { PathItem } from '$lib/motion/gpu-full/display-list';
   import { drawsWhole, onStage, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
+  import { postersFor } from '$lib/canvas/core/frame-poster';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
   type Source = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens };
 
-  let { frames, cards = [], overlay = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; overlay?: PathItem[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, cards = [], posters = [], overlay = [], view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
   const BACKENDS = [createCore, createCoreGl];
@@ -34,6 +35,7 @@
   const put = new Set<string>();
   const media = createMedia();
   const keyOf = (f: FrameAt) => `${f.id}:${f.revision}`;
+  const imagesIn = (list: DisplayList) => list.items.filter((i) => i.kind === ItemKind.Image).length;
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, MAX_RESOLUTION);
 
   async function load(f: FrameAt) {
@@ -64,8 +66,16 @@
   let cardLists = $state(new Map<string, DisplayList>());
   const readying = new Set<string>();
 
+  const framePuts = $derived(
+    frames.flatMap((f): HeldFrame[] => {
+      const list = lists.get(keyOf(f));
+      return list && drawsWhole(list) ? [{ id: f.id, group: keyOf(f), box: f.box, size: { width: list.width, height: list.height }, images: imagesIn(list) }] : [];
+    })
+  );
+  const shownCards = $derived([...cards, ...postersFor(posters, new Set(framePuts.map((f) => f.id)))]);
+
   $effect(() => {
-    for (const c of cards) {
+    for (const c of shownCards) {
       if (!cardLists.has(c.key) && !readying.has(c.key)) {
         readying.add(c.key);
         void media.ready(c.frame.list).then((readiness) => {
@@ -77,16 +87,7 @@
     }
   });
 
-  const imagesIn = (list: DisplayList) => list.items.filter((i) => i.kind === ItemKind.Image).length;
-
-  const cardPuts = $derived(cards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, images: imagesIn(c.frame.list), turn: c.turn }] : [])));
-
-  const framePuts = $derived(
-    frames.flatMap((f): HeldFrame[] => {
-      const list = lists.get(keyOf(f));
-      return list && drawsWhole(list) ? [{ id: f.id, group: keyOf(f), box: f.box, size: { width: list.width, height: list.height }, images: imagesIn(list) }] : [];
-    })
-  );
+  const cardPuts = $derived(shownCards.flatMap((c): HeldFrame[] => (cardLists.has(c.key) ? [{ id: c.frame.id, group: c.key, box: c.frame.box, size: { width: c.frame.list.width, height: c.frame.list.height }, images: imagesIn(c.frame.list), turn: c.turn }] : [])));
 
   const whole = $derived([...cardPuts, ...framePuts]);
   const listOf = (group: string) => cardLists.get(group) ?? lists.get(group)!;
@@ -158,7 +159,7 @@
   $effect(() => () => media.dispose());
 </script>
 
-<canvas class="core-frames" bind:this={canvas} style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+<canvas class="core-frames" bind:this={canvas} style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
 
 <style>
   .core-frames {
