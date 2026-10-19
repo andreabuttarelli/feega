@@ -39,7 +39,18 @@ export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold
   };
 }
 
-const NO_PORTS = { inputs: [], outputs: [] };
+export function cardsOnCanvas(theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): (t: CardTile, layer?: CardLayer) => FrameOnCanvas {
+  const drawn = new Map<string, { key: string; frame: FrameOnCanvas }>();
+  return (t, layer = CardLayer.Whole) => {
+    const key = `${layer}:${cardKey(t)}`;
+    const hit = drawn.get(t.id);
+    const frame = hit?.key === key ? hit.frame : cardOnCanvas(t, theme, glyphs, bold, layer);
+    drawn.set(t.id, { key, frame });
+    return { ...frame, box: { ...frame.box, x: t.box.x - CHROME_REACH.side, y: t.box.y - CHROME_REACH.top } };
+  };
+}
+
+const NO_PORTS ={ inputs: [], outputs: [] };
 
 export function portMarks(t: PortTile): { inputs: PortMark[]; outputs: PortMark[] } {
   if (t.connectable === false) {

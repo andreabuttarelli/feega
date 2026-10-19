@@ -23,7 +23,7 @@
   import GpuTileChrome from './GpuTileChrome.svelte';
   import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
-  import { CardLayer, cardKey, cardOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
+  import { CardLayer, cardKey, cardsOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
@@ -159,6 +159,7 @@
   let targeting = $state<string[] | null>(null);
   let space = $state(false);
   let gesturing = $state(false);
+  let resizing = $state<ReadonlySet<string>>(new Set());
   let fitted = false;
   let known = new Set<string>();
 
@@ -209,13 +210,13 @@
   });
   const coreLook = $derived(wrap ? themeOf(wrap) : null);
   const drawsCard = (t: Tile) => !!t.kind && isNodeType(t.kind) && !handedOver(t);
+  const drawCard = $derived(coreType && coreLook ? cardsOnCanvas({ ...coreLook, panel: coreLook.paper }, coreType.glyphs, coreType.bold) : null);
   const coreCards = $derived.by(() => {
     const text = coreType;
-    const look = coreLook;
-    if (!coreOn || !text || !look) {
+    const draw = drawCard;
+    if (!coreOn || !text || !draw) {
       return [];
     }
-    const theme = { ...look, panel: look.paper };
     return placed.filter(drawsCard).flatMap((t) => {
       const card: CardTile = {
         id: t.id,
@@ -227,7 +228,7 @@
         icon: text.icons.get(t.kind as NodeType) ?? null
       };
       const poster = t.kind === 'motion';
-      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold, poster ? CardLayer.Face : CardLayer.Whole), turn: turnOf(t), poster }];
+      return [{ key: cardKey(card), frame: draw(card, poster ? CardLayer.Face : CardLayer.Whole), turn: turnOf(t), poster }];
     });
   });
   const turnOf = (t: Tile) => (t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined);
@@ -1146,6 +1147,7 @@
         if (a.kind !== GestureKind.Resize) {
           return;
         }
+        resizing = resizing.has(a.id) ? resizing : new Set([a.id]);
         overrides = new Map([[a.id, resized(a.box, a.corner, { x: w.x - a.start.x, y: w.y - a.start.y }, a.min)]]);
       },
       [GestureKind.Marquee]: (a) => {
@@ -1191,6 +1193,7 @@
     const a = active;
     active = null;
     gesturing = false;
+    resizing = new Set();
     if (!a) {
       return;
     }
@@ -1266,6 +1269,7 @@
   function cancelGesture() {
     active = null;
     gesturing = false;
+    resizing = new Set();
     marquee = null;
     ghost = null;
     refusal = null;
@@ -1768,7 +1772,7 @@
     data-owns-pinch
   >
     {#if coreOn}
-      <CoreFrames frames={coreFrames} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={coreOff} />
+      <CoreFrames frames={coreFrames} edited={resizing} cards={nodeCards} posters={posterCards} overlay={coreOverlay} look={coreLook ?? undefined} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={coreOff} />
     {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" class:core={coreOn} aria-hidden="true">

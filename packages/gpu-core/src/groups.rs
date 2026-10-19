@@ -203,6 +203,14 @@ fn texels(group: &DisplayList, scale: f64) -> (u32, u32) {
     ((group.width as f64 * scale).ceil() as u32, (group.height as f64 * scale).ceil() as u32)
 }
 
+fn held_within(u: &UseItem, group: &DisplayList, want: f64, side: u32) -> f64 {
+    let longest = group.width.max(group.height) as f64;
+    if !(u.cache && u.hold) || longest * want <= side as f64 {
+        return want;
+    }
+    side as f64 / longest
+}
+
 fn fresh(want: f64, held: f64) -> bool {
     (SOFTEST..=SHARPEST).contains(&(want / held))
 }
@@ -343,8 +351,15 @@ impl Library {
                 continue;
             };
             let on_screen = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64)).overlaps(Rect::new(0.0, 0.0, list.width as f64, list.height as f64));
-            let want = scale_of(u.matrix);
+            let want = held_within(u, group, scale_of(u.matrix), limits.side);
             let (w, h) = texels(group, want);
+            if let (true, Some(kept)) = (u.cache && u.hold, self.held.get(&u.group).copied()) {
+                seen.insert(u.group.clone());
+                if on_screen {
+                    items.push(cached_image(u, group, kept.scale));
+                }
+                continue;
+            }
             if !u.cache || want <= 0.0 || w.max(h) > limits.side {
                 if on_screen {
                     let start = items.len();

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { faceOf } from '$lib/canvas/gpu/card-face';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
-import { CHROME_REACH, CardLayer, cardKey, cardOnCanvas, portMarks, ringColour, type CardTile } from './card-source';
+import { CHROME_REACH, CardLayer, cardKey, cardOnCanvas, cardsOnCanvas, portMarks, ringColour, type CardTile } from './card-source';
 import { PortState, type Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
 
@@ -90,5 +90,24 @@ describe('cardKey', () => {
   it('changes with anything that changes the drawing', () => {
     expect(cardKey({ ...tile, box: { ...tile.box, w: 300 } })).not.toBe(cardKey(tile));
     expect(cardKey({ ...tile, label: 'Other' })).not.toBe(cardKey(tile));
+  });
+});
+
+describe('cards while another node is dragged', () => {
+  it('a card whose look did not change keeps its list and only moves', () => {
+    let shaped = 0;
+    const counting: Glyphs = (text, size) => (shaped++, glyphs(text, size));
+    const cards = cardsOnCanvas(theme, counting, counting);
+    const first = cards(tile);
+    const after = shaped;
+    const moved = cards({ ...tile, box: { ...tile.box, x: 400 } });
+    expect(shaped).toBe(after);
+    expect(moved.list).toBe(first.list);
+    expect(moved).toEqual(cardOnCanvas({ ...tile, box: { ...tile.box, x: 400 } }, theme, glyphs));
+  });
+
+  it('a card whose look changed is drawn again', () => {
+    const cards = cardsOnCanvas(theme, glyphs);
+    expect(cards({ ...tile, label: 'Other' }).list).not.toBe(cards(tile).list);
   });
 });

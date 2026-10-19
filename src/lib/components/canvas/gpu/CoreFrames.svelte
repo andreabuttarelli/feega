@@ -1,6 +1,4 @@
 <script lang="ts">
-  import type { BrandTokens } from '$lib/motion/brand';
-  import type { MotionDoc } from '$lib/motion/doc';
   import { drawFrame, prepare, type DisplayList, type Prepared } from '$lib/motion/gpu-full/display-list';
   import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
   import { loadFonts } from '$lib/motion/gpu-full/text/load';
@@ -11,7 +9,7 @@
   import { ItemKind } from '$lib/motion/gpu-full/display-list';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
   import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
-  import { cached, pictureBytes, resident, type HeldFrame } from '$lib/canvas/core/residency';
+  import { cached, pictureBytes, resident, heldWhileEdited, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
   import { AHEAD_REACH, screenUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { throughCamera } from '$lib/canvas/core/world-overlay';
@@ -20,6 +18,8 @@
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
   import { readPool } from '$lib/canvas/core/read-pool';
+  import { frameBuilder, type FrameDoc } from '$lib/canvas/core/frame-build';
+  import { gestureWatch, whenQuiet } from '$lib/canvas/core/gesture-quiet';
   import { readClips, type CustomFrame } from '$lib/motion/gpu-full/dom/custom';
   import type { Pictures } from '$lib/motion/gpu-full/raster';
   import { Stand, fillOrder, placeholder, standIn, withoutPictures, type Look } from '$lib/canvas/core/placeholders';
@@ -27,9 +27,8 @@
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
-  type Source = { revision: number; doc: MotionDoc; assets: Record<string, string>; tokens: BrandTokens };
 
-  let { frames, cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
+  let { frames, edited = new Set(), cards = [], posters = [], overlay = [], look = { paper: '#ffffff', line: '#e5e5e5' }, view, area, sourceUrl, onready, onfallback }: { frames: FrameAt[]; edited?: ReadonlySet<string>; cards?: CoreCard[]; posters?: CoreCard[]; overlay?: PathItem[]; look?: Look; view: Viewport; area: { width: number; height: number }; sourceUrl: (id: string) => string; onready: (ids: Set<string>) => void; onfallback: (why: string) => void } = $props();
 
   const MAX_RESOLUTION = 2;
   const IN_FLIGHT: Record<Device, number> = { [Device.Desktop]: 6, [Device.Phone]: 3 };
@@ -56,12 +55,13 @@
   const customPictures = new Map<string, CustomFrame['picture']>();
   const pictures: Pictures = (item) => [...customPictures.values()].reduce<ReturnType<Pictures>>((found, of) => found ?? of(item), null) ?? media.pictures(item);
 
-  async function readDom(f: FrameAt, source: Source, prepared: Prepared, frame: number): Promise<CustomFrame | null> {
+  async function readDom(f: FrameAt, source: FrameDoc, prepared: Prepared, frame: number): Promise<CustomFrame | null> {
     const host = readsHost;
     if (!host || !readClips(source.doc).read.length) {
       return null;
     }
     const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('$lib/motion/gpu-full/dom/custom'), import('$lib/motion/hyperframes/compose'), import('$lib/motion/interactive/settings')]);
+    await whenQuiet(() => gesture.active() || edited.size > 0);
     return domRead(fromView(f), async (signal) => {
       const mounting = mountCustomReads(host, (only) => composeHtml({ doc: source.doc, tokens: source.tokens, assets: source.assets, liveness: Liveness.Baked, target: Target.Screen, only }), prepared);
       signal.addEventListener('abort', () => void mounting.then((r) => r.dispose(), () => undefined));
@@ -69,24 +69,33 @@
     });
   }
 
-  async function load(f: FrameAt) {
-    const res = await fetch(`${sourceUrl(f.id)}?revision=${f.revision}`);
+  const smoothing = smoothingOf(navigator.userAgent);
+  const buildAway = frameBuilder(() => (typeof Worker === 'function' ? new Worker(new URL('../../../canvas/core/frame-build.worker.ts', import.meta.url), { type: 'module' }) : null));
+
+  async function buildHere(f: FrameAt, url: string): Promise<{ list: DisplayList; custom: CustomFrame | null } | null> {
+    const res = await fetch(url);
     if (!res.ok) {
-      return;
+      return null;
     }
-    const source = (await res.json()) as Source;
+    const source = (await res.json()) as FrameDoc;
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
-    const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing: smoothingOf(navigator.userAgent) });
+    const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing });
     const still = stillFrame(source.doc);
     const custom = await readDom(f, source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
-    const list = drawFrame(prepared, still, custom?.reads);
-    if ((await media.ready(list)) === Readiness.Partial) {
+    return { list: drawFrame(prepared, still, custom?.reads), custom };
+  }
+
+  async function load(f: FrameAt) {
+    const url = new URL(`${sourceUrl(f.id)}?revision=${f.revision}`, location.href).href;
+    const away = await buildAway(url, smoothing).catch(() => null);
+    const built = away ? { list: away, custom: null } : await buildHere(f, url);
+    if (!built || (await media.ready(built.list)) === Readiness.Partial) {
       return;
     }
-    if (custom) {
-      customPictures.set(keyOf(f), custom.picture);
+    if (built.custom) {
+      customPictures.set(keyOf(f), built.custom.picture);
     }
-    lists = new Map(lists).set(keyOf(f), onStage(list, f.kind));
+    lists = new Map(lists).set(keyOf(f), onStage(built.list, f.kind));
   }
 
   let inFlight = $state(0);
@@ -239,7 +248,7 @@
       putting.delete(group);
       pictured.delete(group);
     }
-    let room = ITEMS_PER_FRAME;
+    let room = gesture.active() ? 0 : ITEMS_PER_FRAME;
     for (const f of held) {
       while (room > 0 && !put.has(f.group)) {
         room -= putPart(into, f.group);
@@ -254,13 +263,23 @@
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const device = { width: area.width * resolution, height: area.height * resolution };
     const wide = widened(at, device);
-    const screen = screenUses(cached(shown, wide.view, wide.area, textureBytes), at, device, null);
+    const screen = screenUses(heldWhileEdited(cached(shown, wide.view, wide.area, textureBytes), edited), at, device, null);
     const pending = into.drawScreen({ ...screen, items: [...screen.items, ...throughCamera(overlay, at)] }, pictures);
     cacheBytes = into.cacheBytes();
     return pending || held.some((f) => !pictured.has(f.group));
   }
 
   let ahead = false;
+  const gesture = gestureWatch();
+  let lastView = '';
+
+  $effect(() => {
+    const now = `${view.x},${view.y},${view.zoom}`;
+    if (lastView && now !== lastView) {
+      gesture.moved();
+    }
+    lastView = now;
+  });
 
   const idle = (run: () => void) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : setTimeout(run, IDLE_MS));
 
@@ -271,7 +290,9 @@
       ahead = false;
       return;
     }
-    putPart(into, next.group);
+    if (!gesture.active()) {
+      putPart(into, next.group);
+    }
     idle(putAhead);
   }
 
@@ -286,7 +307,7 @@
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame));
 
   $effect(() => {
-    void [raster, held, overlay, view.x, view.y, view.zoom, area.width, area.height];
+    void [raster, held, edited, overlay, view.x, view.y, view.zoom, area.width, area.height];
     pacer.invalidate();
   });
 

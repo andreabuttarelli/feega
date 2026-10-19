@@ -8,7 +8,7 @@ const CORE_URL = '/gpu-core/gpu_core.js';
 type Size = { width: number; height: number };
 type Attached = { draw: (list: string) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; cache_pending: () => boolean; cache_bytes: () => number; free: () => void };
 
-export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine; cache?: boolean };
+export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine; cache?: boolean; hold?: boolean };
 export type Screen = { width: number; height: number; background: Rgba | null; items: (Item | Use)[] };
 export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; dropGroup: (key: string) => void; drawScreen: (screen: Screen, pictures?: Pictures) => boolean; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
