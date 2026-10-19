@@ -1749,8 +1749,8 @@
       onaction={runSelectionAction}
       onpropertychange={(patch) => props.onPropertyChange?.(selected, patch)}
     />
-    {#if props.actionUrl}
-      <NextStepChips actionUrl={props.actionUrl} box={selection.box} zoom={selection.zoom} nodeId={selected.length === 1 ? selected[0] : null} onpick={pickNextStep} />
+    {#if props.postAction}
+      <NextStepChips postAction={props.postAction} box={selection.box} zoom={selection.zoom} nodeId={selected.length === 1 ? selected[0] : null} onpick={pickNextStep} />
     {/if}
   {/if}
 

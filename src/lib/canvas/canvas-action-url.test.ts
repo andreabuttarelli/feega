@@ -22,4 +22,10 @@ describe('canvas actions go to the API, whatever the URL says', () => {
     const posting = CANVAS_ACTION_CALLERS.filter((path) => PAGE_ACTION.test(readFileSync(path, 'utf8')));
     expect(posting).toEqual([]);
   });
+
+  it('both renderers hand the next-step chips the API poster', () => {
+    for (const flow of ['src/lib/components/canvas/CanvasFlow.svelte', 'src/lib/components/canvas/gpu/GpuFlow.svelte']) {
+      expect(readFileSync(flow, 'utf8'), flow).toMatch(/<NextStepChips\s+\{?postAction/);
+    }
+  });
 });
