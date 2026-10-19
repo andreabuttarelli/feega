@@ -5,6 +5,8 @@ use vello::kurbo::{Affine as Matrix, Point, Rect};
 use crate::display_list::{Affine, DisplayList, FillRule, Item, Look, Paint, PathItem, UseItem};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::glyphs::{outline, Fonts};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::text::typeset;
 use crate::Skipped;
 
 #[derive(Default)]
@@ -124,12 +126,19 @@ impl Library {
     }
 
     #[cfg(not(target_arch = "wasm32"))]
-    fn drawable(&self, list: &DisplayList) -> (DisplayList, Vec<String>) {
-        outline(list, &self.fonts)
+    pub fn has_font(&self, key: &str) -> bool {
+        self.fonts.sources().contains_key(key)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn drawable(&self, list: &DisplayList) -> (DisplayList, Vec<Skipped>) {
+        let (set, unset) = typeset(list, self.fonts.sources());
+        let (drawn, fonts) = outline(&set, &self.fonts);
+        (drawn, unset.into_iter().chain(named(fonts, "font")).collect())
     }
 
     #[cfg(target_arch = "wasm32")]
-    fn drawable(&self, list: &DisplayList) -> (DisplayList, Vec<String>) {
+    fn drawable(&self, list: &DisplayList) -> (DisplayList, Vec<Skipped>) {
         (list.clone(), vec![])
     }
 
@@ -144,8 +153,8 @@ impl Library {
 
     pub fn resolve(&self, list: &DisplayList) -> (DisplayList, Vec<Skipped>) {
         let (placed, groups) = expand(list, &self.groups);
-        let (drawn, fonts) = self.drawable(&placed);
-        (drawn, named(groups, "group").chain(named(fonts, "font")).collect())
+        let (drawn, unset) = self.drawable(&placed);
+        (drawn, named(groups, "group").chain(unset).collect())
     }
 }
 
