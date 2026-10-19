@@ -1166,7 +1166,7 @@
   }
 
   let domReason = $state<string | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Dom ? (data.rendererSwitch === Switch.ForceDom ? 'kill switch' : '?renderer=dom') : null);
-  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) === Renderer.Gpu ? null : (CanvasFlow as unknown as typeof GpuFlow));
+  let Flow = $state<typeof GpuFlow | null>(rendererOf(page.url, data.rendererSwitch) !== Renderer.Dom ? null : (CanvasFlow as unknown as typeof GpuFlow));
   $effect(() => {
     if (Flow) {
       return;
