@@ -5,11 +5,11 @@ export enum Device {
   Phone = 'phone'
 }
 
-type Budget = { textureBytes: number; decodeEdge: number; maxResolution: number; antialias: boolean; posterShelf: number; shootsSnapshots: boolean; layerPixels: number };
+type Budget = { textureBytes: number; decodeEdge: number; maxResolution: number; antialias: boolean; posterShelf: number; shootsSnapshots: boolean };
 
 export const BUDGET: Record<Device, Budget> = {
-  [Device.Desktop]: { textureBytes: 256 * MB, decodeEdge: 2048, maxResolution: Infinity, antialias: true, posterShelf: 2, shootsSnapshots: true, layerPixels: Infinity },
-  [Device.Phone]: { textureBytes: 128 * MB, decodeEdge: 512, maxResolution: 2, antialias: false, posterShelf: 0, shootsSnapshots: false, layerPixels: 500_000_000 }
+  [Device.Desktop]: { textureBytes: 256 * MB, decodeEdge: 2048, maxResolution: Infinity, antialias: true, posterShelf: 2, shootsSnapshots: true },
+  [Device.Phone]: { textureBytes: 128 * MB, decodeEdge: 512, maxResolution: 2, antialias: false, posterShelf: 0, shootsSnapshots: false }
 };
 
 const COARSE_POINTER = '(pointer: coarse)';
@@ -28,12 +28,13 @@ export function decodeSize(width: number, height: number, device: Device): { wid
 const FLAT_LAYERS = '<style>*{will-change:auto!important}</style>';
 const HEAD_END = '</head>';
 
+const LAYER_PIXELS = 500_000_000;
 const HINTED_CLIP = /class="[^"]*\b(fx|kf|ks)\b/g;
 
 const layerPixels = (html: string, size: { width: number; height: number }) => (html.match(HINTED_CLIP)?.length ?? 0) * size.width * size.height;
 
-export function previewHtml(html: string, device: Device, size: { width: number; height: number }): string {
-  if (layerPixels(html, size) <= BUDGET[device].layerPixels) {
+export function previewHtml(html: string, size: { width: number; height: number }): string {
+  if (layerPixels(html, size) <= LAYER_PIXELS) {
     return html;
   }
   const end = html.indexOf(HEAD_END);

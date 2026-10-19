@@ -48,15 +48,14 @@ describe('memory budget — a heavy canvas fits an iPhone WebContent process', (
   const LANDING = { width: 1440, height: 4735 };
   const MOTION = { width: 1080, height: 1920 };
 
-  it('a phone preview of a 274-clip landing drops the will-change hints that made it 1.7 GB of GPU layers', () => {
+  it('a 274-clip landing drops the will-change hints that made it 1.7 GB of GPU layers on a phone and 2.6 s per edit on a desktop', () => {
     const html = clips(274);
-    expect(previewHtml(html, Device.Desktop, LANDING)).toBe(html);
-    expect(previewHtml(html, Device.Phone, LANDING)).toContain('will-change:auto!important');
-    expect(previewHtml(html, Device.Phone, LANDING).replace('<style>*{will-change:auto!important}</style>', '')).toBe(html);
+    expect(previewHtml(html, LANDING)).toContain('will-change:auto!important');
+    expect(previewHtml(html, LANDING).replace('<style>*{will-change:auto!important}</style>', '')).toBe(html);
   });
 
-  it('a phone keeps the layer hints of a 110-clip motion frame, or playback repaints the whole frame every tick', () => {
+  it('a 110-clip motion frame keeps its layer hints, or playback repaints the whole frame every tick', () => {
     const html = clips(110);
-    expect(previewHtml(html, Device.Phone, MOTION)).toBe(html);
+    expect(previewHtml(html, MOTION)).toBe(html);
   });
 });

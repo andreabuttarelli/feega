@@ -39,7 +39,7 @@ export async function openFrame(page: Page, nodeId: string) {
     await page.waitForTimeout(250);
     box = (await node.boundingBox())!;
   }
-  await page.touchscreen.tap(at.x, at.y);
+  await page.mouse.click(at.x, at.y);
   await page.waitForTimeout(800);
   await page.mouse.dblclick(at.x, at.y);
   await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: OPEN_MS });
