@@ -8,6 +8,9 @@ import type { Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
 import { circle, line, rect, solid } from './shapes';
 import { genBody, genItems, genMark, type GenIcons } from './gen-card';
+import { emptyItems } from './empty-card';
+
+export type CardIcons = GenIcons & { empty: ReadonlyMap<string, number[][]> };
 
 export enum CardPart {
   Panel = 'panel',
@@ -48,7 +51,7 @@ const RUNNING = 'Running…';
 const AUTO_MODEL = 'Auto';
 const CENTRE: [number, number] = [0.5, 0.5];
 
-type Ctx = { c: CoreCard; theme: CoreTheme; glyphs: Glyphs; bold: Glyphs; icons: GenIcons | null; clip: (p: CardPart) => string };
+type Ctx = { c: CoreCard; theme: CoreTheme; glyphs: Glyphs; bold: Glyphs; icons: CardIcons | null; clip: (p: CardPart) => string };
 
 const at = (c: CoreCard, contours: number[][]) => contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + c.x : v + c.y)));
 
@@ -145,16 +148,19 @@ const SURFACES: Record<Surface, (x: Ctx) => Item[]> = {
   [Surface.Generate]: generate,
   [Surface.Text]: (x) => [...panel(x), ...body(x, x.c.face.text, PAD)],
   [Surface.Source]: source,
+  [Surface.Empty]: (x) => emptyItems(x.c, { title: x.c.face.title, hint: x.c.face.hint, icon: (x.c.face.kind && x.icons?.empty.get(x.c.face.kind)) || null }, x),
   [Surface.Blank]: (x) => panel(x)
 };
 
+const LIVE: ReadonlySet<Surface> = new Set([Surface.Empty]);
+
 const pictured = (x: Ctx, shot: string): Item[] => [...panel(x), { ...image(x, CardPart.Shot, { url: shot, video: false }, whole(x.c), Fit.Cover), clip: `${x.clip(CardPart.Shot)}:${shot}` }];
 
-export function cardItems(c: CoreCard, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: GenIcons | null = null): Item[] {
+export function cardItems(c: CoreCard, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null): Item[] {
   const x: Ctx = { c, theme, glyphs, bold, icons, clip: (p) => `${c.id}:${p}` };
   const drawn = live(x);
   if (drawn) {
     return drawn;
   }
-  return c.shot ? pictured(x, c.shot) : SURFACES[c.face.surface](x);
+  return c.shot && !LIVE.has(c.face.surface) ? pictured(x, c.shot) : SURFACES[c.face.surface](x);
 }

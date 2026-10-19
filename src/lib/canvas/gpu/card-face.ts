@@ -1,5 +1,6 @@
 import { FrameKind } from '../motion-node';
 import { NODE_KIND_LABEL, NameTag } from '../node-label';
+import { NODE_EMPTY_HINT } from '../node-empty';
 import { isNodeType, type NodeType } from '../node-data';
 import { isUploadedNodeRow } from '../uploaded-node';
 import type { Poster } from '../poster-lod';
@@ -12,6 +13,7 @@ export enum Surface {
   Graphic = 'graphic',
   Text = 'text',
   Source = 'source',
+  Empty = 'empty',
   Blank = 'blank'
 }
 
@@ -33,6 +35,8 @@ export type CardFace = {
   subtitle: string;
   thumbs: string[];
   gen: GenTileView | null;
+  kind: NodeType | null;
+  hint: string;
 };
 
 type Data = Record<string, unknown>;
@@ -63,6 +67,8 @@ const source =
   (title: (d: Data) => string, subtitle: (d: Data) => string = () => ''): Draw =>
   (d) => ({ surface: Surface.Source, title: title(d), subtitle: subtitle(d) });
 
+const empty: Draw = (_d, _asset, t) => ({ surface: Surface.Empty, title: NODE_KIND_LABEL[t.kind as NodeType], hint: NODE_EMPTY_HINT[t.kind as NodeType] });
+
 const motion: Draw = (d, asset, t) => {
   const kind = str(d.kind) || FrameKind.Frame;
   const live = str(d.lastRenderAssetId);
@@ -85,15 +91,15 @@ const FACES: Record<NodeType, Draw> = {
   doc: (d) => ({ surface: Surface.Text, text: str(d.content) }),
   iframe: source((d) => str(d.url) || 'HTML'),
   social_account_feed: source((d) => `@${str(d.handle)}`, (d) => str(d.platform)),
-  social_post_mockup: (d) => ({ surface: Surface.Text, text: str((d.general as Data | undefined)?.caption) }),
+  social_post_mockup: empty,
   products: source((d) => str(d.url), (d) => str(d.type)),
-  ads: source((d) => str(d.page_name) || str(d.search_terms), (d) => str(d.country)),
+  ads: empty,
   influencer: source(() => ''),
   list: source((d) => `${Array.isArray(d.items) ? d.items.length : 0} items`),
   select: source((d) => `#${typeof d.index === 'number' ? d.index : 1}`),
   effects: (d, asset) => ({ surface: Surface.Source, media: ref(d) ? { url: asset(ref(d)!), video: false } : null }),
   composition: (d, asset) => ({ surface: Surface.Source, media: ref(d) ? { url: asset(ref(d)!), video: true } : null }),
-  calendar: source((d) => str(d.anchor), (d) => str(d.view)),
+  calendar: empty,
   studio_batch: source(() => '')
 };
 
@@ -110,7 +116,9 @@ const BLANK: CardFace = {
   title: '',
   subtitle: '',
   thumbs: [],
-  gen: null
+  gen: null,
+  kind: null,
+  hint: ''
 };
 
 function labelOf(t: FaceTile, kind: NodeType): string | null {
@@ -129,7 +137,7 @@ export function faceOf(t: FaceTile, data: Data, asset: AssetUrl, thumbs: string[
   if (isUploadedNodeRow({ type: kind, data })) {
     return { ...BLANK, surface: Surface.Media, label, media: { url: asset(str(data.assetId)), video: kind === 'video' } };
   }
-  const face = { ...BLANK, label, thumbs, ...FACES[kind](data, asset, t) };
+  const face = { ...BLANK, label, thumbs, kind, ...FACES[kind](data, asset, t) };
   return face.surface === Surface.Generate ? { ...face, gen } : face;
 }
 

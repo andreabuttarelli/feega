@@ -2,8 +2,7 @@ import type { CardFace } from '$lib/canvas/gpu/card-face';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
 import type { PortTile } from '$lib/canvas/gpu/geometry';
 import type { Box, FrameOnCanvas } from './canvas-scene';
-import { cardItems } from './cards';
-import type { GenIcons } from './gen-card';
+import { cardItems, type CardIcons } from './cards';
 import { PortState, tileChrome, type Glyphs, type PortMark } from './chrome';
 import type { CoreTheme } from './overlay';
 
@@ -22,7 +21,7 @@ export const CHROME_REACH = { top: 24, side: 96, bottom: 4 };
 
 export const ringColour = (t: Pick<CardTile, 'outputs'>, theme: Pick<CoreTheme, 'accent'>): string => (t.outputs.length ? CONNECTOR_STYLE[t.outputs[0].type].color : theme.accent);
 
-export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: GenIcons | null = null): FrameOnCanvas {
+export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: CardIcons | null = null): FrameOnCanvas {
   const [x, y] = [CHROME_REACH.side, CHROME_REACH.top];
   const w = t.box.w + 2 * CHROME_REACH.side;
   const h = t.box.h + CHROME_REACH.top + CHROME_REACH.bottom;

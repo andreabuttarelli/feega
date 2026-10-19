@@ -227,7 +227,7 @@
         label: labelOf(t),
         icon: text.icons.get(t.kind as NodeType) ?? null
       };
-      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold, text.gen), turn: turnOf(t), poster: t.kind === 'motion' }];
+      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold, text.cards), turn: turnOf(t), poster: t.kind === 'motion' }];
     });
   });
   const turnOf = (t: Tile) => (t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined);

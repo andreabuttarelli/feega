@@ -81,6 +81,13 @@ describe('cardItems', () => {
     expect(part(items, CardPart.Media)).toEqual([]);
   });
 
+  it('draws an empty-state kind live even when a tile picture exists', () => {
+    const items = cardItems(card('ads', {}, { shot: 'blob:tile' }), theme, glyphs);
+
+    expect(part(items, CardPart.Shot)).toEqual([]);
+    expect(items.some((i) => i.clip === 'n:empty-title')).toBe(true);
+  });
+
   it('moves every item by the card position', () => {
     const [, paper] = paths(cardItems(card('doc', {}, { x: 50, y: 70 }), theme, glyphs), CardPart.Panel);
 
