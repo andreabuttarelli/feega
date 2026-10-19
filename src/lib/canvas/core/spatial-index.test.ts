@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SpatialIndex } from './spatial-index';
+import { visibleIds } from '$lib/canvas/gpu/camera';
 
 const items = [
   { id: 'a', x: 0, y: 0, w: 100, h: 100 },
@@ -37,5 +38,12 @@ describe('spatial index', () => {
       const linear = [...scene].reverse().find((r) => p.x >= r.x && p.y >= r.y && p.x <= r.x + r.w && p.y <= r.y + r.h)?.id ?? null;
       expect(index.topAt(p)).toBe(linear);
     }
+  });
+
+  it('what the camera sees matches the linear culling', () => {
+    const index = new SpatialIndex(items);
+    const view = { x: -40, y: -40, zoom: 0.5 };
+    const screen = { width: 800, height: 600 };
+    expect(index.visible(view, screen)).toEqual(visibleIds(items, view, screen));
   });
 });

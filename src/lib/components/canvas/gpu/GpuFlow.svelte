@@ -361,7 +361,8 @@
     }
     return !scene?.awaitsMedia(t.id);
   };
-  const unpreviewed = () => [...visibleIds(placed, view, area)].filter((id) => byId.get(id) && !previewed(byId.get(id)!));
+  const cullIndex = $derived(new SpatialIndex(placed));
+  const unpreviewed = () => [...cullIndex.visible(view, area)].filter((id) => byId.get(id) && !previewed(byId.get(id)!));
 
   $effect(() => {
     void revealTick;
