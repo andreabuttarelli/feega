@@ -16,10 +16,10 @@ function env(component: TextComponent, props: Record<string, unknown>, change: P
 }
 
 const drawn = (painted: ReturnType<typeof paintText>): Ink[] => {
-  if (!Array.isArray(painted)) {
+  if (typeof painted === 'string') {
     throw new Error(`gap ${painted}`);
   }
-  return painted;
+  return painted.inks;
 };
 
 function extent(inks: Ink[]) {
@@ -78,7 +78,7 @@ describe('paintText', () => {
   it('upper-cases a kicker before looking its glyphs up', () => {
     const fonts = boxBook(new Set(['a']));
 
-    expect(Array.isArray(paintText(env('Kicker', { text: 'a' }, { fonts })))).toBe(true);
+    expect(typeof paintText(env('Kicker', { text: 'a' }, { fonts }))).toBe('object');
     expect(paintText(env('Text', { text: 'a' }, { fonts }))).toBe(TextGap.Glyph);
   });
 
@@ -147,6 +147,32 @@ describe('paintText', () => {
 
       expect(ink.color).toEqual([1, 0, 0, 1]);
       expect(ink.blur).toBe(4);
+    });
+  });
+  describe('the box the page renders', () => {
+    const frameOf = (component: TextComponent, props: Record<string, unknown>) => {
+      const painted = paintText(env(component, props));
+      if (typeof painted === 'string') {
+        throw new Error(`gap ${painted}`);
+      }
+      return painted.frame;
+    };
+
+    it('is the safe box for a title', () => {
+      expect(frameOf('Title', { text: 'a', x: 0.1, width: 0.3, height: 0.2 })).toEqual({ left: 192, top: 0, width: 384, height: 0.2 * 1080 });
+    });
+
+    it('is as tall as its lines for auto-height text', () => {
+      const frame = frameOf('Text', { text: 'a', sizing: 'auto-height', height: 0.5 });
+
+      expect(frame.top).toBe(0);
+      expect(frame.height).toBeLessThan(0.2 * 1080);
+    });
+
+    it('is as wide as its line for auto-width text', () => {
+      const frame = frameOf('Text', { text: 'a', sizing: 'auto', width: 0.5 });
+
+      expect(frame.width).toBeLessThan(0.1 * 1920);
     });
   });
 });

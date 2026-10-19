@@ -155,6 +155,13 @@ const KINDS: Record<string, () => MotionDoc> = {
     const spun = must(addAnimator(stepped, 'spin', 'a', { shape: 'smooth' as never, softness: 0.3, start: 0, end: 200, values: { rotation: 45, scale: 1.6, color: '#ff375f', opacity: 0.3 } }));
     return keys(spun, 'spin', 'ta.a.offset', -130, 100);
   },
+  pivot: () =>
+    clip(
+      clip(clip(backdrop, 'Title', 'edge', { text: 'Edge title', x: 0.12, y: 0.25, width: 0.4, height: 0.3, rotation: 20, scale: 1.2 }), 'Text', 'tall', { text: 'Auto height, turned', sizing: 'auto-height', x: 0.6, y: 0.5, width: 0.3, height: 0.6, rotation: -30 }),
+      'Text',
+      'wide',
+      { text: 'Auto width', sizing: 'auto', x: 0.3, y: 0.8, width: 0.4, height: 0.2, rotation: 45, scale: 0.8 }
+    ),
   blur: () => keys(must(addClip(shape(backdrop, 'sharp', { shape: 'rect', x: 0.3, y: 0.5, width: 0.2, height: 0.3, fill: '#ffd60a' }), { component: 'Shape', from: 0, durationInFrames: SECONDS, props: { shape: 'star', x: 0.7, y: 0.5, width: 0.25, height: 0.4, fill: '#bf5af2' }, effects: [{ id: 'g', kind: 'gaussian-blur', enabled: true, params: { radius: 6 } }] } as never, 'soft')), 'sharp', 'blur', 0, 24)
 };
 
