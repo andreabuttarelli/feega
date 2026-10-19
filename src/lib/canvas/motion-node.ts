@@ -70,9 +70,9 @@ export function storyboardOf(data: Record<string, unknown>): StoryboardLink | nu
 export const MOTION_NODE_BAR_H = 0;
 
 const BAR_H: Record<FrameKind, Record<NodeMode, number>> = {
-  [FrameKind.Frame]: { [NodeMode.Preview]: MOTION_NODE_BAR_H, [NodeMode.Edit]: 0 },
-  [FrameKind.Element]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0 },
-  [FrameKind.Group]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0 }
+  [FrameKind.Frame]: { [NodeMode.Preview]: MOTION_NODE_BAR_H, [NodeMode.Edit]: 0, [NodeMode.Leaving]: 0 },
+  [FrameKind.Element]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0, [NodeMode.Leaving]: 0 },
+  [FrameKind.Group]: { [NodeMode.Preview]: 0, [NodeMode.Edit]: 0, [NodeMode.Leaving]: 0 }
 };
 
 const MOTION_STAGE_WIDTH: Record<MotionFormat, number> = {
