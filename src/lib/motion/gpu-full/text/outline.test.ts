@@ -57,6 +57,14 @@ describe('dilated', () => {
 
     expect(extent(dilated([reversed], 1))).toEqual([-1, -1, 101, 101]);
   });
+
+  it('never spikes where two curves meet on the same point twice', () => {
+    const ring = Array.from({ length: 48 }, (_, i) => [50 + 40 * Math.cos((i / 48) * 2 * Math.PI), 50 + 40 * Math.sin((i / 48) * 2 * Math.PI)]);
+    const joined = ring.flatMap(([x, y], i) => (i === 12 ? [x, y, x, y] : [x, y]));
+    const out = dilated([joined], 0.3)[0];
+    const reach = Math.max(...Array.from({ length: out.length / 2 }, (_, i) => Math.abs(Math.hypot(out[i * 2] - 50, out[i * 2 + 1] - 50) - 40)));
+    expect(reach).toBeLessThan(0.45);
+  });
 });
 
 describe('within', () => {
