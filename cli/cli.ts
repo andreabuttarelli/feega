@@ -333,6 +333,23 @@ motion
     await cmdMotionRenderState(runId, opts);
   });
 
+program
+  .command('projects')
+  .description('List the projects of your active organisation')
+  .option('--org <id>', 'Which org, if you belong to more than one')
+  .action(async (opts) => {
+    const { cmdProjects } = await import('./commands/projects.ts');
+    await cmdProjects(opts);
+  });
+
+program
+  .command('canvases <projectId>')
+  .description('List the canvases of a project')
+  .action(async (projectId: string) => {
+    const { cmdCanvases } = await import('./commands/projects.ts');
+    await cmdCanvases(projectId);
+  });
+
 const orgs = program
   .command('orgs')
   .description('List your organisations; * marks the active one')
