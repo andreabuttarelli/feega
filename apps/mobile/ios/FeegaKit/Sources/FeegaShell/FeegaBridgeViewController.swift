@@ -62,6 +62,9 @@ public final class FeegaBridgeViewController: CAPBridgeViewController, WKScriptM
         }
         guardian = TerminationGuardian(wrapping: webView.navigationDelegate) { [weak self] in self?.webProcessTerminated() }
         webView.navigationDelegate = guardian
+        #if DEBUG
+        DemoScript.install(in: webView.configuration.userContentController)
+        #endif
         if PerfToggle.isOn {
             installProbe(in: webView)
         }
@@ -84,7 +87,7 @@ public final class FeegaBridgeViewController: CAPBridgeViewController, WKScriptM
         view.addSubview(chip)
         NSLayoutConstraint.activate([
             chip.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
-            chip.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor)
+            chip.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 2)
         ])
         self.chip = chip
     }
