@@ -3,6 +3,7 @@ import { MotionFormat, newMotionDoc, findClip, type MotionDoc } from './doc';
 import { maxFrames } from './design';
 import {
   ClipEdge,
+  TOP_LEFT_ANCHOR,
   addClip,
   addTrack,
   duplicateClip,
@@ -36,6 +37,16 @@ describe('timeline operations', () => {
 
     expect(found?.track.kind).toBe(TrackKind.Visual);
     expect(found?.clip.props.text).toBeTypeOf('string');
+  });
+
+  it('a clip added with the top-left anchor pivots from its corner', () => {
+    const doc = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Title', from: 0, transform: TOP_LEFT_ANCHOR }, 't1'));
+
+    expect(findClip(doc, 't1')?.clip.transform).toEqual({ anchorX: 0, anchorY: 0 });
+  });
+
+  it('a clip added without a transform keeps none, so it pivots from its centre as before', () => {
+    expect(findClip(withTitle(), 't1')?.clip.transform).toEqual({});
   });
 
   it('puts an audio clip on an audio track', () => {

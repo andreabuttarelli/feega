@@ -61,7 +61,14 @@ describe('motion agent keyframe tools', () => {
     await run('add_clip', { component: 'Image', start: 0 });
     await run('set_transform', { clip_id: 'id1', transform: { rotateX: 20, perspective: 800 } });
 
-    expect(findClip(session.doc, 'id1')!.clip.transform).toEqual({ rotateX: 20, perspective: 800 });
+    expect(findClip(session.doc, 'id1')!.clip.transform).toEqual({ anchorX: 0, anchorY: 0, rotateX: 20, perspective: 800 });
+  });
+
+  it('a clip the agent adds pivots from its top-left corner', async () => {
+    const { session, run } = setup();
+    await run('add_clip', { component: 'Image', start: 0 });
+
+    expect(findClip(session.doc, 'id1')!.clip.transform).toEqual({ anchorX: 0, anchorY: 0 });
   });
 
   it('the doc the agent reads shows transform and keyframes in seconds', async () => {
@@ -246,10 +253,10 @@ describe('motion agent units', () => {
     const clip = findClip(session.doc, 'id1')!.clip;
 
     expect(clip.props).toMatchObject({ width: 0.5, opacity: 0.5 });
-    expect(clip.transform).toEqual({ x: 0.1, scale: 1.5, rotateZ: 45 });
+    expect(clip.transform).toEqual({ anchorX: 0, anchorY: 0, x: 0.1, scale: 1.5, rotateZ: 45 });
     expect(clip.keyframes.y.map((k) => k.value)).toEqual([-0.5, 0]);
     expect(shown.props).toMatchObject({ width: 540, opacity: 50 });
-    expect(shown.transform).toEqual({ x: 108, scale: 150, rotateZ: 45 });
+    expect(shown.transform).toEqual({ anchorX: 0, anchorY: 0, x: 108, scale: 150, rotateZ: 45 });
     expect(shown.keyframes.y.map((k) => k.value)).toEqual([-540, 0]);
   });
 

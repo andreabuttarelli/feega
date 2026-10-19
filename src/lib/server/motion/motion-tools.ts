@@ -39,7 +39,7 @@ import { setFrameRate } from '$lib/motion/frame-rate';
 import { Background, DESIGN_MAX_SIDE, DESIGN_MIN_SIDE, MAX_SIDE, MOTION_FORMATS, clipsOf, findClip, formatOf, type MotionDoc } from '$lib/motion/doc';
 import { JUNCTION, JUNCTION_KINDS, junctionPairs } from '$lib/motion/junctions';
 import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
-import { ClipEdge, Side, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
+import { ClipEdge, Side, TOP_LEFT_ANCHOR, addClip, addTrack, moveClip, moveTrack, removeClips, removeTrack, renameTrack, removeAsset, removeKeyframes, setCanvas, setKeyInterp, setKeyframes, setMask, setMaskStack, shaped, setProps, setTiming, setTrackMatte, setTransform, setTransition, setJunction, setPartStyle, trimClip, applyEasePreset, setKeyEase, type OpResult } from '$lib/motion/timeline';
 import { ClipOp, runClipOp } from '$lib/motion/clip-ops';
 import { MASK_KEYS, MASK_KIND_IDS, MASK_MODES, MATTES, MAX_MASK_STACK } from '$lib/motion/mask';
 import { pathProblem } from '$lib/motion/path';
@@ -914,7 +914,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const result = addClip(
           session.doc,
-          { component: input.component, from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props: propsIn(input.component, input.props) },
+          { component: input.component, from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props: propsIn(input.component, input.props), transform: TOP_LEFT_ANCHOR },
           id
         );
         return created(apply(withEffects(registered(result, input.props?.assetId), [id], input.effects), `added ${input.component}`), id);
@@ -1049,7 +1049,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_transform: tool({
-      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot inside the clip box (0..1), blur in px. A negative scaleX or scaleY flips the clip on that axis (-100 = mirrored).`,
+      description: `Set base transform values of a clip; the rest are kept. Keys: ${TRANSFORM_KEYS.join(', ')}. x/y are offsets in px of the frame, scale/scaleX/scaleY and opacity in % (100 = as is), rotations and skews in degrees, z and perspective in px, anchorX/anchorY the pivot inside the clip box (0..1; clips added with add_clip and add_shape start at 0,0 top-left, older ones at 0.5,0.5 centre), blur in px. A negative scaleX or scaleY flips the clip on that axis (-100 = mirrored).`,
       inputSchema: z.object({ clip_id: z.string(), transform: transformInput }),
       execute: async (input) => {
         const shrunk = uiShrink(session.doc, input.clip_id, input.transform.scale as number | undefined);
@@ -1704,7 +1704,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const id = deps.newId();
         const outlined = input.props?.stroke !== undefined && input.props?.strokeKind === undefined ? { strokeKind: StrokeKind.Solid } : {};
         const props = { ...propsIn('Shape', { ...outlined, ...input.props }), shape: input.kind, ...(input.path ? { path: input.path } : {}), ...(input.fills ? { fills: input.fills } : {}), ...(input.strokes ? { strokes: input.strokes } : {}) };
-        const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props }, id);
+        const shape = addClip(session.doc, { component: 'Shape', from: frames(input.start), durationInFrames: input.duration ? frames(input.duration) : undefined, trackId: input.track_id, props, transform: TOP_LEFT_ANCHOR }, id);
         return created(apply(withEffects(shape, [id], input.effects), `added ${input.kind} shape`), id);
       }
     }),

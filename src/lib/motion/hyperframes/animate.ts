@@ -95,8 +95,10 @@ export function cssVar(key: string): string {
   return `${CSS_VAR_PREFIX}${key}`;
 }
 
+const ANCHOR_KEYS: ReadonlySet<string> = new Set(['anchorX', 'anchorY']);
+
 export function isAnimated(clip: MotionClip): boolean {
-  return Object.keys(clip.transform).length > 0 || Object.keys(clip.keyframes).length > 0;
+  return Object.keys(clip.transform).some((k) => !ANCHOR_KEYS.has(k)) || Object.keys(clip.keyframes).length > 0;
 }
 
 type LaneInput = { clip: MotionClip; key: string; track: Keyframe[]; frame: Frame; resolve: (color: string) => string; parents: Parents };

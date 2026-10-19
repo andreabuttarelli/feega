@@ -147,6 +147,7 @@
   import {
     ClipEdge,
     Direction,
+    TOP_LEFT_ANCHOR,
     addClip,
     addTrack,
     adjacentKeyframe,
@@ -1183,7 +1184,7 @@
   function add(component: ComponentId) {
     adding = false;
     const id = newId();
-    apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame }, id), `Added ${COMPONENTS[component].label}`);
+    apply(ADD[component]?.(id) ?? addClip(doc, { component, from: frame, transform: TOP_LEFT_ANCHOR }, id), `Added ${COMPONENTS[component].label}`);
     selection = [id];
   }
 

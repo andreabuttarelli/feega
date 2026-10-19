@@ -4,7 +4,7 @@ import { TransitionKind } from '../design';
 import { Background, MotionFormat, newMotionDoc, type MotionDoc } from '../doc';
 import { installEngine, testTimeline } from '../engine/testing';
 import { engineScript } from '../engine/engine';
-import { addClip, setJunction, setKeyframes, setTransform, setTransition, Side, type OpResult } from '../timeline';
+import { TOP_LEFT_ANCHOR, addClip, setJunction, setKeyframes, setTransform, setTransition, Side, type OpResult } from '../timeline';
 import { JunctionKind } from '../junctions';
 import { LIBRARY_IDS } from '../components';
 import { Ease } from '../design';
@@ -342,6 +342,7 @@ describe('background of the frame', () => {
 
 describe('keyframes and 3D transforms', () => {
   const card = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 30, durationInFrames: 120, props: { shape: 'rect', x: 0.25, y: 0.5, width: 0.2, height: 0.4 } }, 'card'));
+  const cornerCard = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'Shape', from: 30, durationInFrames: 120, transform: TOP_LEFT_ANCHOR, props: { shape: 'rect', x: 0.25, y: 0.5, width: 0.2, height: 0.4 } }, 'card'));
   const spun = must(
     setKeyframes(
       must(setTransform(must(setTransition(card, 'card', Side.In, { kind: TransitionKind.Fade, durationInFrames: 10 })), 'card', { perspective: 900, anchorX: 0, rotateX: 15 })),
@@ -370,6 +371,19 @@ describe('keyframes and 3D transforms', () => {
 
   it('the anchor is a point of the clip box, not of the frame', () => {
     expect(compose(spun)).toMatch(/id="kf-card" style="transform-origin:288px 540px"/);
+  });
+
+  it('a new rotated clip turns about its top-left corner', () => {
+    const fresh = must(setTransform(cornerCard, 'card', { rotateZ: 20 }));
+
+    expect(compose(fresh)).toMatch(/id="kf-card" style="transform-origin:288px 324px"/);
+  });
+
+  it('a saved rotated clip without an anchor keeps turning about its centre', () => {
+    const saved = must(setTransform(card, 'card', { rotateZ: 20 }));
+    const legacy = { ...saved, tracks: saved.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, transform: { rotateZ: 20 } })) })) };
+
+    expect(compose(legacy)).toMatch(/id="kf-card" style="transform-origin:480px 540px"/);
   });
 
   it('base transform values are set before the timeline exists', () => {
