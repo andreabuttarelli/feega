@@ -4,9 +4,12 @@ import type { LayoutLoad } from './$types';
 import { browser, dev } from '$app/environment';
 import { injectAnalytics } from '@vercel/analytics/sveltekit';
 import { viewerCall, viewerSession } from '$lib/api/client';
+import { bundleApiBase } from '$lib/api/bundle-fetch';
 import type { RootShell } from '$lib/server/root-shell';
 
-injectAnalytics({ mode: dev ? 'development' : 'production' });
+if (!browser || !bundleApiBase()) {
+  injectAnalytics({ mode: dev ? 'development' : 'production' });
+}
 
 const ROOT_API = '/api/v1/me/root';
 

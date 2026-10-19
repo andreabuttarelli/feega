@@ -6,7 +6,10 @@ of its own. Not part of the npm workspace, the web build or CI.
 ## What it does
 
 - Opens `FEEGA_URL` (default `https://oh.feega.app`). `FEEGA_URL=bundle` loads `bundle/index.html`
-  instead: the slot for a future static build. Read at runtime first, then at compile time.
+  instead: the static build. Read at runtime first, then at compile time.
+- The bundle is `PUBLIC_API_BASE=https://<api host> npm run build:spa` at the repo root, copied from
+  `build-spa/` to `apps/native/bundle/`. It calls the API with the Supabase bearer; the API answers
+  `tauri://localhost` and `capacitor://localhost` across origins (`src/lib/server/api-cors.ts`).
 - Sends a user agent ending in `FeegaNative/<version>`. The login action reads it
   (`src/lib/native-shell.ts`) and asks Supabase to return to `feega://auth/callback`.
 - Opens every navigation off the app origin (Google, GitHub, Supabase authorize, external links)
