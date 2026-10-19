@@ -22,6 +22,8 @@
   import EdgePanel from '../EdgePanel.svelte';
   import GpuTileChrome from './GpuTileChrome.svelte';
   import RendererBadge from './RendererBadge.svelte';
+  import CoreFrames from './CoreFrames.svelte';
+  import { framesOnCanvas } from '$lib/canvas/core/frame-source';
   import { dev } from '$app/environment';
   import Repeat from '@lucide/svelte/icons/repeat';
   import PeerLayer from '../PeerLayer.svelte';
@@ -87,7 +89,7 @@
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
 
-  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
+  let props: ComponentProps<typeof CanvasFlow> & { thumbsOf?: (id: string) => string[]; onfail?: (why: string) => void; cardPreviews?: Record<string, { hash: string; url: string }>; previewsAt?: string; core?: boolean; tileOver?: import('svelte').Snippet<[{ id: string }]> } = $props();
 
   const DOM_CAP = 6;
   const PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
@@ -177,11 +179,15 @@
     }
   });
   const domIds = $derived.by(() => {
-    const liveFrames = domPainted(placed.filter((t) => t.kind === 'motion'), (id) => summaries.get(id)?.data ?? {}, view, area);
+    const liveFrames = domPainted(placed.filter((t) => t.kind === 'motion' && !coreDrawn.has(t.id)), (id) => summaries.get(id)?.data ?? {}, view, area);
     const next = new Set([...editIds, ...sticky.keys(), ...liveFrames, ...(hoverLive ? [hoverLive] : []), ...(focusLive ? [focusLive] : [])]);
     return sameSet(lastDom, next) ? lastDom : (lastDom = next);
   });
   let lastDom = new Set<string>();
+  let coreOn = $state(props.core ?? false);
+  let coreDrawn = $state(new Set<string>());
+  const coreFrames = $derived(coreOn ? framesOnCanvas(placed, (id) => summaries.get(id)?.data ?? {}) : []);
+  const coreSource = (id: string) => `/p/${page.params.projectId}/c/${page.params.canvasId}/motion/${id}/source`;
   let domShows = $state(new Set<string>());
   const handedOver = (t: Tile) => domIds.has(t.id) && (t.kind !== 'motion' || domShows.has(t.id));
   $effect(() => {
@@ -585,7 +591,7 @@
         h: t.h,
         rotation: t.rotation ?? 0,
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, assetUrl, props.thumbsOf?.(t.id) ?? []),
-        hidden: handedOver(t),
+        hidden: handedOver(t) || coreDrawn.has(t.id),
         snapshot: shotOf(t.id),
         running: isRunning(summaries.get(t.id)?.data ?? {}),
         chrome: chromeOf(t)
@@ -1600,6 +1606,9 @@
     class:panning={space}
     data-owns-pinch
   >
+    {#if coreOn && scene}
+      <CoreFrames frames={coreFrames} {view} {area} sourceUrl={coreSource} onready={(ids) => (coreDrawn = ids)} onfallback={(why) => { console.warn(`[canvas] core off: ${why}`); coreOn = false; coreDrawn = new Set(); }} />
+    {/if}
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" aria-hidden="true">
         {#each curves as c (c.edge.id)}

@@ -35,6 +35,12 @@ describe('canvas scene', () => {
     expect(clips).not.toContain('out-a');
   });
 
+  it('a reach keeps frames just off screen staged, so a pan reveals them without a rebuild', () => {
+    const clips = canvasScene([frame('near', 900), frame('far', 5000)], { x: 0, y: 0, zoom: 1 }, SCREEN, new Set(), LOOK, 800).items.map((i) => i.clip);
+    expect(clips).toContain('near-a');
+    expect(clips).not.toContain('far-a');
+  });
+
   it('outlines selected frames on top, at a constant screen width', () => {
     const ring = paths(canvasScene([frame('f', 0)], { x: 0, y: 0, zoom: 3 }, SCREEN, new Set(['f']), LOOK)).at(-1)!;
     expect(ring.clip).toBe('selection:f');
