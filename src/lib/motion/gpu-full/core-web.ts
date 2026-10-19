@@ -1,9 +1,9 @@
 import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item } from './display-list';
-import type { Picture, Pictures, Raster } from './raster';
+import type { Camera, Picture, Pictures, Raster, Staging } from './raster';
 
 const CORE_URL = '/gpu-core/gpu_core.js';
 
-type Attached = { draw: (list: string) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; free: () => void };
+type Attached = { draw: (list: string) => string; stage?: (list: string) => string; show?: (a: number, b: number, c: number, d: number, e: number, f: number) => void; picture: (clip: string, source: unknown, width: number, height: number) => void; free: () => void };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
 type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
 
@@ -51,12 +51,25 @@ function rasterOf(attached: Attached): Raster {
     uploaded.set(item.clip, picture.source);
   }
 
+  const { stage, show } = attached;
+  const staging: Staging | undefined =
+    stage && show
+      ? {
+          stage: (list: DisplayList, pictures = NO_PICTURES) => {
+            wanted(list.items).forEach((item) => upload(item, pictures));
+            stage.call(attached, JSON.stringify(list));
+          },
+          show: (camera: Camera) => show.call(attached, ...camera)
+        }
+      : undefined;
+
   return {
     draw: (list: DisplayList, pictures = NO_PICTURES) => {
       wanted(list.items).forEach((item) => upload(item, pictures));
       attached.draw(JSON.stringify(list));
     },
-    dispose: () => attached.free()
+    dispose: () => attached.free(),
+    ...(staging ? { staging } : {})
   };
 }
 

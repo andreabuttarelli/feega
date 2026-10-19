@@ -17,6 +17,20 @@ pub struct Engine {
 
 pub type EngineError = vello::Error;
 
+pub struct Staged {
+    scene: Scene,
+    base: Color,
+    size: (u32, u32),
+    images: Vec<vello::peniko::ImageData>,
+    skipped: Vec<Skipped>,
+}
+
+impl Staged {
+    pub fn skipped(&self) -> &[Skipped] {
+        &self.skipped
+    }
+}
+
 struct Gpu<'a> {
     vello: &'a mut vello::Renderer,
     runner: WgpuRunner<'a>,
@@ -75,13 +89,30 @@ impl Engine {
     }
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
+        let staged = self.stage(device, queue, list, pictures)?;
+        let drawn = self.show(device, queue, &staged, pictures, Affine::IDENTITY, target);
+        let skipped = self.release(staged);
+        drawn.map(|_| skipped)
+    }
+
+    pub fn stage(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures) -> Result<Staged, EngineError> {
         let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: list.width, height: list.height, pictures };
         let layers = prepare(&mut gpu, list, pictures)?;
         let (scene, skipped) = build(list, pictures, &layers);
-        let drawn = gpu.render(&scene, base(list.background), target, (list.width, list.height));
-        for image in layers.into_images() {
-            gpu.vello.unregister_texture(image);
+        Ok(Staged { scene, base: base(list.background), size: (list.width, list.height), images: layers.into_images().collect(), skipped })
+    }
+
+    pub fn show(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, staged: &Staged, pictures: &Pictures, camera: Affine, target: &wgpu::TextureView) -> Result<(), EngineError> {
+        let mut gpu = Gpu { vello: &mut self.vello, runner: WgpuRunner { device, queue, passes: &self.filters }, width: staged.size.0, height: staged.size.1, pictures };
+        let mut moved = Scene::new();
+        moved.append(&staged.scene, Some(camera));
+        gpu.render(&moved, staged.base, target, staged.size)
+    }
+
+    pub fn release(&mut self, staged: Staged) -> Vec<Skipped> {
+        for image in staged.images {
+            self.vello.unregister_texture(image);
         }
-        drawn.map(|_| skipped)
+        staged.skipped
     }
 }

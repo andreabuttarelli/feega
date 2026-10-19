@@ -1,4 +1,7 @@
+use vello::kurbo::Affine;
 use vello::wgpu;
+
+const IDENTITY: [f64; 6] = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
 
 use crate::display_list::DisplayList;
 use crate::engine::Engine;
@@ -36,6 +39,10 @@ impl Renderer {
     }
 
     pub fn render(&mut self, list: &DisplayList, pictures: &Pictures) -> Result<Rendered, RenderError> {
+        self.render_at(list, pictures, IDENTITY)
+    }
+
+    pub fn render_at(&mut self, list: &DisplayList, pictures: &Pictures, camera: [f64; 6]) -> Result<Rendered, RenderError> {
         let size = wgpu::Extent3d { width: list.width, height: list.height, depth_or_array_layers: 1 };
         let target = self.device.create_texture(&wgpu::TextureDescriptor {
             label: None,
@@ -48,7 +55,10 @@ impl Renderer {
             view_formats: &[],
         });
         let view = target.create_view(&wgpu::TextureViewDescriptor::default());
-        let skipped = self.engine.draw(&self.device, &self.queue, list, pictures, &view).map_err(failed)?;
+        let staged = self.engine.stage(&self.device, &self.queue, list, pictures).map_err(failed)?;
+        let shown = self.engine.show(&self.device, &self.queue, &staged, pictures, Affine::new(camera), &view);
+        let skipped = self.engine.release(staged);
+        shown.map_err(failed)?;
         Ok(Rendered { pixels: self.read(&target, size)?, skipped })
     }
 

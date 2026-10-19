@@ -5,7 +5,8 @@ use wasm_bindgen::prelude::*;
 use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap};
 
 use crate::display_list::parse;
-use crate::engine::Engine;
+use crate::engine::{Engine, Staged};
+use vello::kurbo::Affine;
 use crate::pictures::Pictures;
 
 #[wasm_bindgen]
@@ -19,6 +20,7 @@ pub struct WebCore {
     target: wgpu::Texture,
     pictures: Pictures,
     textures: HashMap<String, wgpu::Texture>,
+    staged: Option<Staged>,
 }
 
 fn failed<E: std::fmt::Debug>(e: E) -> JsValue {
@@ -77,11 +79,11 @@ impl WebCore {
         let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions { compatible_surface: Some(&surface), ..Default::default() }).await.map_err(failed)?;
         let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor::default()).await.map_err(failed)?;
         let format = surface.get_capabilities(&adapter).formats.into_iter().find(|f| !f.is_srgb()).ok_or_else(|| failed("no linear surface format"))?;
-        surface.configure(&device, &wgpu::SurfaceConfiguration { usage: wgpu::TextureUsages::RENDER_ATTACHMENT, format, width, height, present_mode: wgpu::PresentMode::Fifo, alpha_mode: wgpu::CompositeAlphaMode::Auto, view_formats: vec![], desired_maximum_frame_latency: 2, color_space: wgpu::SurfaceColorSpace::Auto });
+        surface.configure(&device, &wgpu::SurfaceConfiguration { usage: wgpu::TextureUsages::RENDER_ATTACHMENT, format, width, height, present_mode: wgpu::PresentMode::Fifo, alpha_mode: wgpu::CompositeAlphaMode::PreMultiplied, view_formats: vec![], desired_maximum_frame_latency: 2, color_space: wgpu::SurfaceColorSpace::Auto });
         let engine = Engine::new(&device).map_err(failed)?;
         let blitter = wgpu::util::TextureBlitter::new(&device, format);
         let target = storage(&device, width, height);
-        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new() })
+        Ok(WebCore { device, queue, surface, format, engine, blitter, target, pictures: Pictures::new(), textures: HashMap::new(), staged: None })
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -106,9 +108,25 @@ impl WebCore {
     }
 
     pub fn draw(&mut self, list_json: &str) -> Result<String, JsValue> {
+        let skipped = self.stage(list_json)?;
+        self.show(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)?;
+        Ok(skipped)
+    }
+
+    pub fn stage(&mut self, list_json: &str) -> Result<String, JsValue> {
         let list = parse(list_json).map_err(failed)?;
+        let staged = self.engine.stage(&self.device, &self.queue, &list, &self.pictures).map_err(failed)?;
+        let skipped = staged.skipped().iter().map(|s| format!("{} {}", s.clip, s.what)).collect::<Vec<_>>().join("\n");
+        if let Some(old) = self.staged.replace(staged) {
+            self.engine.release(old);
+        }
+        Ok(skipped)
+    }
+
+    pub fn show(&mut self, a: f64, b: f64, c: f64, d: f64, e: f64, f: f64) -> Result<(), JsValue> {
+        let staged = self.staged.as_ref().ok_or_else(|| failed("nothing staged"))?;
         let view = self.target.create_view(&wgpu::TextureViewDescriptor::default());
-        let skipped = self.engine.draw(&self.device, &self.queue, &list, &self.pictures, &view).map_err(failed)?;
+        self.engine.show(&self.device, &self.queue, staged, &self.pictures, Affine::new([a, b, c, d, e, f]), &view).map_err(failed)?;
         let frame = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(t) | wgpu::CurrentSurfaceTexture::Suboptimal(t) => t,
             _ => return Err(failed("no surface texture")),
@@ -118,6 +136,6 @@ impl WebCore {
         self.blitter.copy(&self.device, &mut encoder, &view, &out);
         self.queue.submit([encoder.finish()]);
         self.queue.present(frame);
-        Ok(skipped.iter().map(|s| format!("{} {}", s.clip, s.what)).collect::<Vec<_>>().join("\n"))
+        Ok(())
     }
 }

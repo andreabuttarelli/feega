@@ -141,7 +141,11 @@ export type Picture = { source: TexImageSource; size: Size };
 
 export type Pictures = (item: ImageItem | LayerItem) => Picture | null;
 
-export type Raster = { draw: (list: DisplayList, pictures?: Pictures) => void; dispose: () => void };
+export type Camera = [number, number, number, number, number, number];
+
+export type Staging = { stage: (list: DisplayList, pictures?: Pictures) => void; show: (camera: Camera) => void };
+
+export type Raster = { draw: (list: DisplayList, pictures?: Pictures) => void; dispose: () => void; staging?: Staging };
 
 const NO_PICTURES: Pictures = () => null;
 

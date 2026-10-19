@@ -34,3 +34,15 @@ fn paints_a_square_over_the_background() {
     assert_eq!(at(32, 32), &[255, 0, 0, 255]);
     assert_eq!(at(4, 4), &[0, 0, 255, 255]);
 }
+
+#[cfg(feature = "gpu")]
+#[test]
+fn a_staged_scene_is_shown_through_a_camera_without_rebuilding() {
+    let list = parse(SQUARE).unwrap();
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
+    let pixels = renderer.render_at(&list, &Pictures::new(), [1.0, 0.0, 0.0, 1.0, 8.0, 0.0]).unwrap().pixels;
+    let at = |x: usize, y: usize| &pixels[(y * 64 + x) * 4..(y * 64 + x) * 4 + 4];
+
+    assert_eq!(at(52, 32), &[255, 0, 0, 255]);
+    assert_eq!(at(20, 32), &[0, 0, 255, 255]);
+}
