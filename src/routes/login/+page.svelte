@@ -1,7 +1,7 @@
 <script lang="ts">
   import PageTitle from '$lib/components/PageTitle.svelte';
   import { TitleSize } from '$lib/components/page-title';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { enhance } from '$app/forms';
   import { page } from '$app/stores';
   import { _, locale } from 'svelte-i18n';
@@ -9,6 +9,7 @@
   import { detectInAppBrowser, androidIntentUrl, type InAppBrowser } from '$lib/in-app-browser';
   import { sanitizeWebsiteParam } from '$lib/website-param';
   import { legalHref } from '$lib/legal-links';
+  import { nativeAppleSignIn, tauriInvoke, NativeAppleOutcome, type AppleIdToken } from '$lib/apple-sign-in/native';
   let { form, data } = $props();
   let loading = $state(false);
   let showPassword = $state(false);
@@ -73,6 +74,29 @@
       return;
     }
     loading = true;
+  }
+
+  let appleIdTokenForm = $state<HTMLFormElement | null>(null);
+  let appleIdToken = $state<AppleIdToken | null>(null);
+
+  async function startApple(e: Event) {
+    const invoke = tauriInvoke(window);
+    if (!invoke) {
+      startOAuth(e);
+      return;
+    }
+
+    e.preventDefault();
+    loading = true;
+    const outcome = await nativeAppleSignIn({
+      invoke,
+      submitIdToken: async (credentials) => {
+        appleIdToken = credentials;
+        await tick();
+        appleIdTokenForm?.requestSubmit();
+      }
+    });
+    loading = outcome === NativeAppleOutcome.Submitted;
   }
 
   async function copyLink() {
@@ -162,6 +186,24 @@
           <p class="sub">{$_('login.signin.sub')}</p>
         {/if}
         {#if mode !== 'forgot'}
+        {#if data.appleSignIn}
+        <form method="POST" action="?/apple" class="form oauth-form" onsubmit={startApple}>
+          {#if cliPort}<input type="hidden" name="cli_port" value={cliPort} />{/if}
+          {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
+          {#if inviteToken}<input type="hidden" name="invite_token" value={inviteToken} />{/if}
+          {#if startFlow}<input type="hidden" name="next" value="onboarding" />{/if}
+          {#if planParam}<input type="hidden" name="plan" value={planParam} />{/if}
+          {#if cycleParam}<input type="hidden" name="cycle" value={cycleParam} />{/if}
+          {#if websiteParam}<input type="hidden" name="website" value={websiteParam} />{/if}
+          <button type="submit" class="oauth apple" disabled={loading}>
+            <svg class="gh" viewBox="0 0 17 20" width="16" height="19" aria-hidden="true">
+              <path fill="currentColor" d="M14.1 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9-1.7 0-3.3 1-4.2 2.6-1.8 3.1-.5 7.7 1.3 10.2.8 1.2 1.8 2.6 3.1 2.5 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4 1-1.4 1.3-2.7 1.4-2.8-.1 0-2.6-1-2.6-4ZM11.6 3c.7-.8 1.2-2 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4Z" />
+            </svg>
+            {$_('login.form.apple')}
+          </button>
+        </form>
+        {/if}
+
         <form method="POST" action="?/google" class="form oauth-form" onsubmit={startOAuth}>
           {#if cliPort}<input type="hidden" name="cli_port" value={cliPort} />{/if}
           {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
@@ -199,6 +241,20 @@
             {$_('login.form.github')}
           </button>
         </form>
+
+        {#if data.appleSignIn}
+        <form method="POST" action="?/appleIdToken" class="apple-id-token" bind:this={appleIdTokenForm}>
+          {#if cliPort}<input type="hidden" name="cli_port" value={cliPort} />{/if}
+          {#if cliState}<input type="hidden" name="cli_state" value={cliState} />{/if}
+          {#if inviteToken}<input type="hidden" name="invite_token" value={inviteToken} />{/if}
+          {#if startFlow}<input type="hidden" name="next" value="onboarding" />{/if}
+          {#if planParam}<input type="hidden" name="plan" value={planParam} />{/if}
+          {#if cycleParam}<input type="hidden" name="cycle" value={cycleParam} />{/if}
+          {#if websiteParam}<input type="hidden" name="website" value={websiteParam} />{/if}
+          <input type="hidden" name="token" value={appleIdToken?.token ?? ''} />
+          <input type="hidden" name="nonce" value={appleIdToken?.nonce ?? ''} />
+        </form>
+        {/if}
 
         <div class="divider"><span>{$_('login.form.or')}</span></div>
         {/if}
@@ -432,6 +488,21 @@
   }
   .oauth:hover:not(:disabled) {
     background: var(--ui-input-hover);
+  }
+  .oauth.apple {
+    background: #000;
+    color: #fff;
+  }
+  .oauth.apple:hover:not(:disabled) {
+    background: #000;
+    filter: brightness(1.25);
+  }
+  :global(:root[data-theme='dark']) .oauth.apple {
+    background: #fff;
+    color: #000;
+  }
+  .apple-id-token {
+    display: none;
   }
   .oauth .gh {
     flex: 0 0 auto;
