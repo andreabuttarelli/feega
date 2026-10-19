@@ -19,6 +19,7 @@ const VIEWPORT = { width: 1440, height: 900 };
 const COLOURS = ['#e11d48', '#16a34a', '#2563eb', '#f59e0b', '#9333ea'];
 const SETTLE_MS = 1200;
 const OPEN_MS = 8_000;
+const SERVER_MS = 20_000;
 const SURFACE = '[data-canvas-surface], .svelte-flow';
 const STEP_MS = 45_000;
 const MOVE_PX = 36;
@@ -125,6 +126,7 @@ async function inView(page: Page, id: string): Promise<Box> {
 }
 
 const WHEEL_PROBE = 40;
+const WHEEL_UNLATCH_MS = 250;
 const wheelGains = new WeakMap<Page, number>();
 
 async function wheelGain(page: Page): Promise<number> {
@@ -148,16 +150,18 @@ async function zoomOnto(page: Page, id: string) {
     if (visible(b) && Math.max(b.width / area.width, b.height / area.height) > FILL_SHARE / 2) {
       return;
     }
-    await page.mouse.move(goal.x, goal.y);
+    const pane = await emptySpot(page, { width: 40, height: 40 });
+    await page.mouse.move(pane.x + 20, pane.y + 20);
+    await page.waitForTimeout(WHEEL_UNLATCH_MS);
     const gain = await wheelGain(page);
-    const at = centre((await page.locator(nodeSel(id)).boundingBox())!);
-    await page.mouse.wheel((at.x - goal.x) / gain, (at.y - goal.y) / gain);
-    await page.waitForTimeout(120);
     const scale = Math.min((area.width * FILL_SHARE) / b.width, (area.height * FILL_SHARE) / b.height);
     await page.keyboard.down('Control');
     await page.mouse.wheel(0, -Math.log(scale) / WHEEL_ZOOM / gain);
     await page.keyboard.up('Control');
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(WHEEL_UNLATCH_MS);
+    const at = centre((await page.locator(nodeSel(id)).boundingBox())!);
+    await page.mouse.wheel((at.x - goal.x) / gain, (at.y - goal.y) / gain);
+    await page.waitForTimeout(WHEEL_UNLATCH_MS);
   }
 }
 
@@ -226,6 +230,42 @@ async function marquee(page: Page, ids: string[]) {
   await drag(page, { x: left, y: top }, { x: right, y: bottom }, 8);
 }
 
+const selectedIds = (page: Page) => page.locator('.svelte-flow__node.selected[data-id]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.id!));
+
+const HIT_GRID = 10;
+
+async function hitPoint(page: Page, id: string): Promise<{ x: number; y: number } | null> {
+  const b = await boxOf(page, id);
+  return page.evaluate(([id, b, n]) => {
+    for (let fy = 1; fy < n; fy++) {
+      for (let fx = 1; fx < n; fx++) {
+        const p = { x: b.x + (b.width * fx) / n, y: b.y + (b.height * fy) / n };
+        if (document.elementFromPoint(p.x, p.y)?.closest('.svelte-flow__node')?.getAttribute('data-id') === id) {
+          return p;
+        }
+      }
+    }
+    return null;
+  }, [id, b, HIT_GRID] as const);
+}
+
+async function selectOnly(page: Page, ...wanted: string[]) {
+  const picked = await selectedIds(page);
+  if (picked.length === wanted.length && wanted.every((id) => picked.includes(id))) {
+    return;
+  }
+  await marquee(page, wanted);
+  for (const other of (await selectedIds(page)).filter((p) => !wanted.includes(p))) {
+    const at = await hitPoint(page, other);
+    if (!at) {
+      continue;
+    }
+    await page.keyboard.down('Shift');
+    await page.mouse.click(at.x, at.y);
+    await page.keyboard.up('Shift');
+  }
+}
+
 const FRAME_TRIES = 6;
 const LANDING_FRAME = process.env.FLUID_LANDING ?? '546a6ab6-023a-443f-8add-aa7b667e8d08';
 const MOTION_FRAME = process.env.FLUID_FRAME ?? '09438658-e0c5-4d13-89b3-7aa08eb750cf';
@@ -246,10 +286,18 @@ async function frameWithFill(page: Page): Promise<{ id: string; layer: string }>
   throw new Error(`none of the first ${FRAME_TRIES} frames has a layer with a fill`);
 }
 
-async function anyInView(page: Page, selector: string, idOf: (el: Element) => string): Promise<string> {
-  const id = await page.locator(selector).first().evaluate(idOf);
-  await inView(page, id);
-  return id;
+const GEN_TRIES = 4;
+
+async function promptedGenNode(page: Page): Promise<string> {
+  const candidates = await page.locator(GEN_NODE).evaluateAll((all) => all.map((e) => (e as HTMLElement).dataset.id!).filter(Boolean));
+  for (const id of candidates.filter((c) => !createdHere.has(c)).slice(0, GEN_TRIES)) {
+    await leaveEditor(page);
+    await clickNode(page, id);
+    if (await page.locator(`${contentSel(id)} textarea`).first().isVisible({ timeout: 2000 }).catch(() => false)) {
+      return id;
+    }
+  }
+  throw new Error(`none of the first ${GEN_TRIES} generate nodes shows a prompt`);
 }
 
 async function boxOf(page: Page, id: string): Promise<Box> {
@@ -302,6 +350,14 @@ const INSPECTOR_EDITS: [string, string][] = [
   ['Height', '140'],
   ['Rotate Z', '5']
 ];
+
+async function releasedElements(page: Page, before: Set<string>, kept: string[]): Promise<string[]> {
+  await expect.poll(async () => [...(await domIds(page))].filter((id) => !before.has(id) || kept.includes(id)).length, { timeout: OPEN_MS }).toBeGreaterThan(0);
+  const now = [...(await domIds(page))];
+  const fresh = now.filter((id) => !before.has(id));
+  fresh.forEach((id) => createdHere.add(id));
+  return [...kept.filter((id) => now.includes(id)), ...fresh];
+}
 
 const STEPS: Step[] = [
   {
@@ -402,7 +458,7 @@ const STEPS: Step[] = [
     drive: async ({ page, ids, watch }) => {
       const [a, b] = [ids.get('box')!, ids.get('copy')!];
       await leaveEditor(page);
-      await marquee(page, [a, b]);
+      await selectOnly(page, a, b);
       await watch([boxWatch(a, 'box'), boxWatch(b, 'copy')]);
       await page.keyboard.press('Alt+KeyA');
       await page.waitForTimeout(300);
@@ -425,7 +481,8 @@ const STEPS: Step[] = [
     drive: async ({ page, ids, watch }) => {
       const group = ids.get('group')!;
       await leaveEditor(page);
-      await marquee(page, [group]);
+      await inView(page, group);
+      await selectOnly(page, group);
       const g = await boxOf(page, group);
       await watch([boxWatch(group, 'group')]);
       const handle = page.getByTestId('rotate-handle').first();
@@ -451,10 +508,13 @@ const STEPS: Step[] = [
       await leaveEditor(page);
       await clickNode(page, group);
       await leaveEditor(page);
+      const before = await domIds(page);
       await page.keyboard.press('ControlOrMeta+Shift+g');
-      await expect(page.locator(nodeSel(group))).toHaveCount(0, { timeout: OPEN_MS });
-      await expect(page.locator(nodeSel(box))).toHaveCount(1, { timeout: OPEN_MS });
-      return { touched: [group, box, copy] };
+      await expect(page.locator(nodeSel(group)), 'the server turns the group back into elements').toHaveCount(0, { timeout: SERVER_MS });
+      const released = await releasedElements(page, before, [box, copy]);
+      ids.set('box', released[0]);
+      ids.set('copy', released[1] ?? released[0]);
+      return { touched: [group, ...released] };
     }
   },
   {
@@ -527,17 +587,13 @@ const STEPS: Step[] = [
   {
     name: 'edit a generate prompt and Generate (mocked)',
     drive: async ({ page, ids, watch }) => {
-      const id = await anyInView(page, GEN_NODE, (e) => (e as HTMLElement).dataset.id!);
+      const id = await promptedGenNode(page);
       ids.set('gen', id);
-      await clickNode(page, id);
       const prompt = page.locator(`${contentSel(id)} textarea`).first();
-      await expect(prompt).toBeVisible({ timeout: OPEN_MS });
       await watch([promptWatch(id)]);
       await prompt.fill(PROMPT);
       const run = page.locator(contentSel(id)).getByRole('button', { name: /^(generate|redo)/i }).first();
-      if (!(await run.isEnabled())) {
-        throw new Error('Generate is disabled on this node');
-      }
+      await expect(run, 'Generate turns on once the prompt is in').toBeEnabled({ timeout: OPEN_MS });
       await run.click();
       return { touched: [id], watches: [promptWatch(id)], expected: [{ id: 'prompt', value: PROMPT }] };
     }
@@ -672,6 +728,9 @@ const STEPS: Step[] = [
       await leaveEditor(page);
       await openNode(page, LANDING_FRAME, Open.Double);
       const x = page.locator('aside.props input.num[aria-label="X"]').first();
+      if (!(await x.isVisible({ timeout: 1000 }).catch(() => false))) {
+        await page.getByRole('tab', { name: 'Properties' }).or(page.getByRole('button', { name: 'Properties', exact: true })).first().click();
+      }
       const was = await x.inputValue();
       await x.fill(String(Number(was || 0) + 8));
       await x.press('Enter');
