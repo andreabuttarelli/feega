@@ -92,6 +92,45 @@ const KINDS: Record<string, () => MotionDoc> = {
     const stacked = { ...lower, tracks: [top, ...lower.tracks] };
     return { ...stacked, tracks: stacked.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'alpha' ? { ...c, matte: 'alpha', matteFrom: 'star-a' } : c.id === 'luma' ? { ...c, matte: 'luma-inverted', matteFrom: 'star-l' } : c)) })) } as MotionDoc;
   },
+  effects: () => {
+    const list: [string, Record<string, number | string>][] = [
+      ['brightness-contrast', { brightness: 1.3, contrast: 1.4 }],
+      ['hue-saturation', { hue: 90, saturation: 1.6 }],
+      ['tint', { black: '#1d1d6b', white: '#ffd9a0', amount: 0.8 }],
+      ['curves', { shadows: 0.1, midtones: 0.7, highlights: 0.9 }],
+      ['black-white', { amount: 1 }],
+      ['gaussian-blur', { radius: 6 }],
+      ['directional-blur', { length: 40, angle: 30 }],
+      ['drop-shadow', { distance: 18, angle: 135, blur: 20, color: '#000000', opacity: 0.8 }],
+      ['inner-shadow', { distance: 10, angle: 90, blur: 12, color: '#000000', opacity: 0.7 }],
+      ['glow', { radius: 30, color: '#ffd60a', intensity: 0.9 }],
+      ['stroke', { width: 6, color: '#ffffff' }],
+      ['chromatic-aberration', { offset: 8, angle: 0 }],
+      ['vignette', { amount: 0.7 }],
+      ['levels', { inBlack: 0.1, inWhite: 0.8, gamma: 1.4, outBlack: 0.05, outWhite: 0.95 }],
+      ['lift-gamma-gain', { liftR: 0.1, gammaG: 1.3, gainB: 1.4 }],
+      ['gaussian-blur', { radius: 2 }]
+    ];
+    const under = must(addClip(backdrop, { component: 'Image', from: 0, durationInFrames: SECONDS, props: { assetId: 'pic-b', x: 0.5, y: 0.5, width: 1, height: 1 } }, 'under'));
+    return list.reduce((doc, [kind, params], i) => {
+      const id = `fx${i}`;
+      const placed = must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: SECONDS, props: { shape: i === 15 ? 'rect' : 'star', x: 0.125 + (i % 4) * 0.25, y: 0.125 + Math.floor(i / 4) * 0.25, width: 0.12, height: 0.18, fills: i === 15 ? [{ type: 'solid', color: '#ffffff', opacity: 0.2 }] : [{ type: 'linear-gradient', angle: 45, stops }] } }, id));
+      return { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === id ? { ...c, effects: [{ id: 'e', kind, enabled: true, params }] } : c)) })) } as MotionDoc;
+    }, under);
+  },
+  noise: () =>
+    [
+      ['grain', 'noise', { amount: 0.5, size: 2, evolve: 1 }, 0.27],
+      ['wave', 'wave', { amount: 30, scale: 120, speed: 200 }, 0.73]
+    ].reduce((doc, [id, kind, params, x]) => {
+      const placed = must(addClip(doc, { component: 'Image', from: 0, durationInFrames: SECONDS, props: { assetId: 'pic-a', x, y: 0.5, width: 0.4, height: 0.6 } }, id as string));
+      return { ...placed, tracks: placed.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === id ? { ...c, effects: [{ id: 'e', kind, enabled: true, params }] } : c)) })) } as MotionDoc;
+    }, backdrop),
+  backdrop: () => {
+    const under = must(addClip(backdrop, { component: 'Image', from: 0, durationInFrames: SECONDS, props: { assetId: 'pic-a', x: 0.5, y: 0.5, width: 1, height: 1 } }, 'under'));
+    const glass = shape(under, 'glass', { shape: 'rect', x: 0.5, y: 0.5, width: 0.4, height: 0.4, roundness: 0.1, fills: [{ type: 'solid', color: '#ffffff', opacity: 0.25 }] });
+    return { ...glass, tracks: glass.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'glass' ? { ...c, effects: [{ id: 'e', kind: 'background-blur', enabled: true, params: { radius: 14 } }] } : c)) })) } as MotionDoc;
+  },
   blur: () => keys(must(addClip(shape(backdrop, 'sharp', { shape: 'rect', x: 0.3, y: 0.5, width: 0.2, height: 0.3, fill: '#ffd60a' }), { component: 'Shape', from: 0, durationInFrames: SECONDS, props: { shape: 'star', x: 0.7, y: 0.5, width: 0.25, height: 0.4, fill: '#bf5af2' }, effects: [{ id: 'g', kind: 'gaussian-blur', enabled: true, params: { radius: 6 } }] } as never, 'soft')), 'sharp', 'blur', 0, 24)
 };
 
