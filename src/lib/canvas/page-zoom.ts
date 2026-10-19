@@ -20,7 +20,8 @@ const STEP_OF_KEY: Record<string, ZoomStep> = {
 };
 
 const WHEEL_ZOOM_SPEED = 0.01;
-const LOCKED_TOUCH = 'pan-x pan-y';
+const LOCKED_ATTR = 'data-page-zoom-locked';
+const OWNS_PINCH = '[data-owns-pinch], .svelte-flow';
 const ACTIVE = { passive: false } as const;
 const ACTIVE_CAPTURE = { passive: false, capture: true } as const;
 const CAPTURE = { capture: true } as const;
@@ -34,6 +35,10 @@ export function browserZoomStep(e: KeyboardEvent): ZoomStep | null {
 
 export function wheelFactor(deltaY: number): number {
   return Math.exp(-deltaY * WHEEL_ZOOM_SPEED);
+}
+
+function ownsPinch(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(OWNS_PINCH) !== null;
 }
 
 export function lockPageZoom(win: Window, zoom: CanvasZoom | null): () => void {
@@ -71,7 +76,7 @@ export function lockPageZoom(win: Window, zoom: CanvasZoom | null): () => void {
   const onGestureChange = (e: Event) => {
     e.preventDefault();
     const scale = (e as GestureEvent).scale;
-    if (pinchSentWheels) {
+    if (pinchSentWheels || ownsPinch(e.target)) {
       return;
     }
     zoom?.scaleBy(scale / gestureScale);
@@ -80,9 +85,14 @@ export function lockPageZoom(win: Window, zoom: CanvasZoom | null): () => void {
 
   const block = (e: Event) => e.preventDefault();
 
+  const blockMultiTouch = (e: TouchEvent) => {
+    if (e.touches.length > 1) {
+      e.preventDefault();
+    }
+  };
+
   const root = win.document.documentElement;
-  const touch = root.style.touchAction;
-  root.style.touchAction = LOCKED_TOUCH;
+  root.setAttribute(LOCKED_ATTR, '');
 
   win.addEventListener('wheel', blockPinch, ACTIVE_CAPTURE);
   win.addEventListener('wheel', forwardPinch, ACTIVE);
@@ -90,14 +100,16 @@ export function lockPageZoom(win: Window, zoom: CanvasZoom | null): () => void {
   win.addEventListener('gesturestart', onGestureStart, ACTIVE);
   win.addEventListener('gesturechange', onGestureChange, ACTIVE);
   win.addEventListener('gestureend', block, ACTIVE);
+  win.addEventListener('touchmove', blockMultiTouch, ACTIVE_CAPTURE);
 
   return () => {
-    root.style.touchAction = touch;
+    root.removeAttribute(LOCKED_ATTR);
     win.removeEventListener('wheel', blockPinch, CAPTURE);
     win.removeEventListener('wheel', forwardPinch);
     win.removeEventListener('keydown', onKey);
     win.removeEventListener('gesturestart', onGestureStart);
     win.removeEventListener('gesturechange', onGestureChange);
     win.removeEventListener('gestureend', block);
+    win.removeEventListener('touchmove', blockMultiTouch, CAPTURE);
   };
 }

@@ -7,7 +7,13 @@
 </script>
 
 <div class="shell">
-  <aside data-testid="panel">panel</aside>
+  <aside data-testid="panel">
+    panel
+    <div class="bar" data-testid="bar">
+      <input data-testid="bar-input" />
+      {#each Array.from({ length: 80 }, (_, i) => i) as line (line)}<p>line {line}</p>{/each}
+    </div>
+  </aside>
   <div class="flow">
     <SvelteFlow bind:nodes initialViewport={{ x: 0, y: 0, zoom: 1 }} zoomOnScroll={false} panOnScroll>
       <CanvasZoomLock />
@@ -23,6 +29,13 @@
   }
   aside {
     width: 240px;
+  }
+  .bar {
+    height: 300px;
+    overflow: auto;
+  }
+  input {
+    font-size: 12px;
   }
   .flow {
     flex: 1;

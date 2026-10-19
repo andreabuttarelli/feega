@@ -60,3 +60,69 @@ test('mod+= zooms the canvas and the browser does not zoom the page', async ({ p
   expect(await page.evaluate(() => window.zoomKeyBlocked)).toBe(true);
   expect(await pageScale(page)).toEqual(before);
 });
+
+const BAR = '[data-testid="bar"]';
+const SPREAD = 1.5;
+const MIN_TOUCH_FONT_PX = 16;
+
+function pinchTouches(page: Page, selector: string): Promise<boolean> {
+  return page.locator(selector).first().evaluate((el) => {
+    const twoFingers = (type: string) => {
+      const e = new TouchEvent(type, { bubbles: true, cancelable: true });
+      Object.defineProperty(e, 'touches', { value: { length: 2 } });
+      return e;
+    };
+    el.dispatchEvent(twoFingers('touchstart'));
+    return !el.dispatchEvent(twoFingers('touchmove'));
+  });
+}
+
+function gesture(page: Page, selector: string, scale: number): Promise<boolean[]> {
+  return page.locator(selector).first().evaluate((el, scale) => {
+    const fire = (type: string, value: number) => {
+      const e = Object.assign(new UIEvent(type, { bubbles: true, cancelable: true }), { scale: value });
+      Object.defineProperty(e, 'scale', { value });
+      return !el.dispatchEvent(e);
+    };
+    return [fire('gesturestart', 1), fire('gesturechange', scale), fire('gestureend', scale)];
+  }, scale);
+}
+
+test.describe('touch tablets: pinch never zooms the page', () => {
+  test.skip(({ hasTouch }) => !hasTouch, 'touch only');
+
+  test('a two-finger pinch over a scrolling bar is held, the page stays at scale 1', async ({ page }) => {
+    await open(page);
+
+    expect(await pinchTouches(page, BAR), 'the browser never gets the pinch').toBe(true);
+    expect(await page.locator(BAR).evaluate((el) => getComputedStyle(el).touchAction)).toBe('pan-x pan-y');
+    expect((await pageScale(page)).scale).toBe(1);
+  });
+
+  test('a Safari pinch gesture over a bar zooms the canvas, not the page', async ({ page }) => {
+    await open(page);
+    const zoom = await canvasZoom(page);
+
+    expect(await gesture(page, BAR, SPREAD)).toEqual([true, true, true]);
+
+    await expect.poll(() => canvasZoom(page)).toBeGreaterThan(zoom);
+    expect((await pageScale(page)).scale).toBe(1);
+  });
+
+  test('a Safari pinch gesture over the canvas is left to the canvas own pinch, never doubled', async ({ page }) => {
+    await open(page);
+    const zoom = await canvasZoom(page);
+
+    expect(await gesture(page, PANE, SPREAD)).toEqual([true, true, true]);
+
+    expect(await canvasZoom(page)).toBe(zoom);
+  });
+
+  test('a text field is at least 16px, so focusing it never auto-zooms', async ({ page }) => {
+    await open(page);
+
+    const size = await page.getByTestId('bar-input').evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+
+    expect(size).toBeGreaterThanOrEqual(MIN_TOUCH_FONT_PX);
+  });
+});

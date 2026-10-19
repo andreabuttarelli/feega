@@ -1581,6 +1581,7 @@
     oncontextmenu={onContextMenu}
     onpointerleave={() => props.onPointer?.(null)}
     class:panning={space}
+    data-owns-pinch
   >
     <div class="svelte-flow__viewport gpu-nodes" style={`transform: translate(${view.x}px, ${view.y}px) scale(${view.zoom})`}>
       <svg class="gpu-edges" aria-hidden="true">

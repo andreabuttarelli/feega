@@ -380,6 +380,10 @@ html {
   -webkit-font-smoothing: antialiased;
   touch-action: manipulation;
 }
+html[data-page-zoom-locked],
+:where(html[data-page-zoom-locked]) * {
+  touch-action: pan-x pan-y;
+}
 body {
   font-family: var(--sans);
   color: var(--ink);
@@ -400,7 +404,7 @@ button { font-family: var(--sans); cursor: pointer; }
 /* Prevent iOS/Android auto-zoom on focus: Safari zooms any focused control whose
    computed font-size is < 16px. Force 16px on coarse pointers even when a local
    style asks for something smaller. Pinch-zoom is unaffected. */
-@media (hover: none) and (pointer: coarse) {
+@media (any-pointer: coarse) {
   input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
   textarea,
   select,
