@@ -1,5 +1,5 @@
 import { FrameKind, MOTION_NODE_BAR_H, frameChrome } from '$lib/canvas/motion-node';
-import { posterSecond } from '$lib/motion/poster-capture';
+import { posterSecond } from '$lib/motion/poster-time';
 import { stillFrame as docStill } from '$lib/motion/still';
 import type { DisplayList } from '$lib/motion/gpu-full/display-list';
 import type { Rgba } from '$lib/motion/gpu-full/rgba';
