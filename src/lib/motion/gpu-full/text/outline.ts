@@ -81,7 +81,21 @@ function area(c: number[]): number {
 
 const MIN_COSINE = 0.25;
 
-function pushed(c: number[], distance: number): number[] {
+function distinct(c: number[]): number[] {
+  const out: number[] = [];
+  const n = c.length / 2;
+  for (let i = 0; i < n; i++) {
+    const j = ((i + 1) % n) * 2;
+    if (c[i * 2] === c[j] && c[i * 2 + 1] === c[j + 1]) {
+      continue;
+    }
+    out.push(c[i * 2], c[i * 2 + 1]);
+  }
+  return out;
+}
+
+function pushed(points: number[], distance: number): number[] {
+  const c = distinct(points);
   const n = c.length / 2;
   const out: number[] = [];
   for (let i = 0; i < n; i++) {

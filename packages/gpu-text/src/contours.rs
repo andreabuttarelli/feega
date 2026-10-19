@@ -101,7 +101,19 @@ fn unit_or_one(v: f64) -> f64 {
     }
 }
 
-fn pushed(c: &[f64], distance: f64) -> Contour {
+fn distinct(points: &[f64]) -> Contour {
+    let n = points.len() / 2;
+    (0..n)
+        .filter(|&i| {
+            let j = (i + 1) % n;
+            points[i * 2] != points[j * 2] || points[i * 2 + 1] != points[j * 2 + 1]
+        })
+        .flat_map(|i| [points[i * 2], points[i * 2 + 1]])
+        .collect()
+}
+
+fn pushed(points: &[f64], distance: f64) -> Contour {
+    let c = &distinct(points);
     let n = c.len() / 2;
     let point = |i: usize| (c[i * 2], c[i * 2 + 1]);
     (0..n)
@@ -178,4 +190,21 @@ fn cut(points: &[f64], edge: Edge) -> Contour {
 pub fn clipped(contours: &[Contour], [left, top, right, bottom]: Rect) -> Vec<Contour> {
     let edges = [Edge::Left(left), Edge::Right(right), Edge::Top(top), Edge::Bottom(bottom)];
     contours.iter().map(|c| edges.iter().fold(c.clone(), |c, &e| cut(&c, e))).filter(|c| c.len() >= MIN_POINTS).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dilated;
+
+    #[test]
+    fn never_spikes_where_two_curves_meet_on_the_same_point_twice() {
+        let ring: Vec<(f64, f64)> = (0..48).map(|i| {
+            let a = i as f64 / 48.0 * std::f64::consts::TAU;
+            (50.0 + 40.0 * a.cos(), 50.0 + 40.0 * a.sin())
+        }).collect();
+        let joined: Vec<f64> = ring.iter().enumerate().flat_map(|(i, &(x, y))| if i == 12 { vec![x, y, x, y] } else { vec![x, y] }).collect();
+        let out = &dilated(&[joined], 0.3)[0];
+        let reach = out.chunks(2).map(|p| ((p[0] - 50.0).hypot(p[1] - 50.0) - 40.0).abs()).fold(0.0, f64::max);
+        assert!(reach < 0.45, "reach {reach}");
+    }
 }
