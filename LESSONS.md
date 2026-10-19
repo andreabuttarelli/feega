@@ -3116,3 +3116,10 @@ of opening a frame, with no new canvas or image. The preview iframe lays the fra
 `page.on('framenavigated', f => f.addStyleTag(...))`. On a phone the preview drops layer hints
 (`previewHtml`, `memory-budget.ts`). RSS is noisy when the Mac is under memory pressure: compare
 several runs, not one.
+
+## `/app` throws `first_child_getter.call` in WebKit on `vite dev`, Chromium is fine
+Signal: WebKit/WKWebView only, error "in AppSidebar.svelte"; `node_modules/.vite/deps` holds two
+chunks with `var first_child_getter`, one imported both with and without `?v=` (two instances of
+the Svelte runtime from a later, runtime-discovered optimize pass). A dev server with a fresh deps
+cache does not reproduce it. Move: restart dev with `vite dev --force`. Excluding `@lucide/svelte`
+from `optimizeDeps` is not the fix: the barrel import then loads ~4.000 modules.

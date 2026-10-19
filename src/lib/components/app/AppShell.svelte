@@ -48,7 +48,7 @@
   />
 {/snippet}
 
-<div class="app-shell ui-app">
+<div class="app-shell safe-shell ui-app">
   <aside class="app-side">
     {@render sidebar()}
   </aside>
