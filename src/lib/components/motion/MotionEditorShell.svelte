@@ -322,7 +322,6 @@
       frameBar.editMode = editMode;
     }
   });
-  const unanimated = $derived(editMode === EditMode.Motion && doc.tracks.every((t) => t.clips.every((c) => !Object.keys(c.keyframes).length)));
 
   function setMode(next: EditMode) {
     if (next === EditMode.Motion && !timelineFits(doc)) {
@@ -503,6 +502,7 @@
 
   const compPath = $derived(path.map((p) => p.comp));
   const doc = $derived(viewOf(draft?.doc ?? history.present, compPath));
+  const unanimated = $derived(editMode === EditMode.Motion && doc.tracks.every((t) => t.clips.every((c) => !Object.keys(c.keyframes).length)));
   const mode = $derived(docMode(history.present));
 
   $effect(() => {
