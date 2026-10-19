@@ -1,3 +1,4 @@
+import { cardPreviews } from '$lib/server/canvas/card-previews';
 import { rendererSwitch } from '$lib/server/canvas-renderer-switch';
 import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
@@ -81,6 +82,10 @@ import { groupAskSchema, groupElements, moveNodeGroup, rotateNodeGroup, scaleNod
 import { nodeMembers } from '$lib/server/motion/node-members';
 import { SIZE_STATUS, SizeOutcome, sizeAskSchema, sizeFrame } from '$lib/server/motion/frame-size';
 import { FORMATS_STATUS, FormatsOutcome, createFormats, formatsAskSchema } from '$lib/server/motion/create-formats';
+import { exportElementsSchema, exportRowsSchema } from '$lib/motion/export-rows';
+import { ExportOutcome, exportSelection } from '$lib/server/motion/selection-export';
+import { selectionPorts } from '$lib/server/motion/selection-export-ports';
+import { serverFramesOpen } from '$lib/server/motion/chromium-frames';
 import { FreeSource, MOVE_STATUS, MoveOutcome, canvasBoxSchema, copyElement, drawElement, drawFrameAt, drawnSchema, freeAskSchema, frameStore, moveFree, canvasFrameInputs, moveAskSchema, moveElement, outputAskSchema, placeOutput, type Moved } from '$lib/server/motion/move-element';
 
 // L'azione `run` aspetta la generazione DENTRO la richiesta — un'immagine ci mette fino a un
@@ -208,7 +213,7 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
 
   const connections = await canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed);
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines, killSwitch] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding, componentTemplates, handoff, outlines, killSwitch, previews] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
@@ -216,7 +221,8 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     templateLibrary(db, { orgId, actor: userActor({ userId }) }).list(),
     chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
     canvasOutlines(db, { orgId, nodes }),
-    rendererSwitch()
+    rendererSwitch(),
+    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
@@ -242,7 +248,8 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     projectBrandId,
     onboarding,
     componentTemplates,
-    outlines
+    outlines,
+    cardPreviews: previews
   };
 };
 
@@ -1123,6 +1130,26 @@ export const actions: Actions<CanvasParams> = {
     });
 
     return { connection };
+  },
+
+  exportSelection: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const fd = await request.formData();
+    const rows = exportRowsSchema.safeParse(jsonField(fd, 'rows'));
+    const frameIds = jsonField(fd, 'frame_ids') ?? [];
+    const elements = exportElementsSchema.safeParse(jsonField(fd, 'elements') ?? []);
+    if (!rows.success || !elements.success || !Array.isArray(frameIds) || frameIds.length + elements.data.length === 0) {
+      return fail(400, { error: 'invalid export' });
+    }
+    if (!serverFramesOpen()) {
+      return fail(503, { error: 'image export needs the server renderer, which is not available here' });
+    }
+    const ports = selectionPorts({ db: scope.db, orgId: scope.orgId, projectId: scope.canvas.projectId, brandId: scope.projectBrandId, actor: userActor(scope) });
+    const out = await exportSelection(ports, { targets: [...frameIds.map((id) => ({ nodeId: String(id) })), ...elements.data.map((e) => ({ nodeId: e.frameId, elementId: e.elementId }))], rows: rows.data, name: String(fd.get('name') || 'Export') }).catch((e: unknown) => (e instanceof Error ? e : new Error(String(e))));
+    if (out instanceof Error) {
+      return fail(502, { error: `the images could not be drawn: ${out.message}` });
+    }
+    return out.outcome === ExportOutcome.Done ? out : fail(404, { error: out.outcome });
   },
 
   createFormats: async ({ request, params, locals }) => {

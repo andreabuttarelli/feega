@@ -160,6 +160,7 @@
     onConnect,
     onDelete,
     onCreateFormats,
+    onExport,
     onEdgeDelete,
     onEdgeRetype,
     onEdgeModeChange,
@@ -232,6 +233,7 @@
      */
     onDelete?: (ids: string[]) => void;
     onCreateFormats?: (frameId: string) => void;
+    onExport?: (frameIds: string[]) => void;
     /** "Crea post" dalla barra della selezione: gli id scelti, così com'è per `onDelete`. */
     /** Una linea da togliere. Senza, il primo errore resta sulla tela per sempre. */
     onEdgeDelete?: (edgeId: string) => void;
@@ -341,6 +343,8 @@
   setTileRotate(() => onRotate);
   setTileLive(() => onLive);
 
+  const GROUP_BEHIND_Z = -2000;
+
   const toNode = (t: Tile): Node => ({
     id: t.id,
     position: { x: t.x, y: t.y },
@@ -409,7 +413,6 @@
    */
   let dragOrigin = new Map<string, { x: number; y: number }>();
 
-  const GROUP_BEHIND_Z = -2000;
 
   function onNodeDragStart({ nodes: dragged }: { nodes: Node[] }) {
     dragOrigin = new Map(dragged.map((n) => [n.id, { ...n.position }]));
@@ -678,6 +681,7 @@
     'bring-front': (ids) => onRestack?.(ids, Stack.Front),
     'send-back': (ids) => onRestack?.(ids, Stack.Back),
     'create-formats': (ids) => onCreateFormats?.(ids[0]),
+    export: (ids) => onExport?.(ids),
     delete: (ids) => onDelete?.(ids)
   };
 

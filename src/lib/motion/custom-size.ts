@@ -1,5 +1,6 @@
 import { MAX_SHORT_SIDE, MAX_SIDE, MIN_SIDE, type MotionDoc } from './doc';
-import { setCanvas, type CanvasSize, type OpResult } from './timeline';
+import type { CanvasSize, OpResult } from './timeline';
+import { resizeFrame } from './constraints/constraints';
 
 const evenSide = (n: number) => Math.min(MAX_SIDE, Math.max(MIN_SIDE, Math.round(n / 2) * 2));
 
@@ -10,4 +11,4 @@ export function customSize(node: CanvasSize): CanvasSize {
   return { width: evenSide(node.width * scale), height: evenSide(node.height * scale) };
 }
 
-export const fitToNode = (doc: MotionDoc, node: CanvasSize): OpResult => setCanvas(doc, { size: customSize(node) });
+export const fitToNode = (doc: MotionDoc, node: CanvasSize): OpResult => resizeFrame(doc, customSize(node));

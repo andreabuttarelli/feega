@@ -80,8 +80,12 @@
     textarea.style.height = composerHeight(textarea.scrollHeight);
   }
 
+  let grownFor: string | null = null;
   $effect(() => {
-    void value;
+    if (value === grownFor) {
+      return;
+    }
+    grownFor = value;
     grow();
   });
 

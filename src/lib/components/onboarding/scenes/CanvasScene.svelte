@@ -19,7 +19,6 @@
         <div class="bar">
           <Play size={15} strokeWidth={1.8} />
           <span class="mono">00:04 / 00:24</span>
-          <span class="open">Open editor</span>
         </div>
       </TourNode>
     </div>
@@ -107,12 +106,6 @@
     font-family: var(--ui-mono, monospace);
     font-size: 12px;
     color: var(--ui-ink-2, #5c5c58);
-  }
-
-  .open {
-    margin-left: auto;
-    color: var(--ui-accent, #0099ff);
-    font-weight: 500;
   }
 
   .around {

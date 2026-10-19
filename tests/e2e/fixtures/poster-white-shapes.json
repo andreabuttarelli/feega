@@ -1,0 +1,586 @@
+{
+  "version": 5,
+  "fps": 30,
+  "width": 1080,
+  "height": 1350,
+  "durationInFrames": 60,
+  "tracks": [
+    {
+      "id": "v1",
+      "kind": "visual",
+      "name": "Video 1",
+      "clips": [
+        {
+          "trimStart": 0,
+          "transitionIn": {
+            "kind": "none",
+            "durationInFrames": 0
+          },
+          "transitionOut": {
+            "kind": "none",
+            "durationInFrames": 0
+          },
+          "transform": {},
+          "keyframes": {},
+          "mask": null,
+          "maskStack": [],
+          "matte": "none",
+          "depth": 0,
+          "space": "world",
+          "parent": null,
+          "parentOpacity": "inherit",
+          "expressions": {},
+          "effects": [
+            {
+              "id": "grain",
+              "kind": "noise",
+              "enabled": true,
+              "params": {
+                "amount": 0.05,
+                "size": 1.2,
+                "evolve": 0
+              }
+            }
+          ],
+          "shaders": [],
+          "blend": "normal",
+          "animators": [],
+          "textPath": null,
+          "motionBlur": true,
+          "path": null,
+          "id": "poster",
+          "from": 0,
+          "durationInFrames": 60,
+          "component": "Custom",
+          "props": {
+            "name": "WhiteShapesPoster",
+            "title": "Moving\nRooms",
+            "titleAlt": "Stanze\nin moto",
+            "shapes": "56 5 20 13 -0.6 0.4\n69 14 22 18 0.5 -0.3\n20 18 27 8 0.3 0.6\n31 24 15 9 -0.4 0.2\n29 36 40 5 0.4 -0.5\n14 45 72 25 -0.8 1.1\n7 62 15 10 0.6 0.9\n33 74 25 23 0.3 -0.8",
+            "info": "Opening\n0000.00.00\n18:00 — 20:00\n\nInaugurazione\n0000.00.00\n18:00 — 20:00\n\nExhibition\n0000.00.00 — 00\n\nMostra\n0000.00.00 — 00\n\nOpen hours\nWeekdays 12:00 — 20:00\nWeekends 10:00 — 19:00\n\nLocation\nVenue Name\nSecond floor, Building\n000 Street Name, City",
+            "places": "6 25\n6 34\n52 52\n70 52\n6 76\n62 86",
+            "marker": "04",
+            "index": "room 04 / 12 — spaces that shift",
+            "caption": "an exhibition in eight volumes",
+            "font": "Inter Tight",
+            "paper": "#000000",
+            "shape": "#ffffff",
+            "accent": "#8f826f",
+            "titleSize": 5.2,
+            "infoSize": 1.9,
+            "markerX": 88,
+            "markerY": 39,
+            "varPrefix": "whiteshapes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "a1",
+      "kind": "audio",
+      "name": "Audio 1",
+      "clips": []
+    }
+  ],
+  "comps": {},
+  "assets": [],
+  "camera": null,
+  "look": null,
+  "fonts": [
+    {
+      "family": "Inter Tight",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wght",
+          100,
+          900
+        ]
+      ]
+    },
+    {
+      "family": "Inter",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "opsz",
+          14,
+          32
+        ],
+        [
+          "wght",
+          100,
+          900
+        ]
+      ]
+    },
+    {
+      "family": "Geist",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wght",
+          100,
+          900
+        ]
+      ]
+    },
+    {
+      "family": "Hanken Grotesk",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wght",
+          100,
+          900
+        ]
+      ]
+    },
+    {
+      "family": "Schibsted Grotesk",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wght",
+          400,
+          900
+        ]
+      ]
+    },
+    {
+      "family": "Host Grotesk",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        300,
+        400,
+        500,
+        600,
+        700,
+        800
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wght",
+          300,
+          800
+        ]
+      ]
+    },
+    {
+      "family": "Archivo",
+      "source": "google",
+      "category": "sans",
+      "weights": [
+        100,
+        200,
+        300,
+        400,
+        500,
+        600,
+        700,
+        800,
+        900
+      ],
+      "italic": true,
+      "axes": [
+        [
+          "wdth",
+          62,
+          125
+        ],
+        [
+          "wght",
+          100,
+          900
+        ]
+      ]
+    }
+  ],
+  "background": "brand",
+  "motionBlur": {
+    "enabled": false,
+    "shutterAngle": 180,
+    "shutterPhase": -90,
+    "samples": 8
+  },
+  "fields": [
+    {
+      "key": "title",
+      "label": "Title, top left",
+      "clipId": "poster",
+      "prop": "title",
+      "group": "Text",
+      "type": "text",
+      "default": "Moving\nRooms"
+    },
+    {
+      "key": "title_alt",
+      "label": "Title in the second language, top right",
+      "clipId": "poster",
+      "prop": "titleAlt",
+      "group": "Text",
+      "type": "text",
+      "default": "Stanze\nin moto"
+    },
+    {
+      "key": "shapes",
+      "label": "Shapes: left top width height tilt-top tilt-foot (%)",
+      "clipId": "poster",
+      "prop": "shapes",
+      "group": "Text",
+      "type": "text",
+      "default": "56 5 20 13 -0.6 0.4\n69 14 22 18 0.5 -0.3\n20 18 27 8 0.3 0.6\n31 24 15 9 -0.4 0.2\n29 36 40 5 0.4 -0.5\n14 45 72 25 -0.8 1.1\n7 62 15 10 0.6 0.9\n33 74 25 23 0.3 -0.8"
+    },
+    {
+      "key": "info",
+      "label": "Info blocks, one per paragraph",
+      "clipId": "poster",
+      "prop": "info",
+      "group": "Text",
+      "type": "text",
+      "default": "Opening\n0000.00.00\n18:00 — 20:00\n\nInaugurazione\n0000.00.00\n18:00 — 20:00\n\nExhibition\n0000.00.00 — 00\n\nMostra\n0000.00.00 — 00\n\nOpen hours\nWeekdays 12:00 — 20:00\nWeekends 10:00 — 19:00\n\nLocation\nVenue Name\nSecond floor, Building\n000 Street Name, City"
+    },
+    {
+      "key": "places",
+      "label": "Info block places: left top (%), one per line",
+      "clipId": "poster",
+      "prop": "places",
+      "group": "Text",
+      "type": "text",
+      "default": "6 25\n6 34\n52 52\n70 52\n6 76\n62 86"
+    },
+    {
+      "key": "marker",
+      "label": "Number in the circle",
+      "clipId": "poster",
+      "prop": "marker",
+      "group": "Text",
+      "type": "text",
+      "default": "04"
+    },
+    {
+      "key": "index",
+      "label": "Index line, foot left",
+      "clipId": "poster",
+      "prop": "index",
+      "group": "Text",
+      "type": "text",
+      "default": "room 04 / 12 — spaces that shift"
+    },
+    {
+      "key": "caption",
+      "label": "Vertical caption, right edge",
+      "clipId": "poster",
+      "prop": "caption",
+      "group": "Text",
+      "type": "text",
+      "default": "an exhibition in eight volumes"
+    },
+    {
+      "key": "font",
+      "label": "Font",
+      "clipId": "poster",
+      "prop": "font",
+      "group": "Style",
+      "type": "select",
+      "options": [
+        "Inter Tight",
+        "Inter",
+        "Geist",
+        "Hanken Grotesk",
+        "Schibsted Grotesk",
+        "Host Grotesk",
+        "Archivo"
+      ],
+      "default": "Inter Tight"
+    },
+    {
+      "key": "paper",
+      "label": "Background colour",
+      "clipId": "poster",
+      "prop": "paper",
+      "group": "Style",
+      "type": "color",
+      "default": "#000000"
+    },
+    {
+      "key": "shape",
+      "label": "Shape colour",
+      "clipId": "poster",
+      "prop": "shape",
+      "group": "Style",
+      "type": "color",
+      "default": "#ffffff"
+    },
+    {
+      "key": "accent",
+      "label": "Text and circle colour",
+      "clipId": "poster",
+      "prop": "accent",
+      "group": "Style",
+      "type": "color",
+      "default": "#8f826f"
+    },
+    {
+      "key": "title_size",
+      "label": "Title size (% of the width)",
+      "clipId": "poster",
+      "prop": "titleSize",
+      "group": "Style",
+      "type": "number",
+      "min": 2,
+      "max": 12,
+      "default": 5.2
+    },
+    {
+      "key": "info_size",
+      "label": "Info size (% of the width)",
+      "clipId": "poster",
+      "prop": "infoSize",
+      "group": "Style",
+      "type": "number",
+      "min": 1,
+      "max": 4,
+      "default": 1.9
+    },
+    {
+      "key": "marker_x",
+      "label": "Circle centre across (% of the width)",
+      "clipId": "poster",
+      "prop": "markerX",
+      "group": "Style",
+      "type": "number",
+      "min": 0,
+      "max": 100,
+      "default": 88
+    },
+    {
+      "key": "marker_y",
+      "label": "Circle centre down (% of the height)",
+      "clipId": "poster",
+      "prop": "markerY",
+      "group": "Style",
+      "type": "number",
+      "min": 0,
+      "max": 100,
+      "default": 39
+    }
+  ],
+  "components": {
+    "WhiteShapesPoster": {
+      "source": {
+        "html": "",
+        "css": ".ws {\n  position: absolute;\n  inset: 0;\n  overflow: hidden;\n  background: var(--ws-paper);\n  color: var(--ws-accent);\n  font-family: var(--ws-font);\n  -webkit-font-smoothing: antialiased;\n}\n\n.ws-shapes {\n  position: absolute;\n  inset: 0;\n}\n\n.ws-text {\n  position: absolute;\n  margin: 0;\n  white-space: pre;\n}\n\n.ws-title {\n  font-weight: 600;\n  line-height: 1.08;\n  letter-spacing: -0.03em;\n}\n\n.ws-info {\n  font-weight: 600;\n  line-height: 1.42;\n  letter-spacing: -0.01em;\n}\n\n.ws-marker {\n  position: absolute;\n  display: flex;\n  align-items: center;\n  justify-content: center;\n  border-radius: 50%;\n  background: var(--ws-accent);\n  color: var(--ws-paper);\n  font-weight: 600;\n  letter-spacing: -0.04em;\n}\n\n.ws-index {\n  position: absolute;\n  margin: 0;\n  white-space: pre;\n  font-weight: 600;\n  border-top: 2px solid var(--ws-accent);\n}",
+        "js": "const fontOf = (f) => (String(f).includes(',') ? f : \"'\" + f + \"', system-ui, sans-serif\");\nconst escaped = (s) => String(s).replace(/[&<>\"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;' })[c]);\nconst linesOf = (s) => String(s || '').split('\\n');\nconst box = (x, y, w, h) => 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px;';\nconst part = (field, index) => ' data-part=\"' + field + (index === undefined ? '' : ':' + index) + '\"';\nconst numbersOf = (line) => String(line || '').trim().split(/[\\s,]+/).map(Number).map((n) => (Number.isFinite(n) ? n : 0));\nconst upright = (text, x, bottom, px, colour, field = 'caption') =>\n  '<div' + part(field) + ' style=\"position:absolute;left:' + x + 'px;top:' + bottom + 'px;font-size:' + px + 'px;line-height:1;white-space:pre;letter-spacing:0.08em;text-transform:uppercase;transform:rotate(-90deg);transform-origin:0 0;color:' + colour + '\">' + escaped(text) + '</div>';\n\nconst MARGIN = 0.055;\nconst MARKER = 0.075;\n\nroot.insertAdjacentHTML('beforeend', '<div class=\"ws\"></div>');\nconst scene = root.querySelector('.ws');\n\nconst draw = (p, width, height) => {\n  const s = scene.style;\n  s.setProperty('--ws-paper', p.paper);\n  s.setProperty('--ws-shape', p.shape);\n  s.setProperty('--ws-accent', p.accent);\n  s.setProperty('--ws-font', fontOf(p.font));\n\n  const px = (v) => (v * width) / 100;\n  const py = (v) => (v * height) / 100;\n  const margin = MARGIN * width;\n\n  const shapes = linesOf(p.shapes).filter((l) => l.trim()).map((line, i) => {\n    const [x, y, w, h, top, foot] = numbersOf(line);\n    const corners = [[px(x), py(y)], [px(x + w), py(y) + px(top)], [px(x + w), py(y + h) + px(foot)], [px(x), py(y + h)]];\n    return '<polygon' + part('shapes', i) + ' points=\"' + corners.map((c) => c[0].toFixed(1) + ',' + c[1].toFixed(1)).join(' ') + '\"/>';\n  });\n  const svg = '<svg class=\"ws-shapes\" width=\"' + width + '\" height=\"' + height + '\" fill=\"' + p.shape + '\">' + shapes.join('') + '</svg>';\n\n  const titleSize = px(p.titleSize);\n  const title = '<div class=\"ws-text ws-title\"' + part('title') + ' style=\"left:' + margin + 'px;top:' + margin * 0.8 + 'px;font-size:' + titleSize + 'px\">' + escaped(p.title) + '</div>';\n  const titleAlt = '<div class=\"ws-text ws-title\"' + part('titleAlt') + ' style=\"right:' + margin + 'px;top:' + margin * 0.8 + 'px;text-align:right;font-size:' + titleSize * 0.5 + 'px\">' + escaped(p.titleAlt) + '</div>';\n\n  const infoSize = px(p.infoSize);\n  const places = linesOf(p.places);\n  const info = String(p.info || '').split(/\\n\\s*\\n/).map((text, i) => {\n    const [x, y] = numbersOf(places[i]);\n    return '<div class=\"ws-text ws-info\"' + part('info', i) + ' style=\"left:' + px(x) + 'px;top:' + py(y) + 'px;font-size:' + infoSize + 'px\">' + escaped(text.trim()) + '</div>';\n  }).join('');\n\n  const d = MARKER * width;\n  const marker = '<div class=\"ws-marker\"' + part('marker') + ' style=\"' + box(px(p.markerX) - d / 2, py(p.markerY) - d / 2, d, d) + 'font-size:' + d * 0.42 + 'px\">' + escaped(p.marker) + '</div>';\n  const index = '<div class=\"ws-index\"' + part('index') + ' style=\"left:' + margin + 'px;bottom:' + margin + 'px;padding-top:' + infoSize * 0.5 + 'px;font-size:' + infoSize * 0.8 + 'px\">' + escaped(p.index) + '</div>';\n  const caption = upright(p.caption, width - margin * 0.6, height - margin, infoSize * 0.7, p.accent);\n\n  scene.innerHTML = svg + title + titleAlt + info + marker + index + caption;\n};\n\nlet drawn = '';\nconst run = () => {\n  const p = { ...props };\n  const width = scene.clientWidth || 1080;\n  const height = scene.clientHeight || 1350;\n  const key = JSON.stringify([p, width, height, document.fonts ? document.fonts.status : 'loaded']);\n  if (key === drawn) {\n    return;\n  }\n  drawn = key;\n  draw(p, width, height);\n};\n\nrun();\nif (document.fonts) {\n  document.fonts.ready.then(() => {\n    drawn = '';\n    run();\n  });\n}\ntl.to({}, { duration, ease: 'none', onUpdate: run }, 0);"
+      },
+      "propsSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title, top left",
+            "default": "Moving\nRooms",
+            "format": "textarea",
+            "group": "Content",
+            "maxLength": 600
+          },
+          "titleAlt": {
+            "type": "string",
+            "title": "Title in the second language, top right",
+            "default": "Stanze\nin moto",
+            "format": "textarea",
+            "group": "Content",
+            "maxLength": 600
+          },
+          "shapes": {
+            "type": "string",
+            "title": "Shapes: left top width height tilt-top tilt-foot (%)",
+            "default": "56 5 20 13 -0.6 0.4\n69 14 22 18 0.5 -0.3\n20 18 27 8 0.3 0.6\n31 24 15 9 -0.4 0.2\n29 36 40 5 0.4 -0.5\n14 45 72 25 -0.8 1.1\n7 62 15 10 0.6 0.9\n33 74 25 23 0.3 -0.8",
+            "format": "textarea",
+            "group": "Content",
+            "maxLength": 600
+          },
+          "info": {
+            "type": "string",
+            "title": "Info blocks, one per paragraph",
+            "default": "Opening\n0000.00.00\n18:00 — 20:00\n\nInaugurazione\n0000.00.00\n18:00 — 20:00\n\nExhibition\n0000.00.00 — 00\n\nMostra\n0000.00.00 — 00\n\nOpen hours\nWeekdays 12:00 — 20:00\nWeekends 10:00 — 19:00\n\nLocation\nVenue Name\nSecond floor, Building\n000 Street Name, City",
+            "format": "textarea",
+            "group": "Content",
+            "maxLength": 900
+          },
+          "places": {
+            "type": "string",
+            "title": "Info block places: left top (%), one per line",
+            "default": "6 25\n6 34\n52 52\n70 52\n6 76\n62 86",
+            "format": "textarea",
+            "group": "Content",
+            "maxLength": 600
+          },
+          "marker": {
+            "type": "string",
+            "title": "Number in the circle",
+            "default": "04",
+            "group": "Content",
+            "maxLength": 4
+          },
+          "index": {
+            "type": "string",
+            "title": "Index line, foot left",
+            "default": "room 04 / 12 — spaces that shift",
+            "group": "Content",
+            "maxLength": 60
+          },
+          "caption": {
+            "type": "string",
+            "title": "Vertical caption, right edge",
+            "default": "an exhibition in eight volumes",
+            "group": "Content",
+            "maxLength": 60
+          },
+          "font": {
+            "type": "string",
+            "title": "Font",
+            "default": "Inter Tight",
+            "format": "font",
+            "group": "Style"
+          },
+          "paper": {
+            "type": "string",
+            "title": "Background colour",
+            "default": "#000000",
+            "format": "color",
+            "group": "Style"
+          },
+          "shape": {
+            "type": "string",
+            "title": "Shape colour",
+            "default": "#ffffff",
+            "format": "color",
+            "group": "Style"
+          },
+          "accent": {
+            "type": "string",
+            "title": "Text and circle colour",
+            "default": "#8f826f",
+            "format": "color",
+            "group": "Style"
+          },
+          "titleSize": {
+            "type": "number",
+            "title": "Title size (% of the width)",
+            "default": 5.2,
+            "minimum": 2,
+            "maximum": 12,
+            "step": 0.1,
+            "group": "Layout"
+          },
+          "infoSize": {
+            "type": "number",
+            "title": "Info size (% of the width)",
+            "default": 1.9,
+            "minimum": 1,
+            "maximum": 4,
+            "step": 0.05,
+            "group": "Layout"
+          },
+          "markerX": {
+            "type": "number",
+            "title": "Circle centre across (% of the width)",
+            "default": 88,
+            "minimum": 0,
+            "maximum": 100,
+            "step": 0.5,
+            "group": "Layout"
+          },
+          "markerY": {
+            "type": "number",
+            "title": "Circle centre down (% of the height)",
+            "default": 39,
+            "minimum": 0,
+            "maximum": 100,
+            "step": 0.5,
+            "group": "Layout"
+          },
+          "varPrefix": {
+            "type": "string",
+            "title": "Runtime variable prefix",
+            "default": "whiteshapes",
+            "group": "Layout",
+            "maxLength": 20
+          }
+        }
+      },
+      "mode": "deterministic",
+      "version": 1,
+      "check": null
+    }
+  },
+  "shaders": {},
+  "still": {
+    "frame": 0
+  }
+}

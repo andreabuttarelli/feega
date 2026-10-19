@@ -70,12 +70,8 @@ export function tileMode(id: string, current: string | null, leaving: string | n
 
 export const nodeLayers = (mode: NodeMode, paint: Paint): Layers => LAYERS[mode][paint];
 
-export enum Under {
-  Released = 'released',
-  Kept = 'kept'
-}
 
-export const ownPlayer = (mode: NodeMode, paint: Paint, live: boolean, under: Under = Under.Released): boolean => live && (nodeLayers(mode, paint).own || under === Under.Kept);
+export const ownPlayer = (mode: NodeMode, paint: Paint, live: boolean): boolean => live && nodeLayers(mode, paint).own;
 
 export enum Part {
   Body = 'body',
@@ -101,7 +97,7 @@ export enum Reframe {
 const REFRAME: Record<Viewport, Reframe> = {
   [Viewport.Desktop]: Reframe.Stay,
   [Viewport.Tablet]: Reframe.Frame,
-  [Viewport.Phone]: Reframe.Frame
+  [Viewport.Phone]: Reframe.Stay
 };
 
 export const reframesOn = (viewport: Viewport): Reframe => REFRAME[viewport];

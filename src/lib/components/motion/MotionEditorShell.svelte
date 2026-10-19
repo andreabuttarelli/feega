@@ -1,4 +1,6 @@
 <script lang="ts">
+  import VectorOverlay from '$lib/components/motion/VectorOverlay.svelte';
+  import { toVector } from '$lib/motion/vector/ops';
   import { localStore } from '$lib/browser-storage';
   import { painted } from '$lib/canvas/paint-wait';
   import { frameDocs } from '$lib/canvas/frame-docs.svelte';
@@ -79,16 +81,26 @@
   import type { Boxes } from '$lib/motion/scene-select';
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import ConstraintsSection from '$lib/components/motion/ConstraintsSection.svelte';
+  import { ScaleMode, flipScale } from '$lib/motion/scale-tool';
+  import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
+  import { GridToggle, flipGrid } from '$lib/motion/pixel-grid';
+  import LayoutGuidesOverlay from '$lib/components/motion/LayoutGuidesOverlay.svelte';
+  import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
+  import { guideSnapBounds } from '$lib/motion/layout-guides/guides';
+  import OutlineOverlay from '$lib/components/motion/OutlineOverlay.svelte';
+  import { OutlineView, flipOutline } from '$lib/motion/outline-view';
   import { Flip, flipClips } from '$lib/motion/layer-props';
   import { matchingLayers } from '$lib/motion/select-matching';
-  import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
+  import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
+  import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
   import { Copied, elementClipboard } from '$lib/canvas/element-clipboard.svelte';
   import { Direction as SiblingDirection, layerOrder, siblingOf } from '$lib/motion/siblings';
   import CanvasContextMenu from '$lib/components/canvas/CanvasContextMenu.svelte';
   import { Arrange, arrangeLayers } from '$lib/motion/layer-order';
   import { FRAME_MENU_IDS, frameLayers, frameMenuRun, frameSummaries, type FrameLayer } from '$lib/motion/frame-menu';
   import type { SelectionActionId } from '$lib/canvas/selection-actions';
-  import { Gesture } from '$lib/motion/drill';
+  import { FramePress, Gesture } from '$lib/motion/drill';
   import { frameDrill, type DrillAsk } from '$lib/canvas/frame-drill';
   import AutoLayoutOverlay from '$lib/components/motion/AutoLayoutOverlay.svelte';
   import FramePeers from '$lib/components/motion/FramePeers.svelte';
@@ -116,7 +128,7 @@
   import { BUILTIN_TEMPLATES } from '$lib/motion/template/builtins';
   import { catalogue, starterDoc, starterFormatOf } from '$lib/motion/template/catalogue';
   import SoundDialog, { type Made, type SoundKind } from '$lib/components/motion/SoundDialog.svelte';
-  import ChatPanel from '$lib/components/brand-agent/ChatPanel.svelte';
+  import BarSlot from '$lib/components/brand-agent/BarSlot.svelte';
   import FrameChatHistory from '$lib/components/motion/FrameChatHistory.svelte';
   import SideColumn from '$lib/components/motion/SideColumn.svelte';
   import { AssetKind, COMPONENTS, LIBRARY_IDS, TrackKind, type ComponentId } from '$lib/motion/components';
@@ -171,7 +183,7 @@
   import { frameHover } from '$lib/canvas/layers';
   import { DrawTool } from '$lib/motion/draw-tool';
   import { FrameAction, frameBar } from '$lib/canvas/frame-bar.svelte';
-  import { EDIT_MODE_KEY, EditMode, nextMode, readMode } from '$lib/motion/edit-mode';
+  import { EDIT_MODE_KEY, EditMode, nextMode, startMode } from '$lib/motion/edit-mode';
   import DrawOverlay from './DrawOverlay.svelte';
   import DrawTools from './DrawTools.svelte';
   import { PART_SEP, PartAction, runPart } from '$lib/motion/poster-parts';
@@ -265,6 +277,10 @@
   let selectedPart = $state<string | null>(null);
   let partsByClip = $state.raw<Record<string, string[]>>({});
   let stageBoxes = $state.raw<Boxes>({});
+  let scaleMode = $state(ScaleMode.Resize);
+  let pixelGrid = $state(GridToggle.On);
+  let guidesShown = $state(true);
+  let outlineView = $state(OutlineView.Off);
   let viewportH = $state(0);
   let inspectorTab = $state<InspectorTab>(InspectorTab.Properties);
   let preview = $state<MotionPreview | null>(null);
@@ -290,7 +306,7 @@
   let pressAt: { x: number; y: number } | null = null;
   let pressedMenu: unknown = null;
 
-  let editMode = $state(timelineFits(history.present) ? readMode(localStore()?.getItem(EDIT_MODE_KEY) ?? null) : EditMode.Design);
+  let editMode = $state(startMode(history.present, localStore()?.getItem(EDIT_MODE_KEY) ?? null));
 
   $effect(() => {
     if (rules.tools === ToolsPlace.CanvasBar) {
@@ -469,6 +485,7 @@
   let unsavedSummary = '';
 
   onMount(() => () => {
+    overlay?.flushTyping();
     if (saveTimer && saveState === SaveState.Pending) {
       clearTimeout(saveTimer);
       void save();
@@ -1498,9 +1515,10 @@
   }
   const nudgeBy = (dx: number, dy: number) => selection.length && apply(moveBy(doc, selection, frame, [dx, dy], editMode), 'Moved with the arrows');
   const arrangeTo = (to: Arrange) => apply(arrangeLayers(doc, selection, to, newId), `Arranged ${to}`);
-  function combine(op: BooleanOp) {
-    const result = combineShapes(doc, selection, op, frame);
-    apply(result, `Combined shapes: ${op}`);
+  const combine = (op: BooleanOp) => reshape(combineShapes(doc, selection, op, frame), `Combined shapes: ${op}`);
+
+  function reshape(result: OpResult, summary: string) {
+    apply(result, summary);
     if (result.ok) {
       selection = selection.filter((id) => findClip(result.doc, id));
     }
@@ -1534,6 +1552,12 @@
     [ChatPlace.Sheet]: () => (sheet = sheet === Sheet.Agent ? Sheet.None : Sheet.Agent)
   };
   const docked = $derived(chatPlace === ChatPlace.Column);
+  const barProperties = {
+    get shown() {
+      return layout.side === Side.Properties;
+    },
+    onshow: (shown: boolean) => relayout({ side: shown ? Side.Properties : Side.Chat })
+  };
   const sideOpen = $derived(layout.chat === Panel.Open || layout.inspector === Panel.Open);
   const chatShown = $derived(docked ? sideOpen && layout.side === Side.Chat : sheet === Sheet.Agent);
   const propsShown = $derived(docked ? sideOpen && layout.side === Side.Properties : layout.inspector === Panel.Open);
@@ -1541,7 +1565,8 @@
 
   const COMMANDS: Record<Command, () => void> = {
     [Command.TogglePlay]: () => (playing = controlShown(doc, VideoControl.Playback) && !playing),
-    [Command.ToolSelect]: () => (frameBar.tool = DrawTool.Select),
+    [Command.ToolSelect]: () => ((frameBar.tool = DrawTool.Select), (scaleMode = ScaleMode.Resize)),
+    [Command.ToolScale]: () => ((frameBar.tool = DrawTool.Select), (scaleMode = flipScale(scaleMode))),
     [Command.ToolText]: () => (frameBar.tool = DrawTool.Text),
     [Command.ToolRectangle]: () => (frameBar.tool = DrawTool.Rectangle),
     [Command.ToolEllipse]: () => (frameBar.tool = DrawTool.Ellipse),
@@ -1613,12 +1638,16 @@
     [Command.ToggleChat]: () => CHAT_TOGGLE[chatPlace](),
     [Command.ToggleInspector]: toggleInspector,
     [Command.ToggleTimeline]: () => relayout(toggleTimeline(layout)),
+    [Command.TogglePixelGrid]: () => (pixelGrid = flipGrid(pixelGrid)),
+    [Command.ToggleLayoutGuides]: () => (guidesShown = !guidesShown),
+    [Command.ToggleOutlines]: () => (outlineView = flipOutline(outlineView)),
     [Command.Help]: () => (helpOpen = !helpOpen),
     [Command.Precompose]: precomposeSelection,
     [Command.Group]: groupSelection,
     [Command.Ungroup]: ungroupSelection,
     [Command.AutoLayout]: autoLayoutSelection,
     [Command.UseAsMask]: () => apply(useAsMask(doc, selection), 'Used as mask'),
+    [Command.EditAsVector]: () => selected && apply(toVector(doc, selected.id), 'Made a vector'),
     [Command.BringForward]: () => arrangeTo(Arrange.Forward),
     [Command.SendBackward]: () => arrangeTo(Arrange.Backward),
     [Command.BringToFront]: () => arrangeTo(Arrange.Front),
@@ -1627,6 +1656,8 @@
     [Command.Subtract]: () => combine(BooleanOp.Subtract),
     [Command.Intersect]: () => combine(BooleanOp.Intersect),
     [Command.Exclude]: () => combine(BooleanOp.Exclude),
+    [Command.OutlineStroke]: () => apply(outlineStrokes(doc, selection, frame, newId), 'Outlined the stroke'),
+    [Command.Flatten]: () => reshape(flattenShapes(doc, selection, frame), 'Flattened shapes'),
     [Command.RemoveMask]: () => apply(releaseMasks(doc, selection), 'Removed a mask'),
     [Command.AlignLeft]: () => selection.length && alignTo(Edge.Left),
     [Command.AlignCenter]: () => selection.length && alignTo(Edge.Center),
@@ -1648,7 +1679,7 @@
     [Action.CutToBeat]: cutSelectionToBeat
   };
 
-  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.Union, Action.SelectMatching, Action.BringForward, Action.SendBackward, Action.BringToFront, Action.SendToBack, Action.Subtract, Action.Intersect, Action.Exclude, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
+  const NEEDS_SELECTION = new Set<ActionId>([Action.NullFromSelection, Action.Precompose, Action.AutoLayout, Action.UseAsMask, Action.RemoveMask, Action.EditAsVector, Action.Union, Action.SelectMatching, Action.BringForward, Action.SendBackward, Action.BringToFront, Action.SendToBack, Action.Subtract, Action.Intersect, Action.Exclude, Action.OutlineStroke, Action.Flatten, Action.StartHere, Action.EndHere, Action.TrimIn, Action.TrimOut, Action.NudgeBack, Action.NudgeForward, Action.NudgeBackMore, Action.NudgeForwardMore, Action.CutToBeat, Action.MoveLeft, Action.MoveRight, Action.MoveUp, Action.MoveDown, Action.MoveLeftMore, Action.MoveRightMore, Action.MoveUpMore, Action.MoveDownMore]);
   const NEEDS_BEATS = new Set<ActionId>([Action.MarkBeats, Action.CutToBeat]);
 
   const toolSections = $derived<MenuBlock[]>([
@@ -2026,12 +2057,16 @@
     <section class="stage nodrag nopan" class:hosted={rules.stage === Stage.Node} class:see-through={doc.background === Background.Transparent} aria-label="Preview" data-testid="editor-stage" data-shown={stageShown} style:opacity={stageShown ? null : 0} style:pointer-events={stageTakesPointer ? null : 'none'} {...{ [KEY_REGION_ATTR]: Region.Editor }} bind:this={stageEl} use:anchoredTo={stageHost}>
       {#snippet player()}
       <MotionPreview bind:this={preview} bind:redraws {html} engine={interactive ? RenderEngine.Html : engineFlag(page.url, engineKilled())} gpuCompose={(only) => composeHtml({ doc: previewDoc ?? doc, tokens: data.tokens, assets: assetUrls, analyses, liveness: Liveness.Baked, target: Target.Screen, only })} background={doc.background} width={doc.width} height={doc.height} fps={doc.fps} bind:frame bind:playing live={interactive ? { [InputKey.TiltX]: tiltX, [InputKey.TiltY]: tiltY } : null} vars={interactive ? { ...defaultsOf(interactiveOf(doc).vars), ...previewVars } : null} ontap={playing ? catchAt : null}>
+        {#if outlineView === OutlineView.On}<OutlineOverlay doc={previewDoc ?? doc} {frame} boxes={spaceBoxes()} />{/if}
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
-        {#if !playing}<SelectionOverlay bind:this={overlay} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at) => preview?.editText(selector, at, () => {}) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
+        {#if !playing}<PixelGridOverlay width={doc.width} height={doc.height} toggle={pixelGrid} />{/if}
+        {#if guidesShown && doc.layoutGuides?.length && !playing}<LayoutGuidesOverlay {doc} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} {scaleMode} layoutBounds={guidesShown ? guideSnapBounds(doc) : []} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost ? onhostdrag : null} onframemove={frameChrome(data.node.kind ?? FrameKind.Frame).press === FramePress.Move ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
         {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
+        {#if selected?.component === 'Shape' && selected.props.shape === 'vector' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<VectorOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'rect' && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<CornerOverlay {doc} clip={findClip(withAutoLayout(doc), selected.id)?.clip ?? selected} onchange={edit} />{/if}
         {#if selected?.autoLayout && selection.length === 1 && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<AutoLayoutOverlay {doc} clip={{ ...selected, autoLayout: selected.autoLayout }} onchange={edit} />{/if}
         {#if selected?.path && !playing}<MotionPathOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -2062,7 +2097,7 @@
       {/if}
     </section>
 
-    <SideColumn place={chatPlace} side={layout.side} onside={(side) => relayout({ side })} widthPx={sideWidth(layout.sidePx, width)} onwidth={(sidePx) => (layout = { ...layout, sidePx })} oncommit={() => relayout({})} busy={agentBusy}>
+    <SideColumn place={chatPlace} widthPx={sideWidth(layout.sidePx, width)} onwidth={(sidePx) => (layout = { ...layout, sidePx })} oncommit={() => relayout({})}>
     {#snippet properties()}
     <aside class="props" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Properties} aria-label="Properties">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Properties</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
@@ -2078,6 +2113,7 @@
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
         {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
         <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        {#if typeof selected.props.x === 'number' && !selected.parent}<ConstraintsSection {doc} clip={selected} onchange={apply} />{/if}
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}
@@ -2090,6 +2126,7 @@
         <div class="composition" data-testid="composition-inspector">
           <header class="composition-head"><span>Frame</span></header>
           <CompositionSettings {doc} onchange={apply} />
+          <LayoutGuidesSection {doc} onchange={apply} />
         </div>
       {/if}
       {/if}
@@ -2098,7 +2135,7 @@
     {#snippet chat()}
     <aside class="chat" {...dockOf(Part.Panel)} class:open={sheet === Sheet.Agent} aria-label="Agent">
       <div class="sheet-head"><button type="button" class="grabber" aria-label="Resize the sheet" data-detent={detent} data-testid="sheet-grabber" onpointerdown={grabSheet} onpointermove={dragSheet} onpointerup={dropSheet} onpointercancel={dropSheet}><i aria-hidden="true"></i></button><span>Chat</span><span class="editing" data-testid="chat-editing">{editingLabel(editingName)}</span><IconButton action={Action.Close} onclick={() => (sheet = Sheet.None)} /></div>
-      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} /><ChatPanel projectId={data.projectId} reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} />{/if}
+      {#if panelsDue}<FrameChatHistory historyUrl={agentUrl} projectId={data.projectId} /><BarSlot reload={chatReload} prefill={brandAsk} context={openFrame} onturnend={() => void pullAgentEdit()} ondata={onAgentData} onbusy={(busy) => (agentBusy = busy)} properties={docked ? barProperties : undefined} />{/if}
     </aside>
     {/snippet}
     </SideColumn>

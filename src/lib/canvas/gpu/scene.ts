@@ -4,14 +4,19 @@ import { MOTION_NODE_BAR_H } from '../motion-node';
 import { AssetSize, sized } from '../asset-url';
 import { Surface, type CardFace, type Media } from './card-face';
 import type { Box, Curve } from './geometry';
-import { createTextureCache, type TextureCache } from './texture-cache';
-import { Counter, count } from './frame-stats';
+import { createTextureCache, fitBitmap, type TextureCache } from './texture-cache';
+import { Counter, count, exposeTextures } from './frame-stats';
+import { BUDGET, currentDevice, rendererResolution } from './memory-budget';
+import { textureReport, type SourceSize } from './texture-bytes';
+import { createPins } from './texture-pins';
 import { Backend } from './backend';
+import { ChromeLayer } from './chrome-layer';
+import type { IdleChrome } from './idle-chrome';
 
 export { Backend };
 
 
-export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean; snapshot: string | null; running: boolean };
+export type Card = Box & { id: string; face: CardFace; rotation: number; hidden: boolean; snapshot: string | null; running: boolean; chrome: IdleChrome | null };
 export type Peer = { id: string; name: string; color: string; at: { x: number; y: number } };
 export type Overlay = {
   selected: (Box & { id: string })[];
@@ -26,6 +31,7 @@ export type Overlay = {
 export type Theme = { canvas: string; dot: string; paper: string; line: string; ink: string; inkSoft: string; accent: string; iterate: string; wire: string; font: string };
 
 const PAD = 14;
+const LABEL_SIZE = 12;
 const BODY_SIZE = 13;
 const DOT_TILE = 24;
 const LIVE_VIDEO_CAP = 4;
@@ -36,16 +42,17 @@ const MAX_TEXT_CHARS = 1400;
 const TEXT_TIERS = [1, 2, 4] as const;
 const THUMB_COLUMNS = 3;
 const STAGE = '#000000';
-const OPEN_LABEL = 'Open editor';
 const SKELETON_ROWS = 6;
 const SKELETON_STEP = 22;
 const SKELETON_BAR = 10;
 const SKELETON_WIDTHS = [0.9, 0.75, 0.82, 0.6];
 const THUMB_GAP = 4;
 
-const tierFor = (zoom: number) => TEXT_TIERS.find((t) => t >= zoom * devicePixelRatio) ?? TEXT_TIERS[TEXT_TIERS.length - 1];
+const tierFor = (zoom: number) => TEXT_TIERS.find((t) => t >= zoom * rendererResolution(devicePixelRatio, currentDevice())) ?? TEXT_TIERS[TEXT_TIERS.length - 1];
 
-type Built = { id: string; root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; skeletons: Graphics[]; media: Media | null };
+type Built = { id: string; root: Container; skin: Container; key: string; body: Sprite | null; video: HTMLVideoElement | null; texts: Text[]; skeletons: Graphics[]; media: Media | null; releases: (() => void)[]; loads: Load[]; loaded: boolean };
+
+type Load = { url: string; show: (tex: Texture) => void; clear: () => void };
 
 function dotTexture(theme: Theme): Texture {
   const c = document.createElement('canvas');
@@ -101,6 +108,7 @@ export class GpuScene {
   private grid: TilingSprite;
   private world = new Container();
   private cardLayer = new Container();
+  private chrome: ChromeLayer;
   private overlay = new Graphics();
   private peerLayer = new Container();
   private built = new Map<string, Built>();
@@ -120,6 +128,8 @@ export class GpuScene {
   private snapshots = new Map<string, { key: string; tex: Texture }>();
   private staleSnapshots = new Map<string, Texture[]>();
   private renderFailed = false;
+  private pins = createPins<Built>();
+  private uploaded = new WeakSet<object>();
   private dim: { body: number; edges: number } | null = null;
 
   private constructor(app: Application, theme: Theme) {
@@ -127,9 +137,16 @@ export class GpuScene {
     this.theme = theme;
     this.backend = app.renderer.name === 'webgpu' ? Backend.WebGPU : Backend.WebGL;
     this.grid = new TilingSprite({ texture: dotTexture(theme), width: app.screen.width, height: app.screen.height });
-    this.textures = createTextureCache(() => this.invalidate());
-    this.world.addChild(this.cardLayer, this.overlay, this.peerLayer);
+    this.textures = createTextureCache({
+      changed: () => this.invalidate(),
+      device: currentDevice(),
+      pinned: (url) => this.pins.pinned(url, (b) => b.root.visible),
+      evicted: (url) => this.pins.owners(url).forEach((b) => this.unload(b))
+    });
+    this.chrome = new ChromeLayer({ font: theme.font, ink: theme.inkSoft, size: LABEL_SIZE });
+    this.world.addChild(this.cardLayer, this.chrome.root, this.overlay, this.peerLayer);
     app.stage.addChild(this.grid, this.world);
+    exposeTextures(() => textureReport((app.renderer.texture as unknown as { managedTextures: readonly (SourceSize | null)[] }).managedTextures));
     this.watchLoss();
     this.loop();
   }
@@ -160,11 +177,13 @@ export class GpuScene {
     await app.init({
       preference,
       resizeTo: host,
-      antialias: true,
+      antialias: BUDGET[currentDevice()].antialias,
       autoDensity: true,
-      resolution: devicePixelRatio,
+      resolution: rendererResolution(devicePixelRatio, currentDevice()),
       backgroundAlpha: 0,
-      autoStart: false
+      autoStart: false,
+      textureGCActive: false,
+      gcActive: false
     });
     host.appendChild(app.canvas);
     app.canvas.dataset.testid = 'gpu-canvas';
@@ -224,7 +243,24 @@ export class GpuScene {
     this.invalidate();
   }
 
-  setSnapshot(id: string, key: string, bitmap: ImageBitmap) {
+  awaitsMedia(id: string): boolean {
+    const b = this.built.get(id);
+    return !b || (!!b.media && !this.ready.has(id) && !this.retiring.has(id));
+  }
+
+  setIcon(kind: string, source: ImageBitmap) {
+    this.chrome.setIcon(kind, source);
+    this.setCards(this.cards);
+  }
+
+  private seen(c: Box) {
+    const v = this.visibleBox();
+    const margin = 40 / this.view.zoom;
+    return c.x + c.w > v.x - margin && c.y + c.h > v.y - margin && c.x < v.x + v.w + margin && c.y < v.y + v.h + margin;
+  }
+
+  async setSnapshot(id: string, key: string, full: ImageBitmap) {
+    const bitmap = await fitBitmap(full, currentDevice());
     const old = this.snapshots.get(id);
     this.snapshots.set(id, { key, tex: Texture.from(bitmap) });
     if (old) {
@@ -271,6 +307,7 @@ export class GpuScene {
     const t0 = performance.now();
     try {
       this.app.render();
+      this.closeUploaded();
     } catch (err) {
       if (!this.renderFailed) {
         console.error('[canvas] render failed', err);
@@ -279,6 +316,16 @@ export class GpuScene {
     }
     this.onFrame?.(performance.now() - t0);
   };
+
+  private closeUploaded() {
+    for (const source of (this.app.renderer.texture as unknown as { managedTextures: readonly ({ resource: unknown } | null)[] }).managedTextures) {
+      if (!source || this.uploaded.has(source) || !(source.resource instanceof ImageBitmap)) {
+        continue;
+      }
+      this.uploaded.add(source);
+      source.resource.close();
+    }
+  }
 
   private report() {
     this.onReady?.(new Set([...this.ready, ...this.retiring.keys()]));
@@ -314,6 +361,10 @@ export class GpuScene {
     }
     if (this.retiring.get(b.id) === b) {
       this.retiring.delete(b.id);
+    }
+    this.pins.drop(b);
+    for (const release of b.releases) {
+      release();
     }
     b.root.destroy({ children: true });
   }
@@ -388,13 +439,44 @@ export class GpuScene {
       this.attachVideo(b, media.url, box, fit);
       return;
     }
-    this.textures.want(this.imageUrl(media.url), (tex) => {
-      if (sprite.destroyed) {
-        return;
+    b.loads.push({
+      url: this.imageUrl(media.url),
+      show: (tex) => {
+        place(sprite, tex, box, fit);
+        this.markReady(b);
+      },
+      clear: () => {
+        sprite.texture = Texture.EMPTY;
       }
-      place(sprite, tex, box, fit);
-      this.markReady(b);
     });
+  }
+
+  private load(b: Built) {
+    if (b.loaded || !b.loads.length) {
+      return;
+    }
+    b.loaded = true;
+    for (const l of b.loads) {
+      this.pins.use(l.url, b);
+      b.releases.push(this.textures.want(l.url, (tex) => !b.root.destroyed && l.show(tex)));
+    }
+  }
+
+  private unload(b: Built) {
+    if (!b.loaded || b.root.destroyed) {
+      return;
+    }
+    b.loaded = false;
+    this.pins.drop(b);
+    for (const release of b.releases.splice(0)) {
+      release();
+    }
+    for (const l of b.loads) {
+      l.clear();
+    }
+    if (this.ready.delete(b.id)) {
+      this.report();
+    }
   }
 
   private imageUrl(url: string): string {
@@ -427,7 +509,7 @@ export class GpuScene {
     const holder = new Container();
     const root = new Container();
     holder.addChild(root);
-    const b: Built = { id: c.id, root: holder, skin: root, key, body: null, video: null, texts: [], skeletons: [], media: null };
+    const b: Built = { id: c.id, root: holder, skin: root, key, body: null, video: null, texts: [], skeletons: [], media: null, releases: [], loads: [], loaded: false };
     const f = c.face;
     const BUILD: Record<Surface, () => void> = {
       [Surface.Media]: () => {
@@ -446,7 +528,6 @@ export class GpuScene {
         if (media) {
           this.mediaSprite(root, b, media, stage, Fit.Contain);
         }
-        this.openPill(root, b, c);
       },
       [Surface.Graphic]: () => f.media && this.mediaSprite(root, b, f.media, { x: 0, y: 0, w: c.w, h: c.h }, Fit.Contain),
       [Surface.Generate]: () => this.buildGenerate(root, b, c),
@@ -466,7 +547,7 @@ export class GpuScene {
         root.addChild(title);
         b.texts.push(title);
         if (f.thumbs.length) {
-          this.thumbGrid(root, f.thumbs, c, PAD + BODY_SIZE * 2);
+          this.thumbGrid(root, b, f.thumbs, c, PAD + BODY_SIZE * 2);
           return;
         }
         this.skeleton(root, b, c, PAD + BODY_SIZE * 2);
@@ -490,21 +571,14 @@ export class GpuScene {
       BUILD[f.surface]();
     }
     this.cardLayer.addChild(holder);
+    holder.visible = this.seen(c);
+    if (holder.visible) {
+      this.load(b);
+    }
     return b;
   }
 
-  private openPill(root: Container, b: Built, c: Card) {
-    const open = this.text(OPEN_LABEL, BODY_SIZE - 2, this.theme.ink, null);
-    const pill = new Graphics();
-    const pw = open.width + 16;
-    const ph = open.height + 8;
-    pill.rect(c.w - 6 - pw, 6, pw, ph).fill(this.theme.paper).stroke({ width: 1, color: this.theme.line });
-    open.position.set(c.w - 6 - pw + 8, 10);
-    root.addChild(pill, open);
-    b.texts.push(open);
-  }
-
-  private thumbGrid(root: Container, urls: string[], c: Card, top: number) {
+  private thumbGrid(root: Container, b: Built, urls: string[], c: Card, top: number) {
     const cell = (c.w - PAD * 2 - THUMB_GAP * (THUMB_COLUMNS - 1)) / THUMB_COLUMNS;
     const rows = Math.max(0, Math.floor((c.h - top - PAD + THUMB_GAP) / (cell + THUMB_GAP)));
     const shown = urls.slice(0, rows * THUMB_COLUMNS);
@@ -516,13 +590,16 @@ export class GpuScene {
       const sprite = new Sprite(Texture.EMPTY);
       sprite.position.set(box.x, box.y);
       root.addChild(sprite);
-      this.textures.want(url, (tex) => {
-        if (sprite.destroyed) {
-          return;
+      b.loads.push({
+        url,
+        show: (tex) => {
+          sprite.texture = cover(tex, cell, cell);
+          sprite.width = cell;
+          sprite.height = cell;
+        },
+        clear: () => {
+          sprite.texture = Texture.EMPTY;
         }
-        sprite.texture = cover(tex, cell, cell);
-        sprite.width = cell;
-        sprite.height = cell;
       });
     });
   }
@@ -573,16 +650,18 @@ export class GpuScene {
   }
 
   private cull() {
-    const v = this.visibleBox();
+    this.chrome.set(this.cards, (c) => this.seen(c));
     let live = 0;
     for (const c of this.cards) {
       const b = this.built.get(c.id);
       if (!b) {
         continue;
       }
-      const margin = 40 / this.view.zoom;
-      const seen = c.x + c.w > v.x - margin && c.y + c.h > v.y - margin && c.x < v.x + v.w + margin && c.y < v.y + v.h + margin;
+      const seen = this.seen(c);
       b.root.visible = seen;
+      if (seen) {
+        this.load(b);
+      }
       for (const t of b.texts) {
         t.alpha = Math.max(0, Math.min(1, (Number(t.style.fontSize) * this.view.zoom - TEXT_FADE_FROM_PX) / TEXT_FADE_PX));
       }
@@ -617,6 +696,7 @@ export class GpuScene {
       return;
     }
     this.tier = tier;
+    this.chrome.setTier(tier);
     for (const b of this.built.values()) {
       for (const t of b.texts) {
         t.resolution = tier;

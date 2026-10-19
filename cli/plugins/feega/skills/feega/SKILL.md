@@ -252,7 +252,7 @@ batch status) run through `motion_editor_op` `{ node_id, op, input }` with the s
 the page. CLI: `feega motion op <nodeId> <op> --input '{...}'`.
 
 Graphic elements (Text, Box, Ellipse, Path, Image) live in frames or free on the canvas; Generate
-text/image/video nodes generate. `canvas_tool` ops `draw_element` draws a free element,
+text/image/video nodes generate. `canvas_tool` ops `draw_frame` draws an empty frame (`feega canvas frame`), `draw_element` draws a free element,
 `group_elements` / `ungroup_element` group free elements; `move_frame_element` moves an element
 into another frame (or onto the canvas as a free element) keeping props and keyframes; op `place_in_frame` puts a generative node's output into a frame as an element; the
 motion `motion_tool` `move_to_frame` does the same from inside a video. A frame takes no inputs: a line into it is refused. CLI:

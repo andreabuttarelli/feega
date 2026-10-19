@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FORMATS, MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
-import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
+import { FrameKind, MOTION_NODE_BAR_H, elementNodeOf, frameChrome, frameResize, freshText, ghostShown, posterFresh, openingFor, openingSelection, tileChromeOf, frameNodeOf, frameNodeSize, FIRST_REVISION, motionEditorPath, motionNodeSize, motionLivePath, motionOf, motionPreviewPath, newMotionData, storyboardPath } from './motion-node';
 import { NodeMode, Opening } from './inline-motion';
 import { nodeSize } from './node-size';
 
@@ -12,6 +12,7 @@ describe('motion node', () => {
       docHeadRevision: 0,
       posterAssetId: null,
       lastRenderAssetId: null,
+      interactive: false,
       kind: FrameKind.Frame
     });
   });
@@ -58,6 +59,15 @@ describe('motion node', () => {
 
   it('the preview is read next to the editor', () => {
     expect(motionPreviewPath({ projectId: 'p', canvasId: 'c', nodeId: 'n' })).toBe('/p/p/c/c/motion/n/preview');
+  });
+
+  it('the live interactive page is served next to the editor', () => {
+    expect(motionLivePath({ projectId: 'p', canvasId: 'c', nodeId: 'n' })).toBe('/p/p/c/c/motion/n/live');
+  });
+
+  it('carries whether the frame is interactive, false until a save says so', () => {
+    expect(motionOf({ id: 'n', type: 'motion', data: { ...newMotionData(), interactive: true } })?.interactive).toBe(true);
+    expect(motionOf({ id: 'n', type: 'motion', data: newMotionData() })?.interactive).toBe(false);
   });
 });
 

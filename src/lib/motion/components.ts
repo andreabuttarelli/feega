@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { networkSchema } from './vector/model';
 import { BuiltinFont, FONT_NAME } from './fonts/model';
 import { DURATION, EASE_IDS, Ease, FPS } from './design';
 import { MATERIALS, Material } from './materials';
@@ -341,6 +342,7 @@ export const COMPONENTS = {
       .object({
         shape: choice(SHAPES_2D, ShapeKind.Line, 'Shape', Group.Content),
         path: pathString.default('').meta(managed('Path')),
+        network: networkSchema.optional().meta(managed('Vector network')),
         roundness: range(0, 0.5, 0.01, 0, 'Roundness', Group.Content),
         corners: z.array(z.number().min(0).max(0.5)).max(4).default([]).meta({ control: Control.Corners, label: 'Corners', group: Group.Content }),
         smoothing: range(0, 1, 0.01, 0, 'Corner smoothing', Group.Content),
