@@ -22,11 +22,15 @@ describe('frames on canvas', () => {
 });
 
 describe('handing a frame to the core', () => {
-  const list = (gaps: number) => ({ width: 1, height: 1, background: null, items: [], unsupported: Array.from({ length: gaps }, () => ({ clip: 'c', component: 'Custom', reason: 'custom' })) }) as never;
+  const list = (gaps: number, items: unknown[] = [{ kind: 'path', clip: 'p' }]) => ({ width: 1, height: 1, background: null, items, unsupported: Array.from({ length: gaps }, () => ({ clip: 'c', component: 'Custom', reason: 'custom' })) }) as never;
 
   it('only a frame the core draws completely leaves its poster', () => {
     expect(drawsWhole(list(0))).toBe(true);
     expect(drawsWhole(list(2))).toBe(false);
+  });
+
+  it('leaves the poster to a frame whose still draws nothing, rather than paint its bare background over it', () => {
+    expect(drawsWhole(list(0, []))).toBe(false);
   });
 });
 
