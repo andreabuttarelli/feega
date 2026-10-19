@@ -316,7 +316,8 @@
   let shelfHost = $state<HTMLDivElement | null>(null);
   let fontCss: string | null = null;
 
-  const snapshotKind = (t: Tile) => !coreOn && !!t.kind && t.kind !== 'motion' && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
+  const domCard = (t: Tile) => !!t.kind && t.kind !== 'motion' && paintsDom(t.kind, summaries.get(t.id)?.data ?? {});
+  const snapshotKind = (t: Tile) => !coreOn && domCard(t);
   const shotKeyOf = (id: string) => {
     const t = byId.get(id);
     return t ? snapshotKey(t, summaries.get(id)?.data ?? {}, props.thumbsOf?.(id) ?? []) : '';
@@ -467,7 +468,7 @@
       clearTimeout(hoverTimer);
       hoverTimer = null;
     }
-    if (!id || !byId.get(id) || !snapshotKind(byId.get(id)!)) {
+    if (!id || !byId.get(id) || !domCard(byId.get(id)!)) {
       untrack(() => {
         if (hoverLive && !wrap?.querySelector(`.gpu-dom-node[data-id="${hoverLive}"]:hover, .gpu-dom-node[data-id="${hoverLive}"]:focus-within`)) {
           hoverLive = null;
