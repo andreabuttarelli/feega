@@ -22,3 +22,13 @@ statically again.
 
 Not done: the editing dim (`setDim`) has no core equivalent yet; neighbours stay at full opacity
 while a frame is being edited on core.
+
+Follow-ups in the same PR:
+
+- **Custom components and Device3D on the canvas.** `CoreFrames` now does what `GpuFullLayer`
+  does in the editor: for a frame whose doc has `Custom`/`Device3D` clips (`readClips`), it mounts
+  the sandboxed DOM reader on the composed HTML, reads the still frame once, disposes the iframe
+  and keeps the layer pictures for that frame's group. Reads run one at a time
+  (`oneAtATime`); the compose module and the reader are dynamic imports. A failed read leaves
+  the frame on its poster card.
+- Running nodes are ringed by the core overlay (`runningItems`), as Pixi did.

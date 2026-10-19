@@ -14,7 +14,8 @@ export enum OverlayPart {
   PeerTag = 'peer-tag',
   Rotate = 'rotate',
   Ghost = 'ghost',
-  Hover = 'hover'
+  Hover = 'hover',
+  Running = 'running'
 }
 
 export enum EdgeLook {
@@ -39,6 +40,7 @@ const PEER_TAG = { x: 10, y: 16, h: 18, pad: 5, size: 11, line: 14 };
 const PEER_TEXT = '#ffffff';
 const REFUSED = '#c0392b';
 const HOVER_ALPHA = 0.5;
+const RUNNING_LINE = 1.5;
 const ROTATE = { size: 12, lift: 28, border: 2 };
 
 const WIRE_COLOUR: Record<EdgeLook, (t: CoreTheme) => string> = {
@@ -97,4 +99,8 @@ export function ghostItems(c: Curve, ok: boolean, zoom: number, theme: CoreTheme
 
 export function hoverItems(b: Box, zoom: number, theme: CoreTheme): PathItem[] {
   return [solid(`hover:${OverlayPart.Hover}`, line(rect(b.x, b.y, b.w, b.h), OVERLAY_LINE / zoom, true), theme.accent, HOVER_ALPHA)];
+}
+
+export function runningItems(b: Box & { id: string }, zoom: number, theme: CoreTheme): PathItem[] {
+  return [solid(`${b.id}:${OverlayPart.Running}`, line(rect(b.x, b.y, b.w, b.h), RUNNING_LINE / zoom, true), theme.accent)];
 }

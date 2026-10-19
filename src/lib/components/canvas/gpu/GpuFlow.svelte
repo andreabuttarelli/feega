@@ -1329,7 +1329,8 @@
           outlines: corePeers.length ? peerOutlines(props.peers ?? [], (id) => byId.get(id) ?? null).map((o) => ({ key: o.key, box: o.rect, color: o.colour })) : [],
           rotate: coreRotate,
           ghost: ghost ? { curve: ghost.from.side === PortSide.Out ? wireCurve(ghost.from, ghost.at) : wireCurve(ghost.at, ghost.from), ok: ghost.ok } : null,
-          hovered: hovered && !selected.includes(hovered) ? (byId.get(hovered) ?? null) : null
+          hovered: hovered && !selected.includes(hovered) ? (byId.get(hovered) ?? null) : null,
+          running: placed.filter((t) => !handedOver(t) && isRunning(summaries.get(t.id)?.data ?? {}))
         })
       : []
   );

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { BrandTokens } from '$lib/motion/brand';
   import type { MotionDoc } from '$lib/motion/doc';
-  import { drawFrame, prepare, type DisplayList } from '$lib/motion/gpu-full/display-list';
+  import { drawFrame, prepare, type DisplayList, type Prepared } from '$lib/motion/gpu-full/display-list';
   import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
   import { loadFonts } from '$lib/motion/gpu-full/text/load';
   import { createCore, createCoreGl, type CoreRaster } from '$lib/motion/gpu-full/core-web';
@@ -18,6 +18,9 @@
   import { drawsWhole, onStage, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
   import type { FrameOnCanvas } from '$lib/canvas/core/canvas-scene';
   import { postersFor } from '$lib/canvas/core/frame-poster';
+  import { oneAtATime } from '$lib/canvas/core/one-at-a-time';
+  import { readClips, type CustomFrame } from '$lib/motion/gpu-full/dom/custom';
+  import type { Pictures } from '$lib/motion/gpu-full/raster';
 
   type CoreCard = { key: string; frame: FrameOnCanvas; turn?: Turn };
 
@@ -39,6 +42,27 @@
   const imagesIn = (list: DisplayList) => list.items.filter((i) => i.kind === ItemKind.Image).length;
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, MAX_RESOLUTION);
 
+  let readsHost = $state<HTMLDivElement | null>(null);
+  const domRead = oneAtATime();
+  const customPictures = new Map<string, CustomFrame['picture']>();
+  const pictures: Pictures = (item) => [...customPictures.values()].reduce<ReturnType<Pictures>>((found, of) => found ?? of(item), null) ?? media.pictures(item);
+
+  async function readDom(source: Source, prepared: Prepared, frame: number): Promise<CustomFrame | null> {
+    const host = readsHost;
+    if (!host || !readClips(source.doc).read.length) {
+      return null;
+    }
+    const [{ mountCustomReads }, { composeHtml, Target }, { Liveness }] = await Promise.all([import('$lib/motion/gpu-full/dom/custom'), import('$lib/motion/hyperframes/compose'), import('$lib/motion/interactive/settings')]);
+    return domRead(async () => {
+      const reads = await mountCustomReads(host, (only) => composeHtml({ doc: source.doc, tokens: source.tokens, assets: source.assets, liveness: Liveness.Baked, target: Target.Screen, only }), prepared);
+      try {
+        return await reads.readAt(frame);
+      } finally {
+        reads.dispose();
+      }
+    });
+  }
+
   async function load(f: FrameAt) {
     const res = await fetch(`${sourceUrl(f.id)}?revision=${f.revision}`);
     if (!res.ok) {
@@ -47,9 +71,14 @@
     const source = (await res.json()) as Source;
     const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing: smoothingOf(navigator.userAgent) });
-    const list = drawFrame(prepared, stillFrame(source.doc));
+    const still = stillFrame(source.doc);
+    const custom = await readDom(source, prepared, still).catch((e: unknown) => (console.warn('[canvas] core DOM read failed', f.id, e), null));
+    const list = drawFrame(prepared, still, custom?.reads);
     if ((await media.ready(list)) === Readiness.Partial) {
       return;
+    }
+    if (custom) {
+      customPictures.set(keyOf(f), custom.picture);
     }
     lists = new Map(lists).set(keyOf(f), onStage(list, f.kind));
   }
@@ -149,12 +178,12 @@
       put.delete(group);
     }
     for (const f of shown.filter((f) => !put.has(f.group))) {
-      into.putGroup(f.group, listOf(f.group), media.pictures);
+      into.putGroup(f.group, listOf(f.group), pictures);
       put.add(f.group);
     }
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
     const screen = screenUses(shown, at, { width: area.width * resolution, height: area.height * resolution }, null);
-    into.drawScreen({ ...screen, items: [...screen.items, ...throughCamera(overlay, at)] }, media.pictures);
+    into.drawScreen({ ...screen, items: [...screen.items, ...throughCamera(overlay, at)] }, pictures);
     return false;
   }
 
@@ -168,12 +197,20 @@
   $effect(() => () => media.dispose());
 </script>
 
+<div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>
 <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
 {#key backend}
   <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-frames={framePuts.length} data-cards={cardPuts.length} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
 {/key}
 
 <style>
+  .core-reads {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
   .core-grid {
     position: absolute;
     inset: 0;
