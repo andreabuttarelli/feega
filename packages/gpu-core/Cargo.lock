@@ -488,6 +488,7 @@ dependencies = [
 name = "gpu-core"
 version = "0.1.0"
 dependencies = [
+ "js-sys",
  "png 0.17.16",
  "pollster",
  "serde",

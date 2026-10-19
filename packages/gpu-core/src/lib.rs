@@ -4,6 +4,8 @@ pub mod display_list;
 pub mod engine;
 pub mod filter_passes;
 pub mod filters;
+#[cfg(target_arch = "wasm32")]
+pub mod gl_passes;
 pub mod kernel;
 pub mod layers;
 pub mod pictures;
