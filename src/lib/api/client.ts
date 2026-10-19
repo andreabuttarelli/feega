@@ -13,10 +13,14 @@ function apiUrl(path: string): string {
   return `${publicEnv.PUBLIC_API_BASE ?? ''}${path}`;
 }
 
-async function token(): Promise<string | null> {
+export async function viewerSession() {
   supabase ??= createSupabaseBrowserClient();
   const { data } = await supabase.auth.getSession();
-  return data.session?.access_token ?? null;
+  return data.session;
+}
+
+async function token(): Promise<string | null> {
+  return (await viewerSession())?.access_token ?? null;
 }
 
 export function orgHint(): string | null {
@@ -45,4 +49,11 @@ export async function apiCall<T = Record<string, unknown>>(path: string, init: R
   }
   const res = await fetch(apiUrl(path), { ...init, headers: { ...init.headers, authorization: `Bearer ${bearer}` } });
   return { status: res.status, body: (await res.json().catch(() => ({}))) as T };
+}
+
+export async function viewerCall<T>(path: string): Promise<T> {
+  const bearer = await token();
+  const headers: Record<string, string> = bearer ? { authorization: `Bearer ${bearer}` } : {};
+  const res = await fetch(apiUrl(path), { headers });
+  return (await res.json()) as T;
 }

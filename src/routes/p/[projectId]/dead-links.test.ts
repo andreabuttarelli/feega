@@ -114,7 +114,7 @@ function isRealRoute(urlPath: string): boolean {
       if (!existsSync(dir)) return false;
       const leaves = readdirSync(dir);
       return (
-        leaves.includes('+page.svelte') || leaves.includes('+page.server.ts') || leaves.includes('+server.ts')
+        leaves.includes('+page.svelte') || leaves.includes('+page.ts') || leaves.includes('+page.server.ts') || leaves.includes('+server.ts')
       );
     }
 
@@ -180,7 +180,7 @@ describe('nessun link interno punta a una rotta che non esiste', () => {
     .filter((h) => !isRealRoute(h.path))
     .map((h) => `${h.file.slice(REPO_ROOT.length)}:${h.line} -> ${h.target}`);
 
-  it('ogni href/goto/redirect statico risolve a una cartella con +page.svelte, +page.server.ts o +server.ts', () => {
+  it('ogni href/goto/redirect statico risolve a una cartella con +page.svelte, +page.ts, +page.server.ts o +server.ts', () => {
     expect(dead).toEqual([]);
   });
 });

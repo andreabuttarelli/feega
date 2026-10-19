@@ -6,7 +6,8 @@ export enum SettingsSection {
   Content = 'content',
   Team = 'team',
   ApiKeys = 'api-keys',
-  Danger = 'danger'
+  Danger = 'danger',
+  Products = 'products'
 }
 
 const SECTIONS = new Set<string>(Object.values(SettingsSection));

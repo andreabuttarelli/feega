@@ -1,10 +1,10 @@
 import { error, redirect } from '@sveltejs/kit';
-import type { PageServerLoad } from './$types';
+import type { ServerLoadEvent } from '@sveltejs/kit';
 import { createCanvas } from '$lib/server/repos/canvas';
 import { DEFAULT_CANVAS_NAME, canvasPath } from '$lib/server/tenancy/entry';
-import { load as projectShell } from '$lib/server/projects/project-shell';
+import { load as projectShell } from './project-shell';
 
-export const load: PageServerLoad = async (event) => {
+export const load = async (event: Pick<ServerLoadEvent<{ projectId: string }>, 'params' | 'locals' | 'depends' | 'cookies'>) => {
   const { locals } = event;
   const { project, org, canvases } = await projectShell(event);
   const first = canvases[0];
