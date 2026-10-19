@@ -1,3 +1,5 @@
+import type { SvgNode } from '../../effects/registry';
+
 export const DOM_READ_REQUEST = 'feega:dom-read';
 export const DOM_READ_REPLY = 'feega:dom-read-reply';
 export const CUSTOM_ROOT_PREFIX = 'cc-';
@@ -49,12 +51,16 @@ export const READ_STYLES = [
   'letter-spacing',
   'white-space',
   'text-transform',
+  '-webkit-font-smoothing',
   'fill',
   'fill-opacity',
   'fill-rule',
   'stroke',
   'stroke-width',
-  'stroke-opacity'
+  'stroke-opacity',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-dasharray'
 ] as const;
 
 export const READ_ATTRS = ['points', 'd', 'x', 'y', 'width', 'height', 'rx', 'ry', 'r', 'cx', 'cy', 'viewBox', 'href', 'class'] as const;
@@ -80,7 +86,7 @@ export type RawNode = {
   layer: number;
 };
 
-export type RawTree = { width: number; height: number; nodes: RawNode[] };
+export type RawTree = { width: number; height: number; nodes: RawNode[]; defs: Record<string, SvgNode> };
 
 export type DomReadRequest = { type: typeof DOM_READ_REQUEST; id: string; time: number; clips: string[] };
 

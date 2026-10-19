@@ -5,6 +5,11 @@ import { DomGap, DrawnKind, readTree, type DrawnPath } from './read';
 import { NO_INDEX, TEXT_PAD, type RawNode, type RawTree } from './tree';
 import { boxBook } from '../text/test-face';
 import { Smoothing } from '../text/painter';
+import { BlendMode } from '../../blend';
+import { MaskMode } from '../../mask';
+import { CoverKind } from '../mask-layers';
+import { FilterKind } from '../filters';
+import type { SvgNode } from '../../effects/registry';
 
 const FRAME = { width: 400, height: 300 };
 
@@ -13,7 +18,7 @@ function el(part: Partial<RawNode> & { parent: number }): RawNode {
 }
 
 const root = (style: RawNode['style'] = {}) => el({ parent: NO_INDEX, size: [FRAME.width, FRAME.height], style });
-const tree = (...nodes: RawNode[]): RawTree => ({ ...FRAME, nodes });
+const tree = (...nodes: RawNode[]): RawTree => ({ ...FRAME, nodes, defs: {} });
 const paths = (t: RawTree) => readTree(t).drawn.filter((d): d is DrawnPath => d.kind === DrawnKind.Path);
 
 function bounds(item: DrawnPath) {
@@ -97,8 +102,8 @@ describe('readTree', () => {
     expect(paths(tree(root(), wash))[0].paint).toMatchObject({ kind: PaintKind.Linear, from: [50, expect.closeTo(0)], to: [50, expect.closeTo(50)], stops: [{ at: 0 }, { at: 1 }] });
   });
 
-  it('leaves out a filtered subtree and names it', () => {
-    const blurred = el({ parent: 0, size: [50, 50], attrs: { class: 'soft' }, style: { filter: 'blur(4px)', 'background-color': 'rgb(0, 0, 0)' } });
+  it('leaves out a subtree whose filter mixes its items together and names it', () => {
+    const blurred = el({ parent: 0, size: [50, 50], attrs: { class: 'soft' }, style: { filter: 'drop-shadow(rgb(0, 0, 0) 2px 2px 4px)', 'background-color': 'rgb(0, 0, 0)' } });
     const child = el({ parent: 1, size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
 
     const read = readTree(tree(root(), blurred, child));
@@ -113,8 +118,8 @@ describe('readTree', () => {
     expect(readTree(tree(root(), canvas)).drawn).toEqual([{ kind: DrawnKind.Layer, layer: 0, width: 320, height: 180, opacity: 0.5, matrix: [1, 0, 0, 1, 10, 0] }]);
   });
 
-  it('refuses a clipping box whose content spills out of it', () => {
-    const clip = el({ parent: 0, size: [50, 50], style: { overflow: 'hidden' } });
+  it('refuses a rounded clipping box whose content spills out of it', () => {
+    const clip = el({ parent: 0, size: [50, 50], style: { overflow: 'hidden', 'border-top-left-radius': '8px' } });
     const inside = el({ parent: 1, size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
     const outside = el({ parent: 1, at: [45, 0], size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
 
@@ -129,9 +134,9 @@ describe('readTree', () => {
     expect(readTree(tree(root(), ...faded(2))).gaps.map((g) => g.reason)).toEqual([DomGap.Opacity]);
   });
 
-  it('draws an svg fill without its stroke and names the stroke', () => {
+  it('draws an svg fill without a stroke it cannot dash and names the stroke', () => {
     const svg = el({ parent: 0, tag: 'svg', svg: true, size: [100, 100] });
-    const rect = el({ parent: 1, tag: 'rect', svg: true, at: null, attrs: { x: '10', y: '10', width: '20', height: '20' }, style: { fill: 'rgb(0, 0, 0)', stroke: 'rgb(255, 255, 255)', 'stroke-width': '2px' } });
+    const rect = el({ parent: 1, tag: 'rect', svg: true, at: null, attrs: { x: '10', y: '10', width: '20', height: '20' }, style: { fill: 'rgb(0, 0, 0)', stroke: 'rgb(255, 255, 255)', 'stroke-width': '2px', 'stroke-dasharray': '1 2 3' } });
 
     const read = readTree(tree(root(), svg, rect));
 
@@ -183,6 +188,13 @@ describe('readTree', () => {
       expect(glyphs[0].paint).toEqual({ kind: PaintKind.Solid, color: [1, 0, 0, 1] });
     });
 
+    it('does not darken stems the page asked to render without', () => {
+      const dilated = { fonts: boxBook(), smoothing: Smoothing.Dilated };
+      const plain = readTree(tree(root(), label({ style: { ...label().style, '-webkit-font-smoothing': 'antialiased' } })), dilated);
+
+      expect(near(bounds(plain.drawn[0] as DrawnPath))).toEqual({ left: 30, top: 41, right: 35, bottom: 48 });
+    });
+
     it('draws the case the browser shows, not the case typed', () => {
       const read = readTree(tree(root(), label({ style: { ...label().style, 'text-transform': 'uppercase' } })), typeset(['a', 'b']));
 
@@ -202,6 +214,107 @@ describe('readTree', () => {
 
       expect(read.gaps).toEqual([]);
       expect(read.drawn).toEqual([{ kind: DrawnKind.Layer, layer: 3, width: 120, height: 60, opacity: 1, matrix: [1, 0, 0, 1, 10 - TEXT_PAD, 10 - TEXT_PAD] }]);
+    });
+  });
+  describe('svg groups', () => {
+    const svg = () => el({ parent: 0, tag: 'svg', svg: true, at: [0, 0], size: [400, 300] });
+    const g = (style: RawNode['style'] = {}) => el({ parent: 1, tag: 'g', svg: true, at: null, style });
+    const rect = (parent: number, style: RawNode['style'] = {}) => el({ parent, tag: 'rect', svg: true, at: null, attrs: { width: '400', height: '300' }, style: { fill: 'rgb(0, 0, 0)', ...style } });
+    const blur = { tag: 'filter', attrs: { id: 'soft' }, children: [{ tag: 'feGaussianBlur', attrs: { stdDeviation: '1.2' } }] };
+    const noise = { tag: 'filter', attrs: { id: 'noise' }, children: [{ tag: 'feTurbulence', attrs: { baseFrequency: '0.9' } }] };
+    const clip = { tag: 'clipPath', attrs: { id: 'tiles' }, children: [{ tag: 'rect', attrs: { x: '10', y: '20', width: '30', height: '40' } }] };
+    const withDefs = (t: RawTree): RawTree => ({ ...t, defs: { soft: blur, noise, tiles: clip } });
+
+    it('clips every item of a group to its clip path', () => {
+      const read = readTree(withDefs(tree(root(), svg(), g({ 'clip-path': 'url("#tiles")' }), rect(2), rect(2))));
+
+      expect(read.gaps).toEqual([]);
+      expect(read.drawn).toHaveLength(2);
+      for (const item of read.drawn) {
+        expect(item.masks).toEqual([{ mode: MaskMode.Intersect, invert: false, level: 1, feather: 0, cover: { kind: CoverKind.Path, contours: [[10, 20, 40, 20, 40, 60, 10, 60]], matrix: [1, 0, 0, 1, 0, 0] } }]);
+      }
+    });
+
+    it('filters and blends a single shape with the filter its attribute names', () => {
+      const [item] = readTree(withDefs(tree(root(), svg(), rect(1, { filter: 'url("#noise")', 'mix-blend-mode': 'multiply', opacity: '0.35' })))).drawn;
+
+      expect(item.filters?.map((f) => f.kind)).toEqual([FilterKind.Svg]);
+      expect(item.blend).toBe(BlendMode.Multiply);
+      expect(item.opacity).toBeCloseTo(0.35);
+    });
+
+    it('lays noise over the filter region, a tenth of the shape beyond each side', () => {
+      const [item] = readTree(withDefs(tree(root(), svg(), rect(1, { filter: 'url("#noise")' })))).drawn;
+      const filter = item.filters?.[0];
+      const turbulence = filter?.kind === FilterKind.Svg ? filter.nodes[0].children?.[0] : null;
+
+      expect(turbulence?.attrs).toMatchObject({ x: -40, y: -30, width: 480, height: 360 });
+    });
+
+    it('blurs each shape of a blurred group', () => {
+      const read = readTree(withDefs(tree(root(), svg(), g({ filter: 'url("#soft")' }), rect(2), rect(2))));
+
+      expect(read.gaps).toEqual([]);
+      expect(read.drawn.map((d) => d.filters)).toEqual([[{ kind: FilterKind.Svg, nodes: [blur] }], [{ kind: FilterKind.Svg, nodes: [blur] }]]);
+    });
+
+    it('refuses a group whose filter mixes its shapes together', () => {
+      const read = readTree(withDefs(tree(root(), svg(), g({ filter: 'url("#noise")' }), rect(2), rect(2))));
+
+      expect(read.drawn).toEqual([]);
+      expect(read.gaps.map((g) => g.reason)).toEqual([DomGap.Filter]);
+    });
+
+    it('refuses a group that blends as one', () => {
+      const read = readTree(withDefs(tree(root(), svg(), g({ 'mix-blend-mode': 'multiply' }), rect(2), rect(2))));
+
+      expect(read.gaps.map((g) => g.reason)).toEqual([DomGap.Blend]);
+    });
+  });
+  describe('svg paint', () => {
+    const svg = (style: RawNode['style'] = {}) => el({ parent: 0, tag: 'svg', svg: true, at: [0, 0], size: [400, 300], style });
+    const shape = (tag: string, attrs: RawNode['attrs'], style: RawNode['style']) => el({ parent: 1, tag, svg: true, at: null, attrs, style });
+    const sky: SvgNode = { tag: 'linearGradient', attrs: { id: 'sky', x1: '0', y1: '0', x2: '0.3', y2: '1' }, children: [{ tag: 'stop', attrs: { offset: '0', 'stop-color': '#ffffff' } }, { tag: 'stop', attrs: { offset: '1', 'stop-color': '#000000', 'stop-opacity': '0.5' } }] };
+    const mesh: SvgNode = { tag: 'pattern', attrs: { id: 'mesh', width: '5', height: '5', patternUnits: 'userSpaceOnUse' }, children: [{ tag: 'rect', attrs: { width: '5', height: '1', fill: '#000', opacity: '0.12' } }] };
+    const read = (...nodes: RawNode[]) => readTree({ ...tree(root(), ...nodes), defs: { sky, mesh } });
+
+    it('fills with a linear gradient laid over the shape bounding box', () => {
+      const { drawn, gaps } = read(svg(), shape('rect', { x: '10', y: '20', width: '100', height: '50' }, { fill: 'url("#sky")' }));
+      const [item] = drawn as DrawnPath[];
+
+      expect(gaps).toEqual([]);
+      expect(item.paint).toEqual({ kind: PaintKind.Linear, from: [0, 0], to: [0.3, 1], stops: [{ at: 0, color: [1, 1, 1, 1] }, { at: 1, color: [0, 0, 0, 0.5] }] });
+      expect(near(bounds(item))).toEqual({ left: 10, top: 20, right: 110, bottom: 70 });
+    });
+
+    it('fills with a user-space pattern of rects, one run per row', () => {
+      const { drawn, gaps } = read(svg(), shape('rect', { width: '20', height: '10' }, { fill: 'url("#mesh")' }));
+      const [item] = drawn as DrawnPath[];
+
+      expect(gaps).toEqual([]);
+      expect(item.contours).toEqual([
+        [0, 0, 20, 0, 20, 1, 0, 1],
+        [0, 5, 20, 5, 20, 6, 0, 6]
+      ]);
+      expect(item.paint).toEqual({ kind: PaintKind.Solid, color: [0, 0, 0, 1] });
+      expect(item.opacity).toBeCloseTo(0.12);
+    });
+
+    it('strokes a shape over its fill', () => {
+      const { drawn, gaps } = read(svg(), shape('circle', { cx: '50', cy: '50', r: '10' }, { fill: 'rgb(0, 0, 0)', stroke: 'rgb(255, 255, 255)', 'stroke-width': '4' }));
+      const [, ring] = drawn as DrawnPath[];
+
+      expect(gaps).toEqual([]);
+      expect(ring.rule).toBe(FillRule.Union);
+      expect(ring.paint).toEqual({ kind: PaintKind.Solid, color: [1, 1, 1, 1] });
+      expect(near(bounds(ring))).toEqual({ left: 38, top: 38, right: 62, bottom: 62 });
+    });
+
+    it('clips what spills out of a box that hides its overflow', () => {
+      const { drawn, gaps } = read(svg({ overflow: 'hidden' }), shape('rect', { x: '-10', width: '50', height: '50' }, { fill: 'rgb(0, 0, 0)' }));
+
+      expect(gaps).toEqual([]);
+      expect(drawn[0].masks?.[0].cover).toEqual({ kind: CoverKind.Path, contours: [[0, 0, 400, 0, 400, 300, 0, 300]], matrix: [1, 0, 0, 1, 0, 0] });
     });
   });
 });
