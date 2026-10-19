@@ -28,7 +28,7 @@ jobs:
         run: node scripts/typecheck-runtime.mjs
 
       - name: Build
-        run: npx vite build
+        run: npx vite build && rm -rf .vercel/output build
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
