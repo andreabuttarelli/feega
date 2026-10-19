@@ -50,7 +50,7 @@ for (const nodeId of ids) {
   const clips = new Map(prepared.doc.tracks.flatMap((t) => t.clips).map((c) => [c.id, c]));
   for (const gap of list.unsupported.filter((g) => WHY && reasonOf(g) !== 'custom')) {
     const clip = clips.get(gap.clip)!;
-    console.log(`  ${gap.reason} ${clip.component} ${JSON.stringify({ props: clip.props, keyframed: Object.keys(clip.keyframes).filter((k) => clip.keyframes[k].length) }).slice(0, WHY_CHARS)}`);
+    console.log(`  ${gap.reason} ${clip.component} ${JSON.stringify({ keyframed: Object.keys(clip.keyframes).filter((k) => clip.keyframes[k].length), props: clip.props }).slice(0, WHY_CHARS)}`);
   }
   const tag = landingIds.has(nodeId) ? ' landing' : '';
   const reasons = [...new Set(list.unsupported.map((g) => `${reasonOf(g)}:${g.component}${g.detail ? ` ${g.detail}` : ''}`))];
