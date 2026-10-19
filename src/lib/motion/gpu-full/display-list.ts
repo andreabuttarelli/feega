@@ -25,6 +25,8 @@ import { sourceSeconds } from '../time-remap';
 import { edgeAt, moveAt, type Pose } from './edges';
 import { stillSeconds } from '../still';
 import { animatorOfKey, COLOR_VALUE, SELECTOR_KEYS, type TextAnimator } from '../text-animators/model';
+import { textPathAt, type OnPath } from '../hyperframes/text-path';
+import { paintOnPath } from './text/on-path';
 import { NO_TYPESET, paintText, TEXT_COMPONENTS, TextGap, type TextComponent, type Typeset } from './text/painter';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
@@ -51,8 +53,7 @@ export enum Unsupported {
   ShapeKind = 'shape-kind',
   Text = 'text',
   Font = 'font',
-  Glyph = 'glyph',
-  TextPath = 'text-path'
+  Glyph = 'glyph'
 }
 
 export type Scissor = [number, number, number, number];
@@ -85,7 +86,7 @@ export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<str
 type Content = (Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number }) | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
 type Size = { width: number; height: number };
 type Painted = Content[] | Unsupported;
-type Env = { clip: MotionClip; animators: TextAnimator[]; props: Record<string, unknown>; size: Size; box: Box; stage: Size; unit: number; colour: (v: string) => Rgba; css: (v: string) => string; time: number; media: number; fps: number; still: number | null; asset: (id: unknown) => string | null; logo: string | null; typeset: Typeset };
+type Env = { clip: MotionClip; animators: TextAnimator[]; onPath: OnPath | null; props: Record<string, unknown>; size: Size; box: Box; stage: Size; unit: number; colour: (v: string) => Rgba; css: (v: string) => string; time: number; media: number; fps: number; still: number | null; asset: (id: unknown) => string | null; logo: string | null; typeset: Typeset };
 type Painter = (env: Env) => Painted;
 
 const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment']);
@@ -186,8 +187,9 @@ const logoPainter = ({ props, size, asset, logo }: Env): Painted => {
 const TEXT_GAP: Record<TextGap, Unsupported> = { [TextGap.Font]: Unsupported.Font, [TextGap.Glyph]: Unsupported.Glyph, [TextGap.Fill]: Unsupported.Fill };
 
 function textPainter(env: Env): Painted {
-  const { clip, animators, props, box, stage, css, time, fps, still, typeset } = env;
-  const painted = paintText({ component: clip.component as TextComponent, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators });
+  const { clip, animators, onPath, props, box, stage, css, time, fps, still, typeset } = env;
+  const component = clip.component as TextComponent;
+  const painted = onPath ? paintOnPath({ component, ...typeset, props, stage, box, colour: css, animators, onPath }) : paintText({ component, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators });
   if (typeof painted === 'string') {
     return TEXT_GAP[painted];
   }
@@ -233,8 +235,7 @@ const CLIP_LIMITS: [Unsupported, (clip: MotionClip) => boolean][] = [
   [Unsupported.Animator, (clip) => clip.animators.some((a) => a.values.tracking !== undefined)],
   [Unsupported.Shader, (clip) => clip.shaders.length > 0],
   [Unsupported.Space3d, (clip) => keyed(clip, DEPTH_KEYS)],
-  [Unsupported.Keyframe, keyframedOutside],
-  [Unsupported.TextPath, (clip) => clip.textPath !== null]
+  [Unsupported.Keyframe, keyframedOutside]
 ];
 
 function propsAt(clip: MotionClip, frame: number, colour: (v: string) => string): Record<string, unknown> {
@@ -327,7 +328,7 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     const props = propsAt(clip, frame, css);
     const { box, turn, opacity } = painter.place(props, size);
     const local = frame - clip.from;
-    const painted = painter.paint({ clip, animators: animatorsAt(clip, frame, css), props, size: box, box, stage: size, unit: Math.min(size.width, size.height), colour, css, time: local / doc.fps, media: sourceSeconds(clip, local, doc.fps), fps: doc.fps, still: stillSeconds(doc), asset, logo: tokens.logoUrl, typeset });
+    const painted = painter.paint({ clip, animators: animatorsAt(clip, frame, css), onPath: textPathAt(doc, clip, frame), props, size: box, box, stage: size, unit: Math.min(size.width, size.height), colour, css, time: local / doc.fps, media: sourceSeconds(clip, local, doc.fps), fps: doc.fps, still: stillSeconds(doc), asset, logo: tokens.logoUrl, typeset });
     if (!Array.isArray(painted)) {
       return painted;
     }

@@ -8,6 +8,8 @@ import { maskSchema } from '$lib/motion/mask';
 import { registerFont } from '$lib/motion/fonts/ops';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { addAnimator, applyPreset, TextPreset } from '$lib/motion/text-animators/ops';
+import { setTextPath } from '$lib/motion/text-path/ops';
+import { PathPreset, PathSourceKind } from '$lib/motion/text-path/model';
 
 const SECONDS = 60;
 const out = process.argv[2];
@@ -170,6 +172,12 @@ const KINDS: Record<string, () => MotionDoc> = {
     const body = clip(titled, 'Text', 'body', { text: 'Radial body copy that wraps onto two lines', align: 'left', size: 0.06, x: 0.3, y: 0.62, width: 0.45, height: 0.25, fills: radial });
     const kicker = clip(body, 'Kicker', 'kick', { text: 'outside stroke', size: 0.06, x: 0.75, y: 0.62, fills: [{ type: FillType.Solid, color: '#ffffff' }], strokes: outline('#ff375f', 'outside') });
     return clip(kicker, 'Caption', 'cap', { text: 'Centred stroke, mixed fills', x: 0.5, y: 0.88, size: 0.04, fills: [{ type: FillType.Solid, color: '#0a84ff' }, { type: FillType.Solid, color: '#ffd60a', opacity: 0.5 }], strokes: outline('#30d158', 'center') });
+  },
+  'on-path': () => {
+    const placed = clip(clip(backdrop, 'Title', 'ring', { text: 'all the way around the ring ', size: 0.05, x: 0.3, y: 0.5, width: 0.3, height: 0.5 }), 'Text', 'wave', { text: 'riding a wave, letter by letter', size: 0.04, x: 0.72, y: 0.5, width: 0.4, height: 0.3, color: '#ffd60a' });
+    const ring = must(setTextPath(placed, 'ring', { source: { kind: PathSourceKind.Preset, preset: PathPreset.Circle } }));
+    const wave = must(setTextPath(ring, 'wave', { source: { kind: PathSourceKind.Preset, preset: PathPreset.Wave } }));
+    return keys(must(addAnimator(wave, 'wave', 'a', { softness: 0.3, start: 0, end: 200, values: { y: -0.6, opacity: 0.2, rotation: 30 } })), 'wave', 'ta.a.offset', -130, 100);
   },
   blur: () => keys(must(addClip(shape(backdrop, 'sharp', { shape: 'rect', x: 0.3, y: 0.5, width: 0.2, height: 0.3, fill: '#ffd60a' }), { component: 'Shape', from: 0, durationInFrames: SECONDS, props: { shape: 'star', x: 0.7, y: 0.5, width: 0.25, height: 0.4, fill: '#bf5af2' }, effects: [{ id: 'g', kind: 'gaussian-blur', enabled: true, params: { radius: 6 } }] } as never, 'soft')), 'sharp', 'blur', 0, 24)
 };
