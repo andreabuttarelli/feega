@@ -224,6 +224,7 @@ export const ACTIONS: Record<ActionId, ActionSpec> = {
   [Command.AutoLayout]: { name: 'Add auto layout', icon: Columns2, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.UseAsMask]: { name: 'Use as mask', icon: Contrast, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.RemoveMask]: { name: 'Remove mask', icon: CircleOff, group: GuideGroup.Edit, menu: MenuSection.Layer },
+  [Command.EditAsVector]: { name: 'Edit as vector', icon: PenTool, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.BringForward]: { name: 'Bring forward', icon: BringToFront, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.SendBackward]: { name: 'Send backward', icon: SendToBack, group: GuideGroup.Edit, menu: MenuSection.Layer },
   [Command.BringToFront]: { name: 'Bring to front', icon: BringToFront, group: GuideGroup.Edit, menu: MenuSection.Layer },

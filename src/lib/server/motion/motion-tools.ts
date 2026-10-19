@@ -4,6 +4,8 @@ import { StyleAction, StyleKind, applyStyle, defineStyle, detachStyle, removeSty
 import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
+import { setNetwork, toVector } from '$lib/motion/vector/ops';
+import { networkSchema } from '$lib/motion/vector/model';
 import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
 import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
 import { scaleClips } from '$lib/motion/scale-tool';
@@ -1717,6 +1719,18 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
       description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed. flatten (one or more shapes) merges their outlines into one editable path as they are, curves kept, with no boolean. outline_stroke (one or more shapes) turns the first visible stroke into a filled path of the same look; a shape that also has a fill keeps it and gets the outlined stroke as a new layer above.',
       inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum([...SHAPE_OPS]), at: z.number().min(0).optional().describe('seconds; default 0') }),
       execute: async (input) => apply(SHAPE_OP[input.op](session.doc, input.clip_ids, frames(input.at ?? 0)), `${input.op} ${input.clip_ids.join(', ')}`)
+    }),
+
+    to_vector: tool({
+      description: 'Turn a Shape clip into an editable vector network (same drawing): vertices that any number of segments can join, filled regions.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(toVector(session.doc, input.clip_id), `made ${input.clip_id} a vector`)
+    }),
+
+    set_vector_network: tool({
+      description: 'Replace a Shape clip network: vertices [{x,y}] in 0..1 of its box, segments [{start,end,tangentStart,tangentEnd}] (tangents relative to their vertex, zero = straight), regions [{winding, loops: [[segment indices]]}] that fill.',
+      inputSchema: z.object({ clip_id: z.string(), network: networkSchema }),
+      execute: async (input) => apply(setNetwork(session.doc, input.clip_id, input.network), `set the network of ${input.clip_id}`)
     }),
 
     set_path: tool({

@@ -4,7 +4,8 @@ import { ShapeKind } from './shape/schema';
 const SHAPE_NAME: Partial<Record<string, string>> = {
   [ShapeKind.Rect]: 'Box',
   [ShapeKind.Ellipse]: 'Ellipse',
-  [ShapeKind.Path]: 'Path'
+  [ShapeKind.Path]: 'Path',
+  [ShapeKind.Vector]: 'Vector'
 };
 
 type Named = { component: string; props: Record<string, unknown> };
