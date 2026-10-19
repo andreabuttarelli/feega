@@ -13,7 +13,8 @@ const EDITOR_ACTION_CALLERS = [
   'src/lib/components/motion/TemplateDialog.svelte',
   'src/lib/components/motion/ExportDialog.svelte',
   'src/lib/components/gallery/PublishDialog.svelte',
-  'src/lib/components/canvas/MotionNode.svelte'
+  'src/lib/components/canvas/MotionNode.svelte',
+  'src/routes/app/compose/[nodeId]/+page.svelte'
 ];
 
 describe('a page action goes to the API when the page has a bearer twin', () => {
@@ -22,9 +23,13 @@ describe('a page action goes to the API when the page has a bearer twin', () => 
     expect(apiPathOf('/p/p1/c/c1/motion/n1')).toBe('/api/v1/projects/p1/canvases/c1/motion/n1');
   });
 
+  it('the compose list and the composition editor have one, and keep the page query', () => {
+    expect(apiPathOf('/app/compose?project=p1')).toBe('/api/v1/me/pages/compose?project=p1');
+    expect(apiPathOf('/app/compose/n1?project=p1')).toBe('/api/v1/compose/n1?project=p1');
+  });
+
   it('any other page keeps its own action', () => {
-    expect(apiPathOf('/app/compose/n1?project=p1')).toBeNull();
-    expect(pageActionPath('/app/compose/n1?project=p1', 'poster')).toBe('/app/compose/n1?project=p1&/poster');
+    expect(apiPathOf('/render/t1')).toBeNull();
     expect(pageActionPath('/render/t1', 'slot')).toBe('/render/t1?/slot');
   });
 

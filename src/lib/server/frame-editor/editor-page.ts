@@ -192,3 +192,5 @@ export const actions: Actions<EditorParams> = {
 
   renderStatus: async ({ locals, params }) => answered(await runEditorOp('render_status', editorCtx(await scopeFor(locals, params)), {}))
 };
+
+export type EditorPageData = Awaited<ReturnType<typeof load>>;

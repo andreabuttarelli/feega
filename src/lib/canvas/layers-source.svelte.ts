@@ -2,13 +2,11 @@ import type { MotionDoc } from '$lib/motion/doc';
 import type { EditMode } from '$lib/motion/edit-mode';
 import type { OpResult } from '$lib/motion/timeline';
 import type { CanvasLayer, LayerHover } from './layers';
-import type { OutlineCache } from './frame-outlines';
 
 export type CanvasSide = {
   readonly nodes: readonly CanvasLayer[];
   readonly selected: readonly string[];
   readonly outlinesUrl: string;
-  readonly outlines: OutlineCache;
   previewUrl(nodeId: string): string;
   select(ids: string[]): void;
   open(nodeId: string): void;

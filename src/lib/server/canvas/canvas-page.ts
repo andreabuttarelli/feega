@@ -54,7 +54,6 @@ import { ShowRun, removeNodes, resizeOnCanvas, shareDoc, showRun, type RunShown 
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { templateLibrary } from '$lib/server/motion/templates';
-import { canvasOutlines } from '$lib/server/motion/frame-outlines';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
 import { serverTiming } from '$lib/server/server-timing';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
@@ -204,26 +203,25 @@ async function spendOnVoice<T>(
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, listed, catalogue, shareToken, references] = await Promise.all([
+  const [nodes, listed, catalogue, shareToken, references, orgTemplates, handoff, killSwitch, previews] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
     projectCatalogue(db, { orgId, mode }),
     readCanvasShare(db, { orgId, canvasId }),
-    referenceLibrary(db, { orgId, projectId: canvas.projectId })
+    referenceLibrary(db, { orgId, projectId: canvas.projectId }),
+    templateLibrary(db, { orgId, actor: userActor({ userId }) }).own(),
+    chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
+    rendererSwitch(),
+    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
   ]);
 
   const connections = await canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed);
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, orgTemplates, handoff, outlines, killSwitch, previews] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
-    firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length }),
-    templateLibrary(db, { orgId, actor: userActor({ userId }) }).own(),
-    chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
-    canvasOutlines(db, { orgId, nodes }),
-    rendererSwitch(),
-    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
+    firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length })
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
@@ -249,7 +247,6 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     projectBrandId,
     onboarding,
     orgTemplates,
-    outlines,
     cardPreviews: previews
   };
 };
@@ -1596,3 +1593,5 @@ export const actions: Actions<CanvasParams> = {
   }
 
 };
+
+export type CanvasPageData = Awaited<ReturnType<typeof load>>;

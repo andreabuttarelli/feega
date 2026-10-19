@@ -1,4 +1,4 @@
-import type { ActionResult } from '@sveltejs/kit';
+import { error, redirect, type ActionResult } from '@sveltejs/kit';
 
 const OK = 200;
 const SEE_OTHER = 303;
@@ -28,4 +28,15 @@ export function pageActionOf(status: number, body: Body): ActionResult {
     return { type: 'failure', status, data: body };
   }
   return { type: 'success', status: OK, data: body };
+}
+
+export function pageLoadOf(status: number, body: Body): Body {
+  const location = locationOf(status, body);
+  if (location) {
+    redirect(SEE_OTHER, location);
+  }
+  if (status >= BAD_REQUEST) {
+    error(status, String(body.error ?? body.message ?? 'error'));
+  }
+  return body;
 }

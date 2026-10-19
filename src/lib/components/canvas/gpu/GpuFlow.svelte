@@ -78,6 +78,9 @@
   import { isRunning, nextSnapshot, snapshotKey } from '$lib/canvas/gpu/snapshot-queue';
   import { cachedSnapshot, digest, latestSnapshot, remoteSnapshot, storeSnapshot, uploadSnapshot } from '$lib/canvas/gpu/snapshot-cache';
   import { revealIn as revealDelay } from '$lib/canvas/gpu/reveal-gate';
+  import { CANVAS_LOAD_EVENT, LoadKind, claimLoad, loadTiming } from '$lib/canvas/gpu/load-timing';
+  import { engineOf } from '$lib/motion/engine';
+  import { track } from '$lib/analytics';
   import { getFontEmbedCSS, toCanvas } from 'html-to-image';
   import { NODE_KIND_ICON, NODE_KIND_LABEL, NameTag } from '$lib/canvas/node-label';
   import { followGroup } from '$lib/canvas/node-layout';
@@ -336,6 +339,14 @@
   });
 
   let openedAt = 0;
+  const mountedAt = performance.now();
+  let loadTimer: ReturnType<typeof loadTiming> | null = null;
+  function canvasLoadTiming(renderer: string) {
+    const openedOn = new URL((performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined)?.name ?? location.href).pathname;
+    const kind = claimLoad(openedOn, location.pathname);
+    const origin = kind === LoadKind.Navigation ? 0 : mountedAt;
+    return loadTiming({ kind, renderer, nodes: tiles.length, device: currentDevice(), engine: engineOf(navigator.userAgent), now: () => performance.now() - origin, raf: (frame) => requestAnimationFrame(frame), report: (r) => track(CANVAS_LOAD_EVENT, r) });
+  }
   let revealed = $state(false);
   let revealTick = $state(0);
   const REVEAL_POLL_MS = 100;
@@ -369,6 +380,8 @@
     if (!wait) {
       revealed = true;
       exposeReveal(Math.round(performance.now() - openedAt), missing);
+      loadTimer = spec.chrome ? canvasLoadTiming(scene.backend) : null;
+      loadTimer?.revealed(missing.length, performance.now() - openedAt);
       return;
     }
     const t = setTimeout(() => revealTick++, Math.min(wait, REVEAL_POLL_MS));
@@ -387,6 +400,7 @@
     if (!missing.length) {
       settled = true;
       exposeSettled(Math.round(performance.now() - openedAt));
+      loadTimer?.settled();
       return;
     }
     const t = setTimeout(() => revealTick++, REVEAL_POLL_MS);

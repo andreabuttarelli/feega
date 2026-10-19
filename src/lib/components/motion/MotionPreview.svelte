@@ -22,7 +22,7 @@
   import GpuFullLayer from './GpuFullLayer.svelte';
   import type { BrandTokens } from '$lib/motion/brand';
   import type { MotionDoc } from '$lib/motion/doc';
-  import { currentDevice, previewHtml } from '$lib/canvas/gpu/memory-budget';
+  import { previewHtml } from '$lib/canvas/gpu/memory-budget';
   import type { Compose } from '$lib/motion/gpu/engine';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
@@ -105,7 +105,7 @@
       return;
     }
     ready = false;
-    player.setAttribute('srcdoc', previewHtml(next, currentDevice(), { width, height }));
+    player.setAttribute('srcdoc', previewHtml(next, { width, height }));
   }
 
   function announceDrawn() {

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiEnhance } from '$lib/dashboard/api-enhance';
   import PageTitle from '$lib/components/PageTitle.svelte';
   import { goto } from '$app/navigation';
   import PageHead from '$lib/components/PageHead.svelte';
@@ -27,7 +28,7 @@
       void videoPoster(item.previewUrl, POSTER.width)
         .then(({ jpeg, height }) => {
           frames[item.id] = jpeg;
-          return sendPoster(`?project=${data.projectId}`, jpeg, { node: item.id, width: String(POSTER.width), height: String(height) });
+          return sendPoster(`/app/compose?project=${data.projectId}`, jpeg, { node: item.id, width: String(POSTER.width), height: String(height) });
         })
         .catch((e) => console.error('[compose] poster not derived', e));
     }
@@ -66,7 +67,7 @@
     <ul class="templates" data-testid="compose-templates">
       {#each COMPOSITION_LAYOUTS as layout (layout)}
         <li>
-          <form method="POST" action="?/create" class="template">
+          <form method="POST" action="?/create" use:apiEnhance class="template">
             <input type="hidden" name="project" value={data.projectId} />
             <input type="hidden" name="layout" value={layout} />
             <input type="hidden" name="format" value={format} />
