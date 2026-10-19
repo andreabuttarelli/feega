@@ -2,6 +2,7 @@ import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item } from
 import type { Picture, Pictures, Raster } from './raster';
 import type { Affine } from '../affine';
 import type { Rgba } from './rgba';
+import { ungrouped } from './ungroup';
 
 const CORE_URL = '/gpu-core/gpu_core.js';
 
@@ -58,21 +59,23 @@ function rasterOf(attached: Attached): CoreRaster {
     uploaded.set(item.clip, picture.source);
   }
 
+  const flat = <T extends { items: (Item | Use)[] }>(list: T): T => ({ ...list, items: ungrouped(list.items as Item[]) });
+
   const drawn = (items: Item[]) => items.filter((i): i is Item => (i as Item | Use).kind !== 'use');
 
   return {
     draw: (list: DisplayList, pictures = NO_PICTURES) => {
       wanted(list.items).forEach((item) => upload(item, pictures));
-      return attached.draw(JSON.stringify(list)).split('\n').filter(Boolean);
+      return attached.draw(JSON.stringify(flat(list))).split('\n').filter(Boolean);
     },
     putGroup: (key: string, list: DisplayList, pictures = NO_PICTURES) => {
       wanted(list.items).forEach((item) => upload(item, pictures));
-      attached.put_group(key, JSON.stringify(list));
+      attached.put_group(key, JSON.stringify(flat(list)));
     },
     dropGroup: (key: string) => attached.drop_group(key),
     drawScreen: (screen: Screen, pictures = NO_PICTURES) => {
       wanted(drawn(screen.items as Item[])).forEach((item) => upload(item, pictures));
-      attached.draw(JSON.stringify(screen));
+      attached.draw(JSON.stringify(flat(screen)));
     },
     dispose: () => attached.free()
   };
