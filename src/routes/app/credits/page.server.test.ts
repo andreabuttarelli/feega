@@ -20,7 +20,12 @@ const NATIVE_UA = 'Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 FeegaNative/0.3.0';
 type Row = Record<string, unknown>;
 
 type World = {
-	org?: Partial<{ stripe_customer_id: string | null; stripe_subscription_id: string | null }>;
+	org?: Partial<{
+		stripe_customer_id: string | null;
+		stripe_subscription_id: string | null;
+		store_plan_product: string | null;
+		store_plan_expires_at: string | null;
+	}>;
 	role?: string;
 	brands?: Row[];
 	aiCalls?: Row[];
@@ -120,6 +125,23 @@ describe('/app/credits — the workspace credits page', () => {
 		const data = await run(fakeSupabase());
 		expect(data.currentPlanUsd).toBeNull();
 		expect(subscribedRungPrice).not.toHaveBeenCalled();
+	});
+
+	it('names the tier an app store subscription bought, while it has not expired', async () => {
+		const later = new Date(Date.now() + 86_400_000).toISOString();
+
+		const data = await run(fakeSupabase({ org: { store_plan_product: 'feega_monthly_32', store_plan_expires_at: later } }));
+
+		expect(data.currentPlanUsd).toBe(32);
+		expect(subscribedRungPrice).not.toHaveBeenCalled();
+	});
+
+	it('forgets an app store subscription once it expired', async () => {
+		const earlier = new Date(Date.now() - 1000).toISOString();
+
+		const data = await run(fakeSupabase({ org: { store_plan_product: 'feega_monthly_32', store_plan_expires_at: earlier } }));
+
+		expect(data.currentPlanUsd).toBeNull();
 	});
 
 	it('still renders when Stripe cannot say which tier is current', async () => {

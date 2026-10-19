@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { FrameKind } from '$lib/canvas/motion-node';
 import { MOTION_NODE_BAR_H } from '$lib/canvas/motion-node';
-import { drawsWhole, framesOnCanvas, stillFrame } from './frame-source';
+import { drawsWhole, framesOnCanvas, onStage, stillFrame } from './frame-source';
 
 const tile = (id: string, kind = 'motion') => ({ id, kind, x: 10, y: 20, w: 300, h: 200 });
 
 describe('frames on canvas', () => {
   it('a frame shows its doc in the stage above the bar, at its head revision', () => {
     const [f] = framesOnCanvas([tile('a')], () => ({ kind: FrameKind.Frame, docHeadRevision: 4 }));
-    expect(f).toEqual({ id: 'a', revision: 4, box: { x: 10, y: 20, w: 300, h: 200 - MOTION_NODE_BAR_H } });
+    expect(f).toEqual({ id: 'a', kind: FrameKind.Frame, revision: 4, box: { x: 10, y: 20, w: 300, h: 200 - MOTION_NODE_BAR_H } });
   });
 
   it('elements and groups have no bar', () => {
@@ -37,5 +37,18 @@ describe('still frame', () => {
 
   it('a still doc rests on its own still frame', () => {
     expect(stillFrame({ fps: 30, durationInFrames: 60, still: { frame: 0 } })).toBe(0);
+  });
+});
+
+describe('a transparent doc on the canvas', () => {
+  const list = (background: [number, number, number, number] | null) => ({ width: 1, height: 1, background, items: [], unsupported: [] });
+
+  it('a frame shows it on the black stage, as its card always has', () => {
+    expect(onStage(list(null), FrameKind.Frame).background).toEqual([0, 0, 0, 1]);
+  });
+
+  it('elements and groups stay see-through, and an opaque doc keeps its own colour', () => {
+    expect(onStage(list(null), FrameKind.Element).background).toBeNull();
+    expect(onStage(list([1, 0, 0, 1]), FrameKind.Frame).background).toEqual([1, 0, 0, 1]);
   });
 });

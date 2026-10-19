@@ -46,7 +46,64 @@ the first canvas (simulator screenshots). A debug build takes
 6. First launch is refused: Settings → General → VPN & Device Management → your Apple ID → Trust.
 7. A free-team build expires after 7 days; press Run again. Max 3 apps per device.
 
-Sign in with Apple and in-app purchases need the paid Apple Developer Program.
+Sign in with Apple and real in-app purchases need the paid Apple Developer Program.
+
+## In-app purchases without App Store Connect
+
+`ios/App/App/Products.storekit` holds the 12 products (`feega_monthly_*` in one subscription
+group, `feega_pack_*` consumables; a vitest keeps it equal to `src/lib/store-products.ts`). The
+shared `App` scheme runs with it, so ⌘R in Xcode buys from it: Debug → StoreKit → Manage
+Transactions refunds, expires or speeds up renewals.
+
+Which store the paywall uses (`src/lib/native-bridge.ts`):
+
+| Build | `PUBLIC_REVENUECAT_APPLE_KEY` | Store |
+|---|---|---|
+| any | set | RevenueCat SDK, `app_user_id` = org id → webhook → ledger |
+| Debug | empty | `FeegaStoreKit` (StoreKit 2 direct, `appAccountToken` = org id); no webhook, so no credits |
+| Release | empty | none: "purchases unavailable" |
+
+Production switches by key alone; no code change.
+
+`AppUITests/StorePurchaseUITests` walks the whole path on the simulator: paywall → buy pack and
+plan from the `.storekit` file → RevenueCat-shaped webhook to a local dev server → balance and
+"Current plan" in `/app/credits` → restore → refund. It skips without its environment:
+
+```bash
+# dev server: NATIVE_STORE_BILLING=on REVENUECAT_SANDBOX=accept REVENUECAT_WEBHOOK_SECRET=<s>
+FEEGA_API=http://localhost:<port> npm run bundle
+TEST_RUNNER_FEEGA_DEMO_SESSION='{"key":"sb-<ref>-auth-token","value":<session json>}' \
+TEST_RUNNER_FEEGA_TEST_ORG=<test org id> \
+TEST_RUNNER_FEEGA_WEBHOOK_URL=http://127.0.0.1:<port>/api/v1/webhooks/revenuecat \
+TEST_RUNNER_FEEGA_WEBHOOK_SECRET=<s> TEST_RUNNER_FEEGA_SHOTS_DIR=<dir> \
+xcodebuild -project ios/App/App.xcodeproj -scheme App -sdk iphonesimulator \
+  -destination 'platform=iOS Simulator,name=iPhone 15 Pro' -derivedDataPath build/ios \
+  CODE_SIGNING_ALLOWED=NO test
+```
+
+Test account only (test@dazero.co): the run grants and then refunds, so the balance ends where it
+started. `FEEGA_DEMO_SESSION` (Debug only) seeds the bundled app's Supabase session.
+
+## Sign in with Apple
+
+`App/App.entitlements` carries `com.apple.developer.applesignin`; `FeegaAppleSignIn` →
+`{ identityToken }` → `?/appleIdToken` → `signInWithIdToken`. The plugin registers only with
+`Info.plist FeegaAppleSignIn = on`; the web button follows `src/lib/apple-sign-in/visibility.ts`
+(never on production hosts). The simulator cannot show the sheet for an unsigned build: it needs a
+team and a signed-in Apple ID.
+
+## What only the account owner can do
+
+1. Apple Developer Program: enable *Sign in with Apple* on the App ID `app.feega.mobile`; set the
+   team in Signing & Capabilities.
+2. Supabase → Auth → Apple: add `app.feega.mobile` to the Client IDs.
+3. Set `FeegaAppleSignIn = on` in `Info.plist` and `APPLE_SIGN_IN=on` on the server (preview first).
+4. App Store Connect: app `app.feega.mobile`, the 12 products with the ids above, Paid Apps
+   agreement, sandbox tester.
+5. RevenueCat: App Store app `app.feega.mobile`, products, webhook to
+   `/api/v1/webhooks/revenuecat` with a bearer secret; copy the public Apple SDK key.
+6. Env: `PUBLIC_REVENUECAT_APPLE_KEY` (bundle build), `REVENUECAT_WEBHOOK_SECRET` (server),
+   `NATIVE_STORE_BILLING=on` when the build ships to the store.
 
 ## Performance probe
 
