@@ -12,6 +12,8 @@ export enum FillRule {
   Union = 'union'
 }
 
+export const MAX_STOPS = 8;
+
 export type Stop = { at: number; color: Rgba };
 
 export type Paint =

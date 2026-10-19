@@ -21,6 +21,7 @@ import { ShapeKind, modifierValues } from '../shape/schema';
 import { flatten, rectOutline, type Outline } from '../shape/geometry';
 import { rgbaOf, type Rgba } from './rgba';
 import { FillRule, PaintKind, type Paint, type Stop } from './paint';
+import { DrawnKind, type DomRead, type Drawn } from './dom/read';
 import { sourceSeconds } from '../time-remap';
 import { edgeAt, moveAt, type Pose } from './edges';
 import { stillSeconds } from '../still';
@@ -30,11 +31,12 @@ import { paintOnPath } from './text/on-path';
 import { NO_TYPESET, paintText, TEXT_COMPONENTS, TextGap, type TextComponent, type Typeset } from './text/painter';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
-export { FillRule, PaintKind, type Paint, type Stop } from './paint';
+export { FillRule, PaintKind, type Paint, type Stop };
 
 export enum ItemKind {
   Path = 'path',
-  Image = 'image'
+  Image = 'image',
+  Layer = 'layer'
 }
 
 export enum Unsupported {
@@ -52,6 +54,8 @@ export enum Unsupported {
   Pattern = 'pattern',
   ShapeKind = 'shape-kind',
   Text = 'text',
+  Unread = 'unread',
+  Dom = 'dom',
   Font = 'font',
   Glyph = 'glyph'
 }
@@ -64,7 +68,9 @@ export type PathItem = { kind: ItemKind.Path; clip: string; contours: number[][]
 
 export type ImageItem = { kind: ItemKind.Image; clip: string; src: string; video: boolean; mediaTime: number; size: Size; fit: string; focus: [number, number]; zoom: number; clipped: boolean; inner: Affine; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
-export type Item = PathItem | ImageItem;
+export type LayerItem = { kind: ItemKind.Layer; clip: string; source: string; size: Size; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+
+export type Item = PathItem | ImageItem | LayerItem;
 
 export enum FilterKind {
   Css = 'css',
@@ -77,16 +83,19 @@ export type Linear = [number, number, number, number];
 
 export type MatteOf = { items: Item[]; luma: boolean; invert: boolean };
 
-export type Gap = { clip: string; component: ComponentId; reason: Unsupported };
+export type Gap = { clip: string; component: ComponentId; reason: Unsupported; detail?: string };
+
+export type DomReads = ReadonlyMap<string, DomRead>;
 
 export type DisplayList = { width: number; height: number; background: Rgba | null; items: Item[]; unsupported: Gap[] };
 
 export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; typeset: Typeset };
 
-type Content = (Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number }) | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
+type Content = (Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number }) | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<LayerItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
 type Size = { width: number; height: number };
-type Painted = Content[] | Unsupported;
-type Env = { clip: MotionClip; animators: TextAnimator[]; onPath: OnPath | null; props: Record<string, unknown>; size: Size; box: Box; stage: Size; unit: number; colour: (v: string) => Rgba; css: (v: string) => string; time: number; media: number; fps: number; still: number | null; asset: (id: unknown) => string | null; logo: string | null; typeset: Typeset };
+type Partly = { content: Content[]; gaps: string[] };
+type Painted = Content[] | Partly | Unsupported;
+type Env = { clip: MotionClip; animators: TextAnimator[]; onPath: OnPath | null; props: Record<string, unknown>; size: Size; box: Box; stage: Size; unit: number; colour: (v: string) => Rgba; css: (v: string) => string; time: number; media: number; fps: number; still: number | null; asset: (id: unknown) => string | null; logo: string | null; typeset: Typeset; read: DomRead | null };
 type Painter = (env: Env) => Painted;
 
 const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment']);
@@ -211,6 +220,18 @@ const boxed: Placement = (props, frame) => {
   return { box, turn, opacity: Number(props.opacity ?? 1) };
 };
 
+const CONTENT_OF: Record<DrawnKind, (d: never, clip: string) => Content> = {
+  [DrawnKind.Path]: (d: Extract<Drawn, { kind: DrawnKind.Path }>) => ({ ...d, kind: ItemKind.Path }),
+  [DrawnKind.Layer]: (d: Extract<Drawn, { kind: DrawnKind.Layer }>, clip) => ({ kind: ItemKind.Layer, source: `${clip}:${d.layer}`, size: { width: d.width, height: d.height }, opacity: d.opacity, matrix: d.matrix })
+};
+
+const customPainter = ({ read, clip }: Env): Painted => {
+  if (!read) {
+    return Unsupported.Unread;
+  }
+  return { content: read.drawn.map((d) => (CONTENT_OF[d.kind] as (d: Drawn, clip: string) => Content)(d, clip.id)), gaps: read.gaps.map((g) => `${g.reason} ${g.element} ×${g.count}`) };
+};
+
 const unturned: Placement = (props, frame) => ({ ...boxed(props, frame), turn: IDENTITY });
 
 const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }>> = {
@@ -219,7 +240,8 @@ const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }
   Image: { place: boxed, paint: imagePainter },
   Video: { place: boxed, paint: videoPainter },
   Logo: { place: boxed, paint: logoPainter },
-  ...Object.fromEntries(TEXT_COMPONENTS.map((c) => [c, { place: unturned, paint: textPainter }]))
+  ...Object.fromEntries(TEXT_COMPONENTS.map((c) => [c, { place: unturned, paint: textPainter }])),
+  Custom: { place: fullFrame, paint: customPainter }
 };
 
 const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (clip.transform[k as TransformKey] ?? TRANSFORM[k as TransformKey].fallback) !== TRANSFORM[k as TransformKey].fallback || (clip.keyframes[k]?.length ?? 0) > 0);
@@ -309,7 +331,9 @@ export function prepare(doc: MotionDoc, tokens: BrandTokens, assets: Record<stri
   return { doc: preparedDoc({ doc, tokens, assets }), tokens, assets, typeset };
 }
 
-export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: number): DisplayList {
+const NO_READS: DomReads = new Map();
+
+export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: number, reads: DomReads = NO_READS): DisplayList {
   const asset = (id: unknown) => (typeof id === 'string' && id ? (assets[id] ?? null) : null);
   const css = (v: string) => resolveColor(v, tokens);
   const colour = (v: string) => rgbaOf(css(v)) ?? [0, 0, 0, 1];
@@ -317,6 +341,8 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
   const byId = new Map(doc.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));
   const pairs = new Map(mattePairs(doc).map((p) => [p.target, p]));
   const sources = new Set([...pairs.values()].map((p) => p.source));
+  const items: Item[] = [];
+  const unsupported: Gap[] = [];
   const shown = (clip: MotionClip) => frame >= clip.from && frame < clip.from + clip.durationInFrames && !NO_PAINT.has(clip.component);
 
   function clipItems(clip: MotionClip): Item[] | Unsupported {
@@ -328,10 +354,12 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     const props = propsAt(clip, frame, css);
     const { box, turn, opacity } = painter.place(props, size);
     const local = frame - clip.from;
-    const painted = painter.paint({ clip, animators: animatorsAt(clip, frame, css), onPath: textPathAt(doc, clip, frame), props, size: box, box, stage: size, unit: Math.min(size.width, size.height), colour, css, time: local / doc.fps, media: sourceSeconds(clip, local, doc.fps), fps: doc.fps, still: stillSeconds(doc), asset, logo: tokens.logoUrl, typeset });
-    if (!Array.isArray(painted)) {
+    const painted = painter.paint({ clip, animators: animatorsAt(clip, frame, css), onPath: textPathAt(doc, clip, frame), props, size: box, box, stage: size, unit: Math.min(size.width, size.height), colour, css, time: local / doc.fps, media: sourceSeconds(clip, local, doc.fps), fps: doc.fps, still: stillSeconds(doc), asset, logo: tokens.logoUrl, typeset, read: reads.get(clip.id) ?? null });
+    if (typeof painted === 'string') {
       return painted;
     }
+    const { content, gaps } = Array.isArray(painted) ? { content: painted, gaps: [] } : painted;
+    unsupported.push(...gaps.map((detail) => ({ clip: clip.id, component: clip.component, reason: Unsupported.Dom, detail })));
     const edge = edgeAt(clip, frame);
     const world = mul2d(posed(edge, size.width, size.height), worldAt(doc, clip.id, frame, size));
     const masks = maskLayers(clip, frame, size, world, asset);
@@ -355,11 +383,9 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     const read = pair ? MATTE_READ[pair.matte] : null;
     const extras = { ...(scissor ? { scissor } : {}), ...(filtered.filters.length ? { filters: filtered.filters, space: [world[0], world[1], world[2], world[3]] as Linear } : {}), ...(filtered.backdrop ? { backdrop: filtered.backdrop } : {}), ...(masks.length ? { masks } : {}), ...(read ? { matte: { items: matteItems, luma: read.weights !== null, invert: read.invert } } : {}) };
     const framed = (c: Content) => (c.kind === ItemKind.Image && c.clipped ? { matrix: mul2d(base, c.matrix), inner: moved } : { matrix: mul2d(placed, c.matrix) });
-    return painted.map((c) => ({ ...c, clip: clip.id, opacity: alpha * c.opacity, ...framed(c), blur: blur + ('blur' in c ? (c.blur ?? 0) * scaleOf(placed) : 0), blend: clip.blend, ...extras }) as Item);
+    return content.map((c) => ({ ...c, clip: clip.id, opacity: alpha * c.opacity, ...framed(c), blur: blur + ('blur' in c ? (c.blur ?? 0) * scaleOf(placed) : 0), blend: clip.blend, ...extras }) as Item);
   }
 
-  const items: Item[] = [];
-  const unsupported: Gap[] = [];
   const bottomFirst = [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden);
   for (const clip of bottomFirst.flatMap((t) => t.clips as MotionClip[])) {
     if (!shown(clip) || sources.has(clip.id)) {
