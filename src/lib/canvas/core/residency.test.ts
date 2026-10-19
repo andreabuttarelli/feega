@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CACHE_SHARE, cached, resident } from './residency';
+import { CACHE_SHARE, cached, resident, heldWhileEdited } from './residency';
 
 const view = { x: 0, y: 0, zoom: 1 };
 const screen = { width: 1000, height: 1000 };
@@ -30,5 +30,20 @@ describe('frame residency', () => {
 
     expect(cached(frames, { x: 0, y: 0, zoom: 2 }, screen, texture / CACHE_SHARE).map((f) => f.cache)).toEqual([true, false, false]);
     expect(cached(frames, { x: 0, y: 0, zoom: 2 }, screen, (3 * texture) / CACHE_SHARE).every((f) => f.cache)).toBe(true);
+  });
+});
+
+describe('a node under a live edit', () => {
+  it('holds its texture so each step only stretches its use, never re-rasters', () => {
+    const shown = cached([frame('a', 0, 0), frame('b', 200, 0)], view, screen, 1e9);
+    expect(heldWhileEdited(shown, new Set(['a'])).map((f) => [f.id, f.cache, f.hold])).toEqual([
+      ['a', true, true],
+      ['b', true, undefined]
+    ]);
+  });
+
+  it('is cached even past the texture budget, so a heavy frame is not redrawn item by item each step', () => {
+    const shown = cached([frame('a', 0, 1, 2000)], view, screen, 0);
+    expect(heldWhileEdited(shown, new Set(['a']))[0]).toMatchObject({ cache: true, hold: true });
   });
 });

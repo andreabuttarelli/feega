@@ -1,9 +1,11 @@
 import { postPageAction } from '$lib/api/page-action';
 import { Background } from './doc';
 import { FrameFormat } from './hyperframes/capture';
+import { POSTER_SHARE, posterSecond } from './poster-time';
+
+export { posterSecond };
 export const POSTER_WIDTH = 480;
 export const POSTER_DEBOUNCE_MS = 2500;
-const POSTER_SHARE = 0.4;
 const POSTER_QUALITY = 0.8;
 const POSTER_FORMAT: Record<Background, FrameFormat> = { [Background.Brand]: FrameFormat.Jpeg, [Background.Transparent]: FrameFormat.Png };
 
@@ -12,10 +14,6 @@ export const posterFormat = (background: Background | undefined): FrameFormat =>
 const JPEG_MIME = 'image/jpeg';
 const DATA_URL_MIME = /^data:([^;,]+)/;
 const POSTER_FILE: Record<string, string> = { [JPEG_MIME]: 'poster.jpg', 'image/png': 'poster.png' };
-
-export function posterSecond(doc: { durationInFrames: number; fps: number }): number {
-  return (doc.durationInFrames / doc.fps) * POSTER_SHARE;
-}
 
 export function posterJob(shoot: () => Promise<string>, send: (jpeg: string, revision?: number) => Promise<unknown>, revision: () => number | undefined = () => undefined) {
   let timer: ReturnType<typeof setTimeout> | null = null;

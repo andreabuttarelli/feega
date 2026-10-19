@@ -9,7 +9,7 @@ const DEG = Math.PI / 180;
 
 export type Turn = { degrees: number; about: { x: number; y: number } };
 
-export type PutFrame = { id: string; group: string; box: Box; size: { width: number; height: number }; turn?: Turn; cache?: boolean };
+export type PutFrame = { id: string; group: string; box: Box; size: { width: number; height: number }; turn?: Turn; cache?: boolean; hold?: boolean };
 
 const USE = 'use';
 
@@ -37,7 +37,7 @@ function useOf(f: PutFrame, view: Viewport): Use {
   const place: Affine = [f.box.w / f.size.width, 0, 0, f.box.h / f.size.height, f.box.x, f.box.y];
   const camera: Affine = [view.zoom, 0, 0, view.zoom, view.x, view.y];
   const use: Use = { kind: USE, clip: f.id, group: f.group, matrix: mul2d(camera, mul2d(turned(f.turn), place)) };
-  return f.cache ? { ...use, cache: true } : use;
+  return f.cache ? { ...use, cache: true, ...(f.hold ? { hold: true } : {}) } : use;
 }
 
 export function screenUses(frames: readonly PutFrame[], view: Viewport, screen: ScreenSize, background: Rgba | null): Screen {

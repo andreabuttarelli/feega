@@ -172,6 +172,8 @@ pub struct UseItem {
     pub matrix: Affine,
     #[serde(default)]
     pub cache: bool,
+    #[serde(default)]
+    pub hold: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

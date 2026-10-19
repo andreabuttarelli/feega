@@ -58,6 +58,7 @@ export default defineConfig({
     project: "021-1m",
     autoInstrument: { load: false, serverLoad: true }
   }), sveltekit(), tailwindcss(), devCrons(), motionBundles(), motionLibs()],
+  worker: { format: 'es', plugins: () => [motionBundles(), motionLibs()] },
   // Modern baselines: skip legacy transforms (e.g. Array.from) that PSI flags as unused
   // on current Chrome/Safari/Firefox. Aligns with "Baseline widely available" guidance.
   build: {
