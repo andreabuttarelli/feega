@@ -5,13 +5,14 @@ import { FillType } from '../../fill/model';
 import { apply2d } from '../../affine';
 import { paintText, Smoothing, TextGap, type Ink, type TextComponent, type TextEnv } from './painter';
 import { boxBook } from './test-face';
+import { animatorSchema, AnimatorUnit, SelectorShape } from '../../text-animators/model';
 
 const stage = { width: 1920, height: 1080 };
 const FPS = 30;
 
 function env(component: TextComponent, props: Record<string, unknown>, change: Partial<TextEnv> = {}): TextEnv {
   const parsed = COMPONENTS[component].schema.parse(props) as Record<string, unknown>;
-  return { component, smoothing: Smoothing.Plain, props: parsed, box: boxOf(parsed as never, stage), stage, colour: (v) => (v.startsWith('#') ? v : '#ffffff'), time: 10, trim: 0, fps: FPS, still: null, fonts: boxBook(), ...change };
+  return { component, smoothing: Smoothing.Plain, props: parsed, box: boxOf(parsed as never, stage), stage, colour: (v) => (v.startsWith('#') ? v : '#ffffff'), time: 10, trim: 0, fps: FPS, still: null, fonts: boxBook(), animators: [], ...change };
 }
 
 const drawn = (painted: ReturnType<typeof paintText>): Ink[] => {
@@ -102,5 +103,50 @@ describe('paintText', () => {
 
     expect(smooth.right - smooth.left).toBeCloseTo(plain.right - plain.left + 0.6);
     expect(smooth.bottom).toBeLessThan(plain.bottom);
+  });
+  describe('with text animators', () => {
+    const animated = (text: string, input: Record<string, unknown>, props: Record<string, unknown> = {}) => {
+      const a = animatorSchema.parse({ id: 'a', unit: AnimatorUnit.Char, shape: SelectorShape.Square, ...input });
+      return drawn(paintText(env('Text', { text, align: 'left', ...props }, { animators: [a] })));
+    };
+    const plain = (text: string) => drawn(paintText(env('Text', { text, align: 'left' })));
+    const sizeOf = (inks: Ink[]) => (extent(inks).bottom - extent(inks).top) / 0.7;
+
+    it('hides the characters an opacity animator selects', () => {
+      const still = extent(plain('ab'));
+      const inks = animated('ab', { end: 50, values: { opacity: 0 } });
+
+      expect(inks).toHaveLength(1);
+      expect(extent(inks).left).toBeCloseTo(still.left + (still.right - still.left) / 2, 0);
+    });
+
+    it('groups glyphs by word for a word animator', () => {
+      const inks = animated('ab cd', { unit: AnimatorUnit.Word, end: 50, values: { opacity: 0 } });
+
+      expect(inks.flatMap((i) => i.contours)).toHaveLength(2);
+    });
+
+    it('offsets a unit by em of the type size', () => {
+      const size = sizeOf(plain('a'));
+
+      expect(extent(animated('a', { values: { y: 1 } })).top - extent(plain('a')).top).toBeCloseTo(size, 0);
+    });
+
+    it('turns a unit about the centre of its box', () => {
+      const still = extent(plain('a'));
+      const size = sizeOf(plain('a'));
+      const quarter = extent(animated('a', { values: { rotation: 90 } }));
+      const half = extent(animated('a', { values: { rotation: 180 } }));
+
+      expect(quarter.right - quarter.left).toBeCloseTo(0.7 * size, 0);
+      expect((half.left + half.right) / 2).toBeCloseTo((still.left + still.right) / 2, 0);
+    });
+
+    it('mixes the animator colour into the text colour and blurs the unit', () => {
+      const [ink] = animated('a', { values: { color: '#ff0000', blur: 4 } }, { fills: [{ type: FillType.Solid, color: '#0000ff' }] });
+
+      expect(ink.color).toEqual([1, 0, 0, 1]);
+      expect(ink.blur).toBe(4);
+    });
   });
 });

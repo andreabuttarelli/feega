@@ -55,7 +55,7 @@ Library components, as today's hybrid engine classifies them with default props:
 
 Clip features: transforms 2D, keyframes on transform/prop/param, parent chains, opacity, blur
 (transform + gaussian effect) are drawn. Not yet: 18 of 19 effects, masks/mattes, the 8
-transitions, 15 blend modes, text animators, shaders, 3D space/camera, `move`, strokes, shape
+transitions, 15 blend modes, tracking text animators, shaders, 3D space/camera, `move`, strokes, shape
 modifiers with filters, angular/diamond/image fills, Line and Vector shapes, dots/grid/gradient
 background patterns.
 

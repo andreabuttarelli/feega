@@ -23,6 +23,7 @@ import { rgbaOf, type Rgba } from './rgba';
 import { sourceSeconds } from '../time-remap';
 import { edgeAt, moveAt, type Pose } from './edges';
 import { stillSeconds } from '../still';
+import { animatorOfKey, COLOR_VALUE, SELECTOR_KEYS, type TextAnimator } from '../text-animators/model';
 import { NO_TYPESET, paintText, TEXT_COMPONENTS, TextGap, type TextComponent, type Typeset } from './text/painter';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
@@ -98,10 +99,10 @@ export type DisplayList = { width: number; height: number; background: Rgba | nu
 
 export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string>; typeset: Typeset };
 
-type Content = Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
+type Content = (Omit<PathItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'> & { blur?: number }) | Omit<ImageItem, 'clip' | 'blur' | 'blend' | 'masks' | 'matte' | 'filters' | 'space' | 'backdrop'>;
 type Size = { width: number; height: number };
 type Painted = Content[] | Unsupported;
-type Env = { clip: MotionClip; props: Record<string, unknown>; size: Size; box: Box; stage: Size; unit: number; colour: (v: string) => Rgba; css: (v: string) => string; time: number; media: number; fps: number; still: number | null; asset: (id: unknown) => string | null; logo: string | null; typeset: Typeset };
+type Env = { clip: MotionClip; animators: TextAnimator[]; props: Record<string, unknown>; size: Size; box: Box; stage: Size; unit: number; colour: (v: string) => Rgba; css: (v: string) => string; time: number; media: number; fps: number; still: number | null; asset: (id: unknown) => string | null; logo: string | null; typeset: Typeset };
 type Painter = (env: Env) => Painted;
 
 const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment']);
@@ -202,12 +203,12 @@ const logoPainter = ({ props, size, asset, logo }: Env): Painted => {
 const TEXT_GAP: Record<TextGap, Unsupported> = { [TextGap.Font]: Unsupported.Font, [TextGap.Glyph]: Unsupported.Glyph, [TextGap.Fill]: Unsupported.Fill, [TextGap.Stroke]: Unsupported.Stroke };
 
 function textPainter(env: Env): Painted {
-  const { clip, props, box, stage, css, time, fps, still, typeset } = env;
-  const inks = paintText({ component: clip.component as TextComponent, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still });
+  const { clip, animators, props, box, stage, css, time, fps, still, typeset } = env;
+  const inks = paintText({ component: clip.component as TextComponent, ...typeset, props, box, stage, colour: css, time, trim: clip.trimStart / fps, fps, still, animators });
   if (!Array.isArray(inks)) {
     return TEXT_GAP[inks];
   }
-  return inks.map((ink) => ({ kind: ItemKind.Path as const, contours: ink.contours, rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: ink.color }, opacity: ink.opacity, matrix: ink.matrix }));
+  return inks.map((ink) => ({ kind: ItemKind.Path as const, contours: ink.contours, rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: ink.color }, opacity: ink.opacity, matrix: ink.matrix, blur: ink.blur }));
 }
 
 type Box = { left: number; top: number; width: number; height: number };
@@ -233,7 +234,7 @@ const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }
 
 const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (clip.transform[k as TransformKey] ?? TRANSFORM[k as TransformKey].fallback) !== TRANSFORM[k as TransformKey].fallback || (clip.keyframes[k]?.length ?? 0) > 0);
 
-const drawnKey = (clip: MotionClip, key: string) => effectOfKey(key) !== null || drawnSource(clip, animProp(clip.component, key)?.source);
+const drawnKey = (clip: MotionClip, key: string) => effectOfKey(key) !== null || animatorOfKey(key) !== null || drawnSource(clip, animProp(clip.component, key)?.source);
 
 const drawnSource = (clip: MotionClip, source: Source | undefined) => (source !== undefined && DRAWN_SOURCES.has(source)) || (source === Source.Remap && REMAPPED.has(clip.component));
 
@@ -241,7 +242,7 @@ const keyframedOutside = (clip: MotionClip) => Object.entries(clip.keyframes).so
 
 const CLIP_LIMITS: [Unsupported, (clip: MotionClip) => boolean][] = [
   [Unsupported.Component, (clip) => !PAINTERS[clip.component]],
-  [Unsupported.Animator, (clip) => clip.animators.length > 0],
+  [Unsupported.Animator, (clip) => clip.animators.some((a) => a.values.tracking !== undefined)],
   [Unsupported.Shader, (clip) => clip.shaders.length > 0],
   [Unsupported.Space3d, (clip) => keyed(clip, DEPTH_KEYS)],
   [Unsupported.Keyframe, keyframedOutside],
@@ -258,6 +259,21 @@ function propsAt(clip: MotionClip, frame: number, colour: (v: string) => string)
     return [[key, prop.kind === ValueKind.Color ? sampleColor(track, local, colour) : sampleTrack(track, local)]];
   });
   return { ...clip.props, ...Object.fromEntries(sampled) };
+}
+
+const SELECTOR_FIELDS: ReadonlySet<string> = new Set(SELECTOR_KEYS);
+
+function animatorsAt(clip: MotionClip, frame: number, colour: (v: string) => string): TextAnimator[] {
+  const local = frame - clip.from;
+  return clip.animators.map((a) => {
+    const own = Object.entries(clip.keyframes).flatMap(([key, track]) => {
+      const ref = animatorOfKey(key);
+      return ref?.id === a.id && track.length ? [[ref.field, ref.field === COLOR_VALUE ? sampleColor(track, local, colour) : sampleTrack(track, local)] as const] : [];
+    });
+    const selector = Object.fromEntries(own.filter(([field]) => SELECTOR_FIELDS.has(field)));
+    const values = Object.fromEntries(own.filter(([field]) => !SELECTOR_FIELDS.has(field)));
+    return { ...a, ...selector, values: { ...a.values, ...values } };
+  });
 }
 
 function inheritedOpacity(doc: MotionDoc, clip: MotionClip, byId: Map<string, MotionClip>, frame: number): number {
@@ -323,7 +339,7 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     const props = propsAt(clip, frame, css);
     const { box, turn, opacity } = painter.place(props, size);
     const local = frame - clip.from;
-    const painted = painter.paint({ clip, props, size: box, box, stage: size, unit: Math.min(size.width, size.height), colour, css, time: local / doc.fps, media: sourceSeconds(clip, local, doc.fps), fps: doc.fps, still: stillSeconds(doc), asset, logo: tokens.logoUrl, typeset });
+    const painted = painter.paint({ clip, animators: animatorsAt(clip, frame, css), props, size: box, box, stage: size, unit: Math.min(size.width, size.height), colour, css, time: local / doc.fps, media: sourceSeconds(clip, local, doc.fps), fps: doc.fps, still: stillSeconds(doc), asset, logo: tokens.logoUrl, typeset });
     if (!Array.isArray(painted)) {
       return painted;
     }
@@ -350,7 +366,7 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     const read = pair ? MATTE_READ[pair.matte] : null;
     const extras = { ...(scissor ? { scissor } : {}), ...(filtered.filters.length ? { filters: filtered.filters, space: [world[0], world[1], world[2], world[3]] as Linear } : {}), ...(filtered.backdrop ? { backdrop: filtered.backdrop } : {}), ...(masks.length ? { masks } : {}), ...(read ? { matte: { items: matteItems, luma: read.weights !== null, invert: read.invert } } : {}) };
     const framed = (c: Content) => (c.kind === ItemKind.Image && c.clipped ? { matrix: mul2d(base, c.matrix), inner: moved } : { matrix: mul2d(placed, c.matrix) });
-    return painted.map((c) => ({ ...c, clip: clip.id, opacity: alpha * c.opacity, ...framed(c), blur, blend: clip.blend, ...extras }) as Item);
+    return painted.map((c) => ({ ...c, clip: clip.id, opacity: alpha * c.opacity, ...framed(c), blur: blur + ('blur' in c ? (c.blur ?? 0) * scaleOf(placed) : 0), blend: clip.blend, ...extras }) as Item);
   }
 
   const items: Item[] = [];
