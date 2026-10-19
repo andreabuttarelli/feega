@@ -1,1 +1,1 @@
-export { load, actions } from '$lib/server/project-pages/brand-new';
+export { actions } from '$lib/server/project-pages/brand-new';

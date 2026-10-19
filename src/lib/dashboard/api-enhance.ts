@@ -1,9 +1,7 @@
 import { applyAction } from '$app/forms';
-import { goto } from '$app/navigation';
-import { page } from '$app/state';
+import { goto, invalidateAll } from '$app/navigation';
 import type { ActionResult } from '@sveltejs/kit';
-import { postAction } from './api';
-import { pageAt } from './pages';
+import { hasTwin, postPageAction } from '$lib/api/page-action';
 
 type After = (opts: { result: ActionResult; update: () => Promise<void> }) => Promise<void> | void;
 export type Submit = (opts: { cancel: () => void; formData: FormData }) => After | void;
@@ -14,7 +12,11 @@ export function actionTarget(attribute: string, currentPath: string): { pathname
   return action ? { pathname: url.pathname, action: action.slice(1) } : null;
 }
 
-async function follow(result: ActionResult): Promise<void> {
+async function follow(form: HTMLFormElement, result: ActionResult): Promise<void> {
+  if (result.type === 'success') {
+    form.reset();
+    await invalidateAll();
+  }
   if (result.type !== 'redirect') {
     await applyAction(result);
     return;
@@ -30,9 +32,8 @@ async function follow(result: ActionResult): Promise<void> {
 
 export function apiEnhance(form: HTMLFormElement, submit?: Submit) {
   async function submitted(event: SubmitEvent) {
-    const target = actionTarget(form.getAttribute('action') ?? '', page.url.pathname);
-    const dashboardPage = target ? pageAt(target.pathname) : null;
-    if (!target || !dashboardPage) {
+    const target = actionTarget(form.getAttribute('action') ?? '', location.pathname);
+    if (!target || !hasTwin(target.pathname)) {
       return;
     }
     event.preventDefault();
@@ -44,8 +45,8 @@ export function apiEnhance(form: HTMLFormElement, submit?: Submit) {
       return;
     }
 
-    const result = await postAction(dashboardPage, target.action, formData);
-    const update = () => follow(result);
+    const result = await postPageAction(target.pathname, target.action, formData);
+    const update = () => follow(form, result);
     if (after) {
       await after({ result, update });
       return;

@@ -1,1 +1,1 @@
-export { load, actions } from '$lib/server/project-pages/influencers';
+export { actions } from '$lib/server/project-pages/influencers';

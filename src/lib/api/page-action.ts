@@ -2,21 +2,49 @@ import { deserialize } from '$app/forms';
 import { error, type ActionResult } from '@sveltejs/kit';
 import { apiCall, withOrg } from './client';
 import { pageActionOf, pageLoadOf } from './page-answers';
-import { actionResultOf, loadedOf, type Answer } from '$lib/dashboard/answers';
+import { loadedOf, type Answer } from '$lib/dashboard/answers';
+import { postApi } from '$lib/dashboard/api';
+import { PAGE_PATH } from '$lib/dashboard/pages';
+import { PROJECT_PAGE_PATH } from '$lib/project-pages';
 
 const ACTION_PARAM = 'action';
 const NOT_FOUND = 404;
 
-type Reader = { action: (status: number, body: Answer) => ActionResult; load: (status: number, body: Answer) => unknown };
+type Reader = { post: (api: string, query: URLSearchParams, form: FormData) => Promise<ActionResult>; load: (status: number, body: Answer) => unknown };
 
-const BARE: Reader = { action: pageActionOf, load: pageLoadOf };
-const ENVELOPED: Reader = { action: actionResultOf, load: loadedOf };
+async function postBare(api: string, query: URLSearchParams, form: FormData): Promise<ActionResult> {
+  const { status, body } = await apiCall<Answer>(withOrg(api, query), { method: 'POST', body: form });
+  return pageActionOf(status, body);
+}
 
-const BEARER_PAGES: { page: RegExp; api: (m: RegExpExecArray) => string; reader: Reader }[] = [
+function postEnveloped(api: string, query: URLSearchParams, form: FormData): Promise<ActionResult> {
+  const action = query.get(ACTION_PARAM) ?? '';
+  query.delete(ACTION_PARAM);
+  const search = query.toString();
+  return postApi(search ? `${api}?${search}` : api, action, form);
+}
+
+const BARE: Reader = { post: postBare, load: pageLoadOf };
+const ENVELOPED: Reader = { post: postEnveloped, load: loadedOf };
+
+type Row = { page: RegExp; api: (m: RegExpExecArray) => string; reader: Reader };
+
+const exactly = (path: string) => new RegExp(`^${path.replace(/\//g, '\\/')}$`);
+
+const DASHBOARD_ROWS: Row[] = Object.entries(PAGE_PATH).map(([page, path]) => ({ page: exactly(path), api: () => `/api/v1/me/pages/${page}`, reader: ENVELOPED }));
+
+const PROJECT_ROWS: Row[] = Object.entries(PROJECT_PAGE_PATH).map(([page, path]) => ({
+  page: new RegExp(`^\\/p\\/([^/?#]+)\\/${path.replace(/\//g, '\\/')}$`),
+  api: (m) => `/api/v1/projects/${m[1]}/pages/${page}`,
+  reader: BARE
+}));
+
+const BEARER_PAGES: Row[] = [
   { page: /^\/p\/([^/?#]+)\/c\/([^/?#]+)$/, api: (m) => `/api/v1/projects/${m[1]}/canvases/${m[2]}`, reader: BARE },
   { page: /^\/p\/([^/?#]+)\/c\/([^/?#]+)\/motion\/([^/?#]+)$/, api: (m) => `/api/v1/projects/${m[1]}/canvases/${m[2]}/motion/${m[3]}`, reader: BARE },
-  { page: /^\/app\/compose$/, api: () => '/api/v1/me/pages/compose', reader: ENVELOPED },
-  { page: /^\/app\/compose\/([^/?#]+)$/, api: (m) => `/api/v1/compose/${m[1]}`, reader: BARE }
+  { page: /^\/app\/compose\/([^/?#]+)$/, api: (m) => `/api/v1/compose/${m[1]}`, reader: BARE },
+  ...DASHBOARD_ROWS,
+  ...PROJECT_ROWS
 ];
 
 type Twin = { api: string; query: URLSearchParams; reader: Reader };
@@ -30,6 +58,10 @@ function twinOf(pageUrl: string): Twin | null {
     }
   }
   return null;
+}
+
+export function hasTwin(pageUrl: string): boolean {
+  return twinOf(pageUrl) !== null;
 }
 
 export function apiPathOf(pageUrl: string): string | null {
@@ -58,8 +90,7 @@ export async function postPageAction(pageUrl: string, action: string, form: Form
 
   const query = new URLSearchParams(twin.query);
   query.set(ACTION_PARAM, action);
-  const { status, body } = await apiCall<Answer>(withOrg(twin.api, query), { method: 'POST', body: form });
-  return twin.reader.action(status, body);
+  return twin.reader.post(twin.api, query, form);
 }
 
 export async function loadPageData<T>(url: URL): Promise<T> {
