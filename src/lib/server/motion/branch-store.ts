@@ -12,7 +12,7 @@ const FIRST_REVISION = 1;
 
 const branchOfSchema = z.object({ nodeId: z.string().min(1), baseVersion: z.number().int().min(0), name: z.string() });
 
-function forkOf(record: CanvasNodeRecord | null): Fork | null {
+export function forkOf(record: CanvasNodeRecord | null): Fork | null {
   const parsed = branchOfSchema.safeParse(record?.data.branchOf);
   return record && parsed.success ? { id: record.id, frameId: parsed.data.nodeId, name: parsed.data.name, baseVersion: parsed.data.baseVersion } : null;
 }
