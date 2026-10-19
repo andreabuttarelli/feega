@@ -31,6 +31,7 @@ import { paintOnPath } from './text/on-path';
 import { NO_TYPESET, paintText, planOf, TEXT_COMPONENTS, TextGap, type NativeFaces, type TextComponent, type TextPlan, type Typeset } from './text/painter';
 import { resolvedRequest, type FaceRule } from './text/fonts';
 import { lensAt, type Lens } from './lens';
+import { screenFrames } from '../device-screen';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
 export type { Lens } from './lens';
@@ -268,6 +269,16 @@ const customPainter =({ read, clip }: Env): Painted => {
 
 const lensPainter = ({ clip, stage, fps, time, css }: Env): Painted => [{ kind: ItemKind.Lens, lens: lensAt(clip, { ...stage, fps }, Math.round(time * fps), css), opacity: 1, matrix: IDENTITY }];
 
+export const SCREEN_GAP = 'screen composition on a 3D face';
+
+const devicePainter = (env: Env): Painted => {
+  const read = customPainter(env);
+  if (typeof read === 'string' || Array.isArray(read) || !env.props.screenComp) {
+    return read;
+  }
+  return { ...read, gaps: [...read.gaps, SCREEN_GAP] };
+};
+
 const unturned: Placement = (props, frame) => ({ ...boxed(props, frame), turn: IDENTITY });
 
 const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }>> = {
@@ -278,8 +289,11 @@ const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }
   Logo: { place: boxed, paint: logoPainter },
   ...Object.fromEntries(TEXT_COMPONENTS.map((c) => [c, { place: unturned, paint: textPainter }])),
   Custom: { place: fullFrame, paint: customPainter },
-  LiquidBlob: { place: fullFrame, paint: lensPainter }
+  LiquidBlob: { place: fullFrame, paint: lensPainter },
+  Device3D: { place: fullFrame, paint: devicePainter }
 };
+
+const SELF_ANIMATED: ReadonlySet<ComponentId> = new Set(['Device3D']);
 
 const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (clip.transform[k as TransformKey] ?? TRANSFORM[k as TransformKey].fallback) !== TRANSFORM[k as TransformKey].fallback || (clip.keyframes[k]?.length ?? 0) > 0);
 
@@ -294,7 +308,7 @@ const CLIP_LIMITS: [Unsupported, (clip: MotionClip) => boolean][] = [
   [Unsupported.Animator, (clip) => clip.animators.some((a) => a.values.tracking !== undefined)],
   [Unsupported.Shader, (clip) => clip.shaders.length > 0],
   [Unsupported.Space3d, (clip) => keyed(clip, DEPTH_KEYS)],
-  [Unsupported.Keyframe, keyframedOutside]
+  [Unsupported.Keyframe, (clip) => !SELF_ANIMATED.has(clip.component) && keyframedOutside(clip)]
 ];
 
 function propsAt(clip: MotionClip, frame: number, colour: (v: string) => string): Record<string, unknown> {
@@ -378,6 +392,8 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
   const byId = new Map(doc.tracks.flatMap((t) => t.clips as MotionClip[]).map((c) => [c.id, c]));
   const pairs = new Map(mattePairs(doc).map((p) => [p.target, p]));
   const sources = new Set([...pairs.values()].map((p) => p.source));
+  const screens = screenFrames(doc).map((s) => s.prefix);
+  const onScreen = (clip: MotionClip) => screens.some((prefix) => clip.id.startsWith(prefix));
   const items: Item[] = [];
   const unsupported: Gap[] = [];
   const shown = (clip: MotionClip) => frame >= clip.from && frame < clip.from + clip.durationInFrames && !NO_PAINT.has(clip.component);
@@ -431,7 +447,7 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
 
   const bottomFirst = [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden);
   for (const clip of bottomFirst.flatMap((t) => t.clips as MotionClip[])) {
-    if (!shown(clip) || sources.has(clip.id)) {
+    if (!shown(clip) || sources.has(clip.id) || onScreen(clip)) {
       continue;
     }
     const drawn = clipItems(clip);
