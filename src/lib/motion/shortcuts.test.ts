@@ -207,6 +207,12 @@ describe('mask keys', () => {
   });
 });
 
+describe('pixel grid key', () => {
+  it("⇧' shows or hides the pixel grid", () => {
+    expect(press('"', { shift: true, code: 'Quote' })).toBe(Command.TogglePixelGrid);
+  });
+});
+
 describe('layout guides key', () => {
   it('⇧G shows or hides the layout guides', () => {
     expect(press('G', { shift: true, code: 'KeyG' })).toBe(Command.ToggleLayoutGuides);

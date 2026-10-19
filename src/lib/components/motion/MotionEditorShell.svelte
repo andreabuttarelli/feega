@@ -77,6 +77,8 @@
   import type { Boxes } from '$lib/motion/scene-select';
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
+  import { GridToggle, flipGrid } from '$lib/motion/pixel-grid';
   import LayoutGuidesOverlay from '$lib/components/motion/LayoutGuidesOverlay.svelte';
   import LayoutGuidesSection from '$lib/components/motion/LayoutGuidesSection.svelte';
   import { guideSnapBounds } from '$lib/motion/layout-guides/guides';
@@ -268,6 +270,7 @@
   let selectedPart = $state<string | null>(null);
   let partsByClip = $state.raw<Record<string, string[]>>({});
   let stageBoxes = $state.raw<Boxes>({});
+  let pixelGrid = $state(GridToggle.On);
   let guidesShown = $state(true);
   let outlineView = $state(OutlineView.Off);
   let viewportH = $state(0);
@@ -1574,6 +1577,7 @@
     [Command.ToggleChat]: () => CHAT_TOGGLE[chatPlace](),
     [Command.ToggleInspector]: toggleInspector,
     [Command.ToggleTimeline]: () => relayout(toggleTimeline(layout)),
+    [Command.TogglePixelGrid]: () => (pixelGrid = flipGrid(pixelGrid)),
     [Command.ToggleLayoutGuides]: () => (guidesShown = !guidesShown),
     [Command.ToggleOutlines]: () => (outlineView = flipOutline(outlineView)),
     [Command.Help]: () => (helpOpen = !helpOpen),
@@ -1988,6 +1992,7 @@
         {#if outlineView === OutlineView.On}<OutlineOverlay doc={previewDoc ?? doc} {frame} boxes={spaceBoxes()} />{/if}
         {#if playing}<div class="play-catch" role="presentation" data-testid="play-catch" onpointerdown={catchTap}></div>{/if}
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
+        {#if !playing}<PixelGridOverlay width={doc.width} height={doc.height} toggle={pixelGrid} />{/if}
         {#if guidesShown && doc.layoutGuides?.length && !playing}<LayoutGuidesOverlay {doc} />{/if}
         {#if !playing}<SelectionOverlay bind:this={overlay} layoutBounds={guidesShown ? guideSnapBounds(doc) : []} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost ? onhostdrag : null} onframemove={frameChrome(data.node.kind ?? FrameKind.Frame).press === FramePress.Move ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
         {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}

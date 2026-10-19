@@ -170,6 +170,7 @@ export const EDITOR_ACTIONS: Record<ActionId, Parity> = {
   [Command.ToggleChat]: VIEW,
   [Command.ToggleInspector]: VIEW,
   [Command.ToggleTimeline]: VIEW,
+  [Command.TogglePixelGrid]: VIEW,
   [Command.ToggleLayoutGuides]: VIEW,
   [Command.ToggleOutlines]: VIEW,
   [Command.Help]: VIEW,
