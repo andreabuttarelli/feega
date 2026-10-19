@@ -561,6 +561,14 @@ propagazione prima. Mossa: `addEventListener('dblclick', …)` diretto sull'elem
 
 ## Test: distinguere il tuo difetto dal rumore
 
+### Un test "lento a intermittenza" può non essere lento affatto
+Segnale: un test con budget di tempo fallisce in CI in 70–90 ms. Leggi l'errore, non il nome:
+`cursor-smoothness` falliva per `Page.captureScreenshot: Unable to capture screenshot` (nessun
+frame ancora nel compositor), non per jolt. Mossa: `gh run view <id> --log-failed` sulle run
+rosse prima di toccare soglie. E un budget in ms assoluti su un runner GitHub oscilla 2× (shader
+1080p: 27–62 ms, stesso codice): si misura in rapporto a un riferimento nella stessa pagina,
+interlacciato, mediana.
+
 ### CI rossa con zero test falliti è una promessa non attesa, non un test tuo
 `Test Files 649 passed | Tests 7259 passed | Errors 1 error`, e il job esce comunque 1. Non
 cercare il test rosso: non esiste. Vitest conta come fallimento anche una `Unhandled Rejection`
