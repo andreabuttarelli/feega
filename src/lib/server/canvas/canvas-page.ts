@@ -204,26 +204,26 @@ async function spendOnVoice<T>(
 export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams>) => {
   const { db, orgId, canvasId, canvas, mode, projectBrandId, userId, accountCreatedAt } = await scopeFor(locals, params.canvasId);
 
-  const [nodes, listed, catalogue, shareToken, references] = await Promise.all([
+  const [nodes, listed, catalogue, shareToken, references, orgTemplates, handoff, killSwitch, previews] = await Promise.all([
     listNodes(db, { orgId, canvasId }),
     listConnections(db, { orgId, canvasId }),
     projectCatalogue(db, { orgId, mode }),
     readCanvasShare(db, { orgId, canvasId }),
-    referenceLibrary(db, { orgId, projectId: canvas.projectId })
+    referenceLibrary(db, { orgId, projectId: canvas.projectId }),
+    templateLibrary(db, { orgId, actor: userActor({ userId }) }).own(),
+    chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
+    rendererSwitch(),
+    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
   ]);
 
   const connections = await canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed);
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, orgTemplates, handoff, outlines, killSwitch, previews] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding, outlines] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
     firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length }),
-    templateLibrary(db, { orgId, actor: userActor({ userId }) }).own(),
-    chatHandoff(db, { orgId, projectId: canvas.projectId }, url),
-    canvasOutlines(db, { orgId, nodes }),
-    rendererSwitch(),
-    cardPreviews(db, { orgId, projectId: canvas.projectId }).catch(() => ({}))
+    canvasOutlines(db, { orgId, nodes })
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
