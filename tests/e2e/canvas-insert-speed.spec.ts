@@ -25,7 +25,7 @@ async function armClock(page: Page, shownSelector: string, action: string, start
       new MutationObserver(seen).observe(document.body, { subtree: true, childList: true, attributes: true });
       new PerformanceObserver((list) => {
         for (const entry of list.getEntries() as PerformanceResourceTiming[]) {
-          if (entry.name.includes(`?/${action}`) && w.__insert.saved === null) {
+          if (new URL(entry.name).searchParams.get('action') === action && w.__insert.saved === null) {
             w.__insert.saved = entry.responseEnd;
             w.__insert.serverTiming = (entry.serverTiming ?? []).map((t) => `${t.name}=${Math.round(t.duration)}`).join(' ');
           }

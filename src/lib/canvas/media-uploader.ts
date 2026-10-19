@@ -1,6 +1,6 @@
-import { deserialize } from '$app/forms';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
+import { postCanvasAction } from '$lib/canvas/canvas-api';
 import { MediaKind, kindOfFile } from '$lib/motion/media/pick';
 import type { LibraryMedia, MediaUploader } from '$lib/components/motion/media-upload';
 
@@ -24,8 +24,7 @@ type At = { orgId: string; projectId: string; canvasId: string };
 async function registered(at: At, action: string, fields: Record<string, string>): Promise<{ id: string } | { error: string }> {
   const form = new FormData();
   Object.entries(fields).forEach(([k, v]) => form.set(k, v));
-  const res = await fetch(`/p/${at.projectId}/c/${at.canvasId}?/${action}`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-  const result = deserialize(await res.text());
+  const result = await postCanvasAction(at, action, form);
   const id = result.type === 'success' ? (result.data?.asset as { id?: string } | undefined)?.id : undefined;
   if (id) {
     return { id };

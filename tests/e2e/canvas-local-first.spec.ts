@@ -123,7 +123,7 @@ test.describe('local-first editing never loses or remounts what the user types @
     test.setTimeout(120_000);
     const node = await seedNode({ type: 'text', x: 0, y: 0, data: { prompt: '' } });
     let failures = 2;
-    await page.route(/\?\/write$/, async (route) => {
+    await page.route(/[?&]action=write(&|$)/, async (route) => {
       if (failures > 0) {
         failures -= 1;
         await route.fulfill({ status: 500, body: 'boom' });

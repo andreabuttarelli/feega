@@ -1,5 +1,8 @@
 export type CanvasRoute = { projectId: string; canvasId: string };
 
-export function canvasActionUrl(route: CanvasRoute, action: string): string {
-  return `/p/${route.projectId}/c/${route.canvasId}?/${action}`;
+const CANVAS_HREF = /^\/p\/([^/]+)\/c\/([^/?#]+)/;
+
+export function canvasRouteOf(href: string): CanvasRoute | null {
+  const match = CANVAS_HREF.exec(href);
+  return match ? { projectId: match[1], canvasId: match[2] } : null;
 }

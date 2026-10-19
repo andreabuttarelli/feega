@@ -27,7 +27,7 @@ async function watchFreeElement(page: Page) {
       return !node.querySelector('[data-testid=motion-node-skeleton]') && stage?.dataset.shown === 'true';
     };
     new PerformanceObserver((list) => {
-      if (list.getEntries().some((e) => e.name.includes('?/drawElement'))) {
+      if (list.getEntries().some((e) => new URL(e.name).searchParams.get('action') === 'drawElement')) {
         w.__watch.saved = true;
       }
     }).observe({ type: 'resource' });

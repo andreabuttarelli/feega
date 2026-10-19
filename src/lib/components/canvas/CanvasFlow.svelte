@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ActionResult } from '@sveltejs/kit';
   const MIN_ZOOM = 0.05;
   import { dragOffset, type Offset } from '$lib/canvas/duplicate-plan';
   import { focusEdges } from '$lib/canvas/edge-focus';
@@ -147,7 +148,7 @@
   };
 
   let {
-    actionUrl,
+    postAction,
     tiles = [],
     edges: incomingEdges = [],
     onMove,
@@ -204,7 +205,7 @@
     follow = null,
     tile
   }: {
-    actionUrl?: (action: string) => string;
+    postAction?: (action: string, form: FormData) => Promise<ActionResult>;
     tiles?: Tile[];
     /** Le linee già in `brand_canvas_edges`, pronte per il disegno. */
     edges?: FlowEdge[];
@@ -1046,8 +1047,8 @@
     onpropertychange={(patch) => onPropertyChange?.(selection.ids, patch)}
   />
 
-  {#if actionUrl}
-    <NextStepChips {actionUrl} box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
+  {#if postAction}
+    <NextStepChips {postAction} box={selection.box} zoom={selection.zoom} nodeId={nextStepNodeId} onpick={pickNextStep} />
   {/if}
   {/if}
 

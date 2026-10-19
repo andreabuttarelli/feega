@@ -721,7 +721,7 @@ async function startPeer(peer: BrowserContext, path: string): Promise<() => Prom
 
 async function mockGenerate(page: Page): Promise<string[]> {
   const seen: string[] = [];
-  await page.route(/\/api\/v1\/org\/nodes\/[^/]+\/generate$|\?\/run$|\/prompts\/enhance$|\/agent$/, (route) => {
+  await page.route(/\/api\/v1\/org\/nodes\/[^/]+\/generate$|\?\/run$|[?&]action=run(&|$)|\/prompts\/enhance$|\/agent$/, (route) => {
     if (route.request().method() !== 'POST') {
       return route.fallback();
     }
