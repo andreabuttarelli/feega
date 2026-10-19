@@ -13,6 +13,8 @@
   import LegalFooter from '$lib/components/LegalFooter.svelte';
   import PageTitle from '$lib/components/PageTitle.svelte';
   import PageHead from '$lib/components/PageHead.svelte';
+  import StorePaywall from '$lib/components/StorePaywall.svelte';
+  import { BillingChannel } from '$lib/billing-channel';
 
   let { data, form } = $props();
 
@@ -84,7 +86,9 @@
       hint={$_('app.account.billing.ladderDesc')}
       layout={data.purchasesReady ? FieldLayout.Stack : FieldLayout.Row}
     >
-      {#if !data.purchasesReady}
+      {#if data.billingChannel === BillingChannel.Store}
+        <StorePaywall orgId={data.org.id} ladder={data.credits.ladder} currentPlanUsd={data.currentPlanUsd} onPurchased={invalidateAll} />
+      {:else if !data.purchasesReady}
         <span class="text-[0.8125rem] text-muted-foreground">{$_('app.account.billing.purchasesNotReady')}</span>
       {:else}
         <table class="ladder">
@@ -117,7 +121,7 @@
       {/if}
     </Field>
 
-    {#if data.hasBilling}
+    {#if data.hasBilling && data.billingChannel === BillingChannel.Web}
       <Field label={$_('app.settings.billing.manage')} hint={$_('app.settings.billing.manageInvoicesDesc')} layout={FieldLayout.Row}>
         <div class="flex flex-wrap gap-2">
           <form method="POST" action={`?/billingPortal`} use:apiEnhance><input type="hidden" name="flow" value="invoices" /><Button variant="secondary" size="sm" type="submit">{$_('app.settings.billing.invoices')}</Button></form>
@@ -166,31 +170,31 @@
   .legal-wrap {
     margin-top: 1.5rem;
   }
-  .ladder {
+  .credits-page :global(.ladder) {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.875rem;
     margin-top: 0.5rem;
   }
-  .ladder th,
-  .ladder td {
+  .credits-page :global(.ladder th),
+  .credits-page :global(.ladder td) {
     padding: 0.6rem 0;
     text-align: left;
     border-top: 1px solid var(--ui-divider, #e5e5e5);
   }
-  .ladder th {
+  .credits-page :global(.ladder th) {
     font-weight: 500;
     opacity: 0.7;
   }
   @media (max-width: 640px) {
-    .ladder tr {
+    .credits-page :global(.ladder tr) {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 0.5rem;
       padding: 0.75rem 0;
       border-top: 1px solid var(--ui-divider, #e5e5e5);
     }
-    .ladder td {
+    .credits-page :global(.ladder td) {
       padding: 0;
       border-top: 0;
     }

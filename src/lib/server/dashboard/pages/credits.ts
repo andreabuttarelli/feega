@@ -12,13 +12,15 @@ import {
   buyOneTime
 } from '$lib/server/settings-actions';
 import { checkoutOutcomeOf } from '$lib/billing-path';
+import { billingChannelOf, storeBillingOf } from '$lib/billing-channel';
+import { env } from '$env/dynamic/private';
 
 const stripeApi = () => import('$lib/server/stripe');
 
 type OrgRow = { id: string; name: string; stripe_customer_id: string | null };
 type BrandRow = { id: string; name: string; slug: string };
 
-export const load = async ({ parent, url, locals: { supabase } }: Parameters<PageServerLoad>[0]) => {
+export const load = async ({ parent, url, request, locals: { supabase } }: Parameters<PageServerLoad>[0]) => {
   const {
     data: { user }
   } = await supabase.auth.getUser();
@@ -71,7 +73,8 @@ export const load = async ({ parent, url, locals: { supabase } }: Parameters<Pag
     currentPlanUsd,
     checkoutOutcome: checkoutOutcomeOf(url),
     isOwner: (membership as { role?: string } | null)?.role === 'owner',
-    purchasesReady
+    purchasesReady,
+    billingChannel: billingChannelOf(request.headers.get('user-agent'), storeBillingOf(env.NATIVE_STORE_BILLING))
   };
 };
 

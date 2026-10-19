@@ -540,7 +540,10 @@
         "topUp": "Top up {credits} credits",
         "paymentReceived": "Payment received, credits will appear in a moment.",
         "checkoutCanceled": "Checkout canceled. Nothing was charged.",
-        "purchasesNotReady": "Purchases open soon."
+        "purchasesNotReady": "Purchases open soon.",
+        "restorePurchases": "Restore purchases",
+        "storeUnavailable": "In-app purchases are not available in this version of the app.",
+        "storeFailed": "The purchase did not go through. Nothing was charged."
       }
     },
     "ads": {

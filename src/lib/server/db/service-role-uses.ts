@@ -117,5 +117,10 @@ export const SERVICE_ROLE_USES: readonly ServiceRoleUse[] = [
     path: 'src/lib/server/task-providers-config.ts — loadOf (cap di concorrenza per account del fornitore)',
     why: "Il limite di richieste simultanee di Higgsfield è per account feega, non per org: contarle richiede i giri di ogni org. Si legge solo `external_job_id` dei giri vivi con il prefisso del fornitore, un numero e nient'altro esce; nessun org_id arriva da chi chiama.",
     tables: ['node_runs']
+  },
+  {
+    path: 'src/routes/api/v1/webhooks/revenuecat/+server.ts — applyStoreChange (acquisti in-app iOS/Android/Mac App Store)',
+    why: "Un acquisto in-app lo notifica RevenueCat, non l'utente: nessuna sessione. La chiamata passa solo con il segreto condiviso nell'header Authorization. L'org è l'app_user_id che l'app imposta dopo il login; una sola RPC (`apply_store_event`) registra l'evento per id (una riconsegna non scrive due volte), scrive grant o rimborso su credit_ledger e il piano store su orgs di quell'org.",
+    tables: ['store_events', 'credit_ledger', 'orgs']
   }
 ] as const;
