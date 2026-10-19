@@ -11,6 +11,8 @@ import type { MotionDoc } from '$lib/motion/doc';
 import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
 import { createRaster } from '$lib/motion/gpu-full/raster';
 import { createMedia } from '$lib/motion/gpu-full/media';
+import { loadFonts } from '$lib/motion/gpu-full/text/load';
+import { smoothingOf } from '$lib/motion/gpu-full/text/painter';
 import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
 
 const composer = (spec: Spec) => (only?: ReadonlySet<string>) => composeHtml({ doc: spec.doc as MotionDoc, tokens: FEEGA_TOKENS, assets: spec.assets, origin: spec.origin, only });
@@ -62,7 +64,7 @@ async function gpuShots(input: ShotsInput): Promise<ShotsResult> {
 
 async function gpuFullShots(input: ShotsInput): Promise<ShotsResult> {
   const doc = input.spec.doc as MotionDoc;
-  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets);
+  const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets, { fonts: await loadFonts(doc, input.spec.assets), smoothing: smoothingOf(navigator.userAgent) });
   const media = createMedia();
   const canvas = document.createElement('canvas');
   const raster = createRaster(canvas, input.width, input.height);

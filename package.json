@@ -75,6 +75,7 @@
     "d3": "7.9.0",
     "esbuild": "^0.25.12",
     "html-to-image": "1.11.13",
+    "fontkit": "2.0.4",
     "hyperframes": "0.8.114",
     "kaplay": "3001.0.19",
     "littlejsengine": "1.26.1",

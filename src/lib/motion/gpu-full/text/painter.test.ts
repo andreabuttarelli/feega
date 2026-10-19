@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest';
+import { COMPONENTS } from '../../components';
+import { boxOf } from '../../layout';
+import { FillType } from '../../fill/model';
+import { apply2d } from '../../affine';
+import { paintText, Smoothing, TextGap, type Ink, type TextComponent, type TextEnv } from './painter';
+import { boxBook } from './test-face';
+
+const stage = { width: 1920, height: 1080 };
+const FPS = 30;
+
+function env(component: TextComponent, props: Record<string, unknown>, change: Partial<TextEnv> = {}): TextEnv {
+  const parsed = COMPONENTS[component].schema.parse(props) as Record<string, unknown>;
+  return { component, smoothing: Smoothing.Plain, props: parsed, box: boxOf(parsed as never, stage), stage, colour: (v) => (v.startsWith('#') ? v : '#ffffff'), time: 10, trim: 0, fps: FPS, still: null, fonts: boxBook(), ...change };
+}
+
+const drawn = (painted: ReturnType<typeof paintText>): Ink[] => {
+  if (!Array.isArray(painted)) {
+    throw new Error(`gap ${painted}`);
+  }
+  return painted;
+};
+
+function extent(inks: Ink[]) {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  for (const ink of inks) {
+    for (const c of ink.contours) {
+      for (let i = 0; i < c.length; i += 2) {
+        const [x, y] = apply2d(ink.matrix, [c[i], c[i + 1]]);
+        xs.push(x);
+        ys.push(y);
+      }
+    }
+  }
+  return { left: Math.min(...xs), right: Math.max(...xs), top: Math.min(...ys), bottom: Math.max(...ys) };
+}
+
+describe('paintText', () => {
+  it('centres a line in its box', () => {
+    const e = env('Text', { text: 'aa', align: 'center' });
+    const ink = extent(drawn(paintText(e)));
+
+    expect((ink.left + ink.right) / 2).toBeCloseTo(e.box.width / 2, 0);
+  });
+
+  it('shrinks a title until it fits the safe box', () => {
+    const e = env('Title', { text: 'a very long headline that cannot fit', width: 0.5 });
+    const ink = extent(drawn(paintText(e)));
+
+    expect(ink.right - ink.left).toBeLessThanOrEqual(e.box.width);
+  });
+
+  it('keeps an auto-width text on one line', () => {
+    const e = env('Text', { text: 'aa bb cc', sizing: 'auto', width: 0.05 });
+    const ink = extent(drawn(paintText(e)));
+
+    expect(ink.bottom - ink.top).toBeLessThan(0.04 * 1080);
+  });
+
+  it('hides each title line below its mask until the line rises', () => {
+    const e = env('Title', { text: 'a\nb' });
+
+    expect(drawn(paintText({ ...e, time: 0 }))).toEqual([]);
+    expect(drawn(paintText({ ...e, time: 1 })).flatMap((i) => i.contours)).toHaveLength(2);
+  });
+
+  it('fades body text up from transparent', () => {
+    const e = env('Text', { text: 'a' });
+    const opacity = (time: number) => drawn(paintText({ ...e, time }))[0]?.opacity ?? 0;
+
+    expect(opacity(0)).toBe(0);
+    expect(opacity(9 / FPS)).toBeGreaterThan(0);
+    expect(opacity(1)).toBe(1);
+  });
+
+  it('upper-cases a kicker before looking its glyphs up', () => {
+    const fonts = boxBook(new Set(['a']));
+
+    expect(Array.isArray(paintText(env('Kicker', { text: 'a' }, { fonts })))).toBe(true);
+    expect(paintText(env('Text', { text: 'a' }, { fonts }))).toBe(TextGap.Glyph);
+  });
+
+  it('draws the caption box under the words in the box colour', () => {
+    const inks = drawn(paintText(env('Caption', { text: 'a', background: '#ff0000' })));
+
+    expect(inks[0].color).toEqual([1, 0, 0, 1]);
+    expect(inks).toHaveLength(2);
+  });
+
+  it('names what it cannot paint yet', () => {
+    const gradient = [{ type: FillType.Linear, angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
+
+    expect(paintText(env('Text', { fills: gradient }))).toBe(TextGap.Fill);
+    expect(paintText(env('Text', { strokes: [{ paint: { type: FillType.Solid, color: '#000000' }, width: 0.01 }] }))).toBe(TextGap.Stroke);
+    expect(paintText(env('Text', {}, { fonts: () => null }))).toBe(TextGap.Font);
+  });
+
+  it('darkens and lifts glyphs the way a smoothing rasteriser does', () => {
+    const plain = extent(drawn(paintText(env('Text', { text: 'a' }))));
+    const smooth = extent(drawn(paintText(env('Text', { text: 'a' }, { smoothing: Smoothing.Dilated }))));
+
+    expect(smooth.right - smooth.left).toBeCloseTo(plain.right - plain.left + 0.6);
+    expect(smooth.bottom).toBeLessThan(plain.bottom);
+  });
+});

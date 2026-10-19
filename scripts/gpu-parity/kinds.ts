@@ -5,6 +5,8 @@ import { Ease } from '$lib/motion/design';
 import { addClip, setKeyframes, type OpResult } from '$lib/motion/timeline';
 import { FillType } from '$lib/motion/fill/model';
 import { maskSchema } from '$lib/motion/mask';
+import { registerFont } from '$lib/motion/fonts/ops';
+import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 
 const SECONDS = 60;
 const out = process.argv[2];
@@ -19,6 +21,8 @@ function must(r: OpResult): MotionDoc {
 const backdrop = must(addClip(newMotionDoc(MotionFormat.Landscape), { component: 'BrandBackground', from: 0, durationInFrames: SECONDS }, 'bg'));
 const shape = (doc: MotionDoc, id: string, props: Record<string, unknown>) => must(addClip(doc, { component: 'Shape', from: 0, durationInFrames: SECONDS, props }, id));
 const keys = (doc: MotionDoc, id: string, prop: string, from: number, to: number) => must(setKeyframes(doc, id, prop, [{ frame: 0, value: from, ease: Ease.Standard }, { frame: SECONDS - 1, value: to, ease: Ease.Standard }]));
+const clip = (doc: MotionDoc, component: string, id: string, props: Record<string, unknown>) => must(addClip(doc, { component, from: 0, durationInFrames: SECONDS, props } as never, id));
+const fonts = (doc: MotionDoc, families: string[]) => families.reduce((d, f) => must(registerFont(d, f, GOOGLE_FONTS)), doc);
 const stops = [{ color: '#ff3b30', pos: 0 }, { color: '#0a84ff', pos: 0.6 }, { color: '#30d158', pos: 1 }];
 
 const geometry = [
@@ -131,6 +135,18 @@ const KINDS: Record<string, () => MotionDoc> = {
     const glass = shape(under, 'glass', { shape: 'rect', x: 0.5, y: 0.5, width: 0.4, height: 0.4, roundness: 0.1, fills: [{ type: 'solid', color: '#ffffff', opacity: 0.25 }] });
     return { ...glass, tracks: glass.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => (c.id === 'glass' ? { ...c, effects: [{ id: 'e', kind: 'background-blur', enabled: true, params: { radius: 14 } }] } : c)) })) } as MotionDoc;
   },
+  title: () => clip(backdrop, 'Title', 'title', {}),
+  text: () => clip(clip(backdrop, 'Text', 'body', { text: 'Body copy wraps inside its box and keeps   spaces.\nA second paragraph, left aligned.', align: 'left', width: 0.4, y: 0.4 }), 'Text', 'hug', { text: 'Auto width', sizing: 'auto', x: 0.3, y: 0.8, width: 0.2, height: 0.06 }),
+  kicker: () => clip(clip(backdrop, 'Kicker', 'kicker', {}), 'Kicker', 'right', { text: 'Right aligned label', align: 'right', y: 0.6 }),
+  caption: () => clip(clip(backdrop, 'Caption', 'caption', {}), 'Caption', 'long', { text: 'A longer caption that wraps onto a second line in the box', width: 0.4, y: 0.5, height: 0.3 }),
+  fonts: () =>
+    clip(
+      clip(clip(fonts(backdrop, ['Inter', 'Playfair Display', 'Fraunces', 'Space Grotesk']), 'Title', 'inter', { text: 'Variable weight', font: 'Inter', weight: 800, tracking: -0.05, y: 0.2, height: 0.25 }), 'Text', 'playfair', { text: 'An italic serif, set in Playfair', font: 'Playfair Display', italic: true, size: 0.06, y: 0.45 }),
+      'Kicker',
+      'fraunces',
+      { text: 'soft wonky axes', font: 'Fraunces', weight: 600, axes: "'SOFT' 100, 'WONK' 1", size: 0.05, y: 0.62 }
+    ),
+  grotesk: () => clip(fonts(backdrop, ['Space Grotesk']), 'Text', 'grotesk', { text: 'Space Grotesk at 700, centred', font: 'Space Grotesk', weight: 700, size: 0.07 }),
   blur: () => keys(must(addClip(shape(backdrop, 'sharp', { shape: 'rect', x: 0.3, y: 0.5, width: 0.2, height: 0.3, fill: '#ffd60a' }), { component: 'Shape', from: 0, durationInFrames: SECONDS, props: { shape: 'star', x: 0.7, y: 0.5, width: 0.25, height: 0.4, fill: '#bf5af2' }, effects: [{ id: 'g', kind: 'gaussian-blur', enabled: true, params: { radius: 6 } }] } as never, 'soft')), 'sharp', 'blur', 0, 24)
 };
 

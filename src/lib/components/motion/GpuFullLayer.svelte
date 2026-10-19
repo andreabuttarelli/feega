@@ -3,6 +3,8 @@
   import type { BrandTokens } from '$lib/motion/brand';
   import type { MotionDoc } from '$lib/motion/doc';
   import { drawFrame, prepare, type Prepared } from '$lib/motion/gpu-full/display-list';
+  import { NO_TYPESET, smoothingOf } from '$lib/motion/gpu-full/text/painter';
+  import { loadFonts } from '$lib/motion/gpu-full/text/load';
   import { createRaster, type Raster } from '$lib/motion/gpu-full/raster';
   import { createMedia } from '$lib/motion/gpu-full/media';
 
@@ -10,7 +12,16 @@
 
   let canvas = $state<HTMLCanvasElement | null>(null);
   let gaps = $state(0);
-  const prepared = $derived(prepare(doc, tokens, assets));
+  let typeset = $state(NO_TYPESET);
+  const prepared = $derived(prepare(doc, tokens, assets, typeset));
+
+  $effect(() => {
+    let current = true;
+    void loadFonts(doc, assets).then((fonts) => current && (typeset = { fonts, smoothing: smoothingOf(navigator.userAgent) }));
+    return () => {
+      current = false;
+    };
+  });
 
   $effect(() => {
     const target = canvas;
