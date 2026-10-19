@@ -282,6 +282,10 @@ const shapePainter =
 
 const familyOf = (s: Style) => (splitTop(s['font-family'] ?? '')[0] ?? '').replace(/^["']|["']$/g, '');
 
+const upright = (m: Affine) => Math.abs(m[1]) < UNIT_EPSILON && Math.abs(m[2]) < UNIT_EPSILON && Math.abs(m[3]) > UNIT_EPSILON;
+
+const snapped = (y: number, m: Affine) => (upright(m) ? (Math.round(m[3] * y + m[5]) - m[5]) / m[3] : Math.round(y));
+
 function textOf(node: RawNode, scope: Scope): Own {
   const s = node.style;
   const cased = CASES[s['text-transform'] ?? ''];
@@ -305,7 +309,7 @@ function textOf(node: RawNode, scope: Scope): Own {
       return;
     }
     const { face, skew } = resolved;
-    const baseline = line.top + (line.height * face.ascent) / (face.ascent + face.descent) - smoothing.rise;
+    const baseline = snapped(line.top + (line.height * face.ascent) / (face.ascent + face.descent), scope.matrix) - smoothing.rise;
     const [shaped] = face.shape(char, Ligatures.Off);
     drawn.push(path(moved(glyphContours(face, shaped.glyph, size, skew, smoothing.darken(size)), x, baseline), solid(color), scope.matrix));
   };
@@ -510,7 +514,7 @@ export function readTree(tree: RawTree, typeset: Typeset = NO_TYPESET): DomRead 
       gap(node, refusal ? refusal[0] : DomGap.Geometry);
       return [];
     }
-    const [x, y] = node.at ?? [0, 0];
+    const [x, y] = (node.at ?? [0, 0]).map((v) => (isNone(node.style.transform) ? v : Math.round(v)));
     const matrix = mul2d(mul2d(outer.matrix, [1, 0, 0, 1, x, y]), transformOf(node.style.transform, node.style['transform-origin']) as Affine);
     const visible = !HIDDEN.has(node.style.visibility ?? '');
     const own = visible ? painterOf(node)(node, { ...outer, matrix }) : nothing();

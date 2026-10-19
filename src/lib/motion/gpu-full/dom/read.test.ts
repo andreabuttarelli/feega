@@ -47,6 +47,12 @@ describe('readTree', () => {
     expect(box.paint).toEqual({ kind: PaintKind.Solid, color: [1, 0, 0, 1] });
   });
 
+  it('paints a transformed box from a whole-pixel offset, as the browser does', () => {
+    const turned = el({ parent: 0, at: [100.4, 99.6], size: [40, 20], style: { 'background-color': 'rgb(0, 0, 0)', transform: 'matrix(1, 0, 0, 1, 0, 0)' } });
+
+    expect(near(bounds(paths(tree(root(), turned))[0]))).toEqual({ left: 100, top: 100, right: 140, bottom: 120 });
+  });
+
   it('turns a box about its transform origin', () => {
     const turned = el({ parent: 0, at: [100, 100], size: [40, 20], style: { 'background-color': 'rgb(0, 0, 0)', transform: 'matrix(0, 1, -1, 0, 0, 0)', 'transform-origin': '20px 10px' } });
 
@@ -200,6 +206,12 @@ describe('readTree', () => {
       const plain = readTree(tree(root(), label({ style: { ...label().style, '-webkit-font-smoothing': 'antialiased' } })), dilated);
 
       expect(near(bounds(plain.drawn[0] as DrawnPath))).toEqual({ left: 30, top: 41, right: 35, bottom: 48 });
+    });
+
+    it('sits upright text on a whole device pixel, as the browser does', () => {
+      const read = readTree(tree(root(), label({ lines: [{ chars: ['a'], xs: [20.4], top: 30.3, height: 10 }] })), typeset());
+
+      expect(near(bounds(read.drawn[0] as DrawnPath))).toEqual({ left: 30.4, top: 41, right: 35.4, bottom: 48 });
     });
 
     it('draws the case the browser shows, not the case typed', () => {
