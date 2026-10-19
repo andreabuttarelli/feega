@@ -10,6 +10,7 @@
   import { reorderAt } from '$lib/motion/layout/guides';
   import { measureGaps } from '$lib/motion/measure-gaps';
   import { withAutoLayout } from '$lib/motion/layout/resolve';
+  import { HoverProbe, hoverProbe, moveGate } from '$lib/motion/move-gate';
   import { ScaleMode, bakeScale } from '$lib/motion/scale-tool';
   import { guessedBoxes } from '$lib/motion/move-element';
   import type { ComponentId } from '$lib/motion/components';
@@ -449,14 +450,30 @@
     return { clipId: grab.clipId, client: { x: e.clientX, y: e.clientY }, box };
   }
 
+  const hoverMoved = moveGate();
+  const hostMoved = moveGate();
+
+  function hoverFrom(e: PointerEvent) {
+    if (hoverProbe(e) === HoverProbe.Clear) {
+      hover = null;
+      return;
+    }
+    const p = local(e);
+    if (hoverMoved(p[0], p[1], laid)) {
+      hover = hoverAt(p);
+    }
+  }
+
   function move(e: PointerEvent) {
     if (!grab) {
-      hover = e.pointerType === 'mouse' ? hoverAt(local(e)) : null;
+      hoverFrom(e);
       return;
     }
     const hosted = hostGesture(grab, e);
     if (hosted) {
-      hosted.send(hosted.move, hosted.to, DragPhase.Over);
+      if (hostMoved(hosted.to.x, hosted.to.y, grab)) {
+        hosted.send(hosted.move, hosted.to, DragPhase.Over);
+      }
       return;
     }
     const outside = leaving(e);
