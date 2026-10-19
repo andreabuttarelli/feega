@@ -3144,8 +3144,7 @@ Layer hints drop only past a budget (`layerPixels`), never for a whole device cl
 
 ## gpu-core: a GPU picture draws on the first frames, then vanishes
 
-**Signal:** on WebGPU, a picture registered with vello (`register_texture`) shows in the first
-one or two frames and is missing after, while the same display list renders right natively (CPU
-blobs). Happens once full-frame layers churn the image atlas.
-**Move:** call `mark_override_image_dirty` on every registered picture before each frame; the
-atlas may be rebuilt and an override texture is only recopied when marked dirty.
+**Signal:** a picture (mask cover, image) shows in the first frame and is black after, on WebGPU
+and natively alike. Happens once full-frame layers grow vello's image atlas between scenes.
+**Move:** `Engine::draw` marks every picture dirty before each frame, so a rebuilt atlas recopies
+it. Guarded by `a_picture_mask_survives_frames_that_grow_the_image_atlas`.

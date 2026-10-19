@@ -31,6 +31,9 @@ impl Engine {
 
     pub fn draw(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, list: &DisplayList, pictures: &Pictures, target: &wgpu::TextureView) -> Result<Vec<Skipped>, EngineError> {
         let gpu = Gpu { device, queue, width: list.width, height: list.height };
+        for image in pictures.values() {
+            self.vello.mark_override_image_dirty(image);
+        }
         let mut layers = Layers::new();
         for (i, item) in list.items.iter().enumerate().filter(|(_, item)| layer_worthy(item)) {
             let texture = self.layer(&gpu, item, pictures)?;

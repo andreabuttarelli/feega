@@ -112,6 +112,29 @@ fn a_picture_mask_keeps_what_its_picture_covers() {
 
 #[cfg(feature = "gpu")]
 #[test]
+fn a_picture_mask_survives_frames_that_grow_the_image_atlas() {
+    let masked = r#", "blur": 0, "masks": [{ "mode": "add", "invert": false, "level": 1, "feather": 0,
+  "cover": { "kind": "picture", "src": "p", "luma": false, "matrix": [16, 0, 0, 64, 16, 0] } }]"#;
+    let item = |x: u32| format!(r#"{{ "kind": "path", "clip": "c{x}", "contours": [[{x}, 0, {x}, 0, {x}, 1, {x}, 1]], "rule": "nonzero", "paint": {{ "kind": "solid", "color": [1, 1, 1, 1] }}, "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "blend": "normal", "blur": 2 }}"#);
+    let crowded = |n: u32| {
+        let extra: Vec<String> = (0..n).map(item).collect();
+        let list = square(masked);
+        if n == 0 {
+            return list;
+        }
+        list.replacen("\n  ]", &format!(",\n{}\n  ]", extra.join(",\n")), 1)
+    };
+    let pictures = Pictures::from([("p".to_string(), picture(1, 1, vec![255, 255, 255, 255]))]);
+    let mut renderer = gpu_core::render::Renderer::new().expect("a GPU adapter");
+
+    for n in [0, 12, 0, 24, 1] {
+        let pixels = renderer.render(&parse(&crowded(n)).unwrap(), &pictures).unwrap().pixels;
+        assert_eq!(grey(&pixels, 24, 32), 255, "with {n} extra layers");
+    }
+}
+
+#[cfg(feature = "gpu")]
+#[test]
 fn a_wipe_cuts_the_item_at_its_scissor() {
     let pixels = render(&square(r#", "scissor": [0, 0, 32, 64]"#));
 

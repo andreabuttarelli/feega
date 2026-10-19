@@ -107,9 +107,6 @@ impl WebCore {
 
     pub fn draw(&mut self, list_json: &str) -> Result<String, JsValue> {
         let list = parse(list_json).map_err(failed)?;
-        for image in self.pictures.values() {
-            self.engine.vello.mark_override_image_dirty(image);
-        }
         let view = self.target.create_view(&wgpu::TextureViewDescriptor::default());
         let skipped = self.engine.draw(&self.device, &self.queue, &list, &self.pictures, &view).map_err(failed)?;
         let frame = match self.surface.get_current_texture() {
