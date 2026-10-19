@@ -5,7 +5,7 @@ use vello::peniko::{Fill, ImageData};
 use vello::Scene;
 
 use crate::canvas::{mix, Canvas};
-use crate::display_list::{Cover, DisplayList, FillRule, ImageItem, Item, Look, Paint, PathItem, Ramp, Rgba, Size, Stop};
+use crate::display_list::{Cover, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Look, Paint, PathItem, Ramp, Rgba, Size, Stop};
 use crate::pictures::{image_rect, Pictures};
 use crate::Skipped;
 
@@ -66,6 +66,12 @@ fn draw_image<C: Canvas>(scene: &mut C, item: &ImageItem, image: &C::Picture) {
     scene.picture(Affine::new(item.look.matrix), image, texels, region);
 }
 
+fn draw_layer<C: Canvas>(scene: &mut C, item: &LayerItem, image: &C::Picture) {
+    let natural = C::size(image);
+    let texels = Affine::scale_non_uniform(item.size.width / natural.width, item.size.height / natural.height);
+    scene.picture(Affine::new(item.look.matrix), image, texels, Rect::new(0.0, 0.0, item.size.width, item.size.height));
+}
+
 fn joined(contours: &[Vec<f64>]) -> BezPath {
     let mut path = BezPath::new();
     for contour in contours {
@@ -121,6 +127,12 @@ fn content<C: Canvas>(scene: &mut C, item: &Item, pictures: &Shelf<C::Picture>, 
                 draw_image(scene, image, data);
             }
         }
+        Item::Layer(layer) => {
+            if let Some(data) = pictures.get(&layer.source) {
+                draw_layer(scene, layer, data);
+            }
+        }
+        Item::Group(group) => plain(scene, &group.items, pictures, frame),
         Item::Use(_) | Item::Glyphs(_) | Item::Text(_) | Item::Lens(_) | Item::Other { .. } => {}
     }
 }
@@ -133,6 +145,17 @@ fn ramp(kind: Ramp) -> Paint {
     match kind {
         Ramp::Linear => Paint::Linear { from: [0.0, 0.5], to: [1.0, 0.5], stops },
         Ramp::Radial => Paint::Radial { center: [0.5, 0.5], radius: 0.5, stops },
+    }
+}
+
+pub fn unblended<C: Canvas>(scene: &mut C, items: &[Item], at: usize, frame: Rect, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>) {
+    let item = &items[at];
+    match (layers.bodies.get(&at), item, layers.groups.get(&at)) {
+        (Some(body), _, _) => placed(scene, body),
+        (None, Item::Group(group), Some(inner)) => {
+            build_items(scene, &group.items, frame, pictures, inner);
+        }
+        _ => content(scene, item, pictures, frame),
     }
 }
 
@@ -169,11 +192,13 @@ pub struct Placed<P = ImageData> {
 pub struct Layers<P = ImageData> {
     pub bodies: HashMap<usize, Placed<P>>,
     pub behind: HashMap<usize, Placed<P>>,
+    pub groups: HashMap<usize, Layers<P>>,
+    pub blended: HashMap<usize, Placed<P>>,
 }
 
 impl<P> Default for Layers<P> {
     fn default() -> Self {
-        Self { bodies: HashMap::new(), behind: HashMap::new() }
+        Self { bodies: HashMap::new(), behind: HashMap::new(), groups: HashMap::new(), blended: HashMap::new() }
     }
 }
 
@@ -182,14 +207,19 @@ impl<P> Layers<P> {
         Self::default()
     }
 
-    pub fn into_images(self) -> impl Iterator<Item = P> {
-        self.bodies.into_values().chain(self.behind.into_values()).map(|p| p.image)
+    pub fn into_images(self) -> Vec<P> {
+        let nested = self.groups.into_values().flat_map(Layers::into_images);
+        self.bodies.into_values().chain(self.behind.into_values()).chain(self.blended.into_values()).map(|p| p.image).chain(nested).collect()
     }
 }
 
 fn placed<C: Canvas>(scene: &mut C, layer: &Placed<C::Picture>) {
     let size = C::size(&layer.image);
     scene.picture(Affine::translate(layer.origin.to_vec2()), &layer.image, Affine::IDENTITY, Rect::new(0.0, 0.0, size.width, size.height));
+}
+
+fn corners(m: Affine, r: Rect) -> impl Iterator<Item = Point> {
+    [(r.x0, r.y0), (r.x1, r.y0), (r.x1, r.y1), (r.x0, r.y1)].into_iter().map(move |(x, y)| m * Point::new(x, y))
 }
 
 fn hull(points: impl Iterator<Item = Point>) -> Option<Rect> {
@@ -204,19 +234,24 @@ pub fn bounds<C: Canvas>(item: &Item, pictures: &Shelf<C::Picture>) -> Option<Re
         }
         Item::Image(image) => {
             let (_, region) = image_region(image, C::size(pictures.get(&image.clip)?));
-            let m = Affine::new(image.look.matrix);
-            hull([(region.x0, region.y0), (region.x1, region.y0), (region.x1, region.y1), (region.x0, region.y1)].into_iter().map(|(x, y)| m * Point::new(x, y)))
+            hull(corners(Affine::new(image.look.matrix), region))
         }
+        Item::Layer(layer) => hull(corners(Affine::new(layer.look.matrix), Rect::new(0.0, 0.0, layer.size.width, layer.size.height))),
+        Item::Group(group) => group.items.iter().filter_map(|i| bounds::<C>(i, pictures)).reduce(|a, b| a.union(b)),
         Item::Use(_) | Item::Glyphs(_) | Item::Text(_) | Item::Lens(_) | Item::Other { .. } => None,
     }
 }
 
-pub fn silhouette<C: Canvas>(scene: &mut C, item: &Item, pictures: &Shelf<C::Picture>, frame: Rect) {
-    let white = match item {
+fn whitened(item: &Item) -> Item {
+    match item {
         Item::Path(path) => Item::Path(PathItem { paint: Paint::Solid { color: WHITE }, ..path.clone() }),
+        Item::Group(group) => Item::Group(Box::new(GroupItem { items: group.items.iter().map(whitened).collect(), ..(**group).clone() })),
         other => other.clone(),
-    };
-    alone(scene, &white, pictures, frame);
+    }
+}
+
+pub fn silhouette<C: Canvas>(scene: &mut C, item: &Item, pictures: &Shelf<C::Picture>, frame: Rect) {
+    alone(scene, &whitened(item), pictures, frame);
 }
 
 pub fn build(list: &DisplayList, pictures: &Pictures, layers: &Layers) -> (Scene, Vec<Skipped>) {
@@ -226,9 +261,20 @@ pub fn build(list: &DisplayList, pictures: &Pictures, layers: &Layers) -> (Scene
 }
 
 pub fn build_into<C: Canvas>(scene: &mut C, list: &DisplayList, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>) -> Vec<Skipped> {
+    build_items(scene, &list.items, Rect::new(0.0, 0.0, list.width as f64, list.height as f64), pictures, layers)
+}
+
+fn missing_picture<P>(item: &Item, pictures: &Shelf<P>) -> bool {
+    match item {
+        Item::Image(image) => !pictures.contains_key(&image.clip),
+        Item::Layer(layer) => !pictures.contains_key(&layer.source),
+        _ => false,
+    }
+}
+
+pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>) -> Vec<Skipped> {
     let mut skipped = Vec::new();
-    let frame = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
-    for (i, item) in list.items.iter().enumerate() {
+    for (i, item) in items.iter().enumerate() {
         if let Item::Lens(_) = item {
             match layers.behind.get(&i) {
                 Some(layer) => placed(scene, layer),
@@ -240,6 +286,10 @@ pub fn build_into<C: Canvas>(scene: &mut C, list: &DisplayList, pictures: &Shelf
             skip(&mut skipped, item.clip(), item.kind());
             continue;
         };
+        if let Some(layer) = layers.blended.get(&i) {
+            scissored(scene, look, |s| placed(s, layer));
+            continue;
+        }
         if look.backdrop.is_some() {
             match layers.behind.get(&i) {
                 Some(layer) => scissored(scene, look, |s| placed(s, layer)),
@@ -253,11 +303,15 @@ pub fn build_into<C: Canvas>(scene: &mut C, list: &DisplayList, pictures: &Shelf
             }
             continue;
         }
-        if let Item::Image(image) = item {
-            if !pictures.contains_key(&image.clip) {
-                skip(&mut skipped, item.clip(), "image");
-                continue;
-            }
+        if let Item::Group(group) = item {
+            let empty = Layers::new();
+            let inner = layers.groups.get(&i).unwrap_or(&empty);
+            scissored(scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| skipped.extend(build_items(s, &group.items, frame, pictures, inner))));
+            continue;
+        }
+        if missing_picture(item, pictures) {
+            skip(&mut skipped, item.clip(), item.kind());
+            continue;
         }
         scissored(scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| content(s, item, pictures, frame)));
     }

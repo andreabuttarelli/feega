@@ -10,9 +10,10 @@
   import { dotBackground, type Viewport } from '$lib/canvas/dot-grid';
   import { ItemKind } from '$lib/motion/gpu-full/display-list';
   import { FramePacer } from '$lib/canvas/core/frame-pacer';
-  import { pictureBytes, resident, type HeldFrame } from '$lib/canvas/core/residency';
+  import { PART_ITEMS, parts } from '$lib/canvas/core/group-parts';
+  import { cached, pictureBytes, resident, type HeldFrame } from '$lib/canvas/core/residency';
   import { BUDGET, currentDevice } from '$lib/canvas/gpu/memory-budget';
-  import { screenUses, type Turn } from '$lib/canvas/core/screen-uses';
+  import { AHEAD_REACH, screenUses, type Turn } from '$lib/canvas/core/screen-uses';
   import { throughCamera } from '$lib/canvas/core/world-overlay';
   import type { PathItem } from '$lib/motion/gpu-full/display-list';
   import { drawsWhole, onStage, stillFrame, type FrameAt } from '$lib/canvas/core/frame-source';
@@ -40,7 +41,10 @@
   let lists = $state(new Map<string, DisplayList>());
   const asked = new Set<string>();
   const put = new Set<string>();
+  const pictured = new Set<string>();
+  const putting = new Map<string, { parts: DisplayList[]; next: number }>();
   const media = createMedia({ videoPreload: VideoPreload.Metadata });
+  const widened = (v: Viewport, a: { width: number; height: number }) => ({ view: { x: v.x + a.width * AHEAD_REACH, y: v.y + a.height * AHEAD_REACH, zoom: v.zoom }, area: { width: a.width * (1 + 2 * AHEAD_REACH), height: a.height * (1 + 2 * AHEAD_REACH) } });
   const keyOf = (f: FrameAt) => `${f.id}:${f.revision}`;
   const resolution = Math.min(typeof devicePixelRatio === 'number' ? devicePixelRatio : 1, MAX_RESOLUTION);
 
@@ -178,6 +182,8 @@
           return;
         }
         put.clear();
+        pictured.clear();
+        putting.clear();
         raster = r;
       },
       (e: unknown) => {
@@ -198,26 +204,84 @@
     };
   });
 
+  let cacheBytes = $state(0);
+  const IDLE_MS = 50;
+  const PICTURES_PER_FRAME = 4;
+  const ITEMS_PER_FRAME = 2 * PART_ITEMS;
+
+  function putPart(into: CoreRaster, group: string): number {
+    const job = putting.get(group) ?? { parts: parts(listOf(group), PART_ITEMS), next: 0 };
+    const part = job.parts[job.next];
+    if (job.next === 0) {
+      into.putGroup(group, part);
+    } else {
+      into.appendGroup(group, part);
+    }
+    job.next++;
+    if (job.next < job.parts.length) {
+      putting.set(group, job);
+      return part.items.length + 1;
+    }
+    putting.delete(group);
+    put.add(group);
+    return part.items.length + 1;
+  }
+
   function paint(): boolean {
     const into = raster;
     if (!into) {
       return false;
     }
-    const shown = held;
-    const keep = new Set(shown.map((f) => f.group));
-    for (const group of [...put].filter((g) => !keep.has(g))) {
+    const keep = new Set([...whole, ...held].map((f) => f.group));
+    for (const group of [...put, ...putting.keys()].filter((g) => !keep.has(g))) {
       into.dropGroup(group);
       put.delete(group);
+      putting.delete(group);
+      pictured.delete(group);
     }
-    for (const f of shown.filter((f) => !put.has(f.group))) {
-      into.putGroup(f.group, listOf(f.group), pictures);
-      put.add(f.group);
+    let room = ITEMS_PER_FRAME;
+    for (const f of held) {
+      while (room > 0 && !put.has(f.group)) {
+        room -= putPart(into, f.group);
+      }
     }
+    for (const f of held.filter((f) => put.has(f.group) && !pictured.has(f.group)).slice(0, PICTURES_PER_FRAME)) {
+      if (into.upload(listOf(f.group), pictures, 1)) {
+        pictured.add(f.group);
+      }
+    }
+    const shown = held.filter((f) => pictured.has(f.group));
     const at: Viewport = { x: view.x * resolution, y: view.y * resolution, zoom: view.zoom * resolution };
-    const screen = screenUses(shown, at, { width: area.width * resolution, height: area.height * resolution }, null);
-    into.drawScreen({ ...screen, items: [...screen.items, ...throughCamera(overlay, at)] }, pictures);
-    return false;
+    const device = { width: area.width * resolution, height: area.height * resolution };
+    const wide = widened(at, device);
+    const screen = screenUses(cached(shown, wide.view, wide.area, textureBytes), at, device, null);
+    const pending = into.drawScreen({ ...screen, items: [...screen.items, ...throughCamera(overlay, at)] }, pictures);
+    cacheBytes = into.cacheBytes();
+    return pending || held.some((f) => !pictured.has(f.group));
   }
+
+  let ahead = false;
+
+  const idle = (run: () => void) => (typeof requestIdleCallback === 'function' ? requestIdleCallback(run) : setTimeout(run, IDLE_MS));
+
+  function putAhead() {
+    const into = raster;
+    const next = whole.find((f) => !put.has(f.group));
+    if (!into || !next) {
+      ahead = false;
+      return;
+    }
+    putPart(into, next.group);
+    idle(putAhead);
+  }
+
+  $effect(() => {
+    void [raster, whole];
+    if (!ahead) {
+      ahead = true;
+      idle(putAhead);
+    }
+  });
 
   const pacer = new FramePacer(paint, (frame) => requestAnimationFrame(frame));
 
@@ -232,7 +296,7 @@
 <div class="core-reads" bind:this={readsHost} aria-hidden="true"></div>
 <div class="core-grid" data-testid="core-grid" style={Object.entries(dotBackground(view)).map(([k, v]) => `${k}: ${v}`).join('; ')}></div>
 {#key backend}
-  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
+  <canvas class="core-frames" bind:this={canvas} data-testid="core-canvas" data-held={held.length} data-waiting={waiting} data-frames={framePuts.length} data-cards={cardPuts.length} data-cache-bytes={cacheBytes} data-posters={cardPuts.length - cards.filter((c) => cardLists.has(c.key)).length} data-partial={[...lists.values()].filter((l) => !drawsWhole(l)).length}></canvas>
 {/key}
 
 <style>

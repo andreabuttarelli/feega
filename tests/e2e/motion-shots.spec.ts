@@ -62,6 +62,10 @@ test.describe('every shot of the library, rendered in a real browser', () => {
         await probe(page);
 
         const measured = await page.evaluate((x) => window.shotProbe.jolts(x), c);
+        const dbg = (await page.evaluate(() => (window as any).dbgFrames ?? [])) as string[];
+        const fs = await import('node:fs');
+        fs.mkdirSync('test-results/dbg', { recursive: true });
+        dbg.forEach((u, i) => fs.writeFileSync(`test-results/dbg/${shot}-${format.replace(':', 'x')}-${38 + i}.png`, Buffer.from(u.split(',')[1], 'base64')));
 
         expect(measured.jolts, `frame diffs: ${measured.diffs.join(',')}`).toEqual([]);
       });

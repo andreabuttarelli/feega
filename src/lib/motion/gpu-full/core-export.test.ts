@@ -27,4 +27,10 @@ describe('export through the core', () => {
     expect(coreExportable(prepare(doc, FEEGA_TOKENS), [0])).toBe(true);
     expect(coreExportable(prepare(doc, FEEGA_TOKENS), [0, 0.5])).toBe(false);
   });
+
+  it('takes a video whose custom components the DOM reader draws for it', () => {
+    const doc = must(addClip(base, { component: 'Device3D', from: 10, durationInFrames: 10 }, 'device'));
+
+    expect(coreExportable(prepare(doc, FEEGA_TOKENS), [0, 0.5], new Set(['device']))).toBe(true);
+  });
 });

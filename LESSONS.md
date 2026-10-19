@@ -561,6 +561,14 @@ propagazione prima. Mossa: `addEventListener('dblclick', …)` diretto sull'elem
 
 ## Test: distinguere il tuo difetto dal rumore
 
+### Un test "lento a intermittenza" può non essere lento affatto
+Segnale: un test con budget di tempo fallisce in CI in 70–90 ms. Leggi l'errore, non il nome:
+`cursor-smoothness` falliva per `Page.captureScreenshot: Unable to capture screenshot` (nessun
+frame ancora nel compositor), non per jolt. Mossa: `gh run view <id> --log-failed` sulle run
+rosse prima di toccare soglie. E un budget in ms assoluti su un runner GitHub oscilla 2× (shader
+1080p: 27–62 ms, stesso codice): si misura in rapporto a un riferimento nella stessa pagina,
+interlacciato, mediana.
+
 ### CI rossa con zero test falliti è una promessa non attesa, non un test tuo
 `Test Files 649 passed | Tests 7259 passed | Errors 1 error`, e il job esce comunque 1. Non
 cercare il test rosso: non esiste. Vitest conta come fallimento anche una `Unhandled Rejection`
@@ -3157,3 +3165,13 @@ backdrop), so a rebuilt atlas recopies it; once per frame is not enough. Guarded
 grain 0.93). **Move:** compare against `--ref=live` and encode the variable you suspect into the
 asset (frame number as luma) before touching a renderer; both gaps were in the capture path or
 in a half-pixel convention, not in timing.
+
+## A core frame that comes out blank, with no error, is usually texture memory
+
+**Signal:** `--under=gpu-core` draws some frames and leaves others black or background-only,
+`not drawn: none`, no console error. **Move:** count the layer-worthy items in the frame's list
+(filters, masks, blur): each one gets its own texture, and a filtered item used to get a
+full-frame one. Hundreds of them (a custom component flattened, its group grain copied onto
+every child) exhaust the GPU silently. Bisect by slicing the group's children in
+`scripts/gpu-parity/host.ts`; a single child that flips the frame is a blend/layer bug instead
+(WebGL2 `multiply` inside a group: vello_hybrid wiped the backdrop; the GL core now composites blended layers itself, `Blending::Composited`).

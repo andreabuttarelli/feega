@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use vello::kurbo::{Affine as Matrix, Point, Rect};
 
-use crate::display_list::{Affine, DisplayList, FillRule, Item, Lens, LensItem, Look, Paint, PathItem, UseItem};
+use crate::display_list::{Affine, DisplayList, FillRule, GroupItem, ImageItem, Item, LayerItem, Lens, LensItem, Look, Paint, PathItem, Size, UseItem};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::glyphs::{outline, Fonts};
 #[cfg(not(target_arch = "wasm32"))]
@@ -25,6 +25,12 @@ impl Groups {
 
     pub fn remove(&mut self, key: &str) {
         self.lists.remove(key);
+    }
+
+    pub fn append(&mut self, key: &str, items: Vec<Item>) {
+        if let Some(list) = self.lists.get_mut(key) {
+            list.items.extend(items);
+        }
     }
 
     pub fn get(&self, key: &str) -> Option<&DisplayList> {
@@ -103,7 +109,9 @@ fn placed(item: &Item, m: Affine, frame: Rect, scale: f64) -> Item {
     };
     match item {
         Item::Path(p) => Item::Path(PathItem { look: look(&p.look), ..p.clone() }),
-        Item::Image(i) => Item::Image(crate::display_list::ImageItem { look: look(&i.look), ..i.clone() }),
+        Item::Image(i) => Item::Image(ImageItem { look: look(&i.look), ..i.clone() }),
+        Item::Layer(l) => Item::Layer(LayerItem { look: look(&l.look), ..l.clone() }),
+        Item::Group(g) => Item::Group(Box::new(GroupItem { clip: g.clip.clone(), items: g.items.iter().map(|i| placed(i, m, frame, scale)).collect(), look: look(&g.look) })),
         Item::Lens(l) => Item::Lens(Box::new(LensItem { lens: moved_lens(&l.lens, m, frame, scale), ..(**l).clone() })),
         other => other.clone(),
     }
@@ -140,9 +148,109 @@ pub fn report(skipped: &[Skipped]) -> String {
     skipped.iter().map(|s| format!("{} {}", s.clip, s.what)).collect::<Vec<_>>().join("\n")
 }
 
+const CACHE_PREFIX: &str = "cache:";
+const RGBA_BYTES: u64 = 4;
+const SHARPEST: f64 = 1.02;
+const SOFTEST: f64 = 0.8;
+const IDENTITY: Affine = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+
+#[derive(Debug, Clone, Copy)]
+pub struct Limits {
+    pub side: u32,
+    pub rasters: usize,
+    pub items: usize,
+}
+
+pub struct Raster {
+    pub clip: String,
+    pub list: DisplayList,
+}
+
+pub struct Plan {
+    pub screen: DisplayList,
+    pub rasters: Vec<Raster>,
+    pub evicted: Vec<String>,
+    pub pending: bool,
+    pub skipped: Vec<Skipped>,
+}
+
+#[derive(Clone, Copy)]
+struct Building {
+    scale: f64,
+    next: usize,
+}
+
+struct Chunk {
+    raster: Raster,
+    done: bool,
+}
+
+#[derive(Clone, Copy)]
+struct Held {
+    scale: f64,
+    bytes: u64,
+}
+
+fn cache_clip(group: &str) -> String {
+    format!("{CACHE_PREFIX}{group}")
+}
+
+fn building_clip(group: &str) -> String {
+    format!("{CACHE_PREFIX}{group}#building")
+}
+
+fn texels(group: &DisplayList, scale: f64) -> (u32, u32) {
+    ((group.width as f64 * scale).ceil() as u32, (group.height as f64 * scale).ceil() as u32)
+}
+
+fn fresh(want: f64, held: f64) -> bool {
+    (SOFTEST..=SHARPEST).contains(&(want / held))
+}
+
+fn snapped(m: Affine) -> Affine {
+    let straight = m[1] == 0.0 && m[2] == 0.0;
+    if straight {
+        [m[0], 0.0, 0.0, m[3], m[4].round(), m[5].round()]
+    } else {
+        m
+    }
+}
+
+fn cached_image(u: &UseItem, group: &DisplayList, scale: f64) -> Item {
+    let (w, h) = texels(group, scale);
+    let frame = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64));
+    let matrix = snapped(times(u.matrix, [1.0 / scale, 0.0, 0.0, 1.0 / scale, 0.0, 0.0]));
+    let look = Look { opacity: 1.0, matrix, blur: 0.0, blend: "normal".into(), scissor: Some(scissor_of(frame)), masks: None, matte: None, filters: None, space: None, backdrop: None };
+    let size = Size { width: w as f64, height: h as f64 };
+    Item::Image(ImageItem { clip: cache_clip(&u.group), src: cache_clip(&u.group), video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, clipped: true, inner: IDENTITY, look })
+}
+
+fn partial(group: &str, (w, h): (u32, u32)) -> Item {
+    let look = Look { opacity: 1.0, matrix: IDENTITY, blur: 0.0, blend: "normal".into(), scissor: None, masks: None, matte: None, filters: None, space: None, backdrop: None };
+    let size = Size { width: w as f64, height: h as f64 };
+    Item::Image(ImageItem { clip: building_clip(group), src: building_clip(group), video: false, media_time: 0.0, size, fit: "fill".into(), focus: [0.0, 0.0], zoom: 1.0, clipped: true, inner: IDENTITY, look })
+}
+
+fn chunk_of(u: &UseItem, group: &DisplayList, at: Building, items: usize) -> Chunk {
+    let size = texels(group, at.scale);
+    let placed = UseItem { matrix: [at.scale, 0.0, 0.0, at.scale, 0.0, 0.0], ..u.clone() };
+    let all = used(&placed, group, 0);
+    let whole = all.iter().any(|i| matches!(i, Item::Lens(_)));
+    let end = if whole { all.len() } else { (at.next + items).min(all.len()) };
+    let done = end == all.len();
+    let base = (at.next > 0).then(|| partial(&u.group, size));
+    let list = DisplayList { width: size.0, height: size.1, background: None, items: base.into_iter().chain(all[at.next..end].iter().cloned()).collect(), faces: group.faces.clone() };
+    let clip = if done { cache_clip(&u.group) } else { building_clip(&u.group) };
+    Chunk { raster: Raster { clip, list }, done }
+}
+
 #[derive(Default)]
 pub struct Library {
     groups: Groups,
+    held: HashMap<String, Held>,
+    building: HashMap<String, Building>,
+    stale: Vec<String>,
+    retiring: Vec<String>,
     #[cfg(not(target_arch = "wasm32"))]
     fonts: Fonts,
 }
@@ -181,16 +289,104 @@ impl Library {
     pub fn put_group(&mut self, key: &str, list: &DisplayList) {
         let (drawn, _) = self.drawable(list);
         self.groups.put(key, drawn);
+        self.forget(key);
+    }
+
+    pub fn append_group(&mut self, key: &str, list: &DisplayList) {
+        let (drawn, _) = self.drawable(list);
+        self.groups.append(key, drawn.items);
+        self.forget(key);
     }
 
     pub fn drop_group(&mut self, key: &str) {
         self.groups.remove(key);
+        self.forget(key);
     }
 
-    pub fn resolve(&self, list: &DisplayList) -> (DisplayList, Vec<Skipped>) {
-        let (placed, groups) = expand(list, &self.groups);
-        let (drawn, unset) = self.drawable(&placed);
-        (drawn, named(groups, "group").chain(unset).collect())
+    fn forget(&mut self, key: &str) {
+        if self.held.remove(key).is_some() {
+            self.stale.push(cache_clip(key));
+        }
+        if self.building.remove(key).is_some() {
+            self.stale.push(building_clip(key));
+        }
+    }
+
+    pub fn cache_bytes(&self) -> u64 {
+        self.held.values().map(|h| h.bytes).sum()
+    }
+
+    pub fn plan(&mut self, list: &DisplayList, limits: Limits) -> Plan {
+        let mut missing = Vec::new();
+        let mut rasters = Vec::new();
+        let mut seen = HashSet::new();
+        let mut pending = false;
+        let mut items = Vec::with_capacity(list.items.len());
+        for item in &list.items {
+            let Item::Use(u) = item else {
+                items.push(item.clone());
+                continue;
+            };
+            let Some(group) = self.groups.get(&u.group) else {
+                missing.push(u.group.clone());
+                continue;
+            };
+            let on_screen = screen_rect(u.matrix, Rect::new(0.0, 0.0, group.width as f64, group.height as f64)).overlaps(Rect::new(0.0, 0.0, list.width as f64, list.height as f64));
+            let want = scale_of(u.matrix);
+            let (w, h) = texels(group, want);
+            if !u.cache || want <= 0.0 || w.max(h) > limits.side {
+                if on_screen {
+                    let start = items.len();
+                    items.extend(used(u, group, start));
+                }
+                continue;
+            }
+            seen.insert(u.group.clone());
+            let held = self.held.get(&u.group).copied();
+            let shown = match held {
+                Some(h) if fresh(want, h.scale) => Some(h.scale),
+                _ if rasters.len() < limits.rasters => {
+                    let at = self.building.get(&u.group).copied().filter(|b| fresh(want, b.scale)).unwrap_or(Building { scale: want, next: 0 });
+                    let chunk = chunk_of(u, group, at, limits.items);
+                    let next = at.next + limits.items;
+                    rasters.push(chunk.raster);
+                    if chunk.done {
+                        self.building.remove(&u.group);
+                        if at.next > 0 {
+                            self.retiring.push(building_clip(&u.group));
+                        }
+                        let (w, h) = texels(group, at.scale);
+                        self.held.insert(u.group.clone(), Held { scale: at.scale, bytes: w as u64 * h as u64 * RGBA_BYTES });
+                        Some(at.scale)
+                    } else {
+                        self.building.insert(u.group.clone(), Building { scale: at.scale, next });
+                        pending = true;
+                        held.map(|h| h.scale)
+                    }
+                }
+                _ => {
+                    pending = true;
+                    held.map(|h| h.scale)
+                }
+            };
+            if let (true, Some(scale)) = (on_screen, shown) {
+                items.push(cached_image(u, group, scale));
+            }
+        }
+        let gone: Vec<String> = self.held.keys().filter(|k| !seen.contains(*k)).cloned().collect();
+        let abandoned: Vec<String> = self.building.keys().filter(|k| !seen.contains(*k)).cloned().collect();
+        for key in &gone {
+            self.held.remove(key);
+        }
+        for key in &abandoned {
+            self.building.remove(key);
+        }
+        let mut evicted = std::mem::replace(&mut self.stale, std::mem::take(&mut self.retiring));
+        evicted.extend(gone.iter().map(|k| cache_clip(k)));
+        evicted.extend(abandoned.iter().map(|k| building_clip(k)));
+        let rasters = rasters.into_iter().map(|r| Raster { list: self.drawable(&r.list).0, ..r }).collect();
+        let (screen, unset) = self.drawable(&DisplayList { items, ..list.clone_empty() });
+        Plan { screen, rasters, evicted, pending, skipped: named(missing, "group").chain(unset).collect() }
     }
 }
 

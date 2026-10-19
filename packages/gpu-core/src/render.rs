@@ -2,18 +2,21 @@ use vello::wgpu;
 
 use crate::display_list::DisplayList;
 use crate::engine::Engine;
-use crate::groups::Library;
+use crate::groups::{Library, Limits};
 use crate::pictures::Pictures;
 use crate::Skipped;
 
 const ROW_ALIGN: u32 = 256;
 const BYTES: u32 = 4;
+const LIMITS: Limits = Limits { side: 4096, rasters: 1, items: 96 };
 
 pub struct Renderer {
     device: wgpu::Device,
     queue: wgpu::Queue,
     engine: Engine,
     library: Library,
+    cached: Pictures,
+    limits: Limits,
 }
 
 pub struct Rendered {
@@ -30,11 +33,20 @@ fn failed<E: std::fmt::Debug>(e: E) -> RenderError {
 
 impl Renderer {
     pub fn new() -> Result<Self, RenderError> {
+        Self::with_limits(LIMITS)
+    }
+
+    pub fn with_limits(limits: Limits) -> Result<Self, RenderError> {
         let instance = wgpu::Instance::default();
         let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions::default())).map_err(failed)?;
         let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor::default())).map_err(failed)?;
         let engine = Engine::new(&device).map_err(failed)?;
-        Ok(Self { device, queue, engine, library: Library::new() })
+        Ok(Self { device, queue, engine, library: Library::new(), cached: Pictures::new(), limits })
+    }
+
+    pub fn blending(mut self, blending: crate::layers::Blending) -> Self {
+        self.engine.blending = blending;
+        self
     }
 
     pub fn put_group(&mut self, key: &str, list: DisplayList) {
@@ -50,7 +62,9 @@ impl Renderer {
     }
 
     pub fn render(&mut self, list: &DisplayList, pictures: &Pictures) -> Result<Rendered, RenderError> {
-        let (list, missing) = self.library.resolve(list);
+        let plan = self.library.plan(list, self.limits);
+        let (list, missing) = self.engine.hold(&mut self.cached, plan, pictures, &self.device, &self.queue).map_err(failed)?;
+        let pictures = &pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), v.clone())).collect();
         let list = &list;
         let size = wgpu::Extent3d { width: list.width, height: list.height, depth_or_array_layers: 1 };
         let target = self.device.create_texture(&wgpu::TextureDescriptor {

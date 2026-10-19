@@ -376,6 +376,8 @@ fn set_items(items: &[Item], book: &FaceBook, skipped: &mut Vec<Skipped>) -> Vec
             },
             Item::Path(p) => vec![Item::Path(PathItem { look: matte_set(&p.look, book, skipped), ..p.clone() })],
             Item::Image(i) => vec![Item::Image(crate::display_list::ImageItem { look: matte_set(&i.look, book, skipped), ..i.clone() })],
+            Item::Layer(l) => vec![Item::Layer(crate::display_list::LayerItem { look: matte_set(&l.look, book, skipped), ..l.clone() })],
+            Item::Group(g) => vec![Item::Group(Box::new(crate::display_list::GroupItem { clip: g.clip.clone(), items: set_items(&g.items, book, skipped), look: matte_set(&g.look, book, skipped) }))],
             other => vec![other.clone()],
         })
         .collect()

@@ -3,13 +3,13 @@ use vello::peniko::{BlendMode, Brush, Compose, Fill, ImageQuality, ImageSampler,
 use vello_common::paint::{Image, ImageId, ImageSource};
 use vello_hybrid::{RenderSize, Resources, Scene, WebGlRenderer, WebGlTextureBindings, WebGlTextureWithDimensions};
 use wasm_bindgen::prelude::*;
-use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, WebGl2RenderingContext as Gl};
+use web_sys::{HtmlCanvasElement, HtmlImageElement, HtmlVideoElement, ImageBitmap, WebGl2RenderingContext as Gl};
 
 use crate::canvas::{brush, Canvas};
 use crate::display_list::{parse, DisplayList, Paint, Rgba, Size};
-use crate::groups::{report, Library};
+use crate::groups::{report, Library, Limits, Plan};
 use crate::gl_passes::{texture, GlRunner, Tex};
-use crate::layers::{prepare, Surface};
+use crate::layers::{prepare, Blending, Surface};
 use crate::scene::{build_into, Placed, Shelf};
 use crate::Skipped;
 
@@ -121,6 +121,10 @@ impl Surface for GlSurface<'_> {
     }
 }
 
+const CACHE_SIDE: u32 = 4096;
+const RASTERS_PER_DRAW: usize = 1;
+const ITEMS_PER_RASTER: usize = 16;
+
 #[wasm_bindgen]
 pub struct WebGlCore {
     renderer: WebGlRenderer,
@@ -131,6 +135,8 @@ pub struct WebGlCore {
     height: u32,
     pictures: Shelf<GlPicture>,
     library: Library,
+    cached: Shelf<GlPicture>,
+    pending: bool,
 }
 
 #[wasm_bindgen]
@@ -140,7 +146,7 @@ impl WebGlCore {
         canvas.set_height(height);
         let (renderer, resources) = WebGlRenderer::new(&canvas);
         let runner = GlRunner::new(renderer.gl_context());
-        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, pictures: Shelf::new(), library: Library::new() }
+        WebGlCore { renderer, resources, canvas: GlCanvas { scene: Scene::new(width as u16, height as u16), by: Affine::IDENTITY }, runner, width, height, pictures: Shelf::new(), library: Library::new(), cached: Shelf::new(), pending: false }
     }
 
     pub fn picture(&mut self, clip: &str, source: JsValue, width: u32, height: u32) -> Result<(), JsValue> {
@@ -151,6 +157,8 @@ impl WebGlCore {
         let (rgba, bytes) = (Gl::RGBA as i32, Gl::UNSIGNED_BYTE);
         let uploaded = if let Some(video) = source.dyn_ref::<HtmlVideoElement>() {
             gl.tex_image_2d_with_u32_and_u32_and_html_video_element(Gl::TEXTURE_2D, 0, rgba, Gl::RGBA, bytes, video)
+        } else if let Some(bitmap) = source.dyn_ref::<ImageBitmap>() {
+            gl.tex_image_2d_with_u32_and_u32_and_image_bitmap(Gl::TEXTURE_2D, 0, rgba, Gl::RGBA, bytes, bitmap)
         } else if let Some(still) = source.dyn_ref::<HtmlCanvasElement>() {
             gl.tex_image_2d_with_u32_and_u32_and_html_canvas_element(Gl::TEXTURE_2D, 0, rgba, Gl::RGBA, bytes, still)
         } else {
@@ -173,16 +181,67 @@ impl WebGlCore {
         Ok(())
     }
 
+    pub fn append_group(&mut self, key: &str, list_json: &str) -> Result<(), JsValue> {
+        self.library.append_group(key, &parse(list_json).map_err(failed)?);
+        Ok(())
+    }
+
     pub fn drop_group(&mut self, key: &str) {
         self.library.drop_group(key);
     }
 
-    pub fn draw(&mut self, list_json: &str) -> Result<String, JsValue> {
-        let (list, missing): (DisplayList, Vec<Skipped>) = self.library.resolve(&parse(list_json).map_err(failed)?);
+    pub fn cache_pending(&self) -> bool {
+        self.pending
+    }
+
+    pub fn cache_bytes(&self) -> f64 {
+        self.library.cache_bytes() as f64
+    }
+
+    fn limits(&self) -> Limits {
+        Limits { side: CACHE_SIDE.min(self.width).min(self.height), rasters: RASTERS_PER_DRAW, items: ITEMS_PER_RASTER }
+    }
+
+    fn raster(&mut self, list: &DisplayList) -> Result<(GlPicture, Vec<Skipped>), JsValue> {
         let mut surface = GlSurface { renderer: &mut self.renderer, resources: &mut self.resources, canvas: &mut self.canvas, runner: &self.runner, width: self.width, height: self.height, placed: Vec::new() };
-        let layers = prepare(&mut surface, &list, &self.pictures)?;
+        let pictures: Shelf<GlPicture> = self.pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), *v)).collect();
+        let layers = prepare(&mut surface, list, &pictures, Blending::Composited)?;
         let skipped = std::cell::RefCell::new(Vec::new());
-        surface.render(list.background, Affine::IDENTITY, &|c| skipped.borrow_mut().extend(build_into(c, &list, &self.pictures, &layers)))?;
+        let region = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
+        let tex = surface.paint(region, list.background, &|c| skipped.borrow_mut().extend(build_into(c, list, &pictures, &layers)))?;
+        for id in std::mem::take(&mut surface.placed) {
+            surface.renderer.destroy_image(surface.resources, id);
+        }
+        let id = self.renderer.upload_image(&mut self.resources, &WebGlTextureWithDimensions { texture: tex.texture.clone(), width: tex.width, height: tex.height });
+        Ok((GlPicture { id, size: Size { width: tex.width as f64, height: tex.height as f64 } }, skipped.into_inner()))
+    }
+
+    fn hold(&mut self, plan: Plan) -> Result<(DisplayList, Vec<Skipped>), JsValue> {
+        for clip in &plan.evicted {
+            if let Some(old) = self.cached.remove(clip) {
+                self.renderer.destroy_image(&mut self.resources, old.id);
+            }
+        }
+        let mut skipped = plan.skipped;
+        for raster in plan.rasters {
+            let (picture, missed) = self.raster(&raster.list)?;
+            skipped.extend(missed);
+            if let Some(old) = self.cached.insert(raster.clip, picture) {
+                self.renderer.destroy_image(&mut self.resources, old.id);
+            }
+        }
+        Ok((plan.screen, skipped))
+    }
+
+    pub fn draw(&mut self, list_json: &str) -> Result<String, JsValue> {
+        let plan = self.library.plan(&parse(list_json).map_err(failed)?, self.limits());
+        self.pending = plan.pending;
+        let (list, missing) = self.hold(plan)?;
+        let pictures: Shelf<GlPicture> = self.pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), *v)).collect();
+        let mut surface = GlSurface { renderer: &mut self.renderer, resources: &mut self.resources, canvas: &mut self.canvas, runner: &self.runner, width: self.width, height: self.height, placed: Vec::new() };
+        let layers = prepare(&mut surface, &list, &pictures, Blending::Composited)?;
+        let skipped = std::cell::RefCell::new(Vec::new());
+        surface.render(list.background, Affine::IDENTITY, &|c| skipped.borrow_mut().extend(build_into(c, &list, &pictures, &layers)))?;
         let skipped = skipped.into_inner();
         for id in surface.placed {
             surface.renderer.destroy_image(surface.resources, id);
