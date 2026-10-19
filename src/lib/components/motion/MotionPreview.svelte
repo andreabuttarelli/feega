@@ -52,7 +52,7 @@
     gpuCompose = null,
     fullDoc = null,
     children
-  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; fullDoc?: { doc: MotionDoc; tokens: BrandTokens } | null; children?: Snippet } = $props();
+  }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; fullDoc?: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> } | null; children?: Snippet } = $props();
 
   const DRAWN_OVER: ReadonlySet<RenderEngine> = new Set([RenderEngine.Gpu, RenderEngine.GpuFull]);
 
@@ -444,7 +444,7 @@
   {#if engine === RenderEngine.GpuFull && fullDoc}
     <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
       {#key `${fullDoc.doc.width}x${fullDoc.doc.height}`}
-        <GpuFullLayer doc={fullDoc.doc} tokens={fullDoc.tokens} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+        <GpuFullLayer doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
       {/key}
     </div>
   {/if}

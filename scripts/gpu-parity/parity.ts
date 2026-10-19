@@ -26,10 +26,11 @@ const ROOT = resolve(import.meta.dirname, '../..');
 const OUT = resolve(process.env.PARITY_OUT ?? join(homedir(), 'Documents/feega-videos/gpu-motion'));
 const HTTP_OK = 200;
 const HTTP_NOT_FOUND = 404;
+const HTTP_PARTIAL = 206;
 const TIMEOUT_MS = 3_600_000;
 const APP_LANES = 4;
 const ASSET_SIZE = { width: 1600, height: 1000 };
-const TYPES: Record<string, string> = { js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json', png: 'image/png' };
+const TYPES: Record<string, string> = { js: 'text/javascript; charset=utf-8', mjs: 'text/javascript; charset=utf-8', css: 'text/css; charset=utf-8', json: 'application/json', png: 'image/png', mp4: 'video/mp4' };
 const LAUNCH = { channel: 'chromium', args: ['--enable-gpu', '--ignore-gpu-blocklist', '--use-angle=metal', '--enable-gpu-rasterization', '--enable-unsafe-webgpu'] };
 
 const flags = new Map(process.argv.slice(2).map((a) => a.replace(/^--/, '').split('=') as [string, string]));
@@ -67,6 +68,14 @@ function assetIds(value: unknown, into = new Set<string>()): Set<string> {
   return into;
 }
 
+const VIDEO_ASSET = /^video/;
+
+function placeholderVideo(): Buffer {
+  return execFileSync('ffmpeg', ['-loglevel', 'error', '-f', 'lavfi', '-i', `testsrc2=size=${ASSET_SIZE.width}x${ASSET_SIZE.height}:rate=30:duration=4`, '-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-g', '1', '-movflags', 'frag_keyframe+empty_moov', '-f', 'mp4', 'pipe:1'], { maxBuffer: 1 << 28 });
+}
+
+const assetPath = (id: string) => (VIDEO_ASSET.test(id) ? `/assets/${id}.mp4` : `/assets/${id}.png`);
+
 async function placeholder(id: string): Promise<Buffer> {
   const hue = [...id].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${ASSET_SIZE.width}" height="${ASSET_SIZE.height}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue},70%,55%)"/><stop offset="1" stop-color="hsl(${(hue + 120) % 360},60%,25%)"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/><circle cx="520" cy="420" r="260" fill="hsl(${(hue + 60) % 360},80%,70%)" opacity="0.8"/><rect x="900" y="560" width="520" height="300" fill="#fff" opacity="0.85"/><path d="M0 1000 L800 600 L1600 1000Z" fill="#111" opacity="0.5"/></svg>`;
@@ -88,7 +97,15 @@ function serve(script: string, assets: Map<string, Buffer>): Promise<{ url: stri
     }
     const asset = assets.get(pathname);
     if (asset) {
-      res.writeHead(HTTP_OK, { 'content-type': TYPES.png, 'access-control-allow-origin': '*' }).end(asset);
+      const type = TYPES[pathname.split('.').pop() ?? ''] ?? TYPES.png;
+      const range = /bytes=(\d+)-(\d*)/.exec(req.headers.range ?? '');
+      if (range) {
+        const start = Number(range[1]);
+        const end = range[2] ? Number(range[2]) : asset.length - 1;
+        res.writeHead(HTTP_PARTIAL, { 'content-type': type, 'access-control-allow-origin': '*', 'accept-ranges': 'bytes', 'content-range': `bytes ${start}-${end}/${asset.length}`, 'content-length': end - start + 1 }).end(asset.subarray(start, end + 1));
+        return;
+      }
+      res.writeHead(HTTP_OK, { 'content-type': type, 'access-control-allow-origin': '*', 'accept-ranges': 'bytes' }).end(asset);
       return;
     }
     if (pathname === '/host.js') {
@@ -121,10 +138,10 @@ const doc = verdict.doc;
 const ids = assetIds(doc);
 const assetFiles = new Map<string, Buffer>();
 for (const id of ids) {
-  assetFiles.set(`/assets/${id}.png`, await placeholder(id));
+  assetFiles.set(assetPath(id), VIDEO_ASSET.test(id) ? placeholderVideo() : await placeholder(id));
 }
 const server = await serve(await hostBundle(), assetFiles);
-const assets = Object.fromEntries([...ids].map((id) => [id, `${server.origin}/assets/${id}.png`]));
+const assets = Object.fromEntries([...ids].map((id) => [id, `${server.origin}${assetPath(id)}`]));
 const html = composeHtml({ doc, tokens: FEEGA_TOKENS, assets, origin: server.origin });
 const size = { width: doc.width, height: doc.height };
 const spec = { doc, assets, origin: server.origin };

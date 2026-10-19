@@ -17,9 +17,11 @@ import { modifierFilter } from '../shape/modifiers';
 import { ShapeKind, modifierValues } from '../shape/schema';
 import { flatten, rectOutline, type Outline } from '../shape/geometry';
 import { rgbaOf, type Rgba } from './rgba';
+import { sourceSeconds } from '../time-remap';
 
 export enum ItemKind {
-  Path = 'path'
+  Path = 'path',
+  Image = 'image'
 }
 
 export enum PaintKind {
@@ -48,7 +50,8 @@ export enum Unsupported {
   Modifier = 'modifier',
   Fill = 'fill',
   Pattern = 'pattern',
-  ShapeKind = 'shape-kind'
+  ShapeKind = 'shape-kind',
+  Text = 'text'
 }
 
 export type Stop = { at: number; color: Rgba };
@@ -60,18 +63,21 @@ export type Paint =
 
 export type PathItem = { kind: ItemKind.Path; clip: string; contours: number[][]; rule: FillRule; paint: Paint; opacity: number; matrix: Affine; blur: number };
 
-export type Item = PathItem;
+export type ImageItem = { kind: ItemKind.Image; clip: string; src: string; video: boolean; mediaTime: number; size: Size; fit: string; focus: [number, number]; zoom: number; clipped: boolean; opacity: number; matrix: Affine; blur: number };
+
+export type Item = PathItem | ImageItem;
 
 export type Gap = { clip: string; component: ComponentId; reason: Unsupported };
 
 export type DisplayList = { width: number; height: number; background: Rgba | null; items: Item[]; unsupported: Gap[] };
 
-export type Prepared = { doc: MotionDoc; tokens: BrandTokens };
+export type Prepared = { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> };
 
-type Shape = { contours: number[][]; rule: FillRule; paint: Paint; opacity: number; matrix: Affine };
+type Content = Omit<PathItem, 'clip' | 'blur'> | Omit<ImageItem, 'clip' | 'blur'>;
 type Size = { width: number; height: number };
-type Painted = Shape[] | Unsupported;
-type Painter = (props: Record<string, unknown>, size: Size, colour: (v: string) => Rgba, frame: number) => Painted;
+type Painted = Content[] | Unsupported;
+type Env = { props: Record<string, unknown>; size: Size; colour: (v: string) => Rgba; time: number; media: number; asset: (id: unknown) => string | null; logo: string | null };
+type Painter = (env: Env) => Painted;
 
 const NO_PAINT: ReadonlySet<ComponentId> = new Set(['Audio', 'Null', 'Precomp', 'Adjustment']);
 const DRAWN_EFFECTS: ReadonlySet<string> = new Set([EffectKind.GaussianBlur]);
@@ -79,6 +85,8 @@ const DEPTH_KEYS: readonly TransformKey[] = ['z', 'rotateX', 'rotateY', 'skewX',
 const DRAWN_SOURCES: ReadonlySet<Source> = new Set([Source.Transform, Source.Prop, Source.Param]);
 const NO_MOVE = 'none';
 const SOLID_PATTERN = 'solid';
+const CENTRE = 0.5;
+const REMAPPED: ReadonlySet<ComponentId> = new Set(['Video']);
 const DEG = Math.PI / 180;
 
 const flat = (outline: Outline): number[][] => outline.map((c) => flatten(c).flatMap(([x, y]) => [x, y]));
@@ -105,7 +113,7 @@ const PAINTS: Partial<Record<FillType, (f: never, w: number, h: number, colour: 
 
 const UNDRAWN_SHAPES: ReadonlySet<ShapeKind> = new Set([ShapeKind.Line, ShapeKind.Vector]);
 
-function shapePainter(props: Record<string, unknown>, size: Size, colour: (v: string) => Rgba, frame: number): Painted {
+function shapePainter({ props, size, colour, time }: Env): Painted {
   const look = props as unknown as ShapeLook;
   const fills = fillsOf(props).filter((f) => f.visible);
   const stack = look.modifiers.filter((m) => m.enabled).map((m) => ({ kind: m.kind, values: modifierValues(m) }));
@@ -119,20 +127,39 @@ function shapePainter(props: Record<string, unknown>, size: Size, colour: (v: st
   if (problem) {
     return problem[1];
   }
-  const layers = shapeLayers(look, { w: size.width, h: size.height }, frame).filter((l) => l.outline.length);
+  const layers = shapeLayers(look, { w: size.width, h: size.height }, time).filter((l) => l.outline.length);
   const rule = look.fillRule === FillRule.EvenOdd ? FillRule.EvenOdd : FillRule.NonZero;
   return fills.flatMap((f: Fill) => {
     const paint = (PAINTS[f.type] as (f: Fill, w: number, h: number, c: typeof colour) => Paint)(f, size.width, size.height, colour);
-    return layers.map((l) => ({ contours: flat(l.outline), rule, paint, opacity: f.opacity * l.opacity, matrix: l.matrix as unknown as Affine }));
+    return layers.map((l) => ({ kind: ItemKind.Path as const, contours: flat(l.outline), rule, paint, opacity: f.opacity * l.opacity, matrix: l.matrix as unknown as Affine }));
   });
 }
 
-function backgroundPainter(props: Record<string, unknown>, size: Size, colour: (v: string) => Rgba): Painted {
+function backgroundPainter({ props, size, colour }: Env): Painted {
   if (props.pattern !== SOLID_PATTERN) {
     return Unsupported.Pattern;
   }
-  return [{ contours: flat(rectOutline(0, { w: size.width, h: size.height })), rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: colour(String(props.fill)) }, opacity: Number(props.opacity ?? 1), matrix: IDENTITY }];
+  return [{ kind: ItemKind.Path, contours: flat(rectOutline(0, { w: size.width, h: size.height })), rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: colour(String(props.fill)) }, opacity: Number(props.opacity ?? 1), matrix: IDENTITY }];
 }
+
+const framing = (props: Record<string, unknown>): [number, number] => [Number(props.focusX ?? CENTRE), Number(props.focusY ?? CENTRE)];
+
+const picture = (src: string, size: Size, look: Partial<Omit<ImageItem, 'kind' | 'clip' | 'blur' | 'src' | 'size'>>): Content => ({ kind: ItemKind.Image, src, size, video: false, mediaTime: 0, fit: 'cover', focus: [CENTRE, CENTRE], zoom: 1, clipped: true, opacity: 1, matrix: IDENTITY, ...look });
+
+const imagePainter = ({ props, size, asset }: Env): Painted => {
+  const src = asset(props.assetId);
+  return src ? [picture(src, size, { fit: String(props.fit), focus: framing(props), zoom: Number(props.zoom ?? 1) })] : Unsupported.Component;
+};
+
+const videoPainter = ({ props, size, asset, media }: Env): Painted => {
+  const src = asset(props.assetId);
+  return src ? [picture(src, size, { video: true, mediaTime: media, fit: String(props.fit), focus: framing(props) })] : Unsupported.Component;
+};
+
+const logoPainter = ({ props, size, asset, logo }: Env): Painted => {
+  const src = asset(props.assetId) ?? logo;
+  return src ? [picture(src, size, { fit: 'width', clipped: false })] : Unsupported.Text;
+};
 
 type Placement = (props: Record<string, unknown>, frame: Size) => { box: { left: number; top: number; width: number; height: number }; turn: Affine; opacity: number };
 
@@ -146,12 +173,17 @@ const boxed: Placement = (props, frame) => {
 
 const PAINTERS: Partial<Record<ComponentId, { place: Placement; paint: Painter }>> = {
   BrandBackground: { place: fullFrame, paint: backgroundPainter },
-  Shape: { place: boxed, paint: shapePainter }
+  Shape: { place: boxed, paint: shapePainter },
+  Image: { place: boxed, paint: imagePainter },
+  Video: { place: boxed, paint: videoPainter },
+  Logo: { place: boxed, paint: logoPainter }
 };
 
 const keyed = (clip: MotionClip, keys: readonly string[]) => keys.some((k) => (clip.transform[k as TransformKey] ?? TRANSFORM[k as TransformKey].fallback) !== TRANSFORM[k as TransformKey].fallback || (clip.keyframes[k]?.length ?? 0) > 0);
 
-const keyframedOutside = (clip: MotionClip) => Object.entries(clip.keyframes).some(([key, track]) => track.length > 0 && !DRAWN_SOURCES.has(animProp(clip.component, key)?.source as Source));
+const drawnSource = (clip: MotionClip, source: Source | undefined) => (source !== undefined && DRAWN_SOURCES.has(source)) || (source === Source.Remap && REMAPPED.has(clip.component));
+
+const keyframedOutside = (clip: MotionClip) => Object.entries(clip.keyframes).some(([key, track]) => track.length > 0 && !drawnSource(clip, animProp(clip.component, key)?.source));
 
 const CLIP_LIMITS: [Unsupported, (clip: MotionClip) => boolean][] = [
   [Unsupported.Component, (clip) => !PAINTERS[clip.component]],
@@ -170,7 +202,7 @@ function propsAt(clip: MotionClip, frame: number, colour: (v: string) => string)
   const local = frame - clip.from;
   const sampled = Object.entries(clip.keyframes).flatMap(([key, track]) => {
     const prop = animProp(clip.component, key);
-    if (!prop || prop.source === Source.Transform || !track.length) {
+    if (!prop || !DRAWN_SOURCES.has(prop.source) || prop.source === Source.Transform || !track.length) {
       return [];
     }
     return [[key, prop.kind === ValueKind.Color ? sampleColor(track, local, colour) : sampleTrack(track, local)]];
@@ -193,11 +225,12 @@ function blurOf(clip: MotionClip, frame: number): number {
 
 const scaleOf = (m: Affine) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
 
-export function prepare(doc: MotionDoc, tokens: BrandTokens): Prepared {
-  return { doc: preparedDoc({ doc, tokens, assets: {} }), tokens };
+export function prepare(doc: MotionDoc, tokens: BrandTokens, assets: Record<string, string> = {}): Prepared {
+  return { doc: preparedDoc({ doc, tokens, assets }), tokens, assets };
 }
 
-export function drawFrame({ doc, tokens }: Prepared, frame: number): DisplayList {
+export function drawFrame({ doc, tokens, assets }: Prepared, frame: number): DisplayList {
+  const asset = (id: unknown) => (typeof id === 'string' && id ? (assets[id] ?? null) : null);
   const css = (v: string) => resolveColor(v, tokens);
   const colour = (v: string) => rgbaOf(css(v)) ?? [0, 0, 0, 1];
   const size = { width: doc.width, height: doc.height };
@@ -218,7 +251,8 @@ export function drawFrame({ doc, tokens }: Prepared, frame: number): DisplayList
       const painter = PAINTERS[clip.component]!;
       const props = propsAt(clip, frame, css);
       const { box, turn, opacity } = painter.place(props, size);
-      const painted = painter.paint(props, box, colour, (frame - clip.from) / doc.fps);
+      const local = frame - clip.from;
+      const painted = painter.paint({ props, size: box, colour, time: local / doc.fps, media: sourceSeconds(clip, local, doc.fps), asset, logo: tokens.logoUrl });
       if (!Array.isArray(painted)) {
         unsupported.push({ clip: clip.id, component: clip.component, reason: painted });
         continue;
@@ -226,7 +260,7 @@ export function drawFrame({ doc, tokens }: Prepared, frame: number): DisplayList
       const placed = mul2d(mul2d(worldAt(doc, clip.id, frame, size), [1, 0, 0, 1, box.left, box.top]), turn);
       const alpha = inheritedOpacity(doc, clip, byId, frame) * opacity;
       const blur = blurOf(clip, frame) * scaleOf(placed);
-      items.push(...painted.map((s): PathItem => ({ kind: ItemKind.Path, clip: clip.id, contours: s.contours, rule: s.rule, paint: s.paint, opacity: alpha * s.opacity, matrix: mul2d(placed, s.matrix), blur })));
+      items.push(...painted.map((c) => ({ ...c, clip: clip.id, opacity: alpha * c.opacity, matrix: mul2d(placed, c.matrix), blur }) as Item));
     }
   }
   const background = doc.background === Background.Transparent ? null : colour('brand.background');
