@@ -13,6 +13,10 @@ crate-type = ["cdylib", "rlib"]
 name = "gpu-core-render"
 path = "src/main.rs"
 
+[[bin]]
+name = "gpu-core-export"
+path = "src/export.rs"
+
 [features]
 gpu = []
 
