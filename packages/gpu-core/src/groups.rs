@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use vello::kurbo::{Affine as Matrix, Point, Rect};
 
 use crate::display_list::{Affine, DisplayList, FillRule, Item, Look, Paint, PathItem, UseItem};
+#[cfg(not(target_arch = "wasm32"))]
+use crate::glyphs::{outline, Fonts};
 use crate::Skipped;
 
 #[derive(Default)]
@@ -96,8 +98,55 @@ fn used(u: &UseItem, group: &DisplayList) -> Vec<Item> {
     back.into_iter().chain(group.items.iter().map(|i| placed(i, u.matrix, frame, scale))).collect()
 }
 
-pub fn report(skipped: &[Skipped], missing: &[String]) -> String {
-    skipped.iter().map(|s| format!("{} {}", s.clip, s.what)).chain(missing.iter().map(|g| format!("{g} group"))).collect::<Vec<_>>().join("\n")
+pub fn report(skipped: &[Skipped]) -> String {
+    skipped.iter().map(|s| format!("{} {}", s.clip, s.what)).collect::<Vec<_>>().join("\n")
+}
+
+#[derive(Default)]
+pub struct Library {
+    groups: Groups,
+    #[cfg(not(target_arch = "wasm32"))]
+    fonts: Fonts,
+}
+
+fn named(keys: Vec<String>, what: &str) -> impl Iterator<Item = Skipped> + '_ {
+    keys.into_iter().map(move |clip| Skipped { clip, what: what.into() })
+}
+
+impl Library {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn put_font(&mut self, key: &str, source: gpu_text::Source) {
+        self.fonts.put(key, source);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn drawable(&self, list: &DisplayList) -> (DisplayList, Vec<String>) {
+        outline(list, &self.fonts)
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    fn drawable(&self, list: &DisplayList) -> (DisplayList, Vec<String>) {
+        (list.clone(), vec![])
+    }
+
+    pub fn put_group(&mut self, key: &str, list: &DisplayList) {
+        let (drawn, _) = self.drawable(list);
+        self.groups.put(key, drawn);
+    }
+
+    pub fn drop_group(&mut self, key: &str) {
+        self.groups.remove(key);
+    }
+
+    pub fn resolve(&self, list: &DisplayList) -> (DisplayList, Vec<Skipped>) {
+        let (placed, groups) = expand(list, &self.groups);
+        let (drawn, fonts) = self.drawable(&placed);
+        (drawn, named(groups, "group").chain(named(fonts, "font")).collect())
+    }
 }
 
 pub fn expand(list: &DisplayList, groups: &Groups) -> (DisplayList, Vec<String>) {

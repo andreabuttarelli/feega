@@ -121,7 +121,7 @@ fn content<C: Canvas>(scene: &mut C, item: &Item, pictures: &Shelf<C::Picture>, 
                 draw_image(scene, image, data);
             }
         }
-        Item::Use(_) | Item::Other { .. } => {}
+        Item::Use(_) | Item::Glyphs(_) | Item::Other { .. } => {}
     }
 }
 
@@ -207,7 +207,7 @@ pub fn bounds<C: Canvas>(item: &Item, pictures: &Shelf<C::Picture>) -> Option<Re
             let m = Affine::new(image.look.matrix);
             hull([(region.x0, region.y0), (region.x1, region.y0), (region.x1, region.y1), (region.x0, region.y1)].into_iter().map(|(x, y)| m * Point::new(x, y)))
         }
-        Item::Use(_) | Item::Other { .. } => None,
+        Item::Use(_) | Item::Glyphs(_) | Item::Other { .. } => None,
     }
 }
 
