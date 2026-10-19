@@ -9,7 +9,7 @@ use crate::canvas::{brush, Canvas};
 use crate::display_list::{parse, DisplayList, Paint, Rgba, Size};
 use crate::groups::{report, Library, Limits, Plan};
 use crate::gl_passes::{texture, GlRunner, Tex};
-use crate::layers::{prepare, Surface};
+use crate::layers::{prepare, Blending, Surface};
 use crate::scene::{build_into, Placed, Shelf};
 use crate::Skipped;
 
@@ -205,7 +205,7 @@ impl WebGlCore {
     fn raster(&mut self, list: &DisplayList) -> Result<(GlPicture, Vec<Skipped>), JsValue> {
         let mut surface = GlSurface { renderer: &mut self.renderer, resources: &mut self.resources, canvas: &mut self.canvas, runner: &self.runner, width: self.width, height: self.height, placed: Vec::new() };
         let pictures: Shelf<GlPicture> = self.pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), *v)).collect();
-        let layers = prepare(&mut surface, list, &pictures)?;
+        let layers = prepare(&mut surface, list, &pictures, Blending::Composited)?;
         let skipped = std::cell::RefCell::new(Vec::new());
         let region = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
         let tex = surface.paint(region, list.background, &|c| skipped.borrow_mut().extend(build_into(c, list, &pictures, &layers)))?;
@@ -239,7 +239,7 @@ impl WebGlCore {
         let (list, missing) = self.hold(plan)?;
         let pictures: Shelf<GlPicture> = self.pictures.iter().chain(&self.cached).map(|(k, v)| (k.clone(), *v)).collect();
         let mut surface = GlSurface { renderer: &mut self.renderer, resources: &mut self.resources, canvas: &mut self.canvas, runner: &self.runner, width: self.width, height: self.height, placed: Vec::new() };
-        let layers = prepare(&mut surface, &list, &pictures)?;
+        let layers = prepare(&mut surface, &list, &pictures, Blending::Composited)?;
         let skipped = std::cell::RefCell::new(Vec::new());
         surface.render(list.background, Affine::IDENTITY, &|c| skipped.borrow_mut().extend(build_into(c, &list, &pictures, &layers)))?;
         let skipped = skipped.into_inner();
