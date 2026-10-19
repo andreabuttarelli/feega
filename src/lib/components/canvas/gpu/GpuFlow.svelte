@@ -225,6 +225,7 @@
         id: t.id,
         box: { x: t.x, y: t.y, w: t.w, h: t.h },
         face: faceOf(t, summaries.get(t.id)?.data ?? {}, tierUrl, props.thumbsOf?.(t.id) ?? []),
+        shot: coreShots.get(t.id) ?? null,
         ring: chrome.ring,
         handles: resizable && on && chrome.handles,
         hovered,
@@ -329,8 +330,21 @@
   };
   let shown = $state(new Map<string, string>());
   const shotOf = (id: string) => shown.get(id) ?? null;
+  let coreShots = $state(new Map<string, string>());
+  const shootsTiles = () => !!scene || coreOn;
   const showSnapshot = (id: string, key: string, bitmap: ImageBitmap) => {
-    void scene?.setSnapshot(id, key, bitmap).then(() => (shown = new Map(shown).set(id, key)));
+    if (scene) {
+      void scene.setSnapshot(id, key, bitmap).then(() => (shown = new Map(shown).set(id, key)));
+      return;
+    }
+    void blobOf(bitmap).then((blob) => {
+      const before = coreShots.get(id);
+      coreShots = new Map(coreShots).set(id, URL.createObjectURL(blob));
+      shown = new Map(shown).set(id, key);
+      if (before) {
+        URL.revokeObjectURL(before);
+      }
+    });
   };
   const preloaded = new Set<string>();
   let looking = $state(new Set<string>());
@@ -381,7 +395,7 @@
   }
 
   $effect(() => {
-    if (!scene) {
+    if (!shootsTiles()) {
       return;
     }
     const fresh = placed.filter((t) => !preloaded.has(t.id) && snapshotKind(t));
@@ -494,7 +508,7 @@
   let schedulerTick = $state(0);
   $effect(() => {
     void schedulerTick;
-    if (shotJob || !scene || !BUDGET[currentDevice()].shootsSnapshots) {
+    if (shotJob || !shootsTiles() || !BUDGET[currentDevice()].shootsSnapshots) {
       return;
     }
     if (performance.now() < busyUntil) {
@@ -530,7 +544,7 @@
       if (cancelled) {
         return;
       }
-      if (bitmap && scene) {
+      if (bitmap && shootsTiles()) {
         showSnapshot(id, key, bitmap);
         count(Counter.CachedSnapshot);
         finish();
@@ -564,7 +578,7 @@
       }
       const el = host.querySelector<HTMLElement>('.snapshot-node');
       try {
-        if (el && scene) {
+        if (el && shootsTiles()) {
           const { getFontEmbedCSS, toCanvas } = await import('html-to-image');
           fontCss ??= await withTimeout(getFontEmbedCSS(el), SNAPSHOT_TIMEOUT_MS);
           const options = { pixelRatio: SNAPSHOT_PIXEL_RATIO, fontEmbedCSS: fontCss, cacheBust: false, imagePlaceholder: PIXEL };
