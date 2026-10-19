@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { keepTextSize } from '$lib/motion/text-fit';
+  import { hostFit, keepTextSize, type HostShare } from '$lib/motion/text-fit';
   import ExportDialog from '$lib/components/canvas/ExportDialog.svelte';
   import type { ExportRow } from '$lib/motion/export-rows';
   import { localStore } from '$lib/browser-storage';
@@ -114,7 +114,7 @@
   import FrameLiveControls from '$lib/components/canvas/FrameLiveControls.svelte';
   import { LiveHost } from '$lib/canvas/frame-live';
   import type { CanvasBox, DrawnWire } from '$lib/motion/draw-create';
-  import { FrameKind, frameNodeSize, frameResize, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
+  import { FrameKind, frameNodeSize, frameResize, heightFollowsDoc, motionEditorPath, type FrameResize, motionLivePath, motionOf, motionPreviewPath, openingFor, ghostShown, posterFresh, tileChromeOf } from '$lib/canvas/motion-node';
   import { NameTag } from '$lib/canvas/node-label';
   import { layoutOf, rotateGroup, scaleGroup, undoTurn, type Placed, type Turn } from '$lib/canvas/node-layout';
   import { FORMATS, MotionFormat, formatOf } from '$lib/motion/doc';
@@ -390,13 +390,13 @@
 
   const fittedHosts = new Map<string, string>();
 
-  function fitHost(id: string | null, share: { width: number; height: number }) {
+  function fitHost(id: string | null, share: HostShare) {
     const row = id ? nodes.find((n) => n.id === id) : null;
     const settled = row ? `${row.w}x${row.h}@${motionOf(row)?.docHeadRevision ?? 0}` : "";
-    if (!row || fittedHosts.get(row.id) === settled) {
+    const next = row ? hostFit(row, share) : null;
+    if (!row || !next || fittedHosts.get(row.id) === settled) {
       return;
     }
-    const next = { w: Math.round(row.w * share.width), h: Math.round(row.h * share.height) };
     fittedHosts.set(row.id, `${next.w}x${next.h}@${motionOf(row)?.docHeadRevision ?? 0}`);
     void resize(row.id, next.w, next.h);
   }
@@ -2319,10 +2319,11 @@
   $effect(() => {
     const open = layersSource.video;
     const row = open ? untrack(() => nodes.find((node) => node.id === open.nodeId)) : null;
-    if (!open || !row) {
+    const motion = row ? motionOf(row) : null;
+    if (!open || !row || !motion || !heightFollowsDoc(motion)) {
       return;
     }
-    const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motionOf(row)?.kind);
+    const fit = frameNodeSize(row.w, open.doc, NodeMode.Preview, motion.kind);
     if (Math.abs(fit.h - row.h) > FIT_SLACK_PX) {
       void storeSize(row.id, fit.w, fit.h);
     }

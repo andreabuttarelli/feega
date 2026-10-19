@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { fitTexts, freeTextFit, resizedFreeText } from '$lib/motion/text-fit';
+  import { fitTexts, freeTextFit, resizedFreeText, type HostShare } from '$lib/motion/text-fit';
   import VectorOverlay from '$lib/components/motion/VectorOverlay.svelte';
   import { toVector } from '$lib/motion/vector/ops';
   import { localStore } from '$lib/browser-storage';
@@ -219,7 +219,7 @@
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent', Layers: 'layers' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
-  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: { width: number; height: number }) => void) | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
+  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: HostShare) => void) | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
   const rules = $derived(MOUNT[mount]);
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
