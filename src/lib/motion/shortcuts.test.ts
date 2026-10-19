@@ -207,6 +207,12 @@ describe('mask keys', () => {
   });
 });
 
+describe('layout guides key', () => {
+  it('⇧G shows or hides the layout guides', () => {
+    expect(press('G', { shift: true, code: 'KeyG' })).toBe(Command.ToggleLayoutGuides);
+  });
+});
+
 describe('outline view key', () => {
   it('⌘Y switches the frame to outlines and back', () => {
     expect(press('y', { mod: true, code: 'KeyY' })).toBe(Command.ToggleOutlines);

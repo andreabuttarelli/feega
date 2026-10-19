@@ -32,6 +32,7 @@ import { referenceLookSchema } from './reference-look-model';
 import { stillSchema } from './still-model';
 import { partStylesSchema } from './part-style-model';
 import { autoLayoutSchema, layoutItemSchema } from './layout/model';
+import { layoutGuidesSchema } from './layout-guides/model';
 
 export enum MotionFormat {
   Landscape = '16:9',
@@ -202,6 +203,7 @@ export const motionDocSchema = z
     referenceLook: referenceLookSchema.optional(),
     still: stillSchema.optional(),
     freeSize: z.boolean().optional(),
+    layoutGuides: layoutGuidesSchema,
     links: z.record(z.string().min(1), z.string().min(1)).optional(),
     styles: stylesSchema
   })

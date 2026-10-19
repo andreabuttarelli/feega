@@ -5,6 +5,8 @@ import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
 import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
+import { setLayoutGuides } from '$lib/motion/layout-guides/guides';
+import { MAX_LAYOUT_GUIDES, layoutGuideSchema } from '$lib/motion/layout-guides/model';
 import { setPartFills } from '$lib/motion/part-style';
 import { staticParts } from './static-parts';
 import { strokesSchema } from '$lib/motion/stroke/model';
@@ -374,6 +376,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     assets: doc.assets,
     fields: doc.fields,
     referenceLook: doc.referenceLook ?? null,
+    layoutGuides: doc.layoutGuides ?? [],
     fonts: doc.fonts,
     styles: stylesOf(doc),
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
@@ -2077,7 +2080,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_canvas: tool({
-      description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together: a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} a side, a video the long side up to ${MAX_SIDE} and the short side up to 1080; pass still with the size to make a tall page in one call), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor.`,
+      description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together: a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} a side, a video the long side up to ${MAX_SIDE} and the short side up to 1080; pass still with the size to make a tall page in one call), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor. layout_guides replaces the frame's layout guides (columns/rows: count, gutter, margin px; grid: size px; [] removes them): drawn over the frame in the editor, never in the export, and layers snap to their edges.`,
       inputSchema: z.object({
         format: z.enum(MOTION_FORMATS).optional(),
         width: z.number().int().min(DESIGN_MIN_SIDE).max(DESIGN_MAX_SIDE).optional(),
@@ -2085,7 +2088,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         duration: z.number().positive().max(MAX_SECONDS).optional(),
         fps: z.literal(FRAME_RATES).optional(),
         background: z.enum([Background.Brand, Background.Transparent]).optional(),
-        still: z.union([z.number().min(0), z.literal(false)]).optional()
+        still: z.union([z.number().min(0), z.literal(false)]).optional(),
+        layout_guides: z.array(layoutGuideSchema).max(MAX_LAYOUT_GUIDES).optional()
       }),
       execute: async (input) => {
         const stretched = input.duration !== undefined && session.doc.script ? durationProblem(input.duration, session.doc.script) : null;
@@ -2097,7 +2101,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const paced = !animated.ok || input.fps === undefined ? animated : setFrameRate(animated.doc, input.fps);
         const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, size: input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
-        return apply(pinned, 'changed the canvas');
+        const guided = pinned.ok && input.layout_guides ? setLayoutGuides(pinned.doc, input.layout_guides) : pinned;
+        return apply(guided, 'changed the canvas');
       }
     }),
 
