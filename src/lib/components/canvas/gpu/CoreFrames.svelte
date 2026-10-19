@@ -42,7 +42,7 @@
       return;
     }
     const source = (await res.json()) as Source;
-    const fonts = await loadFonts(source.doc, source.assets);
+    const fonts = await loadFonts(source.doc, source.assets, source.tokens);
     const prepared = prepare(source.doc, source.tokens, source.assets, { fonts, smoothing: smoothingOf(navigator.userAgent) });
     const list = drawFrame(prepared, stillFrame(source.doc));
     if ((await media.ready(list)) === Readiness.Partial) {
