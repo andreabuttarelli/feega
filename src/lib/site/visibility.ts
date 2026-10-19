@@ -10,8 +10,12 @@ export type SiteEnv = { readonly vercelEnv?: string; readonly flag?: string };
 const PRODUCTION = 'production';
 const ENABLED = 'true';
 
+export function siteFlagOn(flag: string | undefined): boolean {
+  return flag === ENABLED;
+}
+
 export function siteVisibility(env: SiteEnv): SiteVisibility {
-  if (env.flag === ENABLED || env.vercelEnv !== PRODUCTION) {
+  if (siteFlagOn(env.flag) || env.vercelEnv !== PRODUCTION) {
     return SiteVisibility.Shown;
   }
 

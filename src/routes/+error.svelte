@@ -17,6 +17,8 @@
   import { _ } from 'svelte-i18n';
   import { errorCopyFor } from '$lib/error-copy';
   import { isSiteHost } from '$lib/site/host';
+  import { env as publicEnv } from '$env/dynamic/public';
+  import { siteFlagOn } from '$lib/site/visibility';
   import SiteNotFound from '$lib/site/SiteNotFound.svelte';
 
   const NOT_FOUND = 404;
@@ -28,7 +30,11 @@
   // 404 → non c'è; 401/403 → non è tua; tutto il resto → si è rotto da noi.
   // `$page.error.message` non si mostra MAI: è testo interno.
   const copy = $derived(errorCopyFor(status));
-  const siteNotFound = $derived(status === NOT_FOUND && isSiteHost(page.url));
+  const siteNotFound = $derived(
+    status === NOT_FOUND &&
+      isSiteHost(page.url) &&
+      siteFlagOn(publicEnv.PUBLIC_SITE_ENABLED)
+  );
 </script>
 
 <svelte:head>
