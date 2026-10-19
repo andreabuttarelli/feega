@@ -14,7 +14,7 @@ export type BuildAsk = { id: number; url: string; smoothing: Smoothing };
 
 export type BuildAnswer = { id: number; list: DisplayList | null } | { id: number; error: string };
 
-export type BuildWorker = { postMessage: (ask: BuildAsk) => void; onmessage: ((e: MessageEvent<BuildAnswer>) => void) | null; onerror: ((e: Event) => void) | null };
+export type BuildWorker = { postMessage: (ask: BuildAsk) => void; onmessage: ((e: MessageEvent<BuildAnswer>) => void) | null; onerror: ((e: ErrorEvent) => void) | null };
 
 export async function buildFrame(source: FrameDoc, smoothing: Smoothing, fonts: Fonts): Promise<DisplayList | null> {
   if (readClips(source.doc).read.length) {
