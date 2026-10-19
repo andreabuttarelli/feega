@@ -5,6 +5,7 @@ import { frameDiffs, motionJolts } from '../smoothness';
 import type { VectorUi } from '../vector-ui/model';
 import { ShotId, shotSource } from './library';
 import { shotCursor } from './ops';
+import { capturePainted } from './capture';
 import FEEGA_APP from './fixtures/feega-app-vector.json';
 
 const UI = FEEGA_APP as unknown as VectorUi;
@@ -44,7 +45,9 @@ async function diffsOf(source: { js: string; css: string }, props: Record<string
   await page.setContent(`<html><head><style>${source.css}</style></head><body style="margin:0;background:#000"><div id="root" style="position:relative;width:${size.width}px;height:${size.height}px;overflow:hidden"></div></body></html>`);
   await page.addScriptTag({ content: STAGE(source.js, props, seconds) });
   const cdp = await page.context().newCDPSession(page);
-  const capture = async () => Buffer.from((await cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, ...size, scale: CAPTURE_SCALE } })).data, 'base64');
+  const painted = () => page.evaluate(() => new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done()))));
+  const shot = () => cdp.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, ...size, scale: CAPTURE_SCALE } });
+  const capture = async () => Buffer.from((await capturePainted(shot, painted)).data, 'base64');
   const frames: Buffer[] = [];
   await capture();
   for (let i = 0; i < Math.round(seconds * FPS); i++) {

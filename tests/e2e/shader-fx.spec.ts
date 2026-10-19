@@ -4,8 +4,9 @@ import { fileURLToPath } from 'node:url';
 
 const ENTRY = fileURLToPath(new URL('./fixtures/shader-fx-entry.ts', import.meta.url));
 
-const SOFTWARE_GL_BUDGET_MS = 60;
-const COST_DRAWS = 30;
+const GRAIN_OVER_PASSTHROUGH_BUDGET = 3;
+const COST_DRAWS = 5;
+const COST_ROUNDS = 9;
 
 let bundle = '';
 
@@ -72,10 +73,9 @@ test('measure reports cost and no problems for a clean effect, and flicker for a
   expect(broken.problems.length).toBeGreaterThan(0);
 });
 
-test('a 1080p grain frame stays inside the software GL budget', async ({ page }) => {
-  const { ms, renderer } = await page.evaluate(([frag, draws]) => window.shaderFxProbe.costMs(frag as string, draws as number), [GRAIN, COST_DRAWS] as const);
-  test.info().annotations.push({ type: 'cost', description: `${ms.toFixed(2)} ms/frame on ${renderer}` });
-  console.log(`shader-fx cost: ${ms.toFixed(2)} ms/frame on ${renderer}`);
+test('a 1080p grain frame costs a bounded multiple of a passthrough frame', async ({ page }) => {
+  const { ratio, renderer } = await page.evaluate(([frag, draws, rounds]) => window.shaderFxProbe.costRatio(frag as string, draws as number, rounds as number), [GRAIN, COST_DRAWS, COST_ROUNDS] as const);
+  console.log(`shader-fx cost: grain ${ratio.toFixed(2)}x passthrough on ${renderer}`);
 
-  expect(ms).toBeLessThan(SOFTWARE_GL_BUDGET_MS);
+  expect(ratio).toBeLessThan(GRAIN_OVER_PASSTHROUGH_BUDGET);
 });

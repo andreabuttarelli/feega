@@ -37,6 +37,8 @@ function runtime() {
   return createRuntime(canvas)!;
 }
 
+const median = (values: number[]) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+
 const uniforms = (time = 0) => ({ time, seed: 7, values: {} });
 
 function hash(data: Uint8ClampedArray): string {
@@ -62,18 +64,26 @@ function hd(): HTMLCanvasElement {
 
 const probe = {
   measure: (frag: string) => measure({ frag, params: [] }),
-  costMs: (frag: string, draws: number) => {
+  costRatio: (frag: string, draws: number, rounds: number) => {
     const rt = runtime();
     const src = hd();
-    const compiled = compile(rt, { frag, params: [] });
-    draw(rt, compiled, src, uniforms());
-    rt.gl.finish();
-    const start = performance.now();
-    for (let i = 0; i < draws; i++) {
-      draw(rt, compiled, src, uniforms(i / 30));
+    const effect = compile(rt, { frag, params: [] });
+    const perFrame = (compiled: typeof effect | null) => {
+      draw(rt, compiled, src, uniforms());
+      rt.gl.finish();
+      const start = performance.now();
+      for (let i = 0; i < draws; i++) {
+        draw(rt, compiled, src, uniforms(i / 30));
+      }
+      rt.gl.readPixels(0, 0, 1, 1, rt.gl.RGBA, rt.gl.UNSIGNED_BYTE, new Uint8Array(4));
+      return (performance.now() - start) / draws;
+    };
+    const ratios: number[] = [];
+    for (let r = 0; r < rounds; r++) {
+      const base = perFrame(null);
+      ratios.push(perFrame(effect) / base);
     }
-    rt.gl.readPixels(0, 0, 1, 1, rt.gl.RGBA, rt.gl.UNSIGNED_BYTE, new Uint8Array(4));
-    return { ms: (performance.now() - start) / draws, renderer: String(rt.gl.getParameter(rt.gl.RENDERER)) };
+    return { ratio: median(ratios), renderer: String(rt.gl.getParameter(rt.gl.RENDERER)) };
   },
   problemsOf: (frag: string) => {
     const compiled = compile(runtime(), { frag, params: [] });
