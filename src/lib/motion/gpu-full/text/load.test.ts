@@ -30,4 +30,15 @@ describe('loadFonts', () => {
 
     expect(fetched).toEqual(['https://g.test/latin.woff2']);
   });
+
+  it('asks for the fonts of clips inside a precomp', async () => {
+    const [clip] = titled.tracks.flatMap((t) => t.clips);
+    const archivo = { family: 'Archivo', source: 'google', category: 'sans', italic: false, weights: [400], axes: [] };
+    const inner = { ...titled.tracks[0], clips: [{ ...clip, props: { ...clip.props, font: 'Archivo' } }] };
+    const nested = { ...titled, fonts: [archivo], comps: { c1: { name: 'c1', durationInFrames: 30, tracks: [inner] } }, tracks: titled.tracks.map((t) => ({ ...t, clips: t.clips.map((c) => ({ ...c, component: 'Precomp', props: { comp: 'c1' } })) })) } as unknown as MotionDoc;
+    const sheets: string[] = [];
+    await fontLoader({ text: async (url) => (sheets.push(url), ''), bytes: async () => new Uint8Array() })(nested, {});
+
+    expect(sheets.some((url) => url.includes('family=Archivo'))).toBe(true);
+  });
 });

@@ -14,6 +14,8 @@ text elements, the photo-grid poster 9.
   a canvas and ships it as a layer.
 - `text-transform` upper/lower case is applied per character; a glyph no face covers is the new
   gap `font`.
+- The font loader flattens precomps first, as the HTML engine does: a custom poster inside a
+  precomp lost its Archivo title.
 
 Found, not fixed here: the HTML export draws Inter Tight 600 narrower and lighter than the live
 player (≈12 px over an 80 px line). gpu-full matches the live player; that difference is most of
