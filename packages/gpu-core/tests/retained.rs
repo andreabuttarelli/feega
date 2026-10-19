@@ -1,4 +1,4 @@
-use gpu_core::retained::{merged, subtract, tiles, Camera, Damage, Outcome, Quality, Retained, Step};
+use gpu_core::retained::{merged, subtract, tiles, Camera, Damage, Lookup, Outcome, Quality, Retained, Step};
 use vello::kurbo::Rect;
 
 const W: u32 = 800;
@@ -72,16 +72,16 @@ fn an_unchanged_camera_with_no_damage_draws_nothing() {
 }
 
 #[test]
-fn a_pan_past_the_overscan_rasters_only_the_uncovered_strip_and_keeps_the_rest() {
+fn a_pan_past_the_overscan_leads_by_the_overscan_and_rasters_only_the_uncovered_strip() {
     let mut r = Retained::new(W, H);
     rendered(&mut r, at(0.0, 0.0, 1.0), 0.0);
 
     let Step::Raster(scroll) = rendered(&mut r, at(-100.0, 0.0, 1.0), 16.0) else { panic!("a raster") };
 
     assert_eq!(scroll.outcome, Outcome::Partial);
-    assert_eq!(scroll.shift, Some((-100, 0)));
-    assert_eq!(scroll.rects, vec![Rect::new(850.0, 0.0, 950.0, 750.0)]);
-    assert_eq!(scroll.camera, at(-100.0, 0.0, 1.0));
+    assert_eq!(scroll.shift, Some((-175, 0)));
+    assert_eq!(scroll.rects, vec![Rect::new(775.0, 0.0, 950.0, 750.0)]);
+    assert_eq!(scroll.camera, at(-175.0, 0.0, 1.0));
 }
 
 #[test]
@@ -194,6 +194,20 @@ fn overlapping_damage_becomes_one_rect() {
     let merged = merged(vec![Rect::new(0.0, 0.0, 10.0, 10.0), Rect::new(5.0, 5.0, 15.0, 15.0)], 8);
 
     assert_eq!(merged, vec![Rect::new(0.0, 0.0, 15.0, 15.0)]);
+}
+
+#[test]
+fn a_lookup_turned_bottom_up_maps_the_same_pixels() {
+    let look = Lookup { scale: 0.5, x: 10.0, y: 20.0 };
+    let (source_h, target_h) = (400.0, 300.0);
+    let down = |sy: f64| sy * look.scale + look.y;
+
+    let up = look.bottom_up(source_h, target_h);
+
+    for sy in [0.0, 17.5, 300.0] {
+        assert_eq!(source_h - down(sy), (target_h - sy) * up.scale + up.y);
+    }
+    assert_eq!((up.scale, up.x), (0.5, 10.0));
 }
 
 #[test]

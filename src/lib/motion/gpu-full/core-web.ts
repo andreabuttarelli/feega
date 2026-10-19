@@ -1,16 +1,17 @@
 import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item, type LayerItem } from './display-list';
 import type { Picture, Pictures, Raster } from './raster';
 import type { Affine } from '../affine';
-import type { Rgba } from './rgba';
+import type { Outcome } from './core-outcome';
 
 const CORE_URL = '/gpu-core/gpu_core.js';
 
 type Size = { width: number; height: number };
-type Attached = { draw: (list: string) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; cache_pending: () => boolean; cache_bytes: () => number; free: () => void };
+type Attached = { draw: (list: string) => string; set_camera: (x: number, y: number, zoom: number) => void; patch_uses: (patch: string) => void; set_overlay: (items: string) => void; frame: (now: number) => string; picture: (clip: string, source: unknown, width: number, height: number) => void; put_group: (key: string, list: string) => void; drop_group: (key: string) => void; append_group: (key: string, list: string) => void; cache_pending: () => boolean; cache_bytes: () => number; free: () => void };
 
 export type Use = { kind: 'use'; clip: string; group: string; matrix: Affine; cache?: boolean; hold?: boolean };
-export type Screen = { width: number; height: number; background: Rgba | null; items: (Item | Use)[] };
-export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; dropGroup: (key: string) => void; drawScreen: (screen: Screen, pictures?: Pictures) => boolean; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number };
+export type UsePatch = { put: Use[]; drop: string[]; order?: string[] };
+export type Painted = { outcome: Outcome; pending: boolean };
+export type CoreRaster = Omit<Raster, 'draw'> & { draw: (list: DisplayList, pictures?: Pictures) => string[]; putGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; appendGroup: (key: string, list: DisplayList, pictures?: Pictures) => void; dropGroup: (key: string) => void; setCamera: (x: number, y: number, zoom: number) => void; patchUses: (patch: UsePatch) => void; setOverlay: (items: Item[]) => void; frame: (now: number) => Painted; upload: (list: DisplayList, pictures: Pictures, most: number) => boolean; cacheBytes: () => number };
 type Attach<T> = (canvas: HTMLCanvasElement, width: number, height: number) => T;
 type CoreModule = { default: () => Promise<unknown>; WebCore: { attach: Attach<Promise<Attached>> }; WebGlCore: { attach: Attach<Attached> } };
 
@@ -98,8 +99,6 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
     return null;
   }
 
-  const drawn = (items: Item[]) => items.filter((i): i is Item => (i as Item | Use).kind !== 'use');
-
   return {
     draw: (list: DisplayList, pictures = NO_PICTURES) => {
       wantedPictures(list.items).forEach((item) => upload(item, pictures));
@@ -138,10 +137,12 @@ export function rasterOf(attached: Attached, fit: Fit = asIs): CoreRaster {
       }
       return queue.length === 0;
     },
-    drawScreen: (screen: Screen, pictures = NO_PICTURES) => {
-      wantedPictures(drawn(screen.items as Item[])).forEach((item) => upload(item, pictures));
-      attached.draw(JSON.stringify(screen));
-      return attached.cache_pending();
+    setCamera: (x: number, y: number, zoom: number) => attached.set_camera(x, y, zoom),
+    patchUses: (patch: UsePatch) => attached.patch_uses(JSON.stringify(patch)),
+    setOverlay: (items: Item[]) => attached.set_overlay(JSON.stringify(items)),
+    frame: (now: number) => {
+      const outcome = attached.frame(now).split('\n')[0] as Outcome;
+      return { outcome, pending: attached.cache_pending() };
     },
     cacheBytes: () => attached.cache_bytes(),
     dispose: () => attached.free()

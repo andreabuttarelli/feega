@@ -64,8 +64,10 @@ impl Compositor {
         self.world.touch(group, library.size_of(group));
     }
 
-    pub fn touch_all(&mut self) {
-        self.world.touch_all();
+    pub fn touch_picture(&mut self, clip: &str, library: &Library) {
+        for group in library.groups_drawing(clip) {
+            self.touch(&group, library);
+        }
     }
 
     fn region<P: Painter>(&mut self, painter: &mut P, library: &mut Library, raster: &Raster, rect: Rect) -> Result<Vec<Skipped>, P::Error> {
@@ -75,7 +77,7 @@ impl Compositor {
         let (w, h) = ((rect.width() * q).ceil() as u32, (rect.height() * q).ceil() as u32);
         let plan = library.plan(&self.world.screen(to_region.as_coeffs(), w, h), painter.limits());
         self.pending |= plan.pending || !plan.finished.is_empty();
-        for group in &plan.finished {
+        for group in plan.finished.iter().chain(&plan.waiting) {
             self.world.touch(group, library.size_of(group));
         }
         painter.paint(plan, rect, raster.quality)

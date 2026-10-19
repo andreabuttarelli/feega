@@ -266,7 +266,20 @@ fn a_plan_names_the_groups_whose_cache_it_finished() {
     let second = lib.plan(&screen(&[("a", 1.0, 0.0), ("b", 1.0, 200.0)]), LIMITS);
 
     assert_eq!(first.finished, vec!["a".to_string()]);
+    assert_eq!(first.waiting, vec!["b".to_string()]);
     assert_eq!(second.finished, vec!["b".to_string()]);
+    assert!(second.waiting.is_empty());
+}
+
+#[test]
+fn the_library_names_the_groups_that_draw_a_picture() {
+    let mut lib = library(&["plain"]);
+    let photo = r#"{ "width": 10, "height": 10, "background": null, "items": [
+      { "kind": "group", "clip": "g", "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0], "items": [
+        { "kind": "image", "clip": "pic", "src": "pic", "video": false, "mediaTime": 0, "size": { "width": 4, "height": 4 }, "fit": "fill", "focus": [0, 0], "zoom": 1, "clipped": true, "inner": [1, 0, 0, 1, 0, 0], "opacity": 1, "matrix": [1, 0, 0, 1, 0, 0] } ] } ] }"#;
+    lib.put_group("photo", &parse(photo).unwrap());
+
+    assert_eq!(lib.groups_drawing("pic"), vec!["photo".to_string()]);
 }
 
 #[test]

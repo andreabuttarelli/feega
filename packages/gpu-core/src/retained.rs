@@ -8,6 +8,7 @@ const ZOOM_IDLE_MS: f64 = 100.0;
 const SLOW_FULL_MS: f64 = 12.0;
 const FULL_SHARE: f64 = 0.6;
 const MAX_RECTS: usize = 8;
+const TOO_MANY_RECTS: usize = 32;
 const AA_PX: f64 = 1.0;
 const EPSILON: f64 = 1e-6;
 
@@ -99,6 +100,12 @@ pub struct Lookup {
     pub y: f64,
 }
 
+impl Lookup {
+    pub fn bottom_up(self, source_height: f64, target_height: f64) -> Lookup {
+        Lookup { y: source_height - target_height * self.scale - self.y, ..self }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct Held {
     camera: Camera,
@@ -141,6 +148,9 @@ fn cheapest(rects: &[Rect]) -> (usize, usize) {
 
 pub fn merged(mut rects: Vec<Rect>, max: usize) -> Vec<Rect> {
     rects.retain(|r| r.area() > 0.0);
+    if rects.len() > TOO_MANY_RECTS {
+        return rects.into_iter().reduce(|a, b| a.union(b)).into_iter().collect();
+    }
     while rects.len() > 1 {
         let pair = match overlapping(&rects) {
             Some(pair) => pair,
@@ -293,13 +303,17 @@ impl Retained {
             }
             return self.raster(held.camera, Quality::Sharp, None, rects);
         }
+        let o = self.overscan as i32;
+        let lead = |d: i32| if d.abs() > o { d + d.signum() * o } else { 0 };
+        let (lx, ly) = (lead(dx), lead(dy));
+        let ahead = Camera { x: held.camera.x + lx as f64, y: held.camera.y + ly as f64, ..c };
         let whole = self.whole();
-        let kept = whole + vello::kurbo::Vec2::new(dx as f64, dy as f64);
+        let kept = whole + vello::kurbo::Vec2::new(lx as f64, ly as f64);
         if whole.intersect(kept).area() <= 0.0 {
             return self.full(c, Quality::Sharp);
         }
         let strips = subtract(whole, kept);
-        let edits = damaged.iter().map(|r| self.pixels(c, *r)).filter(|r| r.area() > 0.0);
-        self.raster(c, Quality::Sharp, Some((dx, dy)), strips.into_iter().chain(edits).collect())
+        let edits = damaged.iter().map(|r| self.pixels(ahead, *r)).filter(|r| r.area() > 0.0);
+        self.raster(ahead, Quality::Sharp, Some((lx, ly)), strips.into_iter().chain(edits).collect())
     }
 }

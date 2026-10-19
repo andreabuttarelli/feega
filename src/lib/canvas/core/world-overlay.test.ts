@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { wireCurve } from '$lib/canvas/gpu/geometry';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { EdgeLook, type CoreTheme } from './overlay';
-import { edgeLook, overlayOf, throughCamera } from './world-overlay';
+import { edgeLook, overlayOf } from './world-overlay';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', line: '#e5e5e5', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
 const edge = (over: Partial<{ id: string; source: string; target: string; mode: string }> = {}) => ({ id: 'e', source: 'a', target: 'b', ...over });
@@ -46,11 +46,6 @@ describe('world overlay', () => {
   it('rings every running node in the accent', () => {
     const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, running: [{ id: 'n', x: 0, y: 0, w: 10, h: 10 }] });
     expect(items.map((i) => i.clip)).toEqual(['n:running']);
-  });
-
-  it('is placed on screen through the camera', () => {
-    const [item] = throughCamera(overlayOf({ curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 2, theme, ...none }), { x: 10, y: 20, zoom: 2 });
-    expect(item.matrix).toEqual([2, 0, 0, 2, 10, 20]);
   });
 });
 

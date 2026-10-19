@@ -92,10 +92,10 @@ fn a_pan_past_the_overscan_shifts_then_paints_the_strip_with_the_region_offset()
     let frame = c.frame(&mut fake, &mut lib, at(-100.0, 0.0, 1.0), 16.0, &mut || 0.0).unwrap();
 
     assert_eq!(frame.outcome, Some(Outcome::Partial));
-    assert_eq!(fake.shifts, vec![(-100, 0)]);
+    assert_eq!(fake.shifts, vec![(-175, 0)]);
     let (into, _, items) = &fake.painted[1];
-    assert_eq!(*into, Rect::new(850.0, 0.0, 950.0, 750.0));
-    assert_eq!(left_edge(items), 900.0 - 100.0 + 75.0 - 850.0);
+    assert_eq!(*into, Rect::new(775.0, 0.0, 950.0, 750.0));
+    assert_eq!(left_edge(items), 900.0 - 175.0 + 75.0 - 775.0);
 }
 
 #[test]
