@@ -11,6 +11,7 @@ import type { MotionDoc } from '$lib/motion/doc';
 import { drawFrame, prepare } from '$lib/motion/gpu-full/display-list';
 import { createRaster } from '$lib/motion/gpu-full/raster';
 import { createMedia } from '$lib/motion/gpu-full/media';
+import { mountCustomReads } from '$lib/motion/gpu-full/dom/custom';
 import { PREVIEW_PROBE, PROBE_REPLY, PROBE_REQUEST, type ExportInput, type ExportResult, type PreviewInput, type PreviewResult, type ShotsInput, type ShotsResult, type Spec } from './probe';
 
 const composer = (spec: Spec) => (only?: ReadonlySet<string>) => composeHtml({ doc: spec.doc as MotionDoc, tokens: FEEGA_TOKENS, assets: spec.assets, origin: spec.origin, only });
@@ -64,21 +65,25 @@ async function gpuFullShots(input: ShotsInput): Promise<ShotsResult> {
   const doc = input.spec.doc as MotionDoc;
   const prepared = prepare(doc, FEEGA_TOKENS, input.spec.assets);
   const media = createMedia();
+  const custom = await mountCustomReads(host(), composer(input.spec), prepared);
   const canvas = document.createElement('canvas');
   const raster = createRaster(canvas, input.width, input.height);
   const pngs: string[] = [];
   const gaps = new Map<string, string>();
   const start = performance.now();
   for (const t of input.times) {
-    const list = drawFrame(prepared, Math.round(t * doc.fps));
-    list.unsupported.forEach((g) => gaps.set(g.clip, `${g.component}:${g.reason}`));
+    const frame = Math.round(t * doc.fps);
+    const read = await custom.readAt(frame);
+    const list = drawFrame(prepared, frame, read.reads);
+    list.unsupported.forEach((g) => gaps.set(`${g.clip} ${g.component}:${g.reason}${g.detail ? ` ${g.detail}` : ''}`, ''));
     await media.ready(list);
-    raster.draw(list, media.pictures);
+    raster.draw(list, (item) => read.picture(item) ?? media.pictures(item));
     pngs.push(await png(canvas, input.width, input.height));
   }
-  const out = { pngs, ms: performance.now() - start, backend: 'gpu-full webgl2', runs: 0, stats: [], unsupported: [...gaps].map(([clip, why]) => `${clip} ${why}`) };
+  const out = { pngs, ms: performance.now() - start, backend: 'gpu-full webgl2', runs: 0, stats: [], unsupported: [...gaps.keys()] };
   raster.dispose();
   media.dispose();
+  custom.dispose();
   return out;
 }
 

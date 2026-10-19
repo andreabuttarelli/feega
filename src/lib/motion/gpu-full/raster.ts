@@ -1,4 +1,4 @@
-import { FillRule, ItemKind, PaintKind, type DisplayList, type ImageItem, type Item, type Paint, type PathItem } from './display-list';
+import { FillRule, ItemKind, PaintKind, type DisplayList, type ImageItem, type Item, type LayerItem, type Paint, type PathItem } from './display-list';
 import { imageRect, type Size } from './image-rect';
 import { gaussianKernel, MAX_TAPS } from './kernel';
 import { BLEND_FS, BLUR_FS, QUAD_VS, plain, program, texture } from './gl-kit';
@@ -139,7 +139,7 @@ type Target = { fbo: WebGLFramebuffer; resolve: WebGLFramebuffer; texture: WebGL
 
 export type Picture = { source: TexImageSource; size: Size };
 
-export type Pictures = (item: ImageItem) => Picture | null;
+export type Pictures = (item: ImageItem | LayerItem) => Picture | null;
 
 export type Raster = { draw: (list: DisplayList, pictures?: Pictures) => void; dispose: () => void };
 
@@ -304,7 +304,7 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     const known = textures.get(source);
     const tex = known ?? gl.createTexture()!;
     gl.bindTexture(gl.TEXTURE_2D, tex);
-    if (!known || source instanceof HTMLVideoElement) {
+    if (!known || !(source instanceof HTMLImageElement)) {
       gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -321,10 +321,20 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     if (!picture) {
       return;
     }
-    const m = item.matrix;
     const fitted = imageRect(item.size, picture.size, item.fit, item.focus, item.zoom);
     const [k, , , , tx, ty] = item.inner;
-    const r = { x: fitted.x * k + tx, y: fitted.y * k + ty, width: fitted.width * k, height: fitted.height * k };
+    drawPicture(item, picture, { x: fitted.x * k + tx, y: fitted.y * k + ty, width: fitted.width * k, height: fitted.height * k }, item.clipped, opacity);
+  }
+
+  function drawLayer(item: LayerItem, opacity: number, pictures: Pictures) {
+    const picture = pictures(item);
+    if (picture) {
+      drawPicture(item, picture, { x: 0, y: 0, ...item.size }, true, opacity);
+    }
+  }
+
+  function drawPicture(item: ImageItem | LayerItem, picture: Picture, r: { x: number; y: number; width: number; height: number }, clipped: boolean, opacity: number) {
+    const m = item.matrix;
     const { width: w, height: h } = item.size;
     gl.useProgram(imageProgram);
     gl.uniformMatrix3fv(u(imageProgram, 'u_matrix'), false, [m[0], m[1], 0, m[2], m[3], 0, m[4], m[5], 1]);
@@ -336,17 +346,19 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     gl.uniform1i(u(imageProgram, 'u_src'), 0);
     gl.bindBuffer(gl.ARRAY_BUFFER, geometry);
     gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    const [x0, y0, x1, y1] = item.clipped ? [0, 0, w, h] : [Math.min(0, r.x), Math.min(0, r.y), Math.max(w, r.x + r.width), Math.max(h, r.y + r.height)];
+    const [x0, y0, x1, y1] = clipped ? [0, 0, w, h] : [Math.min(0, r.x), Math.min(0, r.y), Math.max(w, r.x + r.width), Math.max(h, r.y + r.height)];
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([x0, y0, x1, y0, x1, y1, x0, y0, x1, y1, x0, y1]), gl.STREAM_DRAW);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
+  const DRAW: Record<ItemKind, (item: never, opacity: number, pictures: Pictures) => void> = {
+    [ItemKind.Path]: (item: PathItem, opacity) => fillPath(item, opacity),
+    [ItemKind.Image]: drawImage,
+    [ItemKind.Layer]: drawLayer
+  };
+
   function drawItem(item: Item, opacity: number, pictures: Pictures) {
-    if (item.kind === ItemKind.Image) {
-      drawImage(item, opacity, pictures);
-      return;
-    }
-    fillPath(item, opacity);
+    (DRAW[item.kind] as (item: Item, opacity: number, pictures: Pictures) => void)(item, opacity, pictures);
   }
 
   function scissored(item: Item, paint: () => void) {

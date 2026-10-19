@@ -444,7 +444,7 @@
   {#if engine === RenderEngine.GpuFull && fullDoc}
     <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
       {#key `${fullDoc.doc.width}x${fullDoc.doc.height}`}
-        <GpuFullLayer doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+        <GpuFullLayer doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} compose={gpuCompose ?? (() => html)} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
       {/key}
     </div>
   {/if}
