@@ -87,7 +87,7 @@ const TEXT_ALIGN: Record<StrokeAlign, { stretch: number; order?: string }> = {
   [StrokeAlign.Outside]: { stretch: 2, order: 'stroke fill' }
 };
 
-const firstColour = (f: Fill): string => (f.type === FillType.Solid ? f.color : f.type === FillType.Image ? HIDDEN : f.stops[0].color);
+export const firstColour = (f: Fill): string => (f.type === FillType.Solid ? f.color : f.type === FillType.Image ? HIDDEN : f.stops[0].color);
 
 export function textStroke(strokes: readonly Stroke[], unit: number, color: (value: string) => string): Record<string, string> {
   const s = strokes.find((x) => x.visible && x.width > 0);

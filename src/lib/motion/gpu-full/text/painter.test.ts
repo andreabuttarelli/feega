@@ -5,6 +5,7 @@ import { FillType } from '../../fill/model';
 import { apply2d } from '../../affine';
 import { paintText, Smoothing, TextGap, type Ink, type TextComponent, type TextEnv } from './painter';
 import { boxBook } from './test-face';
+import { FillRule, PaintKind, type Paint } from '../paint';
 import { animatorSchema, AnimatorUnit, SelectorShape } from '../../text-animators/model';
 
 const stage = { width: 1920, height: 1080 };
@@ -85,15 +86,18 @@ describe('paintText', () => {
   it('draws the caption box under the words in the box colour', () => {
     const inks = drawn(paintText(env('Caption', { text: 'a', background: '#ff0000' })));
 
-    expect(inks[0].color).toEqual([1, 0, 0, 1]);
+    expect(inks[0].paint).toEqual({ kind: PaintKind.Solid, color: [1, 0, 0, 1] });
     expect(inks).toHaveLength(2);
   });
 
   it('names what it cannot paint yet', () => {
     const gradient = [{ type: FillType.Linear, angle: 0, stops: [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }] }];
 
-    expect(paintText(env('Text', { fills: gradient }))).toBe(TextGap.Fill);
-    expect(paintText(env('Text', { strokes: [{ paint: { type: FillType.Solid, color: '#000000' }, width: 0.01 }] }))).toBe(TextGap.Stroke);
+    const angular = [{ type: FillType.Angular, angle: 0, center: { x: 0.5, y: 0.5 }, stops: gradient[0].stops }];
+    const blended = [{ type: FillType.Solid, color: '#ff0000', blend: 'multiply' }];
+
+    expect(paintText(env('Text', { fills: angular }))).toBe(TextGap.Fill);
+    expect(paintText(env('Text', { fills: blended }))).toBe(TextGap.Fill);
     expect(paintText(env('Text', {}, { fonts: () => null }))).toBe(TextGap.Font);
   });
 
@@ -145,7 +149,7 @@ describe('paintText', () => {
     it('mixes the animator colour into the text colour and blurs the unit', () => {
       const [ink] = animated('a', { values: { color: '#ff0000', blur: 4 } }, { fills: [{ type: FillType.Solid, color: '#0000ff' }] });
 
-      expect(ink.color).toEqual([1, 0, 0, 1]);
+      expect(ink.paint).toEqual({ kind: PaintKind.Solid, color: [1, 0, 0, 1] });
       expect(ink.blur).toBe(4);
     });
   });
@@ -173,6 +177,65 @@ describe('paintText', () => {
       const frame = frameOf('Text', { text: 'a', sizing: 'auto', width: 0.5 });
 
       expect(frame.width).toBeLessThan(0.1 * 1920);
+    });
+  });
+  describe('strokes and painted fills', () => {
+    const red = { type: FillType.Solid, color: '#ff0000' };
+    const stops = [{ color: '#000000', pos: 0 }, { color: '#ffffff', pos: 1 }];
+    const inksOf = (component: TextComponent, props: Record<string, unknown>) => drawn(paintText(env(component, { text: 'aa', align: 'left', ...props })));
+    const plainInk = (component: TextComponent = 'Text') => extent(inksOf(component, {}));
+
+    it('strokes the outlines on top of the fill, centred on them', () => {
+      const inks = inksOf('Text', { strokes: [{ paint: red, width: 0.01 }] });
+      const band = extent([inks[1]]);
+
+      expect(inks.map((i) => i.rule)).toEqual([FillRule.NonZero, FillRule.Union]);
+      expect(inks[1].paint).toEqual({ kind: PaintKind.Solid, color: [1, 0, 0, 1] });
+      expect(band.left).toBeCloseTo(plainInk().left - 0.005 * 1080, 0);
+    });
+
+    it('puts an outside stroke under the fill at twice the width', () => {
+      const inks = inksOf('Text', { strokes: [{ paint: red, width: 0.01, align: 'outside' }] });
+
+      expect(inks.map((i) => i.rule)).toEqual([FillRule.Union, FillRule.NonZero]);
+      expect(extent([inks[0]]).left).toBeCloseTo(plainInk().left - 0.01 * 1080, 0);
+    });
+
+    it('spreads a linear gradient over the line box of inline text, like background-clip text', () => {
+      const [ink] = inksOf('Text', { fills: [{ type: FillType.Linear, angle: 0, stops }] });
+      const paint = ink.paint as Extract<Paint, { kind: PaintKind.Linear }>;
+      const [from] = apply2d(ink.matrix, paint.from);
+      const [to] = apply2d(ink.matrix, paint.to);
+
+      expect(from).toBeCloseTo(plainInk().left, 0);
+      expect(to).toBeCloseTo(plainInk().right, 0);
+    });
+
+    it('spreads a title gradient down each line block', () => {
+      const e = env('Title', { text: 'aa', fills: [{ type: FillType.Linear, angle: 90, stops }] });
+      const [ink] = drawn(paintText(e));
+      const paint = ink.paint as Extract<Paint, { kind: PaintKind.Linear }>;
+
+      expect(paint.from[0]).toBeCloseTo(paint.to[0]);
+      expect(paint.to[1]).toBeGreaterThan(paint.from[1]);
+    });
+
+    it('draws a radial fill as an ellipse without moving the glyphs', () => {
+      const [ink] = inksOf('Text', { fills: [{ type: FillType.Radial, center: { x: 0.5, y: 0.5 }, radius: 1, stops }] });
+      const drawnAt = extent([ink]);
+
+      expect(ink.paint.kind).toBe(PaintKind.Radial);
+      expect(drawnAt.left).toBeCloseTo(plainInk().left);
+      expect(drawnAt.bottom).toBeCloseTo(plainInk().bottom);
+    });
+
+    it('stacks fills bottom first and fades each by its opacity', () => {
+      const inks = inksOf('Text', { fills: [red, { type: FillType.Solid, color: '#0000ff', opacity: 0.5 }] });
+
+      expect(inks.map((i) => i.paint)).toEqual([
+        { kind: PaintKind.Solid, color: [1, 0, 0, 1] },
+        { kind: PaintKind.Solid, color: [0, 0, 1, 0.5] }
+      ]);
     });
   });
 });

@@ -20,6 +20,7 @@ import { modifierFilter } from '../shape/modifiers';
 import { ShapeKind, modifierValues } from '../shape/schema';
 import { flatten, rectOutline, type Outline } from '../shape/geometry';
 import { rgbaOf, type Rgba } from './rgba';
+import { FillRule, PaintKind, type Paint, type Stop } from './paint';
 import { sourceSeconds } from '../time-remap';
 import { edgeAt, moveAt, type Pose } from './edges';
 import { stillSeconds } from '../still';
@@ -27,22 +28,11 @@ import { animatorOfKey, COLOR_VALUE, SELECTOR_KEYS, type TextAnimator } from '..
 import { NO_TYPESET, paintText, TEXT_COMPONENTS, TextGap, type TextComponent, type Typeset } from './text/painter';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
+export { FillRule, PaintKind, type Paint, type Stop } from './paint';
 
 export enum ItemKind {
   Path = 'path',
   Image = 'image'
-}
-
-export enum PaintKind {
-  Solid = 'solid',
-  Linear = 'linear',
-  Radial = 'radial'
-}
-
-export enum FillRule {
-  NonZero = 'nonzero',
-  EvenOdd = 'evenodd',
-  Union = 'union'
 }
 
 export enum Unsupported {
@@ -64,13 +54,6 @@ export enum Unsupported {
   Glyph = 'glyph',
   TextPath = 'text-path'
 }
-
-export type Stop = { at: number; color: Rgba };
-
-export type Paint =
-  | { kind: PaintKind.Solid; color: Rgba }
-  | { kind: PaintKind.Linear; from: [number, number]; to: [number, number]; stops: Stop[] }
-  | { kind: PaintKind.Radial; center: [number, number]; radius: number; stops: Stop[] };
 
 export type Scissor = [number, number, number, number];
 
@@ -200,7 +183,7 @@ const logoPainter = ({ props, size, asset, logo }: Env): Painted => {
   return src ? [picture(src, size, { fit: 'width', clipped: false })] : Unsupported.Text;
 };
 
-const TEXT_GAP: Record<TextGap, Unsupported> = { [TextGap.Font]: Unsupported.Font, [TextGap.Glyph]: Unsupported.Glyph, [TextGap.Fill]: Unsupported.Fill, [TextGap.Stroke]: Unsupported.Stroke };
+const TEXT_GAP: Record<TextGap, Unsupported> = { [TextGap.Font]: Unsupported.Font, [TextGap.Glyph]: Unsupported.Glyph, [TextGap.Fill]: Unsupported.Fill };
 
 function textPainter(env: Env): Painted {
   const { clip, animators, props, box, stage, css, time, fps, still, typeset } = env;
@@ -211,7 +194,7 @@ function textPainter(env: Env): Painted {
   const { frame, inks } = painted;
   const scale = Number(props.scale ?? 1);
   const turn = scaleAbout(frame.left + frame.width / 2, frame.top + frame.height / 2, Number(props.rotation ?? 0), scale);
-  return inks.map((ink) => ({ kind: ItemKind.Path as const, contours: ink.contours, rule: FillRule.NonZero, paint: { kind: PaintKind.Solid, color: ink.color }, opacity: ink.opacity, matrix: mul2d(turn, ink.matrix), blur: ink.blur * scale }));
+  return inks.map((ink) => ({ kind: ItemKind.Path as const, contours: ink.contours, rule: ink.rule, paint: ink.paint, opacity: ink.opacity, matrix: mul2d(turn, ink.matrix), blur: ink.blur * scale }));
 }
 
 type Box = { left: number; top: number; width: number; height: number };
