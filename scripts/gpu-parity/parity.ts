@@ -70,7 +70,7 @@ function assetIds(value: unknown, into = new Set<string>()): Set<string> {
 }
 
 function serve(script: string, assets: Map<string, Buffer>): Promise<{ url: string; origin: string; close: () => void }> {
-  const page = `<!doctype html><html><body style="margin:0;background:#000"><div id="host" style="position:relative;width:1920px;height:1080px;overflow:hidden"></div><script src="/host.js"></script></body></html>`;
+  const page = `<!doctype html><html><body style="margin:0;background:#000"><div id="host" style="position:relative;width:4096px;height:4096px;overflow:hidden"></div><script src="/host.js"></script></body></html>`;
   const server = createServer((req, res: ServerResponse) => {
     const pathname = new URL(req.url ?? '/', 'http://parity').pathname;
     if (pathname.startsWith(MOTION_LIBS_ROUTE)) {
@@ -141,7 +141,7 @@ const dir = join(OUT, name);
 mkdirSync(dir, { recursive: true });
 
 const browser = engineName === 'webkit' ? await webkit.launch({ headless: mode !== Mode.Preview }) : await chromium.launch({ ...LAUNCH, headless: mode !== Mode.Preview });
-const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: scaleFactor });
+const page = await browser.newPage({ viewport: { width: Math.max(1920, doc.width), height: Math.max(1080, doc.height) }, deviceScaleFactor: scaleFactor });
 page.setDefaultTimeout(TIMEOUT_MS);
 page.on('pageerror', (e) => console.error('pageerror', e.message));
 page.on('console', (m) => (m.type() === 'error' ? console.error('console', m.text().slice(0, 300)) : undefined));

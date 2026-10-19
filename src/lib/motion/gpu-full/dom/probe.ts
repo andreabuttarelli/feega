@@ -1,6 +1,7 @@
 import { js } from '../../hyperframes/html';
 import { COMPOSITION_ID } from '../../hyperframes/capture';
 import { CUSTOM_ROOT_PREFIX, DOM_READ_REPLY, DOM_READ_REQUEST, NO_INDEX, TEXT_PAD, READ_ATTRS, READ_STYLES, type DomReadRequest, type RawNode, type RawTree, type TextLine, type TextRaster } from './tree';
+import type { SvgNode } from '../../effects/registry';
 
 type ProbeConfig = { request: string; reply: string; timeline: string; prefix: string; none: number; pad: number; styles: readonly string[]; attrs: readonly string[] };
 
@@ -84,6 +85,23 @@ export function domProbe(cfg: ProbeConfig) {
     return { layer: layers.push(createImageBitmap(canvas)) - 1, width: canvas.width, height: canvas.height };
   };
 
+  const REFERENCE = /url\(\s*["']?#([^"')]+)["']?\s*\)/;
+  const REFERRING = ['clip-path', 'filter', 'fill', 'stroke', 'mask-image'];
+
+  const serialized = (el: Element): SvgNode => ({
+    tag: el.tagName,
+    attrs: Object.fromEntries([...el.attributes].map((a) => [a.name, a.value])),
+    children: [...el.children].map(serialized)
+  });
+
+  const defsOf = (nodes: RawNode[]): Record<string, SvgNode> => {
+    const ids = new Set(nodes.flatMap((n) => REFERRING.map((k) => REFERENCE.exec(n.style[k as keyof RawNode['style']] ?? '')?.[1]).filter((id): id is string => Boolean(id))));
+    return Object.fromEntries([...ids].flatMap((id) => {
+      const el = document.getElementById(id);
+      return el ? [[id, serialized(el)]] : [];
+    }));
+  };
+
   const read = (root: HTMLElement, layers: Promise<ImageBitmap>[]): RawTree => {
     const nodes: RawNode[] = [];
     const elements: Element[] = [];
@@ -130,7 +148,7 @@ export function domProbe(cfg: ProbeConfig) {
       node.at = [own.left - base.left, own.top - base.top];
       node.size = [own.width, own.height];
     });
-    return { width: rects[0]?.width ?? 0, height: rects[0]?.height ?? 0, nodes };
+    return { width: rects[0]?.width ?? 0, height: rects[0]?.height ?? 0, nodes, defs: defsOf(nodes) };
   };
 
   addEventListener('message', (e: MessageEvent) => {

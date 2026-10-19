@@ -12,6 +12,15 @@ const MAX_MORPH = 64;
 const SOURCE_GRAPHIC = 'SourceGraphic';
 const SOURCE_ALPHA = 'SourceAlpha';
 const HALF = 0.5;
+const SRGB = 'sRGB';
+const INTERPOLATION = 'color-interpolation-filters';
+
+enum Encoding {
+  Linear = 1,
+  Srgb = 0
+}
+
+const linearChannel = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 
 const UNPREMULTIPLIED = `
 vec4 straight(vec4 c) { return c.a > 0.0 ? vec4(c.rgb / c.a, c.a) : vec4(0.0); }
@@ -31,6 +40,20 @@ void main() {
     o[r] = u_m[r * 5] * c.r + u_m[r * 5 + 1] * c.g + u_m[r * 5 + 2] * c.b + u_m[r * 5 + 3] * c.a + u_m[r * 5 + 4];
   }
   outColor = premul(o);
+}`;
+
+const GAMMA_FS = `#version 300 es
+precision highp float;
+in vec2 v_uv;
+uniform sampler2D u_src;
+uniform int u_toLinear;
+out vec4 outColor;
+${UNPREMULTIPLIED}
+vec3 linear(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c)); }
+vec3 encoded(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+void main() {
+  vec4 c = straight(texture(u_src, v_uv));
+  outColor = premul(vec4(u_toLinear == 1 ? linear(c.rgb) : encoded(c.rgb), c.a));
 }`;
 
 const TABLE_FS = `#version 300 es
@@ -262,6 +285,7 @@ const pair = (v: unknown): [number, number] => {
 export function createFilters(gl: WebGL2RenderingContext, width: number, height: number, quad: WebGLBuffer): FilterRunner {
   const programs = {
     matrix: program(gl, QUAD_VS, MATRIX_FS),
+    gamma: program(gl, QUAD_VS, GAMMA_FS),
     table: program(gl, QUAD_VS, TABLE_FS),
     offset: program(gl, QUAD_VS, OFFSET_FS),
     flood: program(gl, QUAD_VS, FLOOD_FS),
@@ -308,6 +332,8 @@ export function createFilters(gl: WebGL2RenderingContext, width: number, height:
 
   const scale = (space: Linear) => Math.sqrt(Math.abs(space[0] * space[3] - space[1] * space[2]));
   const vector = (space: Linear, dx: number, dy: number): [number, number] => [space[0] * dx + space[2] * dy, space[1] * dx + space[3] * dy];
+
+  const encode = (src: WebGLTexture, to: Encoding) => run(programs.gamma, [src], () => gl.uniform1i(u(programs.gamma, 'u_toLinear'), to));
 
   const matrix = (src: WebGLTexture, m: number[]) => run(programs.matrix, [src], () => gl.uniform1fv(u(programs.matrix, 'u_m'), m));
 
@@ -473,14 +499,17 @@ export function createFilters(gl: WebGL2RenderingContext, width: number, height:
     });
   }
 
-  function svgGraph(source: WebGLTexture, filter: SvgNode, space: Linear): WebGLTexture {
+  function svgGraph(srgbSource: WebGLTexture, filter: SvgNode, space: Linear): WebGLTexture {
+    const linear = filter.attrs[INTERPOLATION] !== SRGB;
+    const source = linear ? encode(srgbSource, Encoding.Linear) : srgbSource;
     const results = new Map<string, WebGLTexture>();
     let last = source;
     const s = scale(space);
     const input = (name: unknown) => (name === SOURCE_GRAPHIC ? source : name === SOURCE_ALPHA ? alphaOf(source) : name === undefined ? last : (results.get(String(name)) ?? last));
     const colourOf = (node: SvgNode) => {
       const c = rgbaOf(String(node.attrs['flood-color'] ?? '#000000')) ?? [0, 0, 0, 1];
-      return [c[0], c[1], c[2], c[3] * num(node.attrs['flood-opacity'], 1)] as Rgba;
+      const [r, g, b] = linear ? [c[0], c[1], c[2]].map(linearChannel) : c;
+      return [r, g, b, c[3] * num(node.attrs['flood-opacity'], 1)] as Rgba;
     };
     const PRIMITIVE: Record<string, (node: SvgNode) => WebGLTexture> = {
       feColorMatrix: (n) => colourMatrix(input(n.attrs.in), n.attrs),
@@ -514,7 +543,7 @@ export function createFilters(gl: WebGL2RenderingContext, width: number, height:
         results.set(String(node.attrs.result), last);
       }
     }
-    return last;
+    return linear ? encode(last, Encoding.Srgb) : last;
   }
 
   function cssGraph(source: WebGLTexture, fns: CssFunction[], space: Linear): WebGLTexture {

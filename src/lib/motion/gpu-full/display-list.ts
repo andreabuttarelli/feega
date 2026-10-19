@@ -42,7 +42,8 @@ export enum ItemKind {
   Image = 'image',
   Layer = 'layer',
   Text = 'text',
-  Lens = 'lens'
+  Lens = 'lens',
+  Group = 'group'
 }
 
 export enum Unsupported {
@@ -82,7 +83,9 @@ export type TextItem = { kind: ItemKind.Text; clip: string; plan: TextPlan; turn
 
 export type LensItem = { kind: ItemKind.Lens; clip: string; lens: Lens; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
 
-export type Item = PathItem | ImageItem | LayerItem | TextItem | LensItem;
+export type GroupItem = { kind: ItemKind.Group; clip: string; items: Item[]; opacity: number; matrix: Affine; blur: number; blend: BlendMode; scissor?: Scissor; masks?: MaskLayer[]; matte?: MatteOf; filters?: Filter[]; space?: Linear; backdrop?: number };
+
+export type Item = PathItem | ImageItem | LayerItem | TextItem | LensItem | GroupItem;
 
 
 export type MatteOf = { items: Item[]; luma: boolean; invert: boolean };
@@ -243,7 +246,20 @@ const CONTENT_OF: Record<DrawnKind, (d: never, clip: string) => Content> = {
   [DrawnKind.Layer]: (d: Extract<Drawn, { kind: DrawnKind.Layer }>, clip) => ({ kind: ItemKind.Layer, source: `${clip}:${d.layer}`, size: { width: d.width, height: d.height }, opacity: d.opacity, matrix: d.matrix })
 };
 
-const customPainter = ({ read, clip }: Env): Painted => {
+type Looked = { masks?: MaskLayer[]; filters?: Filter[]; space?: Linear; blend?: BlendMode };
+
+function ownLook(content: object, placed: Affine, clip: Looked): Looked {
+  const own = content as Looked;
+  const masks = own.masks?.map((m) => ({ ...m, cover: { ...m.cover, matrix: mul2d(placed, m.cover.matrix) } }));
+  const space = own.space ? (mul2d([placed[0], placed[1], placed[2], placed[3], 0, 0], [...own.space, 0, 0]).slice(0, 4) as Linear) : undefined;
+  return {
+    ...(masks ? { masks: [...(clip.masks ?? []), ...masks] } : {}),
+    ...(own.filters ? { filters: [...own.filters, ...(clip.filters ?? [])], space } : {}),
+    ...(own.blend ? { blend: own.blend } : {})
+  };
+}
+
+const customPainter =({ read, clip }: Env): Painted => {
   if (!read) {
     return Unsupported.Unread;
   }
@@ -404,7 +420,13 @@ export function drawFrame({ doc, tokens, assets, typeset }: Prepared, frame: num
     const read = pair ? MATTE_READ[pair.matte] : null;
     const extras = { ...(scissor ? { scissor } : {}), ...(filtered.filters.length ? { filters: filtered.filters, space: [world[0], world[1], world[2], world[3]] as Linear } : {}), ...(filtered.backdrop ? { backdrop: filtered.backdrop } : {}), ...(masks.length ? { masks } : {}), ...(read ? { matte: { items: matteItems, luma: read.weights !== null, invert: read.invert } } : {}) };
     const framed = (c: Content) => (c.kind === ItemKind.Image && c.clipped ? { matrix: mul2d(base, c.matrix), inner: moved } : { matrix: mul2d(placed, c.matrix) });
-    return content.map((c) => ({ ...c, clip: clip.id, opacity: alpha * c.opacity, ...framed(c), blur: blur + ('blur' in c ? (c.blur ?? 0) * scaleOf(placed) : 0), blend: clip.blend, ...extras }) as Item);
+    const ownBlur = (c: Content) => ('blur' in c ? (c.blur ?? 0) * scaleOf(placed) : 0);
+    const grouped = content.length > 1 && (Object.keys(extras).length > 0 || alpha < 1 || blur > 0 || clip.blend !== BlendMode.Normal);
+    if (!grouped) {
+      return content.map((c) => ({ ...c, clip: clip.id, opacity: alpha * c.opacity, ...framed(c), blur: blur + ownBlur(c), blend: clip.blend, ...extras, ...ownLook(c, placed, extras) }) as Item);
+    }
+    const items = content.map((c) => ({ ...c, clip: clip.id, opacity: c.opacity, ...framed(c), blur: ownBlur(c), blend: BlendMode.Normal, ...ownLook(c, placed, {}) }) as Item);
+    return [{ kind: ItemKind.Group, clip: clip.id, items, opacity: alpha, matrix: IDENTITY, blur, blend: clip.blend, ...extras }];
   }
 
   const bottomFirst = [...doc.tracks].reverse().filter((t) => t.kind === TrackKind.Visual && !t.hidden);
