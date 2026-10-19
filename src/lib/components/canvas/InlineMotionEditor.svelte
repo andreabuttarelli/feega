@@ -6,7 +6,8 @@
 
   const sessions = earlyFetch<MotionEditorData | null>({
     load: (url) => fetch(url).then((res) => (res.ok ? (res.json() as Promise<MotionEditorData>) : null)),
-    now: () => performance.now()
+    now: () => performance.now(),
+    landed: (url, value) => value && lastSessions.set(url, value)
   });
 
   export const sessionUrl = (editorPath: string) => `${editorPath}/session`;

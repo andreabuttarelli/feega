@@ -91,7 +91,7 @@ function fieldsOf(schema: z.ZodType): string {
 const GENERIC_DESCRIPTION = [
   'Other canvas ops of THIS project, as API/MCP: op, camelCase input.',
   `Spend credits, only if the user asked: ${GENERIC_OPS.filter((name) => CANVAS_OPS[name].access === Access.Spend).join(', ')}.`,
-  `Ops: ${GENERIC_OPS.map((name) => `${name} {${fieldsOf(CANVAS_OPS[name].input)}}`).join('; ')}.`
+  `Ops: ${GENERIC_OPS.map((name) => `${name} {${fieldsOf(CANVAS_OPS[name].input)}}`).join(';')}.`
 ].join(' ');
 
 function canvasOpTools(ctx: CanvasCtx): Record<string, Tool> {

@@ -131,8 +131,20 @@ async function inView(page: Page, id: string): Promise<Box> {
   return (await page.locator(nodeSel(id)).boundingBox())!;
 }
 
+const USER_HOVER_MS = 300;
+let hoverBeforeOpen = 0;
+
+async function approach(page: Page, at: { x: number; y: number }) {
+  if (!hoverBeforeOpen) {
+    return;
+  }
+  await page.mouse.move(at.x, at.y, { steps: 4 });
+  await page.waitForTimeout(hoverBeforeOpen);
+}
+
 async function clickNode(page: Page, id: string) {
   const b = await inView(page, id);
+  await approach(page, { x: b.x + Math.min(20, b.width / 4), y: b.y + Math.min(12, b.height / 4) });
   await page.mouse.click(b.x + Math.min(20, b.width / 4), b.y + Math.min(12, b.height / 4));
 }
 
@@ -141,6 +153,7 @@ async function openNode(page: Page, id: string, how = Open.Single) {
     return;
   }
   const at = centre(await inView(page, id));
+  await approach(page, at);
   await (how === Open.Double ? page.mouse.dblclick(at.x, at.y) : page.mouse.click(at.x, at.y));
   await expect(page.getByTestId('motion-editor')).toBeVisible({ timeout: OPEN_MS });
 }
@@ -495,10 +508,13 @@ const STEPS: Step[] = [
 
 enum Variant {
   Session = 'session',
-  TwoTabs = 'two-tabs'
+  TwoTabs = 'two-tabs',
+  User = 'user'
 }
 
-const VARIANTS = (process.env.FLUID_VARIANTS ?? `${Variant.Session},${Variant.TwoTabs}`).split(',') as Variant[];
+const HOVER_OF: Record<Variant, number> = { [Variant.Session]: 0, [Variant.TwoTabs]: 0, [Variant.User]: USER_HOVER_MS };
+
+const VARIANTS = (process.env.FLUID_VARIANTS ?? `${Variant.Session},${Variant.TwoTabs},${Variant.User}`).split(',') as Variant[];
 const PEER_EVERY_MS = 1500;
 const ACCOUNT = () => ({ email: process.env.E2E_TEST_EMAIL!, password: process.env.E2E_TEST_PASSWORD! });
 
@@ -701,6 +717,7 @@ test.describe('fluidity scorecard @real', () => {
         const page = await context.newPage();
         page.setDefaultTimeout(60_000);
         const mocked = await mockGenerate(page);
+        hoverBeforeOpen = HOVER_OF[variant];
         const peer = variant === Variant.TwoTabs ? await browser.newContext({ viewport: VIEWPORT }) : null;
         let runs: StepRun[] = [];
         let stopPeer = () => Promise.resolve();

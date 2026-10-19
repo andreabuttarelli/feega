@@ -1,3 +1,4 @@
+import { isInteractive } from '$lib/motion/interactive/settings';
 import type { Db } from '$lib/server/db/client';
 import { listProjectAssets, type Asset } from '$lib/server/repos/assets';
 import { findBrandLook } from '$lib/server/repos/brands';
@@ -106,6 +107,8 @@ export function assetUrls(assets: MotionAsset[]): Record<string, string> {
   return Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string]));
 }
 
+export const headPatch = (doc: MotionDoc, version: number) => ({ docHeadRevision: version, format: formatOf(doc), interactive: isInteractive(doc) });
+
 export async function saveMotionDoc(
   db: Db,
   input: { orgId: string; nodeId: string; expectedVersion: number; doc: unknown; actor: Actor; summary?: string | null; known?: CanvasNodeRecord; checkpoint?: Checkpoint }
@@ -118,7 +121,7 @@ export async function saveMotionDoc(
   const patched = await patchNodeData(db, {
     orgId: input.orgId,
     nodeId: input.nodeId,
-    patch: { docHeadRevision: write.head.version, format: formatOf(write.head.doc as MotionDoc) },
+    patch: headPatch(write.head.doc as MotionDoc, write.head.version),
     check: DataCheck.Schema,
     actor: input.actor,
     known: input.known

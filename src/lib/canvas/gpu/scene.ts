@@ -42,7 +42,6 @@ const MAX_TEXT_CHARS = 1400;
 const TEXT_TIERS = [1, 2, 4] as const;
 const THUMB_COLUMNS = 3;
 const STAGE = '#000000';
-const OPEN_LABEL = 'Open editor';
 const SKELETON_ROWS = 6;
 const SKELETON_STEP = 22;
 const SKELETON_BAR = 10;
@@ -529,7 +528,6 @@ export class GpuScene {
         if (media) {
           this.mediaSprite(root, b, media, stage, Fit.Contain);
         }
-        this.openPill(root, b, c);
       },
       [Surface.Graphic]: () => f.media && this.mediaSprite(root, b, f.media, { x: 0, y: 0, w: c.w, h: c.h }, Fit.Contain),
       [Surface.Generate]: () => this.buildGenerate(root, b, c),
@@ -578,17 +576,6 @@ export class GpuScene {
       this.load(b);
     }
     return b;
-  }
-
-  private openPill(root: Container, b: Built, c: Card) {
-    const open = this.text(OPEN_LABEL, BODY_SIZE - 2, this.theme.ink, null);
-    const pill = new Graphics();
-    const pw = open.width + 16;
-    const ph = open.height + 8;
-    pill.rect(c.w - 6 - pw, 6, pw, ph).fill(this.theme.paper).stroke({ width: 1, color: this.theme.line });
-    open.position.set(c.w - 6 - pw + 8, 10);
-    root.addChild(pill, open);
-    b.texts.push(open);
   }
 
   private thumbGrid(root: Container, b: Built, urls: string[], c: Card, top: number) {

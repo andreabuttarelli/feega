@@ -34,6 +34,8 @@ export type Interactive = { playback: PlayMode; loop: boolean; outside: Outside;
 
 export const DEFAULT_INTERACTIVE: Interactive = { playback: PlayMode.Autoplay, loop: HOUSE_LOOP, outside: Outside.Fallback, scrollLength: SCROLL_LENGTH.default, vars: [], bindings: [] };
 
+export const isInteractive = (doc: { interactive?: unknown }): boolean => doc.interactive !== undefined;
+
 export function interactiveOf(doc: { interactive?: Partial<Interactive> }): Interactive {
   return { ...DEFAULT_INTERACTIVE, ...doc.interactive };
 }
