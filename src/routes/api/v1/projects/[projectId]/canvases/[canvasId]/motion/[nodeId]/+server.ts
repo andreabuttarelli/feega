@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { actionOf, servePage, type PageHandler } from '$lib/server/api/bearer-page';
-import { actions, load } from '$lib/server/motion/editor-page';
+import { actions, load } from '$lib/server/frame-editor/editor-page';
 
 const pagePath = (params: { projectId: string; canvasId: string; nodeId: string }) => `/p/${params.projectId}/c/${params.canvasId}/motion/${params.nodeId}`;
 
