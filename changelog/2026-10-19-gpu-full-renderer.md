@@ -12,6 +12,6 @@ default stay on HTML.
 
 Parity harness: `bench:gpu-parity --under=gpu-full` adds pixels-off share next to SSIM/PSNR;
 `scripts/gpu-parity/kinds.ts` writes one doc per kind. Numbers and the target stack (Vello,
-Parley, HarfRust, Taffy, wgpu) in ADR 0015.
+Parley, HarfRust, Taffy, wgpu) in ADR 0018.
 
 Finding: the user's real fixtures are all `Custom` components; no library kind moves them.
