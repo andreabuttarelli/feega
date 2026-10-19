@@ -13,6 +13,10 @@ describe('the right bar never goes back to the park between canvas and editor', 
     expect(editor).toMatch(/mount === Mount\.Canvas && viewportOf\(width\) === Viewport\.Desktop \? BarSeat\.InPlace/);
   });
 
+  it('an editor seated in place lays out as desktop, though the canvas pane narrows its host', () => {
+    expect(editor).toMatch(/const viewport = \$derived\(barSeat === BarSeat\.InPlace \? Viewport\.Desktop :/);
+  });
+
   it('the editor claims the bar as soon as it mounts, not when its panels are due', () => {
     expect(editor).not.toMatch(/\{#if panelsDue\}(?:(?!\{\/if\})[^\n])*<BarSlot/);
   });
