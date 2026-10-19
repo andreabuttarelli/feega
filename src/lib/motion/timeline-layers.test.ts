@@ -3,7 +3,7 @@ import { MotionFormat, newMotionDoc, type MotionClip, type MotionTrack } from '.
 import { Interp, type Keyframe } from './keyframes';
 import { TrackKind } from './components';
 import { Ease } from './design';
-import { KeyMark, KeyGlyph, ROW_PX, RowKind, keyMark, keyGlyph, layerName, layerRows, pinched, propValue, rulerMarks } from './timeline-layers';
+import { KeyMark, KeyGlyph, ROW_PX, RowKind, keyMark, keyGlyph, layerName, layerRows, pinched, rowWindow, propValue, rulerMarks } from './timeline-layers';
 
 const clip = (id: string, over: Partial<MotionClip> = {}): MotionClip => ({ id, component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Better marketing' }, keyframes: {}, ...over }) as MotionClip;
 const track = (id: string, clips: MotionClip[]): MotionTrack => ({ id, kind: TrackKind.Visual, name: id, clips }) as MotionTrack;
@@ -76,5 +76,26 @@ describe('timeline layers', () => {
     expect(pinched(2, 100, 200)).toBe(4);
     expect(pinched(2, 100, 50)).toBe(1);
     expect(pinched(2, 100, 100000)).toBe(16);
+  });
+
+  it('renders only the rows in view on a 270-clip landing, padding the rest', () => {
+    const rows = layerRows([track('t', Array.from({ length: 270 }, (_, i) => clip(`c${i}`)))], { folded: [], open: [], lanes: () => [] });
+    const total = rows.length * ROW_PX[RowKind.Layer];
+
+    const shown = rowWindow(rows, 28 * 100, 280, 2);
+
+    expect(shown.from).toBe(98);
+    expect(shown.to).toBe(112);
+    expect(shown.before + (shown.to - shown.from) * ROW_PX[RowKind.Layer] + shown.after).toBe(total);
+  });
+
+  it('renders a first screenful, not all 270 rows, before the viewport is measured', () => {
+    const rows = layerRows([track('t', Array.from({ length: 270 }, (_, i) => clip(`c${i}`)))], { folded: [], open: [], lanes: () => [] });
+
+    const shown = rowWindow(rows, 0, 0, 2);
+
+    expect(shown.from).toBe(0);
+    expect(shown.to).toBeGreaterThan(10);
+    expect(shown.to).toBeLessThan(60);
   });
 });

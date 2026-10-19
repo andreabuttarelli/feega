@@ -4,6 +4,7 @@
   import { setMotionBlur } from '$lib/motion/motion-blur-ops';
   import { Background, FORMATS, MOTION_FORMATS, sideRange, MAX_SECONDS, formatOf, formatSize, type MotionDoc, type MotionFormat } from '$lib/motion/doc';
   import { setCanvas, type OpResult } from '$lib/motion/timeline';
+  import { resizeFrame, withConstraints } from '$lib/motion/constraints/constraints';
   import { parseDecimal, secondsLabel } from '$lib/motion/inspector';
   import { fitDuration } from '$lib/motion/fit-duration';
   import { DocMode, designStill, docMode, setStill } from '$lib/motion/still';
@@ -25,7 +26,7 @@
     if (!Number.isFinite(pixels)) {
       return;
     }
-    onchange(setCanvas(doc, { size: { width: doc.width, height: doc.height, [side]: pixels } }), 'Changed frame size');
+    onchange(resizeFrame(doc, { width: doc.width, height: doc.height, [side]: pixels }), 'Changed frame size');
   }
 
   function setStillAt(text: string) {
@@ -40,7 +41,7 @@
 <div class="settings" data-testid="composition-settings">
   <label>
     <span>Format</span>
-    <select value={formatOf(doc)} onchange={(e) => onchange(setCanvas(doc, { format: e.currentTarget.value as MotionFormat }), 'Changed format')}>
+    <select value={formatOf(doc)} onchange={(e) => onchange(withConstraints(doc, setCanvas(doc, { format: e.currentTarget.value as MotionFormat })), 'Changed format')}>
       {#each MOTION_FORMATS as format (format)}<option value={format}>{FORMATS[format].label} · {formatSize(format, doc).width}×{formatSize(format, doc).height}</option>{/each}
     </select>
   </label>

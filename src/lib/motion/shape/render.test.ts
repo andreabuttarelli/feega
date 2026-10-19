@@ -83,3 +83,26 @@ describe('shape markup', () => {
     expect(svg).toContain('<path d="M0 0L');
   });
 });
+
+describe('a vector network shape', () => {
+  const zero = { x: 0, y: 0 };
+  const line = (start: number, end: number) => ({ start, end, tangentStart: zero, tangentEnd: zero });
+  const tee = {
+    vertices: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0.5, y: 0 }, { x: 0.5, y: 1 }],
+    segments: [line(0, 2), line(2, 1), line(2, 3)],
+    regions: []
+  };
+
+  it('strokes a branching network as its own runs and fills nothing without regions', () => {
+    const svg = shapeMarkup(look({ shape: 'vector', network: tee, fills: [{ type: 'solid', color: '#ff0000' }], strokes: [{ paint: { type: 'solid', color: '#111111' }, width: 0.01 }] }), paint);
+    expect(svg).toContain('M100 0L100 100');
+    expect(svg).not.toContain('fill:#ff0000');
+  });
+
+  it('fills its regions', () => {
+    const square = { vertices: [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 1, y: 1 }, { x: 0, y: 1 }], segments: [line(0, 1), line(1, 2), line(2, 3), line(3, 0)], regions: [{ winding: 'nonzero', loops: [[0, 1, 2, 3]] }] };
+    const svg = shapeMarkup(look({ shape: 'vector', network: square, fills: [{ type: 'solid', color: '#ff0000' }] }), paint);
+    expect(svg).toContain('<path d="M0 0L200 0L200 100L0 100Z"/>');
+    expect(svg).toContain('fill:#ff0000');
+  });
+});

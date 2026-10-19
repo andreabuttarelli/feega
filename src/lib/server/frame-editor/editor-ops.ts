@@ -34,6 +34,9 @@ import { splitTags } from '$lib/gallery/model';
 import { publishStatus } from '$lib/server/gallery/http';
 import { withdrawFromGallery } from '$lib/server/gallery/publish';
 import { publishNode } from '$lib/server/gallery/service';
+import { BranchOutcome, type Refusal, createBranch, dropBranch, listBranches, mergeBranchBack, reviewBranch } from '$lib/server/motion/branches';
+import { branchStore } from '$lib/server/motion/branch-store';
+import { Side } from '$lib/motion/branch-merge';
 
 export enum EditorAccess {
   Read = 'read',
@@ -61,6 +64,15 @@ const refused = (status: number, body: Record<string, unknown>): EditorAnswer =>
 const nodeScope = (ctx: EditorCtx) => ({ orgId: ctx.orgId, nodeId: ctx.motion.record.id });
 
 const summaryInput = z.string().nullable().optional();
+
+const BRANCH_NAME_MAX = 120;
+
+const branchesOf = (ctx: EditorCtx) => branchStore(ctx.db, { orgId: ctx.orgId, actor: ctx.actor });
+
+const BRANCH_REFUSAL: Record<Refusal, () => EditorAnswer> = {
+  [BranchOutcome.NotABranch]: () => refused(HTTP_BAD_REQUEST, { error: 'not_a_branch' }),
+  [BranchOutcome.FrameGone]: () => refused(HTTP_NOT_FOUND, { error: 'frame_not_found' })
+};
 
 const placeOf = (ctx: EditorCtx) => ({ db: ctx.db, orgId: ctx.orgId, projectId: ctx.canvas.projectId, canvasId: ctx.canvas.id, nodeId: ctx.motion.record.id });
 
@@ -255,6 +267,48 @@ export const EDITOR_OPS = {
     run: async (ctx, input) => {
       const out = await nameVersion(ctx.db, { ...nodeScope(ctx), ...input, actor: ctx.actor });
       return out.named ? ok({ named: true }) : refused(HTTP_NOT_FOUND, { error: out.error });
+    }
+  }),
+
+  create_branch: op({
+    access: EditorAccess.Write,
+    input: z.object({ name: z.string().trim().min(1).max(BRANCH_NAME_MAX) }),
+    run: async (ctx, input) => {
+      const id = await createBranch(branchesOf(ctx), ctx.motion.record.id, input.name);
+      return id ? ok({ branchId: id }) : refused(HTTP_NOT_FOUND, { error: 'frame_has_no_revision' });
+    }
+  }),
+
+  list_branches: op({
+    access: EditorAccess.Read,
+    input: z.object({}),
+    run: async (ctx) => ok({ branches: await listBranches(branchesOf(ctx), ctx.motion.record.id) })
+  }),
+
+  review_branch: op({
+    access: EditorAccess.Read,
+    input: z.object({}),
+    run: async (ctx) => {
+      const review = await reviewBranch(branchesOf(ctx), ctx.motion.record.id);
+      return review ? ok({ fork: review.fork, conflicts: review.conflicts }) : refused(HTTP_BAD_REQUEST, { error: 'not_a_branch' });
+    }
+  }),
+
+  merge_branch: op({
+    access: EditorAccess.Write,
+    input: z.object({ choices: z.record(z.string(), z.enum(Side)).default({}) }),
+    run: async (ctx, input) => {
+      const out = await mergeBranchBack(branchesOf(ctx), ctx.motion.record.id, input.choices);
+      return out.outcome === BranchOutcome.Merged ? ok({ version: out.version }) : BRANCH_REFUSAL[out.outcome]();
+    }
+  }),
+
+  drop_branch: op({
+    access: EditorAccess.Write,
+    input: z.object({}),
+    run: async (ctx) => {
+      const out = await dropBranch(branchesOf(ctx), ctx.motion.record.id);
+      return out === BranchOutcome.Dropped ? ok({ dropped: true }) : BRANCH_REFUSAL[BranchOutcome.NotABranch]();
     }
   }),
 

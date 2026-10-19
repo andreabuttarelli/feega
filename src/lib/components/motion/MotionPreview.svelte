@@ -259,10 +259,13 @@
     });
   }
 
-  export function measure(pose: Pose = Pose.Base): Promise<Record<string, MeasuredBox>> {
+  export async function measure(pose: Pose = Pose.Base): Promise<Record<string, MeasuredBox>> {
+    if (!ready && !(await whenReady())) {
+      return {};
+    }
     const target = player?.iframeElement?.contentWindow;
     if (!target || capturing) {
-      return Promise.resolve({});
+      return {};
     }
     const id = crypto.randomUUID();
     return new Promise((resolve) => {
@@ -326,6 +329,10 @@
       window.addEventListener('message', onMessage);
       target.postMessage({ type: TEXT_EDIT.start, id, selector, ...(at ?? {}) }, '*');
     });
+  }
+
+  export function isTextEditing(): boolean {
+    return textEditing;
   }
 
   export function stopTextEdit() {

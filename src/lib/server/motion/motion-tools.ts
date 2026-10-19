@@ -4,7 +4,15 @@ import { StyleAction, StyleKind, applyStyle, defineStyle, detachStyle, removeSty
 import { STYLE_NAME, styleSchema } from '$lib/motion/styles-model';
 import { Quality as ExportQuality } from '$lib/motion/export-formats';
 import { fillsSchema } from '$lib/motion/fill/model';
-import { BooleanOp, combineShapes } from '$lib/motion/shape/boolean';
+import { setNetwork, toVector } from '$lib/motion/vector/ops';
+import { networkSchema } from '$lib/motion/vector/model';
+import { BooleanOp, combineShapes, flattenShapes } from '$lib/motion/shape/boolean';
+import { outlineStrokes } from '$lib/motion/shape/outline-stroke';
+import { scaleClips } from '$lib/motion/scale-tool';
+import { setLayoutGuides } from '$lib/motion/layout-guides/guides';
+import { MAX_LAYOUT_GUIDES, layoutGuideSchema } from '$lib/motion/layout-guides/model';
+import { HORIZONTALS, VERTICALS } from '$lib/motion/constraints/model';
+import { setConstraints, withConstraints } from '$lib/motion/constraints/constraints';
 import { setPartFills } from '$lib/motion/part-style';
 import { staticParts } from './static-parts';
 import { strokesSchema } from '$lib/motion/stroke/model';
@@ -40,15 +48,35 @@ import { EditMode } from '$lib/motion/edit-mode';
 import type { Pt } from '$lib/motion/scene-select';
 import { Align, addMarker, alignClips, allMarkers, distributeClips, markerFrame, nudgeClips, removeMarker, sequenceClips, setClipFlags, setTrackFlags, setWorkArea, staggerClips } from '$lib/motion/organize';
 
-const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) => `distribute_${a}` as const), 'tidy', 'move'] as const;
+const SPACE_OPS = [...EDGES.map((e) => `align_${e}` as const), ...AXES.map((a) => `distribute_${a}` as const), 'tidy', 'move', 'scale'] as const;
 
-type SpaceInput = { doc: MotionDoc; ids: string[]; frame: number; by: Pt; mode: EditMode };
+const OUTLINE_STROKE = 'outline_stroke';
+const FLATTEN = 'flatten';
+const SHAPE_OPS = [BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, BooleanOp.Exclude, OUTLINE_STROKE, FLATTEN] as const;
+
+type ShapeOp = (doc: MotionDoc, ids: string[], frame: number) => OpResult;
+
+type SpaceInput = { doc: MotionDoc; ids: string[]; frame: number; by: Pt; mode: EditMode; factor: number | undefined };
+
+function scaledFromCorner(i: SpaceInput): OpResult {
+  if (i.factor === undefined) {
+    return { ok: false, error: 'scale needs a factor' };
+  }
+  const boxes = propBoxes(i.doc);
+  const missing = i.ids.find((id) => !boxes[id]);
+  if (missing) {
+    return { ok: false, error: `no clip ${missing}` };
+  }
+  const corner: Pt = [Math.min(...i.ids.map((id) => boxes[id].left)), Math.min(...i.ids.map((id) => boxes[id].top))];
+  return scaleClips(i.doc, i.ids, i.factor, corner);
+}
 
 const SPACE: Record<(typeof SPACE_OPS)[number], (i: SpaceInput) => OpResult> = {
   ...(Object.fromEntries(EDGES.map((edge) => [`align_${edge}`, (i: SpaceInput) => alignSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), edge, i.mode)])) as Record<`align_${Edge}`, (i: SpaceInput) => OpResult>),
   ...(Object.fromEntries(AXES.map((axis) => [`distribute_${axis}`, (i: SpaceInput) => distributeSpace(i.doc, i.ids, i.frame, propBoxes(i.doc), axis, i.mode)])) as Record<`distribute_${Axis}`, (i: SpaceInput) => OpResult>),
   tidy: (i) => tidySpace(i.doc, i.ids, i.frame, propBoxes(i.doc), i.mode),
-  move: (i) => moveBy(i.doc, i.ids, i.frame, i.by, i.mode)
+  move: (i) => moveBy(i.doc, i.ids, i.frame, i.by, i.mode),
+  scale: scaledFromCorner
 };
 
 const ARRANGE_OPS = ['nudge', 'sequence', 'stagger', 'align_start', 'align_end', 'distribute'] as const;
@@ -352,6 +380,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
         parentOpacity: c.parentOpacity,
         autoLayout: c.autoLayout ?? null,
         layoutItem: c.layoutItem ?? null,
+        constraints: c.constraints ?? null,
         parts: posterParts[c.id] ?? [],
         partStyles: c.partStyles ?? null,
         styleRef: c.styleRef ?? null,
@@ -374,6 +403,7 @@ export function docSummary(doc: MotionDoc, selection: string[]) {
     assets: doc.assets,
     fields: doc.fields,
     referenceLook: doc.referenceLook ?? null,
+    layoutGuides: doc.layoutGuides ?? [],
     fonts: doc.fonts,
     styles: stylesOf(doc),
     markers: (doc.markers ?? []).map((m) => ({ label: m.label, time: secs(m.frame) })),
@@ -546,6 +576,12 @@ function propsError(doc: MotionDoc, clipId: string, patch: Record<string, unknow
 }
 
 export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
+  const SHAPE_OP: Record<(typeof SHAPE_OPS)[number], ShapeOp> = {
+    ...(Object.fromEntries(Object.values(BooleanOp).map((op) => [op, (doc: MotionDoc, ids: string[], frame: number) => combineShapes(doc, ids, op, frame)])) as Record<BooleanOp, ShapeOp>),
+    [OUTLINE_STROKE]: (doc, ids, frame) => outlineStrokes(doc, ids, frame, deps.newId),
+    [FLATTEN]: flattenShapes
+  };
+
   const layoutWritten = (written: LayoutWritten | null) => {
     if (!written) {
       return { ok: false, error: 'custom layouts are not available here' };
@@ -974,10 +1010,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     arrange_space: tool({
-      description: `Arrange clips in the frame, like a design tool: align_left/center/right/top/middle/bottom lines up several clips on the edge of their joint box (one clip aligns to the frame); distribute_x/distribute_y spreads 3+ clips so the gaps between them are equal; tidy lays a row or column out with its most common gap, or a grid from its top-left corner (Tidy up); move shifts them by dx/dy px. at (seconds, default 0) is the moment measured. mode design (default) moves animated positions whole, every keyframe; motion keys the change at that moment. Locked clips are refused.`,
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum(SPACE_OPS), dx: z.number().optional(), dy: z.number().optional(), at: z.number().min(0).optional(), mode: z.enum(EditMode).optional() }),
+      description: `Arrange clips in the frame, like a design tool: align_left/center/right/top/middle/bottom lines up several clips on the edge of their joint box (one clip aligns to the frame); distribute_x/distribute_y spreads 3+ clips so the gaps between them are equal; tidy lays a row or column out with its most common gap, or a grid from its top-left corner (Tidy up); move shifts them by dx/dy px; scale (Scale tool) multiplies size, text size and stroke weight by factor from the top-left of their joint box. at (seconds, default 0) is the moment measured. mode design (default) moves animated positions whole, every keyframe; motion keys the change at that moment. Locked clips are refused.`,
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum(SPACE_OPS), dx: z.number().optional(), dy: z.number().optional(), factor: z.number().positive().optional(), at: z.number().min(0).optional(), mode: z.enum(EditMode).optional() }),
       execute: async (input) =>
-        apply(SPACE[input.op]({ doc: session.doc, ids: input.clip_ids, frame: frames(input.at ?? 0), by: [input.dx ?? 0, input.dy ?? 0], mode: input.mode ?? EditMode.Design }), `${input.op} ${input.clip_ids.length} clip(s)`)
+        apply(SPACE[input.op]({ doc: session.doc, ids: input.clip_ids, frame: frames(input.at ?? 0), by: [input.dx ?? 0, input.dy ?? 0], mode: input.mode ?? EditMode.Design, factor: input.factor }), `${input.op} ${input.clip_ids.length} clip(s)`)
     }),
 
     remove_clip: tool({
@@ -1567,9 +1603,13 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_layout_item: tool({
-      description: 'How a clip sizes inside its auto layout, per axis: fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; on a clip not yet in a container it applies once it is parented). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this.',
-      inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string() }),
-      execute: async ({ clip_id, ...patch }) => apply(setLayoutItem(session.doc, clip_id, patch), `sized ${clip_id} in its auto layout`)
+      description: 'How a clip sizes inside its auto layout, per axis: fixed (its own width/height), hug (text: its words; a container: its children), fill (shares the space left; on a clip not yet in a container it applies once it is parented). minWidth/maxWidth/minHeight/maxHeight in px clamp it. absolute true takes it out of the flow: it keeps its own x/y and draws over the others. A container also hugs or stays fixed with this. constraints pins a clip to the frame for when the frame is resized (set_canvas, the frame on the canvas): horizontal left, right, left_right (stretch), center or scale (default); vertical top, bottom, top_bottom, center or scale.',
+      inputSchema: layoutItemPatchSchema.extend({ clip_id: z.string(), constraints: z.object({ horizontal: z.enum(HORIZONTALS).optional(), vertical: z.enum(VERTICALS).optional() }).optional() }),
+      execute: async ({ clip_id, constraints, ...patch }) => {
+        const pinned = constraints ? setConstraints(session.doc, [clip_id], constraints) : ({ ok: true, doc: session.doc } as OpResult);
+        const sized = pinned.ok && Object.keys(patch).length ? setLayoutItem(pinned.doc, clip_id, patch) : pinned;
+        return apply(sized, `sized ${clip_id} in its layout`);
+      }
     }),
 
     set_part_fill: tool({
@@ -1676,9 +1716,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     combine_shapes: tool({
-      description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed.',
-      inputSchema: z.object({ clip_ids: z.array(z.string()).min(2), op: z.enum([BooleanOp.Union, BooleanOp.Subtract, BooleanOp.Intersect, BooleanOp.Exclude]), at: z.number().min(0).optional().describe('seconds; default 0') }),
-      execute: async (input) => apply(combineShapes(session.doc, input.clip_ids, input.op, frames(input.at ?? 0)), `combined ${input.clip_ids.join(', ')} (${input.op})`)
+      description: 'Boolean of two or more Shape clips at the current frame: union, subtract (upper shapes cut out of the bottom one), intersect or exclude. The bottom shape becomes the resulting path and keeps its style; the others are removed. flatten (one or more shapes) merges their outlines into one editable path as they are, curves kept, with no boolean. outline_stroke (one or more shapes) turns the first visible stroke into a filled path of the same look; a shape that also has a fill keeps it and gets the outlined stroke as a new layer above.',
+      inputSchema: z.object({ clip_ids: z.array(z.string()).min(1), op: z.enum([...SHAPE_OPS]), at: z.number().min(0).optional().describe('seconds; default 0') }),
+      execute: async (input) => apply(SHAPE_OP[input.op](session.doc, input.clip_ids, frames(input.at ?? 0)), `${input.op} ${input.clip_ids.join(', ')}`)
+    }),
+
+    to_vector: tool({
+      description: 'Turn a Shape clip into an editable vector network (same drawing): vertices that any number of segments can join, filled regions.',
+      inputSchema: z.object({ clip_id: z.string() }),
+      execute: async (input) => apply(toVector(session.doc, input.clip_id), `made ${input.clip_id} a vector`)
+    }),
+
+    set_vector_network: tool({
+      description: 'Replace a Shape clip network: vertices [{x,y}] in 0..1 of its box, segments [{start,end,tangentStart,tangentEnd}] (tangents relative to their vertex, zero = straight), regions [{winding, loops: [[segment indices]]}] that fill.',
+      inputSchema: z.object({ clip_id: z.string(), network: networkSchema }),
+      execute: async (input) => apply(setNetwork(session.doc, input.clip_id, input.network), `set the network of ${input.clip_id}`)
     }),
 
     set_path: tool({
@@ -2077,7 +2129,7 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     set_canvas: tool({
-      description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together: a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} a side, a video the long side up to ${MAX_SIDE} and the short side up to 1080; pass still with the size to make a tall page in one call), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor.`,
+      description: `Change the format (16:9, 9:16, 1:1, 4:5; custom keeps the current size and lets the frame node on the canvas set it), a custom size (width and height in pixels, both together: a still design frame takes any size from ${DESIGN_MIN_SIDE} to ${DESIGN_MAX_SIDE} a side, a video the long side up to ${MAX_SIDE} and the short side up to 1080; pass still with the size to make a tall page in one call), the total duration in seconds (max ${MAX_SECONDS}; music or sound running past a shorter end is cut there with a fade-out, a visual clip is not; the server renders up to 60 s on free and Go, 120 s on Starter, 180 s on Pro) or the frame rate (${FRAME_RATES.join(', ')} fps; times keep their seconds). 30 fps is the social default, 24 reads as film, 60 makes fast motion smooth. background "transparent" drops the brand background so ProRes 4444, WebM and GIF exports keep alpha (an end card over footage). still: seconds of the one frame a still graphic shows (a post 4:5, a story 9:16, an A poster): the editor hides the timeline and exports an image; pick a time where every element has settled in. false makes it a video again; a one-frame still becomes a video of the given duration (5 s by default) whose elements span it, as Motion does in the editor. layout_guides replaces the frame's layout guides (columns/rows: count, gutter, margin px; grid: size px; [] removes them): drawn over the frame in the editor, never in the export, and layers snap to their edges.`,
       inputSchema: z.object({
         format: z.enum(MOTION_FORMATS).optional(),
         width: z.number().int().min(DESIGN_MIN_SIDE).max(DESIGN_MAX_SIDE).optional(),
@@ -2085,7 +2137,8 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         duration: z.number().positive().max(MAX_SECONDS).optional(),
         fps: z.literal(FRAME_RATES).optional(),
         background: z.enum([Background.Brand, Background.Transparent]).optional(),
-        still: z.union([z.number().min(0), z.literal(false)]).optional()
+        still: z.union([z.number().min(0), z.literal(false)]).optional(),
+        layout_guides: z.array(layoutGuideSchema).max(MAX_LAYOUT_GUIDES).optional()
       }),
       execute: async (input) => {
         const stretched = input.duration !== undefined && session.doc.script ? durationProblem(input.duration, session.doc.script) : null;
@@ -2095,9 +2148,10 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
         const early = typeof input.still === 'number' ? designStill(session.doc, input.still) : ({ ok: true, doc: session.doc } as OpResult);
         const animated = !early.ok || input.still !== false ? early : animateStill(early.doc, input.duration);
         const paced = !animated.ok || input.fps === undefined ? animated : setFrameRate(animated.doc, input.fps);
-        const sized = paced.ok ? setCanvas(paced.doc, { format: input.format, size: input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }) : paced;
+        const sized = !paced.ok ? paced : withConstraints(paced.doc, setCanvas(paced.doc, { format: input.format, size: input.width && input.height ? { width: input.width, height: input.height } : undefined, durationInFrames: input.duration === undefined ? undefined : framesAt(input.duration, paced.doc.fps), background: input.background }));
         const pinned = sized.ok && input.still !== undefined ? setStill(sized.doc, input.still === false ? null : input.still) : sized;
-        return apply(pinned, 'changed the canvas');
+        const guided = pinned.ok && input.layout_guides ? setLayoutGuides(pinned.doc, input.layout_guides) : pinned;
+        return apply(guided, 'changed the canvas');
       }
     }),
 

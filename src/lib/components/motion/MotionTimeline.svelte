@@ -14,7 +14,7 @@
   import { withParams } from '$lib/motion/custom/params';
   import { Grip, KeySide, Pointer, Reveal, Snap, edgeHandles, fitZoom, frameAt, headerPx, keyLanes, pxPerFrame, snapped } from '$lib/motion/timeline-view';
   import { Axis, lockAxis, pinchView, type PinchStart } from '$lib/motion/timeline-touch';
-  import { KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
+  import { KeyMark, RowKind, keyGlyph, keyMark, layerName, layerRows, propValue, rowWindow, rulerMarks, type PropLane } from '$lib/motion/timeline-layers';
   import { MASK_KINDS, Matte } from '$lib/motion/mask';
   import type { MotionTrack } from '$lib/motion/doc';
   import { Interp, Source, type EaseSpec, type Keyframe } from '$lib/motion/keyframes';
@@ -128,6 +128,17 @@
 
   const isOpen = (clip: MotionClip) => open.includes(clip.id) || (reveal !== Reveal.Animated && selection.includes(clip.id));
   const rows = $derived(layerRows(tracks, { folded, open: tracks.flatMap((t) => (t.clips as MotionClip[]).filter(isOpen).map((c) => c.id)), lanes: lanesOf }));
+
+  const OVERSCAN_ROWS = 6;
+  let rowsEl = $state<HTMLDivElement | null>(null);
+  let scrolled = $state(0);
+  let viewHeight = $state(0);
+  const inView = $derived(rowWindow(rows, Math.max(0, scrolled), viewHeight, OVERSCAN_ROWS));
+  const onscreen = $derived(rows.slice(inView.from, inView.to));
+
+  function trackScroll() {
+    scrolled = (lanes?.scrollTop ?? 0) - (rowsEl?.offsetTop ?? 0);
+  }
 
   function keyFrames(clip: MotionClip): number[] {
     return [...new Set(Object.values(clip.keyframes).flatMap((keys) => (keys ?? []).map((k) => k.frame)))];
@@ -424,6 +435,12 @@
 
   async function revealLanes(clipId: string) {
     await tick();
+    const lane = rows.find((r) => r.id.startsWith(`${clipId}:`));
+    if (lane && lanes && rowsEl && !lanes.querySelector(`[data-key-lane^="${clipId}:"]`)) {
+      lanes.scrollTop = rowsEl.offsetTop + lane.top - viewHeight / 2;
+      trackScroll();
+      await tick();
+    }
     lanes?.querySelector(`[data-key-lane^="${clipId}:"]`)?.scrollIntoView({ block: 'nearest' });
   }
 
@@ -680,7 +697,7 @@
   </div>
 {/snippet}
 
-<div class="timeline" bind:this={lanes} bind:clientWidth={timelineWidth} data-narrow={headPx < 120 ? '' : undefined} data-testid="motion-timeline" style={`--head: ${headPx}px;`} onpointerdowncapture={touchDown} onpointermovecapture={touchMove} onpointerupcapture={touchUp} onpointercancelcapture={touchUp}>
+<div class="timeline" bind:this={lanes} bind:clientWidth={timelineWidth} data-narrow={headPx < 120 ? '' : undefined} bind:clientHeight={viewHeight} onscroll={trackScroll} data-testid="motion-timeline" style={`--head: ${headPx}px;`} onpointerdowncapture={touchDown} onpointermovecapture={touchMove} onpointerupcapture={touchUp} onpointercancelcapture={touchUp}>
   <div class="inner" style={`width: ${width + headPx}px;`}>
     <div class="ruler" role="slider" tabindex="-1" aria-label="Playhead" aria-valuenow={frame} onpointerdown={startScrub}>
       <div class="corner">
@@ -736,7 +753,8 @@
       {/if}
     {/if}
 
-    {#each rows as row (row.kind + row.id)}
+    <div class="rows" bind:this={rowsEl} style={`padding-top: ${inView.before}px; padding-bottom: ${inView.after}px;`}>
+    {#each onscreen as row (row.kind + row.id)}
       {#if row.kind === RowKind.Group}
         {@const track = row.track}
         {@const family = trackFamily(track)}
@@ -861,6 +879,7 @@
         {@render propRow(row.clip, row.lane, row.id)}
       {/if}
     {/each}
+    </div>
 
     {#if shown.tracks.every((t) => !t.clips.length)}
       <div class="empty-drop" data-testid="timeline-empty">Press <b>+ Add</b> to place your first element</div>

@@ -79,6 +79,16 @@ describe('measuring the clips in the preview', () => {
     expect(boxes['a#lines:1']).toEqual({ left: 0.1, top: 0.2, width: 0.1, height: 0.1 });
   });
 
+  it('finds a template text by its value where the template drew it, so it can be picked and typed into', () => {
+    const root = stage();
+    root.insertAdjacentHTML('beforeend', `<div class="layer" data-clip="t" data-texts='{"headline":"Big sale","note":"gone"}'><h1><span data-rect="30,40,40,20"><b>Big</b> sale</span></h1></div>`);
+    const boxes = measureClips(root);
+
+    expect(boxes['t#headline']).toEqual({ left: 0.1, top: 0.2, width: 0.2, height: 0.2 });
+    expect(root.querySelector('[data-part="headline"]')!.tagName).toBe('SPAN');
+    expect(boxes['t#note']).toBeUndefined();
+  });
+
   it('posed, reads the box where the element is drawn now, transforms included', () => {
     const { a } = measureClips(stage(), kindsOf(Pose.Posed));
     expect(a.left + a.width).toBeCloseTo(0.7, 5);

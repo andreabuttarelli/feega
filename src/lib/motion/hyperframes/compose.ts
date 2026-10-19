@@ -33,6 +33,7 @@ import { frameTapScript } from './frame-tap';
 import { exactSeekScript } from './exact-seek';
 import { Library, Play, bootScript, definitionScript, librariesOf, seedOf, type CustomRun } from '../custom/runtime';
 import { ComponentMode, PropFormat, modeOf, type CustomComponents } from '../custom/component';
+import { drawnTexts } from '../poster-parts';
 import { mattePairs, type MattePair } from '../matte';
 import { matteScript, matteWrapper } from './mattes';
 import { Composite, cameraMath, stageSpec } from '../camera';
@@ -242,7 +243,7 @@ enum Visibility {
   MatteSource = 'matte-source'
 }
 
-type Placed = { layer: number; trackIndex: number; matte: MattePair | null; visibility: Visibility; transform?: string; chain: MotionClip[]; held: boolean; group?: string; extent?: Extent | null };
+type Placed = { layer: number; trackIndex: number; matte: MattePair | null; visibility: Visibility; transform?: string; chain: MotionClip[]; held: boolean; group?: string; extent?: Extent | null; texts?: Record<string, string> };
 
 const PX_DIGITS = 1000;
 const pxOf = (n: number) => `${Math.round(n * PX_DIGITS) / PX_DIGITS}px`;
@@ -264,7 +265,7 @@ function clipHtml(clip: MotionClip, ctx: TemplateCtx<ComponentId>, placed: Place
   const inner = matted(placed.matte, wrapParents(placed.chain, clip, ctx, wrapAnimated(clip, ctx, effectLayer(clip, ctx, ctx.color, ownMask(clip, ctx, content), paintArea(clip.component, ctx.p as never, ctx, placed.extent ?? null)))));
   const fx = `<div class="${seesBehind(clip) ? 'fx bd' : 'fx'}" id="fx-${clip.id}">${inner}</div>`;
   const style = css({ zIndex: placed.layer, transform: placed.transform, mixBlendMode: blendStyle(clip.blend), clipPath: cropOf(placed.chain, ctx) });
-  const blur = (placed.held ? ` ${HELD}` : '') + (placed.group ? ` data-group="${esc(placed.group)}"` : '');
+  const blur = (placed.held ? ` ${HELD}` : '') + (placed.group ? ` data-group="${esc(placed.group)}"` : '') + (placed.texts && Object.keys(placed.texts).length ? ` data-texts="${esc(JSON.stringify(placed.texts))}"` : '');
   const layer =
     template.timing === Timing.Media
       ? `<div class="layer" data-clip="${esc(clip.id)}"${blur} style="${style}">${fx}</div>`
@@ -689,7 +690,7 @@ export function composeHtml(raw: ComposeInput): string {
       const group = GROUPS[clip.component];
       layer += 1;
       const study = clip.component === 'Shape' ? shapeStudy({ ...clip, props: ctx.p as Record<string, unknown> }, ctx) : null;
-      const placed: Placed = { layer, trackIndex: index, matte: matteOf.get(clip.id) ?? null, visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id), extent: study?.extent ?? null };
+      const placed: Placed = { layer, trackIndex: index, matte: matteOf.get(clip.id) ?? null, visibility: hidden.has(clip.id) ? Visibility.MatteSource : Visibility.Shown, transform: startPose.get(clip.id), chain: ancestorsOf(doc, clip.id).map((id) => byId.get(id)!), held: held.has(clip.id), extent: study?.extent ?? null, texts: drawnTexts(doc, clip) };
       const filtered = THREE_D_COMPONENTS.includes(clip.component) ? withoutGrain(clip) : clip;
       const html = group ? group.html(clip, ctx, placed, layers.splice(group.firstLayer(clip, index, starts)).join('')) : clipHtml(filtered, ctx, placed, template.html(ctx as never));
       (onStage.has(clip.id) && !group && !hidden.has(clip.id) ? world : layers).push(html);
