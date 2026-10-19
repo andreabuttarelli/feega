@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { wireCurve } from '$lib/canvas/gpu/geometry';
+import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { EdgeLook, type CoreTheme } from './overlay';
 import { edgeLook, overlayOf, throughCamera } from './world-overlay';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', line: '#e5e5e5', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
 const edge = (over: Partial<{ id: string; source: string; target: string; mode: string }> = {}) => ({ id: 'e', source: 'a', target: 'b', ...over });
 const glyphs = ((text: string, size: number) => ({ contours: [[0, 0, size, 0, size, size]], width: text.length * size, height: size })) as never;
-const none = { peers: [], outlines: [], rotate: [], ghost: null, hovered: null, running: [], glyphs };
+const none = { peers: [], outlines: [], rotate: [], ghost: null, hovered: null, running: [], chrome: [], glyphs };
 const curve = wireCurve({ x: 0, y: 0 }, { x: 100, y: 50 });
 
 describe('edge look', () => {
@@ -25,7 +26,7 @@ describe('world overlay', () => {
   });
 
   it('adds peers outlines and cursors, then rotate knobs, on top', () => {
-    const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, glyphs, ghost: null, hovered: null, running: [], peers: [{ id: 'p', name: 'Ann', color: '#ff0000', at: { x: 5, y: 5 } }], outlines: [{ key: 'p:n', box: { x: 0, y: 0, w: 10, h: 10 }, color: '#ff0000' }], rotate: [{ id: 'n', box: { x: 0, y: 0, w: 10, h: 10 } }] });
+    const items = overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, glyphs, ghost: null, hovered: null, running: [], chrome: [], peers: [{ id: 'p', name: 'Ann', color: '#ff0000', at: { x: 5, y: 5 } }], outlines: [{ key: 'p:n', box: { x: 0, y: 0, w: 10, h: 10 }, color: '#ff0000' }], rotate: [{ id: 'n', box: { x: 0, y: 0, w: 10, h: 10 } }] });
     expect(items.map((i) => i.clip.split(':').at(-1))).toEqual(['peer-outline', 'peer-cursor', 'peer-tag', 'peer-tag', 'rotate', 'rotate']);
   });
 
@@ -50,5 +51,22 @@ describe('world overlay', () => {
   it('is placed on screen through the camera', () => {
     const [item] = throughCamera(overlayOf({ curves: [{ edge: edge(), curve }], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 2, theme, ...none }), { x: 10, y: 20, zoom: 2 });
     expect(item.matrix).toEqual([2, 0, 0, 2, 10, 20]);
+  });
+});
+
+describe('node chrome in the overlay', () => {
+  const at = { id: 'n', x: 0, y: 0, width: 100, height: 50, inputs: [], outputs: [], label: null, icon: null, ring: NodeChrome.Selected, handles: true, hovered: false, ringColor: '#7c5cff', names: false };
+
+  it('rings and handles a selected node on top of the wires, every frame', () => {
+    const items = overlayOf({ curves: [{ edge: edge(), curve }], selected: ['n'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, chrome: [at] });
+    const parts = [...new Set(items.map((i) => i.clip.split(':')[1]))];
+
+    expect(parts).toEqual(['wire', 'ring', 'handle']);
+  });
+
+  it('turns the chrome of a rotated node about its pivot', () => {
+    const [ring] = overlayOf({ curves: [], selected: ['n'], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, chrome: [{ ...at, turn: { degrees: 90, about: { x: 50, y: 25 } } }] });
+
+    expect(ring.matrix.map((v) => Math.round(v))).toEqual([0, 1, -1, 0, 75, -25]);
   });
 });

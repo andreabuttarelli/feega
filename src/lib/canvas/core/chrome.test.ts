@@ -3,7 +3,7 @@ import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
 import { rgbaOf } from '$lib/motion/gpu-full/rgba';
 import { FillRule, PaintKind } from '$lib/motion/gpu-full/paint';
-import { tileChrome, ChromePart, PortState, type ChromeTile, type Glyphs } from './chrome';
+import { stateChrome, tileChrome, ChromePart, PortState, type StateTile, type Glyphs } from './chrome';
 import type { ConnectorType } from '$lib/canvas/connectors';
 
 const marks = (...types: ConnectorType[]) => types.map((type) => ({ type, state: PortState.Quiet }));
@@ -16,7 +16,7 @@ const box = (contours: number[][]) => {
 
 const glyphs: Glyphs = (text, size) => ({ contours: [[0, 0, text.length * size, 0, text.length * size, size, 0, size]], width: text.length * size, height: size });
 
-const tile = (over: Partial<ChromeTile> = {}): ChromeTile => ({
+const tile = (over: Partial<StateTile> = {}): StateTile => ({
   id: 'n1',
   x: 100,
   y: 200,
@@ -34,8 +34,9 @@ const tile = (over: Partial<ChromeTile> = {}): ChromeTile => ({
   ...over
 });
 
-const parts = (t: ChromeTile) => tileChrome(t, glyphs);
-const ofPart = (t: ChromeTile, part: ChromePart) => parts(t).filter((i) => i.clip === `n1:${part}`);
+const parts = (t: StateTile) => [...tileChrome(t, glyphs), ...stateChrome(t, glyphs)];
+const ofPart = (t: StateTile, part: ChromePart) => parts(t).filter((i) => i.clip === `n1:${part}`);
+const clips = (items: { clip: string }[]) => [...new Set(items.map((i) => i.clip.split(':')[1]))];
 
 describe('tileChrome', () => {
   it('draws nothing for an idle tile without ports or label', () => {
@@ -88,10 +89,22 @@ describe('tileChrome', () => {
     expect(box(label.contours)).toEqual([100, 178, 160, 190]);
   });
 
-  it('draws chrome above the ring order: hover, ring, ports, handles, label', () => {
-    const order = parts(tile({ ring: NodeChrome.Selected, handles: true, inputs: marks('text'), outputs: marks('text'), label: 'Text' })).map((i) => i.clip.split(':')[1]);
+  it('keeps hover, ring, handles and port names out of the tile chrome, so selecting never changes a card group', () => {
+    const t = tile({ ring: NodeChrome.Selected, handles: true, hovered: true, names: true, inputs: marks('text'), outputs: marks('text'), label: 'Text' });
 
-    expect([...new Set(order)]).toEqual([ChromePart.Ring, ChromePart.PortIn, ChromePart.PortOut, ChromePart.Handle, ChromePart.Label]);
+    expect(tileChrome(t, glyphs)).toEqual(tileChrome(tile({ inputs: marks('text'), outputs: marks('text'), label: 'Text' }), glyphs));
+    expect(clips(tileChrome(t, glyphs))).toEqual([ChromePart.PortIn, ChromePart.PortOut, ChromePart.Label]);
+    expect(clips(stateChrome(t, glyphs))).toEqual([ChromePart.Ring, ChromePart.PortName, ChromePart.Handle]);
+  });
+
+  it('draws no state chrome for an idle tile', () => {
+    expect(stateChrome(tile({ inputs: marks('text'), label: 'Text' }), glyphs)).toEqual([]);
+  });
+
+  it('names a lit port once, in the tile chrome, even when the tile is selected', () => {
+    const t = tile({ outputs: [{ type: 'videos', state: PortState.Lit }], names: true });
+
+    expect(ofPart(t, ChromePart.PortName)).toHaveLength(1);
   });
 
   it('names each port beside it, 16px outside, in its colour, only when asked', () => {
