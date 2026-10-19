@@ -81,10 +81,10 @@ describe('displayListAt', () => {
     expect(pathOf(graded, 'card')?.paint).toMatchObject({ kind: PaintKind.Linear, from: [0, 54], to: [192, 54] });
   });
 
-  it('reads a gaussian blur effect as a blur radius', () => {
+  it('reads a gaussian blur effect as a CSS blur filter', () => {
     const blurred = patch(withCard, 'card', { effects: [{ id: 'e1', kind: 'gaussian-blur', enabled: true, params: { radius: 12 } }] } as never);
 
-    expect(pathOf(blurred, 'card')?.blur).toBeGreaterThan(0);
+    expect(pathOf(blurred, 'card')?.filters).toEqual([{ kind: 'css', fns: [{ name: 'blur', args: ['12px'] }] }]);
   });
 
   it('strokes a shape as a union band in its paint, clipped to the shape when inside', () => {
@@ -119,11 +119,11 @@ describe('displayListAt', () => {
 
   it('names what it cannot draw yet instead of drawing it wrong', () => {
     const titled = must(addClip(withCard, { component: 'Title', from: 0, durationInFrames: 90 }, 'title'));
-    const shadowed = patch(titled, 'card', { effects: [{ id: 'e1', kind: 'drop-shadow', enabled: true, params: {} }] } as never);
+    const shadowed = patch(titled, 'card', { blend: BlendMode.Multiply, effects: [{ id: 'e1', kind: 'lut', enabled: true, params: {} }], mask: { kind: 'text', text: 'x' } } as never as never);
     const drawn = list(shadowed);
 
     expect(drawn.unsupported).toContainEqual({ clip: 'title', component: 'Title', reason: Unsupported.Component });
-    expect(drawn.unsupported).toContainEqual({ clip: 'card', component: 'Shape', reason: Unsupported.Effect });
+    expect(drawn.unsupported).toContainEqual({ clip: 'card', component: 'Shape', reason: Unsupported.Mask });
     expect(drawn.items.map((i) => i.clip)).toEqual(['bg']);
   });
 });

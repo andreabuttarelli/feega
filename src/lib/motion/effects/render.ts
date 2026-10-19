@@ -39,7 +39,7 @@ function rendered(clip: EffectClip, effect: Effect, frame: Frame, local: number,
   return area && spec.boxed ? spec.boxed(values, filterId(clip, effect)) : spec.render(values, { ...frame, frame: local }, filterId(clip, effect), effect.lut ?? null);
 }
 
-function renderAt(clip: EffectClip, frame: Frame, local: number, resolve: Resolve, area: Box | null = null): { effect: Effect; out: Rendered }[] {
+export function renderAt(clip: EffectClip, frame: Frame, local: number, resolve: Resolve, area: Box | null = null): { effect: Effect; out: Rendered }[] {
   return active(clip).map((effect) => ({ effect, out: rendered(clip, effect, frame, local, resolve, area) }));
 }
 
