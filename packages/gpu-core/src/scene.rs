@@ -148,6 +148,17 @@ fn ramp(kind: Ramp) -> Paint {
     }
 }
 
+pub fn unblended<C: Canvas>(scene: &mut C, items: &[Item], at: usize, frame: Rect, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>) {
+    let item = &items[at];
+    match (layers.bodies.get(&at), item, layers.groups.get(&at)) {
+        (Some(body), _, _) => placed(scene, body),
+        (None, Item::Group(group), Some(inner)) => {
+            build_items(scene, &group.items, frame, pictures, inner);
+        }
+        _ => content(scene, item, pictures, frame),
+    }
+}
+
 pub fn alone<C: Canvas>(scene: &mut C, item: &Item, pictures: &Shelf<C::Picture>, frame: Rect) {
     content(scene, item, pictures, frame);
 }
@@ -182,11 +193,12 @@ pub struct Layers<P = ImageData> {
     pub bodies: HashMap<usize, Placed<P>>,
     pub behind: HashMap<usize, Placed<P>>,
     pub groups: HashMap<usize, Layers<P>>,
+    pub blended: HashMap<usize, Placed<P>>,
 }
 
 impl<P> Default for Layers<P> {
     fn default() -> Self {
-        Self { bodies: HashMap::new(), behind: HashMap::new(), groups: HashMap::new() }
+        Self { bodies: HashMap::new(), behind: HashMap::new(), groups: HashMap::new(), blended: HashMap::new() }
     }
 }
 
@@ -197,7 +209,7 @@ impl<P> Layers<P> {
 
     pub fn into_images(self) -> Vec<P> {
         let nested = self.groups.into_values().flat_map(Layers::into_images);
-        self.bodies.into_values().chain(self.behind.into_values()).map(|p| p.image).chain(nested).collect()
+        self.bodies.into_values().chain(self.behind.into_values()).chain(self.blended.into_values()).map(|p| p.image).chain(nested).collect()
     }
 }
 
@@ -274,6 +286,10 @@ pub fn build_items<C: Canvas>(scene: &mut C, items: &[Item], frame: Rect, pictur
             skip(&mut skipped, item.clip(), item.kind());
             continue;
         };
+        if let Some(layer) = layers.blended.get(&i) {
+            scissored(scene, look, |s| placed(s, layer));
+            continue;
+        }
         if look.backdrop.is_some() {
             match layers.behind.get(&i) {
                 Some(layer) => scissored(scene, look, |s| placed(s, layer)),
