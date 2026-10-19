@@ -8,7 +8,7 @@
   import { tileHovered } from '$lib/canvas/layers';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
 
-  let { tile, selected, full, painted = false, resizable = false, onrotate }: { tile: Tile; selected: boolean; full: boolean; painted?: boolean; resizable?: boolean; onrotate?: (id: string, degrees: number) => void } = $props();
+  let { tile, selected, full, painted = false, resizable = false, onrotate, knobDrawn = false }: { tile: Tile; selected: boolean; full: boolean; painted?: boolean; resizable?: boolean; onrotate?: (id: string, degrees: number) => void; knobDrawn?: boolean } = $props();
 
   const CORNERS = ['top left', 'top right', 'bottom left', 'bottom right'] as const;
 
@@ -83,7 +83,7 @@
 {/if}
 
 {#if selected && tile.rotatable && onrotate}
-  <button type="button" class="rotate-handle nodrag nopan" aria-label="Rotate" data-testid="rotate-handle" onpointerdown={startRotate}></button>
+  <button type="button" class="rotate-handle nodrag nopan" class:drawn={knobDrawn} aria-label="Rotate" data-testid="rotate-handle" onpointerdown={startRotate}></button>
 {/if}
 
 <style>
@@ -223,5 +223,9 @@
     background: var(--ui-panel-raised, #fff);
     cursor: grab;
     z-index: 5;
+  }
+
+  .rotate-handle.drawn {
+    opacity: 0;
   }
 </style>
