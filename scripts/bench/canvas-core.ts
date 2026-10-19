@@ -7,6 +7,12 @@ const SETTLE_MS = Number(process.env.BENCH_SETTLE_MS ?? 12_000);
 const PAN_MS = 4000;
 const PAN_STEP = 40;
 const KB_PER_MB = 1024;
+const BYTES_PER_KB = 1024;
+const ZOOMS = [4, 0.1];
+const ZOOM_SETTLE_MS = 3000;
+const ZOOM_STEP = 20;
+const ZOOM_PER_DELTA = 0.01;
+const ZOOM_AT = { x: Number(process.env.BENCH_ZOOM_X ?? 0.61), y: Number(process.env.BENCH_ZOOM_Y ?? 0.4) };
 
 enum Target {
   Chrome = 'chrome',
@@ -77,13 +83,40 @@ async function pan(page: Page): Promise<{ fps: number; worstMs: number }> {
   const start = Date.now();
   let dir = 1;
   while (Date.now() - start < PAN_MS) {
-    await page.evaluate(`document.elementFromPoint(${box.width / 2}, ${box.height / 2})?.dispatchEvent(new WheelEvent('wheel', { clientX: ${box.width / 2}, clientY: ${box.height / 2}, deltaX: ${PAN_STEP * dir}, deltaY: ${PAN_STEP / 2}, bubbles: true, cancelable: true }))`);
+    await page.evaluate(`document.elementFromPoint(${box.width / 2}, ${box.height / 2})?.dispatchEvent(new WheelEvent('wheel', { clientX: ${box.width / 2}, clientY: ${box.height / 2}, deltaX: ${PAN_STEP * dir}, deltaY: ${(PAN_STEP / 2) * dir}, bubbles: true, cancelable: true }))`);
     dir = Date.now() - start > PAN_MS / 2 ? -1 : 1;
     await page.waitForTimeout(16);
   }
   const stamps = (await page.evaluate("window.__bench")) as number[];
   const gaps = stamps.slice(1).map((t, i) => t - stamps[i]);
   return { fps: Math.round((stamps.length / PAN_MS) * 1000), worstMs: Math.round(Math.max(...gaps)) };
+}
+
+const zoomOf = async (page: Page) => Number(((await page.locator('[data-view]').first().getAttribute('data-view')) ?? '0,0,1').split(',')[2]);
+
+async function zoomTo(page: Page, zoom: number) {
+  const size = page.viewportSize()!;
+  const box = { width: size.width * ZOOM_AT.x * 2, height: size.height * ZOOM_AT.y * 2 };
+  for (let i = 0; i < 400; i++) {
+    const now = await zoomOf(page);
+    if (Math.abs(Math.log(now / zoom)) < ZOOM_PER_DELTA * ZOOM_STEP) {
+      return;
+    }
+    const delta = Math.sign(Math.log(now / zoom)) * Math.min(ZOOM_STEP, Math.abs(Math.log(now / zoom)) / ZOOM_PER_DELTA);
+    await page.evaluate(`document.elementFromPoint(${box.width / 2}, ${box.height / 2})?.dispatchEvent(new WheelEvent('wheel', { clientX: ${box.width / 2}, clientY: ${box.height / 2}, deltaY: ${delta}, ctrlKey: true, bubbles: true, cancelable: true }))`);
+    await page.waitForTimeout(16);
+  }
+}
+
+async function zoomShots(page: Page, target: Target, renderer: string) {
+  const shots: Record<string, number> = {};
+  for (const zoom of ZOOMS) {
+    await zoomTo(page, zoom);
+    await page.waitForTimeout(ZOOM_SETTLE_MS);
+    shots[`z${zoom}`] = await zoomOf(page);
+    await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}-z${zoom}.png` });
+  }
+  return shots;
 }
 
 async function run(target: Target, renderer: string) {
@@ -106,15 +139,17 @@ async function run(target: Target, renderer: string) {
   const motion = await pan(page);
   const panMb = rssMb(mine());
   const coreFrames = (await core.count()) ? `${await core.getAttribute('data-frames')} whole, ${await core.getAttribute('data-partial')} partial` : null;
+  const cacheKb = (await core.count()) ? Math.round(Number(await core.getAttribute('data-cache-bytes')) / BYTES_PER_KB) : null;
   const backend = await page.locator('[data-renderer]').first().getAttribute('data-renderer');
   await page.screenshot({ path: `${process.env.BENCH_OUT ?? '.'}/${target}-${renderer || 'gpu'}.png` });
+  const zooms = await zoomShots(page, target, renderer);
   await browser.close();
-  return { target, renderer: renderer || 'gpu', backend, coreFrames, firstMs, ...coverage, pixiTextureMb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion };
+  return { target, renderer: renderer || 'gpu', backend, coreFrames, firstMs, ...coverage, pixiTextureMb, cacheKb, idleBrowserMb: idleMb, panBrowserMb: panMb, ...motion, zooms };
 }
 
 const targets = (process.env.BENCH_TARGETS ?? `${Target.Chrome},${Target.IPhone}`).split(',') as Target[];
 for (const target of targets) {
-  for (const renderer of ['', 'core']) {
+  for (const renderer of (process.env.BENCH_RENDERERS ?? ',core').split(',')) {
     console.log(JSON.stringify(await run(target, renderer)));
   }
 }

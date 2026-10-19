@@ -170,6 +170,8 @@ pub struct UseItem {
     pub clip: String,
     pub group: String,
     pub matrix: Affine,
+    #[serde(default)]
+    pub cache: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
