@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { TEXT_SIZINGS, TextSizing } from './text-sizing';
 import { networkSchema } from './vector/model';
 import { BuiltinFont, FONT_NAME } from './fonts/model';
 import { DURATION, EASE_IDS, Ease, FPS } from './design';
@@ -99,8 +100,7 @@ export const TITLE_LOOK = { weight: SEMIBOLD, tracking: -0.05 } as const;
 export const TITLE_RANGE = { weight: [MEDIUM, SEMIBOLD], tracking: [-0.07, -0.04] } as const;
 export const ALIGNS = ['left', 'center', 'right'] as const;
 export const TEXT_CASES = ['as-typed', 'upper', 'lower'] as const;
-export const TEXT_SIZINGS = ['fixed', 'auto'] as const;
-export type TextSizing = (typeof TEXT_SIZINGS)[number];
+export { TEXT_SIZINGS, TextSizing } from './text-sizing';
 export type TextCase = (typeof TEXT_CASES)[number];
 export const MOVES = ['none', 'drift-up', 'zoom-in', 'zoom-out', 'pan-left', 'pan-right'] as const;
 export type Move = (typeof MOVES)[number];
@@ -280,7 +280,7 @@ export const COMPONENTS = {
     track: TrackKind.Visual,
     durationInFrames: seconds(3),
     schema: z
-      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, 'fixed', 'Box width', Group.Style), ...layout({ y: 0.65, height: 0.2 }) })
+      .object({ text: text('Write something.', 'Text', true), fills: fillStack(), strokes: strokeStack(), ...typography(0.04, 'brand.text', { tracking: -0.01, leading: 1.3 }), sizing: choice(TEXT_SIZINGS, TextSizing.Fixed, 'Resizing', Group.Style), truncate: toggle(false, 'Truncate text', Group.Style), ...layout({ y: 0.65, height: 0.2 }) })
       .strict()
   },
   Kicker: {

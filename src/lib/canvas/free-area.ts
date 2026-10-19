@@ -78,3 +78,23 @@ export function inView(node: Bounds, view: Viewport, screen: Screen, free: Inset
   const top = node.y * view.zoom + view.y;
   return left >= free.left && top >= free.top && left + node.width * view.zoom <= screen.width - free.right && top + node.height * view.zoom <= screen.height - free.bottom;
 }
+
+const REVEAL_MARGIN_PX = MARGIN_PX;
+
+function slide(start: number, size: number, from: number, to: number): number {
+  if (start + size > to) {
+    return to - REVEAL_MARGIN_PX - (start + size);
+  }
+  return start < from ? from + REVEAL_MARGIN_PX - start : 0;
+}
+
+export function revealIn(node: Bounds, view: Viewport, screen: Screen, free: Insets = NO_INSETS): Viewport {
+  if (inView(node, view, screen, free)) {
+    return view;
+  }
+  const left = node.x * view.zoom + view.x;
+  const top = node.y * view.zoom + view.y;
+  const dx = slide(left, node.width * view.zoom, free.left, screen.width - free.right);
+  const dy = slide(top, node.height * view.zoom, free.top, screen.height - free.bottom);
+  return { x: view.x + dx, y: view.y + dy, zoom: view.zoom };
+}

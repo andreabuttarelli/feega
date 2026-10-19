@@ -3,6 +3,9 @@
   import AlignLeft from '@lucide/svelte/icons/text-align-start';
   import AlignCenter from '@lucide/svelte/icons/text-align-center';
   import AlignRight from '@lucide/svelte/icons/text-align-end';
+  import MoveHorizontal from '@lucide/svelte/icons/move-horizontal';
+  import MoveVertical from '@lucide/svelte/icons/move-vertical';
+  import Maximize from '@lucide/svelte/icons/maximize';
   import { SegmentedControl } from '$lib/components/ui/shell';
   import { SegmentIcon, type Segment } from '$lib/motion/segments';
 
@@ -11,7 +14,10 @@
   const ICONS: Record<SegmentIcon, Component> = {
     [SegmentIcon.AlignLeft]: AlignLeft,
     [SegmentIcon.AlignCenter]: AlignCenter,
-    [SegmentIcon.AlignRight]: AlignRight
+    [SegmentIcon.AlignRight]: AlignRight,
+    [SegmentIcon.AutoWidth]: MoveHorizontal,
+    [SegmentIcon.AutoHeight]: MoveVertical,
+    [SegmentIcon.FixedSize]: Maximize
   };
 
   const shown = $derived(options.map((o) => ({ value: o.value, label: o.label, icon: o.icon ? ICONS[o.icon] : undefined })));

@@ -1,5 +1,6 @@
 import type { z } from 'zod';
-import type { COMPONENTS, ComponentId, TextSizing } from '../components';
+import type { COMPONENTS, ComponentId } from '../components';
+import { TextSizing } from '../text-sizing';
 import { Ease } from '../design';
 import { boxOf, type Box } from '../layout';
 import { safeBox } from '../fit';
@@ -72,7 +73,15 @@ const JUSTIFY = { left: 'flex-start', center: 'center', right: 'flex-end' } as c
 const REVEAL = 16;
 const LINE_STAGGER = 5;
 const FADE = 18;
-const WHITE_SPACE: Record<TextSizing, string> = { fixed: 'pre-wrap', auto: 'pre' };
+const WHITE_SPACE: Record<TextSizing, string> = { [TextSizing.Fixed]: 'pre-wrap', [TextSizing.AutoWidth]: 'pre', [TextSizing.AutoHeight]: 'pre-wrap' };
+
+const TEXT_BOX: Record<TextSizing, (truncate: boolean) => Record<string, string>> = {
+  [TextSizing.Fixed]: (truncate): Record<string, string> => (truncate ? { overflow: 'hidden', textOverflow: 'ellipsis' } : {}),
+  [TextSizing.AutoWidth]: () => ({ width: 'max-content', height: 'auto' }),
+  [TextSizing.AutoHeight]: () => ({ height: 'auto' })
+};
+
+const FITS: Record<TextSizing, boolean> = { [TextSizing.Fixed]: true, [TextSizing.AutoWidth]: false, [TextSizing.AutoHeight]: false };
 
 type Placed = Pick<PropsOf<'Title'>, 'x' | 'y' | 'width' | 'height' | 'align' | 'opacity' | 'scale' | 'rotation'>;
 
@@ -87,7 +96,7 @@ export enum BoxRole {
 
 const BOX_ATTR: Record<BoxRole, string> = { [BoxRole.Ink]: '', [BoxRole.Own]: ' data-box' };
 
-export function placed(ctx: { id: string; width: number; height: number }, p: Placed, inner: string, clip = false, box: Box = boxOf(p, ctx), role: BoxRole = BoxRole.Ink): string {
+export function placed(ctx: { id: string; width: number; height: number }, p: Placed, inner: string, clip = false, box: Box = boxOf(p, ctx), role: BoxRole = BoxRole.Ink, own: Record<string, string> = {}): string {
   const style = css({
     ...boxCss(box),
     display: 'flex',
@@ -97,7 +106,8 @@ export function placed(ctx: { id: string; width: number; height: number }, p: Pl
     textAlign: p.align,
     opacity: p.opacity,
     transform: `rotate(${p.rotation}deg) scale(${p.scale})`,
-    overflow: clip ? 'hidden' : 'visible'
+    overflow: clip ? 'hidden' : 'visible',
+    ...own
   });
   return `<div class="box"${BOX_ATTR[role]} style="${style}"><div class="mv" id="mv-${ctx.id}" style="${css({ width: '100%', height: clip ? '100%' : undefined })}">${inner}</div></div>`;
 }
@@ -158,7 +168,8 @@ const Text: Template<'Text'> = {
     const size = typeSize(ctx);
     const paint = glyphPaint(ctx, 'Text');
     const style = css({ ...typeStyle(ctx, ctx.p, size), color: paint.color, ...glyphStroke(ctx, 'Text'), whiteSpace: WHITE_SPACE[ctx.p.sizing], ...ctx.text.vars });
-    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}" data-fit="${size}" style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${ctx.text.lines(ctx.p.text).join('\n')}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own);
+    const fit = FITS[ctx.p.sizing] ? ` data-fit="${size}"` : '';
+    return placed(ctx, ctx.p, `<div id="tx-${ctx.id}"${fit} style="${style}"><span${hostId(ctx)}${glyphStyle(paint)}>${ctx.text.style}${ctx.text.lines(ctx.p.text).join('\n')}</span></div>`, false, boxOf(ctx.p, ctx), BoxRole.Own, TEXT_BOX[ctx.p.sizing](ctx.p.truncate));
   },
   tweens: (ctx) => [{ target: `#tx-${ctx.id}`, from: { opacity: 0, y: 16 }, to: { opacity: 1, y: 0 }, at: ctx.start, duration: frames(ctx, FADE), ease: ctx.p.easing }]
 };

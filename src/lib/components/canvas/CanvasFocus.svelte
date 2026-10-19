@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { useSvelteFlow } from '@xyflow/svelte';
   import { FIT_PADDING, READABLE_ZOOM } from '$lib/canvas/placement';
-  import { FocusMode, frameIn, inView, type FocusRequest, type Insets } from '$lib/canvas/free-area';
+  import { FocusMode, frameIn, inView, revealIn, type FocusRequest, type Insets } from '$lib/canvas/free-area';
 
   let { focus }: { focus: FocusRequest | null } = $props();
 
@@ -37,6 +37,10 @@
     if (focus?.mode !== FocusMode.Frame) {
       const flow = document.querySelector('.svelte-flow')?.getBoundingClientRect();
       if (flow && untrack(() => inView(getNodesBounds([...ids]), getViewport(), { width: flow.width, height: flow.height }, free))) {
+        return;
+      }
+      if (flow && focus?.mode === FocusMode.Reveal) {
+        void untrack(() => setViewport(revealIn(getNodesBounds([...ids]), getViewport(), { width: flow.width, height: flow.height }, free), { duration: FIT_DURATION_MS }));
         return;
       }
     }

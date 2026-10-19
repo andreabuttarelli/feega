@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resizedTexts } from '$lib/motion/text-fit';
   import { textTarget } from '$lib/motion/hyperframes/text-edit';
   import { clipChrome } from '$lib/canvas/selection-chrome';
   import { onMount, untrack } from 'svelte';
@@ -536,7 +537,7 @@
       return;
     }
     if (done && grip) {
-      onchange(done.doc, SUMMARY[grip]);
+      onchange(resizedTexts(doc, done.doc), SUMMARY[grip]);
     }
   }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { TextSizing } from '$lib/motion/text-sizing';
   import type { MotionDoc } from '$lib/motion/doc';
   import { DrawTool, clickBox, closesOnFirst, dragRect, type DragPoint, type DrawBox } from '$lib/motion/draw-tool';
   import { drawClip, penClip } from '$lib/motion/draw-create';
@@ -91,14 +92,15 @@
     if (!drag) {
       return;
     }
-    const box = (drag ? live : null) ?? (tool === DrawTool.Text ? clickBox(drag.from, { width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height }) : null);
+    const dragged = drag ? live : null;
+    const box = dragged ?? (tool === DrawTool.Text ? clickBox(drag.from, { width: TEXT_BOX.width * doc.width, height: TEXT_BOX.height * doc.height }) : null);
     drag = null;
     if (!box) {
       return;
     }
     held = box;
     const id = newId();
-    create(drawClip(doc, tool, unit(box), frame, id), id);
+    create(drawClip(doc, tool, unit(box), frame, id, dragged ? TextSizing.AutoHeight : TextSizing.AutoWidth), id);
   }
 
   function finish(done: Outline) {

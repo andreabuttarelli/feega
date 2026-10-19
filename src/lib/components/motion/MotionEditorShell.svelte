@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { fitTexts, freeTextFit, resizedFreeText } from '$lib/motion/text-fit';
   import VectorOverlay from '$lib/components/motion/VectorOverlay.svelte';
   import { toVector } from '$lib/motion/vector/ops';
   import { localStore } from '$lib/browser-storage';
@@ -212,7 +213,7 @@
   const Sheet = { None: 'none', Properties: 'properties', Agent: 'agent' } as const;
   type Sheet = (typeof Sheet)[keyof typeof Sheet];
 
-  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, onhostdrag = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
+  let { data, mount = Mount.Page, fullHref = null, onclose = () => {}, onstageready = () => {}, onmoveout = null, onhostdrag = null, onhostfit = null, canvasundo = null, opensOn = OpensOn.Stage }: { data: MotionEditorData; mount?: Mount; fullHref?: string | null; onclose?: () => void; onstageready?: () => void; onmoveout?: MoveOut | null; onhostdrag?: HostDrag | null; onhostfit?: ((share: { width: number; height: number }) => void) | null; canvasundo?: CanvasUndo | null; opensOn?: OpensOn } = $props();
   const rules = $derived(MOUNT[mount]);
 
   let history = $state<History>(startHistory(data.head.doc as MotionDoc));
@@ -657,6 +658,37 @@
     lastEdit = { summary, at: now };
     scheduleSave(summary);
   }
+
+  const TEXT_FIT_SUMMARY = 'Fitted a text box to its words';
+
+  const hostDragged: HostDrag = (move, to, phase) => {
+    onhostdrag?.(move, to, phase);
+    const switched = phase === DragPhase.Drop ? resizedFreeText(doc, { width: move.dw !== 0, height: move.dh !== 0 }) : null;
+    if (switched) {
+      edit(switched, 'Resized a text');
+    }
+  };
+
+  $effect(() => {
+    const boxes = stageBoxes;
+    if (playing || draft || untrack(() => preview?.isTextEditing())) {
+      return;
+    }
+    if (onhostfit && (data.node.kind ?? FrameKind.Frame) === FrameKind.Element) {
+      const share = untrack(() => freeTextFit(doc, boxes));
+      if (share) {
+        setTimeout(() => onhostfit?.(share), 0);
+      }
+      return;
+    }
+    const next = untrack(() => fitTexts(doc, boxes));
+    if (next) {
+      untrack(() => {
+        history = amend(history, mergeView(history.present, compPath, next));
+        scheduleSave(TEXT_FIT_SUMMARY);
+      });
+    }
+  });
 
   function apply(result: OpResult, summary: string) {
     if (!result.ok) {
@@ -2062,7 +2094,7 @@
         {#if presence}<FramePeers {doc} {frame} {redraws} {peers} measure={() => preview?.measure() ?? Promise.resolve({})} onpointer={pointAt} />{/if}
         {#if !playing}<PixelGridOverlay width={doc.width} height={doc.height} toggle={pixelGrid} />{/if}
         {#if guidesShown && doc.layoutGuides?.length && !playing}<LayoutGuidesOverlay {doc} />{/if}
-        {#if !playing}<SelectionOverlay bind:this={overlay} {scaleMode} layoutBounds={guidesShown ? guideSnapBounds(doc) : []} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost ? onhostdrag : null} onframemove={frameChrome(data.node.kind ?? FrameKind.Frame).press === FramePress.Move ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
+        {#if !playing}<SelectionOverlay bind:this={overlay} {scaleMode} layoutBounds={guidesShown ? guideSnapBounds(doc) : []} pickAt={caughtAt} ask={askedDrill} {doc} {frame} {html} {redraws} measure={() => preview?.measure() ?? Promise.resolve({})} onpreview={(next) => (previewDoc = next)} onchange={edit} bind:part={selectedPart} onparts={(next) => (partsByClip = next)} onboxes={(next) => (stageBoxes = next)} outlined={frameHover(layersSource.hovered, data.node.id)} onhover={(id) => layersSource.hover(id ? { nodeId: data.node.id, id } : null)} ondragout={onmoveout ? moveOut : null} edittext={(selector, at, oninput) => preview?.editText(selector, at, oninput) ?? Promise.resolve(null)} onhostdrag={frameChrome(data.node.kind ?? FrameKind.Frame).dragsHost && onhostdrag ? hostDragged : null} onframemove={frameChrome(data.node.kind ?? FrameKind.Frame).press === FramePress.Move ? onhostdrag : null} onmenu={(m) => (layerMenu = { at: { x: m.client[0], y: m.client[1] }, layers: frameLayers(doc, m.layers) })} />{/if}
         {#if layerMenu}<CanvasContextMenu at={layerMenu.at} summaries={frameSummaries(doc, selection)} available={FRAME_MENU_IDS} layers={layerMenu.layers} onpick={runLayerMenu} onlayer={(id) => (selection = [id])} onclose={() => (layerMenu = null)} />{/if}
         {#if selected?.mask && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<MaskOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected?.component === 'Shape' && selected.props.shape === 'path' && !playing && frame >= selected.from && frame < selected.from + selected.durationInFrames}<PenOverlay {doc} clip={selected} {frame} onchange={edit} />{/if}

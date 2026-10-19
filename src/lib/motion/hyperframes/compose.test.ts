@@ -115,6 +115,18 @@ describe('MotionDoc to HyperFrames composition', () => {
     expect(compose(doc)).not.toContain('class="box" data-box');
   });
 
+  it('each text sizing lays its box out its own way', () => {
+    const text = (props: Record<string, unknown>) => compose(must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Text', from: 0, durationInFrames: 30, props: { text: 'Body', ...props } }, 'tx')));
+    const boxOf = (html: string) => html.slice(html.indexOf('class="box" data-box'), html.indexOf('class="mv"'));
+
+    expect(boxOf(text({ sizing: 'auto' }))).toContain('width:max-content');
+    expect(boxOf(text({ sizing: 'auto' }))).toContain('height:auto');
+    expect(boxOf(text({ sizing: 'auto-height' }))).toContain('height:auto');
+    expect(boxOf(text({ sizing: 'auto-height' }))).not.toContain('max-content');
+    expect(boxOf(text({ sizing: 'fixed', truncate: true }))).toContain('overflow:hidden');
+    expect(text({ sizing: 'auto' })).not.toContain('data-fit="');
+  });
+
   it('text with a stroke outlines its glyphs; text without one composes as before', () => {
     const strokes = [{ paint: { type: 'solid', color: '#ff0000' }, width: 0.002, align: 'outside' }];
     const titled = must(addClip(newMotionDoc(MotionFormat.Square), { component: 'Title', from: 0, durationInFrames: 30, props: { text: 'Hi', strokes } }, 'tt'));
