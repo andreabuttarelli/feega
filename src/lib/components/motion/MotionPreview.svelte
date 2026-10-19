@@ -371,8 +371,19 @@
     }
   }
 
+  async function renderOnCoreOf(spec: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> }, backend: FullBackend, times: number[], onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal): Promise<boolean> {
+    const [{ renderOnCore }, { prepare }, { loadFonts }, { smoothingOf }] = await Promise.all([import('$lib/motion/gpu-full/core-export'), import('$lib/motion/gpu-full/display-list'), import('$lib/motion/gpu-full/text/load'), import('$lib/motion/gpu-full/text/painter')]);
+    const prepared = prepare(spec.doc, spec.tokens, spec.assets, { fonts: await loadFonts(spec.doc, spec.assets), smoothing: smoothingOf(navigator.userAgent) });
+    return renderOnCore(prepared, backend, times, onFrame, signal);
+  }
+
   export async function render(times: number[], size: FrameSize, onFrame: (bitmap: ImageBitmap, index: number) => Promise<void>, signal: AbortSignal, source: string = html, profile: CaptureProfile = CaptureProfile.Fast, prefer: RenderEngine = engine): Promise<void> {
     const { settle, lanes } = CAPTURE_PROFILES[profile];
+    const core = FULL_BACKEND[prefer];
+    if (core && core !== FullBackend.WebGl2 && fullDoc && source === html && size.width === width && size.height === height && (await renderOnCoreOf(fullDoc, core, times, onFrame, signal))) {
+      exportedOn = prefer;
+      return;
+    }
     exportedOn = RenderEngine.Gpu;
     if (prefer === RenderEngine.Gpu && gpuCompose && source === html && size.width === width && size.height === height && width % 2 === 0 && height % 2 === 0 && (await renderOnGpu(gpuCompose, times, onFrame, signal, lanes()))) {
       return;
