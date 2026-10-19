@@ -28,6 +28,7 @@ const OUT = process.env.FLUID_OUT ?? join(homedir(), 'Documents', 'feega-videos'
 const SETTLE_MS = 6_000;
 const STEP_MS = 20_000;
 const TEST_MS = 600_000;
+const ACTION_MS = 10_000;
 const AFTER_STEP_MS = 800;
 const MOVES = 24;
 const DRAG_PX = 40;
@@ -169,7 +170,7 @@ async function emptyPoint(page: Page): Promise<Point> {
 async function bringMotionNodeIntoReach(page: Page) {
   const node = page.locator(MOTION_NODE).first();
   for (let i = 0; i < ZOOM_TRIES; i++) {
-    const box = await node.boundingBox();
+    const box = (await node.count()) ? await node.boundingBox() : null;
     if (box && box.width >= MIN_TARGET_PX && box.x > 0 && box.y > 60) {
       return;
     }
@@ -248,7 +249,9 @@ async function session(base: string, device: Device, canvas: { projectId: string
   const browser = await webkit.launch();
   const rows: Row[] = [];
   try {
-    const page = await (await browser.newContext({ ...DEVICE_OF[device], serviceWorkers: 'block' })).newPage();
+    const context = await browser.newContext({ ...DEVICE_OF[device], serviceWorkers: 'block' });
+    context.setDefaultTimeout(ACTION_MS);
+    const page = await context.newPage();
     const mine = new Set([...webkitPids()].filter((p) => !before.has(p)));
     await login(page, base);
     await page.addInitScript(install);
@@ -257,16 +260,15 @@ async function session(base: string, device: Device, canvas: { projectId: string
     await expect(page.locator(SURFACE).first()).toBeVisible({ timeout: 30_000 });
     await page.waitForTimeout(SETTLE_MS);
     await bringMotionNodeIntoReach(page);
-    page.setDefaultTimeout(10_000);
     for (const step of STEPS.filter((s) => !ONLY || ONLY.test(s.name))) {
-      await page.evaluate(() => (window as unknown as { __touch: { start: () => void } }).__touch.start());
-      let peak = rssMb(mine);
-      const sampler = setInterval(() => (peak = Math.max(peak, rssMb(mine))), 250);
-      let error: string | null = null;
       if (EDITOR_STEPS.test(step.name) && !(await page.getByTestId('motion-editor').count())) {
         rows.push({ device, canvas: label, run, step: step.name, facts: null, error: 'editor not open' });
         continue;
       }
+      await page.evaluate(() => (window as unknown as { __touch: { start: () => void } }).__touch.start());
+      let peak = rssMb(mine);
+      const sampler = setInterval(() => (peak = Math.max(peak, rssMb(mine))), 250);
+      let error: string | null = null;
       try {
         await Promise.race([step.drive(page), new Promise<never>((_, no) => setTimeout(() => no(new Error(`over ${STEP_MS} ms`)), STEP_MS))]);
         await page.waitForTimeout(AFTER_STEP_MS);
