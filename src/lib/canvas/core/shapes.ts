@@ -14,7 +14,7 @@ export const rect = (x: number, y: number, w: number, h: number): number[] => [x
 
 const placed = (outline: Outline, x: number, y: number): number[][] => outline.map((c) => flatten(c).flatMap(([px, py]) => [px + x, py + y]));
 
-export const roundRect = (x: number, y: number, w: number, h: number, r: number): number[][] => placed(rectOutline(r, { w, h }), x, y);
+export const roundRect = (x: number, y: number, w: number, h: number, r: number): number[][] => placed(rectOutline(r / Math.min(w, h), { w, h }), x, y);
 
 export const circle = (cx: number, cy: number, r: number): number[][] => placed(ellipseOutline({ w: 2 * r, h: 2 * r }), cx - r, cy - r);
 
