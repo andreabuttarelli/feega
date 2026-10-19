@@ -24,22 +24,13 @@ import { sourceSeconds } from '../time-remap';
 import { edgeAt, moveAt, type Pose } from './edges';
 
 export { CoverKind, RampKind, type Cover, type MaskLayer } from './mask-layers';
+import { FillRule, PaintKind, type Paint, type Stop } from './paint';
+
+export { FillRule, PaintKind, type Paint, type Stop };
 
 export enum ItemKind {
   Path = 'path',
   Image = 'image'
-}
-
-export enum PaintKind {
-  Solid = 'solid',
-  Linear = 'linear',
-  Radial = 'radial'
-}
-
-export enum FillRule {
-  NonZero = 'nonzero',
-  EvenOdd = 'evenodd',
-  Union = 'union'
 }
 
 export enum Unsupported {
@@ -58,13 +49,6 @@ export enum Unsupported {
   ShapeKind = 'shape-kind',
   Text = 'text'
 }
-
-export type Stop = { at: number; color: Rgba };
-
-export type Paint =
-  | { kind: PaintKind.Solid; color: Rgba }
-  | { kind: PaintKind.Linear; from: [number, number]; to: [number, number]; stops: Stop[] }
-  | { kind: PaintKind.Radial; center: [number, number]; radius: number; stops: Stop[] };
 
 export type Scissor = [number, number, number, number];
 
