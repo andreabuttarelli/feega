@@ -1,5 +1,6 @@
 <script lang="ts">
   import { signOutForm } from '$lib/auth/sign-out-form';
+  import { grantedPath } from '$lib/canvas/asset-url';
   import { enhance } from '$lib/settings/enhance';
   import { _ } from 'svelte-i18n';
   import { SvelteSet } from 'svelte/reactivity';
@@ -142,7 +143,7 @@
     <Button variant="secondary" type="button" onclick={openCookieSettings} data-testid="open-cookie-settings">{$_('cookie.settings')}</Button>
   </Field>
   <Field label={$_('app.settings.profile.exportData')} hint={$_('app.settings.profile.exportHint')} layout={FieldLayout.Row}>
-    <a class={buttonVariants({ variant: 'secondary' })} href="/account/export" download data-testid="export-data">{$_('app.settings.profile.exportData')}</a>
+    <a class={buttonVariants({ variant: 'secondary' })} href={grantedPath('/account/export')} download data-testid="export-data">{$_('app.settings.profile.exportData')}</a>
   </Field>
 </Panel>
 

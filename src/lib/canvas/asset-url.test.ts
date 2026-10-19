@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { keepSame } from './snapshot-keep';
-import { AssetSize, canvasAssetUrl, grantedAssetPaths, isCanvasAssetPath, sized, useAssetGrant } from './asset-url';
+import { AssetSize, canvasAssetUrl, grantedAssetPaths, grantedPath, isCanvasAssetPath, isGrantable, sized, useAssetGrant } from './asset-url';
 
 describe('canvasAssetUrl', () => {
   it('a tier asks the server for the preview', () => {
@@ -54,5 +54,30 @@ describe('in a bundle, canvas files carry the API host and the asset grant', () 
 
     useAssetGrant(null);
     expect(canvasAssetUrl('p1', 'c1', 'a1', AssetSize.Full)).toBe('/p/p1/c/c1/assets/a1');
+  });
+});
+
+describe('the other server pages an app page opens by link or frame are granted too', () => {
+  const API = 'https://feega.app';
+  const OPENED = ['/p/p1/c/c1/motion/n1/preview', '/p/p1/c/c1/motion/n1/live', '/p/p1/c/c1/web-views/k1/shot.jpg', '/app/studio/b1/zip', '/account/export'];
+
+  it('each one is grantable and gets the API host and grant in the bundle', () => {
+    useAssetGrant({ apiBase: API, grant: 'g1' });
+    for (const path of OPENED) {
+      expect(isGrantable(path), path).toBe(true);
+      expect(grantedPath(path)).toBe(`${API}${path}?grant=g1`);
+    }
+    expect(grantedPath('/app/studio/b1/zip?format=amazon')).toBe(`${API}/app/studio/b1/zip?format=amazon&grant=g1`);
+    useAssetGrant(null);
+  });
+
+  it('nothing else is: an API route or a page keeps needing the bearer', () => {
+    for (const path of ['/api/v1/me/root', '/p/p1/c/c1', '/app', '/p/p1/c/c1/motion/n1/session']) {
+      expect(isGrantable(path), path).toBe(false);
+    }
+  });
+
+  it('on the web the path is left alone', () => {
+    expect(grantedPath('/account/export')).toBe('/account/export');
   });
 });

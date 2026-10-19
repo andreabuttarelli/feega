@@ -25,6 +25,14 @@ const SIZE_PARAM = 'size';
 export const ASSET_GRANT_PARAM = 'grant';
 
 const ASSET_PATH = /^\/p\/[^/?#]+\/c\/[^/?#]+\/assets\/[^/?#]+$/;
+
+const GRANTABLE: readonly RegExp[] = [
+  ASSET_PATH,
+  /^\/p\/[^/?#]+\/c\/[^/?#]+\/motion\/[^/?#]+\/(preview|live)$/,
+  /^\/p\/[^/?#]+\/c\/[^/?#]+\/web-views\/[^/?#]+\/[^/?#]+$/,
+  /^\/app\/studio\/[^/?#]+\/zip$/,
+  /^\/account\/export$/
+];
 const ASSET_PATH_IN_TEXT = /"(\/p\/[^/"?#]+\/c\/[^/"?#]+\/assets\/[^/"?#]+)(?:\?size=([a-z0-9]+))?"/g;
 const LOCAL = 'https://local';
 
@@ -44,16 +52,21 @@ export function isCanvasAssetPath(pathname: string): boolean {
   return ASSET_PATH.test(pathname);
 }
 
+export function isGrantable(pathname: string): boolean {
+  return GRANTABLE.some((route) => route.test(pathname));
+}
+
+export function grantedPath(path: string): string {
+  if (!granted) {
+    return path;
+  }
+  const url = new URL(path, LOCAL);
+  url.searchParams.set(ASSET_GRANT_PARAM, granted.grant);
+  return `${granted.apiBase}${url.pathname}${url.search}`;
+}
+
 function withSize(path: string, size: AssetSize): string {
-  const params = new URLSearchParams();
-  if (size !== AssetSize.Full) {
-    params.set(SIZE_PARAM, size);
-  }
-  if (granted) {
-    params.set(ASSET_GRANT_PARAM, granted.grant);
-  }
-  const search = params.toString();
-  return `${granted?.apiBase ?? ''}${path}${search ? `?${search}` : ''}`;
+  return grantedPath(size === AssetSize.Full ? path : `${path}?${SIZE_PARAM}=${size}`);
 }
 
 export function canvasAssetUrl(projectId: string, canvasId: string, assetId: string, size: AssetSize): string {
