@@ -1,7 +1,10 @@
 import { env } from '$env/dynamic/public';
+import { grantedAssetPaths } from '$lib/canvas/asset-url';
 
 const BUNDLE_DIR = '/_app/';
 const FILE_NAME = /\/[^/]+\.[a-z0-9]+$/i;
+const JSON_TYPE = 'application/json';
+const BODILESS = new Set(['GET', 'HEAD']);
 
 function originOf(url: URL): string {
   return `${url.protocol}//${url.host}`;
@@ -19,13 +22,23 @@ function urlOf(input: RequestInfo | URL): URL {
   return new URL(raw, location.href);
 }
 
+async function withGrantedAssets(response: Response): Promise<Response> {
+  if (!(response.headers.get('content-type') ?? '').includes(JSON_TYPE)) {
+    return response;
+  }
+  return new Response(grantedAssetPaths(await response.text()), { status: response.status, statusText: response.statusText, headers: response.headers });
+}
+
 export function sendServerCallsTo(apiBase: string, bearer: () => Promise<string | null>): void {
   const local = window.fetch.bind(window);
+  const apiOrigin = originOf(new URL(apiBase));
 
   window.fetch = async (input, init) => {
-    const target = serverUrlOf(urlOf(input), originOf(new URL(location.href)), apiBase);
+    const url = urlOf(input);
+    const target = serverUrlOf(url, originOf(new URL(location.href)), apiBase);
     if (!target) {
-      return local(input, init);
+      const response = await local(input, init);
+      return originOf(url) === apiOrigin ? withGrantedAssets(response) : response;
     }
 
     const request = new Request(input instanceof Request ? input : target, init);
@@ -34,7 +47,8 @@ export function sendServerCallsTo(apiBase: string, bearer: () => Promise<string 
     if (token && !headers.has('authorization')) {
       headers.set('authorization', `Bearer ${token}`);
     }
-    return local(new Request(target, { method: request.method, headers, body: request.body, signal: request.signal, duplex: 'half' } as RequestInit));
+    const body = BODILESS.has(request.method) ? undefined : await request.arrayBuffer();
+    return withGrantedAssets(await local(target, { method: request.method, headers, body, signal: request.signal }));
   };
 }
 

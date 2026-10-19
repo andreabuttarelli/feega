@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { fitTexts, freeTextFit, resizedFreeText, type HostShare } from '$lib/motion/text-fit';
   import VectorOverlay from '$lib/components/motion/VectorOverlay.svelte';
   import { toVector } from '$lib/motion/vector/ops';
@@ -2162,7 +2163,7 @@
       fallbackRender={htmlExportFrames}
       tokens={data.tokens}
       {analyses}
-      server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}` }}
+      server={{ ...data.serverRender, version, saved: saveState === SaveState.Saved, assetHref: (id: string) => canvasAssetUrl(data.projectId, data.canvas.id, id, AssetSize.Full) }}
       onpresets={() => ((exporting = false), (interactive = true))}
       onclose={() => (exporting = false)}
     />
@@ -2196,7 +2197,7 @@
       {version}
       saved={saveState === SaveState.Saved}
       batch={data.batch}
-      assetHref={(id: string) => `/p/${data.projectId}/c/${data.canvas.id}/assets/${id}`}
+      assetHref={(id: string) => canvasAssetUrl(data.projectId, data.canvas.id, id, AssetSize.Full)}
       {assetUrls}
       scope={{ orgId: data.orgId, projectId: data.projectId, nodeId: data.node.id }}
       framesFor={docFrames}

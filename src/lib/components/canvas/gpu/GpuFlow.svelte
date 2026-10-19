@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { AssetSize, canvasAssetUrl } from '$lib/canvas/asset-url';
   import { frameDrill } from '$lib/canvas/frame-drill';
   import { Gesture } from '$lib/motion/drill';
   import { onMount, untrack, type ComponentProps } from 'svelte';
@@ -146,8 +147,7 @@
   let fitted = false;
   let known = new Set<string>();
 
-  const assetBase = $derived(`/p/${page.params.projectId}/c/${page.params.canvasId}/assets/`);
-  const assetUrl = (id: string) => `${assetBase}${id}`;
+  const assetUrl = (id: string) => canvasAssetUrl(page.params.projectId ?? '', page.params.canvasId ?? '', id, AssetSize.Full);
 
   const placed = $derived([...tiles.filter((t) => t.behind), ...tiles.filter((t) => !t.behind)].map((t) => ({ ...t, ...(overrides.get(t.id) ?? {}) })));
   const byId = $derived(new Map(placed.map((t) => [t.id, t])));

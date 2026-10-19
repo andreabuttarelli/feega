@@ -26,7 +26,7 @@
   import { onCanvasReveal } from '$lib/canvas/canvas-reveal';
   import { DROPPED_EDIT_NOTICE, Trigger, VERDICT_NOTICE, Verdict, carryNotice, changedElsewhere, judge, takeNotice, type RemoteState } from '$lib/canvas/staleness';
   import { keepSame } from '$lib/canvas/snapshot-keep';
-  import { AssetSize, sized } from '$lib/canvas/asset-url';
+  import { AssetSize, canvasAssetUrl, sized } from '$lib/canvas/asset-url';
   import TieredImage from '$lib/components/canvas/TieredImage.svelte';
   import LiveVideo from '$lib/components/canvas/LiveVideo.svelte';
   import { mediaPoster, PosterSource, type Poster } from '$lib/canvas/poster-lod';
@@ -1003,7 +1003,7 @@
   }
 
   function assetUrl(refId: string | null): string | null {
-    return refId ? `/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}` : null;
+    return refId ? canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full) : null;
   }
 
   function cardAssets(cards: ReturnType<typeof compositionCards>): Record<string, string> {
@@ -3548,22 +3548,22 @@
                 </div>
               {:else if gen.medium === 'model3d'}
                 <Model3dViewer
-                  src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`}
+                  src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)}
                   nodeId={id}
-                  poster={typeof row.data.posterRefId === 'string' ? `/p/${data.projectId}/c/${data.canvas.id}/assets/${row.data.posterRefId}` : null}
+                  poster={typeof row.data.posterRefId === 'string' ? canvasAssetUrl(data.projectId, data.canvas.id, row.data.posterRefId, AssetSize.Full) : null}
                   onrender={(views) => renderModelViews(id, views)}
                 />
               {:else if gen.medium === 'audio'}
                 <AudioResult nodeId={id} {...audioUrlsOf(row)} files={audioFilesOf(row, gen.params.targetLanguage ?? null)} />
               {:else if gen.medium === 'video'}
-                <LiveVideo src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} {selected} controls />
+                <LiveVideo src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} {selected} controls />
                 <div class="gen-download">
-                  <NodeDownload kind="video" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
+                  <NodeDownload kind="video" sourceUrl={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {:else}
-                <TieredImage src={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} alt={gen.prompt} />
+                <TieredImage src={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} alt={gen.prompt} />
                 <div class="gen-download">
-                  <NodeDownload kind="image" sourceUrl={`/p/${data.projectId}/c/${data.canvas.id}/assets/${refId}`} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
+                  <NodeDownload kind="image" sourceUrl={canvasAssetUrl(data.projectId, data.canvas.id, refId, AssetSize.Full)} nodeId={id} nodeType={gen.medium} origin={MediaOrigin.Generated} />
                 </div>
               {/if}
             {/snippet}
@@ -3588,7 +3588,7 @@
                 references={referencesOf(row.data)}
                 catalogue={data.references.catalogue}
                 media={data.references.media}
-                assetUrl={(assetId) => sized(`/p/${data.projectId}/c/${data.canvas.id}/assets/${assetId}`, AssetSize.Thumb)}
+                assetUrl={(assetId) => sized(canvasAssetUrl(data.projectId, data.canvas.id, assetId, AssetSize.Full), AssetSize.Thumb)}
                 onchange={(next) => void write(id, { references: next })}
               />
               {/if}
