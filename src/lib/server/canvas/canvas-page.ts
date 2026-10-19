@@ -54,7 +54,6 @@ import { ShowRun, removeNodes, resizeOnCanvas, shareDoc, showRun, type RunShown 
 import { syncNode } from '$lib/server/canvas/node-sync';
 import { insertTemplate } from '$lib/server/canvas/templates';
 import { templateLibrary } from '$lib/server/motion/templates';
-import { canvasOutlines } from '$lib/server/motion/frame-outlines';
 import { FROM_TEMPLATE_DEPS, FromTemplate, startFromTemplate } from '$lib/server/motion/from-template';
 import { serverTiming } from '$lib/server/server-timing';
 import { MOTION_FORMATS, MotionFormat } from '$lib/motion/doc';
@@ -218,12 +217,11 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
 
   const connections = await canvasFrameInputs(db, { orgId, actor: userActor({ userId }), projectId: canvas.projectId }, nodes, listed);
 
-  const [runs, { products, socialPosts, influencers }, sources, onboarding, outlines] = await Promise.all([
+  const [runs, { products, socialPosts, influencers }, sources, onboarding] = await Promise.all([
     loadGenRuns(db, { orgId, nodes }),
     loadDownloaded(db, { orgId, canvasId, nodes }),
     listSourcesForNodes(db, nodes.map((node) => node.id)),
-    firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length }),
-    canvasOutlines(db, { orgId, nodes })
+    firstRunFor(db, { userId, orgId, accountCreatedAt, nodeCount: nodes.length })
   ]);
 
   const nodeIdsInPost = [...new Set(sources.map((source) => source.nodeId))];
@@ -249,7 +247,6 @@ export const load = async ({ params, locals, url }: ServerLoadEvent<CanvasParams
     projectBrandId,
     onboarding,
     orgTemplates,
-    outlines,
     cardPreviews: previews
   };
 };

@@ -44,7 +44,7 @@
   const video = $derived(layersSource.video);
   const heads = $derived(canvasHeads(canvas?.nodes ?? []));
   let outlines = $state.raw<OutlineCache>({});
-  const known = $derived({ ...canvas?.outlines, ...outlines });
+  const known = $derived(outlines);
   let opening = $state<{ nodeId: string; id: string } | null>(null);
   let folds = $state.raw<Set<string>>(localStore() ? readFolds(localStore()!) : new Set());
 

@@ -18,7 +18,6 @@ vi.mock('$lib/server/repos/posts', () => ({ listSourcesForNodes: async () => [] 
 vi.mock('$lib/server/onboarding/first-run', () => ({ firstRunFor: async () => null, endOnboarding: vi.fn(), runDemo: vi.fn() }));
 vi.mock('$lib/server/motion/templates', () => ({ templateLibrary: () => ({ own, list }) }));
 vi.mock('$lib/server/canvas/chat-handoff', () => ({ chatHandoff: async () => null }));
-vi.mock('$lib/server/motion/frame-outlines', () => ({ canvasOutlines: async () => ({}) }));
 vi.mock('$lib/server/canvas-renderer-switch', () => ({ rendererSwitch: async () => null }));
 vi.mock('$lib/server/canvas/card-previews', () => ({ cardPreviews: (...a: unknown[]) => cardPreviews(...a) }));
 
@@ -46,6 +45,12 @@ describe('canvas page load', () => {
 
     expect(data.orgTemplates).toEqual([ORG_TEMPLATE]);
     expect(data).not.toHaveProperty('componentTemplates');
+  });
+
+  it('leaves the frame outlines to the Layers panel, which fetches them when opened', async () => {
+    const data = (await load(event)) as Record<string, unknown>;
+
+    expect(data).not.toHaveProperty('outlines');
   });
 
   it('asks for the card previews without waiting for the nodes', async () => {
