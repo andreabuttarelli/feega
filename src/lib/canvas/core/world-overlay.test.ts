@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { wireCurve } from '$lib/canvas/gpu/geometry';
 import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { EdgeLook, type CoreTheme } from './overlay';
-import { edgeLook, overlayOf, throughCamera } from './world-overlay';
+import { ChromeLayers, edgeLook, overlayOf, throughCamera } from './world-overlay';
+import { PortState } from './chrome';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', line: '#e5e5e5', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
 const edge = (over: Partial<{ id: string; source: string; target: string; mode: string }> = {}) => ({ id: 'e', source: 'a', target: 'b', ...over });
@@ -62,6 +63,13 @@ describe('node chrome in the overlay', () => {
     const parts = [...new Set(items.map((i) => i.clip.split(':')[1]))];
 
     expect(parts).toEqual(['wire', 'ring', 'handle']);
+  });
+
+  it('draws a frame label and ports with it, idle or not, when the node asks for its whole chrome', () => {
+    const frame = { ...at, ring: NodeChrome.None, handles: false, label: 'Frame', outputs: [{ type: 'videos' as const, state: PortState.Quiet }], layers: ChromeLayers.Whole };
+    const parts = new Set(overlayOf({ curves: [], selected: [], selectedEdge: null, marquee: null, guides: [], zoom: 1, theme, ...none, chrome: [frame] }).map((i) => i.clip.split(':')[1]));
+
+    expect([...parts]).toEqual(['port-out', 'label']);
   });
 
   it('turns the chrome of a rotated node about its pivot', () => {

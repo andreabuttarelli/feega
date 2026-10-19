@@ -21,12 +21,17 @@ export const CHROME_REACH = { top: 24, side: 96, bottom: 4 };
 
 export const ringColour = (t: Pick<CardTile, 'outputs'>, theme: Pick<CoreTheme, 'accent'>): string => (t.outputs.length ? CONNECTOR_STYLE[t.outputs[0].type].color : theme.accent);
 
-export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): FrameOnCanvas {
+export enum CardLayer {
+  Whole = 'whole',
+  Face = 'face'
+}
+
+export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, layer = CardLayer.Whole): FrameOnCanvas {
   const [x, y] = [CHROME_REACH.side, CHROME_REACH.top];
   const w = t.box.w + 2 * CHROME_REACH.side;
   const h = t.box.h + CHROME_REACH.top + CHROME_REACH.bottom;
   const card = cardItems({ id: t.id, x, y, w: t.box.w, h: t.box.h, face: t.face, shot: t.shot }, theme, glyphs, bold);
-  const chrome = tileChrome({ id: t.id, x, y, width: t.box.w, height: t.box.h, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon }, glyphs);
+  const chrome = layer === CardLayer.Face ? [] : tileChrome({ id: t.id, x, y, width: t.box.w, height: t.box.h, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon }, glyphs);
   return {
     id: t.id,
     box: { x: t.box.x - x, y: t.box.y - y, w, h },

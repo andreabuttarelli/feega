@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { faceOf } from '$lib/canvas/gpu/card-face';
 import { CONNECTOR_STYLE } from '$lib/canvas/connectors';
-import { CHROME_REACH, cardKey, cardOnCanvas, portMarks, ringColour, type CardTile } from './card-source';
+import { CHROME_REACH, CardLayer, cardKey, cardOnCanvas, portMarks, ringColour, type CardTile } from './card-source';
 import { PortState, type Glyphs } from './chrome';
 import type { CoreTheme } from './overlay';
 
@@ -48,6 +48,14 @@ describe('card group', () => {
     const drawn = new Set(f.list.items.map((i) => i.clip.split(':')[1]));
 
     expect(drawn.has('ring') || drawn.has('hover') || drawn.has('handle') || drawn.has('port-name')).toBe(false);
+  });
+
+  it('a poster holds only its face, so its label and ports survive the poster being dropped', () => {
+    const f = cardOnCanvas({ ...tile, inputs: [{ type: 'text', state: PortState.Quiet }] }, theme, glyphs, glyphs, CardLayer.Face);
+    const drawn = new Set(f.list.items.map((i) => i.clip.split(':')[1]));
+
+    expect([...drawn].some((p) => ['label', 'port-in', 'port-out', 'icon'].includes(p))).toBe(false);
+    expect(drawn.has('panel')).toBe(true);
   });
 });
 

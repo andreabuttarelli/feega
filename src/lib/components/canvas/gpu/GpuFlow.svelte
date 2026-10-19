@@ -23,13 +23,13 @@
   import GpuTileChrome from './GpuTileChrome.svelte';
   import RendererBadge from './RendererBadge.svelte';
   import CoreFrames from './CoreFrames.svelte';
-  import { cardKey, cardOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
+  import { CardLayer, cardKey, cardOnCanvas, portMarks, ringColour, type CardTile } from '$lib/canvas/core/card-source';
   import { coreText, type CoreText } from './core-text';
   import { NodeChrome, nodeChrome } from '$lib/canvas/selection-chrome';
   import { layersSource } from '$lib/canvas/layers-source.svelte';
   import { tileHovered } from '$lib/canvas/layers';
   import { framesOnCanvas } from '$lib/canvas/core/frame-source';
-  import { overlayOf } from '$lib/canvas/core/world-overlay';
+  import { ChromeLayers, overlayOf } from '$lib/canvas/core/world-overlay';
   import { peerOutlines } from '$lib/canvas/peer-outlines';
   import { displayName } from '$lib/realtime/frame-presence';
   import { dev } from '$app/environment';
@@ -226,13 +226,15 @@
         label: labelOf(t),
         icon: text.icons.get(t.kind as NodeType) ?? null
       };
-      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold), turn: turnOf(t), poster: t.kind === 'motion' }];
+      const poster = t.kind === 'motion';
+      return [{ key: cardKey(card), frame: cardOnCanvas(card, theme, text.glyphs, text.bold, poster ? CardLayer.Face : CardLayer.Whole), turn: turnOf(t), poster }];
     });
   });
   const turnOf = (t: Tile) => (t.rotation ? { degrees: t.rotation, about: { x: t.x + t.w / 2, y: t.y + t.h / 2 } } : undefined);
   const coreChrome = $derived.by(() => {
     const look = coreLook;
-    if (!coreOn || !look) {
+    const text = coreType;
+    if (!coreOn || !look || !text) {
       return [];
     }
     return placed.flatMap((t) => {
@@ -242,11 +244,13 @@
       const on = selected.includes(t.id);
       const chrome = nodeChrome(t.id, on, layersSource.video);
       const hovered = !on && tileHovered(layersSource.hovered, t.id, layersSource.video?.nodeId ?? null);
-      if (chrome.ring === NodeChrome.None && !hovered) {
+      const layers = t.kind === 'motion' ? ChromeLayers.Whole : ChromeLayers.State;
+      if (layers === ChromeLayers.State && chrome.ring === NodeChrome.None && !hovered) {
         return [];
       }
       const marks = portMarks(t);
-      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, label: null, icon: null, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered, ringColor: ringColour(marks, look), names: on, turn: turnOf(t) }];
+      const own = layers === ChromeLayers.Whole ? { label: labelOf(t), icon: text.icons.get(t.kind as NodeType) ?? null } : { label: null, icon: null };
+      return [{ id: t.id, x: t.x, y: t.y, width: t.w, height: t.h, ...marks, ...own, ring: chrome.ring, handles: resizable && on && chrome.handles, hovered, ringColor: ringColour(marks, look), names: on, turn: turnOf(t), layers }];
     });
   });
   const posterCards = $derived(coreCards.filter((c) => c.poster));
