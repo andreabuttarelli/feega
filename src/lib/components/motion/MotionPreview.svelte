@@ -99,7 +99,7 @@
       return;
     }
     ready = false;
-    player.setAttribute('srcdoc', previewHtml(next, currentDevice()));
+    player.setAttribute('srcdoc', previewHtml(next, currentDevice(), { width, height }));
   }
 
   function announceDrawn() {
