@@ -19,6 +19,7 @@
   import { RenderEngine } from '$lib/motion/gpu/engine-flag';
   import { EditEnd, TEXT_EDIT, type TextEditMessage } from '$lib/motion/hyperframes/text-edit';
   import GpuLayer from './GpuLayer.svelte';
+  import { currentDevice, previewHtml } from '$lib/canvas/gpu/memory-budget';
   import type { Compose } from '$lib/motion/gpu/engine';
 
   type Player = HTMLElement & { seek: (t: number) => void; play: () => void; pause: () => void; currentTime: number; muted: boolean; loop: boolean; iframeElement: HTMLIFrameElement };
@@ -98,7 +99,7 @@
       return;
     }
     ready = false;
-    player.setAttribute('srcdoc', next);
+    player.setAttribute('srcdoc', previewHtml(next, currentDevice()));
   }
 
   function announceDrawn() {

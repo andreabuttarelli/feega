@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Device, BUDGET, decodeSize, rendererResolution } from './memory-budget';
+import { Device, BUDGET, decodeSize, previewHtml, rendererResolution } from './memory-budget';
 import { bytesOf } from './texture-bytes';
 
 const MB = 1024 * 1024;
@@ -42,5 +42,12 @@ describe('memory budget — a heavy canvas fits an iPhone WebContent process', (
 
   it('a phone renders without MSAA, which quadruples the backing store', () => {
     expect(BUDGET[Device.Phone].antialias).toBe(false);
+  });
+
+  it('a phone preview drops the will-change hints that made a 274-clip frame 1.7 GB of GPU layers', () => {
+    const html = '<html><head><style>.fx{will-change:transform,opacity}</style></head><body><div class="fx"></div></body></html>';
+    expect(previewHtml(html, Device.Desktop)).toBe(html);
+    expect(previewHtml(html, Device.Phone)).toContain('will-change:auto!important');
+    expect(previewHtml(html, Device.Phone).replace('<style>*{will-change:auto!important}</style>', '')).toBe(html);
   });
 });
