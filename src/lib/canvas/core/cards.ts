@@ -71,7 +71,8 @@ function text(x: Ctx, part: CardPart, s: string, size: number, colour: string, l
     return [];
   }
   const set = width === null ? undefined : { width, height };
-  return [solid(x.clip(part), at(x.c, (part === CardPart.Title ? x.bold : x.glyphs)(s, size, set).contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + left : v + top)))), colour)];
+  const contours = at(x.c, (part === CardPart.Title ? x.bold : x.glyphs)(s, size, set).contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + left : v + top))));
+  return [{ ...solid(x.clip(part), contours, colour), scissor: [x.c.x, x.c.y, x.c.x + x.c.w, x.c.y + x.c.h] }];
 }
 
 const body = (x: Ctx, s: string, top: number, bottom = PAD) => text(x, CardPart.Body, s, BODY_SIZE, x.theme.ink, PAD, top, x.c.w - PAD * 2, x.c.h - top - bottom);
