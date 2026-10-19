@@ -77,6 +77,7 @@
   import type { Boxes } from '$lib/motion/scene-select';
   import { boxAround } from '$lib/motion/preview-view';
   import SelectionOverlay from '$lib/components/motion/SelectionOverlay.svelte';
+  import ConstraintsSection from '$lib/components/motion/ConstraintsSection.svelte';
   import { ScaleMode, flipScale } from '$lib/motion/scale-tool';
   import PixelGridOverlay from '$lib/components/motion/PixelGridOverlay.svelte';
   import { GridToggle, flipGrid } from '$lib/motion/pixel-grid';
@@ -2051,6 +2052,7 @@
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
         {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
         <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        {#if typeof selected.props.x === 'number' && !selected.parent}<ConstraintsSection {doc} clip={selected} onchange={apply} />{/if}
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
         {#if selected.component === 'Particles'}<ParticlePresets {doc} clip={selected} onchange={edit} />{/if}

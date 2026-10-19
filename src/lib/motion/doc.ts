@@ -32,6 +32,7 @@ import { referenceLookSchema } from './reference-look-model';
 import { stillSchema } from './still-model';
 import { partStylesSchema } from './part-style-model';
 import { autoLayoutSchema, layoutItemSchema } from './layout/model';
+import { constraintsSchema } from './constraints/model';
 import { layoutGuidesSchema } from './layout-guides/model';
 
 export enum MotionFormat {
@@ -116,6 +117,7 @@ const clipSchema = z.object({
   markers: z.array(markerSchema).max(MAX_MARKERS).optional(),
   autoLayout: autoLayoutSchema.nullable().optional(),
   layoutItem: layoutItemSchema.optional(),
+  constraints: constraintsSchema.optional(),
   partStyles: partStylesSchema.optional(),
   styleRef: z.string().min(1).optional()
 });
