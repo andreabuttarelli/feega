@@ -19,6 +19,19 @@ const patch = (doc: MotionDoc, id: string, change: Partial<MotionClip>): MotionD
 const card = (doc: MotionDoc, frame = 0) => displayListAt(doc, frame, FEEGA_TOKENS).items.find((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'card');
 const mask = (input: Record<string, unknown>) => maskSchema.parse(input);
 
+type CoverOf = NonNullable<PathItem['masks']>[number]['cover'];
+
+describe('keyframed masks', () => {
+  it('draws a mask whose box is keyframed, sampled at the frame', () => {
+    const masked = patch(withCard, 'card', { mask: mask({ kind: MaskKind.Rect, x: 0.5, y: 0.5, width: 1, height: 1 }), keyframes: { maskWidth: [{ frame: 0, value: 0, ease: 'linear' }, { frame: 10, value: 1, ease: 'linear' }] } });
+    const drawn = displayListAt(masked, 5, FEEGA_TOKENS);
+    const cover = card(masked, 5)?.masks?.[0].cover as Extract<CoverOf, { kind: CoverKind.Path }>;
+
+    expect(drawn.unsupported).toEqual([]);
+    expect(cover.matrix[0]).toBeCloseTo(960);
+  });
+});
+
 describe('own masks', () => {
   it('places a rectangle mask in frame space with its feather and mode', () => {
     const masked = patch(withCard, 'card', { mask: mask({ kind: MaskKind.Rect, x: 0.25, y: 0.5, width: 0.5, height: 1, feather: 12 }) });
