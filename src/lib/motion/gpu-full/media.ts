@@ -1,4 +1,4 @@
-import { ItemKind, type DisplayList, type ImageItem } from './display-list';
+import { CoverKind, ItemKind, type DisplayList, type ImageItem, type Item } from './display-list';
 import type { Picture, Pictures } from './raster';
 
 const SEEK_SLACK_S = 0.001;
@@ -32,6 +32,16 @@ function seek(video: HTMLVideoElement, time: number): Promise<void> {
   });
 }
 
+const coverPicture = (src: string): ImageItem => ({ kind: ItemKind.Image, clip: src, src, video: false } as ImageItem);
+
+function needed(items: Item[]): ImageItem[] {
+  return items.flatMap((i) => [
+    ...(i.kind === ItemKind.Image ? [i] : []),
+    ...needed(i.matte?.items ?? []),
+    ...(i.masks ?? []).flatMap((m) => (m.cover.kind === CoverKind.Picture ? [coverPicture(m.cover.src)] : []))
+  ]);
+}
+
 export function createMedia(): Media {
   const images = new Map<string, Promise<HTMLImageElement>>();
   const videos = new Map<string, Promise<HTMLVideoElement>>();
@@ -52,7 +62,7 @@ export function createMedia(): Media {
   }
 
   async function ready(list: DisplayList) {
-    const pictures = list.items.filter((i): i is ImageItem => i.kind === ItemKind.Image);
+    const pictures = needed(list.items);
     await Promise.all(pictures.map((p) => readyOne(p).catch(() => loaded.delete(p.clip))));
   }
 
