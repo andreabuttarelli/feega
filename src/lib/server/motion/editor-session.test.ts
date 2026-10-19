@@ -18,7 +18,7 @@ vi.mock('./editor', () => ({
   motionTokens: () => slow({}),
   motionAssets: () => slow([])
 }));
-vi.mock('$lib/server/repos/motion-revisions', () => ({ readHead: () => slow({ version: 3, doc: { scenes: [] } }) }));
+vi.mock('$lib/server/repos/motion-revisions', () => ({ headCache: () => new Map(), readHead: () => slow({ version: 3, doc: { scenes: [] } }) }));
 vi.mock('$lib/server/repos/node-runs', () => ({ listNodeRuns: () => slow([]) }));
 vi.mock('./templates', () => ({ templateLibrary: () => ({ own: () => slow([]) }) }));
 vi.mock('$lib/server/gallery/editor', () => ({ editorGallery: () => slow(null) }));
