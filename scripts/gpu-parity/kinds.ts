@@ -7,6 +7,7 @@ import { FillType } from '$lib/motion/fill/model';
 import { maskSchema } from '$lib/motion/mask';
 import { registerFont } from '$lib/motion/fonts/ops';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
+import { addAnimator, applyPreset, TextPreset } from '$lib/motion/text-animators/ops';
 
 const SECONDS = 60;
 const out = process.argv[2];
@@ -147,6 +148,13 @@ const KINDS: Record<string, () => MotionDoc> = {
       { text: 'soft wonky axes', font: 'Fraunces', weight: 600, axes: "'SOFT' 100, 'WONK' 1", size: 0.05, y: 0.62 }
     ),
   grotesk: () => clip(fonts(backdrop, ['Space Grotesk']), 'Text', 'grotesk', { text: 'Space Grotesk at 700, centred', font: 'Space Grotesk', weight: 700, size: 0.07 }),
+  animators: () => {
+    const placed = clip(clip(clip(backdrop, 'Text', 'rise', { text: 'Rise out of the blur', size: 0.08, y: 0.25 }), 'Text', 'words', { text: 'Words step up one by one', size: 0.06, y: 0.5 }), 'Kicker', 'spin', { text: 'turn scale tint', size: 0.06, y: 0.75 });
+    const risen = must(applyPreset(placed, 'rise', TextPreset.BlurUp, { start: 0, duration: SECONDS }, 'a'));
+    const stepped = must(applyPreset(risen, 'words', TextPreset.WordStagger, { start: 0, duration: SECONDS }, 'a'));
+    const spun = must(addAnimator(stepped, 'spin', 'a', { shape: 'smooth' as never, softness: 0.3, start: 0, end: 200, values: { rotation: 45, scale: 1.6, color: '#ff375f', opacity: 0.3 } }));
+    return keys(spun, 'spin', 'ta.a.offset', -130, 100);
+  },
   blur: () => keys(must(addClip(shape(backdrop, 'sharp', { shape: 'rect', x: 0.3, y: 0.5, width: 0.2, height: 0.3, fill: '#ffd60a' }), { component: 'Shape', from: 0, durationInFrames: SECONDS, props: { shape: 'star', x: 0.7, y: 0.5, width: 0.25, height: 0.4, fill: '#bf5af2' }, effects: [{ id: 'g', kind: 'gaussian-blur', enabled: true, params: { radius: 6 } }] } as never, 'soft')), 'sharp', 'blur', 0, 24)
 };
 

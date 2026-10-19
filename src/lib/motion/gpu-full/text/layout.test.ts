@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { Ligatures } from './face';
-import { layOut, Spaces, type Flow, type Type } from './layout';
-import { boxBook, seenLigatures, SPACE, UPM, WIDE } from './test-face';
+import { layOut, Shaping, Spaces, type Flow, type Type } from './layout';
+import { boxBook, boxFace, seenLigatures, SPACE, UPM, WIDE } from './test-face';
 
 const SIZE = 100;
 const em = (units: number) => (units / UPM) * SIZE;
-const type: Type = { request: { family: 'sans', weight: 400, italic: false, axes: {} }, size: SIZE, tracking: 0, leading: 1.2, inset: 0 };
+const type: Type = { request: { family: 'sans', weight: 400, italic: false, axes: {} }, size: SIZE, tracking: 0, leading: 1.2, inset: 0, shaping: Shaping.Runs };
 const wrapping: Flow = { spaces: Spaces.Collapse, wraps: true };
 const lines = (laid: ReturnType<typeof layOut>) => laid.blocks.flatMap((b) => b.lines);
 
@@ -75,5 +75,27 @@ describe('layOut', () => {
 
     expect(lines(laid)[0].glyphs[0].x).toBe(10);
     expect(laid.width).toBeCloseTo(em(WIDE) + 20);
+  });
+  it('shapes every character alone when characters are their own boxes, so pairs do not kern', () => {
+    const KERN = 100;
+    const kerning = { ...boxFace, shape: (text: string, l: Ligatures) => boxFace.shape(text, l).map((g, i) => (i === 0 && text.length > 1 ? { ...g, advance: g.advance - KERN } : g)) };
+    const book = () => ({ face: kerning, skew: 0 });
+
+    expect(layOut(['ab'], type, wrapping, 10_000, book).width).toBeCloseTo(2 * em(WIDE) - em(KERN));
+    expect(layOut(['ab'], { ...type, shaping: Shaping.Chars }, wrapping, 10_000, book).width).toBeCloseTo(2 * em(WIDE));
+  });
+
+  it('tells each glyph its word, its letter and the advance it spans', () => {
+    const laid = layOut(['ab cd'], { ...type, tracking: 0.1 }, wrapping, 10_000, boxBook());
+    const glyphs = lines(laid)[0].glyphs;
+    const step = em(WIDE) + 0.1 * SIZE;
+
+    expect(glyphs.map((g) => [g.word, g.letter])).toEqual([[0, 0], [0, 1], [-1, 0], [1, 0], [1, 1]]);
+    expect(glyphs[3].pen).toBeCloseTo(2 * step + em(SPACE) + 0.1 * SIZE);
+    expect(glyphs[3].advance).toBeCloseTo(step);
+  });
+
+  it('gives the line height it stacked lines with', () => {
+    expect(layOut(['a'], type, wrapping, 10_000, boxBook()).lineHeight).toBeCloseTo(1.2 * SIZE);
   });
 });
