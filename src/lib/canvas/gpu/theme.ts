@@ -1,4 +1,4 @@
-export type Theme = { canvas: string; dot: string; paper: string; line: string; ink: string; inkSoft: string; accent: string; iterate: string; wire: string; font: string };
+export type Theme = { canvas: string; dot: string; paper: string; paper2: string; line: string; line2: string; chip: string; chipInk: string; ink: string; inkSoft: string; accent: string; iterate: string; wire: string; font: string };
 
 const WIRE_INK_SHARE = 0.45;
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
@@ -29,6 +29,10 @@ export function themeOf(el: HTMLElement): Theme {
     dot: v('--ui-canvas-dot', '#c8c8c8'),
     paper: v('--paper', '#ffffff'),
     line: v('--line', '#e5e5e5'),
+    paper2: v('--paper-2', '#f9f9f9'),
+    line2: v('--line-2', '#d2d2d7'),
+    chip: v('--ui-input', '#f2f2f2'),
+    chipInk: v('--ui-text', '#141414'),
     ink: v('--ink', '#1d1d1f'),
     inkSoft: v('--ink-soft', '#6e6e73'),
     accent: v('--accent', '#7c5cff'),

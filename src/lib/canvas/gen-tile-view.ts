@@ -20,6 +20,7 @@ export type GenTileView = {
   hint: string;
   placeholder: string;
   prompt: string;
+  output: string | null;
   error: string | null;
   warn: { text: string; soft: boolean } | null;
   run: GenButton;
@@ -70,6 +71,7 @@ export function genTileView(node: GenNode, quote: RunQuote, x: GenTileExtras): G
     hint: RUN_LABEL[state],
     placeholder: PROMPT_PLACEHOLDER[node.medium],
     prompt: node.prompt,
+    output: node.runs.find((r) => r.mediaId === node.refId)?.text ?? null,
     error: node.error ?? null,
     warn: quote.reason ? { text: `${quote.reason}${tooLong}`, soft: !quote.tooLong } : null,
     run: { label: quote.label, credits: approx(quote.credits), variable: quote.variable, enabled: quote.enabled },

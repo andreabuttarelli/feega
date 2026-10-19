@@ -4,6 +4,7 @@ import type { PortTile } from '$lib/canvas/gpu/geometry';
 import type { NodeChrome } from '$lib/canvas/selection-chrome';
 import type { Box, FrameOnCanvas } from './canvas-scene';
 import { cardItems } from './cards';
+import type { GenIcons } from './gen-card';
 import { PortState, tileChrome, type Glyphs, type PortMark } from './chrome';
 import type { CoreTheme } from './overlay';
 
@@ -24,11 +25,11 @@ export type CardTile = {
 
 export const CHROME_REACH = { top: 24, side: 96, bottom: 4 };
 
-export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs): FrameOnCanvas {
+export function cardOnCanvas(t: CardTile, theme: CoreTheme, glyphs: Glyphs, bold: Glyphs = glyphs, icons: GenIcons | null = null): FrameOnCanvas {
   const [x, y] = [CHROME_REACH.side, CHROME_REACH.top];
   const w = t.box.w + 2 * CHROME_REACH.side;
   const h = t.box.h + CHROME_REACH.top + CHROME_REACH.bottom;
-  const card = cardItems({ id: t.id, x, y, w: t.box.w, h: t.box.h, face: t.face, shot: t.shot }, theme, glyphs, bold);
+  const card = cardItems({ id: t.id, x, y, w: t.box.w, h: t.box.h, face: t.face, shot: t.shot }, theme, glyphs, bold, icons);
   const chrome = tileChrome({ id: t.id, x, y, width: t.box.w, height: t.box.h, ring: t.ring, handles: t.handles, hovered: t.hovered, ringColor: t.outputs.length ? CONNECTOR_STYLE[t.outputs[0].type].color : theme.accent, inputs: t.inputs, outputs: t.outputs, label: t.label, icon: t.icon, names: t.names }, glyphs);
   return {
     id: t.id,
