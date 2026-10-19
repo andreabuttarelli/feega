@@ -11,11 +11,16 @@ const box = (contours: number[][]) => {
 const glyphs = glyphsOf(boxBook(), 'DM Sans', 400);
 
 describe('glyphsOf', () => {
-  it('sets one line on the baseline, glyphs rising above it, tracked -0.2px', () => {
-    const { contours, width } = glyphs('ab', 10);
+  it('anchors a line at its line-box top, the baseline 1px below the centred CSS one as canvas text sits', () => {
+    const { contours, width, height } = glyphs('ab', 10);
 
     expect(width).toBeCloseTo(9.6);
-    expect(box(contours)).toEqual([0, -7, 9.8, 0]);
+    expect(height).toBe(14);
+    expect(box(contours)).toEqual([0, 4, 9.8, 11]);
+  });
+
+  it('takes the leading from the caller', () => {
+    expect(glyphs('ab', 10, { leading: 1 }).height).toBe(10);
   });
 
   it('wraps into the box and drops lines that do not fit', () => {
@@ -24,5 +29,9 @@ describe('glyphsOf', () => {
 
     expect(box(one.contours)[2]).toBeLessThanOrEqual(12);
     expect(all.contours.length).toBeGreaterThan(one.contours.length);
+  });
+
+  it('tracks by the caller\'s amount when given', () => {
+    expect(glyphs('ab', 10, { tracking: 0 }).width).toBeCloseTo(10);
   });
 });

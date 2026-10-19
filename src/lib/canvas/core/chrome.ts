@@ -2,6 +2,7 @@ import { NodeChrome } from '$lib/canvas/selection-chrome';
 import { CONNECTOR_STYLE, type ConnectorType } from '$lib/canvas/connectors';
 import type { PathItem } from '$lib/motion/gpu-full/display-list';
 import { dashes } from '$lib/motion/gpu-full/stroke';
+import { FillRule } from '$lib/motion/gpu-full/paint';
 import { line, rect, solid } from './shapes';
 
 export enum ChromePart {
@@ -15,7 +16,9 @@ export enum ChromePart {
   Icon = 'icon'
 }
 
-export type Glyphs = (text: string, size: number, wrap?: { width: number; height: number }) => { contours: number[][]; width: number };
+export type TextSet = { width?: number; height?: number; leading?: number; tracking?: number };
+
+export type Glyphs = (text: string, size: number, set?: TextSet) => { contours: number[][]; width: number; height: number };
 
 export type ChromeTile = {
   id: string;
@@ -44,6 +47,9 @@ const HANDLE_SIZE = 8;
 const HANDLE_BORDER = 1;
 const LABEL_SIZE = 12;
 const LABEL_GAP = 4;
+const LABEL_PAD = 2;
+const LABEL_LEADING = 1.3;
+const NAME_LEADING = 1;
 const HOVER_COLOR = '#b14cff';
 const HANDLE_FILL = '#ffffff';
 const LABEL_COLOR = '#6e6e73';
@@ -111,16 +117,17 @@ function label(t: ChromeTile, glyphs: Glyphs): PathItem[] {
   if (!t.label) {
     return [];
   }
-  const baseline = t.y - LABEL_GAP;
-  const icon = t.icon ? [item(t, ChromePart.Icon, shift(t.icon, t.x, baseline - ICON_SIZE), LABEL_COLOR)] : [];
+  const line = LABEL_SIZE * LABEL_LEADING;
+  const top = t.y - LABEL_GAP - LABEL_PAD - line;
+  const icon = t.icon ? [{ ...item(t, ChromePart.Icon, shift(t.icon, t.x, top + (line - ICON_SIZE) / 2), LABEL_COLOR), rule: FillRule.Union }] : [];
   const left = t.icon ? t.x + ICON_SIZE + ICON_GAP : t.x;
-  return [...icon, item(t, ChromePart.Label, shift(glyphs(t.label, LABEL_SIZE).contours, left, baseline), LABEL_COLOR)];
+  return [...icon, item(t, ChromePart.Label, shift(glyphs(t.label, LABEL_SIZE, { leading: LABEL_LEADING, tracking: 0 }).contours, left, top), LABEL_COLOR)];
 }
 
 function name(t: ChromeTile, glyphs: Glyphs, type: ConnectorType, centre: number, side: ChromePart): PathItem {
-  const { contours, width } = glyphs(CONNECTOR_STYLE[type].label, NAME_SIZE);
+  const { contours, width } = glyphs(CONNECTOR_STYLE[type].label, NAME_SIZE, { leading: NAME_LEADING });
   const left = side === ChromePart.PortIn ? t.x - NAME_GAP - width : t.x + t.width + NAME_GAP;
-  return item(t, ChromePart.PortName, shift(contours, left, centre + NAME_SIZE / 2), CONNECTOR_STYLE[type].color);
+  return item(t, ChromePart.PortName, shift(contours, left, centre - NAME_SIZE / 2), CONNECTOR_STYLE[type].color);
 }
 
 function names(t: ChromeTile, glyphs: Glyphs): PathItem[] {

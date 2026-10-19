@@ -8,7 +8,7 @@ import type { CoreTheme } from './overlay';
 import type { Glyphs } from './chrome';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', line: '#e5e5e5', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
-const glyphs: Glyphs = (text, size) => ({ contours: text ? [[0, -size, text.length * size, -size, text.length * size, 0, 0, 0]] : [], width: text.length * size });
+const glyphs: Glyphs = (text, size) => ({ contours: text ? [[0, 0, text.length * size, 0, text.length * size, size, 0, size]] : [], width: text.length * size, height: size });
 
 const box = (contours: number[][]) => {
   const xs = contours.flatMap((c) => c.filter((_, i) => i % 2 === 0));
@@ -17,7 +17,7 @@ const box = (contours: number[][]) => {
 };
 const asset = (id: string) => `https://cdn/${id}`;
 const card = (kind: string, data: Record<string, unknown>, over: Partial<CoreCard> = {}): CoreCard => ({ id: 'n', x: 0, y: 0, w: 200, h: 100, face: faceOf({ id: 'n', kind }, data, asset), ...over });
-const part = (items: Item[], p: CardPart) => items.filter((i) => i.clip === `n:${p}`);
+const part = (items: Item[], p: CardPart) => items.filter((i) => i.clip === `n:${p}` || i.clip.startsWith(`n:${p}:`));
 const paths = (items: Item[], p: CardPart) => part(items, p) as PathItem[];
 
 describe('cardItems', () => {
@@ -82,9 +82,16 @@ describe('cardItems', () => {
   });
 
   it('sets a source title in the bold face', () => {
-    const bold: Glyphs = () => ({ contours: [[0, 0, 1, 0, 1, 1]], width: 1 });
+    const bold: Glyphs = () => ({ contours: [[0, 0, 1, 0, 1, 1]], width: 1, height: 1 });
     const [title] = paths(cardItems(card('iframe', { url: 'x' }), theme, glyphs, bold), CardPart.Title);
 
-    expect(box(title.contours)).toEqual([14, 27, 15, 28]);
+    expect(box(title.contours)).toEqual([14, 14, 15, 15]);
+  });
+
+  it('gives each picture its own clip, since the engine keys textures by clip', () => {
+    const c = { ...card('social_account_feed', {}), face: faceOf({ id: 'n', kind: 'social_account_feed' }, {}, asset, ['t1', 't2', 't3']), w: 300, h: 300 };
+    const clips = cardItems(c, theme, glyphs).filter((i) => i.kind === ItemKind.Image).map((i) => i.clip);
+
+    expect(new Set(clips).size).toBe(3);
   });
 });

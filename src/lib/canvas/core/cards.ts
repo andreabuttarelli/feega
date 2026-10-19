@@ -52,8 +52,8 @@ const at = (c: CoreCard, contours: number[][]) => contours.map((k) => k.map((v, 
 
 const translate = (x: number, y: number): Affine => [IDENTITY[0], IDENTITY[1], IDENTITY[2], IDENTITY[3], x, y];
 
-function image(x: Ctx, part: CardPart, media: Media, b: Box, fit: Fit): ImageItem {
-  return { kind: ItemKind.Image, clip: x.clip(part), src: media.url, video: media.video, mediaTime: 0, size: { width: b.w, height: b.h }, fit, focus: CENTRE, zoom: 1, clipped: true, inner: IDENTITY, opacity: 1, matrix: translate(x.c.x + b.x, x.c.y + b.y), blur: 0, blend: BlendMode.Normal };
+function image(x: Ctx, part: CardPart, media: Media, b: Box, fit: Fit, nth = 0): ImageItem {
+  return { kind: ItemKind.Image, clip: `${x.clip(part)}:${nth}`, src: media.url, video: media.video, mediaTime: 0, size: { width: b.w, height: b.h }, fit, focus: CENTRE, zoom: 1, clipped: true, inner: IDENTITY, opacity: 1, matrix: translate(x.c.x + b.x, x.c.y + b.y), blur: 0, blend: BlendMode.Normal };
 }
 
 function panel(x: Ctx, raised = true): Item[] {
@@ -70,8 +70,8 @@ function text(x: Ctx, part: CardPart, s: string, size: number, colour: string, l
   if (!s) {
     return [];
   }
-  const wrap = width === null ? undefined : { width, height };
-  return [solid(x.clip(part), at(x.c, (part === CardPart.Title ? x.bold : x.glyphs)(s, size, wrap).contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + left : v + top + size)))), colour)];
+  const set = width === null ? undefined : { width, height };
+  return [solid(x.clip(part), at(x.c, (part === CardPart.Title ? x.bold : x.glyphs)(s, size, set).contours.map((k) => k.map((v, i) => (i % 2 === 0 ? v + left : v + top)))), colour)];
 }
 
 const body = (x: Ctx, s: string, top: number, bottom = PAD) => text(x, CardPart.Body, s, BODY_SIZE, x.theme.ink, PAD, top, x.c.w - PAD * 2, x.c.h - top - bottom);
@@ -99,7 +99,7 @@ function thumbs(x: Ctx, top: number): Item[] {
   const rows = Math.max(0, Math.floor((c.h - top - PAD + THUMB_GAP) / (cell + THUMB_GAP)));
   return c.face.thumbs.slice(0, rows * THUMB_COLUMNS).flatMap((url, i) => {
     const b = { x: PAD + (i % THUMB_COLUMNS) * (cell + THUMB_GAP), y: top + Math.floor(i / THUMB_COLUMNS) * (cell + THUMB_GAP), w: cell, h: cell };
-    return [solid(x.clip(CardPart.Thumb), at(c, [rect(b.x, b.y, b.w, b.h)]), theme.line), image(x, CardPart.Thumb, { url, video: false }, b, Fit.Cover)];
+    return [solid(x.clip(CardPart.Thumb), at(c, [rect(b.x, b.y, b.w, b.h)]), theme.line), image(x, CardPart.Thumb, { url, video: false }, b, Fit.Cover, i)];
   });
 }
 

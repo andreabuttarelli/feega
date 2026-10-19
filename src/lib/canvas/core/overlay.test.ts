@@ -5,7 +5,7 @@ import { EdgeLook, OverlayPart, edgeItems, guideItems, marqueeItems, peerItems, 
 import type { Glyphs } from './chrome';
 
 const theme: CoreTheme = { paper: '#ffffff', panel: '#ffffff', line: '#e5e5e5', ink: '#1d1d1f', inkSoft: '#6e6e73', accent: '#7c5cff', wire: '#b3b3b6', iterate: '#d97706' };
-const glyphs: Glyphs = (text, size) => ({ contours: [[0, -size, text.length * size, -size, text.length * size, 0, 0, 0]], width: text.length * size });
+const glyphs: Glyphs = (text, size) => ({ contours: [[0, 0, text.length * size, 0, text.length * size, size, 0, size]], width: text.length * size, height: size });
 
 const box = (contours: number[][]) => {
   const xs = contours.flatMap((c) => c.filter((_, i) => i % 2 === 0));
