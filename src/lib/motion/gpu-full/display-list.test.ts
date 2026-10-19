@@ -219,4 +219,14 @@ describe('displayListAt', () => {
     });
   });
 
+  it('repeats a shape as many times as its keyframed repeater says at that frame', () => {
+    const repeater = { id: 'r', kind: 'repeater', enabled: true, params: { copies: 1, offsetX: 0.5, offsetY: 0 } };
+    const shaped = must(addClip(blank, { component: 'Shape', from: 0, durationInFrames: 90, props: { ...square, modifiers: [repeater] } }, 's'));
+    const keyed = must(setKeyframes(shaped, 's', 'mod.r.copies', [{ frame: 0, value: 1, ease: Ease.Linear }, { frame: 10, value: 3, ease: Ease.Linear }]));
+
+    const at = (frame: number) => displayListAt(keyed, frame, FEEGA_TOKENS);
+
+    expect(at(10).unsupported).toEqual([]);
+    expect(at(10).items.length).toBeGreaterThan(at(0).items.length);
+  });
 });

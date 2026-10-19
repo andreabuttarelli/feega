@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { apply2d } from '../../affine';
 import { FillRule, PaintKind } from '../paint';
 import { DomGap, DrawnKind, readTree, type DrawnPath } from './read';
-import { NO_INDEX, TEXT_PAD, type RawNode, type RawTree } from './tree';
+import { NO_INDEX, type RawNode, type RawTree } from './tree';
 import { boxBook } from '../text/test-face';
 import { Smoothing } from '../text/painter';
 import { BlendMode } from '../../blend';
@@ -31,11 +31,11 @@ function bounds(item: DrawnPath) {
 const near = (b: ReturnType<typeof bounds>) => Object.fromEntries(Object.entries(b).map(([k, v]) => [k, Math.round(v * 100) / 100]));
 
 describe('readTree', () => {
-  it('leaves the root z-index to the order of clips, and still refuses it inside', () => {
+  it('leaves the root z-index to the order of clips and stacks the ones inside', () => {
     const box = el({ parent: 0, size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
 
     expect(readTree(tree(root({ 'z-index': '3' }), box))).toMatchObject({ gaps: [], drawn: [{ kind: DrawnKind.Path }] });
-    expect(readTree(tree(root(), { ...box, style: { ...box.style, 'z-index': '3' } })).gaps).toMatchObject([{ reason: DomGap.Order }]);
+    expect(readTree(tree(root(), { ...box, style: { ...box.style, 'z-index': '3' } })).gaps).toEqual([]);
   });
 
   it('fills a box background at its position inside its parents', () => {
@@ -45,6 +45,28 @@ describe('readTree', () => {
 
     expect(near(bounds(box))).toEqual({ left: 15, top: 25, right: 45, bottom: 65 });
     expect(box.paint).toEqual({ kind: PaintKind.Solid, color: [1, 0, 0, 1] });
+  });
+
+  it('snaps an upright box to whole device pixels, as the browser paints backgrounds', () => {
+    const box = el({ parent: 0, at: [10.4, 20.6], size: [30.2, 40], style: { 'background-color': 'rgb(0, 0, 0)' } });
+
+    expect(near(bounds(paths(tree(root(), box))[0]))).toEqual({ left: 10, top: 21, right: 41, bottom: 61 });
+  });
+
+  it('cuts a hard-stop gradient into solid bands, one path per colour across all tiles', () => {
+    const grid = el({ parent: 0, at: [0, 0], size: [100, 50], style: { 'background-image': 'linear-gradient(rgb(0, 0, 0) 1px, rgba(0, 0, 0, 0) 1px)', 'background-size': '25px 25px' } });
+
+    const [band] = paths(tree(root(), grid));
+
+    expect(paths(tree(root(), grid))).toHaveLength(1);
+    expect(band.contours).toHaveLength(8);
+    expect(band.paint).toEqual({ kind: PaintKind.Solid, color: [0, 0, 0, 1] });
+  });
+
+  it('paints a transformed box from a whole-pixel offset, as the browser does', () => {
+    const turned = el({ parent: 0, at: [100.4, 99.6], size: [40, 20], style: { 'background-color': 'rgb(0, 0, 0)', transform: 'matrix(1, 0, 0, 1, 0, 0)' } });
+
+    expect(near(bounds(paths(tree(root(), turned))[0]))).toEqual({ left: 100, top: 100, right: 140, bottom: 120 });
   });
 
   it('turns a box about its transform origin', () => {
@@ -94,13 +116,13 @@ describe('readTree', () => {
     expect(near(bounds(ring))).toEqual({ left: 10, top: 10, right: 110, bottom: 40 });
   });
 
-  it('tiles a sized linear gradient across the box', () => {
-    const grid = el({ parent: 0, size: [100, 50], style: { 'background-image': 'linear-gradient(90deg, rgb(0, 0, 0) 1px, rgba(0, 0, 0, 0) 1px)', 'background-size': '25px 25px' } });
+  it('tiles a sized soft gradient across the box', () => {
+    const grid = el({ parent: 0, size: [100, 50], style: { 'background-image': 'linear-gradient(90deg, rgb(0, 0, 0), rgba(0, 0, 0, 0))', 'background-size': '25px 25px' } });
 
     const tiles = paths(tree(root(), grid));
 
     expect(tiles).toHaveLength(8);
-    expect(tiles[1].paint).toMatchObject({ kind: PaintKind.Linear, from: [25, 12.5], to: [50, 12.5], stops: [{ at: 0.04 }, { at: 0.04 }] });
+    expect(tiles[1].paint).toMatchObject({ kind: PaintKind.Linear, from: [25, 12.5], to: [50, 12.5], stops: [{ at: 0 }, { at: 1 }] });
   });
 
   it('spans an unsized gradient over the whole box along its angle', () => {
@@ -134,11 +156,62 @@ describe('readTree', () => {
     expect(readTree(tree(root(), clip, inside, outside)).gaps.map((g) => g.reason)).toEqual([DomGap.Clip]);
   });
 
-  it('multiplies opacity into a single painted leaf but refuses it over a group', () => {
+  it('multiplies opacity into a single painted leaf', () => {
     const faded = (n: number) => [el({ parent: 0, size: [50, 50], style: { opacity: '0.5' } }), ...Array.from({ length: n }, () => el({ parent: 1, size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } }))];
 
     expect(paths(tree(root(), ...faded(1)))[0].opacity).toBeCloseTo(0.5);
-    expect(readTree(tree(root(), ...faded(2))).gaps.map((g) => g.reason)).toEqual([DomGap.Opacity]);
+  });
+
+  it('fades a group whose items do not overlap item by item, which looks the same', () => {
+    const faded = el({ parent: 0, size: [50, 50], style: { opacity: '0.5' } });
+    const square = (x: number) => el({ parent: 1, at: [x, 0], size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
+
+    const read = readTree(tree(root(), faded, square(0), square(20)));
+
+    expect(read.gaps).toEqual([]);
+    expect(read.drawn.map((d) => d.opacity)).toEqual([0.5, 0.5]);
+  });
+
+  it('fades overlapping items together, as one group', () => {
+    const faded = el({ parent: 0, size: [50, 50], style: { opacity: '0.5' } });
+    const square = () => el({ parent: 1, at: [0, 0], size: [10, 10], style: { 'background-color': 'rgb(0, 0, 0)' } });
+
+    const read = readTree(tree(root(), faded, square(), square()));
+
+    expect(read.gaps).toEqual([]);
+    expect(read.drawn).toHaveLength(1);
+    expect(read.drawn[0]).toMatchObject({ kind: DrawnKind.Group, opacity: 0.5 });
+  });
+
+  it('casts each box shadow under the box, blurred by half its radius', () => {
+    const card = el({ parent: 0, at: [10, 10], size: [100, 50], style: { 'background-color': 'rgb(255, 255, 255)', 'box-shadow': 'rgba(0, 0, 0, 0.18) 0px 30px 80px 0px, rgba(0, 0, 0, 0.06) 0px 2px 6px 0px' } });
+
+    const read = readTree(tree(root(), card));
+    const [far, near2, box] = read.drawn as DrawnPath[];
+
+    expect(read.gaps).toEqual([]);
+    expect(far.paint).toEqual({ kind: PaintKind.Solid, color: [0, 0, 0, 0.06] });
+    expect(far.filters).toEqual([{ kind: FilterKind.Css, fns: [{ name: 'blur', args: ['3px'] }] }]);
+    expect(near(bounds(near2))).toEqual({ left: 10, top: 40, right: 110, bottom: 90 });
+    expect(box.paint).toEqual({ kind: PaintKind.Solid, color: [1, 1, 1, 1] });
+  });
+
+  it('stacks positioned siblings by z-index, negative ones under the flow', () => {
+    const box = (z: string, color: string) => el({ parent: 0, size: [10, 10], style: { position: 'absolute', 'z-index': z, 'background-color': color } });
+    const flow = el({ parent: 0, size: [10, 10], style: { 'background-color': 'rgb(0, 0, 255)' } });
+
+    const read = readTree(tree(root(), box('2', 'rgb(255, 0, 0)'), box('1', 'rgb(0, 255, 0)'), flow, box('-1', 'rgb(0, 0, 0)')));
+
+    expect(read.gaps).toEqual([]);
+    expect((read.drawn as DrawnPath[]).map((d) => (d.paint.kind === PaintKind.Solid ? d.paint.color.join() : ''))).toEqual(['0,0,0,1', '0,0,1,1', '0,1,0,1', '1,0,0,1']);
+  });
+
+  it('clips a box to an inset() clip path', () => {
+    const wiped = el({ parent: 0, at: [10, 10], size: [100, 40], style: { 'background-color': 'rgb(0, 0, 0)', 'clip-path': 'inset(0px 25% 10px 0px)' } });
+
+    const [item] = readTree(tree(root(), wiped)).drawn;
+
+    expect(item.masks?.[0].cover).toEqual({ kind: CoverKind.Path, contours: [[0, 0, 75, 0, 75, 30, 0, 30]], matrix: [1, 0, 0, 1, 10, 10] });
   });
 
   it('draws an svg fill without a stroke it cannot dash and names the stroke', () => {
@@ -202,6 +275,12 @@ describe('readTree', () => {
       expect(near(bounds(plain.drawn[0] as DrawnPath))).toEqual({ left: 30, top: 41, right: 35, bottom: 48 });
     });
 
+    it('sits upright glyphs on whole pixel rows and quarter-pixel columns, as the browser does', () => {
+      const read = readTree(tree(root(), label({ lines: [{ chars: ['a'], xs: [20.4], top: 30.3, height: 10 }] })), typeset());
+
+      expect(near(bounds(read.drawn[0] as DrawnPath))).toEqual({ left: 30.5, top: 41, right: 35.5, bottom: 48 });
+    });
+
     it('draws the case the browser shows, not the case typed', () => {
       const read = readTree(tree(root(), label({ style: { ...label().style, 'text-transform': 'uppercase' } })), typeset(['a', 'b']));
 
@@ -216,11 +295,11 @@ describe('readTree', () => {
       expect(read.gaps.map((g) => g.reason)).toEqual([DomGap.Font]);
     });
 
-    it('draws text set in a font the page never loaded from the raster the browser made of it', () => {
-      const read = readTree(tree(root(), label({ raster: { layer: 3, width: 120, height: 60 } })), typeset(['a', 'b']));
+    it('draws text set in a font the page never loaded from the raster the browser made of it, where the browser put it', () => {
+      const read = readTree(tree(root(), label({ raster: { layer: 3, width: 120, height: 60, at: [-15.5, -16.25] } })), typeset(['a', 'b']));
 
       expect(read.gaps).toEqual([]);
-      expect(read.drawn).toEqual([{ kind: DrawnKind.Layer, layer: 3, width: 120, height: 60, opacity: 1, matrix: [1, 0, 0, 1, 10 - TEXT_PAD, 10 - TEXT_PAD] }]);
+      expect(read.drawn).toEqual([{ kind: DrawnKind.Layer, layer: 3, width: 120, height: 60, opacity: 1, matrix: [1, 0, 0, 1, -5.5, -6.25] }]);
     });
   });
   describe('svg groups', () => {

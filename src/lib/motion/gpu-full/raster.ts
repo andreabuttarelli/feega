@@ -4,6 +4,8 @@ import { imageRect, type Size } from './image-rect';
 import { gaussianKernel, MAX_TAPS } from './kernel';
 import { BLEND_FS, BLUR_FS, QUAD_VS, plain, program, texture } from './gl-kit';
 import { createFilters } from './filters-gpu';
+import { createCoverage } from './coverage';
+import { invert2d } from '../parent';
 import { BlendMode } from '../blend';
 import { MaskMode } from '../mask';
 import { CoverKind, RampKind, type MaskLayer } from './mask-layers';
@@ -16,7 +18,7 @@ const CLIP_BIT = 0x80;
 const COVER_BITS = 0x7f;
 
 const PATH_VS = `#version 300 es
-in vec2 a_pos;
+layout(location = 0) in vec2 a_pos;
 uniform mat3 u_matrix;
 uniform vec2 u_frame;
 out vec2 v_local;
@@ -38,7 +40,16 @@ uniform int u_count;
 uniform float u_at[${MAX_STOPS}];
 uniform vec4 u_stop[${MAX_STOPS}];
 uniform float u_opacity;
+uniform mat3 u_toLocal;
+uniform int u_analytic;
+uniform int u_evenOdd;
+uniform sampler2D u_cov;
 out vec4 outColor;
+float covered() {
+  if (u_analytic == 0) { return 1.0; }
+  float w = abs(texelFetch(u_cov, ivec2(gl_FragCoord.xy), 0).r);
+  return u_evenOdd == 1 ? 1.0 - abs(1.0 - mod(w, 2.0)) : min(1.0, w);
+}
 vec4 ramp(float t) {
   t = clamp(t, 0.0, 1.0);
   vec4 c = u_stop[0];
@@ -50,14 +61,15 @@ vec4 ramp(float t) {
   return c;
 }
 void main() {
+  vec2 local = (u_toLocal * vec3(v_local, 1.0)).xy;
   vec4 c = u_color;
   if (u_kind == 1) {
     vec2 d = u_b - u_a;
-    c = ramp(dot(v_local - u_a, d) / max(dot(d, d), 1e-6));
+    c = ramp(dot(local - u_a, d) / max(dot(d, d), 1e-6));
   } else if (u_kind == 2) {
-    c = ramp(length(v_local - u_a) / max(u_radius, 1e-6));
+    c = ramp(length(local - u_a) / max(u_radius, 1e-6));
   }
-  float a = c.a * u_opacity;
+  float a = c.a * u_opacity * covered();
   outColor = vec4(c.rgb * a, a);
 }`;
 
@@ -199,7 +211,8 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
   const lensProgram = program(gl, LENS_VS, BLOB_FRAGMENT);
   const textures = new Map<TexImageSource, WebGLTexture>();
   const main = target(gl, width, height, samples);
-  const group = target(gl, width, height, samples);
+  const groups: Target[] = [];
+  let depth = 0;
   let dest = main;
   const layer = target(gl, width, height, samples);
   const ping = plain(gl, width, height);
@@ -213,6 +226,10 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
   gl.bindBuffer(gl.ARRAY_BUFFER, quad);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1]), gl.STATIC_DRAW);
   const filters = createFilters(gl, width, height, quad);
+  const coverage = createCoverage(gl, width, height);
+  const IDENTITY_MAT3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+  const ANALYTIC_RULES = new Set([FillRule.NonZero, FillRule.EvenOdd]);
+  const COV_UNIT = 3;
   const vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
   gl.enableVertexAttribArray(0);
@@ -257,9 +274,42 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
     [FillRule.Union]: () => gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR_WRAP)
   };
 
+  const solvable = (m: number[]) => Math.abs(m[0] * m[3] - m[1] * m[2]) > 1e-9;
+
+  function fillAnalytic(item: PathItem, opacity: number) {
+    const box = coverage.accumulate(item.contours, item.matrix);
+    if (!box) {
+      return;
+    }
+    const inv = invert2d(item.matrix);
+    gl.useProgram(pathProgram);
+    gl.uniformMatrix3fv(u(pathProgram, 'u_matrix'), false, IDENTITY_MAT3);
+    gl.uniformMatrix3fv(u(pathProgram, 'u_toLocal'), false, [inv[0], inv[1], 0, inv[2], inv[3], 0, inv[4], inv[5], 1]);
+    gl.uniform2f(u(pathProgram, 'u_frame'), width, height);
+    gl.uniform1i(u(pathProgram, 'u_analytic'), 1);
+    gl.uniform1i(u(pathProgram, 'u_evenOdd'), item.rule === FillRule.EvenOdd ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE0 + COV_UNIT);
+    gl.bindTexture(gl.TEXTURE_2D, coverage.texture);
+    gl.uniform1i(u(pathProgram, 'u_cov'), COV_UNIT);
+    gl.activeTexture(gl.TEXTURE0);
+    setPaint(item.paint, opacity);
+    const [x0, y0, x1, y1] = box;
+    gl.bindBuffer(gl.ARRAY_BUFFER, geometry);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([x0, y0, x1, y0, x1, y1, x0, y0, x1, y1, x0, y1]), gl.STREAM_DRAW);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    coverage.clear(box);
+  }
+
   function fillPath(item: PathItem, opacity: number) {
+    if (!item.within && ANALYTIC_RULES.has(item.rule) && solvable(item.matrix)) {
+      fillAnalytic(item, opacity);
+      return;
+    }
     const m = item.matrix;
     gl.useProgram(pathProgram);
+    gl.uniform1i(u(pathProgram, 'u_analytic'), 0);
+    gl.uniformMatrix3fv(u(pathProgram, 'u_toLocal'), false, IDENTITY_MAT3);
     gl.uniformMatrix3fv(u(pathProgram, 'u_matrix'), false, [m[0], m[1], 0, m[2], m[3], 0, m[4], m[5], 1]);
     gl.uniform2f(u(pathProgram, 'u_frame'), width, height);
     gl.bindBuffer(gl.ARRAY_BUFFER, geometry);
@@ -567,12 +617,15 @@ export function createRaster(canvas: HTMLCanvasElement | OffscreenCanvas, width:
 
   function groupLayer(item: GroupItem, pictures: Pictures) {
     const outer = dest;
+    const group = (groups[depth] ??= target(gl, width, height, samples));
     dest = group;
+    depth++;
     gl.bindFramebuffer(gl.FRAMEBUFFER, group.fbo);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.STENCIL_BUFFER_BIT);
     item.items.forEach((inner, i) => paintItem(inner, item.items.slice(0, i), pictures));
     resolveInto(group);
+    depth--;
     dest = outer;
     const mask = item.masks || item.matte ? maskOf(item, pictures) : null;
     const filtered = item.filters ? filters.apply(group.texture, item.filters, item.space ?? [1, 0, 0, 1]) : group.texture;
