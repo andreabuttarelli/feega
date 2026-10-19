@@ -45,6 +45,7 @@ await page.waitForTimeout(8000);
 await page.screenshot({ path: `${SHOTS}/2-canvas.png` });
 console.log('canvas url', page.url());
 console.log('canvas media', JSON.stringify(await page.evaluate(() => { const media = [...document.querySelectorAll('img, video')].filter((m) => (m.currentSrc || m.src || '').includes('/assets/')); return { total: media.length, broken: media.filter((m) => (m instanceof HTMLImageElement ? m.complete && m.naturalWidth === 0 : m.error !== null)).length }; })));
+console.log('canvas frames', JSON.stringify(await page.evaluate(() => [...document.querySelectorAll('iframe')].map((f) => new URL(f.src, location.href).origin + ' grant=' + new URL(f.src, location.href).searchParams.has('grant')))));
 console.log('canvas nodes', await page.locator('.svelte-flow__node, [data-motion-node]').count());
 
 console.log('api calls', JSON.stringify([...new Set(apiCalls)], null, 1));

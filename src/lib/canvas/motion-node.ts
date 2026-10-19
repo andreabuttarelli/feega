@@ -5,6 +5,7 @@ import { NodeMode, Opening } from './inline-motion';
 import { FrameFormat } from '$lib/motion/hyperframes/capture';
 import { DRAWN_TEXT } from '$lib/motion/draw-create';
 import { FramePress } from '$lib/motion/drill';
+import { grantedPath } from './asset-url';
 
 export enum FrameKind {
   Frame = 'frame',
@@ -174,11 +175,11 @@ export function motionSourcePath(input: { projectId: string; canvasId: string; n
 }
 
 export function motionPreviewPath(input: { projectId: string; canvasId: string; nodeId: string }): string {
-  return `${motionEditorPath(input)}/preview`;
+  return grantedPath(`${motionEditorPath(input)}/preview`);
 }
 
 export function motionLivePath(input: { projectId: string; canvasId: string; nodeId: string }): string {
-  return `${motionEditorPath(input)}/live`;
+  return grantedPath(`${motionEditorPath(input)}/live`);
 }
 
 export function storyboardPath(projectId: string, data: Record<string, unknown>): string | null {

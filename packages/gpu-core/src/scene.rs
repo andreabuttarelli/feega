@@ -1,28 +1,15 @@
 use std::collections::HashMap;
 
-use vello::kurbo::{Affine, BezPath, Point, Rect};
-use vello::peniko::{color::AlphaColor, BlendMode, Brush, Color, ColorStop, Compose, Fill, Gradient, ImageBrush, ImageData, ImageQuality, Mix};
+use vello::kurbo::{Affine, BezPath, Point, Rect, Shape};
+use vello::peniko::{Fill, ImageData};
 use vello::Scene;
 
+use crate::canvas::{mix, Canvas};
 use crate::display_list::{Cover, DisplayList, FillRule, ImageItem, Item, Look, Paint, PathItem, Ramp, Rgba, Size, Stop};
 use crate::pictures::{image_rect, Pictures};
 use crate::Skipped;
 
-fn colour(c: &Rgba) -> Color {
-    AlphaColor::new(*c)
-}
-
-fn stops(list: &[Stop]) -> Vec<ColorStop> {
-    list.iter().map(|s| ColorStop::from((s.at, colour(&s.color)))).collect()
-}
-
-fn brush(paint: &Paint) -> Brush {
-    match paint {
-        Paint::Solid { color } => Brush::Solid(colour(color)),
-        Paint::Linear { from, to, stops: s } => Brush::Gradient(Gradient::new_linear(Point::new(from[0], from[1]), Point::new(to[0], to[1])).with_stops(stops(s).as_slice())),
-        Paint::Radial { center, radius, stops: s } => Brush::Gradient(Gradient::new_radial(Point::new(center[0], center[1]), *radius as f32).with_stops(stops(s).as_slice())),
-    }
-}
+pub type Shelf<P> = HashMap<String, P>;
 
 fn polygon(points: &[f64]) -> BezPath {
     let mut path = BezPath::new();
@@ -38,48 +25,26 @@ fn polygon(points: &[f64]) -> BezPath {
     path
 }
 
-fn mix(name: &str) -> Mix {
-    match name {
-        "multiply" => Mix::Multiply,
-        "screen" => Mix::Screen,
-        "overlay" => Mix::Overlay,
-        "darken" => Mix::Darken,
-        "lighten" => Mix::Lighten,
-        "color-dodge" => Mix::ColorDodge,
-        "color-burn" => Mix::ColorBurn,
-        "hard-light" => Mix::HardLight,
-        "soft-light" => Mix::SoftLight,
-        "difference" => Mix::Difference,
-        "exclusion" => Mix::Exclusion,
-        "hue" => Mix::Hue,
-        "saturation" => Mix::Saturation,
-        "color" => Mix::Color,
-        "luminosity" => Mix::Luminosity,
-        _ => Mix::Normal,
-    }
-}
-
-fn draw(scene: &mut Scene, item: &PathItem, frame: Rect) {
+fn draw<C: Canvas>(scene: &mut C, item: &PathItem, frame: Rect) {
     let transform = Affine::new(item.look.matrix);
-    let brush = brush(&item.paint);
     if let Some(within) = &item.within {
         let mut region = joined(&within.contours);
         if within.outside {
             region.extend(frame_in(transform, frame));
         }
         let rule = if within.outside { Fill::EvenOdd } else { Fill::NonZero };
-        scene.push_clip_layer(rule, transform, &region);
+        scene.push_clip(rule, transform, &region);
     }
     if item.rule == FillRule::Union {
         for contour in &item.contours {
-            scene.fill(Fill::NonZero, transform, &brush, None, &polygon(contour));
+            scene.fill(Fill::NonZero, transform, &item.paint, &polygon(contour));
         }
     } else {
         let rule = if item.rule == FillRule::EvenOdd { Fill::EvenOdd } else { Fill::NonZero };
-        scene.fill(rule, transform, &brush, None, &joined(&item.contours));
+        scene.fill(rule, transform, &item.paint, &joined(&item.contours));
     }
     if item.within.is_some() {
-        scene.pop_layer();
+        scene.pop();
     }
 }
 
@@ -91,19 +56,14 @@ fn image_region(item: &ImageItem, natural: Size) -> (Rect, Rect) {
     (placed, region)
 }
 
-fn natural(image: &ImageData) -> Size {
-    Size { width: image.width as f64, height: image.height as f64 }
-}
-
-fn draw_image(scene: &mut Scene, item: &ImageItem, image: &ImageData) {
-    let natural = natural(image);
+fn draw_image<C: Canvas>(scene: &mut C, item: &ImageItem, image: &C::Picture) {
+    let natural = C::size(image);
     let (placed, region) = image_region(item, natural);
     if region.is_zero_area() {
         return;
     }
     let texels = Affine::translate((placed.x0, placed.y0)) * Affine::scale_non_uniform(placed.width() / natural.width, placed.height() / natural.height);
-    let brush = ImageBrush::new(image.clone()).with_quality(ImageQuality::Medium);
-    scene.fill(Fill::NonZero, Affine::new(item.look.matrix), &brush, Some(texels), &region);
+    scene.picture(Affine::new(item.look.matrix), image, texels, region);
 }
 
 fn joined(contours: &[Vec<f64>]) -> BezPath {
@@ -132,28 +92,28 @@ pub fn layer_worthy(item: &Item) -> bool {
     item.look().is_some_and(needs_layer)
 }
 
-fn layered(scene: &mut Scene, blend: &str, opacity: f32, frame: Rect, paint: impl FnOnce(&mut Scene)) {
+fn layered<C: Canvas>(scene: &mut C, blend: &str, opacity: f32, frame: Rect, paint: impl FnOnce(&mut C)) {
     let layer = opacity < 1.0 || blend != "normal";
     if layer {
-        scene.push_layer(Fill::NonZero, BlendMode::new(mix(blend), Compose::SrcOver), opacity, Affine::IDENTITY, &frame);
+        scene.push_layer(mix(blend), opacity, frame);
     }
     paint(scene);
     if layer {
-        scene.pop_layer();
+        scene.pop();
     }
 }
 
-fn scissored(scene: &mut Scene, look: &Look, paint: impl FnOnce(&mut Scene)) {
+fn scissored<C: Canvas>(scene: &mut C, look: &Look, paint: impl FnOnce(&mut C)) {
     let Some([x0, y0, x1, y1]) = look.scissor else {
         paint(scene);
         return;
     };
-    scene.push_clip_layer(Fill::NonZero, Affine::IDENTITY, &Rect::new(x0, y0, x1, y1));
+    scene.push_clip(Fill::NonZero, Affine::IDENTITY, &Rect::new(x0, y0, x1, y1).to_path(0.1));
     paint(scene);
-    scene.pop_layer();
+    scene.pop();
 }
 
-fn content(scene: &mut Scene, item: &Item, pictures: &Pictures, frame: Rect) {
+fn content<C: Canvas>(scene: &mut C, item: &Item, pictures: &Shelf<C::Picture>, frame: Rect) {
     match item {
         Item::Path(path) => draw(scene, path, frame),
         Item::Image(image) => {
@@ -168,13 +128,12 @@ fn content(scene: &mut Scene, item: &Item, pictures: &Pictures, frame: Rect) {
 const WHITE: Rgba = [1.0, 1.0, 1.0, 1.0];
 const CLEAR: Rgba = [1.0, 1.0, 1.0, 0.0];
 
-fn ramp(kind: Ramp) -> Brush {
-    let stops = [ColorStop::from((0.0, colour(&WHITE))), ColorStop::from((1.0, colour(&CLEAR)))];
-    let gradient = match kind {
-        Ramp::Linear => Gradient::new_linear(Point::new(0.0, 0.5), Point::new(1.0, 0.5)),
-        Ramp::Radial => Gradient::new_radial(Point::new(0.5, 0.5), 0.5),
-    };
-    Brush::Gradient(gradient.with_stops(stops.as_slice()))
+fn ramp(kind: Ramp) -> Paint {
+    let stops = vec![Stop { at: 0.0, color: WHITE }, Stop { at: 1.0, color: CLEAR }];
+    match kind {
+        Ramp::Linear => Paint::Linear { from: [0.0, 0.5], to: [1.0, 0.5], stops },
+        Ramp::Radial => Paint::Radial { center: [0.5, 0.5], radius: 0.5, stops },
+    }
 }
 
 pub fn alone(item: &Item, pictures: &Pictures, frame: Rect) -> Scene {
@@ -186,13 +145,12 @@ pub fn alone(item: &Item, pictures: &Pictures, frame: Rect) -> Scene {
 pub fn cover(cover: &Cover, pictures: &Pictures) -> Scene {
     let mut scene = Scene::new();
     match cover {
-        Cover::Path { contours, matrix } => scene.fill(Fill::NonZero, Affine::new(*matrix), &Brush::Solid(colour(&WHITE)), None, &joined(contours)),
-        Cover::Ramp { ramp: kind, contours, matrix } => scene.fill(Fill::NonZero, Affine::new(*matrix), &ramp(*kind), None, &joined(contours)),
+        Cover::Path { contours, matrix } => Canvas::fill(&mut scene, Fill::NonZero, Affine::new(*matrix), &Paint::Solid { color: WHITE }, &joined(contours)),
+        Cover::Ramp { ramp: kind, contours, matrix } => Canvas::fill(&mut scene, Fill::NonZero, Affine::new(*matrix), &ramp(*kind), &joined(contours)),
         Cover::Picture { src, matrix, .. } => {
             if let Some(image) = pictures.get(src) {
                 let texels = Affine::scale_non_uniform(1.0 / image.width as f64, 1.0 / image.height as f64);
-                let brush = ImageBrush::new(image.clone()).with_quality(ImageQuality::Medium);
-                scene.fill(Fill::NonZero, Affine::new(*matrix), &brush, Some(texels), &Rect::new(0.0, 0.0, 1.0, 1.0));
+                Canvas::picture(&mut scene, Affine::new(*matrix), image, texels, Rect::new(0.0, 0.0, 1.0, 1.0));
             }
         }
     }
@@ -208,29 +166,35 @@ pub fn plain(items: &[Item], pictures: &Pictures, frame: Rect) -> Scene {
     scene
 }
 
-pub struct Placed {
-    pub image: ImageData,
+pub struct Placed<P = ImageData> {
+    pub image: P,
     pub origin: Point,
 }
 
-#[derive(Default)]
-pub struct Layers {
-    pub bodies: HashMap<usize, Placed>,
-    pub behind: HashMap<usize, Placed>,
+pub struct Layers<P = ImageData> {
+    pub bodies: HashMap<usize, Placed<P>>,
+    pub behind: HashMap<usize, Placed<P>>,
 }
 
-impl Layers {
+impl<P> Default for Layers<P> {
+    fn default() -> Self {
+        Self { bodies: HashMap::new(), behind: HashMap::new() }
+    }
+}
+
+impl<P> Layers<P> {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn into_images(self) -> impl Iterator<Item = ImageData> {
+    pub fn into_images(self) -> impl Iterator<Item = P> {
         self.bodies.into_values().chain(self.behind.into_values()).map(|p| p.image)
     }
 }
 
-fn placed(scene: &mut Scene, layer: &Placed) {
-    scene.draw_image(&ImageBrush::new(layer.image.clone()), Affine::translate(layer.origin.to_vec2()));
+fn placed<C: Canvas>(scene: &mut C, layer: &Placed<C::Picture>) {
+    let size = C::size(&layer.image);
+    scene.picture(Affine::translate(layer.origin.to_vec2()), &layer.image, Affine::IDENTITY, Rect::new(0.0, 0.0, size.width, size.height));
 }
 
 fn hull(points: impl Iterator<Item = Point>) -> Option<Rect> {
@@ -244,7 +208,7 @@ pub fn bounds(item: &Item, pictures: &Pictures) -> Option<Rect> {
             hull(path.contours.iter().flat_map(|c| c.chunks_exact(2).map(move |xy| m * Point::new(xy[0], xy[1]))))
         }
         Item::Image(image) => {
-            let (_, region) = image_region(image, natural(pictures.get(&image.clip)?));
+            let (_, region) = image_region(image, <Scene as Canvas>::size(pictures.get(&image.clip)?));
             let m = Affine::new(image.look.matrix);
             hull([(region.x0, region.y0), (region.x1, region.y0), (region.x1, region.y1), (region.x0, region.y1)].into_iter().map(|(x, y)| m * Point::new(x, y)))
         }
@@ -262,6 +226,11 @@ pub fn silhouette(item: &Item, pictures: &Pictures, frame: Rect) -> Scene {
 
 pub fn build(list: &DisplayList, pictures: &Pictures, layers: &Layers) -> (Scene, Vec<Skipped>) {
     let mut scene = Scene::new();
+    let skipped = build_into(&mut scene, list, pictures, layers);
+    (scene, skipped)
+}
+
+pub fn build_into<C: Canvas>(scene: &mut C, list: &DisplayList, pictures: &Shelf<C::Picture>, layers: &Layers<C::Picture>) -> Vec<Skipped> {
     let mut skipped = Vec::new();
     let frame = Rect::new(0.0, 0.0, list.width as f64, list.height as f64);
     for (i, item) in list.items.iter().enumerate() {
@@ -271,13 +240,13 @@ pub fn build(list: &DisplayList, pictures: &Pictures, layers: &Layers) -> (Scene
         };
         if look.backdrop.is_some() {
             match layers.behind.get(&i) {
-                Some(layer) => scissored(&mut scene, look, |s| placed(s, layer)),
+                Some(layer) => scissored(scene, look, |s| placed(s, layer)),
                 None => skip(&mut skipped, item.clip(), "backdrop"),
             }
         }
         if needs_layer(look) {
             match layers.bodies.get(&i) {
-                Some(layer) => scissored(&mut scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| placed(s, layer))),
+                Some(layer) => scissored(scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| placed(s, layer))),
                 None => skip(&mut skipped, item.clip(), "layer"),
             }
             continue;
@@ -288,7 +257,7 @@ pub fn build(list: &DisplayList, pictures: &Pictures, layers: &Layers) -> (Scene
                 continue;
             }
         }
-        scissored(&mut scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| content(s, item, pictures, frame)));
+        scissored(scene, look, |s| layered(s, &look.blend, look.opacity, frame, |s| content(s, item, pictures, frame)));
     }
-    (scene, skipped)
+    skipped
 }

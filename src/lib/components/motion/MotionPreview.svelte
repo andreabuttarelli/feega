@@ -55,9 +55,10 @@
     children
   }: { html: string; width: number; height: number; fps?: number; frame?: number; playing?: boolean; muted?: boolean; loop?: boolean; live?: InputValues | null; vars?: VarValues | null; redraws?: number; ontap?: ((at: FramePoint) => void) | null; background?: Background; engine?: RenderEngine; gpuCompose?: Compose | null; fullDoc?: { doc: MotionDoc; tokens: BrandTokens; assets: Record<string, string> } | null; children?: Snippet } = $props();
 
-  const DRAWN_OVER: ReadonlySet<RenderEngine> = new Set([RenderEngine.Gpu, RenderEngine.GpuFull, RenderEngine.GpuCore]);
+  const DRAWN_OVER: ReadonlySet<RenderEngine> = new Set([RenderEngine.Gpu, RenderEngine.GpuFull, RenderEngine.GpuCore, RenderEngine.GpuCoreGl]);
 
-  const FULL_ENGINES: ReadonlySet<RenderEngine> = new Set([RenderEngine.GpuFull, RenderEngine.GpuCore]);
+  const FULL_BACKEND: Partial<Record<RenderEngine, FullBackend>> = { [RenderEngine.GpuFull]: FullBackend.WebGl2, [RenderEngine.GpuCore]: FullBackend.Core, [RenderEngine.GpuCoreGl]: FullBackend.CoreGl };
+  const FULL_ENGINES: ReadonlySet<RenderEngine> = new Set(Object.keys(FULL_BACKEND) as RenderEngine[]);
 
   let pointer = $state<InputValues>({});
   let exportedOn = $state<RenderEngine | null>(null);
@@ -447,7 +448,7 @@
   {#if FULL_ENGINES.has(engine) && fullDoc}
     <div class="gpu-wrap" style:visibility={textEditing ? 'hidden' : null}>
       {#key `${fullDoc.doc.width}x${fullDoc.doc.height}`}
-        <GpuFullLayer backend={engine === RenderEngine.GpuCore ? FullBackend.Core : FullBackend.WebGl2} doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} compose={gpuCompose ?? (() => html)} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
+        <GpuFullLayer backend={FULL_BACKEND[engine] ?? FullBackend.WebGl2} doc={fullDoc.doc} tokens={fullDoc.tokens} assets={fullDoc.assets} compose={gpuCompose ?? (() => html)} time={() => (playing && player ? player.currentTime : frame / fps)} onfallback={showPlayer} />
       {/key}
     </div>
   {/if}

@@ -10,6 +10,8 @@ import { apply2d } from '../affine';
 import { boxBook } from './text/test-face';
 import { Smoothing } from './text/painter';
 import { addAnimator } from '../text-animators/ops';
+import { setTextPath } from '../text-path/ops';
+import { PathPreset, PathSourceKind } from '../text-path/model';
 import { SelectorShape } from '../text-animators/model';
 
 const boxType = { fonts: boxBook(), smoothing: Smoothing.Plain };
@@ -140,11 +142,13 @@ describe('displayListAt', () => {
     expect(glyphs.flatMap((i) => i.contours)).toHaveLength(2);
   });
 
-  it('names a text bent along a path', () => {
-    const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90 }, 'text'));
-    const bent = patch(texted, 'text', { textPath: { path: 'M0 0 L1 0' } } as never);
+  it('draws a text bent along a path, one character at a time', () => {
+    const texted = must(addClip(withBg, { component: 'Text', from: 0, durationInFrames: 90, props: { text: 'abc' } }, 'text'));
+    const bent = must(setTextPath(texted, 'text', { source: { kind: PathSourceKind.Preset, preset: PathPreset.Circle } }));
+    const drawn = displayListAt(bent, 0, FEEGA_TOKENS, boxType);
 
-    expect(displayListAt(bent, 0, FEEGA_TOKENS, boxType).unsupported).toContainEqual({ clip: 'text', component: 'Text', reason: Unsupported.TextPath });
+    expect(drawn.unsupported).toEqual([]);
+    expect(drawn.items.filter((i): i is PathItem => i.kind === ItemKind.Path && i.clip === 'text').flatMap((i) => i.contours)).toHaveLength(3);
   });
   it('turns a title about the centre of its safe box, as the page does', () => {
     const centre = (rotation: number) => {

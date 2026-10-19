@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { grantedPath } from '$lib/canvas/asset-url';
   import PageTitle from '$lib/components/PageTitle.svelte';
   import { apiEnhance } from '$lib/dashboard/api-enhance';
   import { postPageAction } from '$lib/api/page-action';
@@ -174,9 +175,9 @@
     <div class="downloads">
       <Download size={16} />
       {#each data.marketplaces as m (m.id)}
-        <a class="button" class:disabled={!picked.length} aria-disabled={!picked.length} href={picked.length ? `/app/studio/${data.batch.id}/zip?format=${m.id}` : undefined} download title={m.size} data-testid={`studio-download-${m.id}`}>{m.label}</a>
+        <a class="button" class:disabled={!picked.length} aria-disabled={!picked.length} href={picked.length ? grantedPath(`/app/studio/${data.batch.id}/zip?format=${m.id}`) : undefined} download title={m.size} data-testid={`studio-download-${m.id}`}>{m.label}</a>
       {/each}
-      <a class="button" class:disabled={!picked.length} aria-disabled={!picked.length} href={picked.length ? `/app/studio/${data.batch.id}/zip` : undefined} download>Original</a>
+      <a class="button" class:disabled={!picked.length} aria-disabled={!picked.length} href={picked.length ? grantedPath(`/app/studio/${data.batch.id}/zip`) : undefined} download>Original</a>
     </div>
     {#if publishes(data.socialPublishing)}
       <button type="button" class="primary" disabled={!picked.length} onclick={() => (calendarOpen = !calendarOpen)}><CalendarPlus size={16} /> Add to calendar</button>

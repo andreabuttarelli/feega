@@ -46,7 +46,7 @@ const STEM_DARKENING = 0.0121;
 const MAX_DARKENING_PX = 0.3;
 const DILATED_RISE_PX = 0.95;
 
-const SMOOTHING: Record<Smoothing, { darken: (size: number) => number; rise: number }> = {
+export const SMOOTHING: Record<Smoothing, { darken: (size: number) => number; rise: number }> = {
   [Smoothing.Dilated]: { darken: (size) => Math.min(MAX_DARKENING_PX, size * STEM_DARKENING), rise: DILATED_RISE_PX },
   [Smoothing.Plain]: { darken: () => 0, rise: 0 }
 };
@@ -138,9 +138,11 @@ const KINDS: Record<TextComponent, Kind> = {
 
 const CASE: Record<TextCase, (s: string) => string> = { 'as-typed': (s) => s, upper: (s) => s.toUpperCase(), lower: (s) => s.toLowerCase() };
 
+export const casedOf = (component: TextComponent, p: Record<string, unknown>) => CASE[KINDS[component].upper ? 'upper' : ((p.textCase as TextCase) ?? 'as-typed')](String(p.text));
+
 const AXIS = /'([A-Za-z0-9]{4})' (-?\d+(?:\.\d+)?)/g;
 
-function axesOf(p: Record<string, unknown>): Record<string, number> {
+export function axesOf(p: Record<string, unknown>): Record<string, number> {
   const stretch = Number(p.stretch ?? TYPE.stretch.fallback);
   const slant = Number(p.slant ?? TYPE.slant.fallback);
   const extra = String(p.axes ?? '');
@@ -172,7 +174,7 @@ function progress(env: TextEnv, tween: Tween, ease: Ease): number {
 
 const outlines = new WeakMap<Face, Map<string, number[][]>>();
 
-function glyphContours(face: Face, glyph: number, size: number, skew: number, darken: number): number[][] {
+export function glyphContours(face: Face, glyph: number, size: number, skew: number, darken: number): number[][] {
   const cache = outlines.get(face) ?? new Map<string, number[][]>();
   outlines.set(face, cache);
   const key = `${glyph}:${size}:${skew}:${darken}`;
@@ -186,7 +188,7 @@ function glyphContours(face: Face, glyph: number, size: number, skew: number, da
   return made;
 }
 
-const moved = (contours: number[][], dx: number, dy: number) => contours.map((c) => c.map((v, i) => v + (i % 2 === 0 ? dx : dy)));
+export const moved = (contours: number[][], dx: number, dy: number) => contours.map((c) => c.map((v, i) => v + (i % 2 === 0 ? dx : dy)));
 
 const rect = ([l, t, r, b]: Rect) => [l, t, r, t, r, b, l, b];
 
@@ -212,7 +214,7 @@ function place(env: TextEnv, kind: Kind, p: Props, paragraphs: string[], shaping
 
 type Unit = { slot: Slot | null; contours: number[][]; outlines: number[][]; box: Rect; area: Rect };
 
-const STILL: Look = { opacity: 1, blur: 0, turn: [1, 0, 0, 1, 0, 0], tint: null };
+export const STILL: Look = { opacity: 1, blur: 0, turn: [1, 0, 0, 1, 0, 0], tint: null };
 
 const WORD = /\S+/g;
 
@@ -226,18 +228,18 @@ function slotsOf(text: string, paragraphs: string[]): (paragraph: number, g: Gly
   };
 }
 
-function about([left, top, right, bottom]: Rect, turn: Affine, em: number): Affine {
+export function about([left, top, right, bottom]: Rect, turn: Affine, em: number): Affine {
   const cx = (left + right) / 2;
   const cy = (top + bottom) / 2;
   const scaled: Affine = [turn[0], turn[1], turn[2], turn[3], turn[4] * em, turn[5] * em];
   return mul2d(mul2d([1, 0, 0, 1, cx, cy], scaled), [1, 0, 0, 1, -cx, -cy]);
 }
 
-function transformed(contours: number[][], m: Affine): number[][] {
+export function transformed(contours: number[][], m: Affine): number[][] {
   return contours.map((c) => c.flatMap((_, i) => (i % 2 === 0 ? apply2d(m, [c[i], c[i + 1]]) : [])));
 }
 
-const scaleOf = (m: Affine) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
+export const scaleOf = (m: Affine) => Math.sqrt(Math.abs(m[0] * m[3] - m[1] * m[2]));
 
 const inkedWidth = (line: Line) => (line.glyphs.length ? line.glyphs.at(-1)!.pen + line.glyphs.at(-1)!.advance - line.glyphs[0].pen : 0);
 
@@ -251,7 +253,7 @@ type Shade = { paint: Paint; squash: number };
 
 type Layer = (area: Rect) => Shade;
 
-type Colour = (v: string) => Rgba;
+export type Colour = (v: string) => Rgba;
 
 const faded = (c: Rgba, opacity: number): Rgba => [c[0], c[1], c[2], c[3] * opacity];
 
@@ -310,7 +312,7 @@ const unsquashed = (m: Affine, squash: number): Affine => (squash === 1 ? m : mu
 
 const visible = (paint: Paint) => paint.kind !== PaintKind.Solid || paint.color[3] > 0;
 
-const tintedPaint = (paint: Paint, look: Look, colour: Colour): Paint => (look.tint && paint.kind === PaintKind.Solid ? { kind: PaintKind.Solid, color: mixed(paint.color, colour(look.tint.color), look.tint.amount) } : paint);
+export const tintedPaint = (paint: Paint, look: Look, colour: Colour): Paint => (look.tint && paint.kind === PaintKind.Solid ? { kind: PaintKind.Solid, color: mixed(paint.color, colour(look.tint.color), look.tint.amount) } : paint);
 
 export function paintText(env: TextEnv): Painted | TextGap {
   const kind = KINDS[env.component];
@@ -322,7 +324,7 @@ export function paintText(env: TextEnv): Painted | TextGap {
     return TextGap.Fill;
   }
   const outline = outlineOf(env, colour);
-  const cased = CASE[kind.upper ? 'upper' : ((p.textCase as TextCase) ?? 'as-typed')](p.text);
+  const cased = casedOf(env.component, p);
   const run = animation(cased, env.animators);
   const paragraphs = kind.paragraphs(cased);
   const { laid, type, frame, room } = place(env, kind, p, paragraphs, run?.finest === AnimatorUnit.Char ? Shaping.Chars : Shaping.Runs);
