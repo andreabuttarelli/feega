@@ -136,34 +136,29 @@ fn ramp(kind: Ramp) -> Paint {
     }
 }
 
-pub fn alone(item: &Item, pictures: &Pictures, frame: Rect) -> Scene {
-    let mut scene = Scene::new();
-    content(&mut scene, item, pictures, frame);
-    scene
+pub fn alone<C: Canvas>(scene: &mut C, item: &Item, pictures: &Shelf<C::Picture>, frame: Rect) {
+    content(scene, item, pictures, frame);
 }
 
-pub fn cover(cover: &Cover, pictures: &Pictures) -> Scene {
-    let mut scene = Scene::new();
+pub fn cover<C: Canvas>(scene: &mut C, cover: &Cover, pictures: &Shelf<C::Picture>) {
     match cover {
-        Cover::Path { contours, matrix } => Canvas::fill(&mut scene, Fill::NonZero, Affine::new(*matrix), &Paint::Solid { color: WHITE }, &joined(contours)),
-        Cover::Ramp { ramp: kind, contours, matrix } => Canvas::fill(&mut scene, Fill::NonZero, Affine::new(*matrix), &ramp(*kind), &joined(contours)),
+        Cover::Path { contours, matrix } => scene.fill(Fill::NonZero, Affine::new(*matrix), &Paint::Solid { color: WHITE }, &joined(contours)),
+        Cover::Ramp { ramp: kind, contours, matrix } => scene.fill(Fill::NonZero, Affine::new(*matrix), &ramp(*kind), &joined(contours)),
         Cover::Picture { src, matrix, .. } => {
             if let Some(image) = pictures.get(src) {
-                let texels = Affine::scale_non_uniform(1.0 / image.width as f64, 1.0 / image.height as f64);
-                Canvas::picture(&mut scene, Affine::new(*matrix), image, texels, Rect::new(0.0, 0.0, 1.0, 1.0));
+                let size = C::size(image);
+                let texels = Affine::scale_non_uniform(1.0 / size.width, 1.0 / size.height);
+                scene.picture(Affine::new(*matrix), image, texels, Rect::new(0.0, 0.0, 1.0, 1.0));
             }
         }
     }
-    scene
 }
 
-pub fn plain(items: &[Item], pictures: &Pictures, frame: Rect) -> Scene {
-    let mut scene = Scene::new();
+pub fn plain<C: Canvas>(scene: &mut C, items: &[Item], pictures: &Shelf<C::Picture>, frame: Rect) {
     for item in items {
         let opacity = item.look().map_or(1.0, |l| l.opacity);
-        layered(&mut scene, "normal", opacity, frame, |s| content(s, item, pictures, frame));
+        layered(scene, "normal", opacity, frame, |s| content(s, item, pictures, frame));
     }
-    scene
 }
 
 pub struct Placed<P = ImageData> {
@@ -201,14 +196,14 @@ fn hull(points: impl Iterator<Item = Point>) -> Option<Rect> {
     points.fold(None, |acc: Option<Rect>, p| Some(acc.map_or(Rect::from_points(p, p), |r| r.union_pt(p))))
 }
 
-pub fn bounds(item: &Item, pictures: &Pictures) -> Option<Rect> {
+pub fn bounds<C: Canvas>(item: &Item, pictures: &Shelf<C::Picture>) -> Option<Rect> {
     match item {
         Item::Path(path) => {
             let m = Affine::new(path.look.matrix);
             hull(path.contours.iter().flat_map(|c| c.chunks_exact(2).map(move |xy| m * Point::new(xy[0], xy[1]))))
         }
         Item::Image(image) => {
-            let (_, region) = image_region(image, <Scene as Canvas>::size(pictures.get(&image.clip)?));
+            let (_, region) = image_region(image, C::size(pictures.get(&image.clip)?));
             let m = Affine::new(image.look.matrix);
             hull([(region.x0, region.y0), (region.x1, region.y0), (region.x1, region.y1), (region.x0, region.y1)].into_iter().map(|(x, y)| m * Point::new(x, y)))
         }
@@ -216,12 +211,12 @@ pub fn bounds(item: &Item, pictures: &Pictures) -> Option<Rect> {
     }
 }
 
-pub fn silhouette(item: &Item, pictures: &Pictures, frame: Rect) -> Scene {
+pub fn silhouette<C: Canvas>(scene: &mut C, item: &Item, pictures: &Shelf<C::Picture>, frame: Rect) {
     let white = match item {
         Item::Path(path) => Item::Path(PathItem { paint: Paint::Solid { color: WHITE }, ..path.clone() }),
         other => other.clone(),
     };
-    alone(&white, pictures, frame)
+    alone(scene, &white, pictures, frame);
 }
 
 pub fn build(list: &DisplayList, pictures: &Pictures, layers: &Layers) -> (Scene, Vec<Skipped>) {
