@@ -1,5 +1,6 @@
 import { FrameKind, MOTION_NODE_BAR_H, frameChrome } from '$lib/canvas/motion-node';
 import { posterSecond } from '$lib/motion/poster-capture';
+import { stillFrame as docStill } from '$lib/motion/still';
 import type { DisplayList } from '$lib/motion/gpu-full/display-list';
 import type { Box } from './canvas-scene';
 
@@ -26,6 +27,6 @@ export function framesOnCanvas(tiles: readonly FrameTile[], dataOf: (id: string)
   });
 }
 
-export const stillFrame = (doc: { fps: number; durationInFrames: number }): number => Math.round(posterSecond(doc) * doc.fps);
+export const stillFrame = (doc: { fps: number; durationInFrames: number; still?: { frame: number } }): number => docStill(doc) ?? Math.round(posterSecond(doc) * doc.fps);
 
 export const drawsWhole = (list: DisplayList): boolean => list.unsupported.length === 0;
