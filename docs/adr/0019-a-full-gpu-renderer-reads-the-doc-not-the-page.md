@@ -83,6 +83,14 @@ Residue is edge anti-aliasing (8× MSAA vs Skia's analytic coverage) and gradien
 | Effects | own WGSL passes (blur, shadow, colour matrix, blend, mask) | ours | Our effects are a closed list of 19; a generic filter engine buys nothing. |
 | Composition | wgpu | Apache-2.0/MIT | Same code on WebGPU and Metal/Vulkan/D3D in Tauri. |
 
+Text in Rust lives in `packages/gpu-text`, a crate of its own beside `gpu-core`: `Source`/`Face`
+(HarfRust shaping, skrifa outlines and metrics, WOFF2 through `wuff`), `FaceBook` (the
+`@font-face` matching of `fonts.ts`) and `lay_out` (Parley). Versions are pinned to the
+`read-fonts`/`skrifa` that Vello already pulls, so one font parse serves both. Its WASM boundary
+(`TextCore`: `add_font`, `covers`, `metrics`, `shape`, `outline`, `lay_out`, flat `Float32Array`s)
+backs the TS `Face`; `gpu-core`'s boundary is unchanged: text still reaches it as contours in the
+display list. When `gpu-core` wants to shape on its own it depends on `gpu-text` as an rlib.
+
 Discarded: Blitz and Servo (Stylo is MPL-2.0, and they solve arbitrary HTML, which we don't
 need); Ultralight (proprietary); keeping a browser in the loop for text (defeats native).
 
