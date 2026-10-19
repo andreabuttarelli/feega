@@ -107,6 +107,19 @@ export const actions: Actions = {
     return answered(await runEditorOp('upload_font', editorCtx(scope), { path: String(form.get('path') ?? '') }));
   },
 
+  fonts: async ({ locals, params }) => answered(await runEditorOp('list_fonts', editorCtx(await scopeFor(locals, params)), {})),
+
+  renameFont: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    const form = await request.formData();
+    return answered(await runEditorOp('rename_font', editorCtx(scope), { family: String(form.get('family') ?? ''), to: String(form.get('to') ?? '') }));
+  },
+
+  deleteFont: async ({ locals, params, request }) => {
+    const scope = await scopeFor(locals, params);
+    return answered(await runEditorOp('delete_font', editorCtx(scope), { family: String((await request.formData()).get('family') ?? '') }));
+  },
+
   analyze: async ({ locals, params, request }) => {
     const scope = await scopeFor(locals, params);
     const form = await request.formData();

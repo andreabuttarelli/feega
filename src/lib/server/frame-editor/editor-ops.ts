@@ -7,7 +7,7 @@ import { OpsOutcome, commitOps } from '$lib/server/motion/frame-ops';
 import { batchView, renderView } from '$lib/server/motion/render-run';
 import type { MotionEditorScope } from '$lib/server/motion/editor-scope';
 import { saveExport } from '$lib/server/motion/export';
-import { saveFontUpload } from '$lib/server/motion/font-upload';
+import { deleteFontFamily, orgFontFamilies, renameFontFamily, saveFontUpload, type FontChange } from '$lib/server/motion/font-upload';
 import { assetUrls, headOrNew, motionAssets, motionTokens, saveMotionDoc } from '$lib/server/motion/editor';
 import { analyzeSounds, storageAnalysis } from '$lib/server/motion/audio-analysis';
 import { templateLibrary } from '$lib/server/motion/templates';
@@ -60,6 +60,8 @@ const SFX_ID_LENGTH = 8;
 
 const ok = (body: Record<string, unknown>): EditorAnswer => ({ status: HTTP_OK, body });
 const refused = (status: number, body: Record<string, unknown>): EditorAnswer => ({ status, body });
+
+const changed = (change: FontChange): EditorAnswer => (change.ok ? ok({ ok: true }) : refused(HTTP_BAD_REQUEST, { error: change.error }));
 
 const nodeScope = (ctx: EditorCtx) => ({ orgId: ctx.orgId, nodeId: ctx.motion.record.id });
 
@@ -154,13 +156,31 @@ export const EDITOR_OPS = {
     access: EditorAccess.Write,
     input: z.object({ path: z.string() }),
     run: async (ctx, input) => {
-      const saved = await saveFontUpload(ctx.db, { orgId: ctx.orgId, projectId: ctx.canvas.projectId, path: input.path });
+      const saved = await saveFontUpload(ctx.db, { orgId: ctx.orgId, path: input.path });
       if (!saved.ok) {
         return refused(HTTP_BAD_REQUEST, { error: saved.error });
       }
       const assets = await motionAssets(placeOf(ctx));
-      return ok({ asset: assets.find((a) => a.id === saved.assetId) ?? null });
+      return ok({ font: saved.font, asset: assets.find((a) => a.id === saved.assetId) ?? null });
     }
+  }),
+
+  list_fonts: op({
+    access: EditorAccess.Read,
+    input: z.object({}),
+    run: async (ctx) => ok({ fonts: await orgFontFamilies(ctx.db, ctx.orgId) })
+  }),
+
+  rename_font: op({
+    access: EditorAccess.Write,
+    input: z.object({ family: z.string(), to: z.string() }),
+    run: async (ctx, input) => changed(await renameFontFamily(ctx.db, { orgId: ctx.orgId, ...input }))
+  }),
+
+  delete_font: op({
+    access: EditorAccess.Write,
+    input: z.object({ family: z.string() }),
+    run: async (ctx, input) => changed(await deleteFontFamily(ctx.db, { orgId: ctx.orgId, family: input.family }))
   }),
 
   analyze_sounds: op({

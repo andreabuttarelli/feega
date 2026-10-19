@@ -25,6 +25,7 @@ const MIN_WEIGHT = 100;
 const MAX_WEIGHT = 1000;
 export const AXIS_TAG = /^[A-Za-z0-9]{4}$/;
 const MAX_AXES = 16;
+const MAX_VARIANTS = 18;
 const REQUESTED_AXES = new Set(['opsz', 'slnt', 'wdth', 'wght']);
 
 const BUILTIN: Record<BuiltinFont, string> = {
@@ -47,12 +48,22 @@ export const fontFaceSchema = z.object({
   weights: z.array(z.number().int().min(MIN_WEIGHT).max(MAX_WEIGHT)).min(1).max(MAX_WEIGHT / MIN_WEIGHT),
   italic: z.boolean().default(false),
   axes: z.array(z.tuple([z.string().regex(AXIS_TAG), z.number(), z.number()])).max(MAX_AXES).default([]),
-  assetId: z.string().min(1).optional()
+  assetId: z.string().min(1).optional(),
+  variants: z.array(z.object({ assetId: z.string().min(1), weight: z.number().int().min(1).max(MAX_WEIGHT), italic: z.boolean() })).max(MAX_VARIANTS).optional()
 });
 
 export const fontsSchema = z.array(fontFaceSchema).max(MAX_FONTS).default([]);
 
 export type FontFace = z.infer<typeof fontFaceSchema>;
+
+export type FontVariant = { assetId: string; weight: number; italic: boolean };
+
+export function variantsOf(face: FontFace): FontVariant[] {
+  if (face.variants?.length) {
+    return face.variants;
+  }
+  return face.assetId ? face.weights.map((weight) => ({ assetId: face.assetId!, weight, italic: false })) : [];
+}
 
 export type Axis = [tag: string, min: number, max: number];
 
@@ -151,8 +162,8 @@ export function declaredFamilyCss(faces: readonly Face[], registry: readonly Fon
 
 export function uploadFaceCss(registry: readonly FontFace[], assets: Record<string, string>): string {
   return registry
-    .filter((f) => f.source === FontSource.Upload && f.assetId && assets[f.assetId])
-    .flatMap((f) => f.weights.map((w) => `@font-face{font-family:'${f.family}';src:url(${JSON.stringify(assets[f.assetId!])});font-weight:${w};font-style:normal;font-display:block}`))
+    .filter((f) => f.source === FontSource.Upload)
+    .flatMap((f) => variantsOf(f).filter((v) => assets[v.assetId]).map((v) => `@font-face{font-family:'${f.family}';src:url(${JSON.stringify(assets[v.assetId])});font-weight:${v.weight};font-style:${v.italic ? 'italic' : 'normal'};font-display:block}`))
     .join('');
 }
 

@@ -1,3 +1,4 @@
+import { orgFontFamilies } from './font-upload';
 import { styleOf } from '$lib/motion/style';
 import { nameVersion, namedRevisions } from './version-names';
 import { briefAwaits, promptTexts } from '$lib/motion/script-brief';
@@ -361,6 +362,7 @@ async function openMotionTurn(input: MotionTurnInput): Promise<MotionTurn | Resp
     sfx: (sound) => withOrgContext(orgId, () => laySfx(db, { orgId, projectId: project.id, nodeId: motion.record.id, userId, actor }, sound)),
     frames: drawTurnFrames,
     fontAdvance: readFontAdvance,
+    fonts: () => orgFontFamilies(db, orgId),
     inspect: frameStats,
     seam: async () => {
       const end = session.doc.durationInFrames / session.doc.fps;

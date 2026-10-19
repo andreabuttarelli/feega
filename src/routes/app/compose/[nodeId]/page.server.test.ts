@@ -22,6 +22,7 @@ const head = vi.fn(async (): Promise<{ version: number; doc: MotionDoc; summary:
 vi.mock('$lib/server/repos/motion-revisions', () => ({ readHead: head, appendRevision: vi.fn(), RevisionOutcome: { Written: 'written', Conflict: 'conflict', Invalid: 'invalid' } }));
 
 vi.mock('$lib/server/repos/assets', () => ({
+  listFontAssets: async () => [],
   listProjectAssets: vi.fn(async () => [{ id: 'a1', projectId: 'p1', type: 'image', url: 'https://cdn.test/a1.png', source: 'upload', createdAt: '2026-10-04T00:00:00Z', durationS: null }])
 }));
 vi.mock('$lib/server/canvas/sign-media', () => ({ signAssetPaths: vi.fn(async () => new Map()), createAssetSigningDb: vi.fn() }));

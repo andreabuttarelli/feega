@@ -1,3 +1,4 @@
+import { orgFontFamilies } from './font-upload';
 import { asSchema, type Tool } from 'ai';
 import { nameVersion, namedRevisions } from './version-names';
 import type { Db } from '$lib/server/db/client';
@@ -130,7 +131,8 @@ async function prepare(db: Db, scope: ToolRunScope, version: number | undefined,
     templates: templateLibrary(db, { orgId: scope.orgId, actor }),
     revisions: { list: () => namedRevisions(db, nodeScope), read: async (v) => (await readRevision(db, { ...nodeScope, version: v }))?.doc ?? null, name: async (v, name) => (await nameVersion(db, { ...nodeScope, version: v, name, actor })).named },
     exportStill: async (doc, spec) => exportStill(db, { orgId: scope.orgId, projectId: saved.project.id, nodeId: scope.nodeId }, doc, spec, { tokens: await tokens(), assets }),
-    moveOut: frameMover(db, { orgId: scope.orgId, actor, projectId: saved.project.id }, scope.nodeId)
+    moveOut: frameMover(db, { orgId: scope.orgId, actor, projectId: saved.project.id }, scope.nodeId),
+    fonts: () => orgFontFamilies(db, scope.orgId)
   }, frames);
   return { saved, session, tools, actor, nodeScope };
 }

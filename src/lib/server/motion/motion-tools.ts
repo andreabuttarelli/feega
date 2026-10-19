@@ -143,7 +143,8 @@ import { MAX_VAR_TEXT, VARS_GUIDE, VAR_KINDS, VAR_NAME, bindVar, declareVar, rem
 import { flattenComps } from '$lib/motion/precomp';
 import { GOOGLE_FONTS } from '$lib/motion/fonts/catalogue';
 import { BuiltinFont, FONT_WEIGHTS, fontRefProblem, searchFonts } from '$lib/motion/fonts/model';
-import { registerFont, removeFont, setFont } from '$lib/motion/fonts/ops';
+import { registerFont, removeFont, setFont, withUploaded } from '$lib/motion/fonts/ops';
+import type { FontFamily } from '$lib/motion/fonts/library';
 import { EFFECTS, EFFECT_KINDS } from '$lib/motion/effects/registry';
 import { addEffect, removeEffect, setEffect } from '$lib/motion/effects/ops';
 import { MAX_EFFECTS, effectKey } from '$lib/motion/effects/model';
@@ -253,6 +254,7 @@ export type MotionToolDeps = {
   copywrite?: (script: LaunchScript) => Promise<LaunchScript>;
   exportStill?: (doc: MotionDoc, spec: StillExport) => Promise<StillMade>;
   moveOut?: (element: Element, target: FrameTarget) => Promise<Moved>;
+  fonts?: () => Promise<FontFamily[]>;
 };
 
 export type StillMade = { ok: true; asset_id: string; url: string; width: number; height: number } | { ok: false; error: string };
@@ -576,6 +578,8 @@ function propsError(doc: MotionDoc, clipId: string, patch: Record<string, unknow
 }
 
 export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
+  let fontsRead: Promise<FontFamily[]> | null = null;
+  const uploadedFonts = () => (fontsRead ??= deps.fonts ? deps.fonts().catch(() => []) : Promise.resolve([]));
   const SHAPE_OP: Record<(typeof SHAPE_OPS)[number], ShapeOp> = {
     ...(Object.fromEntries(Object.values(BooleanOp).map((op) => [op, (doc: MotionDoc, ids: string[], frame: number) => combineShapes(doc, ids, op, frame)])) as Record<BooleanOp, ShapeOp>),
     [OUTLINE_STROKE]: (doc, ids, frame) => outlineStrokes(doc, ids, frame, deps.newId),
@@ -1998,15 +2002,21 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     list_fonts: tool({
-      description: `Search the Google Fonts catalogue (${GOOGLE_FONTS.length} families, most popular first): family, category, weights, italic. Built-ins: ${Object.values(BuiltinFont).join(', ')}. Fonts this video already has are in get_motion_doc fonts.`,
+      description: `Search the fonts: uploaded (the org's own font files, usable by family name in set_font, register_font and font params) and the Google Fonts catalogue (${GOOGLE_FONTS.length} families, most popular first): family, category, weights, italic. Built-ins: ${Object.values(BuiltinFont).join(', ')}. Fonts this video already has are in get_motion_doc fonts.`,
       inputSchema: z.object({ query: z.string().max(60).default(''), limit: z.number().int().min(1).max(MAX_FONT_RESULTS).default(DEFAULT_FONT_RESULTS) }),
-      execute: async (input) => ({ fonts: searchFonts(GOOGLE_FONTS, input.query, [], input.limit).map((f) => ({ family: f.f, category: f.c, weights: f.w, italic: f.i === 1 })) })
+      execute: async (input) => ({
+        uploaded: (await uploadedFonts()).filter((f) => f.family.toLowerCase().includes(input.query.trim().toLowerCase())).map((f) => ({ family: f.family, weights: [...new Set(f.variants.map((v) => v.weight))], italic: f.variants.some((v) => v.italic) })),
+        fonts: searchFonts(GOOGLE_FONTS, input.query, [], input.limit).map((f) => ({ family: f.f, category: f.c, weights: f.w, italic: f.i === 1 }))
+      })
     }),
 
     set_font: tool({
-      description: `Set the font of a text clip (Title, Text, Kicker, Caption, ProductCard): any Google Fonts family (registered in the video automatically), an uploaded font, or a built-in (${Object.values(BuiltinFont).join(', ')}). weight ${FONT_WEIGHTS[0]}..${FONT_WEIGHTS[FONT_WEIGHTS.length - 1]}; the nearest weight the family has is used.`,
+      description: `Set the font of a text clip (Title, Text, Kicker, Caption, ProductCard): any Google Fonts family (registered in the video automatically), an uploaded font (list_fonts uploaded), or a built-in (${Object.values(BuiltinFont).join(', ')}). weight ${FONT_WEIGHTS[0]}..${FONT_WEIGHTS[FONT_WEIGHTS.length - 1]}; the nearest weight the family has is used.`,
       inputSchema: z.object({ clip_id: z.string(), family: z.string().max(64), weight: z.number().int().min(100).max(900).optional(), italic: z.boolean().optional() }),
-      execute: async (input) => apply(setFont(session.doc, input.clip_id, { family: input.family, weight: input.weight, italic: input.italic }, GOOGLE_FONTS), `font ${input.family} on ${input.clip_id}`)
+      execute: async (input) => {
+        const picked = withUploaded(session.doc, input.family, await uploadedFonts());
+        return apply(setFont(picked.doc, input.clip_id, { family: picked.family, weight: input.weight, italic: input.italic }, GOOGLE_FONTS), `font ${picked.family} on ${input.clip_id}`);
+      }
     }),
 
     named_style: tool({
@@ -2016,9 +2026,12 @@ export function createMotionTools(deps: MotionToolDeps): Record<string, Tool> {
     }),
 
     register_font: tool({
-      description: 'Add a Google Fonts family to the video. Call it before add_clip names the family in props.font, and for a custom component font param (then set_props with that family).',
+      description: 'Add a Google Fonts family or an uploaded font (list_fonts uploaded) to the video. Call it before add_clip names the family in props.font, and for a custom component font param (then set_props with that family).',
       inputSchema: z.object({ family: z.string().max(64) }),
-      execute: async (input) => apply(registerFont(session.doc, input.family, GOOGLE_FONTS), `registered font ${input.family}`)
+      execute: async (input) => {
+        const picked = withUploaded(session.doc, input.family, await uploadedFonts());
+        return apply(registerFont(picked.doc, picked.family, GOOGLE_FONTS), `registered font ${picked.family}`);
+      }
     }),
 
     remove_font: tool({

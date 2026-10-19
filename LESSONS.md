@@ -654,6 +654,15 @@ fresca (`signThumbnailUrls` lo ricorda), e un redirect a una firma non è `no-st
 
 ## Testare la piattaforma nel browser: worker locale ed ambiente
 
+### Lo screenshot della preview motion è nero, l'export PNG locale scade
+Due segnali, stesso giro e2e. (1) `screenshot()` della regione Preview (o dell'iframe) dà un
+quadrato nero anche con il testo visibile nel DOM dell'iframe. Mossa: misurare dentro l'iframe —
+`document.fonts`, lo stile calcolato, o i glifi ridisegnati su un `<canvas>` con quel `font` —
+invece di fotografare la pagina. (2) `?/exportSelection` con `CHROMIUM_PATH` locale torna
+`Waiting failed: 20000ms exceeded` anche per `canvas-export.spec.ts` intatto: è il renderer locale,
+non il tuo diff. Mossa: la parte export gira solo dove il renderer risponde (`E2E_SERVER_EXPORT=1`)
+e il report la dichiara `unrun`.
+
 ### Un import dinamico può tornare dopo che il canvas è già morto
 
 Aprendo un editor WebGL mentre una scrittura rinfrescava la tela, l'import di Three.js riprendeva

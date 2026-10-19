@@ -1,6 +1,6 @@
 import { findClip, type MotionDoc } from '../doc';
 import { setProps, type OpResult } from '../timeline';
-import { FontCategory, FontSource, isBuiltin, searchFonts, usedFaces, type CatalogueFont, type FontFace } from './model';
+import { FontCategory, FontSource, isBuiltin, searchFonts, usedFaces, variantsOf, type CatalogueFont, type FontFace, type FontVariant } from './model';
 
 const fail = (error: string): OpResult => ({ ok: false, error });
 
@@ -55,13 +55,26 @@ export function registerFont(doc: MotionDoc, family: string, catalogue: readonly
   return typeof verdict === 'string' ? fail(verdict) : { ok: true, doc: verdict.doc };
 }
 
-export function registerUpload(doc: MotionDoc, input: { assetId: string; family: string; weights: number[]; italic: boolean }): OpResult {
-  if (isBuiltin(input.family) || doc.fonts.some((f) => f.family === input.family)) {
-    return fail(`a font named ${input.family} is already in this video`);
+export function registerUpload(doc: MotionDoc, family: { family: string; variants: FontVariant[] }): OpResult {
+  const known = doc.fonts.find((f) => f.family === family.family);
+  if (isBuiltin(family.family) || (known && known.source !== FontSource.Upload)) {
+    return fail(`a font named ${family.family} is already in this video`);
   }
-  const face: FontFace = { family: input.family, source: FontSource.Upload, category: FontCategory.Sans, weights: input.weights, italic: input.italic, axes: [], assetId: input.assetId };
-  const assets = doc.assets.some((a) => a.id === input.assetId) ? doc.assets : [...doc.assets, { id: input.assetId, kind: 'font' as const, name: input.family }];
-  return { ok: true, doc: { ...doc, fonts: [...doc.fonts, face], assets } };
+  if (!family.variants.length) {
+    return fail(`${family.family} has no files`);
+  }
+  const weights = [...new Set(family.variants.map((v) => v.weight))].sort((a, b) => a - b);
+  const face: FontFace = { family: family.family, source: FontSource.Upload, category: FontCategory.Sans, weights, italic: family.variants.some((v) => v.italic), axes: [], assetId: family.variants[0].assetId, variants: family.variants };
+  const listed = new Set(doc.assets.map((a) => a.id));
+  const added = family.variants.filter((v) => !listed.has(v.assetId)).map((v) => ({ id: v.assetId, kind: 'font' as const, name: family.family }));
+  const fonts = known ? doc.fonts.map((f) => (f === known ? face : f)) : [...doc.fonts, face];
+  return { ok: true, doc: { ...doc, fonts, assets: [...doc.assets, ...added] } };
+}
+
+export function withUploaded(doc: MotionDoc, family: string, uploaded: readonly { family: string; variants: FontVariant[] }[]): { doc: MotionDoc; family: string } {
+  const match = uploaded.find((f) => f.family.toLowerCase() === family.toLowerCase());
+  const registered = match ? registerUpload(doc, match) : null;
+  return registered?.ok ? { doc: registered.doc, family: match!.family } : { doc, family };
 }
 
 export function removeFont(doc: MotionDoc, family: string): OpResult {
@@ -73,5 +86,5 @@ export function removeFont(doc: MotionDoc, family: string): OpResult {
   if (users.length) {
     return fail(`${family} is used by ${users.map((c) => c.id).join(', ')}: change their font first`);
   }
-  return { ok: true, doc: { ...doc, fonts: doc.fonts.filter((f) => f.family !== family), assets: doc.assets.filter((a) => a.id !== face.assetId) } };
+  return { ok: true, doc: { ...doc, fonts: doc.fonts.filter((f) => f.family !== family), assets: doc.assets.filter((a) => !variantsOf(face).some((v) => v.assetId === a.id)) } };
 }

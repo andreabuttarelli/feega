@@ -19,10 +19,11 @@
   import { CaptureProfile } from '$lib/motion/export/capture-profile';
   import { createSupabaseBrowserClient } from '$lib/supabase/client';
   import { headMoved, watchMotionNode } from '$lib/realtime/motion-channel';
-  import { canvasUploadPrefix } from '$lib/canvas/upload-kind';
   import { canvasMediaUploader } from '$lib/canvas/media-uploader';
   import type { MediaUploader } from './media-upload';
-  import { registerUpload } from '$lib/motion/fonts/ops';
+  import { registerUpload, setFont } from '$lib/motion/fonts/ops';
+  import { FONT_FILE, MAX_FONT_MB, fontFamilies, missingUploads, type FontFamily, type FontFile, type FontLibrary, type FontUploaded } from '$lib/motion/fonts/library';
+  import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
   import Plus from '@lucide/svelte/icons/plus';
   import SlidersHorizontal from '@lucide/svelte/icons/sliders-horizontal';
   import MessageCircle from '@lucide/svelte/icons/message-circle';
@@ -248,7 +249,6 @@
   const peers = $derived(presence ? peersIn(marks, data.node.id, presence.self.userId, clock) : []);
   let notice = $state('');
   const supabase = createSupabaseBrowserClient();
-  const UPLOAD_WEIGHT = 400;
   const uploadToProject = canvasMediaUploader(supabase, { orgId: data.orgId, projectId: data.projectId, canvasId: data.canvas.id });
   const uploadMedia: MediaUploader = async (file, progress) => {
     const outcome = await uploadToProject(file, progress);
@@ -512,8 +512,9 @@
     }
   });
   const beats = $derived(hitFrames(doc, analyses, Hit.Beats));
-  const assets = $derived([...madeAssets, ...data.assets]);
+  const assets = $derived([...madeAssets, ...data.assets].filter((a) => !goneFonts.includes(a.id)));
   const assetUrls = $derived(Object.fromEntries(assets.filter((a) => a.url).map((a) => [a.id, a.url as string])));
+  const missingFonts = $derived(missingUploads(doc.fonts, assetUrls));
   let interactive = $state(false);
   let tiltX = $state(0);
   let previewVars = $state<VarValues>({});
@@ -772,34 +773,103 @@
     }
   }
 
-  const FONT_EXTENSION = /\.(ttf|otf|woff2?)$/i;
+  let fontFamiliesHere = $state<FontFamily[]>(data.fonts);
+  let goneFonts = $state<string[]>([]);
+  const MB = 1024 * 1024;
 
-  function familyOf(fileName: string): string {
-    const base = fileName.replace(FONT_EXTENSION, '').replace(/[^A-Za-z0-9 \-]+/g, ' ').trim();
-    return (base || 'Uploaded font').slice(0, 60);
-  }
-
-  async function uploadFont(file: File): Promise<string | null> {
-    const path = `${canvasUploadPrefix(data.orgId, data.projectId)}${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
+  async function storeFont(file: File): Promise<{ ok: true; font: FontFile; family: FontFamily } | { ok: false; error: string }> {
+    if (!FONT_FILE.test(file.name)) {
+      return { ok: false, error: 'Not a font: upload a TTF, OTF, WOFF or WOFF2 file' };
+    }
+    if (file.size > MAX_FONT_MB * MB) {
+      return { ok: false, error: `A font file is at most ${MAX_FONT_MB}MB` };
+    }
+    const path = `${orgFontPrefix(data.orgId)}${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
     const up = await supabase.storage.from('canvas-assets').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
     if (up.error) {
-      return up.error.message;
+      return { ok: false, error: up.error.message };
     }
     const form = new FormData();
     form.set('path', path);
-    const res = await fetch(`${editorUrl}?/uploadFont`, { method: 'POST', body: form, headers: { 'x-sveltekit-action': 'true' } });
-    const result = deserialize(await res.text());
+    const result = await editorAction('uploadFont', form);
     if (result.type !== 'success' || !result.data?.asset) {
-      return result.type === 'failure' ? String(result.data?.error ?? 'Upload refused') : 'Upload failed';
+      return { ok: false, error: result.type === 'failure' ? String(result.data?.error ?? 'Upload refused') : 'Upload failed' };
     }
-    const asset = result.data.asset as MotionEditorData['assets'][number];
-    madeAssets = [asset, ...madeAssets];
-    const registered = registerUpload(doc, { assetId: asset.id, family: familyOf(file.name), weights: [UPLOAD_WEIGHT], italic: false });
+    const font = result.data.font as FontFile;
+    madeAssets = [result.data.asset as MotionEditorData['assets'][number], ...madeAssets];
+    fontFamiliesHere = fontFamilies([...fontFamiliesHere.flatMap((f) => f.variants.map((v) => ({ ...v, family: f.family }))), font]);
+    return { ok: true, font, family: fontFamiliesHere.find((f) => f.family === font.family)! };
+  }
+
+  async function uploadFont(file: File): Promise<FontUploaded> {
+    const stored = await storeFont(file);
+    return stored.ok ? { ok: true, family: stored.font.family } : stored;
+  }
+
+  async function dropFont(file: File) {
+    const stored = await storeFont(file);
+    if (!stored.ok) {
+      notice = stored.error;
+      return;
+    }
+    const registered = registerUpload(doc, stored.family);
     if (!registered.ok) {
-      return registered.error;
+      notice = `${stored.font.family} is in the uploaded fonts; ${registered.error}`;
+      return;
     }
-    edit(registered.doc, `Uploaded the font ${familyOf(file.name)}`);
+    const target = selected && 'font' in selected.props ? setFont(registered.doc, selected.id, { family: stored.font.family }, []) : registered;
+    edit(target.ok ? target.doc : registered.doc, `Uploaded the font ${stored.font.family}`);
+    notice = `${stored.font.family} is in the uploaded fonts.`;
+  }
+
+  async function renameFont(family: string, to: string): Promise<string | null> {
+    const form = new FormData();
+    form.set('family', family);
+    form.set('to', to);
+    const result = await editorAction('renameFont', form);
+    if (result.type !== 'success') {
+      return result.type === 'failure' ? String(result.data?.error ?? 'Rename refused') : 'Rename failed';
+    }
+    fontFamiliesHere = fontFamiliesHere.map((f) => (f.family === family ? { ...f, family: to } : f));
     return null;
+  }
+
+  async function removeFontFamily(family: string): Promise<string | null> {
+    const form = new FormData();
+    form.set('family', family);
+    const result = await editorAction('deleteFont', form);
+    if (result.type !== 'success') {
+      return result.type === 'failure' ? String(result.data?.error ?? 'Delete refused') : 'Delete failed';
+    }
+    const gone = fontFamiliesHere.find((f) => f.family === family)?.variants.map((v) => v.assetId) ?? [];
+    goneFonts = [...goneFonts, ...gone];
+    fontFamiliesHere = fontFamiliesHere.filter((f) => f.family !== family);
+    return null;
+  }
+
+  const fontLibrary: FontLibrary = {
+    get families() {
+      return fontFamiliesHere;
+    },
+    get missing() {
+      return missingFonts;
+    },
+    upload: uploadFont,
+    rename: renameFont,
+    remove: removeFontFamily
+  };
+
+  function fontFileIn(event: DragEvent): File | null {
+    return [...(event.dataTransfer?.files ?? [])].find((f) => FONT_FILE.test(f.name)) ?? null;
+  }
+
+  function dropFontFile(event: DragEvent) {
+    const file = fontFileIn(event);
+    if (!file) {
+      return;
+    }
+    event.preventDefault();
+    void dropFont(file);
   }
 
   async function moveOut(out: ElementOut, phase: DragPhase) {
@@ -1921,7 +1991,7 @@
 <svelte:head>{#if rules.ownsTitle}<title>{data.node.name ?? 'Frame'} · Frame editor</title>{/if}</svelte:head>
 <svelte:window bind:innerWidth={width} bind:innerHeight={viewportH} onkeydown={onKey} onpointerdown={pressDown} onpointerup={closePopovers} />
 
-<div class="editor" bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} data-sheet={sheet === Sheet.None ? undefined : detent} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
+<div class="editor" ondragover={(e) => e.dataTransfer?.types.includes('Files') && e.preventDefault()} ondrop={dropFontFile} bind:clientWidth={hostWidth} data-testid="motion-editor" data-mount={mount} {...{ [KEY_REGION_ATTR]: Region.Editor }} data-mode={mode} data-viewport={viewport} data-transport={transport} data-dragging={sheetDrag ? '' : undefined} data-sheet={sheet === Sheet.None ? undefined : detent} style={`--sheet-h: ${sheetPx}px; --sheet-floor: ${floorPx}px;`}>
   <header class="bar" class:in-canvas-bar={inCanvasBar} data-testid="editor-bar" use:anchoredTo={barHost} use:claimsWidth={barHost}>
     <div class="group lead" {...dockOf(Part.Bar)}>
       {#if menu === MenuPlace.Drawer}<IconButton action={Action.Menu} aria-expanded={menuOpen} aria-haspopup="dialog" data-testid="menu-open" onclick={() => (menuOpen = true)} />{/if}
@@ -2174,7 +2244,7 @@
         {#snippet partLead()}{#if view === PropertiesView.Part && selectedPart && selected}<PosterPartPanel {doc} clip={selected} part={selectedPart} {assets} upload={uploadMedia} tokens={data.tokens} onchange={edit} />{/if}{/snippet}
         {@const shownPart = view === PropertiesView.Part && selectedPart ? partView(doc, selected, selectedPart) : null}
         {#snippet partFill()}{#if shownPart?.fills && selectedPart && selected}<div data-testid="part-fill"><FillStack fills={shownPart.fills} {assets} upload={uploadMedia} tokens={data.tokens} onchange={(fills, summary) => commitPartFills(selected, selectedPart!, fills, summary)} /></div>{/if}{/snippet}
-        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} onuploadfont={uploadFont} onopen={enterComp} />
+        <MotionInspector lead={partLead} {doc} mode={editMode} {analyses} clip={selected} focus={shownPart?.focus ?? null} shared={shownPart?.shared ?? []} sharedWith={shownPart?.sharedWith ?? 0} partFill={shownPart?.fills ? partFill : null} tokens={data.tokens} {assets} upload={uploadMedia} {frame} previousSource={(name) => previousSource(history, name)} composeHref={composeEditorPath({ projectId: data.projectId, nodeId: data.node.id })} bind:tab={inspectorTab} onchange={edit} fonts={fontLibrary} onopen={enterComp} />
         {#if typeof selected.props.x === 'number' && !selected.parent}<ConstraintsSection {doc} clip={selected} onchange={apply} />{/if}
         {#if selected.component === 'Device3D'}<DevicePresets {doc} clip={selected} onchange={edit} />{/if}
         {#if selected.component === 'Video'}<TimeRemap {doc} clip={selected} {frame} onchange={edit} />{/if}
@@ -2256,6 +2326,7 @@
         {/if}
         <IconButton action={Action.Snap} size={14} caption={Caption.Wide} pressed={snap === Snap.On} onclick={() => (snap = snap === Snap.On ? Snap.Off : Snap.On)} />
         {#if notice}<span class="notice" role="status">{notice}</span>{/if}
+        {#if missingFonts.length}<span class="notice" role="status" data-testid="fonts-missing">Missing font{missingFonts.length > 1 ? 's' : ''}: {missingFonts.join(', ')}. A fallback is showing.</span>{/if}
         <span class="spacer"></span>
         <div class="popover-anchor">
           <IconButton action={Action.More} size={14} aria-expanded={toolsOpen} data-testid="timeline-more" onclick={() => (toolsOpen = !toolsOpen)} />

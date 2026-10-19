@@ -159,6 +159,8 @@
     type WiredListSource
   } from '$lib/canvas/list-node';
   import { verdictForUpload, canvasUploadPrefix } from '$lib/canvas/upload-kind';
+  import { FONT_FILE } from '$lib/motion/fonts/library';
+  import { orgFontPrefix } from '$lib/motion/fonts/upload-path';
   import { isUploadedNodeRow, uploadedNodeOf } from '$lib/canvas/uploaded-node';
   import { genNodeSize, startRun, unlockRun, type GenNode as GenNodeState, type GenMedium, type ModelChoice } from '$lib/canvas/gen-node';
   import type { GenPropertyType } from '$lib/canvas/common-properties';
@@ -1166,6 +1168,7 @@
   }
 
   let failed = $state<string | null>(null);
+  let fontAdded = $state<string | null>(null);
   let failedIsCreditsExhausted = $state(false);
   let peers = $state<PresencePeer[]>([]);
   let topPeers = $state<HTMLElement | null>(null);
@@ -1725,7 +1728,25 @@
    */
   const supabase = createSupabaseBrowserClient();
 
+  async function uploadFontFile(file: File) {
+    const path = `${orgFontPrefix(data.orgId)}${crypto.randomUUID()}-${file.name.replace(/[^\w.-]+/g, '_')}`;
+    const up = await supabase.storage.from('canvas-assets').upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+    if (up.error) {
+      failed = up.error.message;
+      return;
+    }
+    const result = await post('uploadFont', { path });
+    const font = result?.font as { family?: string } | undefined;
+    if (font?.family) {
+      fontAdded = `${font.family} is in the uploaded fonts: pick it in any text's font menu.`;
+    }
+  }
+
   async function upload(file: File) {
+    if (FONT_FILE.test(file.name)) {
+      await uploadFontFile(file);
+      return;
+    }
     const verdict = verdictForUpload(file.type, file.name, file.size);
     if (!verdict.ok) {
       failed = verdict.why;
@@ -3323,6 +3344,9 @@
         <a href={BILLING_PATH}>Buy credits</a>
       {/if}
     </p>
+  {/if}
+  {#if fontAdded}
+    <p class="warning" role="status" data-testid="font-added">{fontAdded}</p>
   {/if}
   {#if reloadOffered}
     <p class="warning reload" role="status">

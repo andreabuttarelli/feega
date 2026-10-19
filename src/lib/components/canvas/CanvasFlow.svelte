@@ -813,9 +813,11 @@
    * Qualcosa lasciato cadere sulla tela. `ondragover` con `preventDefault` non è cerimonia: senza,
    * il browser rifiuta il rilascio e il trascinamento finisce in un nulla di fatto.
    */
+  const OS_FILES = 'Files';
+
   function onDragOver(e: DragEvent) {
     const types = e.dataTransfer?.types ?? [];
-    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT].some((type) => types.includes(type))) return;
+    if (![CANVAS_DRAG_FILLED_NODE, CANVAS_DRAG_MEDIUM, CANVAS_DRAG_OUTPUT, OS_FILES].some((type) => types.includes(type))) return;
     e.preventDefault();
     e.dataTransfer!.dropEffect = 'copy';
   }
@@ -828,6 +830,12 @@
    */
   function onDrop(e: DragEvent) {
     if (!toFlow) return;
+    const files = [...(e.dataTransfer?.files ?? [])];
+    if (files.length && onUpload) {
+      e.preventDefault();
+      files.forEach((file) => onUpload(file));
+      return;
+    }
 
     const output = e.dataTransfer?.getData(CANVAS_DRAG_OUTPUT);
     if (output) {

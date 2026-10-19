@@ -8,6 +8,7 @@ import { writeComponent } from '../custom/ops';
 import { extractParams } from '../custom/params';
 import { BuiltinFont, fontStack, fontsFrom, googleFontsUrl, searchFonts, usedFaces, type CatalogueFont } from './model';
 import { registerUpload, removeFont, setFont } from './ops';
+import { familyFromFileName, fontFamilies, fontFileOf, missingUploads } from './library';
 
 const FACE_JS = "param('face', 'sans', { type: 'font' });";
 
@@ -90,7 +91,7 @@ describe('fonts', () => {
   });
 
   it('an uploaded font is a @font-face on its asset, allowed by the policy, and can be removed only when unused', () => {
-    let doc = ok(registerUpload(titled(), { assetId: 'f1', family: 'Acme Grotesk', weights: [400], italic: false }));
+    let doc = ok(registerUpload(titled(), { family: 'Acme Grotesk', variants: [{ assetId: 'f1', weight: 400, italic: false }] }));
     doc = ok(setFont(doc, 'title', { family: 'Acme Grotesk', weight: 400 }, CATALOGUE));
     const html = compose(doc, { f1: 'https://cdn.example.com/acme.woff2' });
 
@@ -98,6 +99,43 @@ describe('fonts', () => {
     expect(html).toContain("@font-face{font-family:'Acme Grotesk';src:url(\"https://cdn.example.com/acme.woff2\");font-weight:400;font-style:normal;font-display:block}");
     expect(cspPolicy({ scripts: [], assetUrls: ['https://cdn.example.com/acme.woff2'] })).toMatch(/font-src [^;]*https:\/\/cdn\.example\.com/);
     expect(removeFont(doc, 'Acme Grotesk')).toMatchObject({ ok: false, error: expect.stringContaining('title') });
+  });
+
+  it('an uploaded family loads each file as its own weight and style, and re-registering it updates the variants', () => {
+    const bold = { assetId: 'b', weight: 700, italic: false };
+    let doc = ok(registerUpload(titled(), { family: 'Acme Grotesk', variants: [{ assetId: 'r', weight: 400, italic: false }] }));
+    doc = ok(registerUpload(doc, { family: 'Acme Grotesk', variants: [{ assetId: 'r', weight: 400, italic: false }, bold, { assetId: 'bi', weight: 700, italic: true }] }));
+    doc = ok(setFont(doc, 'title', { family: 'Acme Grotesk', weight: 700, italic: true }, CATALOGUE));
+    const html = compose(doc, { r: 'https://x/r.woff2', b: 'https://x/b.woff2', bi: 'https://x/bi.woff2' });
+
+    expect(doc.fonts).toHaveLength(1);
+    expect(doc.fonts[0]).toMatchObject({ weights: [400, 700], italic: true });
+    expect(html).toContain('src:url("https://x/bi.woff2");font-weight:700;font-style:italic');
+    expect(html).toContain('src:url("https://x/b.woff2");font-weight:700;font-style:normal');
+    expect(registerUpload(doc, { family: 'Inter', variants: [bold] })).toMatchObject({ ok: true });
+    expect(registerUpload(ok(setFont(doc, 'title', { family: 'Inter' }, CATALOGUE)), { family: 'Inter', variants: [bold] })).toMatchObject({ ok: false });
+  });
+
+  it('a deleted upload is reported missing, so the editor can warn instead of silently falling back', () => {
+    const doc = ok(registerUpload(titled(), { family: 'Acme Grotesk', variants: [{ assetId: 'gone', weight: 400, italic: false }] }));
+
+    expect(missingUploads(doc.fonts, {})).toEqual(['Acme Grotesk']);
+    expect(missingUploads(doc.fonts, { gone: 'https://x/a.woff2' })).toEqual([]);
+    expect(compose(doc, {})).not.toContain("@font-face{font-family:'Acme Grotesk'");
+  });
+
+  it('groups the org font files by family, reading the family out of the asset or its file name', () => {
+    const files = [
+      fontFileOf({ id: 'b', url: 'o/fonts/x.woff2', content: JSON.stringify({ family: 'Acme', weight: 700, italic: false }) }),
+      fontFileOf({ id: 'r', url: 'o/fonts/y.woff2', content: JSON.stringify({ family: 'Acme', weight: 400, italic: false }) }),
+      fontFileOf({ id: 'old', url: 'o/p/3f2504e0-4f89-11d3-9a0c-0305e82c3301-Brand_Serif.otf', content: null })
+    ];
+
+    expect(fontFamilies(files)).toEqual([
+      { family: 'Acme', variants: [{ assetId: 'r', weight: 400, italic: false }, { assetId: 'b', weight: 700, italic: false }] },
+      { family: 'Brand Serif', variants: [{ assetId: 'old', weight: 400, italic: false }] }
+    ]);
+    expect(familyFromFileName('!!!.ttf')).toBe('Uploaded font');
   });
 
   it('custom component font params take any registered family and reach the code as a CSS stack', () => {

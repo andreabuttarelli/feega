@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { chatHandoff } from '$lib/server/canvas/chat-handoff';
 import { MEDIA_UUID_RE } from '$lib/media-url';
 import { importCanvasLink, registerCanvasUpload, registerUploadedAsset, UploadError } from '$lib/server/canvas/upload';
+import { saveFontUpload } from '$lib/server/motion/font-upload';
 import { isOutputHandle } from '$lib/canvas/select-outputs';
 import { error, fail, redirect } from '@sveltejs/kit';
 import type { Actions, ServerLoadEvent } from '@sveltejs/kit';
@@ -520,6 +521,11 @@ export const actions: Actions<CanvasParams> = {
       if (cause instanceof UploadError) { return fail(cause.status, { error: cause.message }); }
       throw cause;
     }
+  },
+  uploadFont: async ({ request, params, locals }) => {
+    const scope = await scopeFor(locals, params.canvasId);
+    const saved = await saveFontUpload(scope.db, { orgId: scope.orgId, path: String((await request.formData()).get('path') ?? '') });
+    return saved.ok ? { font: saved.font } : fail(400, { error: saved.error });
   },
   importLink: async ({ request, params, locals }) => {
     const scope = await scopeFor(locals, params.canvasId);

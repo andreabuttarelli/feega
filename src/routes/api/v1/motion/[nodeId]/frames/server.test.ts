@@ -24,7 +24,8 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
       : null
 }));
 vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async () => ({ id: 'p-1', brandId: null, mode: 'standard' }) }));
-vi.mock('$lib/server/repos/assets', () => ({ listProjectAssets: async () => [] }));
+vi.mock('$lib/server/repos/assets', () => ({
+  listFontAssets: async () => [], listProjectAssets: async () => [] }));
 vi.mock('$lib/server/canvas/sign-media', () => ({ createAssetSigningDb: () => ({}), signAssetPaths: async () => new Map() }));
 vi.mock('$lib/server/repos/motion-revisions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('$lib/server/repos/motion-revisions')>()),

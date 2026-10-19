@@ -7,10 +7,10 @@ import { MAX_ATTACHMENTS } from '../../lib/attachments.ts';
 const MAX_FRAMES = 6;
 const MAX_FRAME_WIDTH = 960;
 
-const EDITOR_READS = 'editor_session {briefIds?} (everything the editor page loads: head, assets, tokens, templates, render state, gallery), read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render)';
+const EDITOR_READS = 'editor_session {briefIds?} (everything the editor page loads: head, assets, tokens, templates, render state, gallery), read_head {} (version, full doc, actorKind), render_status {} (latest server render), batch_status {} (latest batch render), list_fonts {} (the org's uploaded font families with their files)';
 const EDITOR_WRITES =
   'save_doc {version,doc,summary?} (whole doc; 409 answers the head), apply_ops {version,ops,summary?} (doc ops, rebased on newer edits), ' +
-  'record_export {path,width,height,seconds} (an mp4 already in storage becomes the render asset), upload_font {path} (a font file already in storage), analyze_sounds {assetIds} (tempo, beats, speech), ' +
+  'record_export {path,width,height,seconds} (an mp4 already in storage becomes the render asset), upload_font {path} (a TTF/OTF/WOFF/WOFF2 already under <orgId>/fonts/ in canvas-assets; joins the org library), rename_font {family,to}, delete_font {family}, analyze_sounds {assetIds} (tempo, beats, speech), ' +
   'template_sounds {doc,clipId} (lays the template clip SFX; answers the doc), save_template {doc,name,description,compId?,posterFrame?}. ' +
   'Spends credits: generate_sound {sound:voice|music,text,seconds?} (answers assetId, url), render_batch {version,rows:[{name,values}],settings?} (one server render per row of template field values; poll batch_status)';
 

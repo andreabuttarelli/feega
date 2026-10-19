@@ -101,6 +101,7 @@ vi.mock('$lib/server/repos/canvas', async (importOriginal) => ({
 }));
 vi.mock('$lib/server/repos/projects', () => ({ findProjectById: async (_db: unknown, input: { orgId: string }) => (input.orgId === ORG ? { id: PROJECT, brandId: null, mode: 'standard' } : null) }));
 vi.mock('$lib/server/repos/assets', () => ({
+  listFontAssets: async () => [],
   listProjectAssets: async () => [{ id: 'asset-1', projectId: PROJECT, type: 'image', url: 'org/p/a.png', content: null, mimeType: 'image/png', bytes: 1, width: 1, height: 1, durationS: null, source: 'generated', sourceNodeId: IMAGE, uncensored: false, createdAt: '2026-10-08T00:00:00Z' }],
   findAssets: async () => new Map()
 }));
